@@ -1,0 +1,36 @@
+{
+  "schema": "reality-source-migration-manifest-v0.1",
+  "status": "PRE_CONTINUITY",
+  "source": {
+    "system": "Base44",
+    "app_id": "6a7bd610756b32bc21c39ad0",
+    "canonical": true
+  },
+  "destination": {
+    "provider": "GitHub",
+    "repository": "maloney2323/Reality",
+    "branch": "main"
+  },
+  "capture": {
+    "captured_at": "2026-09-26T12:45:01.677Z",
+    "top_level": {
+      "files": 12,
+      "directories": 15
+    },
+    "recursive_inventory": {
+      "files": 2415,
+      "directories": 457
+    }
+  },
+  "gates": {
+    "source_capture": "IN_PROGRESS",
+    "complete_source_manifest": "NOT_YET_VERIFIED",
+    "github_commit": "NOT_YET_VERIFIED",
+    "vercel_build": "NOT_YET_VERIFIED",
+    "deployment": "NOT_YET_VERIFIED",
+    "live_runtime": "NOT_YET_VERIFIED",
+    "lineage_receipt": "NOT_YET_VERIFIED",
+    "continuity_claim": "PROHIBITED_UNTIL_ALL_GATES_PASS"
+  },
+  "rule": "No migration, source-of-truth, or continuity claim is valid until the evidence chain independently verifies the repository artifact, build, deployment, live runtime, and lineage receipt."
+}
