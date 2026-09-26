@@ -1,0 +1,174 @@
+{
+  "name": "WorkSessionTelemetryPacket",
+  "type": "object",
+  "title": "Work Session Telemetry Packet",
+  "description": "Append-only record of one bounded local Work observer packet after every accepted signal has crossed Reality's authenticated Observation Boundary and the real Fragmented Signal Cleaner has canonicalized it. The packet is lineage to a frozen Work Intent Anchor only. It does not establish Work relevance, objective workflow occurrence, completion, recurrence, productivity, focus, Attention Protected, Net Labor Returned, or action authority.",
+  "properties": {
+    "packet_id": {
+      "type": "string"
+    },
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "work-session-telemetry-v0.1"
+      ]
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "world_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "anchor_id": {
+      "type": "string"
+    },
+    "contract_digest": {
+      "type": "string"
+    },
+    "observer_version": {
+      "type": "string",
+      "enum": [
+        "reality-work-observer-v0.1"
+      ]
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "raw_signal_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "canonical_signal_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exact_duplicate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unresolved_conflict_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observed_order_differs_from_receipt_order": {
+      "type": "boolean"
+    },
+    "missing_observed_time_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "interaction_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "observed_app_classes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "admission_observation_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "canonical_packet": {
+      "type": "object"
+    },
+    "authority": {
+      "type": "string",
+      "enum": [
+        "WORK_SESSION_TELEMETRY_CANONICALIZATION_ONLY"
+      ]
+    },
+    "work_relevance_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "objective_workflow_occurrence_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "completion_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "recurrence_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "attention_protected_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "net_labor_return_established": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "action_authorized": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    }
+  },
+  "required": [
+    "packet_id",
+    "record_version",
+    "user_id",
+    "world_id",
+    "session_id",
+    "anchor_id",
+    "contract_digest",
+    "observer_version",
+    "received_at",
+    "raw_signal_count",
+    "canonical_signal_count",
+    "exact_duplicate_count",
+    "unresolved_conflict_group_count",
+    "observed_order_differs_from_receipt_order",
+    "missing_observed_time_count",
+    "interaction_labels",
+    "observed_app_classes",
+    "admission_observation_refs",
+    "canonical_packet",
+    "authority",
+    "work_relevance_established",
+    "objective_workflow_occurrence_established",
+    "completion_established",
+    "recurrence_established",
+    "attention_protected_established",
+    "net_labor_return_established",
+    "action_authorized"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    }
+  }
+}
