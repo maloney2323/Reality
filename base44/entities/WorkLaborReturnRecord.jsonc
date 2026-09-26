@@ -1,0 +1,106 @@
+{
+  "name": "WorkLaborReturnRecord",
+  "type": "object",
+  "title": "Work Labor Returned Record",
+  "description": "Append-only evidence-backed measurement record for labor actually removed, shortened, or avoided inside one person-owned Work World. Records are never created from onboarding claims or hypothetical savings. Every measured value must be tied to evidence_refs and a measurement_method. Until such a record exists, the Work UI must say there is not enough evidence to measure labor returned.",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "world_id": {
+      "type": "string"
+    },
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "work-labor-return-v0.1"
+      ]
+    },
+    "measurement_status": {
+      "type": "string",
+      "enum": [
+        "ESTIMATED_FROM_EVIDENCE",
+        "SUPPORTED"
+      ]
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "minutes_returned": {
+      "type": "number",
+      "minimum": 0
+    },
+    "interruptions_avoided": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "manual_checks_avoided": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "routine_items_handled": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "measurement_method": {
+      "type": "string"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "user_id",
+    "world_id",
+    "record_version",
+    "measurement_status",
+    "period_start",
+    "period_end",
+    "minutes_returned",
+    "interruptions_avoided",
+    "manual_checks_avoided",
+    "routine_items_handled",
+    "measurement_method",
+    "evidence_refs",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    }
+  }
+}
