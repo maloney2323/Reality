@@ -1,0 +1,65 @@
+{
+  "name": "PersonalMessage",
+  "type": "object",
+  "title": "Personal Reality Message",
+  "description": "Application-level conversation history for Personal Reality. User messages may link to immutable Reality observations; assistant messages are retained as untrusted conversation history and are never independent evidence.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Authenticated principal that owns this Personal Reality message."
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "Stable session identifier inside a persistent Thought."
+    },
+    "thought_id": {
+      "type": "string",
+      "description": "Persistent Thought identity. Multiple conversation/session ids may belong to the same Thought. Optional on legacy messages created before Thoughts existed."
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "description": "Exact displayed message text."
+    },
+    "observation_id": {
+      "type": "string",
+      "description": "Immutable Reality Observation id for user messages. Assistant messages intentionally do not receive evidentiary authority from this field."
+    },
+    "reality_summary": {
+      "type": "object",
+      "description": "User-visible grounding/assessment summary emitted by the bounded Personal Reality response compiler."
+    }
+  },
+  "required": [
+    "user_id",
+    "conversation_id",
+    "role",
+    "text"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    }
+  }
+}
