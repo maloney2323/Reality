@@ -1,0 +1,169 @@
+{
+  "name": "RealityAccessCapability",
+  "type": "object",
+  "title": "Reality Access Capability",
+  "description": "A signed, single-use, time-bounded JIT access capability issued by the Reality capability broker. Binds an exact (agent, mission, target_resource, audience, operation, scope, evidence) tuple and is consumed atomically by the enforcement proxy. The capability is self-signing under Ed25519; the proxy verifies with Reality's public key. Plaintext bearer material is never persisted \u2014 only the nonce hash and signed payload metadata. Production enforcement requires the external enforcement proxy, atomic consumption store, and resource-side lock to actually be deployed; the broker reports enforcement_status honestly so capability validation passing never implies enforcement is complete.",
+  "properties": {
+    "cap_id": {
+      "type": "string",
+      "description": "Public unguessable capability identifier."
+    },
+    "envelope_json": {
+      "type": "string",
+      "description": "Canonical authorization envelope whose digest is action_digest."
+    },
+    "mission_id": {
+      "type": "string",
+      "description": "Mission this capability is bound to."
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Agent identity this capability was issued to."
+    },
+    "agent_pubkey_jwk": {
+      "type": "object",
+      "description": "Ephemeral Ed25519 public JWK proving agent possession at execution time. Private key material is forbidden."
+    },
+    "evidence_state_hash": {
+      "type": "string",
+      "description": "SHA-256 hash of the evidence state the capability was authorized against."
+    },
+    "action_digest": {
+      "type": "string",
+      "description": "SHA-256 of the canonical authorization envelope."
+    },
+    "evidence_digest": {
+      "type": "string",
+      "description": "Digest of the ordered warrant evidence set."
+    },
+    "target_resource": {
+      "type": "string",
+      "description": "First-class resource identifier the capability is scoped to. Not derived solely from a URL."
+    },
+    "audience": {
+      "type": "string",
+      "description": "Enforcement proxy endpoint this capability is valid for. Prevents a capability issued for one boundary from being replayed at another."
+    },
+    "permitted_operation": {
+      "type": "string",
+      "enum": [
+        "DISCOVER",
+        "AUTHENTICATE",
+        "ACCESS",
+        "READ",
+        "RETRIEVE",
+        "EXPORT",
+        "TRANSMIT",
+        "MODIFY",
+        "EXECUTE"
+      ],
+      "description": "Single operation the capability permits on the target resource."
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Narrow scope bounds (e.g. sub-paths, fields, record ids)."
+    },
+    "nonce_hash": {
+      "type": "string",
+      "description": "SHA-256 of the single-use nonce. The plaintext nonce lives only inside the signed capability presented by the agent; the broker never stores it."
+    },
+    "policy_version": {
+      "type": "string",
+      "description": "Access policy version under which the capability was issued."
+    },
+    "policy_mode": {
+      "type": "string",
+      "enum": [
+        "development_permissive",
+        "production_policy_gated"
+      ],
+      "description": "Policy evaluation mode. development_permissive issues for any well-formed authenticated request; production_policy_gated requires real authorization evidence."
+    },
+    "enforcement_status": {
+      "type": "string",
+      "enum": [
+        "DEVELOPMENT_ENFORCEMENT",
+        "PRODUCTION_ENFORCEMENT"
+      ],
+      "description": "Honest enforcement state. DEVELOPMENT_ENFORCEMENT until the external proxy, atomic store, and resource-side lock are actually deployed and verified by bypass/concurrency tests."
+    },
+    "key_id": {
+      "type": "string",
+      "description": "Signing key identifier."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "issued",
+        "consumed",
+        "expired",
+        "revoked"
+      ],
+      "description": "Capability lifecycle state as known to the broker. The authoritative consumption state lives in the proxy's atomic store."
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload_json": {
+      "type": "string",
+      "description": "Canonical capability payload that was signed."
+    },
+    "signature": {
+      "type": "string",
+      "description": "Ed25519 signature over the canonical capability payload."
+    }
+  },
+  "required": [
+    "cap_id",
+    "envelope_json",
+    "mission_id",
+    "agent_id",
+    "agent_pubkey_jwk",
+    "evidence_state_hash",
+    "action_digest",
+    "evidence_digest",
+    "target_resource",
+    "audience",
+    "permitted_operation",
+    "nonce_hash",
+    "policy_version",
+    "policy_mode",
+    "enforcement_status",
+    "key_id",
+    "status",
+    "issued_at",
+    "expires_at",
+    "payload_json",
+    "signature"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
