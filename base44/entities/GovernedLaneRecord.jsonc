@@ -1,0 +1,191 @@
+{
+  "name": "GovernedLaneRecord",
+  "type": "object",
+  "title": "Reality Governed Lane Record",
+  "description": "A governed, append-only, non-authoritative record of one read-only analysis lane (Observer, Verifier, or Adversary) from the Multi-Lane Fan-Out v0.1. Each lane receives the identical canonical signal packet and produces an independent analysis. Lane outputs are preserved without reconciliation, majority voting, or truth/action authority. A lane record is never truth, never authorization, never execution, and never permission to mutate. All three lane records in one fan-out run share the same fanout_run_id, canonical_signal_id, packet_id, and input_packet_hash, proving they analyzed the identical input.",
+  "properties": {
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "reality-governed-lane-record-v0.1"
+      ]
+    },
+    "user_id": {
+      "type": "string",
+      "description": "Authenticated principal that owns this lane record."
+    },
+    "fanout_run_id": {
+      "type": "string",
+      "description": "Stable id for one fan-out run. All three lane records in one run share this id."
+    },
+    "lane_name": {
+      "type": "string",
+      "enum": [
+        "OBSERVER",
+        "VERIFIER",
+        "ADVERSARY"
+      ],
+      "description": "Which analysis lane produced this record."
+    },
+    "canonical_signal_id": {
+      "type": "string",
+      "description": "The signal_id of the admitted observation from the canonical packet. Identical across all three lanes in one run."
+    },
+    "packet_id": {
+      "type": "string",
+      "description": "The canonical packet_id. Identical across all three lanes in one run."
+    },
+    "input_packet_ref": {
+      "type": "string",
+      "description": "Reference to the canonical input packet."
+    },
+    "input_packet_hash": {
+      "type": "string",
+      "description": "SHA-256 of the serialized canonical packet. Proves all three lanes analyzed identical input."
+    },
+    "lane_output": {
+      "type": "string",
+      "description": "The lane's analysis output. Model-generated; never independent evidence."
+    },
+    "lane_evidence": {
+      "type": "object",
+      "description": "Structured lane findings under the Reality Lane Evidence Contract. All fields are model-generated analysis, never independent evidence.",
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supported_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unsupported_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contradictions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authority_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verification_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "analysis": {
+          "type": "string"
+        }
+      }
+    },
+    "governance_status": {
+      "type": "string",
+      "enum": [
+        "COMPLETED",
+        "INSUFFICIENT_EVIDENCE",
+        "INSUFFICIENT_VISIBILITY",
+        "FAILED_CLOSED"
+      ],
+      "description": "COMPLETED = lane produced analysis. INSUFFICIENT_EVIDENCE = lane preserved missing evidence. INSUFFICIENT_VISIBILITY = lane preserved insufficient system visibility. FAILED_CLOSED = lane invocation failed and the failure was recorded honestly rather than bypassed."
+    },
+    "unresolved_contradictions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Contradictions the lane surfaced. Preserved, never resolved by majority vote."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "References to the evidence the lane analyzed. Always the canonical packet; never the lane's own model-generated output."
+    },
+    "truth_authority": {
+      "type": "boolean",
+      "enum": [
+        false
+      ],
+      "description": "Always false. A lane analysis is not truth."
+    },
+    "execution_authority": {
+      "type": "boolean",
+      "enum": [
+        false
+      ],
+      "description": "Always false. A lane analysis grants no action or execution authority."
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "record_version",
+    "user_id",
+    "fanout_run_id",
+    "lane_name",
+    "canonical_signal_id",
+    "packet_id",
+    "input_packet_ref",
+    "input_packet_hash",
+    "lane_output",
+    "lane_evidence",
+    "governance_status",
+    "unresolved_contradictions",
+    "evidence_refs",
+    "truth_authority",
+    "execution_authority",
+    "produced_at"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    }
+  }
+}
