@@ -1,0 +1,104 @@
+{
+  "name": "RealityExecutionReceipt",
+  "type": "object",
+  "title": "Reality Execution Receipt",
+  "description": "Append-only development receipt emitted by the execution boundary after successful atomic capability consumption and protected-resource execution. The receipt is cryptographically bound to the capability, request, evidence state, resource, and outcome.",
+  "properties": {
+    "receipt_id": {
+      "type": "string"
+    },
+    "cap_id": {
+      "type": "string"
+    },
+    "action_digest": {
+      "type": "string"
+    },
+    "evidence_state_hash": {
+      "type": "string"
+    },
+    "target_resource": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string"
+    },
+    "permitted_operation": {
+      "type": "string"
+    },
+    "request_body_hash": {
+      "type": "string"
+    },
+    "nonce_hash": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "EXECUTED",
+        "BLOCKED"
+      ]
+    },
+    "reason_code": {
+      "type": "string"
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload_json": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "key_id": {
+      "type": "string"
+    },
+    "receipt_status": {
+      "type": "string",
+      "enum": [
+        "ATTESTED"
+      ]
+    }
+  },
+  "required": [
+    "receipt_id",
+    "cap_id",
+    "action_digest",
+    "evidence_state_hash",
+    "target_resource",
+    "audience",
+    "permitted_operation",
+    "request_body_hash",
+    "nonce_hash",
+    "outcome",
+    "reason_code",
+    "executed_at",
+    "payload_json",
+    "signature",
+    "key_id",
+    "receipt_status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
