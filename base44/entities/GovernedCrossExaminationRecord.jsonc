@@ -1,0 +1,130 @@
+{
+  "type": "object",
+  "title": "Reality Governed Cross Examination Record",
+  "description": "Append-only non-authoritative record of a bounded cross-examination/rebuttal round. Lane outputs are model-generated analysis, never independent evidence.",
+  "properties": {
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "reality-governed-cross-exam-record-v0.1"
+      ]
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "fanout_run_id": {
+      "type": "string"
+    },
+    "round_id": {
+      "type": "string"
+    },
+    "round_number": {
+      "type": "integer"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "CHALLENGE",
+        "REBUTTAL",
+        "STOP"
+      ]
+    },
+    "lane_name": {
+      "type": "string",
+      "enum": [
+        "OBSERVER",
+        "VERIFIER",
+        "ADVERSARY"
+      ]
+    },
+    "input_packet_hash": {
+      "type": "string"
+    },
+    "target_lane_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_context_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lane_output": {
+      "type": "string"
+    },
+    "lane_evidence": {
+      "type": "object"
+    },
+    "governance_status": {
+      "type": "string",
+      "enum": [
+        "COMPLETED",
+        "INSUFFICIENT_EVIDENCE",
+        "INSUFFICIENT_VISIBILITY",
+        "FAILED_CLOSED"
+      ]
+    },
+    "material_state_changed": {
+      "type": "boolean"
+    },
+    "truth_authority": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "execution_authority": {
+      "type": "boolean",
+      "enum": [
+        false
+      ]
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "record_version",
+    "user_id",
+    "fanout_run_id",
+    "round_id",
+    "round_number",
+    "phase",
+    "lane_name",
+    "input_packet_hash",
+    "target_lane_names",
+    "model_context_refs",
+    "lane_output",
+    "lane_evidence",
+    "governance_status",
+    "material_state_changed",
+    "truth_authority",
+    "execution_authority",
+    "produced_at"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "personal_reality_service_only"
+      }
+    }
+  },
+  "name": "GovernedCrossExaminationRecord"
+}
