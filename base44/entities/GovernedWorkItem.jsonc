@@ -1,0 +1,187 @@
+{
+  "name": "GovernedWorkItem",
+  "type": "object",
+  "title": "Governed Work Item",
+  "description": "Append-oriented, World-scoped work item binding a strategic decision to exact authority, scope, stop conditions, and verification requirements. Approval is not execution.",
+  "properties": {
+    "record_id": {
+      "type": "string"
+    },
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "governed-work-item-v0.1"
+      ]
+    },
+    "work_item_id": {
+      "type": "string"
+    },
+    "sequence_number": {
+      "type": "number"
+    },
+    "decision_id": {
+      "type": "string"
+    },
+    "objective_id": {
+      "type": "string"
+    },
+    "constraint_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "world_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object"
+    },
+    "authorized_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prohibited_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authority_ref": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PROPOSED",
+        "AUTHORIZED_NOT_STARTED",
+        "IN_PROGRESS",
+        "PAUSED",
+        "COMPLETED_PENDING_VERIFICATION",
+        "VERIFIED_COMPLETE",
+        "STOPPED",
+        "SUPERSEDED"
+      ]
+    },
+    "continue_if": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pause_if": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stop_if": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "review_at": {
+      "type": "string"
+    },
+    "verification_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected_outputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected_operational_outcomes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_record_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "uncertainty": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundaries": {
+      "type": "object"
+    },
+    "supersedes_record_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "record_id",
+    "record_version",
+    "work_item_id",
+    "sequence_number",
+    "decision_id",
+    "objective_id",
+    "constraint_id",
+    "user_id",
+    "world_id",
+    "title",
+    "scope",
+    "authorized_actions",
+    "prohibited_actions",
+    "authority_ref",
+    "status",
+    "continue_if",
+    "pause_if",
+    "stop_if",
+    "review_at",
+    "verification_requirements",
+    "expected_outputs",
+    "expected_operational_outcomes",
+    "evidence_refs",
+    "source_record_refs",
+    "provenance",
+    "assumptions",
+    "uncertainty",
+    "claim_boundaries",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "data.user_id": "{{user.id}}"
+    }
+  }
+}
