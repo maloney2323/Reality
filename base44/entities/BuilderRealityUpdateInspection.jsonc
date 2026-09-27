@@ -1,0 +1,40 @@
+{
+  "name": "BuilderRealityUpdateInspection",
+  "type": "object",
+  "title": "Builder Reality Update Inspection",
+  "description": "Append-only admin-owned checkpoint of Reality's generated code-tree snapshot and bounded builder review. Structural change does not establish semantic correctness, breakage, or change safety, and the review cannot authorize code, merge, deploy, governance, Self Model promotion, or external action.",
+  "properties": {
+    "inspection_id": {"type": "string"},
+    "record_version": {"type": "string", "enum": ["builder-reality-update-inspection-v0.1"]},
+    "user_id": {"type": "string"},
+    "code_tree_hash": {"type": "string"},
+    "previous_code_tree_hash": {"type": "string"},
+    "code_index_version": {"type": "string"},
+    "indexed_file_count": {"type": "integer", "minimum": 0},
+    "file_hashes": {"type": "object"},
+    "added_paths": {"type": "array", "items": {"type": "string"}},
+    "removed_paths": {"type": "array", "items": {"type": "string"}},
+    "changed_paths": {"type": "array", "items": {"type": "string"}},
+    "direct_capability_refs": {"type": "array", "items": {"type": "string"}},
+    "downstream_capability_refs": {"type": "array", "items": {"type": "string"}},
+    "potentially_affected_files": {"type": "array", "items": {"type": "string"}},
+    "relevant_tests": {"type": "array", "items": {"type": "string"}},
+    "review_response": {"type": "string", "maxLength": 20000},
+    "review_authority": {"type": "string", "enum": ["MODEL_REVIEW_CANDIDATE_ONLY"]},
+    "semantic_change_established": {"type": "boolean", "enum": [false]},
+    "breakage_established": {"type": "boolean", "enum": [false]},
+    "change_safety_established": {"type": "boolean", "enum": [false]},
+    "code_write_authorized": {"type": "boolean", "enum": [false]},
+    "merge_authorized": {"type": "boolean", "enum": [false]},
+    "deploy_authorized": {"type": "boolean", "enum": [false]},
+    "governance_change_authorized": {"type": "boolean", "enum": [false]},
+    "self_model_promotion_authorized": {"type": "boolean", "enum": [false]},
+    "external_action_authorized": {"type": "boolean", "enum": [false]},
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "required": ["inspection_id","record_version","user_id","code_tree_hash","code_index_version","indexed_file_count","file_hashes","added_paths","removed_paths","changed_paths","direct_capability_refs","downstream_capability_refs","potentially_affected_files","relevant_tests","review_response","review_authority","semantic_change_established","breakage_established","change_safety_established","code_write_authorized","merge_authorized","deploy_authorized","governance_change_authorized","self_model_promotion_authorized","external_action_authorized","created_at"],
+  "rls": {
+    "read": {"user_condition": {"role": "admin"}},
+    "create": {"user_condition": {"role": "personal_reality_service_only"}}
+  }
+}
