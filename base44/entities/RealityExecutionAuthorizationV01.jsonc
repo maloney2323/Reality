@@ -1,0 +1,44 @@
+{
+  "name": "RealityExecutionAuthorizationV01",
+  "type": "object",
+  "title": "Reality Execution Authorization v0.1",
+  "description": "Bounded execution permission for the Universal Executor. G1 defines the contract; G3 will add trusted issuer signatures. This object never grants merge, deploy, credential-change, or destructive authority unless separately scoped.",
+  "properties": {
+    "authorization_id": { "type": "string" },
+    "issuer_id": { "type": "string" },
+    "issuer_key_id": { "type": "string" },
+    "continuity_state_id": { "type": "string" },
+    "continuity_state_digest": { "type": "string" },
+    "action_class": { "type": "string" },
+    "target_digest": { "type": "string" },
+    "candidate_digest": { "type": "string" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "nonce": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["ISSUED", "CONSUMED", "EXPIRED", "REVOKED"]
+    },
+    "signature_algorithm": { "type": "string" },
+    "signature": { "type": "string" }
+  },
+  "required": [
+    "authorization_id",
+    "issuer_id",
+    "continuity_state_id",
+    "continuity_state_digest",
+    "action_class",
+    "target_digest",
+    "candidate_digest",
+    "issued_at",
+    "expires_at",
+    "nonce",
+    "status"
+  ],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
