@@ -1,8 +1,8 @@
 // Reality Execution Claim v0.1
 //
 // G1.1 separates authorization validity from exclusive execution ownership.
-// The claim itself MUST be persisted through a storage primitive that provides
-// an atomic compare-and-set/unique-claim guarantee. This module intentionally
+// The claim MUST be persisted through a storage primitive that provides an
+// atomic compare-and-set/unique-claim guarantee. This module intentionally
 // does not pretend that a normal read followed by update is atomic.
 
 import { canonicalJson, randomToken, sha256Hex } from '../action-gate/canonical.js';
@@ -19,7 +19,27 @@ export const ExecutionClaimState = Object.freeze({
   REVOKED: 'REVOKED',
 });
 
-export function buildExecutionClaim({ authorization, execution_id, request_id, now = new Date().toISOString(), lease_ms = EXECUTION_CLAIM_LEASE_MS } = {}) {
+export async function authorizationDigest(authorization) {
+  const normalized = {
+    authorization_id: authorization.authorization_id,
+    continuity_state_id: authorization.continuity_state_id,
+    continuity_state_digest: authorization.continuity_state_digest,
+    action_class: authorization.action_class,
+    target_digest: authorization.target_digest,
+    candidate_digest: authorization.candidate_digest,
+    expires_at: authorization.expires_at,
+    nonce: authorization.nonce,
+  };
+  return sha256Hex(canonicalJson(normalized));
+}
+
+export async function buildExecutionClaim({
+  authorization,
+  execution_id,
+  request_id,
+  now = new Date().toISOString(),
+  lease_ms = EXECUTION_CLAIM_LEASE_MS,
+} = {}) {
   if (!authorization?.authorization_id) throw new Error('authorization_id is required');
   if (authorization.execution_state !== ExecutionClaimState.ISSUED) throw new Error('authorization must be ISSUED before claim');
   if (!execution_id || !request_id) throw new Error('execution_id and request_id are required');
@@ -40,38 +60,23 @@ export function buildExecutionClaim({ authorization, execution_id, request_id, n
     claim_nonce,
     claimed_at: new Date(nowMs).toISOString(),
     lease_expires_at,
-    authorization_digest: authorizationDigest(authorization),
+    authorization_digest: await authorizationDigest(authorization),
     state: ExecutionClaimState.CLAIMED,
   };
 
   return Object.freeze(claim);
 }
 
-export async function authorizationDigest(authorization) {
-  const normalized = {
-    authorization_id: authorization.authorization_id,
-    continuity_state_id: authorization.continuity_state_id,
-    continuity_state_digest: authorization.continuity_state_digest,
-    action_class: authorization.action_class,
-    target_digest: authorization.target_digest,
-    candidate_digest: authorization.candidate_digest,
-    expires_at: authorization.expires_at,
-    nonce: authorization.nonce,
-  };
-  return sha256Hex(canonicalJson(normalized));
-}
-
 export async function verifyExecutionClaim({ authorization, claim, now = new Date().toISOString() } = {}) {
   if (!authorization || !claim) return { valid: false, code: 'CLAIM_MISSING' };
   if (claim.schema_version !== EXECUTION_CLAIM_VERSION) return { valid: false, code: 'CLAIM_SCHEMA_INVALID' };
   if (claim.authorization_id !== authorization.authorization_id) return { valid: false, code: 'AUTHORIZATION_ID_MISMATCH' };
-  if (claim.execution_id === '' || claim.request_id === '' || claim.claim_nonce === '') return { valid: false, code: 'CLAIM_IDENTITY_INVALID' };
+  if (!claim.execution_id || !claim.request_id || !claim.claim_nonce) return { valid: false, code: 'CLAIM_IDENTITY_INVALID' };
   if (claim.state !== ExecutionClaimState.CLAIMED) return { valid: false, code: 'CLAIM_NOT_ACTIVE' };
   if (authorization.execution_state !== ExecutionClaimState.CLAIMED) return { valid: false, code: 'AUTHORIZATION_NOT_CLAIMED' };
   if (authorization.execution_id !== claim.execution_id) return { valid: false, code: 'EXECUTION_ID_MISMATCH' };
   if (authorization.claim_nonce !== claim.claim_nonce) return { valid: false, code: 'CLAIM_NONCE_MISMATCH' };
   if (authorization.lease_expires_at !== claim.lease_expires_at) return { valid: false, code: 'LEASE_MISMATCH' };
-  if (authorization.continuity_state_digest !== authorization.continuity_state_digest) return { valid: false, code: 'CONTINUITY_BINDING_INVALID' };
 
   const digest = await authorizationDigest(authorization);
   if (digest !== claim.authorization_digest) return { valid: false, code: 'AUTHORIZATION_DIGEST_MISMATCH' };
@@ -84,8 +89,17 @@ export async function verifyExecutionClaim({ authorization, claim, now = new Dat
   return { valid: true, code: null };
 }
 
-export function buildAtomicClaimInstruction({ authorization_id, expected_state = ExecutionClaimState.ISSUED, execution_id, request_id, claim_nonce, claimed_at, lease_expires_at } = {}) {
+export function buildAtomicClaimInstruction({
+  authorization_id,
+  expected_state = ExecutionClaimState.ISSUED,
+  execution_id,
+  request_id,
+  claim_nonce,
+  claimed_at,
+  lease_expires_at,
+} = {}) {
   if (!authorization_id || !execution_id || !request_id || !claim_nonce) throw new Error('claim instruction identity is incomplete');
+
   return Object.freeze({
     schema_version: EXECUTION_CLAIM_VERSION,
     operation: 'ATOMIC_COMPARE_AND_SET',
