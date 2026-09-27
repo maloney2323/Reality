@@ -13,7 +13,7 @@ assert.equal((await verifyOrchestrationDecision({...d1,work_unit_id:'wu:tampered
 assert.equal((await verifyOrchestrationDecision({...d1,continuity_state_id:'cs:tampered'})).failure,'DECISION_DIGEST_MISMATCH');
 
 // Gate 2: failure isolation
-assert.equal(buildOrchestrationDecision({work_unit_id:'x',workday_id:'y'}).state,'HALTED');
+assert.equal((await buildOrchestrationDecision({work_unit_id:'x',workday_id:'y'})).state,'HALTED');
 const failed=await buildOrchestrationDecision({...base,failure:'EXECUTOR_FAILED'});
 assert.equal(failed.status,'HALTED');
 assert.equal(failed.next_action,'HANDOFF_HUMAN');
