@@ -5,7 +5,7 @@ export const WORKDAY_AUTHORITY = 'GOVERNED_WORK_SESSION_COORDINATION_ONLY';
 export const WORKDAY_TARGET_MIN_HOURS = 8;
 export const WORKDAY_TARGET_MAX_HOURS = 12;
 
-export function buildRealityWorkday({ workday_id, world_id, objective, baseline_human_hours = null, created_at }) {
+export async function buildRealityWorkday({ workday_id, world_id, objective, baseline_human_hours = null, created_at }) {
   if (!workday_id || !world_id || !objective || !created_at) throw new Error('workday_id, world_id, objective, created_at required');
   return {
     schema_version: REALITY_WORKDAY_VERSION,
@@ -27,7 +27,7 @@ export function buildRealityWorkday({ workday_id, world_id, objective, baseline_
     merge_authority: false,
     deploy_authority: false,
     created_at,
-    state_digest: sha256Hex(canonicalJson({ schema_version: REALITY_WORKDAY_VERSION, workday_id, world_id, objective, baseline_human_hours, created_at }))
+    state_digest: await sha256Hex(canonicalJson({ schema_version: REALITY_WORKDAY_VERSION, workday_id, world_id, objective, baseline_human_hours, created_at }))
   };
 }
 
