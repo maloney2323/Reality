@@ -15,8 +15,8 @@ export const NEXT_ACTIONS = Object.freeze({
   CLOSE: 'CLOSE'
 });
 
-export function digestOrchestrationState(state) {
-  return sha256Hex(canonicalJson({
+export async function digestOrchestrationState(state) {
+  return await sha256Hex(canonicalJson({
     schema_version: REALITY_ORCHESTRATOR_VERSION,
     work_unit_id: state.work_unit_id,
     workday_id: state.workday_id,
@@ -28,7 +28,7 @@ export function digestOrchestrationState(state) {
   }));
 }
 
-export function buildOrchestrationDecision(input = {}) {
+export async function buildOrchestrationDecision(input = {}) {
   const {
     work_unit_id, workday_id, continuity_state_id,
     status = 'ACTIVE',
@@ -64,14 +64,14 @@ export function buildOrchestrationDecision(input = {}) {
     merge_authority: false,
     deploy_authority: false
   };
-  return { ...decision, decision_digest: digestOrchestrationState(decision) };
+  return { ...decision, decision_digest: await digestOrchestrationState(decision) };
 }
 
-export function verifyOrchestrationDecision(decision) {
+export async function verifyOrchestrationDecision(decision) {
   if (!decision || decision.schema_version !== REALITY_ORCHESTRATOR_VERSION) return { valid:false, failure:'INVALID_SCHEMA' };
   if (decision.authority !== ORCHESTRATOR_AUTHORITY) return { valid:false, failure:'INVALID_AUTHORITY' };
   if (decision.execution_authority || decision.mutation_authority || decision.merge_authority || decision.deploy_authority) return { valid:false, failure:'UNAUTHORIZED_AUTHORITY_ESCALATION' };
-  const expected = digestOrchestrationState(decision);
+  const expected = await digestOrchestrationState(decision);
   if (decision.decision_digest !== expected) return { valid:false, failure:'DECISION_DIGEST_MISMATCH' };
   return { valid:true };
 }
