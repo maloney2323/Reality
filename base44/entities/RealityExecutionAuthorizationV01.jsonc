@@ -2,7 +2,7 @@
   "name": "RealityExecutionAuthorizationV01",
   "type": "object",
   "title": "Reality Execution Authorization v0.1",
-  "description": "Bounded execution permission for the Universal Executor. G1 defines the contract; G3 will add trusted issuer signatures. This object never grants merge, deploy, credential-change, or destructive authority unless separately scoped.",
+  "description": "Bounded execution permission for the Universal Executor. G1.1 adds an explicit claim/lease state so authorization cannot be treated as a reusable token during consequential execution. This object never grants merge, deploy, credential-change, or destructive authority unless separately scoped.",
   "properties": {
     "authorization_id": { "type": "string" },
     "issuer_id": { "type": "string" },
@@ -15,6 +15,14 @@
     "issued_at": { "type": "string", "format": "date-time" },
     "expires_at": { "type": "string", "format": "date-time" },
     "nonce": { "type": "string" },
+    "execution_id": { "type": "string" },
+    "claimed_at": { "type": "string", "format": "date-time" },
+    "lease_expires_at": { "type": "string", "format": "date-time" },
+    "claim_nonce": { "type": "string" },
+    "execution_state": {
+      "type": "string",
+      "enum": ["ISSUED", "CLAIMED", "CONSUMED", "FAILED", "EXPIRED", "REVOKED"]
+    },
     "status": {
       "type": "string",
       "enum": ["ISSUED", "CONSUMED", "EXPIRED", "REVOKED"]
@@ -33,6 +41,7 @@
     "issued_at",
     "expires_at",
     "nonce",
+    "execution_state",
     "status"
   ],
   "rls": {
