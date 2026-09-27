@@ -39,7 +39,7 @@ assert.equal(manual.decision_digest,automated.decision_digest);
 
 // Continuity snapshot integrity boundary: orchestrator cannot replace ledger verification.
 const snapshot=await buildContinuitySnapshot({continuity_state_id:'cs:gate',parent_state_id:null,world_id:'world:gate',transition_type:'WORKDAY_START',transition_reason:'validation',evidence_refs:['e:1'],epistemic_state:{status:'SUPPORTED'},open_debt:[],created_at:'2026-09-27T00:00:00Z',status:'VALID'});
-assert.equal((await verifyContinuitySnapshot(snapshot)).valid,true);
-assert.equal((await verifyContinuitySnapshot({...snapshot,epistemic_state:{status:'ESTABLISHED'}})).valid,false);
+assert.equal(await verifyContinuitySnapshot(snapshot),true);
+assert.equal(await verifyContinuitySnapshot({...snapshot,epistemic_state:{status:'ESTABLISHED'}}),false);
 
 console.log('Orchestrator validation gates: 4/4 PASS');
