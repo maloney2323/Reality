@@ -1,9 +1,10 @@
 // Reality GitHub Write Gate v0.1
 // Narrow authorization boundary for branch + commit + PR only.
 // It does NOT authorize merge, deploy, governance changes, or main-branch writes.
+// G1.1 requires an exclusive execution claim before this authorization can be consumed.
 
 import { canonicalJson, randomToken, sha256Hex } from '../action-gate/canonical.js';
-import { createDevKeyProvider, KEY_ALGORITHM_ED25519, verifyEd25519Jwk } from '../action-gate/key-provider.js';
+import { createDevKeyProvider, KEY_ALGORITHM_ED25519 } from '../action-gate/key-provider.js';
 
 export const GITHUB_WRITE_GATE_VERSION = 'reality-github-write-gate-v0.1';
 export const GITHUB_WRITE_GATE_AUTHORITY = 'BOUNDED_GITHUB_BRANCH_PR_ONLY';
@@ -49,6 +50,7 @@ export function githubWriteKeyProvider(service) {
 export async function issueGithubWriteAuthorization({ service, principal, candidate, repository, baseRef, issuedAt = new Date().toISOString() }) {
   if (!principal?.id || principal.role !== 'admin') throw new Error('admin authorization required');
   if (!candidate?.id || candidate?.artifact_type !== 'CODE_PATCH_CANDIDATE') throw new Error('exact CODE_PATCH_CANDIDATE required');
+
   const data = candidate.extension_data || {};
   if (candidate.user_id !== principal.id) throw new Error('candidate owner mismatch');
   if (!Array.isArray(data.edits) || data.edits.length === 0) throw new Error('candidate contains no edits');
@@ -69,6 +71,7 @@ export async function issueGithubWriteAuthorization({ service, principal, candid
   const token_hash = await sha256Hex(permit_token);
   const issued_ms = Date.parse(issuedAt);
   if (!Number.isFinite(issued_ms)) throw new Error('issuedAt must be valid ISO-8601');
+
   const expires_at = new Date(issued_ms + 5 * 60 * 1000).toISOString();
   const payload = {
     schema: GITHUB_WRITE_GATE_VERSION,
@@ -90,8 +93,10 @@ export async function issueGithubWriteAuthorization({ service, principal, candid
     governance_change_authorized: false,
     main_write_authorized: false,
   };
+
   const provider = githubWriteKeyProvider(service);
   const signed = await provider.sign(canonicalJson(payload));
+
   const created = await service.entities.DerivedArtifact.create({
     user_id: principal.id,
     artifact_group_id: payload.permit_id,
@@ -125,6 +130,11 @@ export async function issueGithubWriteAuthorization({ service, principal, candid
       scope_digest,
       consequence: GITHUB_WRITE_CONSEQUENCE,
       status: 'ISSUED',
+      execution_state: 'ISSUED',
+      execution_id: null,
+      claimed_at: null,
+      lease_expires_at: null,
+      claim_nonce: null,
       merge_authorized: false,
       deploy_authorized: false,
       governance_change_authorized: false,
@@ -132,6 +142,7 @@ export async function issueGithubWriteAuthorization({ service, principal, candid
       live_repository_write_authorized: true,
     },
   });
+
   return {
     permit_id: payload.permit_id,
     permit_token,
@@ -140,17 +151,36 @@ export async function issueGithubWriteAuthorization({ service, principal, candid
     base_ref: baseRef,
     changed_paths: changedPaths,
     expires_at,
+    execution_state: 'ISSUED',
     merge_authorized: false,
     deploy_authorized: false,
     main_write_authorized: false,
   };
 }
 
-export async function consumeGithubWriteAuthorization({ service, authorization, permitToken, candidate, repository, baseRef, now = new Date().toISOString() }) {
+export async function consumeGithubWriteAuthorization({
+  service,
+  authorization,
+  permitToken,
+  candidate,
+  repository,
+  baseRef,
+  execution_id,
+  now = new Date().toISOString(),
+}) {
   if (!authorization || authorization.artifact_type !== 'CODE_WRITE_AUTHORIZATION') throw new Error('authorization artifact required');
   if (authorization.status !== 'ACTIVE') throw new Error('authorization is not active');
-  if (authorization.user_id !== candidate.user_id) throw new Error('authorization owner mismatch');
+
   const ext = authorization.extension_data || {};
+  if (ext.execution_state !== 'CLAIMED') {
+    throw new Error('ATOMIC_EXECUTION_CLAIM_REQUIRED');
+  }
+  if (!execution_id || ext.execution_id !== execution_id) {
+    throw new Error('EXECUTION_ID_MISMATCH');
+  }
+
+  if (authorization.user_id !== candidate.user_id) throw new Error('authorization owner mismatch');
+
   const payload = JSON.parse(ext.payload_json || '{}');
   if (canonicalJson(payload) !== ext.payload_json) throw new Error('authorization payload not canonical');
   if (payload.repository !== repository || payload.base_ref !== baseRef) throw new Error('authorization repository/base mismatch');
@@ -172,16 +202,30 @@ export async function consumeGithubWriteAuthorization({ service, authorization, 
   if (digest !== payload.scope_digest) throw new Error('authorization scope mismatch');
 
   const provider = githubWriteKeyProvider(service);
-  const keys = await service.entities.GateSigningKey.filter({ key_id: ext.key_id, status:'active', algorithm:KEY_ALGORITHM_ED25519 }, '-created_date', 5, 0);
+  const keys = await service.entities.GateSigningKey.filter(
+    { key_id: ext.key_id, status: 'active', algorithm: KEY_ALGORITHM_ED25519 },
+    '-created_date', 5, 0,
+  );
   if (!keys?.length) throw new Error('authorization signing key unavailable');
+
   const key = keys[0];
-  const payloadJson = ext.payload_json;
-  const valid = await provider.verify(key.public_key_b64, payloadJson, ext.signature);
+  const valid = await provider.verify(key.public_key_b64, ext.payload_json, ext.signature);
   if (!valid) throw new Error('authorization signature invalid');
 
   await service.entities.DerivedArtifact.update(authorization.id, {
     status: 'SUPERSEDED',
-    extension_data: { ...ext, status: 'CONSUMED', consumed_at: new Date(Date.parse(now)).toISOString() },
+    extension_data: {
+      ...ext,
+      status: 'CONSUMED',
+      execution_state: 'CONSUMED',
+      consumed_at: new Date(Date.parse(now)).toISOString(),
+    },
   });
-  return { consumed: true, permit_id: payload.permit_id, consequence: GITHUB_WRITE_CONSEQUENCE };
+
+  return {
+    consumed: true,
+    permit_id: payload.permit_id,
+    consequence: GITHUB_WRITE_CONSEQUENCE,
+    execution_id,
+  };
 }
