@@ -1,0 +1,36 @@
+{
+  "name": "RealityTrustedIssuerV01",
+  "type": "object",
+  "description": "G2 trusted issuer registry entry. Registry membership, lifecycle, key identity, and scoped authority are distinct from signature validity. Development trust roots are explicitly non-production.",
+  "properties": {
+    "issuer_id": {"type":"string","description":"Stable issuer identity."},
+    "issuer_name": {"type":"string"},
+    "issuer_type": {"type":"string","enum":["REALITY_GOVERNANCE","HUMAN_AUTHORITY","SERVICE_AUTHORITY","DEVELOPMENT_AUTHORITY"]},
+    "key_id": {"type":"string"},
+    "algorithm": {"type":"string","enum":["Ed25519"]},
+    "public_key_b64": {"type":"string"},
+    "status": {"type":"string","enum":["PENDING","ACTIVE","SUSPENDED","REVOKED","EXPIRED"]},
+    "authorized_action_classes": {"type":"array","items":{"type":"string"}},
+    "authorized_targets": {"type":"array","items":{"type":"object"}},
+    "not_before": {"type":"string"},
+    "not_after": {"type":"string"},
+    "created_at": {"type":"string"},
+    "revoked_at": {"type":["string","null"]},
+    "revocation_reason": {"type":["string","null"]},
+    "parent_trust_reference": {"type":["string","null"]},
+    "registry_version": {"type":"string"},
+    "trust_environment": {"type":"string","enum":["DEVELOPMENT","SANDBOX","PRODUCTION"]},
+    "production_execution_allowed": {"type":"boolean"}
+  },
+  "required": [
+    "issuer_id","issuer_name","issuer_type","key_id","algorithm","public_key_b64",
+    "status","authorized_action_classes","authorized_targets","not_before","not_after",
+    "created_at","registry_version","trust_environment","production_execution_allowed"
+  ],
+  "rls": {
+    "create": {"allowed_roles":["admin"]},
+    "read": {"allowed_roles":["admin"]},
+    "update": {"allowed_roles":["admin"]},
+    "delete": {"allowed_roles":["admin"]}
+  }
+}
