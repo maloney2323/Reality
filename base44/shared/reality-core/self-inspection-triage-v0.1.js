@@ -1,4 +1,4 @@
-import { canonicalJson, sha256Hex } from './action-gate/canonical.js';
+import { canonicalJson, sha256Hex } from '../action-gate/canonical.js';
 
 export const SELF_INSPECTION_TRIAGE_VERSION = 'reality-self-inspection-triage-v0.1';
 export const TRIAGE_AUTHORITY = 'ANALYSIS_AND_VERIFICATION_PLANNING_ONLY';
@@ -43,9 +43,7 @@ export async function buildSelfInspectionTriage(workUnit = {}) {
   }
 
   const coverageGaps = [];
-  if ((added.length || changed.length || removed.length) && requirements.length === 0) {
-    coverageGaps.push('STRUCTURAL_DELTA_HAS_NO_VERIFICATION_REQUIREMENT');
-  }
+  if ((added.length || changed.length || removed.length) && requirements.length === 0) coverageGaps.push('STRUCTURAL_DELTA_HAS_NO_VERIFICATION_REQUIREMENT');
   if (changed.some(path => path.includes('functions/') || path.includes('reality-core/')) &&
       !requirements.some(r => r.includes('FUNCTIONAL') || r.includes('REGRESSION'))) {
     coverageGaps.push('CODE_CHANGE_WITHOUT_FUNCTIONAL_REGRESSION_REQUIREMENT');
@@ -72,22 +70,9 @@ export async function buildSelfInspectionTriage(workUnit = {}) {
     authority: TRIAGE_AUTHORITY,
     work_unit_id: workUnit.work_unit_id || null,
     input_digest: await digestTriageInput(workUnit),
-    observer: {
-      observed_delta: { added, changed, removed },
-      known,
-      unknown,
-      contradictions,
-      verification_requirements: requirements,
-    },
-    verifier: {
-      structural_integrity_findings: structuralIntegrity,
-      coverage_gaps: coverageGaps,
-      requirement_count: requirements.length,
-    },
-    adversary: {
-      questions: adversarialQuestions,
-      model_output_status: 'MODEL_GENERATED_ANALYSIS_NOT_EVIDENCE',
-    },
+    observer: { observed_delta: { added, changed, removed }, known, unknown, contradictions, verification_requirements: requirements },
+    verifier: { structural_integrity_findings: structuralIntegrity, coverage_gaps: coverageGaps, requirement_count: requirements.length },
+    adversary: { questions: adversarialQuestions, model_output_status: 'MODEL_GENERATED_ANALYSIS_NOT_EVIDENCE' },
     status,
     ...FORBIDDEN,
   });
@@ -96,9 +81,7 @@ export async function buildSelfInspectionTriage(workUnit = {}) {
 export async function verifySelfInspectionTriage(triage = {}) {
   if (triage.schema_version !== SELF_INSPECTION_TRIAGE_VERSION) return { valid:false, code:'SCHEMA_MISMATCH' };
   if (triage.authority !== TRIAGE_AUTHORITY) return { valid:false, code:'AUTHORITY_MISMATCH' };
-  for (const key of Object.keys(FORBIDDEN)) {
-    if (triage[key] !== false) return { valid:false, code:'ACTION_AUTHORITY_PRESENT' };
-  }
+  for (const key of Object.keys(FORBIDDEN)) if (triage[key] !== false) return { valid:false, code:'ACTION_AUTHORITY_PRESENT' };
   if (!triage.work_unit_id || !triage.input_digest) return { valid:false, code:'IDENTITY_MISSING' };
   return { valid:true, code:'VALID' };
 }
