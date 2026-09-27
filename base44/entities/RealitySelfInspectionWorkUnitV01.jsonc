@@ -1,0 +1,36 @@
+{
+  "name":"RealitySelfInspectionWorkUnitV01",
+  "type":"object",
+  "title":"Reality Self-Inspection Work Unit",
+  "description":"Idempotent, append-oriented work unit generated from a structural Reality code-tree delta. Observation and verification only; no code mutation or execution authority.",
+  "properties":{
+    "work_unit_id":{"type":"string"},
+    "schema_version":{"type":"string","enum":["reality-self-inspection-work-unit-v0.1"]},
+    "world_id":{"type":"string"},
+    "previous_tree_hash":{"type":["string","null"]},
+    "current_tree_hash":{"type":"string"},
+    "delta_digest":{"type":"string"},
+    "delta":{"type":"object"},
+    "observed_at":{"type":"string","format":"date-time"},
+    "inspection_record_ref":{"type":"string"},
+    "continuity_state_ref":{"type":["string","null"]},
+    "evidence_refs":{"type":"array","items":{"type":"string"}},
+    "known":{"type":"array","items":{"type":"string"}},
+    "unknown":{"type":"array","items":{"type":"string"}},
+    "contradictions":{"type":"array","items":{"type":"string"}},
+    "verification_requirements":{"type":"array","items":{"type":"string"}},
+    "proposed_next_actions":{"type":"array","items":{"type":"string"}},
+    "status":{"type":"string","enum":["OBSERVED","REVIEW_REQUIRED","VERIFICATION_REQUIRED","CLOSED","SUPERSEDED"]},
+    "execution_authority":{"type":"boolean"},
+    "mutation_authority":{"type":"boolean"},
+    "idempotency_key":{"type":"string"},
+    "created_at":{"type":"string","format":"date-time"}
+  },
+  "required":["work_unit_id","schema_version","world_id","current_tree_hash","delta_digest","delta","observed_at","inspection_record_ref","evidence_refs","known","unknown","contradictions","verification_requirements","proposed_next_actions","status","execution_authority","mutation_authority","idempotency_key","created_at"],
+  "rls":{
+    "read":{"allowed_roles":["admin"]},
+    "create":{"allowed_roles":["admin"]},
+    "update":{"allowed_roles":["admin"]},
+    "delete":{"allowed_roles":["admin"]}
+  }
+}
