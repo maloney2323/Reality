@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {buildReasoningSession,recordIndependentRound,recordCrossExaminationRound,shouldContinueReasoning,promoteModelFinding} from '../base44/shared/reality-core/reasoning-orchestration-v0.1.js';
+const s=buildReasoningSession({reasoning_session_id:'r1',continuity_state_id:'c1',input_snapshot:{x:1}});
+const s1=recordIndependentRound(s,{round_id:'1',outputs:[{text:'candidate'}]});
+assert.equal(s1.independent_rounds[0].outputs[0].epistemic_status,'MODEL_GENERATED_ANALYSIS_NOT_EVIDENCE');
+const s2=recordCrossExaminationRound(s1,{round_id:'x1',challenges:[{text:'challenge'}]});
+assert.equal(s2.cross_examination_rounds[0].challenges[0].execution_authority,false);
+assert.equal(shouldContinueReasoning({epistemic_state_changed:false,verification_requirements_open:false}).continue,false);
+assert.equal(promoteModelFinding({finding:{id:'f'},independentVerification:false}).epistemic_status,'MODEL_GENERATED_ANALYSIS_NOT_EVIDENCE');
+assert.equal(promoteModelFinding({finding:{id:'f'},independentVerification:true}).epistemic_status,'SUPPORTED');
+console.log('Reality Reasoning Orchestration v0.1 contract tests: PASS');
