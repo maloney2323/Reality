@@ -74,6 +74,16 @@ let result = await verifyExecutionRequest({
 });
 assert.equal(result.failure_code, ExecutionFailureCode.AUTHORIZATION_ALREADY_CLAIMED);
 
+result = await verifyExecutionRequest({
+  request,
+  now: '2026-09-27T15:06:00.000Z',
+  expected_action_class: 'TEST_WRITE',
+  expected_target: target,
+  expected_candidate: candidate,
+  require_claim: false,
+});
+assert.equal(result.failure_code, ExecutionFailureCode.AUTHORIZATION_EXPIRED);
+
 const claim = await buildExecutionClaim({
   authorization,
   execution_id: 'exec:test:001',
@@ -153,12 +163,12 @@ assert.equal(result.failure_code, ExecutionFailureCode.SNAPSHOT_DIGEST_MISMATCH)
 
 result = await verifyExecutionRequest({
   request,
-  now: '2026-09-27T15:06:00.000Z',
+  now: '2026-09-27T15:03:00.000Z',
   expected_action_class: 'TEST_WRITE',
   expected_target: target,
   expected_candidate: candidate,
 });
-assert.equal(result.failure_code, ExecutionFailureCode.AUTHORIZATION_EXPIRED);
+assert.equal(result.failure_code, ExecutionFailureCode.LEASE_EXPIRED);
 
 result = await verifyExecutionRequest({
   request: {
