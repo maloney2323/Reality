@@ -1,0 +1,37 @@
+{
+  "name": "RealityWorkdayV01",
+  "type": "object",
+  "description": "Governed Reality work session targeting substantial human-equivalent work, typically an 8-12 hour operating envelope.",
+  "properties": {
+    "workday_id": {"type":"string"},
+    "world_id": {"type":"string"},
+    "objective": {"type":"string"},
+    "schema_version": {"type":"string"},
+    "target_operating_envelope_hours": {"type":"object"},
+    "baseline_human_hours": {"type":["number","null"]},
+    "reality_elapsed_seconds": {"type":"number"},
+    "human_intervention_seconds": {"type":"number"},
+    "verified_work_completed": {"type":"array","items":{"type":"string"}},
+    "work_remaining": {"type":"boolean"},
+    "interruptions": {"type":"array"},
+    "rework": {"type":"array"},
+    "evidence_refs": {"type":"array","items":{"type":"string"}},
+    "verification_requirements": {"type":"array","items":{"type":"string"}},
+    "status": {"type":"string","enum":["ACTIVE","PAUSED","COMPLETED","BLOCKED","HALTED","HANDED_OFF"]},
+    "authority": {"type":"string"},
+    "execution_authority": {"type":"boolean"},
+    "mutation_authority": {"type":"boolean"},
+    "merge_authority": {"type":"boolean"},
+    "deploy_authority": {"type":"boolean"},
+    "created_at": {"type":"string"},
+    "closed_at": {"type":["string","null"]},
+    "state_digest": {"type":"string"}
+  },
+  "required": ["workday_id","world_id","objective","schema_version","status","authority","execution_authority","mutation_authority","merge_authority","deploy_authority","created_at","state_digest"],
+  "rls": {
+    "read": {"allowed_roles":["admin"]},
+    "create": {"allowed_roles":["service"]},
+    "update": {"allowed_roles":["service"]},
+    "delete": {"allowed_roles":["admin"]}
+  }
+}
