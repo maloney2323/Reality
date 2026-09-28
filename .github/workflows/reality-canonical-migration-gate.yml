@@ -62,5 +62,6 @@ jobs:
         run: |
           set -euo pipefail
           if test -f REALITY_SOURCE_OF_TRUTH_GATE.md; then
-            ! grep -q "VERIFIED — Evidence → Canonical Source → Verified Build → Runtime" REALITY_SOURCE_OF_TRUTH_GATE.md
+            ! grep -q '^\*\*Status: 🟢 REALITY SOURCE OF TRUTH — VERIFIED\*\*
+ REALITY_SOURCE_OF_TRUTH_GATE.md
           fi
