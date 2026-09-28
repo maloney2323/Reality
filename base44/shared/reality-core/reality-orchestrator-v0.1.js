@@ -5,6 +5,7 @@ export const ORCHESTRATOR_AUTHORITY = 'GOVERNED_WORKFLOW_COORDINATION_ONLY';
 
 export const TERMINAL_STATES = new Set(['COMPLETED','BLOCKED','HALTED','HANDED_OFF']);
 export const NEXT_ACTIONS = Object.freeze({
+  DISCOVER_AUTOMATION: 'DISCOVER_AUTOMATION',
   OBSERVE: 'OBSERVE',
   VERIFY: 'VERIFY',
   REASON: 'REASON',
@@ -37,6 +38,7 @@ export async function buildOrchestrationDecision(input = {}) {
     human_decision_required = false,
     governed_action_required = false,
     evidence_required = false,
+    automation_discovery_required = false,
     work_remaining = false,
     failure = null
   } = input;
@@ -48,6 +50,7 @@ export async function buildOrchestrationDecision(input = {}) {
   if (failure) { state = 'HALTED'; next_action = NEXT_ACTIONS.HANDOFF_HUMAN; }
   else if (human_decision_required) next_action = NEXT_ACTIONS.HANDOFF_HUMAN;
   else if (evidence_required || open_debt.length) next_action = NEXT_ACTIONS.REQUEST_EVIDENCE;
+  else if (automation_discovery_required) next_action = NEXT_ACTIONS.DISCOVER_AUTOMATION;
   else if (verification_requirements.length) next_action = NEXT_ACTIONS.VERIFY;
   else if (governed_action_required) next_action = NEXT_ACTIONS.EXECUTE_GOVERNED;
   else if (work_remaining) next_action = NEXT_ACTIONS.OBSERVE;
