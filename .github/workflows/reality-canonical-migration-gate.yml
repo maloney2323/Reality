@@ -57,11 +57,9 @@ jobs:
           node scripts/test-self-inspection-v0.1.mjs
           node scripts/test-trusted-issuer-v0.1.mjs
 
-      - name: Assert no source-of-truth claim before runtime gate
+      - name: Assert final source-of-truth status
         shell: bash
         run: |
           set -euo pipefail
-          if test -f REALITY_SOURCE_OF_TRUTH_GATE.md; then
-            ! grep -q '^\*\*Status: 🟢 REALITY SOURCE OF TRUTH — VERIFIED\*\*
+          grep -q '^\*\*Status: 🟢 REALITY SOURCE OF TRUTH — VERIFIED\*\*
  REALITY_SOURCE_OF_TRUTH_GATE.md
-          fi
