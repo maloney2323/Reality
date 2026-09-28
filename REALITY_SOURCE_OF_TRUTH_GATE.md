@@ -48,3 +48,5 @@ Until all five runtime gates pass, Reality must not claim:
 `VERIFIED — Evidence → Canonical Source → Verified Build → Runtime`
 
 The source layer may be treated as the current **canonical migration candidate**, but runtime continuity is not yet established.
+
+This document remains runtime-gated until the verified build and live deployment lineage are bound.
