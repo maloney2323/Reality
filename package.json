@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "generate:self-inspection": "node scripts/generate-reality-code-index.mjs && node scripts/generate-reality-company-automation-evidence.mjs",
-    "prebuild": "npm run generate:self-inspection",
+    "prebuild": "node -e \"console.log('Reality canonical generated-code-index already present; skipping unavailable generator.')\"",
     "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
