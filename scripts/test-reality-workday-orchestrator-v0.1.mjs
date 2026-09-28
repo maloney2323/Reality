@@ -9,7 +9,7 @@ assert.equal(wd.execution_authority, false);
 
 const d1 = await buildOrchestrationDecision({ work_unit_id:'wu:test', workday_id:wd.workday_id, continuity_state_id:'cs:1', verification_requirements:['RUN_TESTS'] });
 assert.equal(d1.next_action, 'VERIFY');
-assert.equal(verifyOrchestrationDecision(d1).valid, true);
+assert.equal(await verifyOrchestrationDecision(d1).valid, true);
 
 const d2 = await buildOrchestrationDecision({ work_unit_id:'wu:test', workday_id:wd.workday_id, continuity_state_id:'cs:1', governed_action_required:true });
 assert.equal(d2.next_action, 'EXECUTE_GOVERNED');
@@ -17,8 +17,8 @@ assert.equal(d2.next_action, 'EXECUTE_GOVERNED');
 const d3 = await buildOrchestrationDecision({ work_unit_id:'wu:test', workday_id:wd.workday_id, continuity_state_id:'cs:1', evidence_required:true });
 assert.equal(d3.next_action, 'REQUEST_EVIDENCE');
 
-assert.equal(verifyOrchestrationDecision({...d1, execution_authority:true}).failure, 'UNAUTHORIZED_AUTHORITY_ESCALATION');
-assert.equal(verifyOrchestrationDecision({...d1, decision_digest:'bad'}).failure, 'DECISION_DIGEST_MISMATCH');
+assert.equal(await verifyOrchestrationDecision({...d1, execution_authority:true}).failure, 'UNAUTHORIZED_AUTHORITY_ESCALATION');
+assert.equal(await verifyOrchestrationDecision({...d1, decision_digest:'bad'}).failure, 'DECISION_DIGEST_MISMATCH');
 
 const avoided = estimateHumanEffortAvoided({ baseline_human_hours:10, human_intervention_seconds:3600 });
 assert.equal(avoided.value_hours, 9);
