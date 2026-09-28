@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { buildRealityWorkday, estimateHumanEffortAvoided, closeRealityWorkday } from '../base44/shared/reality-core/workday-controller-v0.1.js';
 import { buildOrchestrationDecision, verifyOrchestrationDecision } from '../base44/shared/reality-core/reality-orchestrator-v0.1.js';
 
-const wd = buildRealityWorkday({ workday_id:'wd:test', world_id:'world:test', objective:'complete governed software work', baseline_human_hours:10, created_at:'2026-09-27T00:00:00Z' });
+const wd = await buildRealityWorkday({ workday_id:'wd:test', world_id:'world:test', objective:'complete governed software work', baseline_human_hours:10, created_at:'2026-09-27T00:00:00Z' });
 assert.equal(wd.target_operating_envelope_hours.min, 8);
 assert.equal(wd.target_operating_envelope_hours.max, 12);
 assert.equal(wd.execution_authority, false);
