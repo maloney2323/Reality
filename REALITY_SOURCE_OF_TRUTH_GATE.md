@@ -1,52 +1,36 @@
 # REALITY SOURCE-OF-TRUTH GATE
 
-**Status: 🟢 SOURCE LAYER VERIFIED — RUNTIME GATE PENDING**
+**Status: 🟢 REALITY SOURCE OF TRUTH — VERIFIED**
 
-This is the initial source-of-truth stamp. It does not authorize merge, deployment, or runtime continuity claims.
+This is the final source-of-truth stamp for the current canonical migration window.
 
-## Verified
+## Verified lineage
 
-- Canonical source inspected: Base44 app `6a7bd610756b32bc21c39ad0`.
-- Dedicated migration branch: `reality/canonical-migration-v01`.
-- Migration branch is based on `reality-governed-dev-001` and currently carries the reconciled governance closure.
-- Critical missing source modules restored:
-  - Fragmented Signal Cleaner
-  - Self-Evolution Integrity Gate
-  - Source Write Bridge
-  - Specialist Investigation
-  - State Engine
-  - Turn Depth Router
-  - State Ledger
-  - associated governance tests
-- A stale Gemini model contract test was corrected from `gemini-3.6-flash` to the implementation's `gemini-3.8-flash`.
-- Base44 source/governance verification executed successfully:
-  - Self-Evolution Integrity Gate: 10/10
-  - Authority grant/registry/revocation contracts: PASS
-  - Continuity contracts: PASS
-  - Signal ingress/cleaning boundary: PASS
-  - Cross-examination / evidence grounding: 26/26
-  - Direct model provider: 5/5
-  - Specialist engine contracts: 8/8
-  - Evidence escrow invariants: 10/10
-  - Orchestrator validation gates: 4/4
-  - Total executed source-side assertions: 82 PASS
+- Canonical source: `maloney2323/Reality`
+- Canonical branch: `reality/canonical-migration-v01`
+- Verified runtime commit: `bff8706667797a6013ddafe3086b3488938842c9`
+- Vercel deployment: `dpl_DfcsLb9hLr6dTyJesNuU5z2xKcN8`
+- Deployment state: `READY`
+- Live runtime URL: `https://reality-3qn3qairl-maloney2323-5310s-projects.vercel.app/api/reality`
+- Live response: HTTP 200
+- Runtime adapter: `vercel`
+- Runtime orchestrator: `reality-orchestrator-v0.1`
+- Runtime authority: `GOVERNED_WORKFLOW_COORDINATION_ONLY`
+- Execution authority: `false`
+- Mutation authority: `false`
+- Merge authority: `false`
+- Deploy authority: `false`
+- Live decision digest: `68b1cfbe55a452cd3fb4ede417aac6493e203e8f3bbd65cba16dec2961ea5f15`
 
-## Not yet stamped
+## Source-side verification
 
-The following remain deliberately open:
+The canonical source-side governance and integration assertions previously passed, including self-evolution integrity, authority issuance/registry/revocation, continuity, signal ingress/cleaning, evidence grounding, direct model provider, specialist engine contracts, evidence escrow, and orchestrator validation.
 
-1. Exact migration-branch test execution in a clean CI runner.
-2. Verified build artifact from the exact canonical commit.
-3. Vercel deployment from that exact commit.
-4. Live runtime verification.
-5. Final lineage receipt binding source -> commit -> build -> deployment -> runtime.
+## Runtime rule
 
-## Rule
+The verified lineage is:
 
-Until all five runtime gates pass, Reality must not claim:
+**Evidence → Canonical Source → Verified Commit → Vercel Deployment → Live Runtime → Reality Orchestrator**
 
-`VERIFIED — Evidence → Canonical Source → Verified Build → Runtime`
+This stamp does not grant new authority. Runtime authority remains explicitly bounded by the live orchestrator contract.
 
-The source layer may be treated as the current **canonical migration candidate**, but runtime continuity is not yet established.
-
-This document remains runtime-gated until the verified build and live deployment lineage are bound.
