@@ -47,7 +47,7 @@ const cases = [
   ['future issuer', { ...baseIssuer, not_before: '2027-01-01T00:00:00.000Z' }, TRUST_FAILURE_CODES.ISSUER_NOT_YET_ACTIVE],
   ['scope mismatch', { ...baseIssuer, authorized_action_classes: ['READ_ONLY'] }, TRUST_FAILURE_CODES.ISSUER_SCOPE_MISMATCH],
   ['target mismatch', { ...baseIssuer, authorized_targets: [{ provider: 'github', repository: 'other/repo' }] }, TRUST_FAILURE_CODES.ISSUER_SCOPE_MISMATCH],
-  ['production blocked by development root', baseIssuer, undefined, { productionExecution: true }],
+  ['production blocked by development root', baseIssuer, TRUST_FAILURE_CODES.PRODUCTION_TRUST_ROOT_BLOCKED, { productionExecution: true }],
 ];
 
 for (const [label, issuer, expected, opts] of cases) {
