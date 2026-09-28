@@ -175,7 +175,6 @@ result = await verifyExecutionRequest({
     ...request,
     authorization: {
       ...claimedAuthorization,
-      execution_id: 'exec:other',
     },
     execution_identity: {
       ...request.execution_identity,
