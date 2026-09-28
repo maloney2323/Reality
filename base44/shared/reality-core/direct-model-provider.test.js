@@ -23,7 +23,7 @@ test('direct provider is transport-only and uses explicit reasoning/coding model
   assert.equal(DIRECT_MODEL_PROVIDER_AUTHORITY, 'MODEL_TRANSPORT_ONLY');
   assert.equal(REALITY_OPENAI_MODEL, 'gpt-5.6-terra');
   assert.equal(REALITY_OPENAI_CODING_MODEL, 'gpt-5.6-sol');
-  assert.equal(REALITY_GEMINI_MODEL, 'gemini-3.6-flash');
+  assert.equal(REALITY_GEMINI_MODEL, 'gemini-3.8-flash');
 });
 
 test('OpenAI transport returns only parsed structured result and keeps schema boundary', async () => {
