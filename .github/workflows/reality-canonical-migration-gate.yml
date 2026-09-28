@@ -1,0 +1,66 @@
+name: Reality Canonical Migration Gate
+
+on:
+  push:
+    branches:
+      - reality/canonical-migration-v01
+  pull_request:
+    branches:
+      - reality-governed-dev-001
+      - main
+
+jobs:
+  canonical-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Verify Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run canonical governance tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            base44/shared/reality-core/reality-self-evolution-integrity-gate-v0.1.test.js
+            base44/shared/reality-core/authority-grant-issuance-v0.1.test.js
+            base44/shared/reality-core/authority-registry-v0.1.test.js
+            base44/shared/reality-core/authority-revocation-v0.1.test.js
+            base44/shared/reality-core/chat-continuity.test.js
+            base44/shared/reality-core/chat-ingress-signal-packet-v0.1.test.js
+            base44/shared/reality-core/continuity-of-intelligence-v0.1.test.js
+            base44/shared/reality-core/continuity-transition-gate-v0.1.test.js
+            base44/shared/reality-core/corridor.test.js
+            base44/shared/reality-core/direct-model-provider.test.js
+            base44/shared/reality-core/engine-adapter.test.js
+            base44/shared/reality-core/evidence-escrow-v0.1.test.js
+          )
+          for test_file in "${tests[@]}"; do
+            test -f "$test_file"
+            echo "=== RUN $test_file ==="
+            node "$test_file"
+          done
+
+      - name: Run governed integration gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/test-reality-orchestrator-validation-gates-v0.1.mjs
+          node scripts/test-reality-executor-v0.1.mjs
+          node scripts/test-reality-github-execution-verification-v0.1.mjs
+          node scripts/test-reality-workday-orchestrator-v0.1.mjs
+          node scripts/test-reasoning-orchestration-v0.1.mjs
+          node scripts/test-self-inspection-v0.1.mjs
+          node scripts/test-trusted-issuer-v0.1.mjs
+
+      - name: Assert no source-of-truth claim before runtime gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f REALITY_SOURCE_OF_TRUTH_GATE.md; then
+            ! grep -q "VERIFIED — Evidence → Canonical Source → Verified Build → Runtime" REALITY_SOURCE_OF_TRUTH_GATE.md
+          fi
