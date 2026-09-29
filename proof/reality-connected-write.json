@@ -1,0 +1,9 @@
+{
+  "proof": "REALITY_CONNECTED_WRITE_READ",
+  "purpose": "Controlled proof of connected GitHub write/read capability",
+  "created_by": "Reality connected integration boundary",
+  "timestamp": "2026-09-29T22:31:16.939Z",
+  "authority": "user-directed proof",
+  "execution": "GitHub connected integration",
+  "note": "This file is a proof artifact, not an application secret."
+}
