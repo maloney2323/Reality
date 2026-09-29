@@ -195,6 +195,7 @@ export function authorizeWorkday(workday, authorityInput = {}) {
   return {
     ...workday,
     authority_envelope,
+    authority_digest: null,
     delegation_state: authority_envelope.human_authorized ? 'AUTHORIZED' : 'NOT_AUTHORIZED',
     verification_state: 'NOT_STARTED',
     decision_digest: null
