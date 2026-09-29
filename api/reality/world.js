@@ -1,3 +1,5 @@
+import { CONSTITUTION, CONSTITUTION_VERSION, evaluateConstitution } from '../../src/reality-constitution.js';
+
 const PROVIDERS = Object.freeze({
   github: { name: 'GitHub', scope: 'repository', connector: 'connected_integration' },
   vercel: { name: 'Vercel', scope: 'project', connector: 'connected_integration' },
@@ -17,8 +19,13 @@ function json(res, status, body) {
 function capabilitySnapshot() {
   return {
     service: 'reality-world-access',
-    version: '0.3.0',
+    version: '0.4.0',
     credential_model: 'connector_backed',
+    constitutional_gate: {
+      version: CONSTITUTION_VERSION,
+      enforced_before_execution: true,
+      intelligence_can_modify: false,
+    },
     providers: Object.fromEntries(
       Object.entries(PROVIDERS).map(([id, p]) => [
         id,
@@ -50,9 +57,9 @@ function capabilitySnapshot() {
   };
 }
 
-function actionEnvelope(body) {
+function actionEnvelope(body, constitutionalDecision) {
   return {
-    envelope_version: '0.3.0',
+    envelope_version: '0.4.0',
     request_id: body.requestId || crypto.randomUUID(),
     provider: body.provider,
     action: body.action,
@@ -62,6 +69,12 @@ function actionEnvelope(body) {
       authorized: body.authorization?.authorized === true,
       scope: body.authorization?.scope || null,
       authorityId: body.authorization?.authorityId || null,
+    },
+    constitution: {
+      version: constitutionalDecision.constitutionVersion,
+      decision: constitutionalDecision.decision,
+      reason: constitutionalDecision.reason,
+      attested: constitutionalDecision.attested,
     },
     verification: {
       required: true,
@@ -84,7 +97,7 @@ function validate(body) {
   if (body.authorization.scope !== provider.scope) {
     return { ok: false, status: 403, error: 'AUTHORITY_SCOPE_MISMATCH' };
   }
-  return { ok: true };
+  return { ok: true, provider };
 }
 
 export default async function handler(req, res) {
@@ -103,11 +116,33 @@ export default async function handler(req, res) {
   const check = validate(body);
   if (!check.ok) return json(res, check.status, { error: check.error, verified: false });
 
+  const proposal = {
+    ...(body.proposal || {}),
+    authorization: body.authorization,
+    requiredScope: check.provider.scope,
+  };
+  const state = body.state || {};
+
+  const constitutionalDecision = evaluateConstitution({
+    proposal,
+    state,
+    constitution: CONSTITUTION,
+  });
+
+  if (!constitutionalDecision.allowed) {
+    return json(res, 403, {
+      verified: false,
+      constitutional_gate: constitutionalDecision,
+      execution: 'BLOCKED',
+      message: 'Constitutional Gate blocked execution. No external action was requested.',
+    });
+  }
+
   // Reality never receives or stores provider credentials here.
   // The connected integration layer executes this envelope and must return
   // an external-state read-back before Reality records completion.
   return json(res, 202, {
-    envelope: actionEnvelope(body),
+    envelope: actionEnvelope(body, constitutionalDecision),
     execution_boundary: 'CONNECTED_INTEGRATION_LAYER',
     verified: false,
     message: 'Action accepted for connected execution; completion is not asserted until an independent external read-back is returned.',
