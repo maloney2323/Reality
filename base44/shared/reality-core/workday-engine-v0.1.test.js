@@ -10,6 +10,7 @@ import {
   executionCapabilityAllowed
 } from './workday-engine-v0.1.js';
 import { WORKDAY_CAPABILITIES } from './workday-authority-envelope-v0.1.js';
+import { buildProviderEvidenceReceipt, ProviderEvidenceAuthority } from './provider-evidence-adapter-v0.1.js';
 import {
   projectedHumanTimeReturned,
   verifiedHumanTimeReturned
@@ -94,6 +95,88 @@ test('requires explicit human authorization before capability use', async () => 
   assert.equal(executionCapabilityAllowed(workday, 'DEPLOY'), false);
   assert.ok(workday.authority_digest);
   assert.ok(workday.authority_envelope.denied_capabilities.includes('DEPLOY'));
+});
+
+test('CREATE WORKDAY consumes the provider evidence receipt as observed world state', async () => {
+  const receipt = buildProviderEvidenceReceipt([
+    {
+      provider: 'github',
+      adapter_id: 'github-read-v0.1',
+      connected: true,
+      read_attempted: true,
+      read_executed: true,
+      readability_established: true,
+      completeness_established: false,
+      evidence: ['commit abc123 exists on the authorized repository'],
+      provenance: 'GITHUB_READONLY_CONNECTOR',
+      exact_ref_sha: 'abc123',
+      provider_identity: 'maloney2323/Reality'
+    },
+    {
+      provider: 'vercel',
+      adapter_id: 'vercel-read-v0.1',
+      connected: true,
+      read_attempted: false,
+      read_executed: false,
+      readability_established: false,
+      completeness_established: false,
+      evidence: [],
+      reason: 'Connected but not read.'
+    }
+  ]);
+
+  const workday = await createWorkday({
+    workday_id: 'wd-evidence-001',
+    subject: { subject_id: 'subject-evidence-001', subject_type: 'PERSON' },
+    objective: 'Reconstruct current workload',
+    created_at: '2026-09-29T00:00:00Z',
+    provider_evidence_receipt: receipt
+  });
+
+  assert.equal(workday.observed_world.observation_statement, 'Here is what I actually observed across your authorized world.');
+  assert.equal(workday.observed_world.summary.providers_seen, 2);
+  assert.equal(workday.observed_world.summary.providers_read, 1);
+  assert.equal(workday.observed_world.summary.evidence_items_observed, 1);
+  assert.deepEqual(workday.evidence_refs, ['provider:github:provider-observation:1']);
+  assert.ok(workday.observed_world.evidence_gaps.includes('COMPLETENESS_NOT_ESTABLISHED:github'));
+  assert.ok(workday.observed_world.evidence_gaps.includes('CONNECTED_NOT_READ:vercel'));
+  assert.equal(workday.delegation_state, 'NOT_AUTHORIZED');
+  assert.equal(workday.authority_envelope.human_authorized, false);
+  assert.equal(workday.provider_evidence_receipt.authority, ProviderEvidenceAuthority);
+});
+
+test('CREATE WORKDAY rejects an evidence receipt that attempts to grant authority', async () => {
+  await assert.rejects(
+    createWorkday({
+      workday_id: 'wd-evidence-002',
+      subject: { subject_id: 'subject-evidence-002', subject_type: 'BUSINESS' },
+      objective: 'Reject authority smuggling',
+      created_at: '2026-09-29T00:00:00Z',
+      provider_evidence_receipt: {
+        schema_version: 'reality-provider-evidence-adapter-v0.1',
+        authority: ProviderEvidenceAuthority,
+        providers: [],
+        truth_authorized: true,
+        action_authorized: false,
+        write_authorized: false,
+        external_effects_permitted: false
+      }
+    }),
+    /cannot grant authority/
+  );
+});
+
+test('CREATE WORKDAY preserves explicit no-receipt evidence boundary', async () => {
+  const workday = await createWorkday({
+    workday_id: 'wd-evidence-003',
+    subject: { subject_id: 'subject-evidence-003', subject_type: 'TEAM' },
+    objective: 'Require real observations',
+    created_at: '2026-09-29T00:00:00Z'
+  });
+
+  assert.equal(workday.observed_world.summary.providers_seen, 0);
+  assert.deepEqual(workday.observed_world.evidence_gaps, ['NO_PROVIDER_EVIDENCE_RECEIPT']);
+  assert.equal(workday.observed_world.observation_statement, 'No provider observations were supplied to CREATE WORKDAY.');
 });
 
 test('human-time metrics refuse unsupported baselines', () => {
