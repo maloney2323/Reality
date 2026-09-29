@@ -1,5 +1,6 @@
 import { canonicalJson, sha256Hex } from '../action-gate/canonical.js';
 import { normalizeAuthorityEnvelope, digestAuthorityEnvelope } from './workday-authority-envelope-v0.1.js';
+import { PROVIDER_EVIDENCE_ADAPTER_VERSION, ProviderEvidenceAuthority } from './provider-evidence-adapter-v0.1.js';
 
 export const REALITY_WORKDAY_ENGINE_VERSION = 'reality-workday-engine-v0.1';
 
@@ -43,6 +44,116 @@ function uniqueSorted(values) {
   return [...new Set(Array.isArray(values) ? values : [])].sort();
 }
 
+function validateProviderEvidenceReceipt(receipt) {
+  if (receipt == null) return null;
+  if (typeof receipt !== 'object' || Array.isArray(receipt)) {
+    throw new Error('provider_evidence_receipt must be an object');
+  }
+  if (receipt.schema_version !== PROVIDER_EVIDENCE_ADAPTER_VERSION) {
+    throw new Error('unsupported provider evidence receipt schema');
+  }
+  if (receipt.authority !== ProviderEvidenceAuthority) {
+    throw new Error('provider evidence receipt authority mismatch');
+  }
+  if (receipt.truth_authorized === true || receipt.action_authorized === true ||
+      receipt.write_authorized === true || receipt.external_effects_permitted === true) {
+    throw new Error('provider evidence receipt cannot grant authority');
+  }
+  if (!Array.isArray(receipt.providers)) throw new Error('provider evidence receipt providers required');
+  return receipt;
+}
+
+export function buildObservedWorldSnapshot(providerEvidenceReceipt = null) {
+  const receipt = validateProviderEvidenceReceipt(providerEvidenceReceipt);
+  if (!receipt) {
+    return {
+      schema_version: 'reality-observed-world-v0.1',
+      authority: ProviderEvidenceAuthority,
+      observation_statement: 'No provider observations were supplied to CREATE WORKDAY.',
+      providers: [],
+      observed_evidence: [],
+      evidence_refs: [],
+      evidence_gaps: ['NO_PROVIDER_EVIDENCE_RECEIPT'],
+      summary: {
+        providers_seen: 0,
+        providers_read: 0,
+        providers_with_observed_evidence: 0,
+        evidence_items_observed: 0,
+        incomplete_providers: 0
+      }
+    };
+  }
+
+  const providers = receipt.providers.map((provider) => {
+    const observed = provider.read_executed === true && provider.readability_established === true;
+    const evidence = observed ? provider.evidence : [];
+    return {
+      provider: provider.provider,
+      adapter_id: provider.adapter_id,
+      connection_state: provider.connection_state,
+      read_state: provider.read_state,
+      read_attempted: provider.read_attempted === true,
+      read_executed: provider.read_executed === true,
+      readability_established: provider.readability_established === true,
+      completeness_established: provider.completeness_established === true,
+      observed_evidence_count: evidence.length,
+      provenance: provider.provenance,
+      exact_ref_sha: provider.exact_ref_sha,
+      provider_identity: provider.provider_identity,
+      reason: provider.reason
+    };
+  });
+
+  const observedEvidence = receipt.providers
+    .filter((provider) => provider.read_executed === true && provider.readability_established === true)
+    .flatMap((provider) => provider.evidence.map((item) => ({
+      provider: provider.provider,
+      evidence_id: item.evidence_id,
+      content: item.content,
+      evidence_state: 'OBSERVED',
+      authority: ProviderEvidenceAuthority,
+      provenance: provider.provenance,
+      exact_ref_sha: provider.exact_ref_sha,
+      provider_identity: provider.provider_identity
+    })));
+
+  const evidenceRefs = uniqueSorted(
+    observedEvidence.map((item) => `provider:${item.provider}:${item.evidence_id}`)
+  );
+
+  const evidenceGaps = uniqueSorted(receipt.providers.flatMap((provider) => {
+    const gaps = [];
+    if (provider.connection_state !== 'CONNECTED') gaps.push(`NOT_CONNECTED:${provider.provider}`);
+    else if (provider.read_state === 'CONNECTED_NOT_READ') gaps.push(`CONNECTED_NOT_READ:${provider.provider}`);
+    else if (provider.read_state === 'READ_FAILED') gaps.push(`READ_FAILED:${provider.provider}`);
+    if (provider.read_executed === true && provider.completeness_established !== true) {
+      gaps.push(`COMPLETENESS_NOT_ESTABLISHED:${provider.provider}`);
+    }
+    return gaps;
+  }));
+
+  const providersRead = providers.filter((provider) => provider.read_executed).length;
+  const providersWithEvidence = providers.filter((provider) => provider.observed_evidence_count > 0).length;
+
+  return {
+    schema_version: 'reality-observed-world-v0.1',
+    authority: ProviderEvidenceAuthority,
+    observation_statement: 'Here is what I actually observed across your authorized world.',
+    epistemic_boundary: 'These are bounded provider observations, not automatically verified truth. Missing or incomplete reads remain explicit.',
+    providers,
+    observed_evidence: observedEvidence,
+    evidence_refs: evidenceRefs,
+    evidence_gaps: evidenceGaps,
+    summary: {
+      providers_seen: providers.length,
+      providers_read: providersRead,
+      providers_with_observed_evidence: providersWithEvidence,
+      evidence_items_observed: observedEvidence.length,
+      incomplete_providers: providers.filter((provider) => provider.completeness_established !== true).length
+    }
+  };
+}
+
 export async function createWorkday({
   workday_id,
   subject,
@@ -50,7 +161,8 @@ export async function createWorkday({
   operating_window = null,
   authority = {},
   created_at,
-  evidence_refs = []
+  evidence_refs = [],
+  provider_evidence_receipt = null
 } = {}) {
   requireNonEmpty(workday_id, 'workday_id');
   requireNonEmpty(objective, 'objective');
@@ -69,6 +181,7 @@ export async function createWorkday({
   });
 
   const authority_digest = await digestAuthorityEnvelope(authority_envelope);
+  const observed_world = buildObservedWorldSnapshot(provider_evidence_receipt);
   const workload_snapshot = [];
   const human_only_work = [];
   const blocked_work = [];
@@ -88,7 +201,7 @@ export async function createWorkday({
     workload_snapshot,
     human_only_work,
     blocked_work,
-    evidence_gaps,
+    evidence_gaps: uniqueSorted([...evidence_gaps, ...observed_world.evidence_gaps]),
     authority_envelope,
     authority_digest,
     delegation_state: 'NOT_AUTHORIZED',
@@ -101,7 +214,9 @@ export async function createWorkday({
       value_hours: null,
       evidence_state: 'INSUFFICIENT_EVIDENCE'
     },
-    evidence_refs: uniqueSorted(evidence_refs),
+    evidence_refs: uniqueSorted([...evidence_refs, ...observed_world.evidence_refs]),
+    provider_evidence_receipt: provider_evidence_receipt ? validateProviderEvidenceReceipt(provider_evidence_receipt) : null,
+    observed_world,
     created_at,
     decision_digest: null
   };
@@ -219,7 +334,8 @@ export async function digestWorkday(workday) {
     verification_state: workday.verification_state,
     projected_human_time_returned: workday.projected_human_time_returned,
     verified_human_time_returned: workday.verified_human_time_returned,
-    evidence_refs: workday.evidence_refs
+    evidence_refs: workday.evidence_refs,
+    observed_world: workday.observed_world || null
   };
   return sha256Hex(canonicalJson(digestInput));
 }
