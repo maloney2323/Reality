@@ -184,7 +184,7 @@ export function advanceWorkday(workday, nextState) {
   };
 }
 
-export function authorizeWorkday(workday, authorityInput = {}) {
+export async function authorizeWorkday(workday, authorityInput = {}) {
   if (!workday || workday.schema_version !== REALITY_WORKDAY_ENGINE_VERSION) throw new Error('invalid workday');
   const authority_envelope = normalizeAuthorityEnvelope({
     ...authorityInput,
@@ -195,7 +195,7 @@ export function authorizeWorkday(workday, authorityInput = {}) {
   return {
     ...workday,
     authority_envelope,
-    authority_digest: null,
+    authority_digest: await digestAuthorityEnvelope(authority_envelope),
     delegation_state: authority_envelope.human_authorized ? 'AUTHORIZED' : 'NOT_AUTHORIZED',
     verification_state: 'NOT_STARTED',
     decision_digest: null
