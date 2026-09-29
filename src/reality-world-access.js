@@ -1,4 +1,4 @@
-export const WORLD_ACCESS_VERSION = '0.1.0';
+export const WORLD_ACCESS_VERSION = '0.2.0';
 
 export const GOVERNANCE = Object.freeze({
   noImplicitAuthority: true,
