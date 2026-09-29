@@ -16,9 +16,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return json(res, 200, {
       service: 'reality-business-intake',
-      version: '0.1.0',
+      version: '0.2.0',
       modes: ['BUSINESS_UPDATE', 'ASK', 'GOVERNED_OPINION'],
-      chat_boundary: { execution_access: false, constitutional_write_access: false },
+      chat_boundary: { execution_access: false, constitutional_write_access: false, world_write_access: false },
+      business_model: 'BUSINESS_CONTEXT_AS_OPERATIONAL_MODEL',
     });
   }
 
@@ -38,10 +39,15 @@ export default async function handler(req, res) {
       : null;
 
     const opinion = governedOpinion({
-      status: work ? 'INVESTIGATION_REQUIRED' : 'ASK_CLARIFICATION_REQUIRED',
+      status: work ? 'INVESTIGATION_REQUIRED' : 'ASK',
+      answer: null,
       establishedFacts: interpretation.known_facts,
       unresolvedQuestions: interpretation.unknowns,
+      hypotheses: work?.hypothesis ? [work.hypothesis] : [],
       nextStep: interpretation.next_decision,
+      decision: interpretation.next_decision,
+      authorityRequired: false,
+      basis: [{ type: 'BUSINESS_PURPOSE', value: businessUpdate.purpose }],
     });
 
     return json(res, 200, {
