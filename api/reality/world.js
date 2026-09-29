@@ -3,11 +3,13 @@ import { CONSTITUTION, CONSTITUTION_VERSION, evaluateConstitution } from '../../
 const PROVIDERS = Object.freeze({
   github: { name: 'GitHub', scope: 'repository', connector: 'connected_integration' },
   vercel: { name: 'Vercel', scope: 'project', connector: 'connected_integration' },
+  base44: { name: 'Base44', scope: 'app', connector: 'connected_integration' },
 });
 
 const ACTIONS = Object.freeze({
   github: ['read_repository', 'create_repository_file', 'update_repository_file', 'create_pull_request'],
   vercel: ['read_project', 'read_deployment', 'trigger_deployment'],
+  base44: ['read_app', 'read_file', 'read_connectors'],
 });
 
 function json(res, status, body) {
