@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-
-import assert from 'node:assert/strict';
+import { createEKR, retrieveRelevantEKR } from '../src/reality-ekr.js';
 
 export const BENCHMARK_VERSION = 'reality-hidden-world-benchmark-v0.1';
 
@@ -38,17 +37,12 @@ export const HIDDEN_WORLDS = Object.freeze({
 });
 
 export const PRIOR_KNOWLEDGE = Object.freeze([
-  Object.freeze({
+  createEKR({
     id: 'ekr-prior-001',
-    status: 'RESOLUTION',
-    epistemicStatus: 'CONDITIONAL',
-    context: Object.freeze({
-      dependencyVersion: 'v2',
-      apiVersion: '2026.09',
-    }),
-    condition: 'capacity >= 50',
+    context: { dependencyVersion: 'v2', apiVersion: '2026.09' },
+    condition: { type: 'minimum', field: 'capacity', value: 50 },
     verifiedOutcome: 'migration succeeds',
-    applicability: 'same dependencyVersion and apiVersion; capacity threshold remains satisfied',
+    resolution: 'Migration succeeds when dependency/API context matches and capacity is >= 50.',
   }),
 ]);
 
@@ -74,17 +68,14 @@ export function baselineReasoner(world) {
 }
 
 export function experienceReasoner(world, priorKnowledge = PRIOR_KNOWLEDGE) {
-  const applicable = retrieveRelevantEKR({
+  const relevant = retrieveRelevantEKR({
     records: priorKnowledge,
     observedContext: world,
   });
 
   const thresholdWarning = world.capacity < 50
-    && applicable.length === 0
-    && priorKnowledge.some((prior) => (
-      prior.context?.dependencyVersion === world.dependencyVersion
-      && prior.context?.apiVersion === world.apiVersion
-      && prior.condition?.type === 'minimum'
+    && relevant.some((prior) => (
+      prior.condition?.type === 'minimum'
       && prior.condition.field === 'capacity'
       && world.capacity < prior.condition.value
     ));
@@ -94,7 +85,7 @@ export function experienceReasoner(world, priorKnowledge = PRIOR_KNOWLEDGE) {
       mode: 'EXPERIENCE_ENABLED',
       proposal: 'INVESTIGATE_CAPACITY_OR_ALTERNATIVE',
       confidence: 0.85,
-      knowledgeUsed: applicable.map((prior) => prior.id),
+      knowledgeUsed: relevant.map((prior) => prior.id),
       applicability: 'SUPPORTED_CONSTRAINT',
     };
   }
@@ -103,8 +94,8 @@ export function experienceReasoner(world, priorKnowledge = PRIOR_KNOWLEDGE) {
     mode: 'EXPERIENCE_ENABLED',
     proposal: world.dependencyVersion === 'v2' ? 'MIGRATE' : 'INVESTIGATE',
     confidence: world.apiVersion === '2026.09' ? 0.9 : 0.55,
-    knowledgeUsed: applicable.map((prior) => prior.id),
-    applicability: applicable.length ? 'SUPPORTED_CONTEXT' : 'NO_MATCHING_PRIOR',
+    knowledgeUsed: relevant.map((prior) => prior.id),
+    applicability: relevant.length ? 'SUPPORTED_CONTEXT' : 'NO_MATCHING_PRIOR',
   };
 }
 
@@ -158,12 +149,10 @@ export function assertBenchmarkInvariants(result) {
   assert.equal(result.baseline.length, 2);
   assert.equal(result.experienceEnabled.length, 2);
 
-  // World B is the transfer test: the old success pattern must not be blindly reused.
   assert.equal(result.baseline[0].decision.proposal, 'MIGRATE');
   assert.equal(result.experienceEnabled[0].decision.proposal, 'INVESTIGATE_CAPACITY_OR_ALTERNATIVE');
   assert.equal(result.experienceEnabled[0].decisionCorrect, true);
 
-  // World C changes a material condition; the prior must not be treated as universally applicable.
   assert.equal(result.experienceEnabled[1].decision.applicability, 'NO_MATCHING_PRIOR');
   assert.equal(result.experienceEnabled[1].decision.proposal, 'MIGRATE');
 
