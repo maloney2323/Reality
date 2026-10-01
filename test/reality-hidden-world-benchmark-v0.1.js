@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 
+import assert from 'node:assert/strict';
+
 export const BENCHMARK_VERSION = 'reality-hidden-world-benchmark-v0.1';
 
 export const HIDDEN_WORLDS = Object.freeze({
