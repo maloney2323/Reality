@@ -54,8 +54,13 @@ export function retrieveRelevantEKR({ records = [], observedContext = {} } = {})
     && record.state === 'RESOLUTION'
     && record.epistemic_status !== 'OBSOLETE'
     && contextMatches(record, observedContext)
-    && conditionMatches(record, observedContext)
   ));
+}
+
+export function retrieveApplicableEKR({ records = [], observedContext = {} } = {}) {
+  return retrieveRelevantEKR({ records, observedContext }).filter((record) =>
+    conditionMatches(record, observedContext)
+  );
 }
 
 export function buildEpistemicPrior(records = []) {
@@ -82,10 +87,4 @@ export function invalidateContradictedEKR(record, contradictionEvidence) {
     contradiction: clone(contradictionEvidence),
     invalidated_at: new Date().toISOString(),
   };
-}
-
-export function retrieveApplicableEKR({ records = [], observedContext = {} } = {}) {
-  return retrieveRelevantEKR({ records, observedContext }).filter((record) =>
-    conditionMatches(record, observedContext)
-  );
 }
