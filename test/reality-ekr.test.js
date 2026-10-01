@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {
   EKR_VERSION,
   createEKR,
-  retrieveApplicableEKR,\n  retrieveRelevantEKR,
+  retrieveApplicableEKR,
+  retrieveRelevantEKR,
   buildEpistemicPrior,
   invalidateContradictedEKR,
 } from '../src/reality-ekr.js';
@@ -19,9 +20,9 @@ const prior = createEKR({
 assert.equal(EKR_VERSION, 'reality-ekr-v0.1');
 
 assert.equal(
-  retrieveApplicableEKR({
+  retrieveRelevantEKR({
     records: [prior],
-    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.09', capacity: 80 },
+    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.09', capacity: 40 },
   }).length,
   1,
 );
@@ -29,15 +30,15 @@ assert.equal(
 assert.equal(
   retrieveApplicableEKR({
     records: [prior],
-    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.10', capacity: 80 },
+    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.09', capacity: 40 },
   }).length,
   0,
 );
 
 assert.equal(
-  retrieveApplicableEKR({
+  retrieveRelevantEKR({
     records: [prior],
-    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.09', capacity: 40 },
+    observedContext: { dependencyVersion: 'v2', apiVersion: '2026.10', capacity: 80 },
   }).length,
   0,
 );
