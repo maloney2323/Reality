@@ -74,14 +74,20 @@ export function baselineReasoner(world) {
 }
 
 export function experienceReasoner(world, priorKnowledge = PRIOR_KNOWLEDGE) {
-  const applicable = priorKnowledge.filter((prior) => (
-    prior.status === 'RESOLUTION'
-    && prior.context.dependencyVersion === world.dependencyVersion
-    && prior.context.apiVersion === world.apiVersion
-  ));
+  const applicable = retrieveApplicableEKR({
+    records: priorKnowledge,
+    observedContext: world,
+  });
 
   const thresholdWarning = world.capacity < 50
-    && applicable.some((prior) => prior.condition === 'capacity >= 50');
+    && applicable.length === 0
+    && priorKnowledge.some((prior) => (
+      prior.context?.dependencyVersion === world.dependencyVersion
+      && prior.context?.apiVersion === world.apiVersion
+      && prior.condition?.type === 'minimum'
+      && prior.condition.field === 'capacity'
+      && world.capacity < prior.condition.value
+    ));
 
   if (thresholdWarning) {
     return {
