@@ -48,7 +48,7 @@ export function createEKR({
   });
 }
 
-export function retrieveApplicableEKR({ records = [], observedContext = {} } = {}) {
+export function retrieveRelevantEKR({ records = [], observedContext = {} } = {}) {
   return records.filter((record) => (
     record?.ekr_version === EKR_VERSION
     && record.state === 'RESOLUTION'
@@ -82,4 +82,10 @@ export function invalidateContradictedEKR(record, contradictionEvidence) {
     contradiction: clone(contradictionEvidence),
     invalidated_at: new Date().toISOString(),
   };
+}
+
+export function retrieveApplicableEKR({ records = [], observedContext = {} } = {}) {
+  return retrieveRelevantEKR({ records, observedContext }).filter((record) =>
+    conditionMatches(record, observedContext)
+  );
 }
