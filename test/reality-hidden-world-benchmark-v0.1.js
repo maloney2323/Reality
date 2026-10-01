@@ -74,7 +74,7 @@ export function baselineReasoner(world) {
 }
 
 export function experienceReasoner(world, priorKnowledge = PRIOR_KNOWLEDGE) {
-  const applicable = retrieveApplicableEKR({
+  const applicable = retrieveRelevantEKR({
     records: priorKnowledge,
     observedContext: world,
   });
