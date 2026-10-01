@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   EKR_VERSION,
   createEKR,
-  retrieveApplicableEKR,
+  retrieveApplicableEKR,\n  retrieveRelevantEKR,
   buildEpistemicPrior,
   invalidateContradictedEKR,
 } from '../src/reality-ekr.js';
