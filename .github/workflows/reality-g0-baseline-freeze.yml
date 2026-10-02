@@ -44,7 +44,10 @@ jobs:
         with:
           name: g0-subject-results
           path: .
-      - name: Run independent G0 oracle and freeze receipt
+      - name: Run independent G0 oracle against sealed and novel distributions
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          G0_ORACLE_MODE: independent
         run: node --experimental-default-type=module test/run-reality-g0-oracle-v0.1.mjs
       - name: Upload frozen G0 receipt
         uses: actions/upload-artifact@v4
