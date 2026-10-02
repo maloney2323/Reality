@@ -1,2 +1,0 @@
-Cognitive Research Engine CI trigger marker.
-This file exists only to produce a real pull-request event so GitHub Actions can execute the benchmark.
