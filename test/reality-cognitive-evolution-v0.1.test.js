@@ -107,6 +107,10 @@ function execute(primitive, problem) {
     decomposition,
     cost: decomposition.subproblems.length + decomposition.dependencies.length,
     generalizes: hasDependency || hasUnknown,
+    quality_score: (
+      (hasUnknown ? 0.5 : 0)
+      + (hasDependency ? 0.5 : 0)
+    ),
   };
 }
 
@@ -122,11 +126,19 @@ export function runCognitiveEvolutionBenchmark() {
     evaluation,
     minimumAccuracyDelta: 0,
     minimumGeneralizationDelta: 0,
+    minimumQualityDelta: 0.25,
   });
 
   const heldOut = assertPrimitiveEvaluationIntegrity({
     evaluation,
     hiddenCases: HIDDEN_PROBLEMS,
+  });
+
+  const hiddenEvaluation = evaluatePrimitive({
+    primitive: candidatePrimitive,
+    baselinePrimitive,
+    cases: HIDDEN_PROBLEMS,
+    executor: execute,
   });
 
   const generated = generateProblemDecompositionPrimitive({
@@ -144,6 +156,7 @@ export function runCognitiveEvolutionBenchmark() {
     evaluation,
     selection,
     held_out: heldOut,
+    hidden_evaluation: hiddenEvaluation,
     generated_primitive: generated,
     composite_primitive: composite,
     fingerprints: {
@@ -158,6 +171,7 @@ export function assertCognitiveEvolutionBenchmark(result) {
   if (result.evaluation.case_count !== PROBLEMS.length) throw new Error('CASE_COUNT_MISMATCH');
   if (result.held_out.integrity !== 'HELD_OUT') throw new Error('HELD_OUT_INTEGRITY_FAILED');
   if (result.selection.decision !== 'KEEP') throw new Error('CANDIDATE_NOT_SELECTED');
+  if (result.hidden_evaluation.metrics.quality_delta <= 0) throw new Error('HIDDEN_CAPABILITY_GAIN_MISSING');
   if (!result.generated_primitive.parent_primitive_id) throw new Error('GENERATOR_LINEAGE_MISSING');
   if (result.composite_primitive.metadata.composed_from.length !== 2) throw new Error('COMPOSITION_LINEAGE_MISSING');
 }
