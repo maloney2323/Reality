@@ -310,6 +310,8 @@ export function evaluatePrimitive({ primitive, baselinePrimitive, cases = [], ex
       baseline_cost: Number(baseline?.cost ?? 0),
       candidate_generalizes: candidate?.generalizes === true,
       baseline_generalizes: baseline?.generalizes === true,
+      candidate_quality_score: Number(candidate?.quality_score ?? 0),
+      baseline_quality_score: Number(baseline?.quality_score ?? 0),
     };
   });
 
@@ -318,6 +320,8 @@ export function evaluatePrimitive({ primitive, baselinePrimitive, cases = [], ex
   const baselineAccuracy = rate('baseline_correct');
   const candidateGeneralization = rate('candidate_generalizes');
   const baselineGeneralization = rate('baseline_generalizes');
+  const candidateQuality = results.reduce((sum, r) => sum + r.candidate_quality_score, 0) / results.length;
+  const baselineQuality = results.reduce((sum, r) => sum + r.baseline_quality_score, 0) / results.length;
 
   return {
     evaluator_version: 'cognitive-capability-evaluator-v0.1',
@@ -332,18 +336,22 @@ export function evaluatePrimitive({ primitive, baselinePrimitive, cases = [], ex
       candidate_generalization: candidateGeneralization,
       baseline_generalization: baselineGeneralization,
       generalization_delta: candidateGeneralization - baselineGeneralization,
+      candidate_quality_score: candidateQuality,
+      baseline_quality_score: baselineQuality,
+      quality_delta: candidateQuality - baselineQuality,
       candidate_mean_cost: results.reduce((sum, r) => sum + r.candidate_cost, 0) / results.length,
       baseline_mean_cost: results.reduce((sum, r) => sum + r.baseline_cost, 0) / results.length,
     },
   };
 }
 
-export function selectPrimitive({ evaluation, minimumAccuracyDelta = 0, minimumGeneralizationDelta = 0 } = {}) {
+export function selectPrimitive({ evaluation, minimumAccuracyDelta = 0, minimumGeneralizationDelta = 0, minimumQualityDelta = 0 } = {}) {
   if (!evaluation?.metrics) throw new Error('EVALUATION_REQUIRED');
 
   const passes = (
     evaluation.metrics.accuracy_delta >= minimumAccuracyDelta
     && evaluation.metrics.generalization_delta >= minimumGeneralizationDelta
+    && evaluation.metrics.quality_delta >= minimumQualityDelta
   );
 
   return {
