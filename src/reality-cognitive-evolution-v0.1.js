@@ -57,7 +57,7 @@ export function createReasoningPrimitive({
     output_contract: clone(outputContract || {}),
     strategy,
     preconditions: clone(preconditions),
-    applicability_domain,
+    applicability_domain: applicabilityDomain,
     resource_budget: clone(resourceBudget),
     allowed_tools: [...allowedTools],
     evaluation_protocol: evaluationProtocol,
