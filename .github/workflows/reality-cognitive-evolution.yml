@@ -1,6 +1,8 @@
 name: Reality Cognitive Evolution Benchmarks
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
     paths:
       - 'src/reality-cognitive-evolution-v0.1.js'
