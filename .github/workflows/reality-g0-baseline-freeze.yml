@@ -1,0 +1,54 @@
+name: Reality G0 Baseline Freeze
+
+on:
+  push:
+    paths:
+      - 'src/reality-cognitive-baseline-v0.1.js'
+      - 'src/reality-cognitive-evolution-v0.1.js'
+      - 'src/reality-cognitive-research-engine-v0.1.js'
+      - 'src/reality-cognitive-invention-v0.1.js'
+      - 'test/g0-development-cases.js'
+      - 'test/g0-sealed-cases.js'
+      - 'test/g0-novel-cases.js'
+      - 'test/run-reality-g0-baseline-v0.1.mjs'
+      - 'test/run-reality-g0-oracle-v0.1.mjs'
+      - '.github/workflows/reality-g0-baseline-freeze.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  g0-subject:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run G0 subject against development distribution only
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          G0_MODEL: gpt-5.6
+        run: node --experimental-default-type=module test/run-reality-g0-baseline-v0.1.mjs
+      - name: Upload subject artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-subject-results
+          path: g0-artifact/
+          retention-days: 7
+
+  g0-independent-oracle:
+    needs: g0-subject
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download subject artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: g0-subject-results
+          path: .
+      - name: Run independent G0 oracle and freeze receipt
+        run: node --experimental-default-type=module test/run-reality-g0-oracle-v0.1.mjs
+      - name: Upload frozen G0 receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-baseline-receipt
+          path: g0-artifact/G0_BASELINE_RECEIPT_V0.1.json
+          retention-days: 90
