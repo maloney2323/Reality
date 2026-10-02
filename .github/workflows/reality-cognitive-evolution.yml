@@ -8,12 +8,15 @@ on:
       - 'src/reality-capability-gap-detector-v0.1.js'
       - 'src/reality-adversarial-critique-v0.1.js'
       - 'src/reality-capability-evolution-ledger-v0.1.js'
+      - 'src/reality-governed-cognitive-loop-v0.1.js'
       - 'test/reality-cognitive-evolution-v0.1.test.js'
       - 'test/run-reality-cognitive-evolution-v0.1.mjs'
       - 'test/reality-cognitive-research-engine-v0.1.test.js'
       - 'test/run-reality-cognitive-research-engine-v0.1.mjs'
       - 'test/reality-intelligence-primitives-v0.1.test.js'
       - 'test/run-reality-intelligence-primitives-v0.1.mjs'
+      - 'test/reality-governed-cognitive-loop-v0.1.test.js'
+      - 'test/run-reality-governed-cognitive-loop-v0.1.mjs'
       - '.github/workflows/reality-cognitive-evolution.yml'
   workflow_dispatch:
 
@@ -33,6 +36,14 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Intelligence Primitives v0.1
         run: node --experimental-default-type=module test/run-reality-intelligence-primitives-v0.1.mjs
+
+  governed-cognitive-loop-v01:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Reality
+        uses: actions/checkout@v4
+      - name: Run Governed Cognitive Loop v0.1
+        run: node --experimental-default-type=module test/run-reality-governed-cognitive-loop-v0.1.mjs
 
   cognitive-research-engine-v01:
     runs-on: ubuntu-latest
