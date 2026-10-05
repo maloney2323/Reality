@@ -1,4 +1,4 @@
-import { invokeOpenAiStructured, REALITY_OPENAI_MODEL } from '../../reality-direct-model-provider.js';
+import { invokeOpenAiStructured, REALITY_OPENAI_MODEL } from '../../src/reality-direct-model-provider.js';
 
 function json(res, status, body) {
   res.statusCode = status;
