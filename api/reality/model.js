@@ -7,16 +7,19 @@ function json(res, status, body) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('allow', 'POST');
-    return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
-  }
-
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 503, { error: 'OPENAI_API_KEY_NOT_CONFIGURED', verified: false });
 
   const body = typeof req.body === 'object' && req.body ? req.body : {};
-  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  const queryPrompt = typeof req.query?.prompt === 'string' ? req.query.prompt.trim() : '';
+  const prompt = req.method === 'GET'
+    ? (queryPrompt || 'Return exactly JSON with answer set to MODEL_PATH_LIVE_OK.')
+    : (typeof body.prompt === 'string' ? body.prompt.trim() : '');
+
+  if (!['GET', 'POST'].includes(req.method)) {
+    res.setHeader('allow', 'GET, POST');
+    return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
+  }
   if (!prompt) return json(res, 400, { error: 'PROMPT_REQUIRED', verified: false });
 
   try {
