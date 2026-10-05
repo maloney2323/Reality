@@ -10,6 +10,7 @@ on:
       - 'src/reality-capability-evolution-ledger-v0.1.js'
       - 'src/reality-governed-cognitive-loop-v0.1.js'
       - 'src/reality-intelligence-orchestrator-v0.1.js'
+      - 'api/worldline-proof.js'
       - 'test/reality-cognitive-evolution-v0.1.test.js'
       - 'test/run-reality-cognitive-evolution-v0.1.mjs'
       - 'test/reality-cognitive-research-engine-v0.1.test.js'
