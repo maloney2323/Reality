@@ -41,3 +41,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
+// Preview runtime probe: verifies the configured Vercel environment reaches OpenAI directly.
