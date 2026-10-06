@@ -1,0 +1,16 @@
+name: System Discovery v0.1
+on:
+  push:
+    branches: [main]
+    paths: ['src/reality-system-discovery-v0.1.js','test/reality-system-discovery-v0.1.test.js','api/reality/discover.js','.github/workflows/reality-system-discovery-v0.1.yml']
+  pull_request:
+    paths: ['src/reality-system-discovery-v0.1.js','test/reality-system-discovery-v0.1.test.js','api/reality/discover.js','.github/workflows/reality-system-discovery-v0.1.yml']
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: node --test test/reality-system-discovery-v0.1.test.js
