@@ -26,7 +26,7 @@ function materialityFromSignal(signal) {
     .join('\n')
     .toLowerCase();
 
-  return /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(actionableText)
+  return /\b(create|execute|send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(actionableText)
     ? 'ACTION_CANDIDATE'
     : 'CONVERSATIONAL';
 }
