@@ -24,9 +24,15 @@ function extractGitHubIssueProposal(answer) {
   if (!/\bGitHub\b/i.test(text)) return null;
 
   const titleMatch = text.match(/(?:\*\*\s*)?(?:Issue\s+title|Title)(?:\s*\*\*)?\s*:\s*([^\n]+)/i);
-  const bodyMatch = text.match(/(?:\*\*\s*)?(?:Issue\s+body|Body)(?:\s*\*\*)?\s*:\s*\n([\s\S]*?)(?=\n(?:\*\*\s*)?(?:Repository|Issue\s+title|Title|Issue\s+body|Body)\b\s*:?|$)/i);
-  const title = titleMatch?.[1]?.trim().replace(/^\`\`\`(?:text)?\s*/i, '').replace(/\s*\`\`\`$/i, '') || '';
-  const body = bodyMatch?.[1]?.trim().replace(/^\`\`\`(?:markdown|text)?\s*\n?/i, '').replace(/\n\s*\`\`\`\s*$/i, '') || '';
+  const bodyMarker = text.match(/(?:\*\*\s*)?(?:Issue\s+body|Body)(?:\s*\*\*)?\s*:/i);
+  if (!titleMatch || !bodyMarker) return null;
+
+  const title = titleMatch[1].trim().replace(/^\`\`\`(?:text)?\s*/i, '').replace(/\s*\`\`\`$/i, '');
+  const bodyStart = bodyMarker.index + bodyMarker[0].length;
+  const remainder = text.slice(bodyStart).replace(/^\s*\n/, '');
+  const nextSection = remainder.search(/\n\s*\*\*[^\n]+\*\*\s*:/i);
+  const body = (nextSection >= 0 ? remainder.slice(0, nextSection) : remainder)
+    .trim().replace(/^\`\`\`(?:markdown|text)?\s*\n?/i, '').replace(/\n\s*\`\`\`\s*$/i, '');
 
   if (!title || !body || title.length > 200 || body.length > 10000) return null;
   return Object.freeze({ title, body });
