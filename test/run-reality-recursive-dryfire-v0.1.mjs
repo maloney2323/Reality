@@ -4,8 +4,10 @@ import { runRecursiveClosure } from '../src/reality-recursive-closure-conductor-
 import { createActionProposal, evaluateGovernance, createAuthorization, createExecutionReceipt, reconcileVerifiedOutcome as reconcileBridge } from '../src/reality-cognition-execution-bridge-v0.1.js';
 import { createBitemporalLedgerEntry } from '../src/reality-universe-bitemporal-ledger-v0.1.js';
 import { runUniverseCognitionPass } from '../src/reality-universe-cognition-runner-v0.1.js';
+import { createDryfirePersistenceAdapter, persistRecursiveClosureTrace, reloadRecursiveClosureTrace } from '../src/reality-universe-dryfire-persistence-v0.1.js';
 
 const world = createRecursiveDryfireWorld();
+const persistence = createDryfirePersistenceAdapter();
 assert.deepEqual(validateDryfireWorld(world).valid, true);
 
 let executionBridgeReceipt;
@@ -181,8 +183,40 @@ assert.ok(result.universeUpdate.universe_learning_update_id);
 assert.ok(result.nextCognitiveState.cognitive_state_id);
 assert.equal(result.continuation.next_cognitive_state_id, result.nextCognitiveState.cognitive_state_id);
 
+const ledgerEntry = createBitemporalLedgerEntry({
+  entryId: 'ledger:shipment-8472:persistence-proof', eventKind: 'VERIFIED_OUTCOME',
+  effectiveTime: '2026-10-01T16:42:00Z', assertionTime: '2026-10-01T16:43:00Z',
+  continuityRootId: world.continuityRootId, worldlineId: world.worldlineId,
+  payload: { outcome_id: result.verifiedOutcome.outcome_id },
+  evidenceReferences: result.targetObservation.evidence_references,
+  sourceRef: result.independentVerification.verification_id,
+});
+await persistRecursiveClosureTrace({ persistence, result, ledgerEntry });
+assert.equal(persistence.size(), 8);
+const reloaded = reloadRecursiveClosureTrace(persistence);
+assert.equal(reloaded.executionReceipt.execution_receipt_hash, result.executionReceipt.execution_receipt_hash);
+assert.equal(reloaded.targetObservation.execution_receipt_hash, reloaded.executionReceipt.execution_receipt_hash);
+assert.equal(reloaded.independentVerification.execution_receipt_hash, reloaded.executionReceipt.execution_receipt_hash);
+assert.equal(reloaded.independentVerification.target_observation_id, reloaded.targetObservation.observation_id);
+assert.equal(reloaded.verifiedOutcome.independent_verification_id, reloaded.independentVerification.verification_id);
+assert.equal(reloaded.learningDelta.source_outcome_id, reloaded.verifiedOutcome.outcome_id);
+assert.equal(reloaded.nextCognitiveState.cognitive_state_id, result.nextCognitiveState.cognitive_state_id);
+const reconstructed = {
+  worldId: world.worldId, continuityRootId: world.continuityRootId, worldlineId: world.worldlineId,
+  evidence: [...world.evidence, reloaded.targetObservation],
+  capabilities: [{ id: world.capability.capability_id, status: 'VERIFIED' }],
+  work: [{ ...world.workItem, status: 'COMPLETED', missing_capabilities: [] }],
+  outcomes: [{ id: reloaded.verifiedOutcome.outcome_id, kind: 'VERIFIED_OUTCOME', claim: world.verifiedOutcome.claim }],
+};
+const resumedFromPersisted = await runUniverseCognitionPass({ universe: reconstructed, ledgerEntry: reloaded.ledgerEntry });
+assert.equal(resumedFromPersisted.state.world_id, world.worldId);
+assert.equal(resumedFromPersisted.state.verified_outcomes[0].id, reloaded.verifiedOutcome.outcome_id);
+
 console.log(JSON.stringify({
   dryfire: 'PASS',
+  persistence_dryfire: 'PASS',
+  persisted_records: persistence.size(),
+  reloaded_cognitive_state_id: resumedFromPersisted.state.state_id,
   state: result.state,
   work_item_id: result.continuation.original_work_item_id,
   execution_receipt_hash: result.executionReceipt.execution_receipt_hash,
