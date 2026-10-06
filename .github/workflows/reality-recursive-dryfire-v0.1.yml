@@ -1,0 +1,20 @@
+name: Reality Recursive Closure Dryfire v0.1
+
+on:
+  push:
+    branches:
+      - universe-cognition-engine-v0.1
+    paths:
+      - 'src/reality-*.js'
+      - 'test/run-reality-recursive-dryfire-v0.1.mjs'
+      - '.github/workflows/reality-recursive-dryfire-v0.1.yml'
+  workflow_dispatch:
+
+jobs:
+  recursive-dryfire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Reality
+        uses: actions/checkout@v4
+      - name: Run controlled recursive dryfire
+        run: node --experimental-default-type=module test/run-reality-recursive-dryfire-v0.1.mjs
