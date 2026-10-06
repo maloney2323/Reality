@@ -92,7 +92,7 @@ assert.equal(foldEKRState(assertion, [asserted, verified, contradicted]).epistem
 assert.throws(() => validateEKRVerification({
   verificationLevel: 'verified_outcome',
   verificationLineage: { execution_receipt_ref: 'x', target_observation_ref: 'y' },
-}), /INDEPENDENT_VERIFICATION_LINEAGE_REQUIRED/);
+}), /VERIFIED_OUTCOME_LINEAGE_REQUIRED/);
 assert.throws(() => validateEKRVerification({
   verificationLevel: 'execution_receipt',
   verificationLineage: {},
