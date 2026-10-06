@@ -95,7 +95,7 @@ assert.throws(() => validateEKRVerification({
 }), /VERIFIED_OUTCOME_LINEAGE_REQUIRED/);
 assert.throws(() => validateEKRVerification({
   verificationLevel: 'execution_receipt',
-  verificationLineage: {},
+  verificationLineage: { execution_receipt_ref: 'execution:gate-test' },
   eventType: 'VERIFICATION_CONFIRMED',
 }), /VERIFICATION_CONFIRMATION_REQUIRES_INDEPENDENT_VERIFICATION/);
 
