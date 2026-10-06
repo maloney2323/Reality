@@ -1,0 +1,22 @@
+name: Reality Capability Growth Engine v0.1
+on:
+  push:
+    paths:
+      - 'src/reality-capability-growth-engine-v0.1.js'
+      - 'test/reality-capability-growth-engine-v0.1.test.js'
+      - 'api/reality/capability-growth.js'
+      - '.github/workflows/reality-capability-growth-engine-v0.1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-capability-growth-engine-v0.1.js'
+      - 'test/reality-capability-growth-engine-v0.1.test.js'
+      - 'api/reality/capability-growth.js'
+      - '.github/workflows/reality-capability-growth-engine-v0.1.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: node --test test/reality-capability-growth-engine-v0.1.test.js
