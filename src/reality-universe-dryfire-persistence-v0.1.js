@@ -1,17 +1,12 @@
-import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex'); }
 
-function hash(value) {
-  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
+export const PERSISTENCE_INTEGRITY_VERSION = '0.1.0';
 
 export function createDryfirePersistenceAdapter() {
   const store = new Map();
-
   return Object.freeze({
     append(record) {
       if (!record?.record_id) throw new Error('PERSISTENCE_RECORD_ID_REQUIRED');
@@ -26,19 +21,32 @@ export function createDryfirePersistenceAdapter() {
       if (!record) throw new Error('PERSISTED_RECORD_NOT_FOUND');
       return clone(record);
     },
-    list() {
-      return [...store.values()].map(clone);
+    list() { return [...store.values()].map(clone); },
+    corruptPayload(recordId, mutate) {
+      const record = store.get(recordId);
+      if (!record) throw new Error('PERSISTED_RECORD_NOT_FOUND');
+      record.payload = mutate(clone(record.payload));
+      store.set(recordId, record);
+      return clone(record);
     },
-    clearMemory() {
-      return true;
-    },
-    size() {
-      return store.size;
-    },
+    delete(recordId) { return store.delete(recordId); },
+    size() { return store.size; },
   });
 }
 
-export async function persistRecursiveClosureTrace({ persistence, result, ledgerEntry }) {
+export function verifyPersistenceIntegrity(persistence) {
+  const records = persistence.list();
+  for (const record of records) {
+    const { persistence_hash, ...unsigned } = record;
+    if (!persistence_hash) throw new Error('EPISTEMIC_INTEGRITY_VIOLATION:PERSISTENCE_HASH_MISSING');
+    if (hash(unsigned) !== persistence_hash) {
+      throw new Error(`EPISTEMIC_INTEGRITY_VIOLATION:PERSISTENCE_HASH_MISMATCH:${record.record_id}`);
+    }
+  }
+  return Object.freeze({ verified: true, record_count: records.length });
+}
+
+export function persistRecursiveClosureTrace({ persistence, result, ledgerEntry }) {
   const records = [
     { record_id: 'trace:execution', kind: 'EXECUTION_RECEIPT', payload: result.executionReceipt },
     { record_id: 'trace:target-observation', kind: 'TARGET_OBSERVATION', payload: result.targetObservation },
@@ -54,6 +62,7 @@ export async function persistRecursiveClosureTrace({ persistence, result, ledger
 }
 
 export function reloadRecursiveClosureTrace(persistence) {
+  verifyPersistenceIntegrity(persistence);
   const read = (id) => persistence.read(id).payload;
   return Object.freeze({
     executionReceipt: read('trace:execution'),
