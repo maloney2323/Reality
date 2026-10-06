@@ -24,7 +24,7 @@ test('capability contract cannot register before independent verification', () =
     verificationSuite:['known-input','malformed-input'],
     status:'UNVERIFIED'
   });
-  assert.throws(() => createVerifiedRegistration({contract:c,verification:{verified:false},sourceRef:'x',verificationRef:'y'}), /CAPABILITY_NOT_VERIFIED/);
+  assert.throws(() => createVerifiedRegistration({contract:c,verification:{verified:false},sourceRef:'x',verificationRef:'y'}), /INDEPENDENT_CAPABILITY_VERIFICATION_REQUIRED/);
 });
 
 test('bounded proposal rejects governance and security files', () => {
@@ -80,8 +80,7 @@ test('resume token preserves original work continuity', () => {
 test('forbidden acquisition never passes authority gate', () => {
   const c = createCapabilityContract({capabilityId:'x.y',description:'x',inputSchema:'x',outputSchema:'y',verificationSuite:['x']});
   const gap = createCapabilityGap({workItemId:'w3',blockedStepId:'s3',gapType:'MISSING_CAPABILITY',capabilityId:c.capability_id});
-  const proposal = createGrowthProposal({gap,contract:c,allowedFiles:['src/capabilities/x.js'],acquisitionActions:['modify_governance']});
-  assert.throws(() => proposal, /FORBIDDEN_ACQUISITION_ACTION/);
+  assert.throws(() => createGrowthProposal({gap,contract:c,allowedFiles:['src/capabilities/x.js'],acquisitionActions:['modify_governance']}), /FORBIDDEN_ACQUISITION_ACTION/);
 });
 
 test('growth run can progress to resumed without rewriting policy', () => {
