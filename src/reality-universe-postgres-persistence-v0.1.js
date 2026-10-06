@@ -29,7 +29,6 @@ export function createUniversePostgresPersistence({
       method,
       headers: {
         apikey: key,
-        Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
         ...headers,
       },
