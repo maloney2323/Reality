@@ -1,0 +1,21 @@
+name: EKR v0.2
+on:
+  push:
+    paths:
+      - 'src/reality-ekr-v0.2.js'
+      - 'test/reality-ekr-v0.2.test.js'
+      - '.github/workflows/ekr-v0.2.yml'
+  pull_request:
+    paths:
+      - 'src/reality-ekr-v0.2.js'
+      - 'test/reality-ekr-v0.2.test.js'
+      - '.github/workflows/ekr-v0.2.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node test/reality-ekr-v0.2.test.js
