@@ -4,6 +4,10 @@
     {
       "path": "/api/reality-shadow",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/reality/shift",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
