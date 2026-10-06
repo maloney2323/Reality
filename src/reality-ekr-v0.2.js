@@ -90,6 +90,18 @@ function normalizeRefs(values = []) {
   return stableArray(values.filter((value) => typeof value === 'string' && value.length > 0));
 }
 
+export function verificationLevelFromLineage(verificationLineage = {}) {
+  const { execution_receipt_ref: execution, target_observation_ref: target, independent_verification_ref: independent, verified_outcome_ref: outcome } = verificationLineage;
+  if (outcome && !independent) throw new Error('VERIFIED_OUTCOME_REQUIRES_INDEPENDENT_VERIFICATION');
+  if (independent && (!target || !execution)) throw new Error('INDEPENDENT_VERIFICATION_REQUIRES_TARGET_AND_EXECUTION');
+  if (target && !execution) throw new Error('TARGET_OBSERVATION_REQUIRES_EXECUTION');
+  if (outcome) return 'verified_outcome';
+  if (independent) return 'independent_verification';
+  if (target) return 'target_observation';
+  if (execution) return 'execution_receipt';
+  return 'none';
+}
+
 export function createEKRAssertion({
   ekrId,
   continuityRootId,
@@ -123,6 +135,7 @@ export function createEKRAssertion({
   if (!confidenceBasis || typeof confidenceBasis !== 'object') throw new Error('CONFIDENCE_BASIS_REQUIRED');
   if (!applicabilityBasis || typeof applicabilityBasis !== 'object') throw new Error('APPLICABILITY_BASIS_REQUIRED');
   if (!Array.isArray(falsifiabilityConditions)) throw new Error('FALSIFIABILITY_CONDITIONS_REQUIRED');
+  verificationLevelFromLineage(verificationLineage);
 
   const assertion = {
     id: ekrId,
@@ -373,10 +386,13 @@ export function migrateLegacyEKRv01(record, { sourceCommit = 'e6d45b1962caceab71
 export function assertAppendOnlyEventStream(events = []) {
   let previousHash = null;
   const ids = new Set();
-  for (const event of events) {
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
     if (ids.has(event.id)) throw new Error('EKR_DUPLICATE_EVENT_ID');
     ids.add(event.id);
-    if (event.previous_event_hash !== undefined && event.previous_event_hash !== previousHash) {
+    if (index === 0) {
+      if (event.previous_event_hash !== undefined) throw new Error('EKR_EVENT_CHAIN_BROKEN');
+    } else if (event.previous_event_hash !== previousHash) {
       throw new Error('EKR_EVENT_CHAIN_BROKEN');
     }
     previousHash = event.event_hash;
