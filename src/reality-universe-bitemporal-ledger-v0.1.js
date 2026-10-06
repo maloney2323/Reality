@@ -127,6 +127,16 @@ export function createBitemporalLedgerEntry({
   });
 }
 
+export function assertLedgerTemporalOrder(previousEntry, nextEntry) {
+  if (!previousEntry) return true;
+  if (!nextEntry) throw new Error('NEXT_LEDGER_ENTRY_REQUIRED');
+  const previousAssertion = Date.parse(previousEntry.assertion_time);
+  const nextAssertion = Date.parse(nextEntry.assertion_time);
+  if (!Number.isFinite(previousAssertion) || !Number.isFinite(nextAssertion)) throw new Error('LEDGER_ASSERTION_TIME_INVALID');
+  if (nextAssertion < previousAssertion) throw new Error('LEDGER_TEMPORAL_PARADOX:ASSERTION_TIME_REGRESSION');
+  return true;
+}
+
 export function assertLedgerContinuity(previousEntry, nextEntry) {
   if (!previousEntry) return true;
   if (!nextEntry) throw new Error('NEXT_LEDGER_ENTRY_REQUIRED');
@@ -143,6 +153,7 @@ export function assertLedgerContinuity(previousEntry, nextEntry) {
     throw new Error('LEDGER_WORLDLINE_MISMATCH');
   }
 
+  assertLedgerTemporalOrder(previousEntry, nextEntry);
   return true;
 }
 
