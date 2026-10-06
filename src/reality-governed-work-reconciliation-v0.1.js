@@ -247,7 +247,15 @@ export function buildReconciledSuccessor({
     committedBy, committedAt
   });
   const successor = createPlanArtifact({
-    ...proposal, planId: proposal.plan_id, reconciliationId: reconciliation.reconciliation_id
+    planId: proposal.plan_id, workflowId: proposal.workflow_id, revision: proposal.revision,
+    derivedFrom: proposal.derived_from, status: proposal.status,
+    validFrom: proposal.valid_from, validTo: proposal.valid_to,
+    recordedAt: proposal.recorded_at, supersededAt: proposal.superseded_at,
+    workItems: proposal.work_items, authorityRequestId: proposal.authority_request_id,
+    authorityDecisionId: proposal.authority_decision_id,
+    authorityDiffId: proposal.authority_diff_id,
+    reconciliationId: reconciliation.reconciliation_id,
+    continuityRootId: proposal.continuity_root_id, worldlineId: proposal.worldline_id
   });
   const lineage = createLineageTransition({
     workflowId: parentPlan.workflow_id, parentPlanId: parentPlan.plan_id,
