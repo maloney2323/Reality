@@ -289,7 +289,7 @@ export function foldEKRState(assertion, events = []) {
     if (event.worldline_id !== assertion.worldline_id) throw new Error('EKR_EVENT_WORLDLINE_MISMATCH');
     if (seen.has(event.id)) throw new Error('EKR_DUPLICATE_EVENT_ID');
     seen.add(event.id);
-    if (event.previous_event_hash !== undefined && event.previous_event_hash !== previousHash) {
+    if ((seen.size === 1 && event.previous_event_hash !== undefined) || (seen.size > 1 && event.previous_event_hash !== previousHash)) {
       throw new Error('EKR_EVENT_CHAIN_BROKEN');
     }
 
