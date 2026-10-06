@@ -46,6 +46,16 @@ export function verifyPersistenceIntegrity(persistence) {
   return Object.freeze({ verified: true, record_count: records.length });
 }
 
+export function verifyRecursiveClosureLineage(trace) {
+  if (!trace?.executionReceipt?.execution_receipt_hash) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:EXECUTION_RECEIPT_MISSING');
+  if (!trace?.targetObservation?.execution_receipt_hash || trace.targetObservation.execution_receipt_hash !== trace.executionReceipt.execution_receipt_hash) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:TARGET_EXECUTION_ORPHANED');
+  if (!trace?.independentVerification?.target_observation_id || trace.independentVerification.target_observation_id !== trace.targetObservation.observation_id) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:VERIFICATION_TARGET_ORPHANED');
+  if (!trace?.independentVerification?.execution_receipt_hash || trace.independentVerification.execution_receipt_hash !== trace.executionReceipt.execution_receipt_hash) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:VERIFICATION_EXECUTION_ORPHANED');
+  if (!trace?.verifiedOutcome?.independent_verification_id || trace.verifiedOutcome.independent_verification_id !== trace.independentVerification.verification_id) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:OUTCOME_VERIFICATION_ORPHANED');
+  if (!trace?.learningDelta?.source_outcome_id || trace.learningDelta.source_outcome_id !== trace.verifiedOutcome.outcome_id) throw new Error('EPISTEMIC_LINEAGE_VIOLATION:LEARNING_OUTCOME_ORPHANED');
+  return Object.freeze({ verified: true });
+}
+
 export function persistRecursiveClosureTrace({ persistence, result, ledgerEntry }) {
   const records = [
     { record_id: 'trace:execution', kind: 'EXECUTION_RECEIPT', payload: result.executionReceipt },
@@ -64,7 +74,7 @@ export function persistRecursiveClosureTrace({ persistence, result, ledgerEntry 
 export function reloadRecursiveClosureTrace(persistence) {
   verifyPersistenceIntegrity(persistence);
   const read = (id) => persistence.read(id).payload;
-  return Object.freeze({
+  const trace = Object.freeze({
     executionReceipt: read('trace:execution'),
     targetObservation: read('trace:target-observation'),
     independentVerification: read('trace:independent-verification'),
@@ -74,4 +84,6 @@ export function reloadRecursiveClosureTrace(persistence) {
     universeUpdate: read('trace:universe-learning-update'),
     nextCognitiveState: read('trace:next-cognitive-state'),
   });
+  verifyRecursiveClosureLineage(trace);
+  return trace;
 }
