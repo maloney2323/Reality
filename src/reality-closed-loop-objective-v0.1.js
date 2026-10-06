@@ -95,7 +95,7 @@ export function recordCapabilityAcquisition(gap, { acquisitionId, artifactRefs =
 export function verifyCapability(acquisition, { verificationId, independent: independentVerification, passed, evidenceRefs = [] } = {}) {
   if (acquisition?.state !== 'CAPABILITY_ACQUIRED') throw new Error('CAPABILITY_ACQUISITION_REQUIRED');
   requireRef(verificationId, 'CAPABILITY_VERIFICATION_ID');
-  if (independent !== true) throw new Error('CAPABILITY_VERIFICATION_MUST_BE_INDEPENDENT');
+  if (independentVerification !== true) throw new Error('CAPABILITY_VERIFICATION_MUST_BE_INDEPENDENT');
   if (passed !== true) throw new Error('CAPABILITY_VERIFICATION_FAILED');
   if (!list(evidenceRefs).length) throw new Error('CAPABILITY_VERIFICATION_EVIDENCE_REQUIRED');
   return freeze({ ...acquisition, state: 'CAPABILITY_VERIFIED', capability_verification_id: verificationId, capability_verification_evidence_refs: list(evidenceRefs), capability_verification_hash: digest({ acquisition_hash: acquisition.acquisition_hash, verificationId, evidenceRefs }) });
