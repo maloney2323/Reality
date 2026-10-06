@@ -69,6 +69,7 @@ export async function runRecursiveClosure({
 
   const learningDelta = await learning.create({
     workItem,
+    executionReceipt: receipt,
     verifiedOutcome,
     targetObservation,
     independentVerification,
