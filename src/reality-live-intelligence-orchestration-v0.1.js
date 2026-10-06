@@ -22,12 +22,10 @@ function isExplicitlyProhibitedFragment(text) {
 function extractGitHubIssueProposal(answer) {
   const text = typeof answer === 'string' ? answer : '';
   if (!/\bGitHub\b/i.test(text)) return null;
-
-  const titleMatch = text.match(new RegExp('\\*\\*(?:Issue title|Title)\\*\\*:?\\s*(?:\\n\\s*'+bt+bt+bt+'(?:text)?\\s*\\n)?([^\\n]+)(?:\\n\\s*'+bt+bt+bt+')?', 'i'));
+  const titleMatch = text.match(/\*\*(?:Issue title|Title)\*\*:?\s*([^\n]+)/i);
   const bodyMatch = text.match(/\*\*(?:Issue body|Body)\*\*:?\s*\n([\s\S]*?)(?=\n\*\*|$)/i);
-  const title = titleMatch?.[1]?.trim() || '';
-  const body = bodyMatch?.[1]?.replace(new RegExp('^\\s*'+bt+bt+bt+'(?:markdown|text)?\\s*\\n?', 'i'), '').replace(new RegExp('\\n\\s*'+bt+bt+bt+'\\s*$','i'),'').trim() || '';
-
+  const title = titleMatch?.[1]?.trim().replace(/^\`\`\`(?:text)?\s*/i, '').replace(/\s*\`\`\`$/i, '') || '';
+  const body = bodyMatch?.[1]?.trim().replace(/^\`\`\`(?:markdown|text)?\s*\n?/i, '').replace(/\n\s*\`\`\`\s*$/i, '') || '';
   if (!title || !body || title.length > 200 || body.length > 10000) return null;
   return Object.freeze({ title, body });
 }
