@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRecursiveDryfireWorld, validateDryfireWorld } from '../src/reality-recursive-dryfire-world-v0.1.js';
 import { runRecursiveClosure } from '../src/reality-recursive-closure-conductor-v0.1.js';
 import { createActionProposal, evaluateGovernance, createAuthorization, createExecutionReceipt, reconcileVerifiedOutcome as reconcileBridge } from '../src/reality-cognition-execution-bridge-v0.1.js';
-import { createBitemporalLedgerEntry } from '../src/reality-universe-bitemporal-ledger-v0.1.js';
+import { createBitemporalLedgerEntry, assertLedgerContinuity, assertLedgerTemporalOrder } from '../src/reality-universe-bitemporal-ledger-v0.1.js';
 import { runUniverseCognitionPass } from '../src/reality-universe-cognition-runner-v0.1.js';
 import { createDryfirePersistenceAdapter, persistRecursiveClosureTrace, reloadRecursiveClosureTrace } from '../src/reality-universe-dryfire-persistence-v0.1.js';
 
@@ -248,6 +248,37 @@ assert.equal(orphanRejected, true);
 console.log(JSON.stringify({
   adversarial_orphaned_lineage: 'PASS',
   deleted_record: 'trace:execution',
+  circuit_breaker: 'CLOSED',
+  cognition_resume_permitted: false,
+  auto_repair: false,
+  external_side_effects: false
+}, null, 2));
+
+
+const temporalBase = createBitemporalLedgerEntry({
+  entryId: 'ledger:temporal:base', eventKind: 'OBSERVATION',
+  effectiveTime: '2026-10-01T10:00:00Z', assertionTime: '2026-10-01T11:00:00Z',
+  continuityRootId: world.continuityRootId, worldlineId: world.worldlineId,
+  payload: { claim: 'Temporal baseline' },
+});
+const temporalParadox = createBitemporalLedgerEntry({
+  entryId: 'ledger:temporal:paradox', eventKind: 'OBSERVATION',
+  effectiveTime: '2026-10-01T12:00:00Z', assertionTime: '2026-10-01T10:30:00Z',
+  continuityRootId: world.continuityRootId, worldlineId: world.worldlineId,
+  payload: { claim: 'Later record asserted earlier' },
+  priorLedgerHash: temporalBase.ledger_entry_hash,
+});
+let temporalRejected = false;
+try { assertLedgerTemporalOrder(temporalBase, temporalParadox); }
+catch (error) { temporalRejected = String(error?.message || error).includes('LEDGER_TEMPORAL_PARADOX:ASSERTION_TIME_REGRESSION'); }
+assert.equal(temporalRejected, true);
+let continuityRejected = false;
+try { assertLedgerContinuity(temporalBase, temporalParadox); }
+catch (error) { continuityRejected = String(error?.message || error).includes('LEDGER_TEMPORAL_PARADOX:ASSERTION_TIME_REGRESSION'); }
+assert.equal(continuityRejected, true);
+console.log(JSON.stringify({
+  adversarial_temporal_paradox: 'PASS',
+  invalid_condition: 'ASSERTION_TIME_REGRESSION',
   circuit_breaker: 'CLOSED',
   cognition_resume_permitted: false,
   auto_repair: false,
