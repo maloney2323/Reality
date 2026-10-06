@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createEvolutionConstitution} from '../src/reality-evolution-constitution-v0.2.js';
+import {generateEvolutionOpportunities} from '../src/reality-opportunity-generator-v0.2.js';
+import {rankOpportunities,buildPortfolio,selectNextEvolution} from '../src/reality-opportunity-ranker-v0.2.js';
+const constitution=createEvolutionConstitution({riskBudget:.5});
+const ops=generateEvolutionOpportunities({failures:[{id:'source-verification',expectedObjectiveGain:9,evidenceRefs:['f1'],leverage:.9,estimatedCost:2,safetyRisk:.1}],friction:[{id:'ui-friction',expectedObjectiveGain:3,evidenceRefs:['f2'],estimatedCost:1,safetyRisk:.1}]});
+const ranked=rankOpportunities(ops,{budgets:{riskBudget:.5}});
+assert.equal(ranked[0].subject,'source-verification');
+const portfolio=buildPortfolio(ranked,{maxSize:2});
+assert.ok(portfolio.length>0);
+const choice=selectNextEvolution({ranked,constitution});
+assert.equal(choice.action,'SANDBOX');
+console.log('SELF_DIRECTED_SELECTION_V0_2_PASS');
