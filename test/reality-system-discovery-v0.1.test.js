@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {buildSelfModelManifest,compareDiscoverySnapshot,buildSystemDiscoveryArtifact} from '../src/reality-system-discovery-v0.1.js';
+const tree=['src/reality-constitution.js','src/reality-capability-gap-detector-v0.1.js','src/reality-governed-cognitive-loop-v0.1.js','src/reality-intelligence-orchestrator-v0.1.js','src/reality-ekr-v0.2.js','src/reality-governed-system-access-v0.1.js'].map((path,i)=>({path,sha:String(i)}));
+assert.equal(Object.values(buildSelfModelManifest({sourceTree:tree}).components).every(x=>x.present),true);
+assert.equal(compareDiscoverySnapshot({current:{commit_sha:'a',tree:{paths:tree}},previous:{commit_sha:'a',tree:{paths:tree}}}).comparison_status,'UNCHANGED');
+const r=buildSystemDiscoveryArtifact({repositoryObservation:{provider:'github',repository:{full_name:'maloney2323/Reality'},source:{ref:'main',commit_sha:'abc'},tree:{paths:tree}},capabilityState:{github:{read:true,write:false},vercel:{read:false,write:false}}});
+assert.equal(r.artifact.authorization.write_authorized,false);
+assert.equal(r.artifact.verification.deployment_verified,false);
+assert.equal(r.persistence.status,'NOT_PERSISTED');
+assert.ok(r.artifact.observed_gaps.some(x=>x.gap_id==='VERCEL_READ_CAPABILITY_MISSING'));
+console.log('System discovery v0.1: PASS');
