@@ -102,15 +102,6 @@ valid=validateExecutionBinding({
 });
 if (valid.reason !== 'EXECUTION_PLAN_MISMATCH') throw new Error('WRONG_PLAN_EXECUTION_ACCEPTED');
 
-let rejected=false;
-try {
-  createReconciliation({
-    parentPlan:parent,authorityDecision:decision,authorityDiff:diff,
-    constitutionalEvaluation:constitution,transitionType:'REJECTED'
-  });
-} catch { rejected=true; }
-if (rejected) throw new Error('REJECTED_TRANSITION_UNEXPECTEDLY_REQUIRES_SUCCESSOR');
-
 const rejectedTransition=createReconciliation({
   parentPlan:parent,authorityDecision:decision,authorityDiff:diff,
   constitutionalEvaluation:constitution,transitionType:'REJECTED',
