@@ -4,8 +4,8 @@ import { buildShadowObservations, detectRecurringWork } from '../../src/reality-
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 
-const CONFIG_ROOT = 'autonomous-shift:configuration';
-const WORLDLINE = 'worldline:autonomous-shift:production';
+const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
+const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
 const SHADOW_REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
 
 function json(res, status, body) {
@@ -101,8 +101,8 @@ async function runTick({ config, phase, local, persistence }) {
   }
 
   const history = await persistence.reconstruct({
-    continuityRootId: 'shadow:github:' + SHADOW_REPO,
-    worldlineId: 'worldline:shadow:production',
+    continuityRootId: '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003',
+    worldlineId: '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004',
   });
   const historyObservations = history
     .filter(e => e.event_kind === 'observation' && e.entity_type === 'shadow_activity')
