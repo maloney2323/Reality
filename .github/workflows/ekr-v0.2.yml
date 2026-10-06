@@ -20,4 +20,4 @@ jobs:
           node-version: 24
       - run: node test/reality-ekr-v0.2.test.js
 
-# CI gate remains intentionally isolated to the EKR v0.2 invariant suite.
+# CI gate remains intentionally isolated and replayable to the EKR v0.2 invariant suite.
