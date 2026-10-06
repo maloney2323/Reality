@@ -1,0 +1,19 @@
+name: Reality Canonical Continuity Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/reality-continuity-seam-repair-v0.1.js'
+      - 'test/reality-continuity-seam-repair-v0.1.test.js'
+      - '.github/workflows/reality-canonical-continuity.yml'
+  workflow_dispatch:
+
+jobs:
+  continuity-seam-repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical Reality
+        uses: actions/checkout@v4
+      - name: Run Continuity Seam Repair v0.1
+        run: node --experimental-default-type=module test/reality-continuity-seam-repair-v0.1.test.js
