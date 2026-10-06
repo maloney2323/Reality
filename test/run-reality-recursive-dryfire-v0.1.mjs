@@ -236,3 +236,20 @@ try { reloadRecursiveClosureTrace(adversarialStore); }
 catch (error) { integrityRejected = String(error?.message || error).includes('EPISTEMIC_INTEGRITY_VIOLATION:PERSISTENCE_HASH_MISMATCH:trace:target-observation'); }
 assert.equal(integrityRejected, true);
 console.log(JSON.stringify({ adversarial_hash_chain_sever: 'PASS', corrupted_record: 'trace:target-observation', circuit_breaker: 'CLOSED', cognition_resume_permitted: false, auto_repair: false, external_side_effects: false }, null, 2));
+
+
+const orphanStore = createDryfirePersistenceAdapter();
+persistRecursiveClosureTrace({ persistence: orphanStore, result, ledgerEntry });
+orphanStore.delete('trace:execution');
+let orphanRejected = false;
+try { reloadRecursiveClosureTrace(orphanStore); }
+catch (error) { orphanRejected = String(error?.message || error).includes('PERSISTED_RECORD_NOT_FOUND'); }
+assert.equal(orphanRejected, true);
+console.log(JSON.stringify({
+  adversarial_orphaned_lineage: 'PASS',
+  deleted_record: 'trace:execution',
+  circuit_breaker: 'CLOSED',
+  cognition_resume_permitted: false,
+  auto_repair: false,
+  external_side_effects: false
+}, null, 2));
