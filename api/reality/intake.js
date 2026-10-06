@@ -1,6 +1,6 @@
 import { createBusinessUpdate, interpretAsk, createInvestigationWork } from '../../src/reality-intent-engine.js';
 import { createChatContext, governedOpinion } from '../../src/reality-chat-interface.js';
-import { observeUserMessage, assertGenerationAfterObservation } from '../../src/reality-observation-boundary-v0.1.js';
+import { buildGovernedChatSignal } from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -27,8 +27,7 @@ export default async function handler(req, res) {
   const body = typeof req.body === 'object' && req.body ? req.body : {};
 
   try {
-    const observationBoundary = observeUserMessage({ message: body.ask });
-    const generationGate = assertGenerationAfterObservation({ boundary: observationBoundary });
+    const governedSignal = buildGovernedChatSignal({ message: body.ask });
     const businessUpdate = createBusinessUpdate(body.businessUpdate);
     const interpretation = interpretAsk({
       ask: body.ask,
@@ -59,8 +58,7 @@ export default async function handler(req, res) {
       work,
       chat: createChatContext({ businessUpdate, governedOpinion: opinion }),
       governed_opinion: opinion,
-      observation_boundary: observationBoundary,
-      generation_gate: generationGate,
+      governed_signal: governedSignal,
     });
   } catch (error) {
     return json(res, 400, { error: error.message, verified: false });
