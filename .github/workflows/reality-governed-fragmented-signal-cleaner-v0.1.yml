@@ -13,3 +13,4 @@ jobs:
         with: { node-version: 20 }
       - run: node test/reality-governed-fragmented-signal-cleaner-v0.1.test.js
       - run: node test/reality-chat-governed-brief-v0.1.test.js
+      - run: node test/reality-chat-signal-routing-v0.1.test.js
