@@ -1,0 +1,17 @@
+name: Reality Closed-Loop Objective v0.1
+on:
+  push:
+    branches: [closed-loop-objective-v0.1]
+    paths:
+      - src/reality-closed-loop-objective-v0.1.js
+      - test/run-reality-closed-loop-objective-v0.1.mjs
+      - .github/workflows/reality-closed-loop-objective-v0.1.yml
+jobs:
+  closure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node test/run-reality-closed-loop-objective-v0.1.mjs
