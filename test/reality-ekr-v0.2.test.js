@@ -84,7 +84,7 @@ const contradicted = createEKREvent({
   previousEventHash: verified.event_hash,
 });
 
-assert.equal(foldEKRState(assertion, [asserted, verified]).epistemic_state, 'HYPOTHESIS');
+assert.equal(foldEKRState(assertion, [asserted, verified]).epistemic_state, 'RESOLUTION');
 assert.equal(foldEKRState(assertion, [asserted, verified]).verification_level, 'verified_outcome');
 assert.equal(foldEKRState(assertion, [asserted, verified]).applicability_status, 'RELEVANT');
 assert.equal(foldEKRState(assertion, [asserted, verified, contradicted]).epistemic_state, 'OBSOLETE');
