@@ -1,4 +1,5 @@
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
+import { investigatorWorld, planInvestigation } from '../../src/reality-investigator.js';
 import {
   classifyBlock,
   createCapabilityContract,
@@ -13,6 +14,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).setHeader('Allow', 'POST').json({ error: 'METHOD_NOT_ALLOWED' });
 
   try {
+    if (req.body?.operation === 'investigate') {
+      const question = req.body?.question;
+      const availableSources = req.body?.availableSources;
+      const investigation = planInvestigation({ question, availableSources });
+      return res.status(200).json({
+        ok: true,
+        operation: 'investigate',
+        world: investigatorWorld(),
+        investigation,
+      });
+    }
+
     if (req.body?.operation === 'capability_growth') {
       const blocked = req.body?.blocked || {};
       const gapType = classifyBlock({
