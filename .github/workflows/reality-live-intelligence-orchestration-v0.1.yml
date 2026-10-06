@@ -1,0 +1,29 @@
+name: Reality Live Intelligence Orchestration v0.1
+
+on:
+  push:
+    paths:
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
+      - 'src/reality-governed-work-runtime-v0.1.js'
+      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
+      - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
+      - 'src/reality-governed-work-runtime-v0.1.js'
+      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
+      - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js
