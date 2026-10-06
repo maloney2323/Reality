@@ -22,10 +22,7 @@ function isExplicitlyProhibitedFragment(text) {
 function extractGitHubIssueProposal(answer) {
   const text = typeof answer === 'string' ? answer : '';
   if (!/\bGitHub\b/i.test(text)) return null;
-  const titleMatch = text.match(/\*\*Issue title\*\*\s*\n\s*\`\`\`(?:text)?\s*\n([\s\S]*?)\n\`\`\`/i);
-  const bodyMatch = text.match(/\*\*Issue body\*\*\s*\n\s*\`\`\`(?:markdown)?\s*\n([\s\S]*?)\n\`\`\`/i);
-  const title = titleMatch?.[1]?.trim() || '';
-  const body = bodyMatch?.[1]?.trim() || '';
+  const titleMatch = text.match(\n    /\*\*(?:Issue title|Title)\*\*:?\s*(?:\n\s*\`\`\`(?:text)?\s*\n([\s\S]*?)\n\`\`\`|([^\n]+))/i,\n  );\n  const bodyMatch = text.match(\n    /\*\*(?:Issue body|Body)\*\*:?\s*(?:\n\s*\`\`\`(?:markdown|text)?\s*\n([\s\S]*?)\n\`\`\`|\n([\s\S]*?)(?=\n\*\*|$))/i,\n  );\n  const title = (titleMatch?.[1] || titleMatch?.[2] || '').trim();\n  const body = (bodyMatch?.[1] || bodyMatch?.[2] || '').trim();
   if (!title || !body || title.length > 200 || body.length > 10000) return null;
   return Object.freeze({ title, body });
 }
