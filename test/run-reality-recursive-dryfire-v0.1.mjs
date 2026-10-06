@@ -226,3 +226,13 @@ console.log(JSON.stringify({
   next_cognitive_state_id: result.nextCognitiveState.cognitive_state_id,
   external_side_effects: false,
 }, null, 2));
+
+
+const adversarialStore = createDryfirePersistenceAdapter();
+persistRecursiveClosureTrace({ persistence: adversarialStore, result, ledgerEntry });
+adversarialStore.corruptPayload('trace:target-observation', (payload) => ({ ...payload, claim: payload.claim + ' CORRUPTED' }));
+let integrityRejected = false;
+try { reloadRecursiveClosureTrace(adversarialStore); }
+catch (error) { integrityRejected = String(error?.message || error).includes('EPISTEMIC_INTEGRITY_VIOLATION:PERSISTENCE_HASH_MISMATCH:trace:target-observation'); }
+assert.equal(integrityRejected, true);
+console.log(JSON.stringify({ adversarial_hash_chain_sever: 'PASS', corrupted_record: 'trace:target-observation', circuit_breaker: 'CLOSED', cognition_resume_permitted: false, auto_repair: false, external_side_effects: false }, null, 2));
