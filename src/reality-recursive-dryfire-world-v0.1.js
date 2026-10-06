@@ -36,11 +36,11 @@ export function createRecursiveDryfireWorld() {
   const targetObservation = {
     observation_id: 'observation:shipment-8472:carrier-readback',
     execution_receipt_hash: execution.execution_receipt_hash,
-    claim: 'Carrier independently reports shipment 8472 delivered at 16:42Z.', source: 'independent-carrier-readback',
+    claim: 'Carrier independently reports shipment 8472 delivered at 16:42Z.', evidence_references: ['evidence:shipment-8472:carrier-readback'], source: 'independent-carrier-readback',
   };
   const independentVerification = {
     verification_id: 'verification:shipment-8472:independent',
-    target_observation_id: targetObservation.observation_id, method: 'independent_source_reconciliation', result: 'CONFIRMED',
+    target_observation_id: targetObservation.observation_id, execution_receipt_hash: execution.execution_receipt_hash, evidence_references: ['evidence:shipment-8472:carrier-readback'], method: 'independent_source_reconciliation', result: 'CONFIRMED', verified: true,
   };
   const verifiedOutcome = {
     outcome_id: 'outcome:shipment-8472:verified', independent_verification_id: independentVerification.verification_id,
@@ -67,7 +67,7 @@ export function validateDryfireWorld(world) {
   if (world.targetObservation.execution_receipt_hash !== world.execution.execution_receipt_hash) throw new Error('TARGET_OBSERVATION_EXECUTION_MISMATCH');
   if (world.independentVerification.target_observation_id !== world.targetObservation.observation_id) throw new Error('INDEPENDENT_VERIFICATION_TARGET_MISMATCH');
   if (world.verifiedOutcome.independent_verification_id !== world.independentVerification.verification_id) throw new Error('VERIFIED_OUTCOME_VERIFICATION_MISMATCH');
-  if (world.independentVerification.result !== 'CONFIRMED') throw new Error('INDEPENDENT_VERIFICATION_REQUIRED');
+  if (world.independentVerification.result !== 'CONFIRMED' || world.independentVerification.verified !== true) throw new Error('INDEPENDENT_VERIFICATION_REQUIRED');
   if (world.verifiedOutcome.status !== 'VERIFIED_OUTCOME') throw new Error('VERIFIED_OUTCOME_REQUIRED');
   return { valid: true, world_id: world.worldId, original_work_item_id: world.workItem.id, capability_id: world.capability.capability_id, adversarial_conditions: world.adversarialConditions };
 }
