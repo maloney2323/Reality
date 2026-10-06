@@ -15,17 +15,4 @@ jobs:
       - name: Checkout Reality
         uses: actions/checkout@v4
       - name: Run closed-loop test
-        id: test
-        shell: bash
-        run: |
-          set +e
-          node --experimental-default-type=module test/run-reality-closed-loop-objective-v0.1.mjs > closed-loop-diagnostic.txt 2>&1
-          status=$?
-          cat closed-loop-diagnostic.txt
-          exit $status
-      - name: Upload diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: closed-loop-diagnostic
-          path: closed-loop-diagnostic.txt
+        run: node --experimental-default-type=module test/run-reality-closed-loop-objective-v0.1.mjs
