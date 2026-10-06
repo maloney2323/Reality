@@ -15,9 +15,18 @@ function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function isExplicitlyProhibitedFragment(text) {
+  return /^(do not|don't|never)\b/i.test(text.trim());
+}
+
 function materialityFromSignal(signal) {
-  const text = (signal?.fragments || []).map((f) => f.cleaned_text || '').join('\n').toLowerCase();
-  return /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(text)
+  const fragments = (signal?.fragments || []).map((f) => f.cleaned_text || '');
+  const actionableText = fragments
+    .filter((text) => !isExplicitlyProhibitedFragment(text))
+    .join('\n')
+    .toLowerCase();
+
+  return /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(actionableText)
     ? 'ACTION_CANDIDATE'
     : 'CONVERSATIONAL';
 }
