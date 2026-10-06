@@ -2,8 +2,8 @@ import { createUniversePostgresPersistence } from '../src/reality-universe-postg
 import { buildShadowObservations, detectRecurringWork } from '../src/reality-shadow-observer-v0.1.js';
 
 const REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
-const CONTINUITY_ROOT_ID = 'shadow:github:' + REPO;
-const WORLDLINE_ID = 'worldline:shadow:production';
+const CONTINUITY_ROOT_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003';
+const WORLDLINE_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004';
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
