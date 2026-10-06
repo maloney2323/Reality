@@ -37,11 +37,13 @@ const base = {
 const assertion = createEKRAssertion(base);
 
 assert.equal(EKR_VERSION, '0.2.0');
-assert.equal(assertion.assertion_hash, sha256Canonical({ ...assertion, assertion_hash: undefined }));
+const { assertion_hash: _, ...assertionWithoutHash } = assertion;
+assert.equal(assertion.assertion_hash, sha256Canonical(assertionWithoutHash));
 assert.equal(Object.prototype.hasOwnProperty.call(assertion, 'epistemic_state'), false);
 assert.equal(Object.isFrozen(assertion), true);
 assert.throws(() => createEKRAssertion({ ...base, continuityRootId: 'unknown' }), /SYNTHETIC_EKR_ID_REJECTED/);
 assert.throws(() => createEKRAssertion({ ...base, evidenceLineage: null }), /EVIDENCE_LINEAGE_REQUIRED/);
+assert.throws(() => createEKRAssertion({ ...base, verificationLineage: { verified_outcome_ref: 'outcome:001' } }), /VERIFIED_OUTCOME_REQUIRES_INDEPENDENT_VERIFICATION/);
 
 const asserted = createEKREvent({
   eventId: 'event:001',
@@ -135,6 +137,7 @@ assert.equal(migrated.verification_completeness, 'UNKNOWN');
 
 assertAppendOnlyEventStream([asserted, verified, contradicted]);
 assert.throws(() => assertAppendOnlyEventStream([verified, contradicted]), /EKR_EVENT_CHAIN_BROKEN/);
+assert.throws(() => assertAppendOnlyEventStream([{ ...asserted, previous_event_hash: 'forbidden' }]), /EKR_EVENT_CHAIN_BROKEN/);
 assert.throws(() => assertAppendOnlyEventStream([asserted, asserted]), /EKR_DUPLICATE_EVENT_ID/);
 
 // Assertion mutation is structurally prevented in strict mode.
