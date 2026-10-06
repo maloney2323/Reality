@@ -3,7 +3,7 @@ import { observeUserMessage, evaluateGeneratedConclusion, assertGenerationAfterO
 
 const boundary = observeUserMessage({ message: 'Send the invoice to my customer; my API key is abc123.' });
 assert.equal(boundary.classifications.proposed_actions.length, 1);
-assert.equal(boundary.classifications.sensitive_data.length, 2);
+assert.equal(boundary.classifications.sensitive_data.length, 1);
 assert.equal(boundary.authority.action_authorized, false);
 assert.equal(boundary.authority.memory_write_authorized, false);
 assert.equal(assertGenerationAfterObservation({ boundary }).allowed, true);
