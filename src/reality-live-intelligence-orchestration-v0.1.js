@@ -19,6 +19,17 @@ function isExplicitlyProhibitedFragment(text) {
   return /^(do not|don't|never)\b/i.test(text.trim());
 }
 
+function extractGitHubIssueProposal(answer) {
+  const text = typeof answer === 'string' ? answer : '';
+  if (!/\bGitHub\b/i.test(text)) return null;
+  const titleMatch = text.match(/\*\*Issue title\*\*\s*\n\s*\`\`\`(?:text)?\s*\n([\s\S]*?)\n\`\`\`/i);
+  const bodyMatch = text.match(/\*\*Issue body\*\*\s*\n\s*\`\`\`(?:markdown)?\s*\n([\s\S]*?)\n\`\`\`/i);
+  const title = titleMatch?.[1]?.trim() || '';
+  const body = bodyMatch?.[1]?.trim() || '';
+  if (!title || !body || title.length > 200 || body.length > 10000) return null;
+  return Object.freeze({ title, body });
+}
+
 function materialityFromSignal(signal) {
   const fragments = (signal?.fragments || []).map((f) => f.cleaned_text || '');
   const actionableText = fragments
@@ -76,6 +87,9 @@ export async function runLiveIntelligenceOrchestration({
     };
   }
 
+  const githubIssueProposal = extractGitHubIssueProposal(modelResult?.answer);
+  const isGitHubIssueAction = Boolean(githubIssueProposal) && /\bGitHub\b/i.test(message);
+
   const intent = createIntentRecord({
     requestedBy,
     statement: message,
@@ -85,19 +99,25 @@ export async function runLiveIntelligenceOrchestration({
 
   const workflow = structureIntent(intent, {
     objective: message,
-    requiredConnectors: ['TO_BE_DETERMINED'],
+    requiredConnectors: isGitHubIssueAction ? ['github'] : ['TO_BE_DETERMINED'],
     successConditions: ['External result is independently verified before completion.'],
   });
 
   const item = createWorkItem({
     workflowId: workflow.workflow_id,
     action: message,
-    connector: 'TO_BE_DETERMINED',
-    operation: 'external_send',
+    connector: isGitHubIssueAction ? 'github' : 'TO_BE_DETERMINED',
+    operation: isGitHubIssueAction ? 'create_issue' : 'external_send',
+    inputs: isGitHubIssueAction
+      ? [{ repository: 'maloney2323/Reality', title: githubIssueProposal.title, body: githubIssueProposal.body }]
+      : [],
     consequential: true,
     authorityRequired: ['EXPLICIT_USER_AUTHORIZATION'],
     expectedEffect: 'External effect only after matching authorization.',
-    verificationMethod: 'Independent observation of resulting external state.',
+    verificationMethod: 'Independent observation of the resulting GitHub issue state.',
+    successConditions: isGitHubIssueAction
+      ? ['GitHub issue is created in maloney2323/Reality.', 'Fresh GitHub readback independently verifies issue number, title, and open state.']
+      : [],
   });
 
   const finalWorkflow = Object.freeze({ ...workflow, work_items: [item] });
