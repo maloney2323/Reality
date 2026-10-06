@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reality — Governed Chat</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090b10;color:#eef1f7}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#171c28,#090b10 45%);min-height:100vh}
+main{max-width:980px;margin:auto;padding:28px 18px 80px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
+.brand{font-weight:700;letter-spacing:.02em}.state{font-size:12px;color:#9da7b8;border:1px solid #2b3240;border-radius:999px;padding:7px 10px}
+h1{font-size:clamp(28px,5vw,48px);line-height:1.05;margin:0 0 10px}.sub{color:#aab3c2;max-width:700px}
+.chat{margin-top:28px}.bubble{background:#11151e;border:1px solid #242b38;border-radius:18px;padding:18px;margin-bottom:16px}
+.user{border-color:#344052}.label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#8792a6;margin-bottom:8px}
+textarea{width:100%;min-height:92px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:14px;padding:14px;font:inherit;resize:vertical}
+button{border:0;border-radius:12px;padding:11px 16px;background:#eef1f7;color:#10131a;font-weight:700;cursor:pointer;margin-top:10px}button:disabled{opacity:.5}
+.brief{display:none;background:#0e121a;border:1px solid #293140;border-radius:18px;overflow:hidden}.brief.open{display:block}
+.brief-head{padding:16px 18px;border-bottom:1px solid #242b38;display:flex;justify-content:space-between;gap:12px}
+.badge{font-size:11px;padding:5px 8px;border-radius:999px;background:#1a2130;color:#bfc8d8}
+section{padding:17px 18px;border-bottom:1px solid #202633}.row{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #1b212c}.row:last-child{border-bottom:0}.muted{color:#98a3b5}.ok{color:#a9d7b5}.blocked{color:#f0b0aa}.step{padding:6px 0}.proof li{margin:8px 0;color:#bdc5d3}
+details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.pill{border:1px solid #2b3341;padding:6px 9px;border-radius:999px;font-size:11px;color:#aeb8c9}
+.error{color:#f0b0aa;margin-top:10px;white-space:pre-wrap}
+@media(max-width:600px){main{padding:20px 12px}.row{display:block}.row span{display:block;margin-top:4px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="brand">REALITY</div><div class="state">GOVERNED CHAT · v0.1</div></div>
+  <h1>Tell Reality what you need.</h1>
+  <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="label">Your request</div>
+      <textarea id="request" placeholder="Try: Review unread business emails, identify follow-ups, draft responses, and send them."></textarea>
+      <button id="plan">Show my plan</button>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div id="brief" class="brief">
+      <div class="brief-head"><strong>Reality Brief</strong><span id="status" class="badge"></span></div>
+      <section><div class="label">1 · Understood</div><div id="understood"></div></section>
+      <section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
+      <section><div class="label">3 · Authority map</div><div id="authority"></div></section>
+      <section><div class="label">4 · Expected effect</div><div id="effect"></div></section>
+      <section class="proof"><div class="label">5 · Proof plan</div><ul id="proof"></ul></section>
+      <section><div class="label">6 · Change history</div><div class="muted">No revisions yet. A changed request will create a new governed interpretation rather than overwrite this one.</div></section>
+      <section>
+        <details><summary>Show work state</summary>
+        <div class="timeline" id="timeline"></div>
+        <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
+        </details>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function render(b){
+  $('brief').classList.add('open'); $('status').textContent=b.status.toUpperCase();
+  $('understood').innerHTML='<strong>'+esc(b.understood.statement)+'</strong>'+
+    (b.understood.ambiguities.length?'<p class="blocked">Clarification required: '+esc(b.understood.ambiguities.join('; '))+'</p>':'<p class="muted">'+esc(b.understood.scope)+'</p>');
+  $('steps').innerHTML=b.intended_plan.map((x,i)=>'<div class="step">'+(i+1)+'. '+esc(x)+'</div>').join('');
+  $('authority').innerHTML=b.authority_map.map(x=>'<div class="row"><span>'+esc(x.action)+'</span><span class="'+(x.status==='NOT_AUTHORIZED'?'blocked':'ok')+'">'+esc(x.status.replaceAll('_',' '))+'</span></div>').join('');
+  $('effect').textContent=b.expected_effect;
+  $('proof').innerHTML=b.proof_plan.map(x=>'<li><strong>'+esc(x.work_item_id)+'</strong> — '+esc(x.evidence)+'</li>').join('');
+  $('timeline').innerHTML=['PROPOSED','AUTHORIZED','EXECUTING','COMPLETED','VERIFIED'].map((x,i)=>'<span class="pill">'+esc(x)+'</span>').join('');
+  $('execution').textContent=b.execution.status+' · '+b.execution.reason;
+  $('verification').textContent=b.verification.status;
+}
+$('plan').onclick=async()=>{
+  const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
+  $('error').textContent=''; $('plan').disabled=true;
+  try{const r=await fetch('/api/reality/chat-brief',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({statement})});const b=await r.json();if(!r.ok)throw new Error(b.error||'Request failed');render(b)}
+  catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+};
+</script>
+</body>
+</html>
