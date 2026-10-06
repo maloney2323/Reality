@@ -4,6 +4,8 @@ on:
     paths:
       - 'src/reality-ekr-v0.2.js'
       - 'test/reality-ekr-v0.2.test.js'
+      - 'test/reality-ekr-wiring-v0.1.test.js'
+      - 'src/reality-intelligence-orchestrator-v0.1.js'
       - '.github/workflows/ekr-v0.2.yml'
   pull_request:
     paths:
@@ -19,5 +21,6 @@ jobs:
         with:
           node-version: 24
       - run: node test/reality-ekr-v0.2.test.js
+      - run: node test/reality-ekr-wiring-v0.1.test.js
 
 # CI gate remains intentionally isolated and replayable to the EKR v0.2 invariant suite.
