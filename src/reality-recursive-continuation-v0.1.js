@@ -57,7 +57,7 @@ export function reconcileVerifiedOutcome(continuation, { targetObservation, inde
 export function commitLearning(continuation, learningDelta) {
   if (continuation?.state !== 'VERIFIED_OUTCOME') throw new Error('VERIFIED_OUTCOME_REQUIRED_BEFORE_LEARNING');
   if (!learningDelta?.learning_delta_id) throw new Error('LEARNING_DELTA_REQUIRED');
-  if (learningDelta.source_outcome_ref && learningDelta.source_outcome_ref !== continuation.verified_outcome_id) throw new Error('LEARNING_OUTCOME_MISMATCH');
+  if ((learningDelta.source_outcome_ref || learningDelta.source_outcome_id) && (learningDelta.source_outcome_ref || learningDelta.source_outcome_id) !== continuation.verified_outcome_id) throw new Error('LEARNING_OUTCOME_MISMATCH');
   return freeze({ ...continuation, state: 'LEARNING_COMMITTED', learning_delta_id: learningDelta.learning_delta_id });
 }
 
