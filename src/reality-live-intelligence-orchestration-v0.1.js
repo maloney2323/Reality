@@ -17,7 +17,7 @@ function clone(value) {
 
 function materialityFromSignal(signal) {
   const text = (signal?.fragments || []).map((f) => f.cleaned_text || '').join('\n').toLowerCase();
-  return /\\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\\b/.test(text)
+  return /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(text)
     ? 'ACTION_CANDIDATE'
     : 'CONVERSATIONAL';
 }
