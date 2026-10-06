@@ -21,7 +21,7 @@ export function createUniversePostgresPersistence({
   url = process.env.SUPABASE_URL,
   secretKey = process.env.SUPABASE_SECRET_KEY,
 } = {}) {
-  const baseUrl = required('SUPABASE_URL', url).replace(/\\/$/, '');
+  const baseUrl = required('SUPABASE_URL', url).replace(/\/$/, '');
   const key = required('SUPABASE_SECRET_KEY', secretKey);
 
   async function request(path, { method = 'GET', body, headers = {} } = {}) {
