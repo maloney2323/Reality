@@ -3,25 +3,28 @@ import { createUniverseEntry, validateUniverseEntry } from './reality-universe-p
 export const REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION =
   'reality-native-universe-persistence-v1.0';
 
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    const error = new Error('UNIVERSE_PERSISTENCE_UNAVAILABLE');
-    error.code = 'UNIVERSE_PERSISTENCE_UNAVAILABLE';
-    error.missing = name;
-    throw error;
-  }
-  return value;
+function persistenceKey() {
+  return process.env.REALITY_UNIVERSE_PERSISTENCE_KEY
+    || process.env.supabase_secret_key
+    || process.env.SUPABASE_SECRET_KEY
+    || '';
 }
 
 function endpoint(path = '') {
-  return `${requiredEnv('REALITY_UNIVERSE_PERSISTENCE_URL').replace(/\/$/, '')}${path}`;
+  const base = process.env.REALITY_UNIVERSE_PERSISTENCE_URL || 'https://qkzvjfiegihyaoabiniy.supabase.co';
+  return base.replace(/\/$/, '') + path;
 }
 
 function headers() {
+  const key = persistenceKey();
+  if (!key) {
+    const error = new Error('UNIVERSE_PERSISTENCE_UNAVAILABLE');
+    error.code = 'UNIVERSE_PERSISTENCE_UNAVAILABLE';
+    throw error;
+  }
   return {
-    apikey: requiredEnv('REALITY_UNIVERSE_PERSISTENCE_KEY'),
-    Authorization: `Bearer ${requiredEnv('REALITY_UNIVERSE_PERSISTENCE_KEY')}`,
+    apikey: key,
+    Authorization: 'Bearer ' + key,
     'Content-Type': 'application/json',
   };
 }
