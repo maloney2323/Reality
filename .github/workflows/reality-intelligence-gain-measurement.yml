@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - 'src/reality-intelligence-gain-runner-v1.0.js'
-      - 'src/reality-intelligence-gain-test-v1.0.js'
+      - 'src/reality-intelligence-gain-test-v1.0.test.js'
       - 'api/reality/intelligence-gain.js'
       - '.github/workflows/reality-intelligence-gain-measurement.yml'
 
@@ -13,7 +13,7 @@ jobs:
   measure-intelligence-gain:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout Reality
         uses: actions/checkout@v4
@@ -21,10 +21,7 @@ jobs:
       - name: Run actual held-out four-condition experiment
         run: |
           set -euo pipefail
-          curl -fsS -X POST \
-            -H 'content-type: application/json' \
-            https://reality-blond.vercel.app/api/reality/intelligence-gain \
-            -o intelligence-gain-result.json
+          curl -fsS -X POST             -H 'content-type: application/json'             https://reality-blond.vercel.app/api/reality/intelligence-gain             -o intelligence-gain-result.json
           cat intelligence-gain-result.json
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -32,12 +29,14 @@ jobs:
           if (result.status !== 'MEASURED') process.exit(1);
           NODE
 
-      - name: Preserve intelligence measurement
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reality-intelligence-gain-${{ github.run_id }}
-          path: intelligence-gain-result.json
-          if-no-files-found: ignore
-
-# execution trigger: 2026-10-07T06:02:00Z
+      - name: Persist result to repository
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/intelligence-gain
+          cp intelligence-gain-result.json artifacts/intelligence-gain/latest.json
+          cp intelligence-gain-result.json "artifacts/intelligence-gain/run-${{ github.run_id }}.json"
+          git config user.name "reality-measurement-bot"
+          git config user.email "reality-measurement-bot@users.noreply.github.com"
+          git add artifacts/intelligence-gain/
+          git commit -m "Record intelligence gain measurement run ${{ github.run_id }}" || exit 0
+          git push
