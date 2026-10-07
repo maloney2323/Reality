@@ -9,6 +9,8 @@ on:
       - 'package.json'
       - 'src/reality-universe-persistence-contract-v1.0.js'
       - 'test/reality-universe-persistence-contract-v1.0.test.js'
+      - 'src/reality-native-universe-v1.0.js'
+      - 'test/reality-universe-context-handoff-v1.0.test.js'
   pull_request:
     paths:
       - 'src/reality-operation-ledger-v1.0.js'
@@ -27,3 +29,4 @@ jobs:
           node-version: 20
       - run: npm test
       - run: node --test test/reality-governed-operation-proof-v1.0.test.js
+      - run: node --test test/reality-universe-context-handoff-v1.0.test.js
