@@ -4,7 +4,6 @@
 
 import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
 import { createIntelligenceSubstrate, assertLearnerOutput } from './reality-intelligence-substrate-v1.0.js';
-import { answerRealityIdentityQuestion, buildRealitySelfContext } from './reality-self-model-v0.1.js';
 
 export const REALITY_COGNITIVE_RUNTIME_VERSION = 'reality-cognitive-runtime-v1.0';
 
@@ -93,30 +92,7 @@ export async function runRealityCognitiveRuntime({
     universeEntries, verifiedLearningSignals, workItems, capabilityState, governanceState,
     query: { terms: textOf(message).split(/\\s+/).filter((x) => x.length > 3).slice(0, 8) },
   });
-  systemContext = {
-    ...(systemContext || {}),
-    reality_self_model: buildRealitySelfContext(),
-    intelligence_substrate: intelligenceSubstrate,
-  };
-
-  // Identity is a Reality-owned fact. Do not delegate the answer to the
-  // underlying model, because a model provider must never become the source
-  // of Reality's own identity.
-  const identityAnswer = answerRealityIdentityQuestion(message);
-  if (identityAnswer) {
-    return {
-      runtime_version: REALITY_COGNITIVE_RUNTIME_VERSION,
-      mode: 'IDENTITY_GROUNDED',
-      answer: identityAnswer,
-      model: 'REALITY_SELF_MODEL',
-      response_id: null,
-      materiality: 'CONVERSATIONAL',
-      lanes: [],
-      synthesis: null,
-      authority_granted: false,
-      execution_authorized: false,
-    };
-  }
+  systemContext = { ...(systemContext || {}), intelligence_substrate: intelligenceSubstrate };
 
   if (!needsDeepReasoning(message)) {
     const result = await invokeRealityModel({
