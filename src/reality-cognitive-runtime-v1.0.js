@@ -3,7 +3,6 @@
 // Reality owns routing, context, evidence discipline, continuity, and governance.
 
 import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
-import { createIntelligenceSubstrate, assertLearnerOutput } from './reality-intelligence-substrate-v1.0.js';
 
 export const REALITY_COGNITIVE_RUNTIME_VERSION = 'reality-cognitive-runtime-v1.0';
 
@@ -80,19 +79,8 @@ export async function runRealityCognitiveRuntime({
   apiKey,
   fetchImpl = fetch,
   governedSignal,
-  universeEntries = [],
-  verifiedLearningSignals = [],
-  workItems = [],
-  capabilityState = {},
-  governanceState = {},
 } = {}) {
   if (!textOf(message)) throw new Error('MESSAGE_REQUIRED');
-
-  const intelligenceSubstrate = createIntelligenceSubstrate({
-    universeEntries, verifiedLearningSignals, workItems, capabilityState, governanceState,
-    query: { terms: textOf(message).split(/\\s+/).filter((x) => x.length > 3).slice(0, 8) },
-  });
-  systemContext = { ...(systemContext || {}), intelligence_substrate: intelligenceSubstrate };
 
   if (!needsDeepReasoning(message)) {
     const result = await invokeRealityModel({
@@ -102,7 +90,6 @@ export async function runRealityCognitiveRuntime({
       apiKey,
       fetchImpl,
     });
-    assertLearnerOutput(result);
     return {
       runtime_version: REALITY_COGNITIVE_RUNTIME_VERSION,
       mode: 'FAST',
@@ -147,8 +134,6 @@ export async function runRealityCognitiveRuntime({
     apiKey,
     fetchImpl,
   });
-
-  assertLearnerOutput(synthesis);
 
   return {
     runtime_version: REALITY_COGNITIVE_RUNTIME_VERSION,
