@@ -125,3 +125,33 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     provider_status: body.status || null,
   };
 }
+
+export async function startRealityModelBackground({ governedSignal, systemContext = null, model = DEFAULT_MODEL, apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch, maxOutputTokens = 220 } = {}) {
+  requireField(apiKey, 'OPENAI_API_KEY_REQUIRED');
+  const input = buildModelInput({ governedSignal, systemContext });
+  const response = await fetchImpl('https://api.openai.com/v1/responses', {
+    method:'POST',
+    headers:{authorization:`Bearer ${apiKey}`,'content-type':'application/json'},
+    body:JSON.stringify({
+      model,
+      background:true,
+      max_output_tokens:maxOutputTokens,
+      input:[
+        {role:'system',content:[{type:'input_text',text:'You are Reality — the user\'s operational intelligence system, not a generic chat assistant. Reason only from the governed signal and supplied system context. Preserve contradictions and uncertainty. Distinguish observations, inference, capability, authority, execution, and verification. Never invent missing facts or claim external execution without independent verification.'}]},
+        {role:'user',content:[{type:'input_text',text:JSON.stringify(input)}]}
+      ]
+    })
+  });
+  const body=await response.json();
+  if(!response.ok) throw new Error(body?.error?.message||'OPENAI_BACKGROUND_REQUEST_FAILED');
+  return {response_id:body.id,status:body.status||'queued',background:true,model};
+}
+
+export async function retrieveRealityModelResponse({responseId,apiKey=process.env.OPENAI_API_KEY,fetchImpl=fetch}={}){
+  requireField(apiKey,'OPENAI_API_KEY_REQUIRED');
+  requireField(responseId,'RESPONSE_ID_REQUIRED');
+  const response=await fetchImpl(`https://api.openai.com/v1/responses/${encodeURIComponent(responseId)}`,{headers:{authorization:`Bearer ${apiKey}`}});
+  const body=await response.json();
+  if(!response.ok) throw new Error(body?.error?.message||'OPENAI_RESPONSE_RETRIEVAL_FAILED');
+  return {response_id:body.id,status:body.status,answer:extractOutputText(body),model:body.model||null,completed_at:body.completed_at||null};
+}
