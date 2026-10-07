@@ -5,6 +5,7 @@ import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAutho
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
+import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -130,6 +131,14 @@ async function runTick({ config, phase, local, persistence }) {
   });
   const prioritizedWork = prioritizeDiscoveredWork(discoveredWork).slice(0, 20);
 
+  const constitution = evaluateOperatingConstitution({
+    evidence: constitutionalEvidenceFromShift({
+      discovered_work_count: prioritizedWork.length,
+      authority: 'NONE_UNLESS_EXPLICITLY_GRANTED_PER_WORK_ITEM',
+      verification_plan: 'INDEPENDENT_OBSERVATION_REQUIRED',
+    }),
+  });
+
   const selfQuestionAgenda = buildRealitySelfQuestionAgenda({
     phase,
     evidence: {
@@ -146,6 +155,7 @@ async function runTick({ config, phase, local, persistence }) {
 
   const mission = [
     'Operate Reality as a governed autonomous business operating shift.',
+    'Constitutional state: ' + constitution.state + '. Never claim responsibility or authority that the constitution has not established.',
     'Do not begin by asking what feature to build. Begin by asking what Reality needs to know to operate the business successfully.',
     buildSelfQuestionPrompt(selfQuestionAgenda),
     'Find concrete unfinished, recurring, repetitive, blocked, risky, or high-value work from observed evidence.',
@@ -159,6 +169,7 @@ async function runTick({ config, phase, local, persistence }) {
   ].join('\n');
 
   const evidence = {
+    operating_constitution: constitution,
     self_question_agenda: selfQuestionAgenda,
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
     recent_observation_count: observations.length,
