@@ -1,0 +1,66 @@
+name: Reality Governed Auto Verification
+
+on:
+  push:
+    paths:
+      - 'src/reality-gsi-training-ground-v0.1.js'
+      - 'src/reality-intelligence-substrate-v1.0.js'
+      - 'src/reality-learning-proof-v1.0.js'
+      - 'src/reality-governed-superintelligence-v1.0.js'
+      - 'src/reality-cognitive-runtime-v1.0.js'
+      - 'test/reality-gsi-training-ground-v1.0.test.js'
+      - 'test/reality-learning-proof-v1.0.test.js'
+      - 'test/reality-governed-superintelligence-v1.0.test.js'
+      - '.github/workflows/reality-governed-learning-proof.yml'
+      - '.github/workflows/reality-governed-auto-verification.yml'
+  workflow_run:
+    workflows:
+      - "Reality Cognitive Evolution Benchmarks"
+      - "Reality Governed Learning Proof"
+    types: [completed]
+
+jobs:
+  governed-verification:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Reality
+        uses: actions/checkout@v4
+
+      - name: Run governed GSI verification suite
+        run: |
+          set -euo pipefail
+          node --test \
+            test/reality-gsi-training-ground-v1.0.test.js \
+            test/reality-learning-proof-v1.0.test.js \
+            test/reality-governed-superintelligence-v1.0.test.js
+
+      - name: Emit verification receipt
+        if: success()
+        run: |
+          mkdir -p verification-receipt
+          node -e '
+            const fs = require("fs");
+            const receipt = {
+              schema: "reality-governed-verification-receipt-v1.0",
+              status: "VERIFIED",
+              commit_sha: process.env.GITHUB_SHA,
+              workflow: process.env.GITHUB_WORKFLOW,
+              run_id: process.env.GITHUB_RUN_ID,
+              verified_at: new Date().toISOString(),
+              authority_granted: false,
+              production_graph_written: false
+            };
+            fs.writeFileSync("verification-receipt/reality-verification.json", JSON.stringify(receipt, null, 2));
+            console.log(JSON.stringify(receipt));
+          '
+
+      - name: Preserve verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-governed-verification-receipt-${{ github.run_id }}
+          path: verification-receipt/
+          if-no-files-found: ignore
