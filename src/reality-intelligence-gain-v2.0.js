@@ -98,3 +98,27 @@ export async function runSingleIntelligenceGainCondition({caseId,condition,apiKe
  const out=await invokeRealityModel({governedSignal:governed,systemContext:context,apiKey,maxOutputTokens:220});
  return {status:'MEASURED',experiment_version:INTELLIGENCE_GAIN_EXPERIMENT_VERSION,case_id:caseId,condition,answer:out.answer,response_id:out.response_id,score:evaluateDeterministically(out.answer,c),proof:{real_model_call:true,universe_context_injected:mode==='REALITY'||mode==='LEARNING',verified_learning_injected:mode==='LEARNING',ground_truth_exposed:false}};
 }
+
+export async function startSingleIntelligenceGainCondition({caseId,condition,apiKey=process.env.OPENAI_API_KEY}={}){
+ if(!apiKey) throw new Error('OPENAI_API_KEY_REQUIRED');
+ const c=cases.find(x=>x.id===caseId); if(!c) throw new Error('CASE_NOT_FOUND');
+ const modes={BASELINE_MODEL:null,PROMPTED_MODEL:{learner_rules:learnerRules},REALITY_UNIVERSE:'REALITY',REALITY_UNIVERSE_PLUS_VERIFIED_LEARNING:'LEARNING'};
+ if(!(condition in modes)) throw new Error('CONDITION_NOT_FOUND');
+ const mode=modes[condition];
+ const substrate=createIntelligenceSubstrate({universeEntries:realityEntries(c),verifiedLearningSignals:c.id==='HG-02'?[{signal_id:'verified-reconciliation-learning',episode_id:'ep-1',verified_outcome:{status:'VERIFIED'},capability_delta:{recurring_work_detection:'improved'},corrections:['recurrence requires repeated evidence','capability does not imply authority'],failure_signals:[],independent_verifier_ref:'verifier-1',signal_hash:'verified-signal-hash'}]:[],governanceState:{authority_separate:true},query:{terms:[]}});
+ let context=null;
+ if(mode==='REALITY') context={universe:substrate,learner_rules:learnerRules};
+ if(mode==='LEARNING') context={universe:substrate,verified_learning_signals:substrate.verified_learning_signals,learner_rules:learnerRules};
+ if(mode==='PROMPTED') context={learner_rules:learnerRules};
+ const governed={...signalFor(c),fragments:[{cleaned_text:'TASK: '+c.task+'\\nEVIDENCE:\\n'+c.evidence.map(e=>e.text).join('\\n')}]};
+ const started=await (await import('./reality-model-gateway-v0.1.js')).startRealityModelBackground({governedSignal:governed,systemContext:context,apiKey,maxOutputTokens:220});
+ return {status:'STARTED',case_id:caseId,condition,response_id:started.response_id,proof:{real_model_call_started:true,universe_context_injected:mode==='REALITY'||mode==='LEARNING',verified_learning_injected:mode==='LEARNING',ground_truth_exposed:false}};
+}
+
+export async function pollSingleIntelligenceGainCondition({caseId,condition,responseId,apiKey=process.env.OPENAI_API_KEY}={}){
+ const c=cases.find(x=>x.id===caseId); if(!c) throw new Error('CASE_NOT_FOUND');
+ const {retrieveRealityModelResponse}=await import('./reality-model-gateway-v0.1.js');
+ const out=await retrieveRealityModelResponse({responseId,apiKey});
+ if(out.status!=='completed') return {status:out.status,case_id:caseId,condition,response_id:responseId};
+ return {status:'MEASURED',experiment_version:INTELLIGENCE_GAIN_EXPERIMENT_VERSION,case_id:caseId,condition,response_id:responseId,answer:out.answer,score:evaluateDeterministically(out.answer,c),proof:{real_model_call_completed:true,ground_truth_exposed:false}};
+}
