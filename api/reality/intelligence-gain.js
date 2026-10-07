@@ -1,9 +1,14 @@
 import { runIntelligenceGainExperiment } from '../../src/reality-intelligence-gain-runner-v1.0.js';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
+  const execute = req.method === 'POST' || (req.method === 'GET' && req.query?.run === '1');
+  if (!execute) {
+    return res.status(200).json({
+      status: 'READY',
+      endpoint: 'reality-intelligence-gain-v1.0',
+      execution: 'POST or GET?run=1',
+      note: 'GET execution is enabled for direct observability.'
+    });
   }
   try {
     const result = await runIntelligenceGainExperiment({
