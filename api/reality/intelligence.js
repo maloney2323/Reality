@@ -32,6 +32,98 @@ function rows(payload) {
   return Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
 }
 
+async function observeConnectedWorld() {
+  const observations = [];
+  const observedAt = new Date().toISOString();
+
+  const token = String(process.env.REALITY_GITHUB_TOKEN || '').trim();
+  if (token) {
+    try {
+      const response = await fetch('https://api.github.com/repos/maloney2323/Reality', {
+        headers: {
+          accept: 'application/vnd.github+json',
+          authorization: `Bearer ${token}`,
+          'x-github-api-version': '2022-11-28',
+        },
+      });
+      const repo = await response.json().catch(() => null);
+      observations.push({
+        entry_id: `world:github:Reality:${observedAt}`,
+        epistemic_kind: response.ok ? 'OBSERVATION' : 'OBSERVATION_FAILURE',
+        event_kind: 'CONNECTED_WORLD_PROVIDER_STATE',
+        assertion_time: observedAt,
+        effective_time: observedAt,
+        source_ref: 'github:maloney2323/Reality',
+        payload: response.ok ? {
+          provider: 'github',
+          repository: 'maloney2323/Reality',
+          default_branch: repo?.default_branch || null,
+          archived: repo?.archived === true,
+          permissions_observed: repo?.permissions ? {
+            pull: repo.permissions.pull === true,
+            push: repo.permissions.push === true,
+            admin: repo.permissions.admin === true,
+          } : null,
+          access_status: 'VERIFIED_BY_LIVE_READ',
+        } : {
+          provider: 'github',
+          access_status: 'READ_FAILED',
+          http_status: response.status,
+        },
+        evidence_references: [`github-live-read:${observedAt}`],
+        provenance: { source: 'live_connector_observation', observed_at: observedAt },
+      });
+    } catch (error) {
+      observations.push({
+        entry_id: `world:github:failure:${observedAt}`,
+        epistemic_kind: 'OBSERVATION_FAILURE',
+        event_kind: 'CONNECTED_WORLD_PROVIDER_STATE',
+        assertion_time: observedAt,
+        effective_time: observedAt,
+        source_ref: 'github:maloney2323/Reality',
+        payload: { provider: 'github', access_status: 'READ_ERROR', error_code: error?.message || 'UNKNOWN' },
+        evidence_references: [`github-live-read-error:${observedAt}`],
+        provenance: { source: 'live_connector_observation', observed_at: observedAt },
+      });
+    }
+  }
+
+  const productionUrl = String(process.env.REALITY_PUBLIC_URL || 'https://reality-blond.vercel.app').replace(/\/$/, '');
+  try {
+    const response = await fetch(productionUrl, { method: 'GET', redirect: 'follow' });
+    observations.push({
+      entry_id: `world:vercel:production:${observedAt}`,
+      epistemic_kind: 'OBSERVATION',
+      event_kind: 'CONNECTED_WORLD_RUNTIME_STATE',
+      assertion_time: observedAt,
+      effective_time: observedAt,
+      source_ref: 'vercel:reality-production',
+      payload: {
+        provider: 'vercel',
+        runtime_url: productionUrl,
+        http_status: response.status,
+        access_status: response.ok ? 'VERIFIED_BY_LIVE_READ' : 'RUNTIME_READ_FAILED',
+      },
+      evidence_references: [`vercel-live-read:${observedAt}`],
+      provenance: { source: 'live_runtime_observation', observed_at: observedAt },
+    });
+  } catch (error) {
+    observations.push({
+      entry_id: `world:vercel:failure:${observedAt}`,
+      epistemic_kind: 'OBSERVATION_FAILURE',
+      event_kind: 'CONNECTED_WORLD_RUNTIME_STATE',
+      assertion_time: observedAt,
+      effective_time: observedAt,
+      source_ref: 'vercel:reality-production',
+      payload: { provider: 'vercel', runtime_url: productionUrl, access_status: 'READ_ERROR', error_code: error?.message || 'UNKNOWN' },
+      evidence_references: [`vercel-live-read-error:${observedAt}`],
+      provenance: { source: 'live_runtime_observation', observed_at: observedAt },
+    });
+  }
+
+  return observations;
+}
+
 async function loadRealityContext(req, body) {
   const authorization = bearer(req);
   if (!authorization) return null;
@@ -153,11 +245,19 @@ export default async function handler(req, res) {
       return null;
     });
 
+    const worldObservations = await observeConnectedWorld();
+    const operationalContext = {
+      ...(realityContext || {}),
+      connected_world_observations: worldObservations,
+      world_observation_status: worldObservations.length ? 'OBSERVED' : 'NO_OBSERVATIONS',
+      world_observation_count: worldObservations.length,
+    };
+
     const principal = getOrCreateSessionPrincipal(req, res);
     const result = await runLiveIntelligenceOrchestration({
       message: body?.message,
       requestedBy: realityContext?.authenticated_user_id || principal.principal_id,
-      systemContext: realityContext,
+      systemContext: operationalContext,
     });
 
     return res.status(200).json({
