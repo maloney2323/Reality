@@ -70,18 +70,43 @@ export async function persistUniverseEntry(entry, { fetchImpl = fetch } = {}) {
   const canonical = createUniverseEntry(entry);
   validateUniverseEntry(canonical);
 
-  const response = await request('/rest/v1/reality_universe_entries?on_conflict=entry_id', {
+  const existingResponse = await request(
+    `/rest/v1/reality_universe_entries?entry_id=eq.${encodeURIComponent(canonical.entry_id)}&select=*`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+    fetchImpl,
+  );
+  const existingRows = await existingResponse.json();
+  const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+
+  if (existing) {
+    const existingEntry = mapRow(existing);
+    validateUniverseEntry(existingEntry);
+    if (existingEntry.ledger_entry_hash !== canonical.ledger_entry_hash) {
+      const error = new Error('UNIVERSE_IMMUTABLE_ENTRY_VIOLATION');
+      error.code = 'UNIVERSE_IMMUTABLE_ENTRY_VIOLATION';
+      throw error;
+    }
+    return Object.freeze({
+      version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+      status: 'DUPLICATE_IDENTICAL',
+      entry: Object.freeze(existingEntry),
+    });
+  }
+
+  const response = await request('/rest/v1/reality_universe_entries', {
     method: 'POST',
-    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    headers: { Prefer: 'return=representation' },
     body: JSON.stringify(canonical),
   }, fetchImpl);
 
   const rows = await response.json();
   const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) throw new Error('UNIVERSE_PERSISTENCE_WRITE_UNCONFIRMED');
+
   return Object.freeze({
     version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
-    status: row ? 'PERSISTED' : 'DUPLICATE_IDENTICAL',
-    entry: row ? Object.freeze(mapRow(row)) : canonical,
+    status: 'PERSISTED',
+    entry: Object.freeze(mapRow(row)),
   });
 }
 
