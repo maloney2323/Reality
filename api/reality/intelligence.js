@@ -100,11 +100,36 @@ async function loadRealityContext(req, body) {
     .map((item) => `USER MEMORY FROM PRIOR THOUGHT: ${String(item.text || '').slice(0, 6000)}`)
     .join('\\n');
 
+  const universe_entries = [
+    {
+      entry_id: `conversation:${conversationId}`,
+      epistemic_kind: 'OBSERVATION',
+      content: historyText || '(No earlier conversation context is available.)',
+      provenance: { source: 'authenticated_conversation_context', authority: 'USER_CONTEXT' },
+      evidence_references: [],
+    },
+    {
+      entry_id: `cross-thought:${user.id}`,
+      epistemic_kind: 'CONTEXT',
+      content: crossText || '(No prior cross-thought user context selected.)',
+      provenance: { source: 'authenticated_cross_thought_context', authority: 'USER_CONTEXT' },
+      evidence_references: [],
+    },
+    ...(safeProfile ? [{
+      entry_id: `profile:${user.id}`,
+      epistemic_kind: 'CONTEXT',
+      content: JSON.stringify(safeProfile),
+      provenance: { source: 'authenticated_profile_context', authority: 'USER_CONTEXT' },
+      evidence_references: [],
+    }] : []),
+  ];
+
   return {
     authenticated_user_id: user.id,
     profile: safeProfile,
     verified_conversation_context: historyText || '(No earlier conversation context is available.)',
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
+    universe_entries,
     context_source: 'BASE44_AUTHENTICATED_PERSONAL_REALITY',
     authority: 'AUTHENTICATED_USER_CONTEXT_ONLY',
     truth_authorized: false,
