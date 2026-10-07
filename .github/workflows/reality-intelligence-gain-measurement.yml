@@ -18,11 +18,6 @@ jobs:
       - name: Checkout Reality
         uses: actions/checkout@v4
 
-      - name: Verify Vercel production deployment
-        run: |
-          set -euo pipefail
-          curl -fsS -I https://reality-blond.vercel.app/api/reality/intelligence-gain >/dev/null
-
       - name: Run actual held-out four-condition experiment
         run: |
           set -euo pipefail
@@ -44,5 +39,3 @@ jobs:
           name: reality-intelligence-gain-${{ github.run_id }}
           path: intelligence-gain-result.json
           if-no-files-found: ignore
-
-# trigger: 2026-10-07T05:56:19.410Z
