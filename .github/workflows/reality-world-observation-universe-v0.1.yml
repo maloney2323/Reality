@@ -1,0 +1,26 @@
+name: Reality World Observation and Universe Reconstruction v0.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/reality-world-observation-fabric-v0.1.js'
+      - 'src/reality-universe-reconstruction-v0.1.js'
+      - 'test/reality-world-observation-universe-v0.1.test.js'
+      - '.github/workflows/reality-world-observation-universe-v0.1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-world-observation-fabric-v0.1.js'
+      - 'src/reality-universe-reconstruction-v0.1.js'
+      - 'test/reality-world-observation-universe-v0.1.test.js'
+      - '.github/workflows/reality-world-observation-universe-v0.1.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test test/reality-world-observation-universe-v0.1.test.js
