@@ -1,4 +1,25 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
+async function loadUniverseContext({ fetchImpl = fetch } = {}) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return { entries: [], status: 'UNAVAILABLE', count: 0 };
+  const base = url.replace(/\/$/, '');
+  const params = new URLSearchParams({ select: '*', order: 'assertion_time.desc', limit: '100' });
+  const response = await fetchImpl(base + '/rest/v1/universe_events?' + params.toString(), {
+    headers: { apikey: key, 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('UNIVERSE_CONTEXT_HTTP_' + response.status);
+  const rows = await response.json();
+  const entries = (Array.isArray(rows) ? rows : []).map((row) => ({
+    ...row,
+    entry_id: row.event_id,
+    ledger_entry_hash: row.content_hash,
+    epistemic_kind: row.epistemic_status,
+    evidence_references: Array.isArray(row.evidence_refs) ? row.evidence_refs : [],
+  }));
+  return { entries, status: 'RETRIEVED', count: entries.length };
+}
+
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
 import {
   createIntentRecord,
@@ -62,10 +83,18 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
+  const universeContext = await loadUniverseContext({ fetchImpl });
+  const cognitionContext = {
+    ...(systemContext || {}),
+    reality_context_source: 'UNIVERSE',
+    universe_context_status: universeContext.status,
+    universe_context_count: universeContext.count,
+  };
   const cognitiveResult = await runRealityCognitiveRuntime({
     message,
     governedSignal,
-    systemContext,
+    systemContext: cognitionContext,
+    universeEntries: universeContext.entries,
     model,
     apiKey,
     fetchImpl,
@@ -81,7 +110,7 @@ export async function runLiveIntelligenceOrchestration({
     message,
     governedSignal,
     intelligence: modelResult,
-    systemContext,
+    systemContext: cognitionContext,
     governance: materiality === 'ACTION_CANDIDATE' ? 'PROPORTIONAL_ACTION_GOVERNANCE' : 'NO_ACTION_GOVERNANCE',
     execution: 'NOT_EXECUTED',
     observedAt,
@@ -100,6 +129,7 @@ export async function runLiveIntelligenceOrchestration({
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
+    context: { universe: { status: universeContext.status, count: universeContext.count } },
     learning: {
       training_experience: trainingExperience,
       training_experiment: trainingExperiment,
