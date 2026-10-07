@@ -104,7 +104,7 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
-  const universeContext = await loadUniverseContext({ fetchImpl });
+  const universeContext = await loadUniverseContext({ systemContext, fetchImpl });
   const cognitionContext = {
     ...(systemContext || {}),
     reality_context_source: 'UNIVERSE',
