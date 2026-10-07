@@ -64,3 +64,6 @@ jobs:
           name: reality-governed-verification-receipt-${{ github.run_id }}
           path: verification-receipt/
           if-no-files-found: ignore
+
+      - name: Verification contract
+        run: echo "AUTOMATIC_GOVERNED_VERIFICATION_V1"
