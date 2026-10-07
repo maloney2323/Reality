@@ -1,0 +1,24 @@
+name: Reality governed operation ledger v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/reality-operation-ledger-v1.0.js'
+      - 'test/reality-operation-ledger-v1.0.test.js'
+      - 'package.json'
+  pull_request:
+    paths:
+      - 'src/reality-operation-ledger-v1.0.js'
+      - 'test/reality-operation-ledger-v1.0.test.js'
+      - 'package.json'
+
+jobs:
+  governance-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
