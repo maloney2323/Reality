@@ -1,23 +1,8 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
-async function loadUniverseContext({ fetchImpl = fetch } = {}) {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return { entries: [], status: 'UNAVAILABLE', count: 0 };
-  const base = url.replace(/\/$/, '');
-  const params = new URLSearchParams({ select: '*', order: 'assertion_time.desc', limit: '100' });
-  const response = await fetchImpl(base + '/rest/v1/universe_events?' + params.toString(), {
-    headers: { apikey: key, 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error('UNIVERSE_CONTEXT_HTTP_' + response.status);
-  const rows = await response.json();
-  const entries = (Array.isArray(rows) ? rows : []).map((row) => ({
-    ...row,
-    entry_id: row.event_id,
-    ledger_entry_hash: row.content_hash,
-    epistemic_kind: row.epistemic_status,
-    evidence_references: Array.isArray(row.evidence_refs) ? row.evidence_refs : [],
-  }));
-  return { entries, status: 'RETRIEVED', count: entries.length };
+import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
+
+function loadUniverseContext({ systemContext = null } = {}) {
+  return buildNativeUniverseContext({ systemContext });
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
