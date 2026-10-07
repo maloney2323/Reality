@@ -8,6 +8,8 @@ import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
 const SHADOW_REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
+const SHADOW_CONTINUITY_ROOT_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003';
+const SHADOW_WORLDLINE_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004';
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
@@ -89,8 +91,8 @@ async function runTick({ config, phase, local, persistence }) {
     try {
       await persistence.appendEvent({
         event_id: o.observation_id, event_kind: 'observation', entity_type: 'shadow_activity',
-        entity_id: o.external_id, continuity_root_id: 'shadow:github:' + SHADOW_REPO,
-        worldline_id: 'worldline:shadow:production', parent_event_id: null,
+        entity_id: o.external_id, continuity_root_id: SHADOW_CONTINUITY_ROOT_ID,
+        worldline_id: SHADOW_WORLDLINE_ID, parent_event_id: null,
         effective_time: o.effective_at, assertion_time: o.observed_at,
         epistemic_status: o.epistemic_status, payload: o, evidence_refs: [],
         provenance: o.provenance, content_hash: o.content_hash,
@@ -102,8 +104,8 @@ async function runTick({ config, phase, local, persistence }) {
   }
 
   const history = await persistence.reconstruct({
-    continuityRootId: 'shadow:github:' + SHADOW_REPO,
-    worldlineId: 'worldline:shadow:production',
+    continuityRootId: SHADOW_CONTINUITY_ROOT_ID,
+    worldlineId: SHADOW_WORLDLINE_ID,
   });
   const historyObservations = history
     .filter(e => e.event_kind === 'observation' && e.entity_type === 'shadow_activity')
