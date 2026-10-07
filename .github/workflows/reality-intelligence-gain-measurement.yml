@@ -21,7 +21,7 @@ jobs:
       - name: Run actual held-out four-condition experiment
         run: |
           set -euo pipefail
-          curl -fsS -X POST             -H 'content-type: application/json'             https://reality-blond.vercel.app/api/reality/intelligence-gain             -o intelligence-gain-result.json
+          curl -fsS -X POST -H 'content-type: application/json' https://reality-blond.vercel.app/api/reality/intelligence-gain -o intelligence-gain-result.json
           cat intelligence-gain-result.json
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
