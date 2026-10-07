@@ -18,6 +18,16 @@ function needsDeepReasoning(message) {
     || q.length > 1800;
 }
 
+function buildCognitionContext(systemContext, universeEntries) {
+  const entries = Array.isArray(universeEntries) ? universeEntries.slice(0, 100) : [];
+  return {
+    ...(systemContext || {}),
+    universe_context_available: entries.length > 0,
+    universe_context_entries: entries,
+    universe_context_count: entries.length,
+  };
+}
+
 function lanePrompt(name, message, systemContext) {
   const role = {
     OBSERVER: 'Reconstruct what is actually present in the supplied context. Separate observations, prior user statements, inference, and unknowns.',
@@ -75,6 +85,7 @@ Return only the answer text for the user.`;
 export async function runRealityCognitiveRuntime({
   message,
   systemContext = null,
+  universeEntries = [],
   model = DEFAULT_MODEL,
   apiKey,
   fetchImpl = fetch,
@@ -82,10 +93,12 @@ export async function runRealityCognitiveRuntime({
 } = {}) {
   if (!textOf(message)) throw new Error('MESSAGE_REQUIRED');
 
+  const cognitionContext = buildCognitionContext(systemContext, universeEntries);
+
   if (!needsDeepReasoning(message)) {
     const result = await invokeRealityModel({
       governedSignal,
-      systemContext,
+      systemContext: cognitionContext,
       model,
       apiKey,
       fetchImpl,
@@ -101,6 +114,7 @@ export async function runRealityCognitiveRuntime({
       synthesis: null,
       authority_granted: false,
       execution_authorized: false,
+      universe_context_count: cognitionContext.universe_context_count,
     };
   }
 
@@ -111,9 +125,9 @@ export async function runRealityCognitiveRuntime({
     const lane = await invokeRealityModel({
       governedSignal,
       systemContext: {
-        ...(systemContext || {}),
+        ...cognitionContext,
         cognitive_lane: name,
-        cognitive_instruction: lanePrompt(name, message, systemContext),
+        cognitive_instruction: lanePrompt(name, message, cognitionContext),
       },
       model,
       apiKey,
@@ -126,9 +140,9 @@ export async function runRealityCognitiveRuntime({
   const synthesis = await invokeRealityModel({
     governedSignal: synthesisSignal,
     systemContext: {
-      ...(systemContext || {}),
+      ...cognitionContext,
       cognitive_mode: 'GOVERNED_MULTI_LANE_SYNTHESIS',
-      cognitive_instruction: synthesisPrompt(message, systemContext, lanes),
+      cognitive_instruction: synthesisPrompt(message, cognitionContext, lanes),
     },
     model,
     apiKey,
@@ -150,5 +164,6 @@ export async function runRealityCognitiveRuntime({
     },
     authority_granted: false,
     execution_authorized: false,
+    universe_context_count: cognitionContext.universe_context_count,
   };
 }
