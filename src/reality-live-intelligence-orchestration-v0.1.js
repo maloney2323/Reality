@@ -21,6 +21,42 @@ function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function createIntelligenceTrainingExperience({
+  message,
+  governedSignal,
+  intelligence,
+  systemContext,
+  governance,
+  execution,
+  observedAt,
+} = {}) {
+  const answer = typeof intelligence?.answer === 'string' ? intelligence.answer : '';
+  return Object.freeze({
+    experience_id: `training_experience:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+    observed_at: observedAt || new Date().toISOString(),
+    input: String(message || ''),
+    governed_signal_hash: governedSignal?.signal_hash || governedSignal?.canonical_packet_id || null,
+    response_summary: answer.slice(0, 2000),
+    runtime_version: intelligence?.runtime_version || null,
+    governance,
+    execution,
+    universe_context_count: Number(systemContext?.universe_context_count || 0),
+    verified_outcome_required: true,
+    status: 'UNVERIFIED',
+  });
+}
+
+function proposeTrainingExperiment(trainingExperience) {
+  return Object.freeze({
+    experiment_id: `training_experiment:${trainingExperience.experience_id}`,
+    basis: trainingExperience.experience_id,
+    status: 'PROPOSED',
+    requires_verified_outcome: true,
+    authority_change: 'NONE',
+    capability_change: 'NONE',
+  });
+}
+
 function isExplicitlyProhibitedFragment(text) {
   return /^(do not|don't|never)\b/i.test(text.trim());
 }
