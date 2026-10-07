@@ -3,7 +3,8 @@ export const REALITY_NATIVE_UNIVERSE_VERSION = 'reality-native-universe-v1.0';
 export function buildNativeUniverseContext({ systemContext = {} } = {}) {
   const source = systemContext && typeof systemContext === 'object' ? systemContext : {};
   const supplied = Array.isArray(source.universe_entries) ? source.universe_entries : [];
-  const entries = supplied.filter(Boolean).slice(0, 100);
+  const worldObservations = Array.isArray(source.connected_world_observations) ? source.connected_world_observations : [];
+  const entries = [...supplied, ...worldObservations].filter(Boolean).slice(0, 100);
   return Object.freeze({
     version: REALITY_NATIVE_UNIVERSE_VERSION,
     status: 'AVAILABLE',
