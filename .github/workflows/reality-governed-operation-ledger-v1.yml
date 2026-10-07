@@ -30,3 +30,4 @@ jobs:
       - run: npm test
       - run: node --test test/reality-governed-operation-proof-v1.0.test.js
       - run: node --test test/reality-universe-context-handoff-v1.0.test.js
+      - run: node --test test/reality-native-universe-persistence-v1.0.test.js
