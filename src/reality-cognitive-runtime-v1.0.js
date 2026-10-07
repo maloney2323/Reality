@@ -78,12 +78,13 @@ export async function runRealityCognitiveRuntime({
   model = DEFAULT_MODEL,
   apiKey,
   fetchImpl = fetch,
+  governedSignal,
 } = {}) {
   if (!textOf(message)) throw new Error('MESSAGE_REQUIRED');
 
   if (!needsDeepReasoning(message)) {
     const result = await invokeRealityModel({
-      governedSignal: arguments[0].governedSignal,
+      governedSignal,
       systemContext,
       model,
       apiKey,
@@ -108,7 +109,7 @@ export async function runRealityCognitiveRuntime({
 
   for (const name of laneNames) {
     const lane = await invokeRealityModel({
-      governedSignal: arguments[0].governedSignal,
+      governedSignal,
       systemContext: {
         ...(systemContext || {}),
         cognitive_lane: name,
@@ -121,7 +122,7 @@ export async function runRealityCognitiveRuntime({
     lanes.push({ name, answer: lane.answer, response_id: lane.response_id, model: lane.model });
   }
 
-  const synthesisSignal = arguments[0].governedSignal;
+  const synthesisSignal = governedSignal;
   const synthesis = await invokeRealityModel({
     governedSignal: synthesisSignal,
     systemContext: {
