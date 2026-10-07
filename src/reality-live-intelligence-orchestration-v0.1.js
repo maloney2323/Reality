@@ -1,5 +1,5 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
-import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
+import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
 import {
   createIntentRecord,
   structureIntent,
@@ -62,13 +62,19 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
-  const modelResult = await invokeRealityModel({
+  const cognitiveResult = await runRealityCognitiveRuntime({
+    message,
     governedSignal,
     systemContext,
     model,
     apiKey,
     fetchImpl,
   });
+  const modelResult = {
+    ...cognitiveResult,
+    answer: cognitiveResult.answer,
+    cognitive_runtime_version: cognitiveResult.runtime_version,
+  };
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
