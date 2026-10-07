@@ -1,8 +1,20 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
+import { retrievePersistedUniverse } from './reality-native-universe-persistence-v1.0.js';
 
-function loadUniverseContext({ systemContext = null } = {}) {
-  return buildNativeUniverseContext({ systemContext });
+async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
+  const requestContext = buildNativeUniverseContext({ systemContext });
+  if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
+
+  const durable = await retrievePersistedUniverse({ limit: 100, fetchImpl });
+  return Object.freeze({
+    ...requestContext,
+    status: durable.status,
+    count: requestContext.count + durable.count,
+    entries: Object.freeze([...durable.entries, ...requestContext.entries]),
+    persistence: durable.persistence,
+    durable_count: durable.count,
+  });
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
