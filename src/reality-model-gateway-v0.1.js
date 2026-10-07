@@ -58,7 +58,7 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
   };
 }
 
-export async function invokeRealityModel({ governedSignal, systemContext = null, model = DEFAULT_MODEL, apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch } = {}) {
+export async function invokeRealityModel({ governedSignal, systemContext = null, model = DEFAULT_MODEL, apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch, maxOutputTokens = 300 } = {}) {
   requireField(apiKey, 'OPENAI_API_KEY_REQUIRED');
   const input = buildModelInput({ governedSignal, systemContext });
 
