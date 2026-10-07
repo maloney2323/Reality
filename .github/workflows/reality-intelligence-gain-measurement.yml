@@ -2,6 +2,11 @@ name: Reality Intelligence Gain Measurement
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'src/reality-intelligence-gain-runner-v1.0.js'
+      - 'src/reality-intelligence-gain-test-v1.0.js'
+      - '.github/workflows/reality-intelligence-gain-measurement.yml'
 
 jobs:
   measure-intelligence-gain:
