@@ -3,7 +3,7 @@ import { createIntelligenceSubstrate } from './reality-intelligence-substrate-v1
 
 export const INTELLIGENCE_GAIN_EXPERIMENT_VERSION='reality-intelligence-gain-v2.0';
 
-const cases=[
+export const cases=[
  {id:'HG-01',task:'Determine the operational truth and safest next step.',evidence:[
   {id:'e1',kind:'delivery',text:'Carrier notice says shipment 441 is delayed until Thursday.'},
   {id:'e2',kind:'inventory',text:'Warehouse record says shipment 441 was received Tuesday.'},
@@ -81,4 +81,20 @@ export async function runIntelligenceGainExperiment({apiKey=process.env.OPENAI_A
  const means=Object.fromEntries(conditions.map(([name])=>[name,results.filter(r=>r.condition===name).reduce((a,r)=>a+(r.score.overall_mean||0),0)/casesToRun.length]));
  const deltas={reality_vs_baseline:means.REALITY_UNIVERSE-means.BASELINE_MODEL,reality_vs_prompted:means.REALITY_UNIVERSE-means.PROMPTED_MODEL,reality_learning_vs_reality:means.REALITY_UNIVERSE_PLUS_VERIFIED_LEARNING-means.REALITY_UNIVERSE,reality_learning_vs_baseline:means.REALITY_UNIVERSE_PLUS_VERIFIED_LEARNING-means.BASELINE_MODEL};
  return {status:'MEASURED',experiment_version:INTELLIGENCE_GAIN_EXPERIMENT_VERSION,experiment_id:'gsi-gain-'+Date.now(),cases:casesToRun.map(c=>c.id),conditions:means,deltas,results,evaluator:{blinded:true,ground_truth_exposed:false,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna'},reproducibility:{heldout_cases:casesToRun.length,all_conditions_executed:results.length===casesToRun.length*conditions.length},claim:'DEMONSTRATED_CAPABILITY_COMPARISON_ONLY'};
+}
+
+export async function runSingleIntelligenceGainCondition({caseId,condition,apiKey=process.env.OPENAI_API_KEY}={}){
+ if(!apiKey) throw new Error('OPENAI_API_KEY_REQUIRED');
+ const c=cases.find(x=>x.id===caseId); if(!c) throw new Error('CASE_NOT_FOUND');
+ const allowed={BASELINE_MODEL:null,PROMPTED_MODEL:{learner_rules:learnerRules},REALITY_UNIVERSE:'REALITY',REALITY_UNIVERSE_PLUS_VERIFIED_LEARNING:'LEARNING'};
+ if(!(condition in allowed)) throw new Error('CONDITION_NOT_FOUND');
+ const mode=allowed[condition];
+ const substrate=createIntelligenceSubstrate({universeEntries:realityEntries(c),verifiedLearningSignals:c.id==='HG-02'?[{signal_id:'verified-reconciliation-learning',episode_id:'ep-1',verified_outcome:{status:'VERIFIED'},capability_delta:{recurring_work_detection:'improved'},corrections:['recurrence requires repeated evidence','capability does not imply authority'],failure_signals:[],independent_verifier_ref:'verifier-1',signal_hash:'verified-signal-hash'}]:[],governanceState:{authority_separate:true},query:{terms:[]}});
+ let context=null;
+ if(mode==='REALITY') context={universe:substrate,learner_rules:learnerRules};
+ if(mode==='LEARNING') context={universe:substrate,verified_learning_signals:substrate.verified_learning_signals,learner_rules:learnerRules};
+ if(mode==='PROMPTED') context={learner_rules:learnerRules};
+ const governed={...signalFor(c),fragments:[{cleaned_text:'TASK: '+c.task+'\\nEVIDENCE:\\n'+c.evidence.map(e=>e.text).join('\\n')}]};
+ const out=await invokeRealityModel({governedSignal:governed,systemContext:context,apiKey,maxOutputTokens:220});
+ return {status:'MEASURED',experiment_version:INTELLIGENCE_GAIN_EXPERIMENT_VERSION,case_id:caseId,condition,answer:out.answer,response_id:out.response_id,score:evaluateDeterministically(out.answer,c),proof:{real_model_call:true,universe_context_injected:mode==='REALITY'||mode==='LEARNING',verified_learning_injected:mode==='LEARNING',ground_truth_exposed:false}};
 }
