@@ -40,3 +40,5 @@ jobs:
           git add artifacts/intelligence-gain/
           git commit -m "Record intelligence gain measurement run ${{ github.run_id }}" || exit 0
           git push
+
+# forced measurement trigger 2026-10-07T18:00:00Z
