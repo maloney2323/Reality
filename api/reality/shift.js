@@ -6,6 +6,7 @@ import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelli
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
+import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -56,6 +57,19 @@ function withinShift(nowMinutes, startMinutes, lengthHours) {
 
 async function runTick({ config, phase, local, persistence }) {
   const tickId = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
+  const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
+  await appendOperationEvent({
+    persistence,
+    continuityRootId: CONFIG_ROOT,
+    worldlineId: WORLDLINE,
+    event: createOperationEvent({
+      operation_id: operationId,
+      stage: 'question',
+      outcome: 'not_started',
+      payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
+    }),
+    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+  });
   try {
     await persistence.appendEvent({
       event_id: tickId,
@@ -169,6 +183,7 @@ async function runTick({ config, phase, local, persistence }) {
   ].join('\n');
 
   const evidence = {
+    operation_id: operationId,
     operating_constitution: constitution,
     self_question_agenda: selfQuestionAgenda,
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
@@ -180,6 +195,20 @@ async function runTick({ config, phase, local, persistence }) {
     execution: 'FAIL_CLOSED',
   };
 
+  await appendOperationEvent({
+    persistence,
+    continuityRootId: CONFIG_ROOT,
+    worldlineId: WORLDLINE,
+    event: createOperationEvent({
+      operation_id: operationId,
+      stage: 'evidence',
+      outcome: 'observed',
+      payload: { constitution, self_question_agenda: selfQuestionAgenda, discovered_work_count: prioritizedWork.length },
+      evidence_refs: prioritizedWork.flatMap(w => w.evidence_refs || []),
+    }),
+    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+  });
+
   const intelligence = await runLiveIntelligenceOrchestration({
     message: mission,
     requestedBy: 'reality-autonomous-shift',
@@ -187,11 +216,24 @@ async function runTick({ config, phase, local, persistence }) {
   });
 
   const result = {
-    tick_id: tickId, phase, local, evidence_summary: evidence,
+    tick_id: tickId, operation_id: operationId, phase, local, evidence_summary: evidence,
     intelligence_mode: intelligence.mode,
     work: intelligence.work || null,
     execution: intelligence.execution,
   };
+
+  await appendOperationEvent({
+    persistence,
+    continuityRootId: CONFIG_ROOT,
+    worldlineId: WORLDLINE,
+    event: createOperationEvent({
+      operation_id: operationId,
+      stage: 'decision',
+      outcome: 'proposed',
+      payload: { intelligence_mode: intelligence.mode, work: intelligence.work || null },
+    }),
+    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+  });
 
   await persistence.appendEvent({
     event_id: tickId + ':result',
