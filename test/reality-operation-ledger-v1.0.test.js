@@ -1,3 +1,4 @@
+// Regression gates for exact authority, replay, contradiction, and verified-learning boundaries.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
