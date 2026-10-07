@@ -102,8 +102,8 @@ async function runTick({ config, phase, local, persistence }) {
   }
 
   const history = await persistence.reconstruct({
-    continuityRootId: '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003',
-    worldlineId: '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004',
+    continuityRootId: 'shadow:github:' + SHADOW_REPO,
+    worldlineId: 'worldline:shadow:production',
   });
   const historyObservations = history
     .filter(e => e.event_kind === 'observation' && e.entity_type === 'shadow_activity')
