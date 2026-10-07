@@ -119,22 +119,30 @@ export async function runRealityCognitiveRuntime({
   }
 
   const laneNames = ['OBSERVER', 'VERIFIER', 'ADVERSARY'];
-  const lanes = [];
 
-  for (const name of laneNames) {
-    const lane = await invokeRealityModel({
-      governedSignal,
-      systemContext: {
-        ...cognitionContext,
-        cognitive_lane: name,
-        cognitive_instruction: lanePrompt(name, message, cognitionContext),
-      },
-      model,
-      apiKey,
-      fetchImpl,
-    });
-    lanes.push({ name, answer: lane.answer, response_id: lane.response_id, model: lane.model });
-  }
+  // Deep cognition used to execute the three independent lanes sequentially.
+  // A medium/long user message therefore turned one request into four serial
+  // provider calls (3 lanes + synthesis), making the production path fragile.
+  // Run the independent lanes concurrently; synthesis remains the only second
+  // round. This preserves the cognitive architecture while materially reducing
+  // end-to-end latency and timeout risk.
+  const laneResults = await Promise.all(
+    laneNames.map(async (name) => {
+      const lane = await invokeRealityModel({
+        governedSignal,
+        systemContext: {
+          ...cognitionContext,
+          cognitive_lane: name,
+          cognitive_instruction: lanePrompt(name, message, cognitionContext),
+        },
+        model,
+        apiKey,
+        fetchImpl,
+      });
+      return { name, answer: lane.answer, response_id: lane.response_id, model: lane.model };
+    }),
+  );
+  const lanes = laneResults;
 
   const synthesisSignal = governedSignal;
   const synthesis = await invokeRealityModel({
