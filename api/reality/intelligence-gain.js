@@ -31,7 +31,7 @@ export default async function handler(req,res){
   if(!c||!allowed.includes(condition)) return res.status(400).json({error:'CASE_OR_CONDITION_REQUIRED',cases:Object.keys(CASES),conditions:allowed});
   if(!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY_MISSING');
   const started=Date.now();
-  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'content-type':'application/json'},body:JSON.stringify({model:process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',max_output_tokens:500,input:[{role:'system',content:[{type:'input_text',text:'You are the cognitive model being evaluated. '+RULES}]},{role:'user',content:[{type:'input_text',text:JSON.stringify(contextFor(condition,c))}]}]})});
+  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'content-type':'application/json'},body:JSON.stringify({model:process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',max_output_tokens:220,input:[{role:'system',content:[{type:'input_text',text:'You are the cognitive model being evaluated. '+RULES}]},{role:'user',content:[{type:'input_text',text:JSON.stringify(contextFor(condition,c))}]}]})});
   const b=await r.json();
   if(!r.ok) return res.status(r.status).json({status:'PROVIDER_ERROR',error:b.error||null});
   const answer=b.output_text||b.output?.flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('')||'';
