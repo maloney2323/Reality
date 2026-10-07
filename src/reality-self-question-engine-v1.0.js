@@ -3,6 +3,8 @@
 // A model may answer these questions, but it does not decide what Reality is
 // responsible for asking itself.
 
+import { buildEvidenceAcquisitionPlan } from './reality-evidence-acquisition-engine-v1.0.js';
+
 export const REALITY_SELF_QUESTION_ENGINE_VERSION = 'reality-self-question-engine-v1.1';
 
 const QUESTIONS = Object.freeze([
@@ -202,6 +204,11 @@ export function buildRealitySelfQuestionAgenda({ evidence = {}, phase = 'CONVERS
     phase,
     question_count: questions.length,
     questions: Object.freeze(questions.map(q => Object.freeze(q))),
+    evidence_acquisition: buildEvidenceAcquisitionPlan({
+      agenda: { questions },
+      availableEvidence: normalizedEvidence,
+      limit: safeLimit,
+    }),
     principle: 'REALITY_MUST_ASK_WHAT_IT_NEEDS_TO_KNOW_BEFORE_DECIDING_WHAT_TO_DO',
   });
 }
