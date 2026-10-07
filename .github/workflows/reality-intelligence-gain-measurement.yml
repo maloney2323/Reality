@@ -39,3 +39,5 @@ jobs:
           name: reality-intelligence-gain-${{ github.run_id }}
           path: intelligence-gain-result.json
           if-no-files-found: ignore
+
+# execution trigger: 2026-10-07T06:02:00Z
