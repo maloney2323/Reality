@@ -47,7 +47,12 @@ export function createLearningSignal({signalId,episodeId,sourceObservations=[],v
 }
 export function runSandboxLearning({baseline,episode,learner,learningSignal,candidate,governanceKernelHash,trainingCorpusRefs=[]}={}){
   if(baseline?.state!=='BASELINE_FROZEN')throw new Error('BASELINE_NOT_FROZEN');if(episode?.state!=='EPISODE_CAPTURED')throw new Error('EPISODE_NOT_CAPTURED');if(!learner?.learner_id)throw new Error('LEARNER_REQUIRED');if(learningSignal?.episode_id!==episode.episode_id)throw new Error('LEARNING_SIGNAL_EPISODE_MISMATCH');if(!learningSignal?.signal_hash)throw new Error('LEARNING_SIGNAL_REQUIRED');if(governanceKernelHash!==baseline.governance_kernel_hash)throw new Error('GOVERNANCE_KERNEL_HASH_MISMATCH');if(candidate?.modifies_governance===true||candidate?.modifies_authority===true)throw new Error('LEARNER_GOVERNANCE_OR_AUTHORITY_MODIFICATION_FORBIDDEN');
-  const ids=[...trainingCorpusRefs,...(episode.contamination_refs||[])];if(new Set(ids).size!==ids.length)throw new Error('TRAINING_CORPUS_CONTAMINATION');
+  const episodeEvidenceIds=(episode.evidence||[]).flatMap((x)=>[x?.id,x?.evidence_id,x?.observation_id,x?.ref].filter(Boolean).map(String));
+  const signalObservationIds=(learningSignal.source_observations||[]).map((x)=>typeof x==='string'?x:(x?.id||x?.observation_id||x?.ref)).filter(Boolean).map(String);
+  const ids=[...trainingCorpusRefs,...(episode.contamination_refs||[])];
+  if(new Set(ids).size!==ids.length)throw new Error('TRAINING_CORPUS_CONTAMINATION');
+  const trainingSet=new Set(trainingCorpusRefs.map(String));
+  if(episodeEvidenceIds.some((id)=>trainingSet.has(id))||signalObservationIds.some((id)=>trainingSet.has(id)))throw new Error('TRAINING_CORPUS_CONTAMINATION');
   const c={candidate_id:candidate?.candidate_id||`candidate:${digest({baseline:baseline.baseline_id,signal:learningSignal.signal_hash})}`,parent_baseline_id:baseline.baseline_id,parent_learner_version:learner.version,learning_signal_hash:learningSignal.signal_hash,strategy:candidate?.strategy||'APPLY_VERIFIED_LEARNING_SIGNAL',training_corpus_refs:[...trainingCorpusRefs],production_graph_write_permitted:false,governance_kernel_hash:governanceKernelHash,authority_scope:'NONE',sandbox_worldline:candidate?.sandbox_worldline||`sandbox:${digest(learningSignal.signal_hash)}`};
   return Object.freeze({state:'SANDBOX_RUNNING',candidate:c,sandbox_constraints:{production_graph_write_permitted:false,governance_kernel_mutable:false,authority_grant_permitted:false,hidden_evaluation_access:false},candidate_hash:digest(c)});
 }
