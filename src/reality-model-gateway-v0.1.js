@@ -1,7 +1,7 @@
 export const REALITY_MODEL_GATEWAY_VERSION = 'reality-model-gateway-v0.1';
 export const MODEL_TRANSPORT_AUTHORITY = 'OPENAI_RESPONSES_ONLY';
 
-const DEFAULT_MODEL = process.env.REALITY_OPENAI_MODEL || 'gpt-6-luna';
+const DEFAULT_MODEL = process.env.REALITY_OPENAI_MODEL || 'gpt-5.6-luna';
 
 function requireField(value, code) {
   if (value == null || value === '') throw new Error(code);
