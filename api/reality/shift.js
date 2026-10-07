@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
-import { buildShadowObservations, detectRecurringWork } from '../../src/reality-shadow-observer-v0.1.js';
+import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
+import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 
@@ -107,7 +108,24 @@ async function runTick({ config, phase, local, persistence }) {
   const historyObservations = history
     .filter(e => e.event_kind === 'observation' && e.entity_type === 'shadow_activity')
     .map(e => e.payload);
-  const recurring = detectRecurringWork(historyObservations).slice(0, 10);
+  const reconstructions = reconstructOperationalWork({ observations: historyObservations });
+  const discoveredWork = reconstructions.map((reconstruction) => {
+    const ownership = analyzeOwnership(reconstruction);
+    const capabilityAuthority = analyzeCapabilityAndAuthority(reconstruction);
+    return validateDiscoveredWork(createDiscoveredWork({
+      reconstruction,
+      ownership,
+      capabilityAuthority,
+      materiality: reconstruction.classification === 'RECURRING' ? 'HIGH' : 'MEDIUM',
+      proposedNextAction: capabilityAuthority.disposition === 'AWAITING_CAPABILITY'
+        ? 'OPEN_CAPABILITY_GAP'
+        : capabilityAuthority.disposition === 'AWAITING_AUTHORITY'
+          ? 'REQUEST_EXPLICIT_AUTHORITY'
+          : 'PREPARE_GOVERNED_WORK',
+      verificationRequirements: ['Independent observation must support completion before reconciliation.'],
+    }));
+  });
+  const prioritizedWork = prioritizeDiscoveredWork(discoveredWork).slice(0, 20);
 
   const mission = [
     'Operate Reality as a governed autonomous business operating shift.',
@@ -125,7 +143,8 @@ async function runTick({ config, phase, local, persistence }) {
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
     recent_observation_count: observations.length,
     newly_persisted_observations: persisted,
-    recurring_work_candidates: recurring,
+    discovered_work: prioritizedWork,
+    recurring_work_candidates: prioritizedWork.filter(w => w.classification === 'RECURRING'),
     authority: 'NONE_UNLESS_EXPLICITLY_GRANTED_PER_WORK_ITEM',
     execution: 'FAIL_CLOSED',
   };
@@ -155,7 +174,7 @@ async function runTick({ config, phase, local, persistence }) {
     assertion_time: new Date().toISOString(),
     epistemic_status: 'OBSERVED',
     payload: result,
-    evidence_refs: recurring.flatMap(c => c.evidence_refs || []),
+    evidence_refs: prioritizedWork.flatMap(c => c.evidence_refs || []),
     provenance: { source: 'reality-autonomous-shift-v0.1' },
   });
 
