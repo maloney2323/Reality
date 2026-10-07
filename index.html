@@ -100,8 +100,21 @@ function render(b){
 $('plan').onclick=async()=>{
   const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
   $('error').textContent=''; $('plan').disabled=true;
-  try{const r=await fetch('/api/reality/chat-brief',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({statement})});const b=await r.json();if(!r.ok)throw new Error(b.error||'Request failed');render(b)}
-  catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+  try{
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
+    const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
+    const intelligence=b.result?.intelligence||{};
+    $('brief').classList.add('open');
+    $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
+    $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>';
+    $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
+    $('authority').innerHTML='<div class="row"><span>Authority granted</span><span class="blocked">NO</span></div><div class="row"><span>Execution authorized</span><span class="blocked">NO</span></div>';
+    $('effect').textContent='Cognition only. No external action was executed.';
+    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+esc(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+esc(b.result?.context?.universe?.status||'unknown')+' ('+esc(b.result?.context?.universe?.count||0)+' records)</li>';
+    $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
+    $('execution').textContent='NOT_EXECUTED · cognition only';
+    $('verification').textContent='No external outcome claimed';
+  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
 };
 </script>
 </body>
