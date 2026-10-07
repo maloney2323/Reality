@@ -65,5 +65,19 @@ jobs:
           path: verification-receipt/
           if-no-files-found: ignore
 
+      - name: Run actual intelligence gain experiment
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { runIntelligenceGainExperiment } from './src/reality-intelligence-gain-runner-v1.0.js';
+          const result = await runIntelligenceGainExperiment();
+          console.log('REALITY_INTELLIGENCE_GAIN_RESULT');
+          console.log(JSON.stringify(result, null, 2));
+          if (result.status !== 'MEASURED') process.exit(1);
+          NODE
+
       - name: Verification contract
         run: echo "AUTOMATIC_GOVERNED_VERIFICATION_V1"
