@@ -105,6 +105,14 @@ export async function runLiveIntelligenceOrchestration({
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
   const universeContext = await loadUniverseContext({ systemContext, fetchImpl });
+  const suppliedUniverseCount =
+    (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
+    (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
+  if (suppliedUniverseCount > 0 && universeContext.count === 0) {
+    const error = new Error('UNIVERSE_CONTEXT_HANDOFF_FAILED');
+    error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
+    throw error;
+  }
   const cognitionContext = {
     ...(systemContext || {}),
     reality_context_source: 'UNIVERSE',
