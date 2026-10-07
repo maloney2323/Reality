@@ -4,6 +4,7 @@ import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -129,8 +130,24 @@ async function runTick({ config, phase, local, persistence }) {
   });
   const prioritizedWork = prioritizeDiscoveredWork(discoveredWork).slice(0, 20);
 
+  const selfQuestionAgenda = buildRealitySelfQuestionAgenda({
+    phase,
+    evidence: {
+      repository: SHADOW_REPO,
+      recent_observation_count: observations.length,
+      discovered_work_count: prioritizedWork.length,
+      recurring_work_count: prioritizedWork.filter(w => w.classification === 'RECURRING').length,
+      authority: 'NONE_UNLESS_EXPLICITLY_GRANTED_PER_WORK_ITEM',
+      execution: 'FAIL_CLOSED',
+      verification_plan: 'INDEPENDENT_OBSERVATION_REQUIRED',
+      live_observation_count: observations.length,
+    },
+  });
+
   const mission = [
     'Operate Reality as a governed autonomous business operating shift.',
+    'Do not begin by asking what feature to build. Begin by asking what Reality needs to know to operate the business successfully.',
+    buildSelfQuestionPrompt(selfQuestionAgenda),
     'Find concrete unfinished, recurring, repetitive, blocked, risky, or high-value work from observed evidence.',
     'Prioritize work that can remove real operational load from the owner.',
     'Inspect system health, regressions, integrations, governance, product gaps, competitive developments, and capability gaps.',
@@ -142,6 +159,7 @@ async function runTick({ config, phase, local, persistence }) {
   ].join('\n');
 
   const evidence = {
+    self_question_agenda: selfQuestionAgenda,
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
     recent_observation_count: observations.length,
     newly_persisted_observations: persisted,
