@@ -1,4 +1,4 @@
-export const REALITY_INTELLIGENCE_TRAINING_LOOP_VERSION = 'reality-intelligence-training-loop-v0.1';
+export const REALITY_INTELLIGENCE_TRAINING_LOOP_VERSION = 'reality-intelligence-training-loop-v1.0';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
