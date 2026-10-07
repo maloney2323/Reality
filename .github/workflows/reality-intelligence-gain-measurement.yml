@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/reality-intelligence-gain-runner-v1.0.js'
       - 'src/reality-intelligence-gain-test-v1.0.js'
+      - 'api/reality/intelligence-gain.js'
       - '.github/workflows/reality-intelligence-gain-measurement.yml'
 
 jobs:
@@ -17,15 +18,29 @@ jobs:
       - name: Checkout Reality
         uses: actions/checkout@v4
 
-      - name: Run held-out four-condition experiment
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+      - name: Verify Vercel production deployment
         run: |
           set -euo pipefail
+          curl -fsS -I https://reality-blond.vercel.app/api/reality/intelligence-gain >/dev/null
+
+      - name: Run actual held-out four-condition experiment
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST \
+            -H 'content-type: application/json' \
+            https://reality-blond.vercel.app/api/reality/intelligence-gain \
+            -o intelligence-gain-result.json
+          cat intelligence-gain-result.json
           node --input-type=module <<'NODE'
-          import { runIntelligenceGainExperiment } from './src/reality-intelligence-gain-runner-v1.0.js';
-          const result = await runIntelligenceGainExperiment();
-          console.log(JSON.stringify(result, null, 2));
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('intelligence-gain-result.json', 'utf8'));
           if (result.status !== 'MEASURED') process.exit(1);
           NODE
+
+      - name: Preserve intelligence measurement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-intelligence-gain-${{ github.run_id }}
+          path: intelligence-gain-result.json
+          if-no-files-found: ignore
