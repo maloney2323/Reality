@@ -71,6 +71,16 @@ export async function runLiveIntelligenceOrchestration({
   });
 
   const materiality = materialityFromSignal(governedSignal);
+  const trainingExperience = createIntelligenceTrainingExperience({
+    message,
+    governedSignal,
+    intelligence: modelResult,
+    systemContext,
+    governance: materiality === 'ACTION_CANDIDATE' ? 'PROPORTIONAL_ACTION_GOVERNANCE' : 'NO_ACTION_GOVERNANCE',
+    execution: 'NOT_EXECUTED',
+    observedAt,
+  });
+  const trainingExperiment = proposeTrainingExperiment(trainingExperience);
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
     governed_signal: clone(governedSignal),
@@ -83,6 +93,11 @@ export async function runLiveIntelligenceOrchestration({
     execution: {
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
+    },
+    learning: {
+      training_experience: trainingExperience,
+      training_experiment: trainingExperiment,
+      principle: 'REALITY_OWNS_INTELLIGENCE_AND_GOVERNANCE',
     },
   };
 
