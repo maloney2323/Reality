@@ -1,0 +1,22 @@
+name: Reality Capability Gap Projection v1
+
+on:
+  push:
+    branches:
+      - capability-gap-projection-v1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  capability-gap-projection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Situation contract test
+        run: node --test test/operational-situation-v1.0.test.js
+      - name: Run capability-gap invariant test
+        run: node --test test/capability-gap-projection-v1.test.js

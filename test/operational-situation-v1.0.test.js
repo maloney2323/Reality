@@ -39,6 +39,10 @@ const situation = createOperationalSituation({
 });
 
 assert.equal(situation.state, 'OBSERVED');
+assert.equal(situation.projection_type, 'OPERATIONAL_SITUATION');
+assert.equal(situation.consequence.description, 'The commitment may be at risk.');
+assert.equal(situation.consequence.desired_outcome, 'Commitment is fulfilled and independently verified.');
+assert.equal(situation.consequence.materiality, 'MATERIAL');
 assert.equal(validateOperationalSituation(situation).valid, true);
 
 const created = transitionOperationalSituation(situation, 'SITUATION_CREATED', {

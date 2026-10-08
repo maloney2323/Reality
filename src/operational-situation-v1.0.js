@@ -52,8 +52,11 @@ function freeze(value) {
 
 export function createOperationalSituation({
   observedTrigger,
+  claim = null,
   consequence,
   desiredOutcome,
+  projectionType = 'OPERATIONAL_SITUATION',
+  origin = null,
   evidence = [],
   missingEvidence = [],
   uncertainty = {},
@@ -80,6 +83,9 @@ export function createOperationalSituation({
     situation_version: OPERATIONAL_SITUATION_VERSION,
     situation_id: id,
     state: 'OBSERVED',
+    projection_type: String(projectionType || 'OPERATIONAL_SITUATION'),
+    origin: freeze(origin || {}),
+    claim: String(claim || observedTrigger.description),
     observed_trigger: freeze({
       description: String(observedTrigger.description),
       observed_at: observedTrigger.observed_at || createdAt,
@@ -87,8 +93,8 @@ export function createOperationalSituation({
       provenance: observedTrigger.provenance || null,
     }),
     consequence: freeze({
-      description: consequence || null,
-      desired_outcome: desiredOutcome || null,
+      description: consequence?.description || null,
+      desired_outcome: desiredOutcome || consequence?.desired_outcome || null,
       materiality: consequence?.materiality || null,
     }),
     evidence: freeze(initialEvidence),
