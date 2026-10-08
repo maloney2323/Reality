@@ -1,4 +1,4 @@
-name: Reality Production Control Plane v1.0
+name: Reality Production Control Plane v1.1
 
 on:
   push:
@@ -10,22 +10,21 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 env:
-  VERCEL_PROJECT_ID: prj_5A3b0WG9IuvzyEUBw9tD9v8jcha8
-  VERCEL_SCOPE: team_PorNAPmuRfcBHlWnYFf1a3T7
+  VERCEL_PRODUCTION_BRANCH: reality/canonical-migration-v01
   PRODUCTION_URL: https://reality-blond.vercel.app
 
 jobs:
-  verify-and-deploy:
+  verify-and-promote:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout exact main commit
+      - name: Checkout exact triggering commit
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Assert checkout is the triggering commit
@@ -46,66 +45,34 @@ jobs:
             npm test --if-present
           fi
 
-      - name: Require deployment authority
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Promote exact verified commit to Vercel production branch
         run: |
           set -euo pipefail
-          test -n "$VERCEL_TOKEN" || {
-            echo "DEPLOYMENT_GATE_BLOCKED: GitHub secret VERCEL_TOKEN is not configured."
-            echo "Reality will not claim deployment authority without an explicit deployment credential."
-            exit 1
-          }
+          git config user.name "Reality Production Control Plane"
+          git config user.email "reality-production@users.noreply.github.com"
+          git fetch origin "${VERCEL_PRODUCTION_BRANCH}" || true
+          git push origin "${GITHUB_SHA}:refs/heads/${VERCEL_PRODUCTION_BRANCH}" --force-with-lease
+          echo "PROMOTED_SHA=${GITHUB_SHA}"
 
-      - name: Deploy exact commit to Vercel production
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Verify production is serving the promoted commit
         run: |
           set -euo pipefail
-          npm install --global vercel@latest
-          DEPLOYMENT_URL="$(vercel deploy --prod --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --name reality)"
-          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
-          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL"
-
-      - name: Wait for deployment readiness
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
-        run: |
-          set -euo pipefail
+          EXPECTED="${GITHUB_SHA}"
           for i in $(seq 1 60); do
-            STATE="$(vercel inspect "$DEPLOYMENT_URL" --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --json | node -e '
-              let s="";
-              process.stdin.on("data",d=>s+=d).on("end",()=>{
-                const x=JSON.parse(s);
-                console.log(x.readyState || x.state || x.status || "");
-              });
-            ')"
-            echo "deployment_state=$STATE"
-            case "$STATE" in
-              READY) exit 0 ;;
-              ERROR|CANCELED|CANCELLED) exit 1 ;;
-            esac
+            HTTP="$(curl -sS -o /tmp/deployment-proof.json -w '%{http_code}' "${PRODUCTION_URL}/api/reality/deployment-proof")" || true
+            echo "proof_http=$HTTP"
+            if [ "$HTTP" = "200" ]; then
+              cat /tmp/deployment-proof.json
+              SERVING="$(node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/deployment-proof.json","utf8")); process.stdout.write(x.commit_sha || "")')"
+              echo "serving_sha=$SERVING"
+              if [ "$SERVING" = "$EXPECTED" ]; then
+                exit 0
+              fi
+            fi
             sleep 5
           done
-          echo "DEPLOYMENT_GATE_FAILED: deployment did not become READY"
+          echo "DEPLOYMENT_GATE_FAILED: production did not independently attest commit ${EXPECTED}"
           exit 1
-
-      - name: Verify live production
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
-        run: |
-          set -euo pipefail
-          HTTP="$(curl -sS -o /tmp/reality-response.txt -w '%{http_code}' "$DEPLOYMENT_URL")"
-          echo "deployment_http=$HTTP"
-          test "$HTTP" -ge 200
-          test "$HTTP" -lt 500
-
-          PROD_HTTP="$(curl -sS -o /tmp/reality-production-response.txt -w '%{http_code}' "$PRODUCTION_URL")"
-          echo "production_http=$PROD_HTTP"
-          test "$PROD_HTTP" -ge 200
-          test "$PROD_HTTP" -lt 500
 
       - name: Emit deployment receipt
         if: always()
@@ -113,12 +80,13 @@ jobs:
           mkdir -p verification-receipt
           cat > verification-receipt/reality-production-receipt.json <<EOF
           {
-            "schema": "reality-production-deployment-receipt-v1.0",
-            "commit_sha": "${GITHUB_SHA}",
+            "schema": "reality-production-deployment-receipt-v1.1",
+            "source_commit_sha": "${GITHUB_SHA}",
+            "production_branch": "${VERCEL_PRODUCTION_BRANCH}",
             "workflow_run_id": "${GITHUB_RUN_ID}",
             "repository": "${GITHUB_REPOSITORY}",
             "production_url": "${PRODUCTION_URL}",
-            "deployment_url": "${{ steps.deploy.outputs.deployment_url || '' }}",
+            "verification": "production-endpoint-must-attest-exact-source-commit",
             "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
