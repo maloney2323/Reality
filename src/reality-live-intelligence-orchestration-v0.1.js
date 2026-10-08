@@ -17,7 +17,7 @@ async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
     entries: Object.freeze([...durable.entries, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
-    continuity_root_id: continuityRootId,
+    continuity_root_id: effectiveContinuityRootId,
   });
 }
 
@@ -141,6 +141,33 @@ export async function runLiveIntelligenceOrchestration({
         trigger: 'CURRENT_REQUEST',
       })
     : null;
+
+  let continuityDiscovery = null;
+  let discoveredContinuityRootId = null;
+  if (!continuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+    const dormant = await retrieveDormantContinuitySummaries({
+      worldlineId: systemContext?.worldline_id || null,
+      limit: 1000,
+      fetchImpl,
+    });
+    const observations = Array.isArray(systemContext?.connected_world_observations)
+      ? systemContext.connected_world_observations : [];
+    const evidence = {
+      id: governedSignal?.signal_hash || null,
+      title: observations.length ? 'New connected-world evidence' : 'New operational signal',
+      description: [message, ...observations.map((item) => item?.summary || item?.description || item?.text || '')]
+        .filter(Boolean).join(' '),
+      domain: systemContext?.domain || null,
+      work_item_id: systemContext?.work_item_id || null,
+      continuation_condition: systemContext?.continuation_condition || null,
+    };
+    continuityDiscovery = discoverDormantContinuity({ evidence, dormantContinuities: dormant.entries });
+    const top = continuityDiscovery.candidates?.[0] || null;
+    if (top && continuityDiscovery.ambiguity_preserved !== true) {
+      discoveredContinuityRootId = top.continuity_root_id;
+    }
+  }
+  const effectiveContinuityRootId = discoveredContinuityRootId || continuityRootId;
   const cognitionContext = {
     ...(systemContext || {}),
     continuity_root_id: continuityRootId,
