@@ -50,7 +50,7 @@ export function discoverAutonomousWork({
 }= {}){
  const work=discoverWork({observations,existingWork,minimumRecurrences});
  return work
-  .map(w=>qualifyWorkCandidate(w))
+  .map(w=>qualifyWorkCandidate(w,{minRevenue}))
   .map(w=>rankWorkForMoney(w))
   .sort((a,b)=>(b.money_priority_score||0)-(a.money_priority_score||0));
 }
