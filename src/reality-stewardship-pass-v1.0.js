@@ -1,34 +1,12 @@
 import { discoverWork, qualifyWorkCandidate, rankWorkForMoney } from './reality-work-discovery-foundation-v1.0.js';
+import { githubGet, githubWrite } from './reality-connector-github-v1.0.js';
 
-const GITHUB_API = 'https://api.github.com';
 const OWNER = 'maloney2323';
 const REPO = 'Reality';
 
-function headers() {
-  const token = process.env.REALITY_GITHUB_TOKEN;
-  return {
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2026-03-10',
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-async function github(path, options = {}) {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    ...options,
-    headers: { ...headers(), ...(options.headers || {}) },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`GITHUB_REQUEST_FAILED:${response.status}`);
-  return body;
-}
-
 async function executeRecurringMaintenance({ owner, repo, workflow, failedRuns }) {
-  const token = process.env.REALITY_GITHUB_TOKEN;
-  if (!token) throw new Error('GITHUB_WRITE_AUTHORITY_MISSING');
-
   const marker = `reality-recurring-work:${workflow}`;
-  const issues = await github(
+  const issues = await githubGet(
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?state=open&per_page=100`
   );
   const existing = (issues || []).find(issue =>
@@ -53,27 +31,45 @@ async function executeRecurringMaintenance({ owner, repo, workflow, failedRuns }
     'This issue was created/updated by Reality Stewardship. It is bounded to tracking and recurring follow-up; it does not merge code or deploy changes.',
   ].join('\n');
 
+  let result;
   if (existing) {
-    await github(
+    result = await githubWrite(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${existing.number}`,
-      { method: 'PATCH', body: JSON.stringify({ body }), headers: { 'content-type': 'application/json' } }
+      'PATCH',
+      { body }
     );
-    return { action: 'UPDATED_EXISTING_ISSUE', issue_number: existing.number, issue_url: existing.html_url };
-  }
-
-  const created = await github(
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
+  } else {
+    result = await githubWrite(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
+      'POST',
+      {
         title: `Reality recurring work: repair repeated ${workflow} failures`,
         body,
         labels: ['reality-recurring-work'],
-      }),
-      headers: { 'content-type': 'application/json' },
-    }
+      }
+    );
+  }
+
+  // Independent read-back: execution is not considered verified until GitHub
+  // returns the resulting issue with Reality's marker.
+  const verified = await githubGet(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${result.number}`
   );
-  return { action: 'CREATED_ISSUE', issue_number: created.number, issue_url: created.html_url };
+  if (!verified || verified.number !== result.number || !String(verified.body || '').includes(marker)) {
+    throw new Error('GITHUB_EXECUTION_READBACK_FAILED');
+  }
+
+  return {
+    action: existing ? 'UPDATED_EXISTING_ISSUE' : 'CREATED_ISSUE',
+    issue_number: verified.number,
+    issue_url: verified.html_url,
+    verification: {
+      status: 'INDEPENDENTLY_VERIFIED',
+      provider: 'github',
+      issue_read_back: true,
+      marker_present: true
+    }
+  };
 }
 
 function ageDays(value) {
@@ -187,7 +183,7 @@ export async function runRealityStewardshipPass({
     execution,
     governance: {
       discovery_automatic: true,
-      authority_automatic: true,
+      authority_automatic: false,
       authority_scope: 'Create or update a tracking issue for repeated GitHub workflow failures only.',
       external_effects_permitted: execution.some(x => x.action === 'CREATED_ISSUE' || x.action === 'UPDATED_EXISTING_ISSUE'),
       code_merge_or_deploy_permitted: false,
