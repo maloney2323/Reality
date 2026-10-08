@@ -99,17 +99,23 @@ export async function runRealityStewardshipPass({
 
   for (const [workflow, failedRuns] of workflowFailures) {
     if (failedRuns.length < 2) continue;
-    observations.push({
-      observation_id: `github-workflow-failure:${workflow}`,
-      work_key: `workflow-failure:${workflow}`,
-      kind: 'SYSTEM_MAINTENANCE',
-      objective: `Investigate repeated ${workflow} failures`,
-      action: 'inspect_and_repair_repeated_workflow_failure',
-      occurred_at: failedRuns[0].updated_at || failedRuns[0].created_at,
-      evidence_refs: failedRuns.map(run => run.html_url).filter(Boolean),
-      recurrence_count: failedRuns.length,
-      source: 'github_actions',
-    });
+
+    // Preserve each observed failure as a distinct observation. The work
+    // discovery foundation establishes recurrence by counting observations
+    // with the same work_key; collapsing the runs into one observation would
+    // make recurrence_count look high while incorrectly leaving recurring=false.
+    for (const run of failedRuns) {
+      observations.push({
+        observation_id: `github-workflow-failure:${workflow}:${run.id || run.run_number || run.updated_at || run.created_at}`,
+        work_key: `workflow-failure:${workflow}`,
+        kind: 'SYSTEM_MAINTENANCE',
+        objective: `Investigate repeated ${workflow} failures`,
+        action: 'inspect_and_repair_repeated_workflow_failure',
+        occurred_at: run.updated_at || run.created_at,
+        evidence_refs: [run.html_url].filter(Boolean),
+        source: 'github_actions',
+      });
+    }
   }
 
   for (const pr of prs) {
