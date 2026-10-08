@@ -1,0 +1,21 @@
+name: Reality Governed Execution Warrant Learning Integration v1.0
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/reality/execute.js'
+      - 'src/reality-governed-execution-engine-v0.1.js'
+      - 'src/reality-evidence-warrant-v1.0.js'
+      - 'src/reality-constitutional-learning-bridge-v1.0.js'
+      - 'src/reality-constitutional-learning-v1.0.js'
+      - 'test/reality-governed-execution-warrant-learning-integration-v1.0.test.js'
+      - '.github/workflows/reality-governed-execution-warrant-learning-integration-v1.0.yml'
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node test/reality-governed-execution-warrant-learning-integration-v1.0.test.js
