@@ -145,3 +145,33 @@ export async function retrievePersistedUniverse({
     persistence: 'POSTGRES_SUBORDINATE',
   });
 }
+
+
+export async function persistContinuityEvent(event, { fetchImpl = fetch } = {}) {
+  const canonical = createUniverseEntry({
+    entry_id: event.continuity_event_id,
+    continuity_root_id: event.continuity_root_id,
+    worldline_id: event.worldline_id || 'reality:primary',
+    event_kind: 'CONTINUITY_STATE_TRANSITION',
+    epistemic_kind: 'OBSERVATION',
+    assertion_time: event.observed_at,
+    effective_time: event.observed_at,
+    source_ref: 'reality:continuous-continuity',
+    payload: {
+      continuity_state: event.next_state,
+      prior_state: event.prior_state,
+      next_state: event.next_state,
+      trigger: event.trigger,
+      work_item_id: event.work_item_id,
+      rehydratable: event.rehydratable === true,
+      continuity_event_version: event.continuity_event_version,
+      ...event.payload,
+    },
+    evidence_references: event.evidence_references || [],
+    provenance: {
+      source: 'reality_continuous_continuity',
+      continuity_event_id: event.continuity_event_id,
+    },
+  });
+  return persistUniverseEntry(canonical, { fetchImpl });
+}
