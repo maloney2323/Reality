@@ -1,0 +1,4 @@
+import {executeWorkGraph} from '../../../src/reality-work-execution-engine-v1.0.js';
+import * as github from '../../../src/reality-github-code-connector-v1.0.js';
+export const maxDuration=60;
+export default async function handler(req,res){if(req.method!=='POST')return res.status(405).json({ok:false,error:'METHOD_NOT_ALLOWED'});try{const {work_items,authorization}=req.body||{};const result=await executeWorkGraph({workItems:work_items,authorization,connectors:{github}});return res.status(200).json({ok:true,result});}catch(error){return res.status(error.status||400).json({ok:false,error:error.code||error.message});}}
