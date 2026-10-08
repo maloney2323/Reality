@@ -168,6 +168,7 @@ export async function runLiveIntelligenceOrchestration({
     }
   }
   const effectiveContinuityRootId = discoveredContinuityRootId || continuityRootId;
+  if (discoveredContinuityRootId) persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: universeContext.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   const cognitionContext = {
     ...(systemContext || {}),
     continuity_root_id: continuityRootId,
