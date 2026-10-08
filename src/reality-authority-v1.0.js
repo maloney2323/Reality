@@ -4,12 +4,18 @@ import { buildAuthorizationRequest, authorize } from './reality-governed-work-ru
 
 export const REALITY_AUTHORITY_VERSION = 'reality-authority-v1.0';
 
-const ROOT = 'reality:customer-authority';
-const WORLDLINE = 'reality:customer-authority:v1';
+const ROOT = uuid('continuity_root', 'reality:customer-authority');
+const WORLDLINE = uuid('worldline', 'reality:customer-authority:v1');
 
-function id(prefix, value) {
-  return prefix + ':' + crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 32);
+function uuid(prefix, value) {
+  const hex = crypto.createHash('sha256').update(JSON.stringify([prefix, value])).digest('hex').slice(0, 32).split('');
+  hex[12] = '5';
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const s = hex.join('');
+  return `${s.slice(0,8)}-${s.slice(8,12)}-${s.slice(12,16)}-${s.slice(16,20)}-${s.slice(20,32)}`;
 }
+
+function id(prefix, value) { return uuid(prefix, value); }
 function list(v) { return Array.isArray(v) ? v : []; }
 
 export function createAuthorityPolicy({
