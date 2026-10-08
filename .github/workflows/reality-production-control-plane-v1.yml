@@ -41,7 +41,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f package.json ]; then
-            npm ci --ignore-scripts
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci --ignore-scripts
+            else
+              npm install --ignore-scripts --no-audit --no-fund
+            fi
             npm test --if-present
           fi
 
