@@ -250,6 +250,9 @@ export default async function handler(req, res) {
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
       ...(realityContext || {}),
+      conversation_id: String(body?.conversation_id || '').trim() || null,
+      thought_id: String(body?.thought_id || '').trim() || null,
+      continuity_root_id: realityContext?.continuity_root_id || null,
       connected_world_observations: worldObservations,
       world_observation_status: worldObservations.length ? 'OBSERVED' : 'NO_OBSERVATIONS',
       world_observation_count: worldObservations.length,
