@@ -4,11 +4,10 @@ import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistC
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 
-async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
+async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
 
-  const continuityRootId = systemContext?.continuity_root_id || null;
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
   return Object.freeze({
     ...requestContext,
@@ -17,7 +16,7 @@ async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
     entries: Object.freeze([...durable.entries, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
-    continuity_root_id: effectiveContinuityRootId,
+    continuity_root_id: continuityRootId,
   });
 }
 
@@ -120,7 +119,12 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
-  const universeContext = await loadUniverseContext({ systemContext, fetchImpl });
+  const continuityRootId = deriveContinuityRootId({
+    explicitRootId: systemContext?.continuity_root_id,
+    conversationId: systemContext?.conversation_id,
+    workstreamId: systemContext?.workstream_id,
+  });
+  const universeContext = await loadUniverseContext({ systemContext, continuityRootId, fetchImpl });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -129,12 +133,7 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
-  const continuityRootId = deriveContinuityRootId({
-    explicitRootId: systemContext?.continuity_root_id,
-    conversationId: systemContext?.conversation_id,
-    workstreamId: systemContext?.workstream_id,
-  });
-  const persistedContinuity = continuityRootId
+  let persistedContinuity = continuityRootId
     ? buildContinuityRehydration({
         continuityRootId,
         entries: universeContext.entries,
@@ -168,10 +167,13 @@ export async function runLiveIntelligenceOrchestration({
     }
   }
   const effectiveContinuityRootId = discoveredContinuityRootId || continuityRootId;
-  if (discoveredContinuityRootId) persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: universeContext.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
+  if (discoveredContinuityRootId) {
+    const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
+    persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
+  }
   const cognitionContext = {
     ...(systemContext || {}),
-    continuity_root_id: continuityRootId,
+    continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
