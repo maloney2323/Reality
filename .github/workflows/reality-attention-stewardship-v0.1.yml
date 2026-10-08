@@ -1,0 +1,19 @@
+name: Reality Attention & Stewardship v0.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/reality-attention-stewardship-v0.1.js'
+      - 'test/reality-attention-stewardship-v0.1.test.js'
+      - 'package.json'
+
+jobs:
+  attention-stewardship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node test/reality-attention-stewardship-v0.1.test.js
