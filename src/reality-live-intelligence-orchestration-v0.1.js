@@ -207,9 +207,9 @@ export async function runLiveIntelligenceOrchestration({
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
   const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
-  const continuityEvent = continuityRootId
+  const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
-        continuityRootId,
+        continuityRootId: effectiveContinuityRootId,
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
         trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
