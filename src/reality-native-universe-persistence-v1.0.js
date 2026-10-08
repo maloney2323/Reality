@@ -145,3 +145,76 @@ export async function retrievePersistedUniverse({
     persistence: 'POSTGRES_SUBORDINATE',
   });
 }
+
+
+export async function retrieveDormantContinuitySummaries({
+  worldlineId = null,
+  limit = 1000,
+  fetchImpl = fetch,
+} = {}) {
+  const params = new URLSearchParams();
+  params.set('select', '*');
+  params.set('event_kind', 'eq.CONTINUITY_STATE_TRANSITION');
+  params.set('order', 'assertion_time.desc,effective_time.desc,ledger_entry_hash.asc');
+  params.set('limit', String(Math.min(Math.max(Number(limit) || 1000, 1), 1000)));
+  if (worldlineId) params.set('worldline_id', `eq.${worldlineId}`);
+
+  const response = await request(`/rest/v1/reality_universe_entries?${params}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  }, fetchImpl);
+
+  const rows = await response.json();
+  const entries = (Array.isArray(rows) ? rows : []).map(mapRow);
+  entries.forEach(validateUniverseEntry);
+
+  const dormantStates = new Set(['WAITING', 'BLOCKED', 'DEFERRED', 'SUSPENDED', 'COMPLETED']);
+  const latestByRoot = new Map();
+
+  for (const entry of entries) {
+    const state = entry?.payload?.continuity_state || entry?.payload?.next_state || null;
+    const root = entry?.continuity_root_id || null;
+    if (!root || !dormantStates.has(state)) continue;
+    if (!latestByRoot.has(root)) latestByRoot.set(root, entry);
+  }
+
+  const dormant = Array.from(latestByRoot.values());
+  return Object.freeze({
+    version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+    status: 'AVAILABLE',
+    count: dormant.length,
+    entries: Object.freeze(dormant),
+    persistence: 'POSTGRES_SUBORDINATE',
+    discovery_scope: 'ROOT_INDEPENDENT_DORMANT_CONTINUITY',
+  });
+}
+
+
+export async function persistContinuityEvent(event, { fetchImpl = fetch } = {}) {
+  const canonical = createUniverseEntry({
+    entry_id: event.continuity_event_id,
+    continuity_root_id: event.continuity_root_id,
+    worldline_id: event.worldline_id || 'reality:primary',
+    event_kind: 'CONTINUITY_STATE_TRANSITION',
+    epistemic_kind: 'OBSERVATION',
+    assertion_time: event.observed_at,
+    effective_time: event.observed_at,
+    source_ref: 'reality:continuous-continuity',
+    payload: {
+      continuity_state: event.next_state,
+      prior_state: event.prior_state,
+      next_state: event.next_state,
+      trigger: event.trigger,
+      work_item_id: event.work_item_id,
+      rehydratable: event.rehydratable === true,
+      continuity_event_version: event.continuity_event_version,
+      ...event.payload,
+    },
+    evidence_references: event.evidence_references || [],
+    provenance: {
+      source: 'reality_continuous_continuity',
+      continuity_event_id: event.continuity_event_id,
+    },
+  });
+  return persistUniverseEntry(canonical, { fetchImpl });
+}

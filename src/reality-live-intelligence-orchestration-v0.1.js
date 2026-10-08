@@ -1,12 +1,15 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
-import { retrievePersistedUniverse } from './reality-native-universe-persistence-v1.0.js';
+import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
+import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
+import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
 
-  const durable = await retrievePersistedUniverse({ limit: 100, fetchImpl });
+  const continuityRootId = systemContext?.continuity_root_id || null;
+  const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
   return Object.freeze({
     ...requestContext,
     status: durable.status,
@@ -14,6 +17,7 @@ async function loadUniverseContext({ systemContext = null, fetchImpl } = {}) {
     entries: Object.freeze([...durable.entries, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
+    continuity_root_id: effectiveContinuityRootId,
   });
 }
 
@@ -125,8 +129,53 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
+  const continuityRootId = deriveContinuityRootId({
+    explicitRootId: systemContext?.continuity_root_id,
+    conversationId: systemContext?.conversation_id,
+    workstreamId: systemContext?.workstream_id,
+  });
+  const persistedContinuity = continuityRootId
+    ? buildContinuityRehydration({
+        continuityRootId,
+        entries: universeContext.entries,
+        trigger: 'CURRENT_REQUEST',
+      })
+    : null;
+
+  let continuityDiscovery = null;
+  let discoveredContinuityRootId = null;
+  if (!continuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+    const dormant = await retrieveDormantContinuitySummaries({
+      worldlineId: systemContext?.worldline_id || null,
+      limit: 1000,
+      fetchImpl,
+    });
+    const observations = Array.isArray(systemContext?.connected_world_observations)
+      ? systemContext.connected_world_observations : [];
+    const evidence = {
+      id: governedSignal?.signal_hash || null,
+      title: observations.length ? 'New connected-world evidence' : 'New operational signal',
+      description: [message, ...observations.map((item) => item?.summary || item?.description || item?.text || '')]
+        .filter(Boolean).join(' '),
+      domain: systemContext?.domain || null,
+      work_item_id: systemContext?.work_item_id || null,
+      continuation_condition: systemContext?.continuation_condition || null,
+    };
+    continuityDiscovery = discoverDormantContinuity({ evidence, dormantContinuities: dormant.entries });
+    const top = continuityDiscovery.candidates?.[0] || null;
+    if (top && continuityDiscovery.ambiguity_preserved !== true) {
+      discoveredContinuityRootId = top.continuity_root_id;
+    }
+  }
+  const effectiveContinuityRootId = discoveredContinuityRootId || continuityRootId;
+  if (discoveredContinuityRootId) persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: universeContext.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   const cognitionContext = {
     ...(systemContext || {}),
+    continuity_root_id: continuityRootId,
+    continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
+    continuity_latest_state: persistedContinuity?.latest_state || null,
+    continuity_rehydrated: persistedContinuity?.continuation_available === true,
+    continuity_entry_count: persistedContinuity?.matched_entry_count || 0,
     reality_context_source: 'UNIVERSE',
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
@@ -157,6 +206,29 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
+  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  const continuityEvent = effectiveContinuityRootId
+    ? buildContinuityEvent({
+        continuityRootId: effectiveContinuityRootId,
+        priorState: persistedContinuity?.latest_state || null,
+        nextState: continuityState,
+        trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
+        evidenceReferences: [governedSignal?.signal_hash, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))],
+        payload: {
+          continuity_state: continuityState,
+          materiality,
+          runtime_version: modelResult?.runtime_version || null,
+          universe_context_count: universeContext.count,
+          response_summary: String(modelResult?.answer || '').slice(0, 1000),
+        },
+        observedAt: observedAt || new Date().toISOString(),
+      })
+    : null;
+
+  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+    await persistContinuityEvent(continuityEvent, { fetchImpl });
+  }
+
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
     governed_signal: clone(governedSignal),
@@ -170,7 +242,15 @@ export async function runLiveIntelligenceOrchestration({
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
-    context: { universe: { status: universeContext.status, count: universeContext.count } },
+    context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
+      root_id: effectiveContinuityRootId,
+      discovery: continuityDiscovery,
+      status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
+      rehydrated: persistedContinuity?.continuation_available === true,
+      prior_state: persistedContinuity?.latest_state || null,
+      current_state: continuityEvent?.next_state || null,
+      event_id: continuityEvent?.continuity_event_id || null,
+    } },
     learning: {
       training_experience: trainingExperience,
       training_experiment: trainingExperiment,
