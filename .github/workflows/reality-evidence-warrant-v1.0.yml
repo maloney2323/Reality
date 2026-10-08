@@ -1,0 +1,17 @@
+name: Reality Evidence Warrant v1.0
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/reality-evidence-warrant-v1.0.js'
+      - 'test/reality-evidence-warrant-v1.0.test.js'
+      - '.github/workflows/reality-evidence-warrant-v1.0.yml'
+jobs:
+  warrant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node test/reality-evidence-warrant-v1.0.test.js
