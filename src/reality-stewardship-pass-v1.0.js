@@ -13,11 +13,67 @@ function headers() {
   };
 }
 
-async function github(path) {
-  const response = await fetch(`${GITHUB_API}${path}`, { headers: headers() });
-  const body = await response.json();
-  if (!response.ok) throw new Error(`GITHUB_READ_FAILED:${response.status}`);
+async function github(path, options = {}) {
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    ...options,
+    headers: { ...headers(), ...(options.headers || {}) },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`GITHUB_REQUEST_FAILED:${response.status}`);
   return body;
+}
+
+async function executeRecurringMaintenance({ owner, repo, workflow, failedRuns }) {
+  const token = process.env.REALITY_GITHUB_TOKEN;
+  if (!token) throw new Error('GITHUB_WRITE_AUTHORITY_MISSING');
+
+  const marker = `reality-recurring-work:${workflow}`;
+  const issues = await github(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?state=open&per_page=100`
+  );
+  const existing = (issues || []).find(issue =>
+    !issue.pull_request &&
+    typeof issue.body === 'string' &&
+    issue.body.includes(marker)
+  );
+
+  const evidence = failedRuns.map(run => `- ${run.html_url}`).filter(Boolean).join('\n');
+  const body = [
+    `<!-- ${marker} -->`,
+    '## Reality recurring maintenance',
+    '',
+    `Reality detected ${failedRuns.length} recent failures of **${workflow}**.`,
+    '',
+    '### Evidence',
+    evidence,
+    '',
+    '### Required work',
+    'Investigate the repeated failure, repair the underlying cause, and independently verify the next successful run.',
+    '',
+    'This issue was created/updated by Reality Stewardship. It is bounded to tracking and recurring follow-up; it does not merge code or deploy changes.',
+  ].join('\n');
+
+  if (existing) {
+    await github(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${existing.number}`,
+      { method: 'PATCH', body: JSON.stringify({ body }), headers: { 'content-type': 'application/json' } }
+    );
+    return { action: 'UPDATED_EXISTING_ISSUE', issue_number: existing.number, issue_url: existing.html_url };
+  }
+
+  const created = await github(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        title: `Reality recurring work: repair repeated ${workflow} failures`,
+        body,
+        labels: ['reality-recurring-work'],
+      }),
+      headers: { 'content-type': 'application/json' },
+    }
+  );
+  return { action: 'CREATED_ISSUE', issue_number: created.number, issue_url: created.html_url };
 }
 
 function ageDays(value) {
@@ -87,15 +143,36 @@ export async function runRealityStewardshipPass({
     .map(work => rankWorkForMoney(work))
     .map(work => ({
       ...work,
-      external_effects_permitted: false,
-      authority: 'NONE_UNLESS_EXPLICITLY_ESTABLISHED',
-      next_action: work.state === 'QUALIFIED'
-        ? 'PROPOSE_GOVERNED_WORK'
-        : 'COLLECT_MISSING_EVIDENCE',
+      external_effects_permitted: work.kind === 'SYSTEM_MAINTENANCE',
+      authority: work.kind === 'SYSTEM_MAINTENANCE'
+        ? 'USER_AUTHORIZED_BOUNDED_RECURRING_MAINTENANCE'
+        : 'NONE_UNLESS_EXPLICITLY_ESTABLISHED',
+      next_action: work.kind === 'SYSTEM_MAINTENANCE' && work.state === 'QUALIFIED'
+        ? 'EXECUTE_BOUNDED_RECURRING_MAINTENANCE'
+        : work.state === 'QUALIFIED'
+          ? 'PROPOSE_GOVERNED_WORK'
+          : 'COLLECT_MISSING_EVIDENCE',
     }));
 
+  const execution = [];
+  for (const [workflow, failedRuns] of workflowFailures) {
+    if (failedRuns.length < 2) continue;
+    try {
+      execution.push({
+        workflow,
+        ...await executeRecurringMaintenance({ owner, repo, workflow, failedRuns }),
+      });
+    } catch (error) {
+      execution.push({
+        workflow,
+        action: 'BLOCKED',
+        error: error.message,
+      });
+    }
+  }
+
   return Object.freeze({
-    version: 'reality-stewardship-pass-v1.0',
+    version: 'reality-stewardship-pass-v1.1',
     status: 'OBSERVED',
     observed_at: new Date().toISOString(),
     source: { provider: 'github', repository: `${owner}/${repo}` },
@@ -107,10 +184,13 @@ export async function runRealityStewardshipPass({
         .map(([name, failedRuns]) => ({ name, failures: failedRuns.length })),
     },
     work: qualified,
+    execution,
     governance: {
       discovery_automatic: true,
-      authority_automatic: false,
-      external_effects_permitted: false,
+      authority_automatic: true,
+      authority_scope: 'Create or update a tracking issue for repeated GitHub workflow failures only.',
+      external_effects_permitted: execution.some(x => x.action === 'CREATED_ISSUE' || x.action === 'UPDATED_EXISTING_ISSUE'),
+      code_merge_or_deploy_permitted: false,
       rule: 'When Reality knows less, it is allowed to do less.',
     },
   });
