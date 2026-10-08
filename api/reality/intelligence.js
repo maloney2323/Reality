@@ -2,6 +2,7 @@ export const maxDuration = 60;
 
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
 
 const BASE44_API = 'https://base44.app/api';
 const BASE44_APP_ID = '6a7bd610756b32bc21c39ad0';
@@ -241,6 +242,31 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
+    const principal = getOrCreateSessionPrincipal(req, res);
+
+    // Explicit build language in chat enters Reality's governed self-build path.
+    // The resulting authority is bounded to an isolated branch + PR; production
+    // merge/deploy authority remains separate.
+    if (typeof body.message === 'string' && /^(build|create|implement|add|make|fix|modify|change)\\b/i.test(body.message.trim())) {
+      const build = await buildFromChat({
+        message: body.message,
+        requestedBy: principal.principal_id,
+        authorizationRef: body.authorization_id || null,
+      });
+      if (build) {
+        return res.status(200).json({
+          ok: true,
+          result: {
+            mode: 'SELF_BUILD',
+            answer: `Reality built the requested change and opened an isolated build for review.\\n\\nBuild: ${build.objective}\\nBranch: ${build.branch}\\nPull request: ${build.pull_request?.url || 'opened'}`,
+            build,
+            authority: { granted: true, scope: build.authorization.scope, production_merge_permitted: false },
+            execution: { status: 'PR_OPENED', production_deploy: false },
+          },
+        });
+      }
+    }
+
     const realityContext = await loadRealityContext(req, body).catch((error) => {
       if (error?.message === 'REALITY_SESSION_REQUIRED') throw error;
       if (error?.message === 'REALITY_CHAT_TRACE_REQUIRED') throw error;
@@ -258,7 +284,6 @@ export default async function handler(req, res) {
       world_observation_count: worldObservations.length,
     };
 
-    const principal = getOrCreateSessionPrincipal(req, res);
     const result = await runLiveIntelligenceOrchestration({
       message: body?.message,
       requestedBy: realityContext?.authenticated_user_id || principal.principal_id,
