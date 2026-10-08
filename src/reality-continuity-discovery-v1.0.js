@@ -28,6 +28,12 @@ function overlap(a, b) {
   for (const value of a) if (b.has(value)) hits += 1;
   return hits / Math.max(a.size, b.size);
 }
+function objectiveCoverage(incoming, objective) {
+  if (!incoming.size || !objective.size) return 0;
+  let hits = 0;
+  for (const value of objective) if (incoming.has(value)) hits += 1;
+  return hits / objective.size;
+}
 function field(entry, key) {
   return text(entry?.[key] ?? entry?.payload?.[key]);
 }
@@ -70,7 +76,7 @@ export function discoverDormantContinuity({
     const s = continuitySummary(raw);
     if (!s.continuity_root_id || !['WAITING','BLOCKED','DEFERRED','SUSPENDED','COMPLETED'].includes(s.state)) continue;
 
-    const objectiveScore = overlap(incomingTokens, tokens(s.objective));
+    const objectiveScore = objectiveCoverage(incomingTokens, tokens(s.objective));
     const conditionMatch = incomingCondition && s.continuation_condition &&
       incomingCondition.toLowerCase() === s.continuation_condition.toLowerCase();
     const domainMatch = incomingDomain && s.domain &&
