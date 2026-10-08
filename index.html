@@ -122,17 +122,24 @@ $('plan').onclick=async()=>{
 };
 const realityWork=$('findWork');const workResult=$('workResult');
 function renderWork(source){
-  const items=Array.isArray(source)?source:(source?.work_items||source?.items||source?.workflow?.work_items||[]);
+  const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
   const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
   const past=new Set(['COMPLETED','VERIFIED','CLOSED']);
   const present=new Set(['WORKING','IN_PROGRESS','VERIFYING','AWAITING_VERIFICATION','NEEDS_AUTHORIZATION','AUTHORIZED']);
   const future=new Set(['DISCOVERED','READY','PROPOSED','EVIDENCE_NEEDED','QUALIFIED']);
-  $('matrixPastCount').textContent=String(items.filter(w=>past.has(state(w))).length);
-  $('matrixPresentCount').textContent=String(items.filter(w=>present.has(state(w))).length);
-  $('matrixFutureCount').textContent=String(items.filter(w=>future.has(state(w))).length);
-  const items=Array.isArray(source)?source:(source?.work_items||source?.items||source?.workflow?.work_items||[]);
+  const counts={
+    past:items.filter(w=>past.has(state(w))).length,
+    present:items.filter(w=>present.has(state(w))).length,
+    future:items.filter(w=>future.has(state(w))).length
+  };
+  $('matrixPastCount').textContent=String(counts.past);
+  $('matrixPresentCount').textContent=String(counts.present);
+  $('matrixFutureCount').textContent=String(counts.future);
   $('workCount').textContent=String(items.length);
-  $('workQueue').innerHTML=items.length?items.map((w,i)=>'<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(w.status||w.state||'DISCOVERED')+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span></div></div>').join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
+  $('workQueue').innerHTML=items.length?items.map((w,i)=>{
+    const evidence=Array.isArray(w.evidence_refs)?w.evidence_refs.length:0;
+    return '<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(state(w))+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span><span class="pill">'+esc('Evidence '+evidence)+'</span></div></div>';
+  }).join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
   const pending=items.filter(w=>w.consequential||w.authority_required?.length||w.authorization_required||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
   $('attentionCount').textContent=String(pending.length);
   $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>'<div class="attention-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||'Governed work')+'</strong><div class="muted">External effect requires your authorization.</div><button type="button" data-auth="'+i+'">Authorize this work</button></div>').join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
@@ -140,10 +147,9 @@ function renderWork(source){
     const w=pending[Number(btn.dataset.auth)];
     btn.disabled=true;btn.textContent='Authorizing…';
     try{
-      const raw=w.authorization_scope||w.scope||w.allowed_operations||null;
-      const scope=Array.isArray(raw)?raw[0]:raw;
-      if(!scope||!scope.connector||!scope.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
       const workItem=w.execution_work_item||w;
+      const scope=(w.authorization_scope||w.scope||w.allowed_operations||workItem.authority_required||[])[0];
+      if(!scope?.connector||!scope?.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
       const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:workItem,enabled:true})});
       const rb=await rr.json();if(!rr.ok||!rb.ok)throw new Error(rb.error||'Authorization failed');
       const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem,workflowId:workItem.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded recurring maintenance explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
@@ -157,8 +163,8 @@ async function checkReality(){try{const r=await fetch('/api/health');const b=awa
 realityWork.onclick=async()=>{
   realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
   try{
-    const r=await fetch('/api/reality/discover?trace=1');const b=await r.json();if(!r.ok)throw new Error(b.error||'discovery failed');
-    renderWork(b.work_discovery||b.work||[]);
+    const r=await fetch('/api/reality/stewardship');const b=await r.json();if(!r.ok)throw new Error(b.error||'stewardship discovery failed');
+    renderWork(b.work||[]);
     workResult.textContent='Discovery completed. Work appears above; attention shows what still requires authorization. No external work was executed.';
     $('liveHeadline').textContent='Reality has started looking for work.';$('liveDetail').textContent='Discovery is observation. Authorization remains explicit.';
   }catch(e){workResult.textContent='Reality stopped honestly: '+e.message}
