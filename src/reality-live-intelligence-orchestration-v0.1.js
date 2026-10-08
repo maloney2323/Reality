@@ -3,6 +3,7 @@ import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
+import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
@@ -232,6 +233,72 @@ export async function runLiveIntelligenceOrchestration({
     await persistContinuityEvent(continuityEvent, { fetchImpl });
   }
 
+  let situation = null;
+  if (materiality === 'ACTION_CANDIDATE') {
+    const observations = Array.isArray(systemContext?.connected_world_observations)
+      ? systemContext.connected_world_observations : [];
+    const evidence = [
+      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      ...observations.map((item) => item?.entry_id ? {
+        ref: item.entry_id,
+        kind: item.event_kind || 'connected_world_observation',
+        source: item.source_ref || null,
+        observed_at: item.assertion_time || null,
+      } : null),
+    ].filter(Boolean);
+    situation = createOperationalSituation({
+      observedTrigger: {
+        description: String(message).slice(0, 2000),
+        observed_at: observedAt || new Date().toISOString(),
+        source: 'live_intelligence_orchestration',
+        provenance: { runtime: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION },
+      },
+      consequence: {
+        description: 'A consequential operational request or condition requires governed handling.',
+        desired_outcome: 'The requested outcome is completed only within explicit authority and independently verified.',
+        materiality: 'ACTION_CANDIDATE',
+      },
+      evidence,
+      missingEvidence: evidence.length ? [] : ['Independent supporting evidence is not yet attached.'],
+      uncertainty: {
+        state: evidence.length ? 'ASSESSED' : 'MISSING_EVIDENCE',
+        confidence: evidence.length ? 'SUPPORTED_BY_RECORDED_SIGNAL' : null,
+        known_unknowns: ['The intended external effect must not be inferred from model output alone.'],
+        blocking_questions: ['What exact action, connector, target, and authorization scope apply?'],
+      },
+      authority: {
+        status: 'REQUIRES_EXPLICIT_AUTHORIZATION',
+        required_decision_maker: requestedBy,
+        limits: ['Model output cannot grant authority.', 'Execution requires matching authorization and independent verification.'],
+      },
+      verification: {
+        method: 'Independent observation of the resulting external state.',
+      },
+      closure: {
+        criteria: ['Authorized action completed where applicable.', 'Outcome independently verified or Situation explicitly closed as non-executable.'],
+      },
+      observedAt,
+    });
+    situation = transitionOperationalSituation(situation, 'SITUATION_CREATED', {
+      reason: 'ACTION_CANDIDATE_REQUIRES_GOVERNED_SITUATION',
+    });
+    if (evidence.length) {
+      situation = transitionOperationalSituation(situation, 'EVIDENCE_ESTABLISHED', {
+        reason: 'LIVE_SIGNAL_AND_CONNECTED_WORLD_EVIDENCE_ATTACHED',
+      });
+    }
+    situation = transitionOperationalSituation(situation, 'UNCERTAINTY_ASSESSED', {
+      reason: 'AUTHORITY_AND_EXTERNAL_EFFECT_REMAIN_UNRESOLVED',
+    });
+    situation = transitionOperationalSituation(situation, 'AUTHORITY_DETERMINED', {
+      reason: 'NO_AUTHORITY_INFERRED_FROM_MODEL_OUTPUT',
+    });
+    situation = transitionOperationalSituation(situation, 'ACTION_PROPOSED', {
+      reason: 'GOVERNED_ACTION_CANDIDATE_CREATED',
+      action: { proposed: 'Continue through separately established authorization and governed execution.' },
+    });
+  }
+
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
     governed_signal: clone(governedSignal),
@@ -254,6 +321,7 @@ export async function runLiveIntelligenceOrchestration({
       current_state: continuityEvent?.next_state || null,
       event_id: continuityEvent?.continuity_event_id || null,
     } },
+    situation: clone(situation),
     learning: {
       training_experience: trainingExperience,
       training_experiment: trainingExperiment,
