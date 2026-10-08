@@ -1,3 +1,4 @@
+// REALITY_CODE_ORGAN_PROOF: bounded transformation executed on isolated branch only.
 export const maxDuration = 60;
 
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
