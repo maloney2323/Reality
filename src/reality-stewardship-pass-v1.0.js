@@ -83,8 +83,8 @@ export async function runRealityStewardshipPass({
   perPage = 30,
   stalePrDays = 7,
 } = {}) {
-  const runs = await github(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
-  const prs = await github(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
+  const runs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
+  const prs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
 
   const workflowFailures = new Map();
   for (const run of runs.workflow_runs || []) {
@@ -137,36 +137,62 @@ export async function runRealityStewardshipPass({
   const qualified = discovered
     .map(work => qualifyWorkCandidate(work, { evidenceRequired: true }))
     .map(work => rankWorkForMoney(work))
-    .map(work => ({
-      ...work,
-      external_effects_permitted: work.kind === 'SYSTEM_MAINTENANCE',
-      authority: work.kind === 'SYSTEM_MAINTENANCE'
-        ? 'USER_AUTHORIZED_BOUNDED_RECURRING_MAINTENANCE'
-        : 'NONE_UNLESS_EXPLICITLY_ESTABLISHED',
-      next_action: work.kind === 'SYSTEM_MAINTENANCE' && work.state === 'QUALIFIED'
-        ? 'EXECUTE_BOUNDED_RECURRING_MAINTENANCE'
-        : work.state === 'QUALIFIED'
-          ? 'PROPOSE_GOVERNED_WORK'
-          : 'COLLECT_MISSING_EVIDENCE',
-    }));
+    .map(work => {
+      if (work.kind !== 'SYSTEM_MAINTENANCE' || work.state !== 'QUALIFIED') {
+        return {
+          ...work,
+          authorization_required: false,
+          external_effects_permitted: false,
+          next_action: work.state === 'QUALIFIED' ? 'PROPOSE_GOVERNED_WORK' : 'COLLECT_MISSING_EVIDENCE',
+        };
+      }
 
+      const workflowId = `workflow:${work.work_id}`;
+      const title = `Reality recurring work: repair repeated ${work.work_key.replace(/^workflow-failure:/, '')} failures`;
+      const body = [
+        '<!-- Reality recurring work -->',
+        '## Reality recurring maintenance',
+        '',
+        `Reality detected ${work.recurrence_count} recent failures for **${work.work_key.replace(/^workflow-failure:/, '')}**.`,
+        '',
+        '### Evidence',
+        ...work.evidence_refs.map(ref => `- ${ref}`),
+        '',
+        '### Required work',
+        `Investigate the repeated failure, repair the underlying cause, and independently verify the next successful run.`,
+        '',
+        'This work item was discovered by Reality. Execution remains blocked until the exact work item is explicitly authorized.',
+      ].join('\\n');
+
+      return {
+        ...work,
+        workflow_id: workflowId,
+        authorization_required: true,
+        authority: 'EXPLICIT_USER_AUTHORIZATION_REQUIRED',
+        external_effects_permitted: true,
+        next_action: 'AWAITING_USER_AUTHORIZATION',
+        execution_work_item: {
+          work_item_id: work.work_id,
+          workflow_id: workflowId,
+          action: 'Create a bounded recurring-maintenance tracking issue for the repeated workflow failure',
+          connector: 'github',
+          operation: 'create_issue',
+          inputs: { repository: `${owner}/${repo}`, title, body },
+          authority_required: [{ connector: 'github', operation: 'create_issue', work_item_id: work.work_id }],
+          expected_effect: 'Create or track the bounded recurring maintenance work item in GitHub.',
+          success_conditions: ['GitHub issue exists with Reality recurring-work evidence and required-work text.'],
+          verification_method: 'Reality-owned GitHub read-back',
+          reversibility: 'issue_can_be_closed',
+          consequential: true,
+          status: 'AWAITING_AUTHORIZATION',
+        },
+      };
+    });
+
+  // Discovery is deliberately side-effect free. Every consequential recurring
+  // candidate is returned as an executable work item and must pass the normal
+  // authority -> execution -> independent verification path.
   const execution = [];
-  for (const [workflow, failedRuns] of workflowFailures) {
-    if (failedRuns.length < 2) continue;
-    try {
-      execution.push({
-        workflow,
-        ...await executeRecurringMaintenance({ owner, repo, workflow, failedRuns }),
-      });
-    } catch (error) {
-      execution.push({
-        workflow,
-        action: 'BLOCKED',
-        error: error.message,
-      });
-    }
-  }
-
   return Object.freeze({
     version: 'reality-stewardship-pass-v1.1',
     status: 'OBSERVED',
@@ -184,8 +210,8 @@ export async function runRealityStewardshipPass({
     governance: {
       discovery_automatic: true,
       authority_automatic: false,
-      authority_scope: 'Create or update a tracking issue for repeated GitHub workflow failures only.',
-      external_effects_permitted: execution.some(x => x.action === 'CREATED_ISSUE' || x.action === 'UPDATED_EXISTING_ISSUE'),
+      authority_scope: 'Consequential recurring work is surfaced as bounded work items and cannot execute until explicitly authorized.',
+      external_effects_permitted: false,
       code_merge_or_deploy_permitted: false,
       rule: 'When Reality knows less, it is allowed to do less.',
     },

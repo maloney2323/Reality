@@ -150,9 +150,13 @@ function renderWork(source){
       const raw=w.authorization_scope||w.scope||w.allowed_operations||null;
       const scope=Array.isArray(raw)?raw[0]:raw;
       if(!scope||!scope.connector||!scope.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
-      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'manual',scopes:[scope],enabled:true})});
+      const workItem=w.execution_work_item||w;
+      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:workItem,enabled:true})});
       const rb=await rr.json();if(!rr.ok||!rb.ok)throw new Error(rb.error||'Authorization failed');
-      btn.textContent='Authorized ✓';
+      const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem,workflowId:workItem.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded recurring maintenance explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
+      const eb=await er.json();if(!er.ok||!eb.ok)throw new Error(eb.error||eb.result?.blocked_reason||'Execution failed');
+      if(eb.result?.status!=='VERIFIED')throw new Error(eb.result?.blocked_reason||eb.result?.outcome?.outcome_state||'Execution was not independently verified');
+      btn.textContent='Authorized & verified ✓';
     }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
   });
 }
