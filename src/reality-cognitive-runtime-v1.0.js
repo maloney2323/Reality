@@ -79,7 +79,7 @@ Rules:
 - Be direct and useful.
 - If the evidence is insufficient, say exactly what is missing.
 
-Return only the answer text for the user.`;
+Return only a natural answer for the user. Lead with the answer. When reasoning matters, include a concise "Why" or "Reasoning" summary based on evidence and inference, without exposing hidden chain-of-thought. Speak as Reality, not as a report generator.`;
 }
 
 export async function runRealityCognitiveRuntime({
@@ -114,6 +114,7 @@ export async function runRealityCognitiveRuntime({
       synthesis: null,
       authority_granted: false,
       execution_authorized: false,
+      reasoning_mode: 'CONCISE_GOVERNED_SUMMARY',
       universe_context_count: cognitionContext.universe_context_count,
     };
   }
