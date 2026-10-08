@@ -5,7 +5,7 @@ import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
 
-function buildWarrantContext(body) {
+function buildWarrantContext(body, authorization) {
   const context = body.warrantContext || {};
   return {
     observationRefs: Array.isArray(context.observationRefs) ? context.observationRefs : [],
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     let governance = { warrant: null, learning: null, learning_warrant: null, warrant_status: 'NOT_CREATED' };
 
     if (result.status === 'VERIFIED') {
-      const context = buildWarrantContext(body);
+      const context = buildWarrantContext(body, authorization);
       if (context.observationRefs.length && context.evidenceRefs.length && context.epistemicAssessment && context.frictionDecision) {
         const warrant = createEvidenceWarrant({
           ...context,
