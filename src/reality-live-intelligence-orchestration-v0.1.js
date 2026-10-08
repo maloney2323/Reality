@@ -243,7 +243,8 @@ export async function runLiveIntelligenceOrchestration({
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
     context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
-      root_id: continuityRootId,
+      root_id: effectiveContinuityRootId,
+      discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
       rehydrated: persistedContinuity?.continuation_available === true,
       prior_state: persistedContinuity?.latest_state || null,
