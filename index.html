@@ -90,7 +90,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
 </main>
 <script>
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
+function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
+function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
+function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
+
 const SHIFT_KEY='reality.dailyShift.v1';
 function loadShift(){try{const s=JSON.parse(localStorage.getItem(SHIFT_KEY)||'{}');if(typeof s.enabled==='boolean')$('shiftEnabled').checked=s.enabled;if(s.readinessTime)$('readinessTime').value=s.readinessTime;if(s.shiftStart)$('shiftStart').value=s.shiftStart;if(s.shiftLength)$('shiftLength').value=String(s.shiftLength)}catch{}}
 $('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const r=await fetch('/api/reality/shift',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent='Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',2500)}};
@@ -121,7 +125,7 @@ $('plan').onclick=async()=>{
     const intelligence=b.result?.intelligence||{};
     $('brief').classList.add('open');
     $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
-    $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>';
+    $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
     $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
     $('authority').innerHTML='<div class="row"><span>Authority granted</span><span class="blocked">NO</span></div><div class="row"><span>Execution authorized</span><span class="blocked">NO</span></div>';
     $('effect').textContent='Cognition only. No external action was executed.';
