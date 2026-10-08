@@ -8,6 +8,10 @@
     {
       "path": "/api/reality/shift",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/reality/stewardship",
+      "schedule": "0 * * * *"
     }
   ]
 }
