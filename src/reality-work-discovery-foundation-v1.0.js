@@ -54,9 +54,15 @@ export function discoverWork({
     const revenue=items.map(x=>number(x.revenue||x.expected_revenue||x.value)).filter(v=>v!==null);
     const expectedRevenue=revenue.length?revenue.reduce((a,b)=>a+b,0)/revenue.length:null;
     const evidenceRefs=items.flatMap(x=>list(x.evidence_refs||x.evidence_references||[x.evidence_ref])).filter(Boolean);
-    const kind=items.some(x=>x.kind==='REVENUE_OPPORTUNITY'||x.revenue||x.expected_revenue)
+    const sourceKinds=items.map(x=>text(x.kind)).filter(k=>WORK_KINDS.includes(k));
+    const kind=sourceKinds.includes('REVENUE_OPPORTUNITY')||items.some(x=>x.revenue||x.expected_revenue)
       ? 'REVENUE_OPPORTUNITY'
-      : items.some(x=>x.recurring_work) ? 'RECURRING_OPERATION' : 'FOLLOW_UP';
+      : sourceKinds.includes('SYSTEM_MAINTENANCE') ? 'SYSTEM_MAINTENANCE'
+      : sourceKinds.includes('CUSTOMER_COMMITMENT') ? 'CUSTOMER_COMMITMENT'
+      : sourceKinds.includes('RECURRING_OPERATION')||items.some(x=>x.recurring_work) ? 'RECURRING_OPERATION'
+      : sourceKinds.includes('RISK_REDUCTION') ? 'RISK_REDUCTION'
+      : sourceKinds.includes('CAPABILITY_BUILD') ? 'CAPABILITY_BUILD'
+      : 'FOLLOW_UP';
 
     discovered.push({
       work_id:'work:'+digest([workKey,items.map(x=>x.id||x.observation_id||null)]).slice(0,32),
@@ -76,6 +82,7 @@ export function discoverWork({
       next_due_at:cadenceDays&&dates.length?new Date(dates[dates.length-1]+cadenceDays*86400000).toISOString():null,
       objective:text(items[items.length-1].objective||items[items.length-1].action||workKey),
       authority:'NONE_UNLESS_EXPLICITLY_ESTABLISHED',
+      authorization_required:false,
       external_effects_permitted:false,
       discovered_at:now,
     });
