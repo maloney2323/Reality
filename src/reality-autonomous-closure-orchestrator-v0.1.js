@@ -1,4 +1,5 @@
 import { runUniverseCognitionPass } from './reality-universe-cognition-runner-v0.1.js';
+import { createCapabilityGapProjection } from './reality-capability-gap-projection-v1.js';
 import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, registerVerifiedCapability, reactivationPlan, handleSynthesisFailure } from './reality-autonomous-capability-loop-v0.1.js';
 
 export const AUTONOMOUS_CLOSURE_VERSION = '0.1.1';
@@ -25,10 +26,25 @@ export async function runAutonomousClosurePass({
   const gap = detectCapabilityGap({ consequence, workItem, capabilities });
   if (!gap) return Object.freeze({ state: 'CAPABILITY_ALREADY_REGISTERED', cognition, resumed_work_item_id: workItem?.id || null });
 
+  const capabilityGapProjection = createCapabilityGapProjection({
+    sourceDiscoveryId: gap.gap_id,
+    requiredCapability: gap.capability_id,
+    currentLimitation: 'Required capability is not currently registered for the blocked work.',
+    evidenceRefs: gap.required_capability_contract?.verification_suite_ref
+      ? [gap.required_capability_contract.verification_suite_ref]
+      : [],
+    acquisitionPath: 'RESEARCH_THEN_ISOLATED_SANDBOX',
+    gapId: gap.gap_id,
+    provenance: {
+      source: 'reality-autonomous-closure-orchestrator-v0.1',
+      cognitive_state: cognition?.state || null,
+    },
+  });
+
   const confirmedGap = confirmCapabilityGap(gap, { historicalFailureRefs, inputSchema, outputSchema, verificationSuiteRef });
   const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe.worldline_id });
 
-  if (!authorization) return Object.freeze({ state: 'AWAITING_AUTHORIZATION', cognition, gap: confirmedGap, experiment });
+  if (!authorization) return Object.freeze({ state: 'AWAITING_AUTHORIZATION', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment });
 
   if (!mergeVerifier || typeof mergeVerifier.verify !== 'function' || typeof mergeVerifier.merge !== 'function') {
     throw new Error('WORLDLINE_MERGE_VERIFIER_CONTRACT_REQUIRED');
@@ -58,9 +74,9 @@ export async function runAutonomousClosurePass({
     const registration = registerVerifiedCapability(mergedExperiment, { capabilityRegistry, mergeResult });
     const reactivation = reactivationPlan(confirmedGap, { registration, originalWorkItem: workItem });
 
-    return Object.freeze({ state: 'REACTIVATED', cognition, gap: confirmedGap, experiment: mergedExperiment, registration, reactivation });
+    return Object.freeze({ state: 'REACTIVATED', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: mergedExperiment, registration, reactivation });
   } catch (error) {
     const failure = handleSynthesisFailure(authorizedExperiment, { nextAttempt: attempt + 1, attemptLimit });
-    return Object.freeze({ state: failure.state, cognition, gap: confirmedGap, experiment: authorizedExperiment, failure, error: error.message });
+    return Object.freeze({ state: failure.state, cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: authorizedExperiment, failure, error: error.message });
   }
 }
