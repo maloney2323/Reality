@@ -1,3 +1,20 @@
+/**
+ * Reality Consequence Constitution v1.1
+ *
+ * The constitution governs CONSEQUENCES, not cognition.
+ *
+ * Reality may investigate, reason, hypothesize, plan, research, code,
+ * build in isolated workspaces, discover work, run experiments, and improve
+ * its capabilities without asking for action authority.
+ *
+ * Authority begins at the external-consequence boundary:
+ * AUTHORITY -> EXECUTION -> INDEPENDENT VERIFICATION.
+ *
+ * This module intentionally does not cap intelligence, evidence gathering,
+ * planning, or capability development. It only constrains consequential
+ * external effects and constitutional mutation.
+ */
+
 const DEFAULT_LIMITS = Object.freeze({
   maxFinancialActionCents: 50000,
   maxDiscoveryCostCents: 1000,
@@ -6,16 +23,20 @@ const DEFAULT_LIMITS = Object.freeze({
 
 const DECISIONS = Object.freeze(['ACT', 'ASK', 'INVESTIGATE', 'WAIT', 'ESCALATE', 'IGNORE']);
 
-export const CONSTITUTION_VERSION = '1.0.0';
+export const CONSTITUTION_VERSION = '1.1.0';
 
 export const CONSTITUTION = Object.freeze({
   version: CONSTITUTION_VERSION,
   principles: Object.freeze({
+    governConsequencesNotCognition: true,
     evidenceFirst: true,
     noImplicitAuthority: true,
     preserveContradictions: true,
     noUnverifiedCompletion: true,
     intelligenceCannotRewriteConstitution: true,
+    capabilityIsNotAuthority: true,
+    authorizationIsNotExecution: true,
+    executionIsNotVerification: true,
   }),
   limits: Object.freeze(DEFAULT_LIMITS),
 });
@@ -37,29 +58,71 @@ function scopeMatches(proposal = {}) {
     proposal.authorization.scope === proposal.requiredScope;
 }
 
-function riskAllowed(proposal = {}) {
+function riskAllowed(proposal = {}, constitution = CONSTITUTION) {
   const order = { low: 0, medium: 1, high: 2, critical: 3 };
   const risk = proposal.risk || 'critical';
-  return order[risk] <= order[CONSTITUTION.limits.maxRisk];
+  return order[risk] <= order[constitution.limits.maxRisk];
 }
 
-function withinFinancialLimit(proposal = {}) {
+function withinFinancialLimit(proposal = {}, constitution = CONSTITUTION) {
   const cents = Number(proposal.amountCents);
   if (!Number.isFinite(cents)) return true;
-  return cents <= CONSTITUTION.limits.maxFinancialActionCents;
+  return cents <= constitution.limits.maxFinancialActionCents;
 }
 
-function withinDiscoveryBudget(proposal = {}) {
+function withinDiscoveryBudget(proposal = {}, constitution = CONSTITUTION) {
   const cents = Number(proposal.discoveryCostCents);
   if (!Number.isFinite(cents)) return true;
-  return cents <= CONSTITUTION.limits.maxDiscoveryCostCents;
+  return cents <= constitution.limits.maxDiscoveryCostCents;
 }
 
-export function evaluateConstitution({ proposal = {}, state = {}, constitution = CONSTITUTION } = {}) {
+function isConsequential(proposal = {}) {
+  return proposal.consequential === true ||
+    proposal.externalEffect === true ||
+    proposal.external_effect === true ||
+    proposal.consequenceClass && proposal.consequenceClass !== 'NO_EXTERNAL_EFFECT' ||
+    proposal.consequence_class && proposal.consequence_class !== 'NO_EXTERNAL_EFFECT' ||
+    proposal.actionProfile?.external_effect === true;
+}
+
+/**
+ * Cognition path.
+ *
+ * This is deliberately permissive. Intelligence does not need authority to
+ * think. A caller may still record evidence, uncertainty, contradictions,
+ * hypotheses, plans, experiments, and proposed actions.
+ */
+export function evaluateCognition({ proposal = {}, constitution = CONSTITUTION } = {}) {
+  if (proposal.constitutionPatch || proposal.overrideConstitution || proposal.systemPromptOverride) {
+    return deny('CONSTITUTION_MUTATION_ATTEMPT', constitution.version, 'ESCALATE');
+  }
+
+  return {
+    allowed: true,
+    decision: proposal.requestedDecision || 'INVESTIGATE',
+    reason: 'COGNITION_NOT_GOVERNED_BY_ACTION_AUTHORITY',
+    constitutionVersion: constitution.version,
+    attested: true,
+    authorityRequired: false,
+    executionPermitted: false,
+  };
+}
+
+/**
+ * Consequence path.
+ *
+ * This is the small hard boundary. External effects must satisfy authority,
+ * scope, evidence, risk, financial and verification requirements.
+ */
+export function evaluateConsequence({ proposal = {}, state = {}, constitution = CONSTITUTION } = {}) {
   const constitutionVersion = constitution.version || CONSTITUTION_VERSION;
 
   if (proposal.constitutionPatch || proposal.overrideConstitution || proposal.systemPromptOverride) {
     return deny('CONSTITUTION_MUTATION_ATTEMPT', constitutionVersion);
+  }
+
+  if (!isConsequential(proposal)) {
+    return evaluateCognition({ proposal, constitution });
   }
 
   if (hasContradiction(state)) {
@@ -78,15 +141,15 @@ export function evaluateConstitution({ proposal = {}, state = {}, constitution =
     return deny('AUTHORITY_SCOPE_MISMATCH', constitutionVersion, 'ESCALATE');
   }
 
-  if (!riskAllowed(proposal)) {
+  if (!riskAllowed(proposal, constitution)) {
     return deny('RISK_LIMIT_EXCEEDED', constitutionVersion, 'ESCALATE');
   }
 
-  if (!withinFinancialLimit(proposal)) {
+  if (!withinFinancialLimit(proposal, constitution)) {
     return deny('FINANCIAL_LIMIT_EXCEEDED', constitutionVersion, 'ESCALATE');
   }
 
-  if (!withinDiscoveryBudget(proposal)) {
+  if (!withinDiscoveryBudget(proposal, constitution)) {
     return deny('DISCOVERY_BUDGET_EXCEEDED', constitutionVersion, 'WAIT');
   }
 
@@ -98,10 +161,25 @@ export function evaluateConstitution({ proposal = {}, state = {}, constitution =
   return {
     allowed: decision === 'ACT',
     decision,
-    reason: decision === 'ACT' ? 'CONSTITUTION_SATISFIED' : 'NON_ACTION_DECISION',
+    reason: decision === 'ACT' ? 'CONSEQUENCE_CONSTITUTION_SATISFIED' : 'NON_ACTION_DECISION',
     constitutionVersion,
     attested: true,
+    authorityRequired: true,
+    executionPermitted: decision === 'ACT',
   };
+}
+
+/**
+ * Compatibility entry point.
+ *
+ * Existing callers are routed to the appropriate boundary. New code should
+ * call evaluateCognition() for intelligence and evaluateConsequence() for
+ * external effects explicitly.
+ */
+export function evaluateConstitution(args = {}) {
+  return isConsequential(args.proposal || {})
+    ? evaluateConsequence(args)
+    : evaluateCognition(args);
 }
 
 function deny(reason, constitutionVersion, decision = 'ESCALATE') {
@@ -111,5 +189,7 @@ function deny(reason, constitutionVersion, decision = 'ESCALATE') {
     reason,
     constitutionVersion,
     attested: true,
+    authorityRequired: true,
+    executionPermitted: false,
   };
 }
