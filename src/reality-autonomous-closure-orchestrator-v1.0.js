@@ -3,7 +3,7 @@ import { discoverAutonomousWork } from './reality-capability-gap-detector-v1.0.j
 import { createCapabilityGapProjection } from './reality-capability-gap-projection-v1.js';
 import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, registerVerifiedCapability, reactivationPlan, handleSynthesisFailure } from './reality-autonomous-capability-loop-v1.0.js';
 
-export const AUTONOMOUS_CLOSURE_VERSION = '0.2.0';
+export const AUTONOMOUS_CLOSURE_VERSION = '1.0.0';
 
 /**
  * Control plane only. It never writes the production graph from a sandbox and
@@ -18,6 +18,7 @@ export async function runAutonomousClosurePass({
   historicalFailureRefs = [], verificationSuiteRef = null, inputSchema = null,
   outputSchema = null, synthesis, sandboxVerifier, mergeVerifier,
   capabilityRegistry, authorization = null, attempt = 1, attemptLimit = 3,
+  existingWork = [], minimumRecurrences = 2, minRevenue = 0,
 } = {}) {
   const cognition = await runUniverseCognitionPass({ universe, reasoner });
 
