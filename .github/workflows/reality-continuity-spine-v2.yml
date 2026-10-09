@@ -1,0 +1,23 @@
+name: Reality Continuity Spine Validation
+
+on:
+  push:
+    branches:
+      - 'feat/continuity-spine-v2'
+  pull_request:
+    paths:
+      - 'src/reality-continuity-spine-v2.0.js'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'test/reality-continuity-spine-v2.0.test.js'
+      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
+      - 'package.json'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
