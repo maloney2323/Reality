@@ -3,10 +3,11 @@ import {
   appendContinuityNode,
   advanceSpine,
   validateContinuityChain,
+  SPINE_STAGES,
 } from './reality-continuity-spine-v2.0.js';
 import { evaluateContinuityStageGate } from './reality-continuity-stage-gate-v1.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
-import { verifyGovernedSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
+import { buildGovernedChatSignal, verifyGovernedSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.2';
 
@@ -50,6 +51,7 @@ export async function startContinuityRuntime({
   }
 
   const runId = String(workflowRunId || `${signal.packet.packet_id}:${observedAt}`);
+  let signalForRun = signal;
   let spine = createContinuitySpine({
     continuityRootId: continuityRootSource,
     worldlineId: worldlineSource,
@@ -88,6 +90,97 @@ export async function startContinuityRuntime({
       throw failure;
     }
     workflowNodes = globalNodes.filter((node) => workflowIdOf(node) === runId);
+
+    if (workflowNodes.length) {
+      // Resume only an intact prefix of the same workflow. A reused workflow ID
+      // with different input or a skipped/reordered stage is a hard collision,
+      // never an excuse to create a second RAW_SIGNAL and fork the workflow.
+      if (workflowNodes.length > SPINE_STAGES.length) {
+        const failure = new Error('CONTINUITY_HISTORY_INVALID:WORKFLOW_STAGE_COUNT_EXCEEDED');
+        failure.code = 'CONTINUITY_HISTORY_INVALID';
+        throw failure;
+      }
+      for (let index = 0; index < workflowNodes.length; index += 1) {
+        if (workflowNodes[index].event_kind !== SPINE_STAGES[index]) {
+          const failure = new Error('CONTINUITY_HISTORY_INVALID:WORKFLOW_STAGE_SEQUENCE_INVALID');
+          failure.code = 'CONTINUITY_HISTORY_INVALID';
+          failure.details = { index, expected: SPINE_STAGES[index], actual: workflowNodes[index].event_kind };
+          throw failure;
+        }
+      }
+
+      const rawNode = workflowNodes[0];
+      if (rawNode?.payload?.raw_content_digest !== signal.packet.raw_content_digest
+          || rawNode?.payload?.source !== signal.packet.source) {
+        const failure = new Error('CONTINUITY_WORKFLOW_SIGNAL_MISMATCH');
+        failure.code = 'CONTINUITY_WORKFLOW_SIGNAL_MISMATCH';
+        throw failure;
+      }
+
+      if (rawNode?.payload?.packet_id !== signal.packet.packet_id) {
+        signalForRun = buildGovernedChatSignal({
+          message: signal.packet.raw_content,
+          observedAt: rawNode?.payload?.observed_at,
+        });
+      }
+      const restoredIntegrity = verifyGovernedSignal(signalForRun);
+      if (!restoredIntegrity.valid || signalForRun.packet.packet_id !== rawNode?.payload?.packet_id) {
+        const failure = new Error('CONTINUITY_WORKFLOW_SIGNAL_MISMATCH');
+        failure.code = 'CONTINUITY_WORKFLOW_SIGNAL_MISMATCH';
+        failure.details = restoredIntegrity;
+        throw failure;
+      }
+
+      if (workflowNodes.length >= 2) {
+        const transformNode = workflowNodes[1];
+        const receipt = signalForRun.transformation_receipt;
+        const persistedReceipt = transformNode?.payload?.transformation_receipt;
+        const receiptMatches = transformNode?.transformation_receipt_id === receipt.receipt_id
+          && transformNode?.payload?.receipt_id === receipt.receipt_id
+          && transformNode?.payload?.input_digest === receipt.input_digest
+          && transformNode?.payload?.output_digest === receipt.output_digest
+          && transformNode?.payload?.cleaner_version === receipt.cleaner_version
+          && transformNode?.payload?.fragment_count === receipt.fragment_count
+          && persistedReceipt?.receipt_id === receipt.receipt_id
+          && JSON.stringify(persistedReceipt?.transformations) === JSON.stringify(receipt.transformations);
+        if (!receiptMatches) {
+          const failure = new Error('CONTINUITY_WORKFLOW_RECEIPT_MISMATCH');
+          failure.code = 'CONTINUITY_WORKFLOW_RECEIPT_MISMATCH';
+          throw failure;
+        }
+        if (persistedReceipt.created_at) {
+          signalForRun = Object.freeze({
+            ...signalForRun,
+            transformation_receipt: Object.freeze({
+              ...receipt,
+              created_at: persistedReceipt.created_at,
+            }),
+          });
+        }
+      }
+
+      if (workflowNodes.length >= 3) {
+        const observation = workflowNodes[2]?.payload || {};
+        const expectedFragments = signalForRun.fragments.map((fragment) => fragment.fragment_id);
+        const actualFragments = observation.fragment_ids || [];
+        const expectedManifest = signalForRun.fragments.map((fragment) => ({
+          fragment_id: fragment.fragment_id,
+          ordinal: fragment.ordinal,
+          raw_text_digest: fragment.raw_text_digest,
+          cleaned_text_digest: fragment.cleaned_text_digest,
+          transformation: fragment.transformation,
+          epistemic_status: fragment.epistemic_status,
+        }));
+        if (observation.packet_id !== signalForRun.packet.packet_id
+            || JSON.stringify(actualFragments) !== JSON.stringify(expectedFragments)
+            || JSON.stringify(observation.fragment_manifest || []) !== JSON.stringify(expectedManifest)) {
+          const failure = new Error('CONTINUITY_WORKFLOW_OBSERVATION_MISMATCH');
+          failure.code = 'CONTINUITY_WORKFLOW_OBSERVATION_MISMATCH';
+          throw failure;
+        }
+      }
+    }
+
     const tail = globalNodes[globalNodes.length - 1] || null;
     if (tail) {
       spine = Object.freeze({
@@ -178,59 +271,65 @@ export async function startContinuityRuntime({
     return committed;
   }
 
-  await appendStage({
-    stage: 'RAW_SIGNAL',
-    entityId: signal.packet.packet_id,
-    eventId: `raw:${signal.packet.packet_id}`,
-    payload: {
-      packet_id: signal.packet.packet_id,
-      packet_version: signal.packet.packet_version,
-      source: signal.packet.source,
-      observed_at: signal.packet.observed_at,
-      raw_content_digest: signal.packet.raw_content_digest,
-    },
-    provenance: { source: 'reality_governed_raw_signal' },
-  });
+  if (workflowNodes.length === 0) {
+    await appendStage({
+      stage: 'RAW_SIGNAL',
+      entityId: signalForRun.packet.packet_id,
+      eventId: `raw:${signalForRun.packet.packet_id}`,
+      payload: {
+        packet_id: signalForRun.packet.packet_id,
+        packet_version: signalForRun.packet.packet_version,
+        source: signalForRun.packet.source,
+        observed_at: signalForRun.packet.observed_at,
+        raw_content_digest: signalForRun.packet.raw_content_digest,
+      },
+      provenance: { source: 'reality_governed_raw_signal' },
+    });
+  }
 
-  await appendStage({
-    stage: 'TRANSFORMATION',
-    entityId: signal.transformation_receipt.receipt_id,
-    eventId: `transform:${signal.transformation_receipt.receipt_id}`,
-    evidenceRefs: [signal.packet.packet_id],
-    transformationReceiptId: signal.transformation_receipt.receipt_id,
-    payload: {
-      receipt_id: signal.transformation_receipt.receipt_id,
-      input_digest: signal.transformation_receipt.input_digest,
-      output_digest: signal.transformation_receipt.output_digest,
-      cleaner_version: signal.transformation_receipt.cleaner_version,
-      fragment_count: signal.transformation_receipt.fragment_count,
-      meaning_change_claimed: signal.transformation_receipt.meaning_change_claimed === true,
-      transformation_receipt: signal.transformation_receipt,
-    },
-    provenance: { source: 'reality_governed_signal_cleaner' },
-  });
+  if (workflowNodes.length === 1) {
+    await appendStage({
+      stage: 'TRANSFORMATION',
+      entityId: signalForRun.transformation_receipt.receipt_id,
+      eventId: `transform:${signalForRun.transformation_receipt.receipt_id}`,
+      evidenceRefs: [signalForRun.packet.packet_id],
+      transformationReceiptId: signalForRun.transformation_receipt.receipt_id,
+      payload: {
+        receipt_id: signalForRun.transformation_receipt.receipt_id,
+        input_digest: signalForRun.transformation_receipt.input_digest,
+        output_digest: signalForRun.transformation_receipt.output_digest,
+        cleaner_version: signalForRun.transformation_receipt.cleaner_version,
+        fragment_count: signalForRun.transformation_receipt.fragment_count,
+        meaning_change_claimed: signalForRun.transformation_receipt.meaning_change_claimed === true,
+        transformation_receipt: signalForRun.transformation_receipt,
+      },
+      provenance: { source: 'reality_governed_signal_cleaner' },
+    });
+  }
 
-  await appendStage({
-    stage: 'OBSERVATION',
-    entityId: signal.packet.packet_id + ':observation',
-    eventId: `observation:${signal.packet.packet_id}`,
-    evidenceRefs: signal.fragments.map((fragment) => fragment.fragment_id),
-    transformationReceiptId: signal.transformation_receipt.receipt_id,
-    payload: {
-      packet_id: signal.packet.packet_id,
-      fragment_ids: signal.fragments.map((fragment) => fragment.fragment_id),
-      fragment_count: signal.fragments.length,
-      fragment_manifest: signal.fragments.map((fragment) => ({
-        fragment_id: fragment.fragment_id,
-        ordinal: fragment.ordinal,
-        raw_text_digest: fragment.raw_text_digest,
-        cleaned_text_digest: fragment.cleaned_text_digest,
-        transformation: fragment.transformation,
-        epistemic_status: fragment.epistemic_status,
-      })),
-    },
-    provenance: { source: 'reality_live_intelligence_orchestration' },
-  });
+  if (workflowNodes.length === 2) {
+    await appendStage({
+      stage: 'OBSERVATION',
+      entityId: signalForRun.packet.packet_id + ':observation',
+      eventId: `observation:${signalForRun.packet.packet_id}`,
+      evidenceRefs: signalForRun.fragments.map((fragment) => fragment.fragment_id),
+      transformationReceiptId: signalForRun.transformation_receipt.receipt_id,
+      payload: {
+        packet_id: signalForRun.packet.packet_id,
+        fragment_ids: signalForRun.fragments.map((fragment) => fragment.fragment_id),
+        fragment_count: signalForRun.fragments.length,
+        fragment_manifest: signalForRun.fragments.map((fragment) => ({
+          fragment_id: fragment.fragment_id,
+          ordinal: fragment.ordinal,
+          raw_text_digest: fragment.raw_text_digest,
+          cleaned_text_digest: fragment.cleaned_text_digest,
+          transformation: fragment.transformation,
+          epistemic_status: fragment.epistemic_status,
+        })),
+      },
+      provenance: { source: 'reality_live_intelligence_orchestration' },
+    });
+  }
 
   return Object.freeze({
     status: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
