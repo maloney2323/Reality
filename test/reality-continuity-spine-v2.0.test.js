@@ -53,3 +53,43 @@ test('a non-root node cannot exist without its prior lineage hash', () => {
     spine, stage: 'OBSERVATION', entityId: 'observation:1', parentEventId: 'missing-hash'
   }), /CONTINUITY_PRIOR_LINEAGE_HASH_REQUIRED/);
 });
+
+test('detects event payload tampering even when parent links remain intact', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:tamper-test' });
+  const raw = appendContinuityNode({
+    spine,
+    stage: 'RAW_SIGNAL',
+    entityId: 'signal:tamper-test',
+    payload: { packet_digest: 'sha256:original' },
+    provenance: { source: 'test' },
+  });
+  const observation = appendContinuityNode({
+    spine,
+    stage: 'TRANSFORMATION',
+    entityId: 'receipt:tamper-test',
+    parentEventId: raw.event_id,
+    priorLineageHash: raw.lineage_hash,
+    evidenceRefs: [raw.event_id],
+    transformationReceiptId: 'receipt:tamper-test',
+    payload: { receipt_digest: 'sha256:original' },
+    provenance: { source: 'test' },
+  });
+  const tampered = {
+    ...observation,
+    payload: { receipt_digest: 'sha256:forged' },
+  };
+  const result = validateContinuityChain([raw, tampered]);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.index === 1 && item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+});
+
+test('rejects a root event that claims an earlier parent or lineage hash', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:root-parent-test' });
+  const raw = appendContinuityNode({ spine, stage: 'RAW_SIGNAL', entityId: 'signal:root-parent-test' });
+  const forgedRoot = { ...raw, parent_event_id: 'some-parent', prior_lineage_hash: 'some-hash' };
+  const result = validateContinuityChain([forgedRoot]);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PARENT_MUST_BE_NULL'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PRIOR_HASH_MUST_BE_NULL'));
+});
