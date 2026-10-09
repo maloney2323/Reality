@@ -68,6 +68,12 @@ export async function startContinuityRuntime({
         worldlineId: spine.worldline_id,
       });
     } catch (error) {
+      if (String(error?.message || error?.code || '').startsWith('CONTINUITY_HISTORY_')) {
+        const failure = new Error('CONTINUITY_HISTORY_INVALID:' + (error?.message || error?.code));
+        failure.code = 'CONTINUITY_HISTORY_INVALID';
+        failure.cause = error;
+        throw failure;
+      }
       const failure = new Error('CONTINUITY_REHYDRATION_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
       failure.code = 'CONTINUITY_REHYDRATION_REQUIRED';
       failure.cause = error;
