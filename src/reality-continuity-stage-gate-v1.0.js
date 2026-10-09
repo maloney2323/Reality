@@ -35,6 +35,16 @@ export function evaluateContinuityStageGate({
   const workflowRunId = candidate?.workflow_run_id || candidate?.payload?.workflow_run_id || null;
   const hasGlobalTailContract = globalTail !== undefined;
 
+  if (!nonempty(workflowRunId)) reasons.push('WORKFLOW_RUN_ID_REQUIRED');
+  if (workflowRunId) {
+    for (let index = 0; index < history.length; index += 1) {
+      const historyRunId = history[index]?.payload?.workflow_run_id || history[index]?.workflow_run_id || null;
+      if (historyRunId !== workflowRunId) {
+        reasons.push('WORKFLOW_HISTORY_ID_MISMATCH:' + index);
+      }
+    }
+  }
+
   if (!VALID_STAGES.has(stage)) {
     reasons.push('CONTINUITY_STAGE_INVALID');
   } else if (stage === 'RAW_SIGNAL') {
