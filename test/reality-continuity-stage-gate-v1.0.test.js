@@ -150,3 +150,36 @@ test('execution requires a granted authority artifact and matching reference', (
   assert.equal(result.allowed, false);
   assert.ok(result.reasons.includes('AUTHORIZATION_SCOPE_REFERENCE_MISMATCH'));
 });
+
+test('requires a durable workflow identity and rejects mixed-run stage history', () => {
+  const missingId = evaluateContinuityStageGate({
+    stage: 'RAW_SIGNAL',
+    workflowHistory: [],
+    globalTail: null,
+    candidate: { payload: {} },
+    persistenceStatus: 'DURABLE_READY',
+  });
+  assert.equal(missingId.allowed, false);
+  assert.ok(missingId.reasons.includes('WORKFLOW_RUN_ID_REQUIRED'));
+
+  const mixed = evaluateContinuityStageGate({
+    stage: 'SITUATION',
+    workflowHistory: [
+      node('RAW_SIGNAL', { payload: { workflow_run_id: 'run-a' } }),
+      node('TRANSFORMATION', { payload: { workflow_run_id: 'run-b' } }),
+      node('OBSERVATION', { payload: { workflow_run_id: 'run-b' } }),
+    ],
+    globalTail: node('OBSERVATION', { event_id: 'tail', lineage_hash: 'tail-hash' }),
+    candidate: {
+      workflow_run_id: 'run-b',
+      parent_event_id: 'tail',
+      prior_lineage_hash: 'tail-hash',
+      evidence_refs: ['evidence:1'],
+      transformation_receipt_id: 'receipt:1',
+      payload: { workflow_run_id: 'run-b' },
+    },
+    persistenceStatus: 'DURABLE_READY',
+  });
+  assert.equal(mixed.allowed, false);
+  assert.ok(mixed.reasons.includes('WORKFLOW_HISTORY_ID_MISMATCH:0'));
+});
