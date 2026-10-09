@@ -156,6 +156,11 @@ test('persists the complete governed proposal and returns the final authority st
   assert.deepEqual(rows.map((row) => row.event_kind), [
     'RAW_SIGNAL', 'TRANSFORMATION', 'OBSERVATION', 'SITUATION', 'WORK', 'AUTHORITY',
   ]);
+  assert.equal(rows[1].payload.transformation_receipt.receipt_id, result.governed_signal.transformation_receipt.receipt_id);
+  assert.equal(rows[2].payload.fragment_manifest.length, result.governed_signal.fragments.length);
+  assert.equal(result.learning.training_experience.governed_signal_packet_id, result.governed_signal.packet.packet_id);
+  assert.equal(result.learning.training_experience.transformation_receipt_id, result.governed_signal.transformation_receipt.receipt_id);
+  assert.ok(result.context.continuity.event_id);
   const authority = rows.at(-1);
   assert.equal(authority.payload.authorization_status, 'REQUESTED');
   assert.equal(authority.payload.granted, false);
