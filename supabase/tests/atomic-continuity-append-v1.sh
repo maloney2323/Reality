@@ -75,4 +75,10 @@ if [[ "$ROW_COUNT" != '2' || "$CHILD_COUNT" != '1' ]]; then
   exit 1
 fi
 
-echo 'PASS: concurrent stale-tail appends serialize; exactly one succeeds and no fork is created.'
+ORDER_OK=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select (child.created_at > seed.created_at)::text from public.universe_events child join public.universe_events seed on seed.event_id=child.parent_event_id where child.continuity_root_id='$ROOT' and child.worldline_id='$WORLD';")
+if [[ "$ORDER_OK" != 'true' ]]; then
+  echo "FAIL: durable insertion timestamp does not follow the committed parent"
+  exit 1
+fi
+
+echo 'PASS: concurrent stale-tail appends serialize; exactly one succeeds, no fork is created, and insertion order is monotonic.'
