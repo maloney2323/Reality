@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${DATABASE_URL:?DATABASE_URL must point to the ephemeral PostgreSQL test database}"
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+do $roles$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if;
+end
+$roles$;
+
+create table public.universe_events (
+  event_id uuid primary key,
+  event_kind text not null,
+  entity_type text not null,
+  entity_id uuid not null,
+  continuity_root_id uuid not null,
+  worldline_id uuid not null,
+  parent_event_id uuid null,
+  effective_time timestamptz not null,
+  assertion_time timestamptz not null,
+  epistemic_status text not null,
+  payload jsonb not null,
+  evidence_refs jsonb not null,
+  provenance jsonb not null,
+  content_hash text not null,
+  lineage_hash text not null,
+  created_at timestamptz not null default now()
+);
+SQL
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql
+
+ROOT='aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa'
+WORLD='bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb'
+SEED='11111111-1111-5111-8111-111111111111'
+CHILD_A='33333333-3333-5333-8333-333333333333'
+CHILD_B='55555555-5555-5555-8555-555555555555'
+ENTITY_A='44444444-4444-5444-8444-444444444444'
+ENTITY_B='66666666-6666-5666-8666-666666666666'
+NOW='2026-10-09T22:00:00Z'
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "insert into public.universe_events (event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,parent_event_id,effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash) values ('$SEED','RAW_SIGNAL','raw_signal','$ENTITY_A','$ROOT','$WORLD',null,'$NOW','$NOW','OBSERVED','{}','[]','{}','seed-content','seed-lineage');"
+
+PAYLOAD_A="{\"event_id\":\"$CHILD_A\",\"event_kind\":\"TRANSFORMATION\",\"entity_type\":\"transformation\",\"entity_id\":\"$ENTITY_A\",\"continuity_root_id\":\"$ROOT\",\"worldline_id\":\"$WORLD\",\"parent_event_id\":\"$SEED\",\"effective_time\":\"$NOW\",\"assertion_time\":\"$NOW\",\"epistemic_status\":\"OBSERVED\",\"payload\":{\"candidate\":\"a\"},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"seed-lineage\"}},\"content_hash\":\"content-a\",\"lineage_hash\":\"lineage-a\"}"
+PAYLOAD_B="{\"event_id\":\"$CHILD_B\",\"event_kind\":\"TRANSFORMATION\",\"entity_type\":\"transformation\",\"entity_id\":\"$ENTITY_B\",\"continuity_root_id\":\"$ROOT\",\"worldline_id\":\"$WORLD\",\"parent_event_id\":\"$SEED\",\"effective_time\":\"$NOW\",\"assertion_time\":\"$NOW\",\"epistemic_status\":\"OBSERVED\",\"payload\":{\"candidate\":\"b\"},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"seed-lineage\"}},\"content_hash\":\"content-b\",\"lineage_hash\":\"lineage-b\"}"
+
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$PAYLOAD_A'::jsonb);" > /tmp/atomic-a.log 2>&1 &
+PID_A=$!
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$PAYLOAD_B'::jsonb);" > /tmp/atomic-b.log 2>&1 &
+PID_B=$!
+wait "$PID_A"; STATUS_A=$?
+wait "$PID_B"; STATUS_B=$?
+set -e
+
+if [[ "$STATUS_A" -eq 0 && "$STATUS_B" -eq 0 ]]; then
+  echo 'FAIL: both competing writes succeeded; continuity fork detected'
+  cat /tmp/atomic-a.log /tmp/atomic-b.log
+  exit 1
+fi
+if [[ "$STATUS_A" -ne 0 && "$STATUS_B" -ne 0 ]]; then
+  echo 'FAIL: both competing writes were rejected'
+  cat /tmp/atomic-a.log /tmp/atomic-b.log
+  exit 1
+fi
+
+ROW_COUNT=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select count(*) from public.universe_events where continuity_root_id='$ROOT' and worldline_id='$WORLD';")
+CHILD_COUNT=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select count(*) from public.universe_events where continuity_root_id='$ROOT' and worldline_id='$WORLD' and parent_event_id='$SEED';")
+if [[ "$ROW_COUNT" != '2' || "$CHILD_COUNT" != '1' ]]; then
+  echo "FAIL: expected 2 total events and exactly 1 child of seed; got rows=$ROW_COUNT children=$CHILD_COUNT"
+  exit 1
+fi
+
+echo 'PASS: concurrent stale-tail appends serialize; exactly one succeeds and no fork is created.'
