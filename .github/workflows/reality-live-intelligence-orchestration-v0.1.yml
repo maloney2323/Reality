@@ -11,10 +11,12 @@ on:
       - 'src/reality-continuity-stage-gate-v1.0.js'
       - 'src/reality-continuity-spine-v2.0.js'
       - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
+      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
       - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
       - 'test/reality-continuity-stage-gate-v1.0.test.js'
       - 'test/reality-continuity-spine-runtime-v0.1.test.js'
-      - 'test/reality-continuity-runtime-v0.1.test.js'
+      - 'test/reality-continuity-runtime-v0.1.test.js test/reality-universe-postgres-continuity-v0.2.test.js'
       - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
   pull_request:
     paths:
@@ -26,6 +28,8 @@ on:
       - 'src/reality-continuity-stage-gate-v1.0.js'
       - 'src/reality-continuity-spine-v2.0.js'
       - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
+      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
       - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
       - 'test/reality-continuity-stage-gate-v1.0.test.js'
       - 'test/reality-continuity-spine-runtime-v0.1.test.js'
