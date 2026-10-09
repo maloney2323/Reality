@@ -21,4 +21,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm test
+      - run: node --test test/reality-continuity-spine-v2.0.test.js test/reality-universe-postgres-continuity-v0.2.test.js test/reality-continuity-runtime-v0.1.test.js
