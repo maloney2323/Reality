@@ -183,6 +183,9 @@ export function validateContinuityChain(nodes = []) {
       broken.push({ index: i, reason: 'NODE_IDENTITY_INCOMPLETE' });
       continue;
     }
+    if (!SPINE_STAGES.includes(node.event_kind)) {
+      broken.push({ index: i, reason: 'CONTINUITY_STAGE_INVALID' });
+    }
 
     const persistedContinuity = node?.provenance?.continuity_spine || null;
     const priorLineageHash = node.prior_lineage_hash ?? persistedContinuity?.prior_lineage_hash ?? null;
