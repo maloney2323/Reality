@@ -180,6 +180,7 @@ export async function runLiveIntelligenceOrchestration({
     subjectId: systemContext?.work_item_id || systemContext?.conversation_id || systemContext?.thought_id || governedSignal.packet.packet_id,
     signal: governedSignal,
     observedAt: observedAt || new Date().toISOString(),
+    workflowRunId: systemContext?.workflow_run_id || null,
     fetchImpl,
   });
   if (discoveredContinuityRootId) {
