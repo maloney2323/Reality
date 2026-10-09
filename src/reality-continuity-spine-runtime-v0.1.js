@@ -178,6 +178,7 @@ export async function startContinuityRuntime({
     eventId: `raw:${signal.packet.packet_id}`,
     payload: {
       packet_id: signal.packet.packet_id,
+      packet_version: signal.packet.packet_version,
       source: signal.packet.source,
       observed_at: signal.packet.observed_at,
       raw_content_digest: signal.packet.raw_content_digest,
@@ -198,6 +199,7 @@ export async function startContinuityRuntime({
       cleaner_version: signal.transformation_receipt.cleaner_version,
       fragment_count: signal.transformation_receipt.fragment_count,
       meaning_change_claimed: signal.transformation_receipt.meaning_change_claimed === true,
+      transformation_receipt: signal.transformation_receipt,
     },
     provenance: { source: 'reality_governed_signal_cleaner' },
   });
@@ -212,6 +214,14 @@ export async function startContinuityRuntime({
       packet_id: signal.packet.packet_id,
       fragment_ids: signal.fragments.map((fragment) => fragment.fragment_id),
       fragment_count: signal.fragments.length,
+      fragment_manifest: signal.fragments.map((fragment) => ({
+        fragment_id: fragment.fragment_id,
+        ordinal: fragment.ordinal,
+        raw_text_digest: fragment.raw_text_digest,
+        cleaned_text_digest: fragment.cleaned_text_digest,
+        transformation: fragment.transformation,
+        epistemic_status: fragment.epistemic_status,
+      })),
     },
     provenance: { source: 'reality_live_intelligence_orchestration' },
   });
