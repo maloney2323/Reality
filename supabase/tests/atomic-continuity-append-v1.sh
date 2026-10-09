@@ -82,3 +82,26 @@ if [[ "$ORDER_OK" != 'true' ]]; then
 fi
 
 echo 'PASS: concurrent stale-tail appends serialize; exactly one succeeds, no fork is created, and insertion order is monotonic.'
+
+# Legacy rows can share created_at. The tail must still be selected by parent
+# topology, even when event_id sorting would put the parent after its child.
+ROOT2='aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaab'
+WORLD2='bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbc'
+PARENT2='ffffffff-ffff-5fff-8fff-ffffffffffff'
+CHILD2='11111111-1111-5111-8111-111111111112'
+GRANDCHILD2='22222222-2222-5222-8222-222222222223'
+ENTITY2='33333333-3333-5333-8333-333333333334'
+TIED='2026-10-09T22:00:00Z'
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "insert into public.universe_events (event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,parent_event_id,effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash,created_at) values ('$PARENT2','RAW_SIGNAL','raw_signal','$ENTITY2','$ROOT2','$WORLD2',null,'$TIED','$TIED','OBSERVED','{}','[]','{}','legacy-parent-content','legacy-parent-hash','$TIED'),('$CHILD2','TRANSFORMATION','transformation','$ENTITY2','$ROOT2','$WORLD2','$PARENT2','$TIED','$TIED','OBSERVED','{}','[]','{}','legacy-child-content','legacy-child-hash','$TIED');"
+
+GRANDCHILD_PAYLOAD="{\"event_id\":\"$GRANDCHILD2\",\"event_kind\":\"OBSERVATION\",\"entity_type\":\"observation\",\"entity_id\":\"$ENTITY2\",\"continuity_root_id\":\"$ROOT2\",\"worldline_id\":\"$WORLD2\",\"parent_event_id\":\"$CHILD2\",\"effective_time\":\"$TIED\",\"assertion_time\":\"$TIED\",\"epistemic_status\":\"OBSERVED\",\"payload\":{},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"legacy-child-hash\"}},\"content_hash\":\"legacy-grandchild-content\",\"lineage_hash\":\"legacy-grandchild-hash\"}"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$GRANDCHILD_PAYLOAD'::jsonb);" >/tmp/atomic-tied-tail.log
+PARENT_CHECK=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select parent_event_id::text from public.universe_events where event_id='$GRANDCHILD2';")
+if [[ "$PARENT_CHECK" != "$CHILD2" ]]; then
+  echo "FAIL: tied-timestamp append chose the wrong tail; expected $CHILD2 got $PARENT_CHECK"
+  cat /tmp/atomic-tied-tail.log
+  exit 1
+fi
+
+echo 'PASS: parent topology identifies the true tail when legacy timestamps tie.'
