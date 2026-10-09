@@ -117,3 +117,41 @@ test('lineage verification treats equivalent UTC timestamp encodings as the same
   };
   assert.equal(validateContinuityChain([changedInstant]).valid, false);
 });
+
+test('does not promote legacy capability stages or unverifiable hashes into the current ledger contract', () => {
+  const legacy = [
+    {
+      event_id: '11111111-1111-4111-8111-111111111111',
+      event_kind: 'OBSERVATION',
+      continuity_root_id: '33333333-3333-4333-8333-333333333333',
+      worldline_id: '44444444-4444-4444-8444-444444444444',
+      parent_event_id: null,
+      lineage_hash: 'lineage-observation-v1',
+      effective_time: '2026-10-06T22:47:51.756Z',
+      assertion_time: '2026-10-06T22:47:51.756Z',
+      epistemic_status: 'OBSERVED',
+      evidence_refs: [],
+      payload: {},
+      provenance: { source: 'universe-v1-proof' },
+    },
+    {
+      event_id: '55555555-5555-4555-8555-555555555555',
+      event_kind: 'CAPABILITY_VERIFIED',
+      continuity_root_id: '33333333-3333-4333-8333-333333333333',
+      worldline_id: '44444444-4444-4444-8444-444444444444',
+      parent_event_id: '11111111-1111-4111-8111-111111111111',
+      prior_lineage_hash: 'lineage-observation-v1',
+      lineage_hash: 'lineage-capability-v1',
+      effective_time: '2026-10-06T22:47:51.756Z',
+      assertion_time: '2026-10-06T22:47:51.756Z',
+      epistemic_status: 'OBSERVED',
+      evidence_refs: [],
+      payload: {},
+      provenance: { source: 'universe-v1-proof' },
+    },
+  ];
+  const result = validateContinuityChain(legacy);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'CONTINUITY_STAGE_INVALID'));
+});
