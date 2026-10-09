@@ -14,6 +14,7 @@ on:
       - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
       - 'test/reality-continuity-stage-gate-v1.0.test.js'
       - 'test/reality-continuity-spine-runtime-v0.1.test.js'
+      - 'test/reality-continuity-runtime-v0.1.test.js'
       - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
   pull_request:
     paths:
@@ -38,4 +39,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm test
+      - run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-continuity-stage-gate-v1.0.test.js test/reality-continuity-spine-runtime-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js
