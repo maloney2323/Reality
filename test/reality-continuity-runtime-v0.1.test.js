@@ -30,8 +30,8 @@ test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on o
     const root = u.searchParams.get('continuity_root_id')?.replace(/^eq\./, '') || null;
     const worldline = u.searchParams.get('worldline_id')?.replace(/^eq\./, '') || null;
     const matching = rows.filter((row) => row.continuity_root_id === root && row.worldline_id === worldline);
-    matching.sort((a, b) => String(b.created_at || b.assertion_time).localeCompare(String(a.created_at || a.assertion_time)));
-    return new Response(JSON.stringify(matching.slice(0, 1)), { status: 200 });
+    const latest = matching[matching.length - 1];
+    return new Response(JSON.stringify(latest ? [latest] : []), { status: 200 });
   };
 
   try {
