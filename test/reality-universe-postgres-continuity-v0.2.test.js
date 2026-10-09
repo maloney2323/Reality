@@ -159,3 +159,35 @@ test('reconstruction fails closed on a forked parent chain', async () => {
     /CONTINUITY_HISTORY_FORK_DETECTED/,
   );
 });
+
+test('reconstructs ledgers larger than one PostgREST page without truncation', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const rows = Array.from({ length: 1001 }, (_, index) => ({
+    event_id: '00000000-0000-5000-8000-' + String(index + 1).padStart(12, '0'),
+    continuity_root_id: root,
+    worldline_id: world,
+    parent_event_id: index === 0
+      ? null
+      : '00000000-0000-5000-8000-' + String(index).padStart(12, '0'),
+    created_at: '2026-10-09T00:00:00.000Z',
+    assertion_time: index === 1000 ? '2099-01-01T00:00:00.000Z' : '2026-10-09T00:00:00.000Z',
+  }));
+  const offsets = [];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async (url) => {
+      const params = new URL(url).searchParams;
+      const offset = Number(params.get('offset'));
+      const limit = Number(params.get('limit'));
+      offsets.push(offset);
+      return new Response(JSON.stringify(rows.slice(offset, offset + limit)), { status: 200 });
+    },
+  });
+  const reconstructed = await persistence.reconstruct({ continuityRootId: root, worldlineId: world });
+  assert.equal(reconstructed.length, 1001);
+  assert.deepEqual(offsets, [0, 1000]);
+  assert.equal(reconstructed[0].event_id, rows[0].event_id);
+  assert.equal(reconstructed.at(-1).event_id, rows.at(-1).event_id);
+});
