@@ -155,14 +155,55 @@ export function validateContinuityChain(nodes = []) {
   for (let i = 0; i < ordered.length; i += 1) {
     const node = ordered[i];
     if (!node?.continuity_root_id || !node?.worldline_id || !node?.event_id || !node?.lineage_hash) {
-      broken.push({ index: i, reason: 'NODE_IDENTITY_INCOMPLETE' }); continue;
+      broken.push({ index: i, reason: 'NODE_IDENTITY_INCOMPLETE' });
+      continue;
     }
-    if (i === 0) continue;
+
+    const persistedContinuity = node?.provenance?.continuity_spine || null;
+    const priorLineageHash = node.prior_lineage_hash ?? persistedContinuity?.prior_lineage_hash ?? null;
+    const transformationReceiptId = node.transformation_receipt_id
+      ?? persistedContinuity?.transformation_receipt_id
+      ?? null;
+    // The persistence adapter adds this envelope after the event hash is minted.
+    // Exclude that envelope when recomputing the hash, while retaining the version
+    // it records so older spine versions can be checked using their own contract.
+    const provenance = node.provenance && typeof node.provenance === 'object'
+      ? Object.fromEntries(Object.entries(node.provenance).filter(([key]) => key !== 'continuity_spine'))
+      : {};
+    const expectedHash = computeContinuityLineageHash({
+      spineVersion: persistedContinuity?.version || REALITY_CONTINUITY_SPINE_VERSION,
+      continuityRootId: node.continuity_root_id,
+      worldlineId: node.worldline_id,
+      parentEventId: node.parent_event_id || null,
+      priorLineageHash,
+      stage: node.event_kind,
+      entityId: node.entity_id,
+      evidenceRefs: node.evidence_refs || [],
+      transformationReceiptId,
+      effectiveTime: node.effective_time,
+      assertionTime: node.assertion_time,
+      epistemicStatus: node.epistemic_status,
+      payload: node.payload ?? {},
+      provenance,
+    });
+    if (expectedHash !== node.lineage_hash) {
+      broken.push({ index: i, reason: 'LINEAGE_HASH_CONTENT_MISMATCH' });
+    }
+
+    if (i === 0) {
+      if (node.parent_event_id != null) broken.push({ index: i, reason: 'ROOT_PARENT_MUST_BE_NULL' });
+      if (priorLineageHash != null) broken.push({ index: i, reason: 'ROOT_PRIOR_HASH_MUST_BE_NULL' });
+      continue;
+    }
     const prev = ordered[i - 1];
     if (node.parent_event_id !== prev.event_id) broken.push({ index: i, reason: 'PARENT_EVENT_MISMATCH' });
-    if (node.prior_lineage_hash !== prev.lineage_hash) broken.push({ index: i, reason: 'LINEAGE_HASH_MISMATCH' });
+    if (priorLineageHash !== prev.lineage_hash) broken.push({ index: i, reason: 'LINEAGE_HASH_MISMATCH' });
     if (node.continuity_root_id !== prev.continuity_root_id) broken.push({ index: i, reason: 'ROOT_MISMATCH' });
     if (node.worldline_id !== prev.worldline_id) broken.push({ index: i, reason: 'WORLDLINE_MISMATCH' });
   }
-  return Object.freeze({ valid: broken.length === 0, event_count: ordered.length, broken_links: broken });
+  return Object.freeze({
+    valid: broken.length === 0,
+    event_count: ordered.length,
+    broken_links: Object.freeze(broken.map((item) => Object.freeze(item))),
+  });
 }
