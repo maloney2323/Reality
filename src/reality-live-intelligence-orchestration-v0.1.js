@@ -451,7 +451,7 @@ export async function runLiveIntelligenceOrchestration({
       evidenceRefs: [item.work_item_id],
       epistemicStatus: 'PROPOSED',
       payload: {
-        authorization_request_id: authorizationRequest.authorization_request_id || null,
+        authorization_request_id: authorizationRequest.authorization_id || null,
         granted: false,
         authorization_status: 'REQUESTED',
         authorization_ref: authorizationRequest.authorization_request_id || null,
