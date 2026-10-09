@@ -3,6 +3,7 @@ import {
   appendContinuityNode,
   advanceSpine,
 } from './reality-continuity-spine-v2.0.js';
+import { evaluateContinuityStageGate } from './reality-continuity-stage-gate-v1.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
 
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.1';
@@ -44,19 +45,42 @@ export async function startContinuityRuntime({
     effectiveTime = observedAt,
     assertionTime = observedAt,
   } = {}) {
+    const parentEventId = spine.last_event_id || null;
+    const priorLineageHash = spine.last_lineage_hash || null;
+    const candidate = {
+      event_kind: stage,
+      parent_event_id: parentEventId,
+      prior_lineage_hash: priorLineageHash,
+      evidence_refs: evidenceRefs,
+      transformation_receipt_id: transformationReceiptId,
+      payload,
+    };
+    const gate = evaluateContinuityStageGate({
+      stage,
+      priorNodes: nodes,
+      candidate,
+      persistenceStatus: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
+    });
+    if (!gate.allowed) {
+      const failure = new Error('CONTINUITY_STAGE_BLOCKED:' + gate.reasons.join(','));
+      failure.code = 'CONTINUITY_STAGE_BLOCKED';
+      failure.details = gate;
+      throw failure;
+    }
+
     const node = appendContinuityNode({
       spine,
       stage,
       entityId,
       eventId,
-      parentEventId: spine.last_event_id || null,
+      parentEventId,
       evidenceRefs,
       transformationReceiptId,
       effectiveTime,
       assertionTime,
       epistemicStatus,
       payload,
-      priorLineageHash: spine.last_lineage_hash || null,
+      priorLineageHash,
       provenance: {
         ...provenance,
         continuity_runtime_version: REALITY_CONTINUITY_RUNTIME_VERSION,
