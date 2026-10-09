@@ -17,6 +17,8 @@ declare
   v_existing public.universe_events%rowtype;
   v_tail public.universe_events%rowtype;
   v_inserted public.universe_events%rowtype;
+  v_event_count bigint;
+  v_tail_count bigint;
 begin
   if v_event_id is null or v_root_id is null or v_worldline_id is null then
     raise exception 'CONTINUITY_REQUIRED_IDENTIFIERS_MISSING';
@@ -38,14 +40,44 @@ begin
     raise exception 'CONTINUITY_EVENT_ID_COLLISION';
   end if;
 
-  select * into v_tail
+  select count(*) into v_event_count
   from public.universe_events
   where continuity_root_id = v_root_id
-    and worldline_id = v_worldline_id
-  order by created_at desc, event_id desc
-  limit 1;
+    and worldline_id = v_worldline_id;
 
-  if found then
+  if v_event_count > 0 then
+    -- Derive the tail from parent topology, never from created_at: legacy rows
+    -- can share transaction timestamps and a later transaction can begin before
+    -- it acquires the advisory lock.
+    select count(*) into v_tail_count
+    from public.universe_events e
+    where e.continuity_root_id = v_root_id
+      and e.worldline_id = v_worldline_id
+      and not exists (
+        select 1
+        from public.universe_events child
+        where child.parent_event_id = e.event_id
+          and child.continuity_root_id = v_root_id
+          and child.worldline_id = v_worldline_id
+      );
+
+    if v_tail_count <> 1 then
+      raise exception 'CONTINUITY_HISTORY_TAIL_INVALID:%', v_tail_count;
+    end if;
+
+    select e.* into v_tail
+    from public.universe_events e
+    where e.continuity_root_id = v_root_id
+      and e.worldline_id = v_worldline_id
+      and not exists (
+        select 1
+        from public.universe_events child
+        where child.parent_event_id = e.event_id
+          and child.continuity_root_id = v_root_id
+          and child.worldline_id = v_worldline_id
+      )
+    limit 1;
+
     if v_parent_id is distinct from v_tail.event_id then
       raise exception 'CONTINUITY_APPEND_NOT_TAIL';
     end if;
