@@ -93,3 +93,27 @@ test('rejects a root event that claims an earlier parent or lineage hash', () =>
   assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PARENT_MUST_BE_NULL'));
   assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PRIOR_HASH_MUST_BE_NULL'));
 });
+
+test('lineage verification treats equivalent UTC timestamp encodings as the same instant', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:timestamp-canonicalization' });
+  const raw = appendContinuityNode({
+    spine,
+    stage: 'RAW_SIGNAL',
+    entityId: 'signal:timestamp-canonicalization',
+    effectiveTime: '2026-10-09T12:00:00.602Z',
+    assertionTime: '2026-10-09T12:00:00.602Z',
+    payload: { value: 'same instant' },
+  });
+  const persistedRepresentation = {
+    ...raw,
+    effective_time: '2026-10-09T12:00:00.602+00:00',
+    assertion_time: '2026-10-09T12:00:00.602+00:00',
+  };
+  assert.equal(validateContinuityChain([persistedRepresentation]).valid, true);
+
+  const changedInstant = {
+    ...raw,
+    effective_time: '2026-10-09T12:00:01.602+00:00',
+  };
+  assert.equal(validateContinuityChain([changedInstant]).valid, false);
+});
