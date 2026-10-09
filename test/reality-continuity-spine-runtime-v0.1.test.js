@@ -202,6 +202,32 @@ test('rejects a tampered signal before writing any continuity event', async (t) 
   assert.equal(db.rows.length, 0);
 });
 
+test('fails closed when persisted event content no longer matches its lineage hash', async (t) => {
+  setPersistenceEnv(t);
+  const db = makeDb();
+  await startContinuityRuntime({
+    continuityRootSource: 'tampered-persisted-payload-root',
+    subjectId: 'subject-payload-original',
+    signal: signal('original content'),
+    workflowRunId: 'run-payload-original',
+    fetchImpl: db.fetchImpl,
+  });
+  db.rows[1].payload.receipt_id = 'receipt:forged-after-write';
+
+  await assert.rejects(
+    () => startContinuityRuntime({
+      continuityRootSource: 'tampered-persisted-payload-root',
+      subjectId: 'subject-payload-recovery',
+      signal: signal('new content'),
+      workflowRunId: 'run-payload-recovery',
+      fetchImpl: db.fetchImpl,
+    }),
+    (error) => error.code === 'CONTINUITY_HISTORY_INVALID'
+      && error.details.broken_links.some((item) => item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'),
+  );
+  assert.equal(db.rows.length, 3, 'tampered history must block before any new append');
+});
+
 test('records a governed business-work proposal but blocks execution without granted authority', async (t) => {
   setPersistenceEnv(t);
   const db = makeDb();
