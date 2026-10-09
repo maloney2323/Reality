@@ -8,7 +8,7 @@ import { createUniversePostgresPersistence } from './reality-universe-postgres-p
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.1';
 
 function enabled() {
-  return process.env.REALITY_CONTINUITY_SPINE_ENABLED === 'true';
+  return process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true';
 }
 
 export async function startContinuityRuntime({
