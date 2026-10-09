@@ -16,6 +16,52 @@ function hash(value) {
   return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 }
 
+function orderContinuityRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const byId = new Map();
+  const children = new Map();
+  const roots = [];
+
+  for (const row of rows) {
+    if (!row?.event_id || byId.has(row.event_id)) {
+      throw new Error('CONTINUITY_HISTORY_EVENT_ID_INVALID');
+    }
+    byId.set(row.event_id, row);
+  }
+
+  for (const row of rows) {
+    const parentId = row.parent_event_id || null;
+    if (!parentId) {
+      roots.push(row);
+      continue;
+    }
+    if (!byId.has(parentId)) {
+      throw new Error('CONTINUITY_HISTORY_PARENT_MISSING');
+    }
+    const siblings = children.get(parentId) || [];
+    siblings.push(row);
+    children.set(parentId, siblings);
+  }
+
+  if (roots.length !== 1) throw new Error('CONTINUITY_HISTORY_ROOT_COUNT_INVALID');
+  for (const siblings of children.values()) {
+    if (siblings.length > 1) throw new Error('CONTINUITY_HISTORY_FORK_DETECTED');
+  }
+
+  const ordered = [];
+  const visited = new Set();
+  let current = roots[0];
+  while (current) {
+    if (visited.has(current.event_id)) throw new Error('CONTINUITY_HISTORY_CYCLE_DETECTED');
+    visited.add(current.event_id);
+    ordered.push(current);
+    current = (children.get(current.event_id) || [])[0] || null;
+  }
+
+  if (ordered.length !== rows.length) throw new Error('CONTINUITY_HISTORY_DISCONNECTED');
+  return ordered;
+}
+
 export function createUniversePostgresPersistence({
   url = process.env.SUPABASE_URL,
   secretKey = process.env.SUPABASE_SECRET_KEY || process.env.supabase_secret_key,
@@ -155,14 +201,18 @@ export function createUniversePostgresPersistence({
     });
   }
 
-  async function reconstruct({ continuityRootId, worldlineId, assertionTime = new Date().toISOString() }) {
+  async function reconstruct({ continuityRootId, worldlineId } = {}) {
+    // A continuity tail is ordered by immutable parent links, not by assertion
+    // time or timestamps that may tie or be affected by transaction start time.
+    // Historical as-of queries must use a separate projection; filtering this
+    // ledger by assertion_time could silently omit its actual durable tail.
     const params = new URLSearchParams({
       continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
       worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      assertion_time: 'lte.' + assertionTime,
       order: 'created_at.asc,event_id.asc',
     });
-    return request('universe_events?' + params.toString());
+    const rows = await request('universe_events?' + params.toString());
+    return orderContinuityRows(rows);
   }
 
   async function getCapability(capabilityId, version) {
