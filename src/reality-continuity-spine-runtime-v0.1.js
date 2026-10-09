@@ -68,7 +68,7 @@ export async function startContinuityRuntime({
       try {
         committed = await persistence.appendEvent(node);
       } catch (error) {
-        const failure = new Error('CONTINUITY_PERSISTENCE_REQUIRED');
+        const failure = new Error('CONTINUITY_PERSISTENCE_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
         failure.code = 'CONTINUITY_PERSISTENCE_REQUIRED';
         failure.cause = error;
         throw failure;
