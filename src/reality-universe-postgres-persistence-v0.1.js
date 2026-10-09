@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 
-export const UNIVERSE_POSTGRES_PERSISTENCE_VERSION = '0.2.1-continuity-spine';
+export const UNIVERSE_POSTGRES_PERSISTENCE_VERSION = '0.3.0-atomic-continuity-append';
 
 function required(name, value) {
   if (!value || typeof value !== 'string') throw new Error(name + '_REQUIRED');
@@ -56,7 +56,7 @@ export function createUniversePostgresPersistence({
     const params = new URLSearchParams({
       continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
       worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      order: 'assertion_time.desc,created_at.desc,event_id.desc',
+      order: 'created_at.desc,event_id.desc',
       limit: '1',
     });
     const rows = await request('universe_events?' + params.toString());
@@ -132,12 +132,27 @@ export function createUniversePostgresPersistence({
       lineage_hash: expectedLineageHash,
     };
 
-    await request('universe_events', {
+    // The database RPC takes a transaction-scoped advisory lock and rechecks the
+    // parent against the actual tail before inserting. The earlier read is for
+    // deterministic hash construction only; it is not the concurrency boundary.
+    const committed = await request('rpc/append_universe_event', {
       method: 'POST',
-      body: record,
-      headers: { Prefer: 'return=representation' },
+      body: { p_record: record },
     });
-    return Object.freeze({ ...event, ...record, prior_lineage_hash: priorLineageHash, status: 'PERSISTED' });
+    const committedRecord = Array.isArray(committed) ? committed[0] : committed;
+    if (!committedRecord || !['PERSISTED', 'DUPLICATE_IDENTICAL'].includes(committedRecord.status)) {
+      throw new Error('CONTINUITY_ATOMIC_APPEND_UNCONFIRMED');
+    }
+    if (committedRecord.lineage_hash !== expectedLineageHash) {
+      throw new Error('CONTINUITY_ATOMIC_APPEND_HASH_MISMATCH');
+    }
+    return Object.freeze({
+      ...event,
+      ...record,
+      ...committedRecord,
+      prior_lineage_hash: priorLineageHash,
+      status: committedRecord.status,
+    });
   }
 
   async function reconstruct({ continuityRootId, worldlineId, assertionTime = new Date().toISOString() }) {
@@ -145,7 +160,7 @@ export function createUniversePostgresPersistence({
       continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
       worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
       assertion_time: 'lte.' + assertionTime,
-      order: 'assertion_time.asc,created_at.asc,event_id.asc',
+      order: 'created_at.asc,event_id.asc',
     });
     return request('universe_events?' + params.toString());
   }
