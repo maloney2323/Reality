@@ -142,7 +142,7 @@ as $$
 begin
   raise exception 'UNIVERSE_EVENTS_APPEND_ONLY';
 end;
-$;
+$$;
 
 revoke all on function public.reject_universe_event_mutation() from public, anon, authenticated, service_role;
 
