@@ -41,6 +41,15 @@ if [[ "$PRIVILEGES" != 'true:false:false:false:false:true' ]]; then
   exit 1
 fi
 
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "set role service_role; insert into public.universe_events (event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash) values ('99999999-9999-5999-8999-999999999999','RAW_SIGNAL','raw_signal','88888888-8888-5888-8888-888888888888','aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb',now(),now(),'OBSERVED','{}','[]','{}','direct-insert-content','direct-insert-lineage');" >/tmp/append-only-direct-insert.log 2>&1
+DIRECT_INSERT_STATUS=$?
+set -e
+if [[ "$DIRECT_INSERT_STATUS" -eq 0 ]]; then
+  echo 'FAIL: service_role bypassed the atomic append RPC with a direct insert'
+  exit 1
+fi
+
 ROOT='aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa'
 WORLD='bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb'
 SEED='11111111-1111-5111-8111-111111111111'
@@ -68,9 +77,9 @@ PAYLOAD_A="{\"event_id\":\"$CHILD_A\",\"event_kind\":\"TRANSFORMATION\",\"entity
 PAYLOAD_B="{\"event_id\":\"$CHILD_B\",\"event_kind\":\"TRANSFORMATION\",\"entity_type\":\"transformation\",\"entity_id\":\"$ENTITY_B\",\"continuity_root_id\":\"$ROOT\",\"worldline_id\":\"$WORLD\",\"parent_event_id\":\"$SEED\",\"effective_time\":\"$NOW\",\"assertion_time\":\"$NOW\",\"epistemic_status\":\"OBSERVED\",\"payload\":{\"candidate\":\"b\"},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"seed-lineage\"}},\"content_hash\":\"content-b\",\"lineage_hash\":\"lineage-b\"}"
 
 set +e
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$PAYLOAD_A'::jsonb);" > /tmp/atomic-a.log 2>&1 &
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$PAYLOAD_A'::jsonb);" > /tmp/atomic-a.log 2>&1 &
 PID_A=$!
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$PAYLOAD_B'::jsonb);" > /tmp/atomic-b.log 2>&1 &
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$PAYLOAD_B'::jsonb);" > /tmp/atomic-b.log 2>&1 &
 PID_B=$!
 wait "$PID_A"; STATUS_A=$?
 wait "$PID_B"; STATUS_B=$?
@@ -115,7 +124,7 @@ TIED='2026-10-09T22:00:00Z'
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "insert into public.universe_events (event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,parent_event_id,effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash,created_at) values ('$PARENT2','RAW_SIGNAL','raw_signal','$ENTITY2','$ROOT2','$WORLD2',null,'$TIED','$TIED','OBSERVED','{}','[]','{}','legacy-parent-content','legacy-parent-hash','$TIED'),('$CHILD2','TRANSFORMATION','transformation','$ENTITY2','$ROOT2','$WORLD2','$PARENT2','$TIED','$TIED','OBSERVED','{}','[]','{}','legacy-child-content','legacy-child-hash','$TIED');"
 
 GRANDCHILD_PAYLOAD="{\"event_id\":\"$GRANDCHILD2\",\"event_kind\":\"OBSERVATION\",\"entity_type\":\"observation\",\"entity_id\":\"$ENTITY2\",\"continuity_root_id\":\"$ROOT2\",\"worldline_id\":\"$WORLD2\",\"parent_event_id\":\"$CHILD2\",\"effective_time\":\"$TIED\",\"assertion_time\":\"$TIED\",\"epistemic_status\":\"OBSERVED\",\"payload\":{},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"legacy-child-hash\"}},\"content_hash\":\"legacy-grandchild-content\",\"lineage_hash\":\"legacy-grandchild-hash\"}"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.append_universe_event('$GRANDCHILD_PAYLOAD'::jsonb);" >/tmp/atomic-tied-tail.log
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$GRANDCHILD_PAYLOAD'::jsonb);" >/tmp/atomic-tied-tail.log
 PARENT_CHECK=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select parent_event_id::text from public.universe_events where event_id='$GRANDCHILD2';")
 if [[ "$PARENT_CHECK" != "$CHILD2" ]]; then
   echo "FAIL: tied-timestamp append chose the wrong tail; expected $CHILD2 got $PARENT_CHECK"
