@@ -112,3 +112,50 @@ test('persistence rejects a write against a non-tail parent', async () => {
     global.fetch = originalFetch;
   }
 });
+
+test('reconstructs the durable ledger by parent links despite timestamp disorder and future assertions', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const seedId = '11111111-1111-5111-8111-111111111111';
+  const childId = '22222222-2222-5222-8222-222222222222';
+  const rows = [
+    {
+      event_id: childId, continuity_root_id: root, worldline_id: world,
+      parent_event_id: seedId, created_at: '2026-10-09T00:00:01Z',
+      assertion_time: '2026-10-08T00:00:00Z', lineage_hash: 'child-hash',
+    },
+    {
+      event_id: seedId, continuity_root_id: root, worldline_id: world,
+      parent_event_id: null, created_at: '2026-10-09T00:00:02Z',
+      assertion_time: '2026-10-10T00:00:00Z', lineage_hash: 'seed-hash',
+    },
+  ];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async () => new Response(JSON.stringify(rows), { status: 200 }),
+  });
+  const reconstructed = await persistence.reconstruct({ continuityRootId: root, worldlineId: world });
+  assert.deepEqual(reconstructed.map((row) => row.event_id), [seedId, childId]);
+  assert.equal(reconstructed.length, 2, 'continuity reconstruction must not apply an implicit assertion-time cutoff');
+});
+
+test('reconstruction fails closed on a forked parent chain', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const seedId = '11111111-1111-5111-8111-111111111111';
+  const rows = [
+    { event_id: seedId, continuity_root_id: root, worldline_id: world, parent_event_id: null },
+    { event_id: '22222222-2222-5222-8222-222222222222', continuity_root_id: root, worldline_id: world, parent_event_id: seedId },
+    { event_id: '33333333-3333-5333-8333-333333333333', continuity_root_id: root, worldline_id: world, parent_event_id: seedId },
+  ];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async () => new Response(JSON.stringify(rows), { status: 200 }),
+  });
+  await assert.rejects(
+    persistence.reconstruct({ continuityRootId: root, worldlineId: world }),
+    /CONTINUITY_HISTORY_FORK_DETECTED/,
+  );
+});
