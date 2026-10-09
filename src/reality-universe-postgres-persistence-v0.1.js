@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 
 export const UNIVERSE_POSTGRES_PERSISTENCE_VERSION = '0.2.1-continuity-spine';
@@ -12,7 +13,6 @@ function stable(value) {
   return Object.fromEntries(Object.keys(value).sort().map((k) => [k, stable(value[k])]));
 }
 function hash(value) {
-  const crypto = await import('node:crypto');
   return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 }
 
