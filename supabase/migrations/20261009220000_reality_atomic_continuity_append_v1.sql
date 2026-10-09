@@ -60,7 +60,7 @@ begin
     event_id, event_kind, entity_type, entity_id,
     continuity_root_id, worldline_id, parent_event_id,
     effective_time, assertion_time, epistemic_status,
-    payload, evidence_refs, provenance, content_hash, lineage_hash
+    payload, evidence_refs, provenance, content_hash, lineage_hash, created_at
   ) values (
     v_event_id,
     p_record->>'event_kind',
@@ -76,7 +76,8 @@ begin
     coalesce(p_record->'evidence_refs', '[]'::jsonb),
     coalesce(p_record->'provenance', '{}'::jsonb),
     p_record->>'content_hash',
-    p_record->>'lineage_hash'
+    p_record->>'lineage_hash',
+    clock_timestamp()
   )
   returning * into v_inserted;
 
