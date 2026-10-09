@@ -1,5 +1,6 @@
 export const maxDuration = 60;
 
+import { createHash } from 'node:crypto';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
@@ -125,6 +126,71 @@ async function observeConnectedWorld() {
   }
 
   return observations;
+}
+
+function sha256(value) {
+  return createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
+
+async function verifyPreflightReceipt(req, body, authenticatedUserId) {
+  const receipt = body?.preflight_receipt;
+  if (!authenticatedUserId || !receipt || typeof receipt !== 'object') {
+    const error = new Error('REALITY_CHAT_PREFLIGHT_REQUIRED');
+    error.status = 409;
+    throw error;
+  }
+
+  const turnId = String(body?.turn_id || '');
+  const conversationId = String(body?.conversation_id || '');
+  const thoughtId = String(body?.thought_id || '');
+  const modelInput = typeof body?.message === 'string' ? body.message : '';
+  if (
+    receipt.turn_id !== turnId
+    || receipt.conversation_id !== conversationId
+    || receipt.thought_id !== thoughtId
+    || !receipt.user_message_id
+    || !receipt.observation_id
+    || !receipt.continuity_event_id
+    || receipt.authority !== 'GOVERNED_PERSONAL_CHAT_PRE_GENERATION_OBSERVATION'
+    || !/^[a-f0-9]{64}$/.test(String(receipt.admitted_model_input_sha256 || ''))
+    || sha256(modelInput) !== receipt.admitted_model_input_sha256
+  ) {
+    const error = new Error('REALITY_CHAT_PREFLIGHT_RECEIPT_MISMATCH');
+    error.status = 409;
+    throw error;
+  }
+
+  const q = encodeURIComponent(JSON.stringify({
+    user_id: authenticatedUserId,
+    thought_id: thoughtId,
+    conversation_id: conversationId,
+    role: 'user',
+  }));
+  const payload = await base44Get(
+    `/apps/${BASE44_APP_ID}/entities/PersonalMessage?q=${q}&sort=-created_date&limit=100`,
+    bearer(req),
+  );
+  const stored = rows(payload).find((item) =>
+    item?.id === receipt.user_message_id
+    && item?.observation_id === receipt.observation_id
+    && item?.reality_summary?.turn_id === turnId
+  );
+  if (
+    !stored
+    || stored?.reality_summary?.preflight_admitted !== true
+    || stored?.reality_summary?.admitted_model_input_sha256 !== receipt.admitted_model_input_sha256
+  ) {
+    const error = new Error('REALITY_CHAT_DURABLE_PREFLIGHT_NOT_VERIFIED');
+    error.status = 409;
+    throw error;
+  }
+  return {
+    verified: true,
+    turn_id: turnId,
+    user_message_id: stored.id,
+    observation_id: receipt.observation_id,
+    admitted_model_input_sha256: receipt.admitted_model_input_sha256,
+  };
 }
 
 async function loadRealityContext(req, body) {
@@ -267,11 +333,13 @@ export default async function handler(req, res) {
       }
     }
 
-    const realityContext = await loadRealityContext(req, body).catch((error) => {
-      if (error?.message === 'REALITY_SESSION_REQUIRED') throw error;
-      if (error?.message === 'REALITY_CHAT_TRACE_REQUIRED') throw error;
-      return null;
-    });
+    const realityContext = await loadRealityContext(req, body);
+    if (!realityContext?.authenticated_user_id) {
+      const error = new Error('REALITY_SESSION_REQUIRED');
+      error.status = 401;
+      throw error;
+    }
+    const preflightReceipt = await verifyPreflightReceipt(req, body, realityContext.authenticated_user_id);
 
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
@@ -296,7 +364,13 @@ export default async function handler(req, res) {
       continuity: {
         context_loaded: Boolean(realityContext),
         authenticated_user_context: Boolean(realityContext?.authenticated_user_id),
-        durable_context_source: realityContext ? 'BASE44_PERSONAL_REALITY' : 'NONE',
+        durable_context_source: 'BASE44_PERSONAL_REALITY',
+        pre_generation_receipt_verified: preflightReceipt.verified,
+        preflight_user_message_id: preflightReceipt.user_message_id,
+        preflight_observation_id: preflightReceipt.observation_id,
+        admitted_model_input_sha256: preflightReceipt.admitted_model_input_sha256,
+        truth_authorized: false,
+        action_authorized: false,
       },
     });
   } catch (error) {
