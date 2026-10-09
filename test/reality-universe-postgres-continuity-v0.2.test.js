@@ -27,8 +27,8 @@ test('persistence automatically links sequential events into one continuity tail
       secretKey: 'test-key',
     });
     const base = {
-      continuity_root_id: 'root:test',
-      worldline_id: 'world:test',
+      continuity_root_id: 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa',
+      worldline_id: 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb',
       effective_time: '2026-10-08T00:00:00.000Z',
       assertion_time: '2026-10-08T00:00:00.000Z',
       epistemic_status: 'OBSERVED',
@@ -36,11 +36,11 @@ test('persistence automatically links sequential events into one continuity tail
       provenance: { source: 'test' },
     };
     const first = await persistence.appendEvent({
-      ...base, event_id: 'event:1', event_kind: 'observation',
+      ...base, event_id: '11111111-1111-5111-8111-111111111111', event_kind: 'observation',
       entity_type: 'observation', entity_id: 'obs:1', payload: { value: 1 },
     });
     const second = await persistence.appendEvent({
-      ...base, event_id: 'event:2', event_kind: 'work',
+      ...base, event_id: '22222222-2222-5222-8222-222222222222', event_kind: 'work',
       entity_type: 'work', entity_id: 'work:1', payload: { value: 2 },
       assertion_time: '2026-10-08T00:01:00.000Z',
     });
@@ -57,7 +57,7 @@ test('persistence automatically links sequential events into one continuity tail
 test('persistence rejects a write against a non-tail parent', async () => {
   const originalFetch = global.fetch;
   const rows = [{
-    event_id: 'event:tail',
+    event_id: '33333333-3333-5333-8333-333333333333',
     continuity_root_id: 'root:test',
     worldline_id: 'world:test',
     lineage_hash: 'tail-hash',
@@ -66,7 +66,6 @@ test('persistence rejects a write against a non-tail parent', async () => {
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
     if (options.method === 'POST') return new Response('[]', { status: 201 });
-    const u = new URL(url);
     if (u.searchParams.get('event_id')) return new Response('[]', { status: 200 });
     return new Response(JSON.stringify(rows), { status: 200 });
   };
@@ -77,7 +76,7 @@ test('persistence rejects a write against a non-tail parent', async () => {
     await assert.rejects(
       persistence.appendEvent({
         continuity_root_id: 'root:test', worldline_id: 'world:test',
-        event_id: 'event:new', event_kind: 'work', entity_type: 'work', entity_id: 'work:new',
+        event_id: '44444444-4444-5444-8444-444444444444', event_kind: 'work', entity_type: 'work', entity_id: 'work:new',
         parent_event_id: 'event:not-tail', payload: {}, assertion_time: '2026-10-08T00:01:00.000Z',
         effective_time: '2026-10-08T00:01:00.000Z',
       }),
