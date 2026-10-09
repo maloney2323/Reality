@@ -127,11 +127,11 @@ create or replace function public.reject_universe_event_mutation()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
-as $
+as $$
 begin
   raise exception 'UNIVERSE_EVENTS_APPEND_ONLY';
 end;
-$;
+$$;
 
 drop trigger if exists universe_events_reject_row_mutation on public.universe_events;
 create trigger universe_events_reject_row_mutation
@@ -150,11 +150,11 @@ revoke insert, update, delete, truncate, references, trigger
   on table public.universe_events from public, anon, authenticated, service_role;
 grant select on table public.universe_events to service_role;
 
-do $
+do $$
 begin
   if to_regprocedure('public.universe_append_event(uuid,text,text,uuid,uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb,text,text)') is not null then
     revoke all on function public.universe_append_event(uuid,text,text,uuid,uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb,text,text)
       from public, anon, authenticated, service_role;
   end if;
 end;
-$;
+$$;
