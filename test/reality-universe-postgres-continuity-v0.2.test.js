@@ -12,6 +12,11 @@ test('persistence automatically links sequential events into one continuity tail
       rows.push(body);
       return new Response(JSON.stringify([body]), { status: 201, headers: { 'content-type': 'application/json' } });
     }
+    const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
+    if (requestedId) {
+      const exact = rows.find((row) => row.event_id === requestedId);
+      return new Response(JSON.stringify(exact ? [exact] : []), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     const latest = rows.slice().sort((a, b) => String(b.assertion_time).localeCompare(String(a.assertion_time)))[0];
     return new Response(JSON.stringify(latest ? [latest] : []), { status: 200, headers: { 'content-type': 'application/json' } });
   };
@@ -61,6 +66,8 @@ test('persistence rejects a write against a non-tail parent', async () => {
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
     if (options.method === 'POST') return new Response('[]', { status: 201 });
+    const u = new URL(url);
+    if (u.searchParams.get('event_id')) return new Response('[]', { status: 200 });
     return new Response(JSON.stringify(rows), { status: 200 });
   };
   try {
