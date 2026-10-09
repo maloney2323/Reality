@@ -100,6 +100,10 @@ test('rehydrates the global tail and starts a separate workflow without cross-ru
   assert.equal(first.nodes.length, 3);
   assert.equal(first.nodes[0].event_kind, 'RAW_SIGNAL');
   assert.equal(first.nodes[2].event_kind, 'OBSERVATION');
+  assert.equal(first.nodes[1].payload.transformation_receipt.receipt_id, first.nodes[1].transformation_receipt_id);
+  assert.equal(first.nodes[1].payload.transformation_receipt.fragment_count, first.nodes[1].payload.fragment_count);
+  assert.equal(first.nodes[2].payload.fragment_manifest.length, first.nodes[2].payload.fragment_count);
+  assert.equal(first.nodes[2].payload.fragment_manifest[0].fragment_id, first.nodes[2].payload.fragment_ids[0]);
 
   const second = await startContinuityRuntime({
     continuityRootSource: root,
