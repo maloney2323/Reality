@@ -1,0 +1,40 @@
+name: Reality Atomic Continuity Append
+
+on:
+  push:
+    paths:
+      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
+      - 'supabase/tests/atomic-continuity-append-v1.sh'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
+      - '.github/workflows/reality-atomic-continuity-append.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
+      - 'supabase/tests/atomic-continuity-append-v1.sh'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
+      - '.github/workflows/reality-atomic-continuity-append.yml'
+
+jobs:
+  atomic-postgres-append:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reality_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reality_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/reality_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify migration and concurrent writer behavior against PostgreSQL
+        run: bash supabase/tests/atomic-continuity-append-v1.sh
