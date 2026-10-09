@@ -18,6 +18,29 @@ function stable(v) {
 function digest(v) {
   return crypto.createHash('sha256').update(JSON.stringify(stable(v))).digest('hex');
 }
+function canonicalTimestamp(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error('CONTINUITY_TIMESTAMP_INVALID');
+  return date.toISOString();
+}
+function computeLegacyLineageHash(fields) {
+  return digest({
+    spine_version: fields.spineVersion,
+    continuity_root_id: fields.continuityRootId,
+    worldline_id: fields.worldlineId,
+    parent_event_id: fields.parentEventId,
+    prior_lineage_hash: fields.priorLineageHash,
+    stage: fields.stage,
+    entity_id: fields.entityId,
+    evidence_refs: list(fields.evidenceRefs),
+    transformation_receipt_id: text(fields.transformationReceiptId) || null,
+    effective_time: fields.effectiveTime,
+    assertion_time: fields.assertionTime,
+    epistemic_status: text(fields.epistemicStatus) || 'OBSERVED',
+    payload: fields.payload,
+    provenance: fields.provenance,
+  });
+}
 function required(v, code) {
   if (!text(v)) throw new Error(code);
   return text(v);
@@ -48,8 +71,8 @@ export function computeContinuityLineageHash({
     entity_id: entityId,
     evidence_refs: list(evidenceRefs),
     transformation_receipt_id: text(transformationReceiptId) || null,
-    effective_time: effectiveTime,
-    assertion_time: assertionTime,
+    effective_time: canonicalTimestamp(effectiveTime),
+    assertion_time: canonicalTimestamp(assertionTime),
     epistemic_status: text(epistemicStatus) || 'OBSERVED',
     payload,
     provenance,
@@ -96,6 +119,8 @@ export function appendContinuityNode({
   if (stage !== 'RAW_SIGNAL' && !parent) throw new Error('CONTINUITY_PARENT_REQUIRED');
   if (stage !== 'RAW_SIGNAL' && !prior) throw new Error('CONTINUITY_PRIOR_LINEAGE_HASH_REQUIRED');
 
+  const canonicalEffectiveTime = canonicalTimestamp(effectiveTime);
+  const canonicalAssertionTime = canonicalTimestamp(assertionTime);
   const lineageHash = computeContinuityLineageHash({
     continuityRootId: spine.continuity_root_id,
     worldlineId: spine.worldline_id,
@@ -105,8 +130,8 @@ export function appendContinuityNode({
     entityId: entity,
     evidenceRefs,
     transformationReceiptId,
-    effectiveTime,
-    assertionTime,
+    effectiveTime: canonicalEffectiveTime,
+    assertionTime: canonicalAssertionTime,
     epistemicStatus,
     payload,
     provenance,
@@ -126,8 +151,8 @@ export function appendContinuityNode({
     parent_event_id: parent,
     prior_lineage_hash: prior,
     lineage_hash: lineageHash,
-    effective_time: effectiveTime,
-    assertion_time: assertionTime,
+    effective_time: canonicalEffectiveTime,
+    assertion_time: canonicalAssertionTime,
     epistemic_status: text(epistemicStatus) || 'OBSERVED',
     evidence_refs: Object.freeze(list(evidenceRefs)),
     transformation_receipt_id: text(transformationReceiptId) || null,
@@ -170,7 +195,7 @@ export function validateContinuityChain(nodes = []) {
     const provenance = node.provenance && typeof node.provenance === 'object'
       ? Object.fromEntries(Object.entries(node.provenance).filter(([key]) => key !== 'continuity_spine'))
       : {};
-    const expectedHash = computeContinuityLineageHash({
+    const hashFields = {
       spineVersion: persistedContinuity?.version || REALITY_CONTINUITY_SPINE_VERSION,
       continuityRootId: node.continuity_root_id,
       worldlineId: node.worldline_id,
@@ -185,8 +210,15 @@ export function validateContinuityChain(nodes = []) {
       epistemicStatus: node.epistemic_status,
       payload: node.payload ?? {},
       provenance,
-    });
-    if (expectedHash !== node.lineage_hash) {
+    };
+    const expectedHash = computeContinuityLineageHash(hashFields);
+    // v2.1 events were hashed from the caller's original timestamp strings. Keep
+    // a read-only compatibility check for that representation while canonical
+    // UTC timestamps are used for all newly minted events.
+    const legacyHash = persistedContinuity?.version === 'reality-continuity-spine-v2.1'
+      ? computeLegacyLineageHash(hashFields)
+      : null;
+    if (expectedHash !== node.lineage_hash && legacyHash !== node.lineage_hash) {
       broken.push({ index: i, reason: 'LINEAGE_HASH_CONTENT_MISMATCH' });
     }
 
