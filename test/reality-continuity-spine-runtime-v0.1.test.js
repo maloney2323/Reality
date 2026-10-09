@@ -32,12 +32,17 @@ function makeDb({ failPost = false, failRead = false } = {}) {
     if (failRead && method === 'GET' && url.pathname.endsWith('/universe_events')) {
       return new Response('read unavailable', { status: 503 });
     }
-    if (method === 'POST' && url.pathname.endsWith('/universe_events')) {
+    if (method === 'POST' && url.pathname.endsWith('/rpc/append_universe_event')) {
       if (failPost) return new Response('write unavailable', { status: 503 });
-      const record = JSON.parse(init.body);
+      const { p_record: record } = JSON.parse(init.body);
+      const tail = rows.filter((row) => row.continuity_root_id === record.continuity_root_id && row.worldline_id === record.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((record.parent_event_id || null) !== (tail?.event_id || null)) return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      const priorHash = record.provenance?.continuity_spine?.prior_lineage_hash || null;
+      if (priorHash !== (tail?.lineage_hash || null)) return new Response('CONTINUITY_PRIOR_LINEAGE_HASH_MISMATCH', { status: 409 });
       sequence += 1;
       rows.push({ ...record, created_at: new Date(Date.now() + sequence).toISOString() });
-      return new Response(JSON.stringify([rows[rows.length - 1]]), { status: 201 });
+      return new Response(JSON.stringify({ ...rows[rows.length - 1], status: 'PERSISTED' }), { status: 200 });
     }
     if (method === 'GET' && url.pathname.endsWith('/universe_events')) {
       const eventFilter = url.searchParams.get('event_id');
