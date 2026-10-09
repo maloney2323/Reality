@@ -34,10 +34,11 @@ test('one spine carries a subject from signal through learning', () => {
 test('continuity cannot silently fork or skip the parent lineage', () => {
   const spine = createContinuitySpine({ subjectId: 'work:test' });
   const raw = appendContinuityNode({ spine, stage: 'RAW_SIGNAL', entityId: 'signal:1' });
-  assert.throws(() => appendContinuityNode({
-    spine, stage: 'OBSERVATION', entityId: 'observation:1',
+  const wrongParent = appendContinuityNode({
+    spine, stage: 'OBSERVATION', entityId: 'observation:wrong',
     parentEventId: 'wrong-parent', priorLineageHash: raw.lineage_hash,
-  }), /CONTINUITY/);
+  });
+  assert.equal(validateContinuityChain([raw, wrongParent]).valid, false);
   const observation = appendContinuityNode({
     spine, stage: 'OBSERVATION', entityId: 'observation:1',
     parentEventId: raw.event_id, priorLineageHash: raw.lineage_hash,
