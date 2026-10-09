@@ -7,18 +7,37 @@ test('persistence automatically links sequential events into one continuity tail
   const rows = [];
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
-    if (options.method === 'POST') {
-      const body = JSON.parse(options.body);
-      rows.push(body);
-      return new Response(JSON.stringify([body]), { status: 201, headers: { 'content-type': 'application/json' } });
+    if (u.pathname.endsWith('/rpc/append_universe_event')) {
+      const { p_record } = JSON.parse(options.body);
+      const existing = rows.find((row) => row.event_id === p_record.event_id);
+      if (existing) {
+        if (existing.lineage_hash !== p_record.lineage_hash) return new Response('CONTINUITY_EVENT_ID_COLLISION', { status: 409 });
+        return new Response(JSON.stringify({ ...existing, status: 'DUPLICATE_IDENTICAL' }), { status: 200 });
+      }
+      const tail = rows.filter((row) => row.continuity_root_id === p_record.continuity_root_id && row.worldline_id === p_record.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((p_record.parent_event_id || null) !== (tail?.event_id || null)) {
+        return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      }
+      const priorHash = p_record.provenance?.continuity_spine?.prior_lineage_hash || null;
+      if (priorHash !== (tail?.lineage_hash || null)) return new Response('CONTINUITY_PRIOR_LINEAGE_HASH_MISMATCH', { status: 409 });
+      const saved = { ...p_record, created_at: new Date(Date.now() + rows.length).toISOString(), status: 'PERSISTED' };
+      rows.push(saved);
+      return new Response(JSON.stringify(saved), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
     if (requestedId) {
       const exact = rows.find((row) => row.event_id === requestedId);
       return new Response(JSON.stringify(exact ? [exact] : []), { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    const latest = rows.slice().sort((a, b) => String(b.assertion_time).localeCompare(String(a.assertion_time)))[0];
-    return new Response(JSON.stringify(latest ? [latest] : []), { status: 200, headers: { 'content-type': 'application/json' } });
+    const root = u.searchParams.get('continuity_root_id')?.replace(/^eq\./, '') || null;
+    const worldline = u.searchParams.get('worldline_id')?.replace(/^eq\./, '') || null;
+    const matching = rows.filter((row) => row.continuity_root_id === root && row.worldline_id === worldline);
+    const order = u.searchParams.get('order') || '';
+    matching.sort((a, b) => order.includes('desc')
+      ? String(b.created_at).localeCompare(String(a.created_at))
+      : String(a.created_at).localeCompare(String(b.created_at)));
+    return new Response(JSON.stringify(matching), { status: 200, headers: { 'content-type': 'application/json' } });
   };
 
   try {
@@ -65,8 +84,15 @@ test('persistence rejects a write against a non-tail parent', async () => {
   }];
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
-    if (options.method === 'POST') return new Response('[]', { status: 201 });
-    if (u.searchParams.get('event_id')) return new Response('[]', { status: 200 });
+    if (u.pathname.endsWith('/rpc/append_universe_event')) {
+      const { p_record } = JSON.parse(options.body);
+      const tail = rows.filter((row) => row.continuity_root_id === p_record.continuity_root_id && row.worldline_id === p_record.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((p_record.parent_event_id || null) !== (tail?.event_id || null)) return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      return new Response(JSON.stringify({ ...p_record, status: 'PERSISTED' }), { status: 200 });
+    }
+    const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
+    if (requestedId) return new Response('[]', { status: 200 });
     return new Response(JSON.stringify(rows), { status: 200 });
   };
   try {
