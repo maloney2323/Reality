@@ -155,7 +155,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = {
-      id: governedSignal?.signal_hash || null,
+      id: governedSignal?.signal_hash || governedSignal?.packet?.packet_id || null,
       title: observations.length ? 'New connected-world evidence' : 'New operational signal',
       description: [message, ...observations.map((item) => item?.summary || item?.description || item?.text || '')]
         .filter(Boolean).join(' '),
@@ -251,7 +251,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      (governedSignal?.signal_hash || governedSignal?.packet?.packet_id) ? { ref: governedSignal?.signal_hash || governedSignal.packet.packet_id, kind: 'governed_signal' } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -272,7 +272,7 @@ export async function runLiveIntelligenceOrchestration({
         materiality: 'ACTION_CANDIDATE',
       },
       evidence,
-      missingEvidence: evidence.length ? [] : ['Independent supporting evidence is not yet attached.'],
+      missingEvidence: observations.length ? [] : ['Independent supporting evidence and exact target details are not yet attached.'],
       uncertainty: {
         state: evidence.length ? 'ASSESSED' : 'MISSING_EVIDENCE',
         confidence: evidence.length ? 'SUPPORTED_BY_RECORDED_SIGNAL' : null,
@@ -409,12 +409,13 @@ export async function runLiveIntelligenceOrchestration({
   });
   const run = createWorkflowRun({ workflow: finalWorkflow, intent });
 
+  const appendedContinuityStages = [];
   if (continuityRuntime?.enabled && continuityRuntime?.appendStage) {
-    await continuityRuntime.appendStage({
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
       stage: 'SITUATION',
       entityId: situation?.situation_id || situation?.id || `situation:${item.work_item_id}`,
       evidenceRefs: [
-        governedSignal?.signal_hash,
+        governedSignal?.signal_hash || governedSignal?.packet?.packet_id,
         ...(situation?.evidence || []).map((entry) => entry?.ref),
       ].filter(Boolean),
       transformationReceiptId: governedSignal?.transformation_receipt?.receipt_id || null,
@@ -428,8 +429,8 @@ export async function runLiveIntelligenceOrchestration({
         blocking_questions: clone(situation?.uncertainty?.blocking_questions || []),
       },
       provenance: { source: 'operational_situation_v1' },
-    });
-    await continuityRuntime.appendStage({
+    }));
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
       stage: 'WORK',
       entityId: item.work_item_id,
       evidenceRefs: [governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id].filter(Boolean),
@@ -444,26 +445,31 @@ export async function runLiveIntelligenceOrchestration({
         authority_required: item.authority_required,
       },
       provenance: { source: 'reality_governed_work_runtime' },
-    });
-    await continuityRuntime.appendStage({
+    }));
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
       stage: 'AUTHORITY',
-      entityId: authorizationRequest.authorization_request_id || workflow.workflow_id,
+      entityId: authorizationRequest.authorization_id || workflow.workflow_id,
       evidenceRefs: [item.work_item_id],
       epistemicStatus: 'PROPOSED',
       payload: {
         authorization_request_id: authorizationRequest.authorization_id || null,
         granted: false,
         authorization_status: 'REQUESTED',
-        authorization_ref: authorizationRequest.authorization_request_id || null,
+        authorization_ref: authorizationRequest.authorization_id || null,
         status: 'REQUIRES_EXPLICIT_AUTHORIZATION',
         production_merge_permitted: false,
       },
       provenance: { source: 'reality_governed_authorization_request' },
-    });
+    }));
   }
 
   return {
     ...base,
+    continuity_spine: {
+      ...base.continuity_spine,
+      node_count: (base.continuity_spine.node_count || 0) + appendedContinuityStages.length,
+      last_event_id: appendedContinuityStages.at(-1)?.event_id || base.continuity_spine.last_event_id,
+    },
     mode: 'ACTION_CANDIDATE',
     governance: 'PROPORTIONAL_ACTION_GOVERNANCE',
     work: {
