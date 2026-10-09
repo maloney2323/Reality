@@ -29,6 +29,16 @@ function workflowIdOf(node) {
   return node?.payload?.workflow_run_id || node?.workflow_run_id || null;
 }
 
+function stableJson(value) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(stableJson);
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJson(value[key])]));
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(stableJson(left)) === JSON.stringify(stableJson(right));
+}
+
 export async function startContinuityRuntime({
   continuityRootSource,
   worldlineSource = 'reality:primary',
@@ -142,7 +152,7 @@ export async function startContinuityRuntime({
           && transformNode?.payload?.cleaner_version === receipt.cleaner_version
           && transformNode?.payload?.fragment_count === receipt.fragment_count
           && persistedReceipt?.receipt_id === receipt.receipt_id
-          && JSON.stringify(persistedReceipt?.transformations) === JSON.stringify(receipt.transformations);
+          && sameJson(persistedReceipt?.transformations, receipt.transformations);
         if (!receiptMatches) {
           const failure = new Error('CONTINUITY_WORKFLOW_RECEIPT_MISMATCH');
           failure.code = 'CONTINUITY_WORKFLOW_RECEIPT_MISMATCH';
@@ -172,8 +182,8 @@ export async function startContinuityRuntime({
           epistemic_status: fragment.epistemic_status,
         }));
         if (observation.packet_id !== signalForRun.packet.packet_id
-            || JSON.stringify(actualFragments) !== JSON.stringify(expectedFragments)
-            || JSON.stringify(observation.fragment_manifest || []) !== JSON.stringify(expectedManifest)) {
+            || !sameJson(actualFragments, expectedFragments)
+            || !sameJson(observation.fragment_manifest || [], expectedManifest)) {
           const failure = new Error('CONTINUITY_WORKFLOW_OBSERVATION_MISMATCH');
           failure.code = 'CONTINUITY_WORKFLOW_OBSERVATION_MISMATCH';
           throw failure;
