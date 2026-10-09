@@ -206,13 +206,25 @@ export function createUniversePostgresPersistence({
     // time or timestamps that may tie or be affected by transaction start time.
     // Historical as-of queries must use a separate projection; filtering this
     // ledger by assertion_time could silently omit its actual durable tail.
-    const params = new URLSearchParams({
-      continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
-      worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      order: 'created_at.asc,event_id.asc',
-    });
-    const rows = await request('universe_events?' + params.toString());
-    return orderContinuityRows(rows);
+    // Page explicitly because PostgREST commonly caps responses at 1,000 rows.
+    const pageSize = 1000;
+    const allRows = [];
+    let offset = 0;
+    while (true) {
+      const params = new URLSearchParams({
+        continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
+        worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
+        order: 'created_at.asc,event_id.asc',
+        limit: String(pageSize),
+        offset: String(offset),
+      });
+      const page = await request('universe_events?' + params.toString());
+      if (!Array.isArray(page)) throw new Error('CONTINUITY_HISTORY_RESPONSE_INVALID');
+      allRows.push(...page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return orderContinuityRows(allRows);
   }
 
   async function getCapability(capabilityId, version) {
