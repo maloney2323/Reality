@@ -22,6 +22,9 @@ function normalizePersistedNode(row) {
     prior_lineage_hash: row?.prior_lineage_hash
       || row?.provenance?.continuity_spine?.prior_lineage_hash
       || null,
+    transformation_receipt_id: row?.transformation_receipt_id
+      || row?.provenance?.continuity_spine?.transformation_receipt_id
+      || null,
   };
 }
 
