@@ -38,4 +38,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-continuity-stage-gate-v1.0.test.js test/reality-continuity-spine-runtime-v0.1.test.js
+      - run: npm test
