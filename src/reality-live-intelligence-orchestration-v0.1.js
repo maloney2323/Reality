@@ -411,6 +411,25 @@ export async function runLiveIntelligenceOrchestration({
 
   if (continuityRuntime?.enabled && continuityRuntime?.appendStage) {
     await continuityRuntime.appendStage({
+      stage: 'SITUATION',
+      entityId: situation?.situation_id || situation?.id || `situation:${item.work_item_id}`,
+      evidenceRefs: [
+        governedSignal?.signal_hash,
+        ...(situation?.evidence || []).map((entry) => entry?.ref),
+      ].filter(Boolean),
+      transformationReceiptId: governedSignal?.transformation_receipt?.receipt_id || null,
+      epistemicStatus: situation?.missing_evidence?.length ? 'PARTIALLY_VERIFIED' : 'OBSERVED',
+      payload: {
+        situation_id: situation?.situation_id || situation?.id || null,
+        state: situation?.state || null,
+        uncertainty: clone(situation?.uncertainty || null),
+        authority_status: situation?.authority?.status || 'REQUIRES_EXPLICIT_AUTHORIZATION',
+        missing_evidence: clone(situation?.missing_evidence || []),
+        blocking_questions: clone(situation?.uncertainty?.blocking_questions || []),
+      },
+      provenance: { source: 'operational_situation_v1' },
+    });
+    await continuityRuntime.appendStage({
       stage: 'WORK',
       entityId: item.work_item_id,
       evidenceRefs: [governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id].filter(Boolean),
@@ -434,6 +453,8 @@ export async function runLiveIntelligenceOrchestration({
       payload: {
         authorization_request_id: authorizationRequest.authorization_request_id || null,
         granted: false,
+        authorization_status: 'REQUESTED',
+        authorization_ref: authorizationRequest.authorization_request_id || null,
         status: 'REQUIRES_EXPLICIT_AUTHORIZATION',
         production_merge_permitted: false,
       },
