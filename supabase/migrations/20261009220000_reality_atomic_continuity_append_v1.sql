@@ -120,3 +120,41 @@ $$;
 revoke all on function public.append_universe_event(jsonb) from public;
 revoke all on function public.append_universe_event(jsonb) from anon, authenticated;
 grant execute on function public.append_universe_event(jsonb) to service_role;
+
+-- Defense in depth: the ledger is append-only even if a privileged application
+-- path accidentally attempts to mutate an existing event directly.
+create or replace function public.reject_universe_event_mutation()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $
+begin
+  raise exception 'UNIVERSE_EVENTS_APPEND_ONLY';
+end;
+$;
+
+drop trigger if exists universe_events_reject_row_mutation on public.universe_events;
+create trigger universe_events_reject_row_mutation
+before update or delete on public.universe_events
+for each row execute function public.reject_universe_event_mutation();
+
+drop trigger if exists universe_events_reject_truncate on public.universe_events;
+create trigger universe_events_reject_truncate
+before truncate on public.universe_events
+for each statement execute function public.reject_universe_event_mutation();
+
+-- All application writes must go through the atomic RPC. Coordinate this
+-- migration with the adapter release; the legacy invoker RPC is intentionally
+-- disabled so it cannot bypass the tail lock.
+revoke insert, update, delete, truncate, references, trigger
+  on table public.universe_events from public, anon, authenticated, service_role;
+grant select on table public.universe_events to service_role;
+
+do $
+begin
+  if to_regprocedure('public.universe_append_event(uuid,text,text,uuid,uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb,text,text)') is not null then
+    revoke all on function public.universe_append_event(uuid,text,text,uuid,uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb,text,text)
+      from public, anon, authenticated, service_role;
+  end if;
+end;
+$;
