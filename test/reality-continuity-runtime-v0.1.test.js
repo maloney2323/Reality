@@ -94,7 +94,7 @@ test('enabled continuity fails closed when durable persistence is unavailable', 
         observedAt: '2026-10-09T01:02:00.000Z',
         fetchImpl: failingFetch,
       }),
-      /CONTINUITY_PERSISTENCE_REQUIRED/
+      /CONTINUITY_(?:REHYDRATION_REQUIRED|PERSISTENCE_REQUIRED)/
     );
   } finally {
     if (previous.enabled === undefined) delete process.env.REALITY_CONTINUITY_SPINE_ENABLED;
