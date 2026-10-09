@@ -8,9 +8,10 @@ function signal(message, observedAt = '2026-10-09T00:00:00.000Z') {
   return buildGovernedChatSignal({ message, observedAt });
 }
 
-function makeDb({ failPost = false, failRead = false } = {}) {
+function makeDb({ failPost = false, failRead = false, failPostNumber = null } = {}) {
   const rows = [];
   let sequence = 0;
+  let postCount = 0;
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(String(input));
     const method = init.method || 'GET';
@@ -18,7 +19,8 @@ function makeDb({ failPost = false, failRead = false } = {}) {
       return new Response('read unavailable', { status: 503 });
     }
     if (method === 'POST' && url.pathname.endsWith('/rpc/append_universe_event')) {
-      if (failPost) return new Response('write unavailable', { status: 503 });
+      postCount += 1;
+      if (failPost || postCount === failPostNumber) return new Response('write unavailable', { status: 503 });
       const { p_record: record } = JSON.parse(init.body);
       const tail = rows.filter((row) => row.continuity_root_id === record.continuity_root_id && row.worldline_id === record.worldline_id)
         .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
@@ -126,6 +128,47 @@ test('rehydrates the global tail and starts a separate workflow without cross-ru
     prior_lineage_hash: row.provenance?.continuity_spine?.prior_lineage_hash || null,
   }));
   assert.equal(validateContinuityChain(normalizedRows).valid, true);
+});
+
+test('resumes a partially persisted workflow without duplicating earlier stages', async (t) => {
+  setPersistenceEnv(t);
+  const db = makeDb({ failPostNumber: 3 });
+  const originalObservedAt = '2026-10-09T10:00:00.000Z';
+  const originalSignal = signal('resume this exact work', originalObservedAt);
+
+  await assert.rejects(
+    () => startContinuityRuntime({
+      continuityRootSource: 'continuity-resume-root',
+      subjectId: 'resume-work',
+      signal: originalSignal,
+      observedAt: originalObservedAt,
+      workflowRunId: 'stable-resume-run',
+      fetchImpl: db.fetchImpl,
+    }),
+    (error) => error.code === 'CONTINUITY_PERSISTENCE_REQUIRED',
+  );
+  assert.deepEqual(db.rows.map((row) => row.event_kind), ['RAW_SIGNAL', 'TRANSFORMATION']);
+
+  // Retry with the same request body but a newly constructed packet timestamp.
+  // The durable run identity restores the original packet timestamp/identity.
+  const retryObservedAt = '2026-10-09T10:05:00.000Z';
+  const retrySignal = signal('resume this exact work', retryObservedAt);
+  const resumed = await startContinuityRuntime({
+    continuityRootSource: 'continuity-resume-root',
+    subjectId: 'resume-work',
+    signal: retrySignal,
+    observedAt: retryObservedAt,
+    workflowRunId: 'stable-resume-run',
+    fetchImpl: db.fetchImpl,
+  });
+
+  assert.equal(resumed.status, 'PERSISTED');
+  assert.equal(resumed.nodes.length, 3);
+  assert.deepEqual(db.rows.map((row) => row.event_kind), ['RAW_SIGNAL', 'TRANSFORMATION', 'OBSERVATION']);
+  assert.equal(new Set(db.rows.map((row) => row.event_id)).size, 3);
+  assert.equal(db.rows[0].payload.packet_id, originalSignal.packet.packet_id);
+  assert.equal(db.rows[2].payload.packet_id, originalSignal.packet.packet_id);
+  assert.equal(db.rows[1].payload.transformation_receipt.receipt_id, originalSignal.transformation_receipt.receipt_id);
 });
 
 test('fails closed when durable history cannot be read', async (t) => {
