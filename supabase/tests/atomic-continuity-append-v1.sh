@@ -97,7 +97,7 @@ if [[ "$STATUS_A" -ne 0 && "$STATUS_B" -ne 0 ]]; then
 fi
 
 if [[ "$STATUS_A" -eq 0 ]]; then WINNING_PAYLOAD="$PAYLOAD_A"; else WINNING_PAYLOAD="$PAYLOAD_B"; fi
-DUPLICATE_STATUS=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$WINNING_PAYLOAD'::jsonb)->>'status';")
+DUPLICATE_STATUS=$(psql "$DATABASE_URL" -qAt -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$WINNING_PAYLOAD'::jsonb)->>'status';")
 if [[ "$DUPLICATE_STATUS" != 'DUPLICATE_IDENTICAL' ]]; then
   echo "FAIL: identical retry was not recognized as a duplicate: $DUPLICATE_STATUS"
   exit 1
