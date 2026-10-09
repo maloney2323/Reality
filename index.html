@@ -29,7 +29,7 @@ button{border:0;border-radius:11px;padding:11px 15px;background:#eef1f7;color:#1
 
   <section class="card" aria-label="Reality past present future">
     <div class="matrix-head">
-      <div><div class="label">REALITY TIMELINE</div><h1>Past · Present · Future</h1></div>
+      <div><div class="label">MATRIX</div><h1>Past · Present · Future</h1></div>
       <span class="badge">ONE WORK REALITY</span>
     </div>
     <div class="matrix-grid">
@@ -44,7 +44,7 @@ button{border:0;border-radius:11px;padding:11px 15px;background:#eef1f7;color:#1
       <div><div class="label">WHAT WE'RE WORKING ON NOW</div><h2>Reality-found work</h2><p class="muted">Only evidence-backed work that Reality has actually discovered.</p></div>
       <button id="findWork" type="button">Find work</button>
     </div>
-    <div id="result" class="empty">Press “Find work” to let Reality inspect the live work surface.</div>
+    <div id="result" class="empty">Reality is ready to inspect the live work surface.</div>
     <div id="queue"></div>
   </section>
 </main>
@@ -64,7 +64,7 @@ function render(items){
   $('future').textContent=items.filter(w=>future.has(state(w))).length;
   if(!items.length){$('queue').innerHTML='';$('result').textContent='Reality did not establish a work candidate.';return}
 
-  $('result').textContent='';
+  $('result').textContent=`Reality found ${items.length} work item${items.length===1?'':'s'} from the live evidence surface.`;
   $('queue').innerHTML=items.map((w,i)=>{
     const wi=w.execution_work_item||w;
     const refs=Array.isArray(w.evidence_refs)?w.evidence_refs:[];
