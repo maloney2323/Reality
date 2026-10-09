@@ -66,7 +66,6 @@ export function createUniversePostgresPersistence({
     const lineageHash = event.lineage_hash || hash({
       continuity_spine_version: UNIVERSE_POSTGRES_PERSISTENCE_VERSION,
       parent_event_id: parent,
-      prior_lineage_hash: priorLineageHash,
       continuity_root_id: root,
       worldline_id: worldline,
       event_id: event.event_id,
