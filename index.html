@@ -3,172 +3,125 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reality — Governed Chat</title>
+<title>Reality — Work Console</title>
 <style>
 :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090b10;color:#eef1f7}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#171c28,#090b10 45%);min-height:100vh}
-main{max-width:980px;margin:auto;padding:28px 18px 80px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
-.brand{font-weight:700;letter-spacing:.02em}.state{font-size:12px;color:#9da7b8;border:1px solid #2b3240;border-radius:999px;padding:7px 10px}
-h1{font-size:clamp(28px,5vw,48px);line-height:1.05;margin:0 0 10px}.sub{color:#aab3c2;max-width:700px}
-.chat{margin-top:28px}.bubble{background:#11151e;border:1px solid #242b38;border-radius:18px;padding:18px;margin-bottom:16px}
-.user{border-color:#344052}.label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#8792a6;margin-bottom:8px}
-textarea{width:100%;min-height:92px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:14px;padding:14px;font:inherit;resize:vertical}
-button{border:0;border-radius:12px;padding:11px 16px;background:#eef1f7;color:#10131a;font-weight:700;cursor:pointer;margin-top:10px}button:disabled{opacity:.5}
-.brief{display:none;background:#0e121a;border:1px solid #293140;border-radius:18px;overflow:hidden}.brief.open{display:block}
-.brief-head{padding:16px 18px;border-bottom:1px solid #242b38;display:flex;justify-content:space-between;gap:12px}
-.badge{font-size:11px;padding:5px 8px;border-radius:999px;background:#1a2130;color:#bfc8d8}
-section{padding:17px 18px;border-bottom:1px solid #202633}.row{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #1b212c}.row:last-child{border-bottom:0}.muted{color:#98a3b5}.ok{color:#a9d7b5}.blocked{color:#f0b0aa}.step{padding:6px 0}.proof li{margin:8px 0;color:#bdc5d3}
-details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.pill{border:1px solid #2b3341;padding:6px 9px;border-radius:999px;font-size:11px;color:#aeb8c9}
-.error{color:#f0b0aa;margin-top:10px;white-space:pre-wrap}
-@media(max-width:600px){main{padding:20px 12px}.row{display:block}.row span{display:block;margin-top:4px}}
-.shift-settings{margin:0 0 28px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.shift-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.shift-head strong{font-size:18px}.switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#cbd3e0;font-size:12px}.switch input{accent-color:#eef1f7}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.shift-grid label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8792a6}.shift-grid input,.shift-grid select{display:block;width:100%;margin-top:7px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:10px;padding:10px;font:inherit}.shift-work{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 12px;border:1px solid #202938;border-radius:12px;color:#aeb8c9;font-size:12px}.shift-work span:first-child{color:#eef1f7;font-weight:700}.shift-scope{margin-top:12px;border-top:1px solid #202938;padding-top:12px}.shift-scope summary{cursor:pointer;color:#cbd3e0;font-size:12px}.shift-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.shift-columns div{border:1px solid #202938;border-radius:12px;padding:11px}.shift-columns strong{display:block;color:#eef1f7;font-size:12px;margin-bottom:7px}.shift-columns ul{margin:0;padding-left:17px;color:#98a3b5;font-size:11px;line-height:1.6}.saved{font-size:12px;color:#a9d7b5;margin-left:8px}@media(max-width:600px){.shift-head{display:block}.switch{margin-top:12px}.shift-grid,.shift-columns{grid-template-columns:1fr}} .shift-banner{margin:0 0 22px;padding:18px 20px;border:1px solid #52627d;border-radius:18px;background:linear-gradient(135deg,#151d2b,#0d121b);display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(0,0,0,.22)}.shift-banner strong{display:block;font-size:18px;line-height:1.4}.shift-banner p{margin:7px 0 0;color:#aeb8c9;font-size:12px}.shift-banner button{margin:0;white-space:nowrap}@media(max-width:600px){.shift-banner{display:block}.shift-banner button{margin-top:12px;width:100%}} .reality-console{margin:0 0 28px;display:grid;grid-template-columns:1.35fr .85fr;gap:14px}.console-card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.console-card h3{margin:4px 0 5px}.console-card .count{font-size:28px;font-weight:800}.work-item{border:1px solid #283242;border-radius:13px;padding:12px;margin-top:10px}.work-item strong{display:block}.work-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.attention-item{border:1px solid #5b4a2f;border-radius:13px;padding:12px;margin-top:10px;background:#17130c}.attention-item button{margin-top:10px;width:100%}.attention-empty{color:#8f9aac;font-size:12px;padding-top:10px}@media(max-width:760px){.reality-console{grid-template-columns:1fr}} .reality-matrix{margin:0 0 22px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.matrix-head{display:flex;justify-content:space-between;gap:12px;align-items:end}.matrix-head h2{margin:4px 0 0;font-size:20px}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:92px}.matrix-card strong{display:block;margin-bottom:6px}.matrix-card p{margin:0;color:#98a3b5;font-size:12px;line-height:1.5}.matrix-card .matrix-count{font-size:24px;font-weight:800;color:#eef1f7}@media(max-width:700px){.matrix-grid{grid-template-columns:1fr}}</style>
+*{box-sizing:border-box}body{margin:0;background:#090b10;min-height:100vh}
+main{max-width:980px;margin:auto;padding:22px 16px 60px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.brand{font-weight:800;letter-spacing:.08em}.state{font-size:11px;color:#9da7b8;border:1px solid #2b3240;border-radius:999px;padding:6px 9px}
+.card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px;margin-bottom:16px}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#8792a6}.muted{color:#98a3b5}
+h1,h2,h3{margin:5px 0 7px}h1{font-size:26px}h2{font-size:20px}
+.matrix-head{display:flex;justify-content:space-between;align-items:end;gap:12px}.badge,.pill{font-size:10px;border:1px solid #2b3341;border-radius:999px;padding:5px 8px;color:#aeb8c9}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:88px}.matrix-card strong{display:block;margin-bottom:6px}.count{font-size:26px;font-weight:800}.matrix-card p{margin:0;color:#98a3b5;font-size:11px;line-height:1.45}
+.work-head{display:flex;justify-content:space-between;align-items:start;gap:12px}.work-head button{margin:0}
+button{border:0;border-radius:11px;padding:11px 15px;background:#eef1f7;color:#10131a;font-weight:800;cursor:pointer}button:disabled{opacity:.55}
+.work-item{border:1px solid #344052;border-radius:15px;padding:16px;margin-top:14px}.work-title{font-size:18px;font-weight:800}.work-description{margin:6px 0 12px;color:#b5becd}.meta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.action{border-top:1px solid #202633;padding-top:14px}.action-row{padding:8px 0}.action-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#8792a6}.action-value{margin-top:3px;overflow-wrap:anywhere}
+.evidence{border-top:1px solid #202633;margin-top:14px;padding-top:14px}.evidence a{display:block;color:#bfcce0;text-decoration:none;padding:5px 0;overflow-wrap:anywhere}.evidence a:hover{text-decoration:underline}
+.auth{margin-top:16px;padding:14px;border:1px solid #5b4a2f;border-radius:13px;background:#17130c}.auth strong{display:block}.auth p{margin:5px 0 11px;color:#b9b19f;font-size:12px}.auth button{width:100%}
+.status{margin-top:10px;font-size:12px}.success{color:#a9d7b5}.error{color:#f0b0aa}.empty{padding:20px 0;color:#8f9aac;font-size:13px}
+@media(max-width:650px){.matrix-grid{grid-template-columns:1fr}.work-head{display:block}.work-head button{margin-top:10px;width:100%}}
+</style>
 </head>
 <body>
 <main>
-  <div class="top"><div class="brand">REALITY</div><div class="state">GOVERNED CHAT · v0.1</div></div>
-  <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
-  <h1>Tell Reality what you need.</h1>
-  <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
+  <div class="top"><div class="brand">REALITY</div><div class="state" id="liveState">CHECKING LIVE STATE</div></div>
 
-  <section class="shift-settings" aria-label="Reality daily shift settings">
-<div class="shift-head"><div><div class="label">REALITY OPERATING SHIFT</div><strong>Daily autonomous shift</strong><p class="muted">Reality starts by itself, discovers its own work, and works the governed queue.</p></div><label class="switch"><input id="shiftEnabled" type="checkbox" checked><span>Enabled</span></label></div>
-<div class="shift-grid"><label>Engineering readiness<input id="readinessTime" type="time" value="20:00"></label><label>Shift start<input id="shiftStart" type="time" value="21:00"></label><label>Shift length<select id="shiftLength"><option value="8">8 hours</option><option value="12">12 hours</option></select></label></div>
-<div class="shift-work"><span>Shift work</span><span>Find bugs · recover unfinished work · discover recurring work · research upgrades · watch competition · execute governed work · verify results</span></div>
-<details class="shift-scope"><summary>Show full shift mission</summary>
-<div class="shift-columns">
-<div><strong>System & reliability</strong><ul><li>Find bugs and regressions</li><li>Find broken integrations and failing workflows</li><li>Check deployment/runtime health</li><li>Find performance and security weaknesses</li><li>Verify yesterday's changes</li></ul></div>
-<div><strong>Work discovery</strong><ul><li>Find unfinished and stalled work</li><li>Find recurring/repetitive work</li><li>Find work Ryan keeps doing</li><li>Find work Reality can own</li><li>Find blocking dependencies</li></ul></div>
-<div><strong>Product improvement</strong><ul><li>Identify missing capabilities</li><li>Find confusing UX and simplify it</li><li>Propose better workflows</li><li>Find valuable opportunities</li><li>Identify features not worth copying</li></ul></div>
-<div><strong>Competitive intelligence</strong><ul><li>Research meaningful competitor changes</li><li>Watch relevant AI capabilities</li><li>Identify material technology opportunities</li><li>Find threats to Reality</li><li>Find gaps competitors miss</li></ul></div>
-<div><strong>Business operations</strong><ul><li>Find operational bottlenecks</li><li>Find missed commitments</li><li>Find repeated coordination</li><li>Separate Ryan work from Reality work</li><li>Find opportunities to return time</li></ul></div>
-<div><strong>Reality's evolution</strong><ul><li>Evaluate capabilities and gaps</li><li>Determine what Reality needs to learn</li><li>Propose and sandbox experiments</li><li>Test against historical failures</li><li>Register only proven improvements</li></ul></div>
-<div><strong>Governance</strong><ul><li>Audit its own actions</li><li>Check authority boundaries</li><li>Find evidence gaps and contradictions</li><li>Verify execution receipts</li><li>Never turn inference into authority</li></ul></div>
-<div><strong>Execution</strong><ul><li>Select highest-value authorized work</li><li>Create governed work items</li><li>Execute only what is authorized</li><li>Independently verify results</li><li>Move to the next legitimate work item</li></ul></div>
-<div><strong>End-of-shift</strong><ul><li>Report what was accomplished</li><li>Report discoveries and learning</li><li>List unfinished/blocked work</li><li>Identify the next capability needed</li><li>Measure work removed from Ryan</li></ul></div>
-</div></details>
-<button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
-</section>
-
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><div class="chat">
-    <div class="bubble user">
-      <div class="label">Your request</div>
-      <textarea id="request" placeholder="Try: Review unread business emails, identify follow-ups, draft responses, and send them."></textarea>
-      <button id="plan">Show my plan</button>
-      <div id="error" class="error"></div>
+  <section class="card" aria-label="Reality past present future">
+    <div class="matrix-head">
+      <div><div class="label">REALITY TIMELINE</div><h1>Past · Present · Future</h1></div>
+      <span class="badge">ONE WORK REALITY</span>
     </div>
-
-    <div id="brief" class="brief">
-      <div class="brief-head"><strong>Reality Brief</strong><span id="status" class="badge"></span></div>
-      <section><div class="label">1 · Understood</div><div id="understood"></div></section>
-      <section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
-      <section><div class="label">3 · Authority map</div><div id="authority"></div></section>
-      <section><div class="label">4 · Expected effect</div><div id="effect"></div></section>
-      <section class="proof"><div class="label">5 · Proof plan</div><ul id="proof"></ul></section>
-      <section><div class="label">6 · Change history</div><div class="muted">No revisions yet. A changed request will create a new governed interpretation rather than overwrite this one.</div></section>
-      <section>
-        <details><summary>Show work state</summary>
-        <div class="timeline" id="timeline"></div>
-        <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
-        </details>
-      </section>
+    <div class="matrix-grid">
+      <div class="matrix-card"><strong>PAST</strong><div class="count" id="past">0</div><p>Verified and completed work.</p></div>
+      <div class="matrix-card"><strong>PRESENT</strong><div class="count" id="present">0</div><p>Active, verifying, or needing you.</p></div>
+      <div class="matrix-card"><strong>FUTURE</strong><div class="count" id="future">0</div><p>Discovered or ready work.</p></div>
     </div>
-  </div>
+  </section>
+
+  <section class="card" aria-label="Current Reality work">
+    <div class="work-head">
+      <div><div class="label">WHAT WE'RE WORKING ON NOW</div><h2>Reality-found work</h2><p class="muted">Only evidence-backed work that Reality has actually discovered.</p></div>
+      <button id="findWork" type="button">Find work</button>
+    </div>
+    <div id="result" class="empty">Press “Find work” to let Reality inspect the live work surface.</div>
+    <div id="queue"></div>
+  </section>
 </main>
+
 <script>
-const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
-function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
-function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
-function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
+const past=new Set(['COMPLETED','VERIFIED','CLOSED']);
+const present=new Set(['WORKING','IN_PROGRESS','VERIFYING','AWAITING_VERIFICATION','NEEDS_AUTHORIZATION','AUTHORIZED']);
+const future=new Set(['DISCOVERED','READY','PROPOSED','EVIDENCE_NEEDED','QUALIFIED']);
 
-const SHIFT_KEY='reality.dailyShift.v1';
-function loadShift(){try{const s=JSON.parse(localStorage.getItem(SHIFT_KEY)||'{}');if(typeof s.enabled==='boolean')$('shiftEnabled').checked=s.enabled;if(s.readinessTime)$('readinessTime').value=s.readinessTime;if(s.shiftStart)$('shiftStart').value=s.shiftStart;if(s.shiftLength)$('shiftLength').value=String(s.shiftLength)}catch{}}
-$('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const r=await fetch('/api/reality/shift',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent='Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',2500)}};
-loadShift();
-$('bannerSave').onclick=()=>{$('readinessTime').value='20:00';$('shiftStart').value='21:00';$('shiftEnabled').checked=true;$('saveShift').click()};
-function updateShiftBanner(){const f=v=>{if(!v)return '';const [h,m]=v.split(':').map(Number);const ap=h>=12?'PM':'AM';const hh=(h%12)||12;return `${hh}:${String(m).padStart(2,'0')} ${ap}`};$('bannerReadiness').textContent=f($('readinessTime').value);$('bannerStart').textContent=f($('shiftStart').value);$('bannerState').textContent=$('shiftEnabled').checked?'Shift enabled':'Shift disabled'}
-$('readinessTime').addEventListener('input',updateShiftBanner);$('shiftStart').addEventListener('input',updateShiftBanner);$('shiftEnabled').addEventListener('change',updateShiftBanner);updateShiftBanner();
+function render(items){
+  items=Array.isArray(items)?items:[];
+  $('past').textContent=items.filter(w=>past.has(state(w))).length;
+  $('present').textContent=items.filter(w=>present.has(state(w))).length;
+  $('future').textContent=items.filter(w=>future.has(state(w))).length;
+  if(!items.length){$('queue').innerHTML='';$('result').textContent='Reality did not establish a work candidate.';return}
 
-function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function render(b){
-  $('brief').classList.add('open'); $('status').textContent=b.status.toUpperCase();
-  $('understood').innerHTML='<strong>'+esc(b.understood.statement)+'</strong>'+
-    (b.understood.ambiguities.length?'<p class="blocked">Clarification required: '+esc(b.understood.ambiguities.join('; '))+'</p>':'<p class="muted">'+esc(b.understood.scope)+'</p>');
-  $('steps').innerHTML=b.intended_plan.map((x,i)=>'<div class="step">'+(i+1)+'. '+esc(x)+'</div>').join('');
-  $('authority').innerHTML=b.authority_map.map(x=>'<div class="row"><span>'+esc(x.action)+'</span><span class="'+(x.status==='NOT_AUTHORIZED'?'blocked':'ok')+'">'+esc(x.status.replaceAll('_',' '))+'</span></div>').join('');
-  $('effect').textContent=b.expected_effect;
-  $('proof').innerHTML=b.proof_plan.map(x=>'<li><strong>'+esc(x.work_item_id)+'</strong> — '+esc(x.evidence)+'</li>').join('');
-  $('timeline').innerHTML=['PROPOSED','AUTHORIZED','EXECUTING','COMPLETED','VERIFIED'].map((x,i)=>'<span class="pill">'+esc(x)+'</span>').join('');
-  $('execution').textContent=b.execution.status+' · '+b.execution.reason;
-  $('verification').textContent=b.verification.status;
-}
-$('plan').onclick=async()=>{
-  const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
-  $('error').textContent=''; $('plan').disabled=true;
-  try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
-    const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
-    const intelligence=b.result?.intelligence||{};
-    $('brief').classList.add('open');
-    $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
-    $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
-    $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
-    $('authority').innerHTML='<div class="row"><span>Authority granted</span><span class="blocked">NO</span></div><div class="row"><span>Execution authorized</span><span class="blocked">NO</span></div>';
-    $('effect').textContent='Cognition only. No external action was executed.';
-    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+esc(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+esc(b.result?.context?.universe?.status||'unknown')+' ('+esc(b.result?.context?.universe?.count||0)+' records)</li>';
-    $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
-    $('execution').textContent='NOT_EXECUTED · cognition only';
-    $('verification').textContent='No external outcome claimed';
-  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
-};
-const realityWork=$('findWork');const workResult=$('workResult');
-function renderWork(source){
-  const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
-  const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
-  const past=new Set(['COMPLETED','VERIFIED','CLOSED']);
-  const present=new Set(['WORKING','IN_PROGRESS','VERIFYING','AWAITING_VERIFICATION','NEEDS_AUTHORIZATION','AUTHORIZED']);
-  const future=new Set(['DISCOVERED','READY','PROPOSED','EVIDENCE_NEEDED','QUALIFIED']);
-  const counts={
-    past:items.filter(w=>past.has(state(w))).length,
-    present:items.filter(w=>present.has(state(w))).length,
-    future:items.filter(w=>future.has(state(w))).length
-  };
-  $('matrixPastCount').textContent=String(counts.past);
-  $('matrixPresentCount').textContent=String(counts.present);
-  $('matrixFutureCount').textContent=String(counts.future);
-  $('workCount').textContent=String(items.length);
-  $('workQueue').innerHTML=items.length?items.map((w,i)=>{
-    const evidence=Array.isArray(w.evidence_refs)?w.evidence_refs.length:0;
-    return '<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(state(w))+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span><span class="pill">'+esc('Evidence '+evidence)+'</span></div></div>';
-  }).join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
-  const pending=items.filter(w=>w.consequential||w.authority_required?.length||w.authorization_required||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
-  $('attentionCount').textContent=String(pending.length);
-  $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>'<div class="attention-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||'Governed work')+'</strong><div class="muted">External effect requires your authorization.</div><button type="button" data-auth="'+i+'">Authorize this work</button></div>').join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
-  $('attentionQueue').querySelectorAll('[data-auth]').forEach(btn=>btn.onclick=async()=>{
-    const w=pending[Number(btn.dataset.auth)];
+  $('result').textContent='';
+  $('queue').innerHTML=items.map((w,i)=>{
+    const wi=w.execution_work_item||w;
+    const refs=Array.isArray(w.evidence_refs)?w.evidence_refs:[];
+    const scope=(w.authorization_scope||w.scope||w.allowed_operations||wi.authority_required||[])[0]||{};
+    const pending=Boolean(w.consequential||w.authorization_required||w.authority_required?.length||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
+    return `
+    <article class="work-item">
+      <div class="work-title">${esc(w.objective||w.title||w.action||w.work_key||w.kind||'Reality work')}</div>
+      <div class="work-description">${esc(w.next_action||'Reality identified this work from observed evidence.')}</div>
+      <div class="meta">
+        <span class="pill">${esc(state(w))}</span>
+        <span class="pill">${esc(w.recurring?'RECURRING':'ONE-TIME / GOVERNED')}</span>
+        <span class="pill">Evidence ${refs.length}</span>
+        <span class="pill">${esc(w.authority||'AUTHORIZATION REQUIRED')}</span>
+      </div>
+      <div class="action">
+        <div class="action-row"><div class="action-label">Exact action</div><div class="action-value">${esc(wi.action||'Not established')}</div></div>
+        <div class="action-row"><div class="action-label">Target</div><div class="action-value">${esc(wi.inputs?.repository||wi.inputs?.resource||wi.resource||scope.resource||'Not established')}</div></div>
+        <div class="action-row"><div class="action-label">Scope</div><div class="action-value">${esc(scope.connector||wi.connector||'Not established')} · ${esc(scope.operation||wi.operation||'Not established')} · ${esc(wi.work_item_id||w.work_id||'No work ID')}</div></div>
+      </div>
+      <div class="evidence">
+        <div class="action-label">Supporting evidence</div>
+        ${refs.length?refs.map(x=>`<a href="${esc(x)}" target="_blank" rel="noopener noreferrer">${esc(x)}</a>`).join(''):'<div class="muted">No evidence references returned.</div>'}
+        <div class="muted" style="margin-top:7px">Last observed: ${esc(w.last_observed_at||'Not provided')} · Recurrence observations: ${esc(w.recurrence_count??'Not established')}</div>
+      </div>
+      ${pending?`<div class="auth"><strong>Authorization required</strong><p>Authorize this exact work item. Reality will execute only this bounded action and must independently verify the result.</p><button type="button" data-auth="${i}">Authorize this exact work</button><div class="status" data-status="${i}"></div></div>`:''}
+    </article>`;
+  }).join('');
+
+  $('queue').querySelectorAll('[data-auth]').forEach(btn=>btn.onclick=async()=>{
+    const index=Number(btn.dataset.auth),w=items[index],wi=w.execution_work_item||w;
     btn.disabled=true;btn.textContent='Authorizing…';
+    const status=$('queue').querySelector('[data-status="'+index+'"]');
     try{
-      const workItem=w.execution_work_item||w;
-      const scope=(w.authorization_scope||w.scope||w.allowed_operations||workItem.authority_required||[])[0];
-      if(!scope?.connector||!scope?.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
-      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:workItem,enabled:true})});
+      const scope=(w.authorization_scope||w.scope||w.allowed_operations||wi.authority_required||[])[0];
+      if(!scope?.connector||!scope?.operation||!wi.work_item_id)throw new Error('Reality has not established an exact authorization scope for this work.');
+      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:wi,enabled:true})});
       const rb=await rr.json();if(!rr.ok||!rb.ok)throw new Error(rb.error||'Authorization failed');
-      const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem,workflowId:workItem.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded recurring maintenance explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
+      const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem:wi,workflowId:wi.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded work explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
       const eb=await er.json();if(!er.ok||!eb.ok)throw new Error(eb.error||eb.result?.blocked_reason||'Execution failed');
       if(eb.result?.status!=='VERIFIED')throw new Error(eb.result?.blocked_reason||eb.result?.outcome?.outcome_state||'Execution was not independently verified');
-      btn.textContent='Authorized & verified ✓';
-    }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
+      btn.textContent='Authorized & verified ✓';status.className='status success';status.textContent='Reality executed the authorized work and independently verified the result.';
+    }catch(e){btn.disabled=false;btn.textContent='Authorize this exact work';status.className='status error';status.textContent=e.message}
   });
 }
-async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
-realityWork.onclick=async()=>{
-  realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
+
+async function findWork(){
+  const b=$('findWork');b.disabled=true;b.textContent='Reality is looking…';$('result').textContent='Inspecting live evidence…';$('queue').innerHTML='';
   try{
-    const r=await fetch('/api/reality/stewardship');const b=await r.json();if(!r.ok)throw new Error(b.error||'stewardship discovery failed');
-    renderWork(b.work||[]);
-    workResult.textContent='Discovery completed. Work appears above; attention shows what still requires authorization. No external work was executed.';
-    $('liveHeadline').textContent='Reality has started looking for work.';$('liveDetail').textContent='Discovery is observation. Authorization remains explicit.';
-  }catch(e){workResult.textContent='Reality stopped honestly: '+e.message}
-  finally{realityWork.disabled=false;realityWork.textContent='Put Reality to work'}
-};</script>
+    const r=await fetch('/api/reality/stewardship');const body=await r.json();if(!r.ok)throw new Error(body.error||'Stewardship discovery failed');
+    render(body.work||[]);
+  }catch(e){$('result').className='error';$('result').textContent='Reality stopped honestly: '+e.message}
+  finally{b.disabled=false;b.textContent='Find work'}
+}
+$('findWork').onclick=findWork;
+
+(async()=>{try{const r=await fetch('/api/health');const b=await r.json();$('liveState').textContent=r.ok?'LIVE':'LIVE STATE UNKNOWN'}catch{$('liveState').textContent='LIVE STATE UNKNOWN'}})();
+</script>
 </body>
 </html>
