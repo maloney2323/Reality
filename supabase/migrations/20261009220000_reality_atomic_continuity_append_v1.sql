@@ -33,8 +33,19 @@ begin
 
   if found then
     if v_existing.lineage_hash = p_record->>'lineage_hash'
+       and v_existing.content_hash = p_record->>'content_hash'
+       and v_existing.event_kind is not distinct from p_record->>'event_kind'
+       and v_existing.entity_type is not distinct from p_record->>'entity_type'
+       and v_existing.entity_id is not distinct from (p_record->>'entity_id')::uuid
        and v_existing.continuity_root_id = v_root_id
-       and v_existing.worldline_id = v_worldline_id then
+       and v_existing.worldline_id = v_worldline_id
+       and v_existing.parent_event_id is not distinct from v_parent_id
+       and v_existing.effective_time is not distinct from (p_record->>'effective_time')::timestamptz
+       and v_existing.assertion_time is not distinct from (p_record->>'assertion_time')::timestamptz
+       and v_existing.epistemic_status is not distinct from p_record->>'epistemic_status'
+       and v_existing.payload is not distinct from coalesce(p_record->'payload', '{}'::jsonb)
+       and v_existing.evidence_refs is not distinct from coalesce(p_record->'evidence_refs', '[]'::jsonb)
+       and v_existing.provenance is not distinct from coalesce(p_record->'provenance', '{}'::jsonb) then
       return to_jsonb(v_existing) || jsonb_build_object('status', 'DUPLICATE_IDENTICAL');
     end if;
     raise exception 'CONTINUITY_EVENT_ID_COLLISION';
@@ -127,11 +138,13 @@ create or replace function public.reject_universe_event_mutation()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
-as $$
+as $
 begin
   raise exception 'UNIVERSE_EVENTS_APPEND_ONLY';
 end;
-$$;
+$;
+
+revoke all on function public.reject_universe_event_mutation() from public, anon, authenticated, service_role;
 
 drop trigger if exists universe_events_reject_row_mutation on public.universe_events;
 create trigger universe_events_reject_row_mutation
