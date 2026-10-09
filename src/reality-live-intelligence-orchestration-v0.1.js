@@ -238,7 +238,11 @@ export async function runLiveIntelligenceOrchestration({
       })
     : null;
 
-  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  // The continuity spine is the canonical ledger when enabled. Do not also write
+  // the legacy state-transition ledger for the same chat turn: its independent
+  // lineage contract can reject the request after the canonical spine has already
+  // durably recorded RAW_SIGNAL -> TRANSFORMATION -> OBSERVATION.
+  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true' && continuityRuntime?.enabled !== true) {
     await persistContinuityEvent(continuityEvent, { fetchImpl });
   }
 
