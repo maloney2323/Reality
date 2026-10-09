@@ -2,14 +2,28 @@ import {
   createContinuitySpine,
   appendContinuityNode,
   advanceSpine,
+  validateContinuityChain,
 } from './reality-continuity-spine-v2.0.js';
 import { evaluateContinuityStageGate } from './reality-continuity-stage-gate-v1.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
 
-export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.1';
+export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.2';
 
 function enabled() {
   return process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true';
+}
+
+function normalizePersistedNode(row) {
+  return {
+    ...row,
+    prior_lineage_hash: row?.prior_lineage_hash
+      || row?.provenance?.continuity_spine?.prior_lineage_hash
+      || null,
+  };
+}
+
+function workflowIdOf(node) {
+  return node?.payload?.workflow_run_id || node?.workflow_run_id || null;
 }
 
 export async function startContinuityRuntime({
@@ -18,12 +32,14 @@ export async function startContinuityRuntime({
   subjectId,
   signal,
   observedAt = new Date().toISOString(),
+  workflowRunId,
   fetchImpl = fetch,
 } = {}) {
   if (!continuityRootSource || !subjectId || !signal?.packet?.packet_id) {
     return Object.freeze({ status: 'NO_CONTINUITY_ROOT', enabled: false, nodes: [] });
   }
 
+  const runId = String(workflowRunId || `${signal.packet.packet_id}:${observedAt}`);
   let spine = createContinuitySpine({
     continuityRootId: continuityRootSource,
     worldlineId: worldlineSource,
@@ -31,7 +47,41 @@ export async function startContinuityRuntime({
   });
   const persistenceEnabled = enabled();
   const persistence = persistenceEnabled ? createUniversePostgresPersistence({ fetchImpl }) : null;
-  const nodes = [];
+  let globalNodes = [];
+  let workflowNodes = [];
+
+  if (persistence) {
+    let reconstructed;
+    try {
+      reconstructed = await persistence.reconstruct({
+        continuityRootId: spine.continuity_root_id,
+        worldlineId: spine.worldline_id,
+      });
+    } catch (error) {
+      const failure = new Error('CONTINUITY_REHYDRATION_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
+      failure.code = 'CONTINUITY_REHYDRATION_REQUIRED';
+      failure.cause = error;
+      throw failure;
+    }
+    globalNodes = (Array.isArray(reconstructed) ? reconstructed : []).map(normalizePersistedNode);
+    const chain = validateContinuityChain(globalNodes);
+    if (!chain.valid) {
+      const failure = new Error('CONTINUITY_HISTORY_INVALID');
+      failure.code = 'CONTINUITY_HISTORY_INVALID';
+      failure.details = chain;
+      throw failure;
+    }
+    workflowNodes = globalNodes.filter((node) => workflowIdOf(node) === runId);
+    const tail = globalNodes[globalNodes.length - 1] || null;
+    if (tail) {
+      spine = Object.freeze({
+        ...spine,
+        last_event_id: tail.event_id,
+        last_lineage_hash: tail.lineage_hash,
+        current_stage: tail.event_kind,
+      });
+    }
+  }
 
   async function appendStage({
     stage,
@@ -47,19 +97,22 @@ export async function startContinuityRuntime({
   } = {}) {
     const parentEventId = spine.last_event_id || null;
     const priorLineageHash = spine.last_lineage_hash || null;
+    const stagePayload = { ...payload, workflow_run_id: runId };
     const candidate = {
       event_kind: stage,
+      workflow_run_id: runId,
       parent_event_id: parentEventId,
       prior_lineage_hash: priorLineageHash,
       evidence_refs: evidenceRefs,
       transformation_receipt_id: transformationReceiptId,
-      payload,
+      payload: stagePayload,
     };
     const gate = evaluateContinuityStageGate({
       stage,
-      priorNodes: nodes,
+      workflowHistory: workflowNodes,
+      globalTail: globalNodes[globalNodes.length - 1] || null,
       candidate,
-      persistenceStatus: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
+      persistenceStatus: persistenceEnabled ? 'DURABLE_READY' : 'IN_MEMORY_ONLY',
     });
     if (!gate.allowed) {
       const failure = new Error('CONTINUITY_STAGE_BLOCKED:' + gate.reasons.join(','));
@@ -72,17 +125,18 @@ export async function startContinuityRuntime({
       spine,
       stage,
       entityId,
-      eventId,
+      eventId: `${eventId || `${stage}:${entityId}`}:workflow:${runId}`,
       parentEventId,
       evidenceRefs,
       transformationReceiptId,
       effectiveTime,
       assertionTime,
       epistemicStatus,
-      payload,
+      payload: stagePayload,
       priorLineageHash,
       provenance: {
         ...provenance,
+        workflow_run_id: runId,
         continuity_runtime_version: REALITY_CONTINUITY_RUNTIME_VERSION,
       },
     });
@@ -91,6 +145,9 @@ export async function startContinuityRuntime({
     if (persistence) {
       try {
         committed = await persistence.appendEvent(node);
+        if (!committed || !['PERSISTED', 'DUPLICATE_IDENTICAL'].includes(committed.status)) {
+          throw new Error('CONTINUITY_PERSISTENCE_COMMIT_UNCONFIRMED');
+        }
       } catch (error) {
         const failure = new Error('CONTINUITY_PERSISTENCE_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
         failure.code = 'CONTINUITY_PERSISTENCE_REQUIRED';
@@ -100,7 +157,8 @@ export async function startContinuityRuntime({
     }
 
     spine = advanceSpine(spine, committed);
-    nodes.push(committed);
+    globalNodes.push(committed);
+    workflowNodes.push(committed);
     return committed;
   }
 
@@ -151,8 +209,11 @@ export async function startContinuityRuntime({
   return Object.freeze({
     status: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
     enabled: persistenceEnabled,
+    workflow_run_id: runId,
+    rehydrated_event_count: globalNodes.length - workflowNodes.length,
+    global_tail_event_id: spine.last_event_id || null,
     spine,
-    nodes: Object.freeze(nodes),
+    nodes: Object.freeze(workflowNodes),
     appendStage,
   });
 }
