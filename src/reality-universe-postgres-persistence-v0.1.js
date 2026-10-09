@@ -22,17 +22,27 @@ export function createUniversePostgresPersistence({
   fetchImpl = fetch,
 } = {}) {
   const baseUrl = required('SUPABASE_URL', url).replace(/\/$/, '');
-  const key = required('SUPABASE_SECRET_KEY', secretKey);
+  const keys = [
+    secretKey,
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.supabase_secret_key,
+  ].filter((value, index, values) => typeof value === 'string' && value.length > 0 && values.indexOf(value) === index);
+  if (!keys.length) throw new Error('SUPABASE_SECRET_KEY_REQUIRED');
 
   async function request(path, { method = 'GET', body, headers = {} } = {}) {
-    const response = await fetchImpl(baseUrl + '/rest/v1/' + path, {
-      method,
-      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const responseText = await response.text();
-    if (!response.ok) throw new Error('UNIVERSE_POSTGRES_HTTP_' + response.status + ':' + responseText.slice(0, 500));
-    return responseText ? JSON.parse(responseText) : null;
+    let lastFailure = null;
+    for (const key of keys) {
+      const response = await fetchImpl(baseUrl + '/rest/v1/' + path, {
+        method,
+        headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const responseText = await response.text();
+      if (response.ok) return responseText ? JSON.parse(responseText) : null;
+      lastFailure = new Error('UNIVERSE_POSTGRES_HTTP_' + response.status + ':' + responseText.slice(0, 500));
+      if (![401, 403].includes(response.status)) throw lastFailure;
+    }
+    throw lastFailure || new Error('SUPABASE_SECRET_KEY_REQUIRED');
   }
 
   async function findEvent(eventId) {
