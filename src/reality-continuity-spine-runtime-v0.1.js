@@ -214,7 +214,7 @@ export async function startContinuityRuntime({
     rehydrated_event_count: globalNodes.length - workflowNodes.length,
     global_tail_event_id: spine.last_event_id || null,
     spine,
-    nodes: Object.freeze(workflowNodes),
+    nodes: Object.freeze([...workflowNodes]),
     appendStage,
   });
 }
