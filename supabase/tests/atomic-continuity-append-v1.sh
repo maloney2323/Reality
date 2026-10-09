@@ -96,6 +96,24 @@ if [[ "$STATUS_A" -ne 0 && "$STATUS_B" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ "$STATUS_A" -eq 0 ]]; then WINNING_PAYLOAD="$PAYLOAD_A"; else WINNING_PAYLOAD="$PAYLOAD_B"; fi
+DUPLICATE_STATUS=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$WINNING_PAYLOAD'::jsonb)->>'status';")
+if [[ "$DUPLICATE_STATUS" != 'DUPLICATE_IDENTICAL' ]]; then
+  echo "FAIL: identical retry was not recognized as a duplicate: $DUPLICATE_STATUS"
+  exit 1
+fi
+
+CONFLICT_PAYLOAD="${WINNING_PAYLOAD/candidate/counterfeit}"
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "set role service_role; select public.append_universe_event('$CONFLICT_PAYLOAD'::jsonb);" >/tmp/atomic-conflict.log 2>&1
+CONFLICT_STATUS=$?
+set -e
+if [[ "$CONFLICT_STATUS" -eq 0 ]] || ! grep -q 'CONTINUITY_EVENT_ID_COLLISION' /tmp/atomic-conflict.log; then
+  echo 'FAIL: conflicting retry was not rejected as an event ID collision'
+  cat /tmp/atomic-conflict.log
+  exit 1
+fi
+
 ROW_COUNT=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select count(*) from public.universe_events where continuity_root_id='$ROOT' and worldline_id='$WORLD';")
 CHILD_COUNT=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select count(*) from public.universe_events where continuity_root_id='$ROOT' and worldline_id='$WORLD' and parent_event_id='$SEED';")
 if [[ "$ROW_COUNT" != '2' || "$CHILD_COUNT" != '1' ]]; then
