@@ -2,25 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-v0.1.js';
 import { validateContinuityChain } from '../src/reality-continuity-spine-v2.0.js';
+import { buildGovernedChatSignal } from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 
-function signal(packetId) {
-  return {
-    packet: {
-      packet_id: packetId,
-      source: 'test',
-      observed_at: new Date().toISOString(),
-      raw_content_digest: 'raw-digest-' + packetId,
-    },
-    transformation_receipt: {
-      receipt_id: 'receipt-' + packetId,
-      input_digest: 'input-' + packetId,
-      output_digest: 'output-' + packetId,
-      cleaner_version: 'test-cleaner-v1',
-      fragment_count: 1,
-      meaning_change_claimed: false,
-    },
-    fragments: [{ fragment_id: 'fragment-' + packetId }],
-  };
+function signal(message, observedAt = '2026-10-09T00:00:00.000Z') {
+  return buildGovernedChatSignal({ message, observedAt });
 }
 
 function makeDb({ failPost = false, failRead = false } = {}) {
@@ -195,6 +180,23 @@ test('blocks progression when the persisted global chain is broken', async (t) =
   assert.equal(db.rows.length, 3);
 });
 
+test('rejects a tampered signal before writing any continuity event', async (t) => {
+  setPersistenceEnv(t);
+  const db = makeDb();
+  const badSignal = structuredClone(signal('tamper-me'));
+  badSignal.fragments[0].cleaned_text = 'Forged cleaned content';
+  await assert.rejects(
+    () => startContinuityRuntime({
+      continuityRootSource: 'tampered-signal-root',
+      subjectId: 'subject-tampered-signal',
+      signal: badSignal,
+      fetchImpl: db.fetchImpl,
+    }),
+    (error) => error.code === 'CONTINUITY_SIGNAL_INTEGRITY_FAILED'
+      && error.message.includes('FRAGMENT_CLEANED_DIGEST_MISMATCH'),
+  );
+  assert.equal(db.rows.length, 0);
+});
 
 test('records a governed business-work proposal but blocks execution without granted authority', async (t) => {
   setPersistenceEnv(t);
@@ -203,25 +205,27 @@ test('records a governed business-work proposal but blocks execution without gra
     continuityRootSource: 'controlled-business-workflow',
     worldlineSource: 'reality:business-test',
     subjectId: 'customer-follow-up-work',
-    signal: signal('customer-follow-up-packet'),
+    signal: signal('customer follow-up request'),
     observedAt: new Date(Date.now() - 10000).toISOString(),
     workflowRunId: 'customer-follow-up-run',
     fetchImpl: db.fetchImpl,
   });
+  const packetId = runtime.nodes[0].payload.packet_id;
+  const receiptId = runtime.nodes[1].payload.receipt_id;
 
   const situation = await runtime.appendStage({
     stage: 'SITUATION',
     entityId: 'situation:customer-follow-up',
-    evidenceRefs: ['customer-follow-up-packet', 'receipt-customer-follow-up-packet'],
-    transformationReceiptId: 'receipt-customer-follow-up-packet',
+    evidenceRefs: [packetId, receiptId],
+    transformationReceiptId: receiptId,
     epistemicStatus: 'PARTIALLY_VERIFIED',
     payload: { situation_id: 'situation:customer-follow-up', missing_evidence: ['customer response not observed'] },
   });
   const work = await runtime.appendStage({
     stage: 'WORK',
     entityId: 'work:customer-follow-up',
-    evidenceRefs: ['customer-follow-up-packet'],
-    transformationReceiptId: 'receipt-customer-follow-up-packet',
+    evidenceRefs: [packetId],
+    transformationReceiptId: receiptId,
     epistemicStatus: 'PROPOSED',
     payload: { work_item_id: 'work:customer-follow-up', operation: 'draft_follow_up', consequential: true },
   });
