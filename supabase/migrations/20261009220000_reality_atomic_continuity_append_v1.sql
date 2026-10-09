@@ -138,7 +138,7 @@ create or replace function public.reject_universe_event_mutation()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
-as $
+as $$
 begin
   raise exception 'UNIVERSE_EVENTS_APPEND_ONLY';
 end;
