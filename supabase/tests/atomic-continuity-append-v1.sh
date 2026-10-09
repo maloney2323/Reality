@@ -30,9 +30,16 @@ create table public.universe_events (
   lineage_hash text not null,
   created_at timestamptz not null default now()
 );
+grant select, insert, update, delete, truncate, references, trigger on public.universe_events to service_role;
 SQL
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql
+
+PRIVILEGES=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "select has_table_privilege('service_role','public.universe_events','SELECT') || ':' || has_table_privilege('service_role','public.universe_events','INSERT') || ':' || has_table_privilege('service_role','public.universe_events','UPDATE') || ':' || has_table_privilege('service_role','public.universe_events','DELETE') || ':' || has_table_privilege('service_role','public.universe_events','TRUNCATE') || ':' || has_function_privilege('service_role','public.append_universe_event(jsonb)','EXECUTE');")
+if [[ "$PRIVILEGES" != 'true:false:false:false:false:true' ]]; then
+  echo "FAIL: unexpected ledger permissions after migration: $PRIVILEGES"
+  exit 1
+fi
 
 ROOT='aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa'
 WORLD='bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb'
@@ -44,6 +51,18 @@ ENTITY_B='66666666-6666-5666-8666-666666666666'
 NOW='2026-10-09T22:00:00Z'
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "insert into public.universe_events (event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,parent_event_id,effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash) values ('$SEED','RAW_SIGNAL','raw_signal','$ENTITY_A','$ROOT','$WORLD',null,'$NOW','$NOW','OBSERVED','{}','[]','{}','seed-content','seed-lineage');"
+
+for OP in "update public.universe_events set payload='{}'::jsonb where event_id='$SEED'" "delete from public.universe_events where event_id='$SEED'" "truncate public.universe_events"; do
+  set +e
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "$OP" >/tmp/append-only-guard.log 2>&1
+  MUTATION_STATUS=$?
+  set -e
+  if [[ "$MUTATION_STATUS" -eq 0 ]] || ! grep -q 'UNIVERSE_EVENTS_APPEND_ONLY' /tmp/append-only-guard.log; then
+    echo "FAIL: append-only guard did not reject: $OP"
+    cat /tmp/append-only-guard.log
+    exit 1
+  fi
+done
 
 PAYLOAD_A="{\"event_id\":\"$CHILD_A\",\"event_kind\":\"TRANSFORMATION\",\"entity_type\":\"transformation\",\"entity_id\":\"$ENTITY_A\",\"continuity_root_id\":\"$ROOT\",\"worldline_id\":\"$WORLD\",\"parent_event_id\":\"$SEED\",\"effective_time\":\"$NOW\",\"assertion_time\":\"$NOW\",\"epistemic_status\":\"OBSERVED\",\"payload\":{\"candidate\":\"a\"},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"seed-lineage\"}},\"content_hash\":\"content-a\",\"lineage_hash\":\"lineage-a\"}"
 PAYLOAD_B="{\"event_id\":\"$CHILD_B\",\"event_kind\":\"TRANSFORMATION\",\"entity_type\":\"transformation\",\"entity_id\":\"$ENTITY_B\",\"continuity_root_id\":\"$ROOT\",\"worldline_id\":\"$WORLD\",\"parent_event_id\":\"$SEED\",\"effective_time\":\"$NOW\",\"assertion_time\":\"$NOW\",\"epistemic_status\":\"OBSERVED\",\"payload\":{\"candidate\":\"b\"},\"evidence_refs\":[],\"provenance\":{\"continuity_spine\":{\"prior_lineage_hash\":\"seed-lineage\"}},\"content_hash\":\"content-b\",\"lineage_hash\":\"lineage-b\"}"
