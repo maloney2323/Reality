@@ -17,10 +17,16 @@ test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on o
   const originalFetch = global.fetch;
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
-    if (options.method === 'POST') {
-      const body = JSON.parse(options.body);
-      rows.push(body);
-      return new Response(JSON.stringify([body]), { status: 201 });
+    if (options.method === 'POST' && u.pathname.endsWith('/rpc/append_universe_event')) {
+      const { p_record: body } = JSON.parse(options.body);
+      const tail = rows.filter((row) => row.continuity_root_id === body.continuity_root_id && row.worldline_id === body.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((body.parent_event_id || null) !== (tail?.event_id || null)) return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      const priorHash = body.provenance?.continuity_spine?.prior_lineage_hash || null;
+      if (priorHash !== (tail?.lineage_hash || null)) return new Response('CONTINUITY_PRIOR_LINEAGE_HASH_MISMATCH', { status: 409 });
+      const saved = { ...body, created_at: new Date(Date.now() + rows.length).toISOString() };
+      rows.push(saved);
+      return new Response(JSON.stringify({ ...saved, status: 'PERSISTED' }), { status: 200 });
     }
     const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
     if (requestedId) {
