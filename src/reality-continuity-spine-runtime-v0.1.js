@@ -29,7 +29,7 @@ export async function startContinuityRuntime({
     subjectId,
   });
   const persistenceEnabled = enabled();
-  const persistence = persistenceEnabled ? createUniversePostgresPersistence() : null;
+  const persistence = persistenceEnabled ? createUniversePostgresPersistence({ fetchImpl }) : null;
   const nodes = [];
 
   async function appendStage({
