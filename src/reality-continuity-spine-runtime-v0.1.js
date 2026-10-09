@@ -6,6 +6,7 @@ import {
 } from './reality-continuity-spine-v2.0.js';
 import { evaluateContinuityStageGate } from './reality-continuity-stage-gate-v1.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
+import { verifyGovernedSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.2';
 
@@ -38,6 +39,14 @@ export async function startContinuityRuntime({
 } = {}) {
   if (!continuityRootSource || !subjectId || !signal?.packet?.packet_id) {
     return Object.freeze({ status: 'NO_CONTINUITY_ROOT', enabled: false, nodes: [] });
+  }
+
+  const signalIntegrity = verifyGovernedSignal(signal);
+  if (!signalIntegrity.valid) {
+    const failure = new Error('CONTINUITY_SIGNAL_INTEGRITY_FAILED:' + signalIntegrity.reasons.join(','));
+    failure.code = 'CONTINUITY_SIGNAL_INTEGRITY_FAILED';
+    failure.details = signalIntegrity;
+    throw failure;
   }
 
   const runId = String(workflowRunId || `${signal.packet.packet_id}:${observedAt}`);
