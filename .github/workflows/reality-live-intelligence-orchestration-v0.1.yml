@@ -69,3 +69,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify migration and concurrent writer behavior against PostgreSQL
         run: bash supabase/tests/atomic-continuity-append-v1.sh
+
+  full-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run full repository regression suite
+        run: npm test
