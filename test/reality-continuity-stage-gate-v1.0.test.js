@@ -8,8 +8,8 @@ const node = (event_kind, overrides = {}) => ({
   lineage_hash: event_kind.toLowerCase() + '-hash',
   evidence_refs: ['evidence:1'],
   transformation_receipt_id: 'receipt:1',
-  payload: {},
   ...overrides,
+  payload: { workflow_run_id: 'run-test', ...(overrides.payload || {}) },
 });
 
 test('blocks WORK when SITUATION has not been durably established', () => {
