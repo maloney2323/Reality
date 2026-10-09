@@ -189,3 +189,64 @@ test('blocks progression when the persisted global chain is broken', async (t) =
   );
   assert.equal(db.rows.length, 3);
 });
+
+
+test('records a governed business-work proposal but blocks execution without granted authority', async (t) => {
+  setPersistenceEnv(t);
+  const db = makeDb();
+  const runtime = await startContinuityRuntime({
+    continuityRootSource: 'controlled-business-workflow',
+    worldlineSource: 'reality:business-test',
+    subjectId: 'customer-follow-up-work',
+    signal: signal('customer-follow-up-packet'),
+    observedAt: new Date(Date.now() - 10000).toISOString(),
+    workflowRunId: 'customer-follow-up-run',
+    fetchImpl: db.fetchImpl,
+  });
+
+  const situation = await runtime.appendStage({
+    stage: 'SITUATION',
+    entityId: 'situation:customer-follow-up',
+    evidenceRefs: ['customer-follow-up-packet', 'receipt-customer-follow-up-packet'],
+    transformationReceiptId: 'receipt-customer-follow-up-packet',
+    epistemicStatus: 'PARTIALLY_VERIFIED',
+    payload: { situation_id: 'situation:customer-follow-up', missing_evidence: ['customer response not observed'] },
+  });
+  const work = await runtime.appendStage({
+    stage: 'WORK',
+    entityId: 'work:customer-follow-up',
+    evidenceRefs: ['customer-follow-up-packet'],
+    transformationReceiptId: 'receipt-customer-follow-up-packet',
+    epistemicStatus: 'PROPOSED',
+    payload: { work_item_id: 'work:customer-follow-up', operation: 'draft_follow_up', consequential: true },
+  });
+  const authority = await runtime.appendStage({
+    stage: 'AUTHORITY',
+    entityId: 'authority:customer-follow-up',
+    evidenceRefs: ['work:customer-follow-up'],
+    epistemicStatus: 'PROPOSED',
+    payload: {
+      authorization_status: 'REQUESTED',
+      granted: false,
+      authorization_ref: 'authorization-request:customer-follow-up',
+    },
+  });
+
+  assert.equal(situation.event_kind, 'SITUATION');
+  assert.equal(work.event_kind, 'WORK');
+  assert.equal(authority.event_kind, 'AUTHORITY');
+  assert.equal(authority.payload.authorization_status, 'REQUESTED');
+  assert.equal(authority.payload.granted, false);
+  assert.equal(db.rows.length, 6);
+  await assert.rejects(
+    () => runtime.appendStage({
+      stage: 'EXECUTION',
+      entityId: 'execution:customer-follow-up',
+      evidenceRefs: ['work:customer-follow-up'],
+      payload: { authorization_ref: 'authorization-request:customer-follow-up' },
+    }),
+    (error) => error.code === 'CONTINUITY_STAGE_BLOCKED' && error.message.includes('AUTHORITY_NOT_GRANTED'),
+  );
+  assert.equal(db.rows.length, 6);
+  assert.equal(runtime.nodes.length, 3, 'returned initial nodes are a stable snapshot, not the live mutable history');
+});
