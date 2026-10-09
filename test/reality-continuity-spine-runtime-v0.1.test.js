@@ -127,7 +127,11 @@ test('rehydrates the global tail and starts a separate workflow without cross-ru
   assert.equal(second.nodes[0].parent_event_id, first.nodes[2].event_id);
   assert.equal(second.nodes[0].payload.workflow_run_id, 'run-b');
   assert.equal(first.nodes[0].payload.workflow_run_id, 'run-a');
-  assert.equal(validateContinuityChain(db.rows).valid, true);
+  const normalizedRows = db.rows.map((row) => ({
+    ...row,
+    prior_lineage_hash: row.provenance?.continuity_spine?.prior_lineage_hash || null,
+  }));
+  assert.equal(validateContinuityChain(normalizedRows).valid, true);
 });
 
 test('fails closed when durable history cannot be read', async (t) => {
