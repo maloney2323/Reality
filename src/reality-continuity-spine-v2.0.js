@@ -242,3 +242,30 @@ export function validateContinuityChain(nodes = []) {
     broken_links: Object.freeze(broken.map((item) => Object.freeze(item))),
   });
 }
+
+
+// Legacy stage names are classified for diagnostics only. Classification never
+// promotes the event into the current verified contract or makes the chain resumable.
+export function classifyContinuityHistoryDisposition(nodes = [], validation = null) {
+  const rows = Array.isArray(nodes) ? nodes : [];
+  const legacyStage = rows.find((node) => node?.event_kind === 'CAPABILITY_VERIFIED');
+  if (legacyStage) {
+    return Object.freeze({
+      status: 'LEGACY_UNVERIFIABLE',
+      eligible_for_resume: false,
+      reason: 'LEGACY_STAGE_OUTSIDE_CURRENT_CONTRACT',
+      event_id: legacyStage.event_id || null,
+      event_kind: legacyStage.event_kind,
+      event_count: rows.length,
+      broken_links: Object.freeze([...(validation?.broken_links || [])]),
+    });
+  }
+  const result = validation || validateContinuityChain(rows);
+  return Object.freeze({
+    status: result.valid ? 'VERIFIED' : 'INVALID',
+    eligible_for_resume: result.valid,
+    reason: result.valid ? null : 'CONTINUITY_HISTORY_INVALID',
+    event_count: result.event_count,
+    broken_links: Object.freeze([...(result.broken_links || [])]),
+  });
+}
