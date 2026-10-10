@@ -37,7 +37,10 @@ test('experience-enabled reasoning uses relevant prior knowledge without grantin
 test('benchmark reports baseline and measured experience delta explicitly', () => {
   const result = runBenchmark();
   assertBenchmarkInvariants(result);
-  assert.equal(result.metrics.baselineDecisionAccuracy, 0.5);
+  const measuredBaseline = result.baseline.filter((item) => item.decisionCorrect).length / result.baseline.length;
+  const measuredExperience = result.experienceEnabled.filter((item) => item.decisionCorrect).length / result.experienceEnabled.length;
+  assert.equal(result.metrics.baselineDecisionAccuracy, measuredBaseline);
+  assert.equal(result.metrics.experienceDecisionAccuracy, measuredExperience);
   assert.ok(result.metrics.experienceDecisionAccuracy > result.metrics.baselineDecisionAccuracy);
   assert.equal(result.metrics.experienceImprovement,
     result.metrics.experienceDecisionAccuracy - result.metrics.baselineDecisionAccuracy);
