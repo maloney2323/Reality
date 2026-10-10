@@ -80,3 +80,75 @@ export function validateSandboxResult(experiment,{synthesizedCapability,frozenRe
  const bundle={experiment_hash:experiment.experiment_hash,synthesized_capability:synthesizedCapability,frozen_regression:frozenRegression,isolated_verification:isolatedVerification,capability_signature:capabilitySignature};
  return Object.freeze({...experiment,state:'SANDBOX_VERIFIED',synthesized_capability:synthesizedCapability,verification_bundle:bundle,verification_hash:digest(bundle),capability_signature:capabilitySignature});
 }
+
+
+export function authorizeWorldlineMerge(verifiedExperiment, { mergeVerifier } = {}) {
+  if (!verifiedExperiment?.verification_hash || verifiedExperiment.state !== 'SANDBOX_VERIFIED') {
+    throw new Error('VERIFIED_SANDBOX_EXPERIMENT_REQUIRED');
+  }
+  if (typeof mergeVerifier !== 'function') throw new Error('WORLDLINE_MERGE_VERIFIER_REQUIRED');
+  const result = mergeVerifier(verifiedExperiment);
+  if (result?.approved !== true) throw new Error('WORLDLINE_MERGE_REJECTED');
+  return Object.freeze({
+    ...verifiedExperiment,
+    state: 'WORLDLINE_MERGE_PENDING',
+    merge_authorization_hash: digest({ verification_hash: verifiedExperiment.verification_hash, verifier_result: result }),
+  });
+}
+
+export function registerVerifiedCapability(verifiedExperiment, { capabilityRegistry, mergeResult } = {}) {
+  if (!verifiedExperiment?.verification_hash || verifiedExperiment.state !== 'WORLDLINE_MERGE_PENDING') {
+    throw new Error('WORLDLINE_MERGE_NOT_AUTHORIZED');
+  }
+  if (mergeResult?.merged !== true) throw new Error('WORLDLINE_MERGE_NOT_VERIFIED');
+  if (!text(verifiedExperiment.capability_signature)) throw new Error('CAPABILITY_SIGNATURE_REQUIRED');
+  if (!capabilityRegistry || typeof capabilityRegistry.register !== 'function') throw new Error('CAPABILITY_REGISTRY_REQUIRED');
+  const registration = capabilityRegistry.register({
+    capability: verifiedExperiment.synthesized_capability,
+    signature: verifiedExperiment.capability_signature,
+    verification_hash: verifiedExperiment.verification_hash,
+    worldline_id: verifiedExperiment.ephemeral_worldline_id,
+    merge_result: mergeResult,
+  });
+  return Object.freeze({
+    state: 'REGISTERED',
+    capability_id: verifiedExperiment.capability_id,
+    registration,
+    verification_hash: verifiedExperiment.verification_hash,
+    capability_signature: verifiedExperiment.capability_signature,
+  });
+}
+
+export function reactivationPlan(confirmedGap, { registration, originalWorkItem } = {}) {
+  if (!confirmedGap?.gap_id) throw new Error('CAPABILITY_GAP_REQUIRED');
+  if (registration?.state !== 'REGISTERED') throw new Error('CAPABILITY_REGISTRATION_REQUIRED');
+  if (!originalWorkItem?.id) throw new Error('ORIGINAL_WORK_ITEM_REQUIRED');
+  return Object.freeze({
+    state: 'REACTIVATED',
+    gap_id: confirmedGap.gap_id,
+    capability_id: confirmedGap.capability_id,
+    original_work_item_id: originalWorkItem.id,
+    continuation_token: digest({
+      gap_id: confirmedGap.gap_id,
+      original_work_item_id: originalWorkItem.id,
+      capability_id: confirmedGap.capability_id,
+    }),
+  });
+}
+
+export function handleSynthesisFailure(experiment, {
+  nextAttempt = experiment?.attempt + 1,
+  attemptLimit = experiment?.attempt_limit || DEFAULT_ATTEMPT_LIMIT,
+} = {}) {
+  if (!experiment?.experiment_hash) throw new Error('SANDBOX_EXPERIMENT_REQUIRED');
+  if (nextAttempt > attemptLimit) {
+    return Object.freeze({
+      state: 'ESCALATED', gap_id: experiment.gap_id, capability_id: experiment.capability_id,
+      reason: 'CAPABILITY_SYNTHESIS_BUDGET_EXHAUSTED', exhausted_attempts: attemptLimit, human_review_required: true,
+    });
+  }
+  return Object.freeze({
+    state: 'SANDBOX_PROPOSED', gap_id: experiment.gap_id, capability_id: experiment.capability_id,
+    next_attempt: nextAttempt, attempt_limit: attemptLimit, retry_allowed: true,
+  });
+}
