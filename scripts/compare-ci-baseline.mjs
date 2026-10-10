@@ -8,20 +8,20 @@ function stableErrorFromBlock(block) {
     const unquoted = inline
       .replace(/^'(.*)'$/s, '$1')
       .replace(/^"(.*)"$/s, '$1')
-      .replace(/\\s+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
     if (unquoted && unquoted !== '|-' && unquoted !== '|') return unquoted;
   }
 
-  const blockMatch = block.match(/^  error: \\|-?\\n([\\s\\S]*?)(?=^  (?:stack|code|failureType|exitCode|signal):|^  \.\.\.)/m);
+  const blockMatch = block.match(/^  error: \|-?\n([\s\S]*?)(?=^  (?:stack|code|failureType|exitCode|signal):|^  \.\.\.)/m);
   if (blockMatch) {
     const detail = blockMatch[1]
-      .split('\\n')
+      .split('\n')
       .map((line) => line.replace(/^    /, '').trim())
       .filter(Boolean)
-      .filter((line) => !/^at \\S/.test(line))
+      .filter((line) => !/^at \S/.test(line))
       .join(' ')
-      .replace(/\\s+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
     if (detail) return detail;
   }
@@ -33,10 +33,10 @@ function stableErrorFromBlock(block) {
 }
 
 function failures(path) {
-  const tap = fs.readFileSync(path, 'utf8').replace(/^\\uFEFF/, '');
-  const blocks = tap.match(/^not ok \\d+ - [^\\n]+[\\s\\S]*?(?=^(?:ok|not ok) \\d+ - |^1\\.\\.)/gm) ?? [];
+  const tap = fs.readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
+  const blocks = tap.match(/^not ok \d+ - [^\n]+[\s\S]*?(?=^(?:ok|not ok) \d+ - |^1\.\.)/gm) ?? [];
   return blocks.map((block) => {
-    const title = block.match(/^not ok \\d+ - (.+)$/m)?.[1]?.trim() ?? 'UNKNOWN_FAILURE';
+    const title = block.match(/^not ok \d+ - (.+)$/m)?.[1]?.trim() ?? 'UNKNOWN_FAILURE';
     const error = stableErrorFromBlock(block);
     return { title, error, signature: title + ' :: ' + error };
   });
@@ -52,9 +52,9 @@ const pr = failures(prPath);
 const counts = (path) => {
   const content = fs.readFileSync(path, 'utf8');
   return {
-    tests: Number(content.match(/^# tests (\\d+)/m)?.[1] ?? 0),
-    pass: Number(content.match(/^# pass (\\d+)/m)?.[1] ?? 0),
-    fail: Number(content.match(/^# fail (\\d+)/m)?.[1] ?? 0),
+    tests: Number(content.match(/^# tests (\d+)/m)?.[1] ?? 0),
+    pass: Number(content.match(/^# pass (\d+)/m)?.[1] ?? 0),
+    fail: Number(content.match(/^# fail (\d+)/m)?.[1] ?? 0),
   };
 };
 const baseSignatures = new Set(base.map((failure) => failure.signature));
