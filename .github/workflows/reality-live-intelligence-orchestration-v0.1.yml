@@ -38,6 +38,7 @@ on:
       - 'test/reality-continuity-stage-gate-v1.0.test.js'
       - 'test/reality-continuity-spine-runtime-v0.1.test.js'
       - 'test/reality-continuity-runtime-v0.1.test.js'
+      - 'test/reality-continuity-legacy-disposition-v1.test.js'
       - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
 
 jobs:
