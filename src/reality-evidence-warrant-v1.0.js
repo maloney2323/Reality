@@ -87,11 +87,11 @@ export function verifyEvidenceWarrant(warrant) {
 export function verifyWarrantChain(warrants = []) {
   if (!Array.isArray(warrants)) throw new Error('WARRANTS_ARRAY_REQUIRED');
   for (let i = 0; i < warrants.length; i += 1) {
-    const result = verifyEvidenceWarrant(warrants[i]);
-    if (!result.valid) throw new Error(`WARRANT_INVALID:${result.reason}`);
     if (i > 0 && warrants[i].parent_warrant_hash !== warrants[i - 1].warrant_hash) {
       throw new Error('WARRANT_CHAIN_BREAK');
     }
+    const result = verifyEvidenceWarrant(warrants[i]);
+    if (!result.valid) throw new Error(`WARRANT_INVALID:${result.reason}`);
   }
   return Object.freeze({
     valid: true,
