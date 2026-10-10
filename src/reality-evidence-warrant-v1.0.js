@@ -87,11 +87,11 @@ export function verifyEvidenceWarrant(warrant) {
 export function verifyWarrantChain(warrants = []) {
   if (!Array.isArray(warrants)) throw new Error('WARRANTS_ARRAY_REQUIRED');
   for (let i = 0; i < warrants.length; i += 1) {
-    const result = verifyEvidenceWarrant(warrants[i]);
-    if (!result.valid) throw new Error(`WARRANT_INVALID:${result.reason}`);
     if (i > 0 && warrants[i].parent_warrant_hash !== warrants[i - 1].warrant_hash) {
       throw new Error('WARRANT_CHAIN_BREAK');
     }
+    const result = verifyEvidenceWarrant(warrants[i]);
+    if (!result.valid) throw new Error(`WARRANT_INVALID:${result.reason}`);
   }
   return Object.freeze({
     valid: true,
@@ -104,9 +104,20 @@ export function attachLearningProposalToWarrant({ warrant, learningProposal } = 
   const result = verifyEvidenceWarrant(warrant);
   if (!result.valid) throw new Error(`WARRANT_INVALID:${result.reason}`);
   return createEvidenceWarrant({
-    ...warrant,
-    warrantId: undefined,
+    warrantId: null,
     parentWarrantHash: warrant.warrant_hash,
+    observationRefs: warrant.observation_refs,
+    evidenceRefs: warrant.evidence_refs,
+    transformationReceiptRefs: warrant.transformation_receipt_refs,
+    epistemicAssessment: warrant.epistemic_assessment,
+    frictionDecision: warrant.friction_decision,
+    attentionDecision: warrant.attention_decision,
+    workProposal: warrant.work_proposal,
+    authorityArtifact: warrant.authority_artifact,
+    executionReceipt: warrant.execution_receipt,
+    verificationReceipt: warrant.verification_receipt,
+    outcome: warrant.outcome,
     learningProposal,
+    policyVersion: warrant.policy_version,
   });
 }

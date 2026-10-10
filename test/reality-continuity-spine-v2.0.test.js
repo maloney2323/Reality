@@ -53,3 +53,105 @@ test('a non-root node cannot exist without its prior lineage hash', () => {
     spine, stage: 'OBSERVATION', entityId: 'observation:1', parentEventId: 'missing-hash'
   }), /CONTINUITY_PRIOR_LINEAGE_HASH_REQUIRED/);
 });
+
+test('detects event payload tampering even when parent links remain intact', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:tamper-test' });
+  const raw = appendContinuityNode({
+    spine,
+    stage: 'RAW_SIGNAL',
+    entityId: 'signal:tamper-test',
+    payload: { packet_digest: 'sha256:original' },
+    provenance: { source: 'test' },
+  });
+  const observation = appendContinuityNode({
+    spine,
+    stage: 'TRANSFORMATION',
+    entityId: 'receipt:tamper-test',
+    parentEventId: raw.event_id,
+    priorLineageHash: raw.lineage_hash,
+    evidenceRefs: [raw.event_id],
+    transformationReceiptId: 'receipt:tamper-test',
+    payload: { receipt_digest: 'sha256:original' },
+    provenance: { source: 'test' },
+  });
+  const tampered = {
+    ...observation,
+    payload: { receipt_digest: 'sha256:forged' },
+  };
+  const result = validateContinuityChain([raw, tampered]);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.index === 1 && item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+});
+
+test('rejects a root event that claims an earlier parent or lineage hash', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:root-parent-test' });
+  const raw = appendContinuityNode({ spine, stage: 'RAW_SIGNAL', entityId: 'signal:root-parent-test' });
+  const forgedRoot = { ...raw, parent_event_id: 'some-parent', prior_lineage_hash: 'some-hash' };
+  const result = validateContinuityChain([forgedRoot]);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PARENT_MUST_BE_NULL'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'ROOT_PRIOR_HASH_MUST_BE_NULL'));
+});
+
+test('lineage verification treats equivalent UTC timestamp encodings as the same instant', () => {
+  const spine = createContinuitySpine({ subjectId: 'work:timestamp-canonicalization' });
+  const raw = appendContinuityNode({
+    spine,
+    stage: 'RAW_SIGNAL',
+    entityId: 'signal:timestamp-canonicalization',
+    effectiveTime: '2026-10-09T12:00:00.602Z',
+    assertionTime: '2026-10-09T12:00:00.602Z',
+    payload: { value: 'same instant' },
+  });
+  const persistedRepresentation = {
+    ...raw,
+    effective_time: '2026-10-09T12:00:00.602+00:00',
+    assertion_time: '2026-10-09T12:00:00.602+00:00',
+  };
+  assert.equal(validateContinuityChain([persistedRepresentation]).valid, true);
+
+  const changedInstant = {
+    ...raw,
+    effective_time: '2026-10-09T12:00:01.602+00:00',
+  };
+  assert.equal(validateContinuityChain([changedInstant]).valid, false);
+});
+
+test('does not promote legacy capability stages or unverifiable hashes into the current ledger contract', () => {
+  const legacy = [
+    {
+      event_id: '11111111-1111-4111-8111-111111111111',
+      event_kind: 'OBSERVATION',
+      continuity_root_id: '33333333-3333-4333-8333-333333333333',
+      worldline_id: '44444444-4444-4444-8444-444444444444',
+      parent_event_id: null,
+      lineage_hash: 'lineage-observation-v1',
+      effective_time: '2026-10-06T22:47:51.756Z',
+      assertion_time: '2026-10-06T22:47:51.756Z',
+      epistemic_status: 'OBSERVED',
+      evidence_refs: [],
+      payload: {},
+      provenance: { source: 'universe-v1-proof' },
+    },
+    {
+      event_id: '55555555-5555-4555-8555-555555555555',
+      event_kind: 'CAPABILITY_VERIFIED',
+      continuity_root_id: '33333333-3333-4333-8333-333333333333',
+      worldline_id: '44444444-4444-4444-8444-444444444444',
+      parent_event_id: '11111111-1111-4111-8111-111111111111',
+      prior_lineage_hash: 'lineage-observation-v1',
+      lineage_hash: 'lineage-capability-v1',
+      effective_time: '2026-10-06T22:47:51.756Z',
+      assertion_time: '2026-10-06T22:47:51.756Z',
+      epistemic_status: 'OBSERVED',
+      evidence_refs: [],
+      payload: {},
+      provenance: { source: 'universe-v1-proof' },
+    },
+  ];
+  const result = validateContinuityChain(legacy);
+  assert.equal(result.valid, false);
+  assert.ok(result.broken_links.some((item) => item.reason === 'LINEAGE_HASH_CONTENT_MISMATCH'));
+  assert.ok(result.broken_links.some((item) => item.reason === 'CONTINUITY_STAGE_INVALID'));
+});

@@ -28,6 +28,7 @@ const baseline = freezeBaseline({
   hiddenCaseIds: ['hidden-1'],
   governanceKernelHash: 'kernel:v1',
   baselineResults: { visible: { quality: 0.50 }, hidden: { quality: 0.50 } },
+  seed: 'gsi-training-seed-v1',
 });
 
 test('training ground exposes non-negotiable invariants', () => {
@@ -54,6 +55,7 @@ test('verified experience creates an evidence-grounded learning signal', () => {
     sourceObservations: [{ id: 'obs:1' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:1' },
     corrections: [{ kind: 'verified_correction' }],
+    independentVerifierRef: 'verifier:test-v1',
   });
   assert.equal(signal.truth_status, 'EVIDENCE_GROUNDED');
 });
@@ -69,6 +71,7 @@ test('sandbox cannot modify governance or authority', () => {
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:2' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:2' },
+    independentVerifierRef: 'verifier:test-v1',
   });
   assert.throws(() => runSandboxLearning({
     baseline,
@@ -91,6 +94,7 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:3' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:3' },
+    independentVerifierRef: 'verifier:test-v1',
   });
   const sandbox = runSandboxLearning({
     baseline,
@@ -108,6 +112,8 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     hiddenResults: { quality: 0.61 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
+    benchmarkContractHash: baseline.benchmark_contract_hash,
+    heldoutCaseIds: ['hidden-1'],
     independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
 
@@ -128,6 +134,8 @@ test('candidate that does not generalize cannot promote', () => {
     hiddenResults: { quality: 0.49 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
+    benchmarkContractHash: baseline.benchmark_contract_hash,
+    heldoutCaseIds: ['hidden-1'],
     independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
   assert.equal(evaluation.verdict, 'REJECTED');

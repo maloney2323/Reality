@@ -52,7 +52,11 @@ function createIntelligenceTrainingExperience({
     experience_id: `training_experience:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
     observed_at: observedAt || new Date().toISOString(),
     input: String(message || ''),
-    governed_signal_hash: governedSignal?.signal_hash || governedSignal?.canonical_packet_id || null,
+    governed_signal_hash: governedSignal?.signal_hash || governedSignal?.canonical_packet_id || governedSignal?.packet?.packet_id || null,
+    governed_signal_packet_id: governedSignal?.packet?.packet_id || null,
+    transformation_receipt_id: governedSignal?.transformation_receipt?.receipt_id || null,
+    fragment_ids: (governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean),
+    evidence_refs: [governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id, ...(governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id)].filter(Boolean),
     response_summary: answer.slice(0, 2000),
     runtime_version: intelligence?.runtime_version || null,
     governance,
@@ -155,7 +159,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = {
-      id: governedSignal?.signal_hash || null,
+      id: governedSignal?.signal_hash || governedSignal?.packet?.packet_id || null,
       title: observations.length ? 'New connected-world evidence' : 'New operational signal',
       description: [message, ...observations.map((item) => item?.summary || item?.description || item?.text || '')]
         .filter(Boolean).join(' '),
@@ -176,6 +180,7 @@ export async function runLiveIntelligenceOrchestration({
     subjectId: systemContext?.work_item_id || systemContext?.conversation_id || systemContext?.thought_id || governedSignal.packet.packet_id,
     signal: governedSignal,
     observedAt: observedAt || new Date().toISOString(),
+    workflowRunId: systemContext?.workflow_run_id || null,
     fetchImpl,
   });
   if (discoveredContinuityRootId) {
@@ -226,7 +231,7 @@ export async function runLiveIntelligenceOrchestration({
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
         trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
-        evidenceReferences: [governedSignal?.signal_hash, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))],
+        evidenceReferences: [governedSignal?.signal_hash || governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))].filter(Boolean),
         payload: {
           continuity_state: continuityState,
           materiality,
@@ -251,7 +256,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      (governedSignal?.signal_hash || governedSignal?.packet?.packet_id) ? { ref: governedSignal?.signal_hash || governedSignal.packet.packet_id, kind: 'governed_signal' } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -272,7 +277,7 @@ export async function runLiveIntelligenceOrchestration({
         materiality: 'ACTION_CANDIDATE',
       },
       evidence,
-      missingEvidence: evidence.length ? [] : ['Independent supporting evidence is not yet attached.'],
+      missingEvidence: observations.length ? [] : ['Independent supporting evidence and exact target details are not yet attached.'],
       uncertainty: {
         state: evidence.length ? 'ASSESSED' : 'MISSING_EVIDENCE',
         confidence: evidence.length ? 'SUPPORTED_BY_RECORDED_SIGNAL' : null,
@@ -409,8 +414,28 @@ export async function runLiveIntelligenceOrchestration({
   });
   const run = createWorkflowRun({ workflow: finalWorkflow, intent });
 
+  const appendedContinuityStages = [];
   if (continuityRuntime?.enabled && continuityRuntime?.appendStage) {
-    await continuityRuntime.appendStage({
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
+      stage: 'SITUATION',
+      entityId: situation?.situation_id || situation?.id || `situation:${item.work_item_id}`,
+      evidenceRefs: [
+        governedSignal?.signal_hash || governedSignal?.packet?.packet_id,
+        ...(situation?.evidence || []).map((entry) => entry?.ref),
+      ].filter(Boolean),
+      transformationReceiptId: governedSignal?.transformation_receipt?.receipt_id || null,
+      epistemicStatus: situation?.missing_evidence?.length ? 'PARTIALLY_VERIFIED' : 'OBSERVED',
+      payload: {
+        situation_id: situation?.situation_id || situation?.id || null,
+        state: situation?.state || null,
+        uncertainty: clone(situation?.uncertainty || null),
+        authority_status: situation?.authority?.status || 'REQUIRES_EXPLICIT_AUTHORIZATION',
+        missing_evidence: clone(situation?.missing_evidence || []),
+        blocking_questions: clone(situation?.uncertainty?.blocking_questions || []),
+      },
+      provenance: { source: 'operational_situation_v1' },
+    }));
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
       stage: 'WORK',
       entityId: item.work_item_id,
       evidenceRefs: [governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id].filter(Boolean),
@@ -425,24 +450,31 @@ export async function runLiveIntelligenceOrchestration({
         authority_required: item.authority_required,
       },
       provenance: { source: 'reality_governed_work_runtime' },
-    });
-    await continuityRuntime.appendStage({
+    }));
+    appendedContinuityStages.push(await continuityRuntime.appendStage({
       stage: 'AUTHORITY',
-      entityId: authorizationRequest.authorization_request_id || workflow.workflow_id,
+      entityId: authorizationRequest.authorization_id || workflow.workflow_id,
       evidenceRefs: [item.work_item_id],
       epistemicStatus: 'PROPOSED',
       payload: {
-        authorization_request_id: authorizationRequest.authorization_request_id || null,
+        authorization_request_id: authorizationRequest.authorization_id || null,
         granted: false,
+        authorization_status: 'REQUESTED',
+        authorization_ref: authorizationRequest.authorization_id || null,
         status: 'REQUIRES_EXPLICIT_AUTHORIZATION',
         production_merge_permitted: false,
       },
       provenance: { source: 'reality_governed_authorization_request' },
-    });
+    }));
   }
 
   return {
     ...base,
+    continuity_spine: {
+      ...base.continuity_spine,
+      node_count: (base.continuity_spine.node_count || 0) + appendedContinuityStages.length,
+      last_event_id: appendedContinuityStages.at(-1)?.event_id || base.continuity_spine.last_event_id,
+    },
     mode: 'ACTION_CANDIDATE',
     governance: 'PROPORTIONAL_ACTION_GOVERNANCE',
     work: {

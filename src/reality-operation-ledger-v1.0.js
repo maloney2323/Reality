@@ -143,16 +143,16 @@ export function validateExecutionReplay({ operation_id, execution_id, priorEvent
   if (!operation_id) return { valid: false, reason: 'OPERATION_ID_REQUIRED' };
   if (!execution_id) return { valid: false, reason: 'EXECUTION_ID_REQUIRED' };
   const events = Array.isArray(priorEvents) ? priorEvents : [];
+  const wrongOperation = events.some(e =>
+    e?.payload?.execution_id === execution_id && e?.payload?.operation_id !== operation_id
+  );
+  if (wrongOperation) return Object.freeze({ valid: false, reason: 'EXECUTION_ID_BOUND_TO_DIFFERENT_OPERATION' });
   const duplicate = events.some(e =>
     e?.payload?.execution_id === execution_id ||
     e?.event_id === execution_id ||
     (e?.entity_type === 'execution_receipt' && e?.entity_id === execution_id)
   );
   if (duplicate) return Object.freeze({ valid: false, reason: 'EXECUTION_REPLAY_OR_DUPLICATE' });
-  const wrongOperation = events.some(e =>
-    e?.payload?.execution_id === execution_id && e?.payload?.operation_id !== operation_id
-  );
-  if (wrongOperation) return Object.freeze({ valid: false, reason: 'EXECUTION_ID_BOUND_TO_DIFFERENT_OPERATION' });
   return Object.freeze({ valid: true, reason: null });
 }
 

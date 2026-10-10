@@ -18,6 +18,29 @@ function stable(v) {
 function digest(v) {
   return crypto.createHash('sha256').update(JSON.stringify(stable(v))).digest('hex');
 }
+function canonicalTimestamp(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error('CONTINUITY_TIMESTAMP_INVALID');
+  return date.toISOString();
+}
+function computeLegacyLineageHash(fields) {
+  return digest({
+    spine_version: fields.spineVersion,
+    continuity_root_id: fields.continuityRootId,
+    worldline_id: fields.worldlineId,
+    parent_event_id: fields.parentEventId,
+    prior_lineage_hash: fields.priorLineageHash,
+    stage: fields.stage,
+    entity_id: fields.entityId,
+    evidence_refs: list(fields.evidenceRefs),
+    transformation_receipt_id: text(fields.transformationReceiptId) || null,
+    effective_time: fields.effectiveTime,
+    assertion_time: fields.assertionTime,
+    epistemic_status: text(fields.epistemicStatus) || 'OBSERVED',
+    payload: fields.payload,
+    provenance: fields.provenance,
+  });
+}
 function required(v, code) {
   if (!text(v)) throw new Error(code);
   return text(v);
@@ -48,8 +71,8 @@ export function computeContinuityLineageHash({
     entity_id: entityId,
     evidence_refs: list(evidenceRefs),
     transformation_receipt_id: text(transformationReceiptId) || null,
-    effective_time: effectiveTime,
-    assertion_time: assertionTime,
+    effective_time: canonicalTimestamp(effectiveTime),
+    assertion_time: canonicalTimestamp(assertionTime),
     epistemic_status: text(epistemicStatus) || 'OBSERVED',
     payload,
     provenance,
@@ -96,6 +119,8 @@ export function appendContinuityNode({
   if (stage !== 'RAW_SIGNAL' && !parent) throw new Error('CONTINUITY_PARENT_REQUIRED');
   if (stage !== 'RAW_SIGNAL' && !prior) throw new Error('CONTINUITY_PRIOR_LINEAGE_HASH_REQUIRED');
 
+  const canonicalEffectiveTime = canonicalTimestamp(effectiveTime);
+  const canonicalAssertionTime = canonicalTimestamp(assertionTime);
   const lineageHash = computeContinuityLineageHash({
     continuityRootId: spine.continuity_root_id,
     worldlineId: spine.worldline_id,
@@ -105,8 +130,8 @@ export function appendContinuityNode({
     entityId: entity,
     evidenceRefs,
     transformationReceiptId,
-    effectiveTime,
-    assertionTime,
+    effectiveTime: canonicalEffectiveTime,
+    assertionTime: canonicalAssertionTime,
     epistemicStatus,
     payload,
     provenance,
@@ -126,8 +151,8 @@ export function appendContinuityNode({
     parent_event_id: parent,
     prior_lineage_hash: prior,
     lineage_hash: lineageHash,
-    effective_time: effectiveTime,
-    assertion_time: assertionTime,
+    effective_time: canonicalEffectiveTime,
+    assertion_time: canonicalAssertionTime,
     epistemic_status: text(epistemicStatus) || 'OBSERVED',
     evidence_refs: Object.freeze(list(evidenceRefs)),
     transformation_receipt_id: text(transformationReceiptId) || null,
@@ -155,14 +180,92 @@ export function validateContinuityChain(nodes = []) {
   for (let i = 0; i < ordered.length; i += 1) {
     const node = ordered[i];
     if (!node?.continuity_root_id || !node?.worldline_id || !node?.event_id || !node?.lineage_hash) {
-      broken.push({ index: i, reason: 'NODE_IDENTITY_INCOMPLETE' }); continue;
+      broken.push({ index: i, reason: 'NODE_IDENTITY_INCOMPLETE' });
+      continue;
     }
-    if (i === 0) continue;
+    if (!SPINE_STAGES.includes(node.event_kind)) {
+      broken.push({ index: i, reason: 'CONTINUITY_STAGE_INVALID' });
+    }
+
+    const persistedContinuity = node?.provenance?.continuity_spine || null;
+    const priorLineageHash = node.prior_lineage_hash ?? persistedContinuity?.prior_lineage_hash ?? null;
+    const transformationReceiptId = node.transformation_receipt_id
+      ?? persistedContinuity?.transformation_receipt_id
+      ?? null;
+    // The persistence adapter adds this envelope after the event hash is minted.
+    // Exclude that envelope when recomputing the hash, while retaining the version
+    // it records so older spine versions can be checked using their own contract.
+    const provenance = node.provenance && typeof node.provenance === 'object'
+      ? Object.fromEntries(Object.entries(node.provenance).filter(([key]) => key !== 'continuity_spine'))
+      : {};
+    const hashFields = {
+      spineVersion: persistedContinuity?.version || REALITY_CONTINUITY_SPINE_VERSION,
+      continuityRootId: node.continuity_root_id,
+      worldlineId: node.worldline_id,
+      parentEventId: node.parent_event_id || null,
+      priorLineageHash,
+      stage: node.event_kind,
+      entityId: node.entity_id,
+      evidenceRefs: node.evidence_refs || [],
+      transformationReceiptId,
+      effectiveTime: node.effective_time,
+      assertionTime: node.assertion_time,
+      epistemicStatus: node.epistemic_status,
+      payload: node.payload ?? {},
+      provenance,
+    };
+    const expectedHash = computeContinuityLineageHash(hashFields);
+    // v2.1 events were hashed from the caller's original timestamp strings. Keep
+    // a read-only compatibility check for that representation while canonical
+    // UTC timestamps are used for all newly minted events.
+    const legacyHash = persistedContinuity?.version === 'reality-continuity-spine-v2.1'
+      ? computeLegacyLineageHash(hashFields)
+      : null;
+    if (expectedHash !== node.lineage_hash && legacyHash !== node.lineage_hash) {
+      broken.push({ index: i, reason: 'LINEAGE_HASH_CONTENT_MISMATCH' });
+    }
+
+    if (i === 0) {
+      if (node.parent_event_id != null) broken.push({ index: i, reason: 'ROOT_PARENT_MUST_BE_NULL' });
+      if (priorLineageHash != null) broken.push({ index: i, reason: 'ROOT_PRIOR_HASH_MUST_BE_NULL' });
+      continue;
+    }
     const prev = ordered[i - 1];
     if (node.parent_event_id !== prev.event_id) broken.push({ index: i, reason: 'PARENT_EVENT_MISMATCH' });
-    if (node.prior_lineage_hash !== prev.lineage_hash) broken.push({ index: i, reason: 'LINEAGE_HASH_MISMATCH' });
+    if (priorLineageHash !== prev.lineage_hash) broken.push({ index: i, reason: 'LINEAGE_HASH_MISMATCH' });
     if (node.continuity_root_id !== prev.continuity_root_id) broken.push({ index: i, reason: 'ROOT_MISMATCH' });
     if (node.worldline_id !== prev.worldline_id) broken.push({ index: i, reason: 'WORLDLINE_MISMATCH' });
   }
-  return Object.freeze({ valid: broken.length === 0, event_count: ordered.length, broken_links: broken });
+  return Object.freeze({
+    valid: broken.length === 0,
+    event_count: ordered.length,
+    broken_links: Object.freeze(broken.map((item) => Object.freeze(item))),
+  });
+}
+
+
+// Legacy stage names are classified for diagnostics only. Classification never
+// promotes the event into the current verified contract or makes the chain resumable.
+export function classifyContinuityHistoryDisposition(nodes = [], validation = null) {
+  const rows = Array.isArray(nodes) ? nodes : [];
+  const legacyStage = rows.find((node) => node?.event_kind === 'CAPABILITY_VERIFIED');
+  if (legacyStage) {
+    return Object.freeze({
+      status: 'LEGACY_UNVERIFIABLE',
+      eligible_for_resume: false,
+      reason: 'LEGACY_STAGE_OUTSIDE_CURRENT_CONTRACT',
+      event_id: legacyStage.event_id || null,
+      event_kind: legacyStage.event_kind,
+      event_count: rows.length,
+      broken_links: Object.freeze([...(validation?.broken_links || [])]),
+    });
+  }
+  const result = validation || validateContinuityChain(rows);
+  return Object.freeze({
+    status: result.valid ? 'VERIFIED' : 'INVALID',
+    eligible_for_resume: result.valid,
+    reason: result.valid ? null : 'CONTINUITY_HISTORY_INVALID',
+    event_count: result.event_count,
+    broken_links: Object.freeze([...(result.broken_links || [])]),
+  });
 }

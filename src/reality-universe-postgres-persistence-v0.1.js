@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 
-export const UNIVERSE_POSTGRES_PERSISTENCE_VERSION = '0.2.1-continuity-spine';
+export const UNIVERSE_POSTGRES_PERSISTENCE_VERSION = '0.3.0-atomic-continuity-append';
 
 function required(name, value) {
   if (!value || typeof value !== 'string') throw new Error(name + '_REQUIRED');
@@ -14,6 +14,52 @@ function stable(value) {
 }
 function hash(value) {
   return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+}
+
+function orderContinuityRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const byId = new Map();
+  const children = new Map();
+  const roots = [];
+
+  for (const row of rows) {
+    if (!row?.event_id || byId.has(row.event_id)) {
+      throw new Error('CONTINUITY_HISTORY_EVENT_ID_INVALID');
+    }
+    byId.set(row.event_id, row);
+  }
+
+  for (const row of rows) {
+    const parentId = row.parent_event_id || null;
+    if (!parentId) {
+      roots.push(row);
+      continue;
+    }
+    if (!byId.has(parentId)) {
+      throw new Error('CONTINUITY_HISTORY_PARENT_MISSING');
+    }
+    const siblings = children.get(parentId) || [];
+    siblings.push(row);
+    children.set(parentId, siblings);
+  }
+
+  if (roots.length !== 1) throw new Error('CONTINUITY_HISTORY_ROOT_COUNT_INVALID');
+  for (const siblings of children.values()) {
+    if (siblings.length > 1) throw new Error('CONTINUITY_HISTORY_FORK_DETECTED');
+  }
+
+  const ordered = [];
+  const visited = new Set();
+  let current = roots[0];
+  while (current) {
+    if (visited.has(current.event_id)) throw new Error('CONTINUITY_HISTORY_CYCLE_DETECTED');
+    visited.add(current.event_id);
+    ordered.push(current);
+    current = (children.get(current.event_id) || [])[0] || null;
+  }
+
+  if (ordered.length !== rows.length) throw new Error('CONTINUITY_HISTORY_DISCONNECTED');
+  return ordered;
 }
 
 export function createUniversePostgresPersistence({
@@ -56,7 +102,7 @@ export function createUniversePostgresPersistence({
     const params = new URLSearchParams({
       continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
       worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      order: 'assertion_time.desc,created_at.desc,event_id.desc',
+      order: 'created_at.desc,event_id.desc',
       limit: '1',
     });
     const rows = await request('universe_events?' + params.toString());
@@ -132,22 +178,53 @@ export function createUniversePostgresPersistence({
       lineage_hash: expectedLineageHash,
     };
 
-    await request('universe_events', {
+    // The database RPC takes a transaction-scoped advisory lock and rechecks the
+    // parent against the actual tail before inserting. The earlier read is for
+    // deterministic hash construction only; it is not the concurrency boundary.
+    const committed = await request('rpc/append_universe_event', {
       method: 'POST',
-      body: record,
-      headers: { Prefer: 'return=representation' },
+      body: { p_record: record },
     });
-    return Object.freeze({ ...event, ...record, prior_lineage_hash: priorLineageHash, status: 'PERSISTED' });
+    const committedRecord = Array.isArray(committed) ? committed[0] : committed;
+    if (!committedRecord || !['PERSISTED', 'DUPLICATE_IDENTICAL'].includes(committedRecord.status)) {
+      throw new Error('CONTINUITY_ATOMIC_APPEND_UNCONFIRMED');
+    }
+    if (committedRecord.lineage_hash !== expectedLineageHash) {
+      throw new Error('CONTINUITY_ATOMIC_APPEND_HASH_MISMATCH');
+    }
+    return Object.freeze({
+      ...event,
+      ...record,
+      ...committedRecord,
+      prior_lineage_hash: priorLineageHash,
+      status: committedRecord.status,
+    });
   }
 
-  async function reconstruct({ continuityRootId, worldlineId, assertionTime = new Date().toISOString() }) {
-    const params = new URLSearchParams({
-      continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
-      worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      assertion_time: 'lte.' + assertionTime,
-      order: 'assertion_time.asc,created_at.asc,event_id.asc',
-    });
-    return request('universe_events?' + params.toString());
+  async function reconstruct({ continuityRootId, worldlineId } = {}) {
+    // A continuity tail is ordered by immutable parent links, not by assertion
+    // time or timestamps that may tie or be affected by transaction start time.
+    // Historical as-of queries must use a separate projection; filtering this
+    // ledger by assertion_time could silently omit its actual durable tail.
+    // Page explicitly because PostgREST commonly caps responses at 1,000 rows.
+    const pageSize = 1000;
+    const allRows = [];
+    let offset = 0;
+    while (true) {
+      const params = new URLSearchParams({
+        continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
+        worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
+        order: 'created_at.asc,event_id.asc',
+        limit: String(pageSize),
+        offset: String(offset),
+      });
+      const page = await request('universe_events?' + params.toString());
+      if (!Array.isArray(page)) throw new Error('CONTINUITY_HISTORY_RESPONSE_INVALID');
+      allRows.push(...page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return orderContinuityRows(allRows);
   }
 
   async function getCapability(capabilityId, version) {

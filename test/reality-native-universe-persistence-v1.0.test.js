@@ -6,6 +6,9 @@ import {
   retrievePersistedUniverse,
 } from '../src/reality-native-universe-persistence-v1.0.js';
 
+// The tests inject mock fetch handlers; this dummy key never reaches a real network.
+process.env.SUPABASE_SECRET_KEY ||= 'test-only-persistence-key';
+
 const base = createUniverseEntry({
   entry_id: 'entry:persistence:test:1',
   continuity_root_id: 'root:test',

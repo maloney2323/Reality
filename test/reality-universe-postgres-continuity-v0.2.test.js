@@ -7,18 +7,37 @@ test('persistence automatically links sequential events into one continuity tail
   const rows = [];
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
-    if (options.method === 'POST') {
-      const body = JSON.parse(options.body);
-      rows.push(body);
-      return new Response(JSON.stringify([body]), { status: 201, headers: { 'content-type': 'application/json' } });
+    if (u.pathname.endsWith('/rpc/append_universe_event')) {
+      const { p_record } = JSON.parse(options.body);
+      const existing = rows.find((row) => row.event_id === p_record.event_id);
+      if (existing) {
+        if (existing.lineage_hash !== p_record.lineage_hash) return new Response('CONTINUITY_EVENT_ID_COLLISION', { status: 409 });
+        return new Response(JSON.stringify({ ...existing, status: 'DUPLICATE_IDENTICAL' }), { status: 200 });
+      }
+      const tail = rows.filter((row) => row.continuity_root_id === p_record.continuity_root_id && row.worldline_id === p_record.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((p_record.parent_event_id || null) !== (tail?.event_id || null)) {
+        return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      }
+      const priorHash = p_record.provenance?.continuity_spine?.prior_lineage_hash || null;
+      if (priorHash !== (tail?.lineage_hash || null)) return new Response('CONTINUITY_PRIOR_LINEAGE_HASH_MISMATCH', { status: 409 });
+      const saved = { ...p_record, created_at: new Date(Date.now() + rows.length).toISOString(), status: 'PERSISTED' };
+      rows.push(saved);
+      return new Response(JSON.stringify(saved), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
     if (requestedId) {
       const exact = rows.find((row) => row.event_id === requestedId);
       return new Response(JSON.stringify(exact ? [exact] : []), { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    const latest = rows.slice().sort((a, b) => String(b.assertion_time).localeCompare(String(a.assertion_time)))[0];
-    return new Response(JSON.stringify(latest ? [latest] : []), { status: 200, headers: { 'content-type': 'application/json' } });
+    const root = u.searchParams.get('continuity_root_id')?.replace(/^eq\./, '') || null;
+    const worldline = u.searchParams.get('worldline_id')?.replace(/^eq\./, '') || null;
+    const matching = rows.filter((row) => row.continuity_root_id === root && row.worldline_id === worldline);
+    const order = u.searchParams.get('order') || '';
+    matching.sort((a, b) => order.includes('desc')
+      ? String(b.created_at).localeCompare(String(a.created_at))
+      : String(a.created_at).localeCompare(String(b.created_at)));
+    return new Response(JSON.stringify(matching), { status: 200, headers: { 'content-type': 'application/json' } });
   };
 
   try {
@@ -65,8 +84,15 @@ test('persistence rejects a write against a non-tail parent', async () => {
   }];
   global.fetch = async (url, options = {}) => {
     const u = new URL(url);
-    if (options.method === 'POST') return new Response('[]', { status: 201 });
-    if (u.searchParams.get('event_id')) return new Response('[]', { status: 200 });
+    if (u.pathname.endsWith('/rpc/append_universe_event')) {
+      const { p_record } = JSON.parse(options.body);
+      const tail = rows.filter((row) => row.continuity_root_id === p_record.continuity_root_id && row.worldline_id === p_record.worldline_id)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      if ((p_record.parent_event_id || null) !== (tail?.event_id || null)) return new Response('CONTINUITY_APPEND_NOT_TAIL', { status: 409 });
+      return new Response(JSON.stringify({ ...p_record, status: 'PERSISTED' }), { status: 200 });
+    }
+    const requestedId = u.searchParams.get('event_id')?.replace(/^eq\./, '') || null;
+    if (requestedId) return new Response('[]', { status: 200 });
     return new Response(JSON.stringify(rows), { status: 200 });
   };
   try {
@@ -85,4 +111,83 @@ test('persistence rejects a write against a non-tail parent', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test('reconstructs the durable ledger by parent links despite timestamp disorder and future assertions', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const seedId = '11111111-1111-5111-8111-111111111111';
+  const childId = '22222222-2222-5222-8222-222222222222';
+  const rows = [
+    {
+      event_id: childId, continuity_root_id: root, worldline_id: world,
+      parent_event_id: seedId, created_at: '2026-10-09T00:00:01Z',
+      assertion_time: '2026-10-08T00:00:00Z', lineage_hash: 'child-hash',
+    },
+    {
+      event_id: seedId, continuity_root_id: root, worldline_id: world,
+      parent_event_id: null, created_at: '2026-10-09T00:00:02Z',
+      assertion_time: '2026-10-10T00:00:00Z', lineage_hash: 'seed-hash',
+    },
+  ];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async () => new Response(JSON.stringify(rows), { status: 200 }),
+  });
+  const reconstructed = await persistence.reconstruct({ continuityRootId: root, worldlineId: world });
+  assert.deepEqual(reconstructed.map((row) => row.event_id), [seedId, childId]);
+  assert.equal(reconstructed.length, 2, 'continuity reconstruction must not apply an implicit assertion-time cutoff');
+});
+
+test('reconstruction fails closed on a forked parent chain', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const seedId = '11111111-1111-5111-8111-111111111111';
+  const rows = [
+    { event_id: seedId, continuity_root_id: root, worldline_id: world, parent_event_id: null },
+    { event_id: '22222222-2222-5222-8222-222222222222', continuity_root_id: root, worldline_id: world, parent_event_id: seedId },
+    { event_id: '33333333-3333-5333-8333-333333333333', continuity_root_id: root, worldline_id: world, parent_event_id: seedId },
+  ];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async () => new Response(JSON.stringify(rows), { status: 200 }),
+  });
+  await assert.rejects(
+    persistence.reconstruct({ continuityRootId: root, worldlineId: world }),
+    /CONTINUITY_HISTORY_FORK_DETECTED/,
+  );
+});
+
+test('reconstructs ledgers larger than one PostgREST page without truncation', async () => {
+  const root = 'aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const world = 'bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const rows = Array.from({ length: 1001 }, (_, index) => ({
+    event_id: '00000000-0000-5000-8000-' + String(index + 1).padStart(12, '0'),
+    continuity_root_id: root,
+    worldline_id: world,
+    parent_event_id: index === 0
+      ? null
+      : '00000000-0000-5000-8000-' + String(index).padStart(12, '0'),
+    created_at: '2026-10-09T00:00:00.000Z',
+    assertion_time: index === 1000 ? '2099-01-01T00:00:00.000Z' : '2026-10-09T00:00:00.000Z',
+  }));
+  const offsets = [];
+  const persistence = createUniversePostgresPersistence({
+    url: 'https://example.supabase.co',
+    secretKey: 'test-key',
+    fetchImpl: async (url) => {
+      const params = new URL(url).searchParams;
+      const offset = Number(params.get('offset'));
+      const limit = Number(params.get('limit'));
+      offsets.push(offset);
+      return new Response(JSON.stringify(rows.slice(offset, offset + limit)), { status: 200 });
+    },
+  });
+  const reconstructed = await persistence.reconstruct({ continuityRootId: root, worldlineId: world });
+  assert.equal(reconstructed.length, 1001);
+  assert.deepEqual(offsets, [0, 1000]);
+  assert.equal(reconstructed[0].event_id, rows[0].event_id);
+  assert.equal(reconstructed.at(-1).event_id, rows.at(-1).event_id);
 });
