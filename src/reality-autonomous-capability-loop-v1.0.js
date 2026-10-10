@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-export const AUTONOMOUS_CAPABILITY_LOOP_VERSION = '0.2.0';
+export const AUTONOMOUS_CAPABILITY_LOOP_VERSION = '1.0.0';
 
 export const CAPABILITY_LOOP_STATES = Object.freeze([
  'GAP_DETECTED','GAP_CONFIRMED','SANDBOX_PROPOSED','AWAITING_AUTHORIZATION',
