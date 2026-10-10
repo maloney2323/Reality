@@ -3,6 +3,7 @@ import {
   appendContinuityNode,
   advanceSpine,
   validateContinuityChain,
+  classifyContinuityHistoryDisposition,
   SPINE_STAGES,
 } from './reality-continuity-spine-v2.0.js';
 import { evaluateContinuityStageGate } from './reality-continuity-stage-gate-v1.0.js';
@@ -97,9 +98,13 @@ export async function startContinuityRuntime({
     globalNodes = (Array.isArray(reconstructed) ? reconstructed : []).map(normalizePersistedNode);
     const chain = validateContinuityChain(globalNodes);
     if (!chain.valid) {
-      const failure = new Error('CONTINUITY_HISTORY_INVALID');
-      failure.code = 'CONTINUITY_HISTORY_INVALID';
-      failure.details = chain;
+      const disposition = classifyContinuityHistoryDisposition(globalNodes, chain);
+      const code = disposition.status === 'LEGACY_UNVERIFIABLE'
+        ? 'LEGACY_UNVERIFIABLE'
+        : 'CONTINUITY_HISTORY_INVALID';
+      const failure = new Error(code);
+      failure.code = code;
+      failure.details = disposition;
       throw failure;
     }
     workflowNodes = globalNodes.filter((node) => workflowIdOf(node) === runId);
