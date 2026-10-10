@@ -107,7 +107,7 @@ export function rankWorkForMoney(work,{riskWeight=1,recurrenceWeight=1,revenueWe
   const revenue=work.expected_revenue||0;
   const recurrence=work.recurring?Math.min(work.recurrence_count/5,1):0;
   const riskPenalty=work.risk==='HIGH'?riskWeight:0;
-  const score=(revenue*revenueWeight)+(recurrence*100*recurrenceWeight)-riskPenalty;
+  const score=(revenue*revenueWeight)+(recurrence*50*recurrenceWeight)-riskPenalty;
   return Object.freeze({...work,money_priority_score:score});
 }
 
