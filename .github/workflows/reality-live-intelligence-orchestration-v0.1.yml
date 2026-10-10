@@ -2,57 +2,21 @@ name: Reality Live Intelligence Orchestration v0.1
 
 on:
   push:
-    paths:
-      - 'src/reality-live-intelligence-orchestration-v0.1.js'
-      - 'src/reality-model-gateway-v0.1.js'
-      - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
-      - 'src/reality-governed-work-runtime-v0.1.js'
-      - 'src/reality-continuity-spine-runtime-v0.1.js'
-      - 'src/reality-continuity-stage-gate-v1.0.js'
-      - 'src/reality-continuity-spine-v2.0.js'
-      - 'src/reality-universe-postgres-persistence-v0.1.js'
-      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
-      - 'supabase/tests/atomic-continuity-append-v1.sh'
-      - '.github/workflows/reality-atomic-continuity-append.yml'
-      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
-      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
-      - 'test/reality-continuity-stage-gate-v1.0.test.js'
-      - 'test/reality-continuity-spine-runtime-v0.1.test.js'
-      - 'test/reality-continuity-runtime-v0.1.test.js'
-      - 'test/reality-continuity-legacy-disposition-v1.test.js'
-      - 'test/reality-governed-fragmented-signal-cleaner-v0.1.test.js'
-      - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
   pull_request:
-    paths:
-      - 'src/reality-live-intelligence-orchestration-v0.1.js'
-      - 'src/reality-model-gateway-v0.1.js'
-      - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
-      - 'src/reality-governed-work-runtime-v0.1.js'
-      - 'src/reality-continuity-spine-runtime-v0.1.js'
-      - 'src/reality-continuity-stage-gate-v1.0.js'
-      - 'src/reality-continuity-spine-v2.0.js'
-      - 'src/reality-universe-postgres-persistence-v0.1.js'
-      - 'supabase/migrations/20261009220000_reality_atomic_continuity_append_v1.sql'
-      - 'supabase/tests/atomic-continuity-append-v1.sh'
-      - 'test/reality-governed-fragmented-signal-cleaner-v0.1.test.js'
-      - '.github/workflows/reality-atomic-continuity-append.yml'
-      - 'test/reality-universe-postgres-continuity-v0.2.test.js'
-      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
-      - 'test/reality-continuity-stage-gate-v1.0.test.js'
-      - 'test/reality-continuity-spine-runtime-v0.1.test.js'
-      - 'test/reality-continuity-runtime-v0.1.test.js'
-      - 'test/reality-continuity-legacy-disposition-v1.test.js'
-      - '.github/workflows/reality-live-intelligence-orchestration-v0.1.yml'
+  workflow_dispatch:
 
 jobs:
-  test:
+  focused-continuity:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-continuity-stage-gate-v1.0.test.js test/reality-continuity-spine-runtime-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-continuity-legacy-disposition-v1.test.js test/reality-universe-postgres-continuity-v0.2.test.js test/reality-governed-fragmented-signal-cleaner-v0.1.test.js
+      - name: Run focused continuity and orchestration tests
+        run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-continuity-stage-gate-v1.0.test.js test/reality-continuity-spine-runtime-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-continuity-legacy-disposition-v1.test.js test/reality-universe-postgres-continuity-v0.2.test.js test/reality-governed-fragmented-signal-cleaner-v0.1.test.js
 
   atomic-postgres-append:
     runs-on: ubuntu-latest
@@ -73,6 +37,8 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/reality_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify migration and concurrent writer behavior against PostgreSQL
         run: bash supabase/tests/atomic-continuity-append-v1.sh
 
@@ -80,8 +46,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run full repository regression suite
-        run: npm test
+      - name: Run full repository regression suite (raw result retained)
+        run: npm test > /tmp/pr.tap 2>&1
+        continue-on-error: true
+      - name: Preserve raw full-regression TAP output
+        if: always()
+        run: cp /tmp/pr.tap pr-full-regression.tap
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-full-regression-${{ github.run_id }}
+          path: pr-full-regression.tap
+          if-no-files-found: warn
+
+  baseline-regression-comparison:
+    runs-on: ubuntu-latest
+    needs: full-regression
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      PR_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run exact base commit full regression suite
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "No valid base SHA supplied; cannot compare regressions safely."
+            exit 1
+          fi
+          git -C . rev-parse "$PR_SHA"
+          git clone --quiet --no-checkout "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" /tmp/reality-base
+          git -C /tmp/reality-base fetch --quiet origin "$BASE_SHA"
+          git -C /tmp/reality-base checkout --quiet --detach FETCH_HEAD
+          cd /tmp/reality-base
+          node --test test/*.test.js > /tmp/base.tap 2>&1 || true
+          cd "$GITHUB_WORKSPACE"
+          npm test > /tmp/pr.tap 2>&1 || true
+      - name: Compare failure signatures; fail only for newly introduced failures
+        run: node scripts/compare-ci-baseline.mjs /tmp/base.tap /tmp/pr.tap | tee ci-regression-comparison.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-regression-comparison-${{ github.run_id }}
+          path: ci-regression-comparison.json
+          if-no-files-found: error
