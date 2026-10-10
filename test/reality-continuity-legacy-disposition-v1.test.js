@@ -12,7 +12,7 @@ test('legacy CAPABILITY_VERIFIED history is quarantined, never promoted or resum
     continuity_root_id: 'legacy-root',
     worldline_id: 'legacy-worldline',
     parent_event_id: 'legacy-parent',
-    lineage_hash: 'legacy-placeholder-hash',
+    lineage_hash: 'legacy-placeholder-hash',\n    entity_id: 'legacy-entity',\n    effective_time: '2026-10-01T00:00:00.000Z',\n    assertion_time: '2026-10-01T00:00:00.000Z',\n    epistemic_status: 'OBSERVED',\n    evidence_refs: [],\n    payload: {},\n    provenance: {},
   }];
   const validation = validateContinuityChain(legacy);
   const disposition = classifyContinuityHistoryDisposition(legacy, validation);
