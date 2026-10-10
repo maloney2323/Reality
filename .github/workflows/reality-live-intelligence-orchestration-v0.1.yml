@@ -74,22 +74,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Run exact base commit full regression suite
+      - name: Validate base SHA
         run: |
           if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
             echo "No valid base SHA supplied; cannot compare regressions safely."
             exit 1
           fi
-          git -C . rev-parse "$PR_SHA"
-          git clone --quiet --no-checkout "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" /tmp/reality-base
-          git -C /tmp/reality-base fetch --quiet origin "$BASE_SHA"
-          git -C /tmp/reality-base checkout --quiet --detach FETCH_HEAD
-          cd /tmp/reality-base
-          node --test test/*.test.js > /tmp/base.tap 2>&1 || true
-          cd "$GITHUB_WORKSPACE"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run full regression suite against exact base and PR commits
+        run: |
+          (cd baseline && node --test test/*.test.js) > /tmp/base.tap 2>&1 || true
           npm test > /tmp/pr.tap 2>&1 || true
       - name: Compare failure signatures; fail only for newly introduced failures
         run: node scripts/compare-ci-baseline.mjs /tmp/base.tap /tmp/pr.tap | tee ci-regression-comparison.json
