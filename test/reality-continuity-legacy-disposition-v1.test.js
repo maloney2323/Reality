@@ -32,7 +32,7 @@ test('ordinary invalid history remains invalid rather than being mislabeled as l
     continuity_root_id: 'root',
     worldline_id: 'worldline',
     parent_event_id: null,
-    lineage_hash: 'placeholder',
+    lineage_hash: 'placeholder',\n    entity_id: 'unknown-stage-entity',\n    effective_time: '2026-10-01T00:00:00.000Z',\n    assertion_time: '2026-10-01T00:00:00.000Z',\n    epistemic_status: 'OBSERVED',\n    evidence_refs: [],\n    payload: {},\n    provenance: {},
   }];
   const disposition = classifyContinuityHistoryDisposition(invalid);
 
