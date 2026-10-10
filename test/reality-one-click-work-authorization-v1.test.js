@@ -7,7 +7,8 @@ test('one-click found-work authorization creates scoped auto authority', () => {
   const workItem = { workflow_id: 'workflow:test', connector: 'github', operation: 'create_issue', resource: 'maloney2323/Reality', work_item_id: 'work:test' };
   assert.equal(scopeMatches(policy, workItem), true);
   const authorization = autoAuthorize({ policy, workItem });
-  assert.equal(authorization?.principal_id, 'session:test');
+  assert.equal(authorization?.principal, 'session:test');
+  assert.equal(authorization?.authorized, true);
 });
 
 test('one-click authority stays bounded to the found work item', () => {
