@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONSTITUTION, evaluateConstitution } from '../src/reality-constitution.js';
+import { CONSTITUTION, evaluateConstitution, evaluateCognition, evaluateConsequence } from '../src/reality-constitution.js';
 
 const base = {
   proposal: {
@@ -8,6 +8,7 @@ const base = {
     requiredScope: 'repository',
     risk: 'low',
     amountCents: 1000,
+    consequential: true,
   },
   state: { evidenceSufficient: true, contradiction: false },
 };
@@ -72,4 +73,33 @@ test('non-action decisions remain explicit and attested', () => {
   assert.equal(result.allowed, false);
   assert.equal(result.decision, 'ESCALATE');
   assert.equal(result.attested, true);
+});
+
+
+test('cognition is not blocked by action authority requirements', () => {
+  const result = evaluateCognition({
+    proposal: { requestedDecision: 'INVESTIGATE' },
+    state: { evidenceSufficient: false, contradiction: true },
+  });
+  assert.equal(result.allowed, true);
+  assert.equal(result.executionPermitted, false);
+  assert.equal(result.authorityRequired, false);
+});
+
+test('non-consequential intelligence work does not enter the consequence gate', () => {
+  const result = evaluateConstitution({
+    proposal: { requestedDecision: 'INVESTIGATE' },
+    state: { evidenceSufficient: false, contradiction: true },
+  });
+  assert.equal(result.allowed, true);
+  assert.equal(result.reason, 'COGNITION_NOT_GOVERNED_BY_ACTION_AUTHORITY');
+});
+
+test('consequential work still requires explicit authority and evidence', () => {
+  const result = evaluateConsequence({
+    proposal: { consequential: true, requestedDecision: 'ACT' },
+    state: { evidenceSufficient: false },
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, 'INSUFFICIENT_EVIDENCE');
 });
