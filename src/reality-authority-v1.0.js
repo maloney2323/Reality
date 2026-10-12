@@ -1,3 +1,11 @@
+/**
+ * Reality Authority Module v1.0
+ *
+ * Provides the logic for managing, validating, and persisting customer authority policies.
+ * This module enables automatic authorization of work items based on defined scopes and
+ * ensures governance via persistence of authority-related events.
+ */
+
 import crypto from 'node:crypto';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
 import { buildAuthorizationRequest, authorize } from './reality-governed-work-runtime-v0.1.js';
