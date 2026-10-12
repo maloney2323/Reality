@@ -3,6 +3,7 @@ import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
+import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -169,6 +170,14 @@ export async function runLiveIntelligenceOrchestration({
     }
   }
   const effectiveContinuityRootId = discoveredContinuityRootId || explicitContinuityRootId || conversationContinuityRootId;
+  const continuityRuntime = await startContinuityRuntime({
+    continuityRootSource: effectiveContinuityRootId,
+    worldlineSource: systemContext?.worldline_id || 'reality:primary',
+    subjectId: systemContext?.work_item_id || systemContext?.conversation_id || systemContext?.thought_id || governedSignal.packet.packet_id,
+    signal: governedSignal,
+    observedAt: observedAt || new Date().toISOString(),
+    fetchImpl,
+  });
   if (discoveredContinuityRootId) {
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
@@ -229,7 +238,11 @@ export async function runLiveIntelligenceOrchestration({
       })
     : null;
 
-  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  // The continuity spine is the canonical ledger when enabled. Do not also write
+  // the legacy state-transition ledger for the same chat turn: its independent
+  // lineage contract can reject the request after the canonical spine has already
+  // durably recorded RAW_SIGNAL -> TRANSFORMATION -> OBSERVATION.
+  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true' && continuityRuntime?.enabled !== true) {
     await persistContinuityEvent(continuityEvent, { fetchImpl });
   }
 
@@ -301,6 +314,16 @@ export async function runLiveIntelligenceOrchestration({
 
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
+    continuity_spine: {
+      version: continuityRuntime?.spine?.spine_version || null,
+      status: continuityRuntime?.status || 'NO_CONTINUITY_ROOT',
+      enabled: continuityRuntime?.enabled === true,
+      continuity_root_id: continuityRuntime?.spine?.continuity_root_id || null,
+      continuity_root_source: continuityRuntime?.spine?.continuity_root_source || effectiveContinuityRootId || null,
+      worldline_id: continuityRuntime?.spine?.worldline_id || null,
+      node_count: continuityRuntime?.nodes?.length || 0,
+      last_event_id: continuityRuntime?.spine?.last_event_id || null,
+    },
     governed_signal: clone(governedSignal),
     intelligence: clone(modelResult),
     authority: {
@@ -385,6 +408,38 @@ export async function runLiveIntelligenceOrchestration({
     scope: [{ connector: item.connector, operation: item.operation, work_item_id: item.work_item_id }],
   });
   const run = createWorkflowRun({ workflow: finalWorkflow, intent });
+
+  if (continuityRuntime?.enabled && continuityRuntime?.appendStage) {
+    await continuityRuntime.appendStage({
+      stage: 'WORK',
+      entityId: item.work_item_id,
+      evidenceRefs: [governedSignal?.packet?.packet_id, governedSignal?.transformation_receipt?.receipt_id].filter(Boolean),
+      transformationReceiptId: governedSignal?.transformation_receipt?.receipt_id || null,
+      epistemicStatus: 'PROPOSED',
+      payload: {
+        work_item_id: item.work_item_id,
+        workflow_id: workflow.workflow_id,
+        connector: item.connector,
+        operation: item.operation,
+        consequential: item.consequential === true,
+        authority_required: item.authority_required,
+      },
+      provenance: { source: 'reality_governed_work_runtime' },
+    });
+    await continuityRuntime.appendStage({
+      stage: 'AUTHORITY',
+      entityId: authorizationRequest.authorization_request_id || workflow.workflow_id,
+      evidenceRefs: [item.work_item_id],
+      epistemicStatus: 'PROPOSED',
+      payload: {
+        authorization_request_id: authorizationRequest.authorization_request_id || null,
+        granted: false,
+        status: 'REQUIRES_EXPLICIT_AUTHORIZATION',
+        production_merge_permitted: false,
+      },
+      provenance: { source: 'reality_governed_authorization_request' },
+    });
+  }
 
   return {
     ...base,
