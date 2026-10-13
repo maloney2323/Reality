@@ -7,7 +7,7 @@ import {
   createWorkflowRun,
 } from './reality-governed-work-runtime-v0.1.js';
 
-export const REALITY_CHAT_BRIEF_VERSION = '0.1.0';
+export const REALITY_CHAT_BRIEF_VERSION = '1.0.0';
 
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function lower(value) { return text(value).toLowerCase(); }

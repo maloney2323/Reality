@@ -74,4 +74,4 @@ if (!rejected) throw new Error('ILLEGAL_STATE_JUMP_ACCEPTED');
 if (!assertNoImplicitExecution({preflight, authorization:null, executionReceipt:blocked}))
   throw new Error('IMPLICIT_EXECUTION_ASSERTION_FAILED');
 
-console.log('Governed Work Runtime v0.1: PASS');
+console.log('Governed Work Runtime v1.0: PASS');
