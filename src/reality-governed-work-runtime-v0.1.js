@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const GOVERNED_WORK_RUNTIME_VERSION = '0.1.0';
+export const GOVERNED_WORK_RUNTIME_VERSION = '1.0.0';
 
 export const WORKFLOW_STATES = Object.freeze([
   'CAPTURED','STRUCTURED','CLARIFICATION_REQUIRED','PLANNED','PREFLIGHTED',
@@ -35,7 +35,7 @@ function list(value) { return Array.isArray(value) ? value.map((v) => typeof v =
 function id(prefix, seed) { return prefix + ':' + createHash('sha256').update(seed).digest('hex').slice(0, 32); }
 function freeze(value) { return Object.freeze(value); }
 
-export function createIntentRecord({
+export function createIntentRecord({ 
   requestedBy, statement, desiredOutcome = null, constraints = [], scope = {},
   priority = null, deadline = null, recurrence = null, trigger = 'user_request',
   ambiguities = [], materialAssumptions = [], continuityRootId = null, worldlineId = null
