@@ -50,7 +50,7 @@ test('protocol is explicit that source checks are not a live benchmark pass', as
   const protocol = await readFile(new URL('../docs/benchmarks/reality-multiconversation-continuity-benchmark-v0.1.md', import.meta.url), 'utf8');
   assert.match(protocol, /not a substitute for live multi-conversation testing/i);
   assert.match(protocol, /Infrastructure failure is reported separately/i);
-  assert.match(protocol, /Do not weaken thresholds/i);
+  assert.match(protocol, /Never weaken thresholds/i);
 });
 
 
