@@ -256,7 +256,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      governedSignal?.packet?.packet_id ? { ref: governedSignal.packet.packet_id, kind: 'governed_signal_packet' } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
