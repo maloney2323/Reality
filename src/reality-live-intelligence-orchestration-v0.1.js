@@ -127,7 +127,10 @@ export async function runLiveIntelligenceOrchestration({
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
   });
-  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
+  // Always scope the initial durable read to an explicit or conversation-derived root.
+  // A null root in retrievePersistedUniverse means an unscoped query and can mix conversations.
+  const retrievalContinuityRootId = explicitContinuityRootId || conversationContinuityRootId;
+  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: retrievalContinuityRootId, fetchImpl });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -136,9 +139,9 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
-  let persistedContinuity = explicitContinuityRootId
+  let persistedContinuity = retrievalContinuityRootId
     ? buildContinuityRehydration({
-        continuityRootId: explicitContinuityRootId,
+        continuityRootId: retrievalContinuityRootId,
         entries: universeContext.entries,
         trigger: 'CURRENT_REQUEST',
       })
@@ -146,7 +149,9 @@ export async function runLiveIntelligenceOrchestration({
 
   let continuityDiscovery = null;
   let discoveredContinuityRootId = null;
-  if (!explicitContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  // Cross-root dormant discovery is allowed only when a caller supplies an explicit
+  // worldline scope. Without that scope, do not search other conversations' roots.
+  if (!explicitContinuityRootId && systemContext?.worldline_id && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const dormant = await retrieveDormantContinuitySummaries({
       worldlineId: systemContext?.worldline_id || null,
       limit: 1000,
