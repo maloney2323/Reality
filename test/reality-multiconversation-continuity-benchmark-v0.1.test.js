@@ -6,6 +6,7 @@ const apiPath = new URL('../api/reality/intelligence.js', import.meta.url);
 const gatewayPath = new URL('../src/reality-model-gateway-v0.1.js', import.meta.url);
 const cognitivePath = new URL('../src/reality-cognitive-runtime-v1.0.js', import.meta.url);
 const orchestrationPath = new URL('../src/reality-live-intelligence-orchestration-v0.1.js', import.meta.url);
+const completenessPath = new URL('../src/reality-context-completeness-v0.1.js', import.meta.url);
 
 async function source(url) {
   return readFile(url, 'utf8');
@@ -50,4 +51,54 @@ test('protocol is explicit that source checks are not a live benchmark pass', as
   assert.match(protocol, /not a substitute for live multi-conversation testing/i);
   assert.match(protocol, /Infrastructure failure is reported separately/i);
   assert.match(protocol, /Do not weaken thresholds/i);
+});
+
+
+test('continuity completeness flags a saturated 80-record source window as partial', async () => {
+  const { classifyContextCompleteness } = await import(completenessPath.href);
+  const result = classifyContextCompleteness({
+    requestedLimit: 80,
+    rawRecordCount: 80,
+    eligibleMessageCount: 74,
+    retainedMessageCount: 60,
+  });
+  assert.equal(result.status, 'PARTIAL_CONTEXT');
+  assert.equal(result.complete, false);
+  assert.equal(result.truncated, true);
+  assert.equal(result.retained_message_count, 60);
+});
+
+test('continuity completeness distinguishes a fresh conversation from a partial history', async () => {
+  const { classifyContextCompleteness } = await import(completenessPath.href);
+  const result = classifyContextCompleteness({
+    requestedLimit: 80,
+    rawRecordCount: 0,
+    eligibleMessageCount: 0,
+    retainedMessageCount: 0,
+  });
+  assert.equal(result.status, 'NO_PRIOR_MESSAGES');
+  assert.equal(result.complete, true);
+  assert.equal(result.truncated, false);
+});
+
+test('unavailable context produces a safety directive that forbids continuity claims', async () => {
+  const { classifyContextCompleteness, continuitySafetyDirective } = await import(completenessPath.href);
+  const result = classifyContextCompleteness({ historyLoadSucceeded: false });
+  assert.equal(result.status, 'UNAVAILABLE');
+  assert.match(continuitySafetyDirective(result), /Do not claim continuity/i);
+});
+
+test('API fails closed instead of silently proceeding when authenticated context cannot load', async () => {
+  const text = await source(apiPath);
+  assert.match(text, /REALITY_CONTEXT_UNAVAILABLE/);
+  assert.match(text, /unavailable\.status = 503/);
+  assert.doesNotMatch(text, /return null;\s*\}\);\s*\n\s*const worldObservations/);
+});
+
+test('API exposes truncation and degraded continuity status to downstream reasoning and callers', async () => {
+  const text = await source(apiPath);
+  assert.match(text, /context_completeness: contextCompleteness/);
+  assert.match(text, /continuity_safety_directive/);
+  assert.match(text, /status: realityContext\?\.continuity_status/);
+  assert.match(text, /slice\(0, 60\)/);
 });
