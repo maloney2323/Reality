@@ -3,6 +3,7 @@ export const maxDuration = 60;
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
+import { classifyContextCompleteness, continuitySafetyDirective } from '../../src/reality-context-completeness-v0.1.js';
 
 const BASE44_API = 'https://base44.app/api';
 const BASE44_APP_ID = '6a7bd610756b32bc21c39ad0';
@@ -129,7 +130,11 @@ async function observeConnectedWorld() {
 
 async function loadRealityContext(req, body) {
   const authorization = bearer(req);
-  if (!authorization) return null;
+  if (!authorization) {
+    const error = new Error('REALITY_AUTH_REQUIRED');
+    error.status = 401;
+    throw error;
+  }
 
   const user = await base44Get(`/apps/${BASE44_APP_ID}/entities/User/me`, authorization);
   if (!user?.id) throw new Error('REALITY_SESSION_REQUIRED');
@@ -147,9 +152,17 @@ async function loadRealityContext(req, body) {
     `/apps/${BASE44_APP_ID}/entities/PersonalMessage?q=${q}&sort=-created_date&limit=80`,
     authorization,
   );
-  const historyRows = rows(historyPayload)
-    .filter((item) => item?.role === 'user' || item?.role === 'assistant')
-    .slice(0, 60);
+  const rawHistoryRows = rows(historyPayload);
+  const eligibleHistoryRows = rawHistoryRows
+    .filter((item) => item?.role === 'user' || item?.role === 'assistant');
+  const historyRows = eligibleHistoryRows.slice(0, 60);
+  const contextCompleteness = classifyContextCompleteness({
+    requestedLimit: 80,
+    rawRecordCount: rawHistoryRows.length,
+    eligibleMessageCount: eligibleHistoryRows.length,
+    retainedMessageCount: historyRows.length,
+  });
+  const continuitySafety = continuitySafetyDirective(contextCompleteness);
 
   const profileQuery = encodeURIComponent(JSON.stringify({ user_id: user.id }));
   let profile = null;
@@ -200,8 +213,10 @@ async function loadRealityContext(req, body) {
       entry_id: `conversation:${conversationId}`,
       epistemic_kind: 'OBSERVATION',
       content: historyText || '(No earlier conversation context is available.)',
-      provenance: { source: 'authenticated_conversation_context', authority: 'USER_CONTEXT' },
+      provenance: { source: 'authenticated_conversation_context', authority: 'USER_CONTEXT', completeness_status: contextCompleteness.status, retrieval_cap: 60 },
       evidence_references: [],
+      continuity_status: contextCompleteness.status,
+      continuity_safety_directive: continuitySafety,
     },
     {
       entry_id: `cross-thought:${user.id}`,
@@ -226,6 +241,9 @@ async function loadRealityContext(req, body) {
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
     universe_entries,
     context_source: 'BASE44_AUTHENTICATED_PERSONAL_REALITY',
+    context_completeness: contextCompleteness,
+    continuity_status: contextCompleteness.status,
+    continuity_safety_directive: continuitySafety,
     authority: 'AUTHENTICATED_USER_CONTEXT_ONLY',
     truth_authorized: false,
     action_authorized: false,
@@ -267,11 +285,18 @@ export default async function handler(req, res) {
       }
     }
 
-    const realityContext = await loadRealityContext(req, body).catch((error) => {
+    let realityContext;
+    try {
+      realityContext = await loadRealityContext(req, body);
+    } catch (error) {
       if (error?.message === 'REALITY_SESSION_REQUIRED') throw error;
       if (error?.message === 'REALITY_CHAT_TRACE_REQUIRED') throw error;
-      return null;
-    });
+      if (error?.message === 'REALITY_AUTH_REQUIRED') throw error;
+      const unavailable = new Error('REALITY_CONTEXT_UNAVAILABLE');
+      unavailable.status = 503;
+      unavailable.provider_error = error?.message || 'UNKNOWN_CONTEXT_PROVIDER_ERROR';
+      throw unavailable;
+    }
 
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
@@ -282,6 +307,15 @@ export default async function handler(req, res) {
       connected_world_observations: worldObservations,
       world_observation_status: worldObservations.length ? 'OBSERVED' : 'NO_OBSERVATIONS',
       world_observation_count: worldObservations.length,
+      continuity_status: realityContext?.continuity_status || 'UNAVAILABLE',
+      context_completeness: realityContext?.context_completeness || {
+        status: 'UNAVAILABLE',
+        complete: false,
+        truncated: false,
+        reason: 'AUTHENTICATED_CONTEXT_NOT_LOADED',
+      },
+      continuity_safety_directive: realityContext?.continuity_safety_directive
+        || continuitySafetyDirective({ status: 'UNAVAILABLE' }),
     };
 
     const result = await runLiveIntelligenceOrchestration({
@@ -297,6 +331,9 @@ export default async function handler(req, res) {
         context_loaded: Boolean(realityContext),
         authenticated_user_context: Boolean(realityContext?.authenticated_user_id),
         durable_context_source: realityContext ? 'BASE44_PERSONAL_REALITY' : 'NONE',
+        status: realityContext?.continuity_status || 'UNAVAILABLE',
+        context_completeness: realityContext?.context_completeness || null,
+        fail_safe: true,
       },
     });
   } catch (error) {
