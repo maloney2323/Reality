@@ -102,3 +102,11 @@ test('API exposes truncation and degraded continuity status to downstream reason
   assert.match(text, /status: realityContext\?\.continuity_status/);
   assert.match(text, /slice\(0, 60\)/);
 });
+
+
+test('durable continuity reads are scoped to a conversation root by default', async () => {
+  const text = await source(orchestrationPath);
+  assert.match(text, /retrievalContinuityRootId = explicitContinuityRootId \|\| conversationContinuityRootId/);
+  assert.match(text, /loadUniverseContext\(\{ systemContext, continuityRootId: retrievalContinuityRootId/);
+  assert.match(text, /systemContext\?\.worldline_id && process\.env\.REALITY_UNIVERSE_PERSISTENCE_ENABLED/);
+});
