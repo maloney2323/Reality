@@ -47,6 +47,8 @@ test('consequential intelligence produces a governed work proposal but cannot au
   assert.equal(result.work.authorization_request.authorized, false);
   assert.equal(result.execution.status, 'NOT_EXECUTED');
   assert.equal(result.work.run.state, 'CAPTURED');
+  assert.equal(result.situation.state, 'ACTION_PROPOSED');
+  assert.ok(result.situation.evidence.some((item) => item.ref === result.governed_signal.packet.packet_id));
   assert.ok(result.governed_signal.packet.packet_id);
   assert.ok(result.governed_signal.transformation_receipt.receipt_id);
 });
