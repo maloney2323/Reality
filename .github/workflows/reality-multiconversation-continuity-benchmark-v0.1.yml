@@ -1,0 +1,40 @@
+name: Reality Multi-Conversation Continuity Benchmark (source contract)
+
+on:
+  pull_request:
+    paths:
+      - 'api/reality/intelligence.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-cognitive-runtime-v1.0.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'test/reality-multiconversation-continuity-benchmark-v0.1.test.js'
+      - 'docs/benchmarks/reality-multiconversation-continuity-benchmark-v0.1.md'
+      - '.github/workflows/reality-multiconversation-continuity-benchmark-v0.1.yml'
+  push:
+    branches:
+      - 'test/multiconversation-continuity-benchmark-2026-10-16'
+    paths:
+      - 'api/reality/intelligence.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-cognitive-runtime-v1.0.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'test/reality-multiconversation-continuity-benchmark-v0.1.test.js'
+      - 'docs/benchmarks/reality-multiconversation-continuity-benchmark-v0.1.md'
+      - '.github/workflows/reality-multiconversation-continuity-benchmark-v0.1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run continuity source-contract tests
+        run: node --test test/reality-multiconversation-continuity-benchmark-v0.1.test.js
