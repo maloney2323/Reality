@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { executeAuthorizedWork } from '../src/reality-governed-execution-engine-v0.1.js';
+import { makeVerifiedTestAuthority } from './ect-test-helpers.js';
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../src/reality-constitutional-learning-bridge-v1.0.js';
 
