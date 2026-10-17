@@ -71,3 +71,19 @@ The fixture command is a smoke test only. Do not report its fixture counts as Re
 ## Adjudication-to-Oracle receipt integration
 
 `oracle_receipt_builder.py` composes the completed model run, response-bound adjudication, and a separately supplied `TrustedOracleContext`. It refuses to build when the adjudicated judgments differ from the context's frozen expected judgments. The builder takes policy/evidence/manifest hashes, transaction time, policy-valid interval, and chain head only from trusted context, seals the receipt using RFC 8785 canonicalization, then passes it through `verify_receipt`. It does not invent lineage or fuzzing evidence: those fields remain explicitly empty, and production containment remains false. The caller is responsible for obtaining trustworthy inputs and reviewer records; this is a local integration component, not a production attestation or authenticated trust boundary.
+
+## Trust Authority and Evaluation Context v0.1
+
+`trust_policy.schema.json` defines the strict Trust Policy v0.1 structure: authorized issuers, Ed25519 public keys and key status, accepted audiences, optional OIDC issuer/subject/audience/workflow constraints, maximum context lifetime, allowed scopes, and revoked key IDs. Its `policy_sha256` is the SHA-256 of canonical UTF-8 JSON (sorted keys, compact separators, Unicode preserved) for the policy object with only `policy_sha256` omitted. The digest is checked by `evaluation_context.py`; it is not self-authenticating.
+
+`evaluation_context.py` issues compact EdDSA-signed Evaluation Context Tokens (ECTs) bound to the active trust policy, an authorized key, a permitted audience, explicit scope, bounded lifetime, identity claims, and non-empty evaluation boundaries. The verifier rejects invalid signatures, stale policy bindings, expired tokens, revoked keys, unauthorized audiences, and scope escalation. The runner is a consumer of ECTs; it must not issue tokens or expand scope.
+
+**Critical trust boundary and limitations:** the caller must authenticate the upstream OIDC token (signature, issuer, audience, expiry, and relevant claims) before passing identity claims to the issuer. This module does not perform OIDC discovery/JWKS verification, obtain keys from a remote trust registry, authenticate policy distribution, or persist token IDs for replay prevention. A durable replay store and fresh key-revocation source are required before production use. Key material must be held by a separately controlled issuer; never embed private keys in the repository or benchmark runner. ECT verification establishes evaluation authorization only—not deployment identity, runtime behavior, production containment, or permission to execute customer actions.
+
+Run the trust-context tests with:
+
+```sh
+python -m unittest benchmarks.schema_gate.test_evaluation_context -v
+```
+
+These are isolated contract and token tests, not live OIDC, Sigstore, SLSA, deployment, or production-gating evidence.
