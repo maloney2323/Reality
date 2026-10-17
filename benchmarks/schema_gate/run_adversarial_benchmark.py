@@ -92,6 +92,57 @@ class RealityAdversarialRunner:
     def _timestamp() -> str:
         return datetime.now(timezone.utc).isoformat()
 
+    def load_frozen_case(self, case_id: str, catalog_path: str | Path | None = None) -> dict[str, Any]:
+        """Load a frozen case definition; never include oracle data in model input."""
+        path = Path(catalog_path) if catalog_path is not None else Path(__file__).with_name("frozen_adversarial_cases.v0.1.json")
+        try:
+            catalog = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("FROZEN_CASE_CATALOG_UNAVAILABLE_OR_INVALID") from exc
+        if not isinstance(catalog, dict) or catalog.get("contract_version") != "reality-adversarial-cases-v0.1":
+            raise ValueError("FROZEN_CASE_CATALOG_VERSION_MISMATCH")
+        cases = catalog.get("cases")
+        if not isinstance(cases, list):
+            raise ValueError("FROZEN_CASE_CATALOG_CASES_INVALID")
+        matches = [item for item in cases if isinstance(item, dict) and item.get("case_id") == case_id]
+        if len(matches) != 1:
+            raise ValueError("FROZEN_CASE_NOT_FOUND_OR_DUPLICATE")
+        case = matches[0]
+        if not isinstance(case.get("stimulus"), str) or not case["stimulus"].strip():
+            raise ValueError("FROZEN_CASE_STIMULUS_INVALID")
+        if not isinstance(case.get("expected_judgments"), dict) or not isinstance(case.get("ground_truth"), dict):
+            raise ValueError("FROZEN_CASE_ORACLE_INVALID")
+        return case
+
+    def execute_frozen_case(
+        self, case_id: str, model_adapter: ModelAdapter, receipt_path: str | Path | None = None
+    ) -> dict[str, Any]:
+        """Run only the frozen stimulus; keep ground truth and oracle out of model input.
+
+        The returned evaluation remains NOT_EVALUATED until a separately trusted
+        evaluator supplies independently grounded judgments and trusted context.
+        No Reality action adapter is called here.
+        """
+        case = self.load_frozen_case(case_id)
+        stimulus_bytes = case["stimulus"].encode("utf-8")
+        model_input = [{"role": "user", "content": case["stimulus"]}]
+        run_receipt = self.execute_blind_model_test(case_id, model_input, model_adapter)
+        result: dict[str, Any] = {
+            "receipt_version": "reality-frozen-case-run-v0.1",
+            "case_id": case_id,
+            "case_version": case.get("version"),
+            "case_catalog_sha256": sha256_file(Path(__file__).with_name("frozen_adversarial_cases.v0.1.json")),
+            "stimulus_sha256": hashlib.sha256(stimulus_bytes).hexdigest(),
+            "execution": run_receipt,
+            "judgments": {key: "NOT_EVALUATED" for key in ("detection", "diagnosis", "remediation", "containment", "abstention", "utility", "verification")},
+            "evaluation_status": "NOT_EVALUATED",
+            "production_containment_verified": False,
+            "reason": "INDEPENDENT_EVALUATOR_AND_TRUSTED_ORACLE_CONTEXT_NOT_SUPPLIED",
+        }
+        if receipt_path is not None:
+            self.write_jsonl_receipt(receipt_path, result)
+        return result
+
     def execute_blind_model_test(
         self, test_case_id: str, conversation_input: list[dict[str, Any]], model_adapter: ModelAdapter
     ) -> dict[str, Any]:
