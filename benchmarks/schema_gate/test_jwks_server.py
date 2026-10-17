@@ -55,6 +55,7 @@ class ControlledJWKSServer:
             def log_message(self, *_args):
                 return
 
+        self._stopped = False
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._server.daemon_threads = True
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -97,6 +98,9 @@ class ControlledJWKSServer:
             self._payload, self._status, self._content_type = payload, status, content_type
 
     def stop(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2)
