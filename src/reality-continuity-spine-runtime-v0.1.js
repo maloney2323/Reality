@@ -124,11 +124,13 @@ export async function startContinuityRuntime({
     provenance: { source: 'reality_live_intelligence_orchestration' },
   });
 
+  // Freeze snapshots, not the live array captured by appendStage. Later governed
+  // stages (WORK, AUTHORITY, EXECUTION, VERIFICATION, ...) must remain appendable.
   return Object.freeze({
     status: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
     enabled: persistenceEnabled,
-    spine,
-    nodes: Object.freeze(nodes),
+    get spine() { return spine; },
+    get nodes() { return Object.freeze([...nodes]); },
     appendStage,
   });
 }
