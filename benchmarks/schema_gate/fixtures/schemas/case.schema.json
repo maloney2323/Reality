@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["decision", "case_id"],
+  "properties": {
+    "decision": {"enum": ["ACCEPT", "REJECT", "INSUFFICIENT_EVIDENCE"]},
+    "case_id": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

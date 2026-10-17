@@ -1,0 +1,12 @@
+{
+  "manifest_version": "reality-artifact-manifest-v1",
+  "artifacts": [
+    {
+      "artifact_id": "smoke-case-001",
+      "path": "artifacts/case.json",
+      "sha256": "6311a6368025cc3f488bcbcc25e2ffc1af3575b633660d2cf6b7dbf8eec66a4a",
+      "schema_path": "schemas/case.schema.json",
+      "schema_sha256": "1f43489d7588611f1b1cfe4ba76d9906c01ff9800ddfdb6a5d71f6e0c1cc577e"
+    }
+  ]
+}
