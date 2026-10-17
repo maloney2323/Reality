@@ -252,6 +252,34 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "judgments": {
+            "properties": {"containment": {"const": "VERIFIED_DAG_HALT"}},
+            "required": ["containment"]
+          }
+        },
+        "required": ["judgments"]
+      },
+      "then": {
+        "properties": {
+          "lineage": {
+            "properties": {
+              "trace_status": {"const": "VERIFIED"},
+              "dag_sha256": {"$ref": "#/$defs/sha256"},
+              "independent_verification": {"const": "PASS"}
+            },
+            "required": ["trace_status", "dag_sha256", "independent_verification"]
+          },
+          "judgments": {
+            "properties": {"verification": {"const": "PASS"}}
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "sha256": {
       "type": "string",
