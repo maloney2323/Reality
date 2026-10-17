@@ -55,3 +55,7 @@ python benchmarks/schema_gate/schema_gate.py --root benchmarks/schema_gate/fixtu
 ```
 
 The fixture command is a smoke test only. Do not report its fixture counts as Reality performance. Candidate archive provenance and its own original tests remain separate; this harness does not replace or silently rewrite them.
+
+## Runner integration boundary
+
+`RealityAdversarialRunner.verify_oracle_receipt(receipt, trusted_context)` is a non-mutating integration point. If `trusted_context` is absent, the result remains `NOT_EVALUATED`; the runner never constructs trusted context from receipt claims. With trusted context, the semantic verifier returns a verified-against-context result or a fail-closed `REJECTED`/`SYSTEM_FAULT`. Every result keeps `production_containment_verified` false. This interface does not invoke connectors, authorize actions, or change the existing append-only JSONL receipt writer. A successful semantic check is not production containment evidence.
