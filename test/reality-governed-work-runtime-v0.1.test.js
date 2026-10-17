@@ -44,9 +44,9 @@ const activeAuth = authorize({
   scope:authRequest.allowed_operations
 });
 
-const allowed = canExecute({workItem, authorization:activeAuth});
+const allowed = canExecute({workItem, authorization:makeVerifiedTestAuthority(workItem).authority});
 const receipt = createExecutionReceipt({
-  workItem, authorization:activeAuth, requestSummary:'create Product Planning event',
+  workItem, authorization:makeVerifiedTestAuthority(workItem).authority, requestSummary:'create Product Planning event',
   requestFingerprint:'sha256:test-request'
 });
 
@@ -54,8 +54,9 @@ if (intent.status !== 'captured') throw new Error('INTENT_CAPTURE_FAILED');
 if (workflowWithItem.status !== 'STRUCTURED') throw new Error('WORKFLOW_STRUCTURE_FAILED');
 if (preflight.execution_permitted !== false) throw new Error('PREFLIGHT_GRANTED_EXECUTION');
 if (blocked.execution_state !== 'BLOCKED') throw new Error('UNAUTHORIZED_EXECUTION_NOT_BLOCKED');
-if (blocked.blocked_reason !== 'EXPLICIT_AUTHORIZATION_REQUIRED') throw new Error('WRONG_BLOCK_REASON');
-if (!allowed.allowed) throw new Error('AUTHORIZED_WORK_NOT_ALLOWED');
+if (blocked.blocked_reason !== 'VERIFIED_ECT_REQUIRED') throw new Error('WRONG_BLOCK_REASON');
+if (allowed.allowed !== true) throw new Error('SIGNED_ECT_WORK_NOT_ALLOWED');
+if (canExecute({workItem, authorization:activeAuth}).allowed) throw new Error('UNSIGNED_AUTH_OBJECT_ACCEPTED');
 if (receipt.execution_state !== 'AUTHORIZED') throw new Error('AUTHORIZED_RECEIPT_FAILED');
 if (receipt.authorization_id !== activeAuth.authorization_id) throw new Error('RECEIPT_AUTH_LINK_FAILED');
 
