@@ -18,6 +18,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from jsonschema import Draft202012Validator
+from oidc_identity import VerifiedOIDCIdentity
 
 
 class TrustContextError(ValueError):
@@ -131,7 +132,9 @@ def issue_evaluation_context(
         raise TrustContextError("SIGNING_KEY_MISMATCH") from exc
     if supplied_public != configured_raw:
         raise TrustContextError("SIGNING_KEY_MISMATCH")
-    identity = _validated_identity(identity_claims, policy)
+    if not isinstance(identity_claims, VerifiedOIDCIdentity):
+        raise TrustContextError("OIDC_IDENTITY_NOT_VERIFIED")
+    identity = _validated_identity(identity_claims.claims, policy)
     if audience not in policy["audiences"]:
         raise TrustContextError("AUDIENCE_NOT_ALLOWED")
     if not isinstance(scope, list) or not scope or len(scope) != len(set(scope)):
