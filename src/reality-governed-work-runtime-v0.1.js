@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isVerifiedExecutionAuthority } from './reality-ect-execution-verifier-v0.1.js';
 
 export const GOVERNED_WORK_RUNTIME_VERSION = '0.1.0';
 
@@ -126,17 +127,17 @@ export function authorize({ request, approvedBy, scope }) {
 
 export function canExecute({ workItem, authorization }) {
   if (!workItem?.work_item_id) return { allowed:false, reason:'WORK_ITEM_REQUIRED' };
-  if (!workItem.consequential && !SENSITIVE_OPERATIONS.has(workItem.operation))
-    return { allowed:true, reason:'NON_CONSEQUENTIAL_WORK_ITEM' };
-  if (!authorization?.authorized) return { allowed:false, reason:'EXPLICIT_AUTHORIZATION_REQUIRED' };
+  if (!isVerifiedExecutionAuthority(authorization))
+    return { allowed:false, reason:'VERIFIED_ECT_REQUIRED' };
+  if (!authorization.authorized) return { allowed:false, reason:'EXPLICIT_AUTHORIZATION_REQUIRED' };
   if (authorization.workflow_id !== workItem.workflow_id) return { allowed:false, reason:'AUTHORIZATION_WORKFLOW_MISMATCH' };
   const allowed = (authorization.allowed_operations || []).some((x) =>
     x.connector === workItem.connector && x.operation === workItem.operation &&
-    (!x.work_item_id || x.work_item_id === workItem.work_item_id));
+    x.work_item_id === workItem.work_item_id);
   if (!allowed) return { allowed:false, reason:'AUTHORIZATION_SCOPE_MISMATCH' };
-  if (authorization.expires_at && new Date(authorization.expires_at).getTime() <= Date.now())
+  if (!authorization.expires_at || new Date(authorization.expires_at).getTime() <= Date.now())
     return { allowed:false, reason:'AUTHORIZATION_EXPIRED' };
-  return { allowed:true, reason:'AUTHORIZED' };
+  return { allowed:true, reason:'VERIFIED_ECT_AUTHORIZED' };
 }
 
 export function createExecutionReceipt({ workItem, authorization = null, requestSummary = null, requestFingerprint = null } = {}) {
