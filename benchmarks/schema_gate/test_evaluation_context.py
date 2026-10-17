@@ -146,6 +146,11 @@ class EvaluationContextTests(unittest.TestCase):
         with self.assertRaisesRegex(TrustContextError, "TTL_OUT_OF_POLICY"):
             issue(self.policy, self.schema, self.key, ttl_seconds=301)
 
+    def test_private_key_must_match_authorized_public_key(self):
+        attacker_key = Ed25519PrivateKey.generate()
+        with self.assertRaisesRegex(TrustContextError, "SIGNING_KEY_MISMATCH"):
+            issue(self.policy, self.schema, attacker_key)
+
     def test_empty_boundaries_rejected(self):
         with self.assertRaisesRegex(TrustContextError, "EVALUATION_BOUNDARIES_REQUIRED"):
             issue(self.policy, self.schema, self.key, evaluation_boundaries={})
