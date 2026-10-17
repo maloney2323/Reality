@@ -25,6 +25,19 @@ Manifest JSON shape (frozen `reality-artifact-manifest-v1`; the alternate `evide
 
 The checked-in `manifest.schema.json` is compiled and applied before any artifact file is opened. Unexpected top-level or artifact fields, malformed or uppercase hashes, and paths outside the frozen relative JSON layout abort the manifest as a whole. All paths are relative to the supplied evidence root. Absolute paths, parent traversal, symlinks, missing files, duplicate IDs, malformed or uppercase hashes, digest mismatches, malformed JSON, and schema failures are rejected. Only accepted artifact records are returned to a caller; rejected records cannot be included in its score unless the caller ignores this contract.
 
+## Oracle semantic verifier
+
+`oracle_verifier.py` checks a receipt against separately supplied trusted context: exact trusted input bytes, the expected case ID, a trusted transaction timestamp, the effective policy interval, frozen expected judgments, and the expected prior receipt link. It recomputes the RFC 8785 JCS receipt digest and mutation digests from actual bytes.
+
+A `VERIFIED_DAG_HALT` claim requires both trace bytes and a matching digest supplied by an independently trusted lineage verifier. This module does not itself implement or authenticate that lineage verifier; the trust boundary must be wired to a verified source before production use. Its result explicitly leaves `production_containment_verified` false.
+
+Run all tests with:
+
+```sh
+python -m pip install -r benchmarks/schema_gate/requirements.txt
+python -m unittest discover -s benchmarks/schema_gate -p 'test_*.py' -v
+```
+
 ## Oracle receipt contract
 
 `oracle_receipt.schema.json` defines the proposed `reality-oracle-v0.1` receipt shape. See [ORACLE_CONTRACT_V0_1.md](ORACLE_CONTRACT_V0_1.md) for the semantics and verification boundaries.
