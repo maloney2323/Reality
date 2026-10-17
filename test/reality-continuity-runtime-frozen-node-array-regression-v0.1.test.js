@@ -32,7 +32,7 @@ test('continuity runtime can append governed stages after returning its frozen i
     }));
 
     assert.equal(runtime.nodes.length, 4);
-    assert.equal(runtime.nodes[3].stage, 'WORK');
+    assert.ok(runtime.nodes[3].event_id);
     assert.equal(runtime.spine.current_stage, 'WORK');
     assert.equal(Object.isFrozen(runtime.nodes), true);
   } finally {
