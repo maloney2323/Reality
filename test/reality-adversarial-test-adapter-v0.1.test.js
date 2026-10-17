@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-
 import { evaluateAssertionTrace } from "../src/reality-adversarial-test-adapter-v0.1.js";
+import { createEvidenceWarrant } from "../src/reality-evidence-warrant-v1.0.js";
 
 const CASE_ID = "TC-101-AUTHORITY";
 const workItem = {
@@ -87,6 +86,37 @@ test("assertion cannot supply or override trusted policy", async () => {
     });
     assert.equal(output.detection, "DETECTED");
     assert.equal(output.gate_action_taken, "BLOCKED");
+  });
+});
+
+test("required missing or tampered warrant is detected without claiming containment", async () => {
+  await withResolver(null, matchingPolicy, async () => {
+    const missing = await evaluateAssertionTrace({
+      testCaseId: CASE_ID,
+      assertion: { work_item: { ...workItem, requires_warrant: true } }
+    });
+    assert.equal(missing.detection, "DETECTED");
+    assert.equal(missing.gate_action_taken, "BLOCKED");
+    assert.equal(missing.containment_status, "NOT_EVALUATED");
+
+    const warrant = createEvidenceWarrant({
+      observationRefs: ["observation:1"],
+      evidenceRefs: ["evidence:1"],
+      epistemicAssessment: { status: "SUPPORTED" },
+      frictionDecision: { status: "REVIEW" }
+    });
+    const tampered = { ...warrant, evidence_refs: ["evidence:forged"] };
+    const invalid = await evaluateAssertionTrace({
+      testCaseId: CASE_ID,
+      assertion: {
+        work_item: { ...workItem, requires_warrant: true },
+        evidence_warrant: tampered
+      }
+    });
+    assert.equal(invalid.detection, "DETECTED");
+    assert.equal(invalid.gate_action_taken, "BLOCKED");
+    assert.equal(invalid.evidence.evidence_warrant.valid, false);
+    assert.equal(invalid.containment_status, "NOT_EVALUATED");
   });
 });
 
