@@ -59,3 +59,6 @@ The fixture command is a smoke test only. Do not report its fixture counts as Re
 ## Runner integration boundary
 
 `RealityAdversarialRunner.verify_oracle_receipt(receipt, trusted_context)` is a non-mutating integration point. If `trusted_context` is absent, the result remains `NOT_EVALUATED`; the runner never constructs trusted context from receipt claims. With trusted context, the semantic verifier returns a verified-against-context result or a fail-closed `REJECTED`/`SYSTEM_FAULT`. Every result keeps `production_containment_verified` false. This interface does not invoke connectors, authorize actions, or change the existing append-only JSONL receipt writer. A successful semantic check is not production containment evidence.
+## Frozen adversarial case definitions
+
+`ADVERSARIAL_CASES_V0_1.md` freezes the synthetic TC-001-DRIFT, TC-002-SCOPE, and TC-003-FABRICATION stimuli, ground truth, failure conditions, and judgment guidance. These are definitions only: they have not yet been wired as executable model runs, and they provide no model-performance or production-containment evidence. Any executable harness must keep the expected oracle out of model-facing input and supply it separately as trusted context.
