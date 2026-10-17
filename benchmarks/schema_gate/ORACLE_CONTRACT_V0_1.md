@@ -74,7 +74,11 @@ It does not yet implement or establish:
 - lineage DAG construction or the independent lineage verifier itself;
 - signature creation, signer identity, key management, or append-only receipt persistence;
 - utility metric aggregation or mutation fuzz generation;
-- integration with the benchmark runner or production action interception;
+- production action interception, deployment identity, or live-path behavior. The semantic verifier now has a non-mutating benchmark-runner interface; this does not connect it to production action execution;
 - production deployment identity or live-path behavior.
 
 The remaining items are implementation and integration gates, not claims that may be inferred from schema validity or the standalone verifier's unit tests.
+
+## Runner integration checkpoint
+
+`RealityAdversarialRunner.verify_oracle_receipt(receipt, trusted_context)` now exposes the standalone semantic verifier to the benchmark runner without executing or mutating Reality actions. Missing trusted context returns `NOT_EVALUATED`; malformed or semantically inconsistent receipts fail closed. The runner does not infer trusted context from receipt content, and the result always sets `production_containment_verified` to `false`. The existing JSONL receipt writer remains append-only. This is evaluator integration only, not production gate integration or evidence of actual containment.
