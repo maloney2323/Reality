@@ -54,4 +54,5 @@ jobs:
             test_jwks_fetcher \
             test_replay_store \
             test_oidc_identity \
-            test_evaluation_context
+            test_evaluation_context \
+            test_policy_authority
