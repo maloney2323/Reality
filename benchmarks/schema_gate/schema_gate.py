@@ -8,10 +8,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, SchemaError, ValidationError
 
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 MANIFEST_VERSION = "reality-artifact-manifest-v1"
+MANIFEST_SCHEMA_PATH = Path(__file__).with_name("manifest.schema.json")
 
 
 class GateError(ValueError):
@@ -54,14 +55,23 @@ def _parse_json(raw: bytes, code: str) -> Any:
         raise GateError(code) from exc
 
 
+def _validate_manifest_shape(manifest: Any) -> None:
+    """Compile and apply the checked-in manifest contract before reading any artifact."""
+    try:
+        schema = _parse_json(MANIFEST_SCHEMA_PATH.read_bytes(), "MANIFEST_SCHEMA_INVALID")
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(manifest)
+    except GateError:
+        raise
+    except (OSError, ValidationError, SchemaError) as exc:
+        raise GateError("MANIFEST_SCHEMA_VALIDATION_FAILED") from exc
+
+
 def verify_manifest(root: Path, manifest_path: str = "manifest.json") -> dict[str, Any]:
     raw = _read_regular_file(root, manifest_path)
     manifest = _parse_json(raw, "MANIFEST_JSON_INVALID")
-    if not isinstance(manifest, dict) or manifest.get("manifest_version") != MANIFEST_VERSION:
-        raise GateError("MANIFEST_VERSION_INVALID")
-    artifacts = manifest.get("artifacts")
-    if not isinstance(artifacts, list):
-        raise GateError("MANIFEST_ARTIFACTS_INVALID")
+    _validate_manifest_shape(manifest)
+    artifacts = manifest["artifacts"]
 
     seen_ids: set[str] = set()
     accepted: list[dict[str, Any]] = []
