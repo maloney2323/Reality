@@ -36,7 +36,7 @@ export function makeVerifiedTestAuthority(workItem, overrides = {}) {
   const second = b64u(stable(claims));
   const signingInput = first + '.' + second;
   const token = signingInput + '.' + sign(null, Buffer.from(signingInput, 'ascii'), privateKey).toString('base64url');
-  const authority = verifyExecutionECT(token, {
+  const authority = overrides.skipVerify ? null : verifyExecutionECT(token, {
     trustedPublicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }),
     expectedKeyId: keyId, expectedIssuer: issuer, expectedAudience: audience,
     expectedPolicyDigest: policyDigest, expectedAuthorityDigest: authorityDigest,
