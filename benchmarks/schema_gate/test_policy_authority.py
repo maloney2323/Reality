@@ -22,7 +22,7 @@ from policy_authority import (
     issue_authorized_evaluation_context,
 )
 from evaluation_context import verify_evaluation_context
-from test_evaluation_context import make_policy
+from test_evaluation_context import make_policy, identity as make_policy_identity
 
 
 SUBJECT = "repo:maloney2323/Reality:ref:refs/heads/integration/schema-gate-python-v0.1"
@@ -59,7 +59,7 @@ def make_identity(*, subject=SUBJECT, workflow=WORKFLOW):
     )
 
 
-def make_authority(*, subject=SUBJECT, workflow=WORKFLOW, policy_digest=POLICY_DIGEST):
+def make_authority(*, subject=SUBJECT, workflow=WORKFLOW, policy_digest=POLICY_DIGEST, allowed_scopes=None):
     signing_key = Ed25519PrivateKey.generate()
     public_pem = signing_key.public_key().public_bytes(
         serialization.Encoding.PEM,
@@ -71,7 +71,7 @@ def make_authority(*, subject=SUBJECT, workflow=WORKFLOW, policy_digest=POLICY_D
             policy_digest: {
                 "target_workstream": "ledger_check",
                 "max_token_lifetime_seconds": 300,
-                "allowed_scopes": ["read:evidence", "evaluate:sandbox"],
+                "allowed_scopes": allowed_scopes or ["read:evidence", "evaluate:sandbox"],
                 "allowed_subjects": [subject],
                 "allowed_workflow_refs": [workflow],
             }
@@ -169,18 +169,19 @@ class PolicyAuthorityTests(unittest.TestCase):
 
     def test_authorized_policy_issues_short_lived_ect_bound_to_authority(self):
         policy, schema, ect_key = make_policy()
-        identity = make_identity()
+        identity = make_policy_identity()
         authority, _registry, authority_pin, _public_pem, _authority_key = make_authority(
             subject=identity.claims["sub"],
             workflow=identity.claims["workflow_ref"],
             policy_digest=policy["policy_sha256"],
+            allowed_scopes=["benchmark:execute", "oracle:verify"],
         )
         token = issue_authorized_evaluation_context(
             authority=authority,
             identity=identity,
             requested_policy_digest=policy["policy_sha256"],
             requested_workstream="ledger_check",
-            requested_scopes=["read:evidence"],
+            requested_scopes=["benchmark:execute"],
             requested_ttl_seconds=120,
             policy=policy,
             schema=schema,
@@ -194,7 +195,7 @@ class PolicyAuthorityTests(unittest.TestCase):
         verified = verify_evaluation_context(
             token, policy=policy, schema=schema,
             expected_audience="reality-benchmark-runner",
-            required_scope="read:evidence", now=1_800_000_050,
+            required_scope="benchmark:execute", now=1_800_000_050,
         )
         self.assertEqual(
             verified["claims"]["evaluation_boundaries"]["policy_authority_digest"],
@@ -208,18 +209,19 @@ class PolicyAuthorityTests(unittest.TestCase):
 
     def test_ect_issuance_rejects_policy_digest_not_matching_policy(self):
         policy, schema, ect_key = make_policy()
-        identity = make_identity()
+        identity = make_policy_identity()
         authority, *_ = make_authority(
             subject=identity.claims["sub"],
             workflow=identity.claims["workflow_ref"],
             policy_digest=policy["policy_sha256"],
+            allowed_scopes=["benchmark:execute", "oracle:verify"],
         )
         with self.assertRaisesRegex(PolicyAuthorityError, "REQUESTED_POLICY_DOES_NOT_MATCH_TRUST_POLICY"):
             issue_authorized_evaluation_context(
                 authority=authority, identity=identity,
                 requested_policy_digest="f" * 64,
                 requested_workstream="ledger_check",
-                requested_scopes=["read:evidence"], requested_ttl_seconds=120,
+                requested_scopes=["benchmark:execute"], requested_ttl_seconds=120,
                 policy=policy, schema=schema, issuer="https://reality.example/trust",
                 key_id="test-ed25519-key", private_key=ect_key,
                 audience="reality-benchmark-runner",
