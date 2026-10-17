@@ -87,3 +87,10 @@ python -m unittest benchmarks.schema_gate.test_evaluation_context -v
 ```
 
 These are isolated contract and token tests, not live OIDC, Sigstore, SLSA, deployment, or production-gating evidence.
+
+
+## Upstream OIDC identity and replay boundary (prototype)
+
+`oidc_identity.py` verifies an OIDC JWT signature against a supplied JWKS snapshot with RS256 only, validates issuer, audience, expiry/activation times, subject, and workflow reference, and atomically claims the JWT `jti` through an injected replay-store interface. A missing replay store or replay-store error rejects the request. ECT issuance now requires the resulting `VerifiedOIDCIdentity` object; raw caller-supplied claims are rejected.
+
+Important limits: the JWKS snapshot must be obtained through a separately trusted retrieval path with a defined refresh/rotation policy. The test replay store is in-memory and is not production-safe. Production use requires a durable atomic replay store (for example, a transactional unique-key insert with expiry), authenticated JWKS refresh, operational revocation/rotation policy, and deployment-specific identity policy. These tests do not establish production identity or containment.
