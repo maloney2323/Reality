@@ -47,14 +47,14 @@ class SchemaGateTests(unittest.TestCase):
     def test_uppercase_hash_is_rejected_not_normalized(self):
         self.entry["sha256"] = self.entry["sha256"].upper()
         self.write_manifest()
-        result = verify_manifest(self.root)
-        self.assertEqual(result["accepted_count"], 0)
-        self.assertEqual(result["rejected_artifacts"][0]["reason"], "INVALID_SHA256_FORMAT")
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
 
     def test_malformed_hash_is_rejected(self):
         self.entry["sha256"] = "abc123"
         self.write_manifest()
-        self.assertEqual(verify_manifest(self.root)["accepted_count"], 0)
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
 
     def test_changed_bytes_are_rejected(self):
         (self.root / "artifacts" / "case.json").write_bytes(b'{"value":8}')
@@ -73,7 +73,8 @@ class SchemaGateTests(unittest.TestCase):
     def test_path_traversal_is_rejected(self):
         self.entry["path"] = "../outside.json"
         self.write_manifest()
-        self.assertEqual(verify_manifest(self.root)["rejected_artifacts"][0]["reason"], "INVALID_ARTIFACT_PATH")
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
 
     def test_schema_failure_is_rejected(self):
         bad_payload = b'{"value":"not-an-integer"}'
@@ -91,6 +92,29 @@ class SchemaGateTests(unittest.TestCase):
         self.assertEqual(result["rejected_count"], 1)
         self.assertEqual(result["accepted_artifacts"][0]["artifact_id"], "case-good")
 
+
+    def test_unexpected_top_level_field_aborts_manifest(self):
+        self.write_manifest(unauthorized_injection_payload="malicious")
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
+
+    def test_unexpected_artifact_field_aborts_manifest(self):
+        poisoned = dict(self.entry, unauthorized="malicious")
+        self.write_manifest([poisoned])
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
+
+    def test_artifact_hash_must_be_lowercase_hex(self):
+        self.entry["sha256"] = "A" + "a" * 63
+        self.write_manifest()
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
+
+    def test_manifest_shape_is_validated_before_artifact_access(self):
+        self.write_manifest(artifacts=[dict(self.entry, path="../outside.json")])
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
+            verify_manifest(self.root)
+
     def test_duplicate_ids_are_rejected(self):
         self.write_manifest([self.entry, dict(self.entry)])
         result = verify_manifest(self.root)
@@ -99,7 +123,7 @@ class SchemaGateTests(unittest.TestCase):
 
     def test_invalid_manifest_version_fails_closed(self):
         (self.root / "manifest.json").write_text(json.dumps({"manifest_version": "wrong", "artifacts": []}), encoding="utf-8")
-        with self.assertRaisesRegex(GateError, "MANIFEST_VERSION_INVALID"):
+        with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
             verify_manifest(self.root)
 
 
