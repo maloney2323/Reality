@@ -9,6 +9,8 @@ import unittest
 import uuid
 
 import jwt
+from jsonschema import Draft202012Validator
+from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -136,6 +138,25 @@ class PolicyAuthorityTests(unittest.TestCase):
                 registry=changed, trusted_registry_sha256=new_pin,
                 trusted_issuance_public_key_pem=self.public_pem,
             )
+
+    def test_registry_rejects_unknown_top_level_field(self):
+        changed = copy.deepcopy(self.registry)
+        changed["fallback_policy"] = {"allow": True}
+        changed_pin = registry_digest(changed)
+        # Re-signing the modified document does not make an unsupported field valid.
+        unsigned = {k: v for k, v in changed.items() if k != "signature"}
+        changed["signature"] = base64.urlsafe_b64encode(self.key.sign(canonical_json(unsigned))).rstrip(b"=").decode()
+        changed_pin = registry_digest(changed)
+        with self.assertRaisesRegex(PolicyAuthorityError, "POLICY_AUTHORITY_FIELDS_INVALID"):
+            PolicyAuthorityVerifier(
+                registry=changed, trusted_registry_sha256=changed_pin,
+                trusted_issuance_public_key_pem=self.public_pem,
+            )
+
+    def test_registry_schema_is_strict(self):
+        schema = json.loads((Path(__file__).parent / "policy_authority.schema.json").read_text())
+        errors = list(Draft202012Validator(schema).iter_errors(self.registry))
+        self.assertEqual(errors, [])
 
     def test_wrong_workstream_rejected(self):
         with self.assertRaisesRegex(PolicyAuthorityError, "POLICY_WORKSTREAM_MISMATCH"):
