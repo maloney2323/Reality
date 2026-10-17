@@ -1,6 +1,6 @@
 # Reality Oracle Contract v0.1
 
-Status: **contract draft committed to the isolated integration branch; not yet runtime-enforced or production-verified.**
+Status: **schema and standalone semantic verifier implemented and CI-tested on the isolated integration branch; not wired into production or production-verified.**
 
 This contract is intended to evaluate whether Reality's foundational invariants hold. It is not an additional runtime guardrail and does not itself enforce policy, prevent execution, calculate a valid digest, or prove that a judgment is true. Those claims require implementation in the relevant architecture and independent verification.
 
@@ -67,13 +67,14 @@ The previous receipt digest remains included in the canonicalized content to sup
 
 ## Verification boundary
 
-The first test suite validates the schema and the fail-closed structural rules. It does not yet implement:
-- a receipt producer or canonical digest calculator;
-- trusted-clock or bitemporal policy resolution;
-- lineage DAG construction or provenance authentication;
-- signature creation, key management, or append-only receipt persistence;
-- utility metric aggregation;
-- mutation fuzz generation;
-- production action interception.
+The schema and standalone semantic verifier now have CI coverage. The verifier validates receipts against separately supplied trusted context, recomputes the RFC 8785 receipt digest, checks trusted input bytes, compares judgments with frozen expected judgments, checks the bitemporal interval against the trusted policy interval, verifies mutation hashes from actual bytes, and requires an independently supplied lineage-verifier digest for a DAG-halt claim.
 
-Those are implementation and integration gates, not claims that may be inferred from a schema or its unit tests.
+It does not yet implement or establish:
+- trusted-clock provenance or automatic historical policy resolution;
+- lineage DAG construction or the independent lineage verifier itself;
+- signature creation, signer identity, key management, or append-only receipt persistence;
+- utility metric aggregation or mutation fuzz generation;
+- integration with the benchmark runner or production action interception;
+- production deployment identity or live-path behavior.
+
+The remaining items are implementation and integration gates, not claims that may be inferred from schema validity or the standalone verifier's unit tests.
