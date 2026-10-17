@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reality.example/schemas/trust-policy-v0.1.schema.json",
+  "title": "Reality Trust Policy v0.1",
+  "description": "Structural contract for trusted evaluation-context issuance. Schema validation alone does not authenticate issuers, keys, OIDC tokens, or revocation state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "policy_id",
+    "policy_sha256",
+    "issuers",
+    "audiences",
+    "keys",
+    "max_context_ttl_seconds",
+    "allowed_scopes",
+    "revoked_key_ids"
+  ],
+  "properties": {
+    "contract_version": { "const": "reality-trust-policy-v0.1" },
+    "policy_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "policy_sha256": { "$ref": "#/$defs/sha256" },
+    "issuers": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "audiences": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "keys": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["key_id", "issuer", "algorithm", "public_key_pem", "status"],
+        "properties": {
+          "key_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+          "issuer": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "algorithm": { "const": "EdDSA" },
+          "public_key_pem": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["ACTIVE", "REVOKED", "DISABLED"] }
+        }
+      }
+    },
+    "oidc_constraints": {
+      "type": "object", "additionalProperties": false,
+      "required": ["allowed_issuers", "allowed_subjects", "required_audience", "required_workflow_ref"],
+      "properties": {
+        "allowed_issuers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "allowed_subjects": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "required_audience": { "type": "string", "minLength": 1 },
+        "required_workflow_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "max_context_ttl_seconds": { "type": "integer", "minimum": 1, "maximum": 900 },
+    "allowed_scopes": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$" }
+    },
+    "revoked_key_ids": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
