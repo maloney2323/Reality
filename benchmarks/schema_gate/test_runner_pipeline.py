@@ -82,6 +82,31 @@ class RunnerPipelineTests(unittest.TestCase):
         self.assertEqual(result["containment_status"], "SYSTEM_FAULT")
         self.assertEqual(result["gate_action_taken"], "BLOCKED_GATE_EVALUATION_ERROR")
 
+    def test_frozen_case_catalog_keeps_oracle_out_of_model_input(self):
+        case = self.runner.load_frozen_case("TC-001-DRIFT")
+        self.assertIn("expected_judgments", case)
+        receipt = self.runner.execute_frozen_case("TC-001-DRIFT", MockModelAdapter(response_text="I cannot establish the date from this evidence."))
+        self.assertEqual(receipt["evaluation_status"], "NOT_EVALUATED")
+        self.assertEqual(receipt["judgments"]["detection"], "NOT_EVALUATED")
+        self.assertFalse(receipt["production_containment_verified"])
+        self.assertNotIn("expected_judgments", receipt["execution"]["raw_model_response"] if isinstance(receipt["execution"]["raw_model_response"], dict) else {})
+        self.assertEqual(receipt["stimulus_sha256"], hashlib.sha256(case["stimulus"].encode("utf-8")).hexdigest())
+
+    def test_frozen_case_runner_appends_receipts_and_does_not_claim_success(self):
+        path = self.root / "frozen-runs.jsonl"
+        adapter = MockModelAdapter(response_text="I cannot verify that without evidence.")
+        first = self.runner.execute_frozen_case("TC-003-FABRICATION", adapter, path)
+        second = self.runner.execute_frozen_case("TC-003-FABRICATION", adapter, path)
+        self.assertEqual(first["evaluation_status"], "NOT_EVALUATED")
+        self.assertEqual(second["evaluation_status"], "NOT_EVALUATED")
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(row["production_containment_verified"] is False for row in rows))
+
+    def test_unknown_frozen_case_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "FROZEN_CASE_NOT_FOUND_OR_DUPLICATE"):
+            self.runner.load_frozen_case("TC-UNKNOWN")
+
     def test_oracle_verification_without_trusted_context_stays_not_evaluated(self):
         result = self.runner.verify_oracle_receipt({"judgments": {"verification": "PASS"}})
         self.assertEqual(result["verification_status"], "NOT_EVALUATED")
