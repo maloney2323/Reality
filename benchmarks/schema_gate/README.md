@@ -6,7 +6,7 @@ This package verifies a manifest and artifact bytes before any artifact is admit
 
 ## Contract
 
-Manifest JSON shape:
+Manifest JSON shape (frozen `reality-artifact-manifest-v1`; the alternate `evidence_registry` shape is not accepted):
 
 ```json
 {
@@ -23,7 +23,7 @@ Manifest JSON shape:
 }
 ```
 
-All paths are relative to the supplied evidence root. Absolute paths, parent traversal, symlinks, missing files, duplicate IDs, malformed or uppercase hashes, digest mismatches, malformed JSON, and schema failures are rejected. Only accepted artifact records are returned to a caller; rejected records cannot be included in its score unless the caller ignores this contract.
+The checked-in `manifest.schema.json` is compiled and applied before any artifact file is opened. Unexpected top-level or artifact fields, malformed or uppercase hashes, and paths outside the frozen relative JSON layout abort the manifest as a whole. All paths are relative to the supplied evidence root. Absolute paths, parent traversal, symlinks, missing files, duplicate IDs, malformed or uppercase hashes, digest mismatches, malformed JSON, and schema failures are rejected. Only accepted artifact records are returned to a caller; rejected records cannot be included in its score unless the caller ignores this contract.
 
 ## Run
 
