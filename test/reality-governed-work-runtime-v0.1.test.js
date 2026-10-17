@@ -46,9 +46,10 @@ const activeAuth = authorize({
   scope:authRequest.allowed_operations
 });
 
-const allowed = canExecute({workItem, authorization:makeVerifiedTestAuthority(workItem).authority});
+const signedAuth = makeVerifiedTestAuthority(workItem).authority;
+const allowed = canExecute({workItem, authorization:signedAuth});
 const receipt = createExecutionReceipt({
-  workItem, authorization:makeVerifiedTestAuthority(workItem).authority, requestSummary:'create Product Planning event',
+  workItem, authorization:signedAuth, requestSummary:'create Product Planning event',
   requestFingerprint:'sha256:test-request'
 });
 
@@ -60,7 +61,7 @@ if (blocked.blocked_reason !== 'VERIFIED_ECT_REQUIRED') throw new Error('WRONG_B
 if (allowed.allowed !== true) throw new Error('SIGNED_ECT_WORK_NOT_ALLOWED');
 if (canExecute({workItem, authorization:activeAuth}).allowed) throw new Error('UNSIGNED_AUTH_OBJECT_ACCEPTED');
 if (receipt.execution_state !== 'AUTHORIZED') throw new Error('AUTHORIZED_RECEIPT_FAILED');
-if (receipt.authorization_id !== activeAuth.authorization_id) throw new Error('RECEIPT_AUTH_LINK_FAILED');
+if (receipt.authorization_id !== signedAuth.authorization_id) throw new Error('RECEIPT_AUTH_LINK_FAILED');
 
 let run = createWorkflowRun({workflow:workflowWithItem,intent});
 run = transitionWorkflow(run,'STRUCTURED');
