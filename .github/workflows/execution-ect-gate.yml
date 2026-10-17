@@ -1,0 +1,32 @@
+name: Execution ECT Security Gate
+
+on:
+  push:
+    branches:
+      - security/ect-execution-gate-v0.1
+  pull_request:
+    paths:
+      - "api/reality/execute.js"
+      - "src/reality-ect-execution-verifier-v0.1.js"
+      - "src/reality-configured-ect-execution-verifier-v0.2.js"
+      - "src/reality-governed-work-runtime-v0.1.js"
+      - "src/reality-governed-execution-engine-v0.1.js"
+      - "test/**"
+      - ".github/workflows/execution-ect-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  node-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run complete Node.js test suite
+        run: npm test
