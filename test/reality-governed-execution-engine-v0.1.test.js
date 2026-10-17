@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executeAuthorizedWork } from '../src/reality-governed-execution-engine-v0.1.js';
+import { makeVerifiedTestAuthority } from './ect-test-helpers.js';
 
 const workItem={
   work_item_id:'work_item:test-1',
@@ -12,14 +13,7 @@ const workItem={
   authority_required:['EXPLICIT_USER_AUTHORIZATION'],
 };
 
-function auth(){return {
-  authorization_id:'auth:test-1',
-  workflow_id:'workflow:test-1',
-  principal:'test-user',
-  allowed_operations:[{connector:'test-probe',operation:'record_write',work_item_id:'work_item:test-1'}],
-  authorized:true,
-  status:'ACTIVE',
-};}
+function auth(){ return makeVerifiedTestAuthority(workItem).authority; }
 
 test('execution fails closed without matching authority',async()=>{
  const r=await executeAuthorizedWork({
@@ -28,7 +22,7 @@ test('execution fails closed without matching authority',async()=>{
    independentVerifier:{verify:async()=>({verified:false})},
  });
  assert.equal(r.status,'BLOCKED');
- assert.equal(r.blocked_reason,'EXPLICIT_AUTHORIZATION_REQUIRED');
+ assert.equal(r.blocked_reason,'VERIFIED_ECT_REQUIRED');
 });
 
 test('authorized work executes and requires independent verification',async()=>{
@@ -63,4 +57,19 @@ test('executor success without independent verification cannot become verified o
  assert.equal(r.status,'UNRESOLVED');
  assert.equal(r.outcome.outcome_state,'UNRESOLVED');
  assert.equal(r.outcome.verified,false);
+});
+
+test('a fabricated authorization object cannot bypass the engine even for non-consequential work', async () => {
+ let connectorCalls = 0;
+ const nonConsequential = { ...workItem, consequential:false, operation:'read' };
+ const r = await executeAuthorizedWork({
+   workItem: nonConsequential,
+   workflowId: nonConsequential.workflow_id,
+   authorization: { authorized:true, workflow_id:nonConsequential.workflow_id, allowed_operations:[] },
+   connector: { execute: async () => { connectorCalls++; return {}; } },
+   independentVerifier: { verify: async () => ({ verified:true }) },
+ });
+ assert.equal(r.status, 'BLOCKED');
+ assert.equal(r.blocked_reason, 'VERIFIED_ECT_REQUIRED');
+ assert.equal(connectorCalls, 0);
 });
