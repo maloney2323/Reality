@@ -6,7 +6,7 @@ Trust is anchored by an exact configured HTTPS endpoint allowlist, normal TLS
 certificate/hostname validation, bounded cache age, and strict JWKS validation.
 """
 from __future__ import annotations
-import json, time, urllib.request
+import json, time, urllib.request, urllib.error
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -57,6 +57,8 @@ class JWKSFetcher:
                 response.close()
         except JWKSFetchError:
             raise
+        except urllib.error.HTTPError as exc:
+            raise JWKSFetchError("JWKS_HTTP_STATUS_REJECTED") from exc
         except Exception as exc:
             raise JWKSFetchError("JWKS_FETCH_FAILED") from exc
         if len(raw) > self.max_response_bytes:
