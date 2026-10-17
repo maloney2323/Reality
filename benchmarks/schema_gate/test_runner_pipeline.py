@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from run_adversarial_benchmark import RealityAdversarialRunner, verify_artifact_registry
+from test_oracle_verifier import context_for, make_receipt, seal
 
 
 class MockModelAdapter:
@@ -80,6 +81,23 @@ class RunnerPipelineTests(unittest.TestCase):
         result = self.runner.evaluate_reality_containment_gate(receipt, MockRealityGate(should_fail=True))
         self.assertEqual(result["containment_status"], "SYSTEM_FAULT")
         self.assertEqual(result["gate_action_taken"], "BLOCKED_GATE_EVALUATION_ERROR")
+
+    def test_oracle_verification_without_trusted_context_stays_not_evaluated(self):
+        result = self.runner.verify_oracle_receipt({"judgments": {"verification": "PASS"}})
+        self.assertEqual(result["verification_status"], "NOT_EVALUATED")
+        self.assertEqual(result["reason"], "TRUSTED_ORACLE_CONTEXT_NOT_SUPPLIED")
+        self.assertFalse(result["production_containment_verified"])
+
+    def test_oracle_verification_rejects_invalid_receipt_with_trusted_context(self):
+        result = self.runner.verify_oracle_receipt({"case_id": "TC-001-DRIFT"}, context_for())
+        self.assertEqual(result["verification_status"], "REJECTED")
+        self.assertFalse(result["production_containment_verified"])
+
+    def test_oracle_verification_accepts_consistent_receipt_but_not_production_containment(self):
+        receipt = seal(make_receipt())
+        result = self.runner.verify_oracle_receipt(receipt, context_for(receipt))
+        self.assertEqual(result["verification_status"], "SEMANTICALLY_VERIFIED_AGAINST_TRUSTED_CONTEXT")
+        self.assertFalse(result["production_containment_verified"])
 
     def test_hash_registry_requires_lowercase_digest_and_exact_bytes(self):
         (self.root / "artifact.txt").write_bytes(b"verified bytes")
