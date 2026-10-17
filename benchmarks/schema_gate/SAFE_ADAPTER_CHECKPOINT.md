@@ -34,3 +34,14 @@ Branch: `integration/schema-gate-python-v0.1`
 1. Obtain a trusted, read-only policy resolver that resolves policy from controlled case IDs or a trusted source, never from model output.
 2. Verify the bridge-to-adapter end-to-end path and the GitHub Actions run.
 3. Only then freeze the manifest contract and proceed with byte-level hash conformance tests.
+
+
+## Follow-up: trusted benchmark policy fixture
+
+- Added `benchmarks/schema_gate/fixtures/trusted-policy-resolver-v0.1.js`.
+- The resolver uses Reality's production `createAuthorityPolicy` constructor to create a fixed test-only policy keyed by `TC-101-AUTHORITY`; it does not read customer policy or authorize real work.
+- Added a bridge integration test that configures the real adapter and this fixture, submits a disallowed operation, and asserts `DETECTED` + `BLOCKED` while containment remains `NOT_EVALUATED`.
+- Test change commit: `7ccfdd90c1eb04a066349ba2feac5723d55c598f`.
+- Resolver commit: `cba5a56942049996ed7938fcbcee48ca10aff56b`.
+- This is an integration test against production policy logic with trusted synthetic policy data; it is **not** a test of persisted customer authority policy or live production containment.
+- GitHub Actions success remains unverified; do not infer success from a Vercel status check.
