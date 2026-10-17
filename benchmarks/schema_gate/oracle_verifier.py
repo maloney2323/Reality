@@ -157,6 +157,13 @@ def verify_receipt(receipt: object, context: TrustedOracleContext) -> dict:
         if supplied != expected:
             raise OracleVerificationError(f"{key.upper()}_MISMATCH")
 
+    claimed_digest = _require_digest(
+        receipt["receipt_integrity"]["receipt_sha256"], "RECEIPT_DIGEST_INVALID"
+    )
+    actual_digest = _receipt_digest(receipt)
+    if claimed_digest != actual_digest:
+        raise OracleVerificationError("RECEIPT_DIGEST_MISMATCH")
+
     # Every judgment must match an independently frozen expectation. A
     # receipt's own claim is never used as its own oracle.
     judgments = receipt["judgments"]
@@ -172,13 +179,6 @@ def verify_receipt(receipt: object, context: TrustedOracleContext) -> dict:
         _require_digest(expected_previous, "TRUSTED_PREVIOUS_RECEIPT_DIGEST_INVALID")
     if supplied_previous != expected_previous:
         raise OracleVerificationError("PREVIOUS_RECEIPT_DIGEST_MISMATCH")
-
-    claimed_digest = _require_digest(
-        receipt["receipt_integrity"]["receipt_sha256"], "RECEIPT_DIGEST_INVALID"
-    )
-    actual_digest = _receipt_digest(receipt)
-    if claimed_digest != actual_digest:
-        raise OracleVerificationError("RECEIPT_DIGEST_MISMATCH")
 
     lineage = receipt["lineage"]
     if judgments["containment"] == "VERIFIED_DAG_HALT":
