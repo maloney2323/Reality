@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isVerifiedExecutionAuthority } from './reality-ect-execution-verifier-v0.1.js';
+import { isConfiguredExecutionAuthority } from './reality-configured-ect-execution-verifier-v0.2.js';
 
 export const GOVERNED_WORK_RUNTIME_VERSION = '0.1.0';
 
