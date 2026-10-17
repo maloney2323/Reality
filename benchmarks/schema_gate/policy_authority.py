@@ -90,6 +90,8 @@ class PolicyAuthorityVerifier:
         except Exception as exc:
             raise PolicyAuthorityError("POLICY_AUTHORITY_SIGNATURE_INVALID") from exc
 
+        if set(registry.keys()) != {"authority_version", "authorized_policies", "signature"}:
+            raise PolicyAuthorityError("POLICY_AUTHORITY_FIELDS_INVALID")
         if registry.get("authority_version") != "reality-policy-authority-v1.0":
             raise PolicyAuthorityError("POLICY_AUTHORITY_VERSION_UNSUPPORTED")
         policies = registry.get("authorized_policies")
@@ -100,6 +102,12 @@ class PolicyAuthorityVerifier:
                 raise PolicyAuthorityError("POLICY_DIGEST_INVALID")
             if not isinstance(entry, dict):
                 raise PolicyAuthorityError("POLICY_AUTHORITY_ENTRY_INVALID")
+            required_fields = {
+                "target_workstream", "max_token_lifetime_seconds", "allowed_scopes",
+                "allowed_subjects", "allowed_workflow_refs",
+            }
+            if set(entry.keys()) != required_fields:
+                raise PolicyAuthorityError("POLICY_AUTHORITY_ENTRY_FIELDS_INVALID")
             if not isinstance(entry.get("target_workstream"), str) or not entry["target_workstream"]:
                 raise PolicyAuthorityError("POLICY_WORKSTREAM_INVALID")
             scopes = entry.get("allowed_scopes")
