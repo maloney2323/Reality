@@ -74,6 +74,31 @@ class ManifestReconciliationTests(unittest.TestCase):
         with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
             verify_manifest(self.root)
 
+
+    def test_artifact_byte_tampering_is_rejected(self):
+        (self.root / "artifacts" / "case.json").write_bytes(b'{"ok":false}')
+        result = verify_manifest(self.root)
+        self.assertEqual(result["accepted_count"], 0)
+        self.assertEqual(result["rejected_artifacts"][0]["reason"], "ARTIFACT_SHA256_MISMATCH")
+
+    def test_schema_byte_tampering_is_rejected(self):
+        (self.root / "schemas" / "case.schema.json").write_bytes(b'{"type":"string"}')
+        result = verify_manifest(self.root)
+        self.assertEqual(result["accepted_count"], 0)
+        self.assertEqual(result["rejected_artifacts"][0]["reason"], "SCHEMA_SHA256_MISMATCH")
+
+    def test_missing_artifact_is_rejected(self):
+        poisoned = dict(self.entry, path="artifacts/missing.json")
+        self.write_manifest({"manifest_version": "reality-artifact-manifest-v1", "artifacts": [poisoned]})
+        result = verify_manifest(self.root)
+        self.assertEqual(result["accepted_count"], 0)
+        self.assertEqual(result["rejected_artifacts"][0]["reason"], "ARTIFACT_NOT_FOUND")
+
+    def test_malformed_manifest_json_aborts(self):
+        (self.root / "manifest.json").write_bytes(b'{"manifest_version":')
+        with self.assertRaisesRegex(GateError, "MANIFEST_JSON_INVALID"):
+            verify_manifest(self.root)
+
     def test_alternate_evidence_registry_contract_is_not_silently_accepted(self):
         self.write_manifest({
             "manifest_version": "reality-artifact-manifest-v1",
