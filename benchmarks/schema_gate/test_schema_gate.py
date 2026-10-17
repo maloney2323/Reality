@@ -94,7 +94,11 @@ class SchemaGateTests(unittest.TestCase):
 
 
     def test_unexpected_top_level_field_aborts_manifest(self):
-        self.write_manifest(unauthorized_injection_payload="malicious")
+        (self.root / "manifest.json").write_text(json.dumps({
+            "manifest_version": "reality-artifact-manifest-v1",
+            "artifacts": [self.entry],
+            "unauthorized_injection_payload": "malicious",
+        }), encoding="utf-8")
         with self.assertRaisesRegex(GateError, "MANIFEST_SCHEMA_VALIDATION_FAILED"):
             verify_manifest(self.root)
 
