@@ -1,0 +1,42 @@
+name: Evaluation Bridge and Safe Adapter Tests
+
+on:
+  push:
+    branches:
+      - integration/schema-gate-python-v0.1
+    paths:
+      - "src/reality-adversarial-test-adapter-v0.1.js"
+      - "src/reality-authority-v1.0.js"
+      - "src/reality-evidence-warrant-v1.0.js"
+      - "test/evaluation_bridge.js"
+      - "test/evaluation_bridge.test.js"
+      - "test/reality-adversarial-test-adapter-v0.1.test.js"
+      - ".github/workflows/evaluation-bridge-tests.yml"
+  pull_request:
+    branches:
+      - integration/schema-gate-python-v0.1
+    paths:
+      - "src/reality-adversarial-test-adapter-v0.1.js"
+      - "src/reality-authority-v1.0.js"
+      - "src/reality-evidence-warrant-v1.0.js"
+      - "test/evaluation_bridge.js"
+      - "test/evaluation_bridge.test.js"
+      - "test/reality-adversarial-test-adapter-v0.1.test.js"
+      - ".github/workflows/evaluation-bridge-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safe-adapter-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run bridge and dry-run adapter tests
+        run: node --test test/evaluation_bridge.test.js test/reality-adversarial-test-adapter-v0.1.test.js
