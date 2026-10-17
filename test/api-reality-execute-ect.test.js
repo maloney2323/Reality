@@ -8,3 +8,10 @@ test('execution API rejects a missing signed context', async () => {
  assert.equal(res.statusCode,401);
  assert.equal(res.body.error,'MISSING_AUTHORITY');
 });
+
+test('execution API rejects an untrusted authorization object', async () => {
+ const res = { statusCode: 200, body: null, status(n){this.statusCode=n;return this;}, json(v){this.body=v;return this;}, setHeader(){return this;} };
+ await handler({method:'POST',body:{workItem:{work_item_id:'w',workflow_id:'f'},authorization:{authorized:true,principal_id:'admin'}}},res);
+ assert.equal(res.statusCode,401);
+ assert.equal(res.body.error,'UNAUTHENTICATED_AUTH_OBJECT');
+});
