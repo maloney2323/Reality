@@ -3,7 +3,6 @@
 These tests validate receipt shape and fail-closed semantics only. They do not
 prove that any judgment is true or that production containment occurred.
 """
-import copy
 import json
 import unittest
 from pathlib import Path
@@ -56,7 +55,7 @@ def valid_receipt():
             "mutation_description": None,
         },
         "receipt_integrity": {
-            "canonicalization_version": "reality-canonical-json-v0.1",
+            "canonicalization_version": "RFC8785-JCS-excluding-receipt-digest-v0.1",
             "receipt_sha256": SHA_A,
             "previous_receipt_sha256": None,
         },
