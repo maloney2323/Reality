@@ -52,7 +52,7 @@ test("invalid request shape is rejected before adapter discovery", () => {
 test("configured adapter with malformed output is blocked", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "reality-bridge-test-"));
   const adapterPath = path.join(dir, "adapter.mjs");
-  await fs.writeFile(adapterPath, "export async function evaluateAssertionTrace(){ return { containment_status: 'CONTAINED' }; }\\n");
+  await fs.writeFile(adapterPath, "export async function evaluateAssertionTrace(){ return { containment_status: 'CONTAINED' }; }" + "\n");
   try {
     const result = invoke(
       { test_case_id: "TC-003-SHAPE", secret_token: TOKEN, raw_model_response: "x" },
