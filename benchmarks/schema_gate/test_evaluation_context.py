@@ -1,7 +1,12 @@
 import copy
 import json
 import unittest
+import uuid
 from pathlib import Path
+
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
+from oidc_identity import verify_oidc_identity
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -51,12 +56,32 @@ def make_policy(private_key=None):
 
 
 def identity():
-    return {
-        "iss": "https://token.actions.githubusercontent.com",
-        "sub": "repo:maloney2323/Reality:ref:refs/heads/integration/schema-gate-python-v0.1",
-        "aud": "https://reality.example/ect",
-        "workflow_ref": "maloney2323/Reality/.github/workflows/schema-gate.yml@refs/heads/integration/schema-gate-python-v0.1",
-    }
+    issuer = "https://token.actions.githubusercontent.com"
+    audience = "https://reality.example/ect"
+    subject = "repo:maloney2323/Reality:ref:refs/heads/integration/schema-gate-python-v0.1"
+    workflow_ref = "maloney2323/Reality/.github/workflows/schema-gate.yml@refs/heads/integration/schema-gate-python-v0.1"
+    now = 1_800_000_000
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key()))
+    jwk.update({"kid": "test-oidc-key", "use": "sig", "alg": "RS256"})
+    token = jwt.encode({
+        "iss": issuer, "sub": subject, "aud": audience,
+        "iat": now - 5, "nbf": now - 5, "exp": now + 600,
+        "jti": str(uuid.uuid4()), "workflow_ref": workflow_ref,
+    }, key, algorithm="RS256", headers={"kid": "test-oidc-key"})
+    class TestReplayStore:
+        def __init__(self):
+            self.used = set()
+        def claim_once(self, token_id, expires_at):
+            if token_id in self.used:
+                return False
+            self.used.add(token_id)
+            return True
+    return verify_oidc_identity(
+        token, jwks={"keys": [jwk]}, expected_issuer=issuer,
+        expected_audience=audience, allowed_subjects={subject},
+        required_workflow_ref=workflow_ref, replay_store=TestReplayStore(), now=now,
+    )
 
 
 def issue(policy, schema, key, **overrides):
@@ -130,11 +155,15 @@ class EvaluationContextTests(unittest.TestCase):
             verify_evaluation_context(token, policy=revoked, schema=self.schema,
                 expected_audience="reality-benchmark-runner", now=1_800_000_050)
 
-    def test_oidc_subject_not_allowed(self):
-        bad_identity = identity()
-        bad_identity["sub"] = "repo:attacker/other:ref:refs/heads/main"
-        with self.assertRaisesRegex(TrustContextError, "OIDC_SUBJECT_NOT_ALLOWED"):
-            issue(self.policy, self.schema, self.key, identity_claims=bad_identity)
+    def test_raw_claims_cannot_bypass_oidc_verification(self):
+        raw_claims = {
+            "iss": "https://token.actions.githubusercontent.com",
+            "sub": "repo:attacker/other:ref:refs/heads/main",
+            "aud": "https://reality.example/ect",
+            "workflow_ref": "attacker.yml@main",
+        }
+        with self.assertRaisesRegex(TrustContextError, "OIDC_IDENTITY_NOT_VERIFIED"):
+            issue(self.policy, self.schema, self.key, identity_claims=raw_claims)
 
     def test_policy_digest_tampering_rejected(self):
         tampered = copy.deepcopy(self.policy)
