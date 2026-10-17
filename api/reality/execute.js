@@ -1,7 +1,6 @@
 import { executeAuthorizedWork } from '../../src/reality-governed-execution-engine-v0.1.js';
 import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
-import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
+import { verifyExecutionECT } from '../../src/reality-ect-execution-verifier-v0.1.js';
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
 
@@ -26,16 +25,33 @@ export default async function handler(req, res) {
     const body = req.body || {};
     if (!body.workItem) return res.status(400).json({ ok: false, error: 'WORK_ITEM_REQUIRED' });
     if (body.connector || body.independentVerifier) return res.status(400).json({ ok: false, error: 'CLIENT_SUPPLIED_EXECUTION_BRIDGES_REJECTED' });
-    const principal = getOrCreateSessionPrincipal(req, res);
-    let authorization = body.authorization || null;
-    let authoritySource = authorization ? 'EXPLICIT_AUTHORIZATION' : 'NONE';
-    if (authorization?.principal_id && authorization.principal_id !== principal.principal_id) return res.status(403).json({ ok: false, error: 'AUTHORIZATION_PRINCIPAL_MISMATCH' });
-    if (!authorization) {
-      const policy = await getAuthorityPolicy(principal.principal_id);
-      authorization = autoAuthorize({ policy, workItem: body.workItem });
-      if (authorization) authoritySource = 'CUSTOMER_AUTO_AUTHORITY';
+    if (Object.prototype.hasOwnProperty.call(body, 'authorization')) {
+      return res.status(401).json({ ok: false, error: 'UNAUTHENTICATED_AUTH_OBJECT' });
     }
-    if (!authorization) return res.status(200).json({ ok:true, result:{ status:'BLOCKED', blocked_reason:'EXPLICIT_AUTHORIZATION_REQUIRED', authority_source:'NONE', execution:null, verification:null, outcome:null } });
+    if (typeof body.signed_ect !== 'string' || !body.signed_ect) {
+      return res.status(401).json({ ok: false, error: 'MISSING_AUTHORITY' });
+    }
+
+    const workflowId = body.workflowId || body.workItem.workflow_id;
+    let authorization;
+    try {
+      authorization = verifyExecutionECT(body.signed_ect, {
+        trustedPublicKeyPem: process.env.REALITY_ECT_PUBLIC_KEY_PEM,
+        expectedKeyId: process.env.REALITY_ECT_KEY_ID,
+        expectedIssuer: process.env.REALITY_ECT_ISSUER,
+        expectedAudience: process.env.REALITY_ECT_AUDIENCE,
+        expectedPolicyDigest: process.env.REALITY_ECT_POLICY_SHA256,
+        expectedAuthorityDigest: process.env.REALITY_POLICY_AUTHORITY_SHA256,
+        expectedWorkstream: process.env.REALITY_ECT_WORKSTREAM,
+        workItem: body.workItem,
+        workflowId,
+      });
+    } catch (error) {
+      const code = error?.code || error?.message || 'ECT_REJECTED';
+      const status = code === 'ECT_TRUST_CONFIGURATION_MISSING' ? 503 : 401;
+      return res.status(status).json({ ok: false, error: code });
+    }
+    const authoritySource = 'SIGNED_ECT';
 
     let bridges;
     try { bridges = getServerExecutionBridges(); }
@@ -45,7 +61,7 @@ export default async function handler(req, res) {
 
     const result = await executeAuthorizedWork({
       workItem: body.workItem,
-      workflowId: body.workflowId || body.workItem.workflow_id,
+      workflowId,
       authorization,
       connector: bridges,
       independentVerifier: bridges,
@@ -102,7 +118,7 @@ export default async function handler(req, res) {
         ...result,
         ...governance,
         server_bridge_version: bridges.bridge_version,
-        principal_id: principal.principal_id,
+        principal_id: authorization.principal_id,
         authority_source: authoritySource,
       },
     });
