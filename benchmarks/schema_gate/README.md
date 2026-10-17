@@ -115,3 +115,16 @@ The isolated integration workflow `.github/workflows/schema-gate-integration.yml
 - `test_jwks_rotation_integration.py` verifies Key A, rotates the endpoint to Key B, asserts unknown-`kid` refresh and verifies Key B, and checks expired-cache endpoint failure, HTTP 500, and oversized payload rejection.
 
 The local server and test-only replay store are not production infrastructure. This harness does not yet establish an out-of-band policy digest authority, real production JWKS trust configuration, or production execution permission. Those remain separate acceptance gates. CI results must be inspected after the workflow completes; adding a workflow file is not itself evidence that the tests passed.
+
+
+## Independent Policy Authority v1.0 (Gate C)
+
+- `policy_authority.schema.json` defines the strict signed registry shape. No live registry, private signing key, or production authority is checked into this repository.
+- `policy_authority.py` requires two independently supplied trust anchors: a pinned SHA-256 digest for the unsigned canonical registry content, and an Ed25519 public key used to verify the registry signature. The registry cannot nominate its own trust root.
+- Each policy digest binds a target workstream, maximum ECT lifetime, allowed scopes, permitted OIDC subjects, and exact workflow references. Unknown policy digests, subject/workflow mismatches, workstream mismatches, scope escalation, duplicate scopes, and excessive token lifetimes are rejected.
+- `issue_authorized_evaluation_context` is the authority-enforcing issuance entry point. It requires a `VerifiedOIDCIdentity`, requires the requested digest to equal the actual trust-policy digest, authorizes scope and TTL against the independently anchored registry, and binds the registry digest and target workstream into the ECT's signed evaluation boundaries.
+- The lower-level `issue_evaluation_context` function remains a cryptographic primitive for internal/testing use; production request paths must expose only the authority-enforcing entry point. The Python identity proof object is not a process-isolation boundary against malicious in-process code.
+
+Adversarial tests in `test_policy_authority.py` cover registry tampering, signature tampering even when a caller supplies a newly computed digest, unknown policy digest, wrong workstream, wrong subject, wrong workflow, scope escalation, duplicate scope, excessive TTL, raw-claims bypass, and authorized ECT issuance.
+
+The integration workflow now includes the policy authority suite. A committed workflow update is not evidence of a passing run; check its completed CI result before marking Gates A/B/C accepted.
