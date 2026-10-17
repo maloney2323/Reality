@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-6-astra',
         input: 'Reply with exactly: REALITY_OPENAI_CONNECTIVITY_OK',
         max_output_tokens: 24,
         store: false,
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     ok: outputText.trim() === 'REALITY_OPENAI_CONNECTIVITY_OK',
     stage: 'complete',
     provider: 'openai',
-    model: payload?.model || 'gpt-4.1-mini',
+    model: payload?.model || 'gpt-6-astra',
     response_id: payload?.id || null,
     output_matches_probe: outputText.trim() === 'REALITY_OPENAI_CONNECTIVITY_OK',
   });
