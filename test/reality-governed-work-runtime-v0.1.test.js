@@ -1,3 +1,5 @@
+import { makeVerifiedTestAuthority } from './ect-test-helpers.js';
+
 import {
   createIntentRecord, structureIntent, createWorkItem, buildPreflightPackage,
   buildAuthorizationRequest, authorize, canExecute, createExecutionReceipt,
