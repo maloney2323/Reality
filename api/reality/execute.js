@@ -1,6 +1,6 @@
 import { executeAuthorizedWork } from '../../src/reality-governed-execution-engine-v0.1.js';
 import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
-import { verifyExecutionECT } from '../../src/reality-ect-execution-verifier-v0.1.js';
+import { verifyConfiguredExecutionECT } from '../../src/reality-configured-ect-execution-verifier-v0.2.js';
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
 
@@ -35,14 +35,7 @@ export default async function handler(req, res) {
     const workflowId = body.workflowId || body.workItem.workflow_id;
     let authorization;
     try {
-      authorization = verifyExecutionECT(body.signed_ect, {
-        trustedPublicKeyPem: process.env.REALITY_ECT_PUBLIC_KEY_PEM,
-        expectedKeyId: process.env.REALITY_ECT_KEY_ID,
-        expectedIssuer: process.env.REALITY_ECT_ISSUER,
-        expectedAudience: process.env.REALITY_ECT_AUDIENCE,
-        expectedPolicyDigest: process.env.REALITY_ECT_POLICY_SHA256,
-        expectedAuthorityDigest: process.env.REALITY_POLICY_AUTHORITY_SHA256,
-        expectedWorkstream: process.env.REALITY_ECT_WORKSTREAM,
+      authorization = verifyConfiguredExecutionECT(body.signed_ect, {
         workItem: body.workItem,
         workflowId,
       });
