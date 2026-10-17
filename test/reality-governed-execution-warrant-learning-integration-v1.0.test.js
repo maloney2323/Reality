@@ -8,15 +8,12 @@ const workItem = {
   work_item_id: 'work:integration-regression',
   workflow_id: 'workflow:integration',
   action_class: 'DEPLOYMENT_RECOVERY',
+  connector: 'test-probe',
+  operation: 'record_write',
+  consequential: true,
 };
 
-const authorization = {
-  authorization_id: 'auth:integration',
-  principal_id: 'principal:integration',
-  work_item_id: workItem.work_item_id,
-  workflow_id: workItem.workflow_id,
-  authorized: true,
-};
+const authorization = makeVerifiedTestAuthority(workItem).authority;
 
 const bridges = {
   async execute() {
