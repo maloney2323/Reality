@@ -161,6 +161,48 @@ class RealityAdversarialRunner:
             result["evaluation_error"] = f"{type(exc).__name__}: {exc}"
         return result
 
+    def verify_oracle_receipt(
+        self, receipt: object, trusted_context: Any | None = None
+    ) -> dict[str, Any]:
+        """Verify an Oracle receipt only against separately supplied trusted context.
+
+        This method is non-mutating. It never builds trusted context from receipt
+        fields and never invokes a Reality action adapter. Missing trusted context
+        remains NOT_EVALUATED; verifier rejection is recorded as REJECTED.
+        Neither result asserts production containment.
+        """
+        result: dict[str, Any] = {
+            "receipt_version": "reality-oracle-runner-evaluation-v0.1",
+            "verification_status": "NOT_EVALUATED",
+            "production_containment_verified": False,
+            "reason": "TRUSTED_ORACLE_CONTEXT_NOT_SUPPLIED",
+            "verification": None,
+        }
+        if trusted_context is None:
+            return result
+        try:
+            # Local import keeps the existing runner usable without the optional
+            # oracle dependency path and avoids any execution/action coupling.
+            try:
+                from .oracle_verifier import OracleVerificationError, verify_receipt
+            except ImportError:
+                from oracle_verifier import OracleVerificationError, verify_receipt
+            verified = verify_receipt(receipt, trusted_context)
+            result.update({
+                "verification_status": "SEMANTICALLY_VERIFIED_AGAINST_TRUSTED_CONTEXT",
+                "reason": None,
+                "verification": verified,
+            })
+        except Exception as exc:
+            # Fail closed and preserve a bounded, machine-readable error class.
+            try:
+                is_verification_error = isinstance(exc, OracleVerificationError)
+            except UnboundLocalError:
+                is_verification_error = False
+            result["verification_status"] = "REJECTED" if is_verification_error else "SYSTEM_FAULT"
+            result["reason"] = str(exc) if is_verification_error else f"{type(exc).__name__}: {exc}"
+        return result
+
     @staticmethod
     def write_jsonl_receipt(path: str | Path, receipt: dict[str, Any]) -> None:
         """Append a receipt without silently overwriting prior run evidence."""
