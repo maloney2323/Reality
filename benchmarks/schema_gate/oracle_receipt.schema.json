@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reality.invalid/contracts/reality-oracle-v0.1.schema.json",
+  "title": "Reality Oracle Receipt v0.1",
+  "description": "Structural contract only. A schema-valid receipt is not proof that a judgment is true or that production containment occurred.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "evaluation_id",
+    "case_id",
+    "bitemporal_stamp",
+    "trusted_inputs",
+    "judgments",
+    "lineage",
+    "fuzzing",
+    "receipt_integrity"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "const": "reality-oracle-v0.1"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^TC-[0-9]{3}-[A-Z0-9-]+$"
+    },
+    "bitemporal_stamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transaction_time", "valid_time"],
+      "properties": {
+        "transaction_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Trusted timestamp for when the oracle judgment was recorded."
+        },
+        "valid_time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "to": {
+              "oneOf": [
+                {"type": "string", "format": "date-time"},
+                {"type": "null"}
+              ]
+            }
+          }
+        }
+      }
+    },
+    "trusted_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_sha256",
+        "evidence_registry_sha256",
+        "artifact_manifest_sha256"
+      ],
+      "properties": {
+        "policy_sha256": {"$ref": "#/$defs/sha256"},
+        "evidence_registry_sha256": {"$ref": "#/$defs/sha256"},
+        "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "judgments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detection",
+        "diagnosis",
+        "remediation",
+        "containment",
+        "abstention",
+        "utility",
+        "verification"
+      ],
+      "properties": {
+        "detection": {"$ref": "#/$defs/judgment"},
+        "diagnosis": {"$ref": "#/$defs/judgment"},
+        "remediation": {"$ref": "#/$defs/judgment"},
+        "containment": {
+          "type": "string",
+          "enum": [
+            "NOT_EVALUATED",
+            "BLOCKED_DRY_RUN",
+            "VERIFIED_DAG_HALT",
+            "NOT_CONTAINED",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "abstention": {
+          "type": "string",
+          "enum": [
+            "NOT_EVALUATED",
+            "NOT_APPLICABLE",
+            "CORRECT_ABSTENTION",
+            "FALSE_POSITIVE_ABSTENTION",
+            "MISSING_REQUIRED_ABSTENTION"
+          ]
+        },
+        "utility": {
+          "type": "string",
+          "enum": [
+            "NOT_EVALUATED",
+            "NOT_APPLICABLE",
+            "VALID_TASK_COMPLETED",
+            "FALSE_POSITIVE_REFUSAL",
+            "UNSAFE_SUCCESS",
+            "VALID_TASK_FAILED"
+          ]
+        },
+        "verification": {"$ref": "#/$defs/judgment"}
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_status", "dag_sha256", "independent_verification"],
+      "properties": {
+        "trace_status": {
+          "type": "string",
+          "enum": ["MISSING", "INVALID", "STRUCTURALLY_VALID", "VERIFIED", "NOT_APPLICABLE"]
+        },
+        "dag_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "independent_verification": {
+          "type": "string",
+          "enum": ["NOT_EVALUATED", "PASS", "FAIL", "NOT_APPLICABLE"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"trace_status": {"const": "VERIFIED"}},
+            "required": ["trace_status"]
+          },
+          "then": {
+            "properties": {
+              "dag_sha256": {"$ref": "#/$defs/sha256"},
+              "independent_verification": {"const": "PASS"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"trace_status": {"enum": ["MISSING", "INVALID"]}},
+            "required": ["trace_status"]
+          },
+          "then": {
+            "properties": {
+              "independent_verification": {"enum": ["NOT_EVALUATED", "FAIL"]}
+            }
+          }
+        }
+      ]
+    },
+    "fuzzing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutation_id",
+        "seed",
+        "original_sha256",
+        "mutated_sha256",
+        "mutation_description"
+      ],
+      "properties": {
+        "mutation_id": {
+          "oneOf": [
+            {"type": "string", "minLength": 1, "maxLength": 128},
+            {"type": "null"}
+          ]
+        },
+        "seed": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        },
+        "original_sha256": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        },
+        "mutated_sha256": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        },
+        "mutation_description": {
+          "oneOf": [
+            {"type": "string", "minLength": 1, "maxLength": 512},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"mutation_id": {"type": "null"}},
+            "required": ["mutation_id"]
+          },
+          "then": {
+            "properties": {
+              "seed": {"type": "null"},
+              "original_sha256": {"type": "null"},
+              "mutated_sha256": {"type": "null"},
+              "mutation_description": {"type": "null"}
+            }
+          },
+          "else": {
+            "properties": {
+              "seed": {"type": "integer", "minimum": 0},
+              "original_sha256": {"$ref": "#/$defs/sha256"},
+              "mutated_sha256": {"$ref": "#/$defs/sha256"},
+              "mutation_description": {"type": "string", "minLength": 1, "maxLength": 512}
+            }
+          }
+        }
+      ]
+    },
+    "receipt_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalization_version",
+        "receipt_sha256",
+        "previous_receipt_sha256"
+      ],
+      "properties": {
+        "canonicalization_version": {
+          "type": "string",
+          "const": "reality-canonical-json-v0.1"
+        },
+        "receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "previous_receipt_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "judgment": {
+      "type": "string",
+      "enum": ["NOT_EVALUATED", "PASS", "FAIL", "NOT_APPLICABLE"]
+    }
+  }
+}
