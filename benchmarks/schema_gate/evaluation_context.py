@@ -116,7 +116,21 @@ def issue_evaluation_context(
     validate_policy(policy, schema)
     if not isinstance(private_key, Ed25519PrivateKey):
         raise TrustContextError("UNSUPPORTED_PRIVATE_KEY_ALGORITHM")
-    _key(policy, key_id, issuer)
+    trusted_key = _key(policy, key_id, issuer)
+    try:
+        configured_public = serialization.load_pem_public_key(trusted_key["public_key_pem"].encode("utf-8"))
+        supplied_public = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        configured_raw = configured_public.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+    except Exception as exc:
+        raise TrustContextError("SIGNING_KEY_MISMATCH") from exc
+    if supplied_public != configured_raw:
+        raise TrustContextError("SIGNING_KEY_MISMATCH")
     identity = _validated_identity(identity_claims, policy)
     if audience not in policy["audiences"]:
         raise TrustContextError("AUDIENCE_NOT_ALLOWED")
