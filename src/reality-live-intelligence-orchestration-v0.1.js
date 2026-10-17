@@ -446,8 +446,18 @@ export async function runLiveIntelligenceOrchestration({
     });
   }
 
+  // Refresh the continuity summary after governed WORK and AUTHORITY stages
+  // have been appended. The earlier base summary intentionally reflects the
+  // initial RAW_SIGNAL -> TRANSFORMATION -> OBSERVATION snapshot.
+  const finalContinuitySpine = {
+    ...base.continuity_spine,
+    node_count: continuityRuntime?.nodes?.length || 0,
+    last_event_id: continuityRuntime?.spine?.last_event_id || null,
+  };
+
   return {
     ...base,
+    continuity_spine: finalContinuitySpine,
     mode: 'ACTION_CANDIDATE',
     governance: 'PROPORTIONAL_ACTION_GOVERNANCE',
     work: {
