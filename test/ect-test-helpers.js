@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { verifyExecutionECT } from '../src/reality-ect-execution-verifier-v0.1.js';
+import { verifyConfiguredExecutionECT } from '../src/reality-configured-ect-execution-verifier-v0.2.js';
 
 function stable(value) {
   if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']';
@@ -36,11 +36,20 @@ export function makeVerifiedTestAuthority(workItem, overrides = {}) {
   const second = b64u(stable(claims));
   const signingInput = first + '.' + second;
   const token = signingInput + '.' + sign(null, Buffer.from(signingInput, 'ascii'), privateKey).toString('base64url');
-  const authority = overrides.skipVerify ? null : verifyExecutionECT(token, {
-    trustedPublicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }),
-    expectedKeyId: keyId, expectedIssuer: issuer, expectedAudience: audience,
-    expectedPolicyDigest: policyDigest, expectedAuthorityDigest: authorityDigest,
-    expectedWorkstream: 'test-workstream', workItem, workflowId: workItem.workflow_id, nowSeconds: now,
-  });
+  const names = ['REALITY_ECT_PUBLIC_KEY_PEM','REALITY_ECT_KEY_ID','REALITY_ECT_ISSUER','REALITY_ECT_AUDIENCE','REALITY_ECT_POLICY_SHA256','REALITY_POLICY_AUTHORITY_SHA256','REALITY_ECT_WORKSTREAM'];
+  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  let authority = null;
+  try {
+    process.env.REALITY_ECT_PUBLIC_KEY_PEM = publicKey.export({ type: 'spki', format: 'pem' });
+    process.env.REALITY_ECT_KEY_ID = keyId;
+    process.env.REALITY_ECT_ISSUER = issuer;
+    process.env.REALITY_ECT_AUDIENCE = audience;
+    process.env.REALITY_ECT_POLICY_SHA256 = policyDigest;
+    process.env.REALITY_POLICY_AUTHORITY_SHA256 = authorityDigest;
+    process.env.REALITY_ECT_WORKSTREAM = 'test-workstream';
+    if (!overrides.skipVerify) authority = verifyConfiguredExecutionECT(token, { workItem, workflowId: workItem.workflow_id, nowSeconds: now });
+  } finally {
+    for (const name of names) previous[name] === undefined ? delete process.env[name] : process.env[name] = previous[name];
+  }
   return { token, authority, publicKey, privateKey, claims, header, policyDigest, authorityDigest, keyId, issuer, audience, now };
 }
