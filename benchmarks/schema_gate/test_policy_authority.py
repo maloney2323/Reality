@@ -19,7 +19,10 @@ from policy_authority import (
     PolicyAuthorityVerifier,
     canonical_json,
     registry_digest,
+    issue_authorized_evaluation_context,
 )
+from evaluation_context import verify_evaluation_context
+from test_evaluation_context import make_policy
 
 
 SUBJECT = "repo:maloney2323/Reality:ref:refs/heads/integration/schema-gate-python-v0.1"
@@ -56,7 +59,7 @@ def make_identity(*, subject=SUBJECT, workflow=WORKFLOW):
     )
 
 
-def make_authority(*, subject=SUBJECT, workflow=WORKFLOW):
+def make_authority(*, subject=SUBJECT, workflow=WORKFLOW, policy_digest=POLICY_DIGEST):
     signing_key = Ed25519PrivateKey.generate()
     public_pem = signing_key.public_key().public_bytes(
         serialization.Encoding.PEM,
@@ -65,7 +68,7 @@ def make_authority(*, subject=SUBJECT, workflow=WORKFLOW):
     registry = {
         "authority_version": "reality-policy-authority-v1.0",
         "authorized_policies": {
-            POLICY_DIGEST: {
+            policy_digest: {
                 "target_workstream": "ledger_check",
                 "max_token_lifetime_seconds": 300,
                 "allowed_scopes": ["read:evidence", "evaluate:sandbox"],
@@ -163,6 +166,66 @@ class PolicyAuthorityTests(unittest.TestCase):
     def test_raw_claims_cannot_authorize(self):
         with self.assertRaisesRegex(PolicyAuthorityError, "OIDC_IDENTITY_NOT_VERIFIED"):
             self.authorize(identity={"sub": SUBJECT, "workflow_ref": WORKFLOW})
+
+    def test_authorized_policy_issues_short_lived_ect_bound_to_authority(self):
+        policy, schema, ect_key = make_policy()
+        identity = make_identity()
+        authority, _registry, authority_pin, _public_pem, _authority_key = make_authority(
+            subject=identity.claims["sub"],
+            workflow=identity.claims["workflow_ref"],
+            policy_digest=policy["policy_sha256"],
+        )
+        token = issue_authorized_evaluation_context(
+            authority=authority,
+            identity=identity,
+            requested_policy_digest=policy["policy_sha256"],
+            requested_workstream="ledger_check",
+            requested_scopes=["read:evidence"],
+            requested_ttl_seconds=120,
+            policy=policy,
+            schema=schema,
+            issuer="https://reality.example/trust",
+            key_id="test-ed25519-key",
+            private_key=ect_key,
+            audience="reality-benchmark-runner",
+            evaluation_boundaries={"case_ids": ["TC-001-DRIFT"]},
+            now=1_800_000_000,
+        )
+        verified = verify_evaluation_context(
+            token, policy=policy, schema=schema,
+            expected_audience="reality-benchmark-runner",
+            required_scope="read:evidence", now=1_800_000_050,
+        )
+        self.assertEqual(
+            verified["claims"]["evaluation_boundaries"]["policy_authority_digest"],
+            authority_pin,
+        )
+        self.assertEqual(
+            verified["claims"]["evaluation_boundaries"]["target_workstream"],
+            "ledger_check",
+        )
+        self.assertEqual(verified["claims"]["exp"] - verified["claims"]["iat"], 120)
+
+    def test_ect_issuance_rejects_policy_digest_not_matching_policy(self):
+        policy, schema, ect_key = make_policy()
+        identity = make_identity()
+        authority, *_ = make_authority(
+            subject=identity.claims["sub"],
+            workflow=identity.claims["workflow_ref"],
+            policy_digest=policy["policy_sha256"],
+        )
+        with self.assertRaisesRegex(PolicyAuthorityError, "REQUESTED_POLICY_DOES_NOT_MATCH_TRUST_POLICY"):
+            issue_authorized_evaluation_context(
+                authority=authority, identity=identity,
+                requested_policy_digest="f" * 64,
+                requested_workstream="ledger_check",
+                requested_scopes=["read:evidence"], requested_ttl_seconds=120,
+                policy=policy, schema=schema, issuer="https://reality.example/trust",
+                key_id="test-ed25519-key", private_key=ect_key,
+                audience="reality-benchmark-runner",
+                evaluation_boundaries={"case_ids": ["TC-001-DRIFT"]},
+                now=1_800_000_000,
+            )
 
     def test_invalid_anchor_format_rejected(self):
         with self.assertRaisesRegex(PolicyAuthorityError, "POLICY_AUTHORITY_ANCHOR_INVALID"):
