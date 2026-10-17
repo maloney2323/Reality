@@ -25,6 +25,14 @@ Manifest JSON shape (frozen `reality-artifact-manifest-v1`; the alternate `evide
 
 The checked-in `manifest.schema.json` is compiled and applied before any artifact file is opened. Unexpected top-level or artifact fields, malformed or uppercase hashes, and paths outside the frozen relative JSON layout abort the manifest as a whole. All paths are relative to the supplied evidence root. Absolute paths, parent traversal, symlinks, missing files, duplicate IDs, malformed or uppercase hashes, digest mismatches, malformed JSON, and schema failures are rejected. Only accepted artifact records are returned to a caller; rejected records cannot be included in its score unless the caller ignores this contract.
 
+## Oracle receipt contract
+
+`oracle_receipt.schema.json` defines the proposed `reality-oracle-v0.1` receipt shape. See [ORACLE_CONTRACT_V0_1.md](ORACLE_CONTRACT_V0_1.md) for the semantics and verification boundaries.
+
+The schema requires bitemporal stamps and trusted-input digests, keeps detection/diagnosis/remediation/containment/utility/verification distinct, and rejects `VERIFIED_DAG_HALT` unless a verified lineage digest and independent verification PASS are present. `BLOCKED_DRY_RUN` is explicitly not production containment.
+
+Schema validity is only structural validation. The receipt producer, canonical digest calculator, trusted temporal policy resolution, lineage provenance verifier, signature and append-only persistence, mutation generator, and production interception are not implemented by this contract alone. Do not claim those capabilities based on these schema tests.
+
 ## Run
 
 ```sh
