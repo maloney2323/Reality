@@ -103,3 +103,15 @@ Important limits: the JWKS snapshot must be obtained through a separately truste
 - `test_jwks_fetcher.py`, `test_replay_store.py`, and `test_production_oidc_chain.py` cover timeout, stale cache, key rotation, malformed/oversized response, write/commit failure, duplicate claims, and concurrent fake-store claims.
 
 Security boundary notes: TLS CA/hostname verification is used instead of leaf-certificate pinning because issuer certificates rotate; endpoint allowlisting and JWKS trust-root configuration remain deployment controls. The adapter contract tests use injected fake network/database objects and do not prove live TLS, database durability, cross-region consistency, or production containment. The concurrent fake-store test only verifies the desired interface behavior; true distributed atomicity must be tested against the chosen database service.
+
+
+## Live replay and JWKS rotation acceptance harness
+
+The isolated integration workflow `.github/workflows/schema-gate-integration.yml` starts a disposable PostgreSQL 16 service and runs the live adapter tests. Set `REALITY_TEST_POSTGRES_DSN` to a disposable database to run the database tests locally; the tests create and drop a uniquely named table and must not target production data.
+
+- `test_postgres_replay_store_integration.py` races 50 workers against the real PostgreSQL unique constraint. The required outcome is exactly one `True` claim and 49 `False` replay results, with exactly one row persisted.
+- The commit-acknowledgement-loss test commits through a real connection and then injects a lost-ack exception. The adapter must raise `ReplayStoreError`; a subsequent authoritative claim must detect the already committed row as replay. This tests the fail-closed adapter response to the ambiguous outcome, not arbitrary TCP fault behavior in every driver/network path.
+- `test_jwks_server.py` provides a controlled local HTTPS endpoint using an ephemeral test certificate explicitly trusted by the test client. It is test-only and is not a production trust configuration.
+- `test_jwks_rotation_integration.py` verifies Key A, rotates the endpoint to Key B, asserts unknown-`kid` refresh and verifies Key B, and checks expired-cache endpoint failure, HTTP 500, and oversized payload rejection.
+
+The local server and test-only replay store are not production infrastructure. This harness does not yet establish an out-of-band policy digest authority, real production JWKS trust configuration, or production execution permission. Those remain separate acceptance gates. CI results must be inspected after the workflow completes; adding a workflow file is not itself evidence that the tests passed.
