@@ -160,3 +160,58 @@ class PolicyAuthorityVerifier:
             max_token_lifetime_seconds=entry["max_token_lifetime_seconds"],
             authority_digest=self.authority_digest,
         )
+
+
+def issue_authorized_evaluation_context(
+    *,
+    authority: PolicyAuthorityVerifier,
+    identity: VerifiedOIDCIdentity,
+    requested_policy_digest: str,
+    requested_workstream: str,
+    requested_scopes: list[str],
+    requested_ttl_seconds: int,
+    policy: Mapping[str, Any],
+    schema: Mapping[str, Any],
+    issuer: str,
+    key_id: str,
+    private_key: Any,
+    audience: str,
+    evaluation_boundaries: Mapping[str, Any],
+    now: int | None = None,
+) -> str:
+    """Authorize against the independent registry before creating an ECT.
+
+    This is the authority-enforcing issuance entry point. The low-level issuer is
+    a cryptographic primitive and must not be exposed as a production request path.
+    """
+    from evaluation_context import TrustContextError, issue_evaluation_context, policy_digest as trust_policy_digest
+
+    if trust_policy_digest(policy) != requested_policy_digest:
+        raise PolicyAuthorityError("REQUESTED_POLICY_DOES_NOT_MATCH_TRUST_POLICY")
+    authorized = authority.authorize(
+        identity=identity,
+        requested_policy_digest=requested_policy_digest,
+        requested_workstream=requested_workstream,
+        requested_scopes=requested_scopes,
+        requested_ttl_seconds=requested_ttl_seconds,
+    )
+    try:
+        return issue_evaluation_context(
+            policy=policy,
+            schema=schema,
+            issuer=issuer,
+            key_id=key_id,
+            private_key=private_key,
+            identity_claims=identity,
+            audience=audience,
+            scope=list(authorized.permissions),
+            evaluation_boundaries={
+                **dict(evaluation_boundaries),
+                "policy_authority_digest": authorized.authority_digest,
+                "target_workstream": authorized.target_workstream,
+            },
+            now=now,
+            ttl_seconds=requested_ttl_seconds,
+        )
+    except TrustContextError as exc:
+        raise PolicyAuthorityError("ECT_ISSUANCE_REJECTED") from exc
