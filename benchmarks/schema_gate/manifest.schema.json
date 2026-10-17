@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RealityArtifactManifestSchema_v1",
+  "type": "object",
+  "required": ["manifest_version", "artifacts"],
+  "additionalProperties": false,
+  "properties": {
+    "manifest_version": { "type": "string", "const": "reality-artifact-manifest-v1" },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "path", "sha256", "schema_path", "schema_sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+          "path": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+\\.json$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "schema_path": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+\\.json$" },
+          "schema_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}
