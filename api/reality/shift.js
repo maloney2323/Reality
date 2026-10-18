@@ -1,11 +1,9 @@
-import crypto from 'node:crypto';
 import { isAuthorizedCronRequest } from '../../src/reality-cron-auth-v0.1.js';
 import { validateCronAuthorization } from '../../src/reality-cron-governance-v1.0.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
@@ -281,29 +279,6 @@ export default async function handler(req, res) {
     }
 
     const persistence = createUniversePostgresPersistence();
-
-    if (req.method === 'POST') {
-      const principal = getOrCreateSessionPrincipal(req, res);
-      const b = req.body && typeof req.body === 'object' ? req.body : {};
-      const config = {
-        enabled: b.enabled === true,
-        readinessTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
-        shiftStart: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
-        shiftLength: [8, 12].includes(Number(b.shiftLength)) ? Number(b.shiftLength) : 8,
-        timeZone: typeof b.timeZone === 'string' && b.timeZone ? b.timeZone : 'America/New_York',
-        updated_by: principal.principal_id,
-        updated_at: new Date().toISOString(),
-      };
-      const eventId = 'shift:config:' + crypto.randomUUID();
-      await persistence.appendEvent({
-        event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
-        entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
-        parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
-        epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
-        provenance: { source: 'reality-homepage-shift-settings', principal_id: principal.principal_id },
-      });
-      return json(res, 200, { ok: true, config, persisted: true });
-    }
 
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
