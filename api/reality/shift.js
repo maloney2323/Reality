@@ -256,12 +256,6 @@ async function runTick({ config, phase, local, persistence }) {
 }
 
 export default async function handler(req, res) {
-  // Shift configuration writes are treated as scheduled/privileged operations.
-  if (req.method === 'POST') {
-    const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
-    if (!authorization.authorized) return json(res, authorization.status, { error: authorization.error, message: authorization.message });
-  }
-
   try {
     const persistence = createUniversePostgresPersistence();
 
