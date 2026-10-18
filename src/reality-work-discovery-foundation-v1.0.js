@@ -105,7 +105,7 @@ export function qualifyWorkCandidate(work,{evidenceRequired=true,minRevenue=0}={
 export function rankWorkForMoney(work,{riskWeight=1,recurrenceWeight=1,revenueWeight=1}={}){
   if(!work?.work_id) throw new Error('WORK_CANDIDATE_REQUIRED');
   const revenue=work.expected_revenue||0;
-  const recurrence=work.recurring?Math.min(work.recurrence_count/5,1):0;
+  const recurrence=work.recurring?Math.min(Math.max(0,work.recurrence_count-1)/5,1):0;
   const riskPenalty=work.risk==='HIGH'?riskWeight:0;
   const score=(revenue*revenueWeight)+(recurrence*100*recurrenceWeight)-riskPenalty;
   return Object.freeze({...work,money_priority_score:score});
