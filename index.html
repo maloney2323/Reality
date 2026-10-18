@@ -10,7 +10,7 @@
 main{max-width:980px;margin:auto;padding:28px 18px 80px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
 .brand{font-weight:700;letter-spacing:.02em}.state{font-size:12px;color:#9da7b8;border:1px solid #2b3240;border-radius:999px;padding:7px 10px}
 h1{font-size:clamp(28px,5vw,48px);line-height:1.05;margin:0 0 10px}.sub{color:#aab3c2;max-width:700px}
-.chat{margin-top:28px}.bubble{background:#11151e;border:1px solid #242b38;border-radius:18px;padding:18px;margin-bottom:16px}
+.chat{margin:24px 0 30px}.conversation-history{display:flex;flex-direction:column;gap:12px;margin:14px 0 20px}.message{max-width:100%;padding:14px 16px;border:1px solid #293140;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}.assistant-message{background:#111923;align-self:stretch}.user-message{background:#171c28;border-color:#46546a;align-self:flex-end;width:min(92%,760px)}.message-label{font-size:10px;letter-spacing:.12em;color:#8f9db2;margin-bottom:7px;font-weight:700}.message-pending{color:#aab3c2;font-style:italic}.bubble{background:#11151e;border:1px solid #242b38;border-radius:18px;padding:18px;margin-bottom:16px}
 .user{border-color:#344052}.label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#8792a6;margin-bottom:8px}
 textarea{width:100%;min-height:92px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:14px;padding:14px;font:inherit;resize:vertical}
 button{border:0;border-radius:12px;padding:11px 16px;background:#eef1f7;color:#10131a;font-weight:700;cursor:pointer;margin-top:10px}button:disabled{opacity:.5}
@@ -29,6 +29,32 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
   <h1>Tell Reality what you need.</h1>
   <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="label">Conversation with Reality</div><div id="conversationHistory" class="conversation-history" aria-live="polite"><div class="message assistant-message"><div class="message-label">REALITY</div><div>Hi — ask me a question about Reality, get help troubleshooting, or tell me what you need done. I’ll distinguish verified information from uncertainty, and I’ll ask for authorization before consequential actions.</div></div></div><div class="label">Your message</div>
+      <textarea id="request" placeholder="Ask Reality a question or tell it what you need…"></textarea>
+      <button id="plan">Send message</button>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div id="brief" class="brief">
+      <div class="brief-head"><strong>Reality Brief</strong><span id="status" class="badge"></span></div>
+      <section><div class="label">1 · Understood</div><div id="understood"></div></section>
+      <section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
+      <section><div class="label">3 · Authority map</div><div id="authority"></div></section>
+      <section><div class="label">4 · Expected effect</div><div id="effect"></div></section>
+      <section class="proof"><div class="label">5 · Proof plan</div><ul id="proof"></ul></section>
+      <section><div class="label">6 · Change history</div><div class="muted">No revisions yet. A changed request will create a new governed interpretation rather than overwrite this one.</div></section>
+      <section>
+        <details><summary>Show work state</summary>
+        <div class="timeline" id="timeline"></div>
+        <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
+        </details>
+      </section>
+    </div>
+  </div>
+
 
   <section class="shift-settings" aria-label="Reality daily shift settings">
 <div class="shift-head"><div><div class="label">REALITY OPERATING SHIFT</div><strong>Daily autonomous shift</strong><p class="muted">Reality starts by itself, discovers its own work, and works the governed queue.</p></div><label class="switch"><input id="shiftEnabled" type="checkbox" checked><span>Enabled</span></label></div>
@@ -49,33 +75,18 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
 </section>
 
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><div class="chat">
-    <div class="bubble user">
-      <div class="label">Your request</div>
-      <textarea id="request" placeholder="Try: Review unread business emails, identify follow-ups, draft responses, and send them."></textarea>
-      <button id="plan">Show my plan</button>
-      <div id="error" class="error"></div>
-    </div>
-
-    <div id="brief" class="brief">
-      <div class="brief-head"><strong>Reality Brief</strong><span id="status" class="badge"></span></div>
-      <section><div class="label">1 · Understood</div><div id="understood"></div></section>
-      <section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
-      <section><div class="label">3 · Authority map</div><div id="authority"></div></section>
-      <section><div class="label">4 · Expected effect</div><div id="effect"></div></section>
-      <section class="proof"><div class="label">5 · Proof plan</div><ul id="proof"></ul></section>
-      <section><div class="label">6 · Change history</div><div class="muted">No revisions yet. A changed request will create a new governed interpretation rather than overwrite this one.</div></section>
-      <section>
-        <details><summary>Show work state</summary>
-        <div class="timeline" id="timeline"></div>
-        <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
-        </details>
-      </section>
-    </div>
-  </div>
-</main>
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section></main>
 <script>
-const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
+const $=id=>document.getElementById(id);
+const REALITY_CONVERSATION_KEY='reality.conversation.v1';
+function getRealityConversationId(){
+  try{
+    let id=sessionStorage.getItem(REALITY_CONVERSATION_KEY);
+    if(!id){id=crypto.randomUUID();sessionStorage.setItem(REALITY_CONVERSATION_KEY,id)}
+    return id;
+  }catch{return crypto.randomUUID()}
+}
+const SPEECH_STATE={utterance:null,button:null};
 function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
 function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
 function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
@@ -101,25 +112,60 @@ function render(b){
   $('execution').textContent=b.execution.status+' · '+b.execution.reason;
   $('verification').textContent=b.verification.status;
 }
+function escapeChatHTML(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function appendConversationMessage(role,text){
+  const history=$('conversationHistory');
+  const item=document.createElement('div');
+  item.className='message '+(role==='user'?'user-message':'assistant-message');
+  const label=document.createElement('div');
+  label.className='message-label';
+  label.textContent=role==='user'?'YOU':'REALITY';
+  const body=document.createElement('div');
+  body.textContent=String(text??'');
+  item.append(label,body);
+  history.appendChild(item);
+  item.scrollIntoView({block:'nearest',behavior:'smooth'});
+  return {item,body};
+}
 $('plan').onclick=async()=>{
-  const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
-  $('error').textContent=''; $('plan').disabled=true;
+  const statement=$('request').value.trim(); if(!statement){$('error').textContent='Type a message first.';return}
+  $('error').textContent='';
+  const submit=$('plan'); submit.disabled=true; submit.textContent='Reality is thinking…';
+  appendConversationMessage('user',statement);
+  $('request').value='';
+  const pending=appendConversationMessage('assistant','Thinking…');
+  pending.body.className='message-pending';
   try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:getRealityConversationId()})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
+    const answer=String(intelligence.answer||'Reality returned no answer.');
+    pending.body.className='';
+    pending.body.textContent=answer;
+    addReadAloudButton(pending.item,answer);
     $('brief').classList.add('open');
     $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
-    $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
-    $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
+    $('understood').textContent=answer; addReadAloudButton($('understood'),answer);
+    $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+escapeChatHTML(x.name)+'</strong>: '+escapeChatHTML(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
     $('authority').innerHTML='<div class="row"><span>Authority granted</span><span class="blocked">NO</span></div><div class="row"><span>Execution authorized</span><span class="blocked">NO</span></div>';
     $('effect').textContent='Cognition only. No external action was executed.';
-    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+esc(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+esc(b.result?.context?.universe?.status||'unknown')+' ('+esc(b.result?.context?.universe?.count||0)+' records)</li>';
-    $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
+    const memoryReceipt=b.result?.context?.universe?.memory_retrieval||null;
+    const selectedMemoryIds=Array.isArray(memoryReceipt?.selected_entry_ids)?memoryReceipt.selected_entry_ids:[];
+    const memoryProof=memoryReceipt
+      ? '<li>Memory retrieval strategy: '+escapeChatHTML(memoryReceipt.strategy||'unknown')+'</li><li>Durable candidates: '+escapeChatHTML(memoryReceipt.source_entry_count||0)+' · selected for cognition: '+escapeChatHTML(memoryReceipt.selected_entry_count||0)+'</li><li>Memory query ID: '+escapeChatHTML(memoryReceipt.query_id||'unknown')+'</li><li>Selected entry IDs: '+escapeChatHTML(selectedMemoryIds.slice(0,8).join(', '))+(selectedMemoryIds.length>8?' … ('+escapeChatHTML(selectedMemoryIds.length)+' total)':'')+'</li>'
+      : '<li>Durable memory retrieval receipt unavailable for this request.</li>';
+    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+escapeChatHTML(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+escapeChatHTML(b.result?.context?.universe?.status||'unknown')+' ('+escapeChatHTML(b.result?.context?.universe?.count||0)+' records)</li>'+memoryProof;
+    $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+escapeChatHTML(x)+'</span>').join('');
     $('execution').textContent='NOT_EXECUTED · cognition only';
     $('verification').textContent='No external outcome claimed';
-  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+  }catch(e){
+    pending.body.className='';
+    pending.body.textContent='I could not complete that request: '+e.message;
+    $('error').textContent=e.message;
+  }finally{submit.disabled=false;submit.textContent='Send message';$('request').focus()}
 };
+$('request').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('plan').click()}});
+
 const realityWork=$('findWork');const workResult=$('workResult');
 function renderWork(source){
   const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);

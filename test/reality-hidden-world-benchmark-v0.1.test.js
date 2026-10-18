@@ -9,24 +9,25 @@ import {
 } from './reality-hidden-world-benchmark-v0.1.js';
 
 test('hidden-world benchmark is deterministic and ground-truth bounded', () => {
-  assert.equal(BENCHMARK_VERSION, 'reality-hidden-world-benchmark-v0.1');
-  assert.equal(HIDDEN_WORLDS.WORLD_B.groundTruth.migrationSucceeds, false);
-  assert.equal(HIDDEN_WORLDS.WORLD_C.apiVersion, '2026.10');
-  assert.equal(PRIOR_KNOWLEDGE[0].status, 'RESOLUTION');
+  assert.equal(BENCHMARK_VERSION, 'reality-hidden-world-benchmark-v0.2');
+  assert.equal(HIDDEN_WORLDS[1].groundTruth.migrationSucceeds, false);
+  assert.equal(HIDDEN_WORLDS[2].apiVersion, '2026.08');
+  assert.equal(PRIOR_KNOWLEDGE[0].state, 'RESOLUTION');
 });
 
 test('experience-enabled reasoning improves transfer without treating prior knowledge as authority', () => {
   const result = runBenchmark();
   assertBenchmarkInvariants(result);
-  assert.equal(result.experienceEnabled[0].decision.knowledgeUsed[0], 'ekr-prior-001');
-  assert.equal(result.experienceEnabled[0].action, 'NO_EXTERNAL_ACTION');
+  const matchedPrior = result.experienceEnabled.find(item => item.decision.knowledgeUsed.includes('ekr-v2-api08'));
+  assert.ok(matchedPrior, 'a context-matched prior should be used');
+  assert.equal(matchedPrior.action, 'NO_EXTERNAL_ACTION');
 });
 
 test('benchmark reports the baseline and experience delta explicitly', () => {
   const result = runBenchmark();
-  assert.equal(result.metrics.baselineDecisionAccuracy, 0.5);
-  assert.equal(result.metrics.experienceDecisionAccuracy, 1);
-  assert.equal(result.metrics.novelCaseTransferImprovement, 0.5);
+  assert.equal(result.metrics.baselineDecisionAccuracy, 0.78125);
+  assert.equal(result.metrics.experienceDecisionAccuracy, 0.9375);
+  assert.equal(result.metrics.experienceImprovement, 0.15625);
 });
 
 test('benchmark rejects an over-broad prior when a material context dimension changes', () => {

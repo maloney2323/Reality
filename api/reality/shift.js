@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { isAuthorizedCronRequest } from '../../src/reality-cron-auth-v0.1.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
@@ -20,8 +21,7 @@ function json(res, status, body) {
 }
 
 function cronRequest(req) {
-  return String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
+  return isAuthorizedCronRequest(req, process.env.CRON_SECRET);
 }
 
 async function githubCommits() {

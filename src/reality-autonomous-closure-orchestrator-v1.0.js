@@ -1,7 +1,8 @@
 import { runUniverseCognitionPass } from './reality-universe-cognition-runner-v0.1.js';
 import { discoverAutonomousWork } from './reality-capability-gap-detector-v1.0.js';
 import { createCapabilityGapProjection } from './reality-capability-gap-projection-v1.js';
-import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, registerVerifiedCapability, reactivationPlan, handleSynthesisFailure } from './reality-autonomous-capability-loop-v1.0.js';
+import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult } from './reality-autonomous-capability-loop-v1.0.js';
+import { authorizeWorldlineMerge, registerVerifiedCapability, reactivationPlan, handleSynthesisFailure } from './reality-autonomous-capability-loop-v0.1.js';
 
 export const AUTONOMOUS_CLOSURE_VERSION = '1.0.0';
 

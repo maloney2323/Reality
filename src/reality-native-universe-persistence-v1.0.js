@@ -15,6 +15,12 @@ function endpoint(path = '') {
   return base.replace(/\/$/, '') + path;
 }
 
+function normalizeTimestamp(value) {
+  if (typeof value !== 'string') return value;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : value;
+}
+
 function headers() {
   const key = persistenceKey();
   if (!key) {
@@ -36,8 +42,8 @@ function mapRow(row) {
     worldline_id: row.worldline_id,
     event_kind: row.event_kind,
     epistemic_kind: row.epistemic_kind,
-    assertion_time: row.assertion_time,
-    effective_time: row.effective_time,
+    assertion_time: normalizeTimestamp(row.assertion_time),
+    effective_time: normalizeTimestamp(row.effective_time),
     source_ref: row.source_ref,
     payload: row.payload,
     evidence_references: row.evidence_references || [],
@@ -120,11 +126,17 @@ export async function retrievePersistedUniverse({
   limit = 100,
   fetchImpl = fetch,
 } = {}) {
+  const root = typeof continuityRootId === 'string' ? continuityRootId.trim() : '';
+  if (!root) {
+    const error = new Error('CONTINUITY_SCOPE_REQUIRED');
+    error.code = 'CONTINUITY_SCOPE_REQUIRED';
+    throw error;
+  }
   const params = new URLSearchParams();
   params.set('select', '*');
   params.set('order', 'assertion_time.desc,effective_time.desc,ledger_entry_hash.asc');
   params.set('limit', String(Math.min(Math.max(Number(limit) || 100, 1), 1000)));
-  if (continuityRootId) params.set('continuity_root_id', `eq.${continuityRootId}`);
+  params.set('continuity_root_id', `eq.${root}`);
   if (worldlineId) params.set('worldline_id', `eq.${worldlineId}`);
   if (assertionTime) params.set('assertion_time', `lte.${assertionTime}`);
 
@@ -170,15 +182,24 @@ export async function retrieveDormantContinuitySummaries({
 
   const dormantStates = new Set(['WAITING', 'BLOCKED', 'DEFERRED', 'SUSPENDED', 'COMPLETED']);
   const latestByRoot = new Map();
+  const orderedEntries = entries.slice().sort((a, b) =>
+    String(b.assertion_time || '').localeCompare(String(a.assertion_time || '')) ||
+    String(b.effective_time || '').localeCompare(String(a.effective_time || '')) ||
+    String(a.ledger_entry_hash || '').localeCompare(String(b.ledger_entry_hash || ''))
+  );
 
-  for (const entry of entries) {
-    const state = entry?.payload?.continuity_state || entry?.payload?.next_state || null;
+  // Choose the latest transition for every root first. Only then classify its
+  // state; filtering dormant states before this step resurrects stale work.
+  for (const entry of orderedEntries) {
     const root = entry?.continuity_root_id || null;
-    if (!root || !dormantStates.has(state)) continue;
-    if (!latestByRoot.has(root)) latestByRoot.set(root, entry);
+    if (!root || latestByRoot.has(root)) continue;
+    latestByRoot.set(root, entry);
   }
 
-  const dormant = Array.from(latestByRoot.values());
+  const dormant = Array.from(latestByRoot.values()).filter((entry) => {
+    const state = entry?.payload?.continuity_state || entry?.payload?.next_state || null;
+    return dormantStates.has(state);
+  });
   return Object.freeze({
     version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
     status: 'AVAILABLE',

@@ -2,6 +2,7 @@ export const maxDuration = 60;
 
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { deriveServerContinuityScope } from '../../src/reality-continuity-scope-v1.0.js';
 import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
 
 const BASE44_API = 'https://base44.app/api';
@@ -273,12 +274,25 @@ export default async function handler(req, res) {
       return null;
     });
 
+    const conversationId = String(body?.conversation_id || '').trim() || null;
+    const scopePrincipalId = realityContext?.authenticated_user_id || principal.principal_id;
+    const continuityScope = conversationId
+      ? deriveServerContinuityScope({ principalId: scopePrincipalId, conversationId })
+      : null;
+    if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true' && !continuityScope) {
+      const error = new Error('CONTINUITY_SCOPE_REQUIRED');
+      error.code = 'CONTINUITY_SCOPE_REQUIRED';
+      throw error;
+    }
+
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
       ...(realityContext || {}),
-      conversation_id: String(body?.conversation_id || '').trim() || null,
+      conversation_id: conversationId,
       thought_id: String(body?.thought_id || '').trim() || null,
-      continuity_root_id: realityContext?.continuity_root_id || null,
+      continuity_root_id: continuityScope?.continuity_root_id || null,
+      worldline_id: continuityScope?.worldline_id || null,
+      continuity_scope_source: continuityScope?.scope_source || null,
       connected_world_observations: worldObservations,
       world_observation_status: worldObservations.length ? 'OBSERVED' : 'NO_OBSERVATIONS',
       world_observation_count: worldObservations.length,
