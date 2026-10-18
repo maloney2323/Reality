@@ -27,7 +27,7 @@ export function verifySessionPrincipal(token) {
 
 export function getOrCreateSessionPrincipal(req, res) {
   const cookies = String(req.headers?.cookie || '');
-  const match = cookies.match(/(?:^|;\\s*)reality_principal=([^;]+)/);
+  const match = cookies.match(/(?:^|;\s*)reality_principal=([^;]+)/);
   if (match) { try { return verifySessionPrincipal(decodeURIComponent(match[1])); } catch {} }
   const token = createSessionPrincipal();
   res.setHeader('Set-Cookie', 'reality_principal=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=31536000');
