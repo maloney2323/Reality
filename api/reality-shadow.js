@@ -1,4 +1,5 @@
 import { createUniversePostgresPersistence } from '../src/reality-universe-postgres-persistence-v0.1.js';
+import { validateCronAuthorization } from '../src/reality-cron-governance-v1.0.js';
 import { buildShadowObservations, detectRecurringWork } from '../src/reality-shadow-observer-v0.1.js';
 
 const REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
@@ -25,10 +26,9 @@ async function github(path) {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
-  const cron = String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
-  if (!cron && process.env.REALITY_SHADOW_ALLOW_MANUAL !== 'true') {
-    return json(res, 401, { error: 'SHADOW_CRON_ONLY' });
+  const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
+  if (!authorization.authorized) {
+    return json(res, authorization.status, { error: authorization.error, message: authorization.message });
   }
 
   try {
