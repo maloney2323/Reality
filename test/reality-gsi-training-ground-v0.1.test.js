@@ -24,6 +24,7 @@ const learner = createLearnerAdapter({
 const baseline = freezeBaseline({
   learner,
   benchmarkVersion: 'gsi-training-benchmark-v0.1',
+  seed: 'gsi-training-seed-v0.1',
   cases: [{ id: 'visible-1' }, { id: 'visible-2' }],
   hiddenCaseIds: ['hidden-1'],
   governanceKernelHash: 'kernel:v1',
@@ -53,6 +54,7 @@ test('verified experience creates an evidence-grounded learning signal', () => {
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:1' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:1' },
+    independentVerifierRef: 'independent-verifier:test-v1',
     corrections: [{ kind: 'verified_correction' }],
   });
   assert.equal(signal.truth_status, 'EVIDENCE_GROUNDED');
@@ -69,6 +71,7 @@ test('sandbox cannot modify governance or authority', () => {
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:2' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:2' },
+    independentVerifierRef: 'independent-verifier:test-v1',
   });
   assert.throws(() => runSandboxLearning({
     baseline,
@@ -91,6 +94,7 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:3' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:3' },
+    independentVerifierRef: 'independent-verifier:test-v1',
   });
   const sandbox = runSandboxLearning({
     baseline,
@@ -108,6 +112,9 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     hiddenResults: { quality: 0.61 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
+    benchmarkContractHash: baseline.benchmark_contract_hash,
+    heldoutCaseIds: ['hidden-1'],
+    trainingCaseIds: ['visible-1', 'visible-2'],
     independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
 
