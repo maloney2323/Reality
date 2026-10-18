@@ -1,6 +1,7 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
-import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
+import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent, persistUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
+import { createUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -184,6 +185,39 @@ export async function runLiveIntelligenceOrchestration({
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
   };
+  // Persist the user's own statement separately from Reality's response summary.
+  // This is the factual input needed for later-turn recall; continuity-state events alone
+  // cannot reconstruct what the user actually said.
+  if (effectiveContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+    const statementRef = governedSignal?.signal_hash || governedSignal?.packet?.packet_id;
+    if (!statementRef) throw new Error('USER_STATEMENT_SIGNAL_REFERENCE_REQUIRED');
+    const statementTime = observedAt || new Date().toISOString();
+    const statementEntry = createUniverseEntry({
+      entry_id: `user-statement:${statementRef}`,
+      continuity_root_id: effectiveContinuityRootId,
+      worldline_id: systemContext?.worldline_id || 'reality:primary',
+      event_kind: 'USER_STATEMENT',
+      epistemic_kind: 'USER_REPORTED',
+      assertion_time: statementTime,
+      effective_time: statementTime,
+      source_ref: 'reality:chat-user-input',
+      payload: {
+        statement: message,
+        statement_kind: 'USER_PROVIDED',
+        memory_scope: 'CONTINUITY',
+        actor_ref: requestedBy,
+        governed_signal_hash: statementRef,
+      },
+      evidence_references: [statementRef],
+      provenance: {
+        source: 'reality_live_intelligence_orchestration',
+        actor_ref: requestedBy,
+        governed_signal_hash: statementRef,
+      },
+    });
+    await persistUniverseEntry(statementEntry, { fetchImpl });
+  }
+
   const cognitiveResult = await runRealityCognitiveRuntime({
     message,
     governedSignal,
