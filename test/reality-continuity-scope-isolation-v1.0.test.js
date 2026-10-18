@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { deriveServerContinuityScope } from '../src/reality-continuity-scope-v1.0.js';
 import { retrievePersistedUniverse } from '../src/reality-native-universe-persistence-v1.0.js';
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
+import { createSessionPrincipal, getOrCreateSessionPrincipal } from '../src/reality-session-principal-v0.1.js';
 
 test('server continuity scope separates users and conversations and requires both identifiers', () => {
   const a = deriveServerContinuityScope({ principalId: 'user-a', conversationId: 'conversation-1' });
@@ -17,6 +18,23 @@ test('server continuity scope separates users and conversations and requires bot
   assert.equal(a.worldline_id, otherConversation.worldline_id);
   assert.throws(() => deriveServerContinuityScope({ principalId: '', conversationId: 'conversation-1' }), /CONTINUITY_PRINCIPAL_REQUIRED/);
   assert.throws(() => deriveServerContinuityScope({ principalId: 'user-a', conversationId: '' }), /CONTINUITY_CONVERSATION_REQUIRED/);
+});
+
+test('session principal remains stable when its cookie is not the first cookie', () => {
+  const previousKey = process.env.REALITY_CHAT_RECEIPT_HMAC_KEY;
+  process.env.REALITY_CHAT_RECEIPT_HMAC_KEY = 'scope-test-hmac-key';
+  try {
+    const token = createSessionPrincipal({ principalId: 'stable-principal' });
+    const headers = [];
+    const req = { headers: { cookie: 'theme=dark; reality_principal=' + encodeURIComponent(token) } };
+    const res = { setHeader: (...args) => headers.push(args) };
+    const principal = getOrCreateSessionPrincipal(req, res);
+    assert.equal(principal.principal_id, 'stable-principal');
+    assert.equal(headers.length, 0, 'a valid existing principal cookie must not be replaced');
+  } finally {
+    if (previousKey === undefined) delete process.env.REALITY_CHAT_RECEIPT_HMAC_KEY;
+    else process.env.REALITY_CHAT_RECEIPT_HMAC_KEY = previousKey;
+  }
 });
 
 test('persisted universe retrieval refuses an absent continuity root before any database request', async () => {
