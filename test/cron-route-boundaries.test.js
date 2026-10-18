@@ -73,7 +73,7 @@ for (const [name, handler] of routes) {
 test('shift configuration writes fail closed before persistence without verified user auth', async () => {
   const res = await invoke(shiftHandler, {}, 'POST', '/api/reality/shift');
   assert.equal(res.statusCode, 401);
-  assert.equal(res.body.error, 'VERIFIED_USER_AUTH_REQUIRED');
+  assert.equal(res.body.error, 'USER_AUTH_REQUIRED');
   assert.equal(res.body.connectorCalls, 0);
   assert.equal(res.body.stateMutations, 0);
 });
