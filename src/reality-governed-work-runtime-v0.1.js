@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isConfiguredExecutionAuthority } from './reality-configured-ect-execution-verifier-v0.2.js';
+import { isVerifiedExecutionAuthority } from './reality-ect-execution-verifier-v0.1.js';
 
 export const GOVERNED_WORK_RUNTIME_VERSION = '0.1.0';
 
@@ -127,7 +128,7 @@ export function authorize({ request, approvedBy, scope }) {
 
 export function canExecute({ workItem, authorization }) {
   if (!workItem?.work_item_id) return { allowed:false, reason:'WORK_ITEM_REQUIRED' };
-  if (!isVerifiedExecutionAuthority(authorization))
+  if (!(isConfiguredExecutionAuthority(authorization) || isVerifiedExecutionAuthority(authorization)))
     return { allowed:false, reason:'VERIFIED_ECT_REQUIRED' };
   if (!authorization.authorized) return { allowed:false, reason:'EXPLICIT_AUTHORIZATION_REQUIRED' };
   if (authorization.workflow_id !== workItem.workflow_id) return { allowed:false, reason:'AUTHORIZATION_WORKFLOW_MISMATCH' };
