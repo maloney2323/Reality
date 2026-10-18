@@ -48,6 +48,19 @@ test('user auth rejects invalid token and non-admin identity', async () => {
   } finally { restoreEnv(); }
 });
 
+test('user auth accepts only the verified allowlisted administrator identity', async () => {
+  try {
+    process.env.SUPABASE_URL = 'https://auth.example.test';
+    process.env.SUPABASE_PUBLISHABLE_KEY = 'public-test-key';
+    process.env.REALITY_ADMIN_EMAIL = 'Maloney2323@gmail.com';
+    globalThis.fetch = async () => response(200, { id: 'admin-123', email: 'Maloney2323@gmail.com' });
+    const result = await verifyRealityAdmin({ headers: { authorization: 'Bearer test-token' } });
+    assert.equal(result.authorized, true);
+    assert.equal(result.user.id, 'admin-123');
+    assert.equal(result.user.email, 'maloney2323@gmail.com');
+  } finally { restoreEnv(); }
+});
+
 test('shift POST rejects missing user auth before persistence or mutation', async () => {
   try {
     const res = {
