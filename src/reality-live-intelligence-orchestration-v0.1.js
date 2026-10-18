@@ -215,7 +215,7 @@ export async function runLiveIntelligenceOrchestration({
     if (!statementRef) throw new Error('USER_STATEMENT_SIGNAL_REFERENCE_REQUIRED');
     const statementTime = observedAt || new Date().toISOString();
     const statementEntry = createUniverseEntry({
-      entry_id: `user-statement:${statementRef}`,
+      entry_id: `user-statement:${resolvedContinuityRootId}:${statementRef}`,
       continuity_root_id: resolvedContinuityRootId,
       worldline_id: systemContext?.worldline_id || 'reality:primary',
       event_kind: 'USER_STATEMENT',
