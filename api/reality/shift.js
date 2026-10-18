@@ -282,8 +282,8 @@ export default async function handler(req, res) {
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
-        readinessTime: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
-        shiftStart: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
+        readinessTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
+        shiftStart: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
         shiftLength: [8, 12].includes(Number(b.shiftLength)) ? Number(b.shiftLength) : 8,
         timeZone: typeof b.timeZone === 'string' && b.timeZone ? b.timeZone : 'America/New_York',
         updated_by: identity.user.id,
