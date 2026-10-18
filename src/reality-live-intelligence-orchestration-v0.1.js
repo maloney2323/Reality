@@ -6,11 +6,16 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
-async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
+async function loadUniverseContext({ systemContext = null, continuityRootId = null, worldlineId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
 
-  const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
+  if (!continuityRootId) {
+    const error = new Error('CONTINUITY_SCOPE_REQUIRED');
+    error.code = 'CONTINUITY_SCOPE_REQUIRED';
+    throw error;
+  }
+  const durable = await retrievePersistedUniverse({ continuityRootId, worldlineId, limit: 100, fetchImpl });
   return Object.freeze({
     ...requestContext,
     status: durable.status,
@@ -127,7 +132,19 @@ export async function runLiveIntelligenceOrchestration({
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
   });
-  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
+  const effectiveContinuityRootId = explicitContinuityRootId || conversationContinuityRootId;
+  const persistenceEnabled = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true';
+  if (persistenceEnabled && !effectiveContinuityRootId) {
+    const error = new Error('CONTINUITY_SCOPE_REQUIRED');
+    error.code = 'CONTINUITY_SCOPE_REQUIRED';
+    throw error;
+  }
+  const universeContext = await loadUniverseContext({
+    systemContext,
+    continuityRootId: effectiveContinuityRootId,
+    worldlineId: systemContext?.worldline_id || null,
+    fetchImpl,
+  });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -136,9 +153,9 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
-  let persistedContinuity = explicitContinuityRootId
+  let persistedContinuity = effectiveContinuityRootId
     ? buildContinuityRehydration({
-        continuityRootId: explicitContinuityRootId,
+        continuityRootId: effectiveContinuityRootId,
         entries: universeContext.entries,
         trigger: 'CURRENT_REQUEST',
       })
@@ -146,7 +163,7 @@ export async function runLiveIntelligenceOrchestration({
 
   let continuityDiscovery = null;
   let discoveredContinuityRootId = null;
-  if (!explicitContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  if (!effectiveContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const dormant = await retrieveDormantContinuitySummaries({
       worldlineId: systemContext?.worldline_id || null,
       limit: 1000,
@@ -169,14 +186,19 @@ export async function runLiveIntelligenceOrchestration({
       discoveredContinuityRootId = top.continuity_root_id;
     }
   }
-  const effectiveContinuityRootId = discoveredContinuityRootId || explicitContinuityRootId || conversationContinuityRootId;
-  if (discoveredContinuityRootId) {
-    const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
+  const resolvedContinuityRootId = effectiveContinuityRootId || discoveredContinuityRootId;
+  if (discoveredContinuityRootId && !effectiveContinuityRootId) {
+    const discoveredUniverse = await retrievePersistedUniverse({
+      continuityRootId: discoveredContinuityRootId,
+      worldlineId: systemContext?.worldline_id || null,
+      limit: 100,
+      fetchImpl,
+    });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
   const cognitionContext = {
     ...(systemContext || {}),
-    continuity_root_id: effectiveContinuityRootId,
+    continuity_root_id: resolvedContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
@@ -188,13 +210,13 @@ export async function runLiveIntelligenceOrchestration({
   // Persist the user's own statement separately from Reality's response summary.
   // This is the factual input needed for later-turn recall; continuity-state events alone
   // cannot reconstruct what the user actually said.
-  if (effectiveContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  if (resolvedContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const statementRef = governedSignal?.signal_hash || governedSignal?.packet?.packet_id;
     if (!statementRef) throw new Error('USER_STATEMENT_SIGNAL_REFERENCE_REQUIRED');
     const statementTime = observedAt || new Date().toISOString();
     const statementEntry = createUniverseEntry({
       entry_id: `user-statement:${statementRef}`,
-      continuity_root_id: effectiveContinuityRootId,
+      continuity_root_id: resolvedContinuityRootId,
       worldline_id: systemContext?.worldline_id || 'reality:primary',
       event_kind: 'USER_STATEMENT',
       epistemic_kind: 'USER_REPORTED',
@@ -245,9 +267,10 @@ export async function runLiveIntelligenceOrchestration({
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
   const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
-  const continuityEvent = effectiveContinuityRootId
+  const continuityEvent = resolvedContinuityRootId
     ? buildContinuityEvent({
-        continuityRootId: effectiveContinuityRootId,
+        continuityRootId: resolvedContinuityRootId,
+        worldlineId: systemContext?.worldline_id || 'reality:primary',
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
         trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
@@ -351,7 +374,7 @@ export async function runLiveIntelligenceOrchestration({
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
     context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
-      root_id: effectiveContinuityRootId,
+      root_id: resolvedContinuityRootId,
       discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
       rehydrated: persistedContinuity?.continuation_available === true,
