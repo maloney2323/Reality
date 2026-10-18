@@ -49,6 +49,7 @@ assert.equal(verifyEvidenceWarrant(attached).valid, true);
 
 const tampered = { ...base, friction_decision: { level: 'LOW' } };
 assert.equal(verifyEvidenceWarrant(tampered).valid, false);
-assert.throws(() => verifyWarrantChain([base, { ...next, parent_warrant_hash: 'bad' }]), /WARRANT_CHAIN_BREAK/);
+const wrongParent = createEvidenceWarrant({ parentWarrantHash: 'bad', observationRefs: ['observation:bad'], evidenceRefs: ['evidence:bad'], epistemicAssessment: { state: 'SUPPORTED' }, frictionDecision: { level: 'STANDARD' } });
+assert.throws(() => verifyWarrantChain([base, wrongParent]), /WARRANT_CHAIN_BREAK/);
 
 console.log('REALITY_EVIDENCE_WARRANT_V1_0_PASS');
