@@ -30,6 +30,12 @@ function mockFetch(routes) {
 
 test('round-trips a Universe entry through the persistence adapter', async () => {
   const calls = [];
+  const databaseRow = {
+    ...base,
+    // PostgreSQL/PostgREST may return timestamptz with an offset and omit .000.
+    assertion_time: '2026-10-07T17:00:00+00:00',
+    effective_time: '2026-10-07T17:00:00+00:00',
+  };
   const fetchImpl = mockFetch([
     {
       match: (url, options) => options.method === 'GET' && url.includes('entry_id=eq.'),
@@ -44,7 +50,7 @@ test('round-trips a Universe entry through the persistence adapter', async () =>
     },
     {
       match: (url, options) => options.method === 'GET' && url.includes('/rest/v1/reality_universe_entries?select=*'),
-      respond: () => ({ ok: true, json: async () => [base] }),
+      respond: () => ({ ok: true, json: async () => [databaseRow] }),
     },
   ]);
 
