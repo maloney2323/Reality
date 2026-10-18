@@ -1,4 +1,5 @@
 import { runRealityStewardshipPass } from '../../src/reality-stewardship-pass-v1.0.js';
+import { validateCronAuthorization } from '../../src/reality-cron-governance-v1.0.js';
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -10,6 +11,11 @@ export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     res.setHeader('allow', 'GET, POST');
     return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
+  }
+
+  const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
+  if (!authorization.authorized) {
+    return json(res, authorization.status, { error: authorization.error, message: authorization.message });
   }
 
   try {
