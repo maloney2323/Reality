@@ -46,6 +46,26 @@ test('persisted universe retrieval refuses an absent continuity root before any 
   assert.equal(calls, 0);
 });
 
+test('orchestration rejects persistent-memory requests without a stable scope before reading storage', async () => {
+  const previousEnabled = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+  const previousKey = process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
+  process.env.REALITY_UNIVERSE_PERSISTENCE_KEY = 'test-key';
+  let calls = 0;
+  try {
+    await assert.rejects(() => runLiveIntelligenceOrchestration({
+      message: 'Explain memory isolation.',
+      apiKey: 'test-openai-key',
+      fetchImpl: async () => { calls += 1; throw new Error('unexpected request'); },
+    }), /CONTINUITY_SCOPE_REQUIRED/);
+    assert.equal(calls, 0, 'missing scope must be rejected before storage or model access');
+  } finally {
+    if (previousEnabled === undefined) delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = previousEnabled;
+    if (previousKey === undefined) delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY = previousKey;
+  }
+});
 test('durable user statements remain isolated to their conversation root during retrieval and cognition', async () => {
   const previousEnabled = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
   const previousKey = process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
