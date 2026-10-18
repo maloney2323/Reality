@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import { verifyRealityAdmin } from '../../src/reality-user-auth-v1.0.js';
 import { isAuthorizedCronRequest } from '../../src/reality-cron-auth-v0.1.js';
 import { validateCronAuthorization } from '../../src/reality-cron-governance-v1.0.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
@@ -255,27 +257,48 @@ async function runTick({ config, phase, local, persistence }) {
 
 export default async function handler(req, res) {
   try {
-    // Fail closed until a real identity provider is wired and its access token
-    // is verified server-side. The HMAC reality_principal cookie is self-issued
-    // by this application and is not evidence of an authenticated user.
-    // Reject before constructing persistence or invoking any downstream work.
     if (req.method === 'POST') {
-      console.warn(JSON.stringify({
-        event: 'USER_AUTHORIZATION_REJECTED',
-        endpoint: '/api/reality/shift',
-        status: 401,
-        error: 'VERIFIED_USER_AUTH_REQUIRED',
-        connectorCalls: 0,
-        stateMutations: 0,
-        downstreamInvoked: false,
-        timestamp: new Date().toISOString(),
-      }));
-      return json(res, 401, {
-        error: 'VERIFIED_USER_AUTH_REQUIRED',
-        message: 'Configuration writes are disabled until verified user authentication is configured.',
-        connectorCalls: 0,
-        stateMutations: 0,
+      const identity = await verifyRealityAdmin(req);
+      if (!identity.authorized) {
+        console.warn(JSON.stringify({
+          event: 'USER_AUTHORIZATION_REJECTED',
+          endpoint: '/api/reality/shift',
+          status: identity.status,
+          error: identity.error,
+          connectorCalls: 0,
+          stateMutations: 0,
+          downstreamInvoked: false,
+          timestamp: new Date().toISOString(),
+        }));
+        return json(res, identity.status, {
+          error: identity.error,
+          message: identity.message,
+          connectorCalls: 0,
+          stateMutations: 0,
+        });
+      }
+
+      const persistence = createUniversePostgresPersistence();
+      const b = req.body && typeof req.body === 'object' ? req.body : {};
+      const config = {
+        enabled: b.enabled === true,
+        readinessTime: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
+        shiftStart: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
+        shiftLength: [8, 12].includes(Number(b.shiftLength)) ? Number(b.shiftLength) : 8,
+        timeZone: typeof b.timeZone === 'string' && b.timeZone ? b.timeZone : 'America/New_York',
+        updated_by: identity.user.id,
+        updated_by_email: identity.user.email,
+        updated_at: new Date().toISOString(),
+      };
+      const eventId = 'shift:config:' + crypto.randomUUID();
+      await persistence.appendEvent({
+        event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
+        entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
+        parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
+        epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
+        provenance: { source: 'reality-homepage-shift-settings', principal_id: identity.user.id, admin_email: identity.user.email },
       });
+      return json(res, 200, { ok: true, config, persisted: true });
     }
 
     const persistence = createUniversePostgresPersistence();
