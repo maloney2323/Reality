@@ -123,7 +123,12 @@ $('plan').onclick=async()=>{
     $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
     $('authority').innerHTML='<div class="row"><span>Authority granted</span><span class="blocked">NO</span></div><div class="row"><span>Execution authorized</span><span class="blocked">NO</span></div>';
     $('effect').textContent='Cognition only. No external action was executed.';
-    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+esc(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+esc(b.result?.context?.universe?.status||'unknown')+' ('+esc(b.result?.context?.universe?.count||0)+' records)</li>';
+    const memoryReceipt=b.result?.context?.universe?.memory_retrieval||null;
+    const selectedMemoryIds=Array.isArray(memoryReceipt?.selected_entry_ids)?memoryReceipt.selected_entry_ids:[];
+    const memoryProof=memoryReceipt
+      ? '<li>Memory retrieval strategy: '+esc(memoryReceipt.strategy||'unknown')+'</li><li>Durable candidates: '+esc(memoryReceipt.source_entry_count||0)+' · selected for cognition: '+esc(memoryReceipt.selected_entry_count||0)+'</li><li>Memory query ID: '+esc(memoryReceipt.query_id||'unknown')+'</li><li>Selected entry IDs: '+esc(selectedMemoryIds.slice(0,8).join(', '))+(selectedMemoryIds.length>8?' … ('+esc(selectedMemoryIds.length)+' total)':'')+'</li>'
+      : '<li>Durable memory retrieval receipt unavailable for this request.</li>';
+    $('proof').innerHTML='<li>Governed signal admitted before cognition.</li><li>Reality cognitive runtime: '+esc(intelligence.cognitive_runtime_version||'unknown')+'</li><li>Universe context: '+esc(b.result?.context?.universe?.status||'unknown')+' ('+esc(b.result?.context?.universe?.count||0)+' records)</li>'+memoryProof;
     $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
     $('execution').textContent='NOT_EXECUTED · cognition only';
     $('verification').textContent='No external outcome claimed';
