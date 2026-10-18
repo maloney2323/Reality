@@ -4,6 +4,7 @@ import { createUniverseEntry } from '../src/reality-universe-persistence-contrac
 import {
   persistUniverseEntry,
   retrievePersistedUniverse,
+  retrieveDormantContinuitySummaries,
 } from '../src/reality-native-universe-persistence-v1.0.js';
 
 process.env.REALITY_UNIVERSE_PERSISTENCE_KEY ||= 'test-persistence-key';
@@ -79,6 +80,52 @@ test('rejects a conflicting retry for an immutable entry id', async () => {
     persistUniverseEntry(conflicting, { fetchImpl }),
     /UNIVERSE_IMMUTABLE_ENTRY_VIOLATION/,
   );
+});
+
+
+test('dormant continuity uses each root latest state before classifying it', async () => {
+  const transition = (root, state, timestamp) => createUniverseEntry({
+    entry_id: 'transition:' + root + ':' + state + ':' + timestamp,
+    continuity_root_id: root,
+    worldline_id: 'worldline:test',
+    event_kind: 'CONTINUITY_STATE_TRANSITION',
+    epistemic_kind: 'OBSERVATION',
+    assertion_time: timestamp,
+    effective_time: timestamp,
+    source_ref: 'test:continuity',
+    payload: { continuity_state: state, next_state: state },
+    evidence_references: ['evidence:' + root],
+    provenance: { source: 'test' },
+  });
+
+  const rows = [
+    transition('root:active', 'ACTIVE', '2026-10-18T12:00:00.000Z'),
+    transition('root:dormant', 'BLOCKED', '2026-10-18T12:00:00.000Z'),
+    transition('root:completed', 'COMPLETED', '2026-10-18T12:00:00.000Z'),
+    transition('root:reopened', 'REOPENED', '2026-10-18T12:00:00.000Z'),
+    transition('root:active', 'WAITING', '2026-10-18T11:00:00.000Z'),
+    transition('root:dormant', 'ACTIVE', '2026-10-18T11:00:00.000Z'),
+    transition('root:completed', 'ACTIVE', '2026-10-18T11:00:00.000Z'),
+    transition('root:reopened', 'BLOCKED', '2026-10-18T11:00:00.000Z'),
+  ];
+
+  const fetchImpl = async (url, options = {}) => {
+    assert.equal(options.method, 'GET');
+    const parsed = new URL(url);
+    assert.equal(parsed.searchParams.get('event_kind'), 'eq.CONTINUITY_STATE_TRANSITION');
+    assert.equal(parsed.searchParams.get('worldline_id'), 'eq.worldline:test');
+    return { ok: true, status: 200, json: async () => rows };
+  };
+
+  const result = await retrieveDormantContinuitySummaries({
+    worldlineId: 'worldline:test',
+    fetchImpl,
+  });
+  const byRoot = new Map(result.entries.map((entry) => [entry.continuity_root_id, entry]));
+
+  assert.deepEqual([...byRoot.keys()].sort(), ['root:completed', 'root:dormant']);
+  assert.equal(byRoot.get('root:dormant').payload.continuity_state, 'BLOCKED');
+  assert.equal(byRoot.get('root:completed').payload.continuity_state, 'COMPLETED');
 });
 
 test('fails closed when persistence is unavailable', async () => {
