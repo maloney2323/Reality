@@ -7,7 +7,7 @@ const workItem = { work_item_id:'work_item:ect-test', workflow_id:'workflow:ect-
 
 test('accepts a correctly signed and operation-bound ECT', () => {
  const fixture = makeVerifiedTestAuthority(workItem);
- assert.equal(fixture.authority.verified_by, 'reality-ect-execution-verifier-v0.1');
+ assert.equal(fixture.authority.verified_by, 'reality-configured-ect-execution-verifier-v0.2');
 });
 
 test('rejects an expired ECT', () => {
