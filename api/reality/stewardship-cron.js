@@ -24,6 +24,23 @@ export default async function handler(req, res) {
     });
   }
 
+  const url = new URL(req.url || '/', 'http://localhost');
+  const dryRunRequested = req.query?.dryRun === 'true' || url.searchParams.get('dryRun') === 'true';
+  if (dryRunRequested) {
+    if (process.env.CRON_AUTH_DRY_RUN_ENABLED !== 'true') {
+      return json(res, 403, { error: 'CRON_DRY_RUN_DISABLED' });
+    }
+    // Return before the stewardship pass: no downstream work or persistence.
+    return json(res, 200, {
+      status: 'AUTHORIZED_DRY_RUN_SUCCESS',
+      authorizationGateVerified: true,
+      executionPathVerified: false,
+      connectorCalls: 0,
+      stateMutations: 0,
+      downstreamInvoked: false,
+    });
+  }
+
   try {
     return json(res, 200, await runRealityStewardshipPass());
   } catch (error) {
