@@ -257,6 +257,29 @@ async function runTick({ config, phase, local, persistence }) {
 
 export default async function handler(req, res) {
   try {
+    // Fail closed until a real identity provider is wired and its access token
+    // is verified server-side. The HMAC reality_principal cookie is self-issued
+    // by this application and is not evidence of an authenticated user.
+    // Reject before constructing persistence or invoking any downstream work.
+    if (req.method === 'POST') {
+      console.warn(JSON.stringify({
+        event: 'USER_AUTHORIZATION_REJECTED',
+        endpoint: '/api/reality/shift',
+        status: 401,
+        error: 'VERIFIED_USER_AUTH_REQUIRED',
+        connectorCalls: 0,
+        stateMutations: 0,
+        downstreamInvoked: false,
+        timestamp: new Date().toISOString(),
+      }));
+      return json(res, 401, {
+        error: 'VERIFIED_USER_AUTH_REQUIRED',
+        message: 'Configuration writes are disabled until verified user authentication is configured.',
+        connectorCalls: 0,
+        stateMutations: 0,
+      });
+    }
+
     const persistence = createUniversePostgresPersistence();
 
     if (req.method === 'POST') {
