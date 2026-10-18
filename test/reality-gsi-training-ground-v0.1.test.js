@@ -135,6 +135,9 @@ test('candidate that does not generalize cannot promote', () => {
     hiddenResults: { quality: 0.49 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
+    benchmarkContractHash: baseline.benchmark_contract_hash,
+    heldoutCaseIds: ['hidden-1'],
+    trainingCaseIds: ['visible-1', 'visible-2'],
     independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
   assert.equal(evaluation.verdict, 'REJECTED');
