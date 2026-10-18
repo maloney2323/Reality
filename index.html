@@ -75,7 +75,16 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
 </main>
 <script>
-const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
+const $=id=>document.getElementById(id);
+const REALITY_CONVERSATION_KEY='reality.conversation.v1';
+function getRealityConversationId(){
+  try{
+    let id=sessionStorage.getItem(REALITY_CONVERSATION_KEY);
+    if(!id){id=crypto.randomUUID();sessionStorage.setItem(REALITY_CONVERSATION_KEY,id)}
+    return id;
+  }catch{return crypto.randomUUID()}
+}
+const SPEECH_STATE={utterance:null,button:null};
 function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
 function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
 function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
@@ -105,7 +114,7 @@ $('plan').onclick=async()=>{
   const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
   $('error').textContent=''; $('plan').disabled=true;
   try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:getRealityConversationId()})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
     $('brief').classList.add('open');
