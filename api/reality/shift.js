@@ -256,23 +256,28 @@ async function runTick({ config, phase, local, persistence }) {
 }
 
 export default async function handler(req, res) {
-  try {
-    if (req.method === 'POST') {
+  const requestId = 'req_' + crypto.randomUUID();
+  if (req.method === 'POST') {
+    res.setHeader('X-Reality-Request-Id', requestId);
+    const logSaveFailure = (status, errorCategory) => console.warn(JSON.stringify({
+      event: 'CONFIG_SAVE_FAILED',
+      requestId,
+      endpoint: '/api/reality/shift',
+      status,
+      errorCategory,
+      timestamp: new Date().toISOString(),
+    }));
+    try {
       const identity = await verifyRealityAdmin(req);
       if (!identity.authorized) {
-        console.warn(JSON.stringify({
-          event: 'USER_AUTHORIZATION_REJECTED',
-          endpoint: '/api/reality/shift',
-          status: identity.status,
-          error: identity.error,
-          connectorCalls: 0,
-          stateMutations: 0,
-          downstreamInvoked: false,
-          timestamp: new Date().toISOString(),
-        }));
+        const category = identity.status === 401 ? 'AUTHENTICATION_FAILED'
+          : identity.status === 403 ? 'AUTHORIZATION_FAILED'
+          : 'AUTH_PROVIDER_OR_CONFIGURATION_ERROR';
+        logSaveFailure(identity.status, category);
         return json(res, identity.status, {
           error: identity.error,
           message: identity.message,
+          requestId,
           connectorCalls: 0,
           stateMutations: 0,
         });
@@ -282,8 +287,8 @@ export default async function handler(req, res) {
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
-        readinessTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
-        shiftStart: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
+        readinessTime: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
+        shiftStart: /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
         shiftLength: [8, 12].includes(Number(b.shiftLength)) ? Number(b.shiftLength) : 8,
         timeZone: typeof b.timeZone === 'string' && b.timeZone ? b.timeZone : 'America/New_York',
         updated_by: identity.user.id,
@@ -291,15 +296,25 @@ export default async function handler(req, res) {
         updated_at: new Date().toISOString(),
       };
       const eventId = 'shift:config:' + crypto.randomUUID();
-      await persistence.appendEvent({
-        event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
-        entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
-        parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
-        epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
-        provenance: { source: 'reality-homepage-shift-settings', principal_id: identity.user.id, admin_email: identity.user.email },
-      });
-      return json(res, 200, { ok: true, config, persisted: true });
+      try {
+        await persistence.appendEvent({
+          event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
+          entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
+          parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
+          epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
+          provenance: { source: 'reality-homepage-shift-settings', principal_id: identity.user.id, admin_email: identity.user.email },
+        });
+      } catch {
+        logSaveFailure(500, 'DATABASE_PERSISTENCE_ERROR');
+        return json(res, 500, { ok: false, error: 'DATABASE_PERSISTENCE_ERROR', requestId });
+      }
+      return json(res, 200, { ok: true, config, persisted: true, requestId });
+    } catch {
+      logSaveFailure(500, 'INTERNAL_SAVE_ERROR');
+      return json(res, 500, { ok: false, error: 'INTERNAL_SAVE_ERROR', requestId });
     }
+  }
+  try {
 
     const persistence = createUniversePostgresPersistence();
 
