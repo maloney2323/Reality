@@ -126,11 +126,17 @@ export async function retrievePersistedUniverse({
   limit = 100,
   fetchImpl = fetch,
 } = {}) {
+  const root = typeof continuityRootId === 'string' ? continuityRootId.trim() : '';
+  if (!root) {
+    const error = new Error('CONTINUITY_SCOPE_REQUIRED');
+    error.code = 'CONTINUITY_SCOPE_REQUIRED';
+    throw error;
+  }
   const params = new URLSearchParams();
   params.set('select', '*');
   params.set('order', 'assertion_time.desc,effective_time.desc,ledger_entry_hash.asc');
   params.set('limit', String(Math.min(Math.max(Number(limit) || 100, 1), 1000)));
-  if (continuityRootId) params.set('continuity_root_id', `eq.${continuityRootId}`);
+  params.set('continuity_root_id', `eq.${root}`);
   if (worldlineId) params.set('worldline_id', `eq.${worldlineId}`);
   if (assertionTime) params.set('assertion_time', `lte.${assertionTime}`);
 
