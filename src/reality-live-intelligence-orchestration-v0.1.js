@@ -266,17 +266,27 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  const priorContinuityState = persistedContinuity?.latest_state || null;
+  const preservedContinuityStates = new Set(['WAITING', 'BLOCKED', 'DEFERRED', 'SUSPENDED', 'COMPLETED']);
+  const continuityState = preservedContinuityStates.has(priorContinuityState)
+    ? priorContinuityState
+    : materiality === 'ACTION_CANDIDATE' ? 'WAITING' : 'ACTIVE';
+  const continuityStateReason = continuityState === priorContinuityState
+    ? 'PRESERVE_PRIOR_STATE_UNTIL_VERIFIED_TRANSITION'
+    : materiality === 'ACTION_CANDIDATE'
+      ? 'ACTION_CANDIDATE_AWAITS_EXPLICIT_AUTHORIZATION'
+      : 'CONVERSATION_OPEN_NO_OPERATIONAL_ACTION_CANDIDATE';
   const continuityEvent = resolvedContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: resolvedContinuityRootId,
         worldlineId: systemContext?.worldline_id || 'reality:primary',
-        priorState: persistedContinuity?.latest_state || null,
+        priorState: priorContinuityState,
         nextState: continuityState,
         trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
         evidenceReferences: [governedSignal?.signal_hash, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))],
         payload: {
           continuity_state: continuityState,
+          continuity_state_reason: continuityStateReason,
           materiality,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,
