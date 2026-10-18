@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { isAuthorizedCronRequest } from '../../src/reality-cron-auth-v0.1.js';
+import { validateCronAuthorization } from '../../src/reality-cron-governance-v1.0.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
@@ -255,6 +256,12 @@ async function runTick({ config, phase, local, persistence }) {
 }
 
 export default async function handler(req, res) {
+  // Shift configuration writes are treated as scheduled/privileged operations.
+  if (req.method === 'POST') {
+    const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
+    if (!authorization.authorized) return json(res, authorization.status, { error: authorization.error, message: authorization.message });
+  }
+
   try {
     const persistence = createUniversePostgresPersistence();
 
@@ -283,7 +290,12 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
-    if (!cronRequest(req)) {
+    const hasAuthorizationHeader = Boolean(req?.headers?.authorization || req?.headers?.Authorization);
+    const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
+    if (!authorization.authorized && hasAuthorizationHeader) {
+      return json(res, authorization.status, { error: authorization.error, message: authorization.message });
+    }
+    if (!authorization.authorized || !cronRequest(req)) {
       const config = await readConfig(persistence);
       return json(res, 200, { ok: true, config, runtime: 'server_backed' });
     }
