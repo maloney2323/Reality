@@ -15,6 +15,12 @@ function endpoint(path = '') {
   return base.replace(/\/$/, '') + path;
 }
 
+function normalizeTimestamp(value) {
+  if (typeof value !== 'string') return value;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : value;
+}
+
 function headers() {
   const key = persistenceKey();
   if (!key) {
@@ -36,8 +42,8 @@ function mapRow(row) {
     worldline_id: row.worldline_id,
     event_kind: row.event_kind,
     epistemic_kind: row.epistemic_kind,
-    assertion_time: row.assertion_time,
-    effective_time: row.effective_time,
+    assertion_time: normalizeTimestamp(row.assertion_time),
+    effective_time: normalizeTimestamp(row.effective_time),
     source_ref: row.source_ref,
     payload: row.payload,
     evidence_references: row.evidence_references || [],
