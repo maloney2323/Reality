@@ -304,7 +304,17 @@ export default async function handler(req, res) {
           epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
           provenance: { source: 'reality-homepage-shift-settings', principal_id: identity.user.id, admin_email: identity.user.email },
         });
-      } catch {
+      } catch (error) {
+        const message = String(error?.message || 'UNKNOWN_DATABASE_ERROR');
+        const httpStatus = message.match(/UNIVERSE_POSTGRES_HTTP_(\d{3})/)?.[1] || null;
+        const safeCode = message.match(/(?:^|:)([A-Z][A-Z0-9_]{2,80})(?::|$)/)?.[1] || null;
+        console.warn(JSON.stringify({
+          event: 'CONFIG_PERSISTENCE_DIAGNOSTIC', requestId,
+          databaseHttpStatus: httpStatus ? Number(httpStatus) : null,
+          databaseErrorCode: safeCode,
+          missingConfiguration: ['SUPABASE_URL_REQUIRED', 'SUPABASE_SECRET_KEY_REQUIRED'].includes(message) ? message : null,
+          timestamp: new Date().toISOString(),
+        }));
         logSaveFailure(500, 'DATABASE_PERSISTENCE_ERROR');
         return json(res, 500, { ok: false, error: 'DATABASE_PERSISTENCE_ERROR', requestId });
       }
