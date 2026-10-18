@@ -24,6 +24,25 @@ export default async function handler(req, res) {
     });
   }
 
+  const url = new URL(req.url || '/', 'http://localhost');
+  const dryRunRequested = req.query?.dryRun === 'true' || url.searchParams.get('dryRun') === 'true';
+  if (dryRunRequested) {
+    if (process.env.CRON_AUTH_DRY_RUN_ENABLED !== 'true') {
+      return json(res, 403, { error: 'CRON_DRY_RUN_DISABLED' });
+    }
+    // This branch intentionally returns before shiftHandler, persistence, or
+    // any connector can be invoked. It verifies authorization + dry-run routing,
+    // not the real scheduled execution path.
+    return json(res, 200, {
+      status: 'AUTHORIZED_DRY_RUN_SUCCESS',
+      authorizationGateVerified: true,
+      executionPathVerified: false,
+      connectorCalls: 0,
+      stateMutations: 0,
+      downstreamInvoked: false,
+    });
+  }
+
   // Delegate only after the cron boundary has been validated. The underlying
   // shift handler retains its existing, tested execution logic.
   return shiftHandler(req, res);
