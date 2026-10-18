@@ -72,6 +72,16 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <div><strong>Execution</strong><ul><li>Select highest-value authorized work</li><li>Create governed work items</li><li>Execute only what is authorized</li><li>Independently verify results</li><li>Move to the next legitimate work item</li></ul></div>
 <div><strong>End-of-shift</strong><ul><li>Report what was accomplished</li><li>Report discoveries and learning</li><li>List unfinished/blocked work</li><li>Identify the next capability needed</li><li>Measure work removed from Ryan</li></ul></div>
 </div></details>
+<div class="auth-panel" aria-label="Reality administrator sign in">
+  <div class="label">ADMINISTRATOR AUTHENTICATION</div>
+  <p class="muted">Sign in with the authorized administrator account to save shared shift settings.</p>
+  <div class="shift-grid">
+    <label>Email<input id="adminEmail" type="email" autocomplete="username" value="Maloney2323@gmail.com" placeholder="you@example.com"></label>
+    <label>Password<input id="adminPassword" type="password" autocomplete="current-password" placeholder="Supabase Auth password"></label>
+  </div>
+  <div class="auth-actions"><button id="adminSignIn" type="button">Sign in</button><button id="adminRecover" type="button">Send password reset link</button><button id="adminSignOut" type="button" hidden>Sign out</button></div>
+  <span id="adminAuthStatus" class="saved" role="status"></span>
+</div>
 <button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
 </section>
 
@@ -93,7 +103,16 @@ function addReadAloudButton(target,text){if(!target)return;target.querySelectorA
 
 const SHIFT_KEY='reality.dailyShift.v1';
 function loadShift(){try{const s=JSON.parse(localStorage.getItem(SHIFT_KEY)||'{}');if(typeof s.enabled==='boolean')$('shiftEnabled').checked=s.enabled;if(s.readinessTime)$('readinessTime').value=s.readinessTime;if(s.shiftStart)$('shiftStart').value=s.shiftStart;if(s.shiftLength)$('shiftLength').value=String(s.shiftLength)}catch{}}
-$('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const r=await fetch('/api/reality/shift',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent='Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',2500)}};
+const AUTH_URL='https://qkzvjfiegihyaoabiniy.supabase.co/auth/v1';
+const AUTH_KEY='sb_publishable_-AQu53rW0VnaLiPd3meugw_Cu-7FOv2';
+const ADMIN_TOKEN_KEY='reality_admin_access_token';
+function adminToken(){return sessionStorage.getItem(ADMIN_TOKEN_KEY)||''}
+function updateAdminAuthStatus(message){$('adminAuthStatus').textContent=message;$('adminSignOut').hidden=!adminToken()}
+$('adminSignIn').onclick=async()=>{const email=$('adminEmail').value.trim();const password=$('adminPassword').value;if(!email||!password){updateAdminAuthStatus('Enter your email and password.');return}$('adminSignIn').disabled=true;try{const r=await fetch(AUTH_URL+'/token?grant_type=password',{method:'POST',headers:{'content-type':'application/json',apikey:AUTH_KEY},body:JSON.stringify({email,password})});const b=await r.json();if(!r.ok||!b.access_token)throw new Error(b.msg||b.message||b.error_description||'Sign-in failed');sessionStorage.setItem(ADMIN_TOKEN_KEY,b.access_token);updateAdminAuthStatus('Signed in. Server authorization is checked on every save.');$('adminPassword').value='';}catch(e){updateAdminAuthStatus(e.message||'Sign-in failed.')}finally{$('adminSignIn').disabled=false}};
+$('adminRecover').onclick=async()=>{const email=$('adminEmail').value.trim();if(!email){updateAdminAuthStatus('Enter your administrator email first.');return}$('adminRecover').disabled=true;try{const r=await fetch(AUTH_URL+'/recover',{method:'POST',headers:{'content-type':'application/json',apikey:AUTH_KEY},body:JSON.stringify({email})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.msg||b.message||b.error_description||'Password reset request failed');updateAdminAuthStatus('If this email has a Supabase Auth account, check its inbox for the password reset email. Public account creation is disabled for security.');}catch(e){updateAdminAuthStatus(e.message||'Password reset request failed.')}finally{$('adminRecover').disabled=false}};
+$('adminSignOut').onclick=()=>{sessionStorage.removeItem(ADMIN_TOKEN_KEY);updateAdminAuthStatus('Signed out.')};
+if(adminToken())updateAdminAuthStatus('Session token present. Server verifies identity and admin permission on save.');
+$('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const headers={'content-type':'application/json'};if(adminToken())headers.authorization='Bearer '+adminToken();const r=await fetch('/api/reality/shift',{method:'POST',headers,body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent=e.message==='USER_AUTH_REQUIRED'?'Saved locally · sign in required for server save':e.message==='ADMIN_ROLE_REQUIRED'?'Saved locally · this account is not the authorized administrator':e.message==='USER_TOKEN_INVALID'?'Saved locally · session expired; sign in again':e.message==='USER_AUTH_NOT_CONFIGURED'?'Saved locally · server authentication is not configured':'Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',4000)}};
 loadShift();
 $('bannerSave').onclick=()=>{$('readinessTime').value='20:00';$('shiftStart').value='21:00';$('shiftEnabled').checked=true;$('saveShift').click()};
 function updateShiftBanner(){const f=v=>{if(!v)return '';const [h,m]=v.split(':').map(Number);const ap=h>=12?'PM':'AM';const hh=(h%12)||12;return `${hh}:${String(m).padStart(2,'0')} ${ap}`};$('bannerReadiness').textContent=f($('readinessTime').value);$('bannerStart').textContent=f($('shiftStart').value);$('bannerState').textContent=$('shiftEnabled').checked?'Shift enabled':'Shift disabled'}

@@ -17,6 +17,20 @@ function hash(value) {
   return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 }
 
+// PostgreSQL universe_events uses UUIDs for event/entity/parent identifiers.
+// Preserve already-valid UUIDs; map legacy namespaced IDs to stable UUIDs so
+// repeated writes and parent references resolve to the same database identity.
+function databaseUuid(value, field) {
+  if (value == null || value === '') return null;
+  const input = String(value);
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input)) return input;
+  const bytes = crypto.createHash('sha256').update(`reality-universe:${field}:${input}`).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
 export function createUniversePostgresPersistence({
   url = process.env.SUPABASE_URL,
   secretKey = process.env.SUPABASE_SECRET_KEY,
@@ -44,6 +58,11 @@ export function createUniversePostgresPersistence({
   async function appendEvent(event) {
     const record = {
       ...event,
+      event_id: databaseUuid(event.event_id || crypto.randomUUID(), 'event_id'),
+      entity_id: databaseUuid(event.entity_id, 'entity_id'),
+      parent_event_id: databaseUuid(event.parent_event_id, 'parent_event_id'),
+      continuity_root_id: databaseUuid(event.continuity_root_id, 'continuity_root_id'),
+      worldline_id: databaseUuid(event.worldline_id, 'worldline_id'),
       content_hash: event.content_hash || hash(event.payload),
       lineage_hash: event.lineage_hash || hash({
         parent_event_id: event.parent_event_id || null,

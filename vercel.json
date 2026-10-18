@@ -6,11 +6,11 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/reality/shift",
+      "path": "/api/reality/shift-cron",
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/reality/stewardship",
+      "path": "/api/reality/stewardship-cron",
       "schedule": "0 * * * *"
     }
   ]

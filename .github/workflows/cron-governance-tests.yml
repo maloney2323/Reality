@@ -1,0 +1,30 @@
+name: Cron Governance Route Tests
+
+on:
+  push:
+    branches:
+      - fix/cron-failclosed-governance
+  pull_request:
+    branches:
+      - test/adversarial-drift-hallucination-metrics-v04
+
+jobs:
+  full-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run complete repository test suite
+        run: npm test
+
+  cron-governance-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run cron authorization and route boundary tests
+        run: node --test test/cron-governance.test.js test/cron-route-boundaries.test.js

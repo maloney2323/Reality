@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
+import { verifyRealityAdmin } from '../../src/reality-user-auth-v1.0.js';
 import { isAuthorizedCronRequest } from '../../src/reality-cron-auth-v0.1.js';
+import { validateCronAuthorization } from '../../src/reality-cron-governance-v1.0.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
@@ -255,11 +256,34 @@ async function runTick({ config, phase, local, persistence }) {
 }
 
 export default async function handler(req, res) {
-  try {
-    const persistence = createUniversePostgresPersistence();
+  const requestId = 'req_' + crypto.randomUUID();
+  if (req.method === 'POST') {
+    res.setHeader('X-Reality-Request-Id', requestId);
+    const logSaveFailure = (status, errorCategory) => console.warn(JSON.stringify({
+      event: 'CONFIG_SAVE_FAILED',
+      requestId,
+      endpoint: '/api/reality/shift',
+      status,
+      errorCategory,
+      timestamp: new Date().toISOString(),
+    }));
+    try {
+      const identity = await verifyRealityAdmin(req);
+      if (!identity.authorized) {
+        const category = identity.status === 401 ? 'AUTHENTICATION_FAILED'
+          : identity.status === 403 ? 'AUTHORIZATION_FAILED'
+          : 'AUTH_PROVIDER_OR_CONFIGURATION_ERROR';
+        logSaveFailure(identity.status, category);
+        return json(res, identity.status, {
+          error: identity.error,
+          message: identity.message,
+          requestId,
+          connectorCalls: 0,
+          stateMutations: 0,
+        });
+      }
 
-    if (req.method === 'POST') {
-      const principal = getOrCreateSessionPrincipal(req, res);
+      const persistence = createUniversePostgresPersistence();
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
@@ -267,23 +291,51 @@ export default async function handler(req, res) {
         shiftStart: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.shiftStart)) ? b.shiftStart : '21:00',
         shiftLength: [8, 12].includes(Number(b.shiftLength)) ? Number(b.shiftLength) : 8,
         timeZone: typeof b.timeZone === 'string' && b.timeZone ? b.timeZone : 'America/New_York',
-        updated_by: principal.principal_id,
+        updated_by: identity.user.id,
+        updated_by_email: identity.user.email,
         updated_at: new Date().toISOString(),
       };
       const eventId = 'shift:config:' + crypto.randomUUID();
-      await persistence.appendEvent({
-        event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
-        entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
-        parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
-        epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
-        provenance: { source: 'reality-homepage-shift-settings', principal_id: principal.principal_id },
-      });
-      return json(res, 200, { ok: true, config, persisted: true });
+      try {
+        await persistence.appendEvent({
+          event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
+          entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
+          parent_event_id: null, effective_time: config.updated_at, assertion_time: config.updated_at,
+          epistemic_status: 'OBSERVED', payload: config, evidence_refs: [],
+          provenance: { source: 'reality-homepage-shift-settings', principal_id: identity.user.id, admin_email: identity.user.email },
+        });
+      } catch (error) {
+        const message = String(error?.message || 'UNKNOWN_DATABASE_ERROR');
+        const httpStatus = message.match(/UNIVERSE_POSTGRES_HTTP_(\d{3})/)?.[1] || null;
+        const safeCode = message.match(/(?:^|:)([A-Z][A-Z0-9_]{2,80})(?::|$)/)?.[1] || null;
+        console.warn(JSON.stringify({
+          event: 'CONFIG_PERSISTENCE_DIAGNOSTIC', requestId,
+          databaseHttpStatus: httpStatus ? Number(httpStatus) : null,
+          databaseErrorCode: safeCode,
+          missingConfiguration: ['SUPABASE_URL_REQUIRED', 'SUPABASE_SECRET_KEY_REQUIRED'].includes(message) ? message : null,
+          timestamp: new Date().toISOString(),
+        }));
+        logSaveFailure(500, 'DATABASE_PERSISTENCE_ERROR');
+        return json(res, 500, { ok: false, error: 'DATABASE_PERSISTENCE_ERROR', requestId });
+      }
+      return json(res, 200, { ok: true, config, persisted: true, requestId });
+    } catch {
+      logSaveFailure(500, 'INTERNAL_SAVE_ERROR');
+      return json(res, 500, { ok: false, error: 'INTERNAL_SAVE_ERROR', requestId });
     }
+  }
+  try {
+
+    const persistence = createUniversePostgresPersistence();
 
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
-    if (!cronRequest(req)) {
+    const hasAuthorizationHeader = Boolean(req?.headers?.authorization || req?.headers?.Authorization);
+    const authorization = validateCronAuthorization(req, process.env.CRON_SECRET);
+    if (!authorization.authorized && hasAuthorizationHeader) {
+      return json(res, authorization.status, { error: authorization.error, message: authorization.message });
+    }
+    if (!authorization.authorized || !cronRequest(req)) {
       const config = await readConfig(persistence);
       return json(res, 200, { ok: true, config, runtime: 'server_backed' });
     }
