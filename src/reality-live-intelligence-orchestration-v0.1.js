@@ -5,8 +5,114 @@ import { createUniverseEntry } from './reality-universe-persistence-contract-v1.
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
+import { retrieveUniverseMemory } from './reality-universe-memory-retrieval-v0.1.js';
 
-async function loadUniverseContext({ systemContext = null, continuityRootId = null, worldlineId = null, fetchImpl } = {}) {
+const MEMORY_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'what', 'when', 'where', 'which',
+  'who', 'why', 'how', 'was', 'were', 'are', 'is', 'be', 'been', 'being', 'do',
+  'does', 'did', 'can', 'could', 'would', 'should', 'will', 'shall', 'have',
+  'has', 'had', 'not', 'but', 'from', 'into', 'onto', 'about', 'then', 'than',
+  'you', 'your', 'yours', 'our', 'ours', 'their', 'them', 'they', 'its', 'it',
+  'my', 'me', 'we', 'us', 'a', 'an', 'to', 'of', 'in', 'on', 'at', 'as', 'or',
+  'if', 'by', 'so', 'up', 'out', 'now', 'please', 'tell', 'show', 'explain',
+]);
+
+function memoryTermsFromMessage(message) {
+  const matches = String(message || '').toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g) || [];
+  return [...new Set(matches.filter((term) => !MEMORY_STOP_WORDS.has(term)))].slice(0, 16);
+}
+
+function memoryAssertionTime(entry) {
+  const value = Date.parse(entry?.assertion_time || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function selectRelevantDurableMemory(entries, {
+  message,
+  continuityRootId,
+  worldlineId = null,
+  limit = 30,
+} = {}) {
+  const scoped = retrieveUniverseMemory(entries, {
+    continuityRootId,
+    worldlineId,
+    limit: 1000,
+  });
+  const all = scoped.entries;
+  const terms = memoryTermsFromMessage(message);
+  const scores = new Map(all.map((entry) => [entry.entry_id, 0]));
+  const termQueryIds = [];
+
+  for (const term of terms) {
+    const result = retrieveUniverseMemory(all, {
+      continuityRootId,
+      worldlineId,
+      terms: [term],
+      limit: 1000,
+    });
+    termQueryIds.push(result.query_id);
+    for (const entry of result.entries) {
+      scores.set(entry.entry_id, (scores.get(entry.entry_id) || 0) + 1);
+    }
+  }
+
+  const recent = (items) => items.slice().sort((a, b) =>
+    memoryAssertionTime(b) - memoryAssertionTime(a) ||
+    String(a.entry_id || '').localeCompare(String(b.entry_id || ''))
+  );
+  const ranked = recent(all.filter((entry) => (scores.get(entry.entry_id) || 0) > 0))
+    .sort((a, b) =>
+      (scores.get(b.entry_id) || 0) - (scores.get(a.entry_id) || 0) ||
+      memoryAssertionTime(b) - memoryAssertionTime(a) ||
+      String(a.entry_id || '').localeCompare(String(b.entry_id || ''))
+    )
+    .slice(0, 20);
+
+  const selectedById = new Map();
+  for (const entry of ranked) selectedById.set(entry.entry_id, entry);
+  const recentStatements = recent(all.filter((entry) => entry.event_kind === 'USER_STATEMENT')).slice(0, 8);
+  for (const entry of recentStatements) selectedById.set(entry.entry_id, entry);
+  const latestStateEvent = recent(all.filter((entry) => entry.event_kind === 'CONTINUITY_STATE_TRANSITION'))[0] || null;
+  if (latestStateEvent) selectedById.set(latestStateEvent.entry_id, latestStateEvent);
+
+  const selected = Array.from(selectedById.values())
+    .sort((a, b) =>
+      (scores.get(b.entry_id) || 0) - (scores.get(a.entry_id) || 0) ||
+      memoryAssertionTime(b) - memoryAssertionTime(a) ||
+      String(a.entry_id || '').localeCompare(String(b.entry_id || ''))
+    )
+    .slice(0, Math.min(Math.max(Number(limit) || 30, 1), 30))
+    .map((entry) => Object.freeze({
+      ...entry,
+      memory_relevance_score: scores.get(entry.entry_id) || 0,
+    }));
+
+  return Object.freeze({
+    entries: Object.freeze(selected),
+    receipt: Object.freeze({
+      retrieval_version: scoped.retrieval_version,
+      query_id: scoped.query_id,
+      strategy: 'LEXICAL_OVERLAP_PLUS_RECENT_USER_STATEMENTS_AND_LATEST_STATE',
+      continuity_root_id: continuityRootId,
+      worldline_id: worldlineId,
+      source_entry_count: scoped.matched_count,
+      selected_entry_count: selected.length,
+      terms_considered: terms.length,
+      term_query_ids: Object.freeze(termQueryIds),
+      selected_entry_ids: Object.freeze(selected.map((entry) => entry.entry_id)),
+      latest_state_event_included: Boolean(latestStateEvent),
+      recent_user_statement_count: recentStatements.length,
+    }),
+  });
+}
+
+async function loadUniverseContext({
+  message,
+  systemContext = null,
+  continuityRootId = null,
+  worldlineId = null,
+  fetchImpl,
+} = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
 
@@ -15,14 +121,27 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
     error.code = 'CONTINUITY_SCOPE_REQUIRED';
     throw error;
   }
-  const durable = await retrievePersistedUniverse({ continuityRootId, worldlineId, limit: 100, fetchImpl });
+  const durable = await retrievePersistedUniverse({
+    continuityRootId,
+    worldlineId,
+    limit: 1000,
+    fetchImpl,
+  });
+  const memory = selectRelevantDurableMemory(durable.entries, {
+    message,
+    continuityRootId,
+    worldlineId,
+    limit: 30,
+  });
   return Object.freeze({
     ...requestContext,
     status: durable.status,
-    count: requestContext.count + durable.count,
-    entries: Object.freeze([...durable.entries, ...requestContext.entries]),
+    count: requestContext.count + memory.entries.length,
+    entries: Object.freeze([...memory.entries, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
+    durable_selected_count: memory.entries.length,
+    memory_retrieval: memory.receipt,
     continuity_root_id: continuityRootId,
   });
 }
@@ -140,6 +259,7 @@ export async function runLiveIntelligenceOrchestration({
     throw error;
   }
   const universeContext = await loadUniverseContext({
+    message,
     systemContext,
     continuityRootId: effectiveContinuityRootId,
     worldlineId: systemContext?.worldline_id || null,
@@ -206,6 +326,7 @@ export async function runLiveIntelligenceOrchestration({
     reality_context_source: 'UNIVERSE',
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
+    memory_retrieval: universeContext.memory_retrieval || null,
   };
   // Persist the user's own statement separately from Reality's response summary.
   // This is the factual input needed for later-turn recall; continuity-state events alone
@@ -383,7 +504,13 @@ export async function runLiveIntelligenceOrchestration({
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
-    context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
+    context: { universe: {
+      status: universeContext.status,
+      count: universeContext.count,
+      durable_matched_count: universeContext.durable_count || 0,
+      durable_selected_count: universeContext.durable_selected_count || 0,
+      memory_retrieval: universeContext.memory_retrieval || null,
+    }, continuity: {
       root_id: resolvedContinuityRootId,
       discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
