@@ -182,15 +182,24 @@ export async function retrieveDormantContinuitySummaries({
 
   const dormantStates = new Set(['WAITING', 'BLOCKED', 'DEFERRED', 'SUSPENDED', 'COMPLETED']);
   const latestByRoot = new Map();
+  const orderedEntries = entries.slice().sort((a, b) =>
+    String(b.assertion_time || '').localeCompare(String(a.assertion_time || '')) ||
+    String(b.effective_time || '').localeCompare(String(a.effective_time || '')) ||
+    String(a.ledger_entry_hash || '').localeCompare(String(b.ledger_entry_hash || ''))
+  );
 
-  for (const entry of entries) {
-    const state = entry?.payload?.continuity_state || entry?.payload?.next_state || null;
+  // Choose the latest transition for every root first. Only then classify its
+  // state; filtering dormant states before this step resurrects stale work.
+  for (const entry of orderedEntries) {
     const root = entry?.continuity_root_id || null;
-    if (!root || !dormantStates.has(state)) continue;
-    if (!latestByRoot.has(root)) latestByRoot.set(root, entry);
+    if (!root || latestByRoot.has(root)) continue;
+    latestByRoot.set(root, entry);
   }
 
-  const dormant = Array.from(latestByRoot.values());
+  const dormant = Array.from(latestByRoot.values()).filter((entry) => {
+    const state = entry?.payload?.continuity_state || entry?.payload?.next_state || null;
+    return dormantStates.has(state);
+  });
   return Object.freeze({
     version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
     status: 'AVAILABLE',
