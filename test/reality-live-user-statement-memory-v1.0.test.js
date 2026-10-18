@@ -8,13 +8,17 @@ function memoryFetch(store, modelContexts) {
       const body = JSON.parse(options.body);
       const modelInput = JSON.parse(body.input[1].content[0].text);
       modelContexts.push(modelInput.system_context);
+      const hasPriorSealCode = (modelInput.system_context?.universe_context_entries || []).some((entry) =>
+        entry.event_kind === 'USER_STATEMENT' &&
+        entry.payload?.statement === "Kestrel's seal code is 4821."
+      );
       return {
         ok: true,
         status: 200,
         json: async () => ({
           id: `resp:memory-test:${modelContexts.length}`,
           status: 'completed',
-          output_text: '4821',
+          output_text: hasPriorSealCode ? '4821' : 'UNKNOWN',
         }),
       };
     }
@@ -71,13 +75,15 @@ test('a user-provided fact is persisted and supplied to cognition on the next tu
       entry.payload?.statement === "Kestrel's seal code is 4821."
     ), 'the original user statement must be stored as a distinct Universe entry');
 
-    await runLiveIntelligenceOrchestration({
+    const secondTurn = await runLiveIntelligenceOrchestration({
       message: "What was Kestrel's seal code? Answer with the four digits only.",
       systemContext,
       apiKey: 'test-openai-key',
       fetchImpl,
     });
 
+    assert.equal(secondTurn.intelligence.answer, '4821',
+      'the mock model should only recall the code when the prior statement reaches its context');
     const secondTurnEntries = modelContexts[1]?.universe_context_entries || [];
     assert.ok(secondTurnEntries.some((entry) =>
       entry.event_kind === 'USER_STATEMENT' &&
