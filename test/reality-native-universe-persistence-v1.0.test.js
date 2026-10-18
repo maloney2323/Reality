@@ -6,6 +6,8 @@ import {
   retrievePersistedUniverse,
 } from '../src/reality-native-universe-persistence-v1.0.js';
 
+process.env.REALITY_UNIVERSE_PERSISTENCE_KEY ||= 'test-persistence-key';
+
 const base = createUniverseEntry({
   entry_id: 'entry:persistence:test:1',
   continuity_root_id: 'root:test',
@@ -59,7 +61,7 @@ test('round-trips a Universe entry through the persistence adapter', async () =>
   assert.equal(persisted.entry.ledger_entry_hash, base.ledger_entry_hash);
   assert.equal(calls.length, 1);
 
-  const retrieved = await retrievePersistedUniverse({ fetchImpl });
+  const retrieved = await retrievePersistedUniverse({ continuityRootId: 'root:test', worldlineId: 'worldline:test', fetchImpl });
   assert.equal(retrieved.status, 'AVAILABLE');
   assert.equal(retrieved.count, 1);
   assert.deepEqual(retrieved.entries[0], base);
@@ -82,7 +84,7 @@ test('rejects a conflicting retry for an immutable entry id', async () => {
 test('fails closed when persistence is unavailable', async () => {
   const fetchImpl = async () => { throw new Error('network down'); };
   await assert.rejects(
-    retrievePersistedUniverse({ fetchImpl }),
+    retrievePersistedUniverse({ continuityRootId: 'root:test', worldlineId: 'worldline:test', fetchImpl }),
     /UNIVERSE_PERSISTENCE_UNAVAILABLE/,
   );
 });
