@@ -1,9 +1,13 @@
 name: Business50 Reality Astra Single-Case Pilot
+# The one-time October 21 paid pilot already ran. No automatic paid reruns.
+# A future manually dispatched test requires a fresh deliberate approval.
 on:
-  push:
-    branches: [fix/governed-verification-and-context-boundary-20261021]
-    paths:
-      - '.github/workflows/reality-business50-astra-one-case-pilot.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_one_paid_model_call:
+        description: 'Type YES_EXACT_RUN to approve exactly one new Astra API request'
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -14,7 +18,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       B50_GOVERNED_MODE: paid_one
       B50_GOVERNED_CASE: B07
-      B50_GOVERNED_PAID_APPROVED: YES_EXACT_RUN
+      B50_GOVERNED_PAID_APPROVED: ${{ inputs.confirm_one_paid_model_call }}
       B50_GOVERNED_RECEIPT_PATH: artifacts/reality-business50-astra-B07-once.json
     steps:
       - uses: actions/checkout@v4
