@@ -1,3 +1,4 @@
+import { requireTrustedInternalConnector } from '../../../src/reality-internal-connector-auth-v0.1.js';
 import crypto from 'node:crypto';
 
 const ALLOWED_REPOSITORY = 'maloney2323/Reality';
@@ -47,6 +48,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).setHeader('Allow', 'POST').json({ error: 'METHOD_NOT_ALLOWED' });
 
   try {
+    requireTrustedInternalConnector(req, {purpose:'WRITE'});
     const { workItem, authorization, execution } = req.body || {};
     if (!workItem?.work_item_id || !authorization?.authorized || !execution?.execution_id) {
       return res.status(400).json({ ok: false, error: 'WORK_ITEM_AUTHORIZATION_EXECUTION_REQUIRED' });
