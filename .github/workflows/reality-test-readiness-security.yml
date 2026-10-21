@@ -1,0 +1,50 @@
+name: Reality Adversarial Test-Readiness Boundaries
+
+on:
+  pull_request:
+    paths:
+      - 'api/chat.js'
+      - 'api/reality/self-build.js'
+      - 'api/reality/system-access.js'
+      - 'api/reality/model-probe.js'
+      - 'api/reality/connectors/github.js'
+      - 'api/reality/connectors/github-verify.js'
+      - 'api/reality-shadow.js'
+      - 'api/reality/shift.js'
+      - 'src/reality-internal-connector-auth-v0.1.js'
+      - 'src/reality-cron-authorization-v0.1.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'src/reality-authenticated-conversation-v0.1.js'
+      - 'test/reality-cron-authorization.test.js'
+      - 'test/reality-direct-action-bypass.test.js'
+      - 'test/reality-authenticated-conversation.test.js'
+      - 'test/reality-benchmark-preflight.test.js'
+      - '.github/workflows/reality-test-readiness-security.yml'
+  workflow_dispatch:
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Adversarial route and 100-turn tests, no provider credentials
+        run: |
+          node --test \
+            test/reality-cron-authorization.test.js \
+            test/reality-direct-action-bypass.test.js \
+            test/reality-authenticated-conversation.test.js \
+            test/reality-chat-egress-integrity.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-vercel-runtime-route-imports.test.js
+      - name: Reject syntactically broken HTTP route imports
+        run: |
+          node --check api/reality/self-build.js
+          node --check api/reality/system-access.js
+          node --check api/reality/model-probe.js
+          node --check api/reality/connectors/github.js
+          node --check api/reality/connectors/github-verify.js
+          node --check api/reality-shadow.js
+          node --check api/reality/shift.js
