@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import selfBuild from '../api/reality/self-build.js';
 import systemAccess from '../api/reality/system-access.js';
 import modelProbe from '../api/reality/model-probe.js';
+import worldHandler from '../api/reality/world.js';
 import githubWrite from '../api/reality/connectors/github.js';
 import githubVerify from '../api/reality/connectors/github-verify.js';
 import {requireTrustedInternalConnector} from '../src/reality-internal-connector-auth-v0.1.js';
@@ -44,6 +45,19 @@ test('public system-access cannot perform GitHub writes without Base44 identity'
   const source=readFileSync('api/reality/system-access.js','utf8');
   assert.match(source,/DIRECT_SYSTEM_WRITE_NOT_RELEASED/);
   assert.match(source,/await verifyBase44Principal\(req\)/);
+});
+test('legacy world envelope cannot promote caller-claimed approval to action',async()=>{
+  const resultWrite=result();
+  await worldHandler(request({provider:'github',action:'create_repository_file',
+    authorization:{authorized:true,scope:'repository',authorityId:'fake'},
+    target:'maloney2323/Reality'}),resultWrite);
+  assert.equal(resultWrite.statusCode,401);
+  assert.equal(resultWrite.body.error,'AUTHENTICATION_REQUIRED');
+  const caps=result();
+  await worldHandler(request({},'GET'),caps);
+  assert.equal(caps.statusCode,200);
+  assert.equal(caps.body.provider_writes_enabled,false);
+  assert.equal(caps.body.connected_execution_released,false);
 });
 test('unauthenticated model probe cannot trigger a paid OpenAI call',async()=>{
   const output=result();
@@ -95,7 +109,7 @@ test('a forged bridge credential cannot authorize execution when explicitly enab
   }
 });
 test('server routes cannot silently return to request-body action authority',()=>{
-  for(const name of ['api/reality/self-build.js','api/reality/system-access.js',
+  for(const name of ['api/reality/self-build.js','api/reality/system-access.js','api/reality/world.js',
     'api/reality/connectors/github.js','api/reality/connectors/github-verify.js']){
     const source=readFileSync(name,'utf8');
     assert.match(source,/verifyBase44Principal|requireTrustedInternalConnector/);
