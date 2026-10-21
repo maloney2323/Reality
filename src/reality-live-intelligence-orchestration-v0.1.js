@@ -183,9 +183,46 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Never silently discharge obligations by changing conversation topic.
+  // Carry only server-persisted unresolved items. A user's intent/request
+  // establishes the obligation to track, NOT proof of successful execution.
+  const latestContinuityEntry = (persistedContinuity?.entries || [])
+    .slice().sort((a,b)=>String(b.assertion_time||'').localeCompare(String(a.assertion_time||'')))[0] || null;
+  const priorPending = latestContinuityEntry?.payload?.pending_obligations || [];
+  if (!Array.isArray(priorPending) || priorPending.length > 100) {
+    throw new Error('PENDING_OBLIGATION_LEDGER_INVALID_OR_OVER_CAPACITY');
+  }
+  const pendingObligations = priorPending.map((item)=>{
+    if (!item || typeof item.obligation_id!=='string' ||
+        item.status!=='UNRESOLVED' || item.outcome_verified!==false ||
+        typeof item.source_request_digest!=='string') {
+      throw new Error('PENDING_OBLIGATION_EVIDENCE_INVALID');
+    }
+    return Object.freeze({...item});
+  });
+  const materiality = materialityFromSignal(governedSignal);
+  if (materiality === 'ACTION_CANDIDATE') {
+    const sourceId = governedSignal?.packet?.packet_id;
+    const sourceDigest = governedSignal?.packet?.raw_content_digest;
+    if (!sourceId || !sourceDigest) throw new Error('NEW_OBLIGATION_SOURCE_EVIDENCE_REQUIRED');
+    if (pendingObligations.length >= 100) throw new Error('PENDING_OBLIGATION_LEDGER_FULL');
+    pendingObligations.push(Object.freeze({
+      obligation_id: 'obligation:' + sourceId,
+      source_request_digest: sourceDigest,
+      user_intent_summary: String(message).slice(0,500),
+      status: 'UNRESOLVED',
+      outcome_verified: false,
+      source_authority: 'USER_INTENT_ONLY',
+      authorization_status: 'NOT_GRANTED_BY_CHAT',
+    }));
+  }
   const cognitionContext = {
     ...(systemContext || {}),
     continuity_root_id: effectiveContinuityRootId,
+    // Only the previously recorded source history is read here; a model
+    // cannot delete a pending obligation by contradicting the ledger.
+    pending_obligations: pendingObligations,
+    pending_obligation_count: pendingObligations.length,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
@@ -222,7 +259,6 @@ export async function runLiveIntelligenceOrchestration({
     cognitive_runtime_version: cognitiveResult.runtime_version,
   };
 
-  const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
     message,
     governedSignal,
@@ -233,7 +269,10 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  const previousState = persistedContinuity?.latest_state || null;
+  const continuityState = pendingObligations.length>0 ||
+    ['WAITING','BLOCKED','SUSPENDED','DEFERRED'].includes(previousState)
+    ? 'WAITING' : 'ACTIVE';
   const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: effectiveContinuityRootId,
@@ -244,6 +283,9 @@ export async function runLiveIntelligenceOrchestration({
         payload: {
           continuity_state: continuityState,
           materiality,
+          pending_obligations: pendingObligations,
+          pending_obligation_count: pendingObligations.length,
+          pending_outcome_verified: false,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,
           response_summary: String(modelResult?.answer || '').slice(0, 1000),
@@ -346,6 +388,10 @@ export async function runLiveIntelligenceOrchestration({
       rehydrated: persistedContinuity?.continuation_available === true,
       prior_state: persistedContinuity?.latest_state || null,
       current_state: continuityEvent?.next_state || null,
+      pending_obligation_count: pendingObligations.length,
+      pending_obligation_refs: pendingObligations.map(x=>x.obligation_id),
+      unresolved_action_claims_not_verified: pendingObligations.length>0,
+      persistence_enabled: process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true',
       event_id: continuityEvent?.continuity_event_id || null,
     } },
     situation: clone(situation),
