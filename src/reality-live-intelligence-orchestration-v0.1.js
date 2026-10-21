@@ -199,6 +199,7 @@ export async function runLiveIntelligenceOrchestration({
   const publication = enforceChatPublication({
     candidateAnswer: cognitiveResult.answer,
     executionStatus: 'NOT_EXECUTED',
+    actionCandidate: materialityFromSignal(governedSignal) === 'ACTION_CANDIDATE',
   });
   const modelResult = {
     ...cognitiveResult,
