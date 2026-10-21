@@ -290,18 +290,51 @@ export function reactivationPlan(confirmedGap, {
   originalWorkItem,
 } = {}) {
   if (!confirmedGap?.gap_id) throw new Error('CAPABILITY_GAP_REQUIRED');
+  if (confirmedGap.state !== 'GAP_CONFIRMED') throw new Error('CONFIRMED_CAPABILITY_GAP_REQUIRED');
   if (registration?.state !== 'REGISTERED') throw new Error('CAPABILITY_REGISTRATION_REQUIRED');
   if (!originalWorkItem?.id) throw new Error('ORIGINAL_WORK_ITEM_REQUIRED');
+  if (!text(confirmedGap.work_item_id) || originalWorkItem.id !== confirmedGap.work_item_id) {
+    throw new Error('ORIGINAL_WORK_ITEM_IDENTITY_MISMATCH');
+  }
+  if (registration.capability_id !== confirmedGap.capability_id) {
+    throw new Error('UPGRADE_CAPABILITY_MISMATCH');
+  }
+  if (!text(registration.verification_hash) || !text(registration.capability_signature)) {
+    throw new Error('REGISTERED_CAPABILITY_PROOF_REQUIRED');
+  }
+  if (confirmedGap.continuity_root_id &&
+      originalWorkItem.continuity_root_id !== confirmedGap.continuity_root_id) {
+    throw new Error('CONTINUITY_ROOT_IDENTITY_MISMATCH');
+  }
+  if (confirmedGap.worldline_id &&
+      originalWorkItem.worldline_id !== confirmedGap.worldline_id) {
+    throw new Error('WORLDLINE_IDENTITY_MISMATCH');
+  }
 
+  // Re-activation is a proposal for the ORIGINAL task, not a tool execution.
+  // The ordinary work authorization gate still applies; no model may infer
+  // execution authority from successful capability registration.
   return freeze({
     state: 'REACTIVATED',
     gap_id: confirmedGap.gap_id,
     capability_id: confirmedGap.capability_id,
     original_work_item_id: originalWorkItem.id,
+    continuity_root_id: confirmedGap.continuity_root_id || null,
+    worldline_id: confirmedGap.worldline_id || null,
+    capability_verification_hash: registration.verification_hash,
+    capability_signature: registration.capability_signature,
+    execution_authorized: false,
+    customer_task_completed: false,
+    requires_fresh_action_authorization: true,
+    requires_independent_outcome_readback: true,
     continuation_token: digest({
       gap_id: confirmedGap.gap_id,
       original_work_item_id: originalWorkItem.id,
       capability_id: confirmedGap.capability_id,
+      continuity_root_id: confirmedGap.continuity_root_id || null,
+      worldline_id: confirmedGap.worldline_id || null,
+      verification_hash: registration.verification_hash,
+      capability_signature: registration.capability_signature,
     }),
   });
 }
