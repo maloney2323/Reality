@@ -12,6 +12,7 @@ import {runGovernedDispositionGeneration}
 import {repairPolicyMisalignedAdvisory}
   from './reality-governed-advisory-repair-v0.1.js';
 import {verifyDispositionPolicyFacts} from './reality-disposition-escalation-contract-v0.1.js';
+import {evaluateModelStatementIntegrity} from './reality-statement-integrity-v0.1.js';
 export const SOURCE_DECISION_BOUNDARY_VERSION='reality-evidence-bound-decision-v0.1';
 const digest=x=>createHash('sha256').update(JSON.stringify(x??null)).digest('hex');
 
@@ -22,6 +23,7 @@ export async function resolveEvidenceBoundDecision({
 }={}){
   if(!rawCandidate||typeof rawCandidate!=='object'||Array.isArray(rawCandidate))
     throw Error('MODEL_CANDIDATE_REQUIRED');
+  const statementIntegrity=evaluateModelStatementIntegrity(rawCandidate);
   // Typed reconciliation is independent of the model's preferred disposition.
   const typed=reconcileTypedEvidenceFindings(publicPacket,{legacyFindings});
   const scope=discloseUnverifiedSourceScope({
@@ -33,6 +35,7 @@ export async function resolveEvidenceBoundDecision({
     schema:SOURCE_DECISION_BOUNDARY_VERSION,
     work_item_id:publicPacket.work_item_id,
     raw_candidate_sha256:digest(rawCandidate),
+    statement_integrity_receipt:statementIntegrity,
     normalized_candidate_sha256:digest(normalized),
     typed_findings:typed,
     scope_uncertainty_receipt:scope.receipt,
@@ -45,6 +48,11 @@ export async function resolveEvidenceBoundDecision({
   };
   if(!typed.findings.length){
     if(policyAttestation)throw Error('UNCLASSIFIED_POLICY_MUST_NOT_CLAIM_SIGNED_AUTHORITY');
+    if(!statementIntegrity.admissible){
+      const response={...base,status:'WITHHELD_UNSAFE_MODEL_STATEMENT',
+        publication:null,publication_assessment_receipt:null,policy_repair_receipt:null};
+      return Object.freeze({...response,receipt_sha256:digest(response)});
+    }
     // No trusted policy -> no positive authorization, and publish only if
     // a non-enabling informational advisory passes the separate schema gate.
     const advisory=publishUnverifiedInformationalAdvisory({
@@ -70,6 +78,11 @@ export async function resolveEvidenceBoundDecision({
     workItemId:publicPacket.work_item_id,evidence:publicPacket.evidence,
     attestation:policyAttestation,trustedPublicKey:trustedPolicyPublicKey
   });
+  if(!statementIntegrity.admissible){
+    const response={...base,status:'WITHHELD_UNSAFE_MODEL_STATEMENT',
+      publication:null,policy_repair_receipt:null};
+    return Object.freeze({...response,receipt_sha256:digest(response)});
+  }
   if(!normalized){
     const response={...base,status:'WITHHELD_INVALID_CANDIDATE',
       publication:null,policy_repair_receipt:null};
