@@ -1,6 +1,11 @@
 name: Business50 OpenAI Baseline First Five
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/business50-vercel-preflight-20261021
+    paths:
+      - '.github/workflows/business50-openai-baseline-first5.yml'
 permissions:
   contents: read
 jobs:
