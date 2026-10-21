@@ -1,4 +1,5 @@
 import { dispositionDigest, assessProposedDisposition, verifyDispositionPolicyFacts } from './reality-disposition-escalation-contract-v0.1.js';
+import {evaluateModelStatementIntegrity} from './reality-statement-integrity-v0.1.js';
 
 // Execution path for a real underlying model injected by the trusted server.
 // Candidate generation sees ONLY admitted public facts; the human owner/agent
@@ -48,6 +49,18 @@ export async function runGovernedDispositionGeneration({
       raw_candidate_digest:null,policy_attestation_digest:verified.policy_attestation_digest,
       publication:null,external_action_executed:false,
       error_code:'MODEL_PROVIDER_FAILURE',
+    });
+  }
+  const statementIntegrity=evaluateModelStatementIntegrity(generated);
+  if(!statementIntegrity.admissible){
+    return Object.freeze({
+      version:GOVERNED_DISPOSITION_GENERATION_VERSION,
+      work_item_id:publicFacts.work_item_id,public_packet_digest,
+      status:'WITHHELD_UNSAFE_MODEL_STATEMENT',
+      raw_candidate_digest:dispositionDigest(generated),
+      policy_attestation_digest:verified.policy_attestation_digest,
+      statement_integrity_receipt:statementIntegrity,publication:null,
+      external_action_executed:false,customer_work_completed:false,
     });
   }
   const assessment=assessProposedDisposition({
