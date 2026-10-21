@@ -6,6 +6,8 @@ on:
       - 'test/reality-governed-execution-engine-v0.1.test.js'
       - 'test/reality-governed-execution-independent-readback.test.js'
       - 'api/reality/execute.js'
+      - 'src/reality-connector-supabase-v1.0.js'
+      - 'test/reality-vercel-runtime-route-imports.test.js'
       - '.github/workflows/reality-governed-execution-engine-v0.1.yml'
   pull_request:
     paths:
@@ -13,6 +15,8 @@ on:
       - 'test/reality-governed-execution-engine-v0.1.test.js'
       - 'test/reality-governed-execution-independent-readback.test.js'
       - 'api/reality/execute.js'
+      - 'src/reality-connector-supabase-v1.0.js'
+      - 'test/reality-vercel-runtime-route-imports.test.js'
       - '.github/workflows/reality-governed-execution-engine-v0.1.yml'
 jobs:
  test:
@@ -22,3 +26,4 @@ jobs:
    - uses: actions/setup-node@v4
      with: {node-version: 22}
    - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-governed-execution-independent-readback.test.js
+   - run: node --test test/reality-vercel-runtime-route-imports.test.js
