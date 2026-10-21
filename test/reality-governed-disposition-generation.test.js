@@ -94,3 +94,19 @@ test('model cannot claim work completed, add untrusted citations or change dispo
   assert.equal(out.publication.claims_authority,false);
   assert.equal(out.customer_work_completed,false);
 });
+
+
+test('signed policy alone cannot publish false completed-action claims in narrative',async()=>{
+  const {packet,att}=input('CONTROL_HOLD');
+  const out=await runGovernedDispositionGeneration({
+    publicPacket:packet,verifiedPolicyAttestation:att,
+    modelGateway:{generateDisposition:async()=>({
+      disposition:'BLOCK',uncertainty_acknowledged:true,claims_authority:false,
+      evidence_ids:['rev-1'],reasoning:'We successfully transferred the money to the payee.'
+    })}
+  });
+  assert.equal(out.status,'WITHHELD_UNSAFE_MODEL_STATEMENT');
+  assert.equal(out.publication,null);
+  assert.equal(out.customer_work_completed,false);
+  assert.ok(out.statement_integrity_receipt.reason_codes.includes('UNVERIFIED_EXTERNAL_EXECUTION_CLAIM'));
+});
