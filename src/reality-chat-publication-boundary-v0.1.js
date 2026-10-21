@@ -9,16 +9,16 @@ function digest(text) {
   return createHash('sha256').update(String(text)).digest('hex');
 }
 
-function allegesExternalCompletion(text) {
+function allegesExternalCompletion(text, actionCandidate) {
   // Covers explicit first-person completed work or inspection claims.
   // This detector is NOT an exhaustive semantic hallucination classifier.
-  const firstPerson = /\b(?:I|we)\s+(?:(?:have|had|already|just)\s+|['’]ve\s+|['’]d\s+)*(?:sent|emailed|posted|published|deleted|updated|deployed|transferred|purchased|paid|scheduled|cancelled|canceled|created|merged|committed|executed|saved|uploaded|downloaded|installed|verified|confirmed|checked|inspected|completed|booked)\b/i;
+  const firstPerson = /\b(?:(?:I|we)\s+(?:(?:have|had|already|just)\s+)*|(?:I|we)['’]ve\s+)(?:sent|emailed|posted|published|deleted|updated|deployed|transferred|purchased|paid|scheduled|cancelled|canceled|created|merged|committed|executed|saved|uploaded|downloaded|installed|verified|confirmed|checked|inspected|completed|booked)\b/i;
   const assertedResult = /\b(?:your|the)\s+(?:email|message|payment|transfer|file|document|record|issue|pull request|deployment|repository|calendar event|booking|reservation|invoice|account|database)\s+(?:(?:has|have)\s+been|was|were|is\s+now)\s+(?:sent|emailed|posted|published|deleted|updated|deployed|transferred|purchased|paid|scheduled|cancelled|canceled|created|merged|committed|executed|saved|uploaded|installed|verified|confirmed|completed|booked)\b/i;
   const doneClaim = /^\s*(?:done|completed|successfully\s+(?:sent|updated|deployed|saved|published|scheduled))\s*[!.,:—-]/i;
-  return firstPerson.test(text) || assertedResult.test(text) || doneClaim.test(text);
+  return firstPerson.test(text) || assertedResult.test(text) || (actionCandidate === true && doneClaim.test(text));
 }
 
-export function enforceChatPublication({ candidateAnswer, executionStatus = 'NOT_EXECUTED' } = {}) {
+export function enforceChatPublication({ candidateAnswer, executionStatus = 'NOT_EXECUTED', actionCandidate = false } = {}) {
   if (executionStatus !== 'NOT_EXECUTED') {
     // Any future tool-executing chat route needs a separate real execution
     // receipt verifier, not a boolean supplied by the model or API caller.
@@ -26,7 +26,7 @@ export function enforceChatPublication({ candidateAnswer, executionStatus = 'NOT
   }
 
   const candidate = typeof candidateAnswer === 'string' ? candidateAnswer : '';
-  const unsupportedCompletion = allegesExternalCompletion(candidate);
+  const unsupportedCompletion = allegesExternalCompletion(candidate, actionCandidate);
   const empty = candidate.trim().length === 0;
   const held = unsupportedCompletion || empty;
   const publishedAnswer = empty
