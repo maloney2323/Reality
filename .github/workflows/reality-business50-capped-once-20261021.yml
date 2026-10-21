@@ -1,0 +1,64 @@
+name: Business50 Reality Astra Capped Fifty Evaluation — Once
+# User authorized this controlled test on 2026-10-21.
+# One-time push trigger (path itself only); then remove push trigger immediately.
+on:
+  push:
+    branches: [fix/governed-verification-and-context-boundary-20261021]
+    paths:
+      - '.github/workflows/reality-business50-capped-once-20261021.yml'
+permissions:
+  contents: read
+concurrency:
+  group: b50-reality-astra-once-20261021
+  cancel-in-progress: false
+jobs:
+  capped-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      B50_GOVERNED_MODE: paid_fifty
+      B50_GOVERNED_CASE: FULL_FIFTY
+      B50_GOVERNED_PAID_APPROVED: YES_EXACT_RUN
+      B50_GOVERNED_MAX_PROVIDER_CALLS: "25"
+      B50_GOVERNED_RECEIPT_PATH: artifacts/reality-business50-governed-capped-20261021.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Require exact frozen 50-case public corpus before any calls
+        run: |
+          echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
+          node --test benchmarks/business50/reality-governed-preflight.test.js
+      - name: Verify model secret is present without printing it
+        run: |
+          if [ -z "${OPENAI_API_KEY:-}" ]; then echo "OPENAI_API_KEY_NOT_CONFIGURED"; exit 2; fi
+      - name: Run same Astra model and scoring with strict 25-call maximum
+        run: node benchmarks/business50/reality-governed-astra.mjs
+      - name: Validate receipts and compare original ungoverned data honestly
+        if: always()
+        run: |
+          if [ -f artifacts/reality-business50-governed-capped-20261021.json ]; then
+            node --input-type=module <<'JS'
+            import {readFileSync} from 'node:fs';
+            const r=JSON.parse(readFileSync('artifacts/reality-business50-governed-capped-20261021.json','utf8'));
+            const x=r.summary||{};
+            if(x.provider_calls>25)throw Error('PROVIDER_CALL_BUDGET_BREACH');
+            console.log(JSON.stringify({run_id:r.run_id,complete:r.complete,case_receipts:r.records?.length,
+              calls:x.provider_calls,classified:x.planned_classified_provider_cases,
+              original_raw_passed:r.original_baseline_passed,
+              published:x.published,governed_scored:x.scored,governed_passed:x.governed_passed,
+              withheld:x.withheld,unclassified:x.unclassified,unresolved:x.unresolved,
+              policy_origin:r.policy_origin,receipt_sha256:r.receipt_sha256,
+              honest_overall_quality_score:'NOT_BLINDED_OR_INDEPENDENTLY_VERIFIED'}));
+            JS
+          fi
+      - name: Preserve original responses, governed receipts and all errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-business50-astra-capped-20261021
+          path: artifacts/reality-business50-governed-capped-20261021.json
+          if-no-files-found: warn
+          retention-days: 30
