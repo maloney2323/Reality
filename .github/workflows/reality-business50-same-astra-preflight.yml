@@ -1,0 +1,51 @@
+name: Business50 Reality Same-Astra Preflight
+on:
+  push:
+    branches: [fix/governed-verification-and-context-boundary-20261021]
+    paths:
+      - 'benchmarks/business50/**'
+      - '.github/workflows/reality-business50-same-astra-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify public cases and identical model request shape
+        run: node --test benchmarks/business50/reality-governed-preflight.test.js
+      - name: Check frozen source SHA256
+        run: |
+          echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
+      - name: Run 50 public packets through independent-from-oracle source-only policy WITHOUT model calls
+        env:
+          B50_GOVERNED_MODE: preflight
+          B50_GOVERNED_CASE: FULL_FIFTY
+          B50_GOVERNED_RECEIPT_PATH: artifacts/reality-b50-50case-zero-cost-preflight.json
+        run: node benchmarks/business50/reality-governed-astra.mjs
+      - name: Verify receipts and forbid paid calls in preflight
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const r=JSON.parse(readFileSync('artifacts/reality-b50-50case-zero-cost-preflight.json','utf8'));
+          if(!r.complete||r.records.length!==50||r.summary.provider_calls!==0||
+             r.records.some(x=>x.model_called||x.governed_score||x.governed_publication)){
+            throw Error('FAILED_CLOSED_ZERO_COST_PREFLIGHT');
+          }
+          console.log(JSON.stringify({cases:r.records.length,classified:r.records.filter(x=>x.source_policy.findings.length>0).length,
+            unclassified:r.summary.unclassified,calls:r.summary.provider_calls,
+            policy_origin:r.policy_origin,receipt_sha256:r.receipt_sha256}));
+          JS
+      - name: Preserve auditable receipts without hidden scorer results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-business50-governed-no-cost-preflight
+          path: artifacts/reality-b50-50case-zero-cost-preflight.json
+          if-no-files-found: warn
+          retention-days: 30
