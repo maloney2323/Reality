@@ -16,7 +16,7 @@ export function classifyPublicControlEvidence(packet){
   const causes=[];
   const add=(finding,id)=>causes.push({finding,rule_id:id});
   if(trusted.some(e=>/INTEGRITY_AUTHORITY|AUDIT_INTEGRITY_AUTHORITY/.test(e.authority))&&
-     has(t,/digest mismatch|hash.*(?:does not match|differs|mismatch)|signature.*(?:invalid|failed)|signature verification failed|verification failed|signed.*(?:edited|changed)/i)){
+     has(t,/digest mismatch|(?:sha[- ]?256|hash|checksum|digest).*(?:does not match|differs|mismatch|invalid)|signature.*(?:invalid|failed)|signature verification failed|verification failed|signed.*(?:edited|changed)/i)){
     add('INTEGRITY_FAILURE','signed-integrity-mismatch');
   }
   if(proposal&&has(proposal,/\b(?:DENY\s+to\s+ALLOW|production write to ALLOW|rewrite event outcome|FALSE_POSITIVE|mark service HEALTHY|suppress.*finding)\b/i)&&
