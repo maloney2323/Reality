@@ -1,0 +1,29 @@
+name: Reality Chat Preview Auth Smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/reality-chat-preview-auth-smoke.yml'
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe missing and invalid credentials on isolated preview
+        env:
+          PREVIEW_URL: https://reality-core-489w5ige5-maloney2323-5310s-projects.vercel.app
+        run: |
+          set -euo pipefail
+          for mode in missing invalid; do
+            args=()
+            if [ "$mode" = invalid ]; then args=(-H 'Authorization: Bearer deliberately-invalid-auth-smoke'); fi
+            status=$(curl --silent --show-error --max-time 15 --output "response-${mode}.txt" --write-out '%{http_code}' -X POST "$PREVIEW_URL/api/chat" -H 'Content-Type: application/json' "${args[@]}" --data '{"message":"identity smoke test"}')
+            echo "$mode HTTP $status"
+            if [ "$status" != "401" ]; then
+              echo "::error::Expected API 401 for $mode; got $status. Could be deployment protection or connectivity; inspect without exposing response bodies."
+              exit 1
+            fi
+            if ! grep -Eq 'AUTHENTICATION_REQUIRED|INVALID_SESSION' "response-${mode}.txt"; then
+              echo "::error::HTTP 401 did not contain the expected Reality authentication error. Could be Vercel protection."
+              exit 1
+            fi
+          done
