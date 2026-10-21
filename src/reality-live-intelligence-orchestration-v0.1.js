@@ -22,6 +22,7 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
+import { enforceChatPublication } from './reality-chat-publication-boundary-v0.1.js';
 import {
   createIntentRecord,
   structureIntent,
@@ -193,9 +194,21 @@ export async function runLiveIntelligenceOrchestration({
     apiKey,
     fetchImpl,
   });
+  // Enforcement before training, continuity writes, or public responses.
+  // This runtime is proposal-only: no action has been executed.
+  const publication = enforceChatPublication({
+    candidateAnswer: cognitiveResult.answer,
+    executionStatus: 'NOT_EXECUTED',
+  });
   const modelResult = {
     ...cognitiveResult,
-    answer: cognitiveResult.answer,
+    answer: publication.answer,
+    // Model-lane analyses are unverified advisory text, never independent
+    // evidence or public claims of reality. Keep only non-content trace IDs.
+    lanes: (cognitiveResult.lanes || []).map(({ name, response_id, model }) => ({
+      name, response_id, model, epistemic_status: 'UNVERIFIED_MODEL_ANALYSIS',
+    })),
+    publication_gate: publication.receipt,
     cognitive_runtime_version: cognitiveResult.runtime_version,
   };
 
