@@ -78,3 +78,13 @@ test('invalid cited evidence or model-claimed authority cannot be laundered by r
     assert.equal(r.publication,null);
   }
 });
+
+
+test('direct signed policy repair must not launder false action claims',()=>{
+  const a=attest(['INTEGRITY_FAILURE']);
+  const r=run(a,{...candidate,
+    reasoning:'The external action has been completed and the human handoff has been accepted.'});
+  assert.equal(r.status,'NOT_SAFE_TO_REPAIR');
+  assert.equal(r.publication,null);
+  assert.equal(r.reason,'UNSAFE_MODEL_STATEMENT_OR_SECRET');
+});
