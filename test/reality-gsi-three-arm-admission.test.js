@@ -68,7 +68,7 @@ function signedOwner(r){
   return {...body,signature:sign(null,Buffer.from(canonicalOwnerConsentMessage(body)),ownerKeys.privateKey).toString('base64')};
 }
 const fakeEvaluation={
-  verdict:'VERIFIED',
+  verdict:'PROVISIONAL_PASS_REQUIRES_EXTERNAL_ATTESTATION',
   evidence:{baseline_id:contract.baseline_id,candidate_id:contract.candidate_id,
     candidate_hash:contract.candidate_hash,governance_kernel_hash:contract.governance_kernel_hash},
   metrics:{hidden_generalization_delta:.2,regression_passed:true,governance_preserved:true}
