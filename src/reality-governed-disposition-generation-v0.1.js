@@ -1,4 +1,4 @@
-import { dispositionDigest, assessProposedDisposition } from './reality-disposition-escalation-contract-v0.1.js';
+import { dispositionDigest, assessProposedDisposition, verifyDispositionPolicyFacts } from './reality-disposition-escalation-contract-v0.1.js';
 
 // Execution path for a real underlying model injected by the trusted server.
 // Candidate generation sees ONLY admitted public facts; the human owner/agent
@@ -22,12 +22,12 @@ export async function runGovernedDispositionGeneration({
     question:publicPacket.question,
     evidence:Object.freeze(publicPacket.evidence.map(x=>Object.freeze({
       id:x.id,source:x.source,authority:x.authority,text:x.text,
+      ...(x.observed_at !== undefined?{observed_at:x.observed_at}:{}),
     }))),
     instructions:'Use only the admitted facts. Cite evidence IDs, preserve uncertainty and never claim external action or authorization.',
   });
   // Validate attestation BEFORE model call, or even a bogus attestation can
   // generate cost and cause output to escape if a caller supplies bad state.
-  const { verifyDispositionPolicyFacts }=await import('./reality-disposition-escalation-contract-v0.1.js');
   const verified=verifyDispositionPolicyFacts({
     workItemId:publicFacts.work_item_id,
     evidence:publicFacts.evidence,
