@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge } from '../src/reality-autonomous-capability-loop-v0.1.js';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, canonicalOwnerWorldlineMergeApprovalMessage,
+  OWNER_WORLDLINE_MERGE_APPROVAL_VERSION } from '../src/reality-autonomous-capability-loop-v0.1.js';
 import { createCapabilityGapProjection, assertCapabilityGapNonAuthoritative } from '../src/reality-capability-gap-projection-v1.js';
 
 const discovery = {
@@ -79,9 +81,39 @@ assert.throws(
   /VERIFIED_SANDBOX_EXPERIMENT_REQUIRED/,
 );
 
+// An owner's cryptographic signature is required even for the legacy
+// capability pathway; a verifier's approved:true statement is not authority.
+const ownerKeys = generateKeyPairSync('ed25519');
+const previousOwnerKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY =
+  ownerKeys.publicKey.export({type:'spki',format:'pem'});
+const approval = {
+  schema: OWNER_WORLDLINE_MERGE_APPROVAL_VERSION,
+  decision: 'APPROVE_CANONICAL_CAPABILITY_MERGE',
+  owner_id: 'test-owner',
+  gap_id: verified.gap_id,
+  capability_id: verified.capability_id,
+  capability_signature: verified.capability_signature,
+  experiment_hash: verified.experiment_hash,
+  verification_hash: verified.verification_hash,
+  primary_worldline_id: verified.primary_worldline_id,
+  ephemeral_worldline_id: verified.ephemeral_worldline_id,
+  target: 'CANONICAL_CAPABILITY_REGISTRY',
+  issued_at: new Date(Date.now()-1000).toISOString(),
+  expires_at: new Date(Date.now()+3600000).toISOString(),
+  nonce: 'capability-gap-v1-test-approval',
+};
+const ownerApproval = {
+  ...approval,
+  signature: sign(null, Buffer.from(canonicalOwnerWorldlineMergeApprovalMessage(approval)),
+    ownerKeys.privateKey).toString('base64'),
+};
 const merged = authorizeWorldlineMerge(verified, {
   mergeVerifier: () => ({ approved: true }),
+  ownerApproval,
 });
+if (previousOwnerKey === undefined) delete process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+else process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY = previousOwnerKey;
 assert.equal(merged.state, 'WORLDLINE_MERGE_PENDING');
 assert.equal(projection.execution_authorized, false);
 
