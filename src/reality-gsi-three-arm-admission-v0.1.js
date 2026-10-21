@@ -48,7 +48,7 @@ export function createThreeArmReport({contract,arms,training_case_ids=[]}={}){
     for(const counter of counters)metrics[counter]=ordered.filter(x=>x[counter]).length;
     metrics.heldout_completed=ordered.filter(x=>contract.heldout_case_ids.includes(x.case_id)&&x.completed).length;
     metrics.total_cases=ordered.length;
-    normalized[phase]={provider:arm.provider,model:arm.model,model_version:arm.model_version,parameters_hash:arm.parameters_hash,case_results:ordered};
+    normalized[phase]={provider:arm.provider,model:arm.model,model_version:arm.model_version,parameters_hash:arm.parameters_hash,tool_manifest_hash:arm.tool_manifest_hash,activated_capability_id:phase==='C_GOVERNED_IMPROVED'?arm.activated_capability_id:null,case_results:ordered};
     measured[phase]=metrics;
   }
   const a=measured.A_BASELINE,b=measured.B_GOVERNED,c=measured.C_GOVERNED_IMPROVED;
