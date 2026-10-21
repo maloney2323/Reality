@@ -52,7 +52,8 @@ function fakePgClient() {
     query:async(sql,args)=>{
       calls.push({sql,args});
       assert.match(sql,/INSERT INTO reality_governance\.owner_approval_consumptions/);
-      assert.match(sql,/ON CONFLICT \(approval_key\) DO NOTHING/);
+      assert.match(sql,/ON CONFLICT DO NOTHING/);
+      assert.doesNotMatch(sql,/ON CONFLICT \(/);
       assert.match(sql,/WHERE \$7::timestamptz > now\(\)/);
       assert.doesNotMatch(sql,/RETURNING/i);
       assert.equal(args.length,7);
