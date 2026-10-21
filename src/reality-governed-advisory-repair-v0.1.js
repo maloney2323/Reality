@@ -3,6 +3,7 @@
 // disposition. The repair is an advisory ONLY and never executes a handoff.
 import {createHash} from 'node:crypto';
 import {assessProposedDisposition} from './reality-disposition-escalation-contract-v0.1.js';
+import {evaluateModelStatementIntegrity} from './reality-statement-integrity-v0.1.js';
 
 export const GOVERNED_REPAIR_VERSION='reality-governed-advisory-repair-v0.1';
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
@@ -15,6 +16,17 @@ export function repairPolicyMisalignedAdvisory({
     policyAttestation,trustedPublicKey:trustedPolicyPublicKey,
     candidateDecision
   }); // verification of signature/scope happens here; invalid signature throws
+  const statementIntegrity=evaluateModelStatementIntegrity(candidateDecision);
+  if(!statementIntegrity.admissible){
+    return Object.freeze({
+      schema:GOVERNED_REPAIR_VERSION,status:'NOT_SAFE_TO_REPAIR',
+      original_disposition:candidateDecision?.disposition??null,
+      required_disposition:assessment.required_disposition,
+      assessment_receipt:assessment,statement_integrity_receipt:statementIntegrity,
+      publication:null,external_action_executed:false,
+      independent_outcome_verified:false,reason:'UNSAFE_MODEL_STATEMENT_OR_SECRET',
+    });
+  }
   const permittedMismatch=new Set([
     'ESCALATION_REQUIRED_NOT_MERELY_BLOCK',
     'PROPOSED_WORKFLOW_DISPOSITION_MISMATCH'
