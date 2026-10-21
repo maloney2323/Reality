@@ -27,21 +27,22 @@ export function createPostgresOwnerApprovalStore({query}={}) {
       'SELECT $1,$2,$3,$4,$5,$6,$7::timestamptz',
       'WHERE $7::timestamptz > now()',
       'ON CONFLICT (approval_key) DO NOTHING',
-      'RETURNING approval_key,binding_sha256',
     ].join(' ');
     const args = [
       input.key, input.binding_sha256, input.owner_id,
       input.purpose, input.subject_ref, input.consent_ref,
       input.expires_at,
     ];
+    // Insert-only database roles must NOT need SELECT or RETURNING rights.
+    // A trusted autocommit PostgreSQL driver provides a server-calculated
+    // command rowCount: exactly 1 for the unique winner, 0 for duplicates/
+    // expired approval. Anything else fails closed without an execution token.
     const result = await query(sql,args);
-    const inserted = result?.rows?.[0];
-    if (inserted &&
-      (result?.rowCount !== 1 || result.rows.length !== 1 ||
-       inserted.approval_key !== input.key ||
-       inserted.binding_sha256 !== input.binding_sha256)) {
-      throw new Error('POSTGRES_OWNER_CONSUMPTION_READBACK_MISMATCH');
+    if (!result || (result.rowCount !== 1 && result.rowCount !== 0) ||
+        (Array.isArray(result.rows) && result.rows.length !== 0)) {
+      throw new Error('POSTGRES_OWNER_CONSUMPTION_ROWCOUNT_INVALID');
     }
+    const inserted = result.rowCount === 1;
     if (inserted) {
       return Object.freeze({
         key:input.key, binding_sha256:input.binding_sha256,
