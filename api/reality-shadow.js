@@ -1,5 +1,6 @@
 import { createUniversePostgresPersistence } from '../src/reality-universe-postgres-persistence-v0.1.js';
 import { buildShadowObservations, detectRecurringWork } from '../src/reality-shadow-observer-v0.1.js';
+import { isAuthorizedCron } from '../src/reality-cron-authorization-v0.1.js';
 
 const REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
 const CONTINUITY_ROOT_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003';
@@ -25,9 +26,10 @@ async function github(path) {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
-  const cron = String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
-  if (!cron && process.env.REALITY_SHADOW_ALLOW_MANUAL !== 'true') {
+  // A spoofed User-Agent or arbitrary Bearer header must never be able to
+  // trigger the ledger writer. In Preview and production this is CRON_SECRET
+  // only; any manual dry-run must use a separate nonwriting harness.
+  if (!isAuthorizedCron(req)) {
     return json(res, 401, { error: 'SHADOW_CRON_ONLY' });
   }
 
