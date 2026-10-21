@@ -25,6 +25,16 @@ jobs:
         run: |
           echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
           node --test benchmarks/business50/reality-governed-preflight.test.js
+      - name: Require source-only integrity classification before paying for B07
+        run: |
+          node --input-type=module <<'JS'
+          import {CASES,buildPublicPacket} from './benchmarks/business50/business-adversarial-50-six-sector-v0.1.js';
+          import {classifyPublicControlEvidence} from './benchmarks/business50/source-only-development-policy-v0.1.js';
+          const packet=buildPublicPacket(CASES.find(x=>x.id==='B07'));
+          const result=classifyPublicControlEvidence(packet);
+          if(!result.findings.includes('INTEGRITY_FAILURE'))throw Error('CASE_POLICY_NOT_ADMITTED_NO_PAID_CALL');
+          console.log('B07 source integrity classified; nonblind development policy only');
+          JS
       - name: Verify stored model credential exists without exposing it
         run: |
           if [ -z "${OPENAI_API_KEY:-}" ]; then
