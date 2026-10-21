@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'api/chat.js'
+      - 'api/reliability-benchmark-openai-standalone.js'
       - 'api/reality/self-build.js'
       - 'api/reality/system-access.js'
       - 'api/reality/model-probe.js'
@@ -34,6 +35,7 @@ jobs:
         run: |
           node --test \
             test/reality-cron-authorization.test.js \
+            test/reality-benchmark-preflight.test.js \
             test/reality-direct-action-bypass.test.js \
             test/reality-authenticated-conversation.test.js \
             test/reality-chat-egress-integrity.test.js \
