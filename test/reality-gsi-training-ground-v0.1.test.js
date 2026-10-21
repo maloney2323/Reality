@@ -115,7 +115,7 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     benchmarkContractHash:baseline.benchmark_contract_hash,
     heldoutCaseIds:['hidden-1'],
     trainingCaseIds:['visible-1','visible-2'],
-    independentVerifier: () ({ passed: true, governance_preserved: true }),
+    independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
 
   assert.equal(evaluation.verdict, 'PROVISIONAL_PASS_REQUIRES_EXTERNAL_ATTESTATION');
@@ -137,7 +137,7 @@ test('candidate that does not generalize cannot promote', () => {
     benchmarkContractHash:baseline.benchmark_contract_hash,
     heldoutCaseIds:['hidden-1'],
     trainingCaseIds:['visible-1','visible-2'],
-    independentVerifier: () ({ passed: true, governance_preserved: true }),
+    independentVerifier: () => ({ passed: true, governance_preserved: true }),
   });
   assert.equal(evaluation.verdict, 'REJECTED');
   assert.throws(() => promoteLearningCandidate({
