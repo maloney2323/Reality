@@ -54,11 +54,12 @@ function fakePgClient() {
       assert.match(sql,/INSERT INTO reality_governance\.owner_approval_consumptions/);
       assert.match(sql,/ON CONFLICT \(approval_key\) DO NOTHING/);
       assert.match(sql,/WHERE \$7::timestamptz > now\(\)/);
+      assert.doesNotMatch(sql,/RETURNING/i);
       assert.equal(args.length,7);
       if(unique.has(args[0]) || new Date(args[6]).valueOf()<=Date.now())
         return {rowCount:0,rows:[]};
       unique.add(args[0]);
-      return {rowCount:1,rows:[{approval_key:args[0],binding_sha256:args[1]}]};
+      return {rowCount:1,rows:[]};
     },
   };
 }
@@ -101,7 +102,7 @@ test('invalid or contradictory insert readback fails closed',async()=>{
     binding_sha256:'c'.repeat(64),
     owner_id:'owner',purpose:'purpose',subject_ref:'subject',consent_ref:'consent',
     expires_at:new Date(Date.now()+60000).toISOString(),
-  }),/POSTGRES_OWNER_CONSUMPTION_READBACK_MISMATCH/);
+  }),/POSTGRES_OWNER_CONSUMPTION_ROWCOUNT_INVALID/);
 });
 test('migration is private, primary-key backed and RLS enabled',()=>{
   const sql=readFileSync('sql/owner_approval_consumptions_v0.1.sql','utf8');
