@@ -1,11 +1,13 @@
 name: Business50 Reality Astra Capped Fifty Evaluation — Once
-# User authorized this controlled test on 2026-10-21.
-# One-time push trigger (path itself only); then remove push trigger immediately.
+# One-time authorized push run already initiated. No automatic repeats.
+# A future run requires a new manual owner approval for the exact cost scope.
 on:
-  push:
-    branches: [fix/governed-verification-and-context-boundary-20261021]
-    paths:
-      - '.github/workflows/reality-business50-capped-once-20261021.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_up_to_25_paid_model_calls:
+        description: 'Type YES_EXACT_RUN to authorize up to 25 new model calls'
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -19,7 +21,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       B50_GOVERNED_MODE: paid_fifty
       B50_GOVERNED_CASE: FULL_FIFTY
-      B50_GOVERNED_PAID_APPROVED: YES_EXACT_RUN
+      B50_GOVERNED_PAID_APPROVED: ${{ inputs.confirm_up_to_25_paid_model_calls }}
       B50_GOVERNED_MAX_PROVIDER_CALLS: "25"
       B50_GOVERNED_RECEIPT_PATH: artifacts/reality-business50-governed-capped-20261021.json
     steps:
