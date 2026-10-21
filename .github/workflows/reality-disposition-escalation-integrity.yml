@@ -4,6 +4,9 @@ on:
     paths:
       - 'src/reality-disposition-escalation-contract-v0.1.js'
       - 'src/reality-governed-disposition-generation-v0.1.js'
+      - 'src/reality-typed-evidence-findings-v0.1*'
+      - 'src/reality-source-scope-uncertainty-v0.1*'
+      - 'src/reality-evidence-bound-decision-v0.1*'
       - 'test/reality-disposition-escalation-contract.test.js'
       - 'test/reality-governed-disposition-generation.test.js'
       - '.github/workflows/reality-disposition-escalation-integrity.yml'
@@ -18,6 +21,8 @@ jobs:
           node-version: 22
       - name: Twelve held-apart development scenarios and adversarial signer tests
         run: node --test test/reality-disposition-escalation-contract.test.js test/reality-governed-disposition-generation.test.js
+      - name: Thirty-two source, uncertainty and typed decision security scenarios
+        run: node --test src/reality-typed-evidence-findings-v0.1.test.js src/reality-source-scope-uncertainty-v0.1.test.js src/reality-evidence-bound-decision-v0.1.test.js
       - name: Check contract syntax
         run: |
           node --check src/reality-disposition-escalation-contract-v0.1.js
