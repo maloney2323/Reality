@@ -28,6 +28,40 @@ function mockFetch(routes) {
   };
 }
 
+
+// Tests never access a real Supabase project. A deliberately reserved
+// example hostname verifies routing without making network calls.
+const initialTarget=process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://synthetic-persistence-a.supabase.co';
+process.on('exit',()=>{
+  if(initialTarget===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_URL=initialTarget;
+});
+
+test('missing implicit database target fails before network and never falls back to production',async()=>{
+  delete process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+  try {
+    await assert.rejects(retrievePersistedUniverse({fetchImpl:async()=>{throw Error('NETWORK_NOT_ALLOWED')}}),
+      /UNIVERSE_PERSISTENCE_TARGET_NOT_CONFIGURED/);
+  } finally {
+    process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://synthetic-persistence-a.supabase.co';
+  }
+});
+test('Preview rejects wrong configured database even if a Supabase secret is present',async()=>{
+  const oldEnv=process.env.VERCEL_ENV;
+  const oldId=process.env.REALITY_PREVIEW_PERSISTENCE_PROJECT_ID;
+  process.env.VERCEL_ENV='preview';
+  process.env.REALITY_PREVIEW_PERSISTENCE_PROJECT_ID='synthetic-isolated-preview';
+  try {
+    await assert.rejects(retrievePersistedUniverse({fetchImpl:async()=>{throw Error('NETWORK_NOT_ALLOWED')}}),
+      /PREVIEW_PERSISTENCE_PROJECT_MISMATCH/);
+  }finally{
+    if(oldEnv===undefined)delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV=oldEnv;
+    if(oldId===undefined)delete process.env.REALITY_PREVIEW_PERSISTENCE_PROJECT_ID;
+    else process.env.REALITY_PREVIEW_PERSISTENCE_PROJECT_ID=oldId;
+  }
+});
 test('round-trips a Universe entry through the persistence adapter', async () => {
   const calls = [];
   const fetchImpl = mockFetch([
