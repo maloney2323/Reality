@@ -1,4 +1,5 @@
 import crypto, { createPublicKey, verify as verifySignature } from 'node:crypto';
+import { verifyOwnerConsent, SANDBOX_CONSENT_SCOPE } from './reality-owner-consent-boundary-v0.1.js';
 
 export const AUTONOMOUS_CAPABILITY_LOOP_VERSION = '0.1.0';
 
@@ -165,6 +166,8 @@ export function createSandboxExperiment({
     attempt_limit: attemptLimit,
     primary_worldline_id: primaryWorldlineId,
     ephemeral_worldline_id: ephemeralWorldlineId,
+    original_work_item_id: confirmedGap.work_item_id,
+    continuity_root_id: confirmedGap.continuity_root_id,
     production_graph_write_permitted: false,
     historical_failure_refs: confirmedGap.frozen_historical_failure_refs,
     capability_contract: confirmedGap.capability_contract,
@@ -180,20 +183,38 @@ export function createSandboxExperiment({
 export function authorizeSandboxExperiment(experiment, {
   authorizationRef,
   authorizedBy,
+  ownerApproval,
 } = {}) {
   if (!experiment?.experiment_hash) throw new Error('SANDBOX_EXPERIMENT_REQUIRED');
   if (!text(authorizationRef)) throw new Error('SANDBOX_AUTHORIZATION_REQUIRED');
   if (!text(authorizedBy)) throw new Error('SANDBOX_AUTHORIZED_BY_REQUIRED');
+  if (!text(experiment.original_work_item_id)) throw new Error('SANDBOX_ORIGINAL_WORK_ITEM_REQUIRED');
+  const signed = verifyOwnerConsent(ownerApproval, {
+    purpose: SANDBOX_CONSENT_SCOPE,
+    subjectRef: experiment.experiment_hash,
+    originalTaskRef: experiment.original_work_item_id,
+    governanceKernelRef: null,
+    consentRef: authorizationRef,
+  });
+  if (signed.owner_id !== authorizedBy) {
+    throw new Error('SANDBOX_OWNER_ID_MISMATCH');
+  }
 
+  // This object is a sandbox proposal. A future sandbox executor must
+  // atomically consume the approval nonce before it runs any candidate code.
   return freeze({
     ...experiment,
     state: 'SANDBOX_SYNTHESIS',
     sandbox_authorization_ref: authorizationRef,
-    sandbox_authorized_by: authorizedBy,
+    sandbox_authorized_by: signed.owner_id,
+    sandbox_authorization_binding_sha256: signed.binding_sha256,
+    sandbox_approval_nonce: signed.nonce,
+    sandbox_owner_consent_consumed: false,
+    sandbox_execution_proven: false,
+    requires_atomic_owner_consent_consumption: true,
     sandbox_authorization_hash: digest({
       experiment_hash: experiment.experiment_hash,
-      authorizationRef,
-      authorizedBy,
+      owner_consent_binding_sha256: signed.binding_sha256,
     }),
   });
 }
