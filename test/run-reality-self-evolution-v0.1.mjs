@@ -1,4 +1,29 @@
 import assert from 'node:assert/strict';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { canonicalOwnerConsentMessage, OWNER_CONSENT_SCHEMA, SANDBOX_CONSENT_SCOPE }
+  from '../src/reality-owner-consent-boundary-v0.1.js';
+
+const ownerKeys = generateKeyPairSync('ed25519');
+const previousOwnerKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY =
+  ownerKeys.publicKey.export({ type: 'spki', format: 'pem' });
+function signOwnerConsent({ purpose, subjectRef, consentRef, nonce }) {
+  const payload = {
+    schema: OWNER_CONSENT_SCHEMA,
+    owner_id: 'human:explicit',
+    purpose,
+    subject_ref: subjectRef,
+    original_task_ref: 'objective:resolve-shipment',
+    governance_kernel_ref: 'sha256:governance-kernel-v1',
+    consent_ref: consentRef,
+    nonce,
+    issued_at: new Date(Date.now() - 1000).toISOString(),
+    expires_at: new Date(Date.now() + 3600000).toISOString(),
+  };
+  return { ...payload, signature: sign(null,
+    Buffer.from(canonicalOwnerConsentMessage(payload)), ownerKeys.privateKey).toString('base64') };
+}
+
 import {
   createEvolutionState,
   detectLimitation,
@@ -81,6 +106,12 @@ state = authorizeUpgradeSandbox({
     approved: true,
     authorization_ref: 'auth:sandbox-001',
     authorized_by: 'human:explicit',
+    owner_approval: signOwnerConsent({
+      purpose: SANDBOX_CONSENT_SCOPE,
+      subjectRef: state.upgrade_proposal_hash,
+      consentRef: 'auth:sandbox-001',
+      nonce: 'consent:sandbox:001'
+    }),
   },
 });
 assert.equal(state.state, 'AWAITING_AUTHORIZATION');
@@ -119,35 +150,24 @@ state = promoteVerifiedUpgrade({
   promotion: {
     approved: true,
     promotion_ref: 'promotion:carrier-status-v1',
-    approved_by: 'promotion-authority:test',
+    approved_by: 'human:explicit',
+    owner_approval: signOwnerConsent({
+      purpose: 'AUTHORIZE_SHADOW_PROMOTION_ONLY',
+      subjectRef: state.upgrade_verification_hash,
+      consentRef: 'promotion:carrier-status-v1',
+      nonce: 'consent:promotion:001'
+    })
   },
 });
-assert.equal(state.state, 'PROMOTED');
-
-state = commitEvolutionLearning({
+assert.equal(state.state, 'PROMOTION_PENDING');
+assert.equal(state.promotion.target, 'SHADOW_ONLY');
+assert.equal(state.promotion.owner_consent_consumed, false);
+assert.equal(state.promotion.requires_atomic_owner_consent_consumption, true);
+assert.throws(() => commitEvolutionLearning({
   evolutionState: state,
-  verifiedOutcome: {
-    id: 'outcome:shipment-8472',
-    kind: 'VERIFIED_OUTCOME',
-  },
-  learningDelta: {
-    learning_delta_id: 'learning_delta:shipment-8472',
-    prior_state_id: 'cognitive_state:baseline',
-    changed_claims: ['shipment status can be resolved from independent carrier readback'],
-    capability_effects: ['carrier-status-lookup'],
-  },
-});
-assert.equal(state.state, 'LEARNING_COMMITTED');
-
-state = replanAfterLearning({
-  evolutionState: state,
-  updatedUniverseState: {
-    state_id: 'cognitive_state:after-learning',
-  },
-});
-assert.equal(state.state, 'REPLANNED');
-assert.equal(state.prior_universe_state_id, 'cognitive_state:baseline');
-assert.equal(state.universe_state_id, 'cognitive_state:after-learning');
+  verifiedOutcome: { id: 'outcome:shipment-8472', kind: 'VERIFIED_OUTCOME' },
+  learningDelta: { learning_delta_id: 'learning_delta:shipment-8472' }
+}), /PROMOTED_UPGRADE_REQUIRED/);
 
 const selection = selectNextEvolution({
   objective,
@@ -206,18 +226,21 @@ assert.throws(() => proposeUpgrade({
   },
 }), /GOVERNANCE_SELF_MODIFICATION_FORBIDDEN/);
 
+const negativeCandidate = proposeUpgrade({
+  evolutionState: ranked,
+  proposal: { id: 'upgrade:test', strategy: 'candidate', capability_signature: 'sig:test' },
+});
 const authorized = authorizeUpgradeSandbox({
-  evolutionState: proposeUpgrade({
-    evolutionState: ranked,
-    proposal: {
-      id: 'upgrade:test',
-      strategy: 'candidate',
-      capability_signature: 'sig:test',
-    },
-  }),
+  evolutionState: negativeCandidate,
   authorization: {
     approved: true,
     authorization_ref: 'auth:test',
+    owner_approval: signOwnerConsent({
+      purpose: SANDBOX_CONSENT_SCOPE,
+      subjectRef: negativeCandidate.upgrade_proposal_hash,
+      consentRef: 'auth:test',
+      nonce: 'consent:sandbox:negative'
+    }),
   },
 });
 const sandbox = beginSandboxExperiment({
@@ -242,4 +265,6 @@ const failed = verifyUpgradeExperiment({
 assert.equal(failed.state, 'BLOCKED');
 assert.equal(failed.block_reason, 'INDEPENDENT_VERIFICATION_FAILED');
 
+if (previousOwnerKey === undefined) delete process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+else process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY = previousOwnerKey;
 console.log('SELF_EVOLUTION_V0_1_PASS');
