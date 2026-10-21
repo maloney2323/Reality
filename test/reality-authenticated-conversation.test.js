@@ -44,7 +44,7 @@ test('100 simulated server turns retrieve the same scoped continuity and never c
   };
   process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
   process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='unit-test-only-key';
-  process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://synthetic-durable-store.example';
+  process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://synthetic-audit-store.supabase.co';
   const ledger=[];
   let modelCalls=0;
   const mockFetch=async(url,options={})=>{
@@ -55,7 +55,7 @@ test('100 simulated server turns retrieve the same scoped continuity and never c
         output_text:'No external outcome is established by this model response.'
       })};
     }
-    if(!url.startsWith('https://synthetic-durable-store.example/rest/v1/reality_universe_entries')){
+    if(!url.startsWith('https://synthetic-audit-store.supabase.co/rest/v1/reality_universe_entries')){
       throw Error('UNEXPECTED_NETWORK_ADDRESS:'+url);
     }
     if(options.method==='POST'){
