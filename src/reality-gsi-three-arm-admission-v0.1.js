@@ -11,11 +11,11 @@ const txt=v=>typeof v==='string'&&v.trim().length>0;
 function stable(x){if(Array.isArray(x))return x.map(stable);if(x&&typeof x==='object')return Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]));return x;}
 export const trainingDigest=x=>createHash('sha256').update(JSON.stringify(stable(x))).digest('hex');
 
-export function freezeThreeArmContract({model,provider,model_version,parameters_hash,benchmark_version,case_ids,heldout_case_ids,scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id}={}){
-  for(const value of [model,provider,model_version,parameters_hash,benchmark_version,scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id])if(!txt(value))throw Error('TRAINING_CONTRACT_FIELD_REQUIRED');
+export function freezeThreeArmContract({model,provider,model_version,parameters_hash,benchmark_version,case_ids,heldout_case_ids,scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id,candidate_hash,baseline_tool_manifest_hash,improved_tool_manifest_hash}={}){
+  for(const value of [model,provider,model_version,parameters_hash,benchmark_version,scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id,candidate_hash,baseline_tool_manifest_hash,improved_tool_manifest_hash])if(!txt(value))throw Error('TRAINING_CONTRACT_FIELD_REQUIRED');
   if(!Array.isArray(case_ids)||!case_ids.length||case_ids.some(x=>!txt(x))||new Set(case_ids).size!==case_ids.length)throw Error('TRAINING_CASE_IDS_INVALID');
   if(!Array.isArray(heldout_case_ids)||!heldout_case_ids.length||heldout_case_ids.some(x=>!case_ids.includes(x))||new Set(heldout_case_ids).size!==heldout_case_ids.length)throw Error('TRAINING_HELDOUT_IDS_INVALID');
-  const body={version:TRAINING_ADMISSION_VERSION,provider,model,model_version,parameters_hash,benchmark_version,case_ids:[...case_ids],heldout_case_ids:[...heldout_case_ids],scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id};
+  const body={version:TRAINING_ADMISSION_VERSION,provider,model,model_version,parameters_hash,benchmark_version,case_ids:[...case_ids],heldout_case_ids:[...heldout_case_ids],scorer_hash,seed,governance_kernel_hash,allowed_candidate_capability,baseline_id,candidate_id,candidate_hash,baseline_tool_manifest_hash,improved_tool_manifest_hash};
   return Object.freeze({...body,contract_hash:trainingDigest(body)});
 }
 
@@ -32,6 +32,8 @@ export function createThreeArmReport({contract,arms,training_case_ids=[]}={}){
     const arm=arms[phase];
     if(!arm||arm.provider!==contract.provider||arm.model!==contract.model||
        arm.model_version!==contract.model_version||arm.parameters_hash!==contract.parameters_hash)throw Error('UNDERLYING_MODEL_PARITY_FAILED');
+    if(arm.tool_manifest_hash!==(phase==='C_GOVERNED_IMPROVED'?contract.improved_tool_manifest_hash:contract.baseline_tool_manifest_hash))throw Error('TRAINING_TOOLS_NOT_DISCLOSED_OR_NOT_PARITY');
+    if(phase==='C_GOVERNED_IMPROVED'&&arm.activated_capability_id!==contract.allowed_candidate_capability)throw Error('UNDECLARED_CAPABILITY_UPGRADE');
     if(!Array.isArray(arm.case_results)||arm.case_results.length!==caseOrder.length)throw Error('ARM_CASE_PARITY_FAILED');
     const caseMap=new Map();
     for(const result of arm.case_results){
@@ -71,7 +73,7 @@ export function createThreeArmReport({contract,arms,training_case_ids=[]}={}){
     no_false_block_regression:c.false_block<=b.false_block,
   };
   const body={version:TRAINING_ADMISSION_VERSION,contract_hash:contract.contract_hash,
-    baseline_id:contract.baseline_id,candidate_id:contract.candidate_id,
+    baseline_id:contract.baseline_id,candidate_id:contract.candidate_id,candidate_hash:contract.candidate_hash,
     governance_kernel_hash:contract.governance_kernel_hash,
     phases:normalized,reported_metrics:measured,reported_deltas:gains,admission_checks:checks};
   return Object.freeze({...body,report_hash:trainingDigest(body),
@@ -93,8 +95,8 @@ export function canonicalTrainingAttestation(attestation){
   });
 }
 
-export function verifyThreeArmAdmission({report,attestation,baseline_id,candidate_id}={}){
-  if(!report||report.version!==TRAINING_ADMISSION_VERSION||!report.report_hash||report.baseline_id!==baseline_id||report.candidate_id!==candidate_id)throw Error('TRAINING_ADMISSION_SCOPE_MISMATCH');
+export function verifyThreeArmAdmission({report,attestation,baseline_id,candidate_id,candidate_hash}={}){
+  if(!report||report.version!==TRAINING_ADMISSION_VERSION||!report.report_hash||report.baseline_id!==baseline_id||report.candidate_id!==candidate_id||report.candidate_hash!==candidate_hash)throw Error('TRAINING_ADMISSION_SCOPE_MISMATCH');
   const {report_hash,evidence_status,candidate_activation_authorized,...body}=report;
   if(trainingDigest(body)!==report_hash)throw Error('TRAINING_REPORT_TAMPERED');
   if(Object.values(report.admission_checks||{}).some(x=>x!==true)||Object.keys(report.admission_checks||{}).length!==8)throw Error('TRAINING_GENERALIZATION_OR_SAFETY_GATE_FAILED');
