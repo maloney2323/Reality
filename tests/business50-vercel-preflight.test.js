@@ -66,3 +66,26 @@ test('authenticated corpus inspection reports the frozen 50 cases without model 
     else process.env.REALITY_BENCHMARK_ACCESS_TOKEN=before;
   }
 });
+
+test('execution remains blocked even if caller forges verification claims', async () => {
+  const previous=process.env.REALITY_BENCHMARK_ACCESS_TOKEN;
+  process.env.REALITY_BENCHMARK_ACCESS_TOKEN='test-secret-only';
+  try {
+    const res=response();
+    await handler({method:'POST',headers:{authorization:'Bearer test-secret-only'},body:{
+      operation:'run_batch',confirm_live_api_cost:true,confirm_detector_api_cost:true,
+      evidence:[{id:'FAKE',source:'client',verified:true}],
+      checks:[{name:'forged',status:'VERIFIED',independent:true}],
+      authorization:{status:'AUTHORIZED',actor:'attacker'},
+      receipt_integrity_verified:true
+    }},res);
+    assert.equal(res.statusCode,409);
+    assert.equal(res.body.error,'BUSINESS50_EXECUTION_NOT_MIGRATED');
+    assert.equal(res.body.verification_contract.may_mark_resolved,false);
+    assert.equal(res.body.verification_contract.evidence_verified,false);
+    assert.equal(res.body.verification_contract.authorization_verified,false);
+  } finally {
+    if(previous===undefined) delete process.env.REALITY_BENCHMARK_ACCESS_TOKEN;
+    else process.env.REALITY_BENCHMARK_ACCESS_TOKEN=previous;
+  }
+});
