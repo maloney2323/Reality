@@ -1,0 +1,43 @@
+name: Business50 Reality Astra Single-Case Pilot
+on:
+  push:
+    branches: [fix/governed-verification-and-context-boundary-20261021]
+    paths:
+      - '.github/workflows/reality-business50-astra-one-case-pilot.yml'
+permissions:
+  contents: read
+jobs:
+  single-controlled-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      B50_GOVERNED_MODE: paid_one
+      B50_GOVERNED_CASE: B07
+      B50_GOVERNED_PAID_APPROVED: YES_EXACT_RUN
+      B50_GOVERNED_RECEIPT_PATH: artifacts/reality-business50-astra-B07-once.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact frozen corpus and same-model request before cost
+        run: |
+          echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
+          node --test benchmarks/business50/reality-governed-preflight.test.js
+      - name: Verify stored model credential exists without exposing it
+        run: |
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "No GitHub OPENAI_API_KEY secret configured; no paid call made."
+            exit 2
+          fi
+      - name: Run exactly one original Astra request through Reality (B07)
+        run: node benchmarks/business50/reality-governed-astra.mjs
+      - name: Preserve full raw and governed receipts even on error
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-astra-governed-B07-one-call-receipts
+          path: artifacts/reality-business50-astra-B07-once.json
+          if-no-files-found: warn
+          retention-days: 30
