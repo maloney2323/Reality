@@ -17,6 +17,8 @@ on:
       - 'src/reality-cron-authorization-v0.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'src/reality-authenticated-conversation-v0.1.js'
+      - 'src/reality-native-universe-persistence-v1.0.js'
+      - 'test/reality-native-universe-persistence-v1.0.test.js'
       - 'test/reality-cron-authorization.test.js'
       - 'test/reality-direct-action-bypass.test.js'
       - 'test/reality-authenticated-conversation.test.js'
@@ -39,6 +41,7 @@ jobs:
             test/reality-benchmark-preflight.test.js \
             test/reality-direct-action-bypass.test.js \
             test/reality-authenticated-conversation.test.js \
+            test/reality-native-universe-persistence-v1.0.test.js \
             test/reality-chat-egress-integrity.test.js \
             test/reality-live-intelligence-orchestration-v0.1.test.js \
             test/reality-vercel-runtime-route-imports.test.js
