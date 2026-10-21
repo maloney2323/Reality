@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
+import { canonicalOwnerConsentMessage, OWNER_CONSENT_SCHEMA, SANDBOX_CONSENT_SCOPE } from '../src/reality-owner-consent-boundary-v0.1.js';
 import {
   detectCapabilityGap,confirmCapabilityGap,createSandboxExperiment,
   authorizeSandboxExperiment,validateSandboxResult,authorizeWorldlineMerge,
@@ -24,7 +25,18 @@ const confirmed=confirmCapabilityGap(detected,{
   historicalFailureRefs:['fail:89'],verificationSuiteRef:'suite:89',
 });
 const experiment=createSandboxExperiment({confirmedGap:confirmed,primaryWorldlineId:'world:89'});
-const sandbox=authorizeSandboxExperiment(experiment,{authorizationRef:'test-sandbox-auth:89',authorizedBy:'test-owner'});
+const sandboxApproval={
+  schema:OWNER_CONSENT_SCHEMA, owner_id:'test-owner', purpose:SANDBOX_CONSENT_SCOPE,
+  subject_ref:experiment.experiment_hash, original_task_ref:experiment.original_work_item_id,
+  governance_kernel_ref:null, consent_ref:'test-sandbox-auth:89',
+  issued_at:new Date(Date.now()-1000).toISOString(), expires_at:new Date(Date.now()+3600000).toISOString(),
+  nonce:'sandbox:89',
+};
+const sandbox=authorizeSandboxExperiment(experiment,{
+  authorizationRef:'test-sandbox-auth:89',authorizedBy:'test-owner',
+  ownerApproval:{...sandboxApproval,signature:sign(null,
+    Buffer.from(canonicalOwnerConsentMessage(sandboxApproval)),keys.privateKey).toString('base64')},
+});
 const verified=validateSandboxResult(sandbox,{
   synthesizedCapability:{id:'reader:customer-89'},
   frozenRegression:{passed:true},
@@ -88,17 +100,17 @@ test('without pinned owner verification key, merge is blocked',()=>{
   try{ assert.throws(()=>plan(),/WORLDLINE_TRUSTED_OWNER_SIGNATURE_REQUIRED/); }
   finally{process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY=trusted;}
 });
-test('unsigned fake readback cannot register capability',()=>{
+test('unsigned fake readback cannot register capability',async()=>{
   const proposed=plan();
   let calls=0;
   const registry={register:()=>{calls++;return {registered:true}}};
-  assert.throws(()=>registerVerifiedCapability(proposed,{
+  await assert.rejects(()=>registerVerifiedCapability(proposed,{
     capabilityRegistry:registry,
     mergeResult:{merged:true},
   }),/WORLDLINE_MERGE_INDEPENDENT_READBACK_REQUIRED/);
   assert.equal(calls,0);
 });
-test('mismatching provider merge readback is rejected before registry write',()=>{
+test('mismatching provider merge readback is rejected before registry write',async()=>{
   const proposed=plan();
   let calls=0;
   const registry={register:()=>{calls++;return {registered:true}}};
@@ -118,14 +130,14 @@ test('mismatching provider merge readback is rejected before registry write',()=
     {independent:false},
     {readback_observation_id:''},
   ]) {
-    assert.throws(()=>registerVerifiedCapability(proposed,{
+    await assert.rejects(()=>registerVerifiedCapability(proposed,{
       capabilityRegistry:registry,
       mergeResult:{...base,...patch}
     }),/WORLDLINE_MERGE_INDEPENDENT_READBACK_REQUIRED/);
   }
   assert.equal(calls,0);
 });
-test('signed proposal plus bound simulated independent readback admits registry adapter',()=>{
+test('signed proposal plus bound simulated independent readback admits registry adapter',async()=>{
   const proposed=plan();
   let calls=0;
   const registry={register:(args)=>{
@@ -134,8 +146,11 @@ test('signed proposal plus bound simulated independent readback admits registry 
     assert.equal(args.worldline_id,proposed.ephemeral_worldline_id);
     return {registered:true,receipt:'unit-test-only'};
   }};
-  const result=registerVerifiedCapability(proposed,{
+  const simulatedDurableStore={kind:'TRUSTED_DURABLE_OWNER_APPROVAL_STORE',
+    consumeOnce:async req=>({...req,durable:true,atomic:true,consumed:true,already_used:false,record_ref:'local-store-receipt:89'})};
+  const result=await registerVerifiedCapability(proposed,{
     capabilityRegistry:registry,
+    approvalStore:simulatedDurableStore,
     mergeResult:{
       merged:true,independent:true,readback_verified:true,
       verification_hash:proposed.verification_hash,
@@ -148,4 +163,5 @@ test('signed proposal plus bound simulated independent readback admits registry 
   assert.equal(calls,1);
   assert.equal(result.state,'REGISTERED');
   assert.equal(result.registration.registered,true);
+  assert.equal(result.owner_approval_consumption_ref,'local-store-receipt:89');
 });
