@@ -12,7 +12,11 @@ export const TRAINING_GROUND_INVARIANTS = Object.freeze({
   promotion_requires_measured_generalization:true, failed_candidate_cannot_promote:true,
   learner_provider_is_replaceable:true, benchmark_contract_is_immutable:true,
   evaluation_identity_is_sealed:true, contamination_is_rejected:true,
-  baseline_is_reproducible:true, learning_lineage_is_complete:true
+  baseline_is_reproducible:true, learning_lineage_is_complete:true,
+  a_b_c_same_agent_comparison_required:true,
+  independent_three_arm_evaluator_signature_required:true,
+  owner_signed_shadow_approval_required:true,
+  no_automatic_activation_from_training_score:true
 });
 function clone(v){return v==null?v:JSON.parse(JSON.stringify(v));}
 function stable(v){if(v===null||typeof v!=='object')return v;if(Array.isArray(v))return v.map(stable);return Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])]));}
