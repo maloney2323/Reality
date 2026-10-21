@@ -251,8 +251,14 @@ export async function runLiveIntelligenceOrchestration({
   if (materiality === 'ACTION_CANDIDATE') {
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
+    // The admitted original request is evidence of the user's intent, NOT
+    // independent evidence that any external-world effect occurred. The old
+    // signal_hash field was absent from the current signal packet, causing
+    // this state machine to skip EVIDENCE_ESTABLISHED and throw on action requests.
+    const originalRequestDigest = governedSignal?.packet?.raw_content_digest;
+    if (!originalRequestDigest) throw new Error('RAW_USER_REQUEST_EVIDENCE_REQUIRED');
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      { ref: originalRequestDigest, kind: 'RAW_USER_REQUEST', authority: 'INTENT_ONLY_NOT_WORLD_FACT' },
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -273,10 +279,10 @@ export async function runLiveIntelligenceOrchestration({
         materiality: 'ACTION_CANDIDATE',
       },
       evidence,
-      missingEvidence: evidence.length ? [] : ['Independent supporting evidence is not yet attached.'],
+      missingEvidence: ['Independent evidence of the external result is not yet attached. The raw user request establishes intent only.'],
       uncertainty: {
-        state: evidence.length ? 'ASSESSED' : 'MISSING_EVIDENCE',
-        confidence: evidence.length ? 'SUPPORTED_BY_RECORDED_SIGNAL' : null,
+        state: 'MISSING_EXTERNAL_EVIDENCE',
+        confidence: null,
         known_unknowns: ['The intended external effect must not be inferred from model output alone.'],
         blocking_questions: ['What exact action, connector, target, and authorization scope apply?'],
       },
@@ -296,11 +302,9 @@ export async function runLiveIntelligenceOrchestration({
     situation = transitionOperationalSituation(situation, 'SITUATION_CREATED', {
       reason: 'ACTION_CANDIDATE_REQUIRES_GOVERNED_SITUATION',
     });
-    if (evidence.length) {
-      situation = transitionOperationalSituation(situation, 'EVIDENCE_ESTABLISHED', {
-        reason: 'LIVE_SIGNAL_AND_CONNECTED_WORLD_EVIDENCE_ATTACHED',
-      });
-    }
+    situation = transitionOperationalSituation(situation, 'EVIDENCE_ESTABLISHED', {
+      reason: 'ORIGINAL_REQUEST_ADMITTED_AS_INTENT_ONLY_NOT_EXTERNAL_PROOF',
+    });
     situation = transitionOperationalSituation(situation, 'UNCERTAINTY_ASSESSED', {
       reason: 'AUTHORITY_AND_EXTERNAL_EFFECT_REMAIN_UNRESOLVED',
     });
