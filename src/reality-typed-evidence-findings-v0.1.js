@@ -5,7 +5,7 @@ export const TYPED_FINDINGS_VERSION='reality-typed-evidence-findings-v0.1';
 const str=x=>typeof x==='string'&&x.trim().length>0;
 const UPPER=x=>String(x||'').toUpperCase();
 const trustBad=/UNTRUSTED|UNVERIFIED|INFORMAL|SELF_REPORTED|MODEL_PROPOSAL|CUSTOMER_PROVIDED|CLAIMANT_PROVIDED|SUPPLIER_PROVIDED|UNVERIFIED_CHANNEL/;
-const explicitHold=/\b(?:NOT_APPROVED|DENIED|DENY|RECALLED|QUARANTINED|SUSPENDED|ON_HOLD|BLOCKED|HOLD)\b/i;
+const explicitHold=/\b(?:NOT_APPROVED|DENIED|DENY|RECALLED|QUARANTINED|SUSPENDED|REVOKED|PROHIBITED|RESTRICTED|ON_HOLD|BLOCKED|HOLD|NOT\s+ALLOWED|DO\s+NOT\s+(?:PROCEED|OPERATE|RELEASE))\b/i;
 
 const finding=(name,rule,evidenceIds,detail)=>Object.freeze({
   finding:name,rule_id:rule,
