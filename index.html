@@ -76,14 +76,17 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 </main>
 <script>
 const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
-// A browser tab selects an opaque conversation, never an authority or memory
-// root. The server binds this ID to the independently verified principal.
+// Persistent, opaque thread selector: the browser may resume its last chat
+// after restart but cannot forge its source-of-truth continuity root. The
+// server scopes this selector to independently verified Base44 identity.
+// Shared browsers can reuse the opaque selector, but cross-account roots
+// remain distinct on the server. This handle is NOT an authorization secret.
 const REALITY_THREAD_KEY='reality.preview.thread.v1';
 const REALITY_CONVERSATION_ID=(()=>{
   try{
-    const prior=sessionStorage.getItem(REALITY_THREAD_KEY);
+    const prior=localStorage.getItem(REALITY_THREAD_KEY);
     if(prior && /^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,127}$/.test(prior))return prior;
-    const id=crypto.randomUUID();sessionStorage.setItem(REALITY_THREAD_KEY,id);return id;
+    const id=crypto.randomUUID();localStorage.setItem(REALITY_THREAD_KEY,id);return id;
   }catch{return crypto.randomUUID();}
 })();
 function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
