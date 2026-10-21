@@ -345,9 +345,10 @@ export function authorizeWorldlineMerge(verifiedExperiment, {
   });
 }
 
-export function registerVerifiedCapability(verifiedExperiment, {
+export async function registerVerifiedCapability(verifiedExperiment, {
   capabilityRegistry,
   mergeResult,
+  approvalStore,
 } = {}) {
   if (!verifiedExperiment?.verification_hash) throw new Error('VERIFIED_SANDBOX_EXPERIMENT_REQUIRED');
   if (verifiedExperiment.state !== 'WORLDLINE_MERGE_PENDING') {
@@ -373,8 +374,37 @@ export function registerVerifiedCapability(verifiedExperiment, {
   if (!capabilityRegistry || typeof capabilityRegistry.register !== 'function') {
     throw new Error('CAPABILITY_REGISTRY_REQUIRED');
   }
+  if (!approvalStore ||
+      approvalStore.kind !== 'TRUSTED_DURABLE_OWNER_APPROVAL_STORE' ||
+      typeof approvalStore.consumeOnce !== 'function') {
+    throw new Error('DURABLE_APPROVAL_STORE_REQUIRED');
+  }
 
-  const registration = capabilityRegistry.register({
+  // Atomic compare-and-insert must happen BEFORE any capability registry
+  // mutation. The owner signature is revalidated at time of execution.
+  const approval = verifiedExperiment.owner_merge_approval;
+  const consumptionKey = 'owner-consent:' + crypto.createHash('sha256')
+    .update(JSON.stringify([approval.owner_id, approval.decision, approval.nonce])).digest('hex');
+  const bindingHash = crypto.createHash('sha256')
+    .update(canonicalOwnerWorldlineMergeApprovalMessage(approval)).digest('hex');
+  const consumed = await approvalStore.consumeOnce({
+    key: consumptionKey,
+    binding_sha256: bindingHash,
+    owner_id: approval.owner_id,
+    purpose: approval.decision,
+    subject_ref: verifiedExperiment.verification_hash,
+    consent_ref: approval.experiment_hash,
+    expires_at: approval.expires_at,
+  });
+  if (consumed?.key !== consumptionKey ||
+      consumed?.binding_sha256 !== bindingHash ||
+      consumed?.durable !== true || consumed?.atomic !== true ||
+      consumed?.consumed !== true || consumed?.already_used === true ||
+      !text(consumed?.record_ref)) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_NOT_ATOMICALLY_CONSUMED');
+  }
+
+  const registration = await capabilityRegistry.register({
     capability: verifiedExperiment.synthesized_capability,
     signature: verifiedExperiment.capability_signature,
     verification_hash: verifiedExperiment.verification_hash,
@@ -388,6 +418,8 @@ export function registerVerifiedCapability(verifiedExperiment, {
     registration,
     verification_hash: verifiedExperiment.verification_hash,
     capability_signature: verifiedExperiment.capability_signature,
+    owner_approval_consumption_ref: consumed.record_ref,
+    owner_approval_binding_sha256: bindingHash,
   });
 }
 
