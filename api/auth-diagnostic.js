@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   }
   if (req.method === 'OPTIONS') return res.status(origin === ALLOWED_ORIGIN ? 204 : 403).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'METHOD_NOT_ALLOWED' });
+  if (process.env.VERCEL_ENV === 'production') return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const requestId = randomUUID();
   try {
     await verifyBase44Principal(req);
