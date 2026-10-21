@@ -3,6 +3,8 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, canonicalOwnerWorldlineMergeApprovalMessage,
   OWNER_WORLDLINE_MERGE_APPROVAL_VERSION } from '../src/reality-autonomous-capability-loop-v0.1.js';
 import { createCapabilityGapProjection, assertCapabilityGapNonAuthoritative } from '../src/reality-capability-gap-projection-v1.js';
+import { canonicalOwnerConsentMessage, OWNER_CONSENT_SCHEMA, SANDBOX_CONSENT_SCOPE }
+  from '../src/reality-owner-consent-boundary-v0.1.js';
 
 const discovery = {
   id: 'discovery:test:missing-capability',
@@ -49,10 +51,34 @@ assert.throws(
   /SANDBOX_AUTHORIZATION_REQUIRED/,
 );
 
+const ownerKeys = generateKeyPairSync('ed25519');
+const previousOwnerKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY =
+  ownerKeys.publicKey.export({type:'spki',format:'pem'});
+const sandboxApprovalPayload = {
+  schema: OWNER_CONSENT_SCHEMA,
+  owner_id: 'owner:test',
+  purpose: SANDBOX_CONSENT_SCOPE,
+  subject_ref: experiment.experiment_hash,
+  original_task_ref: experiment.original_work_item_id,
+  governance_kernel_ref: null,
+  consent_ref: 'auth:sandbox-test',
+  issued_at: new Date(Date.now()-1000).toISOString(),
+  expires_at: new Date(Date.now()+3600000).toISOString(),
+  nonce: 'legacy-sandbox-consent:01',
+};
+const sandboxOwnerApproval = {
+  ...sandboxApprovalPayload,
+  signature: sign(null, Buffer.from(canonicalOwnerConsentMessage(sandboxApprovalPayload)),
+    ownerKeys.privateKey).toString('base64'),
+};
 const authorized = authorizeSandboxExperiment(experiment, {
   authorizationRef: 'auth:sandbox-test',
   authorizedBy: 'owner:test',
+  ownerApproval: sandboxOwnerApproval,
 });
+assert.equal(authorized.sandbox_owner_consent_consumed, false);
+assert.equal(authorized.requires_atomic_owner_consent_consumption, true);
 
 const failedVerification = {
   frozen_regression: { passed: false },
@@ -83,10 +109,6 @@ assert.throws(
 
 // An owner's cryptographic signature is required even for the legacy
 // capability pathway; a verifier's approved:true statement is not authority.
-const ownerKeys = generateKeyPairSync('ed25519');
-const previousOwnerKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
-process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY =
-  ownerKeys.publicKey.export({type:'spki',format:'pem'});
 const approval = {
   schema: OWNER_WORLDLINE_MERGE_APPROVAL_VERSION,
   decision: 'APPROVE_CANONICAL_CAPABILITY_MERGE',
