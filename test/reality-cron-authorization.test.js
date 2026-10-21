@@ -51,9 +51,9 @@ test('shift read cannot use spoofed cron header to reach database',async()=>{
   process.env.CRON_SECRET=secret;
   try{
     const output=res();
-    await shiftHandler(getReq('Bearer wrong','vercel-cron/1.0'),output);
+    await shiftHandler(getReq('','vercel-cron/1.0'),output);
     assert.equal(output.statusCode,401);
-    assert.equal(output.body.error,'INVALID_SESSION');
+    assert.equal(output.body.error,'AUTHENTICATION_REQUIRED');
   }finally{
     if(saved===undefined)delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET=saved;
