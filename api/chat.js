@@ -1,5 +1,5 @@
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../src/reality-base44-principal-v0.1.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,11 +17,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const principal = getOrCreateSessionPrincipal(req, res);
+    // The public request body never supplies authoritative system, universe,
+    // or continuity state. Trusted evidence must be admitted server-side.
+    const principal = await verifyBase44Principal(req);
+    if (req.body?.systemContext != null) {
+      return res.status(400).json({
+        ok: false, error: 'UNTRUSTED_SYSTEM_CONTEXT_REJECTED',
+        message: 'System and continuity context requires trusted server-side evidence admission.',
+      });
+    }
     const result = await runLiveIntelligenceOrchestration({
       message: req.body?.message,
       requestedBy: principal.principal_id,
-      systemContext: req.body?.systemContext || null,
+      systemContext: null,
     });
 
     return res.status(200).json({
