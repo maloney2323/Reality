@@ -5,10 +5,12 @@ on:
     paths:
       - 'src/reality-gsi-training-ground-v0.1.js'
       - 'src/reality-gsi-three-arm-admission-v0.1.js'
+      - 'src/reality-gsi-four-arm-capability-report-v0.1.js'
       - 'src/reality-owner-consent-boundary-v0.1.js'
       - 'test/reality-gsi-training-ground-v0.1.test.js'
       - 'test/reality-gsi-training-ground-v1.0.test.js'
       - 'test/reality-gsi-three-arm-admission.test.js'
+      - 'test/reality-gsi-four-arm-capability-report.test.js'
       - '.github/workflows/reality-training-ground-admission.yml'
   workflow_dispatch:
 
@@ -20,5 +22,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Show Node runtime
         run: node --version
-      - name: Enforce both historic suites and independent A/B/C admission
+      - name: Enforce historic training suites and A/B/C admission
         run: node --test test/reality-gsi-training-ground-v0.1.test.js test/reality-gsi-training-ground-v1.0.test.js test/reality-gsi-three-arm-admission.test.js
+      - name: Test standard guardrails comparator and agent capability report
+        run: node --test test/reality-gsi-four-arm-capability-report.test.js
