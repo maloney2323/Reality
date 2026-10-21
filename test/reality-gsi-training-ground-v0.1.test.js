@@ -28,6 +28,7 @@ const baseline = freezeBaseline({
   hiddenCaseIds: ['hidden-1'],
   governanceKernelHash: 'kernel:v1',
   baselineResults: { visible: { quality: 0.50 }, hidden: { quality: 0.50 } },
+  seed: 'reconciled-v0-frozen-seed',
 });
 
 test('training ground exposes non-negotiable invariants', () => {
@@ -53,6 +54,7 @@ test('verified experience creates an evidence-grounded learning signal', () => {
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:1' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:1' },
+    independentVerifierRef:'unit-test-evaluator',
     corrections: [{ kind: 'verified_correction' }],
   });
   assert.equal(signal.truth_status, 'EVIDENCE_GROUNDED');
@@ -69,6 +71,7 @@ test('sandbox cannot modify governance or authority', () => {
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:2' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:2' },
+    independentVerifierRef:'unit-test-evaluator',
   });
   assert.throws(() => runSandboxLearning({
     baseline,
@@ -91,6 +94,7 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
     episodeId: episode.episode_id,
     sourceObservations: [{ id: 'obs:3' }],
     verifiedOutcome: { status: 'VERIFIED', id: 'outcome:3' },
+    independentVerifierRef:'unit-test-evaluator',
   });
   const sandbox = runSandboxLearning({
     baseline,
@@ -103,21 +107,23 @@ test('candidate must beat baseline on hidden evaluation and independent verifica
 
   const evaluation = independentlyEvaluateCandidate({
     baseline,
-    candidate: sandbox.candidate,
+    candidate: {...sandbox.candidate,candidate_hash:sandbox.candidate_hash},
     candidateResults: { quality: 0.60 },
     hiddenResults: { quality: 0.61 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
-    independentVerifier: () => ({ passed: true, governance_preserved: true }),
+    benchmarkContractHash:baseline.benchmark_contract_hash,
+    heldoutCaseIds:['hidden-1'],
+    trainingCaseIds:['visible-1','visible-2'],
+    independentVerifier: () ({ passed: true, governance_preserved: true }),
   });
 
-  assert.equal(evaluation.verdict, 'VERIFIED');
-  const promotion = promoteLearningCandidate({
-    evaluation,
-    promotionAuthority: { approved: true, authorized_by: 'human:test' },
-    promotionRef: 'promotion:test',
-  });
-  assert.equal(promotion.state, 'PROMOTED');
+  assert.equal(evaluation.verdict, 'PROVISIONAL_PASS_REQUIRES_EXTERNAL_ATTESTATION');
+  assert.equal(evaluation.independent_real_agent_evidence_established,false);
+  assert.throws(()=>promoteLearningCandidate({
+    evaluation,promotionAuthority:{approved:true,authorized_by:'human:test'},
+    promotionRef:'promotion:test',
+  }),/TRAINING_ADMISSION_SCOPE_MISMATCH/);
 });
 
 test('candidate that does not generalize cannot promote', () => {
@@ -128,12 +134,15 @@ test('candidate that does not generalize cannot promote', () => {
     hiddenResults: { quality: 0.49 },
     regressionResults: { passed: true },
     governanceKernelHash: 'kernel:v1',
-    independentVerifier: () => ({ passed: true, governance_preserved: true }),
+    benchmarkContractHash:baseline.benchmark_contract_hash,
+    heldoutCaseIds:['hidden-1'],
+    trainingCaseIds:['visible-1','visible-2'],
+    independentVerifier: () ({ passed: true, governance_preserved: true }),
   });
   assert.equal(evaluation.verdict, 'REJECTED');
   assert.throws(() => promoteLearningCandidate({
     evaluation,
     promotionAuthority: { approved: true },
     promotionRef: 'promotion:bad',
-  }), /CANDIDATE_NOT_VERIFIED/);
+  }), /CANDIDATE_NOT_PROVISIONALLY_PASSED/);
 });
