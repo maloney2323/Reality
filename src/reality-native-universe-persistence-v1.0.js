@@ -11,8 +11,24 @@ function persistenceKey() {
 }
 
 function endpoint(path = '') {
-  const base = process.env.REALITY_UNIVERSE_PERSISTENCE_URL || 'https://qkzvjfiegihyaoabiniy.supabase.co';
-  return base.replace(/\/$/, '') + path;
+  // No implicit production database target. Preview tests must explicitly
+  // name their isolated project; secret presence alone never selects a DB.
+  const base = process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+  if (!base) throw new Error('UNIVERSE_PERSISTENCE_TARGET_NOT_CONFIGURED');
+  let target;
+  try { target = new URL(base); } catch { throw new Error('UNIVERSE_PERSISTENCE_TARGET_INVALID'); }
+  if (target.protocol !== 'https:' || !/^[a-z0-9-]+\.supabase\.co$/.test(target.hostname) ||
+      target.username || target.password || target.search || target.hash ||
+      target.pathname !== '/') {
+    throw new Error('UNIVERSE_PERSISTENCE_TARGET_INVALID');
+  }
+  if (process.env.VERCEL_ENV === 'preview') {
+    const approvedId = process.env.REALITY_PREVIEW_PERSISTENCE_PROJECT_ID;
+    if (!approvedId || target.hostname !== approvedId + '.supabase.co') {
+      throw new Error('PREVIEW_PERSISTENCE_PROJECT_MISMATCH');
+    }
+  }
+  return target.origin + path;
 }
 
 function headers() {
