@@ -254,8 +254,7 @@ async function runTick({ config, phase, local, persistence }) {
 
 export default async function handler(req, res) {
   try {
-    const persistence = createUniversePostgresPersistence();
-
+    // Check identity and release controls BEFORE opening a database client.
     if (req.method === 'POST') {
       const principal = await verifyBase44Principal(req);
       // Historical configuration is global, not yet scoped by customer.
@@ -264,6 +263,7 @@ export default async function handler(req, res) {
       if (process.env.REALITY_SHIFT_CONFIGURATION_ENABLED !== 'true') {
         return json(res, 503, { ok:false, error:'SHIFT_CONFIGURATION_NOT_RELEASED' });
       }
+      const persistence = createUniversePostgresPersistence();
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
@@ -296,6 +296,7 @@ export default async function handler(req, res) {
       });
     }
 
+    const persistence = createUniversePostgresPersistence();
     const config = await readConfig(persistence);
     if (!config?.enabled) return json(res, 200, { ok: true, status: 'DISABLED' });
 
