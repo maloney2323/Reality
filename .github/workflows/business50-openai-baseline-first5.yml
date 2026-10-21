@@ -11,11 +11,12 @@ permissions:
 jobs:
   baseline:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      BASELINE_OPENAI_MODEL: gpt-6-astra
       BASELINE_EXECUTION_APPROVED: FIRST_FIVE_ONLY
-      BASELINE_RECEIPT_PATH: artifacts/business50-openai-baseline-first5.json
+      BASELINE_RECEIPT_PATH: artifacts/business50-astra-baseline-first5.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +30,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: business50-openai-baseline-first5-receipts
-          path: artifacts/business50-openai-baseline-first5.json
+          name: business50-astra-baseline-first5-receipts
+          path: artifacts/business50-astra-baseline-first5.json
           if-no-files-found: warn
           retention-days: 30
