@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import crypto, { createPublicKey, verify as verifySignature } from 'node:crypto';
 
 export const AUTONOMOUS_CAPABILITY_LOOP_VERSION = '0.1.0';
 
@@ -229,8 +229,73 @@ export function validateSandboxResult(experiment, {
   });
 }
 
+export const OWNER_WORLDLINE_MERGE_APPROVAL_VERSION = 'reality-owner-worldline-merge-approval-v0.1';
+
+export function canonicalOwnerWorldlineMergeApprovalMessage(approval) {
+  return JSON.stringify({
+    schema: OWNER_WORLDLINE_MERGE_APPROVAL_VERSION,
+    decision: 'APPROVE_CANONICAL_CAPABILITY_MERGE',
+    owner_id: approval?.owner_id || null,
+    gap_id: approval?.gap_id || null,
+    capability_id: approval?.capability_id || null,
+    capability_signature: approval?.capability_signature || null,
+    experiment_hash: approval?.experiment_hash || null,
+    verification_hash: approval?.verification_hash || null,
+    primary_worldline_id: approval?.primary_worldline_id || null,
+    ephemeral_worldline_id: approval?.ephemeral_worldline_id || null,
+    target: 'CANONICAL_CAPABILITY_REGISTRY',
+    issued_at: approval?.issued_at || null,
+    expires_at: approval?.expires_at || null,
+    nonce: approval?.nonce || null,
+  });
+}
+
+function assertOwnerWorldlineMergeApproval(experiment, approval) {
+  if (!approval || approval.schema !== OWNER_WORLDLINE_MERGE_APPROVAL_VERSION ||
+      approval.decision !== 'APPROVE_CANONICAL_CAPABILITY_MERGE' ||
+      approval.target !== 'CANONICAL_CAPABILITY_REGISTRY' ||
+      !text(approval.owner_id) || !text(approval.nonce) ||
+      approval.gap_id !== experiment.gap_id ||
+      approval.capability_id !== experiment.capability_id ||
+      approval.capability_signature !== experiment.capability_signature ||
+      approval.experiment_hash !== experiment.experiment_hash ||
+      approval.verification_hash !== experiment.verification_hash ||
+      approval.primary_worldline_id !== experiment.primary_worldline_id ||
+      approval.ephemeral_worldline_id !== experiment.ephemeral_worldline_id) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_SCOPE_MISMATCH');
+  }
+
+  const issued = Date.parse(approval.issued_at);
+  const expires = Date.parse(approval.expires_at);
+  const now = Date.now();
+  if (!Number.isFinite(issued) || !Number.isFinite(expires) ||
+      issued > now || expires <= now || expires <= issued ||
+      expires - issued > 7 * 24 * 60 * 60 * 1000) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_EXPIRED');
+  }
+
+  // Pinned deployment-owned verifier key; never accept a public key supplied
+  // by an untrusted model, client, candidate, or approval object.
+  const trustedPublicKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+  if (!text(trustedPublicKey) || !text(approval.signature)) {
+    throw new Error('WORLDLINE_TRUSTED_OWNER_SIGNATURE_REQUIRED');
+  }
+  let valid = false;
+  try {
+    const signature = Buffer.from(approval.signature, 'base64');
+    valid = signature.length === 64 && verifySignature(null,
+      Buffer.from(canonicalOwnerWorldlineMergeApprovalMessage(approval)),
+      createPublicKey(trustedPublicKey), signature);
+  } catch {
+    valid = false;
+  }
+  if (!valid) throw new Error('WORLDLINE_OWNER_SIGNATURE_INVALID');
+  return true;
+}
+
 export function authorizeWorldlineMerge(verifiedExperiment, {
   mergeVerifier,
+  ownerApproval,
 } = {}) {
   if (!verifiedExperiment?.verification_hash || verifiedExperiment.state !== 'SANDBOX_VERIFIED') {
     throw new Error('VERIFIED_SANDBOX_EXPERIMENT_REQUIRED');
@@ -238,15 +303,22 @@ export function authorizeWorldlineMerge(verifiedExperiment, {
   if (typeof mergeVerifier !== 'function') {
     throw new Error('WORLDLINE_MERGE_VERIFIER_REQUIRED');
   }
-
+  assertOwnerWorldlineMergeApproval(verifiedExperiment, ownerApproval);
   const result = mergeVerifier(verifiedExperiment);
   if (result?.approved !== true) throw new Error('WORLDLINE_MERGE_REJECTED');
 
+  // This generates a merge proposal only. The actual production executor
+  // must atomically consume the owner's nonce and read back the worldline.
   return freeze({
     ...verifiedExperiment,
     state: 'WORLDLINE_MERGE_PENDING',
+    owner_merge_approval: freeze(clone(ownerApproval)),
+    production_merge_executed: false,
+    durable_owner_nonce_consumption_required: true,
+    independent_merge_readback_required: true,
     merge_authorization_hash: digest({
       verification_hash: verifiedExperiment.verification_hash,
+      owner_approval: ownerApproval,
       verifier_result: result,
     }),
   });
@@ -260,7 +332,20 @@ export function registerVerifiedCapability(verifiedExperiment, {
   if (verifiedExperiment.state !== 'WORLDLINE_MERGE_PENDING') {
     throw new Error('WORLDLINE_MERGE_NOT_AUTHORIZED');
   }
-  if (mergeResult?.merged !== true) throw new Error('WORLDLINE_MERGE_NOT_VERIFIED');
+  // A caller's merged:true claim is insufficient: require signed owner
+  // authorization and externally recorded provider readback bound to the
+  // exact experiment, capability and canonical destination.
+  assertOwnerWorldlineMergeApproval(verifiedExperiment, verifiedExperiment.owner_merge_approval);
+  if (mergeResult?.merged !== true ||
+      mergeResult?.independent !== true ||
+      mergeResult?.readback_verified !== true ||
+      mergeResult?.verification_hash !== verifiedExperiment.verification_hash ||
+      mergeResult?.capability_id !== verifiedExperiment.capability_id ||
+      mergeResult?.target_worldline_id !== verifiedExperiment.primary_worldline_id ||
+      !text(mergeResult?.provider_execution_id) ||
+      !text(mergeResult?.readback_observation_id)) {
+    throw new Error('WORLDLINE_MERGE_INDEPENDENT_READBACK_REQUIRED');
+  }
   if (!text(verifiedExperiment.capability_signature)) {
     throw new Error('CAPABILITY_SIGNATURE_REQUIRED');
   }
