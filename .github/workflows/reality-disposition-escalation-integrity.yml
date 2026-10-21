@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - 'src/reality-disposition-escalation-contract-v0.1.js'
+      - 'src/reality-governed-disposition-generation-v0.1.js'
       - 'test/reality-disposition-escalation-contract.test.js'
+      - 'test/reality-governed-disposition-generation.test.js'
       - '.github/workflows/reality-disposition-escalation-integrity.yml'
   workflow_dispatch:
 jobs:
@@ -15,6 +17,8 @@ jobs:
         with:
           node-version: 22
       - name: Twelve held-apart development scenarios and adversarial signer tests
-        run: node --test test/reality-disposition-escalation-contract.test.js
+        run: node --test test/reality-disposition-escalation-contract.test.js test/reality-governed-disposition-generation.test.js
       - name: Check contract syntax
-        run: node --check src/reality-disposition-escalation-contract-v0.1.js
+        run: |
+          node --check src/reality-disposition-escalation-contract-v0.1.js
+          node --check src/reality-governed-disposition-generation-v0.1.js
