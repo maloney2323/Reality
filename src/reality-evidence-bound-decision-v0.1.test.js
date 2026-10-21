@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {resolveEvidenceBoundDecision} from './reality-evidence-bound-decision-v0.1.js';
 import {reconcileTypedEvidenceFindings} from './reality-typed-evidence-findings-v0.1.js';
@@ -134,4 +135,18 @@ test('invalid citations are not repaired into supported answers',async()=>{
  const x=await run(p,C('BLOCK',['invented-reference']));
  assert.equal(x.publication,null);
  assert.equal(x.status,'WITHHELD_INVALID_CANDIDATE');
+});
+
+test('foundation source modules have no scorer, oracle or benchmark fixture dependency',()=>{
+ const files=[
+  'reality-evidence-bound-decision-v0.1.js',
+  'reality-typed-evidence-findings-v0.1.js',
+  'reality-source-scope-uncertainty-v0.1.js',
+  'reality-governed-advisory-repair-v0.1.js',
+  'reality-advisory-publication-boundary-v0.1.js'
+ ];
+ for(const file of files){
+  const content=readFileSync(new URL(file,import.meta.url),'utf8');
+  assert.doesNotMatch(content,/scoreDecision\(|oracle_rationale|expected_disposition|business-adversarial-50/);
+ }
 });
