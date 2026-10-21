@@ -2,6 +2,7 @@ import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligen
 import { verifyBase44Principal } from '../src/reality-base44-principal-v0.1.js';
 import { requireNoClientSystemContext } from '../src/reality-chat-context-boundary-v0.1.js';
 import { finalizeGovernedChatEgress } from '../src/reality-chat-egress-integrity-v0.1.js';
+import { requireConversationSelector } from '../src/reality-authenticated-conversation-v0.1.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,9 +24,13 @@ export default async function handler(req, res) {
     // or continuity state. Trusted evidence must be admitted server-side.
     const principal = await verifyBase44Principal(req);
     const trustedSystemContext = requireNoClientSystemContext(req.body);
+    // A conversation ID is a routing selector, never a trusted memory root.
+    // Its scope is cryptographically bound to the verified Base44 principal.
+    const conversationId = requireConversationSelector(req.body);
     const result = await runLiveIntelligenceOrchestration({
       message: req.body?.message,
       requestedBy: principal.principal_id,
+      conversationId,
       systemContext: trustedSystemContext,
     });
 
