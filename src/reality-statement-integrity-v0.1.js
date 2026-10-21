@@ -11,12 +11,22 @@ const completedExternal=/\b(?:payment|funds transfer|bank transfer|wire transfer
 const verifiedHandoff=/\b(?:human reviewer|review queue|escalation desk|receiving team|external provider|receiving system)\s+(?:has\s+)?(?:accepted|confirmed|received|acknowledged)\b/i;
 const secretMaterial=/(?:\b(?:OPENAI_API_KEY|STRIPE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|GITHUB_TOKEN)\s*[:=]\s*["']?[A-Za-z0-9_\-]{8,}|\b(?:sk-(?:proj-)?|ghp_|gho_|xoxb-)[A-Za-z0-9_\-]{12,}|\b(?:api\s*key|access\s*token|password|secret\s*key)\s+(?:is|equals)\s+["']?[A-Za-z0-9_\-]{12,})/i;
 
+function positiveClaim(text,re){
+  for(const match of text.matchAll(new RegExp(re.source, re.flags.includes('g')?re.flags:re.flags+'g'))){
+    const prefix=text.slice(Math.max(0,match.index-24),match.index);
+    // Explicit "No external action has been performed" is a denial.
+    if(/\b(?:no|not|never|without)\s*$/i.test(prefix))continue;
+    return true;
+  }
+  return false;
+}
+
 export function evaluateModelStatementIntegrity(candidateDecision){
   const narrative=candidateDecision?.reasoning;
   const text=typeof narrative==='string'?narrative:'';
   const codes=[];
   if(!text.trim())codes.push('MISSING_REASONING');
-  if(executorClaim.test(text)||completedExternal.test(text)||verifiedHandoff.test(text))
+  if(positiveClaim(text,executorClaim)||positiveClaim(text,completedExternal)||positiveClaim(text,verifiedHandoff))
     codes.push('UNVERIFIED_EXTERNAL_EXECUTION_CLAIM');
   if(secretMaterial.test(text))codes.push('POSSIBLE_SECRET_MATERIAL');
   const data={
