@@ -40,7 +40,7 @@ export function canonicalDispositionPolicyAttestation(a){
   });
 }
 
-export function verifyDispositionPolicyFacts({workItemId,evidence,attestation}={}){
+export function verifyDispositionPolicyFacts({workItemId,evidence,attestation,trustedPublicKey=null}={}){
   if(!str(workItemId)||!Array.isArray(evidence)||!evidence.length||
     evidence.some(x=>!str(x?.id)||!str(x?.source)||!str(x?.authority)||!str(x?.text)) ||
     new Set(evidence.map(x=>x.id)).size!==evidence.length){
@@ -62,7 +62,7 @@ export function verifyDispositionPolicyFacts({workItemId,evidence,attestation}={
     expires<=now||expires<=issued||expires-issued>86400000){
     throw Error('DISPOSITION_POLICY_ATTESTATION_EXPIRED');
   }
-  const key=process.env.REALITY_DISPOSITION_POLICY_PUBLIC_KEY;
+  const key=trustedPublicKey || process.env.REALITY_DISPOSITION_POLICY_PUBLIC_KEY;
   if(!str(key)||!str(attestation.signature))throw Error('DISPOSITION_TRUSTED_SIGNER_NOT_CONFIGURED');
   let valid=false;
   try{
@@ -110,8 +110,8 @@ export function determineRequiredHandling(facts){
     reason_codes:['NO_ADMITTED_DISPOSITION_RULE']});
 }
 
-export function assessProposedDisposition({workItemId,evidence,policyAttestation,candidateDecision}={}){
-  const trusted=verifyDispositionPolicyFacts({workItemId,evidence,attestation:policyAttestation});
+export function assessProposedDisposition({workItemId,evidence,policyAttestation,candidateDecision,trustedPublicKey=null}={}){
+  const trusted=verifyDispositionPolicyFacts({workItemId,evidence,attestation:policyAttestation,trustedPublicKey});
   const requirement=determineRequiredHandling(trusted);
   const proposed=candidateDecision?.disposition;
   const allowedRefs=new Set(evidence.map(x=>x.id));
