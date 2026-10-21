@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 
 // Importing every route at runtime is crucial: Vercel's build can report
 // READY even when a lazily evaluated Node ESM import has a syntax error.
