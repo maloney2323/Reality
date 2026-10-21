@@ -1,11 +1,14 @@
 name: Reality Same Astra All Fifty — One Time
 # The user explicitly requested all original 50 cases and unchanged frozen scoring.
-# This exact workflow has one initial branch push trigger only; disarm immediately.
+# Initial exact-50 workflow was dispatched by its one-time push.
+# No subsequent code push may cause another paid run.
 on:
-  push:
-    branches: [fix/governed-verification-and-context-boundary-20261021]
-    paths:
-      - '.github/workflows/reality-astra-all50-one-time-20261021.yml'
+  workflow_dispatch:
+    inputs:
+      approve_another_exact_fifty_calls:
+        description: 'Requires explicit separate approval YES_EXACT_RUN'
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -19,7 +22,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       B50_GOVERNED_MODE: paid_fifty
       B50_GOVERNED_CASE: FULL_FIFTY
-      B50_GOVERNED_PAID_APPROVED: YES_EXACT_RUN
+      B50_GOVERNED_PAID_APPROVED: ${{ inputs.approve_another_exact_fifty_calls }}
       B50_GOVERNED_MAX_PROVIDER_CALLS: "50"
       B50_GOVERNED_RECEIPT_PATH: artifacts/reality-business50-all50-original-test-20261021.json
     steps:
