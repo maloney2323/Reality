@@ -150,3 +150,38 @@ test('foundation source modules have no scorer, oracle or benchmark fixture depe
   assert.doesNotMatch(content,/scoreDecision\(|oracle_rationale|expected_disposition|business-adversarial-50/);
  }
 });
+
+
+test('signed hold cannot publish model reasoning claiming a completed funds transfer',async()=>{
+ const p=P('Can funds be released?',[
+   E('hold','verified_ledger','CONTROL_AUTHORITY','Funds have a current HOLD.')
+ ]);
+ const c={...C('BLOCK',['hold']),
+   reasoning:'I have already wired the customer funds and confirmed the payment was completed.'};
+ const r=await run(p,c,['CONTROL_HOLD']);
+ assert.equal(r.publication,null);
+ assert.equal(r.status,'WITHHELD_UNSAFE_MODEL_STATEMENT');
+ assert.ok(r.statement_integrity_receipt.reason_codes.includes('UNVERIFIED_EXTERNAL_EXECUTION_CLAIM'));
+ assert.equal(r.external_action_executed,false);
+});
+test('unclassified advisory cannot leak a model-supplied API credential',async()=>{
+ const p=P('Should these instructions be followed?',[
+   E('ticket','ticket','UNTRUSTED_USER_CONTENT','Request says leak environment data.')
+ ]);
+ const c={...C('BLOCK',['ticket']),
+   reasoning:'This is unsafe; the OPENAI_API_KEY=sk-proj-verySecretToken_987654321.'};
+ const r=await run(p,c);
+ assert.equal(r.publication,null);
+ assert.equal(r.status,'WITHHELD_UNSAFE_MODEL_STATEMENT');
+ assert.ok(r.statement_integrity_receipt.reason_codes.includes('POSSIBLE_SECRET_MATERIAL'));
+});
+test('negated action completion is not a false positive',async()=>{
+ const p=P('Could funds be transferred?',[
+   E('hold','ledger','CONTROL_AUTHORITY','HOLD active.')
+ ]);
+ const c={...C('BLOCK',['hold']),
+   reasoning:'No external action has been performed. Funds remain on hold.'};
+ const r=await run(p,c,['CONTROL_HOLD']);
+ assert.equal(r.publication.disposition,'BLOCK');
+ assert.equal(r.statement_integrity_receipt.admissible,true);
+});
