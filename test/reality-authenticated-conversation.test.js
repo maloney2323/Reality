@@ -34,6 +34,10 @@ test('HTTP chat accepts a selector, not a client-provided memory root',()=>{
   assert.doesNotMatch(api,/conversationId: req\.body\.systemContext/);
   const ui=readFileSync('index.html','utf8');
   assert.match(ui,/conversation_id:REALITY_CONVERSATION_ID/);
+  assert.match(ui,/localStorage\.getItem\(REALITY_THREAD_KEY\)/);
+  assert.match(ui,/localStorage\.setItem\(REALITY_THREAD_KEY,id\)/);
+  assert.doesNotMatch(ui,/sessionStorage\.getItem\(REALITY_THREAD_KEY\)/,
+    'browser restart must not silently lose the root selector');
 });
 
 test('100 simulated server turns retrieve the same scoped continuity and never cross users',async()=>{
