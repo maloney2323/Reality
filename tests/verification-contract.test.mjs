@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { evaluateVerificationContract } from '../shared/reality-core/verification-contract-v0.1.js';
+const valid={evidence:[{id:'E1',source:'independent-record',verified:true}],checks:[{name:'independent-review',status:'VERIFIED',independent:true}],authorization:{status:'AUTHORIZED',actor:'reviewer'},unresolved_conflicts:[]};
+test('verified only when evidence, independent review and authorization are complete',()=>{const r=evaluateVerificationContract(valid);assert.equal(r.status,'VERIFIED');assert.equal(r.may_mark_resolved,true)});
+test('receipt hash alone never establishes truth',()=>{const r=evaluateVerificationContract({receipt_integrity_verified:true});assert.equal(r.may_mark_resolved,false);assert.equal(r.status,'INCOMPLETE')});
+test('unresolved conflict blocks resolution',()=>{const r=evaluateVerificationContract({...valid,unresolved_conflicts:['E1 conflicts with E2']});assert.equal(r.status,'CONTRADICTED');assert.equal(r.may_mark_resolved,false)});
+test('failed detector blocks resolution',()=>{const r=evaluateVerificationContract({...valid,checks:[{name:'review',status:'FAILED',independent:true}]});assert.equal(r.status,'FAILED')});
+test('unavailable evaluation blocks resolution',()=>{const r=evaluateVerificationContract({...valid,checks:[{name:'review',status:'NOT_EVALUATED',independent:true}]});assert.equal(r.status,'INCOMPLETE')});
+test('missing authorization blocks resolution',()=>{const r=evaluateVerificationContract({...valid,authorization:{status:'PENDING'}});assert.equal(r.may_mark_resolved,false)});
