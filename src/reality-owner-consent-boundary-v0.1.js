@@ -29,7 +29,6 @@ export function verifyOwnerConsent(approval, {
   purpose, subjectRef, consentRef,
   originalTaskRef = null, governanceKernelRef = null,
   now = Date.now(),
-  trustedPublicKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY,
 } = {}) {
   if (!approval || approval.schema !== OWNER_CONSENT_SCHEMA ||
       !isText(purpose) || !isText(subjectRef) || !isText(consentRef) ||
@@ -48,6 +47,7 @@ export function verifyOwnerConsent(approval, {
       expires <= issued || expires - issued > MAX_OWNER_CONSENT_AGE_MS) {
     throw new Error('OWNER_CONSENT_EXPIRED_OR_INVALID');
   }
+  const trustedPublicKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
   if (!isText(trustedPublicKey) || !isText(approval.signature)) {
     throw new Error('OWNER_CONSENT_TRUSTED_KEY_REQUIRED');
   }
