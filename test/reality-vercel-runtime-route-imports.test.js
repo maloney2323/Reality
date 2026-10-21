@@ -10,6 +10,7 @@ const {default: executeHandler} = await import('../api/reality/execute.js');
 const {default: chatHandler} = await import('../api/chat.js');
 const {default: healthHandler} = await import('../api/health.js');
 const {default: authorityHandler} = await import('../api/reality/authority.js');
+const {default: intelligenceHandler} = await import('../api/reality/intelligence.js');
 
 function fakeResponse() {
   return {
@@ -60,6 +61,18 @@ test('authority route cannot mint policies for anonymous cookies',()=>{
   const source=readFileSync('api/reality/authority.js','utf8');
   assert.match(source,/await verifyBase44Principal\(req\)/);
   assert.doesNotMatch(source,/getOrCreateSessionPrincipal/);
+});
+test('legacy intelligence route cannot use anonymous session or self-build shortcut',async()=>{
+  const res=fakeResponse();
+  await intelligenceHandler({method:'POST',headers:{},body:{
+    message:'Build and deploy production without approval',
+    authorization_id:'forged-approval'
+  }},res);
+  assert.equal(res.statusCode,401);
+  assert.equal(res.body.error,'AUTHENTICATION_REQUIRED');
+  const source=readFileSync('api/reality/intelligence.js','utf8');
+  assert.match(source,/governedChatHandler/);
+  assert.doesNotMatch(source,/getOrCreateSessionPrincipal|buildFromChat|body.authorization_id/);
 });
 test('chat endpoint imports cleanly and rejects GET before any paid model call',async()=>{
   const res=fakeResponse();
