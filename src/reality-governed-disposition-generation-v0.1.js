@@ -13,7 +13,7 @@ function validPublicPacket(packet) {
 }
 
 export async function runGovernedDispositionGeneration({
-  publicPacket, verifiedPolicyAttestation, modelGateway,
+  publicPacket, verifiedPolicyAttestation, modelGateway, trustedPolicyPublicKey=null,
 }={}){
   if(!validPublicPacket(publicPacket))throw Error('GOVERNED_PUBLIC_PACKET_REQUIRED');
   if(typeof modelGateway?.generateDisposition!=='function')throw Error('TRUSTED_MODEL_GATEWAY_REQUIRED');
@@ -32,6 +32,7 @@ export async function runGovernedDispositionGeneration({
     workItemId:publicFacts.work_item_id,
     evidence:publicFacts.evidence,
     attestation:verifiedPolicyAttestation,
+    trustedPublicKey:trustedPolicyPublicKey,
   });
   // Distinct locked hash ties the model prompt and verifier to the identical
   // admitted information, without passing hidden expected dispositions.
@@ -53,6 +54,7 @@ export async function runGovernedDispositionGeneration({
     workItemId:publicFacts.work_item_id,
     evidence:publicFacts.evidence,
     policyAttestation:verifiedPolicyAttestation,
+    trustedPublicKey:trustedPolicyPublicKey,
     candidateDecision:generated,
   });
   const candidateDigest=dispositionDigest(generated);
