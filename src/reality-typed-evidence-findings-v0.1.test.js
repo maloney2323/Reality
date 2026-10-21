@@ -20,6 +20,17 @@ test('explicit trusted suspension CANNOT be rewritten into missing-evidence clea
   assert.ok(x.findings.includes('CONTROL_HOLD'));
   assert.ok(!x.findings.includes('MISSING_MANDATORY_EVIDENCE'));
 });
+test('revoked or expressly prohibited credential is NOT downgraded to missing paperwork',()=>{
+ for(const instruction of ['REVOKED','NOT ALLOWED','PROHIBITED','DO NOT OPERATE']){
+  const x=calc('May covered work proceed?',[
+   E('registry','certificate_registry','COMPLIANCE_AUTHORITY',
+     'Credential expired. Current status: '+instruction+'.'),
+   E('renew','email','SELF_REPORTED','We renewed, new certificate will arrive.')
+  ],['CONTROL_HOLD']);
+  assert.ok(x.findings.includes('CONTROL_HOLD'),instruction);
+  assert.ok(!x.findings.includes('MISSING_MANDATORY_EVIDENCE'),instruction);
+ }
+});
 test('current validated renewal prevents stale absence classification',()=>{
   const x=calc('May work proceed?',[
     E('old','certificate_registry','COMPLIANCE_AUTHORITY','Old certificate expired.'),
