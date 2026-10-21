@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { verifyOwnerConsent } from './reality-owner-consent-boundary-v0.1.js';
+import { verifyThreeArmAdmission } from './reality-gsi-three-arm-admission-v0.1.js';
 
 export const GSI_TRAINING_GROUND_VERSION = 'reality-gsi-training-ground-v1.0';
 export const LEARNING_STATES = Object.freeze(['BASELINE_FROZEN','EPISODE_CAPTURED','LEARNING_PROPOSED','SANDBOX_RUNNING','EVALUATING','VERIFIED','REJECTED','PROMOTION_PENDING','PROMOTED']);
@@ -70,7 +72,50 @@ export function createTrainingManifest({baseline,benchmarkContract,episodes=[],l
   const manifest={manifest_version:'reality-gsi-training-manifest-v1.0',baseline_id:baseline.baseline_id,benchmark_contract_hash:benchmarkContract.contract_hash,episode_ids:episodes.map(e=>e.episode_id),learning_signal_ids:learningSignals.map(s=>s.signal_id),candidate_refs:[...candidateRefs],hidden_evaluation_ref:hiddenEvaluationRef,governance_kernel_hash:governanceKernelHash};
   return Object.freeze({...manifest,manifest_hash:digest(manifest)});
 }
-export function promoteLearningCandidate({evaluation,promotionAuthority,promotionRef}={}){
-  if(evaluation?.verdict!=='VERIFIED')throw new Error('CANDIDATE_NOT_VERIFIED');if(promotionAuthority?.approved!==true)throw new Error('PROMOTION_AUTHORIZATION_REQUIRED');req(promotionRef,'PROMOTION_REF_REQUIRED');
-  return Object.freeze({state:'PROMOTED',promotion_ref:promotionRef,approved_by:promotionAuthority.authorized_by||'explicit_promotion_authority',candidate_id:evaluation.evidence.candidate_id,baseline_id:evaluation.evidence.baseline_id,learning_commit:{verified_outcome:true,hidden_generalization_verified:evaluation.metrics.hidden_generalization_delta>0,regression_verified:evaluation.metrics.regression_passed,governance_preserved:evaluation.metrics.governance_preserved},promotion_hash:digest({candidate_id:evaluation.evidence.candidate_id,promotionRef,governance_kernel_hash:evaluation.evidence.governance_kernel_hash})});
+export function promoteLearningCandidate({evaluation,promotionAuthority,promotionRef,trainingReport,trainingAttestation}={}){
+  if(evaluation?.verdict!=='VERIFIED')throw new Error('CANDIDATE_NOT_VERIFIED');
+  if(promotionAuthority?.approved!==true)throw new Error('PROMOTION_AUTHORIZATION_REQUIRED');
+  req(promotionRef,'PROMOTION_REF_REQUIRED');
+  // Historical injected-score/callback tests are NOT independent evidence.
+  // The three-arm report must pass the gates and carry an externally signed
+  // evaluator attestation bound to the EXACT candidate and baseline hashes.
+  const evidence=evaluation.evidence||{};
+  const independentAdmission=verifyThreeArmAdmission({
+    report:trainingReport,
+    attestation:trainingAttestation,
+    baseline_id:evidence.baseline_id,
+    candidate_id:evidence.candidate_id,
+    candidate_hash:evidence.candidate_hash,
+  });
+  if(trainingReport.governance_kernel_hash!==evidence.governance_kernel_hash)throw new Error('TRAINING_GOVERNANCE_KERNEL_MISMATCH');
+  const consent=verifyOwnerConsent(promotionAuthority.owner_approval,{
+    purpose:'AUTHORIZE_SHADOW_PROMOTION_ONLY',
+    subjectRef:trainingReport.report_hash,
+    originalTaskRef:evidence.baseline_id,
+    governanceKernelRef:evidence.governance_kernel_hash,
+    consentRef:promotionRef,
+  });
+  // This is admission for human-controlled shadow review only. No direct
+  // capability registration, production write, learning commit or resumption.
+  return Object.freeze({
+    state:'PROMOTION_PENDING',
+    promotion_ref:promotionRef,
+    approved_by:consent.owner_id,
+    candidate_id:evidence.candidate_id,
+    candidate_hash:evidence.candidate_hash,
+    baseline_id:evidence.baseline_id,
+    training_report_hash:trainingReport.report_hash,
+    training_evaluation_ref:independentAdmission.independent_readback_ref,
+    owner_consent_binding_sha256:consent.binding_sha256,
+    owner_consent_nonce:consent.nonce,
+    owner_consent_consumed:false,
+    requires_atomic_owner_consent_consumption:true,
+    requires_independent_shadow_readback:true,
+    production_deploy_authorized:false,
+    original_task_execution_authorized:false,
+    customer_task_completed:false,
+    promotion_hash:digest({candidate_id:evidence.candidate_id,candidate_hash:evidence.candidate_hash,promotionRef,
+      governance_kernel_hash:evidence.governance_kernel_hash,training_report_hash:trainingReport.report_hash,
+      owner_consent_binding_sha256:consent.binding_sha256})
+  });
 }
