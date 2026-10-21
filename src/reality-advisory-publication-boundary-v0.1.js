@@ -3,6 +3,7 @@
 // not justify treating a harmless, clearly unverified advisory as a completed
 // business action. This gate never authorizes writes, handoffs, payments, etc.
 import {createHash} from 'node:crypto';
+import {evaluateModelStatementIntegrity} from './reality-statement-integrity-v0.1.js';
 
 export const ADVISORY_BOUNDARY_VERSION='reality-advisory-publication-boundary-v0.1';
 const DISPOSITIONS=new Set(['ALLOW','BLOCK','REQUEST_EVIDENCE','ESCALATE','BRANCH_HISTORY']);
@@ -29,6 +30,7 @@ export function assessUnverifiedInformationalAdvisory({
   const validCitations=Array.isArray(cited)&&cited.length>0&&
     cited.every(id=>str(id)&&evidence.some(e=>e.id===id))&&
     new Set(cited).size===cited.length;
+  const statementIntegrity=evaluateModelStatementIntegrity(candidateDecision);
   const fieldsValid=DISPOSITIONS.has(disposition)&&
     candidateDecision?.uncertainty_acknowledged===true&&
     candidateDecision?.claims_authority===false&&
@@ -36,6 +38,7 @@ export function assessUnverifiedInformationalAdvisory({
   let reason='NON_ENABLEMENT_ADVISORY_WITH_UNVERIFIED_POLICY';
   if(classifiedControlFindings.length)reason='CLASSIFIED_CONTROL_REQUIRES_SIGNED_POLICY_GATE';
   else if(!fieldsValid)reason='INVALID_SCHEMA_CITATION_UNCERTAINTY_OR_AUTHORITY';
+  else if(!statementIntegrity.admissible)reason='UNSAFE_MODEL_STATEMENT_OR_SECRET';
   else if(!NON_ENABLEMENT.has(disposition))reason='AFFIRMATIVE_PERMISSION_REQUIRES_VERIFIED_AUTHORITY';
   const publishable=reason==='NON_ENABLEMENT_ADVISORY_WITH_UNVERIFIED_POLICY';
   const data={
@@ -47,6 +50,7 @@ export function assessUnverifiedInformationalAdvisory({
     policy_signature_verified:false,
     evidence_citation_ids_valid:validCitations,
     candidate_schema_valid:fieldsValid,
+    statement_integrity_receipt:statementIntegrity,
     proposed_disposition:disposition??null,
     publication_permitted:publishable,
     reason,
