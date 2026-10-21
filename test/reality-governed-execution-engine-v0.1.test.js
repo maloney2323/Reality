@@ -39,12 +39,25 @@ test('authorized work executes and requires independent verification',async()=>{
      providerExecutionId:'probe-exec-1',
      observation:{record_id:'probe-record-1',state:'written'},
    }}},
-   independentVerifier:{verify:async({providerResult})=>{verified=true;return {
-     verified:providerResult.observation?.state==='written',
-     independent:true,
-     basis:'independent-readback',
-     observedState:{record_id:'probe-record-1',state:'written'},
-   }}},
+   independentVerifier:{verify:async({providerResult,execution,workItem:wi,authorization:grant})=>{
+     // Simulated separate provider readback. This is a unit-test fixture,
+     // not a claim that a real provider was independently inspected.
+     verified=true;
+     const readback={observationId:'probe-readback-1',record_id:'probe-record-1',state:'written'};
+     return {
+       verified:readback.state==='written',
+       independent:true,
+       method:'EXTERNAL_PROVIDER_READBACK',
+       providerExecutionId:providerResult.providerExecutionId,
+       executionId:execution.execution_id,
+       workItemId:wi.work_item_id,
+       authorizationId:grant.authorization_id,
+       readbackObservationId:readback.observationId,
+       basis:'unit-test independent-readback fixture',
+       observedState:{record_id:readback.record_id,state:readback.state},
+       mismatch:false,
+     };
+   }},
  });
  assert.equal(executed,true);
  assert.equal(verified,true);

@@ -1,3 +1,4 @@
+import { requireTrustedInternalConnector } from '../../../src/reality-internal-connector-auth-v0.1.js';
 const ALLOWED_REPOSITORY = 'maloney2323/Reality';
 
 function text(value) {
@@ -36,6 +37,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).setHeader('Allow', 'POST').json({ error: 'METHOD_NOT_ALLOWED' });
 
   try {
+    requireTrustedInternalConnector(req, {purpose:'READBACK'});
     const { workItem, execution, providerResult } = req.body || {};
     if (workItem?.connector !== 'github' || workItem?.operation !== 'create_issue') {
       return res.status(403).json({ ok: false, error: 'GITHUB_OPERATION_NOT_ALLOWED' });

@@ -76,6 +76,19 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 </main>
 <script>
 const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
+// Persistent, opaque thread selector: the browser may resume its last chat
+// after restart but cannot forge its source-of-truth continuity root. The
+// server scopes this selector to independently verified Base44 identity.
+// Shared browsers can reuse the opaque selector, but cross-account roots
+// remain distinct on the server. This handle is NOT an authorization secret.
+const REALITY_THREAD_KEY='reality.preview.thread.v1';
+const REALITY_CONVERSATION_ID=(()=>{
+  try{
+    const prior=localStorage.getItem(REALITY_THREAD_KEY);
+    if(prior && /^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,127}$/.test(prior))return prior;
+    const id=crypto.randomUUID();localStorage.setItem(REALITY_THREAD_KEY,id);return id;
+  }catch{return crypto.randomUUID();}
+})();
 function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
 function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
 function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
@@ -105,7 +118,7 @@ $('plan').onclick=async()=>{
   const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
   $('error').textContent=''; $('plan').disabled=true;
   try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:REALITY_CONVERSATION_ID})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
     $('brief').classList.add('open');
@@ -118,7 +131,7 @@ $('plan').onclick=async()=>{
     $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
     $('execution').textContent='NOT_EXECUTED · cognition only';
     $('verification').textContent='No external outcome claimed';
-  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+  }catch(e){$('error').textContent=/AUTHENTICATION_REQUIRED|INVALID_SESSION/.test(e.message)?'A verified Base44 sign-in is required before Reality can process this request. The standalone Vercel page does not yet provide that sign-in flow.':e.message}finally{$('plan').disabled=false}
 };
 const realityWork=$('findWork');const workResult=$('workResult');
 function renderWork(source){
@@ -159,7 +172,7 @@ function renderWork(source){
     }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
   });
 }
-async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
+async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();if(!b.model_configured || b.governed_execution_endpoint_enabled===false){$('productState').textContent='PREVIEW · RESTRICTED';$('liveHeadline').textContent='Reality is deployed; governed execution is not released.';$('liveDetail').textContent='Server health is confirmed, but authenticated chat needs a verified Base44 session and a separately configured Preview model key. External actions are disabled.';}else{$('liveHeadline').textContent='Reality runtime is reachable.';$('liveDetail').textContent='Server health is confirmed. Authentication, authorization, and provider readback still determine whether any specific operation can proceed.';}}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
 realityWork.onclick=async()=>{
   realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
   try{

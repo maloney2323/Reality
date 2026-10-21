@@ -7,6 +7,7 @@ import {
   writeGitHubFile,
   inspectVercelDeployment,
 } from '../../src/reality-governed-system-access-v0.1.js';
+import { verifyBase44Principal } from '../../src/reality-base44-principal-v0.1.js';
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -29,6 +30,16 @@ export default async function handler(req, res) {
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   try {
+    await verifyBase44Principal(req);
+    // Credential-backed writes are not allowed to bypass the separately
+    // governed work-item/owner-consent/provider-readback architecture.
+    if (['create_github_branch','write_github_file'].includes(body.operation)) {
+      return json(res,503,{
+        ok:false,error:'DIRECT_SYSTEM_WRITE_NOT_RELEASED',
+        reason:'EXACT_ACTION_AUTHORIZATION_AND_VERIFIED_EXECUTION_REQUIRED',
+        external_action_executed:false,
+      });
+    }
     let result;
     switch (body.operation) {
       case 'inspect_github_repository':
@@ -54,7 +65,7 @@ export default async function handler(req, res) {
     }
     return json(res, 200, result);
   } catch (error) {
-    return json(res, 502, {
+    return json(res, error.status || 502, {
       error: error.message,
       verified: false,
       external_status: error.status || null,

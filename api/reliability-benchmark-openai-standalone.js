@@ -85,7 +85,6 @@ export default async function handler(req, res) {
   if (!expectedToken || !suppliedToken || suppliedToken !== expectedToken) {
     return json(res, 401, { success: false, error: 'BENCHMARK_ACCESS_NOT_CONFIGURED_OR_UNAUTHORIZED', hint: 'Configure REALITY_BENCHMARK_ACCESS_TOKEN on Vercel and provide it from a trusted server-side caller.' });
   }
-  if (!process.env.OPENAI_API_KEY) return json(res, 503, { success: false, error: 'OPENAI_API_KEY_NOT_CONFIGURED_IN_VERCEL_RUNTIME' });
   const body = req.body || {};
   const dryRun = body.dry_run === true;
   const driftTasks = DRIFT_FOCUS_TASKS;
@@ -99,6 +98,9 @@ export default async function handler(req, res) {
     corpus_counts: { available_dev_tasks: DEV_TASKS.length, available_factual_cases: DEV_TASKS.filter(t => t.category === 'FACTUAL_HALLUCINATION').length, available_contradiction_cases: DEV_TASKS.filter(t => t.category === 'CONTRADICTION').length },
     note: 'No model calls made. Frozen source corpora are used. Candidate generation and scoring both call OpenAI directly.'
   });
+  // An authenticated, zero-cost corpus preflight must work before the
+  // paid model key is provisioned. Never make provider calls in dry-run.
+  if (!process.env.OPENAI_API_KEY) return json(res, 503, { success: false, error: 'OPENAI_API_KEY_NOT_CONFIGURED_IN_VERCEL_RUNTIME' });
   const results = [];
   for (const task of tasks) {
     const prompt = task.benchmark_type === 'drift' ? driftPrompt(task) : factualPrompt(task);

@@ -3,7 +3,8 @@ import { createUniversePostgresPersistence } from '../../src/reality-universe-po
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../../src/reality-base44-principal-v0.1.js';
+import { isAuthorizedCron } from '../../src/reality-cron-authorization-v0.1.js';
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
@@ -19,10 +20,7 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
-function cronRequest(req) {
-  return String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
-}
+function cronRequest(req) { return isAuthorizedCron(req); }
 
 async function githubCommits() {
   const [owner, repo] = SHADOW_REPO.split('/');
@@ -256,10 +254,16 @@ async function runTick({ config, phase, local, persistence }) {
 
 export default async function handler(req, res) {
   try {
-    const persistence = createUniversePostgresPersistence();
-
+    // Check identity and release controls BEFORE opening a database client.
     if (req.method === 'POST') {
-      const principal = getOrCreateSessionPrincipal(req, res);
+      const principal = await verifyBase44Principal(req);
+      // Historical configuration is global, not yet scoped by customer.
+      // Do not let any authenticated tenant overwrite global shift state
+      // until a separate operator policy and per-principal storage exist.
+      if (process.env.REALITY_SHIFT_CONFIGURATION_ENABLED !== 'true') {
+        return json(res, 503, { ok:false, error:'SHIFT_CONFIGURATION_NOT_RELEASED' });
+      }
+      const persistence = createUniversePostgresPersistence();
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
@@ -284,10 +288,15 @@ export default async function handler(req, res) {
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
     if (!cronRequest(req)) {
-      const config = await readConfig(persistence);
-      return json(res, 200, { ok: true, config, runtime: 'server_backed' });
+      await verifyBase44Principal(req);
+      // Do not return the global configuration to an unrelated account.
+      return json(res, 200, {
+        ok: true, config: null, runtime:'server_backed',
+        status:'PER_PRINCIPAL_CONFIGURATION_NOT_YET_RELEASED'
+      });
     }
 
+    const persistence = createUniversePostgresPersistence();
     const config = await readConfig(persistence);
     if (!config?.enabled) return json(res, 200, { ok: true, status: 'DISABLED' });
 
@@ -309,6 +318,6 @@ export default async function handler(req, res) {
     const result = await runTick({ config, phase, local, persistence });
     return json(res, 200, { ok: true, status: 'WORKED', result });
   } catch (error) {
-    return json(res, 500, { ok: false, status: 'ERROR', error: error.message });
+    return json(res, error.status || 500, { ok: false, status: 'ERROR', error: error.message });
   }
 }

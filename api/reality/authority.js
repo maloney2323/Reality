@@ -1,10 +1,10 @@
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../../src/reality-base44-principal-v0.1.js';
 import { createAuthorityPolicy, saveAuthorityPolicy, getAuthorityPolicy } from '../../src/reality-authority-v1.0.js';
 
 export default async function handler(req, res) {
   if (!['GET','POST'].includes(req.method)) return res.status(405).setHeader('Allow','GET, POST').json({ ok:false, error:'METHOD_NOT_ALLOWED' });
   try {
-    const principal = getOrCreateSessionPrincipal(req, res);
+    const principal = await verifyBase44Principal(req);
     if (req.method === 'GET') return res.status(200).json({ ok:true, authority: await getAuthorityPolicy(principal.principal_id) });
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};

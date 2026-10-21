@@ -1,5 +1,8 @@
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../src/reality-base44-principal-v0.1.js';
+import { requireNoClientSystemContext } from '../src/reality-chat-context-boundary-v0.1.js';
+import { finalizeGovernedChatEgress } from '../src/reality-chat-egress-integrity-v0.1.js';
+import { requireConversationSelector } from '../src/reality-authenticated-conversation-v0.1.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,17 +20,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const principal = getOrCreateSessionPrincipal(req, res);
+    // The public request body never supplies authoritative system, universe,
+    // or continuity state. Trusted evidence must be admitted server-side.
+    const principal = await verifyBase44Principal(req);
+    const trustedSystemContext = requireNoClientSystemContext(req.body);
+    // A conversation ID is a routing selector, never a trusted memory root.
+    // Its scope is cryptographically bound to the verified Base44 principal.
+    const conversationId = requireConversationSelector(req.body);
     const result = await runLiveIntelligenceOrchestration({
       message: req.body?.message,
       requestedBy: principal.principal_id,
-      systemContext: req.body?.systemContext || null,
+      conversationId,
+      systemContext: trustedSystemContext,
     });
 
+    // Recheck the EXACT HTTP payload after orchestration, publication
+    // correction, continuity writes, and result-object assembly. No later
+    // fallback may bypass this gate.
+    const finalEgress = finalizeGovernedChatEgress(result);
     return res.status(200).json({
       ok: true,
-      response: result?.intelligence?.answer || '',
-      result,
+      response: finalEgress.response,
+      result: finalEgress.result,
+      final_release_receipt: finalEgress.final_receipt,
       source_version: 'reality-chat-compat-v1',
     });
   } catch (error) {

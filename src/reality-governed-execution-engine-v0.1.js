@@ -55,12 +55,33 @@ export async function executeAuthorizedWork({
     providerResult,
   });
 
-  const verified = verification?.verified === true;
+  // A verifier's positive opinion is not independent evidence of the
+  // provider's actual effect. Bind independent readback to this exact
+  // execution, work item, authorization and provider execution identifier.
+  // Missing, mismatched, or untraceable proof always remains UNRESOLVED.
+  const nonEmpty = (value) => typeof value === 'string' && value.trim().length > 0;
+  const readbackMatched =
+    verification?.verified === true &&
+    verification?.independent === true &&
+    verification?.method === 'EXTERNAL_PROVIDER_READBACK' &&
+    nonEmpty(providerResult?.providerExecutionId) &&
+    verification?.providerExecutionId === executed.provider_execution_id &&
+    verification?.executionId === executed.execution_id &&
+    verification?.workItemId === workItem.work_item_id &&
+    verification?.authorizationId === executed.authorization_id &&
+    nonEmpty(verification?.readbackObservationId) &&
+    nonEmpty(verification?.basis) &&
+    verification?.observedState != null &&
+    (verification?.mismatch === false || verification?.mismatch == null);
+  const verified = readbackMatched;
   const outcome = Object.freeze({
     outcome_state:verified?'VERIFIED_OUTCOME':'UNRESOLVED',
     verified,
     verification_basis:verification?.basis ?? null,
     independent:verification?.independent === true,
+    independent_readback_bound:readbackMatched,
+    provider_execution_id:executed.provider_execution_id,
+    readback_observation_id:verification?.readbackObservationId ?? null,
     observed_state:verification?.observedState ?? null,
     mismatch:verification?.mismatch ?? null,
   });

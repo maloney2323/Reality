@@ -3,6 +3,7 @@ import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
+import { derivePrincipalScopedContinuityRoot } from './reality-authenticated-conversation-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -22,6 +23,7 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
+import { enforceChatPublication } from './reality-chat-publication-boundary-v0.1.js';
 import {
   createIntentRecord,
   structureIntent,
@@ -112,6 +114,7 @@ export async function runLiveIntelligenceOrchestration({
   message,
   observedAt,
   requestedBy = 'chat_user',
+  conversationId = null,
   systemContext = null,
   model,
   apiKey,
@@ -120,8 +123,15 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
-  const explicitContinuityRootId = String(systemContext?.continuity_root_id || '').trim() || null;
-  const conversationContinuityRootId = deriveContinuityRootId({
+  // Only a verified server-side identity and a nonauthoritative thread
+  // selector may form the public-chat continuity root. Never accept an
+  // identity, root ID, prior obligations or universe state from the browser.
+  const authenticatedContinuityRootId = conversationId !== null
+    ? derivePrincipalScopedContinuityRoot({ principalId: requestedBy, conversationId })
+    : null;
+  const explicitContinuityRootId = authenticatedContinuityRootId
+    || String(systemContext?.continuity_root_id || '').trim() || null;
+  const conversationContinuityRootId = authenticatedContinuityRootId || deriveContinuityRootId({
     explicitRootId: null,
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
@@ -173,9 +183,46 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Never silently discharge obligations by changing conversation topic.
+  // Carry only server-persisted unresolved items. A user's intent/request
+  // establishes the obligation to track, NOT proof of successful execution.
+  const latestContinuityEntry = (persistedContinuity?.entries || [])
+    .slice().sort((a,b)=>String(b.assertion_time||'').localeCompare(String(a.assertion_time||'')))[0] || null;
+  const priorPending = latestContinuityEntry?.payload?.pending_obligations || [];
+  if (!Array.isArray(priorPending) || priorPending.length > 100) {
+    throw new Error('PENDING_OBLIGATION_LEDGER_INVALID_OR_OVER_CAPACITY');
+  }
+  const pendingObligations = priorPending.map((item)=>{
+    if (!item || typeof item.obligation_id!=='string' ||
+        item.status!=='UNRESOLVED' || item.outcome_verified!==false ||
+        typeof item.source_request_digest!=='string') {
+      throw new Error('PENDING_OBLIGATION_EVIDENCE_INVALID');
+    }
+    return Object.freeze({...item});
+  });
+  const materiality = materialityFromSignal(governedSignal);
+  if (materiality === 'ACTION_CANDIDATE') {
+    const sourceId = governedSignal?.packet?.packet_id;
+    const sourceDigest = governedSignal?.packet?.raw_content_digest;
+    if (!sourceId || !sourceDigest) throw new Error('NEW_OBLIGATION_SOURCE_EVIDENCE_REQUIRED');
+    if (pendingObligations.length >= 100) throw new Error('PENDING_OBLIGATION_LEDGER_FULL');
+    pendingObligations.push(Object.freeze({
+      obligation_id: 'obligation:' + sourceId,
+      source_request_digest: sourceDigest,
+      user_intent_summary: String(message).slice(0,500),
+      status: 'UNRESOLVED',
+      outcome_verified: false,
+      source_authority: 'USER_INTENT_ONLY',
+      authorization_status: 'NOT_GRANTED_BY_CHAT',
+    }));
+  }
   const cognitionContext = {
     ...(systemContext || {}),
     continuity_root_id: effectiveContinuityRootId,
+    // Only the previously recorded source history is read here; a model
+    // cannot delete a pending obligation by contradicting the ledger.
+    pending_obligations: pendingObligations,
+    pending_obligation_count: pendingObligations.length,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
@@ -193,13 +240,25 @@ export async function runLiveIntelligenceOrchestration({
     apiKey,
     fetchImpl,
   });
+  // Enforcement before training, continuity writes, or public responses.
+  // This runtime is proposal-only: no action has been executed.
+  const publication = enforceChatPublication({
+    candidateAnswer: cognitiveResult.answer,
+    executionStatus: 'NOT_EXECUTED',
+    actionCandidate: materialityFromSignal(governedSignal) === 'ACTION_CANDIDATE',
+  });
   const modelResult = {
     ...cognitiveResult,
-    answer: cognitiveResult.answer,
+    answer: publication.answer,
+    // Model-lane analyses are unverified advisory text, never independent
+    // evidence or public claims of reality. Keep only non-content trace IDs.
+    lanes: (cognitiveResult.lanes || []).map(({ name, response_id, model }) => ({
+      name, response_id, model, epistemic_status: 'UNVERIFIED_MODEL_ANALYSIS',
+    })),
+    publication_gate: publication.receipt,
     cognitive_runtime_version: cognitiveResult.runtime_version,
   };
 
-  const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
     message,
     governedSignal,
@@ -210,7 +269,10 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  const previousState = persistedContinuity?.latest_state || null;
+  const continuityState = pendingObligations.length>0 ||
+    ['WAITING','BLOCKED','SUSPENDED','DEFERRED'].includes(previousState)
+    ? 'WAITING' : 'ACTIVE';
   const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: effectiveContinuityRootId,
@@ -221,6 +283,9 @@ export async function runLiveIntelligenceOrchestration({
         payload: {
           continuity_state: continuityState,
           materiality,
+          pending_obligations: pendingObligations,
+          pending_obligation_count: pendingObligations.length,
+          pending_outcome_verified: false,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,
           response_summary: String(modelResult?.answer || '').slice(0, 1000),
@@ -237,8 +302,14 @@ export async function runLiveIntelligenceOrchestration({
   if (materiality === 'ACTION_CANDIDATE') {
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
+    // The admitted original request is evidence of the user's intent, NOT
+    // independent evidence that any external-world effect occurred. The old
+    // signal_hash field was absent from the current signal packet, causing
+    // this state machine to skip EVIDENCE_ESTABLISHED and throw on action requests.
+    const originalRequestDigest = governedSignal?.packet?.raw_content_digest;
+    if (!originalRequestDigest) throw new Error('RAW_USER_REQUEST_EVIDENCE_REQUIRED');
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      { ref: originalRequestDigest, kind: 'RAW_USER_REQUEST', authority: 'INTENT_ONLY_NOT_WORLD_FACT' },
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -259,10 +330,10 @@ export async function runLiveIntelligenceOrchestration({
         materiality: 'ACTION_CANDIDATE',
       },
       evidence,
-      missingEvidence: evidence.length ? [] : ['Independent supporting evidence is not yet attached.'],
+      missingEvidence: ['Independent evidence of the external result is not yet attached. The raw user request establishes intent only.'],
       uncertainty: {
-        state: evidence.length ? 'ASSESSED' : 'MISSING_EVIDENCE',
-        confidence: evidence.length ? 'SUPPORTED_BY_RECORDED_SIGNAL' : null,
+        state: 'MISSING_EXTERNAL_EVIDENCE',
+        confidence: null,
         known_unknowns: ['The intended external effect must not be inferred from model output alone.'],
         blocking_questions: ['What exact action, connector, target, and authorization scope apply?'],
       },
@@ -282,11 +353,9 @@ export async function runLiveIntelligenceOrchestration({
     situation = transitionOperationalSituation(situation, 'SITUATION_CREATED', {
       reason: 'ACTION_CANDIDATE_REQUIRES_GOVERNED_SITUATION',
     });
-    if (evidence.length) {
-      situation = transitionOperationalSituation(situation, 'EVIDENCE_ESTABLISHED', {
-        reason: 'LIVE_SIGNAL_AND_CONNECTED_WORLD_EVIDENCE_ATTACHED',
-      });
-    }
+    situation = transitionOperationalSituation(situation, 'EVIDENCE_ESTABLISHED', {
+      reason: 'ORIGINAL_REQUEST_ADMITTED_AS_INTENT_ONLY_NOT_EXTERNAL_PROOF',
+    });
     situation = transitionOperationalSituation(situation, 'UNCERTAINTY_ASSESSED', {
       reason: 'AUTHORITY_AND_EXTERNAL_EFFECT_REMAIN_UNRESOLVED',
     });
@@ -319,6 +388,10 @@ export async function runLiveIntelligenceOrchestration({
       rehydrated: persistedContinuity?.continuation_available === true,
       prior_state: persistedContinuity?.latest_state || null,
       current_state: continuityEvent?.next_state || null,
+      pending_obligation_count: pendingObligations.length,
+      pending_obligation_refs: pendingObligations.map(x=>x.obligation_id),
+      unresolved_action_claims_not_verified: pendingObligations.length>0,
+      persistence_enabled: process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true',
       event_id: continuityEvent?.continuity_event_id || null,
     } },
     situation: clone(situation),

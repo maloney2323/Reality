@@ -1,4 +1,5 @@
-import crypto from 'node:crypto';
+import crypto, { createPublicKey, verify as verifySignature } from 'node:crypto';
+import { verifyOwnerConsent, SANDBOX_CONSENT_SCOPE } from './reality-owner-consent-boundary-v0.1.js';
 
 export const AUTONOMOUS_CAPABILITY_LOOP_VERSION = '0.1.0';
 
@@ -165,6 +166,8 @@ export function createSandboxExperiment({
     attempt_limit: attemptLimit,
     primary_worldline_id: primaryWorldlineId,
     ephemeral_worldline_id: ephemeralWorldlineId,
+    original_work_item_id: confirmedGap.work_item_id,
+    continuity_root_id: confirmedGap.continuity_root_id,
     production_graph_write_permitted: false,
     historical_failure_refs: confirmedGap.frozen_historical_failure_refs,
     capability_contract: confirmedGap.capability_contract,
@@ -180,20 +183,38 @@ export function createSandboxExperiment({
 export function authorizeSandboxExperiment(experiment, {
   authorizationRef,
   authorizedBy,
+  ownerApproval,
 } = {}) {
   if (!experiment?.experiment_hash) throw new Error('SANDBOX_EXPERIMENT_REQUIRED');
   if (!text(authorizationRef)) throw new Error('SANDBOX_AUTHORIZATION_REQUIRED');
   if (!text(authorizedBy)) throw new Error('SANDBOX_AUTHORIZED_BY_REQUIRED');
+  if (!text(experiment.original_work_item_id)) throw new Error('SANDBOX_ORIGINAL_WORK_ITEM_REQUIRED');
+  const signed = verifyOwnerConsent(ownerApproval, {
+    purpose: SANDBOX_CONSENT_SCOPE,
+    subjectRef: experiment.experiment_hash,
+    originalTaskRef: experiment.original_work_item_id,
+    governanceKernelRef: null,
+    consentRef: authorizationRef,
+  });
+  if (signed.owner_id !== authorizedBy) {
+    throw new Error('SANDBOX_OWNER_ID_MISMATCH');
+  }
 
+  // This object is a sandbox proposal. A future sandbox executor must
+  // atomically consume the approval nonce before it runs any candidate code.
   return freeze({
     ...experiment,
     state: 'SANDBOX_SYNTHESIS',
     sandbox_authorization_ref: authorizationRef,
-    sandbox_authorized_by: authorizedBy,
+    sandbox_authorized_by: signed.owner_id,
+    sandbox_authorization_binding_sha256: signed.binding_sha256,
+    sandbox_approval_nonce: signed.nonce,
+    sandbox_owner_consent_consumed: false,
+    sandbox_execution_proven: false,
+    requires_atomic_owner_consent_consumption: true,
     sandbox_authorization_hash: digest({
       experiment_hash: experiment.experiment_hash,
-      authorizationRef,
-      authorizedBy,
+      owner_consent_binding_sha256: signed.binding_sha256,
     }),
   });
 }
@@ -229,8 +250,73 @@ export function validateSandboxResult(experiment, {
   });
 }
 
+export const OWNER_WORLDLINE_MERGE_APPROVAL_VERSION = 'reality-owner-worldline-merge-approval-v0.1';
+
+export function canonicalOwnerWorldlineMergeApprovalMessage(approval) {
+  return JSON.stringify({
+    schema: OWNER_WORLDLINE_MERGE_APPROVAL_VERSION,
+    decision: 'APPROVE_CANONICAL_CAPABILITY_MERGE',
+    owner_id: approval?.owner_id || null,
+    gap_id: approval?.gap_id || null,
+    capability_id: approval?.capability_id || null,
+    capability_signature: approval?.capability_signature || null,
+    experiment_hash: approval?.experiment_hash || null,
+    verification_hash: approval?.verification_hash || null,
+    primary_worldline_id: approval?.primary_worldline_id || null,
+    ephemeral_worldline_id: approval?.ephemeral_worldline_id || null,
+    target: 'CANONICAL_CAPABILITY_REGISTRY',
+    issued_at: approval?.issued_at || null,
+    expires_at: approval?.expires_at || null,
+    nonce: approval?.nonce || null,
+  });
+}
+
+function assertOwnerWorldlineMergeApproval(experiment, approval) {
+  if (!approval || approval.schema !== OWNER_WORLDLINE_MERGE_APPROVAL_VERSION ||
+      approval.decision !== 'APPROVE_CANONICAL_CAPABILITY_MERGE' ||
+      approval.target !== 'CANONICAL_CAPABILITY_REGISTRY' ||
+      !text(approval.owner_id) || !text(approval.nonce) ||
+      approval.gap_id !== experiment.gap_id ||
+      approval.capability_id !== experiment.capability_id ||
+      approval.capability_signature !== experiment.capability_signature ||
+      approval.experiment_hash !== experiment.experiment_hash ||
+      approval.verification_hash !== experiment.verification_hash ||
+      approval.primary_worldline_id !== experiment.primary_worldline_id ||
+      approval.ephemeral_worldline_id !== experiment.ephemeral_worldline_id) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_SCOPE_MISMATCH');
+  }
+
+  const issued = Date.parse(approval.issued_at);
+  const expires = Date.parse(approval.expires_at);
+  const now = Date.now();
+  if (!Number.isFinite(issued) || !Number.isFinite(expires) ||
+      issued > now || expires <= now || expires <= issued ||
+      expires - issued > 7 * 24 * 60 * 60 * 1000) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_EXPIRED');
+  }
+
+  // Pinned deployment-owned verifier key; never accept a public key supplied
+  // by an untrusted model, client, candidate, or approval object.
+  const trustedPublicKey = process.env.REALITY_OWNER_PROMOTION_PUBLIC_KEY;
+  if (!text(trustedPublicKey) || !text(approval.signature)) {
+    throw new Error('WORLDLINE_TRUSTED_OWNER_SIGNATURE_REQUIRED');
+  }
+  let valid = false;
+  try {
+    const signature = Buffer.from(approval.signature, 'base64');
+    valid = signature.length === 64 && verifySignature(null,
+      Buffer.from(canonicalOwnerWorldlineMergeApprovalMessage(approval)),
+      createPublicKey(trustedPublicKey), signature);
+  } catch {
+    valid = false;
+  }
+  if (!valid) throw new Error('WORLDLINE_OWNER_SIGNATURE_INVALID');
+  return true;
+}
+
 export function authorizeWorldlineMerge(verifiedExperiment, {
   mergeVerifier,
+  ownerApproval,
 } = {}) {
   if (!verifiedExperiment?.verification_hash || verifiedExperiment.state !== 'SANDBOX_VERIFIED') {
     throw new Error('VERIFIED_SANDBOX_EXPERIMENT_REQUIRED');
@@ -238,37 +324,87 @@ export function authorizeWorldlineMerge(verifiedExperiment, {
   if (typeof mergeVerifier !== 'function') {
     throw new Error('WORLDLINE_MERGE_VERIFIER_REQUIRED');
   }
-
+  assertOwnerWorldlineMergeApproval(verifiedExperiment, ownerApproval);
   const result = mergeVerifier(verifiedExperiment);
   if (result?.approved !== true) throw new Error('WORLDLINE_MERGE_REJECTED');
 
+  // This generates a merge proposal only. The actual production executor
+  // must atomically consume the owner's nonce and read back the worldline.
   return freeze({
     ...verifiedExperiment,
     state: 'WORLDLINE_MERGE_PENDING',
+    owner_merge_approval: freeze({ ...ownerApproval }),
+    production_merge_executed: false,
+    durable_owner_nonce_consumption_required: true,
+    independent_merge_readback_required: true,
     merge_authorization_hash: digest({
       verification_hash: verifiedExperiment.verification_hash,
+      owner_approval: ownerApproval,
       verifier_result: result,
     }),
   });
 }
 
-export function registerVerifiedCapability(verifiedExperiment, {
+export async function registerVerifiedCapability(verifiedExperiment, {
   capabilityRegistry,
   mergeResult,
+  approvalStore,
 } = {}) {
   if (!verifiedExperiment?.verification_hash) throw new Error('VERIFIED_SANDBOX_EXPERIMENT_REQUIRED');
   if (verifiedExperiment.state !== 'WORLDLINE_MERGE_PENDING') {
     throw new Error('WORLDLINE_MERGE_NOT_AUTHORIZED');
   }
-  if (mergeResult?.merged !== true) throw new Error('WORLDLINE_MERGE_NOT_VERIFIED');
+  // A caller's merged:true claim is insufficient: require signed owner
+  // authorization and externally recorded provider readback bound to the
+  // exact experiment, capability and canonical destination.
+  assertOwnerWorldlineMergeApproval(verifiedExperiment, verifiedExperiment.owner_merge_approval);
+  if (mergeResult?.merged !== true ||
+      mergeResult?.independent !== true ||
+      mergeResult?.readback_verified !== true ||
+      mergeResult?.verification_hash !== verifiedExperiment.verification_hash ||
+      mergeResult?.capability_id !== verifiedExperiment.capability_id ||
+      mergeResult?.target_worldline_id !== verifiedExperiment.primary_worldline_id ||
+      !text(mergeResult?.provider_execution_id) ||
+      !text(mergeResult?.readback_observation_id)) {
+    throw new Error('WORLDLINE_MERGE_INDEPENDENT_READBACK_REQUIRED');
+  }
   if (!text(verifiedExperiment.capability_signature)) {
     throw new Error('CAPABILITY_SIGNATURE_REQUIRED');
   }
   if (!capabilityRegistry || typeof capabilityRegistry.register !== 'function') {
     throw new Error('CAPABILITY_REGISTRY_REQUIRED');
   }
+  if (!approvalStore ||
+      approvalStore.kind !== 'TRUSTED_DURABLE_OWNER_APPROVAL_STORE' ||
+      typeof approvalStore.consumeOnce !== 'function') {
+    throw new Error('DURABLE_APPROVAL_STORE_REQUIRED');
+  }
 
-  const registration = capabilityRegistry.register({
+  // Atomic compare-and-insert must happen BEFORE any capability registry
+  // mutation. The owner signature is revalidated at time of execution.
+  const approval = verifiedExperiment.owner_merge_approval;
+  const consumptionKey = 'owner-consent:' + crypto.createHash('sha256')
+    .update(JSON.stringify([approval.owner_id, approval.decision, approval.nonce])).digest('hex');
+  const bindingHash = crypto.createHash('sha256')
+    .update(canonicalOwnerWorldlineMergeApprovalMessage(approval)).digest('hex');
+  const consumed = await approvalStore.consumeOnce({
+    key: consumptionKey,
+    binding_sha256: bindingHash,
+    owner_id: approval.owner_id,
+    purpose: approval.decision,
+    subject_ref: verifiedExperiment.verification_hash,
+    consent_ref: approval.experiment_hash,
+    expires_at: approval.expires_at,
+  });
+  if (consumed?.key !== consumptionKey ||
+      consumed?.binding_sha256 !== bindingHash ||
+      consumed?.durable !== true || consumed?.atomic !== true ||
+      consumed?.consumed !== true || consumed?.already_used === true ||
+      !text(consumed?.record_ref)) {
+    throw new Error('WORLDLINE_OWNER_APPROVAL_NOT_ATOMICALLY_CONSUMED');
+  }
+
+  const registration = await capabilityRegistry.register({
     capability: verifiedExperiment.synthesized_capability,
     signature: verifiedExperiment.capability_signature,
     verification_hash: verifiedExperiment.verification_hash,
@@ -282,6 +418,8 @@ export function registerVerifiedCapability(verifiedExperiment, {
     registration,
     verification_hash: verifiedExperiment.verification_hash,
     capability_signature: verifiedExperiment.capability_signature,
+    owner_approval_consumption_ref: consumed.record_ref,
+    owner_approval_binding_sha256: bindingHash,
   });
 }
 
@@ -290,18 +428,51 @@ export function reactivationPlan(confirmedGap, {
   originalWorkItem,
 } = {}) {
   if (!confirmedGap?.gap_id) throw new Error('CAPABILITY_GAP_REQUIRED');
+  if (confirmedGap.state !== 'GAP_CONFIRMED') throw new Error('CONFIRMED_CAPABILITY_GAP_REQUIRED');
   if (registration?.state !== 'REGISTERED') throw new Error('CAPABILITY_REGISTRATION_REQUIRED');
   if (!originalWorkItem?.id) throw new Error('ORIGINAL_WORK_ITEM_REQUIRED');
+  if (!text(confirmedGap.work_item_id) || originalWorkItem.id !== confirmedGap.work_item_id) {
+    throw new Error('ORIGINAL_WORK_ITEM_IDENTITY_MISMATCH');
+  }
+  if (registration.capability_id !== confirmedGap.capability_id) {
+    throw new Error('UPGRADE_CAPABILITY_MISMATCH');
+  }
+  if (!text(registration.verification_hash) || !text(registration.capability_signature)) {
+    throw new Error('REGISTERED_CAPABILITY_PROOF_REQUIRED');
+  }
+  if (confirmedGap.continuity_root_id &&
+      originalWorkItem.continuity_root_id !== confirmedGap.continuity_root_id) {
+    throw new Error('CONTINUITY_ROOT_IDENTITY_MISMATCH');
+  }
+  if (confirmedGap.worldline_id &&
+      originalWorkItem.worldline_id !== confirmedGap.worldline_id) {
+    throw new Error('WORLDLINE_IDENTITY_MISMATCH');
+  }
 
+  // Re-activation is a proposal for the ORIGINAL task, not a tool execution.
+  // The ordinary work authorization gate still applies; no model may infer
+  // execution authority from successful capability registration.
   return freeze({
     state: 'REACTIVATED',
     gap_id: confirmedGap.gap_id,
     capability_id: confirmedGap.capability_id,
     original_work_item_id: originalWorkItem.id,
+    continuity_root_id: confirmedGap.continuity_root_id || null,
+    worldline_id: confirmedGap.worldline_id || null,
+    capability_verification_hash: registration.verification_hash,
+    capability_signature: registration.capability_signature,
+    execution_authorized: false,
+    customer_task_completed: false,
+    requires_fresh_action_authorization: true,
+    requires_independent_outcome_readback: true,
     continuation_token: digest({
       gap_id: confirmedGap.gap_id,
       original_work_item_id: originalWorkItem.id,
       capability_id: confirmedGap.capability_id,
+      continuity_root_id: confirmedGap.continuity_root_id || null,
+      worldline_id: confirmedGap.worldline_id || null,
+      verification_hash: registration.verification_hash,
+      capability_signature: registration.capability_signature,
     }),
   });
 }

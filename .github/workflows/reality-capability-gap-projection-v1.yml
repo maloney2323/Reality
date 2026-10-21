@@ -20,3 +20,7 @@ jobs:
         run: node --test test/operational-situation-v1.0.test.js
       - name: Run capability-gap invariant test
         run: node --test test/capability-gap-projection-v1.test.js
+      - name: Run exact original-task reactivation contract tests
+        run: node --test test/reality-original-work-reactivation-boundary.test.js
+      - name: Run owner-signed worldline merge and provider readback tests
+        run: node --test test/reality-worldline-merge-authorization.test.js
