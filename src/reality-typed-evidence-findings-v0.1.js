@@ -73,7 +73,7 @@ export function reconcileTypedEvidenceFindings(publicPacket,{legacyFindings=[]}=
     /\bCRITICAL\b/i.test(e.text)&&
     /\b(?:OPEN|UNRESOLVED|REMAINS OPEN|NOT REMEDIATED)\b/i.test(e.text));
   const suppressionProposal=proposed.filter(e=>/suppress|dismiss|false.positive|close|resolved|override/i.test(e.text));
-  const resolutionQuestion=/\b(?:resolved|closed|remediated|suppress|accept|fixed|complete)\b/i.test(qs);
+  const resolutionQuestion=/\b(?:resolved|closed|close|closing|remediated|suppress|accept|fixed|complete)\b/i.test(qs);
   if(openCritical.length&&(suppressionProposal.length||resolutionQuestion)){
     detections.push(finding('UNRESOLVED_CRITICAL_FINDING','AUTHORITATIVE_OPEN_CRITICAL_SECURITY_FINDING',
       uniqueEvidence([...openCritical,...suppressionProposal].map(x=>x.id)),
