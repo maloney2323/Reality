@@ -11,6 +11,7 @@ import {runGovernedDispositionGeneration}
   from './reality-governed-disposition-generation-v0.1.js';
 import {repairPolicyMisalignedAdvisory}
   from './reality-governed-advisory-repair-v0.1.js';
+import {verifyDispositionPolicyFacts} from './reality-disposition-escalation-contract-v0.1.js';
 export const SOURCE_DECISION_BOUNDARY_VERSION='reality-evidence-bound-decision-v0.1';
 const digest=x=>createHash('sha256').update(JSON.stringify(x??null)).digest('hex');
 
@@ -63,6 +64,12 @@ export async function resolveEvidenceBoundDecision({
     typed.findings.every(x=>policyAttestation.findings.includes(x));
   if(!same)throw Error('SIGNED_POLICY_FINDINGS_DO_NOT_MATCH_EVIDENCE');
   if(!trustedPolicyPublicKey)throw Error('TRUSTED_POLICY_SIGNER_REQUIRED');
+  // Authenticate policy even if the candidate is invalid; a malformed model
+  // answer must never cause this layer to describe a forged policy as trusted.
+  verifyDispositionPolicyFacts({
+    workItemId:publicPacket.work_item_id,evidence:publicPacket.evidence,
+    attestation:policyAttestation,trustedPublicKey:trustedPolicyPublicKey
+  });
   if(!normalized){
     const response={...base,status:'WITHHELD_INVALID_CANDIDATE',
       publication:null,policy_repair_receipt:null};
