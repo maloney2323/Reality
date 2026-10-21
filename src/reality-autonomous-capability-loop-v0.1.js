@@ -312,7 +312,7 @@ export function authorizeWorldlineMerge(verifiedExperiment, {
   return freeze({
     ...verifiedExperiment,
     state: 'WORLDLINE_MERGE_PENDING',
-    owner_merge_approval: freeze(clone(ownerApproval)),
+    owner_merge_approval: freeze({ ...ownerApproval }),
     production_merge_executed: false,
     durable_owner_nonce_consumption_required: true,
     independent_merge_readback_required: true,
