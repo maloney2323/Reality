@@ -29,6 +29,14 @@ test('control-integrity discrepancy requires escalation in unrelated development
   assert.deepEqual(result.findings,['INTEGRITY_FAILURE']);
   assert.equal(result.proof_of_source_independence,false);
 });
+test('SHA-256 disagreement with stored bytes is a recognized integrity finding',()=>{
+  const finding=classifyPublicControlEvidence({
+    question:'May this signed site record be used?',
+    evidence:[{id:'signature-proof',source:'registry',authority:'INTEGRITY_AUTHORITY',
+      text:'Expected SHA-256 differs from uploaded report bytes.'}]
+  });
+  assert.deepEqual(finding.findings,['INTEGRITY_FAILURE']);
+});
 test('ordinary authenticated hold is blocking rather than unnecessary escalation',()=>{
   const result=classifyPublicControlEvidence({
     question:'Can the contractor release the payable?',
