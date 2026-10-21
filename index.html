@@ -118,7 +118,7 @@ $('plan').onclick=async()=>{
     $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
     $('execution').textContent='NOT_EXECUTED · cognition only';
     $('verification').textContent='No external outcome claimed';
-  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+  }catch(e){$('error').textContent=/AUTHENTICATION_REQUIRED|INVALID_SESSION/.test(e.message)?'A verified Base44 sign-in is required before Reality can process this request. The standalone Vercel page does not yet provide that sign-in flow.':e.message}finally{$('plan').disabled=false}
 };
 const realityWork=$('findWork');const workResult=$('workResult');
 function renderWork(source){
@@ -159,7 +159,7 @@ function renderWork(source){
     }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
   });
 }
-async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
+async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();if(!b.model_configured || b.governed_execution_endpoint_enabled===false){$('productState').textContent='PREVIEW · RESTRICTED';$('liveHeadline').textContent='Reality is deployed; governed execution is not released.';$('liveDetail').textContent='Server health is confirmed, but authenticated chat needs a verified Base44 session and a separately configured Preview model key. External actions are disabled.';}else{$('liveHeadline').textContent='Reality runtime is reachable.';$('liveDetail').textContent='Server health is confirmed. Authentication, authorization, and provider readback still determine whether any specific operation can proceed.';}}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
 realityWork.onclick=async()=>{
   realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
   try{
