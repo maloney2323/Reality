@@ -98,7 +98,11 @@ export default async function handler(req, res) {
     corpus_counts: { available_dev_tasks: DEV_TASKS.length, available_factual_cases: DEV_TASKS.filter(t => t.category === 'FACTUAL_HALLUCINATION').length, available_contradiction_cases: DEV_TASKS.filter(t => t.category === 'CONTRADICTION').length },
     note: 'No model calls made. Frozen source corpora are used. Candidate generation and scoring both call OpenAI directly.'
   });
-  // An authenticated, zero-cost corpus preflight must work before the\n  // paid model key is provisioned. Never make provider calls in dry-run.\n  if (!process.env.OPENAI_API_KEY) return json(res, 503, { success: false, error: 'OPENAI_API_KEY_NOT_CONFIGURED_IN_VERCEL_RUNTIME' });\n  const results = [];\n  for (const task of tasks) {
+  // An authenticated, zero-cost corpus preflight must work before the
+  // paid model key is provisioned. Never make provider calls in dry-run.
+  if (!process.env.OPENAI_API_KEY) return json(res, 503, { success: false, error: 'OPENAI_API_KEY_NOT_CONFIGURED_IN_VERCEL_RUNTIME' });
+  const results = [];
+  for (const task of tasks) {
     const prompt = task.benchmark_type === 'drift' ? driftPrompt(task) : factualPrompt(task);
     const started = Date.now();
     try {
