@@ -25,6 +25,20 @@ if(runMode==='paid_fifty'&&selection!=='FULL_FIFTY')throw Error('FULL_FIFTY_SELE
 if(runMode==='paid_one'&&selection==='FULL_FIFTY')throw Error('ONE_CASE_CAP_REQUIRED');
 if(runMode!=='preflight'&&process.env.B50_GOVERNED_PAID_APPROVED!=='YES_EXACT_RUN')throw Error('B50_GOVERNED_PAID_RUN_NOT_APPROVED');
 if(runMode!=='preflight'&&(!key||key.length<15))throw Error('OPENAI_KEY_NOT_AVAILABLE');
+const maxCalls=runMode==='preflight'?0:Number(process.env.B50_GOVERNED_MAX_PROVIDER_CALLS);
+if(runMode!=='preflight'&&(!Number.isSafeInteger(maxCalls)||maxCalls<1||maxCalls>25)){
+  throw Error('EXPLICIT_PROVIDER_CALL_CAP_REQUIRED_1_TO_25');
+}
+const previewClassifications=cases.map(c=>{
+  const packet=buildPublicPacket(c);
+  return {case_id:c.id,findings:classifyPublicControlEvidence({
+    question:packet.question,evidence:packet.evidence
+  }).findings};
+});
+const plannedCalls=previewClassifications.filter(x=>x.findings.length>0).length;
+if(runMode!=='preflight'&&plannedCalls>maxCalls){
+  throw Error('PLANNED_PROVIDER_CALLS_EXCEED_CAP');
+}
 const {privateKey,publicKey}=generateKeyPairSync('ed25519');
 const trustedPolicyPublicKey=publicKey.export({type:'spki',format:'pem'});
 const started=new Date().toISOString();
@@ -39,6 +53,9 @@ const run={schema:'reality.business50.governed-astra-experimental.v0.1',
   policy_signature_trust:'EPHEMERAL_LOCAL_TEST_INTEGRITY_ONLY',
   independent_source_classification_proven:false,
   verified_hallucination_rate:null,verified_drift_rate:null,
+  provider_call_cap:maxCalls,
+  planned_classified_provider_cases:plannedCalls,
+  actual_provider_call_cost_usd:null,
   original_customer_task_completion_verified:false,
   external_business_actions_executed:false,records:[],complete:false};
 async function persist(){
@@ -114,6 +131,7 @@ for(const c of cases){
       att.signature=sign(null,Buffer.from(canonicalDispositionPolicyAttestation(att)),privateKey).toString('base64');
       record.policy_attestation_digest=dispositionDigest(att);
       const gateway={generateDisposition:async()=>{
+        if(calls>=maxCalls)throw Error('PROVIDER_CALL_CAP_EXCEEDED');
         calls++;record.model_called=true;
         const raw=await callOriginalAstra(packet,record);
         record.raw_candidate=raw;
@@ -148,6 +166,10 @@ run.summary={
   governed_passed:run.records.filter(r=>r.governed_score?.pass===true).length,
   governed_failed:run.records.filter(r=>r.governed_score?.pass===false).length,
   unresolved:run.records.filter(r=>r.error).length,
+  no_model_unclassified:run.records.filter(r=>r.outcome_status==='UNCLASSIFIED_WITHHELD').length,
+  requested_case_denominator:50,
+  independently_verified_customer_outcomes:0,
+  actual_provider_cost_usd:null,
 };
 run.completed_at=new Date().toISOString();
 run.receipt_sha256=digest({...run,receipt_sha256:undefined});
