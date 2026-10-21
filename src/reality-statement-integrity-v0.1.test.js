@@ -39,6 +39,8 @@ test('conditional, informational recommendations with no execution stay visible'
   'The audit trail is unverified. No external action has been performed.',
   'If the receiving team accepts the request later, record a separate receipt.',
   'The unsigned request asks whether the transfer should proceed.',
+  'The signed ledger records that a refund executed last weekend. Do not erase the historical entry.',
+  'The current operation has not been completed; do not misrepresent its state.',
  ];
  for(const s of ok){
   const r=evaluateModelStatementIntegrity(C(s));
