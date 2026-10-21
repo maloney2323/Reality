@@ -106,7 +106,7 @@ test('unknown policy cannot release a permission-to-act ALLOW response',async()=
  assert.equal(x.status,'WITHHELD_UNVERIFIED_ADVISORY');
 });
 test('faked or mismatched source-signed policy cannot be used to repair a candidate',async()=>{
- const p=P('Can work proceed?',[
+ const p=P('Can this critical incident be closed?',[
   E('scan','security_scan','SECURITY_FINDING_AUTHORITY','Critical finding CVE-Q remains OPEN.')
  ]);
  const a=signPolicy(p,['UNRESOLVED_CRITICAL_FINDING']);
