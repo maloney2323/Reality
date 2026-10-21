@@ -3,6 +3,7 @@ import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
+import { derivePrincipalScopedContinuityRoot } from './reality-authenticated-conversation-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -113,6 +114,7 @@ export async function runLiveIntelligenceOrchestration({
   message,
   observedAt,
   requestedBy = 'chat_user',
+  conversationId = null,
   systemContext = null,
   model,
   apiKey,
@@ -121,8 +123,15 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
-  const explicitContinuityRootId = String(systemContext?.continuity_root_id || '').trim() || null;
-  const conversationContinuityRootId = deriveContinuityRootId({
+  // Only a verified server-side identity and a nonauthoritative thread
+  // selector may form the public-chat continuity root. Never accept an
+  // identity, root ID, prior obligations or universe state from the browser.
+  const authenticatedContinuityRootId = conversationId !== null
+    ? derivePrincipalScopedContinuityRoot({ principalId: requestedBy, conversationId })
+    : null;
+  const explicitContinuityRootId = authenticatedContinuityRootId
+    || String(systemContext?.continuity_root_id || '').trim() || null;
+  const conversationContinuityRootId = authenticatedContinuityRootId || deriveContinuityRootId({
     explicitRootId: null,
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
