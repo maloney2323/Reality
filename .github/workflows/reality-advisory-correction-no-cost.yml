@@ -9,6 +9,7 @@ on:
       - 'src/reality-typed-evidence-findings-v0.1*'
       - 'src/reality-source-scope-uncertainty-v0.1*'
       - 'src/reality-evidence-bound-decision-v0.1*'
+      - 'src/reality-statement-integrity-v0.1*'
       - 'benchmarks/business50/reality-governed-astra-all50-v0.4.mjs'
       - 'benchmarks/business50/reality-governed-all50-v0.4-mock-preflight.mjs'
       - '.github/workflows/reality-advisory-correction-no-cost.yml'
@@ -29,7 +30,7 @@ jobs:
           echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
       - name: Verify no privileged execution, forged evidence or bypass
         run: |
-          node --test src/reality-advisory-publication-boundary-v0.1.test.js src/reality-governed-advisory-repair-v0.1.test.js src/reality-typed-evidence-findings-v0.1.test.js src/reality-source-scope-uncertainty-v0.1.test.js src/reality-evidence-bound-decision-v0.1.test.js
+          node --test src/reality-statement-integrity-v0.1.test.js src/reality-advisory-publication-boundary-v0.1.test.js src/reality-governed-advisory-repair-v0.1.test.js src/reality-typed-evidence-findings-v0.1.test.js src/reality-source-scope-uncertainty-v0.1.test.js src/reality-evidence-bound-decision-v0.1.test.js
       - name: Test full fifty-case pipeline with synthetic model gateway — NO PAID CALLS
         run: |
           node benchmarks/business50/reality-governed-all50-v0.4-mock-preflight.mjs > /tmp/reality-v04-synthetic-test-log.txt
