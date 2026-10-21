@@ -1,6 +1,7 @@
 // Read-only migration preflight. No model calls, no Base44 functions, no secret disclosure.
 // This endpoint is intentionally server-to-server only; never place its bearer token in browser code.
 import { timingSafeEqual, createHash } from 'node:crypto';
+import { evaluateVerificationContract } from '../shared/reality-core/verification-contract-v0.1.js';
 import { CASES, BENCHMARK_ID, VERSION, buildPublicPacket, scoreDecision } from '../shared/reality-core/business-adversarial-50-six-sector-v0.1.js';
 
 function authorized(req) {
@@ -28,17 +29,22 @@ export default async function handler(req, res) {
       answer_keys_exposed: false, paid_model_calls: 0, ready_for_paid_execution: false
     });
   }
-  if (operation !== 'preflight') return res.status(409).json({
-    success: false, error: 'BUSINESS50_EXECUTION_NOT_MIGRATED',
+  if (operation !== 'preflight') {
+    // Server-owned verification state. Never accept client-asserted evidence, authorization, or detector success.
+    const gate = evaluateVerificationContract({ evidence: [], checks: [], unresolved_conflicts: [], authorization: { status: 'NOT_AUTHORIZED' }, receipt_integrity_verified: false });
+    return res.status(409).json({
+    success: false, error: 'BUSINESS50_EXECUTION_NOT_MIGRATED', verification_contract: gate,
     note: 'No paid execution is enabled. Frozen six-sector corpus, detectors, receipts and persistent storage must be ported and verified first.'
-  });
+    });
+  }
+  const gate = evaluateVerificationContract({ evidence: [], checks: [], unresolved_conflicts: [], authorization: { status: 'NOT_AUTHORIZED' }, receipt_integrity_verified: false });
   return res.status(200).json({
     success: true, operation: 'preflight', provider: 'OPENAI_RESPONSES_API_DIRECT',
     backend: 'VERCEL', api_key_configured: Boolean(process.env.OPENAI_API_KEY),
     benchmark_access_configured: Boolean(process.env.REALITY_BENCHMARK_ACCESS_TOKEN),
     corpus: 'business-adversarial-50-six-sector-v0.1',
     corpus_ported: CASES.length === 50, corpus_cases: CASES.length, detectors_ported: false, receipts_ported: false,
-    ready_for_paid_execution: false, paid_model_calls: 0,
+    ready_for_paid_execution: gate.may_mark_resolved && false, verification_contract: gate, paid_model_calls: 0,
     note: 'Readiness inspection only. No model requests or Base44 backend calls.'
   });
 }
