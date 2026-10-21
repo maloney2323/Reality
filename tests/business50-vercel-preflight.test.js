@@ -46,3 +46,23 @@ test('preflight is read-only; paid execution is disabled', async () => {
     else process.env.REALITY_BENCHMARK_ACCESS_TOKEN=before;
   }
 });
+
+test('authenticated corpus inspection reports the frozen 50 cases without model calls', async () => {
+  const before=process.env.REALITY_BENCHMARK_ACCESS_TOKEN;
+  process.env.REALITY_BENCHMARK_ACCESS_TOKEN='test-secret-only';
+  try {
+    const res=response();
+    await handler({method:'POST',headers:{authorization:'Bearer test-secret-only'},body:{operation:'corpus_check'}},res);
+    assert.equal(res.statusCode,200);
+    assert.equal(res.body.total_cases,50);
+    assert.equal(res.body.unique_case_ids,true);
+    assert.equal(res.body.sectors.length,6);
+    assert.equal(res.body.scorer_available,true);
+    assert.equal(res.body.answer_keys_exposed,false);
+    assert.equal(res.body.paid_model_calls,0);
+    assert.equal(res.body.ready_for_paid_execution,false);
+  } finally {
+    if(before===undefined) delete process.env.REALITY_BENCHMARK_ACCESS_TOKEN;
+    else process.env.REALITY_BENCHMARK_ACCESS_TOKEN=before;
+  }
+});
