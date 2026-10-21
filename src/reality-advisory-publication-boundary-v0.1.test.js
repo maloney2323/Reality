@@ -68,3 +68,13 @@ test('unclassified proposed escalation never claims verified human handoff',()=>
   assert.equal(r.publication.disposition,'ESCALATE');
   assert.equal(r.publication.human_handoff_completed,false);
 });
+
+
+test('direct unverified advisory cannot release forged completion narrative',()=>{
+  const r=publishUnverifiedInformationalAdvisory({
+    publicPacket:packet,
+    candidateDecision:{...candidate,reasoning:'I have already wired the customer funds.'}
+  });
+  assert.equal(r.publication,null);
+  assert.equal(r.assessment_receipt.reason,'UNSAFE_MODEL_STATEMENT_OR_SECRET');
+});
