@@ -48,3 +48,19 @@ The frozen cases are synthetic. A signed policy attestation may bind an integrit
 6. Independently test hallucinations and factual/obligation drift using the distinct 100-turn corpus and after-publication receipts.
 
 **Verdict:** `BASE44_GOVERNED_CODE_WIRED_AND_UNIT_TESTED`; `SIGNED_POLICY_SOURCE_NOT_YET_ESTABLISHED`; `AUTHENTICATED_ENDPOINT_UNTESTED`; `PAID_MODEL_RUN_NOT_AUTHORIZED`; `GOVERNED_COMPARATIVE_SCORE_UNMEASURED`.
+
+
+## 2026-10-21 follow-up — policy coverage is not independent classification
+
+**Base44 checkpoint `6ad8f7ce2a40bd56e2cf7216`**, commit `f0c2c19f054319d115a59138a5f2427175c47a4f`.
+
+The endpoint's earlier hypothetical `run_case` model-call implementation was intentionally **unreleased** because its signed policy-attestation source-independence had not been verified. A signer-generated policy decision is not necessarily answer-key-blind. Do not enable payment or run scored model cases on the strength of signatures alone.
+
+Updated Base44:
+- `business50-governed-lane-adapter-v0.1.js` now implements `auditGovernedBusiness50PolicyBundle`, verifying **each** work-item/evidence-bound signature separately and reporting valid, missing, and invalid signatures; merely having 50 keys in a JSON bundle is not validation.
+- `reality-business-adversarial-50-governed/entry.ts` returns a signature-coverage audit on admin preflight; per-case validation remains available for `verify_case_preflight`. `run_case` **always** fails with HTTP 409 `INDEPENDENT_POLICY_PROVENANCE_NOT_VERIFIED` after signature checks, with `paid_model_calls=0`. The model-gateway *adapter* is staged, but live provider invocation from this endpoint is not released.
+- The preflight fields `ready_for_paid_case_execution` and `source_independence_verified` remain false even if a policy bundle and model key are configured. A reviewer or trusted source adapter must independently establish authority facts from **public evidence only** and demonstrate no hidden `expected_disposition` or `oracle_rationale` was supplied.
+- Combined Base44 local tests: **29/29 passed** (12 policy-rule + 6 proposal/publisher + 7 governed adapter + 4 original-baseline-replay tests), TypeScript endpoint parsed by the installed esbuild transformer, and an additional structural check confirmed no model invocation remains reachable in the new route.
+- Frozen six-sector corpus remains SHA-256 `a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c`.
+
+**Still untested:** real admin-authenticated Base44 HTTP endpoint, blind policy classification by an independent verifier, real model response generation, human handoff, hallucination escape, and 100-turn semantic drift. No new OpenAI API charges, production writes, or production deployments.
