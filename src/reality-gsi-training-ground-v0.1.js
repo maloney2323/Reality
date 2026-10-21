@@ -64,8 +64,21 @@ export function independentlyEvaluateCandidate({baseline,candidate,candidateResu
   const verification=independentVerifier({baseline:clone(baseline),candidate:clone(candidate),candidate_results:clone(candidateResults),hidden_results:clone(hiddenResults),regression_results:clone(regressionResults),heldout_case_ids:[...heldoutCaseIds]});
   const generalizationDelta=delta(hiddenResults,baseline.results.hidden,'quality');const capabilityDelta=delta(candidateResults,baseline.results.visible,'quality');
   const regressionPassed=regressionResults?.passed===true;const independentPassed=verification?.passed===true;const generalizationPassed=generalizationDelta>0;const governancePreserved=verification?.governance_preserved===true;
-  const verdict=independentPassed&&regressionPassed&&generalizationPassed&&governancePreserved?'VERIFIED':'REJECTED';
-  return Object.freeze({state:'EVALUATING',verdict,metrics:{capability_delta:capabilityDelta,hidden_generalization_delta:generalizationDelta,regression_passed:regressionPassed,independently_verified:independentPassed,governance_preserved:governancePreserved},verification:clone(verification),evidence:{baseline_id:baseline.baseline_id,candidate_id:candidate.candidate_id,candidate_hash:candidate.candidate_hash,governance_kernel_hash:baseline.governance_kernel_hash,benchmark_contract_hash:baseline.benchmark_contract_hash,heldout_case_ids:[...heldoutCaseIds]}});
+  // A caller-provided callback, even named independentVerifier, is NOT
+  // a trusted provider readback or authenticated evaluation service.
+  // It establishes only a provisional, self-contained harness result.
+  const verdict=independentPassed&&regressionPassed&&generalizationPassed&&governancePreserved
+    ?'PROVISIONAL_PASS_REQUIRES_EXTERNAL_ATTESTATION':'REJECTED';
+  return Object.freeze({state:'EVALUATING',verdict,
+    evaluation_evidence_status:'CALLBACK_EVIDENCE_UNATTESTED',
+    independent_real_agent_evidence_established:false,
+    metrics:{capability_delta:capabilityDelta,hidden_generalization_delta:generalizationDelta,
+      regression_passed:regressionPassed,harness_verifier_passed:independentPassed,
+      independently_verified:false,governance_preserved:governancePreserved},
+    verification:clone(verification),
+    evidence:{baseline_id:baseline.baseline_id,candidate_id:candidate.candidate_id,
+      candidate_hash:candidate.candidate_hash,governance_kernel_hash:baseline.governance_kernel_hash,
+      benchmark_contract_hash:baseline.benchmark_contract_hash,heldout_case_ids:[...heldoutCaseIds]}});
 }
 export function createTrainingManifest({baseline,benchmarkContract,episodes=[],learningSignals=[],candidateRefs=[],hiddenEvaluationRef,governanceKernelHash}={}){
   if(baseline?.state!=='BASELINE_FROZEN')throw new Error('BASELINE_NOT_FROZEN');if(benchmarkContract?.contract_hash!==baseline.benchmark_contract_hash)throw new Error('BENCHMARK_CONTRACT_MISMATCH');req(hiddenEvaluationRef,'HIDDEN_EVALUATION_REF_REQUIRED');if(governanceKernelHash!==baseline.governance_kernel_hash)throw new Error('GOVERNANCE_KERNEL_CHANGED');
@@ -73,7 +86,7 @@ export function createTrainingManifest({baseline,benchmarkContract,episodes=[],l
   return Object.freeze({...manifest,manifest_hash:digest(manifest)});
 }
 export function promoteLearningCandidate({evaluation,promotionAuthority,promotionRef,trainingReport,trainingAttestation}={}){
-  if(evaluation?.verdict!=='VERIFIED')throw new Error('CANDIDATE_NOT_VERIFIED');
+  if(evaluation?.verdict!=='PROVISIONAL_PASS_REQUIRES_EXTERNAL_ATTESTATION')throw new Error('CANDIDATE_NOT_PROVISIONALLY_PASSED');
   if(promotionAuthority?.approved!==true)throw new Error('PROMOTION_AUTHORIZATION_REQUIRED');
   req(promotionRef,'PROMOTION_REF_REQUIRED');
   // Historical injected-score/callback tests are NOT independent evidence.
