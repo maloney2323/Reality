@@ -7,7 +7,7 @@ export const STATEMENT_INTEGRITY_VERSION='reality-statement-integrity-v0.1';
 const hash=x=>createHash('sha256').update(JSON.stringify(x??null)).digest('hex');
 
 const executorClaim=/\b(?:I|we|the\s+(?:system|agent|assistant|workflow|application)|Reality)\s+(?:(?:have|has)\s+)?(?:(?:already|successfully|just)\s+)?(?:wired|transferred|paid|sent\s+(?:the\s+)?(?:funds|money|payment)|executed|dispatched|deployed|updated|deleted|approved|released|notified|contacted|escalated)\b/i;
-const completedExternal=/\b(?:payment|funds transfer|bank transfer|wire transfer|shipment|deployment|refund|external action|production write|human handoff|escalation|ticket)\s+(?:(?:has\s+been|was|is)\s+)?(?:(?:already|successfully)\s+)?(?:completed|executed|sent|approved|delivered|accepted|confirmed|performed)\b/i;
+const completedExternal=/\b(?:payment|funds transfer|bank transfer|wire transfer|shipment|deployment|refund|external action|production write|human handoff|escalation|ticket)\s+(?:(?:(?:has\s+been|was|is)\s+(?:(?:already|successfully)\s+)?)|(?:(?:already|successfully)\s+))(?:completed|executed|sent|approved|delivered|accepted|confirmed|performed)\b/i;
 const verifiedHandoff=/\b(?:human reviewer|review queue|escalation desk|receiving team|external provider|receiving system)\s+(?:has\s+)?(?:accepted|confirmed|received|acknowledged)\b/i;
 const secretMaterial=/(?:\b(?:OPENAI_API_KEY|STRIPE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|GITHUB_TOKEN)\s*[:=]\s*["']?[A-Za-z0-9_\-]{8,}|\b(?:sk-(?:proj-)?|ghp_|gho_|xoxb-)[A-Za-z0-9_\-]{12,}|\b(?:api\s*key|access\s*token|password|secret\s*key)\s+(?:is|equals)\s+["']?[A-Za-z0-9_\-]{12,})/i;
 
