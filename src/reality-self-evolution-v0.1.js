@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { verifyOwnerConsent, SANDBOX_CONSENT_SCOPE } from './reality-owner-consent-boundary-v0.1.js';
 
 export const REALITY_SELF_EVOLUTION_VERSION = 'reality-self-evolution-v0.1';
 export const EVOLUTION_STATES = Object.freeze([
@@ -329,13 +330,24 @@ export function authorizeUpgradeSandbox({
     });
   }
   if (!text(authorization.authorization_ref)) throw new Error('UPGRADE_AUTHORIZATION_REF_REQUIRED');
+  const ownerConsent = verifyOwnerConsent(authorization.owner_approval, {
+    purpose: SANDBOX_CONSENT_SCOPE,
+    subjectRef: evolutionState.upgrade_proposal_hash,
+    originalTaskRef: evolutionState.objective.id,
+    governanceKernelRef: evolutionState.governance_kernel_hash,
+    consentRef: authorization.authorization_ref,
+  });
 
   return freeze({
     ...evolutionState,
     state: 'AWAITING_AUTHORIZATION',
     sandbox_authorization: {
       authorization_ref: authorization.authorization_ref,
-      authorized_by: authorization.authorized_by || 'explicit_human_authorization',
+      authorized_by: ownerConsent.owner_id,
+      owner_consent_binding_sha256: ownerConsent.binding_sha256,
+      owner_consent_nonce: ownerConsent.nonce,
+      owner_consent_consumed: false,
+      requires_atomic_owner_consent_consumption: true,
       scope: 'SANDBOX_ONLY',
       production_graph_write_permitted: false,
       governance_kernel_hash: evolutionState.governance_kernel_hash,
@@ -458,18 +470,38 @@ export function promoteVerifiedUpgrade({
   if (!text(evolutionState.verified_upgrade?.capability_signature)) {
     throw new Error('CAPABILITY_SIGNATURE_REQUIRED_FOR_PROMOTION');
   }
-
+  if (!text(evolutionState.verified_upgrade?.independent_verification_ref) ||
+      !text(evolutionState.upgrade_verification_hash)) {
+    throw new Error('UPGRADE_INDEPENDENT_VERIFICATION_PROOF_REQUIRED');
+  }
+  const ownerConsent = verifyOwnerConsent(promotion.owner_approval, {
+    purpose: 'AUTHORIZE_SHADOW_PROMOTION_ONLY',
+    subjectRef: evolutionState.upgrade_verification_hash,
+    originalTaskRef: evolutionState.objective.id,
+    governanceKernelRef: evolutionState.governance_kernel_hash,
+    consentRef: promotion.promotion_ref,
+  });
+  // The legacy controller may only propose promotion. 'PROMOTED' and
+  // 'LEARNING_COMMITTED' require a trusted nonce-consuming executor plus
+  // independently witnessed provider readback; pure model/state transitions
+  // cannot confer either status.
   return freeze({
     ...evolutionState,
-    state: 'PROMOTED',
+    state: 'PROMOTION_PENDING',
     promotion: {
       promotion_ref: promotion.promotion_ref,
-      approved_by: promotion.approved_by || 'explicit_promotion_authority',
-      target: 'CANONICAL_CAPABILITY_REGISTRY',
+      approved_by: ownerConsent.owner_id,
+      target: 'SHADOW_ONLY',
+      owner_consent_binding_sha256: ownerConsent.binding_sha256,
+      owner_consent_nonce: ownerConsent.nonce,
+      owner_consent_consumed: false,
+      production_graph_write_permitted: false,
+      requires_atomic_owner_consent_consumption: true,
+      requires_independent_deployment_readback: true,
     },
     promotion_hash: digest({
       upgrade_verification_hash: evolutionState.upgrade_verification_hash,
-      promotion,
+      owner_consent_binding_sha256: ownerConsent.binding_sha256,
     }),
   });
 }
