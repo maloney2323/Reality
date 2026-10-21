@@ -11,9 +11,10 @@ const output = process.env.BASELINE_RECEIPT_PATH || 'artifacts/business50-openai
 const model = process.env.BASELINE_OPENAI_MODEL || 'gpt-4.1';
 const astra = model === 'gpt-6-astra';
 if (!process.env.OPENAI_API_KEY) throw Error('OPENAI_API_KEY_MISSING');
-if (process.env.BASELINE_EXECUTION_APPROVED !== 'FIRST_FIVE_ONLY') throw Error('BASELINE_EXECUTION_NOT_APPROVED');
+const full = process.env.BASELINE_EXECUTION_APPROVED === 'FULL_FIFTY_ONCE';
+if (!full && process.env.BASELINE_EXECUTION_APPROVED !== 'FIRST_FIVE_ONLY') throw Error('BASELINE_EXECUTION_NOT_APPROVED');
 if (CASES.length !== 50 || CASES.slice(0, 5).some((c, i) => c.id !== 'B0' + (i + 1))) throw Error('FROZEN_CORPUS_MISMATCH');
-const packets = CASES.slice(0, 5).map(buildPublicPacket);
+const packets = CASES.slice(0, full ? 50 : 5).map(buildPublicPacket);
 const run = { run_id: randomUUID(), benchmark_id: BENCHMARK_ID, version: VERSION, model, provider: 'openai', lane: 'RAW_UNGOVERNED_BASELINE', packet_sha256: digest(packets), started_at: new Date().toISOString(), records: [], complete: false };
 async function persist() {
   await mkdir(dirname(output), { recursive: true });
@@ -58,10 +59,12 @@ for (const packet of packets) {
   record.receipt_sha256 = digest({ ...record, receipt_sha256: undefined });
   run.records.push(record);
   await persist();
-  if (record.error || record.score?.pass !== true) break; // persist first, then stop on execution or scoring failure
+  console.log(JSON.stringify({ case_id: record.case_id, pass: record.score?.pass ?? null, execution_error: Boolean(record.error) }));
+  if (record.error || (!full && record.score?.pass !== true)) break; // full evaluation records scoring failures and continues
 }
-run.complete = run.records.length === 5 && run.records.every(r => !r.error);
+run.complete = run.records.length === packets.length && run.records.every(r => !r.error);
 run.passed = run.complete && run.records.every(r => r.score?.pass === true);
+run.summary = { expected: packets.length, scored: run.records.filter(r => r.score).length, passed: run.records.filter(r => r.score?.pass === true).length, failed: run.records.filter(r => r.score?.pass === false).length, execution_errors: run.records.filter(r => r.error).length };
 run.completed_at = new Date().toISOString();
 run.receipt_sha256 = digest({ ...run, receipt_sha256: undefined });
 await persist();
