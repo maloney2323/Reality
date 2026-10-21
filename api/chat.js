@@ -1,5 +1,5 @@
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../src/reality-base44-principal-v0.1.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const principal = getOrCreateSessionPrincipal(req, res);
+    const principal = await verifyBase44Principal(req);
     const result = await runLiveIntelligenceOrchestration({
       message: req.body?.message,
       requestedBy: principal.principal_id,
