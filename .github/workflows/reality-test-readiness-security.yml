@@ -6,6 +6,7 @@ on:
       - 'api/chat.js'
       - 'api/reliability-benchmark-openai-standalone.js'
       - 'api/reality/self-build.js'
+      - 'api/reality/world.js'
       - 'api/reality/system-access.js'
       - 'api/reality/model-probe.js'
       - 'api/reality/connectors/github.js'
@@ -44,6 +45,7 @@ jobs:
       - name: Reject syntactically broken HTTP route imports
         run: |
           node --check api/reality/self-build.js
+          node --check api/reality/world.js
           node --check api/reality/system-access.js
           node --check api/reality/model-probe.js
           node --check api/reality/connectors/github.js
