@@ -32,10 +32,14 @@ function mockFetch(routes) {
 // Tests never access a real Supabase project. A deliberately reserved
 // example hostname verifies routing without making network calls.
 const initialTarget=process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+const initialKey=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
 process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://synthetic-persistence-a.supabase.co';
+process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='unit-test-only-not-a-real-secret';
 process.on('exit',()=>{
   if(initialTarget===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_URL=initialTarget;
+  if(initialKey===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=initialKey;
 });
 
 test('missing implicit database target fails before network and never falls back to production',async()=>{
