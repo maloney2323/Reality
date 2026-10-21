@@ -1,4 +1,4 @@
-name: Business50 OpenAI Baseline First Five
+name: Business50 Astra Full Baseline
 on:
   workflow_dispatch:
   push:
@@ -11,12 +11,12 @@ permissions:
 jobs:
   baseline:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 170
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       BASELINE_OPENAI_MODEL: gpt-6-astra
-      BASELINE_EXECUTION_APPROVED: FIRST_FIVE_ONLY
-      BASELINE_RECEIPT_PATH: artifacts/business50-astra-baseline-first5.json
+      BASELINE_EXECUTION_APPROVED: FULL_FIFTY_ONCE
+      BASELINE_RECEIPT_PATH: artifacts/business50-astra-baseline-full50.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +24,13 @@ jobs:
           node-version: '22'
       - name: Verify frozen corpus and scorer without model calls
         run: node --test tests/business50-vercel-preflight.test.js tests/verification-contract.test.mjs
-      - name: Run first five OpenAI baseline cases
+      - name: Run all fifty Astra baseline cases
         run: node shared/reality-core/openai-baseline-first5.mjs
       - name: Preserve raw receipts even if a case fails
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: business50-astra-baseline-first5-receipts
-          path: artifacts/business50-astra-baseline-first5.json
+          name: business50-astra-baseline-full50-receipts
+          path: artifacts/business50-astra-baseline-full50.json
           if-no-files-found: warn
           retention-days: 30
