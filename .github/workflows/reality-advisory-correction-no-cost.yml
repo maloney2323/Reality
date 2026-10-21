@@ -1,0 +1,36 @@
+name: Reality Advisory and Correction Foundation No-Cost
+on:
+  push:
+    branches:
+      - fix/governed-verification-and-context-boundary-20261021
+    paths:
+      - 'src/reality-advisory-publication-boundary-v0.1*'
+      - 'src/reality-governed-advisory-repair-v0.1*'
+      - 'benchmarks/business50/reality-governed-astra-all50-v0.3.mjs'
+      - 'benchmarks/business50/reality-governed-all50-v0.3-mock-preflight.mjs'
+      - '.github/workflows/reality-advisory-correction-no-cost.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  no-cost-synthetic-and-original-scorer-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original corpus has never been rewritten
+        run: |
+          echo 'a8a989203915d8614d73eda08ffe24e8cec040e19c6654cb83e6785ea5d3d81c  benchmarks/business50/business-adversarial-50-six-sector-v0.1.js' | sha256sum -c -
+      - name: Verify no privileged execution, forged evidence or bypass
+        run: |
+          node --test src/reality-advisory-publication-boundary-v0.1.test.js src/reality-governed-advisory-repair-v0.1.test.js
+      - name: Test full fifty-case pipeline with synthetic model gateway — NO PAID CALLS
+        run: |
+          node benchmarks/business50/reality-governed-all50-v0.3-mock-preflight.mjs > /tmp/reality-v03-synthetic-test-log.txt
+          tail -2 /tmp/reality-v03-synthetic-test-log.txt
+      - name: Assert honest accounting: fifty cases, independent verification still missing
+        run: |
+          node --input-type=module -e "import {readFileSync} from 'node:fs';const r=JSON.parse(readFileSync('artifacts/mock-reality-business50-all-50-test.json'));const s=r.summary;if(s.provider_calls!==50||s.strict_final_passed+s.strict_final_failed!==50||s.unclassified!==25||s.policy_corrected_independent_outcome_verified!==0||r.independent_source_classification_proven!==false)throw Error('INVALID_MOCK_OR_PROVENANCE_SCORE');console.log(JSON.stringify({synthetic_cases:50,no_real_api_calls:true,strict_accounting:true,independent_outcomes_verified:0}));"
