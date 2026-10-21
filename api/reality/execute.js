@@ -1,6 +1,6 @@
 import { executeAuthorizedWork } from '../../src/reality-governed-execution-engine-v0.1.js';
 import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
-import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
+import { verifyBase44Principal } from '../../src/reality-base44-principal-v0.1.js';
 import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
@@ -23,18 +23,24 @@ function buildWarrantContext(body, authorization) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).setHeader('Allow', 'POST').json({ error: 'METHOD_NOT_ALLOWED' });
   try {
+    const principal = await verifyBase44Principal(req);
     const body = req.body || {};
+    // No body-supplied approval is trusted as execution authority. Only a
+    // server-admitted policy bound to the verified principal can authorize.
+    if (body.authorization != null) return res.status(403).json({ ok:false, error:'CLIENT_SUPPLIED_AUTHORIZATION_REJECTED' });
+    if (body.connector || body.independentVerifier) return res.status(403).json({ ok:false, error:'CLIENT_SUPPLIED_EXECUTION_BRIDGES_REJECTED' });
     if (!body.workItem) return res.status(400).json({ ok: false, error: 'WORK_ITEM_REQUIRED' });
-    if (body.connector || body.independentVerifier) return res.status(400).json({ ok: false, error: 'CLIENT_SUPPLIED_EXECUTION_BRIDGES_REJECTED' });
-    const principal = getOrCreateSessionPrincipal(req, res);
-    let authorization = body.authorization || null;
-    let authoritySource = authorization ? 'EXPLICIT_AUTHORIZATION' : 'NONE';
-    if (authorization?.principal_id && authorization.principal_id !== principal.principal_id) return res.status(403).json({ ok: false, error: 'AUTHORIZATION_PRINCIPAL_MISMATCH' });
-    if (!authorization) {
-      const policy = await getAuthorityPolicy(principal.principal_id);
-      authorization = autoAuthorize({ policy, workItem: body.workItem });
-      if (authorization) authoritySource = 'CUSTOMER_AUTO_AUTHORITY';
+
+    // Keep the production mutation route opt-in until an independently
+    // attested action/consent/readback integration has been exercised.
+    if (process.env.REALITY_GOVERNED_EXECUTION_ENABLED !== 'true') {
+      return res.status(503).json({ok:false,error:'GOVERNED_EXECUTION_NOT_RELEASED'});
     }
+    let authorization = null;
+    let authoritySource = 'NONE';
+    const policy = await getAuthorityPolicy(principal.principal_id);
+    authorization = autoAuthorize({ policy, workItem: body.workItem });
+    if (authorization) authoritySource = 'CUSTOMER_AUTO_AUTHORITY';
     if (!authorization) return res.status(200).json({ ok:true, result:{ status:'BLOCKED', blocked_reason:'EXPLICIT_AUTHORIZATION_REQUIRED', authority_source:'NONE', execution:null, verification:null, outcome:null } });
 
     let bridges;
