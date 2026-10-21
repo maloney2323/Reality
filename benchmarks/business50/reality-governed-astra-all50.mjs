@@ -182,7 +182,7 @@ run.summary={
   governed_passed:run.records.filter(r=>r.governed_score?.pass===true).length,
   governed_failed:run.records.filter(r=>r.governed_score?.pass===false).length,
   unresolved:run.records.filter(r=>r.error).length,
-  no_model_unclassified:run.records.filter(r=>r.outcome_status==='UNCLASSIFIED_WITHHELD').length,
+  no_model_unclassified:run.records.filter(r=>r.outcome_status==='WITHHELD_NO_ADMITTED_POLICY').length,
   requested_case_denominator:50,
   all_50_cases_attempted:run.records.length===50 && run.records.every(r=>r.model_called),
   raw_model_scored:run.records.filter(r=>r.raw_score).length,
@@ -199,5 +199,5 @@ await persist();
 console.log(JSON.stringify({run_id:run.run_id,summary:run.summary,complete:run.complete,
   record_sha256:run.receipt_sha256,record_path:out,
   warning:'FULL_FIFTY_UNMODIFIED_SCORER_DEVELOPMENT_POLICY_NOT_BLINDED'}));
-if(!run.complete||run.records.length!==50||run.summary.provider_calls!==50||
-   !run.summary.all_50_cases_attempted)process.exitCode=1;
+if(runMode!=='preflight'&&(!run.complete||run.records.length!==50||run.summary.provider_calls!==50||
+   !run.summary.all_50_cases_attempted))process.exitCode=1;
