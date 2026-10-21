@@ -168,13 +168,13 @@ export function verifyFourArmAttestation({report,attestation}={}){
     verified_customer_outcome_claims_allowed:false});
 }
 
-export function createCustomerCapabilityReportView({report,provider_readback_verified=false}={}){
+export function createCustomerCapabilityReportView({report}={}){
   const names={A_AGENT_ALONE:'Existing agent',
     B_STANDARD_GUARDRAILS:'Existing agent + standard guardrails',
     C_REALITY_GOVERNED:'Existing agent + Reality',
     D_REALITY_APPROVED_UPGRADE:'Existing agent + Reality + approved upgrade'};
   return Object.freeze({title:'Reality Agent Capability Report',
-    evidence_status:provider_readback_verified?'EXTERNAL_READBACK_CLAIM_REQUIRES_VERIFIER_VALIDATION':'NOT_INDEPENDENTLY_VERIFIED',
+    evidence_status:'NOT_INDEPENDENTLY_VERIFIED',
     verified_results_available:false,
     benchmark_ref:report?.contract_hash??null,
     conditions:FOUR_ARM_PHASES.map(id=>({id,name:names[id],verified_task_completion:null,
