@@ -26,7 +26,7 @@ export function createPostgresOwnerApprovalStore({query}={}) {
       '(approval_key,binding_sha256,owner_id,purpose,subject_ref,consent_ref,expires_at)',
       'SELECT $1,$2,$3,$4,$5,$6,$7::timestamptz',
       'WHERE $7::timestamptz > now()',
-      'ON CONFLICT (approval_key) DO NOTHING',
+      'ON CONFLICT DO NOTHING',
     ].join(' ');
     const args = [
       input.key, input.binding_sha256, input.owner_id,
@@ -34,7 +34,7 @@ export function createPostgresOwnerApprovalStore({query}={}) {
       input.expires_at,
     ];
     // Insert-only database roles must NOT need SELECT or RETURNING rights.
-    // A trusted autocommit PostgreSQL driver provides a server-calculated
+    // Omitting the explicit conflict target avoids requiring SELECT on the PK\n    // for an INSERT-only runtime role. Approval key remains the only unique\n    // constraint in this dedicated table.\n    // A trusted autocommit PostgreSQL driver provides a server-calculated
     // command rowCount: exactly 1 for the unique winner, 0 for duplicates/
     // expired approval. Anything else fails closed without an execution token.
     const result = await query(sql,args);
