@@ -34,10 +34,11 @@ function signed(subject, nonce='nonce:owner-101', changes={}) {
   return {...payload,signature:sign(null,
     Buffer.from(canonicalOwnerConsentMessage(payload)),keys.privateKey).toString('base64')};
 }
-const expected=()=>{
-  ({purpose:SANDBOX_CONSENT_SCOPE,subjectRef:'upgrade-proposal:101',
+const expected=()=>({
+  purpose:SANDBOX_CONSENT_SCOPE,subjectRef:'upgrade-proposal:101',
   originalTaskRef:'original-customer-task:101',
-  governanceKernelRef:'immutable-kernel:101',consentRef:'authorization:101'});
+  governanceKernelRef:'immutable-kernel:101',consentRef:'authorization:101'
+});
 
 test('legacy sandbox never accepts approved:true without signed owner consent',()=>{
   const state={
