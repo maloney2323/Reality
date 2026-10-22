@@ -86,3 +86,12 @@ test('detector event identity is stable and does not grant action authority',()=
  assert.equal(a.alters_authority,false);
  assert.throws(()=>createEpistemicDiscrepancyEvent({...params,confidence:2}),/DETECTOR_CONFIDENCE_INVALID/);
 });
+
+test('matching structured evidence never creates a discrepancy or intervention',()=>{
+ const first=obs('same-a',{value:90,currency:'USD'});
+ const second=obs('same-b',{currency:'USD',value:90},{seen:t1});
+ const inspected=inspectEpistemicDifferences({observations:[first,second]});
+ assert.equal(inspected.typed_claims_examined,2);
+ assert.deepEqual(inspected.epistemic_discrepancies,[]);
+ assert.equal(inspected.intervention_count,0);
+});
