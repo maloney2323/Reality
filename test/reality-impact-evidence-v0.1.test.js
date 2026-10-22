@@ -48,3 +48,49 @@ test('cross-customer data cannot enter the read-only impact projection',()=>{
   evaluations:[{tenant_id:'different:customer',turn_id:'x',drift_confirmed:true}],
  }),/IMPACT_CROSS_TENANT_RECORD/);
 });
+
+test('Reality earns credit for independently proven model errors correctly caught even without correction',()=>{
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,
+  detections:[{tenant_id:tenant,status:'ERROR_INDEPENDENTLY_CONFIRMED',
+   detection_id:'detect:invoice:17',
+   original_model_output_ref:'model:original:incorrect-estimate',
+   model_id:'model:version-A',turn_id:'construction:turn:14',
+   detection_receipt_id:'reality:detector:14',
+   independent_error_grade_receipt_id:'grade:14',
+  }],
+ });
+ assert.equal(r.verified_underlying_model_errors_caught,1);
+ assert.equal(r.verified_errors_contained_before_action,0);
+ assert.equal(r.verified_corrections,0);
+ assert.equal(r.verified_roi,null);
+});
+test('separate a confirmed catch from an independently verified pre-action containment',()=>{
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,
+  detections:[{tenant_id:tenant,status:'ERROR_INDEPENDENTLY_CONFIRMED',
+   detection_id:'detect:estimate:18',
+   original_model_output_ref:'model:err',model_id:'underlying:gpt',
+   turn_id:'turn:18',detection_receipt_id:'reality:18',
+   independent_error_grade_receipt_id:'grader:18',
+   containment_status:'VERIFIED_BEFORE_EXTERNAL_ACTION',
+   independent_containment_receipt_id:'verifier:blocked-send',
+   action_scope_ref:'estimate:send-to-customer',
+  }],
+ });
+ assert.equal(r.verified_underlying_model_errors_caught,1);
+ assert.equal(r.verified_errors_contained_before_action,1);
+ assert.equal(r.verified_corrections,0);
+ assert.equal(r.verified_roi,null);
+});
+test('raw alerts, incomplete verdicts and duplicate detections do not inflate ROI',()=>{
+ const base={tenant_id:tenant,status:'ERROR_INDEPENDENTLY_CONFIRMED',
+  detection_id:'same',original_model_output_ref:'model:err',model_id:'provider:A',
+  turn_id:'turn:1',detection_receipt_id:'det:1',
+  independent_error_grade_receipt_id:'grade:1'};
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,
+  detections:[base,{...base},{...base,detection_id:'incomplete',independent_error_grade_receipt_id:null},
+   {tenant_id:tenant,detection_id:'suspicious',status:'DETECTED'}],
+ });
+ assert.equal(r.verified_underlying_model_errors_caught,1);
+ assert.equal(r.unverified_detection_candidates_excluded,3);
+ assert.equal(r.verified_roi,null);
+});

@@ -5,11 +5,11 @@ export const REALITY_IMPACT_VERSION='reality-impact-evidence-v0.1';
 const defined=x=>typeof x==='string'&&x.trim().length>0;
 const validNumber=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
 export function summarizeRealityImpact({
-  evaluations=[],corrections=[],upgrades=[],benefits=[],
+  evaluations=[],detections=[],corrections=[],upgrades=[],benefits=[],
   authenticatedTenantId,
 }={}){
  if(!defined(authenticatedTenantId))throw Error('IMPACT_AUTHENTICATED_TENANT_REQUIRED');
- for(const arr of [evaluations,corrections,upgrades,benefits]){
+ for(const arr of [evaluations,detections,corrections,upgrades,benefits]){
   if(!Array.isArray(arr))throw Error('IMPACT_RECORDS_INVALID');
   if(arr.some(x=>x?.tenant_id!==authenticatedTenantId))
    throw Error('IMPACT_CROSS_TENANT_RECORD');
@@ -25,6 +25,28 @@ export function summarizeRealityImpact({
   percentage:100*measured.filter(x=>x.drift_confirmed).length/measured.length,
   coverage:'GRADED_TURNS_ONLY',
  }:null;
+ // A model's error caught by Reality is valuable independently of any
+ // external action, verified correction, or dollar savings. But a diagnostic
+ // flag alone is NOT a verified catch. Every counted catch needs an independent
+ // adjudication of the original output plus a traceable detector receipt.
+ const verifiedCatchIds=new Set();
+ const verifiedCatchRecords=[];
+ for(const hit of detections){
+  if(hit?.status!=='ERROR_INDEPENDENTLY_CONFIRMED' ||
+     !defined(hit?.detection_id) ||
+     !defined(hit?.original_model_output_ref) ||
+     !defined(hit?.model_id) ||
+     !defined(hit?.turn_id) ||
+     !defined(hit?.detection_receipt_id) ||
+     !defined(hit?.independent_error_grade_receipt_id) ||
+     verifiedCatchIds.has(hit.detection_id))continue;
+  verifiedCatchIds.add(hit.detection_id);
+  verifiedCatchRecords.push(hit);
+ }
+ const contained=verifiedCatchRecords.filter(x=>
+   x?.containment_status==='VERIFIED_BEFORE_EXTERNAL_ACTION' &&
+   defined(x?.independent_containment_receipt_id) &&
+   defined(x?.action_scope_ref));
  const fixed=corrections.filter(x=>
    x?.status==='CORRECTION_VERIFIED'&&
    defined(x?.original_model_output_ref)&&
@@ -55,15 +77,20 @@ export function summarizeRealityImpact({
  return Object.freeze({
   version:REALITY_IMPACT_VERSION,tenant_id:authenticatedTenantId,
   model_drift:driftRate,
+  verified_underlying_model_errors_caught:verifiedCatchRecords.length,
+  verified_errors_contained_before_action:contained.length,
   verified_corrections:fixed.length,
   authorized_production_upgrades:promoted.length,
   verified_roi:roi,
   receipt_quality:'ONLY_EVIDENCE_BACKED_STATUSES_COUNTED',
   ungraded_turns:evaluations.length-measured.length,
+  unverified_detection_candidates_excluded:detections.length-verifiedCatchRecords.length,
   correction_candidates_excluded:corrections.length-fixed.length,
   upgrade_candidates_excluded:upgrades.length-promoted.length,
   benefits_excluded:benefits.length-supported.length,
   detector_interventions_not_equivalent_to_verified_corrections:true,
+  independently_verified_errors_caught_are_operational_value:true,
+  error_caught_does_not_prove_financial_loss_prevented:true,
   values_must_not_be_displayed_as_total_business_savings:true,
  });
 }

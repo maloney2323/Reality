@@ -36,6 +36,10 @@ on:
       - "test/reality-verified-layer-handoff-v0.1.test.js"
       - "test/reality-six-layer-integration-v0.1.test.js"
       - "test/reality-persistence-integrity-v0.1.test.js"
+      - "index.html"
+      - "src/reality-impact-evidence-v0.1.js"
+      - "test/reality-impact-evidence-v0.1.test.js"
+      - "test/reality-impact-ui-v0.1.test.js"
   workflow_dispatch:
 permissions:
   contents: read
@@ -74,5 +78,7 @@ jobs:
       - name: Preserve pre-existing capability gap runtime contract
         run: node --test test/capability-gap-runtime-v1.test.js
 
+      - name: Validate evidence-based model-error catches, measured benefit and Impact UI
+        run: node --test test/reality-impact-evidence-v0.1.test.js test/reality-impact-ui-v0.1.test.js
       - name: Keep live orchestration state machine and existing semantics working
         run: node --test test/reality-live-intelligence-orchestration-v0.1.test.js
