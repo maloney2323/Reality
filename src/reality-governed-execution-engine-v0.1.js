@@ -55,7 +55,8 @@ export async function executeAuthorizedWork({
     providerResult,
   });
 
-  const verified = verification?.verified === true;
+  // Verification must be an independent readback, not merely an executor echo.
+  const verified = verification?.verified === true && verification?.independent === true;
   const outcome = Object.freeze({
     outcome_state:verified?'VERIFIED_OUTCOME':'UNRESOLVED',
     verified,
