@@ -1,0 +1,137 @@
+// Base44-independent entrypoint to the EXISTING Reality cognition, Universe,
+// Continuity Ledger and Integrity Spine. Server-owned identity and evidence.
+// This is a preview pilot until the full frontend/data migration is verified.
+import {createUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
+import {persistUniverseEntry,retrievePersistedUniverse} from './reality-native-universe-persistence-v1.0.js';
+import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
+import {verifyStandaloneUser,createStandaloneConversationScope,
+ rejectUnsafeStandalonePayload,scopedTurnEntryId,
+ STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
+
+export const STANDALONE_CHAT_VERSION='reality-standalone-chat-v0.1';
+const error=(code,status=400)=>{const e=new Error(code);e.status=status;return e};
+function makeTurnEntry({scope,turnId,role,text,observedAt}){
+ return createUniverseEntry({
+  entry_id:scopedTurnEntryId({root:scope.continuity_root_id,turnId,role}),
+  continuity_root_id:scope.continuity_root_id,
+  worldline_id:scope.worldline_id,
+  event_kind:'AUTHENTICATED_CONVERSATION_MESSAGE',
+  epistemic_kind:'OBSERVATION',
+  assertion_time:observedAt,
+  effective_time:observedAt,
+  source_ref:'reality:authenticated:customer-conversation',
+  payload:{
+   role,text,
+   // A customer utterance is evidence of intent, not external-world truth.
+   epistemic_status:role==='user'?'USER_ASSERTED_INTENT':'MODEL_OUTPUT_UNVERIFIED',
+   turn_id:turnId,principal_id:scope.authenticated_user_id,
+  },
+  evidence_references:[],
+  provenance:{
+   source:STANDALONE_HISTORY_PROVENANCE,
+   authenticated_user_id:scope.authenticated_user_id,
+   owner_scoped_root:scope.continuity_root_id,
+   authority_granted:false,
+  },
+ });
+}
+export function reconstructStandaloneHistory({entries,scope}={}){
+ if(!Array.isArray(entries)||!scope?.continuity_root_id)
+  throw error('STANDALONE_HISTORY_INVALID',503);
+ const retained=entries.filter(e=>
+  e.event_kind==='AUTHENTICATED_CONVERSATION_MESSAGE'&&
+  e.continuity_root_id===scope.continuity_root_id&&
+  e.worldline_id===scope.worldline_id&&
+  e.provenance?.source===STANDALONE_HISTORY_PROVENANCE&&
+  e.provenance?.authenticated_user_id===scope.authenticated_user_id&&
+  e.payload?.principal_id===scope.authenticated_user_id&&
+  ['user','assistant'].includes(e.payload?.role)&&
+  typeof e.payload?.text==='string');
+ return retained.sort((a,b)=>Date.parse(a.assertion_time)-Date.parse(b.assertion_time)||
+   a.entry_id.localeCompare(b.entry_id))
+  .slice(-60).map(e=>Object.freeze({
+   role:e.payload.role,text:e.payload.text.slice(0,12000),
+   source_ref:'reality:universe:'+e.entry_id,
+  }));
+}
+export async function processStandaloneChat(req,{
+ fetchImpl=fetch,env=process.env,
+ load=retrievePersistedUniverse,store=persistUniverseEntry,
+ run=runLiveIntelligenceOrchestration,
+ now=()=>new Date().toISOString(),
+}={}){
+ if(env.REALITY_STANDALONE_CHAT_ENABLED!=='true')
+  throw error('STANDALONE_CHAT_DISABLED',503);
+ if(env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+  throw error('STANDALONE_DURABILITY_REQUIRED',503);
+ const principal=await verifyStandaloneUser(req,{fetchImpl,env});
+ const input=rejectUnsafeStandalonePayload(req.body);
+ const scope=createStandaloneConversationScope({
+  userId:principal.user_id,conversationId:input.conversationId,
+  thoughtId:input.thoughtId,
+ });
+ // No global scan or client-supplied history: the server selects one owner root.
+ const stored=await load({continuityRootId:scope.continuity_root_id,
+  worldlineId:scope.worldline_id,limit:100,fetchImpl});
+ if(stored?.status!=='AVAILABLE'||!Array.isArray(stored.entries))
+  throw error('STANDALONE_LEDGER_UNAVAILABLE',503);
+ const history=reconstructStandaloneHistory({entries:stored.entries,scope});
+ const userEntryId=scopedTurnEntryId({
+  root:scope.continuity_root_id,turnId:input.turnId,role:'user'});
+ if(stored.entries.some(x=>x.entry_id===userEntryId))
+  throw error('STANDALONE_TURN_ID_ALREADY_USED',409);
+ const observedAt=now();
+ const accepted=await store(makeTurnEntry({
+  scope,turnId:input.turnId,role:'user',
+  text:input.message,observedAt,
+ }),{fetchImpl});
+ if(!['PERSISTED','DUPLICATE_IDENTICAL','DUPLICATE_IDENTICAL_CONCURRENT'].includes(accepted?.status)||
+     accepted?.entry?.entry_id!==userEntryId)
+  throw error('STANDALONE_USER_MESSAGE_NOT_DURABLY_CONFIRMED',503);
+ const result=await run({
+  message:input.message,requestedBy:principal.user_id,
+  systemContext:{
+   ...scope,
+   authenticated_conversation_turns:history,
+   // Explicitly avoid accepting browser supplied external facts.
+   universe_entries:[],connected_world_observations:[],
+   verified_conversation_context:history.map(x=>x.role.toUpperCase()+': '+x.text).join('\n'),
+  },
+  fetchImpl,
+ });
+ // The receipt, not the model's own wording, establishes durability.
+ if(result?.context?.continuity?.root_id!==scope.continuity_root_id ||
+    result?.context?.continuity?.cognitive_readback_verified!==true ||
+    result?.context?.continuity?.signal_handoff_status!=='STORED_AND_READ_BACK')
+  throw error('STANDALONE_COGNITION_NOT_DURABLY_CONFIRMED',503);
+ const rawAnswer=result?.intelligence?.raw_model_answer;
+ const displayedAnswer=result?.intelligence?.answer;
+ if(typeof rawAnswer!=='string'||!rawAnswer.trim()||
+    typeof displayedAnswer!=='string')
+  throw error('STANDALONE_RESPONSE_MISSING',503);
+ const assistantEntryId=scopedTurnEntryId({
+  root:scope.continuity_root_id,turnId:input.turnId,role:'assistant'});
+ const assistant=await store(makeTurnEntry({
+  scope,turnId:input.turnId,role:'assistant',text:rawAnswer,
+  observedAt:now(),
+ }),{fetchImpl});
+ if(!['PERSISTED','DUPLICATE_IDENTICAL','DUPLICATE_IDENTICAL_CONCURRENT'].includes(assistant?.status)||
+    assistant?.entry?.entry_id!==assistantEntryId)
+  throw error('STANDALONE_ASSISTANT_MESSAGE_NOT_DURABLY_CONFIRMED',503);
+ return Object.freeze({
+  ok:true,version:STANDALONE_CHAT_VERSION,
+  response:displayedAnswer,
+  result,
+  identity_basis:scope.identity_basis,
+  continuity_root_id:scope.continuity_root_id,
+  receipt:{
+   user_message_entry_id:userEntryId,
+   assistant_message_entry_id:assistantEntryId,
+   cognition_ledger_event_id:result.context.continuity.event_id,
+   cognitive_readback_verified:true,
+   history_window_count:history.length,
+   history_is_complete:false,
+  },
+  external_action_executed:false,
+ });
+}
