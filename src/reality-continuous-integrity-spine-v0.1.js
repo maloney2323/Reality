@@ -413,7 +413,7 @@ export function replayConversationTrajectory({
         classification:'CONVERSATIONAL_RETROSPECTIVE_DRIFT',
         origin_stage:'COGNITION',
         // Turns in the supplied chronologically ordered history are 1-based.
-        apparent_origin_turn:i+1,
+        apparent_origin_turn:priorTurns.slice(0,i+1).filter(t=>t.role==='assistant').length,
         origin_turn_ref:turn.source_ref,
         original_user_turn_ref:x.source_receipt_refs[0],
         original_user_text:x.original_user_text,
@@ -421,7 +421,7 @@ export function replayConversationTrajectory({
         expected_condition:x.expected_condition,
         proposed_action:x.proposed_action,
         source_receipt_refs:[x.source_receipt_refs[0],turn.source_ref],
-        retrospective_detection_turn:priorTurns.length+1,
+        retrospective_detection_turn:priorTurns.filter(t=>t.role==='assistant').length+1,
         previously_recorded_detection:priorReceipt,
         discovery_status:priorReceipt?
           'PRIOR_DIAGNOSTIC_RECEIPT_FOUND':'NOT_FOUND_IN_SUPPLIED_DIAGNOSTIC_RECEIPTS',
