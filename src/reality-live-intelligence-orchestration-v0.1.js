@@ -8,7 +8,7 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 import { inspectModelOutputWithContinuity } from './reality-model-output-integrity-v0.1.js';
-import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine } from './reality-continuous-integrity-spine-v0.1.js';
+import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine, inspectConversationDrift } from './reality-continuous-integrity-spine-v0.1.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
@@ -301,6 +301,19 @@ export async function runLiveIntelligenceOrchestration({
     observedAt:observedAt||new Date().toISOString(),
   });
   const {candidate_observations:_syntheticComparator,...modelIntegrityPublic}=modelIntegrity;
+  // Earlier speaker turns must be retrieved and authenticated server side.
+  const historyAuthenticated=systemContext?.context_source==='BASE44_AUTHENTICATED_PERSONAL_REALITY' &&
+    Boolean(systemContext?.authenticated_user_id) && systemContext?.ephemeral_no_history!==true;
+  const conversationDrift=inspectConversationDrift({
+    priorTurns:historyAuthenticated?systemContext.authenticated_conversation_turns||[]:[],
+    historySource:historyAuthenticated?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
+    currentUserMessage:message,modelAnswer:rawModelAnswer,
+    continuityRootId:effectiveContinuityRootId,
+    currentUserSourceRef:governedSignal.packet.packet_id,
+    modelResponseId:cognitiveResult.response_id||'untracked',
+  });
+  const {anchors:_intentCandidates,...conversationDriftPublic}=conversationDrift;
+  const combinedIntegrityFindings=[...modelIntegrity.findings,...conversationDrift.findings];
   let spine=null,spineSummary=null;
   // Only claim lineage anchoring if an earlier handoff was stored and read back.
   if(signalHandoff?.status==='STORED_AND_READ_BACK' && effectiveContinuityRootId){
@@ -320,17 +333,19 @@ export async function runLiveIntelligenceOrchestration({
           : stage==='COGNITION'
             ? ['model-response:'+(cognitiveResult.response_id||'untracked')]
             : [signalHandoff.entry_id],
-        observedModelFindings:stage==='COGNITION'?modelIntegrity.findings:[],
+        observedModelFindings:stage==='COGNITION'?combinedIntegrityFindings:[],
         // The selected context is bounded; full obligation coverage unproven.
         presentOpenObligationIds:null,
       });
     }
     spineSummary=summarizeIntegritySpine(spine);
   }
-  const integrityRequiresReview=modelIntegrity.findings.some(x=>
-    ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
+  const integrityRequiresReview=combinedIntegrityFindings.some(x=>
+    ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM',
+      'CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT',
+      'CONVERSATIONAL_REVISION_REQUIRES_REVIEW'].includes(x.classification));
   const note=integrityRequiresReview
-    ? '\n\nReality integrity notice: This response contains an operational claim that conflicts with source-attested context or asserts an unverified action. Treat it as unverified pending independent confirmation; no external action is authorized.'
+    ? '\n\nReality integrity notice: A material claim, prior conversational condition, or requested revision needs review. The original user requirement remains recorded; no independent truth verdict or external action is authorized.'
     : '';
   const modelResult = {
     ...cognitiveResult,
@@ -384,6 +399,7 @@ export async function runLiveIntelligenceOrchestration({
           cleaner_verification:verifiedCleaner,
           passive_epistemic_diagnostics:passiveEpistemicDiagnostics,
           model_output_integrity:modelIntegrityPublic,
+          conversation_drift:conversationDriftPublic,
           integrity_spine:spine?spine:null,
           contradiction_diagnostics:'NARROW_EXPLICIT_MODEL_CLAIMS_COMPARED_NOT_FULL_SEMANTIC_VERIFICATION',
         },
@@ -400,6 +416,7 @@ export async function runLiveIntelligenceOrchestration({
     if(stored.entry?.ledger_entry_hash!==continuityReadback.ledger_entry_hash ||
        continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash ||
        continuityReadback.payload?.model_output_integrity?.status!==modelIntegrityPublic.status ||
+       continuityReadback.payload?.conversation_drift?.status!==conversationDriftPublic.status ||
        (spine && continuityReadback.payload?.integrity_spine?.trace_hash!==spine.trace_hash))
       throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
@@ -491,6 +508,7 @@ export async function runLiveIntelligenceOrchestration({
     context: { universe: { status: universeContext.status, count: universeContext.count },
       epistemic_diagnostics:clone(passiveEpistemicDiagnostics),
       model_output_integrity:clone(modelIntegrityPublic),
+      conversation_drift:clone(conversationDriftPublic),
       integrity_spine:spineSummary?clone(spineSummary):{status:'NOT_DURABLY_ANCHORED'},
       continuity: {
       root_id: effectiveContinuityRootId,
@@ -521,7 +539,7 @@ export async function runLiveIntelligenceOrchestration({
       work:null,
       integrity_review:{
         status:'WORK_PROPOSAL_HELD',reason:'UNVERIFIED_MATERIAL_MODEL_ASSERTION',
-        finding_ids:modelIntegrity.findings.map(x=>x.issue_id),
+        finding_ids:combinedIntegrityFindings.map(x=>x.issue_id),
         authorization_granted:false,
       },
     };
