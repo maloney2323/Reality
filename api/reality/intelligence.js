@@ -3,6 +3,7 @@ export const maxDuration = 60;
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
+import { buildAuthenticatedChatContinuity } from '../../src/reality-authenticated-chat-continuity-v0.1.js';
 
 const BASE44_API = 'https://base44.app/api';
 const BASE44_APP_ID = '6a7bd610756b32bc21c39ad0';
@@ -282,18 +283,46 @@ export default async function handler(req, res) {
       }
     }
 
-    const realityContext = await loadRealityContext(req, body).catch((error) => {
-      if (error?.message === 'REALITY_SESSION_REQUIRED') throw error;
-      if (error?.message === 'REALITY_CHAT_TRACE_REQUIRED') throw error;
-      return null;
-    });
+    // Selectors name a project; they are not identity or a trusted ledger root.
+    // Require both selectors and independently verify the Base44 user before
+    // deriving any durable continuity identity. An anonymous client must never
+    // choose a persisted conversation root by providing arbitrary IDs.
+    const thoughtSelected = Boolean(String(body?.thought_id || '').trim());
+    const conversationSelected = Boolean(String(body?.conversation_id || '').trim());
+    if (thoughtSelected !== conversationSelected) {
+      const error = new Error('REALITY_CHAT_TRACE_REQUIRED');
+      error.status = 400;
+      throw error;
+    }
+    const hasAuthenticatedBearer = Boolean(bearer(req));
+    if (conversationSelected && !hasAuthenticatedBearer) {
+      const error = new Error('AUTHENTICATED_SESSION_REQUIRED_FOR_DURABLE_CONTINUITY');
+      error.status = 401;
+      throw error;
+    }
+    // Do not swallow failed authentication or Base44 retrieval and silently
+    // replace a real project with an anonymous, unrelated conversation.
+    const realityContext = hasAuthenticatedBearer
+      ? await loadRealityContext(req, body, { noHistoryWhenSelectorsMissing: !conversationSelected })
+      : null;
+    const persistentProjectSelected = conversationSelected &&
+      Boolean(realityContext?.authenticated_user_id);
+    const scopedContext = persistentProjectSelected
+      ? buildAuthenticatedChatContinuity({ body, authenticatedContext: realityContext })
+      : {
+          ...(realityContext || {}),
+          ephemeral_no_history: true,
+          continuity_root_id: null,
+          conversation_id: null,
+          thought_id: null,
+          identity_basis: hasAuthenticatedBearer
+            ? 'BASE44_VERIFIED_EPHEMERAL_NO_HISTORY'
+            : 'ANONYMOUS_EPHEMERAL_NO_HISTORY',
+        };
 
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
-      ...(realityContext || {}),
-      conversation_id: String(body?.conversation_id || '').trim() || null,
-      thought_id: String(body?.thought_id || '').trim() || null,
-      continuity_root_id: realityContext?.continuity_root_id || null,
+      ...scopedContext,
       connected_world_observations: worldObservations,
       world_observation_status: worldObservations.length ? 'OBSERVED' : 'NO_OBSERVATIONS',
       world_observation_count: worldObservations.length,
@@ -304,6 +333,10 @@ export default async function handler(req, res) {
       requestedBy: realityContext?.authenticated_user_id || principal.principal_id,
       systemContext: operationalContext,
     });
+    const ledger = result?.context?.continuity || {};
+    const durableReadbackVerified = persistentProjectSelected &&
+      ledger.signal_handoff_status === 'STORED_AND_READ_BACK' &&
+      ledger.cognitive_readback_verified === true;
 
     return res.status(200).json({
       ok: true,
@@ -311,7 +344,15 @@ export default async function handler(req, res) {
       continuity: {
         context_loaded: Boolean(realityContext),
         authenticated_user_context: Boolean(realityContext?.authenticated_user_id),
-        durable_context_source: realityContext ? 'BASE44_PERSONAL_REALITY' : 'NONE',
+        durable_context_source: persistentProjectSelected
+          ? 'BASE44_AUTHENTICATED_PROJECT_SCOPE'
+          : 'NONE',
+        mode: !persistentProjectSelected ? 'EPHEMERAL_NO_HISTORY'
+          : durableReadbackVerified ? 'DURABLE_READBACK_VERIFIED'
+          : 'AUTHENTICATED_PERSISTENCE_NOT_VERIFIED',
+        durable_readback_verified: durableReadbackVerified,
+        // This is a diagnostic root identifier, not a bearer or authority grant.
+        root_id: persistentProjectSelected ? scopedContext.continuity_root_id : null,
       },
     });
   } catch (error) {
