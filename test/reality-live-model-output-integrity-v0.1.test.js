@@ -114,9 +114,12 @@ test('live turn-2 model subtly drops a user precondition and retains evidence in
    authenticated_conversation_turns:history,
   },
  });
- assert.equal(result.mode,'INTEGRITY_REVIEW_REQUIRED');
- assert.equal(result.work,null);
+ assert.equal(result.mode,'ACTION_CANDIDATE');
+ assert.ok(result.work,'a diagnostic does not create new conversational governance gates');
+ assert.equal(result.work.authorization_request.authorized,false);
  assert.equal(result.authority.granted,false);
+ assert.equal(result.intelligence.conversation_drift_observed,true);
+ assert.equal(result.intelligence.integrity_review_required,false);
  assert.equal(result.context.conversation_drift.status,'EARLY_CONVERSATION_DRIFT_RISK');
  assert.equal(result.context.conversation_drift.findings.length,1);
  assert.equal(result.context.conversation_drift.findings[0].classification,
