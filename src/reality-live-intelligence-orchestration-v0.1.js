@@ -2,6 +2,7 @@ import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cl
 import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from './reality-verified-layer-handoff-v0.1.js';
 import { retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
+import { inspectPersistedEpistemicDifferences } from './reality-live-epistemic-diagnostics-v0.1.js';
 import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
@@ -156,6 +157,11 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
+  const passiveEpistemicDiagnostics = inspectPersistedEpistemicDifferences({
+    entries:universeContext.entries,
+    continuityRootId:explicitContinuityRootId || conversationContinuityRootId,
+    worldlineId:systemContext?.worldline_id || 'reality:primary',
+  });
   let persistedContinuity = explicitContinuityRootId
     ? buildContinuityRehydration({
         continuityRootId: explicitContinuityRootId,
@@ -215,6 +221,7 @@ export async function runLiveIntelligenceOrchestration({
     : null;
   const cognitionContext = {
     signal_cleaner_structural_verification:verifiedCleaner,
+    epistemic_diagnostics:passiveEpistemicDiagnostics,
     signal_ledger_handoff:signalHandoff ? {
       status:signalHandoff.status,
       entry_id:signalHandoff.entry_id,
@@ -305,6 +312,7 @@ export async function runLiveIntelligenceOrchestration({
           signal_handoff_entry_id:signalHandoff?.entry_id || null,
           signal_handoff_ledger_hash:signalHandoff?.ledger_entry_hash || null,
           cleaner_verification:verifiedCleaner,
+          passive_epistemic_diagnostics:passiveEpistemicDiagnostics,
           contradiction_diagnostics:'MODEL_LANE_TEXT_PRESERVED_NOT_SEMANTICALLY_VERIFIED',
         },
         observedAt: observedAt || new Date().toISOString(),
@@ -406,7 +414,8 @@ export async function runLiveIntelligenceOrchestration({
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
-    context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
+    context: { universe: { status: universeContext.status, count: universeContext.count },
+      epistemic_diagnostics:clone(passiveEpistemicDiagnostics), continuity: {
       root_id: effectiveContinuityRootId,
       discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
