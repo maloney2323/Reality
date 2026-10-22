@@ -185,9 +185,10 @@ test('12 hard sequential construction turns: native detections, continuity, auth
      turn.label+' missing '+expected+': '+[...classes].join(','));
    if(turn.metaphor)assert.equal(observed.length,priorDiscrepancies,
      'Nonliteral metaphor must not create a discrepancy');
-   if(turn.other)assert.ok(
-     output.context.epistemic_diagnostics.ignored_untrusted_or_out_of_scope>=1,
-     'Cross-tenant record not ignored');
+   if(turn.other)assert.equal(
+     output.context.epistemic_diagnostics.source_observation_count,
+     outputs.at(-2).context.epistemic_diagnostics.source_observation_count,
+     'Cross-tenant source must be excluded by scoped Universe retrieval before detector');
    if(turn.action)assert.equal(output.mode,'ACTION_CANDIDATE',turn.label);
    if(i===0)assert.equal(output.context.epistemic_diagnostics.contradictions.length,0);
    if(i===1)assert.equal(output.context.epistemic_diagnostics.contradictions.length,0);
