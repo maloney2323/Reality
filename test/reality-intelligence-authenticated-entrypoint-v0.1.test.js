@@ -124,7 +124,7 @@ test('UI reports scoped continuity and passive typed discrepancies without inven
   assert.match(page,/Status: OBSERVATION_ONLY/);
   assert.match(page,/Truth not adjudicated/);
   assert.match(page,/No trusted structured-source discrepancies were returned in the retrieved window/);
-  assert.match(page,/esc\\(compactValue\\(e\\.previous_value\\)\\)/);
-  assert.match(page,/esc\\(compactValue\\(e\\.incoming_value\\)\\)/);
+  assert.ok(page.includes('esc(compactValue(e.previous_value))'));
+  assert.ok(page.includes('esc(compactValue(e.incoming_value))'));
   assert.doesNotMatch(page,/100% hallucination-free/);
 });
