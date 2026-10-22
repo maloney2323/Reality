@@ -16,8 +16,20 @@ export function summarizeRealityImpact({
  }
  // Only independently adjudicated evaluations define a denominator;
  // "no observations" is NOT a 0% drift rate.
- const measured=evaluations.filter(x=>x?.independent_grade_receipt_id&&
+ // Duplicate or inconsistent grading of the same turn must not change the
+ // denominator or manufacture certainty. Exclude ambiguous turn identities.
+ const graded=evaluations.filter(x=>defined(x?.independent_grade_receipt_id)&&
    defined(x?.turn_id)&&typeof x?.drift_confirmed==='boolean');
+ const gradeGroups=new Map();
+ for(const row of graded){
+   const group=gradeGroups.get(row.turn_id)||[];
+   group.push(row); gradeGroups.set(row.turn_id,group);
+ }
+ const measured=[];
+ for(const group of gradeGroups.values()){
+   if(group.length!==1)continue; // Duplicate grading is ambiguous until reconciled.
+   measured.push(group[0]);
+ }
  const driftRate=measured.length?{
   numerator:measured.filter(x=>x.drift_confirmed).length,
   denominator:measured.length,
@@ -47,29 +59,42 @@ export function summarizeRealityImpact({
    x?.containment_status==='VERIFIED_BEFORE_EXTERNAL_ACTION' &&
    defined(x?.independent_containment_receipt_id) &&
    defined(x?.action_scope_ref));
+ const correctionReceiptIds=new Set();
  const fixed=corrections.filter(x=>
    x?.status==='CORRECTION_VERIFIED'&&
    defined(x?.original_model_output_ref)&&
    defined(x?.independent_verification_receipt_id)&&
-   defined(x?.corrected_outcome_ref));
+   defined(x?.corrected_outcome_ref)&&
+   !correctionReceiptIds.has(x.independent_verification_receipt_id)&&
+   Boolean(correctionReceiptIds.add(x.independent_verification_receipt_id)));
+ const releasedReceiptIds=new Set();
  const promoted=upgrades.filter(x=>
    x?.status==='PROMOTED'&&
    defined(x?.promotion_authorization_receipt_id)&&
    defined(x?.independent_regression_receipt_id)&&
-   defined(x?.release_receipt_id));
+   defined(x?.release_receipt_id)&&
+   !releasedReceiptIds.has(x.release_receipt_id)&&
+   Boolean(releasedReceiptIds.add(x.release_receipt_id)));
  // For verified ROI we additionally require a signed customer/time-accounting
  // receipt, actual directly attributable saved labor or expense, plus baseline.
  // Projected "avoided losses" remain estimates and NEVER count here.
+ const outcomeReceiptIds=new Set();
  const supported=benefits.filter(x=>
    x?.status==='VERIFIED_REALIZED_BENEFIT'&&
    defined(x?.baseline_receipt_id)&&
    defined(x?.customer_confirmation_receipt_id)&&
    defined(x?.measured_outcome_receipt_id)&&
-   validNumber(x?.verified_value_usd)&&validNumber(x?.attributable_cost_usd));
+   validNumber(x?.verified_value_usd)&&validNumber(x?.attributable_cost_usd)&&
+   !outcomeReceiptIds.has(x.measured_outcome_receipt_id)&&
+   Boolean(outcomeReceiptIds.add(x.measured_outcome_receipt_id)));
  const roi=supported.length?{
   verified_net_benefit_usd:supported.reduce((n,x)=>n+x.verified_value_usd-x.attributable_cost_usd,0),
   verified_gross_benefit_usd:supported.reduce((n,x)=>n+x.verified_value_usd,0),
   measured_cases:supported.length,
+  verified_total_cost_usd:supported.reduce((n,x)=>n+x.attributable_cost_usd,0),
+  verified_roi_percentage:supported.reduce((n,x)=>n+x.attributable_cost_usd,0)>0
+    ? 100*supported.reduce((n,x)=>n+x.verified_value_usd-x.attributable_cost_usd,0)/
+      supported.reduce((n,x)=>n+x.attributable_cost_usd,0):null,
   attribution:'RECEIPT_BOUND_REALIZED_BENEFITS_ONLY',
  }:null;
  // Only show one observed event per ID. Unverified, partial and merely
@@ -82,8 +107,11 @@ export function summarizeRealityImpact({
   verified_corrections:fixed.length,
   authorized_production_upgrades:promoted.length,
   verified_roi:roi,
-  receipt_quality:'ONLY_EVIDENCE_BACKED_STATUSES_COUNTED',
-  ungraded_turns:evaluations.length-measured.length,
+  receipt_quality:'RECEIPT_REFERENCES_PRESENT_CONTENT_REQUIRES_INDEPENDENT_READBACK',
+  independent_receipt_readback_performed_by_projection:false,
+  production_claim_requires_authenticated_source_admission:true,
+  ungraded_turns:evaluations.length-graded.length,
+  duplicate_or_ambiguous_grade_records_excluded:graded.length-measured.length,
   unverified_detection_candidates_excluded:detections.length-verifiedCatchRecords.length,
   correction_candidates_excluded:corrections.length-fixed.length,
   upgrade_candidates_excluded:upgrades.length-promoted.length,

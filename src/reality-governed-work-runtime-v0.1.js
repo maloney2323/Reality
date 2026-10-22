@@ -126,8 +126,8 @@ export function authorize({ request, approvedBy, scope }) {
 
 export function canExecute({ workItem, authorization }) {
   if (!workItem?.work_item_id) return { allowed:false, reason:'WORK_ITEM_REQUIRED' };
-  if (!workItem.consequential && !SENSITIVE_OPERATIONS.has(workItem.operation))
-    return { allowed:true, reason:'NON_CONSEQUENTIAL_WORK_ITEM' };
+  // An execution bridge must not trust client-side risk labels to bypass authority.
+  // Read-only discovery belongs to separate read-only interfaces.
   if (!authorization?.authorized) return { allowed:false, reason:'EXPLICIT_AUTHORIZATION_REQUIRED' };
   if (authorization.workflow_id !== workItem.workflow_id) return { allowed:false, reason:'AUTHORIZATION_WORKFLOW_MISMATCH' };
   const allowed = (authorization.allowed_operations || []).some((x) =>

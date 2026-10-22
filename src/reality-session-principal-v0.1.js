@@ -27,8 +27,15 @@ export function verifySessionPrincipal(token) {
 
 export function getOrCreateSessionPrincipal(req, res) {
   const cookies = String(req.headers?.cookie || '');
-  const match = cookies.match(/(?:^|;\\s*)reality_principal=([^;]+)/);
-  if (match) { try { return verifySessionPrincipal(decodeURIComponent(match[1])); } catch {} }
+  // Read the exact cookie key regardless of its position among other cookies.
+  // A transient cookie-parser miss would mint a new principal and sever
+  // scoped continuity/authorization unexpectedly.
+  const serialized = cookies.split(';').map(part => part.trim())
+    .find(part => part.startsWith('reality_principal='));
+  const cookieToken = serialized ? serialized.slice('reality_principal='.length) : null;
+  if (cookieToken) {
+    try { return verifySessionPrincipal(decodeURIComponent(cookieToken)); } catch {}
+  }
   const token = createSessionPrincipal();
   res.setHeader('Set-Cookie', 'reality_principal=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=31536000');
   return verifySessionPrincipal(token);
