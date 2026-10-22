@@ -226,6 +226,7 @@ export async function runLiveIntelligenceOrchestration({
     continuity_latest_state: persistedContinuity?.latest_state || null,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
     continuity_entry_count: persistedContinuity?.matched_entry_count || 0,
+    continuity_transition_ref: universeContext.continuity_transition_ref || null,
     reality_context_source: 'UNIVERSE',
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,

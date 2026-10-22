@@ -6,6 +6,10 @@ on:
       - "src/reality-original-work-retry-v0.1.js"
       - "src/reality-verified-layer-handoff-v0.1.js"
       - "src/reality-live-intelligence-orchestration-v0.1.js"
+      - "src/reality-cognitive-runtime-v1.0.js"
+      - "src/reality-cognition-context-selection-v0.1.js"
+      - "src/reality-native-universe-v1.0.js"
+      - "test/reality-cognition-context-selection-v0.1.test.js"
       - "src/reality-native-universe-persistence-v1.0.js"
       - "src/reality-continuity-recovery-outbox-v0.1.js"
       - "test/reality-continuity-recovery-outbox-v0.1.test.js"
@@ -36,6 +40,8 @@ jobs:
           node-version: "22"
       - name: Verify authenticated continuity and end-to-end original work retry (mock provider only)
         run: node --test test/reality-authenticated-chat-continuity-v0.1.test.js test/reality-original-work-retry-v0.1.test.js test/reality-verified-layer-handoff-v0.1.test.js test/reality-governed-fragmented-signal-cleaner-v0.1.test.js test/reality-trusted-observation-admission-v0.1.test.js test/reality-continuous-continuity-v1.0.test.js test/reality-continuity-recovery-outbox-v0.1.test.js
+      - name: Check complete supplied view and bounded cognitive recall
+        run: node --test test/reality-cognition-context-selection-v0.1.test.js
       - name: Preserve pre-existing capability gap runtime contract
         run: node --test test/capability-gap-runtime-v1.test.js
 
