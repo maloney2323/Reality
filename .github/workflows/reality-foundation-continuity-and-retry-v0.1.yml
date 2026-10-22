@@ -5,6 +5,8 @@ on:
       - "src/reality-authenticated-chat-continuity-v0.1.js"
       - "src/reality-original-work-retry-v0.1.js"
       - "src/reality-verified-layer-handoff-v0.1.js"
+      - "src/reality-model-gateway-v0.1.js"
+      - "test/reality-signal-source-to-model-v0.1.test.js"
       - "src/reality-live-intelligence-orchestration-v0.1.js"
       - "src/reality-cognitive-runtime-v1.0.js"
       - "src/reality-cognition-context-selection-v0.1.js"
@@ -50,6 +52,8 @@ jobs:
         run: node --test test/reality-live-epistemic-diagnostics-v0.1.test.js
       - name: Check legacy + canonical Universe identities without rewriting history
         run: node --test test/reality-universe-source-inventory-v0.1.test.js
+      - name: Verify lossless source text reaches intelligence despite cleaner transformations
+        run: node --test test/reality-signal-source-to-model-v0.1.test.js
       - name: Preserve pre-existing capability gap runtime contract
         run: node --test test/capability-gap-runtime-v1.test.js
 

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const REALITY_MODEL_GATEWAY_VERSION = 'reality-model-gateway-v0.1';
 export const MODEL_TRANSPORT_AUTHORITY = 'OPENAI_RESPONSES_ONLY';
 
@@ -36,6 +38,17 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
   requireField(governedSignal?.transformation_receipt?.receipt_id, 'TRANSFORMATION_RECEIPT_REQUIRED');
 
   const fragments = clone(governedSignal.fragments || []);
+  const raw=governedSignal.packet.raw_content;
+  requireField(raw,'SIGNAL_RAW_CONTENT_REQUIRED');
+  const inputDigest='sha256:'+createHash('sha256')
+    .update(JSON.stringify(raw)).digest('hex');
+  if(inputDigest!==governedSignal.packet.raw_content_digest ||
+     inputDigest!==governedSignal.transformation_receipt.input_digest)
+    throw Error('SIGNAL_RAW_SOURCE_INTEGRITY_FAILED');
+  // The fragments may have normalized code indentation, line breaks, tabs
+  // or extra whitespace. Never replace source data with its cleaned form.
+  // Avoid paying for duplicate raw text when one fragment exactly matches.
+  const rawRequired=fragments.length!==1 || fragments[0]?.cleaned_text!==raw;
   const materiality = materialityForFragments(fragments);
 
   return {
@@ -44,6 +57,10 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
     governed_signal: {
       packet_id: governedSignal.packet.packet_id,
       raw_content_digest: governedSignal.packet.raw_content_digest,
+      ...(rawRequired ? {raw_content_exact:raw}:{}),
+      source_text_status:rawRequired
+        ? 'EXACT_RAW_SOURCE_INCLUDED_WITH_TRANSFORMED_FRAGMENTS'
+        : 'SINGLE_FRAGMENT_EXACTLY_EQUALS_SOURCE',
       fragments,
       transformation_receipt: clone(governedSignal.transformation_receipt),
       lineage: clone(governedSignal.lineage),
