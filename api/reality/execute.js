@@ -6,7 +6,9 @@ import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantCh
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
 
 function buildWarrantContext(body, authorization) {
-  const context = body.warrantContext || {};
+  // Browser evidence may be displayed as a proposal, never promoted into an evidence warrant.
+  // Server-verified observation/evidence transport is still pending implementation.
+  const context = {};
   return {
     observationRefs: Array.isArray(context.observationRefs) ? context.observationRefs : [],
     evidenceRefs: Array.isArray(context.evidenceRefs) ? context.evidenceRefs : [],
@@ -26,15 +28,13 @@ export default async function handler(req, res) {
     const body = req.body || {};
     if (!body.workItem) return res.status(400).json({ ok: false, error: 'WORK_ITEM_REQUIRED' });
     if (body.connector || body.independentVerifier) return res.status(400).json({ ok: false, error: 'CLIENT_SUPPLIED_EXECUTION_BRIDGES_REJECTED' });
+    // Never allow browser-origin authority or unverified epistemic assessments to create a trusted warrant.
+    if (body.authorization) return res.status(403).json({ok:false,error:'CLIENT_SUPPLIED_AUTHORIZATION_FORBIDDEN'});
+    if (body.warrantContext || body.failurePattern) return res.status(400).json({ok:false,error:'CLIENT_SUPPLIED_VERIFICATION_CONTEXT_FORBIDDEN'});
     const principal = getOrCreateSessionPrincipal(req, res);
-    let authorization = body.authorization || null;
-    let authoritySource = authorization ? 'EXPLICIT_AUTHORIZATION' : 'NONE';
-    if (authorization?.principal_id && authorization.principal_id !== principal.principal_id) return res.status(403).json({ ok: false, error: 'AUTHORIZATION_PRINCIPAL_MISMATCH' });
-    if (!authorization) {
-      const policy = await getAuthorityPolicy(principal.principal_id);
-      authorization = autoAuthorize({ policy, workItem: body.workItem });
-      if (authorization) authoritySource = 'CUSTOMER_AUTO_AUTHORITY';
-    }
+    const policy = await getAuthorityPolicy(principal.principal_id);
+    const authorization = autoAuthorize({policy,workItem:body.workItem});
+    const authoritySource = authorization ? 'SERVER_PERSISTED_POLICY' : 'NONE';
     if (!authorization) return res.status(200).json({ ok:true, result:{ status:'BLOCKED', blocked_reason:'EXPLICIT_AUTHORIZATION_REQUIRED', authority_source:'NONE', execution:null, verification:null, outcome:null } });
 
     let bridges;
