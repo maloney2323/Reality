@@ -1,0 +1,50 @@
+name: Reality Detector and Customer Value Audit
+on:
+  push:
+    branches:
+      - audit/detectors-roi-proof-20261022
+    paths:
+      - src/reality-value-scorecard-v0.1.js
+      - src/reality-impact-evidence-v0.1.js
+      - src/reality-governed-execution-engine-v0.1.js
+      - api/reality/execute.js
+      - index.html
+      - test/reality-value-scorecard-v0.1.test.js
+      - test/reality-impact-evidence-v0.1.test.js
+      - test/reality-detector-roi-security-audit-v0.1.test.js
+      - .github/workflows/reality-detector-roi-audit-v0.1.yml
+  pull_request:
+    paths:
+      - src/reality-value-scorecard-v0.1.js
+      - src/reality-impact-evidence-v0.1.js
+      - src/reality-governed-execution-engine-v0.1.js
+      - api/reality/execute.js
+      - index.html
+      - test/reality-value-scorecard-v0.1.test.js
+      - test/reality-impact-evidence-v0.1.test.js
+      - test/reality-detector-roi-security-audit-v0.1.test.js
+      - .github/workflows/reality-detector-roi-audit-v0.1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Execute independent-outcome, security and UI regression checks
+        run: |
+          node --test test/reality-value-scorecard-v0.1.test.js test/reality-impact-evidence-v0.1.test.js test/reality-detector-roi-security-audit-v0.1.test.js test/reality-governed-execution-engine-v0.1.test.js test/reality-impact-ui-v0.1.test.js
+      - name: Verify detector, continuity and Cleaner compatibility
+        run: |
+          node --test test/reality-epistemic-difference-detector-v0.1.test.js test/reality-continuity-seam-repair-v0.1.test.js test/reality-signal-interpretation-v0.2.test.js
+      - name: State measurement scope
+        run: |
+          echo 'No paid models, no live deployment, and no customer ROI verified by CI.'
+          echo 'Only source and test fixtures evaluated; paired scorecards require authenticated, independently verified production source data.'
