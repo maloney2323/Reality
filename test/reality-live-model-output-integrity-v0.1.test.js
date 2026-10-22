@@ -21,8 +21,10 @@ function source(){
 }
 function setup(modelAnswer,rows=[source()]){
  const stored=new Map(rows.map(x=>[x.entry_id,x]));
+ let lastModelContext=null;
  const fetchImpl=async(url,options={})=>{
   if(new URL(url).hostname==='api.openai.com'){
+   lastModelContext=JSON.parse(JSON.parse(options.body).input[1].content[0].text).system_context;
    return {ok:true,status:200,json:async()=>({
     id:'resp:mock-live',status:'completed',output_text:modelAnswer
    })};
@@ -41,7 +43,7 @@ function setup(modelAnswer,rows=[source()]){
   data.sort((a,b)=>String(b.assertion_time).localeCompare(String(a.assertion_time)));
   return {ok:true,status:200,json:async()=>data.slice(0,Number(u.searchParams.get('limit')||1000))};
  };
- return {fetchImpl,stored};
+ return {fetchImpl,stored,getModelContext:()=>lastModelContext};
 }
 async function run(answer,{message='Explain the approved estimate.',context={},rows}={}){
  const prev=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
@@ -52,7 +54,7 @@ async function run(answer,{message='Explain the approved estimate.',context={},r
    message,observedAt:'2026-10-22T12:08:00Z',
    systemContext:{continuity_root_id:root,...context},
    apiKey:'test-key',fetchImpl:mock.fetchImpl});
-  return {result,stored:mock.stored};
+  return {result,stored:mock.stored,modelContext:mock.getModelContext()};
  }finally{if(prev===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=prev}
 }
@@ -140,4 +142,60 @@ test('live prior speaker data without authenticated context cannot create a fals
  });
  assert.equal(result.context.conversation_drift.history_scope,'CURRENT_USER_TURN_ONLY');
  assert.equal(result.context.conversation_drift.findings.length,0);
+});
+
+
+test('Turn 3 retrospective replay notices a Turn 2 drift, briefs model and records proposed recovery',async()=>{
+ const history=[
+  {role:'user',source_ref:'authenticated:job:1:user:turn1',
+   text:'Do not send the estimate until the customer approves it.'},
+  {role:'assistant',source_ref:'authenticated:job:1:assistant:turn1',
+   text:"I'll prepare a draft and wait."},
+  {role:'user',source_ref:'authenticated:job:1:user:turn2',
+   text:'How is the draft progressing?'},
+  {role:'assistant',source_ref:'authenticated:job:1:assistant:turn2',
+   text:"We'll send the estimate when it is ready."},
+ ];
+ const {result,stored,modelContext}=await run(
+  "We'll send the estimate after the customer approves it.",{
+   message:'Please confirm the correct next step.',
+   context:{authenticated_user_id:'owner:test',
+    context_source:'BASE44_AUTHENTICATED_PERSONAL_REALITY',
+    authenticated_conversation_turns:history},
+  });
+ assert.equal(result.mode,'CONVERSATIONAL');
+ const r=result.context.conversation_trajectory;
+ assert.equal(r.status,'RETROSPECTIVE_DRIFT_CANDIDATES');
+ assert.equal(r.findings.length,1);
+ assert.equal(r.findings[0].apparent_origin_turn,2);
+ assert.equal(r.findings[0].retrospective_detection_turn,3);
+ assert.equal(r.recovery.assessments[0].assessment,
+  'MODEL_RESTATED_USER_CONDITION_UNVERIFIED');
+ assert.equal(modelContext.conversation_trajectory_reconciliation.prior_drift_candidates.length,1);
+ assert.equal(modelContext.conversation_trajectory_reconciliation.prior_drift_candidates[0].original_required_condition,
+  'the customer approves it');
+ assert.equal(result.context.integrity_spine.open_issue_origins[0].classification,
+  'CONVERSATIONAL_RETROSPECTIVE_DRIFT');
+ const entry=stored.get(result.context.continuity.event_id);
+ assert.equal(entry.payload.conversation_trajectory.findings[0].origin_turn_ref,
+  'authenticated:job:1:assistant:turn2');
+ assert.equal(entry.payload.conversation_trajectory.recovery.independent_outcome_verification,
+  'NOT_PERFORMED');
+ assert.equal(result.authority.granted,false);
+});
+test('real runtime does not replay unauthenticated supplied conversation',async()=>{
+ const history=[
+  {role:'user',source_ref:'untrusted:user1',
+   text:'Do not send the estimate until the customer approves it.'},
+  {role:'assistant',source_ref:'untrusted:assistant2',
+   text:"We'll send the estimate when it is ready."},
+ ];
+ const {result,modelContext}=await run("I'll send the estimate now.",{
+  message:'Status on the project?',
+  context:{authenticated_conversation_turns:history,
+   context_source:'USER_SUPPLIED'},
+ });
+ assert.equal(result.context.conversation_trajectory.status,
+  'NO_AUTHENTICATED_TRAJECTORY');
+ assert.equal(modelContext.conversation_trajectory_reconciliation.prior_drift_candidates.length,0);
 });
