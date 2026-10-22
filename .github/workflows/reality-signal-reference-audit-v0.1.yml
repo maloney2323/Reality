@@ -1,0 +1,39 @@
+name: Reality Signal Cleaner Provisional Reference Audit
+on:
+  push:
+    branches:
+      - eval/signal-cleaner-reference-audit-20261022
+    paths:
+      - benchmarks/signal-cleaner-reference-audit-v0.1.json
+      - test/reality-signal-reference-audit-v0.1.test.js
+      - .github/workflows/reality-signal-reference-audit-v0.1.yml
+      - src/reality-signal-interpretation-v0.2.js
+  pull_request:
+    paths:
+      - benchmarks/signal-cleaner-reference-audit-v0.1.json
+      - test/reality-signal-reference-audit-v0.1.test.js
+      - .github/workflows/reality-signal-reference-audit-v0.1.yml
+      - src/reality-signal-interpretation-v0.2.js
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provisional-reference-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Run structural contract and provisional adversarial semantic reference audit
+        run: |
+          node --test test/reality-signal-interpretation-v0.2.test.js
+          node --test test/reality-signal-reference-audit-v0.1.test.js
+      - name: Explain benchmark limits
+        run: |
+          echo "This reports expectation misses, not independently verified accuracy."
+          echo "All cases are public provisional annotations, no holdout and no paid model calls."
+          echo "Model-only, model plus cleaner, and full Reality lanes are NOT_RUN."
