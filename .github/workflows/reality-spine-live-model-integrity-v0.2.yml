@@ -8,6 +8,8 @@ on:
       - src/reality-model-output-integrity-v0.1.js
       - src/reality-live-intelligence-orchestration-v0.1.js
       - src/reality-continuous-integrity-spine-v0.1.js
+      - api/reality/intelligence.js
+      - test/reality-conversation-drift-spine-v0.3.test.js
       - test/reality-model-output-integrity-v0.1.test.js
       - test/reality-live-model-output-integrity-v0.1.test.js
       - index.html
@@ -28,7 +30,7 @@ jobs:
           node-version: '22'
       - name: Model output to Continuity Spine contract
         run: |
-          node --test test/reality-model-output-integrity-v0.1.test.js test/reality-continuous-integrity-spine-v0.1.test.js test/reality-epistemic-difference-detector-v0.1.test.js
+          node --test test/reality-model-output-integrity-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js test/reality-continuous-integrity-spine-v0.1.test.js test/reality-epistemic-difference-detector-v0.1.test.js
       - name: Live orchestration and receipt regression
         run: |
           node --test test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-live-epistemic-diagnostics-v0.1.test.js test/reality-live-model-output-integrity-v0.1.test.js test/reality-impact-ui-v0.1.test.js
