@@ -7,6 +7,7 @@ on:
       - src/reality-value-scorecard-v0.1.js
       - src/reality-impact-evidence-v0.1.js
       - src/reality-governed-execution-engine-v0.1.js
+      - src/reality-governed-work-runtime-v0.1.js
       - src/reality-session-principal-v0.1.js
       - src/reality-connector-supabase-v1.0.js
       - api/reality/execute.js
@@ -21,6 +22,7 @@ on:
       - src/reality-value-scorecard-v0.1.js
       - src/reality-impact-evidence-v0.1.js
       - src/reality-governed-execution-engine-v0.1.js
+      - src/reality-governed-work-runtime-v0.1.js
       - src/reality-session-principal-v0.1.js
       - src/reality-connector-supabase-v1.0.js
       - api/reality/execute.js
