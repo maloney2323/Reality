@@ -86,11 +86,24 @@ test('signal ingress writes complete evidence and verifies independent storage r
  }),/HANDOFF_PARENT_ROOT_MISMATCH/);
 });
 
+test('an identical verified handoff is idempotent and does not lose the original packet',async()=>{
+ const io=memoryAdapter();
+ const args={stage:'SIGNAL_CLEANER',continuityRootId:'root:duplicate',observedAt:observed,
+   sourceRef:'reality:signal-cleaner',
+   output:{signal,verification:verifySignalCleanerRecord(signal)},
+   fetchImpl:io.fakeFetch};
+ const first=await recordVerifiedLayerHandoff(args);
+ const second=await recordVerifiedLayerHandoff(args);
+ assert.equal(first.entry_id,second.entry_id);
+ assert.equal(first.ledger_entry_hash,second.ledger_entry_hash);
+ assert.equal(io.rows.size,1);
+});
+
 test('tampered durable readback does not become a verified next-layer receipt',async()=>{
  const io=memoryAdapter({modifyReadback:row=>({...row,payload:{replaced:'false evidence'}})});
  await assert.rejects(()=>recordVerifiedLayerHandoff({
   stage:'SIGNAL_CLEANER',continuityRootId:'root:one',observedAt,
-  sourceRef:'reality:signal-cleaner',output:{signal},
+  sourceRef:'reality:signal-cleaner',output:{signal,verification:verifySignalCleanerRecord(signal)},
   fetchImpl:io.fakeFetch,
  }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
 });
