@@ -318,3 +318,59 @@ test('if parent changes between append and post-write readback, child is not VER
   output:{error_code:'DISCONNECTED'},parent:first.entry,fetchImpl:modified,
  }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
 });
+
+test('an ordinary chat observation cannot silently change a WAITING state to ACTIVE',async()=>{
+ const oldEnable=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+ const oldKey=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+ process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+ process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='test-waiting-state';
+ const {createUniverseEntry}=await import('../src/reality-universe-persistence-contract-v1.0.js');
+ const rows=new Map();
+ const root='root:state-preservation';
+ const older=createUniverseEntry({
+  entry_id:'old:waiting',continuity_root_id:root,worldline_id:'reality:primary',
+  event_kind:'CONTINUITY_STATE_TRANSITION',epistemic_kind:'OBSERVATION',
+  assertion_time:'2026-10-22T09:00:00Z',effective_time:'2026-10-22T09:00:00Z',
+  source_ref:'test:external',payload:{continuity_state:'WAITING',work_item_id:'work:still-unpaid'},
+  evidence_references:[],provenance:{source:'test:state'},
+ });rows.set(older.entry_id,older);
+ async function mock(url,opt={}){
+  const u=new URL(url),method=opt.method||'GET';
+  if(u.hostname==='api.openai.com')return {ok:true,status:200,json:async()=>({
+   id:'stub',output_text:'I can discuss the work while it remains waiting.',status:'completed',
+  })};
+  if(!u.pathname.endsWith('/rest/v1/reality_universe_entries'))throw Error('UNEXPECTED_PATH');
+  if(method==='POST'){const row=JSON.parse(opt.body);rows.set(row.entry_id,row);
+   return {ok:true,status:201,json:async()=>[row]};}
+  let values=[...rows.values()],q=u.searchParams;
+  for(const k of ['entry_id','continuity_root_id','event_kind']){
+   const v=q.get(k);if(v?.startsWith('eq.'))values=values.filter(x=>x[k]===v.slice(3));
+  }
+  values.sort((a,b)=>b.assertion_time.localeCompare(a.assertion_time));
+  return {ok:true,status:200,json:async()=>values.slice(0,Number(q.get('limit')||1000))};
+ }
+ try{
+  const first=await runLiveIntelligenceOrchestration({
+   message:'Explain the project timeline.',systemContext:{continuity_root_id:root},
+   observedAt:'2026-10-22T10:00:00Z',apiKey:'synthetic',fetchImpl:mock,
+  });
+  assert.equal(first.context.continuity.prior_state,'WAITING');
+  assert.equal(first.context.continuity.current_state,'WAITING');
+  const events=[...rows.values()].filter(x=>x.event_kind==='CONTINUITY_STATE_TRANSITION');
+  const newest=events.sort((a,b)=>b.assertion_time.localeCompare(a.assertion_time))[0];
+  assert.equal(newest.payload.continuity_state,'WAITING');
+  assert.equal(newest.payload.state_transition_authorized,false);
+  const second=await runLiveIntelligenceOrchestration({
+   message:'Tell me more about the options.',systemContext:{continuity_root_id:root},
+   observedAt:'2026-10-22T11:00:00Z',apiKey:'synthetic',fetchImpl:mock,
+  });
+  assert.equal(second.context.continuity.prior_state,'WAITING');
+  assert.equal(second.context.continuity.current_state,'WAITING');
+  assert.equal(second.authority.granted,false);
+ }finally{
+  if(oldEnable===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=oldEnable;
+  if(oldKey===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=oldKey;
+ }
+});

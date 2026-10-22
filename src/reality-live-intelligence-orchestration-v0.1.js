@@ -162,9 +162,10 @@ export async function runLiveIntelligenceOrchestration({
     continuityRootId:explicitContinuityRootId || conversationContinuityRootId,
     worldlineId:systemContext?.worldline_id || 'reality:primary',
   });
-  let persistedContinuity = explicitContinuityRootId
+  const scopedRootForRehydration=explicitContinuityRootId || conversationContinuityRootId;
+  let persistedContinuity = scopedRootForRehydration
     ? buildContinuityRehydration({
-        continuityRootId: explicitContinuityRootId,
+        continuityRootId: scopedRootForRehydration,
         entries: universeContext.entries,
         trigger: 'CURRENT_REQUEST',
       })
@@ -287,13 +288,17 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = 'ACTIVE';
+  // A chat turn is an observation, not evidence that WAITING/BLOCKED or
+  // completed work changed state. Preserve the latest verified projection.
+  // State advancement requires a separate, evidence-linked transition.
+  const continuityState = persistedContinuity?.latest_state || 'ACTIVE';
   const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: effectiveContinuityRootId,
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
-        trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
+        workItemId:persistedContinuity?.latest_work_item_id || null,
+        trigger: persistedContinuity?.latest_state ? 'STATE_PRESERVED_DURING_CHAT' : 'NEW_OBSERVATION',
         evidenceReferences: [
           governedSignal.packet.packet_id,
           governedSignal.transformation_receipt.receipt_id,
@@ -303,6 +308,8 @@ export async function runLiveIntelligenceOrchestration({
         ].filter(Boolean),
         payload: {
           continuity_state: continuityState,
+          prior_state_preserved: Boolean(persistedContinuity?.latest_state),
+          state_transition_authorized: false,
           materiality,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,

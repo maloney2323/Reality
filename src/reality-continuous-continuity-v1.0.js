@@ -74,6 +74,9 @@ export function buildContinuityRehydration({ continuityRootId, entries = [], tri
     matched_entry_count: matching.length,
     relevant_entry_ids: Object.freeze(Array.isArray(relevantEntryIds) ? relevantEntryIds.filter(Boolean) : []),
     latest_state: latest?.payload?.continuity_state || latest?.payload?.next_state || null,
+    latest_work_item_id: latest?.payload?.work_item_id || latest?.payload?.cognitive_output?.work_item_id ||
+      latest?.provenance?.work_item_id || null,
+    latest_state_entry_id: latest?.entry_id || null,
     entries: Object.freeze(matching),
     continuation_available: matching.length > 0,
   });
