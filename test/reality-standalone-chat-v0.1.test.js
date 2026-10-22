@@ -103,7 +103,7 @@ test('complete standalone proof: provider auth -> scope -> persisted user -> sam
    return {intelligence:{raw_model_answer:'I will preserve customer approval.',
        answer:'I will preserve customer approval.'},
     context:{continuity:{root_id:root,cognitive_readback_verified:true,
-      signal_handoff_status:'STORED_AND_READ_BACK',event_id:'test:durable-event'}}}}},
+      signal_handoff_status:'STORED_AND_READ_BACK',event_id:'test:durable-event'}}}},
  });
  assert.deepEqual(log,['load','user','run','assistant']);
  assert.equal(out.receipt.cognitive_readback_verified,true);
