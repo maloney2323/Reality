@@ -8,7 +8,7 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 import { inspectModelOutputWithContinuity } from './reality-model-output-integrity-v0.1.js';
-import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine, inspectConversationDrift } from './reality-continuous-integrity-spine-v0.1.js';
+import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine, inspectConversationDrift, replayConversationTrajectory, inspectTrajectoryRecovery } from './reality-continuous-integrity-spine-v0.1.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
@@ -235,6 +235,21 @@ export async function runLiveIntelligenceOrchestration({
         fetchImpl,
       })
     : null;
+  const historyAuthenticated=systemContext?.context_source==='BASE44_AUTHENTICATED_PERSONAL_REALITY' &&
+    Boolean(systemContext?.authenticated_user_id) && systemContext?.ephemeral_no_history!==true;
+  const priorConversationTurns=historyAuthenticated?systemContext.authenticated_conversation_turns||[]:[];
+  const priorDetectionReceipts=(universeContext.persisted_attested_entries||[])
+    .filter(e=>e?.continuity_root_id===effectiveContinuityRootId &&
+      e?.worldline_id===(systemContext?.worldline_id||'reality:primary'))
+    .flatMap(e=>e?.payload?.conversation_drift?.findings||[]);
+  const trajectoryReplay=replayConversationTrajectory({
+    priorTurns:priorConversationTurns,
+    historySource:historyAuthenticated?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
+    continuityRootId:effectiveContinuityRootId,
+    currentUserMessage:message,
+    currentUserSourceRef:governedSignal.packet.packet_id,
+    priorDetectionReceipts,
+  });
   const cognitionContext = {
     signal_cleaner_structural_verification:verifiedCleaner,
     epistemic_diagnostics:passiveEpistemicDiagnostics,
@@ -244,6 +259,19 @@ export async function runLiveIntelligenceOrchestration({
       ledger_entry_hash:signalHandoff.ledger_entry_hash,
     } : {status:'NOT_DURABLY_PERSISTED'},
     ...(systemContext || {}),
+    conversation_trajectory_reconciliation:{
+      status:trajectoryReplay.status,
+      prior_drift_candidates:trajectoryReplay.findings.slice(0,8).map(x=>({
+        earliest_model_message_ref:x.origin_turn_ref,
+        original_user_message_ref:x.original_user_turn_ref,
+        original_user_text:x.original_user_text,
+        observed_assistant_shift:x.observed_model_text,
+        original_required_condition:x.expected_condition,
+        independent_verification:'NOT_PERFORMED',
+      })),
+      interpretation_rule:'Preserve user-stated conditions. Prior assistant summaries do not override original user intent. Clarify unverified changes.',
+      evidence_status:'AUTHENTICATED_CONVERSATION_INTENT_NOT_EXTERNAL_TRUTH',
+    },
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
@@ -301,11 +329,8 @@ export async function runLiveIntelligenceOrchestration({
     observedAt:observedAt||new Date().toISOString(),
   });
   const {candidate_observations:_syntheticComparator,...modelIntegrityPublic}=modelIntegrity;
-  // Earlier speaker turns must be retrieved and authenticated server side.
-  const historyAuthenticated=systemContext?.context_source==='BASE44_AUTHENTICATED_PERSONAL_REALITY' &&
-    Boolean(systemContext?.authenticated_user_id) && systemContext?.ephemeral_no_history!==true;
   const conversationDrift=inspectConversationDrift({
-    priorTurns:historyAuthenticated?systemContext.authenticated_conversation_turns||[]:[],
+    priorTurns:priorConversationTurns,
     historySource:historyAuthenticated?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
     currentUserMessage:message,modelAnswer:rawModelAnswer,
     continuityRootId:effectiveContinuityRootId,
@@ -313,7 +338,15 @@ export async function runLiveIntelligenceOrchestration({
     modelResponseId:cognitiveResult.response_id||'untracked',
   });
   const {anchors:_intentCandidates,...conversationDriftPublic}=conversationDrift;
-  const combinedIntegrityFindings=[...modelIntegrity.findings,...conversationDrift.findings];
+  const trajectoryRecovery=inspectTrajectoryRecovery({replay:trajectoryReplay,modelAnswer:rawModelAnswer});
+  const trajectoryPublic={
+    ...trajectoryReplay,recovery:trajectoryRecovery,
+    detection_turn_semantics:'OBSERVED_BY_THIS_REPLAY_NOT_PROVEN_FIRST_EVER',
+  };
+  const combinedIntegrityFindings=[
+    ...modelIntegrity.findings,...conversationDrift.findings,
+    ...trajectoryReplay.findings.filter(x=>!x.previously_recorded_detection),
+  ];
   let spine=null,spineSummary=null;
   // Only claim lineage anchoring if an earlier handoff was stored and read back.
   if(signalHandoff?.status==='STORED_AND_READ_BACK' && effectiveContinuityRootId){
@@ -342,7 +375,7 @@ export async function runLiveIntelligenceOrchestration({
   }
   // Conversation drift is *diagnostic*, not a new action gate. Continue
   // to apply only the pre-existing factual-output proposal policy.
-  const conversationReviewNeeded=conversationDrift.findings.length>0;
+  const conversationReviewNeeded=conversationDrift.findings.length>0||trajectoryReplay.findings.length>0;
   const integrityRequiresReview=modelIntegrity.findings.some(x=>
     ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM',
       'CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
@@ -404,6 +437,7 @@ export async function runLiveIntelligenceOrchestration({
           passive_epistemic_diagnostics:passiveEpistemicDiagnostics,
           model_output_integrity:modelIntegrityPublic,
           conversation_drift:conversationDriftPublic,
+          conversation_trajectory:trajectoryPublic,
           integrity_spine:spine?spine:null,
           contradiction_diagnostics:'NARROW_EXPLICIT_MODEL_CLAIMS_COMPARED_NOT_FULL_SEMANTIC_VERIFICATION',
         },
@@ -421,6 +455,7 @@ export async function runLiveIntelligenceOrchestration({
        continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash ||
        continuityReadback.payload?.model_output_integrity?.status!==modelIntegrityPublic.status ||
        continuityReadback.payload?.conversation_drift?.status!==conversationDriftPublic.status ||
+       continuityReadback.payload?.conversation_trajectory?.status!==trajectoryPublic.status ||
        (spine && continuityReadback.payload?.integrity_spine?.trace_hash!==spine.trace_hash))
       throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
@@ -513,6 +548,7 @@ export async function runLiveIntelligenceOrchestration({
       epistemic_diagnostics:clone(passiveEpistemicDiagnostics),
       model_output_integrity:clone(modelIntegrityPublic),
       conversation_drift:clone(conversationDriftPublic),
+      conversation_trajectory:clone(trajectoryPublic),
       integrity_spine:spineSummary?clone(spineSummary):{status:'NOT_DURABLY_ANCHORED'},
       continuity: {
       root_id: effectiveContinuityRootId,

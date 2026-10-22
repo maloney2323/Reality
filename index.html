@@ -114,7 +114,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
         <p class="muted" id="continuityDetail">Durable cross-session continuity has not been verified for this conversation.</p>
         <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>\n        <p class="muted" id="modelOutputIntegrity">Model output versus continuity: Not assessed.</p>
         <p class="muted" id="conversationDriftStatus">Conversation continuity: Not assessed.</p>
-        <div id="conversationDriftFindings" class="impact-detail"></div>\n        <div id="modelIntegrityFindings" class="impact-detail"></div>
+        <div id="conversationDriftFindings" class="impact-detail"></div>
+        <p class="muted" id="trajectoryReplayStatus">Retrospective conversation check: Not assessed.</p>
+        <div id="trajectoryReplayFindings" class="impact-detail"></div>\n        <div id="modelIntegrityFindings" class="impact-detail"></div>
         <details id="epistemicEventsPanel"><summary>Inspect source discrepancies and evidence</summary><div id="epistemicEvents" class="impact-detail" role="status">No trusted source discrepancies returned for this turn.</div></details>
         <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
         </details>
@@ -158,6 +160,26 @@ $('plan').onclick=async()=>{
     const intelligence=b.result?.intelligence||{};
     const continuity=b.continuity||{};
     const diag=b.result?.context?.epistemic_diagnostics||{};
+    const replay=b.result?.context?.conversation_trajectory||{};
+    const late=Array.isArray(replay.findings)?replay.findings:[];
+    const recovered=Array.isArray(replay.recovery?.assessments)?replay.recovery.assessments:[];
+    $('trajectoryReplayStatus').textContent=replay.status==='RETROSPECTIVE_DRIFT_CANDIDATES'
+      ? 'Retrospective continuity: '+late.length+' earlier conversational meaning shift(s) found in available prior turns.'
+      : replay.status==='PRIOR_DRIFT_CANDIDATES_RECONFIRMED'
+        ? 'Retrospective continuity: known earlier drift candidates still under review.'
+        : replay.status==='LIMITED_REPLAY_NO_DRIFT_FLAGGED'
+          ? 'Retrospective continuity: no shift flagged in the bounded authenticated conversation window.'
+          : 'Retrospective continuity: prior-turn comparison not established.';
+    $('trajectoryReplayFindings').innerHTML=late.slice(0,8).map(x=>{
+      const rec=recovered.find(y=>y.issue_id===x.issue_id);
+      return '<div class="work-item"><strong>Possible drift originated at turn '+esc(x.apparent_origin_turn)+
+       ' · examined again at turn '+esc(x.retrospective_detection_turn)+'</strong>'+
+       '<div class="muted">Original customer instruction: '+esc(x.original_user_text||'')+'</div>'+
+       '<div class="muted">Earlier AI interpretation: '+esc(x.observed_model_text||'')+'</div>'+
+       '<div class="muted">Current response: '+esc(rec?.assessment||'NOT_EVALUATED')+'</div>'+
+       '<div class="muted">Earlier detection receipt: '+esc(x.discovery_status||'UNKNOWN')+
+       ' · Independent correction not verified</div></div>';
+    }).join('');
     const convo=b.result?.context?.conversation_drift||{};
     const convoIssues=Array.isArray(convo.findings)?convo.findings:[];
     $('conversationDriftStatus').textContent=convo.status==='EARLY_CONVERSATION_DRIFT_RISK'
