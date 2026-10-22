@@ -312,3 +312,35 @@ export async function retrieveCompleteContinuityHistory({
         .update(acc+'|'+e.entry_id+'|'+e.ledger_entry_hash).digest('hex'),'seed'),
   });
 }
+
+
+// A narrow, principal-root-scoped state index query. This does NOT infer a
+// continuity state from arbitrary signal, diagnostic or model output events.
+// Older obligations must remain discoverable even after 100 newer signals.
+export async function retrieveLatestPersistedContinuityTransition({
+  continuityRootId,worldlineId=null,fetchImpl=fetch,
+}={}) {
+  if(typeof continuityRootId!=='string'||!continuityRootId.trim())
+    throw Error('CONTINUITY_STATE_ROOT_REQUIRED');
+  const params=new URLSearchParams();
+  params.set('select','*');
+  params.set('continuity_root_id','eq.'+continuityRootId);
+  if(worldlineId)params.set('worldline_id','eq.'+worldlineId);
+  params.set('event_kind','eq.CONTINUITY_STATE_TRANSITION');
+  params.set('order','assertion_time.desc,effective_time.desc,ledger_entry_hash.asc');
+  params.set('limit','1');
+  const response=await request('/rest/v1/reality_universe_entries?'+params,{
+    method:'GET',headers:{Accept:'application/json'},
+  },fetchImpl);
+  const rows=await response.json();
+  if(!Array.isArray(rows)||rows.length>1)
+    throw Error('CONTINUITY_STATE_INDEX_READBACK_INVALID');
+  if(!rows.length)return null;
+  const entry=Object.freeze(mapRow(rows[0]));
+  validateUniverseEntry(entry);
+  if(entry.continuity_root_id!==continuityRootId ||
+     (worldlineId && entry.worldline_id!==worldlineId) ||
+     entry.event_kind!=='CONTINUITY_STATE_TRANSITION')
+    throw Error('CONTINUITY_STATE_INDEX_SCOPE_MISMATCH');
+  return entry;
+}

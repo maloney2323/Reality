@@ -186,3 +186,69 @@ test('consequential observation does not skip the evidence-established layer',as
  assert.equal(result.situation.evidence[0].kind,'OBSERVED_USER_REQUEST_NOT_INDEPENDENT_WORLD_TRUTH');
  assert.equal(result.authority.granted,false);
 });
+
+
+test('long-lived WAITING state is retained even after over 100 newer ordinary signals',async()=>{
+ const prevOn=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+ const prevKey=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+ process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+ process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='synthetic-test-key';
+ try{
+   const root='root:old-state-survives';
+   const rows=new Map();
+   const stamp=i=>new Date(Date.parse('2026-10-22T10:00:00Z')+i*1000).toISOString();
+   const {createUniverseEntry}=await import('../src/reality-universe-persistence-contract-v1.0.js');
+   const older=createUniverseEntry({
+     entry_id:'state:waiting',continuity_root_id:root,
+     worldline_id:'reality:primary',event_kind:'CONTINUITY_STATE_TRANSITION',
+     epistemic_kind:'OBSERVATION',assertion_time:stamp(0),effective_time:stamp(0),
+     source_ref:'test:continuity',payload:{continuity_state:'WAITING',work_item_id:'work:unresolved'},
+     evidence_references:[],provenance:{source:'synthetic:test'},
+   });
+   rows.set(older.entry_id,older);
+   for(let i=1;i<=140;i++){
+     const obs=createUniverseEntry({
+       entry_id:'signal:'+i,continuity_root_id:root,worldline_id:'reality:primary',
+       event_kind:'REALITY_LAYER_HANDOFF',epistemic_kind:'OBSERVATION',
+       assertion_time:stamp(i),effective_time:stamp(i),source_ref:'test:signal',
+       payload:{ordinal:i},evidence_references:[],provenance:{source:'synthetic:test'},
+     });rows.set(obs.entry_id,obs);
+   }
+   let wrote=0,unscopedReads=0;
+   async function mocked(url,options={}){
+     const u=new URL(url),method=options.method||'GET',q=u.searchParams;
+     if(u.hostname==='api.openai.com')return {ok:true,json:async()=>({
+       id:'model:stub',status:'completed',output_text:'The invoice follow-up remains waiting.'
+     })};
+     if(!u.pathname.endsWith('/rest/v1/reality_universe_entries'))throw Error('UNEXPECTED_ROUTE');
+     if(method==='POST'){
+       const entry=JSON.parse(options.body);rows.set(entry.entry_id,entry);wrote++;
+       return {ok:true,status:201,json:async()=>[entry]};
+     }
+     if(method!=='GET')throw Error('UNEXPECTED_METHOD');
+     let items=Array.from(rows.values());
+     for(const key of ['entry_id','continuity_root_id','worldline_id','event_kind']){
+       const criterion=q.get(key);
+       if(criterion?.startsWith('eq.'))items=items.filter(x=>x[key]===criterion.slice(3));
+     }
+     if(!q.get('entry_id')&&!q.get('continuity_root_id'))unscopedReads++;
+     items.sort((a,b)=>b.assertion_time.localeCompare(a.assertion_time));
+     return {ok:true,json:async()=>items.slice(0,Number(q.get('limit')||1000))};
+   }
+   const result=await runLiveIntelligenceOrchestration({
+     message:'What work are we still waiting on?',
+     systemContext:{continuity_root_id:root},
+     observedAt:stamp(141),apiKey:'synthetic',
+     fetchImpl:mocked,
+   });
+   assert.equal(result.context.continuity.rehydrated,true);
+   assert.equal(result.context.continuity.prior_state,'WAITING');
+   assert.equal(unscopedReads,0);
+   assert.ok(wrote>=2);
+ }finally{
+   if(prevOn===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+   else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=prevOn;
+   if(prevKey===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+   else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=prevKey;
+ }
+});

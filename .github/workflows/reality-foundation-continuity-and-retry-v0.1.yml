@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: "22"
       - name: Verify authenticated continuity and end-to-end original work retry (mock provider only)
-        run: node --test test/reality-authenticated-chat-continuity-v0.1.test.js test/reality-original-work-retry-v0.1.test.js test/reality-verified-layer-handoff-v0.1.test.js test/reality-governed-fragmented-signal-cleaner-v0.1.test.js test/reality-trusted-observation-admission-v0.1.test.js
+        run: node --test test/reality-authenticated-chat-continuity-v0.1.test.js test/reality-original-work-retry-v0.1.test.js test/reality-verified-layer-handoff-v0.1.test.js test/reality-governed-fragmented-signal-cleaner-v0.1.test.js test/reality-trusted-observation-admission-v0.1.test.js test/reality-continuous-continuity-v1.0.test.js
       - name: Preserve pre-existing capability gap runtime contract
         run: node --test test/capability-gap-runtime-v1.test.js
 

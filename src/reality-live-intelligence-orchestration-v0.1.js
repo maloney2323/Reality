@@ -2,7 +2,7 @@ import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cl
 import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from './reality-verified-layer-handoff-v0.1.js';
 import { retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
-import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
+import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -17,13 +17,22 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
       !continuityRootId) return requestContext;
 
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
+  const latestTransition = await retrieveLatestPersistedContinuityTransition({
+    continuityRootId, fetchImpl,
+  });
+  const retained = latestTransition && !durable.entries.some(
+    entry=>entry.entry_id===latestTransition.entry_id)
+      ? [latestTransition,...durable.entries] : durable.entries;
   return Object.freeze({
     ...requestContext,
     status: durable.status,
-    count: requestContext.count + durable.count,
-    entries: Object.freeze([...durable.entries, ...requestContext.entries]),
+    count: requestContext.count + retained.length,
+    entries: Object.freeze([...retained, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
+    continuity_transition_ref: latestTransition?.entry_id || null,
+    // A bounded reasoning context is not the complete Universe history.
+    context_is_full_history: false,
     continuity_root_id: continuityRootId,
   });
 }
