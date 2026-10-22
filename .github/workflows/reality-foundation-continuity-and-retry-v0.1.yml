@@ -15,6 +15,8 @@ on:
       - "src/reality-native-universe-v1.0.js"
       - "test/reality-cognition-context-selection-v0.1.test.js"
       - "src/reality-native-universe-persistence-v1.0.js"
+      - "src/reality-universe-bitemporal-ledger-v0.1.js"
+      - "test/reality-bitemporal-hash-integrity-v0.1.test.js"
       - "src/reality-universe-source-inventory-v0.1.js"
       - "test/reality-universe-source-inventory-v0.1.test.js"
       - "src/reality-continuity-recovery-outbox-v0.1.js"
@@ -56,6 +58,8 @@ jobs:
         run: node --test test/reality-universe-source-inventory-v0.1.test.js
       - name: Verify lossless source text reaches intelligence despite cleaner transformations
         run: node --test test/reality-signal-source-to-model-v0.1.test.js
+      - name: Prove bitemporal historical hash and correction integrity
+        run: node --test test/reality-bitemporal-hash-integrity-v0.1.test.js
       - name: Prove immutable concurrent writes and readback receipts
         run: node --test test/reality-persistence-integrity-v0.1.test.js
       - name: Enforce six-layer end-to-end contracts and negative controls
