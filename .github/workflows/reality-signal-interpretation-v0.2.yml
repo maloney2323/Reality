@@ -1,0 +1,38 @@
+name: Reality Signal Cleaner v0.2 Contract and 50-Case Corpus
+on:
+  push:
+    branches:
+      - foundation/signal-cleaner-v02-interpretation-contract-20261022
+    paths:
+      - schemas/reality-interpretation-receipt-v0.2.schema.json
+      - src/reality-signal-interpretation-v0.2.js
+      - test/reality-signal-interpretation-v0.2.test.js
+      - .github/workflows/reality-signal-interpretation-v0.2.yml
+  pull_request:
+    paths:
+      - schemas/reality-interpretation-receipt-v0.2.schema.json
+      - src/reality-signal-interpretation-v0.2.js
+      - test/reality-signal-interpretation-v0.2.test.js
+      - .github/workflows/reality-signal-interpretation-v0.2.yml
+permissions:
+  contents: read
+jobs:
+  signal-interpretation-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify v0.2 schema and 50-case deterministic intake contract
+        run: node --test test/reality-signal-interpretation-v0.2.test.js
+      - name: Ensure backwards compatibility with v0.1 transport
+        run: node --test test/reality-governed-fragmented-signal-cleaner-v0.1.test.js test/reality-signal-source-to-model-v0.1.test.js
+      - name: Limit claims
+        run: |
+          echo "Structural tests only; no external model or production runtime invoked."
+          echo "Interpreter is additive and NOT wired to live route."
+          echo "50-case corpus is design-regression, NOT an independent accuracy measurement."
