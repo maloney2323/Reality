@@ -35,6 +35,9 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
     status: durable.status,
     count: requestContext.count + retained.length,
     entries: Object.freeze([...retained, ...requestContext.entries]),
+    // Prevent request-supplied context from masquerading as durable source
+    // admission records during model-output reconciliation.
+    persisted_attested_entries: Object.freeze([...retained]),
     persistence: durable.persistence,
     durable_count: durable.count,
     continuity_transition_ref: latestTransition?.entry_id || null,
@@ -291,7 +294,7 @@ export async function runLiveIntelligenceOrchestration({
   const rawModelAnswer=String(cognitiveResult.answer||'');
   const modelIntegrity=inspectModelOutputWithContinuity({
     answer:rawModelAnswer,
-    ledgerEntries:universeContext.entries,
+    ledgerEntries:universeContext.persisted_attested_entries||[],
     continuityRootId:effectiveContinuityRootId,
     worldlineId:systemContext?.worldline_id||'reality:primary',
     modelResponseId:cognitiveResult.response_id||'untracked',
@@ -327,7 +330,7 @@ export async function runLiveIntelligenceOrchestration({
   const integrityRequiresReview=modelIntegrity.findings.some(x=>
     ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM'].includes(x.classification));
   const note=integrityRequiresReview
-    ? '\\n\\nReality integrity notice: This response contains an operational claim that conflicts with source-attested context or asserts an unverified action. Treat it as unverified pending independent confirmation; no external action is authorized.'
+    ? '\n\nReality integrity notice: This response contains an operational claim that conflicts with source-attested context or asserts an unverified action. Treat it as unverified pending independent confirmation; no external action is authorized.'
     : '';
   const modelResult = {
     ...cognitiveResult,
