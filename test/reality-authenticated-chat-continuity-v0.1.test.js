@@ -49,8 +49,18 @@ test('a missing authenticated identity or conversation selector fails instead of
 test('actual chat entrypoint invokes the existing authenticated context source', async () => {
   const {readFile}=await import('node:fs/promises');
   const chat=await readFile(new URL('../api/chat.js',import.meta.url),'utf8');
-  assert.match(chat,/loadRealityContext\(req, body\)/);
+  assert.match(chat,/loadRealityContext\(req, body,/);
+  assert.match(chat,/noHistoryWhenSelectorsMissing: noHistoryProbe/);
   assert.match(chat,/buildAuthenticatedChatContinuity\(\{ body, authenticatedContext \}\)/);
   assert.doesNotMatch(chat,/systemContext:\s*req\.body\?\.systemContext/);
   assert.match(chat,/requestedBy:\s*systemContext\.authenticated_user_id/);
+});
+
+test('legacy single-turn proof clients remain context-free rather than acquiring an unrelated memory',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const chat=await readFile(new URL('../api/chat.js',import.meta.url),'utf8');
+  const runtime=await readFile(new URL('../src/reality-live-intelligence-orchestration-v0.1.js',import.meta.url),'utf8');
+  assert.match(chat,/ephemeral_no_history: true/);
+  assert.match(chat,/continuity_root_id: null/);
+  assert.match(runtime,/systemContext\?\.ephemeral_no_history !== true/);
 });
