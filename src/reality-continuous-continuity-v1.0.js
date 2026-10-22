@@ -52,34 +52,60 @@ export function buildContinuityEvent({
   });
 }
 
-export function buildContinuityRehydration({ continuityRootId, entries = [], trigger = 'RELEVANT_NEW_EVIDENCE', relevantEntryIds = [] } = {}) {
-  const root = requiredText(continuityRootId, 'CONTINUITY_ROOT_REQUIRED');
-  const matching = (Array.isArray(entries) ? entries : []).filter((entry) => entry?.continuity_root_id === root);
-  // Every observation remains in the Universe, but only actual continuity
-  // transitions can supply the active continuity state. A newer signal,
-  // diagnostic, or model output must not erase an earlier WAITING obligation.
-  // Older records without event_kind remain readable for legacy continuity.
-  const stateTransitions = matching.filter((entry) =>
-    (!entry.event_kind || entry.event_kind === 'CONTINUITY_STATE_TRANSITION') &&
-    CONTINUITY_STATES.includes(entry.payload?.continuity_state || entry.payload?.next_state)
-  );
-  const latest = stateTransitions.slice().sort((a, b) =>
-    String(b.assertion_time || '').localeCompare(String(a.assertion_time || '')) ||
-    String(b.entry_id || '').localeCompare(String(a.entry_id || ''))
-  )[0] || null;
-  return Object.freeze({
-    continuity_root_id: root,
-    status: matching.length ? 'REHYDRATED' : 'NO_PRIOR_CONTINUITY',
-    trigger,
-    matched_entry_count: matching.length,
-    relevant_entry_ids: Object.freeze(Array.isArray(relevantEntryIds) ? relevantEntryIds.filter(Boolean) : []),
-    latest_state: latest?.payload?.continuity_state || latest?.payload?.next_state || null,
-    latest_work_item_id: latest?.payload?.work_item_id || latest?.payload?.cognitive_output?.work_item_id ||
-      latest?.provenance?.work_item_id || null,
-    latest_state_entry_id: latest?.entry_id || null,
-    entries: Object.freeze(matching),
-    continuation_available: matching.length > 0,
-  });
+// Identity-scoped projection: an individual construction work item has its
+// own state. Completing invoice B cannot complete invoice A.
+const UNRESOLVED_CONTINUITY_STATES=new Set([
+  'ACTIVE','WAITING','BLOCKED','DEFERRED','SUSPENDED','REOPENED','RECURRING',
+]);
+export function buildContinuityRehydration({
+ continuityRootId,entries=[],trigger='RELEVANT_NEW_EVIDENCE',relevantEntryIds=[],
+ worldlineId=null,
+}={}){
+ const root=requiredText(continuityRootId,'CONTINUITY_ROOT_REQUIRED');
+ const matching=(Array.isArray(entries)?entries:[]).filter(x=>
+   x?.continuity_root_id===root &&
+   (!worldlineId || !x.worldline_id || x.worldline_id===worldlineId));
+ const states=matching.filter(entry=>
+   (!entry.event_kind||entry.event_kind==='CONTINUITY_STATE_TRANSITION') &&
+   CONTINUITY_STATES.includes(entry.payload?.continuity_state||entry.payload?.next_state));
+ const ordered=states.slice().sort((a,b)=>
+   String(b.assertion_time||'').localeCompare(String(a.assertion_time||'')) ||
+   String(b.entry_id||'').localeCompare(String(a.entry_id||'')));
+ const latest=ordered[0]||null,byItem=new Map();
+ for(const entry of ordered){
+   const workId=entry.payload?.work_item_id||entry.provenance?.work_item_id||null;
+   if(typeof workId!=='string'||!workId.trim()||byItem.has(workId))continue;
+   const state=entry.payload.continuity_state||entry.payload.next_state;
+   byItem.set(workId,Object.freeze({
+     work_item_id:workId,
+     latest_state:state,
+     latest_entry_id:entry.entry_id||null,
+     latest_ledger_hash:entry.ledger_entry_hash||null,
+     assertion_time:entry.assertion_time||null,
+     unresolved:UNRESOLVED_CONTINUITY_STATES.has(state),
+     // No actuation authority may follow from a reconstructed projection.
+     action_authorized:false,
+   }));
+ }
+ const workItems=Object.freeze([...byItem.values()].sort((a,b)=>
+   a.work_item_id.localeCompare(b.work_item_id)));
+ const unresolvedItems=Object.freeze(workItems.filter(x=>x.unresolved));
+ return Object.freeze({
+   continuity_root_id:root,
+   status:matching.length?'REHYDRATED':'NO_PRIOR_CONTINUITY',
+   trigger,
+   matched_entry_count:matching.length,
+   relevant_entry_ids:Object.freeze(Array.isArray(relevantEntryIds)?relevantEntryIds.filter(Boolean):[]),
+   latest_state:latest?.payload?.continuity_state||latest?.payload?.next_state||null,
+   latest_work_item_id:latest?.payload?.work_item_id||
+     latest?.payload?.cognitive_output?.work_item_id||latest?.provenance?.work_item_id||null,
+   latest_state_entry_id:latest?.entry_id||null,
+   work_item_states:workItems,
+   unresolved_work_items:unresolvedItems,
+   work_item_projection_complete_history_proven:false,
+   entries:Object.freeze(matching),
+   continuation_available:matching.length>0,
+ });
 }
 
 export function validateContinuityEvent(event) {
