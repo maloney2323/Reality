@@ -115,11 +115,16 @@ test('main intelligence route obeys authenticated project root and honest persis
   }
 });
 test('UI reports scoped continuity and passive typed discrepancies without inventing a hallucination score',()=>{
-  for(const id of ['continuityMode','continuityDetail','epistemicSummary']) {
+  for(const id of ['continuityMode','continuityDetail','epistemicSummary','epistemicEventsPanel','epistemicEvents']) {
     assert.ok(page.includes('id="'+id+'"'),'missing '+id);
   }
   assert.match(page,/b\\.continuity\\|\\|\\{\\}/);
   assert.match(page,/AUTHENTICATED_PERSISTENCE_NOT_VERIFIED/);
   assert.match(page,/These are structured evidence differences, not verified model-output hallucination catches/);
+  assert.match(page,/Status: OBSERVATION_ONLY/);
+  assert.match(page,/Truth not adjudicated/);
+  assert.match(page,/No trusted structured-source discrepancies were returned in the retrieved window/);
+  assert.match(page,/esc\\(compactValue\\(e\\.previous_value\\)\\)/);
+  assert.match(page,/esc\\(compactValue\\(e\\.incoming_value\\)\\)/);
   assert.doesNotMatch(page,/100% hallucination-free/);
 });
