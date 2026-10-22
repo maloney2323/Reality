@@ -20,7 +20,7 @@ The new conversation continuity check is embedded in the existing src/reality-co
 3. Actual model output is compared against those user-intent anchors. If the model affirmatively proposes an action without retaining the user-stated condition, it yields CONVERSATIONAL_PRECONDITION_DRIFT at COGNITION.
 4. If a user explicitly changes the relevant condition, the Spine yields CONVERSATIONAL_REVISION_REQUIRES_REVIEW, not an automatically confirmed model hallucination or grant of action authority.
 5. Findings join preexisting epistemic model-output observations at the **same Cognition checkpoint**, and remain unresolved in its Continuity Spine receipt.
-6. Live orchestration carries the observation in the original Continuity Ledger event and checks readback when durable persistence is enabled. The original model output remains intact, with an explicit review notice. Any already-proposed consequential work awaits independent review instead of interpreting a questionable plan as a completed instruction.
+6. Live orchestration carries the observation in the original Continuity Ledger event and checks readback when durable persistence is enabled. The original model output remains intact, with an explicit review notice. **A conversational drift candidate alone does not block conversational work proposals or establish authority**; the existing publication, authorization and independent outcome verification boundaries remain responsible for consequential action.
 7. Existing Reality Brief displays the prior condition, the model's new proposal, provenance references and the limitation that these are *potential* meaning shifts.
 
 ## Architectural rules
