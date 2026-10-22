@@ -4,6 +4,10 @@ import { buildGovernedChatSignal } from '../src/reality-governed-fragmented-sign
 import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from '../src/reality-verified-layer-handoff-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
 
+// All I/O in this file is a fake in-memory fetch, not an external database.
+if(!process.env.REALITY_UNIVERSE_PERSISTENCE_KEY)
+  process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='test-only-mocked-supabase-key';
+
 const observed='2026-10-22T10:00:00.000Z';
 const signal=buildGovernedChatSignal({
   message:'Customer  says $100. But  invoice says $90.\nInvoice number X-17 remains disputed.',
@@ -81,7 +85,7 @@ test('signal ingress writes complete evidence and verifies independent storage r
  assert.equal(outcome.entry.ledger_entry_hash,outcome.ledger_entry_hash);
  const parentBad={...outcome.entry,continuity_root_id:'root:other'};
  await assert.rejects(()=>recordVerifiedLayerHandoff({
-  stage:'COGNITION_ERROR',continuityRootId:'root:one',observedAt,sourceRef:'reality:cognition',
+  stage:'COGNITION_ERROR',continuityRootId:'root:one',observedAt:observed,sourceRef:'reality:cognition',
   output:{error_code:'stub'},parent:parentBad,fetchImpl:io.fakeFetch,
  }),/HANDOFF_PARENT_ROOT_MISMATCH/);
 });
@@ -102,7 +106,7 @@ test('an identical verified handoff is idempotent and does not lose the original
 test('tampered durable readback does not become a verified next-layer receipt',async()=>{
  const io=memoryAdapter({modifyReadback:row=>({...row,payload:{replaced:'false evidence'}})});
  await assert.rejects(()=>recordVerifiedLayerHandoff({
-  stage:'SIGNAL_CLEANER',continuityRootId:'root:one',observedAt,
+  stage:'SIGNAL_CLEANER',continuityRootId:'root:one',observedAt:observed,
   sourceRef:'reality:signal-cleaner',output:{signal,verification:verifySignalCleanerRecord(signal)},
   fetchImpl:io.fakeFetch,
  }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
