@@ -230,7 +230,6 @@ test('12 hard sequential construction turns: native detections, continuity, auth
     model_free_text_semantic_detection:'NOT_IMPLEMENTED',
     confirmed_real_llm_drift:'NOT_MEASURED',live_ui_feed:'NOT_CONNECTED_BY_TEST',
     declared_impact:impact,}));
-  );
  }finally{
   if(previous.enabled===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=previous.enabled;
