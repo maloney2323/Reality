@@ -130,3 +130,23 @@ test('end-to-end dormant continuity rehydrates and resumes the same thread', () 
   assert.equal(resumed.payload.objective, parked.payload.objective);
   assert.equal(resumed.payload.resumed_from, parked.continuity_event_id);
 });
+
+
+test('later signal and discrepancy events cannot overwrite the last actual continuity state', () => {
+  const root = 'continuity:test-no-silent-loss';
+  const entries = [
+    {entry_id:'transition:waiting',continuity_root_id:root,event_kind:'CONTINUITY_STATE_TRANSITION',
+      assertion_time:'2026-10-21T14:00:00Z',
+      payload:{continuity_state:'WAITING',next_continuation_condition:'INVOICE_RECEIPT'}},
+    {entry_id:'signal:later',continuity_root_id:root,event_kind:'REALITY_LAYER_HANDOFF',
+      assertion_time:'2026-10-21T14:01:00Z',payload:{layer_stage:'SIGNAL_CLEANER'}},
+    {entry_id:'discrepancy:later',continuity_root_id:root,event_kind:'DISCREPANCY_DETECTED',
+      assertion_time:'2026-10-21T14:02:00Z',
+      payload:{continuity_state:'COMPLETED',classification:'E_FACT_CONFLICT'}},
+  ];
+  const view = buildContinuityRehydration({continuityRootId:root,entries});
+  assert.equal(view.latest_state,'WAITING');
+  assert.equal(view.matched_entry_count,3);
+  assert.equal(view.entries.length,3);
+  assert.equal(view.continuation_available,true);
+});

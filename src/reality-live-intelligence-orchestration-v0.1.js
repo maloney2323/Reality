@@ -9,7 +9,12 @@ import { createOperationalSituation, transitionOperationalSituation } from './op
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
-  if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
+  // Do not read a global/unscoped Universe view when a principal root is
+  // absent. Synthetic no-history probes must never inherit another world.
+  // The ledger remains durable; this is a scoped retrieval decision only.
+  if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true' ||
+      systemContext?.ephemeral_no_history === true ||
+      !continuityRootId) return requestContext;
 
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
   return Object.freeze({
@@ -129,7 +134,11 @@ export async function runLiveIntelligenceOrchestration({
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
   });
-  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
+  const universeContext = await loadUniverseContext({
+    systemContext,
+    continuityRootId: explicitContinuityRootId || conversationContinuityRootId,
+    fetchImpl,
+  });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -148,7 +157,10 @@ export async function runLiveIntelligenceOrchestration({
 
   let continuityDiscovery = null;
   let discoveredContinuityRootId = null;
-  if (!explicitContinuityRootId && systemContext?.ephemeral_no_history !== true && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  // Root-independent dormant-continuity discovery currently queries a
+  // cross-root global index. Keep it off the interactive path until this
+  // lookup can prove principal/tenant scope independently.
+  if (false && !explicitContinuityRootId && systemContext?.ephemeral_no_history !== true && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const dormant = await retrieveDormantContinuitySummaries({
       worldlineId: systemContext?.worldline_id || null,
       limit: 1000,

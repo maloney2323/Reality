@@ -308,7 +308,7 @@ export async function retrieveCompleteContinuityHistory({
     // Caller can compare this digest across restarts to detect a changed
     // snapshot. This digest is not evidence that a database holds all reality.
     history_hash:'sha256:'+entries.reduce(
-      (acc,e)=>require('node:crypto').createHash('sha256')
+      (acc,e)=>crypto.createHash('sha256')
         .update(acc+'|'+e.entry_id+'|'+e.ledger_entry_hash).digest('hex'),'seed'),
   });
 }

@@ -55,7 +55,18 @@ export function buildContinuityEvent({
 export function buildContinuityRehydration({ continuityRootId, entries = [], trigger = 'RELEVANT_NEW_EVIDENCE', relevantEntryIds = [] } = {}) {
   const root = requiredText(continuityRootId, 'CONTINUITY_ROOT_REQUIRED');
   const matching = (Array.isArray(entries) ? entries : []).filter((entry) => entry?.continuity_root_id === root);
-  const latest = matching.slice().sort((a, b) => String(b.assertion_time || '').localeCompare(String(a.assertion_time || '')))[0] || null;
+  // Every observation remains in the Universe, but only actual continuity
+  // transitions can supply the active continuity state. A newer signal,
+  // diagnostic, or model output must not erase an earlier WAITING obligation.
+  // Older records without event_kind remain readable for legacy continuity.
+  const stateTransitions = matching.filter((entry) =>
+    (!entry.event_kind || entry.event_kind === 'CONTINUITY_STATE_TRANSITION') &&
+    CONTINUITY_STATES.includes(entry.payload?.continuity_state || entry.payload?.next_state)
+  );
+  const latest = stateTransitions.slice().sort((a, b) =>
+    String(b.assertion_time || '').localeCompare(String(a.assertion_time || '')) ||
+    String(b.entry_id || '').localeCompare(String(a.entry_id || ''))
+  )[0] || null;
   return Object.freeze({
     continuity_root_id: root,
     status: matching.length ? 'REHYDRATED' : 'NO_PRIOR_CONTINUITY',

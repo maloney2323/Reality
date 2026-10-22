@@ -61,3 +61,22 @@ test('missing model credential fails closed before orchestration can produce a w
     /OPENAI_API_KEY_REQUIRED/
   );
 });
+
+
+test('ephemeral probes cannot read a shared persisted Universe or discover another principal root',async()=>{
+  const previous = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
+  try {
+    const result=await runLiveIntelligenceOrchestration({
+      message:'Explain the idea without prior state.',
+      systemContext:{ephemeral_no_history:true},
+      apiKey:'test-key',
+      fetchImpl:fakeFetch,
+    });
+    assert.equal(result.mode,'CONVERSATIONAL');
+    assert.equal(result.context.continuity.signal_handoff_status,'NOT_DURABLY_PERSISTED');
+  } finally {
+    if(previous===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=previous;
+  }
+});
