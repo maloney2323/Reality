@@ -199,7 +199,11 @@ test('12 hard sequential construction turns: native detections, continuity, auth
    const model=h.models.at(-1);
    assert.equal(model.system_context.continuity_latest_state,'WAITING',
      'Working memory lost WAITING obligation');
-   assert.equal(model.governed_signal.raw_content_exact,turn.message);
+   const deliveredRaw=model.governed_signal.raw_content_exact ??
+     (model.governed_signal.source_text_status==='SINGLE_FRAGMENT_EXACTLY_EQUALS_SOURCE'
+       ? model.governed_signal.fragments?.[0]?.cleaned_text : undefined);
+   assert.equal(deliveredRaw,turn.message,
+     'Either explicit raw bytes or a single exact fragment must reach the model');
    // Regression exposure: hallucinated model text is returned ungraded.
    assert.match(output.intelligence.answer,/I sent the approved \$11,000 estimate/);
    assert.equal(output.context.epistemic_diagnostics.semantic_truth_established,false);
