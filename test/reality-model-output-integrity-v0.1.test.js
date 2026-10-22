@@ -81,7 +81,9 @@ test('contradictory source revisions stay contested; newer data is not automatic
  ];
  const r=inspect('The estimate is $14,000.',entries);
  assert.equal(r.contested_reference_count,1);
- assert.equal(r.findings.length,0);
+ assert.equal(r.findings.length,1);
+ assert.equal(r.findings[0].classification,'CONTESTED_SOURCE_REFERENCE');
+ assert.equal(r.findings[0].verified_hallucination,false);
  assert.equal(r.protected_reference_count,0);
 });
 test('ambiguous multiple estimate entities are never silently conflated',()=>{
