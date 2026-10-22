@@ -23,6 +23,7 @@ export function verifyObservationEnvelope(observation,{continuityRootId}={}){
     throw Error('TRUSTED_OBSERVATION_ROOT_MISMATCH');
   if(observation.access_scope!=='READ') throw Error('TRUSTED_OBSERVATION_READ_SCOPE_REQUIRED');
   const rebuilt=createObservation({
+    observationVersion:observation.observation_version,
     source:observation.source,domain:observation.domain,
     sourceRecordId:observation.source_record_id,
     observedAt:observation.observed_at,eventTime:observation.event_time,
