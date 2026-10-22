@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { inspectEpistemicDifferences } from './reality-epistemic-difference-detector-v0.1.js';
+import { projectVerifiedDiscrepancyKeys } from './reality-epistemic-discrepancy-ledger-v0.1.js';
 import {
   EPISTEMIC_STATUS,
   WORLD_OBSERVATION_FABRIC_VERSION,
@@ -54,7 +55,7 @@ function hasCompletionSignal(textValue) {
   return /\b(done|completed|sent|delivered|resolved|closed|finished|confirmed)\b/i.test(textValue);
 }
 
-export function reconstructUniverse({ observations = [], now = new Date().toISOString() } = {}) {
+export function reconstructUniverse({ observations = [], verifiedDiscrepancyReceipts = [], now = new Date().toISOString() } = {}) {
   const ordered = [...observations].sort((a, b) => Date.parse(a.event_time) - Date.parse(b.event_time));
   const claims = [];
   const entities = new Map();
@@ -188,6 +189,9 @@ export function reconstructUniverse({ observations = [], now = new Date().toISOS
     recurring_process_signals: recurring,
     discovered_work: discoveredWork,
     contradictions,
+    // Only supplied verified read-back receipts can affect this active view.
+    // Raw detector diagnoses remain separate from this durable state projection.
+    persisted_epistemic_state:projectVerifiedDiscrepancyKeys({verifiedReceipts:verifiedDiscrepancyReceipts}),
     epistemic_discrepancies: epistemicDiagnostics.epistemic_discrepancies,
     detector_summary: {
       version:epistemicDiagnostics.detector_version,
