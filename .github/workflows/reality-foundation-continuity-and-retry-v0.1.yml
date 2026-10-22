@@ -13,6 +13,8 @@ on:
       - "src/reality-native-universe-v1.0.js"
       - "test/reality-cognition-context-selection-v0.1.test.js"
       - "src/reality-native-universe-persistence-v1.0.js"
+      - "src/reality-universe-source-inventory-v0.1.js"
+      - "test/reality-universe-source-inventory-v0.1.test.js"
       - "src/reality-continuity-recovery-outbox-v0.1.js"
       - "test/reality-continuity-recovery-outbox-v0.1.test.js"
       - "src/reality-trusted-observation-admission-v0.1.js"
@@ -46,6 +48,8 @@ jobs:
         run: node --test test/reality-cognition-context-selection-v0.1.test.js
       - name: Verify passive native discrepancies reach ordinary cognition
         run: node --test test/reality-live-epistemic-diagnostics-v0.1.test.js
+      - name: Check legacy + canonical Universe identities without rewriting history
+        run: node --test test/reality-universe-source-inventory-v0.1.test.js
       - name: Preserve pre-existing capability gap runtime contract
         run: node --test test/capability-gap-runtime-v1.test.js
 
