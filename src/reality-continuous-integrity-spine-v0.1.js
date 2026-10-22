@@ -91,7 +91,7 @@ function classification(x) {
 export function advanceIntegritySpine({
   trace,stage,observedAt='2026-10-22T12:00:00.000Z',
   sourceReceiptRefs=[],typedObservations=[],
-  presentOpenObligationIds=null,
+  presentOpenObligationIds=null,observedModelFindings=[],
 }={}) {
   const validity=verifyIntegritySpine(trace);
   if(!validity.valid)throw Error(validity.reason);
@@ -99,6 +99,8 @@ export function advanceIntegritySpine({
   const sources=names(sourceReceiptRefs,'SPINE_SOURCE_RECEIPTS_INVALID');
   if(!sources.length)throw Error('SPINE_SOURCE_RECEIPT_REQUIRED');
   if(!Array.isArray(typedObservations))throw Error('SPINE_TYPED_OBSERVATIONS_INVALID');
+  if(!Array.isArray(observedModelFindings))throw Error('SPINE_MODEL_FINDINGS_INVALID');
+  if(observedModelFindings.length && stage!=='COGNITION')throw Error('SPINE_MODEL_FINDINGS_WRONG_STAGE');
   for(const x of typedObservations){
     if(x?.provenance?.continuity_root_id!==trace.continuity_root_id ||
        (x?.provenance?.worldline_id &&
@@ -133,6 +135,18 @@ export function advanceIntegritySpine({
       work_item_id:id,epistemic_truth_established:false,
       independently_adjudicated:false,resolves_automatically:false,
     });
+  }
+  for(const issue of observedModelFindings){
+    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM'].includes(issue.classification)||
+       issue.origin_stage!==stage||issue.independently_adjudicated!==false||
+       !Array.isArray(issue.source_receipt_refs)||!issue.source_receipt_refs.length||
+       !issue.source_receipt_refs.every(nonempty))throw Error('SPINE_MODEL_FINDING_UNTRUSTED');
+    // Observed adapter findings are NOT independent factual verdicts.
+    created.push({issue_id:issue.issue_id,classification:issue.classification,
+      origin_stage:stage,source_receipt_refs:[...issue.source_receipt_refs],
+      target_state_keys:issue.target_state_key?[issue.target_state_key]:[],
+      epistemic_truth_established:false,independently_adjudicated:false,
+      resolves_automatically:false});
   }
   const priorIssues=trace.checkpoints.at(-1)?.unresolved_issues||[];
   const existing=new Set(priorIssues.map(x=>x.issue_id));
