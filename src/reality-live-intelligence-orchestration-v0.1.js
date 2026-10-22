@@ -340,11 +340,14 @@ export async function runLiveIntelligenceOrchestration({
     }
     spineSummary=summarizeIntegritySpine(spine);
   }
-  const integrityRequiresReview=combinedIntegrityFindings.some(x=>
+  // Conversation drift is *diagnostic*, not a new action gate. Continue
+  // to apply only the pre-existing factual-output proposal policy.
+  const conversationReviewNeeded=conversationDrift.findings.length>0;
+  const integrityRequiresReview=modelIntegrity.findings.some(x=>
     ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM',
-      'CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT',
-      'CONVERSATIONAL_REVISION_REQUIRES_REVIEW'].includes(x.classification));
-  const note=integrityRequiresReview
+      'CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
+  const anyIntegrityFinding=integrityRequiresReview||conversationReviewNeeded;
+  const note=anyIntegrityFinding
     ? '\n\nReality integrity notice: A material claim, prior conversational condition, or requested revision needs review. The original user requirement remains recorded; no independent truth verdict or external action is authorized.'
     : '';
   const modelResult = {
@@ -353,6 +356,7 @@ export async function runLiveIntelligenceOrchestration({
     answer:rawModelAnswer+note,
     cognitive_runtime_version:cognitiveResult.runtime_version,
     integrity_review_required:integrityRequiresReview,
+    conversation_drift_observed:conversationReviewNeeded,
   };
 
   const materiality = materialityFromSignal(governedSignal);
