@@ -3,7 +3,7 @@ import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from './reality
 import { retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { inspectPersistedEpistemicDifferences } from './reality-live-epistemic-diagnostics-v0.1.js';
-import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
+import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition, retrieveScopedWorkItemTransitionHistory, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -21,6 +21,10 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
   const latestTransition = await retrieveLatestPersistedContinuityTransition({
     continuityRootId, fetchImpl,
   });
+  const workHistory=await retrieveScopedWorkItemTransitionHistory({
+    continuityRootId,worldlineId:systemContext?.worldline_id || 'reality:primary',
+    pageSize:100,maxTransitions:2000,fetchImpl,
+  });
   const retained = latestTransition && !durable.entries.some(
     entry=>entry.entry_id===latestTransition.entry_id)
       ? [latestTransition,...durable.entries] : durable.entries;
@@ -32,6 +36,10 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
     persistence: durable.persistence,
     durable_count: durable.count,
     continuity_transition_ref: latestTransition?.entry_id || null,
+    work_item_transition_history: workHistory.entries,
+    work_item_transition_scan_status: workHistory.status,
+    work_item_transition_snapshot_verified:
+      workHistory.transactionally_consistent_snapshot_proven,
     // A bounded reasoning context is not the complete Universe history.
     context_is_full_history: false,
     continuity_root_id: continuityRootId,
@@ -166,7 +174,9 @@ export async function runLiveIntelligenceOrchestration({
   let persistedContinuity = scopedRootForRehydration
     ? buildContinuityRehydration({
         continuityRootId: scopedRootForRehydration,
-        entries: universeContext.entries,
+        entries: [...universeContext.entries,
+          ...(universeContext.work_item_transition_history||[])],
+        worldlineId:systemContext?.worldline_id || 'reality:primary',
         trigger: 'CURRENT_REQUEST',
       })
     : null;
@@ -232,6 +242,9 @@ export async function runLiveIntelligenceOrchestration({
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
+    continuity_work_items: persistedContinuity?.work_item_states||[],
+    continuity_unresolved_work_items: persistedContinuity?.unresolved_work_items||[],
+    continuity_work_items_complete_snapshot_proven:false,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
     continuity_entry_count: persistedContinuity?.matched_entry_count || 0,
     continuity_transition_ref: universeContext.continuity_transition_ref || null,
@@ -429,6 +442,9 @@ export async function runLiveIntelligenceOrchestration({
       rehydrated: persistedContinuity?.continuation_available === true,
       prior_state: persistedContinuity?.latest_state || null,
       current_state: continuityEvent?.next_state || null,
+      work_item_states:clone(persistedContinuity?.work_item_states||[]),
+      unresolved_work_items:clone(persistedContinuity?.unresolved_work_items||[]),
+      work_item_history_scan_status:universeContext.work_item_transition_scan_status||'NOT_SCANNED',
       event_id: continuityEvent?.continuity_event_id || null,
       signal_handoff_status:signalHandoff?.status || 'NOT_DURABLY_PERSISTED',
       signal_handoff_entry_id:signalHandoff?.entry_id || null,

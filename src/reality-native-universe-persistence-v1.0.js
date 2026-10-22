@@ -373,3 +373,56 @@ export async function retrieveLatestPersistedContinuityTransition({
     throw Error('CONTINUITY_STATE_INDEX_SCOPE_MISMATCH');
   return entry;
 }
+
+// Tenant-scoped continuity transition scan. It intentionally scans *only*
+// state transitions, not every raw signal. No model-context truncation may
+// silently hide an unfinished work item within this bounded source scan.
+export async function retrieveScopedWorkItemTransitionHistory({
+ continuityRootId,worldlineId='reality:primary',pageSize=100,
+ maxTransitions=2000,fetchImpl=fetch,
+}={}){
+ if(typeof continuityRootId!=='string'||!continuityRootId.trim()||
+    typeof worldlineId!=='string'||!worldlineId.trim())
+  throw Error('WORK_ITEM_HISTORY_SCOPE_REQUIRED');
+ if(!Number.isInteger(pageSize)||pageSize<1||pageSize>1000||
+    !Number.isInteger(maxTransitions)||maxTransitions<1)
+  throw Error('WORK_ITEM_HISTORY_LIMIT_INVALID');
+ const rows=[],ids=new Set();let offset=0,pages=0;
+ while(true){
+  const available=maxTransitions-rows.length;
+  const limit=Math.min(pageSize,available+1);
+  const q=new URLSearchParams();
+  q.set('select','*');q.set('continuity_root_id','eq.'+continuityRootId);
+  q.set('worldline_id','eq.'+worldlineId);
+  q.set('event_kind','eq.CONTINUITY_STATE_TRANSITION');
+  q.set('order','assertion_time.desc,effective_time.desc,ledger_entry_hash.asc');
+  q.set('offset',String(offset));q.set('limit',String(limit));
+  const response=await request('/rest/v1/reality_universe_entries?'+q,{
+   method:'GET',headers:{Accept:'application/json'},
+  },fetchImpl);
+  const page=await response.json();
+  if(!Array.isArray(page)||page.length>limit)
+   throw Error('WORK_ITEM_HISTORY_INVALID_PAGE');
+  pages++;
+  for(const data of page){
+   const entry=Object.freeze(mapRow(data));validateUniverseEntry(entry);
+   if(entry.continuity_root_id!==continuityRootId||
+      entry.worldline_id!==worldlineId||
+      entry.event_kind!=='CONTINUITY_STATE_TRANSITION')
+    throw Error('WORK_ITEM_HISTORY_SCOPE_MISMATCH');
+   if(ids.has(entry.entry_id))throw Error('WORK_ITEM_HISTORY_DUPLICATE_ENTRY');
+   if(rows.length>=maxTransitions)throw Error('WORK_ITEM_HISTORY_LIMIT_REACHED');
+   ids.add(entry.entry_id);rows.push(entry);
+  }
+  offset+=page.length;
+  if(page.length<limit)break;
+ }
+ return Object.freeze({
+  status:'SCANNED_ALL_MATCHING_ROWS_WITHIN_LIMIT',
+  scope:'ONE_CONTINUITY_ROOT_AND_WORLDLINE',count:rows.length,
+  pages_read:pages,entries:Object.freeze(rows),
+  // Offset pagination is not snapshot-isolated against concurrent backfills.
+  transactionally_consistent_snapshot_proven:false,
+  truncated:false,
+ });
+}

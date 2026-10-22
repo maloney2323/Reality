@@ -274,3 +274,46 @@ test('historical Universe survives a 100-record working-context window without l
   assert.equal(all.limit_truncated,false);
  }finally{reset();}
 });
+
+test('two parallel job obligations survive 135 later signals and both reach cognition',async()=>{
+ const reset=envOn();
+ try{
+  const waiting=createUniverseEntry({
+   entry_id:'job:invoice:WAITING',continuity_root_id:ROOT,worldline_id:'reality:primary',
+   event_kind:'CONTINUITY_STATE_TRANSITION',epistemic_kind:'OBSERVATION',
+   assertion_time:AT,effective_time:AT,source_ref:'synthetic:invoice',
+   payload:{work_item_id:'invoice:unpaid',continuity_state:'WAITING'},
+   provenance:{source:'synthetic:test'},evidence_references:[],
+  });
+  const completed=createUniverseEntry({
+   entry_id:'job:cabinet:COMPLETED',continuity_root_id:ROOT,worldline_id:'reality:primary',
+   event_kind:'CONTINUITY_STATE_TRANSITION',epistemic_kind:'OBSERVATION',
+   assertion_time:LATER,effective_time:LATER,source_ref:'synthetic:cabinet',
+   payload:{work_item_id:'cabinets:delivered',continuity_state:'COMPLETED'},
+   provenance:{source:'synthetic:test'},evidence_references:[],
+  });
+  const seed=[waiting,completed];
+  for(let i=0;i<135;i++){
+   const d=new Date(Date.parse(LATER)+1000*(i+1)).toISOString();
+   seed.push(createUniverseEntry({
+    entry_id:'unrelated:signal:'+i,continuity_root_id:ROOT,worldline_id:'reality:primary',
+    event_kind:'REALITY_LAYER_HANDOFF',epistemic_kind:'OBSERVATION',
+    assertion_time:d,effective_time:d,source_ref:'synthetic:latest-signals',
+    payload:{ordinal:i},evidence_references:[],provenance:{source:'synthetic:test'},
+   }));
+  }
+  const h=buildHarness({seed});
+  const turn=await runLiveIntelligenceOrchestration({
+   message:'Which jobs still need attention?',observedAt:'2026-10-22T11:00:00Z',
+   systemContext:{continuity_root_id:ROOT},apiKey:'synthetic',fetchImpl:h.fakeFetch,
+  });
+  const outstanding=turn.context.continuity.unresolved_work_items;
+  assert.deepEqual(outstanding.map(x=>x.work_item_id),['invoice:unpaid']);
+  const all=turn.context.continuity.work_item_states;
+  assert.equal(all.length,2);
+  assert.equal(all.find(x=>x.work_item_id==='cabinets:delivered').latest_state,'COMPLETED');
+  const model=h.modelCalls.at(-1).system_context;
+  assert.deepEqual(model.continuity_unresolved_work_items.map(x=>x.work_item_id),['invoice:unpaid']);
+  assert.equal(model.continuity_work_items_complete_snapshot_proven,false);
+ }finally{reset();}
+});
