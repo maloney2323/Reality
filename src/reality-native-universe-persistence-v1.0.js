@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { createUniverseEntry, validateUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
 
 export const REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION =
@@ -235,4 +236,79 @@ export async function retrievePersistedUniverseEntry({ entryId, fetchImpl = fetc
   const entry=Object.freeze(mapRow(rows[0]));
   validateUniverseEntry(entry);
   return entry;
+}
+
+
+/**
+ * Full, point-in-time, root-scoped history scan. This is for reconstruction
+ * and auditing, NOT a directive to feed every ledger entry into an LLM.
+ * An exhausted scan is explicit: no hidden top-100 truncation.
+ *
+ * Fail rather than claim a complete history when a bounded scan is exhausted
+ * at maxEntries, page ordering repeats an entry, or storage integrity fails.
+ */
+export async function retrieveCompleteContinuityHistory({
+  continuityRootId,worldlineId=null,
+  snapshotAssertionTime=new Date().toISOString(),
+  pageSize=100,maxEntries=10000,fetchImpl=fetch,
+}={}){
+  if(typeof continuityRootId!=='string'||!continuityRootId.trim())
+    throw Error('CONTINUITY_FULL_HISTORY_ROOT_REQUIRED');
+  if(!Number.isFinite(Date.parse(snapshotAssertionTime)))
+    throw Error('CONTINUITY_FULL_HISTORY_CUTOFF_INVALID');
+  if(!Number.isInteger(pageSize)||pageSize<1||pageSize>1000||
+     !Number.isInteger(maxEntries)||maxEntries<1)
+    throw Error('CONTINUITY_FULL_HISTORY_BOUNDS_INVALID');
+  const cutoff=new Date(snapshotAssertionTime).toISOString();
+  const entries=[],seen=new Set();
+  let offset=0,pages=0;
+  while(true) {
+    // When at the limit, request one further row. Do not silently report
+    // that exactly maxEntries entries represents the entire history.
+    const remaining=maxEntries-entries.length;
+    const limit=Math.min(pageSize,remaining+1);
+    const params=new URLSearchParams();
+    params.set('select','*');
+    params.set('continuity_root_id','eq.'+continuityRootId);
+    if(worldlineId)params.set('worldline_id','eq.'+worldlineId);
+    params.set('assertion_time','lte.'+cutoff);
+    params.set('order','assertion_time.asc,effective_time.asc,ledger_entry_hash.asc');
+    params.set('offset',String(offset));
+    params.set('limit',String(limit));
+    const response=await request('/rest/v1/reality_universe_entries?'+params,{
+      method:'GET',headers:{Accept:'application/json'},
+    },fetchImpl);
+    const rows=await response.json();
+    if(!Array.isArray(rows)||rows.length>limit)
+      throw Error('CONTINUITY_FULL_HISTORY_INVALID_PAGE');
+    pages++;
+    for(const row of rows) {
+      const entry=Object.freeze(mapRow(row));
+      validateUniverseEntry(entry);
+      if(entry.continuity_root_id!==continuityRootId||
+          (worldlineId&&entry.worldline_id!==worldlineId)||
+          Date.parse(entry.assertion_time)>Date.parse(cutoff))
+        throw Error('CONTINUITY_FULL_HISTORY_SCOPE_MISMATCH');
+      if(seen.has(entry.entry_id))throw Error('CONTINUITY_FULL_HISTORY_DUPLICATE_ENTRY');
+      if(entries.length>=maxEntries)throw Error('CONTINUITY_FULL_HISTORY_LIMIT_REACHED');
+      seen.add(entry.entry_id);
+      entries.push(entry);
+    }
+    offset+=rows.length;
+    if(rows.length<limit) break;
+  }
+  return Object.freeze({
+    version:REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+    status:'COMPLETE_AT_SNAPSHOT',
+    completeness_scope:'DATABASE_ROWS_MATCHING_SNAPSHOT_QUERY',
+    continuity_root_id:continuityRootId,worldline_id:worldlineId,
+    assertion_time_cutoff:cutoff,limit_truncated:false,
+    count:entries.length,pages_read:pages,
+    entries:Object.freeze(entries),
+    // Caller can compare this digest across restarts to detect a changed
+    // snapshot. This digest is not evidence that a database holds all reality.
+    history_hash:'sha256:'+entries.reduce(
+      (acc,e)=>require('node:crypto').createHash('sha256')
+        .update(acc+'|'+e.entry_id+'|'+e.ledger_entry_hash).digest('hex'),'seed'),
+  });
 }
