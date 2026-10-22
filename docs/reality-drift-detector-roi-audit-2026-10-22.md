@@ -47,7 +47,12 @@ Each customer card needs **time window, scope/tenant, case count/denominator, un
 - `api/reality/execute.js`: reject browser-supplied authorization and evidence/learning context; derive executable authorization solely from server-persisted policy. Independent source observation provenance for warrants is **not yet built**, so the handler must report `PROVENANCE_INPUT_REQUIRED` rather than invent a warrant.
 - `src/reality-governed-execution-engine-v0.1.js`: require `verified:true` AND `independent:true` for `VERIFIED` status.
 - `index.html`: remove browser-generated support/friction evidence claims, temper health readiness language, add clear unmeasured value metrics (completed work, lift, coverage, rework minutes, cost per verified outcome).
+- Corrected a malformed URL trimming expression in `src/reality-connector-supabase-v1.0.js` that prevented importing the connector in Node (found by cross-layer CI).
+- Corrected the signed principal cookie parser to accept the Reality cookie in any position among ordinary browser cookies; added continuity regression.
+- Changed the work-runtime execution gate so `nonconsequential` caller metadata cannot bypass explicit authority.
+- Changed initial customer work counts to an em dash until an actual query returns a count; unavailable telemetry is not automatically zero.
 - Added deterministic regression suites and a dedicated GitHub Actions workflow. They prove these code contracts only; they do not perform paid model comparisons or customer integrations.
+- Latest targeted audit run at https://github.com/maloney2323/Reality/actions/runs/39858837012 passed **43/43 deterministic tests** in two test groups; related targeted continuity, live orchestration, authenticated entrypoint and governed execution workflows also passed at the audited commit. These do **not** establish semantic detector recall, autonomous task completion, verified customer ROI, or deployed production correctness.
 
 ## Exit gates before the 100-turn construction test
 
