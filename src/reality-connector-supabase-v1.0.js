@@ -5,7 +5,7 @@
 function baseUrl() {
   const value = process.env.SUPABASE_URL;
   if (!value) throw new Error("CONNECTOR_CREDENTIAL_MISSING:supabase_url");
-  return value.replace(/\\/$/, "");
+  return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
 function headers() {
