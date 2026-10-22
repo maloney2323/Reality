@@ -1,0 +1,31 @@
+name: Reality 12-Turn Construction Adversarial (isolated synthetic)
+on:
+  push:
+    branches:
+      - test/construction-12-turn-adversarial-20261022
+    paths:
+      - test/reality-construction-12-turn-adversarial-v0.1.test.js
+      - .github/workflows/reality-construction-12-turn-adversarial-v0.1.yml
+  pull_request:
+    paths:
+      - test/reality-construction-12-turn-adversarial-v0.1.test.js
+      - .github/workflows/reality-construction-12-turn-adversarial-v0.1.yml
+permissions:
+  contents: read
+jobs:
+  construction-12-turn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Run 12 sequential, difficult construction-business turns
+        run: node --test test/reality-construction-12-turn-adversarial-v0.1.test.js
+      - name: Disallow false claim that mocked success is a live LLM score
+        run: |
+          echo "Scope: deterministic mocked source, model, and persistence"
+          echo "Live model drift, paid API, production UI, and actual customer ROI: NOT MEASURED"
