@@ -145,7 +145,7 @@ export async function runLiveIntelligenceOrchestration({
 
   let continuityDiscovery = null;
   let discoveredContinuityRootId = null;
-  if (!explicitContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  if (!explicitContinuityRootId && systemContext?.ephemeral_no_history !== true && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const dormant = await retrieveDormantContinuitySummaries({
       worldlineId: systemContext?.worldline_id || null,
       limit: 1000,
