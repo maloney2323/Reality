@@ -44,7 +44,7 @@ export async function runAutonomousClosurePass({
   });
 
   const confirmedGap = confirmCapabilityGap(gap, { historicalFailureRefs, inputSchema, outputSchema, verificationSuiteRef });
-  const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe.worldline_id });
+  const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe?.worldline_id || universe?.worldlineId || workItem?.worldline_id });
 
   if (!authorization) return Object.freeze({ state: 'AWAITING_AUTHORIZATION', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment });
 
