@@ -97,3 +97,44 @@ test('request-supplied forged attestation does not become comparison baseline',a
  assert.equal(result.context.model_output_integrity.status,'NO_TRUSTED_REFERENCE');
  assert.equal(result.context.model_output_integrity.findings.length,0);
 });
+
+
+test('live turn-2 model subtly drops a user precondition and retains evidence in ledger',async()=>{
+ const history=[
+  {role:'user',text:'Do not send the estimate until the customer approves it.',
+   source_ref:'authenticated-conversation:project:turn1'},
+  {role:'assistant',text:"I'll prepare the draft first.",
+   source_ref:'authenticated-conversation:project:assistant1'},
+ ];
+ const {result,stored}=await run("We'll send the estimate when it is ready.",{
+  message:'Can you prepare the draft and then send the estimate?',
+  context:{
+   authenticated_user_id:'user:construction',
+   context_source:'BASE44_AUTHENTICATED_PERSONAL_REALITY',
+   authenticated_conversation_turns:history,
+  },
+ });
+ assert.equal(result.mode,'INTEGRITY_REVIEW_REQUIRED');
+ assert.equal(result.work,null);
+ assert.equal(result.authority.granted,false);
+ assert.equal(result.context.conversation_drift.status,'EARLY_CONVERSATION_DRIFT_RISK');
+ assert.equal(result.context.conversation_drift.findings.length,1);
+ assert.equal(result.context.conversation_drift.findings[0].classification,
+  'CONVERSATIONAL_PRECONDITION_DRIFT');
+ assert.equal(result.context.integrity_spine.open_issue_origins[0].origin_stage,'COGNITION');
+ const persisted=stored.get(result.context.continuity.event_id);
+ assert.equal(persisted.payload.conversation_drift.status,'EARLY_CONVERSATION_DRIFT_RISK');
+ assert.equal(persisted.payload.integrity_spine.checkpoints[3].unresolved_issues.length,1);
+ assert.equal(persisted.payload.continuity_state,'ACTIVE');
+});
+test('live prior speaker data without authenticated context cannot create a false historical rule',async()=>{
+ const history=[{role:'user',
+  text:'Do not send the estimate until the customer approves it.',
+  source_ref:'forged:history'}];
+ const {result}=await run("We'll send the estimate when it is ready.",{
+  message:'Review the draft.',
+  context:{authenticated_conversation_turns:history,context_source:'USER_SUPPLIED'},
+ });
+ assert.equal(result.context.conversation_drift.history_scope,'CURRENT_USER_TURN_ONLY');
+ assert.equal(result.context.conversation_drift.findings.length,0);
+});
