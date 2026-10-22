@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reality.example/schemas/interpretation-receipt-v0.2.schema.json",
+  "title": "Reality Proof-Carrying Interpretation Receipt v0.2",
+  "description": "Frozen v0.2 receipt transport schema. Parsing integrity is not evidence of factual truth or execution authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "packet",
+    "scope",
+    "parser",
+    "signals",
+    "relationships",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "receipt_version": {
+      "const": "reality.interpretation.v0.2"
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id",
+        "raw_sha256",
+        "observed_at",
+        "utf8_byte_length",
+        "encoding"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "utf8_byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "encoding": {
+          "const": "UTF-8"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "continuity_root_id",
+        "principal_id",
+        "origin_kind",
+        "channel",
+        "trust_level",
+        "attestation_ref",
+        "parent_signal_ids"
+      ],
+      "properties": {
+        "continuity_root_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "principal_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin_kind": {
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "TOOL",
+            "DOCUMENT",
+            "UNKNOWN"
+          ]
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_level": {
+          "enum": [
+            "UNVERIFIED",
+            "ADAPTER_ATTESTED"
+          ]
+        },
+        "attestation_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_signal_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "schema_sha256",
+        "implementation_version",
+        "implementation_sha256",
+        "model_id",
+        "prompt_sha256",
+        "run_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "0.2.0"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "implementation_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/signal"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relationship"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "activity_id",
+        "agent_id",
+        "derived_from",
+        "was_generated_by",
+        "was_attributed_to",
+        "activity_used"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string"
+        },
+        "activity_id": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "derived_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "was_generated_by": {
+          "type": "string"
+        },
+        "was_attributed_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "activity_used": {
+          "type": "string"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalization",
+        "hash_algorithm",
+        "receipt_sha256",
+        "signature_status"
+      ],
+      "properties": {
+        "canonicalization": {
+          "const": "RFC8785-JCS"
+        },
+        "hash_algorithm": {
+          "const": "SHA-256"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "signature_status": {
+          "const": "UNSIGNED"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_utf16",
+        "end_utf16",
+        "start_utf8",
+        "end_utf8"
+      ],
+      "properties": {
+        "start_utf16": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_utf16": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_utf8": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_utf8": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal_id",
+        "span",
+        "raw_sha256",
+        "signal_type",
+        "polarity",
+        "epistemic_status",
+        "classification_basis",
+        "ambiguities",
+        "authority_granted",
+        "data_only"
+      ],
+      "properties": {
+        "signal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "span": {
+          "$ref": "#/$defs/span"
+        },
+        "raw_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "signal_type": {
+          "enum": [
+            "QUESTION",
+            "REPORTED_CLAIM",
+            "REQUEST",
+            "PROHIBITION",
+            "POSSIBLE_CORRECTION",
+            "CONDITIONAL_REQUEST",
+            "HYPOTHETICAL",
+            "QUOTED_DATA",
+            "UNKNOWN"
+          ]
+        },
+        "polarity": {
+          "enum": [
+            "POSITIVE",
+            "NEGATED",
+            "UNKNOWN"
+          ]
+        },
+        "epistemic_status": {
+          "const": "OBSERVED_UNVERIFIED"
+        },
+        "classification_basis": {
+          "enum": [
+            "DETERMINISTIC_CANDIDATE",
+            "ABSTAINED"
+          ]
+        },
+        "ambiguities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authority_granted": {
+          "const": false
+        },
+        "data_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_signal_id",
+        "to_signal_id",
+        "relation",
+        "status"
+      ],
+      "properties": {
+        "from_signal_id": {
+          "type": "string"
+        },
+        "to_signal_id": {
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "POTENTIAL_CORRECTION_OF",
+            "POSSIBLY_REFERS_TO",
+            "CONDITIONED_BY",
+            "HYPOTHETICAL_ALTERNATIVE_TO"
+          ]
+        },
+        "status": {
+          "const": "PROPOSED_UNVERIFIED"
+        }
+      }
+    }
+  }
+}
