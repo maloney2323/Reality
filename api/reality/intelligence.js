@@ -239,6 +239,13 @@ export async function loadRealityContext(req, body, { noHistoryWhenSelectorsMiss
     authenticated_user_id: user.id,
     profile: safeProfile,
     verified_conversation_context: historyText || '(No earlier conversation context is available.)',
+    // Explicit speaker boundaries and message provenance, from the authenticated
+    // Base44 read only. Do not infer role from arbitrary text prefixes.
+    authenticated_conversation_turns: historyRows.map((item,index)=>({
+      role:item.role,
+      text:String(item.text||'').slice(0,12000),
+      source_ref:'authenticated-conversation:'+conversationId+':'+String(item.id||item.created_date||index),
+    })),
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
     universe_entries,
     context_source: 'BASE44_AUTHENTICATED_PERSONAL_REALITY',

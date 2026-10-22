@@ -112,7 +112,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
         <div class="timeline" id="timeline"></div>
         <p class="muted">Project continuity: <strong id="continuityMode">Not established</strong></p>
         <p class="muted" id="continuityDetail">Durable cross-session continuity has not been verified for this conversation.</p>
-        <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>\n        <p class="muted" id="modelOutputIntegrity">Model output versus continuity: Not assessed.</p>\n        <div id="modelIntegrityFindings" class="impact-detail"></div>
+        <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>\n        <p class="muted" id="modelOutputIntegrity">Model output versus continuity: Not assessed.</p>
+        <p class="muted" id="conversationDriftStatus">Conversation continuity: Not assessed.</p>
+        <div id="conversationDriftFindings" class="impact-detail"></div>\n        <div id="modelIntegrityFindings" class="impact-detail"></div>
         <details id="epistemicEventsPanel"><summary>Inspect source discrepancies and evidence</summary><div id="epistemicEvents" class="impact-detail" role="status">No trusted source discrepancies returned for this turn.</div></details>
         <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
         </details>
@@ -156,6 +158,22 @@ $('plan').onclick=async()=>{
     const intelligence=b.result?.intelligence||{};
     const continuity=b.continuity||{};
     const diag=b.result?.context?.epistemic_diagnostics||{};
+    const convo=b.result?.context?.conversation_drift||{};
+    const convoIssues=Array.isArray(convo.findings)?convo.findings:[];
+    $('conversationDriftStatus').textContent=convo.status==='EARLY_CONVERSATION_DRIFT_RISK'
+      ? 'Conversation continuity: '+convoIssues.length+' possible early meaning shifts. They require review, not automatic correction.'
+      : convo.status==='LIMITED_CONVERSATION_CHECK_NO_FLAG'
+      ? 'Conversation continuity: no condition change flagged within limited scope. Other drift may remain unexamined.'
+      : 'Conversation continuity: no reliable historical comparison available.';
+    $('conversationDriftFindings').innerHTML=convoIssues.length
+      ? convoIssues.slice(0,12).map(x=>
+       '<div class="work-item"><strong>'+esc(x.classification)+
+       '</strong><div class="muted">Original instruction: '+esc(x.original_user_text||'')+
+       '</div><div class="muted">Changed or proposed: '+esc(x.observed_model_text||'')+
+       '</div><div class="muted">Original condition: '+esc(x.expected_condition||'NOT_APPLICABLE')+
+       '</div><div class="muted">Evidence references: '+esc((x.source_receipt_refs||[]).join(', '))+
+       '</div><div class="muted">Not independently adjudicated · No verified customer loss or savings.</div></div>').join('')
+      : '';
     const modelCheck=b.result?.context?.model_output_integrity||{};
     const modelFindings=Array.isArray(modelCheck.findings)?modelCheck.findings:[];
     $('modelOutputIntegrity').textContent=modelCheck.status==='REVIEW_REQUIRED'
