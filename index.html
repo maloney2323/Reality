@@ -108,6 +108,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
         <p class="muted">Project continuity: <strong id="continuityMode">Not established</strong></p>
         <p class="muted" id="continuityDetail">Durable cross-session continuity has not been verified for this conversation.</p>
         <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>
+        <details id="epistemicEventsPanel"><summary>Inspect source discrepancies and evidence</summary><div id="epistemicEvents" class="impact-detail" role="status">No trusted source discrepancies returned for this turn.</div></details>
         <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
         </details>
       </section>
@@ -161,6 +162,25 @@ $('plan').onclick=async()=>{
     $('epistemicSummary').textContent='Passive source discrepancies: '+differences+
       ' (conflicts '+conflicts+'). Coverage: '+(diag.coverage||'NOT_ESTABLISHED')+
       '. These are structured evidence differences, not verified model-output hallucination catches.';
+    const typedDifferences=Array.isArray(diag.discrepancies)?diag.discrepancies:[];
+    const compactValue=v=>{try{return JSON.stringify(v).slice(0,400)}catch{return 'Unrenderable source value'}};
+    $('epistemicEvents').innerHTML=typedDifferences.length
+      ? typedDifferences.slice(0,20).map(e=>{
+          const lineage=e.evidence_lineage||{};
+          const refs=[...(Array.isArray(lineage.ledger_record_ids)?lineage.ledger_record_ids:[]),
+            lineage.incoming_signal_id].filter(Boolean);
+          return '<div class="work-item"><strong>'+esc(e.classification||'UNCLASSIFIED')+
+            '</strong><div class="muted">State key: '+esc((e.target_state_keys||[]).join(', '))+
+            '</div><div class="muted">Previous: '+esc(compactValue(e.previous_value))+
+            '</div><div class="muted">Incoming: '+esc(compactValue(e.incoming_value))+
+            '</div><div class="muted">Reconciliation proposed: '+esc(e.recommended_reconciliation||'NONE')+
+            '</div><div class="muted">Source observation IDs: '+esc(refs.join(', ')||'NOT_REPORTED')+
+            '</div><div class="muted">Effective time: '+esc(e.timestamp_asserted||'UNKNOWN')+
+            ' · Recorded: '+esc(e.timestamp_recorded||'UNKNOWN')+
+            '</div><div class="muted">Status: OBSERVATION_ONLY · Truth not adjudicated</div></div>';
+        }).join('')+
+        (typedDifferences.length>20?'<p class="muted">Showing the first 20 of '+typedDifferences.length+' observed discrepancies.</p>':'')
+      : '<div class="muted">No trusted structured-source discrepancies were returned in the retrieved window. This does not prove the model made no errors or that the full history was checked.</div>';
     $('brief').classList.add('open');
     $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
     $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
