@@ -127,7 +127,7 @@ async function observeConnectedWorld() {
   return observations;
 }
 
-async function loadRealityContext(req, body) {
+export async function loadRealityContext(req, body) {
   const authorization = bearer(req);
   if (!authorization) return null;
 
