@@ -48,3 +48,15 @@ test('UI does not self-attest an evidence warrant or conflate API health with co
   'impactReworkMinutes','impactCostPerOutcome'])
   assert.ok(html.includes('id="'+id+'"'));
 });
+
+test('a work item cannot bypass execution authority by labeling itself read-only',async()=>{
+ let executed=false;
+ const r=await executeAuthorizedWork({
+  workItem:{...workItem,consequential:false,operation:'read'},
+  workflowId:'workflow:test',
+  connector:{execute:async()=>{executed=true;return {providerExecutionId:'unexpected'}}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})}});
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.blocked_reason,'EXPLICIT_AUTHORIZATION_REQUIRED');
+ assert.equal(executed,false);
+});
