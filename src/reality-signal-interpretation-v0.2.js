@@ -62,6 +62,9 @@ function spansOf(input){
    continue;
   }
   if(quote)continue;
+  if(i>start&&/\s/u.test(c) && /^\s+(?:but|and)\s+(?=(?:do not|don't|never|must not|what if|please\s+send|send|draft|prepare)\b)/iu.test(input.slice(i))){
+   flush(i);continue;
+  }
   if(c==='\n'){flush(i+1);continue;}
   if(/[.!?]/.test(c)){
    if(c==='.'&&/\d/.test(prev)&&/\d/.test(next))continue;
@@ -73,16 +76,19 @@ function spansOf(input){
  return parts;
 }
 function classify(s){
+ // A single grammatical sentence can contain multiple independent signals.
+ // Only strip a leading connector for classification; raw spans stay exact.
+ const semantic=s.replace(/^(?:but|and)\s+/iu,'');
  const fence=String.fromCharCode(96).repeat(3);
- if(s.startsWith(fence)||s.startsWith('>')||
+ if(semantic.startsWith(fence)||semantic.startsWith('>')||
     /\b(?:document|email|model|assistant|agent|article)\s+(?:says?|said|reads?|states?)\s*[:“"]/iu.test(s))return 'QUOTED_DATA';
- if(/^(?:please\s+)?(?:do not|don't|never|must not|stop|avoid)\b/iu.test(s))return 'PROHIBITION';
- if(/^(?:what if|suppose|imagine|hypothetically|if we were to)\b/iu.test(s))return 'HYPOTHETICAL';
- if(/^(?:if|unless|only if|provided that)\b/iu.test(s))return 'CONDITIONAL_REQUEST';
- if(/^(?:actually|correction|i meant|instead|rather|no[,!:])/iu.test(s))return 'POSSIBLE_CORRECTION';
- if(/\?\s*$/u.test(s))return 'QUESTION';
- if(/^(?:please\s+)?(?:send|approve|prepare|draft|publish|post|call|write|update|pay|cancel|schedule|make|create|fix|build|review)\b/iu.test(s))return 'REQUEST';
- if(/\b(?:is|are|was|were|has|have|had|said|says|arrived|paid|completed|delivered|finished|costs?|confirmed|approved)\b/iu.test(s))return 'REPORTED_CLAIM';
+ if(/^(?:please\s+)?(?:do not|don't|never|must not|stop|avoid)\b/iu.test(semantic))return 'PROHIBITION';
+ if(/^(?:what if|suppose|imagine|hypothetically|if we were to)\b/iu.test(semantic))return 'HYPOTHETICAL';
+ if(/^(?:if|unless|only if|provided that)\b/iu.test(semantic))return 'CONDITIONAL_REQUEST';
+ if(/^(?:actually|correction|i meant|instead|rather|no[,!:])/iu.test(semantic))return 'POSSIBLE_CORRECTION';
+ if(/\?\s*$/u.test(semantic))return 'QUESTION';
+ if(/^(?:please\s+)?(?:send|approve|prepare|draft|publish|post|call|write|update|pay|cancel|schedule|make|create|fix|build|review)\b/iu.test(semantic))return 'REQUEST';
+ if(/\b(?:is|are|was|were|has|have|had|said|says|arrived|paid|completed|delivered|finished|costs?|confirmed|approved)\b/iu.test(semantic))return 'REPORTED_CLAIM';
  return 'UNKNOWN';
 }
 function uncertainty(s,t,source){
@@ -111,6 +117,8 @@ function scopeOf(value={}){
 }
 export function createInterpretationReceipt({message,observedAt=new Date().toISOString(),source={}}={}){
  if(typeof message!=='string'||!message.trim())throw Error('MESSAGE_REQUIRED');
+ // Reject ill-formed Unicode instead of hashing replacement-byte variants.
+ canonicalJCS(message);
  if(!Number.isFinite(Date.parse(observedAt)))throw Error('INVALID_TIME');
  const legacy=buildGovernedChatSignal({message,observedAt}),scope=scopeOf(source);
  const positions=spansOf(message);
@@ -166,17 +174,24 @@ export function verifyInterpretationReceipt({receipt,message}={}){
     receipt.packet?.utf8_byte_length!==Buffer.byteLength(message,'utf8'))throw Error('SOURCE_MISMATCH');
  if(receipt.packet.packet_id!==buildGovernedChatSignal({message,observedAt:receipt.packet.observed_at}).packet.packet_id)
    throw Error('SOURCE_PACKET_MISMATCH');
- if(receipt.parser?.schema_sha256!==SCHEMA_SHA256)throw Error('SCHEMA_MISMATCH');
- const ids=new Set();
+ if(receipt.parser?.schema_sha256!==SCHEMA_SHA256 ||
+    receipt.parser.schema_version!=='0.2.0' ||
+    receipt.parser.implementation_version!==PARSER_VERSION ||
+    receipt.parser.implementation_sha256!==IMPLEMENTATION_SHA256)throw Error('SCHEMA_OR_PARSER_MISMATCH');
+ if(!Array.isArray(receipt.signals)||!Array.isArray(receipt.relationships)||
+    !Array.isArray(receipt.scope?.parent_signal_ids)||
+    !['HUMAN','AGENT','TOOL','DOCUMENT','UNKNOWN'].includes(receipt.scope.origin_kind))
+   throw Error('RECEIPT_SCHEMA_INVALID');
+ const ids=new Set();let lastEnd=-1;
  for(const s of receipt.signals||[]){
   const a=s.span?.start_utf16,b=s.span?.end_utf16;
-  if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<=a||b>message.length||
+  if(!Number.isInteger(a)||!Number.isInteger(b)||a<lastEnd||a<0||b<=a||b>message.length||
      s.span.start_utf8!==Buffer.byteLength(message.slice(0,a),'utf8')||
      s.span.end_utf8!==Buffer.byteLength(message.slice(0,b),'utf8')||
      s.raw_sha256!==hash(message.slice(a,b))||
      s.authority_granted!==false||s.data_only!==true||
      s.epistemic_status!=='OBSERVED_UNVERIFIED'||ids.has(s.signal_id))throw Error('SPAN_OR_AUTHORITY_INVALID');
-  ids.add(s.signal_id);
+  ids.add(s.signal_id);lastEnd=b;
  }
  for(const r of receipt.relationships||[]){
   if(!ids.has(r.from_signal_id)||!ids.has(r.to_signal_id)||r.status!=='PROPOSED_UNVERIFIED')throw Error('GRAPH_INVALID');
