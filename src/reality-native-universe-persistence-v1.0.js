@@ -70,47 +70,76 @@ async function request(path, options = {}, fetchImpl = fetch) {
   return response;
 }
 
-export async function persistUniverseEntry(entry, { fetchImpl = fetch } = {}) {
-  const canonical = createUniverseEntry(entry);
-  validateUniverseEntry(canonical);
-
-  const existingResponse = await request(
-    `/rest/v1/reality_universe_entries?entry_id=eq.${encodeURIComponent(canonical.entry_id)}&select=*`,
-    { method: 'GET', headers: { Accept: 'application/json' } },
-    fetchImpl,
+// A successful POST is not a storage receipt. It must independently return
+// the exact immutable entry under its original ID after the write.
+async function verifyPersistedEntryReadback(canonical,fetchImpl){
+  const fetched=await request(
+    '/rest/v1/reality_universe_entries?entry_id=eq.'+
+       encodeURIComponent(canonical.entry_id)+'&select=*',
+    {method:'GET',headers:{Accept:'application/json'}},fetchImpl
   );
-  const existingRows = await existingResponse.json();
-  const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+  const rows=await fetched.json();
+  if(!Array.isArray(rows)||rows.length!==1)
+    throw Error('UNIVERSE_WRITE_READBACK_NOT_UNIQUE');
+  const observed=Object.freeze(mapRow(rows[0]));
+  validateUniverseEntry(observed);
+  if(observed.ledger_entry_hash!==canonical.ledger_entry_hash)
+    throw Error('UNIVERSE_IMMUTABLE_ENTRY_VIOLATION');
+  return observed;
+}
 
-  if (existing) {
-    const existingEntry = mapRow(existing);
-    validateUniverseEntry(existingEntry);
-    if (existingEntry.ledger_entry_hash !== canonical.ledger_entry_hash) {
-      const error = new Error('UNIVERSE_IMMUTABLE_ENTRY_VIOLATION');
-      error.code = 'UNIVERSE_IMMUTABLE_ENTRY_VIOLATION';
-      throw error;
-    }
+export async function persistUniverseEntry(entry, { fetchImpl = fetch } = {}) {
+  // NEVER recalculate an invalid caller-supplied hash into a valid-looking
+  // record. Validate the original signed content before storage I/O.
+  validateUniverseEntry(entry);
+  const canonical=createUniverseEntry(entry);
+
+  const found=await request(
+    '/rest/v1/reality_universe_entries?entry_id=eq.'+
+       encodeURIComponent(canonical.entry_id)+'&select=*',
+    {method:'GET',headers:{Accept:'application/json'}},fetchImpl
+  );
+  const existingRows=await found.json();
+  if(!Array.isArray(existingRows)||existingRows.length>1)
+    throw Error('UNIVERSE_EXISTING_ENTRY_READBACK_INVALID');
+
+  if(existingRows.length){
+    const confirmed=await verifyPersistedEntryReadback(canonical,fetchImpl);
     return Object.freeze({
-      version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
-      status: 'DUPLICATE_IDENTICAL',
-      entry: Object.freeze(existingEntry),
+      version:REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+      status:'DUPLICATE_IDENTICAL',entry:confirmed,
     });
   }
 
-  const response = await request('/rest/v1/reality_universe_entries', {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify(canonical),
-  }, fetchImpl);
+  let response;
+  try{
+    response=await request('/rest/v1/reality_universe_entries',{
+      method:'POST',headers:{Prefer:'return=representation'},
+      body:JSON.stringify(canonical),
+    },fetchImpl);
+  }catch(error){
+    // Competing writers can both observe the same empty snapshot. Only the
+    // DB uniqueness constraint can arbitrate. On HTTP 409, independently
+    // read back and accept ONLY the exact same immutable entry.
+    if(error.status!==409)throw error;
+    const confirmed=await verifyPersistedEntryReadback(canonical,fetchImpl);
+    return Object.freeze({
+      version:REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+      status:'DUPLICATE_IDENTICAL_CONCURRENT',entry:confirmed,
+    });
+  }
 
-  const rows = await response.json();
-  const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row) throw new Error('UNIVERSE_PERSISTENCE_WRITE_UNCONFIRMED');
-
+  const insertedRows=await response.json();
+  if(!Array.isArray(insertedRows)||insertedRows.length!==1)
+    throw Error('UNIVERSE_PERSISTENCE_WRITE_UNCONFIRMED');
+  const inserted=mapRow(insertedRows[0]);
+  validateUniverseEntry(inserted);
+  if(inserted.ledger_entry_hash!==canonical.ledger_entry_hash)
+    throw Error('UNIVERSE_PERSISTENCE_RESPONSE_MISMATCH');
+  const verified=await verifyPersistedEntryReadback(canonical,fetchImpl);
   return Object.freeze({
-    version: REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
-    status: 'PERSISTED',
-    entry: Object.freeze(mapRow(row)),
+    version:REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION,
+    status:'PERSISTED',entry:verified,
   });
 }
 
