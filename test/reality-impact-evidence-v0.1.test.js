@@ -94,3 +94,43 @@ test('raw alerts, incomplete verdicts and duplicate detections do not inflate RO
  assert.equal(r.unverified_detection_candidates_excluded,3);
  assert.equal(r.verified_roi,null);
 });
+
+
+test('ambiguous duplicate turn grades are excluded, not used to dilute drift',()=>{
+ const evaluated=[{tenant_id:tenant,turn_id:'t1',drift_confirmed:true,independent_grade_receipt_id:'g1'},
+  {tenant_id:tenant,turn_id:'t1',drift_confirmed:false,independent_grade_receipt_id:'g2'},
+  {tenant_id:tenant,turn_id:'t2',drift_confirmed:true,independent_grade_receipt_id:'g3'}];
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,evaluations:evaluated});
+ assert.equal(r.model_drift.numerator,1);
+ assert.equal(r.model_drift.denominator,1);
+ assert.equal(r.duplicate_or_ambiguous_grade_records_excluded,2);
+});
+test('double billed realized benefit receipt, correction and released upgrade cannot inflate the projection',()=>{
+ const benefit={tenant_id:tenant,status:'VERIFIED_REALIZED_BENEFIT',
+   baseline_receipt_id:'baseline',customer_confirmation_receipt_id:'customer',
+   measured_outcome_receipt_id:'outcome:one',verified_value_usd:100,attributable_cost_usd:25};
+ const correction={tenant_id:tenant,status:'CORRECTION_VERIFIED',
+   original_model_output_ref:'bad',corrected_outcome_ref:'correct',
+   independent_verification_receipt_id:'correction:once'};
+ const upgrade={tenant_id:tenant,status:'PROMOTED',
+   promotion_authorization_receipt_id:'approval',
+   independent_regression_receipt_id:'regression',release_receipt_id:'release:one'};
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,
+   benefits:[benefit,{...benefit,verified_value_usd:9000}],
+   corrections:[correction,{...correction,corrected_outcome_ref:'other'}],
+   upgrades:[upgrade,{...upgrade}]});
+ assert.equal(r.verified_roi.measured_cases,1);
+ assert.equal(r.verified_roi.verified_net_benefit_usd,75);
+ assert.equal(r.verified_roi.verified_total_cost_usd,25);
+ assert.equal(r.verified_roi.verified_roi_percentage,300);
+ assert.equal(r.verified_corrections,1);
+ assert.equal(r.authorized_production_upgrades,1);
+ assert.equal(r.benefits_excluded,1);
+});
+test('zero cost does not yield an infinite ROI percentage',()=>{
+ const b={tenant_id:tenant,status:'VERIFIED_REALIZED_BENEFIT',
+  baseline_receipt_id:'baseline',customer_confirmation_receipt_id:'customer',
+  measured_outcome_receipt_id:'outcome',verified_value_usd:100,attributable_cost_usd:0};
+ const r=summarizeRealityImpact({authenticatedTenantId:tenant,benefits:[b]});
+ assert.equal(r.verified_roi.verified_roi_percentage,null);
+});
