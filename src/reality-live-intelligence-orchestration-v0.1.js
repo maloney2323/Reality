@@ -328,7 +328,7 @@ export async function runLiveIntelligenceOrchestration({
     spineSummary=summarizeIntegritySpine(spine);
   }
   const integrityRequiresReview=modelIntegrity.findings.some(x=>
-    ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM'].includes(x.classification));
+    ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
   const note=integrityRequiresReview
     ? '\n\nReality integrity notice: This response contains an operational claim that conflicts with source-attested context or asserts an unverified action. Treat it as unverified pending independent confirmation; no external action is authorized.'
     : '';
