@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { Script } from 'node:vm';
 import handler from '../api/reality/intelligence.js';
 import { deriveContinuityRootId } from '../src/reality-continuous-continuity-v1.0.js';
 
@@ -127,4 +128,7 @@ test('UI reports scoped continuity and passive typed discrepancies without inven
   assert.ok(page.includes('esc(compactValue(e.previous_value))'));
   assert.ok(page.includes('esc(compactValue(e.incoming_value))'));
   assert.doesNotMatch(page,/100% hallucination-free/);
+  const script = page.split('<script>')[1]?.split('</script>')[0];
+  assert.ok(script,'inline UI JavaScript is required');
+  assert.doesNotThrow(()=>new Script(script),'customer UI script must parse');
 });
