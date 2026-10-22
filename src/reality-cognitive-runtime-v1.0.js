@@ -3,6 +3,7 @@
 // Reality owns routing, context, evidence discipline, continuity, and governance.
 
 import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
+import { selectCognitionContextEntries } from './reality-cognition-context-selection-v0.1.js';
 
 export const REALITY_COGNITIVE_RUNTIME_VERSION = 'reality-cognitive-runtime-v1.0';
 
@@ -18,13 +19,30 @@ function needsDeepReasoning(message) {
     || q.length > 1800;
 }
 
-function buildCognitionContext(systemContext, universeEntries) {
-  const entries = Array.isArray(universeEntries) ? universeEntries.slice(0, 100) : [];
+export function buildCognitionContext(systemContext, universeEntries) {
+  // Exclude duplicate raw arrays; otherwise the "bounded" context silently
+  // sends the full unbounded history through system_context.universe_entries.
+  const {universe_entries,connected_world_observations,...nonArrayContext}=systemContext||{};
+  const requestEntries=[
+    ...(Array.isArray(universe_entries)?universe_entries:[]),
+    ...(Array.isArray(connected_world_observations)?connected_world_observations:[]),
+  ];
+  const chosen=selectCognitionContextEntries({
+    entries:Array.isArray(universeEntries)?universeEntries:[],
+    requestEntries,
+    latestTransitionRef:systemContext?.continuity_transition_ref||null,
+    maxEntries:100,
+  });
   return {
-    ...(systemContext || {}),
-    universe_context_available: entries.length > 0,
-    universe_context_entries: entries,
-    universe_context_count: entries.length,
+    ...nonArrayContext,
+    universe_context_available:chosen.selected_count>0,
+    universe_context_entries:chosen.entries,
+    universe_context_count:chosen.selected_count,
+    universe_context_supplied_count:chosen.supplied_count,
+    universe_context_omitted_count:chosen.omitted_count,
+    universe_context_selection_status:chosen.selection_status,
+    universe_context_critical_omitted_count:chosen.critical_omitted_count,
+    universe_context_full_history_proven:false,
   };
 }
 

@@ -130,3 +130,66 @@ test('end-to-end dormant continuity rehydrates and resumes the same thread', () 
   assert.equal(resumed.payload.objective, parked.payload.objective);
   assert.equal(resumed.payload.resumed_from, parked.continuity_event_id);
 });
+
+
+test('later signal and discrepancy events cannot overwrite the last actual continuity state', () => {
+  const root = 'continuity:test-no-silent-loss';
+  const entries = [
+    {entry_id:'transition:waiting',continuity_root_id:root,event_kind:'CONTINUITY_STATE_TRANSITION',
+      assertion_time:'2026-10-21T14:00:00Z',
+      payload:{continuity_state:'WAITING',next_continuation_condition:'INVOICE_RECEIPT'}},
+    {entry_id:'signal:later',continuity_root_id:root,event_kind:'REALITY_LAYER_HANDOFF',
+      assertion_time:'2026-10-21T14:01:00Z',payload:{layer_stage:'SIGNAL_CLEANER'}},
+    {entry_id:'discrepancy:later',continuity_root_id:root,event_kind:'DISCREPANCY_DETECTED',
+      assertion_time:'2026-10-21T14:02:00Z',
+      payload:{continuity_state:'COMPLETED',classification:'E_FACT_CONFLICT'}},
+  ];
+  const view = buildContinuityRehydration({continuityRootId:root,entries});
+  assert.equal(view.latest_state,'WAITING');
+  assert.equal(view.matched_entry_count,3);
+  assert.equal(view.entries.length,3);
+  assert.equal(view.continuation_available,true);
+});
+
+test('several construction jobs retain independent WAITING and COMPLETED states',()=>{
+ const root='root:builder';
+ const make=(id,state,time)=>({
+  entry_id:id+':'+time,continuity_root_id:root,worldline_id:'reality:primary',
+  event_kind:'CONTINUITY_STATE_TRANSITION',assertion_time:time,
+  payload:{work_item_id:id,continuity_state:state},
+ });
+ const entries=[
+  make('invoice:A','WAITING','2026-10-20T10:00:00Z'),
+  make('invoice:B','WAITING','2026-10-20T11:00:00Z'),
+  make('invoice:B','COMPLETED','2026-10-21T10:00:00Z'),
+  make('inspection:C','BLOCKED','2026-10-21T12:00:00Z'),
+  {entry_id:'signal:later',continuity_root_id:root,event_kind:'REALITY_LAYER_HANDOFF',
+   assertion_time:'2026-10-22T12:00:00Z',payload:{continuity_state:'COMPLETED'}},
+ ];
+ const result=buildContinuityRehydration({continuityRootId:root,entries,
+  worldlineId:'reality:primary'});
+ assert.equal(result.work_item_states.length,3);
+ assert.deepEqual(result.unresolved_work_items.map(x=>x.work_item_id),
+  ['inspection:C','invoice:A']);
+ assert.equal(result.work_item_states.find(x=>x.work_item_id==='invoice:B').latest_state,'COMPLETED');
+ assert.equal(result.work_item_states.find(x=>x.work_item_id==='invoice:A').latest_state,'WAITING');
+ assert.equal(result.work_item_projection_complete_history_proven,false);
+ assert.ok(result.work_item_states.every(x=>x.action_authorized===false));
+});
+test('one customer or speculative worldline never contaminates primary work item state',()=>{
+ const root='root:builder';
+ const entries=[
+  {entry_id:'a',continuity_root_id:root,worldline_id:'reality:primary',
+   event_kind:'CONTINUITY_STATE_TRANSITION',assertion_time:'2026-10-20T10:00:00Z',
+   payload:{work_item_id:'work:customer',continuity_state:'WAITING'}},
+  {entry_id:'b',continuity_root_id:root,worldline_id:'worldline:hypothesis',
+   event_kind:'CONTINUITY_STATE_TRANSITION',assertion_time:'2026-10-21T10:00:00Z',
+   payload:{work_item_id:'work:customer',continuity_state:'COMPLETED'}},
+  {entry_id:'c',continuity_root_id:'root:other',worldline_id:'reality:primary',
+   event_kind:'CONTINUITY_STATE_TRANSITION',assertion_time:'2026-10-21T10:00:00Z',
+   payload:{work_item_id:'work:customer',continuity_state:'COMPLETED'}},
+ ];
+ const result=buildContinuityRehydration({continuityRootId:root,worldlineId:'reality:primary',entries});
+ assert.equal(result.work_item_states.length,1);
+ assert.equal(result.unresolved_work_items[0].latest_state,'WAITING');
+});

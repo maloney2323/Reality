@@ -171,6 +171,16 @@ export function validateLedgerEntry(entry) {
   if (!text(entry.provenance_hash)) throw new Error('PROVENANCE_HASH_REQUIRED');
   if (!text(entry.ledger_entry_hash)) throw new Error('LEDGER_ENTRY_HASH_REQUIRED');
 
+  // Hash fields being PRESENT is not integrity. Rebuild the exact original
+  // content-addressed envelope, including bitemporal dates, worldline,
+  // evidence, parent linkage and correction lineage.
+  const { provenance_hash, ledger_entry_hash, ...unsigned } = entry;
+  const expectedProvenance=digest(unsigned);
+  if(provenance_hash!==expectedProvenance)
+    throw Error('BITEMPORAL_PROVENANCE_HASH_MISMATCH');
+  const expectedLedger=digest({...unsigned,provenance_hash});
+  if(ledger_entry_hash!==expectedLedger)
+    throw Error('BITEMPORAL_LEDGER_ENTRY_HASH_MISMATCH');
   return true;
 }
 

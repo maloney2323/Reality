@@ -1,4 +1,5 @@
 import { runUniverseCognitionPass } from './reality-universe-cognition-runner-v0.1.js';
+import { retryAndVerifyOriginalWork } from './reality-original-work-retry-v0.1.js';
 import { createCapabilityGapProjection } from './reality-capability-gap-projection-v1.js';
 import { detectCapabilityGap, confirmCapabilityGap, createSandboxExperiment, authorizeSandboxExperiment, validateSandboxResult, authorizeWorldlineMerge, registerVerifiedCapability, reactivationPlan, handleSynthesisFailure } from './reality-autonomous-capability-loop-v0.1.js';
 
@@ -17,6 +18,7 @@ export async function runAutonomousClosurePass({
   historicalFailureRefs = [], verificationSuiteRef = null, inputSchema = null,
   outputSchema = null, synthesis, sandboxVerifier, mergeVerifier,
   capabilityRegistry, authorization = null, attempt = 1, attemptLimit = 3,
+  originalWorkRunner = null, originalWorkAuthorization = null,
 } = {}) {
   const cognition = await runUniverseCognitionPass({ universe, reasoner });
   const consequence = capabilityGap || cognition.consequences.find((item) => item?.gap === 'MISSING_CAPABILITY');
@@ -42,7 +44,7 @@ export async function runAutonomousClosurePass({
   });
 
   const confirmedGap = confirmCapabilityGap(gap, { historicalFailureRefs, inputSchema, outputSchema, verificationSuiteRef });
-  const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe.worldline_id });
+  const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe?.worldline_id || universe?.worldlineId || workItem?.worldline_id });
 
   if (!authorization) return Object.freeze({ state: 'AWAITING_AUTHORIZATION', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment });
 
@@ -74,7 +76,19 @@ export async function runAutonomousClosurePass({
     const registration = registerVerifiedCapability(mergedExperiment, { capabilityRegistry, mergeResult });
     const reactivation = reactivationPlan(confirmedGap, { registration, originalWorkItem: workItem });
 
-    return Object.freeze({ state: 'REACTIVATED', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: mergedExperiment, registration, reactivation });
+    // Reactivation means the newly verified capability is registered; it does
+    // NOT mean that the original customer task has been retried or completed.
+    // Retry requires its own work-item-scoped authority and independent readback.
+    const originalWork = await retryAndVerifyOriginalWork({
+      workItem, reactivation, registration,
+      authorization: originalWorkAuthorization, runner: originalWorkRunner,
+    });
+    return Object.freeze({
+      state: originalWork.status === 'VERIFIED' ? 'ORIGINAL_WORK_VERIFIED' : 'REACTIVATED',
+      cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection,
+      experiment: mergedExperiment, registration, reactivation,
+      original_work: originalWork,
+    });
   } catch (error) {
     const failure = handleSynthesisFailure(authorizedExperiment, { nextAttempt: attempt + 1, attemptLimit });
     return Object.freeze({ state: failure.state, cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: authorizedExperiment, failure, error: error.message });

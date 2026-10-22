@@ -1,22 +1,47 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
+import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from './reality-verified-layer-handoff-v0.1.js';
+import { retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
-import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
+import { inspectPersistedEpistemicDifferences } from './reality-live-epistemic-diagnostics-v0.1.js';
+import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition, retrieveScopedWorkItemTransitionHistory, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
-  if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
+  // Do not read a global/unscoped Universe view when a principal root is
+  // absent. Synthetic no-history probes must never inherit another world.
+  // The ledger remains durable; this is a scoped retrieval decision only.
+  if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true' ||
+      systemContext?.ephemeral_no_history === true ||
+      !continuityRootId) return requestContext;
 
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
+  const latestTransition = await retrieveLatestPersistedContinuityTransition({
+    continuityRootId, fetchImpl,
+  });
+  const workHistory=await retrieveScopedWorkItemTransitionHistory({
+    continuityRootId,worldlineId:systemContext?.worldline_id || 'reality:primary',
+    pageSize:100,maxTransitions:2000,fetchImpl,
+  });
+  const retained = latestTransition && !durable.entries.some(
+    entry=>entry.entry_id===latestTransition.entry_id)
+      ? [latestTransition,...durable.entries] : durable.entries;
   return Object.freeze({
     ...requestContext,
     status: durable.status,
-    count: requestContext.count + durable.count,
-    entries: Object.freeze([...durable.entries, ...requestContext.entries]),
+    count: requestContext.count + retained.length,
+    entries: Object.freeze([...retained, ...requestContext.entries]),
     persistence: durable.persistence,
     durable_count: durable.count,
+    continuity_transition_ref: latestTransition?.entry_id || null,
+    work_item_transition_history: workHistory.entries,
+    work_item_transition_scan_status: workHistory.status,
+    work_item_transition_snapshot_verified:
+      workHistory.transactionally_consistent_snapshot_proven,
+    // A bounded reasoning context is not the complete Universe history.
+    context_is_full_history: false,
     continuity_root_id: continuityRootId,
   });
 }
@@ -120,13 +145,18 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
+  const verifiedCleaner = verifySignalCleanerRecord(governedSignal);
   const explicitContinuityRootId = String(systemContext?.continuity_root_id || '').trim() || null;
   const conversationContinuityRootId = deriveContinuityRootId({
     explicitRootId: null,
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
   });
-  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
+  const universeContext = await loadUniverseContext({
+    systemContext,
+    continuityRootId: explicitContinuityRootId || conversationContinuityRootId,
+    fetchImpl,
+  });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -135,17 +165,28 @@ export async function runLiveIntelligenceOrchestration({
     error.code = 'UNIVERSE_CONTEXT_HANDOFF_FAILED';
     throw error;
   }
-  let persistedContinuity = explicitContinuityRootId
+  const passiveEpistemicDiagnostics = inspectPersistedEpistemicDifferences({
+    entries:universeContext.entries,
+    continuityRootId:explicitContinuityRootId || conversationContinuityRootId,
+    worldlineId:systemContext?.worldline_id || 'reality:primary',
+  });
+  const scopedRootForRehydration=explicitContinuityRootId || conversationContinuityRootId;
+  let persistedContinuity = scopedRootForRehydration
     ? buildContinuityRehydration({
-        continuityRootId: explicitContinuityRootId,
-        entries: universeContext.entries,
+        continuityRootId: scopedRootForRehydration,
+        entries: [...universeContext.entries,
+          ...(universeContext.work_item_transition_history||[])],
+        worldlineId:systemContext?.worldline_id || 'reality:primary',
         trigger: 'CURRENT_REQUEST',
       })
     : null;
 
   let continuityDiscovery = null;
   let discoveredContinuityRootId = null;
-  if (!explicitContinuityRootId && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
+  // Root-independent dormant-continuity discovery currently queries a
+  // cross-root global index. Keep it off the interactive path until this
+  // lookup can prove principal/tenant scope independently.
+  if (false && !explicitContinuityRootId && systemContext?.ephemeral_no_history !== true && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
     const dormant = await retrieveDormantContinuitySummaries({
       worldlineId: systemContext?.worldline_id || null,
       limit: 1000,
@@ -173,26 +214,76 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  const durabilityEnabled = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true' && systemContext?.ephemeral_no_history !== true;
+  const signalHandoff = durabilityEnabled && effectiveContinuityRootId
+    ? await recordVerifiedLayerHandoff({
+        stage:'SIGNAL_CLEANER',
+        continuityRootId:effectiveContinuityRootId,
+        observedAt:governedSignal.packet.observed_at,
+        sourceRef:'reality:signal-cleaner',
+        output:{signal:governedSignal,verification:verifiedCleaner},
+        evidenceReferences:[
+          governedSignal.packet.raw_content_digest,
+          governedSignal.transformation_receipt.receipt_id,
+          ...governedSignal.fragments.map(f=>f.fragment_id),
+        ],
+        fetchImpl,
+      })
+    : null;
   const cognitionContext = {
+    signal_cleaner_structural_verification:verifiedCleaner,
+    epistemic_diagnostics:passiveEpistemicDiagnostics,
+    signal_ledger_handoff:signalHandoff ? {
+      status:signalHandoff.status,
+      entry_id:signalHandoff.entry_id,
+      ledger_entry_hash:signalHandoff.ledger_entry_hash,
+    } : {status:'NOT_DURABLY_PERSISTED'},
     ...(systemContext || {}),
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
+    continuity_work_items: persistedContinuity?.work_item_states||[],
+    continuity_unresolved_work_items: persistedContinuity?.unresolved_work_items||[],
+    continuity_work_items_complete_snapshot_proven:false,
     continuity_rehydrated: persistedContinuity?.continuation_available === true,
     continuity_entry_count: persistedContinuity?.matched_entry_count || 0,
+    continuity_transition_ref: universeContext.continuity_transition_ref || null,
     reality_context_source: 'UNIVERSE',
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
   };
-  const cognitiveResult = await runRealityCognitiveRuntime({
-    message,
-    governedSignal,
-    systemContext: cognitionContext,
-    universeEntries: universeContext.entries,
-    model,
-    apiKey,
-    fetchImpl,
-  });
+  let cognitiveResult;
+  try {
+    cognitiveResult = await runRealityCognitiveRuntime({
+      message,
+      governedSignal,
+      systemContext: cognitionContext,
+      universeEntries: universeContext.entries,
+      model,
+      apiKey,
+      fetchImpl,
+    });
+  } catch (error) {
+    // Keep a durable observed failure rather than lose the broken transition.
+    // This is diagnostic capture, not answer filtering or semantic judgment.
+    if(signalHandoff) {
+      try {
+        await recordVerifiedLayerHandoff({
+          stage:'COGNITION_ERROR',
+          continuityRootId:effectiveContinuityRootId,
+          observedAt:new Date().toISOString(),
+          sourceRef:'reality:cognitive-runtime',
+          output:{error_code:String(error?.code || error?.message || 'COGNITION_ERROR').slice(0,320),
+            failed_stage:'COGNITION',source_signal_entry_id:signalHandoff.entry_id},
+          evidenceReferences:[signalHandoff.entry_id,signalHandoff.ledger_entry_hash],
+          parent:signalHandoff.entry,fetchImpl,
+        });
+      } catch (persistenceError) {
+        error.ledger_capture_error=String(persistenceError?.message || persistenceError);
+      }
+    }
+    throw error;
+  }
   const modelResult = {
     ...cognitiveResult,
     answer: cognitiveResult.answer,
@@ -210,27 +301,53 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  // A chat turn is an observation, not evidence that WAITING/BLOCKED or
+  // completed work changed state. Preserve the latest verified projection.
+  // State advancement requires a separate, evidence-linked transition.
+  const continuityState = persistedContinuity?.latest_state || 'ACTIVE';
   const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: effectiveContinuityRootId,
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
-        trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
-        evidenceReferences: [governedSignal?.signal_hash, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))],
+        workItemId:persistedContinuity?.latest_work_item_id || null,
+        trigger: persistedContinuity?.latest_state ? 'STATE_PRESERVED_DURING_CHAT' : 'NEW_OBSERVATION',
+        evidenceReferences: [
+          governedSignal.packet.packet_id,
+          governedSignal.transformation_receipt.receipt_id,
+          ...governedSignal.fragments.map(fragment=>fragment.fragment_id),
+          signalHandoff?.entry_id,
+          signalHandoff?.ledger_entry_hash,
+        ].filter(Boolean),
         payload: {
           continuity_state: continuityState,
+          prior_state_preserved: Boolean(persistedContinuity?.latest_state),
+          state_transition_authorized: false,
           materiality,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,
           response_summary: String(modelResult?.answer || '').slice(0, 1000),
+          // Do not replace a layer's actual output with only a summary.
+          cognitive_output: modelResult,
+          signal_handoff_entry_id:signalHandoff?.entry_id || null,
+          signal_handoff_ledger_hash:signalHandoff?.ledger_entry_hash || null,
+          cleaner_verification:verifiedCleaner,
+          passive_epistemic_diagnostics:passiveEpistemicDiagnostics,
+          contradiction_diagnostics:'MODEL_LANE_TEXT_PRESERVED_NOT_SEMANTICALLY_VERIFIED',
         },
         observedAt: observedAt || new Date().toISOString(),
       })
     : null;
 
-  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
-    await persistContinuityEvent(continuityEvent, { fetchImpl });
+  let continuityReadback = null;
+  if (continuityEvent && durabilityEnabled) {
+    const stored=await persistContinuityEvent(continuityEvent, { fetchImpl });
+    continuityReadback=await retrievePersistedUniverseEntry({
+      entryId:continuityEvent.continuity_event_id,fetchImpl
+    });
+    if(stored.entry?.ledger_entry_hash!==continuityReadback.ledger_entry_hash ||
+       continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash)
+      throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
 
   let situation = null;
@@ -238,7 +355,12 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      governedSignal?.packet?.packet_id ? {
+        ref:governedSignal.packet.packet_id,
+        kind:'OBSERVED_USER_REQUEST_NOT_INDEPENDENT_WORLD_TRUTH',
+        source:'USER_MESSAGE',
+        observed_at:governedSignal.packet.observed_at,
+      } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -312,14 +434,21 @@ export async function runLiveIntelligenceOrchestration({
       status: 'NOT_EXECUTED',
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
-    context: { universe: { status: universeContext.status, count: universeContext.count }, continuity: {
+    context: { universe: { status: universeContext.status, count: universeContext.count },
+      epistemic_diagnostics:clone(passiveEpistemicDiagnostics), continuity: {
       root_id: effectiveContinuityRootId,
       discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
       rehydrated: persistedContinuity?.continuation_available === true,
       prior_state: persistedContinuity?.latest_state || null,
       current_state: continuityEvent?.next_state || null,
+      work_item_states:clone(persistedContinuity?.work_item_states||[]),
+      unresolved_work_items:clone(persistedContinuity?.unresolved_work_items||[]),
+      work_item_history_scan_status:universeContext.work_item_transition_scan_status||'NOT_SCANNED',
       event_id: continuityEvent?.continuity_event_id || null,
+      signal_handoff_status:signalHandoff?.status || 'NOT_DURABLY_PERSISTED',
+      signal_handoff_entry_id:signalHandoff?.entry_id || null,
+      cognitive_readback_verified:Boolean(continuityReadback),
     } },
     situation: clone(situation),
     learning: {

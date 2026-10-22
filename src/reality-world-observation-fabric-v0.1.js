@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
-export const WORLD_OBSERVATION_FABRIC_VERSION = '0.1.0';
+export const WORLD_OBSERVATION_FABRIC_VERSION = '0.2.0';
+export const LEGACY_WORLD_OBSERVATION_FABRIC_VERSION = '0.1.0';
 
 export const EPISTEMIC_STATUS = Object.freeze({
   OBSERVED: 'OBSERVED',
@@ -34,6 +35,7 @@ function hash(value) {
 function id(prefix, value) { return `${prefix}:${hash(value).slice(0, 32)}`; }
 
 export function createObservation({
+  observationVersion = WORLD_OBSERVATION_FABRIC_VERSION,
   source,
   domain,
   sourceRecordId,
@@ -54,9 +56,12 @@ export function createObservation({
   if (!text(sourceRecordId)) throw new Error('OBSERVATION_SOURCE_RECORD_ID_REQUIRED');
   if (!text(eventType)) throw new Error('OBSERVATION_EVENT_TYPE_REQUIRED');
 
+  if (![WORLD_OBSERVATION_FABRIC_VERSION,LEGACY_WORLD_OBSERVATION_FABRIC_VERSION].includes(observationVersion))
+    throw Error('OBSERVATION_VERSION_UNSUPPORTED');
   const observation = {
-    observation_id: id('observation', { source, sourceRecordId }),
-    observation_version: WORLD_OBSERVATION_FABRIC_VERSION,
+    observation_id: observationVersion===LEGACY_WORLD_OBSERVATION_FABRIC_VERSION
+      ? id('observation',{source,sourceRecordId}) : null,
+    observation_version: observationVersion,
     source: text(source),
     domain: text(domain),
     source_record_id: text(sourceRecordId),
@@ -72,6 +77,11 @@ export function createObservation({
     reliability: text(reliability) || 'UNSPECIFIED',
     epistemic_status: epistemicStatus,
   };
+  // A source record's stable ID is NOT an observation revision ID. An update
+  // to the same invoice must append a new immutable observation instead of
+  // colliding with the original ledger entry.
+  if(observationVersion===WORLD_OBSERVATION_FABRIC_VERSION)
+    observation.observation_id=id('observation',{...observation,observation_id:null});
   return Object.freeze({ ...observation, observation_hash: `sha256:${hash(observation)}` });
 }
 
