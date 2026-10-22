@@ -22,11 +22,20 @@ export default async function handler(req, res) {
     // The user bearer token is verified against Base44 before forming an
     // authoritative user identity, evidence context or stable continuity root.
     // Caller-supplied systemContext is never admitted as trusted state here.
-    const authenticatedContext = await loadRealityContext(req, body);
+    const noHistoryProbe = !String(body.conversation_id || '').trim() ||
+      !String(body.thought_id || '').trim();
+    const authenticatedContext = await loadRealityContext(req, body, {
+      noHistoryWhenSelectorsMissing: noHistoryProbe,
+    });
     if (!authenticatedContext?.authenticated_user_id) {
       return res.status(401).json({ ok: false, error: 'BASE44_AUTHENTICATED_SESSION_REQUIRED' });
     }
-    const systemContext = buildAuthenticatedChatContinuity({ body, authenticatedContext });
+    // Existing HCAST/proof consoles deliberately send single-turn probes
+    // without selectors. Keep those requests context-free, but authenticated.
+    const systemContext = noHistoryProbe
+      ? { ...authenticatedContext, ephemeral_no_history: true, continuity_root_id: null,
+          conversation_id: null, thought_id: null, identity_basis: 'BASE44_VERIFIED_USER_ME' }
+      : buildAuthenticatedChatContinuity({ body, authenticatedContext });
     const result = await runLiveIntelligenceOrchestration({
       message: body.message,
       requestedBy: systemContext.authenticated_user_id,
