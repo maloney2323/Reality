@@ -112,7 +112,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
         <div class="timeline" id="timeline"></div>
         <p class="muted">Project continuity: <strong id="continuityMode">Not established</strong></p>
         <p class="muted" id="continuityDetail">Durable cross-session continuity has not been verified for this conversation.</p>
-        <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>
+        <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>\n        <p class="muted" id="modelOutputIntegrity">Model output versus continuity: Not assessed.</p>\n        <div id="modelIntegrityFindings" class="impact-detail"></div>
         <details id="epistemicEventsPanel"><summary>Inspect source discrepancies and evidence</summary><div id="epistemicEvents" class="impact-detail" role="status">No trusted source discrepancies returned for this turn.</div></details>
         <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
         </details>
@@ -156,6 +156,23 @@ $('plan').onclick=async()=>{
     const intelligence=b.result?.intelligence||{};
     const continuity=b.continuity||{};
     const diag=b.result?.context?.epistemic_diagnostics||{};
+    const modelCheck=b.result?.context?.model_output_integrity||{};
+    const modelFindings=Array.isArray(modelCheck.findings)?modelCheck.findings:[];
+    $('modelOutputIntegrity').textContent=modelCheck.status==='REVIEW_REQUIRED'
+      ? 'Model-output integrity review: '+modelFindings.length+' material or execution claims flagged. These are potential issues, not independently confirmed hallucinations.'
+      : modelCheck.status==='LIMITED_CHECK_NO_FLAG'
+      ? 'Model-output integrity: no issue flagged within limited explicit-claim coverage; unexamined assertions may remain.'
+      : 'Model-output integrity: no trusted comparison available for this turn.';
+    $('modelIntegrityFindings').innerHTML=modelFindings.length
+      ? modelFindings.slice(0,12).map(x=>
+          '<div class="work-item"><strong>'+esc(x.classification||'UNVERIFIED_CLAIM')+
+          '</strong><div class="muted">Model claim: '+esc(x.excerpt||'')+
+          '</div><div class="muted">Compared state key: '+esc(x.target_state_key||'NOT_APPLICABLE')+
+          ' · Source receipts: '+esc((x.source_receipt_refs||[]).join(', '))+
+          '</div><div class="muted">Review: '+esc(x.recommended_action||'REQUIRE_VERIFICATION')+
+          '</div></div>').join('')
+      : '';
+
     $('continuityMode').textContent=continuity.mode||'NOT_ESTABLISHED';
     $('continuityDetail').textContent=continuity.mode==='DURABLE_READBACK_VERIFIED'
       ? 'Verified ledger readback for this authenticated project turn. Future-turn recovery still requires testing.'
