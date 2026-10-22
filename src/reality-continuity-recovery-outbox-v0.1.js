@@ -88,13 +88,15 @@ export async function appendContinuityWithRecovery({
     // recoverable: idempotent replay will re-read that same immutable entry.
     let failureRecorded=false;
     try{
-      await outbox.recordFailure(entry.entry_id,{
+      const failure={
         assertion_time:assertionTime,
         reason:observedFailure(error),
         fault_domain:'PRIMARY_LEDGER_OR_ACKNOWLEDGEMENT',
-      });
-      await verifyQueued(outbox,record);
-      failureRecorded=true;
+      };
+      await outbox.recordFailure(entry.entry_id,failure);
+      const confirmed=await verifyQueued(outbox,record);
+      failureRecorded=Array.isArray(confirmed.failures) &&
+        confirmed.failures.some(item=>identical(item,failure));
     } catch(failureRecordingError){
       // Do not erase the original operational error, but do not claim
       // that failure metadata was durably written either.
@@ -167,9 +169,8 @@ export async function replayContinuityOutbox({
       const failuresObserved=Array.isArray(pendingItem.failures)?pendingItem.failures:[];
       // Append an explicit interruption receipt. Failure records are only
       // diagnostic; the original event remains immutable.
-      if(failuresObserved.length){
-        const lastFailure=failuresObserved[failuresObserved.length-1];
-        const gap=recoveryGapEvent({record,latestFailure:lastFailure});
+      for(const failure of failuresObserved){
+        const gap=recoveryGapEvent({record,latestFailure:failure});
         await verifyPrimary(gap,fetchImpl);
       }
       await outbox.acknowledge(id,{
