@@ -1,5 +1,6 @@
 // Evidence-preserving transport between Reality's signal cleaner, ledger,
 // verifier and the next cognition layer. Integrity is NOT factual truth.
+import { createHash } from 'node:crypto';
 import { createRawSignalPacket, cleanFragmentedSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { createUniverseEntry, validateUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
 import { persistUniverseEntry, retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
@@ -56,10 +57,18 @@ export async function recordVerifiedLayerHandoff({
   requiredString(sourceRef,'HANDOFF_SOURCE_REQUIRED');
   if(parent && parent.continuity_root_id !== continuityRootId)
     throw new Error('HANDOFF_PARENT_ROOT_MISMATCH');
+  if(stage==='SIGNAL_CLEANER') {
+    const verified=verifySignalCleanerRecord(output?.signal);
+    if(!same(verified,output?.verification))
+      throw new Error('SIGNAL_CLEANER_VERIFICATION_RECORD_MISMATCH');
+  }
+  const eventIdentity=createHash('sha256').update(JSON.stringify({
+    stage,continuityRootId,observedAt,sourceRef,output,
+    parent_entry_id:parent?.entry_id||null,
+    parent_ledger_hash:parent?.ledger_entry_hash||null,
+  })).digest('hex').slice(0,32);
   const event= createUniverseEntry({
-    entry_id:'layer:'+stage+':'+continuityRootId+':'+
-      // The stage/parent/source make the event identity stable within a turn.
-      (output?.packet?.packet_id || output?.signal?.packet?.packet_id || output?.response_id || observedAt),
+    entry_id:'layer:'+stage+':'+eventIdentity,
     continuity_root_id:continuityRootId,
     worldline_id:'reality:primary',
     event_kind:'REALITY_LAYER_HANDOFF',
@@ -83,6 +92,11 @@ export async function recordVerifiedLayerHandoff({
   validateUniverseEntry(event);
   await persistUniverseEntry(event,{fetchImpl});
   const readBack=await retrievePersistedUniverseEntry({entryId:event.entry_id,fetchImpl});
+  if(stage==='SIGNAL_CLEANER') {
+    const storedCleaner=verifySignalCleanerRecord(readBack?.payload?.data?.signal);
+    if(!same(storedCleaner,readBack?.payload?.data?.verification))
+      throw new Error('SIGNAL_CLEANER_READBACK_VERIFICATION_MISMATCH');
+  }
   if(!readBack || readBack.ledger_entry_hash!==event.ledger_entry_hash ||
       readBack.continuity_root_id!==continuityRootId ||
       !same(readBack.payload,event.payload) ||
