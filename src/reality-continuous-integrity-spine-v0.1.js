@@ -137,7 +137,7 @@ export function advanceIntegritySpine({
     });
   }
   for(const issue of observedModelFindings){
-    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE'].includes(issue.classification)||
+    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW'].includes(issue.classification)||
        issue.origin_stage!==stage||issue.independently_adjudicated!==false||
        !Array.isArray(issue.source_receipt_refs)||!issue.source_receipt_refs.length||
        !issue.source_receipt_refs.every(nonempty))throw Error('SPINE_MODEL_FINDING_UNTRUSTED');
@@ -203,4 +203,147 @@ export function summarizeIntegritySpine(trace) {
     persistence:'NOT_PERSISTED_BY_THIS_MODULE',
     action_enforcement:'NOT_WIRED',
   });
+}
+
+
+// Conversation drift is part of the Continuity Spine, not a new independent
+// detector. This initial parser is deliberately conservative; it identifies
+// explicit user-stated conditions and later assistant intent shifts only.
+export const CONVERSATIONAL_CONTINUITY_VERSION='reality-conversation-continuity-v0.3';
+function terms(s){
+ const stop=new Set(['the','a','an','to','of','for','by','on','at','with','my','our','your','their','that','this','it','them','please','we','i','you','will','can','could','would','shall','should','must','not','dont','do','only','after','before','until','unless','once','if','when','now','then']);
+ const stem=w=>{
+  const aliases={sending:'send',sent:'send',ordering:'order',ordered:'order',signs:'sign',signed:'sign',signing:'sign',approved:'approve',approves:'approve',approving:'approve',approval:'approve',materials:'material'};
+  if(aliases[w])return aliases[w];
+  if(w.endsWith('ies')&&w.length>4)return w.slice(0,-3)+'y';
+  if(w.endsWith('ing')&&w.length>6)return w.slice(0,-3);
+  if(w.endsWith('ed')&&w.length>5)return w.slice(0,-2);
+  if(w.endsWith('s')&&w.length>4)return w.slice(0,-1);
+  return w;
+ };
+ return (String(s||'').toLowerCase().replace(/\u2019/g,"'").match(/[a-z0-9]+/g)||[])
+  .map(stem).filter(w=>w.length>1&&!stop.has(w));
+}
+function anchorsFromUser(message,ref,turnIndex){
+ const anchors=[];
+ for(const clause of String(message||'').split(/(?<=[.?!])\s+|\n+/)){
+  const t=clause.trim();
+  if(!t||/^[>"']/.test(t))continue;
+  const forms=[
+   /^(?:please\s+)?(?:do\s+not|don't|never|must\s+not|should\s+not)\s+(.+?)\s+(?:until|before|unless)\s+([^.;!?]+)/i,
+   /^(?:please\s+)?(?:only\s+|you\s+may\s+only\s+|we\s+can\s+only\s+)(.+?)\s+(?:after|if|when|once)\s+([^.;!?]+)/i,
+   /^(?:please\s+)?(?:wait\s+to|hold\s+off\s+on)\s+(.+?)\s+(?:until|after)\s+([^.;!?]+)/i,
+  ];
+  const match=forms.map(f=>t.match(f)).find(Boolean);
+  if(!match)continue;
+  const action=match[1].trim(),condition=match[2].trim();
+  const a=terms(action),c=terms(condition);
+  if(a.length<2||!c.length)continue;
+  anchors.push({
+   anchor_id:'conversation:'+sha([ref,turnIndex,action,condition]).slice(7,39),
+   source_ref:ref,turn_index:turnIndex,original_user_text:t.slice(0,600),
+   action_text:action,condition_text:condition,
+   action_tokens:a,condition_tokens:c,
+   authority:'USER_STATED_INTENT_NOT_EXTERNAL_FACT',
+  });
+ }
+ return anchors;
+}
+function matchesAction(candidate,anchor){
+ const words=terms(candidate);
+ return words.includes(anchor.action_tokens[0])&&
+  anchor.action_tokens.slice(1).some(x=>words.includes(x));
+}
+function nonAssertive(t){
+ return /^(?:>|["'])/.test(t.trim())||
+ /(?:^|[.?!]\s*)(?:if|what\s+if|suppose|hypothetically)\b/i.test(t)||
+ /\b(?:perhaps|maybe|might|could|should|would|consider|example|hypothetical)\b/i.test(t);
+}
+function negativeAction(t,anchor){
+ const v=anchor.action_tokens[0];
+ return new RegExp("\\b(?:do not|don't|never|won't|will not|cannot|can't|not going to|avoid|hold off on)\\s+(?:\\w+\\s+){0,2}"+v+"\\b",'i').test(t);
+}
+function retainsCondition(t,anchor){
+ const parts=t.split(/\b(?:after|until|once|unless|when|only if|provided that|if)\b/i);
+ if(parts.length<2)return false;
+ return parts.slice(1).some(x=>{
+  const observed=terms(x),c=anchor.condition_tokens;
+  return c.length===1?observed.includes(c[0]):
+   c.filter(token=>observed.includes(token)).length>=Math.min(2,c.length);
+ });
+}
+function possibleRevision(t,anchor){
+ return /\b(?:actually|instead|change|override|no longer|you can now|go ahead|forget the earlier|remove the restriction)\b/i.test(t)&&
+   matchesAction(t,anchor);
+}
+export function inspectConversationDrift({
+ priorTurns=[],currentUserMessage='',modelAnswer='',continuityRootId,
+ modelResponseId='untracked',currentUserSourceRef='current:user:signal',
+ historySource='NOT_ATTESTED',
+}={}){
+ if(!nonempty(continuityRootId))return Object.freeze({
+  version:CONVERSATIONAL_CONTINUITY_VERSION,status:'NO_CONTINUITY_ROOT',
+  assessment_scope:'NOT_EVALUATED',anchors:[],findings:[],
+  semantic_recall:null,detector_false_negative_rate:null});
+ if(!Array.isArray(priorTurns)||typeof currentUserMessage!=='string'||typeof modelAnswer!=='string')
+  throw Error('CONVERSATION_DRIFT_INPUT_INVALID');
+ if(priorTurns.length>80)throw Error('CONVERSATION_HISTORY_BOUNDS_EXCEEDED');
+ const authenticated=historySource==='AUTHENTICATED_CONVERSATION_MESSAGES';
+ const eligible=authenticated?priorTurns:[],anchors=[],seen=new Set();
+ for(let i=0;i<eligible.length;i++){
+  const turn=eligible[i];
+  if(!['user','assistant'].includes(turn?.role)||typeof turn?.text!=='string'||
+     !nonempty(turn?.source_ref))throw Error('CONVERSATION_HISTORY_PROVENANCE_INVALID');
+  if(turn.role!=='user')continue;
+  for(const anchor of anchorsFromUser(turn.text,turn.source_ref,i))
+   if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
+ }
+ for(const anchor of anchorsFromUser(currentUserMessage,currentUserSourceRef,eligible.length))
+  if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
+ const findings=[],revisions=[];
+ for(const anchor of anchors){
+  if(anchor.source_ref!==currentUserSourceRef&&possibleRevision(currentUserMessage,anchor)){
+   revisions.push({anchor_id:anchor.anchor_id,status:'REVISION_PROPOSED_NOT_ADJUDICATED'});
+   findings.push({
+    issue_id:'conversation-drift:'+sha([continuityRootId,anchor.anchor_id,modelResponseId,'revision']).slice(7,39),
+    classification:'CONVERSATIONAL_REVISION_REQUIRES_REVIEW',
+    origin_stage:'COGNITION',source_receipt_refs:[anchor.source_ref,currentUserSourceRef],
+    anchor_id:anchor.anchor_id,original_user_text:anchor.original_user_text,
+    observed_model_text:currentUserMessage.slice(0,400),
+    reason:'Customer revised a previously expressed condition; version history must be preserved',
+    independently_adjudicated:false,verified_hallucination:false,
+   });
+   continue;
+  }
+  for(const clause of modelAnswer.split(/(?<=[.?!])\s+|\n+/)){
+   const t=clause.trim();
+   if(!t||nonAssertive(t)||!matchesAction(t,anchor)||
+      negativeAction(t,anchor)||retainsCondition(t,anchor))continue;
+   // Flag only an expressed proposal/commitment, not a casual topic mention.
+   if(!/\b(?:i(?:'ll| will| am going to| plan to)|we(?:'ll| will| can| are going to)|let's|go ahead and|proceed to|ready to|now|next step is to|scheduled to|you can)\b/i.test(t))continue;
+   findings.push({
+    issue_id:'conversation-drift:'+sha([continuityRootId,anchor.anchor_id,modelResponseId,t]).slice(7,39),
+    classification:'CONVERSATIONAL_PRECONDITION_DRIFT',
+    origin_stage:'COGNITION',source_receipt_refs:[anchor.source_ref,'model-response:'+modelResponseId],
+    anchor_id:anchor.anchor_id,original_user_text:anchor.original_user_text,
+    expected_condition:anchor.condition_text,proposed_action:anchor.action_text,
+    observed_model_text:t.slice(0,400),
+    reason:'Assistant proposes an action but no longer carries the user-stated condition',
+    independently_adjudicated:false,verified_hallucination:false,
+   });
+   break;
+  }
+ }
+ return Object.freeze({
+  version:CONVERSATIONAL_CONTINUITY_VERSION,
+  status:findings.length?'EARLY_CONVERSATION_DRIFT_RISK':
+   anchors.length?'LIMITED_CONVERSATION_CHECK_NO_FLAG':'NO_EXTRACTABLE_CONVERSATION_ANCHOR',
+  assessment_scope:'EXPLICIT_USER_CONDITIONAL_INTENT_AND_AFFIRMATIVE_ACTION_PROPOSALS_ONLY',
+  history_scope:authenticated?'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT':'CURRENT_USER_TURN_ONLY',
+  observed_prior_turn_count:eligible.length,anchor_count:anchors.length,
+  anchors,revision_candidates:revisions,findings,
+  unknown_semantic_claims_possible:true,
+  semantic_recall:null,drift_rate:null,false_positive_rate:null,
+  authoritative_state_mutated:false,action_authorized:false,
+ });
 }
