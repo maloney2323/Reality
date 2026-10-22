@@ -28,15 +28,30 @@ export async function retryAndVerifyOriginalWork({
       authorization?.work_item_id !== workItem.id) {
     return freeze({ ...context, status: 'AWAITING_AUTHORIZATION', reason: 'ORIGINAL_WORK_RETRY_AUTHORITY_REQUIRED' });
   }
-  if (typeof runner.retry !== 'function' || typeof runner.verify !== 'function') {
-    return freeze({ ...context, status: 'NOT_ATTEMPTED', reason: 'RETRY_AND_INDEPENDENT_VERIFICATION_ADAPTER_REQUIRED' });
+  if (typeof runner.verifyAuthorization !== 'function' ||
+      typeof runner.retry !== 'function' || typeof runner.verify !== 'function') {
+    return freeze({ ...context, status: 'NOT_ATTEMPTED', reason: 'AUTHORITY_RETRY_AND_INDEPENDENT_VERIFICATION_ADAPTER_REQUIRED' });
+  }
+  // A caller-supplied authorization reference is not evidence that consent
+  // or scope was issued. Resolve it through the server-owned authority record.
+  let authorized;
+  try {
+    authorized = await runner.verifyAuthorization({ workItem, authorization });
+  } catch (error) {
+    return freeze({ ...context, status: 'AWAITING_AUTHORIZATION', reason: String(error?.message || error) });
+  }
+  if (authorized?.verified !== true ||
+      authorized?.work_item_id !== workItem.id ||
+      authorized?.authorization_ref !== authorization.authorization_ref ||
+      !nonempty(authorized?.verification_ref)) {
+    return freeze({ ...context, status: 'AWAITING_AUTHORIZATION', reason: 'ORIGINAL_WORK_AUTHORITY_NOT_INDEPENDENTLY_VERIFIED' });
   }
   let retryReceipt;
   try {
     retryReceipt = await runner.retry({
       workItem, registration,
       continuationToken: reactivation.continuation_token,
-      authorization,
+      authorization, authorizationProof: authorized,
     });
   } catch (error) {
     return freeze({ ...context, status: 'RETRY_FAILED', reason: String(error?.message || error) });
