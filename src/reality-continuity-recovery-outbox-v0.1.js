@@ -27,11 +27,13 @@ function validEnvelope(record,entryId=null){
      record?.event_id!==record?.event?.entry_id ||
      (entryId && record.event_id!==entryId))
     throw Error('OUTBOX_RECORD_IDENTITY_INVALID');
+  if(!record.queued_at || !Number.isFinite(Date.parse(record.queued_at)))
+    throw Error('OUTBOX_RECORD_TIMESTAMP_INVALID');
   validateUniverseEntry(record.event);
   if(record.ledger_hash!==record.event.ledger_entry_hash ||
      record.root_id!==record.event.continuity_root_id ||
      record.worldline_id!==record.event.worldline_id ||
-     record.record_hash!==digest({version:record.version,event:record.event}))
+     record.record_hash!==digest({version:record.version,event:record.event,queued_at:record.queued_at}))
     throw Error('OUTBOX_RECORD_INTEGRITY_FAILED');
   return record;
 }
@@ -65,9 +67,10 @@ export async function appendContinuityWithRecovery({
   journal(outbox);
   const record=Object.freeze({
     version:CONTINUITY_RECOVERY_VERSION,event_id:entry.entry_id,
+    queued_at:assertionTime,
     root_id:entry.continuity_root_id,worldline_id:entry.worldline_id,
     ledger_hash:entry.ledger_entry_hash,event:entry,
-    record_hash:digest({version:CONTINUITY_RECOVERY_VERSION,event:entry}),
+    record_hash:digest({version:CONTINUITY_RECOVERY_VERSION,event:entry,queued_at:assertionTime}),
   });
   await outbox.append(record);
   await verifyQueued(outbox,record);
@@ -167,9 +170,15 @@ export async function replayContinuityOutbox({
     try{
       const verified=await verifyPrimary(record.event,fetchImpl);
       const failuresObserved=Array.isArray(pendingItem.failures)?pendingItem.failures:[];
-      // Append an explicit interruption receipt. Failure records are only
-      // diagnostic; the original event remains immutable.
-      for(const failure of failuresObserved){
+      // If a process died after a durable append but before error telemetry,
+      // record an honest UNKNOWN outage, not a falsely seamless history.
+      const replayGapEvidence=failuresObserved.length ? failuresObserved : [{
+        assertion_time:record.queued_at,
+        reason:'PENDING_WITHOUT_FAILURE_TELEMETRY',
+        fault_domain:'UNCONFIRMED_PENDING_EVENT',
+      }];
+      // Append an explicit interruption receipt for every known gap.
+      for(const failure of replayGapEvidence){
         const gap=recoveryGapEvent({record,latestFailure:failure});
         await verifyPrimary(gap,fetchImpl);
       }

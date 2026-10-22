@@ -116,3 +116,15 @@ test('unavailable error telemetry does not falsely claim confirmed gap preservat
  assert.equal(r.failure_record_verified,false);
  assert.equal(q.rows.size,1);
 });
+
+test('process interruption before error telemetry still yields an explicit unknown-gap receipt',async()=>{
+ const p=primary(),q=outbox({failFailure:true}),entry=makeEntry('gap-no-telemetry');
+ const pending=await appendContinuityWithRecovery({entry,outbox:q,fetchImpl:p.fetchImpl,assertionTime:at});
+ assert.equal(pending.failure_record_verified,false);
+ p.online=true;
+ const recovered=await replayContinuityOutbox({outbox:q,continuityRootId:root,fetchImpl:p.fetchImpl});
+ assert.equal(recovered.replayed,1);
+ const gap=[...p.rows.values()].find(x=>x.event_kind==='CONTINUITY_RECOVERY_GAP');
+ assert.equal(gap.payload.failure.reason,'PENDING_WITHOUT_FAILURE_TELEMETRY');
+ assert.equal(gap.payload.failure.assertion_time,at);
+});
