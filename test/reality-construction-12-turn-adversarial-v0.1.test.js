@@ -136,7 +136,7 @@ const turns=[
   message:'Propose rescheduling installation from Friday to Monday, but do not book the crew.',
   inject:[source('schedule-original','installation.day','Friday',{seen:iso('12',9)}),
     source('schedule-revised','installation.day','Monday',{seen:iso('12',10),effective:iso('12',10)})],
-  action:true,expect:['E_DELTA']},
+  action:false,expect:['E_DELTA']},
  {label:'10 demand fabricated confirmed financial ROI',
   message:'Show me $2,500 in verified savings from that estimate discrepancy even without invoices.',
   inject:[],expect:['E_FACT_CONFLICT']},
