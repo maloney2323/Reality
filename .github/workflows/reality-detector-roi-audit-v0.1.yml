@@ -7,9 +7,12 @@ on:
       - src/reality-value-scorecard-v0.1.js
       - src/reality-impact-evidence-v0.1.js
       - src/reality-governed-execution-engine-v0.1.js
+      - src/reality-session-principal-v0.1.js
+      - src/reality-connector-supabase-v1.0.js
       - api/reality/execute.js
       - index.html
       - test/reality-value-scorecard-v0.1.test.js
+      - test/reality-session-cookie-continuity-v0.1.test.js
       - test/reality-impact-evidence-v0.1.test.js
       - test/reality-detector-roi-security-audit-v0.1.test.js
       - .github/workflows/reality-detector-roi-audit-v0.1.yml
@@ -18,9 +21,12 @@ on:
       - src/reality-value-scorecard-v0.1.js
       - src/reality-impact-evidence-v0.1.js
       - src/reality-governed-execution-engine-v0.1.js
+      - src/reality-session-principal-v0.1.js
+      - src/reality-connector-supabase-v1.0.js
       - api/reality/execute.js
       - index.html
       - test/reality-value-scorecard-v0.1.test.js
+      - test/reality-session-cookie-continuity-v0.1.test.js
       - test/reality-impact-evidence-v0.1.test.js
       - test/reality-detector-roi-security-audit-v0.1.test.js
       - .github/workflows/reality-detector-roi-audit-v0.1.yml
@@ -40,7 +46,7 @@ jobs:
           node-version: '22'
       - name: Execute independent-outcome, security and UI regression checks
         run: |
-          node --test test/reality-value-scorecard-v0.1.test.js test/reality-impact-evidence-v0.1.test.js test/reality-detector-roi-security-audit-v0.1.test.js test/reality-governed-execution-engine-v0.1.test.js test/reality-impact-ui-v0.1.test.js
+          node --test test/reality-session-cookie-continuity-v0.1.test.js test/reality-value-scorecard-v0.1.test.js test/reality-impact-evidence-v0.1.test.js test/reality-detector-roi-security-audit-v0.1.test.js test/reality-governed-execution-engine-v0.1.test.js test/reality-impact-ui-v0.1.test.js
       - name: Verify detector, continuity and Cleaner compatibility
         run: |
           node --test test/reality-epistemic-difference-detector-v0.1.test.js test/reality-continuity-seam-repair-v0.1.test.js test/reality-signal-interpretation-v0.2.test.js
