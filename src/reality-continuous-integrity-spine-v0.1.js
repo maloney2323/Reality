@@ -137,7 +137,7 @@ export function advanceIntegritySpine({
     });
   }
   for(const issue of observedModelFindings){
-    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM'].includes(issue.classification)||
+    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE'].includes(issue.classification)||
        issue.origin_stage!==stage||issue.independently_adjudicated!==false||
        !Array.isArray(issue.source_receipt_refs)||!issue.source_receipt_refs.length||
        !issue.source_receipt_refs.every(nonempty))throw Error('SPINE_MODEL_FINDING_UNTRUSTED');
