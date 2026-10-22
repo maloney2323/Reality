@@ -218,3 +218,21 @@ export async function persistContinuityEvent(event, { fetchImpl = fetch } = {}) 
   });
   return persistUniverseEntry(canonical, { fetchImpl });
 }
+
+
+// Read-after-write is a separate check from receiving a successful POST.
+// A database-returned row is not evidence that the entry can be rehydrated.
+export async function retrievePersistedUniverseEntry({ entryId, fetchImpl = fetch } = {}) {
+  if(typeof entryId !== 'string' || !entryId.trim())
+    throw new Error('UNIVERSE_ENTRY_ID_REQUIRED');
+  const response=await request(
+    '/rest/v1/reality_universe_entries?entry_id=eq.'+encodeURIComponent(entryId)+'&select=*',
+    {method:'GET',headers:{Accept:'application/json'}},fetchImpl
+  );
+  const rows=await response.json();
+  if(!Array.isArray(rows) || rows.length !== 1)
+    throw new Error('UNIVERSE_ENTRY_READBACK_NOT_UNIQUE');
+  const entry=Object.freeze(mapRow(rows[0]));
+  validateUniverseEntry(entry);
+  return entry;
+}

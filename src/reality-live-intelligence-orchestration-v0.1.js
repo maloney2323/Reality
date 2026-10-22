@@ -1,4 +1,6 @@
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
+import { verifySignalCleanerRecord, recordVerifiedLayerHandoff } from './reality-verified-layer-handoff-v0.1.js';
+import { retrievePersistedUniverseEntry } from './reality-native-universe-persistence-v1.0.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
@@ -120,6 +122,7 @@ export async function runLiveIntelligenceOrchestration({
   if (typeof message !== 'string' || !message.trim()) throw new Error('MESSAGE_REQUIRED');
 
   const governedSignal = buildGovernedChatSignal({ message, observedAt });
+  const verifiedCleaner = verifySignalCleanerRecord(governedSignal);
   const explicitContinuityRootId = String(systemContext?.continuity_root_id || '').trim() || null;
   const conversationContinuityRootId = deriveContinuityRootId({
     explicitRootId: null,
@@ -173,7 +176,29 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  const durabilityEnabled = process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true' && systemContext?.ephemeral_no_history !== true;
+  const signalHandoff = durabilityEnabled && effectiveContinuityRootId
+    ? await recordVerifiedLayerHandoff({
+        stage:'SIGNAL_CLEANER',
+        continuityRootId:effectiveContinuityRootId,
+        observedAt:governedSignal.packet.observed_at,
+        sourceRef:'reality:signal-cleaner',
+        output:{signal:governedSignal,verification:verifiedCleaner},
+        evidenceReferences:[
+          governedSignal.packet.raw_content_digest,
+          governedSignal.transformation_receipt.receipt_id,
+          ...governedSignal.fragments.map(f=>f.fragment_id),
+        ],
+        fetchImpl,
+      })
+    : null;
   const cognitionContext = {
+    signal_cleaner_structural_verification:verifiedCleaner,
+    signal_ledger_handoff:signalHandoff ? {
+      status:signalHandoff.status,
+      entry_id:signalHandoff.entry_id,
+      ledger_entry_hash:signalHandoff.ledger_entry_hash,
+    } : {status:'NOT_DURABLY_PERSISTED'},
     ...(systemContext || {}),
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
@@ -184,15 +209,38 @@ export async function runLiveIntelligenceOrchestration({
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
   };
-  const cognitiveResult = await runRealityCognitiveRuntime({
-    message,
-    governedSignal,
-    systemContext: cognitionContext,
-    universeEntries: universeContext.entries,
-    model,
-    apiKey,
-    fetchImpl,
-  });
+  let cognitiveResult;
+  try {
+    cognitiveResult = await runRealityCognitiveRuntime({
+      message,
+      governedSignal,
+      systemContext: cognitionContext,
+      universeEntries: universeContext.entries,
+      model,
+      apiKey,
+      fetchImpl,
+    });
+  } catch (error) {
+    // Keep a durable observed failure rather than lose the broken transition.
+    // This is diagnostic capture, not answer filtering or semantic judgment.
+    if(signalHandoff) {
+      try {
+        await recordVerifiedLayerHandoff({
+          stage:'COGNITION_ERROR',
+          continuityRootId:effectiveContinuityRootId,
+          observedAt:new Date().toISOString(),
+          sourceRef:'reality:cognitive-runtime',
+          output:{error_code:String(error?.code || error?.message || 'COGNITION_ERROR').slice(0,320),
+            failed_stage:'COGNITION',source_signal_entry_id:signalHandoff.entry_id},
+          evidenceReferences:[signalHandoff.entry_id,signalHandoff.ledger_entry_hash],
+          parent:signalHandoff.entry,fetchImpl,
+        });
+      } catch (persistenceError) {
+        error.ledger_capture_error=String(persistenceError?.message || persistenceError);
+      }
+    }
+    throw error;
+  }
   const modelResult = {
     ...cognitiveResult,
     answer: cognitiveResult.answer,
@@ -210,27 +258,46 @@ export async function runLiveIntelligenceOrchestration({
     observedAt,
   });
   const trainingExperiment = proposeTrainingExperiment(trainingExperience);
-  const continuityState = materiality === 'ACTION_CANDIDATE' ? 'ACTIVE' : 'ACTIVE';
+  const continuityState = 'ACTIVE';
   const continuityEvent = effectiveContinuityRootId
     ? buildContinuityEvent({
         continuityRootId: effectiveContinuityRootId,
         priorState: persistedContinuity?.latest_state || null,
         nextState: continuityState,
         trigger: persistedContinuity?.continuation_available ? 'CONTINUITY_REHYDRATED' : 'NEW_OBSERVATION',
-        evidenceReferences: [governedSignal?.signal_hash, ...((governedSignal?.fragments || []).map((fragment) => fragment?.fragment_id).filter(Boolean))],
+        evidenceReferences: [
+          governedSignal.packet.packet_id,
+          governedSignal.transformation_receipt.receipt_id,
+          ...governedSignal.fragments.map(fragment=>fragment.fragment_id),
+          signalHandoff?.entry_id,
+          signalHandoff?.ledger_entry_hash,
+        ].filter(Boolean),
         payload: {
           continuity_state: continuityState,
           materiality,
           runtime_version: modelResult?.runtime_version || null,
           universe_context_count: universeContext.count,
           response_summary: String(modelResult?.answer || '').slice(0, 1000),
+          // Do not replace a layer's actual output with only a summary.
+          cognitive_output: modelResult,
+          signal_handoff_entry_id:signalHandoff?.entry_id || null,
+          signal_handoff_ledger_hash:signalHandoff?.ledger_entry_hash || null,
+          cleaner_verification:verifiedCleaner,
+          contradiction_diagnostics:'MODEL_LANE_TEXT_PRESERVED_NOT_SEMANTICALLY_VERIFIED',
         },
         observedAt: observedAt || new Date().toISOString(),
       })
     : null;
 
-  if (continuityEvent && process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED === 'true') {
-    await persistContinuityEvent(continuityEvent, { fetchImpl });
+  let continuityReadback = null;
+  if (continuityEvent && durabilityEnabled) {
+    const stored=await persistContinuityEvent(continuityEvent, { fetchImpl });
+    continuityReadback=await retrievePersistedUniverseEntry({
+      entryId:continuityEvent.continuity_event_id,fetchImpl
+    });
+    if(stored.entry?.ledger_entry_hash!==continuityReadback.ledger_entry_hash ||
+       continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash)
+      throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
 
   let situation = null;
@@ -238,7 +305,12 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      governedSignal?.packet?.packet_id ? {
+        ref:governedSignal.packet.packet_id,
+        kind:'OBSERVED_USER_REQUEST_NOT_INDEPENDENT_WORLD_TRUTH',
+        source:'USER_MESSAGE',
+        observed_at:governedSignal.packet.observed_at,
+      } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -320,6 +392,9 @@ export async function runLiveIntelligenceOrchestration({
       prior_state: persistedContinuity?.latest_state || null,
       current_state: continuityEvent?.next_state || null,
       event_id: continuityEvent?.continuity_event_id || null,
+      signal_handoff_status:signalHandoff?.status || 'NOT_DURABLY_PERSISTED',
+      signal_handoff_entry_id:signalHandoff?.entry_id || null,
+      cognitive_readback_verified:Boolean(continuityReadback),
     } },
     situation: clone(situation),
     learning: {
