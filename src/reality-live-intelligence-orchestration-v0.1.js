@@ -7,6 +7,8 @@ import { retrievePersistedUniverse, retrieveLatestPersistedContinuityTransition,
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
+import { inspectModelOutputWithContinuity } from './reality-model-output-integrity-v0.1.js';
+import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine } from './reality-continuous-integrity-spine-v0.1.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
@@ -284,10 +286,55 @@ export async function runLiveIntelligenceOrchestration({
     }
     throw error;
   }
+  // Compare model output against trusted, root-scoped source observations.
+  // Model prose never becomes a source fact. A mismatch is not a confirmed hallucination.
+  const rawModelAnswer=String(cognitiveResult.answer||'');
+  const modelIntegrity=inspectModelOutputWithContinuity({
+    answer:rawModelAnswer,
+    ledgerEntries:universeContext.entries,
+    continuityRootId:effectiveContinuityRootId,
+    worldlineId:systemContext?.worldline_id||'reality:primary',
+    modelResponseId:cognitiveResult.response_id||'untracked',
+    observedAt:observedAt||new Date().toISOString(),
+  });
+  const {candidate_observations:_syntheticComparator,...modelIntegrityPublic}=modelIntegrity;
+  let spine=null,spineSummary=null;
+  // Only claim lineage anchoring if an earlier handoff was stored and read back.
+  if(signalHandoff?.status==='STORED_AND_READ_BACK' && effectiveContinuityRootId){
+    spine=createIntegritySpine({
+      continuityRootId:effectiveContinuityRootId,
+      worldlineId:systemContext?.worldline_id||'reality:primary',
+      runId:'model-response:'+(cognitiveResult.response_id||governedSignal.packet.packet_id),
+      ledgerAnchorRef:signalHandoff.entry_id,
+      openedAt:observedAt||new Date().toISOString(),
+    });
+    for(const stage of ['SIGNAL_CLEANER','UNIVERSE','CONTINUITY','COGNITION']){
+      spine=advanceIntegritySpine({
+        trace:spine,stage,
+        observedAt:observedAt||new Date().toISOString(),
+        sourceReceiptRefs:stage==='SIGNAL_CLEANER'
+          ? [signalHandoff.entry_id]
+          : stage==='COGNITION'
+            ? ['model-response:'+(cognitiveResult.response_id||'untracked')]
+            : [signalHandoff.entry_id],
+        observedModelFindings:stage==='COGNITION'?modelIntegrity.findings:[],
+        // The selected context is bounded; full obligation coverage unproven.
+        presentOpenObligationIds:null,
+      });
+    }
+    spineSummary=summarizeIntegritySpine(spine);
+  }
+  const integrityRequiresReview=modelIntegrity.findings.some(x=>
+    ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM'].includes(x.classification));
+  const note=integrityRequiresReview
+    ? '\\n\\nReality integrity notice: This response contains an operational claim that conflicts with source-attested context or asserts an unverified action. Treat it as unverified pending independent confirmation; no external action is authorized.'
+    : '';
   const modelResult = {
     ...cognitiveResult,
-    answer: cognitiveResult.answer,
-    cognitive_runtime_version: cognitiveResult.runtime_version,
+    raw_model_answer:rawModelAnswer,
+    answer:rawModelAnswer+note,
+    cognitive_runtime_version:cognitiveResult.runtime_version,
+    integrity_review_required:integrityRequiresReview,
   };
 
   const materiality = materialityFromSignal(governedSignal);
@@ -333,7 +380,9 @@ export async function runLiveIntelligenceOrchestration({
           signal_handoff_ledger_hash:signalHandoff?.ledger_entry_hash || null,
           cleaner_verification:verifiedCleaner,
           passive_epistemic_diagnostics:passiveEpistemicDiagnostics,
-          contradiction_diagnostics:'MODEL_LANE_TEXT_PRESERVED_NOT_SEMANTICALLY_VERIFIED',
+          model_output_integrity:modelIntegrityPublic,
+          integrity_spine:spine?spine:null,
+          contradiction_diagnostics:'NARROW_EXPLICIT_MODEL_CLAIMS_COMPARED_NOT_FULL_SEMANTIC_VERIFICATION',
         },
         observedAt: observedAt || new Date().toISOString(),
       })
@@ -346,7 +395,9 @@ export async function runLiveIntelligenceOrchestration({
       entryId:continuityEvent.continuity_event_id,fetchImpl
     });
     if(stored.entry?.ledger_entry_hash!==continuityReadback.ledger_entry_hash ||
-       continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash)
+       continuityReadback.payload?.signal_handoff_ledger_hash!==signalHandoff?.ledger_entry_hash ||
+       continuityReadback.payload?.model_output_integrity?.status!==modelIntegrityPublic.status ||
+       (spine && continuityReadback.payload?.integrity_spine?.trace_hash!==spine.trace_hash))
       throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
 
@@ -435,7 +486,10 @@ export async function runLiveIntelligenceOrchestration({
       reason: 'INTELLIGENCE_AND_PLANNING_ONLY',
     },
     context: { universe: { status: universeContext.status, count: universeContext.count },
-      epistemic_diagnostics:clone(passiveEpistemicDiagnostics), continuity: {
+      epistemic_diagnostics:clone(passiveEpistemicDiagnostics),
+      model_output_integrity:clone(modelIntegrityPublic),
+      integrity_spine:spineSummary?clone(spineSummary):{status:'NOT_DURABLY_ANCHORED'},
+      continuity: {
       root_id: effectiveContinuityRootId,
       discovery: continuityDiscovery,
       status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
@@ -458,6 +512,17 @@ export async function runLiveIntelligenceOrchestration({
     },
   };
 
+  if(integrityRequiresReview && materiality==='ACTION_CANDIDATE'){
+    return {
+      ...base,mode:'INTEGRITY_REVIEW_REQUIRED',governance:'REQUIRES_INDEPENDENT_REVIEW',
+      work:null,
+      integrity_review:{
+        status:'WORK_PROPOSAL_HELD',reason:'UNVERIFIED_MATERIAL_MODEL_ASSERTION',
+        finding_ids:modelIntegrity.findings.map(x=>x.issue_id),
+        authorization_granted:false,
+      },
+    };
+  }
   if (materiality !== 'ACTION_CANDIDATE') {
     return {
       ...base,
