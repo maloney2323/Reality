@@ -136,6 +136,27 @@ export function inspectModelOutputWithContinuity({
     independently_adjudicated:false,verified_hallucination:false,
    });
   }
+  // Conflicting source histories are themselves an unresolved condition.
+  // Do not silently accept the latest amount as verified or report "no drift".
+  for(const conflicted of contested){
+   const kind=kindOf(conflicted.key);
+   if(!kind)continue;
+   const value=matchValue(kind,p.text);
+   if(value===null)continue;
+   const similar=[...reference.filter(x=>x.kind===kind),
+     ...contested.filter(x=>kindOf(x.key)===kind)];
+   if(similar.length!==1)continue; // A model phrase cannot select ambiguous entities.
+   findings.push({
+     issue_id:'model-integrity:'+hash([modelResponseId,p.offset,conflicted.entity,conflicted.key,'CONTESTED']).slice(0,32),
+     classification:'CONTESTED_SOURCE_REFERENCE',origin_stage:'COGNITION',
+     entity_ref:conflicted.entity,target_state_key:conflicted.key,
+     source_receipt_refs:conflicted.source_entry_refs,
+     model_response_id:modelResponseId,model_claim_value:value,
+     excerpt:p.text.slice(0,240),offset:p.offset,
+     recommended_action:'INDEPENDENTLY_RECONCILE_SOURCE_CHANGE',
+     independently_adjudicated:false,verified_hallucination:false,
+   });
+  }
   const matches=[];
   for(const ref of reference){
    const v=matchValue(ref.kind,p.text);
