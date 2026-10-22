@@ -105,6 +105,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
       <section>
         <details><summary>Show work state</summary>
         <div class="timeline" id="timeline"></div>
+        <p class="muted">Project continuity: <strong id="continuityMode">Not established</strong></p>
+        <p class="muted" id="continuityDetail">Durable cross-session continuity has not been verified for this conversation.</p>
+        <p class="muted" id="epistemicSummary">No trustworthy detector readout available for this turn.</p>
         <p class="muted">Execution: <span id="execution"></span><br>Verification: <span id="verification"></span></p>
         </details>
       </section>
@@ -145,6 +148,19 @@ $('plan').onclick=async()=>{
     const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
+    const continuity=b.continuity||{};
+    const diag=b.result?.context?.epistemic_diagnostics||{};
+    $('continuityMode').textContent=continuity.mode||'NOT_ESTABLISHED';
+    $('continuityDetail').textContent=continuity.mode==='DURABLE_READBACK_VERIFIED'
+      ? 'Verified ledger readback for this authenticated project turn. Future-turn recovery still requires testing.'
+      : continuity.mode==='AUTHENTICATED_PERSISTENCE_NOT_VERIFIED'
+        ? 'Project identity was authenticated, but the durable ledger was not verified. Do not assume this turn will survive a restart.'
+        : 'This chat is context-free, not a persistent project session. Use a verified authenticated project session for continuity.';
+    const conflicts=Array.isArray(diag.contradictions)?diag.contradictions.length:0;
+    const differences=Array.isArray(diag.discrepancies)?diag.discrepancies.length:0;
+    $('epistemicSummary').textContent='Passive source discrepancies: '+differences+
+      ' (conflicts '+conflicts+'). Coverage: '+(diag.coverage||'NOT_ESTABLISHED')+
+      '. These are structured evidence differences, not verified model-output hallucination catches.';
     $('brief').classList.add('open');
     $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
     $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
