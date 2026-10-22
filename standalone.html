@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reality — Independent Preview</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:dark;background:#070b14;color:#ebf1ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(165deg,#0b1322,#070b14 52%);min-height:100vh}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #26324a;padding:0 max(18px,calc((100vw - 1140px)/2))}
+.brand{font-weight:800;font-size:21px;letter-spacing:-.025em}.pill{font-size:12px;background:#18253a;border:1px solid #2d405e;color:#b7cce9;border-radius:100px;padding:7px 12px}
+main{max-width:1140px;margin:auto;padding:24px 18px 72px}
+h1{font-size:clamp(25px,5vw,39px);margin:0 0 8px;letter-spacing:-.04em}h2{font-size:17px;margin:0 0 12px}
+.sub{color:#a6b6cf;line-height:1.55;max-width:720px}
+section,.panel{background:#101828;border:1px solid #293950;border-radius:18px;padding:22px;margin-bottom:18px}
+#workspace{display:none}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+label{display:block;font-size:12px;color:#aabbd4;margin-bottom:7px}input,textarea{width:100%;border-radius:11px;border:1px solid #334861;background:#0a111e;color:#edf4ff;padding:12px;font:inherit}
+input:focus,textarea:focus{outline:2px solid #7197da}textarea{resize:vertical;min-height:85px}
+button{background:#e5eeff;color:#081223;border:none;border-radius:12px;padding:12px 17px;cursor:pointer;font-weight:750}
+button:disabled{opacity:.5;cursor:wait}.secondary{background:#263650;color:#e4eeff}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+small,.muted{color:#98aac4}.notice{font-size:13px;white-space:pre-wrap;line-height:1.5;margin-top:12px;min-height:1.5em}
+.error{color:#ffb7b7}.good{color:#9cddbb}
+.two{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(235px,1fr);gap:18px}
+.message{margin:13px 0;padding:14px;border-radius:13px;background:#131e30;border:1px solid #2a3e59;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.message.user{background:#182940;border-color:#49638a}.who{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#a9bedf;font-weight:700;margin-bottom:5px}
+.trait{display:flex;gap:9px;justify-content:space-between;align-items:flex-start;padding:12px 0;border-bottom:1px solid #273750;font-size:13px}.trait:last-child{border-bottom:0}
+.trait strong{max-width:54%;text-align:right;font-weight:600}
+#loginNotice,#chatNotice{color:#abbdd8}
+footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
+@media(max-width:760px){.two,.fields{grid-template-columns:1fr}header{padding:0 16px}section,.panel{padding:17px}}
+</style></head>
+<body>
+<header><div class="brand">✦ Reality</div><div class="pill">Independent migration preview</div></header>
+<main>
+<h1>Your world. Your continuity.</h1>
+<p class="sub">A preview of Reality served from GitHub and Vercel, independent of Base44. The full Base44 interface and historical data have not been migrated. No customer-facing deployment has been changed.</p>
+<section id="signIn">
+<h2>Sign in to a separate Reality account</h2>
+<p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here.</p>
+<div class="fields"><div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@example.com"></div>
+<div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"></div></div>
+<div class="actions"><button id="login">Sign in</button><button class="secondary" id="signup">Create preview account</button></div>
+<div id="loginNotice" class="notice" role="status"></div>
+</section>
+<div id="workspace">
+<div class="actions" style="justify-content:space-between;margin-bottom:19px">
+<div class="pill">Personal world · Independently authenticated</div>
+<button id="logout" class="secondary">Sign out</button></div>
+<div class="two">
+<div>
+<section>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Continuous conversation</h2><button id="newConversation" class="secondary">New thought</button></div>
+<div id="conversation" aria-live="polite"></div>
+<label for="prompt">What should Reality work on?</label>
+<textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
+<div class="actions"><button id="send">Send</button><small id="conversationIdLabel"></small></div>
+<div id="chatNotice" class="notice" role="status"></div>
+</section>
+</div>
+<aside>
+<div class="panel"><h2>Continuity and integrity</h2>
+<div class="trait"><span>Conversation ledger</span><strong id="ledger">Not tested</strong></div>
+<div class="trait"><span>Source-fact integrity</span><strong id="fact">Not evaluated</strong></div>
+<div class="trait"><span>Conversation drift</span><strong id="drift">Not evaluated</strong></div>
+<div class="trait"><span>Retrospective recovery</span><strong id="retro">Not evaluated</strong></div>
+<div class="trait"><span>Model hallucination rate</span><strong>Not independently measured</strong></div></div>
+<div class="panel"><h2>Evidence status</h2><p class="sub" id="evidence">No verified work has been submitted in this preview.</p>
+<small>A flagged candidate is not a verified hallucination. A reply is not evidence that an outside action occurred.</small></div>
+</aside>
+</div>
+</div>
+<footer>Migration proof, not a production release. A Vercel deployment's READY status does not establish authenticated continuity or accuracy. Publishing and customer-data migration require separate approval.</footer>
+</main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const state={config:null,accessToken:null,conversationId:localStorage.getItem('reality-standalone-conversation-v01')||crypto.randomUUID()};
+const status=(id,text,error=false)=>{$(id).textContent=text;$(id).className='notice'+(error?' error':'')};
+const newConversation=()=>{state.conversationId=crypto.randomUUID();localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);$('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity()};
+const resetIntegrity=()=>{for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';$('evidence').textContent='No independently verified outcome yet.'};
+$('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
+async function config(){
+ if(state.config)return state.config;
+ const res=await fetch('/api/reality/standalone-config',{cache:'no-store'});
+ const data=await res.json();
+ if(!res.ok||!data?.auth_url||!data?.publishable_key)
+  throw Error(data?.error||'Migration preview is not enabled.');
+ state.config=data;return data;
+}
+async function authorize(create){
+ const button=create?$('signup'):$('login');
+ button.disabled=true;
+ status('loginNotice','Contacting the independent identity provider...');
+ try{
+  const {auth_url,publishable_key}=await config();
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password)throw Error('Email and password are required.');
+  const url=create?'/auth/v1/signup':'/auth/v1/token?grant_type=password';
+  const res=await fetch(auth_url+url,{method:'POST',headers:{
+   apikey:publishable_key,'Content-Type':'application/json'
+  },body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(!res.ok)throw Error(data?.msg||data?.error_description||data?.message||'Authentication failed');
+  if(!data.access_token) {
+   status('loginNotice','Account requested. Confirm your email if required, then sign in.');
+   return;
+  }
+  state.accessToken=data.access_token; $('password').value='';
+  $('signIn').style.display='none';$('workspace').style.display='block';
+  status('chatNotice','Signed in. No historical Base44 messages have been imported.');
+ }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
+ finally{button.disabled=false}
+}
+function render(role,text){
+ const item=document.createElement('div');item.className='message'+(role==='user'?' user':'');
+ const name=document.createElement('div');name.className='who';name.textContent=role;
+ const content=document.createElement('div');content.textContent=text;
+ item.append(name,content);$('conversation').append(item);item.scrollIntoView({block:'end',behavior:'smooth'});
+}
+function readout(result){
+ const c=result?.context||{},ledger=c.continuity||{};
+ $('ledger').textContent=ledger.cognitive_readback_verified?'Stored and read back':'Not independently verified';
+ $('fact').textContent=c.model_output_integrity?.status||'Not evaluated';
+ $('drift').textContent=c.conversation_drift?.status||'Not evaluated';
+ $('retro').textContent=c.conversation_trajectory?.status||'Not evaluated';
+ const findings=[...(c.model_output_integrity?.findings||[]),...(c.conversation_drift?.findings||[]),
+  ...(c.conversation_trajectory?.findings||[])];
+ $('evidence').textContent=findings.length?findings.slice(0,3).map(f=>
+  f.classification+': '+(f.original_user_text||f.excerpt||'Evidence review required')).join('\n\n'):
+  'No issue flagged within available, limited assessment coverage. This does not prove zero drift.';
+}
+$('login').addEventListener('click',()=>authorize(false));
+$('signup').addEventListener('click',()=>authorize(true));
+$('logout').addEventListener('click',()=>{state.accessToken=null;$('workspace').style.display='none';$('signIn').style.display='block';$('conversation').replaceChildren();resetIntegrity();status('loginNotice','Signed out.');});
+$('newConversation').addEventListener('click',newConversation);
+$('send').addEventListener('click',async()=>{
+ const message=$('prompt').value.trim();
+ if(!message)return;
+ if(!state.accessToken){status('chatNotice','Sign in first.',true);return}
+ $('send').disabled=true;status('chatNotice','Submitting to independent Reality...');
+ try{
+  const res=await fetch('/api/reality/standalone-chat',{method:'POST',headers:{
+   'Content-Type':'application/json',Authorization:'Bearer '+state.accessToken,
+  },body:JSON.stringify({message,conversation_id:state.conversationId,thought_id:'personal',
+   turn_id:crypto.randomUUID()})});
+  const data=await res.json();
+  if(!res.ok)throw Error(data?.error||'Reality could not confirm the turn.');
+  render('user',message);render('Reality',data.response||'(No response)');
+  $('prompt').value='';readout(data.result);
+  localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+  $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
+  status('chatNotice','Response stored with independently verified ledger readback.');
+ }catch(err){status('chatNotice',err.message||'Unable to complete the turn',true)}
+ finally{$('send').disabled=false}
+});
+config().then(()=>status('loginNotice','Preview identity provider configured.'))
+ .catch(e=>status('loginNotice',e.message,true));
+</script>
+</body></html>
