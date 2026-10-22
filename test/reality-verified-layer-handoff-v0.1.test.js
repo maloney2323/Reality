@@ -252,3 +252,69 @@ test('long-lived WAITING state is retained even after over 100 newer ordinary si
    else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=prevKey;
  }
 });
+
+test('verifier performs two independent predecessor reads across a layer handoff',async()=>{
+ const io=memoryAdapter();
+ const first=await recordVerifiedLayerHandoff({
+  stage:'SIGNAL_CLEANER',continuityRootId:'root:linked',
+  observedAt:observed,sourceRef:'reality:cleaner',
+  output:{signal,verification:verifySignalCleanerRecord(signal)},
+  fetchImpl:io.fakeFetch,
+ });
+ const second=await recordVerifiedLayerHandoff({
+  stage:'COGNITION_ERROR',continuityRootId:'root:linked',
+  observedAt:'2026-10-22T10:01:00Z',sourceRef:'reality:cognition',
+  output:{error_code:'MODEL_UNAVAILABLE'},parent:first.entry,
+  fetchImpl:io.fakeFetch,
+ });
+ assert.equal(second.parent_integrity_verified,true);
+ assert.equal(second.parent_ledger_hash,first.ledger_entry_hash);
+ assert.equal(io.rows.size,2);
+ assert.equal(io.requests.filter(x=>x.method==='GET').length>=6,true);
+});
+test('forged/missing parent cannot yield verified child despite valid-looking root',async()=>{
+ const io=memoryAdapter();
+ const actual=await recordVerifiedLayerHandoff({
+  stage:'SIGNAL_CLEANER',continuityRootId:'root:protected',
+  observedAt:observed,sourceRef:'reality:cleaner',
+  output:{signal,verification:verifySignalCleanerRecord(signal)},fetchImpl:io.fakeFetch,
+ });
+ const common={stage:'COGNITION_ERROR',continuityRootId:'root:protected',
+ observedAt:'2026-10-22T10:02:00Z',sourceRef:'reality:cognition',
+ output:{error_code:'TEST'},fetchImpl:io.fakeFetch};
+ await assert.rejects(()=>recordVerifiedLayerHandoff({
+  ...common,parent:{...actual.entry,ledger_entry_hash:'forged'},
+ }),/HANDOFF_PARENT_READBACK_MISMATCH/);
+ await assert.rejects(()=>recordVerifiedLayerHandoff({
+  ...common,parent:{...actual.entry,entry_id:'missing-parent'},
+ }),/UNIVERSE_ENTRY_READBACK_NOT_UNIQUE/);
+ await assert.rejects(()=>recordVerifiedLayerHandoff({
+  ...common,worldlineId:'worldline:other',parent:actual.entry,
+ }),/HANDOFF_PARENT_WORLDLINE_MISMATCH/);
+ assert.equal(io.rows.size,1);
+});
+test('if parent changes between append and post-write readback, child is not VERIFIED',async()=>{
+ const io=memoryAdapter();
+ const first=await recordVerifiedLayerHandoff({
+  stage:'SIGNAL_CLEANER',continuityRootId:'root:tamper',
+  observedAt:observed,sourceRef:'reality:cleaner',
+  output:{signal,verification:verifySignalCleanerRecord(signal)},fetchImpl:io.fakeFetch,
+ });
+ let reads=0;
+ const modified=async (url,opts={})=>{
+  const u=new URL(url);
+  if(u.searchParams.get('entry_id')==='eq.'+first.entry_id && (opts.method||'GET')==='GET'){
+    reads++;
+    if(reads===2) {
+      const copy=io.rows.get(first.entry_id);
+      return {ok:true,status:200,json:async()=>[{...copy,ledger_entry_hash:'forged:hash'}]};
+    }
+  }
+  return io.fakeFetch(url,opts);
+ };
+ await assert.rejects(()=>recordVerifiedLayerHandoff({
+  stage:'COGNITION_ERROR',continuityRootId:'root:tamper',
+  observedAt:'2026-10-22T10:02:00Z',sourceRef:'reality:cognition',
+  output:{error_code:'DISCONNECTED'},parent:first.entry,fetchImpl:modified,
+ }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
+});

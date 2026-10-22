@@ -49,7 +49,7 @@ export function verifySignalCleanerRecord(signal) {
 
 export async function recordVerifiedLayerHandoff({
   stage,continuityRootId,observedAt,sourceRef,output,evidenceReferences=[],
-  parent=null,fetchImpl=fetch,
+  parent=null,worldlineId='reality:primary',fetchImpl=fetch,
 }={}) {
   requiredString(stage,'HANDOFF_STAGE_REQUIRED');
   requiredString(continuityRootId,'HANDOFF_CONTINUITY_ROOT_REQUIRED');
@@ -57,6 +57,21 @@ export async function recordVerifiedLayerHandoff({
   requiredString(sourceRef,'HANDOFF_SOURCE_REQUIRED');
   if(parent && parent.continuity_root_id !== continuityRootId)
     throw new Error('HANDOFF_PARENT_ROOT_MISMATCH');
+  if(parent && parent.worldline_id !== worldlineId)
+    throw new Error('HANDOFF_PARENT_WORLDLINE_MISMATCH');
+  if(parent){
+    if(!parent.entry_id || !parent.ledger_entry_hash)
+      throw new Error('HANDOFF_PARENT_IDENTITY_REQUIRED');
+    // A caller-supplied hash is not a lineage receipt. Verify the actual
+    // immutable predecessor in the same continuity scope before appending.
+    const predecessor=await retrievePersistedUniverseEntry({
+      entryId:parent.entry_id,fetchImpl,
+    });
+    if(predecessor.ledger_entry_hash!==parent.ledger_entry_hash ||
+       predecessor.continuity_root_id!==continuityRootId ||
+       predecessor.worldline_id!==worldlineId)
+      throw new Error('HANDOFF_PARENT_READBACK_MISMATCH');
+  }
   if(stage==='SIGNAL_CLEANER') {
     const verified=verifySignalCleanerRecord(output?.signal);
     if(!same(verified,output?.verification))
@@ -70,7 +85,7 @@ export async function recordVerifiedLayerHandoff({
   const event= createUniverseEntry({
     entry_id:'layer:'+stage+':'+eventIdentity,
     continuity_root_id:continuityRootId,
-    worldline_id:'reality:primary',
+    worldline_id:worldlineId,
     event_kind:'REALITY_LAYER_HANDOFF',
     epistemic_kind:'OBSERVATION',
     assertion_time:observedAt,effective_time:observedAt,
@@ -99,13 +114,26 @@ export async function recordVerifiedLayerHandoff({
   }
   if(!readBack || readBack.ledger_entry_hash!==event.ledger_entry_hash ||
       readBack.continuity_root_id!==continuityRootId ||
+      readBack.worldline_id!==worldlineId ||
       !same(readBack.payload,event.payload) ||
       !same(readBack.evidence_references,event.evidence_references))
     throw new Error('HANDOFF_DURABLE_READBACK_MISMATCH');
+  // Second predecessor read detects a changed/missing parent across the
+  // append boundary. Failure means the child is never labeled verified.
+  if(parent){
+    const predecessor=await retrievePersistedUniverseEntry({
+      entryId:parent.entry_id,fetchImpl,
+    });
+    if(predecessor.ledger_entry_hash!==parent.ledger_entry_hash ||
+       predecessor.continuity_root_id!==continuityRootId ||
+       predecessor.worldline_id!==worldlineId)
+      throw new Error('HANDOFF_PARENT_POSTWRITE_MISMATCH');
+  }
   return Object.freeze({
     status:'STORED_AND_READ_BACK',
     verification_scope:'DURABLE_INTEGRITY_AND_PARENT_REFERENCE',
     semantic_truth_evaluated:false,
+    parent_integrity_verified:Boolean(parent),
     entry_id:event.entry_id,
     ledger_entry_hash:event.ledger_entry_hash,
     continuity_root_id:continuityRootId,
