@@ -7,6 +7,7 @@ const work = { id:'work:followup-1',continuity_root_id:'root:followup-1',worldli
 const registration = {state:'REGISTERED',capability_id:'followup-verifier'};
 const reactivation = {state:'REACTIVATED',original_work_item_id:work.id,capability_id:'followup-verifier',continuation_token:'resume:followup'};
 const authorization = {work_item_id:work.id,authorized_by:'owner',authorization_ref:'auth:original-work'};
+const authProof = {verified:true,work_item_id:work.id,authorization_ref:authorization.authorization_ref,verification_ref:'authority:readback'};
 const receipt = {status:'EXECUTED',original_work_item_id:work.id,retry_receipt_id:'receipt:attempt'};
 const proof = {verified:true,independent:true,original_work_item_id:work.id,retry_receipt_id:receipt.retry_receipt_id,verification_ref:'provider-readback:followup'};
 const base = {workItem:work,registration,reactivation};
@@ -18,13 +19,17 @@ test('capability reactivation does not claim the original work completed',async(
 });
 test('independent work authorization does not inherit from sandbox permission',async()=>{
   let attempts=0;
-  const x=await retryAndVerifyOriginalWork({...base,authorization:{...authorization,work_item_id:'other'},runner:{retry:async()=>{attempts++;return receipt;},verify:async()=>proof}});
+  const x=await retryAndVerifyOriginalWork({...base,authorization:{...authorization,work_item_id:'other'},runner:{verifyAuthorization:async()=>authProof,retry:async()=>{attempts++;return receipt;},verify:async()=>proof}});
   assert.equal(x.status,'AWAITING_AUTHORIZATION');
   assert.equal(attempts,0);
 });
 test('registered capability can retry and verify the original work',async()=>{
   let checks=0;
   const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{
+    verifyAuthorization:async({workItem,authorization:issued})=>{
+      assert.equal(workItem.id,work.id);assert.equal(issued.authorization_ref,authorization.authorization_ref);
+      return authProof;
+    },
     retry:async({workItem,continuationToken})=>{assert.equal(workItem.id,work.id);assert.equal(continuationToken,reactivation.continuation_token);checks++;return receipt;},
     verify:async({retryReceipt})=>{assert.equal(retryReceipt.retry_receipt_id,receipt.retry_receipt_id);checks++;return proof;},
   }});
@@ -32,12 +37,12 @@ test('registered capability can retry and verify the original work',async()=>{
 });
 test('identity mismatch, unavailable readback, and unsupported success cannot close work',async()=>{
   for(const bad of [{...proof,verified:false},{...proof,independent:false},{...proof,original_work_item_id:'other'},{...proof,retry_receipt_id:'other'},{...proof,verification_ref:null}]){
-    const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{retry:async()=>receipt,verify:async()=>bad}});
+    const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{verifyAuthorization:async()=>authProof,retry:async()=>receipt,verify:async()=>bad}});
     assert.equal(x.status,'EXECUTED_UNVERIFIED');
   }
 });
 test('provider failure is attributed to original-work retry rather than upgrade synthesis',async()=>{
-  const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{retry:async()=>{throw Error('PROVIDER_FAILURE')},verify:async()=>proof}});
+  const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{verifyAuthorization:async()=>authProof,retry:async()=>{throw Error('PROVIDER_FAILURE')},verify:async()=>proof}});
   assert.equal(x.status,'RETRY_FAILED');assert.match(x.reason,/PROVIDER_FAILURE/);
 });
 
@@ -59,13 +64,24 @@ test('integrated capability loop reactivates without fabricating task completion
  assert.equal(result.original_work.status,'NOT_ATTEMPTED');assert.equal(result.reactivation.original_work_item_id,work.id);
 });
 test('integrated capability loop closes only after matching independent retry readback',async()=>{
- const result=await integrated({retry:async()=>receipt,verify:async()=>proof},authorization);
+ const result=await integrated({verifyAuthorization:async()=>authProof,retry:async()=>receipt,verify:async()=>proof},authorization);
  assert.equal(result.state,'ORIGINAL_WORK_VERIFIED');
  assert.equal(result.original_work.status,'VERIFIED');
  assert.equal(result.experiment.production_graph_write_permitted,false);
 });
 test('integrated retry with failed verification leaves original task unresolved',async()=>{
- const result=await integrated({retry:async()=>receipt,verify:async()=>({...proof,verified:false})},authorization);
+ const result=await integrated({verifyAuthorization:async()=>authProof,retry:async()=>receipt,verify:async()=>({...proof,verified:false})},authorization);
  assert.equal(result.state,'REACTIVATED');
  assert.equal(result.original_work.status,'EXECUTED_UNVERIFIED');
+});
+
+test('a forged approval reference cannot authorize the original task',async()=>{
+ let attempts=0;
+ const x=await retryAndVerifyOriginalWork({...base,authorization,runner:{
+   verifyAuthorization:async()=>({...authProof,verified:false}),
+   retry:async()=>{attempts++;return receipt;},
+   verify:async()=>proof,
+ }});
+ assert.equal(x.status,'AWAITING_AUTHORIZATION');
+ assert.equal(attempts,0);
 });
