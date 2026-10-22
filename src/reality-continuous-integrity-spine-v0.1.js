@@ -137,7 +137,7 @@ export function advanceIntegritySpine({
     });
   }
   for(const issue of observedModelFindings){
-    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW'].includes(issue.classification)||
+    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW','CONVERSATIONAL_RETROSPECTIVE_DRIFT'].includes(issue.classification)||
        issue.origin_stage!==stage||issue.independently_adjudicated!==false||
        !Array.isArray(issue.source_receipt_refs)||!issue.source_receipt_refs.length||
        !issue.source_receipt_refs.every(nonempty))throw Error('SPINE_MODEL_FINDING_UNTRUSTED');
@@ -346,4 +346,132 @@ export function inspectConversationDrift({
   semantic_recall:null,drift_rate:null,false_positive_rate:null,
   authoritative_state_mutated:false,action_authorized:false,
  });
+}
+
+
+// RETROSPECTIVE CONTINUITY REPLAY
+// Re-examines *historical assistant turns* against only those user intent
+// constraints that predated each assistant reply. It is a replay adapter to the
+// existing conversation-drift logic, not another independent detector.
+// A later user's revision never rewrites the meaning of an earlier turn.
+// No prior detection receipts => "previous detection unknown", not "missed".
+export const CONTINUITY_TRAJECTORY_REPLAY_VERSION='reality-continuity-trajectory-replay-v0.1';
+export function replayConversationTrajectory({
+  priorTurns=[],historySource='NOT_ATTESTED',continuityRootId,
+  currentUserMessage='',currentUserSourceRef='current:user:signal',
+  priorDetectionReceipts=[],maxAssistantTurns=16,
+}={}){
+  if(!nonempty(continuityRootId)||historySource!=='AUTHENTICATED_CONVERSATION_MESSAGES'){
+    return Object.freeze({
+      version:CONTINUITY_TRAJECTORY_REPLAY_VERSION,
+      status:'NO_AUTHENTICATED_TRAJECTORY',
+      assessment_scope:'NOT_EVALUATED',historical_assistant_turns_checked:0,
+      prior_turn_coverage:'NOT_ESTABLISHED',findings:[],recovery_candidates:[],
+      independent_truth_adjudication:'NOT_PERFORMED',
+    });
+  }
+  if(!Array.isArray(priorTurns)||!Array.isArray(priorDetectionReceipts) ||
+     !Number.isInteger(maxAssistantTurns)||maxAssistantTurns<1||maxAssistantTurns>40)
+    throw Error('TRAJECTORY_REPLAY_INPUT_INVALID');
+  if(priorTurns.length>80)throw Error('TRAJECTORY_HISTORY_BOUNDS_EXCEEDED');
+  for(const t of priorTurns){
+    if(!['user','assistant'].includes(t?.role)||!nonempty(t?.source_ref)||
+       typeof t?.text!=='string')
+      throw Error('TRAJECTORY_TURN_SOURCE_INVALID');
+  }
+  const lastAssists=priorTurns.map((t,i)=>t.role==='assistant'?i:null)
+    .filter(i=>i!==null).slice(-maxAssistantTurns);
+  const receiptIndex=new Set();
+  for(const e of priorDetectionReceipts){
+    if(e?.classification!=='CONVERSATIONAL_PRECONDITION_DRIFT'||
+       typeof e.original_user_text!=='string'||typeof e.observed_model_text!=='string')continue;
+    receiptIndex.add(sha([
+      continuityRootId,e.original_user_text.trim().toLowerCase(),
+      e.observed_model_text.trim().toLowerCase(),
+    ]));
+  }
+  const findings=[],recoveryCandidates=[],candidateKeys=new Set();
+  for(const i of lastAssists){
+    const turn=priorTurns[i];
+    // Use ONLY earlier history to prevent future-authority leakage.
+    const prior=inspectConversationDrift({
+      priorTurns:priorTurns.slice(0,i),
+      currentUserMessage:'',modelAnswer:turn.text,
+      continuityRootId,modelResponseId:'historical:'+turn.source_ref,
+      historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+    });
+    for(const x of prior.findings.filter(y=>y.classification==='CONVERSATIONAL_PRECONDITION_DRIFT')){
+      const material=[continuityRootId,x.original_user_text.trim().toLowerCase(),
+        x.observed_model_text.trim().toLowerCase()];
+      const cmp=sha(material);
+      if(candidateKeys.has(cmp))continue;
+      candidateKeys.add(cmp);
+      const priorReceipt=receiptIndex.has(cmp);
+      findings.push(Object.freeze({
+        issue_id:'trajectory:'+sha([continuityRootId,turn.source_ref,
+          x.source_receipt_refs[0],x.observed_model_text]).slice(7,39),
+        classification:'CONVERSATIONAL_RETROSPECTIVE_DRIFT',
+        origin_stage:'COGNITION',
+        // Turns in the supplied chronologically ordered history are 1-based.
+        apparent_origin_turn:i+1,
+        origin_turn_ref:turn.source_ref,
+        original_user_turn_ref:x.source_receipt_refs[0],
+        original_user_text:x.original_user_text,
+        observed_model_text:x.observed_model_text,
+        expected_condition:x.expected_condition,
+        proposed_action:x.proposed_action,
+        source_receipt_refs:[x.source_receipt_refs[0],turn.source_ref],
+        retrospective_detection_turn:priorTurns.length+1,
+        previously_recorded_detection:priorReceipt,
+        discovery_status:priorReceipt?
+          'PRIOR_DIAGNOSTIC_RECEIPT_FOUND':'NOT_FOUND_IN_SUPPLIED_DIAGNOSTIC_RECEIPTS',
+        // Unknown completeness => no "first ever caught"/"missed" claim.
+        prior_detection_completeness:'NOT_PROVEN',
+        independently_adjudicated:false,verified_hallucination:false,
+      }));
+    }
+  }
+  return Object.freeze({
+    version:CONTINUITY_TRAJECTORY_REPLAY_VERSION,
+    status:findings.some(x=>!x.previously_recorded_detection)
+      ? 'RETROSPECTIVE_DRIFT_CANDIDATES'
+      :findings.length?'PRIOR_DRIFT_CANDIDATES_RECONFIRMED'
+      :'LIMITED_REPLAY_NO_DRIFT_FLAGGED',
+    assessment_scope:'REPLAY_OF_EXPLICIT_CONDITION_AND_ACTION_MEANING_ONLY',
+    historical_assistant_turns_checked:lastAssists.length,
+    prior_turn_coverage:'BOUNDED_AUTHENTICATED_WINDOW_NOT_FULL_HISTORY',
+    findings,recovery_candidates:recoveryCandidates,
+    independent_truth_adjudication:'NOT_PERFORMED',
+    detector_recall:null,false_negative_rate:null,verified_customer_roi:null,
+    authority_granted:false,
+  });
+}
+
+// An apparent recovery is not proof the customer goal or an external action
+// has been satisfied; it is merely a model *restatement* of original intent.
+export function inspectTrajectoryRecovery({replay,modelAnswer=''}={}){
+  if(!replay||!Array.isArray(replay.findings)||typeof modelAnswer!=='string')
+    throw Error('TRAJECTORY_RECOVERY_INPUT_INVALID');
+  const answers=modelAnswer.split(/(?<=[.?!])\s+|\n+/).map(x=>x.trim());
+  return Object.freeze({
+    status:replay.findings.length?'RECONCILIATION_ASSESSED':'NO_REPLAY_ISSUES',
+    assessments:replay.findings.map(issue=>{
+      const anchor={action_tokens:terms(issue.proposed_action),
+        condition_tokens:terms(issue.expected_condition)};
+      const actionStatements=answers.filter(x=>matchesAction(x,anchor));
+      const restated=actionStatements.some(x=>
+        !nonAssertive(x)&&retainsCondition(x,anchor));
+      const continued=actionStatements.some(x=>
+        !nonAssertive(x)&&!negativeAction(x,anchor)&&!retainsCondition(x,anchor)&&
+        /\b(?:i(?:'ll| will)|we(?:'ll| will| can)|let's|go ahead|proceed|now|next step)\b/i.test(x));
+      return Object.freeze({
+        issue_id:issue.issue_id,apparent_origin_turn:issue.apparent_origin_turn,
+        assessment:restated?'MODEL_RESTATED_USER_CONDITION_UNVERIFIED':
+          continued?'DRIFT_RISK_CONTINUES':'RECOVERY_NOT_DEMONSTRATED',
+        independently_verified:false,
+      });
+    }),
+    canonical_continuity_state_changed:false,
+    independent_outcome_verification:'NOT_PERFORMED',
+  });
 }
