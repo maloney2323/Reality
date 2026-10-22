@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {
  canonicalJCS,canonicalSha256,SCHEMA_SHA256,IMPLEMENTATION_SHA256,
  createInterpretationReceipt,verifyInterpretationReceipt,compareInterpretations,
@@ -37,8 +38,8 @@ test('source, exact UTF-16/UTF-8 spans, conservatively proposed relationships, a
   const text=message.slice(p.start_utf16,p.end_utf16);
   assert.equal(p.start_utf8,Buffer.byteLength(message.slice(0,p.start_utf16),'utf8'));
   assert.equal(p.end_utf8,Buffer.byteLength(message.slice(0,p.end_utf16),'utf8'));
-  assert.equal(signal.raw_sha256,canonicalSha256(text).replace(/^sha256:/,'sha256:')===signal.raw_sha256
-    ? signal.raw_sha256:signal.raw_sha256); // digest validated by verifier below
+  const rawDigest='sha256:'+createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
+  assert.equal(signal.raw_sha256,rawDigest);
   assert.equal(signal.epistemic_status,'OBSERVED_UNVERIFIED');
   assert.equal(signal.authority_granted,false);
   assert.equal(signal.data_only,true);
@@ -57,6 +58,20 @@ test('unicode byte positions, code fences, and preserved raw source',()=>{
  assert.equal(verifyInterpretationReceipt({receipt:r,message:original}).semantic_truth_established,false);
  assert.ok(r.signals.every(x=>!x.authority_granted));
  assert.ok(r.signals.some(x=>x.span.end_utf8!==x.span.end_utf16));
+});
+test('multiple signals inside one sentence split without changing source text',()=>{
+ const message="The estimate is $14,500 but don't approve it. What if we wait?";
+ const r=run(message);
+ assert.deepEqual(r.signals.map(x=>x.signal_type),
+  ['REPORTED_CLAIM','PROHIBITION','HYPOTHETICAL']);
+ assert.ok(r.signals[1].span.start_utf16>r.signals[0].span.start_utf16);
+ assert.ok(message.slice(r.signals[1].span.start_utf16,r.signals[1].span.end_utf16).startsWith("but don't"));
+ assert.equal(r.signals[1].polarity,'NEGATED');
+ assert.ok(r.signals.some(x=>x.ambiguities.includes('REFERENCE_TARGET_UNRESOLVED')));
+ assert.equal(verifyInterpretationReceipt({receipt:r,message}).status,'INTEGRITY_VERIFIED');
+});
+test('ill-formed Unicode is rejected before hashing, no replacement-byte equivalence',()=>{
+ assert.throws(()=>run('Unpaired surrogate: '+String.fromCharCode(0xD800)),/JCS_INVALID_UNICODE/);
 });
 test('rejects self-attested privilege, tampered interpretation, forged graph lineage',()=>{
  const m='The invoice is unpaid. Do not send it.';
