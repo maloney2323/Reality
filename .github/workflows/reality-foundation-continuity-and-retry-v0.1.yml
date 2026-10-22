@@ -30,6 +30,7 @@ on:
       - ".github/workflows/reality-foundation-continuity-and-retry-v0.1.yml"
       - "test/reality-verified-layer-handoff-v0.1.test.js"
       - "test/reality-six-layer-integration-v0.1.test.js"
+      - "test/reality-persistence-integrity-v0.1.test.js"
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,6 +56,8 @@ jobs:
         run: node --test test/reality-universe-source-inventory-v0.1.test.js
       - name: Verify lossless source text reaches intelligence despite cleaner transformations
         run: node --test test/reality-signal-source-to-model-v0.1.test.js
+      - name: Prove immutable concurrent writes and readback receipts
+        run: node --test test/reality-persistence-integrity-v0.1.test.js
       - name: Enforce six-layer end-to-end contracts and negative controls
         run: node --test test/reality-six-layer-integration-v0.1.test.js
       - name: Preserve pre-existing capability gap runtime contract
