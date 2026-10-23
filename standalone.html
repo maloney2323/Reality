@@ -61,7 +61,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
 <div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button type="button" class="secondary" id="inspectRecovery">Inspect recovery evidence (read-only)</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
-<div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
+<div id="unresolvedPicker" class="notice" role="status"></div><div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
 </section>
 </div>
 <aside>
@@ -87,14 +87,23 @@ const priorConversationId=localStorage.getItem('reality-standalone-conversation-
 const state={config:null,accessToken:null,
  conversationId:priorConversationId||crypto.randomUUID(),
  pendingTurn:pending?.turnId&&pending?.conversationId?pending:null,
- pendingRetryApproved:false,discoveryReady:false};
+ pendingRetryApproved:false,discoveryReady:false,
+ serverUnresolved:[],reviewSelection:null};
 if(!priorConversationId)localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
 const savePending=()=>{if(state.pendingTurn)localStorage.setItem(pendingKey,JSON.stringify(state.pendingTurn));
  else localStorage.removeItem(pendingKey);
  sessionStorage.removeItem(pendingKey)};
 const status=(id,text,error=false)=>{$(id).textContent=text;$(id).className='notice'+(error?' error':'')};
-const newConversation=()=>{if(state.pendingTurn&&!window.confirm('An earlier turn is unresolved. Start a different conversation without resolving it?'))return;
- state.conversationId=crypto.randomUUID();localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);$('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity()};
+const newConversation=()=>{
+ if((state.pendingTurn||state.serverUnresolved.length)&&
+    !window.confirm('An earlier turn is unresolved. Its server evidence stays preserved. Start a new conversation?'))return;
+ state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+ state.serverUnresolved=[];state.reviewSelection=null;
+ $('unresolvedPicker').replaceChildren();$('recoveryEvidence').replaceChildren();
+ state.conversationId=crypto.randomUUID();
+ localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+ $('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity();
+};
 const resetIntegrity=()=>{for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';$('evidence').textContent='No independently verified outcome yet.'};
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
 async function config(){
@@ -207,9 +216,37 @@ async function refreshHistory(){
  }
  $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
  const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
+ if(unresolved.some(x=>typeof x?.turn_id!=='string'||!/^[A-Za-z0-9:_-]{1,96}$/.test(x.turn_id))||
+    new Set(unresolved.map(x=>x.turn_id)).size!==unresolved.length)
+  throw Error('SERVER_UNRESOLVED_TURN_INDEX_INVALID');
+ // Only owner-authenticated server history may select an interrupted turn for review.
+ // Browser pending markers remain independent and are NOT required for read-only review.
+ state.serverUnresolved=unresolved.map(x=>Object.freeze({
+  conversationId:selected,turnId:x.turn_id,status:x.status,
+ }));
+ if(!state.reviewSelection||state.reviewSelection.conversationId!==selected||
+   !state.serverUnresolved.some(x=>x.turnId===state.reviewSelection.turnId))
+  state.reviewSelection=state.serverUnresolved.length===1?state.serverUnresolved[0]:null;
+ const picker=$('unresolvedPicker');picker.replaceChildren();
+ if(state.serverUnresolved.length>1){
+  const hint=document.createElement('p');
+  hint.textContent='Choose an interrupted turn for read-only inspection.';
+  picker.append(hint);
+  state.serverUnresolved.forEach((target,i)=>{
+   const b=document.createElement('button');b.type='button';b.className='secondary';
+   b.style.margin='4px';b.textContent='Select interrupted turn '+(i+1);
+   b.addEventListener('click',()=>{
+    state.reviewSelection=target;
+    status('chatNotice','Selected server-verified interrupted turn '+(i+1)+
+     '. Choose Inspect recovery evidence (read-only).',true);
+   });
+   picker.append(b);
+  });
+ }
  status('chatNotice',unresolved.length?
-  'Restored committed messages. '+unresolved.length+' interrupted or uncommitted turn(s) still require reconciliation; no model reply has been published for them.':
-  'Restored '+data.messages.length+' committed-history messages from the ledger. Earlier history may exist beyond this bounded view.',
+  'Restored '+data.messages.length+' saved message(s); '+unresolved.length+
+  ' interrupted or uncommitted turn(s) require review. No unverified model reply has been published.':
+  'Restored '+data.messages.length+' verified-history message(s). Earlier history may exist beyond this bounded view.',
   unresolved.length>0);
 }
 // The confirmation link returns a one-time Supabase access token through
@@ -319,9 +356,10 @@ $('checkTurn').addEventListener('click',async()=>{
  catch(e){status('chatNotice',e.message||'Status unavailable',true)}
 });
 $('inspectRecovery').addEventListener('click',async()=>{
- const pending=state.pendingTurn;
+ const pending=state.reviewSelection||
+  (state.pendingTurn?.conversationId===state.conversationId?state.pendingTurn:null);
  if(!state.accessToken||!pending){
-  status('chatNotice','Sign in and select the interrupted turn to inspect.',true);return;
+  status('chatNotice','Sign in and choose an interrupted turn in the recovered conversation.',true);return;
  }
  $('inspectRecovery').disabled=true;
  try{
@@ -383,6 +421,9 @@ $('send').addEventListener('click',async()=>{
  if(!message)return;
  if(!state.accessToken){status('chatNotice','Sign in first.',true);return}
  if(!state.discoveryReady){status('chatNotice','Account recovery must succeed before sending.',true);return}
+ if(state.serverUnresolved.length){
+  status('chatNotice','This conversation has a server-verified unresolved turn. Inspect its evidence instead of sending.',true);return;
+ }
  if(state.pendingTurn&&(!state.pendingRetryApproved||
     state.pendingTurn.conversationId!==state.conversationId)){
   status('chatNotice','An earlier turn has not been verified. Check interrupted turn before sending anything else.',true);
