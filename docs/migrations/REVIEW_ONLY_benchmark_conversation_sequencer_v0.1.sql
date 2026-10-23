@@ -104,6 +104,121 @@ BEGIN
 END;
 $finish$;
 
+
+-- Recovery only for an already-verified COMMITTED turn whose fence is still
+-- active because the original finalization response was lost or process died.
+-- No timer or blanket release; remains blocked for all incomplete turns.
+CREATE OR REPLACE FUNCTION public.reality_reconcile_committed_conversation_turn(
+ p_root_id text,p_owner_user_id uuid,p_turn_id text,
+ p_commit_entry_id text,p_commit_hash text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $recover$
+DECLARE r public.reality_conversation_turn_fences%ROWTYPE;
+DECLARE e public.reality_universe_entries%ROWTYPE;
+DECLARE predecessor public.reality_universe_entries%ROWTYPE;
+BEGIN
+ IF current_user <> 'service_role' THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_CALLER_DENIED';
+ END IF;
+ IF p_root_id IS NULL OR p_owner_user_id IS NULL OR
+    p_turn_id IS NULL OR p_commit_entry_id IS NULL OR
+    p_commit_hash IS NULL OR
+    p_turn_id !~ '^[A-Za-z0-9:_-]{1,96}
+REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) TO service_role;
+REVOKE ALL ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) TO service_role;
+COMMIT;
+
+-- Fail-closed known limitation: if a process dies after durable COMMITTED but
+-- before finish RPC, active_turn_id can be released ONLY by the verified
+-- COMMITTED evidence reconciliation RPC. Uncommitted work remains blocked.
+-- TEST BEFORE RELEASE: simultaneous distinct IDs, same ID, crash, lost finish
+-- response, wrong principal, missing commit, corrupted hash, non-service caller.
+ OR
+    p_commit_hash !~ '^[0-9a-f]{64}
+REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) TO service_role;
+COMMIT;
+
+-- Fail-closed known limitation: if a process dies after durable COMMITTED but
+-- before finish RPC, active_turn_id remains locked until a separately verified
+-- repair protocol exists. Never clear it on a timer.
+-- TEST BEFORE RELEASE: simultaneous distinct IDs, same ID, crash, lost finish
+-- response, wrong principal, missing commit, corrupted hash, non-service caller.
+ THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_INPUT_INVALID';
+ END IF;
+ SELECT * INTO STRICT r FROM public.reality_conversation_turn_fences
+  WHERE root_id=p_root_id FOR UPDATE;
+ IF r.owner_user_id IS DISTINCT FROM p_owner_user_id OR
+    r.worldline_id IS DISTINCT FROM 'reality:primary' THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_OWNER_OR_WORLDLINE_MISMATCH';
+ END IF;
+ -- The only legal no-op retry is the same most-recent fully committed turn.
+ -- Never unlock another active turn or reapply an older commit.
+ IF r.active_turn_id IS NULL THEN
+  IF r.last_committed_turn_id IS DISTINCT FROM p_turn_id OR
+     r.last_committed_entry_id IS DISTINCT FROM p_commit_entry_id OR
+     r.last_committed_entry_hash IS DISTINCT FROM p_commit_hash THEN
+    RAISE EXCEPTION 'REALITY_RECONCILIATION_NOT_CURRENT_COMMIT';
+  END IF;
+  RETURN jsonb_build_object('status','ALREADY_FINISHED',
+    'sequence_num',r.sequence_num,
+    'commit_entry_id',p_commit_entry_id,'commit_hash',p_commit_hash);
+ END IF;
+ IF r.active_turn_id IS DISTINCT FROM p_turn_id OR
+    r.active_claim_token IS NULL THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_DIFFERENT_ACTIVE_TURN';
+ END IF;
+ SELECT * INTO STRICT e FROM public.reality_universe_entries
+  WHERE entry_id=p_commit_entry_id;
+ IF e.continuity_root_id IS DISTINCT FROM p_root_id OR
+    e.worldline_id IS DISTINCT FROM r.worldline_id OR
+    e.event_kind IS DISTINCT FROM 'REALITY_CAUSAL_TURN_RECEIPT' OR
+    e.ledger_entry_hash IS DISTINCT FROM p_commit_hash OR
+    e.payload->>'phase' IS DISTINCT FROM 'COMMITTED' OR
+    e.payload->>'turn_id' IS DISTINCT FROM p_turn_id OR
+    e.payload->>'authenticated_user_id' IS DISTINCT FROM p_owner_user_id::text OR
+    (e.payload->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num OR
+    e.payload->>'prior_commit_entry_id' IS DISTINCT FROM r.last_committed_entry_id OR
+    e.payload->>'prior_commit_hash' IS DISTINCT FROM r.last_committed_entry_hash OR
+    e.payload->>'user_message_entry_id' IS NULL OR
+    e.payload->>'assistant_message_entry_id' IS NULL OR
+    e.payload->>'cognition_ledger_event_id' IS NULL THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_COMMIT_EVIDENCE_INVALID';
+ END IF;
+ -- Guard predecessor existence and exact hash/sequence in the database too.
+ IF r.sequence_num>1 THEN
+  SELECT * INTO STRICT predecessor FROM public.reality_universe_entries
+   WHERE entry_id=r.last_committed_entry_id;
+  IF predecessor.ledger_entry_hash IS DISTINCT FROM r.last_committed_entry_hash OR
+     predecessor.continuity_root_id IS DISTINCT FROM p_root_id OR
+     predecessor.event_kind IS DISTINCT FROM 'REALITY_CAUSAL_TURN_RECEIPT' OR
+     predecessor.payload->>'phase' IS DISTINCT FROM 'COMMITTED' OR
+     (predecessor.payload->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num-1 THEN
+   RAISE EXCEPTION 'REALITY_RECONCILIATION_PREDECESSOR_INVALID';
+  END IF;
+ ELSIF r.last_committed_entry_id IS NOT NULL OR
+       r.last_committed_entry_hash IS NOT NULL THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_GENESIS_INVALID';
+ END IF;
+ UPDATE public.reality_conversation_turn_fences SET
+  active_turn_id=NULL,active_claim_token=NULL,
+  last_committed_turn_id=p_turn_id,
+  last_committed_entry_id=p_commit_entry_id,
+  last_committed_entry_hash=p_commit_hash,
+  changed_at=clock_timestamp()
+  WHERE root_id=p_root_id;
+ RETURN jsonb_build_object('status','RECOVERED',
+  'sequence_num',r.sequence_num,
+  'commit_entry_id',p_commit_entry_id,'commit_hash',p_commit_hash);
+END;
+$recover$;
+
 -- Postgres functions grant PUBLIC EXECUTE by default. Restrict explicitly.
 REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
