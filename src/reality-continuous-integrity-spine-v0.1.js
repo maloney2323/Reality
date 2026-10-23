@@ -224,11 +224,17 @@ function terms(s){
  return (String(s||'').toLowerCase().replace(/\u2019/g,"'").match(/[a-z0-9]+/g)||[])
   .map(stem).filter(w=>w.length>1&&!stop.has(w));
 }
-function anchorsFromUser(message,ref,turnIndex){
+// A short setting clause is not permission to drop the following rule.
+// E.g. "For the construction job, do not send the estimate until approval."
+// Restrict contextual extraction to an anchored bounded preface; never scan
+// arbitrary quotations or hypothetical examples for action authority.
+export function extractUserIntentAnchors(message,ref,turnIndex){
  const anchors=[];
  for(const clause of String(message||'').split(/(?<=[.?!])\s+|\n+/)){
-  const t=clause.trim();
-  if(!t||/^[>"']/.test(t))continue;
+  const raw=clause.trim();
+  if(!raw||/^[>"']/.test(raw))continue;
+  const t=raw.replace(/^(?:for|regarding|on|about|in)\s+(?:[^,]{3,120}),\s*/i,'')
+    .replace(/^(?:remember|note)\s*(?:that)?\s*:\s*/i,'');
   const forms=[
    /^(?:please\s+)?(?:do\s+not|don't|never|must\s+not|should\s+not)\s+(.+?)\s+(?:until|before|unless)\s+([^.;!?]+)/i,
    /^(?:please\s+)?(?:only\s+|you\s+may\s+only\s+|we\s+can\s+only\s+)(.+?)\s+(?:after|if|when|once)\s+([^.;!?]+)/i,
@@ -241,7 +247,7 @@ function anchorsFromUser(message,ref,turnIndex){
   if(a.length<2||!c.length)continue;
   anchors.push({
    anchor_id:'conversation:'+sha([ref,turnIndex,action,condition]).slice(7,39),
-   source_ref:ref,turn_index:turnIndex,original_user_text:t.slice(0,600),
+   source_ref:ref,turn_index:turnIndex,original_user_text:raw.slice(0,600),
    action_text:action,condition_text:condition,
    action_tokens:a,condition_tokens:c,
    authority:'USER_STATED_INTENT_NOT_EXTERNAL_FACT',
@@ -295,10 +301,10 @@ export function inspectConversationDrift({
   if(!['user','assistant'].includes(turn?.role)||typeof turn?.text!=='string'||
      !nonempty(turn?.source_ref))throw Error('CONVERSATION_HISTORY_PROVENANCE_INVALID');
   if(turn.role!=='user')continue;
-  for(const anchor of anchorsFromUser(turn.text,turn.source_ref,i))
+  for(const anchor of extractUserIntentAnchors(turn.text,turn.source_ref,i))
    if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
  }
- for(const anchor of anchorsFromUser(currentUserMessage,currentUserSourceRef,eligible.length))
+ for(const anchor of extractUserIntentAnchors(currentUserMessage,currentUserSourceRef,eligible.length))
   if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
  const findings=[],revisions=[];
  for(const anchor of anchors){

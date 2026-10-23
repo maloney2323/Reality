@@ -235,7 +235,7 @@ export async function runLiveIntelligenceOrchestration({
         fetchImpl,
       })
     : null;
-  const historyAuthenticated=systemContext?.context_source==='BASE44_AUTHENTICATED_PERSONAL_REALITY' &&
+  const historyAuthenticated=['BASE44_AUTHENTICATED_PERSONAL_REALITY','REALITY_STANDALONE_AUTHENTICATED'].includes(systemContext?.context_source) &&
     Boolean(systemContext?.authenticated_user_id) && systemContext?.ephemeral_no_history!==true;
   const priorConversationTurns=historyAuthenticated?systemContext.authenticated_conversation_turns||[]:[];
   const priorDetectionReceipts=(universeContext.persisted_attested_entries||[])

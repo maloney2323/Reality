@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { createUniverseEntry, validateUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
+import { createUniverseEntry, validateUniverseEntry, hashUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
 
 export const REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION =
   'reality-native-universe-persistence-v1.0';
@@ -23,29 +23,54 @@ function headers() {
     error.code = 'UNIVERSE_PERSISTENCE_UNAVAILABLE';
     throw error;
   }
-  return {
-    apikey: key,
-    Authorization: 'Bearer ' + key,
-    'Content-Type': 'application/json',
-  };
+  // New Supabase sb_secret keys are opaque, not JWTs. Sending these as a
+  // Bearer token triggers Invalid JWT; route them only as an apikey.
+  // Legacy JWT service_role headers retain their original behavior.
+  if (key.startsWith('sb_secret_')) {
+    return {apikey:key,'Content-Type':'application/json'};
+  }
+  return {apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'};
 }
 
-function mapRow(row) {
-  return {
-    entry_id: row.entry_id,
-    continuity_root_id: row.continuity_root_id,
-    worldline_id: row.worldline_id,
-    event_kind: row.event_kind,
-    epistemic_kind: row.epistemic_kind,
-    assertion_time: row.assertion_time,
-    effective_time: row.effective_time,
-    source_ref: row.source_ref,
-    payload: row.payload,
-    evidence_references: row.evidence_references || [],
-    provenance: row.provenance,
-    ledger_entry_hash: row.ledger_entry_hash,
-  };
+// PostgREST adds transport columns (e.g. created_at) and serializes
+// timestamptz values with offsets and trimmed fractions. The immutable
+// Universe hash was calculated over the original JS ISO-millisecond times
+// and only the canonical entry fields. Restore that representation BEFORE
+// validating; NEVER recompute or replace the stored ledger_entry_hash.
+function canonicalTime(value) {
+  if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return value;
+  return new Date(value).toISOString();
 }
+export function restoreCanonicalUniverseRow(row) {
+  if(!row||typeof row!=='object'||Array.isArray(row))
+    throw Error('UNIVERSE_ROW_INVALID');
+  const original={
+    entry_id:row.entry_id,
+    continuity_root_id:row.continuity_root_id,
+    worldline_id:row.worldline_id,
+    event_kind:row.event_kind,
+    epistemic_kind:row.epistemic_kind,
+    assertion_time:row.assertion_time,
+    effective_time:row.effective_time,
+    source_ref:row.source_ref,
+    payload:row.payload,
+    evidence_references:row.evidence_references,
+    provenance:row.provenance,
+    ledger_entry_hash:row.ledger_entry_hash,
+  };
+  // Existing historical entries and test fixtures may have been signed over
+  // another valid timestamp string. First preserve any already-verifiable
+  // representation. Only try canonical ISO if the original is NOT valid.
+  if(hashUniverseEntry(original)===original.ledger_entry_hash)return original;
+  const normalized={...original,
+    assertion_time:canonicalTime(original.assertion_time),
+    effective_time:canonicalTime(original.effective_time)};
+  if(hashUniverseEntry(normalized)===normalized.ledger_entry_hash)return normalized;
+  // The caller's validator must reject a genuinely unverifiable record.
+  // Never invent, recalculate, or replace any signed ledger hash.
+  return original;
+}
+const mapRow=restoreCanonicalUniverseRow;
 
 async function request(path, options = {}, fetchImpl = fetch) {
   let response;
@@ -147,6 +172,7 @@ export async function retrievePersistedUniverse({
   continuityRootId = null,
   worldlineId = null,
   assertionTime = null,
+  eventKind = null,
   limit = 100,
   fetchImpl = fetch,
 } = {}) {
@@ -157,6 +183,13 @@ export async function retrievePersistedUniverse({
   if (continuityRootId) params.set('continuity_root_id', `eq.${continuityRootId}`);
   if (worldlineId) params.set('worldline_id', `eq.${worldlineId}`);
   if (assertionTime) params.set('assertion_time', `lte.${assertionTime}`);
+  // Allow retrieval by event kind so recent diagnostic activity cannot evict
+  // authenticated conversation turns from the available history window.
+  if (eventKind) {
+    if (typeof eventKind !== 'string' || !/^[A-Z][A-Z0-9_]{1,96}$/.test(eventKind))
+      throw Error('UNIVERSE_EVENT_KIND_FILTER_INVALID');
+    params.set('event_kind', `eq.${eventKind}`);
+  }
 
   const response = await request(`/rest/v1/reality_universe_entries?${params}`, {
     method: 'GET',
@@ -252,6 +285,27 @@ export async function persistContinuityEvent(event, { fetchImpl = fetch } = {}) 
 
 // Read-after-write is a separate check from receiving a successful POST.
 // A database-returned row is not evidence that the entry can be rehydrated.
+// Exact identity lookup for causal-turn commit recovery. Unlike a bounded
+// conversation scan this cannot lose an early turn after 100+ messages.
+// A missing entry is NOT the same as a failed storage request.
+export async function retrieveOptionalPersistedUniverseEntry({entryId,fetchImpl=fetch}={}){
+  if(typeof entryId!=='string'||!entryId.trim())
+    throw Error('UNIVERSE_ENTRY_ID_REQUIRED');
+  const response=await request(
+    '/rest/v1/reality_universe_entries?entry_id=eq.'+
+      encodeURIComponent(entryId)+'&select=*',
+    {method:'GET',headers:{Accept:'application/json'}},fetchImpl
+  );
+  const rows=await response.json();
+  if(!Array.isArray(rows)||rows.length>1)
+    throw Error('UNIVERSE_OPTIONAL_ENTRY_READBACK_INVALID');
+  if(rows.length===0)return null;
+  const entry=Object.freeze(mapRow(rows[0]));
+  validateUniverseEntry(entry);
+  if(entry.entry_id!==entryId)throw Error('UNIVERSE_OPTIONAL_ENTRY_ID_MISMATCH');
+  return entry;
+}
+
 export async function retrievePersistedUniverseEntry({ entryId, fetchImpl = fetch } = {}) {
   if(typeof entryId !== 'string' || !entryId.trim())
     throw new Error('UNIVERSE_ENTRY_ID_REQUIRED');

@@ -1,0 +1,153 @@
+name: Reality Standalone Migration Proof
+on:
+  push:
+    branches:
+      - migration/vercel-independent-chat-proof-20261022
+      - feature/persistent-obligation-observation-20261023
+      - feature/construction-conflict-probe-20261023
+      - feature/estimate-egress-boundary-20261023
+      - feature/live-12turn-intelligence-dashboard-20261023
+  pull_request:
+    paths:
+      - src/reality-native-universe-persistence-v1.0.js
+      - src/reality-verified-layer-handoff-v0.1.js
+      - test/reality-verified-layer-handoff-v0.1.test.js
+      - src/reality-turn-recovery-review-v1.0.js
+      - api/reality/standalone-recovery-review.js
+      - test/reality-turn-recovery-review-v1.0.test.js
+      - src/reality-standalone-conversation-recovery-v0.1.js
+      - api/reality/standalone-conversations.js
+      - api/reality/standalone-legacy-preview.js
+      - test/reality-standalone-conversation-recovery-v0.1.test.js
+      - src/reality-standalone-auth-v0.1.js
+      - src/reality-standalone-chat-v0.1.js
+      - src/reality-causal-turn-commit-v0.1.js
+      - src/reality-conversation-sequencer-v0.1.js
+      - src/reality-live-intelligence-orchestration-v0.1.js
+      - src/reality-obligation-observation-v0.1.js
+      - src/reality-standalone-obligations-v0.1.js
+      - test/reality-standalone-obligation-adapter-v0.1.test.js
+      - api/reality/standalone-obligations.js
+      - test/reality-standalone-obligations-http-v0.1.test.js
+      - src/reality-construction-conflict-probe-v0.1.js
+      - api/reality/standalone-conflict-probe.js
+      - test/reality-construction-conflict-probe-v0.1.test.js
+      - src/reality-estimate-egress-guard-v0.1.js
+      - api/reality/standalone-estimate-egress-challenge.js
+      - test/reality-estimate-egress-guard-v0.1.test.js
+      - src/reality-12turn-comparison-v0.1.js
+      - api/reality/standalone-12turn-comparison.js
+      - public/intelligence-12turn.html
+      - test/reality-12turn-comparison-v0.1.test.js
+      - src/reality-continuous-integrity-spine-v0.1.js
+      - test/reality-obligation-observation-v0.1.test.js
+      - docs/reality-obligation-observation-v0.1.md
+      - api/reality/standalone-chat.js
+      - api/reality/standalone-turn-status.js
+      - api/reality/standalone-reconcile.js
+      - api/reality/standalone-sequence-probe.js
+      - api/reality/standalone-history.js
+      - api/reality/standalone-config.js
+      - api/reality/standalone-readiness.js
+      - standalone.html
+      - test/reality-preview-server-recovery-selection-v0.1.test.js
+      - test/reality-preview-persistent-session-v1.test.js
+      - public/reality-preview-session-v1.js
+      - test/reality-standalone-chat-v0.1.test.js
+      - test/reality-causal-turn-commit-v0.1.test.js
+      - test/reality-conversation-sequencer-v0.1.test.js
+      - test/reality-sequence-http-probe-v0.1.test.js
+      - test/reality-standalone-full-causal-pipeline-v0.1.test.js
+      - test/reality-12turn-standalone-construction-v0.1.test.js
+      - .github/workflows/reality-standalone-migration-proof.yml
+permissions:
+  contents: read
+jobs:
+  no-cost-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Static import and syntax gate
+        run: |
+          node --check src/reality-standalone-auth-v0.1.js
+          node --check src/reality-native-universe-persistence-v1.0.js
+          node --check src/reality-verified-layer-handoff-v0.1.js
+          node --check src/reality-turn-recovery-review-v1.0.js
+          node --check api/reality/standalone-recovery-review.js
+          node --check src/reality-standalone-conversation-recovery-v0.1.js
+          node --check api/reality/standalone-conversations.js
+          node --check api/reality/standalone-legacy-preview.js
+          node --check src/reality-standalone-chat-v0.1.js
+          node --check src/reality-causal-turn-commit-v0.1.js
+          node --check src/reality-conversation-sequencer-v0.1.js
+          node --check api/reality/standalone-chat.js
+          node --check api/reality/standalone-turn-status.js
+          node --check api/reality/standalone-reconcile.js
+          node --check api/reality/standalone-sequence-probe.js
+          node --check api/reality/standalone-history.js
+          node --check api/reality/standalone-config.js
+          node --check api/reality/standalone-readiness.js
+      - name: Signal cleaner JSONB receipt integrity and durable handoff
+        run: node --test test/reality-verified-layer-handoff-v0.1.test.js
+      - name: Evidence-linked human approval obligation contract and detector (no paid model)
+        run: |
+          node --check src/reality-obligation-observation-v0.1.js
+          node --test test/reality-obligation-observation-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js
+      - name: Authenticated Preview observation capture and next-turn condition replay (no model calls)
+        run: |
+          node --check src/reality-standalone-obligations-v0.1.js
+          node --check src/reality-standalone-chat-v0.1.js
+          node --test test/reality-standalone-obligation-adapter-v0.1.test.js
+          node --check api/reality/standalone-obligations.js
+          node --test test/reality-standalone-obligations-http-v0.1.test.js
+      - name: Synthetic conflict detector and dry-run execution gate (read-only; no paid provider)
+        run: |
+          node --check src/reality-construction-conflict-probe-v0.1.js
+          node --check api/reality/standalone-conflict-probe.js
+          node --test test/reality-construction-conflict-probe-v0.1.test.js
+      - name: Controlled send-tool boundary bypass challenge (no network send)
+        run: |
+          node --check src/reality-estimate-egress-guard-v0.1.js
+          node --check api/reality/standalone-estimate-egress-challenge.js
+          node --test test/reality-estimate-egress-guard-v0.1.test.js
+      - name: Read-only authenticated 12-turn comparison evidence and no fabricated model baseline
+        run: |
+          node --check src/reality-12turn-comparison-v0.1.js
+          node --check api/reality/standalone-12turn-comparison.js
+          node --test test/reality-12turn-comparison-v0.1.test.js
+      - name: Browser restoration and server-owned interrupted-turn selection
+        run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
+      - name: Persistent login rotation, logout and bounded authenticated pilot UI
+        run: |
+          node --check public/reality-preview-session-v1.js
+          node --test test/reality-preview-persistent-session-v1.test.js
+      - name: Preview-only read-only recovery classifier; no paid model calls
+        run: node --test test/reality-turn-recovery-review-v1.0.test.js
+      - name: Independent Auth and owner-root continuity
+        run: node --test test/reality-standalone-chat-v0.1.test.js
+      - name: Authenticated conversation discovery and legacy recovery (no provider calls)
+        run: node --test test/reality-standalone-conversation-recovery-v0.1.test.js
+      - name: Causal turn commit and crash-recovery safety (no provider calls)
+        run: node --test test/reality-causal-turn-commit-v0.1.test.js
+      - name: Distinct-turn atomic sequencing and crash fence tests (no provider charges)
+        run: node --test test/reality-conversation-sequencer-v0.1.test.js
+      - name: Safe preview-only HTTP RPC connectivity probe tests (no provider calls)
+        run: node --test test/reality-sequence-http-probe-v0.1.test.js
+      - name: Two-turn complete causal pipeline (mocked provider + atomic sequence)
+        run: node --test test/reality-standalone-full-causal-pipeline-v0.1.test.js
+      - name: Twelve-turn synthetic construction full-stack challenge (no provider charges)
+        run: node --test test/reality-12turn-standalone-construction-v0.1.test.js
+      - name: Existing live cognition and Integrity Spine regressions
+        run: |
+          node --test test/reality-live-model-output-integrity-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js test/reality-trajectory-replay-continuity-v0.4.test.js
+      - name: Proven limitations
+        run: |
+          echo "Auth and DB are mocked. No real Supabase customer account was accessed."
+          echo "Real Base44 history not migrated. No live paid model call."
+          echo "Only draft source. Not a customer-facing or production release."

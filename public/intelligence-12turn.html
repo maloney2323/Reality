@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Reality · Intelligence Control Center · 12-Turn Test</title>
+<style>
+:root{background:#090e14;color:#e9f5f6;font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 83% 0%,#12394460,transparent 46%),#090e14;min-height:100vh}
+main{width:min(1180px,95%);margin:auto;padding:30px 0 60px}
+a{color:#81f0ed}a:hover{text-decoration:none}
+.head{display:flex;align-items:center;gap:15px;justify-content:space-between;flex-wrap:wrap}
+.wordmark{font-size:1.1rem;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:#a5ffff}
+.tag{display:inline-block;border:1px solid #227a7a;background:#10353b;border-radius:40px;padding:4px 13px;font-size:.75rem;color:#8ee4e1}
+h1{font-size:clamp(1.8rem,4vw,3rem);line-height:1.1;margin:20px 0 8px}h2{margin:0 0 13px;font-size:1.12rem}h3{margin:0;font-size:1rem}
+p{margin:6px 0 13px}.muted{color:#9eb0bd}.small{font-size:.81rem}.micro{font-size:.73rem;color:#9eb0bd}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0}
+.card{background:#101a24;border:1px solid #23404b;border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 4px 18px #0002}
+.stat{font-weight:750;font-size:2rem;letter-spacing:-.05em}.teal{color:#8df8ee}.amber{color:#ffd28d}.red{color:#ff9ca3}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+button{background:#1ccbc2;color:#001e23;border:0;border-radius:10px;padding:12px 16px;font-weight:750;cursor:pointer;font:inherit;font-weight:730}
+button.secondary{background:#1a333c;color:#d6ffff;border:1px solid #3b7180}
+button:disabled{opacity:.45;cursor:not-allowed}button:hover:not(:disabled){filter:brightness(1.12)}
+.notice{padding:12px 14px;border:1px solid #3a6b75;border-radius:10px;background:#0b232b;white-space:pre-wrap;margin:12px 0;color:#c2e8e7}
+.warning{border-color:#85552f;background:#251d18;color:#ffdaad}
+.progressbar{height:11px;background:#283b46;border-radius:20px;overflow:hidden;margin-top:8px}
+.progressbar>div{background:linear-gradient(90deg,#25d9be,#90ecfa);height:100%;width:0%;transition:width .25s}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.panel{background:#0a141c;border:1px solid #254b53;border-radius:10px;padding:14px;overflow-wrap:anywhere;white-space:pre-wrap}
+.panel b{display:block;color:#8ff7ef;margin-bottom:7px;font-size:.84rem;letter-spacing:.03em}
+.turn{border-top:1px solid #2a4550;padding:15px 2px}.turn:first-child{border-top:0}
+.turnhead{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;color:#c9dcdd;border:1px solid #506273;border-radius:30px;padding:2px 10px;font-size:.73rem}
+.evidence{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.evidence span{font-size:.73rem;border-radius:6px;padding:3px 7px;background:#153039;color:#addbdc}
+.barwrap{display:grid;grid-template-columns:180px 1fr 40px;gap:12px;align-items:center;margin:12px 0}
+.bar{height:13px;background:#233642;border-radius:20px;overflow:hidden}.bar div{height:100%;background:#2cc7bd}
+.bar.orange div{background:#f5ae64}
+footer{border-top:1px solid #203f4b;padding:18px 0;color:#9eb0bd;font-size:.8rem;margin-top:24px}
+@media(max-width:730px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.compare{grid-template-columns:1fr}.barwrap{grid-template-columns:125px 1fr 35px}.card{padding:14px}main{width:93%}}
+</style></head><body>
+<main>
+<div class="head"><div class="wordmark">✦ Reality <span class="micro">/ Intelligence Control Center</span></div><a href="/standalone.html">← Back to Reality chat</a></div>
+<div class="tag">ISOLATED PREVIEW · LIVE 12-TURN TEST</div>
+<h1>Test the intelligence. <span class="teal">See the evidence.</span></h1>
+<p class="muted">Construction business stress test · Signal Cleaner → Universe → Continuity → Cognition → Integrity Spine → verified conversation receipt.</p>
+<div class="notice warning">The underlying model's <b>raw output</b> and Reality's <b>published response</b> are from the same Reality-assisted run. This is NOT a separate model-only A/B baseline. Detector flags are candidates, not independently adjudicated hallucinations. External estimate sending remains disabled.</div>
+<section class="card">
+<h2>Run a new 12-turn stress test</h2>
+<p class="muted">Twelve fixed construction prompts include approval conflicts, topic changes, cabinet uncertainty, fabricated authority, memory recovery, and a forbidden send request. Each step makes a real authenticated Reality chat call, which may make one or more paid provider calls. No external business actions.</p>
+<div class="actions"><button id="start" disabled>Run 12 live turns · provider charges apply</button><button class="secondary" id="load">Reload evidence report</button><button class="secondary" id="stop" disabled>Stop after this turn</button></div>
+<div class="small muted">Only the conversation owner can access these records. Completed turns stay in the isolated Preview's persistent ledger. No automatic retries.</div>
+<div class="notice" id="status">Restoring your authenticated Preview session…</div>
+<div class="progressbar"><div id="progress"></div></div>
+<p class="micro" id="runIdentity"></p>
+</section>
+<section class="card">
+<h2>Measured results · this run</h2>
+<div class="grid">
+ <div><div class="stat teal" id="committed">—</div><div class="muted small">Verified commits / 12</div></div>
+ <div><div class="stat" id="checkpoints">—</div><div class="muted small">4-stage integrity traces</div></div>
+ <div><div class="stat amber" id="flags">—</div><div class="muted small">Detector candidate findings</div></div>
+ <div><div class="stat" id="notices">—</div><div class="muted small">Published replies with notices</div></div>
+</div>
+<div class="barwrap"><div class="small muted">Committed turns</div><div class="bar"><div id="barCommits"></div></div><div id="commitsN">—</div></div>
+<div class="barwrap"><div class="small muted">Turns with flags</div><div class="bar orange"><div id="barFlags"></div></div><div id="flagsN">—</div></div>
+<div class="notice" id="comparisonNote">No authenticated benchmark results loaded yet.</div>
+<div class="grid">
+ <div><div class="muted small">Underlying model drift</div><div class="stat micro amber">Not measured</div></div>
+ <div><div class="muted small">Reality residual drift</div><div class="stat micro amber">Not measured</div></div>
+ <div><div class="muted small">Underlying hallucination</div><div class="stat micro amber">Not measured</div></div>
+ <div><div class="muted small">Detector recall</div><div class="stat micro amber">Not measured</div></div>
+</div>
+</section>
+<section class="card"><h2>Turn-by-turn comparison and detector traces</h2><p class="muted small">Left: raw underlying model response. Right: Reality's displayed response including any integrity warning. Below each, persisted detector findings and lineage checkpoint receipts.</p>
+<div id="turns">Run the benchmark or open a saved run to view evidence.</div></section>
+<section class="card"><h2>What the comparison establishes</h2>
+<p class="small">A verified conversation commit shows storage/readback succeeded. A four-stage trace shows the Integrity Spine recorded checkpoints. A detector finding shows a possible issue; it does not prove the model was wrong. A published notice is a warning, not a verified correction. To calculate real error-reduction percentages we still need an independently run model-only baseline and labeled ground-truth decisions on equivalent cases.</p>
+<div id="receipt" class="micro">Report receipt not yet available.</div>
+</section>
+<footer>Reality independent migration Preview · Base44 production and customer data unchanged · Business action execution disabled</footer>
+</main>
+<script type="module">
+import {createPreviewSession} from '/reality-preview-session-v1.js';
+const $=s=>document.getElementById(s);
+let token=null,running=false,stopAfter=false,script=[],conversationId=null;
+const LAST='reality-12turn-last-conversation-v01',ACTIVE='reality-12turn-active-v01';
+const status=(s,warn=false)=>{$('status').textContent=s;$('status').className='notice'+(warn?' warning':'')};
+const getConfig=async()=>{
+ const r=await fetch('/api/reality/standalone-config',{cache:'no-store'}),d=await r.json();
+ if(!r.ok||!d?.auth_url||!d?.publishable_key)throw Error(d.error||'Preview configuration missing');
+ return d;
+};
+const session=createPreviewSession({getConfig,storage:localStorage,onToken:t=>{token=t;}});
+async function authGet(path){
+ let t=await session.accessToken();
+ let r=await fetch(path,{cache:'no-store',headers:{Authorization:'Bearer '+t}});
+ if(r.status===401){t=await session.refresh();r=await fetch(path,{cache:'no-store',headers:{Authorization:'Bearer '+t}})}
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(d.error||'Authenticated evidence read failed');
+ return d;
+}
+function el(tag,text,cls=''){
+ const n=document.createElement(tag);if(cls)n.className=cls;n.textContent=text;return n;
+}
+const fmt=x=>typeof x==='string'&&x?x:'Not evaluated';
+async function loadReport(selected=conversationId){
+ if(!selected)return status('No saved benchmark. Start a new 12-turn test.',true);
+ const out=await authGet('/api/reality/standalone-12turn-comparison?'+
+  new URLSearchParams({conversation_id:selected,thought_id:'personal'}).toString());
+ if(selected!==conversationId)return;
+ if(!Array.isArray(out.turns)||!Array.isArray(out.script)||out.turn_target!==12||
+   out.independent_adjudication_performed!==false||out.independent_model_only_baseline_available!==false)
+  throw Error('UNVERIFIED_COMPARISON_CONTRACT');
+ script=out.script;
+ $('committed').textContent=out.verified_commits+' / 12';
+ $('checkpoints').textContent=out.checkpointed_turns+' / 12';
+ $('flags').textContent=out.detector_candidate_findings;
+ $('notices').textContent=out.published_replies_with_integrity_notices;
+ $('commitsN').textContent=out.verified_commits;
+ $('flagsN').textContent=out.turns_with_flags;
+ $('barCommits').style.width=Math.min(100,100*out.verified_commits/12)+'%';
+ $('barFlags').style.width=Math.min(100,100*out.turns_with_flags/12)+'%';
+ $('progress').style.width=Math.min(100,100*out.verified_commits/12)+'%';
+ $('runIdentity').textContent='Conversation '+selected.slice(0,8)+' · '+out.turn_count+
+  ' observed turns · '+out.observed_user_conditions+' server-linked user conditions';
+ $('comparisonNote').textContent=out.completed_pre_registered_benchmark?
+  'All 12 specified turns have verified commits. This is a SAME-PATH raw-model vs Reality comparison, not an independent baseline or measured hallucination reduction.':
+  'Incomplete benchmark: '+out.verified_commits+'/12 verified commits. No score or success is inferred for unfinished turns.';
+ $('receipt').textContent='Authenticated reconstruction receipt: '+out.comparison_receipt_hash+
+  ' · Historical window: bounded · Independent error adjudication: not performed';
+ const root=$('turns');root.replaceChildren();
+ if(!out.turns.length)root.textContent='No saved turns for this conversation.';
+ for(const t of out.turns){
+  const wrap=el('div','','turn');
+  const heading=el('div','','turnhead');
+  const title=el('h3','Turn '+t.ordinal+' · '+(t.prompt_name||'Unscripted'));
+  const badge=el('span',t.verified_commit?'COMMITTED':'NOT COMMITTED','pill');
+  heading.append(title,badge);wrap.append(heading);
+  wrap.append(el('p',t.prompt,'small muted'));
+  const sides=el('div','','compare');
+  const baseline=el('div','','panel');
+  baseline.append(el('b','UNDERLYING MODEL · RAW'));
+  baseline.append(el('div',fmt(t.raw_model_output),'small'));
+  const reality=el('div','','panel');
+  reality.append(el('b','REALITY · PUBLISHED'));
+  reality.append(el('div',fmt(t.reality_published_reply),'small'));
+  sides.append(baseline,reality);wrap.append(sides);
+  const evidence=el('div','','evidence');
+  const traces=(t.integrity_spine_checkpoints||[]).map(x=>x.stage);
+  for(const label of [
+   'Signal: '+fmt(t.signal_cleaner),
+   'Universe: '+fmt(t.universe),
+   'Continuity: '+fmt(t.continuity),
+   'Factual: '+fmt(t.factual_integrity_status),
+   'Drift: '+fmt(t.drift_status),
+   'Replay: '+fmt(t.trajectory_status),
+   'Spine: '+traces.length+'/4',
+   'Findings: '+(t.detector_findings||[]).length]){
+   evidence.append(el('span',label));
+  }
+  wrap.append(evidence);
+  const details=el('details');details.append(el('summary','Inspect evidence and detector findings'));
+  details.append(el('p','User receipt: '+fmt(t.user_source_entry_id),'micro'));
+  details.append(el('p','Assistant receipt: '+fmt(t.assistant_source_entry_id),'micro'));
+  details.append(el('p','Continuity receipt: '+fmt(t.diagnostic_entry_id),'micro'));
+  for(const cp of t.integrity_spine_checkpoints||[])
+   details.append(el('p',cp.stage+' · '+fmt(cp.hash)+' · truth verdict '+fmt(cp.independent_truth_verdict),'micro'));
+  for(const f of t.detector_findings||[])
+   details.append(el('p',f.detector+' / '+f.classification+' / '+f.summary,'small amber'));
+  wrap.append(details);root.append(wrap);
+ }
+ return out;
+}
+function setBusy(b){
+ running=b;$('start').disabled=b||!token;
+ $('load').disabled=b;$('stop').disabled=!b;
+}
+$('load').addEventListener('click',async()=>{
+ try{if(!token)throw Error('Sign in from the Reality Preview first.');
+  const latest=localStorage.getItem(LAST);
+  conversationId=conversationId||latest;
+  const out=await loadReport();
+  status('Restored '+out.verified_commits+'/12 verified turns. No model calls made.');
+ }catch(e){status(e.message,true);}
+});
+$('stop').addEventListener('click',()=>{stopAfter=true;status('Stop requested. The currently submitted turn will finish or fail; no further turns will be sent.');});
+$('start').addEventListener('click',async()=>{
+ if(running)return;
+ if(!token)return status('Sign in from the Reality Preview first.',true);
+ if(!window.confirm('Run TWELVE sequential LIVE Reality conversation turns with the model? This may incur API charges (possibly multiple model calls per turn). Each successful turn is durably saved. There are no external business sends. No failed turn will be retried automatically.'))return;
+ const newId=crypto.randomUUID();conversationId=newId;stopAfter=false;
+ localStorage.setItem(LAST,newId);
+ localStorage.setItem(ACTIVE,JSON.stringify({conversationId:newId,completed:0,active:true}));
+ setBusy(true);
+ try{
+  const initial=await loadReport(newId);
+  if(initial.turn_count!==0||script.length!==12)throw Error('BENCHMARK_NEW_CONVERSATION_NOT_EMPTY');
+  for(let i=0;i<12;i++){
+   if(stopAfter)break;
+   const turnId=crypto.randomUUID();
+   localStorage.setItem(ACTIVE,JSON.stringify({conversationId:newId,completed:i,
+     pending_turn_id:turnId,pending_case_id:script[i].id,active:true}));
+   status('Turn '+(i+1)+'/12 · '+script[i].name+' · sending once and verifying commitment…');
+   // POSTs NEVER auto-retry on 401/timeout/uncertainty.
+   const activeToken=await session.accessToken();
+   const response=await fetch('/api/reality/standalone-chat',{
+    method:'POST',cache:'no-store',
+    headers:{Authorization:'Bearer '+activeToken,'Content-Type':'application/json'},
+    body:JSON.stringify({message:script[i].prompt,conversation_id:newId,
+      thought_id:'personal',turn_id:turnId}),
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error('Turn '+(i+1)+' stopped: '+(result.error||'HTTP '+response.status));
+   if(result.receipt?.verified_chain!==true||
+     result.receipt?.turn_commit_status!=='COMMITTED'||
+     (result.receipt?.sequence_num!==undefined&&result.receipt.sequence_status!=='FINISHED'))
+    throw Error('Turn '+(i+1)+' did not return a verified finalized commit. Inspect its status; no retry.');
+   const observed=await loadReport(newId);
+   if(observed.verified_commits<i+1||observed.turns[i]?.prescribed_prompt_matches!==true)
+    throw Error('Turn '+(i+1)+' did not survive independent evidence readback. Stop and investigate.');
+   localStorage.setItem(ACTIVE,JSON.stringify({conversationId:newId,completed:i+1,active:true}));
+  }
+  const report=await loadReport(newId);
+  localStorage.setItem(ACTIVE,JSON.stringify({conversationId:newId,completed:report.verified_commits,active:false}));
+  status(report.completed_pre_registered_benchmark?
+   'COMPLETE · All 12 turns have committed receipts. Review raw model vs Reality, detector findings, and lineage below.':
+   'STOPPED · '+report.verified_commits+'/12 verified turns. Partial evidence remains available.',!report.completed_pre_registered_benchmark);
+ }catch(e){
+  status('STOPPED · '+e.message+' No failed request was retried. Press Reload evidence report to inspect previously committed turns.',true);
+ }finally{setBusy(false);}
+});
+(async()=>{
+ try{
+  if(!await session.restore()){
+   $('start').disabled=true;
+   return status('Not signed in. Open Reality chat, sign in, then return to this page. Existing results require the same authenticated account.',true);
+  }
+  token=await session.accessToken();
+  $('start').disabled=false;
+  const active=JSON.parse(localStorage.getItem(ACTIVE)||'null');
+  conversationId=new URL(location.href).searchParams.get('conversation_id')||
+    active?.conversationId||localStorage.getItem(LAST)||null;
+  if(conversationId){
+   const out=await loadReport(conversationId);
+   status('Restored '+out.verified_commits+'/12 turns from server evidence. Start a NEW test or inspect this report.');
+  }else status('Session restored. Ready for the 12-turn test. New run will use an isolated conversation.');
+ }catch(e){status('Cannot restore the evidence view: '+e.message,true);}
+})();
+</script></body></html>

@@ -7,7 +7,21 @@ import { persistUniverseEntry, retrievePersistedUniverseEntry } from './reality-
 
 export const VERIFIED_LAYER_HANDOFF_VERSION = 'reality-verified-layer-handoff-v0.1';
 
-function same(a,b) { return JSON.stringify(a) === JSON.stringify(b); }
+// PostgreSQL JSONB does not preserve JS object property insertion order.
+// Arrays (fragment chronology) remain ordered. Require the exact same fields
+// and values but compare nested objects in canonical key order; never alter
+// packet IDs, evidence digests, Universe hashes, or persisted source bytes.
+function canonicalEvidence(value) {
+ if(Array.isArray(value)) return value.map(canonicalEvidence);
+ if(value&&typeof value==='object'){
+  return Object.fromEntries(Object.keys(value).sort().map(
+   key=>[key,canonicalEvidence(value[key])]));
+ }
+ return value;
+}
+function same(a,b) {
+ return JSON.stringify(canonicalEvidence(a))===JSON.stringify(canonicalEvidence(b));
+}
 function requiredString(value,code) {
   if(typeof value !== 'string' || !value.trim()) throw new Error(code);
   return value;
