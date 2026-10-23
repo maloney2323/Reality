@@ -1,0 +1,38 @@
+name: Reality Workers Comp 12 LIVE OpenAI + Native Judge
+on:
+  push:
+    branches:
+      - benchmark/workers-comp-native-12-openai-20261023
+    paths:
+      - test/run-workers-comp-native-12-v1.mjs
+      - .github/workflows/reality-workers-comp-12-live-openai.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  workers-comp-openai-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      WC_BENCHMARK_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Static syntax gate
+        run: |
+          node --check test/run-workers-comp-native-12-v1.mjs
+          node --test test/reality-consequential-trust-native-judge-v1.test.js
+      - name: LIVE OpenAI 12 turns with Reality native judge (no external claim tools)
+        run: node test/run-workers-comp-native-12-v1.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workers-comp-12-openai-reality
+          path: benchmark-results/wc12-openai-reality.json
+          if-no-files-found: ignore
+          retention-days: 3
