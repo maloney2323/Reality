@@ -69,6 +69,8 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div class="trait"><span>Conversation ledger</span><strong id="ledger">Not tested</strong></div>
 <div class="trait"><span>Source-fact integrity</span><strong id="fact">Not evaluated</strong></div>
 <div class="trait"><span>Conversation drift</span><strong id="drift">Not evaluated</strong></div>
+<div class="trait"><span>Stored user conditions</span><strong id="obligations">Not loaded</strong></div>
+<div class="trait"><span>Proposal versus conditions</span><strong id="obligationAssessment">Not yet evaluated</strong></div>
 <div class="trait"><span>Retrospective recovery</span><strong id="retro">Not evaluated</strong></div>
 <div class="trait"><span>Model hallucination rate</span><strong>Not independently measured</strong></div></div>
 <div class="panel"><h2>Evidence status</h2><p class="sub" id="evidence">No verified work has been submitted in this preview.</p>
@@ -105,7 +107,12 @@ const newConversation=()=>{
  localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
  $('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity();
 };
-const resetIntegrity=()=>{for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';$('evidence').textContent='No independently verified outcome yet.'};
+const resetIntegrity=()=>{
+ for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';
+ $('obligations').textContent='Not loaded';
+ $('obligationAssessment').textContent='Not evaluated for this view';
+ $('evidence').textContent='No independently verified outcome yet.';
+};
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
 async function config(){
  if(state.config)return state.config;
@@ -228,6 +235,35 @@ async function refreshConversationInventory(){
  }
  state.discoveryReady=true;
 }
+async function refreshSavedObligations(selectedConversationId){
+ // Read-only, independently authenticated owner-root retrieval; never accept
+ // browser-provided user, root, condition hash or operational authority.
+ const q=new URLSearchParams({conversation_id:selectedConversationId,thought_id:'personal'});
+ const result=await authFetch('/api/reality/standalone-obligations?'+q,{
+  method:'GET',cache:'no-store',
+ });
+ const data=await result.json().catch(()=>({}));
+ if(!result.ok)throw Error(data?.error||'User condition retrieval failed.');
+ if(data?.ok!==true||!Array.isArray(data.observed_conditions))
+  throw Error('CONDITION_READBACK_INVALID');
+ if(selectedConversationId!==state.conversationId)return;
+ $('obligations').textContent=data.scoped_observation_count+
+   ' source-linked '+(data.scoped_observation_count===1?'condition':'conditions')+
+   ' (bounded view)';
+ // Deliberately not a drift score or approved/fulfilled obligations total.
+ $('obligationAssessment').textContent='No independent approval or drift rate measured';
+}
+function displayObligationAssessment(receipt){
+ const info=receipt?.observed_obligations;
+ if(!info)return;
+ $('obligations').textContent=info.observed_conditions_scoped+
+  ' observed '+(info.observed_conditions_scoped===1?'condition':'conditions');
+ $('obligationAssessment').textContent=info.proposal_assessment_status===
+  'PROPOSAL_CONFLICT_CANDIDATE'?'Possible precondition conflict — review required':
+  info.proposal_assessment_status==='LIMITED_CHECK_NO_CONFLICT'?
+  'Limited check: no conflict flagged':'No observed condition evaluated';
+}
+
 async function refreshHistory(){
  if(!state.accessToken)throw Error('An authenticated session is required.');
  const selected=state.conversationId;
@@ -262,6 +298,12 @@ async function refreshHistory(){
   render(turn.role==='assistant'?'Reality':'user',turn.text);
  }
  $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
+ try{await refreshSavedObligations(selected)}
+ catch(err){
+  $('obligations').textContent='Readback unavailable';
+  $('obligationAssessment').textContent='Not evaluated';
+  $('evidence').textContent='User-condition readback unavailable: '+err.message;
+ }
  const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
  if(unresolved.some(x=>typeof x?.turn_id!=='string'||!/^[A-Za-z0-9:_-]{1,96}$/.test(x.turn_id))||
     new Set(unresolved.map(x=>x.turn_id)).size!==unresolved.length)
@@ -509,6 +551,7 @@ $('send').addEventListener('click',async()=>{
   await refreshHistory();
   $('prompt').value='';
   if(data.result)readout(data.result);
+  displayObligationAssessment(data.receipt);
   localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
   status('chatNotice','Completed: customer message, model output and cognition are linked by an independently verified commit.');
  }catch(err){
@@ -593,6 +636,7 @@ $('runContinuityProof').addEventListener('click',async()=>{
   // verified commits and an independently reloaded transcript. These are
   // diagnostics, not independent hallucination or zero-drift findings.
   if(second.result)readout(second.result);
+  displayObligationAssessment(second.receipt);
   status('continuityProof','PASS: two app turns committed and both user instructions survived a fresh server read.\n'+
     'Original rule: '+firstMessage+'\n'+
     'Reality reply to recall check: '+(second.response||assistantMessages.at(-1))+'\n'+
