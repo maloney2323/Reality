@@ -269,3 +269,18 @@ test('same-turn concurrent requests may race intake but can never both enter mod
  });
  assert.equal(terminal.status,'COMMITTED');
 });
+
+
+test('orphaned processing receipt must never be mistaken for a safe new turn',async()=>{
+ const x=rig();
+ const entry=makeCausalTurnReceipt({
+  scope:x.scope,turnId:'turn-1',phase:'PROCESSING',
+  observedAt:'2026-10-22T20:00:00.000Z',
+  payload:{user_message_entry_id:'missing-user',user_message_hash:'missing-hash'},
+ });
+ x.entries.set(entry.entry_id,entry);
+ await assert.rejects(()=>inspectCausalTurn({
+  scope:x.scope,turnId:'turn-1',lookup:x.lookup,
+ }),/CAUSAL_TURN_ORPHANED_EVIDENCE/);
+ assert.equal(x.calls.model,0);
+});
