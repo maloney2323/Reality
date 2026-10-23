@@ -14,7 +14,8 @@ const validIssues=new Set([
  'CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW',
  'CONVERSATIONAL_RETROSPECTIVE_DRIFT','POTENTIAL_MATERIAL_DRIFT',
  'CONTESTED_SOURCE_REFERENCE','UNVERIFIED_EXECUTION_CLAIM',
- 'POSSIBLE_MISMATCH','POSSIBLE_HALLUCINATION','UNSUPPORTED_CLAIM'
+ 'POSSIBLE_MISMATCH','POSSIBLE_HALLUCINATION','UNSUPPORTED_CLAIM',
+ 'UNTRUSTED_SOURCE_EVENT_PROMOTION','MODEL_RESPONSE_INCOMPLETE'
 ]);
 function percent(n,d){return d?Number((100*n/d).toFixed(2)):null;}
 function checkSpine(spine,turn){
@@ -53,7 +54,8 @@ function trustedHistory(turn){
   fail('NATIVE_JUDGE_AUTHENTICATED_READBACK_REQUIRED');
 }
 const kinds=['request_alignment','continuity','factual_grounding',
- 'semantic_reasoning','retrospective_replay','business_outcome'];
+ 'semantic_reasoning','retrospective_replay','business_outcome',
+ 'evidence_provenance','response_completeness'];
 function coverage(spine){
  const entries=kinds.map(k=>[k,spine.coverage[k]?.status||'NOT_EVALUATED']);
  const evaluated=entries.filter(([key,state])=>
@@ -62,6 +64,8 @@ function coverage(spine){
    key==='factual_grounding' ? state==='LIMITED_CHECK_NO_FLAG'||state==='REVIEW_REQUIRED':
    key==='semantic_reasoning' ? state==='CANDIDATE_REVIEW_ONLY':
    key==='retrospective_replay' ? !['NOT_EVALUATED','NO_AUTHENTICATED_TRAJECTORY'].includes(state):
+   key==='evidence_provenance' ? state==='BOUNDED_LEXICAL_CHECK':
+   key==='response_completeness' ? !['NOT_EVALUATED'].includes(state):
    state==='INDEPENDENTLY_OBSERVED');
  return {assessments:entries.map(([area,status])=>({area,status})),
   assessed_dimension_count:evaluated.length,unassessed_dimension_count:kinds.length-evaluated.length,
