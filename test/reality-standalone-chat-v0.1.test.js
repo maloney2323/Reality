@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStandaloneConversationScope,verifyStandaloneUser,
- rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation}
+ rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation,inspectStandaloneReadiness,requireStandaloneReady}
  from '../src/reality-standalone-auth-v0.1.js';
 import {processStandaloneChat,reconstructStandaloneHistory,getStandaloneConversationHistory}
  from '../src/reality-standalone-chat-v0.1.js';
@@ -174,7 +174,7 @@ test('migration pilot refuses to mix standalone user auth with a different Unive
   await assert.rejects(()=>processStandaloneChat(request(),{
     env:environment,fetchImpl:async()=>{touched=true;throw Error('AUTH_USED')},
     load:async()=>{touched=true},store:async()=>{touched=true},run:async()=>{touched=true},
-  }),/STANDALONE_(?:PRODUCTION_RELEASE_NOT_AUTHORIZED|PREVIEW_PROJECT_BINDING_REQUIRED|AUTH_UNIVERSE_PROJECT_MISMATCH)/);
+  }),/STANDALONE_PREVIEW_PROJECT_BINDING_INVALID/);
   assert.equal(touched,false,'failed environment isolation must prevent all reads/writes');
  }
 });
@@ -391,4 +391,82 @@ test('two messages from the same turn keep user-before-model order even at ident
  const history=reconstructStandaloneHistory({entries:[a,u],scope});
  assert.deepEqual(history.map(e=>e.role),['user','assistant']);
  assert.deepEqual(history.map(e=>e.text),[u.payload.text,a.payload.text]);
+});
+
+
+test('standalone readiness reports missing explicit secret and model without leaking any values',async()=>{
+ const missing=inspectStandaloneReadiness({
+   ...env,REALITY_STANDALONE_CHAT_ENABLED:'false',
+   REALITY_UNIVERSE_PERSISTENCE_KEY:'',
+   OPENAI_API_KEY:'',
+ });
+ assert.equal(missing.status,'NOT_READY');
+ assert.equal(missing.checks.preview_isolation,true);
+ assert.ok(missing.missing.includes('REALITY_UNIVERSE_PERSISTENCE_KEY'));
+ assert.ok(missing.missing.includes('OPENAI_API_KEY'));
+ assert.ok(missing.missing.includes('REALITY_STANDALONE_CHAT_ENABLED'));
+ assert.equal(JSON.stringify(missing).includes('sb_secret_TEST_ONLY_NOT_REAL'),false);
+ assert.equal(JSON.stringify(missing).includes('sk-TEST_ONLY_NOT_REAL'),false);
+ const ready=inspectStandaloneReadiness(env);
+ assert.equal(ready.status,'CONFIGURED_NOT_LIVE_VERIFIED');
+ assert.equal(ready.live_authentication_verified,false);
+ assert.equal(ready.live_database_write_verified,false);
+ assert.equal(ready.real_model_call_verified,false);
+});
+test('dedicated server persistence key must exist even if a generic shared preview secret exists',async()=>{
+ let touched=false;
+ const guarded={
+   ...env,REALITY_UNIVERSE_PERSISTENCE_KEY:'',
+   SUPABASE_SECRET_KEY:'sb_secret_UNRELATED_PROJECT_SHOULD_NEVER_BE_USED',
+ };
+ assert.throws(()=>requireStandaloneReady(guarded),
+  /STANDALONE_DEDICATED_STORAGE_KEY_REQUIRED/);
+ await assert.rejects(()=>processStandaloneChat(request(),{
+   env:guarded,
+   fetchImpl:async()=>{touched=true;throw Error('MUST_NOT_AUTH')},
+   load:async()=>{touched=true},
+   store:async()=>{touched=true},
+   run:async()=>{touched=true},
+ }),/STANDALONE_DEDICATED_STORAGE_KEY_REQUIRED/);
+ assert.equal(touched,false);
+});
+test('model configuration must exist before a user turn is written into Universe',async()=>{
+ let touched=false;
+ await assert.rejects(()=>processStandaloneChat(request(),{
+   env:{...env,OPENAI_API_KEY:'',REALITY_OPENAI_MODEL:''},
+   fetchImpl:async()=>{touched=true;throw Error('MUST_NOT_AUTH')},
+   load:async()=>{touched=true},
+   store:async()=>{touched=true},
+   run:async()=>{touched=true},
+ }),/STANDALONE_MODEL_CONFIGURATION_REQUIRED/);
+ assert.equal(touched,false);
+});
+test('native Universe adapter sends opaque Supabase sb_secret only as apikey, retaining legacy JWT compatibility',async()=>{
+ const original={
+  key:process.env.REALITY_UNIVERSE_PERSISTENCE_KEY,
+  url:process.env.REALITY_UNIVERSE_PERSISTENCE_URL,
+ };
+ try{
+  process.env.REALITY_UNIVERSE_PERSISTENCE_URL='https://reality-example.supabase.co';
+  for(const k of ['sb_secret_TEST_ONLY_NOT_REAL_abcdefghijklmnop',
+                  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature']){
+   process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=k;
+   await retrievePersistedUniverse({
+    continuityRootId:'root:test',
+    limit:1,
+    fetchImpl:async(_url,req)=>{
+     assert.equal(req.headers.apikey,k);
+     if(k.startsWith('sb_secret_'))
+      assert.equal(Object.hasOwn(req.headers,'Authorization'),false);
+     else assert.equal(req.headers.Authorization,'Bearer '+k);
+     return {ok:true,status:200,json:async()=>[]};
+    },
+   });
+  }
+ }finally{
+  for(const [key,value] of Object.entries({
+   REALITY_UNIVERSE_PERSISTENCE_KEY:original.key,
+   REALITY_UNIVERSE_PERSISTENCE_URL:original.url,
+  })){if(value===undefined)delete process.env[key];else process.env[key]=value}
+ }
 });
