@@ -213,6 +213,12 @@ async function refreshHistory(){
  for(const turn of data.messages){
   if(!['user','assistant'].includes(turn.role)||typeof turn.text!=='string')continue;
   render(turn.role==='assistant'?'Reality':'user',turn.text);
+  if(turn.role==='user'&&turn.turn_resolution==='ABANDONED_AFTER_OWNER_REVIEW'){
+   const marker=document.createElement('div');
+   marker.className='notice';
+   marker.textContent='Turn abandoned after verified owner review. Original instruction preserved; no assistant completion was established.';
+   $('conversation').append(marker);
+  }
  }
  $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
  const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
@@ -243,10 +249,16 @@ async function refreshHistory(){
    picker.append(b);
   });
  }
+ const archived=Array.isArray(data.resolved_turns)?data.resolved_turns:[];
+ if(archived.some(x=>x?.status!=='ABANDONED_AFTER_OWNER_REVIEW'||
+   typeof x?.resolution_receipt_id!=='string'))
+  throw Error('SERVER_ARCHIVED_TURN_EVIDENCE_INVALID');
  status('chatNotice',unresolved.length?
   'Restored '+data.messages.length+' saved message(s); '+unresolved.length+
-  ' interrupted or uncommitted turn(s) require review. No unverified model reply has been published.':
-  'Restored '+data.messages.length+' verified-history message(s). Earlier history may exist beyond this bounded view.',
+  ' interrupted or uncommitted turn(s) require review; '+archived.length+
+  ' prior turn(s) independently resolved. No unverified model reply was published.':
+  'Restored '+data.messages.length+' saved message(s); '+archived.length+
+  ' turn(s) abandoned after verified owner review. Original instructions remain visible. Earlier history may exist beyond this bounded view.',
   unresolved.length>0);
 }
 // The confirmation link returns a one-time Supabase access token through

@@ -10,6 +10,7 @@ import {createUniverseEntry,validateUniverseEntry} from './reality-universe-pers
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {processStandaloneChat,getStandaloneConversationHistory} from './reality-standalone-chat-v0.1.js';
+import {inspectAbandonedTurn} from './reality-abandoned-turn-readback-v1.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,scopedTurnEntryId,
  rejectUnsafeStandalonePayload,requireStandaloneReady,STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
@@ -311,6 +312,7 @@ export async function processCausalTurn(req,{
 }
 export async function getCausalTurnStatus(req,{
  env=process.env,fetchImpl=fetch,lookup=retrieveOptionalPersistedUniverseEntry,
+ inspectAbandonment=inspectAbandonedTurn,inspectFence=inspectConversationSlot,
 }={}){
  requireStandaloneReady(env);
  const principal=await verifyStandaloneUser(req,{fetchImpl,env});
@@ -325,8 +327,28 @@ export async function getCausalTurnStatus(req,{
  const status=await inspectCausalTurn({
   scope,turnId:q.turn_id,lookup,fetchImpl,
  });
+ // Verified archived turns are neither completed model replies nor unresolved
+ // work. Do not report abandonment while its exact sequence is still locked.
+ const archived=!status.committed
+  ?await inspectAbandonment({scope,turnId:q.turn_id,turn:status,lookup,fetchImpl})
+  :null;
+ if(archived?.verified_chain){
+  if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
+   const held=await inspectFence({scope,env,fetchImpl});
+   if(held.status==='BUSY'&&held.active_turn_id===q.turn_id)
+    throw fail('ABANDONED_TURN_FENCE_STILL_BUSY');
+  }
+  return Object.freeze({ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
+   continuity_root_id:scope.continuity_root_id,
+   status:'ABANDONED_AFTER_OWNER_REVIEW',turn_id:q.turn_id,
+   committed:false,abandoned:true,verified_resolution_receipt_id:archived.receipt_id,
+   verified_resolution_receipt_hash:archived.receipt_hash,
+   model_call_outcome:'UNKNOWN',response:null,model_called:false,
+   retry_policy:'DO_NOT_REPLAY_ABANDONED_TURN_ID',
+  });
+ }
  if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
-  const fence=await inspectConversationSlot({scope,env,fetchImpl});
+  const fence=await inspectFence({scope,env,fetchImpl});
   if(fence.status==='BUSY'&&fence.active_turn_id===q.turn_id){
    return Object.freeze({
     ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
@@ -348,6 +370,7 @@ export async function getCausalTurnStatus(req,{
 export async function getCommittedStandaloneHistory(req,{
  env=process.env,fetchImpl=fetch,
  load,lookup=retrieveOptionalPersistedUniverseEntry,
+ inspectAbandonment=inspectAbandonedTurn,inspectFence=inspectConversationSlot,
 }={}){
  const transcript=await getStandaloneConversationHistory(req,{
   env,fetchImpl,...(load?{load}:{})
@@ -363,12 +386,25 @@ export async function getCommittedStandaloneHistory(req,{
  // A COMMITTED entry is insufficient if the DB atomic fence has not been
  // finalized. The customer-visible reply must remain withheld.
  const fence=env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'
-  ?await inspectConversationSlot({scope,env,fetchImpl}):null;
+  ?await inspectFence({scope,env,fetchImpl}):null;
  // Concurrency is bounded to avoid overwhelming Supabase on long threads.
  for(let i=0;i<ids.length;i+=5){
   const slice=ids.slice(i,i+5);
   await Promise.all(slice.map(async turnId=>{
    const status=await inspectCausalTurn({scope,turnId,lookup,fetchImpl});
+   if(!status.committed){
+    const abandonment=await inspectAbandonment({scope,turnId,turn:status,lookup,fetchImpl});
+    if(abandonment?.verified_chain){
+     if(fence?.status==='BUSY'&&fence.active_turn_id===turnId)
+      throw fail('ABANDONED_TURN_FENCE_STILL_BUSY');
+     statuses.set(turnId,Object.freeze({
+      ...status,status:'ABANDONED_AFTER_OWNER_REVIEW',
+      committed:false,archived:true,
+      resolution_receipt_id:abandonment.receipt_id,
+     }));
+     return;
+    }
+   }
    statuses.set(turnId,fence?.status==='BUSY'&&fence.active_turn_id===turnId
     ?Object.freeze({...status,committed:false,status:'SEQUENCE_FENCE_UNRESOLVED'})
     :status);
@@ -376,12 +412,25 @@ export async function getCommittedStandaloneHistory(req,{
  }
  const messages=transcript.messages.filter(m=>
   m.role==='user'||statuses.get(m.turn_id)?.committed===true);
- const unresolved=ids.filter(id=>statuses.get(id)?.committed!==true)
+ const unresolved=ids.filter(id=>statuses.get(id)?.committed!==true&&
+  statuses.get(id)?.archived!==true)
   .map(id=>Object.freeze({turn_id:id,status:statuses.get(id)?.status||'UNVERIFIED'}));
+ const resolved=ids.filter(id=>statuses.get(id)?.archived===true)
+  .map(id=>Object.freeze({
+   turn_id:id,status:'ABANDONED_AFTER_OWNER_REVIEW',
+   resolution_receipt_id:statuses.get(id)?.resolution_receipt_id,
+   model_outcome:'UNKNOWN',
+   assistant_completion_verified:false,
+  }));
  return Object.freeze({
   ...transcript,
-  messages:messages.map(m=>Object.freeze(m)),
+  messages:messages.map(m=>Object.freeze({
+   ...m,
+   ...(statuses.get(m.turn_id)?.archived===true&&m.role==='user'
+    ?{turn_resolution:'ABANDONED_AFTER_OWNER_REVIEW'}:{}),
+  })),
   unresolved_turns:unresolved,
+  resolved_turns:resolved,
   assistant_messages_require_verified_commit:true,
   history_is_complete:false,
  });

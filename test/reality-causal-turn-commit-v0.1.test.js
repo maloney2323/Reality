@@ -284,3 +284,81 @@ test('orphaned processing receipt must never be mistaken for a safe new turn',as
  }),/CAUSAL_TURN_ORPHANED_EVIDENCE/);
  assert.equal(x.calls.model,0);
 });
+
+test('history preserves original user content but archives a hash-verified abandoned interrupted turn',async()=>{
+ const x=rig({failRun:true});
+ await assert.rejects(()=>processCausalTurn(req(),x.opts),/SYNTHETIC_PROVIDER_TIMEOUT/);
+ const historyReq={...req(),query:{conversation_id:'job-1',thought_id:'personal'}};
+ const base=await getCommittedStandaloneHistory(historyReq,{
+  env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+ });
+ assert.equal(base.messages.length,1);
+ assert.match(base.messages[0].text,/homeowner approval/);
+ assert.equal(base.unresolved_turns.length,1);
+ assert.equal(base.resolved_turns.length,0);
+ const tid='turn-1', ids=causalTurnIds(x.scope,tid);
+ const user=x.entries.get(ids.user),processing=x.entries.get(ids.processing),
+  interrupted=x.entries.get(ids.interrupted);
+ const time='2026-10-23T13:00:00.000Z';
+ const receipt=(id,kind,payload,refs=[])=>createUniverseEntry({
+  entry_id:id,continuity_root_id:x.scope.continuity_root_id,
+  worldline_id:x.scope.worldline_id,event_kind:kind,epistemic_kind:'OBSERVATION',
+  assertion_time:time,effective_time:time,source_ref:'synthetic:abandonment',
+  payload,evidence_references:refs,provenance:{source:'synthetic:owner-review'},
+ });
+ const approvalId='reality-abandonment:'+ (await import('node:crypto')).createHash('sha256')
+  .update(JSON.stringify([x.scope.continuity_root_id,tid,'approval'])).digest('hex');
+ const resolutionId='reality-abandonment:'+ (await import('node:crypto')).createHash('sha256')
+  .update(JSON.stringify([x.scope.continuity_root_id,tid,'resolution'])).digest('hex');
+ const approval=receipt(approvalId,'REALITY_TURN_ABANDONMENT_APPROVAL',{
+  owner_user_id:userA,turn_id:tid,approval_intent:'EXPLICIT_OWNER_ABANDON_INCOMPLETE',
+  acknowledges_uncertain_model_execution:true,acknowledges_possible_model_billing:true,
+  user_message_hash:user.ledger_entry_hash,interruption_receipt_hash:interrupted.ledger_entry_hash,
+ });
+ const resolution=receipt(resolutionId,'REALITY_TURN_RESOLUTION_RECEIPT',{
+  owner_user_id:userA,turn_id:tid,resolution_status:'ABANDONED',
+  model_call_outcome:'UNKNOWN',external_action_outcome:'NOT_ESTABLISHED',
+  approval_receipt_id:approval.entry_id,approval_receipt_hash:approval.ledger_entry_hash,
+  user_message_hash:user.ledger_entry_hash,
+  processing_receipt_hash:processing.ledger_entry_hash,
+  interruption_receipt_hash:interrupted.ledger_entry_hash,
+ },[user.entry_id,processing.entry_id,interrupted.entry_id,approval.entry_id]);
+ x.entries.set(approval.entry_id,approval);x.entries.set(resolution.entry_id,resolution);
+ const after=await getCommittedStandaloneHistory(historyReq,{
+  env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+ });
+ assert.equal(after.unresolved_turns.length,0);
+ assert.equal(after.resolved_turns.length,1);
+ assert.equal(after.resolved_turns[0].model_outcome,'UNKNOWN');
+ const afterStatus=await getCausalTurnStatus(req(),{
+  env,fetchImpl:authFetch(),lookup:x.lookup,
+ });
+ assert.equal(afterStatus.status,'ABANDONED_AFTER_OWNER_REVIEW');
+ assert.equal(afterStatus.committed,false);
+ assert.equal(afterStatus.abandoned,true);
+ assert.equal(afterStatus.response,null);
+ assert.equal(afterStatus.model_call_outcome,'UNKNOWN');
+ assert.equal(afterStatus.retry_policy,'DO_NOT_REPLAY_ABANDONED_TURN_ID');
+ assert.equal(after.messages.length,1);
+ assert.equal(after.messages[0].role,'user');
+ assert.equal(after.messages[0].turn_resolution,'ABANDONED_AFTER_OWNER_REVIEW');
+ assert.match(after.messages[0].text,/homeowner approval/);
+ assert.equal(x.calls.model,1,'never repeat interrupted LLM execution in read-only recovery');
+ // A signed resolution receipt cannot override a STILL-active server processing lock.
+ await assert.rejects(getCausalTurnStatus(req(),{
+  env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'true'},
+  fetchImpl:authFetch(),lookup:x.lookup,
+  inspectFence:async()=>({status:'BUSY',active_turn_id:tid,sequence_num:1}),
+ }),/ABANDONED_TURN_FENCE_STILL_BUSY/);
+ await assert.rejects(getCommittedStandaloneHistory(historyReq,{
+  env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'true'},
+  fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+  inspectFence:async()=>({status:'BUSY',active_turn_id:tid,sequence_num:1}),
+ }),/ABANDONED_TURN_FENCE_STILL_BUSY/);
+ // Any tampering must fail integrity validation, not turn an incomplete turn into a completed one.
+ x.entries.set(resolution.entry_id,{...resolution,
+  payload:{...resolution.payload,model_call_outcome:'VERIFIED'}});
+ await assert.rejects(getCommittedStandaloneHistory(historyReq,{
+  env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+ }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
+});
