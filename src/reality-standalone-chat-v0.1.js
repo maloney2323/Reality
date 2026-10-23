@@ -10,7 +10,7 @@ import {verifyStandaloneUser,createStandaloneConversationScope,
 
 export const STANDALONE_CHAT_VERSION='reality-standalone-chat-v0.1';
 const error=(code,status=400)=>{const e=new Error(code);e.status=status;return e};
-function makeTurnEntry({scope,turnId,role,text,observedAt}){
+function makeTurnEntry({scope,turnId,role,text,displayText,observedAt}){
  return createUniverseEntry({
   entry_id:scopedTurnEntryId({root:scope.continuity_root_id,turnId,role}),
   continuity_root_id:scope.continuity_root_id,
@@ -22,6 +22,9 @@ function makeTurnEntry({scope,turnId,role,text,observedAt}){
   source_ref:'reality:authenticated:customer-conversation',
   payload:{
    role,text,
+   // Preserve both the model's raw words for drift analysis and what the
+   // customer actually saw (which may include an integrity notice).
+   ...(role==='assistant'&&typeof displayText==='string'?{display_text:displayText}:{}),
    // A customer utterance is evidence of intent, not external-world truth.
    epistemic_status:role==='user'?'USER_ASSERTED_INTENT':'MODEL_OUTPUT_UNVERIFIED',
    turn_id:turnId,principal_id:scope.authenticated_user_id,
@@ -51,6 +54,7 @@ export function reconstructStandaloneHistory({entries,scope}={}){
    a.entry_id.localeCompare(b.entry_id))
   .slice(-60).map(e=>Object.freeze({
    role:e.payload.role,text:e.payload.text.slice(0,12000),
+   display_text:String(e.payload.display_text||e.payload.text).slice(0,16000),
    source_ref:'reality:universe:'+e.entry_id,
   }));
 }
@@ -117,7 +121,7 @@ export async function processStandaloneChat(req,{
   root:scope.continuity_root_id,turnId:input.turnId,role:'assistant'});
  const assistant=await store(makeTurnEntry({
   scope,turnId:input.turnId,role:'assistant',text:rawAnswer,
-  observedAt:now(),
+  displayText:displayedAnswer,observedAt:now(),
  }),{fetchImpl});
  if(assistant?.status!=='PERSISTED'||
     assistant?.entry?.entry_id!==assistantEntryId)
@@ -138,4 +142,47 @@ export async function processStandaloneChat(req,{
   },
   external_action_executed:false,
  });
+}
+
+
+// Read-only history endpoint. Uses exactly the same verified principal and
+// root selection as the chat POST; raw model text stays in the durable ledger,
+// while the history UI gets the exact displayed answer.
+export async function getStandaloneConversationHistory(req,{
+  fetchImpl=fetch,env=process.env,load=retrievePersistedUniverse,
+}={}){
+  if(env.REALITY_STANDALONE_CHAT_ENABLED!=='true')
+    throw error('STANDALONE_CHAT_DISABLED',503);
+  if(env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+    throw error('STANDALONE_DURABILITY_REQUIRED',503);
+  assertStandalonePreviewIsolation(env);
+  const principal=await verifyStandaloneUser(req,{fetchImpl,env});
+  const q=req?.query||{};
+  if(!q||typeof q!=='object'||Array.isArray(q)||
+     Object.keys(q).some(k=>!['conversation_id','thought_id'].includes(k)))
+    throw error('STANDALONE_HISTORY_SELECTOR_INVALID');
+  const scope=createStandaloneConversationScope({
+    userId:principal.user_id,
+    conversationId:q.conversation_id,
+    thoughtId:q.thought_id===undefined?'personal':q.thought_id,
+  });
+  const historyRows=await load({
+    continuityRootId:scope.continuity_root_id,
+    worldlineId:scope.worldline_id,
+    eventKind:'AUTHENTICATED_CONVERSATION_MESSAGE',
+    limit:80,fetchImpl,
+  });
+  if(historyRows?.status!=='AVAILABLE'||!Array.isArray(historyRows.entries))
+    throw error('STANDALONE_LEDGER_UNAVAILABLE',503);
+  const history=reconstructStandaloneHistory({entries:historyRows.entries,scope});
+  return Object.freeze({
+    ok:true,version:STANDALONE_CHAT_VERSION,
+    continuity_root_id:scope.continuity_root_id,
+    messages:history.map(h=>Object.freeze({
+      role:h.role,text:h.display_text,source_ref:h.source_ref,
+    })),
+    displayed_history_not_full_ledger:true,
+    history_is_complete:false,
+    bounded_message_window:60,
+  });
 }
