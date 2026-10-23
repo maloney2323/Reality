@@ -4,6 +4,8 @@ import {createStandaloneConversationScope,STANDALONE_HISTORY_PROVENANCE} from '.
 import {createUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
 import {TWELVE_TURN_SCRIPT,buildTwelveTurnComparison,getAuthenticatedTwelveTurnComparison}
  from '../src/reality-12turn-comparison-v0.1.js';
+import {assessIntelligenceSpineV1} from '../src/reality-intelligence-spine-v1.0.js';
+import {realityJudgeTurn} from '../src/reality-native-judge-v1.0.js';
 const user='e83340ec-4266-4c95-a6cd-929bc58b445e';
 const scope=createStandaloneConversationScope({userId:user,conversationId:'suite-12'});
 function row(kind,id,time,payload,extra={}){
@@ -133,4 +135,42 @@ test('deterministic report after reload over unchanged ledger',()=>{
  const params={scope,messageEntries:msgs,continuityEntries:diag,commitEntries:commits};
  assert.equal(buildTwelveTurnComparison(params).comparison_receipt_hash,
   buildTwelveTurnComparison(params).comparison_receipt_hash);
+});
+
+test('read-only benchmark projects actual Reality-native judge receipts without inventing accuracy',()=>{
+ const {msgs,diag,commits}=sample(12);
+ const userText=TWELVE_TURN_SCRIPT[0].prompt;
+ const answerText='Understood, I will hold the construction estimate until the homeowner approves the final scope.';
+ const userSource='signal:synthetic-test-turn-one';
+ const assistantSource='model-response:synthetic-test-turn-one';
+ const spine=assessIntelligenceSpineV1({
+  continuityRootId:scope.continuity_root_id,userSourceRef:userSource,
+  modelSourceRef:assistantSource,currentRequest:userText,rawAnswer:answerText,
+  priorConversationSource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+  authenticatedHistoryVerified:true,
+  conversationDrift:{status:'LIMITED_CONVERSATION_CHECK_NO_FLAG',findings:[]},
+  modelIntegrity:{status:'NO_TRUSTED_REFERENCE',findings:[]},
+  trajectoryReplay:{status:'LIMITED_REPLAY_NO_DRIFT_FLAGGED',findings:[]},
+ });
+ const native=realityJudgeTurn({
+  turn_id:'benchmark-0',continuity_root_id:scope.continuity_root_id,
+  user_source_ref:userSource,answer_source_ref:assistantSource,
+  request:userText,answer:answerText,owner_scoped_readback_verified:true,
+  user_message_receipt_hash:'sha256:verified-user-in-test',
+  assistant_message_receipt_hash:'sha256:verified-assistant-in-test',
+  spine,
+ });
+ const first=commits[0];
+ const signed=row('REALITY_CAUSAL_TURN_RECEIPT',first.entry_id,
+  first.assertion_time,{...first.payload,native_judge_receipt:native});
+ const out=buildTwelveTurnComparison({scope,messageEntries:msgs,
+  continuityEntries:diag,commitEntries:[signed,...commits.slice(1)]});
+ assert.equal(out.reality_native_judged_turns,1);
+ assert.equal(out.reality_native_clear_turns,1);
+ assert.equal(out.reality_native_self_score_pct,100);
+ assert.equal(out.turns[0].reality_native_judge_status,
+   'NO_CANDIDATES_IN_CHECKED_COVERAGE');
+ assert.equal(out.turns[0].reality_native_judge_receipt,native.judge_receipt_hash);
+ assert.equal(out.hallucination_rate_reality,null);
+ assert.equal(out.drift_rate_reality,null);
 });
