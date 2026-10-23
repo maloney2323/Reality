@@ -357,6 +357,12 @@ export async function runLiveIntelligenceOrchestration({
           ?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
         authenticatedHistoryVerified:historyAuthenticated,
         conversationDrift,modelIntegrity,trajectoryReplay,
+        providerCompletion:{
+          status:cognitiveResult.provider_status??null,
+          incomplete_reason:cognitiveResult.provider_incomplete_reason??null,
+          output_tokens:cognitiveResult.provider_output_tokens??null,
+          max_output_tokens:cognitiveResult.provider_max_output_tokens??null,
+        },
       }):null;
   const combinedIntegrityFindings=[
     ...modelIntegrity.findings,...conversationDrift.findings,
@@ -394,9 +400,13 @@ export async function runLiveIntelligenceOrchestration({
   const integrityRequiresReview=modelIntegrity.findings.some(x=>
     ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM',
       'CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
-  const anyIntegrityFinding=integrityRequiresReview||conversationReviewNeeded;
+  const boundaryRequiresReview=Boolean(intelligenceSpineV1?.findings?.some(x=>
+    ['UNTRUSTED_SOURCE_EVENT_PROMOTION','MODEL_RESPONSE_INCOMPLETE'].includes(x.classification)));
+  const anyIntegrityFinding=integrityRequiresReview||conversationReviewNeeded||boundaryRequiresReview;
   const note=anyIntegrityFinding
-    ? '\n\nReality integrity notice: A material claim, prior conversational condition, or requested revision needs review. The original user requirement remains recorded; no independent truth verdict or external action is authorized.'
+    ? boundaryRequiresReview
+      ? '\n\nReality integrity notice: A response-completeness or untrusted-source factual claim requires review. No external action is authorized and unsupported event claims are not verified.'
+      : '\n\nReality integrity notice: A material claim, prior conversational condition, or requested revision needs review. The original user requirement remains recorded; no independent truth verdict or external action is authorized.'
     : '';
   const modelResult = {
     ...cognitiveResult,
