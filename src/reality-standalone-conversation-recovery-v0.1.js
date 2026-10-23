@@ -21,7 +21,7 @@ function requireRecoveryStore(env){
 export async function readOwnerConversationRows({userId,rootId=null,env=process.env,fetchImpl=fetch}={}){
  const {url,key}=requireRecoveryStore(env);
  if(!/^[0-9a-f-]{36}$/i.test(String(userId||'')))throw fail('RECOVERY_USER_INVALID',401);
- if(rootId!==null&&!/^[a-f0-9]{64}$/.test(String(rootId)))
+ if(rootId!==null&&!/^continuity:[a-f0-9]{32}$/.test(String(rootId)))
   throw fail('RECOVERY_ROOT_SELECTOR_INVALID',400);
  const q=new URLSearchParams({
   select:'*',event_kind:'eq.AUTHENTICATED_CONVERSATION_MESSAGE',
@@ -52,7 +52,7 @@ export function summarizeOwnerConversations(rows,userId){
      row.payload?.principal_id!==userId||
      row.payload?.role!=='user')continue;
   const root=row.continuity_root_id;
-  if(!/^[a-f0-9]{64}$/.test(root))throw fail('RECOVERY_ROOT_INVALID');
+  if(!/^continuity:[a-f0-9]{32}$/.test(root))throw fail('RECOVERY_ROOT_INVALID');
   let conversationId=null;
   const id=row.payload?.client_conversation_selector;
   const thought=row.payload?.thought_id||'personal';
