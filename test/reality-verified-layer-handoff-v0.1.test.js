@@ -68,6 +68,39 @@ test('signal cleaner reconstructs exact raw bytes and all fragment transformatio
   }),/SIGNAL_TRANSFORMATION_RECEIPT_INTEGRITY_FAILED/);
 });
 
+
+function reorderJsonObjectKeys(value){
+ if(Array.isArray(value))return value.map(reorderJsonObjectKeys);
+ if(value&&typeof value==='object'){
+  return Object.fromEntries(Object.keys(value).sort().reverse().map(
+   key=>[key,reorderJsonObjectKeys(value[key])]));
+ }
+ return value;
+}
+test('JSONB key reordering does not corrupt an unchanged raw signal packet',()=>{
+ const reorganized=reorderJsonObjectKeys(signal);
+ assert.notEqual(JSON.stringify(reorganized.packet),JSON.stringify(signal.packet));
+ const verified=verifySignalCleanerRecord(reorganized);
+ assert.equal(verified.status,'VERIFIED');
+ assert.equal(verified.input_digest,signal.transformation_receipt.input_digest);
+ const altered={...reorganized,packet:{...reorganized.packet,raw_content:'Changed message'}};
+ assert.throws(()=>verifySignalCleanerRecord(altered),/SIGNAL_RAW_PACKET_INTEGRITY_FAILED/);
+ const removed={...reorganized,fragments:reorganized.fragments.slice(1)};
+ assert.throws(()=>verifySignalCleanerRecord(removed),/SIGNAL_FRAGMENT_LINEAGE_INTEGRITY_FAILED/);
+});
+test('durable SIGNAL_CLEANER handoff accepts real JSONB object key order but not changed evidence',async()=>{
+ const io=memoryAdapter({modifyReadback:reorderJsonObjectKeys});
+ const receipt=await recordVerifiedLayerHandoff({
+  stage:'SIGNAL_CLEANER',continuityRootId:'root:jsonb-key-order',
+  observedAt:observed,sourceRef:'reality:signal-cleaner',
+  output:{signal,verification:verifySignalCleanerRecord(signal)},
+  fetchImpl:io.fakeFetch,
+ });
+ assert.equal(receipt.status,'STORED_AND_READ_BACK');
+ assert.equal(receipt.entry.ledger_entry_hash,receipt.ledger_entry_hash);
+ assert.equal(receipt.entry.payload.data.signal.packet.raw_content,signal.packet.raw_content);
+});
+
 test('signal ingress writes complete evidence and verifies independent storage readback before handoff',async()=>{
  const io=memoryAdapter();
  const outcome=await recordVerifiedLayerHandoff({
