@@ -2,6 +2,7 @@
 // The Universe is authoritative; browser localStorage is only a convenience.
 // No mutations, model calls, credentials or cross-user scans occur here.
 import {validateUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
+import {restoreCanonicalUniverseRow} from './reality-native-universe-persistence-v1.0.js';
 import {assertStandalonePreviewIsolation,verifyStandaloneUser,
  createStandaloneConversationScope,STANDALONE_HISTORY_PROVENANCE}
  from './reality-standalone-auth-v0.1.js';
@@ -38,7 +39,12 @@ export async function readOwnerConversationRows({userId,rootId=null,env=process.
  if(!response.ok)throw fail('RECOVERY_STORAGE_READ_FAILED');
  const rows=await response.json().catch(()=>null);
  if(!Array.isArray(rows)||rows.length>MAX_ROWS)throw fail('RECOVERY_STORAGE_RESPONSE_INVALID');
- return rows;
+ return rows.map(row=>{
+  const canonical=restoreCanonicalUniverseRow(row);
+  try{validateUniverseEntry(canonical);}
+  catch{throw fail('RECOVERY_LEDGER_ENTRY_INTEGRITY_FAILED');}
+  return canonical;
+ });
 }
 export function summarizeOwnerConversations(rows,userId){
  if(!Array.isArray(rows))throw fail('RECOVERY_ROWS_INVALID');
