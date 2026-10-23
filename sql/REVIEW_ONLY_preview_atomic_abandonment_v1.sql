@@ -53,27 +53,27 @@ set search_path = ''
 as $$
 declare computed text; n int;
 begin
- if pg_catalog.jsonb_typeof(p_entry) <> 'object'
+ if pg_catalog.jsonb_typeof(p_entry) is distinct from 'object'
     or p_entry->>'ledger_entry_hash' !~ '^[a-f0-9]{64}$' then
   return false;
  end if;
  select count(*) into n from pg_catalog.jsonb_object_keys(p_entry);
- if n <> 12 then return false; end if;
+ if n is distinct from 12 then return false; end if;
  if not (p_entry ?& array[
   'entry_id','continuity_root_id','worldline_id','event_kind',
   'epistemic_kind','assertion_time','effective_time','source_ref',
   'payload','evidence_references','provenance','ledger_entry_hash'
  ]) then return false; end if;
- if pg_catalog.jsonb_typeof(p_entry->'payload') <> 'object'
-    or pg_catalog.jsonb_typeof(p_entry->'provenance') <> 'object'
-    or pg_catalog.jsonb_typeof(p_entry->'evidence_references') <> 'array' then
+ if pg_catalog.jsonb_typeof(p_entry->'payload') is distinct from 'object'
+    or pg_catalog.jsonb_typeof(p_entry->'provenance') is distinct from 'object'
+    or pg_catalog.jsonb_typeof(p_entry->'evidence_references') is distinct from 'array' then
   return false;
  end if;
  computed:=pg_catalog.encode(extensions.digest(
     pg_catalog.convert_to(
       public.reality_canonical_json_v1(p_entry - 'ledger_entry_hash'),
       'UTF8'),'sha256'),'hex');
- return computed = p_entry->>'ledger_entry_hash';
+ return coalesce(computed = p_entry->>'ledger_entry_hash',false);
 exception when others then
  return false;
 end;
@@ -153,15 +153,16 @@ declare
  proposed_id text;
  preceding bigint;
 begin
- if current_user <> 'service_role' then
+ if current_user is distinct from 'service_role' then
   raise exception 'REALITY_ABANDONMENT_CALLER_DENIED';
  end if;
  if p_root_id !~ '^continuity:[a-f0-9]{32}$'
-    or p_worldline_id <> 'reality:primary'
+    or p_worldline_id is distinct from 'reality:primary'
     or p_owner_user_id is null
     or p_turn_id !~ '^[A-Za-z0-9:_-]{1,96}$'
     or p_claim_token is null
-    or p_expected_sequence < 1
+    or p_approval_entry is null or p_resolution_entry is null
+    or p_expected_sequence is null or p_expected_sequence < 1
     or not public.reality_verify_resolution_entry_v1(p_approval_entry)
     or not public.reality_verify_resolution_entry_v1(p_resolution_entry) then
   raise exception 'REALITY_ABANDONMENT_INVALID_INPUT_OR_HASH';
@@ -175,30 +176,30 @@ begin
   raise exception 'REALITY_ABANDONMENT_ROOT_OWNER_MISMATCH';
  end if;
 
- if p_approval_entry->>'event_kind' <> 'REALITY_TURN_ABANDONMENT_APPROVAL'
-    or p_resolution_entry->>'event_kind' <> 'REALITY_TURN_RESOLUTION_RECEIPT'
-    or p_approval_entry->>'epistemic_kind' <> 'OBSERVATION'
-    or p_resolution_entry->>'epistemic_kind' <> 'OBSERVATION'
-    or p_approval_entry->>'continuity_root_id' <> p_root_id
-    or p_resolution_entry->>'continuity_root_id' <> p_root_id
-    or p_approval_entry->>'worldline_id' <> p_worldline_id
-    or p_resolution_entry->>'worldline_id' <> p_worldline_id
-    or p_approval_entry->'payload'->>'owner_user_id' <> p_owner_user_id::text
-    or p_resolution_entry->'payload'->>'owner_user_id' <> p_owner_user_id::text
-    or p_approval_entry->'payload'->>'turn_id' <> p_turn_id
-    or p_resolution_entry->'payload'->>'turn_id' <> p_turn_id
-    or p_approval_entry->'payload'->>'approval_intent' <> 'EXPLICIT_OWNER_ABANDON_INCOMPLETE'
-    or p_approval_entry->'payload'->>'acknowledges_uncertain_model_execution' <> 'true'
-    or p_approval_entry->'payload'->>'acknowledges_possible_model_billing' <> 'true'
-    or p_resolution_entry->'payload'->>'resolution_status' <> 'ABANDONED'
-    or p_resolution_entry->'payload'->>'model_call_outcome' <> 'UNKNOWN'
-    or p_resolution_entry->'payload'->>'external_action_outcome' <> 'NOT_ESTABLISHED'
+ if p_approval_entry->>'event_kind' is distinct from 'REALITY_TURN_ABANDONMENT_APPROVAL'
+    or p_resolution_entry->>'event_kind' is distinct from 'REALITY_TURN_RESOLUTION_RECEIPT'
+    or p_approval_entry->>'epistemic_kind' is distinct from 'OBSERVATION'
+    or p_resolution_entry->>'epistemic_kind' is distinct from 'OBSERVATION'
+    or p_approval_entry->>'continuity_root_id' is distinct from p_root_id
+    or p_resolution_entry->>'continuity_root_id' is distinct from p_root_id
+    or p_approval_entry->>'worldline_id' is distinct from p_worldline_id
+    or p_resolution_entry->>'worldline_id' is distinct from p_worldline_id
+    or p_approval_entry->'payload'->>'owner_user_id' is distinct from p_owner_user_id::text
+    or p_resolution_entry->'payload'->>'owner_user_id' is distinct from p_owner_user_id::text
+    or p_approval_entry->'payload'->>'turn_id' is distinct from p_turn_id
+    or p_resolution_entry->'payload'->>'turn_id' is distinct from p_turn_id
+    or p_approval_entry->'payload'->>'approval_intent' is distinct from 'EXPLICIT_OWNER_ABANDON_INCOMPLETE'
+    or p_approval_entry->'payload'->>'acknowledges_uncertain_model_execution' is distinct from 'true'
+    or p_approval_entry->'payload'->>'acknowledges_possible_model_billing' is distinct from 'true'
+    or p_resolution_entry->'payload'->>'resolution_status' is distinct from 'ABANDONED'
+    or p_resolution_entry->'payload'->>'model_call_outcome' is distinct from 'UNKNOWN'
+    or p_resolution_entry->'payload'->>'external_action_outcome' is distinct from 'NOT_ESTABLISHED'
     or p_resolution_entry->'payload'->>'approval_receipt_hash'
-        <> p_approval_entry->>'ledger_entry_hash'
+        is distinct from p_approval_entry->>'ledger_entry_hash'
     or p_resolution_entry->'payload'->>'approval_receipt_id'
-        <> p_approval_entry->>'entry_id'
-    or (p_resolution_entry->'payload'->>'claim_sequence_num')::bigint <> p_expected_sequence
-    or (p_approval_entry->'payload'->>'claim_sequence_num')::bigint <> p_expected_sequence
+        is distinct from p_approval_entry->>'entry_id'
+    or (p_resolution_entry->'payload'->>'claim_sequence_num')::bigint is distinct from p_expected_sequence
+    or (p_approval_entry->'payload'->>'claim_sequence_num')::bigint is distinct from p_expected_sequence
     or p_resolution_entry->'payload'->>'prior_commit_entry_id'
          is distinct from f.last_committed_entry_id
     or p_resolution_entry->'payload'->>'prior_commit_hash'
@@ -213,11 +214,11 @@ begin
   where entry_id=proposed_id and event_kind='REALITY_TURN_RESOLUTION_RECEIPT'
     and continuity_root_id=p_root_id and worldline_id=p_worldline_id;
  if found then
-  if old_resolution.payload->>'turn_id' <> p_turn_id
-     or old_resolution.payload->>'owner_user_id' <> p_owner_user_id::text
-     or old_resolution.payload->>'resolution_status' <> 'ABANDONED'
+  if old_resolution.payload->>'turn_id' is distinct from p_turn_id
+     or old_resolution.payload->>'owner_user_id' is distinct from p_owner_user_id::text
+     or old_resolution.payload->>'resolution_status' is distinct from 'ABANDONED'
      or f.active_turn_id is not null
-     or f.sequence_num <> p_expected_sequence-1 then
+     or f.sequence_num is distinct from p_expected_sequence-1 then
    raise exception 'REALITY_ABANDONMENT_REPLAY_STATE_CONFLICT';
   end if;
   return pg_catalog.jsonb_build_object(
@@ -269,7 +270,15 @@ begin
     and payload->>'phase'='INTERRUPTED' and payload->>'turn_id'=p_turn_id
     and payload->>'authenticated_user_id'=p_owner_user_id::text;
 
- if processing.payload->>'user_message_hash' is distinct from u.ledger_entry_hash
+ if not (p_approval_entry->'evidence_references' @>
+           pg_catalog.jsonb_build_array(u.entry_id,interrupted.entry_id))
+    or not (p_resolution_entry->'evidence_references' @>
+           pg_catalog.jsonb_build_array(u.entry_id,processing.entry_id,
+                interrupted.entry_id,p_approval_entry->>'entry_id'))
+    or pg_catalog.abs(pg_catalog.extract(epoch from
+       (pg_catalog.clock_timestamp() -
+        (p_approval_entry->>'assertion_time')::timestamptz))) > 300
+    or processing.payload->>'user_message_hash' is distinct from u.ledger_entry_hash
     or p_resolution_entry->'payload'->>'user_message_hash' is distinct from u.ledger_entry_hash
     or p_resolution_entry->'payload'->>'processing_receipt_hash' is distinct from processing.ledger_entry_hash
     or p_resolution_entry->'payload'->>'interruption_receipt_hash' is distinct from interrupted.ledger_entry_hash
@@ -287,12 +296,12 @@ begin
 
  -- Restrict allowed receipt provenance. None of these entries grants action
  -- authority; authorization was checked by signed-in server before invoking.
- if p_approval_entry->'provenance'->>'source' <> 'REALITY_STANDALONE_OWNER_AUTHORIZED'
-    or p_resolution_entry->'provenance'->>'source' <> 'REALITY_STANDALONE_VERIFIED_RESOLUTION'
-    or p_approval_entry->'provenance'->>'authenticated_user_id' <> p_owner_user_id::text
-    or p_resolution_entry->'provenance'->>'authenticated_user_id' <> p_owner_user_id::text
-    or p_approval_entry->'payload'->>'user_message_hash' <> u.ledger_entry_hash
-    or p_approval_entry->'payload'->>'interruption_receipt_hash' <> interrupted.ledger_entry_hash
+ if p_approval_entry->'provenance'->>'source' is distinct from 'REALITY_STANDALONE_OWNER_AUTHORIZED'
+    or p_resolution_entry->'provenance'->>'source' is distinct from 'REALITY_STANDALONE_VERIFIED_RESOLUTION'
+    or p_approval_entry->'provenance'->>'authenticated_user_id' is distinct from p_owner_user_id::text
+    or p_resolution_entry->'provenance'->>'authenticated_user_id' is distinct from p_owner_user_id::text
+    or p_approval_entry->'payload'->>'user_message_hash' is distinct from u.ledger_entry_hash
+    or p_approval_entry->'payload'->>'interruption_receipt_hash' is distinct from interrupted.ledger_entry_hash
  then
   raise exception 'REALITY_ABANDONMENT_OWNER_INTENT_EVIDENCE_INVALID';
  end if;
