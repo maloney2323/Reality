@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createUniverseEntry,validateUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
 import {createStandaloneConversationScope} from '../src/reality-standalone-auth-v0.1.js';
 import {processCausalTurn,getCausalTurnStatus,inspectCausalTurn,causalTurnIds,
- makeCausalTurnReceipt} from '../src/reality-causal-turn-commit-v0.1.js';
+ makeCausalTurnReceipt,getCommittedStandaloneHistory} from '../src/reality-causal-turn-commit-v0.1.js';
 import {retrieveOptionalPersistedUniverseEntry} from '../src/reality-native-universe-persistence-v1.0.js';
 
 const userA='e83340ec-4266-4c95-a6cd-929bc58b445e';
@@ -195,4 +195,30 @@ test('optional exact entry lookup distinguishes missing row from unverified stor
   if(url===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_URL=url;
  }
+});
+
+
+test('authenticated history displays only committed model replies; unfinished user instruction remains visible',async()=>{
+ const x=rig({failCommit:true});
+ await assert.rejects(()=>processCausalTurn(req(),x.opts),
+   /SYNTHETIC_COMMIT_STORAGE_OUTAGE/);
+ const history=await getCommittedStandaloneHistory(req(),{
+  env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+ });
+ assert.equal(history.messages.length,1);
+ assert.equal(history.messages[0].role,'user');
+ assert.equal(history.messages[0].text,original);
+ assert.deepEqual(history.unresolved_turns.map(x=>x.status),
+  ['RESPONSE_STORED_UNCOMMITTED']);
+ assert.equal(history.assistant_messages_require_verified_commit,true);
+});
+test('authenticated committed history presents only fully verified two-message turn',async()=>{
+ const x=rig();
+ await processCausalTurn(req(),x.opts);
+ const history=await getCommittedStandaloneHistory(req(),{
+  env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
+ });
+ assert.equal(history.messages.length,2);
+ assert.deepEqual(history.messages.map(x=>x.role),['user','assistant']);
+ assert.equal(history.unresolved_turns.length,0);
 });
