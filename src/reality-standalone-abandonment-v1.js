@@ -26,6 +26,41 @@ function sessionFingerprint(req){
   .update('reality:abandonment:owner-session:v1:')
   .update(match[1]).digest('hex');
 }
+// The exact bearer is first validated with Supabase Auth /auth/v1/user.
+// Only then are its provider-issued JWT claims inspected. The refreshed
+// token's iat is NOT reauthentication: use the authenticated method's own
+// amr timestamp. No password, token or raw claims appear in error responses.
+export function requireRecentProviderAuthentication(req,principal,{
+ env=process.env,now=Date.now,maxAgeSeconds=300
+}={}){
+ const h=req?.headers?.authorization||req?.headers?.Authorization||'';
+ const token=typeof h==='string'?h.match(/^Bearer ([A-Za-z0-9._-]{24,4096})$/)?.[1]:null;
+ if(!token)throw fail('AUTHENTICATED_SESSION_REQUIRED',401);
+ const segments=token.split('.');
+ if(segments.length!==3||!segments.every(x=>x.length>0&&x.length<3500))
+  throw fail('ABANDONMENT_PROVIDER_REAUTH_REQUIRED',403);
+ let c;
+ try{c=JSON.parse(Buffer.from(segments[1],'base64url').toString('utf8'))}
+ catch{throw fail('ABANDONMENT_PROVIDER_REAUTH_REQUIRED',403)}
+ const authOrigin=String(env.SUPABASE_URL||'').replace(/\\/$/,'');
+ const sec=Math.floor(now()/1000);
+ const validSession=typeof c?.session_id==='string'&&
+  /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(c.session_id);
+ const methods=Array.isArray(c?.amr)?c.amr:[];
+ const recentlyAuthenticated=methods.some(m=>
+  ['password','otp','totp'].includes(m?.method)&&
+  Number.isSafeInteger(m?.timestamp)&&m.timestamp<=sec+30&&
+  m.timestamp>=sec-maxAgeSeconds);
+ if(!validSession||c.sub!==principal.user_id||
+  c.iss!==authOrigin+'/auth/v1'||
+  c.aud!=='authenticated'||c.role!=='authenticated'||
+  !['aal1','aal2'].includes(c.aal)||
+  !Number.isSafeInteger(c.exp)||c.exp<=sec||
+  !recentlyAuthenticated)
+  throw fail('ABANDONMENT_PROVIDER_REAUTH_REQUIRED',403);
+ return Object.freeze({provider_authenticated_recently:true,
+  session_id:c.session_id,recent_method_verified:true});
+}
 function claimFingerprint(scope,claim){
  if(!claim||claim.root_id!==scope.continuity_root_id||
   claim.owner_user_id!==scope.authenticated_user_id||
@@ -99,6 +134,7 @@ async function ownerEvidence(req,{env,fetchImpl,verify=verifyStandaloneUser,
  inspect=inspectCausalTurn,inspectFence=inspectConversationSlot}={}){
  const x=verifySelector(req,req.method);
  const principal=await verify(req,{env,fetchImpl});
+ requireRecentProviderAuthentication(req,principal,{env});
  const scope=createStandaloneConversationScope({userId:principal.user_id,
   conversationId:x.conversation_id,thoughtId:'personal'});
  const turn=await inspect({scope,turnId:x.turn_id,fetchImpl});
