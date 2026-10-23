@@ -89,10 +89,15 @@ function filterClaims(extracted,answer,scope,modelRef){
       material_risk:consequent&&action});continue;
   }
   const explicitUncertainty=/\b(?:uncertain|unresolved|unsettled|disputed|conflicting|pending|unknown|unverified|undecided|not\s+(?:yet\s+)?(?:decided|confirmed|verified|known|settled|signed|approved|finalized)|no\s+(?:verified|confirmed|evidence|amount|agreement)|(?:counts?|reports?|figures?)\s+(?:differ|disagree|conflict)|\bopen\s+(?:decisions|questions))\b/i.test(x.source_span);
+  // Source-attributed quantities are reports, not independent physical truth.
+  const explicitAttribution=/\b(?:foreman|crew|supplier|subcontractor|homeowner|portal|inspector)\b.{0,55}\b(?:says|reports?|reported|counted|claims?|lists?|shows?)\b/i.test(x.source_span)||
+   /\b(?:according to|reported by|counted by)\b/i.test(x.source_span);
   // "No count is verified" and "the sink remains unsettled" are positive
   // ADMISSIONS OF IGNORANCE, not claims of known physical truth.
   let normalizedKind=x.claim_kind==='MATERIAL_FACT'&&explicitUncertainty?
-    'UNCERTAINTY_ADMISSION':x.claim_kind;
+    'UNCERTAINTY_ADMISSION':
+    x.claim_kind==='MATERIAL_FACT'&&explicitAttribution?
+    'ATTRIBUTED_REPORT':x.claim_kind;
   const isFact=normalizedKind==='MATERIAL_FACT';
   if(isFact&&(!text(x.entity_ref)||!text(x.state_key)||
    !Object.hasOwn(x,'value')||
