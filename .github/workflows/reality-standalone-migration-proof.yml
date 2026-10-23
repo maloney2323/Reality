@@ -5,6 +5,7 @@ on:
       - migration/vercel-independent-chat-proof-20261022
   pull_request:
     paths:
+      - src/reality-native-universe-persistence-v1.0.js
       - src/reality-standalone-conversation-recovery-v0.1.js
       - api/reality/standalone-conversations.js
       - api/reality/standalone-legacy-preview.js
@@ -44,6 +45,7 @@ jobs:
       - name: Static import and syntax gate
         run: |
           node --check src/reality-standalone-auth-v0.1.js
+          node --check src/reality-native-universe-persistence-v1.0.js
           node --check src/reality-standalone-conversation-recovery-v0.1.js
           node --check api/reality/standalone-conversations.js
           node --check api/reality/standalone-legacy-preview.js
