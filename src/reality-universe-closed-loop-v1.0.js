@@ -9,6 +9,8 @@ import {createUniverseEntry,validateUniverseEntry,assertAppendOnly}
  from './reality-universe-persistence-contract-v1.0.js';
 import {verifyCandidateCorrectionAgainstUniverse}
  from './reality-universe-correction-verifier-v1.0.js';
+import {absorbClosedLoopMistakesIntoLearningForms}
+ from './reality-universe-intelligence-forms-v1.0.js';
 
 export const CLOSED_LOOP_VERSION='reality-universe-closed-loop-v1.0';
 const norm=x=>Array.isArray(x)?x.map(norm):x&&typeof x==='object'
@@ -144,6 +146,7 @@ export async function runUniverseClosedLoopTurn({
  trustedScope,turn,prompt,history=[],policyProjection,ledger,
  generateAnswer,extractClaims,independentEvidenceVerifier,
  evidenceEntries=[],maxRepairs=1,at=null,
+ generateLearningHypothesis=null,
 }={}){
  const scope=requireScope(trustedScope);
  if(!Number.isInteger(turn)||turn<1||turn>1000||!text(prompt)||
@@ -270,6 +273,38 @@ export async function runUniverseClosedLoopTurn({
    prior_receipt:history.length?sha(previousHistory):null,
    real_world_action_executed:false,
   },[deliveredSaved.entry_id,origSaved.entry_id]);
+ // Actual mistakes may create learning candidates *after* delivery/continuity.
+ // Neither the original answer nor a proposed form is rewritten as competence.
+ // Candidate formation is optional and deliberately separate from the chat
+ // success path and all consequential authority.
+ const learningCandidates=[];
+ if(generateLearningHypothesis!==null){
+  if(typeof generateLearningHypothesis!=='function')
+   fail('CLOSED_LOOP_LEARNING_GENERATOR_INVALID');
+  const candidateForms=await absorbClosedLoopMistakesIntoLearningForms({
+   scope,at:stamp,
+   readLedger:id=>ledger.read(id),
+   generateHypothesis:generateLearningHypothesis,
+   turnResult:{
+    turn,original_response_id:original.response_id,
+    original_answer:original.answer,
+    original_findings:first.e.findings,
+    receipts,
+   },
+  });
+  for(const record of candidateForms){
+   const saved=await appendVerified(ledger,record.universe_candidate_entry);
+   receipts.push({kind:'INTELLIGENCE_FORM_CANDIDATE',...saved});
+   learningCandidates.push({
+    form_id:record.candidate.form_id,
+    learning_state:'CANDIDATE_UNVERIFIED',
+    failure_class:record.candidate.failure_class,
+    competence_coordinate:record.candidate.competence_coordinate,
+    universe_receipt_id:saved.entry_id,
+    available_to_apply_as_verified_competence:false,
+   });
+  }
+ }
  return Object.freeze({
   turn,prompt,
   original_answer:original.answer,original_response_id:original.response_id,
@@ -285,6 +320,8 @@ export async function runUniverseClosedLoopTurn({
   evidence_repair_verified:usedRepair,
   independently_verified_full_semantics:false,
   evidence_entries_read_back:first.e.admitted_independent_proofs,
+  intelligence_form_candidates:learningCandidates,
+  candidate_forms_are_not_verified_learning:true,
   receipts,continuity_receipt_id:continuitySaved.entry_id,
   next_history:newHistory,
   external_actions_executed:0,
