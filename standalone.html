@@ -106,9 +106,30 @@ async function authorize(create){
   }
   state.accessToken=data.access_token; $('password').value='';
   $('signIn').style.display='none';$('workspace').style.display='block';
-  status('chatNotice','Signed in. No historical Base44 messages have been imported.');
+  status('chatNotice','Signed in. Rechecking your own Reality conversation history...');
+  try{await refreshHistory()}
+  catch(error){status('chatNotice','Signed in, but history could not be verified: '+error.message,true)}
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
+}
+async function refreshHistory(){
+ if(!state.accessToken)throw Error('An authenticated session is required.');
+ const selected=state.conversationId;
+ const q=new URLSearchParams({conversation_id:selected,thought_id:'personal'});
+ const res=await fetch('/api/reality/standalone-history?'+q.toString(),{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
+ });
+ const data=await res.json();
+ if(!res.ok)throw Error(data?.error||'Authenticated history request failed.');
+ if(selected!==state.conversationId)return;
+ if(!Array.isArray(data.messages))throw Error('Invalid history response.');
+ $('conversation').replaceChildren();
+ for(const turn of data.messages){
+  if(!['user','assistant'].includes(turn.role)||typeof turn.text!=='string')continue;
+  render(turn.role==='assistant'?'Reality':'user',turn.text);
+ }
+ $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
+ status('chatNotice','Restored '+data.messages.length+' messages from the server-owned ledger. Earlier history may exist beyond this bounded view.');
 }
 function render(role,text){
  const item=document.createElement('div');item.className='message'+(role==='user'?' user':'');
