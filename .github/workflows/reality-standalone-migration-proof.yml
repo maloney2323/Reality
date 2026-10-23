@@ -28,6 +28,7 @@ on:
       - api/reality/standalone-config.js
       - api/reality/standalone-readiness.js
       - standalone.html
+      - test/reality-preview-server-recovery-selection-v0.1.test.js
       - test/reality-standalone-chat-v0.1.test.js
       - test/reality-causal-turn-commit-v0.1.test.js
       - test/reality-conversation-sequencer-v0.1.test.js
@@ -70,6 +71,8 @@ jobs:
           node --check api/reality/standalone-readiness.js
       - name: Signal cleaner JSONB receipt integrity and durable handoff
         run: node --test test/reality-verified-layer-handoff-v0.1.test.js
+      - name: Browser restoration and server-owned interrupted-turn selection
+        run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
       - name: Preview-only read-only recovery classifier; no paid model calls
         run: node --test test/reality-turn-recovery-review-v1.0.test.js
       - name: Independent Auth and owner-root continuity
