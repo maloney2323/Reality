@@ -5,6 +5,7 @@
 // No automatic rerun from a partially committed turn: that would permit
 // double billing, duplicate execution claims, and conflicting model answers.
 import {createHash} from 'node:crypto';
+import {claimConversationSlot,finishConversationSlot,inspectConversationSlot} from './reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry,validateUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
@@ -176,6 +177,7 @@ export async function processCausalTurn(req,{
  lookup=retrieveOptionalPersistedUniverseEntry,
  store=persistUniverseEntry,run=runLiveIntelligenceOrchestration,
  load,now=()=>new Date().toISOString(),
+ sequence={claim:claimConversationSlot,finish:finishConversationSlot,inspect:inspectConversationSlot},
 }={}){
  // Any failure before this check must have zero database or model effects.
  requireStandaloneReady(env);
@@ -187,6 +189,11 @@ export async function processCausalTurn(req,{
  });
  const existing=await inspectCausalTurn({scope,turnId:input.turnId,lookup,fetchImpl});
  if(existing.committed){
+  if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
+   const fence=await sequence.inspect({scope,env,fetchImpl});
+   if(fence.status==='NO_FENCE'||fence.active_turn_id===input.turnId)
+    throw fail('SEQUENCE_COMMITTED_BUT_FENCE_UNRESOLVED',409);
+  }
   // Prevent a user from retrieving an unrelated committed answer by guessing
   // a turn_id and supplying different text in the same conversation.
   const original=await lookup({entryId:causalTurnIds(scope,input.turnId).user,fetchImpl});
@@ -201,6 +208,10 @@ export async function processCausalTurn(req,{
  }
  if(existing.status!=='NOT_RECEIVED')
   throw fail('CAUSAL_TURN_RECOVERY_REVIEW_REQUIRED',409);
+ // Atomic DB claim MUST happen before writing a message or starting cognition.
+ // Disabled by default until the separate benchmark DB migration passes.
+ const claim=env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'
+  ?await sequence.claim({scope,turnId:input.turnId,env,fetchImpl}):null;
  let started=null;
  const wrappedRun=async args=>{
   const user=await lookup({entryId:causalTurnIds(scope,input.turnId).user,fetchImpl});
@@ -243,9 +254,12 @@ export async function processCausalTurn(req,{
    },store,lookup,fetchImpl,now});
   const verified=await inspectCausalTurn({scope,turnId:input.turnId,lookup,fetchImpl});
   if(!verified.committed)throw fail('CAUSAL_TURN_COMMIT_VERIFICATION_FAILED');
+  const fence=claim?await sequence.finish({scope,claim,committed:verified,env,fetchImpl}):null;
+  if(claim&&fence?.status!=='FINISHED')throw fail('SEQUENCE_FINALIZATION_NOT_VERIFIED');
   return Object.freeze({
    ...reply,version:CAUSAL_TURN_CONTRACT_VERSION,
-   receipt:Object.freeze({...reply.receipt,...verified.receipt,turn_commit_status:'COMMITTED'}),
+   receipt:Object.freeze({...reply.receipt,...verified.receipt,turn_commit_status:'COMMITTED',
+    ...(fence?{sequence_num:fence.sequence_num,sequence_status:'FINISHED'}:{})}),
    idempotent_replay:false,
   });
  }catch(cause){
