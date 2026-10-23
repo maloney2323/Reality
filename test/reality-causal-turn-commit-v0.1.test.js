@@ -288,7 +288,8 @@ test('orphaned processing receipt must never be mistaken for a safe new turn',as
 test('history preserves original user content but archives a hash-verified abandoned interrupted turn',async()=>{
  const x=rig({failRun:true});
  await assert.rejects(()=>processCausalTurn(req(),x.opts),/SYNTHETIC_PROVIDER_TIMEOUT/);
- const base=await getCommittedStandaloneHistory(req(),{
+ const historyReq={...req(),query:{conversation_id:'job-1',thought_id:'personal'}};
+ const base=await getCommittedStandaloneHistory(historyReq,{
   env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
  });
  assert.equal(base.messages.length,1);
@@ -323,7 +324,7 @@ test('history preserves original user content but archives a hash-verified aband
   interruption_receipt_hash:interrupted.ledger_entry_hash,
  },[user.entry_id,processing.entry_id,interrupted.entry_id,approval.entry_id]);
  x.entries.set(approval.entry_id,approval);x.entries.set(resolution.entry_id,resolution);
- const after=await getCommittedStandaloneHistory(req(),{
+ const after=await getCommittedStandaloneHistory(historyReq,{
   env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
  });
  assert.equal(after.unresolved_turns.length,0);
@@ -335,7 +336,7 @@ test('history preserves original user content but archives a hash-verified aband
  assert.match(after.messages[0].text,/homeowner approval/);
  assert.equal(x.calls.model,1,'never repeat interrupted LLM execution in read-only recovery');
  // A signed resolution receipt cannot override a STILL-active server processing lock.
- await assert.rejects(getCommittedStandaloneHistory(req(),{
+ await assert.rejects(getCommittedStandaloneHistory(historyReq,{
   env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'true'},
   fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
   inspectFence:async()=>({status:'BUSY',active_turn_id:tid,sequence_num:1}),
@@ -343,7 +344,7 @@ test('history preserves original user content but archives a hash-verified aband
  // Any tampering must fail integrity validation, not turn an incomplete turn into a completed one.
  x.entries.set(resolution.entry_id,{...resolution,
   payload:{...resolution.payload,model_call_outcome:'VERIFIED'}});
- await assert.rejects(getCommittedStandaloneHistory(req(),{
+ await assert.rejects(getCommittedStandaloneHistory(historyReq,{
   env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
  }),/UNIVERSE_LEDGER_HASH_MISMATCH/);
 });
