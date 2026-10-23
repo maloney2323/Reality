@@ -80,18 +80,26 @@ function filterClaims(extracted,answer,scope,modelRef){
   fail('CLOSED_LOOP_EXTRACTOR_BOUNDS_EXCEEDED');
  const accepted=[],rejected=[];
  for(const x of extracted){
+  const consequent=['SEND_ESTIMATE','ORDER_MATERIALS','SCHEDULE_INSTALLATION'].includes(x?.operation);
+  const action=['ACTION_COMMITMENT','OUTCOME_COMPLETED'].includes(x?.claim_kind);
   if(!x||typeof x.source_span!=='string'||x.source_span.length<8||
     !answer.includes(x.source_span)||!text(x.claim_kind)||
     !text(x.operation)||!text(x.resource)){
-    rejected.push({reason:'INVALID_VERBATIM_MODEL_CLAIM'});continue;
+    rejected.push({reason:'INVALID_VERBATIM_MODEL_CLAIM',
+      material_risk:consequent&&action});continue;
   }
-  const isFact=x.claim_kind==='MATERIAL_FACT';
+  const explicitUncertainty=/\b(?:uncertain|unresolved|unsettled|disputed|conflicting|pending|unknown|unverified|undecided|not\s+(?:yet\s+)?(?:decided|confirmed|verified|known|settled|signed|approved|finalized)|no\s+(?:verified|confirmed|evidence|amount|agreement)|(?:counts?|reports?|figures?)\s+(?:differ|disagree|conflict)|\bopen\s+(?:decisions|questions))\b/i.test(x.source_span);
+  // "No count is verified" and "the sink remains unsettled" are positive
+  // ADMISSIONS OF IGNORANCE, not claims of known physical truth.
+  let normalizedKind=x.claim_kind==='MATERIAL_FACT'&&explicitUncertainty?
+    'UNCERTAINTY_ADMISSION':x.claim_kind;
+  const isFact=normalizedKind==='MATERIAL_FACT';
   if(isFact&&(!text(x.entity_ref)||!text(x.state_key)||
    !Object.hasOwn(x,'value')||
    (typeof x.value!=='string'&&typeof x.value!=='number'&&typeof x.value!=='boolean')||
    (typeof x.value==='number'&&!Number.isFinite(x.value)))){
    rejected.push({reason:'MALFORMED_MATERIAL_FACT_EXTRACTION',
-     source_span:x.source_span});continue;
+     source_span:x.source_span,material_risk:true});continue;
   }
   // Minimal native semantic rescue of a *clearly negated* verbatim claim:
   // "I will not send" cannot be treated as "I will send" even if a model
@@ -100,9 +108,10 @@ function filterClaims(extracted,answer,scope,modelRef){
   const negated=/(?:\b(?:will|would|shall)\s+not\s+(?:send|schedule|confirm|order|dispatch)|\b(?:cannot|can't|won't|shouldn't|must not|do not|never)\s+(?:send|schedule|confirm|order|dispatch|proceed)|\b(?:not|never)\s+(?:be\s+)?(?:sent|scheduled|ordered|confirmed|dispatched))\b/i.test(x.source_span);
   const draftOnly=/\b(?:draft|prepare a draft|unsent draft)\b/i.test(x.source_span)&&
    !/\b(?:send|sent|publish|dispatched|confirmed)\b/i.test(x.source_span);
-  let normalizedKind=x.claim_kind;
+  const completedNegation=/\b(?:no|not|never|without)\b.{0,80}\b(?:sent|scheduled|confirmed|dispatched|ordered|executed|delivered)\b/i.test(x.source_span)||
+   /\b(?:not|never|no)\s+(?:final\s+)?(?:estimate|order|schedule)\b.{0,80}\b(?:sent|confirmed|completed)\b/i.test(x.source_span);
   if(['ACTION_COMMITMENT','OUTCOME_COMPLETED'].includes(normalizedKind)){
-   if(negated)normalizedKind='DENIAL_OF_ACTION';
+   if(negated||completedNegation)normalizedKind='DENIAL_OF_ACTION';
    else if(draftOnly)normalizedKind='DRAFT_ONLY';
   }
   accepted.push({...x,claim_kind:normalizedKind,model_source_ref:modelRef,
@@ -183,9 +192,10 @@ export async function runUniverseClosedLoopTurn({
  }
  const first=await evaluate(original.answer,original.response_id,'INITIAL');
  let chosen=original,latest=first,usedRepair=false;
- const needRepair=first.e.findings.some(f=>REVIEWABLE.has(f.classification))||
-  first.e.possible_unexamined_material_assertion||
-  first.parsed.rejected.length>0;
+ const confirmedIssue=first.e.findings.some(f=>REVIEWABLE.has(f.classification));
+ const flaggedCoverage=first.e.possible_unexamined_material_assertion;
+ const materialExtractionFailure=first.parsed.rejected.some(r=>r.material_risk===true);
+ const needRepair=confirmedIssue||flaggedCoverage||materialExtractionFailure;
  const repairs=[];
  if(needRepair){
   for(let i=0;i<maxRepairs;i++){
@@ -216,12 +226,16 @@ export async function runUniverseClosedLoopTurn({
   }
  }
  const unresolved=needRepair&&!usedRepair;
- // If an identified consequential failure cannot be fixed on checked claims,
- // do not ship a known-bad answer as though it was verified. This is a bounded
- // fallback, not an "AI intelligence disabled" mode for ordinary conversation.
- const delivered=unresolved?BLOCKED_RESPONSE:chosen.answer;
- const deliveryStatus=unresolved?'UNCERTAINTY_DISCLOSED_ACTION_WITHHELD':
+ // Hard fallback is limited to *positive material claims* or action-commitment
+ // violations. A generic extraction gap is not justification for replacing a
+ // useful answer with a canned refusal; mark it unverified and preserve it.
+ const knownConsequentialIssue=confirmedIssue||materialExtractionFailure||
+   (flaggedCoverage&&/\b(?:definitely|certainly|guaranteed)\b/i.test(original.answer));
+ const safetyFallback=unresolved&&knownConsequentialIssue;
+ const delivered=safetyFallback?BLOCKED_RESPONSE:chosen.answer;
+ const deliveryStatus=safetyFallback?'UNCERTAINTY_DISCLOSED_ACTION_WITHHELD':
    usedRepair?'MODEL_REPAIR_ACCEPTED_ON_TYPED_EVIDENCE':
+   unresolved?'ORIGINAL_PRESERVED_EXTRACTION_UNCERTAINTY':
    'ORIGINAL_ANSWER_UNCHANGED_LIMITED_COVERAGE';
  const deliveredSaved=await save('LLM_DELIVERY_DECISION',
   usedRepair?'model:'+chosen.response_id:originalRef,{
