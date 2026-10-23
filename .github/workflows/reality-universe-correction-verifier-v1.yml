@@ -1,0 +1,51 @@
+name: Reality Universe-Backed Correction Verifier V1 Proof
+on:
+  push:
+    branches:
+      - feature/universe-correction-verifier-v1-20261023
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  correction-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Syntax and original World contracts
+        run: |
+          node --check src/reality-universe-correction-verifier-v1.0.js
+          node --check test/reality-universe-correction-verifier-v1.0.test.js
+          node --check test/reality-universe-correction-verifier-real-llm-v1.0.test.js
+      - name: Generic bounded correction and source-scoping tests
+        run: |
+          node --test \
+            test/reality-universe-correction-verifier-v1.0.test.js \
+            test/reality-universe-ignorance-manifest-v1.0.test.js \
+            test/reality-universe-ignorance-durable-reconciliation-v1.0.test.js \
+            test/reality-sandbox-repair-proposal-v1.0.test.js \
+            test/reality-universe-persistence-contract-v1.0.test.js \
+            test/reality-trusted-observation-admission-v0.1.test.js \
+            test/reality-typed-claim-evidence-v1.0.test.js \
+            test/reality-intelligence-spine-v1.0.test.js \
+            test/reality-construction-messy-signal-pilot-v1.0.test.js
+      - name: Download pinned actual live OpenAI 25-turn corrected conversation
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-real-openai-25turn-detect-repair
+          run-id: 40034886368
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: benchmark-results
+      - name: Verify actual LLM original mistakes and generated corrections
+        run: node --test test/reality-universe-correction-verifier-real-llm-v1.0.test.js
+      - name: Preserve technical truth boundaries
+        run: |
+          echo 'Only typed claims tested; no complete language understanding guaranteed.'
+          echo 'Policy records and independent proof must be loaded by a trusted authenticated server.'
+          echo 'No new OpenAI calls, customer-world writes, production changes, or executed actions.'
