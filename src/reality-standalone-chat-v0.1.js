@@ -50,7 +50,16 @@ export function reconstructStandaloneHistory({entries,scope}={}){
   e.payload?.principal_id===scope.authenticated_user_id&&
   ['user','assistant'].includes(e.payload?.role)&&
   typeof e.payload?.text==='string');
- return retained.sort((a,b)=>Date.parse(a.assertion_time)-Date.parse(b.assertion_time)||
+ // Same-millisecond writes are legitimate: do NOT sort a hashed assistant
+ // message before the user instruction that caused it. Group each turn by
+ // its durable user message, with user before its matching model reply.
+ const usersByTurn=new Map(retained.filter(e=>e.payload.role==='user')
+   .map(e=>[e.payload.turn_id,e]));
+ const turnTimestamp=e=>Date.parse((usersByTurn.get(e.payload.turn_id)||e).assertion_time);
+ return retained.sort((a,b)=>turnTimestamp(a)-turnTimestamp(b)||
+   (a.payload.turn_id===b.payload.turn_id
+     ? (a.payload.role==='user'?-1:1)-(b.payload.role==='user'?-1:1)
+     : String(a.payload.turn_id).localeCompare(String(b.payload.turn_id)))||
    a.entry_id.localeCompare(b.entry_id))
   .slice(-60).map(e=>Object.freeze({
    role:e.payload.role,text:e.payload.text.slice(0,12000),
