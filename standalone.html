@@ -42,7 +42,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 </section>
 <section id="signIn">
 <h2>Sign in to a separate Reality account</h2>
-<p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here.</p>
+<p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here. After signing in once, your session is saved on this device and refreshed as needed until you log out, the provider revokes it, or browser storage is cleared. Only use this option on your own device.</p>
 <div class="fields"><div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@example.com"></div>
 <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"></div></div>
 <div class="actions"><button id="login">Sign in</button><button class="secondary" id="signup">Create preview account</button><button class="secondary" id="resend">Resend confirmation email</button></div>
@@ -60,8 +60,8 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
-<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button type="button" class="secondary" id="inspectRecovery">Inspect recovery evidence (read-only)</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
-<div id="unresolvedPicker" class="notice" role="status"></div><div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
+<div class="actions"><button id="send">Send</button><button type="button" id="runContinuityProof" class="secondary">Run 2-turn continuity test</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button type="button" class="secondary" id="inspectRecovery">Inspect recovery evidence (read-only)</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
+<div id="continuityProof" class="notice" role="status"></div><div id="unresolvedPicker" class="notice" role="status"></div><div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
 </section>
 </div>
 <aside>
@@ -79,6 +79,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <footer>Migration proof, not a production release. A Vercel deployment's READY status does not establish authenticated continuity or accuracy. Publishing and customer-data migration require separate approval.</footer>
 </main>
 <script type="module">
+import {createPreviewSession} from '/reality-preview-session-v1.js';
 const $=id=>document.getElementById(id);
 const pendingKey='reality-standalone-pending-turn-v01';
 let pending=null;
@@ -114,6 +115,36 @@ async function config(){
   throw Error(data?.error||'Migration preview is not enabled.');
  state.config=data;return data;
 }
+const session=createPreviewSession({
+ getConfig:config,storage:window.localStorage,
+ onToken:token=>{state.accessToken=token;},
+});
+async function authFetch(path,options={}){
+ let token=await session.accessToken();
+ const headers=new Headers(options.headers||{});
+ headers.set('Authorization','Bearer '+token);
+ let response=await fetch(path,{...options,headers});
+ if(response.status===401){
+  // Only one retry after a fresh provider-issued token, never a replay of work
+  // unless the request was a read-only GET. POST retries can duplicate effects.
+  if((options.method||'GET').toUpperCase()!=='GET')return response;
+  token=await session.refresh();
+  headers.set('Authorization','Bearer '+token);
+  response=await fetch(path,{...options,headers});
+ }
+ return response;
+}
+async function enterWorkspace(message){
+ $('password').value='';
+ $('signIn').style.display='none';$('workspace').style.display='block';
+ status('chatNotice',message||'Session restored. Checking server-owned history...');
+ try{await refreshConversationInventory();await refreshHistory();}
+ catch(error){
+  state.discoveryReady=false;
+  $('savedConversations').textContent='Saved conversations could not be verified. Use Retry saved conversations.';
+  status('chatNotice','Signed in, but server history is not verified: '+error.message,true);
+ }
+}
 async function authorize(create){
  const button=create?$('signup'):$('login');
  button.disabled=true;
@@ -136,18 +167,15 @@ async function authorize(create){
    status('loginNotice','Account requested. Use your confirmation email. If it points to localhost, the Supabase test project Site URL must be corrected, then select Resend confirmation email.');
    return;
   }
-  state.accessToken=data.access_token; $('password').value='';
-  $('signIn').style.display='none';$('workspace').style.display='block';
-  status('chatNotice','Signed in. Rechecking your own Reality conversation history...');
-  try{await refreshConversationInventory();await refreshHistory()}
-  catch(error){state.discoveryReady=false;$('savedConversations').textContent='Saved conversations could not be verified. Use Retry saved conversations.';status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
+  await session.accept(data);
+  await enterWorkspace('Signed in with a renewable session. Rechecking server-owned history...');
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
 }
 async function refreshConversationInventory(){
  state.discoveryReady=false;
  if(!state.accessToken)throw Error('An authenticated account is required.');
- const res=await fetch('/api/reality/standalone-conversations',{
+ const res=await authFetch('/api/reality/standalone-conversations',{
   method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}
  });
  const data=await res.json();
@@ -180,7 +208,7 @@ async function refreshConversationInventory(){
    button.addEventListener('click',async()=>{
     try{
      const q=new URLSearchParams({root_id:item.recovery_root});
-     const response=await fetch('/api/reality/standalone-legacy-preview?'+q,{
+     const response=await authFetch('/api/reality/standalone-legacy-preview?'+q,{
       cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
      const result=await response.json();
      if(!response.ok||result.read_only!==true)throw Error(result.error||'Read-only recovery failed');
@@ -202,7 +230,7 @@ async function refreshHistory(){
  if(!state.accessToken)throw Error('An authenticated session is required.');
  const selected=state.conversationId;
  const q=new URLSearchParams({conversation_id:selected,thought_id:'personal'});
- const res=await fetch('/api/reality/standalone-history?'+q.toString(),{
+ const res=await authFetch('/api/reality/standalone-history?'+q.toString(),{
   method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
  });
  const data=await res.json();
@@ -271,11 +299,13 @@ async function consumeConfirmationCallback(){
   if(!verified.ok)throw Error('Email session could not be verified');
   const user=await verified.json();
   if(!user?.id||user.is_anonymous)throw Error('Authenticated user unavailable');
-  state.accessToken=token;
-  $('password').value='';
-  $('signIn').style.display='none';$('workspace').style.display='block';
-  status('chatNotice','Email confirmed. Checking continuity from the verified account...');
-  await refreshConversationInventory();await refreshHistory();
+  const refreshToken=fragment.get('refresh_token');
+  if(refreshToken)await session.accept({access_token:token,refresh_token:refreshToken,
+    expires_in:Number(fragment.get('expires_in'))||3600});
+  else state.accessToken=token; // one-time confirmation only; normal sign-in is needed to persist.
+  await enterWorkspace(refreshToken?
+    'Email confirmed. Renewable session established.':
+    'Email confirmed. Sign in with your password to keep the session across reloads.');
  }catch(e){state.discoveryReady=false;state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
 }
 async function resendConfirmation(){
@@ -316,7 +346,16 @@ function readout(result){
 $('login').addEventListener('click',()=>authorize(false));
 $('signup').addEventListener('click',()=>authorize(true));
 $('resend').addEventListener('click',resendConfirmation);
-$('logout').addEventListener('click',()=>{state.accessToken=null;$('workspace').style.display='none';$('signIn').style.display='block';$('conversation').replaceChildren();resetIntegrity();status('loginNotice','Signed out.');});
+$('logout').addEventListener('click',async()=>{
+ let revoked=false;
+ try{revoked=(await session.signOut()).provider_logout_confirmed;}
+ catch{session.clear();}
+ state.discoveryReady=false;
+ $('workspace').style.display='none';$('signIn').style.display='block';
+ $('conversation').replaceChildren();resetIntegrity();
+ status('loginNotice',revoked?'Signed out on this device and the provider.':
+   'Signed out on this device. Provider revocation could not be confirmed.');
+});
 $('newConversation').addEventListener('click',newConversation);
 $('retryRecovery').addEventListener('click',async()=>{
  if(!state.accessToken){status('chatNotice','Sign in to inspect saved conversations.',true);return}
@@ -332,7 +371,7 @@ async function checkPendingTurn(){
  const q=new URLSearchParams({
   conversation_id:pending.conversationId,thought_id:'personal',turn_id:pending.turnId,
  });
- const res=await fetch('/api/reality/standalone-turn-status?'+q,{
+ const res=await authFetch('/api/reality/standalone-turn-status?'+q,{
   method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
  });
  const data=await res.json();
@@ -365,7 +404,7 @@ $('inspectRecovery').addEventListener('click',async()=>{
  try{
   const params=new URLSearchParams({conversation_id:pending.conversationId,
    thought_id:'personal',turn_id:pending.turnId});
-  const response=await fetch('/api/reality/standalone-recovery-review?'+params,{
+  const response=await authFetch('/api/reality/standalone-recovery-review?'+params,{
    method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
   const result=await response.json();
   if(!response.ok||result.review_is_a_durable_receipt!==false)
@@ -393,7 +432,7 @@ $('reconcileTurn').addEventListener('click',async()=>{
  if(!state.accessToken||!pending){status('chatNotice','Sign in and check the interrupted turn first.',true);return}
  $('reconcileTurn').disabled=true;
  try{
-  const res=await fetch('/api/reality/standalone-reconcile',{
+  const res=await authFetch('/api/reality/standalone-reconcile',{
    method:'POST',cache:'no-store',
    headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},
    body:JSON.stringify({conversation_id:pending.conversationId,
@@ -437,7 +476,7 @@ $('send').addEventListener('click',async()=>{
  state.pendingRetryApproved=false;
  $('send').disabled=true;status('chatNotice','Submitting to independent Reality...');
  try{
-  const res=await fetch('/api/reality/standalone-chat',{method:'POST',headers:{
+  const res=await authFetch('/api/reality/standalone-chat',{method:'POST',headers:{
    'Content-Type':'application/json',Authorization:'Bearer '+state.accessToken,
   },body:JSON.stringify({message,conversation_id:state.conversationId,thought_id:'personal',
    turn_id:turnId})});
@@ -482,6 +521,17 @@ refreshReadiness();
 config().then(async()=>{
  status('loginNotice','Independent identity configuration present.');
  await consumeConfirmationCallback();
+ if(!state.accessToken){
+  try{if(await session.restore())await enterWorkspace('Welcome back. Your saved session was restored.');}
+  catch(e){status('loginNotice','Previous sign-in could not be restored: '+e.message,true);}
+ }
 }).catch(e=>status('loginNotice',e.message,true));
+const keepSessionFresh=()=>{
+ if(!document.hidden&&state.accessToken)session.accessToken().catch(e=>{
+  status('chatNotice','Your session needs attention: '+e.message,true);
+ });
+};
+document.addEventListener('visibilitychange',keepSessionFresh);
+window.addEventListener('focus',keepSessionFresh);
 </script>
 </body></html>
