@@ -288,9 +288,9 @@ test('correction loop automatically absorbs actual original error receipts into 
  assert.equal(output.original_answer,original);
  assert.equal(output.final_answer,safe);
  assert.equal(output.repaired_in_history,true);
- assert.equal(output.learning_form_candidates.length,1);
+ assert.equal(output.intelligence_form_candidates.length,1);
  assert.equal(output.learning_candidate_status,'CANDIDATES_RECORDED_UNVERIFIED');
- const formRef=output.learning_form_candidates[0];
+ const formRef=output.intelligence_form_candidates[0];
  assert.equal(formRef.learning_state,'CANDIDATE_UNVERIFIED');
  assert.equal(formRef.available_to_apply_as_verified_competence,false);
  const candidateRow=await ledger.read(formRef.universe_receipt_id);
@@ -302,7 +302,7 @@ test('correction loop automatically absorbs actual original error receipts into 
 test('learning-system failure does not lose the corrected reply or pretend promotion succeeded',async()=>{
  const {output,ledger}=await fullLoopWithLearning(async()=>{throw Error('LLM_HYPOTHESIS_UNAVAILABLE');});
  assert.equal(output.repaired_in_history,true);
- assert.equal(output.learning_form_candidates.length,0);
+ assert.equal(output.intelligence_form_candidates.length,0);
  assert.match(output.learning_candidate_status,/CANDIDATE_FORMATION_FAILED/);
  assert.equal((await ledger.list()).filter(x=>x.event_kind==='CONTINUITY_TURN_COMMITTED').length,1);
  assert.equal((await ledger.list()).filter(x=>x.event_kind==='INTELLIGENCE_FORM_COMPETENCE_VERIFIED').length,0);
