@@ -103,7 +103,7 @@ test('race: owner review expires when claimed sequence changes',async()=>{
  const challenge=(await prepareOwnerAbandonment(getReq,{env,...f,now:()=>clock})).challenge;
  f.stale();
  await assert.rejects(confirmOwnerAbandonment(approvals(challenge),{
-  env,...f,now:()=>clock+1}),/ABANDONMENT_CHALLENGE_EXPIRED_OR_STALE/);
+  env,...f,now:()=>clock+1}),/ABANDONMENT_NOT_ELIGIBLE_PRIOR_COMMIT_EVIDENCE_REQUIRED/);
  assert.equal(f.rpcCount,0);
 });
 test('older USER-only turn, foreign identity fields and production rejected',async()=>{
