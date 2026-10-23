@@ -131,7 +131,7 @@ async function authorize(create){
   $('signIn').style.display='none';$('workspace').style.display='block';
   status('chatNotice','Signed in. Rechecking your own Reality conversation history...');
   try{await refreshConversationInventory();await refreshHistory()}
-  catch(error){status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
+  catch(error){state.discoveryReady=false;status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
 }
@@ -239,7 +239,7 @@ async function consumeConfirmationCallback(){
   $('signIn').style.display='none';$('workspace').style.display='block';
   status('chatNotice','Email confirmed. Checking continuity from the verified account...');
   await refreshConversationInventory();await refreshHistory();
- }catch(e){state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
+ }catch(e){state.discoveryReady=false;state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
 }
 async function resendConfirmation(){
  const btn=$('resend');btn.disabled=true;
