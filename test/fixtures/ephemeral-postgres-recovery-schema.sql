@@ -3,7 +3,7 @@ create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 do $do$ begin
  if not exists(select 1 from pg_roles where rolname='service_role') then
-  create role service_role login;
+  create role service_role login bypassrls;
  end if;
  if not exists(select 1 from pg_roles where rolname='anon') then
   create role anon login;
@@ -45,3 +45,9 @@ grant usage on schema public,extensions to service_role;
 grant select,insert,update on public.reality_conversation_turn_fences to service_role;
 grant select,insert on public.reality_universe_entries to service_role;
 grant execute on function extensions.digest(bytea,text) to service_role;
+
+-- Match the isolated Supabase schema's RLS posture. The synthetic service_role
+-- bypasses RLS like the privileged Supabase service role; browser roles never
+-- receive table grants or permissive policies.
+alter table public.reality_universe_entries enable row level security;
+alter table public.reality_conversation_turn_fences enable row level security;
