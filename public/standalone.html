@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reality — Independent Preview</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:dark;background:#070b14;color:#ebf1ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(165deg,#0b1322,#070b14 52%);min-height:100vh}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #26324a;padding:0 max(18px,calc((100vw - 1140px)/2))}
+.brand{font-weight:800;font-size:21px;letter-spacing:-.025em}.pill{font-size:12px;background:#18253a;border:1px solid #2d405e;color:#b7cce9;border-radius:100px;padding:7px 12px}
+main{max-width:1140px;margin:auto;padding:24px 18px 72px}
+h1{font-size:clamp(25px,5vw,39px);margin:0 0 8px;letter-spacing:-.04em}h2{font-size:17px;margin:0 0 12px}
+.sub{color:#a6b6cf;line-height:1.55;max-width:720px}
+section,.panel{background:#101828;border:1px solid #293950;border-radius:18px;padding:22px;margin-bottom:18px}
+#workspace{display:none}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+label{display:block;font-size:12px;color:#aabbd4;margin-bottom:7px}input,textarea{width:100%;border-radius:11px;border:1px solid #334861;background:#0a111e;color:#edf4ff;padding:12px;font:inherit}
+input:focus,textarea:focus{outline:2px solid #7197da}textarea{resize:vertical;min-height:85px}
+button{background:#e5eeff;color:#081223;border:none;border-radius:12px;padding:12px 17px;cursor:pointer;font-weight:750}
+button:disabled{opacity:.5;cursor:wait}.secondary{background:#263650;color:#e4eeff}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+small,.muted{color:#98aac4}.notice{font-size:13px;white-space:pre-wrap;line-height:1.5;margin-top:12px;min-height:1.5em}
+.error{color:#ffb7b7}.good{color:#9cddbb}
+.two{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(235px,1fr);gap:18px}
+.message{margin:13px 0;padding:14px;border-radius:13px;background:#131e30;border:1px solid #2a3e59;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.message.user{background:#182940;border-color:#49638a}.who{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#a9bedf;font-weight:700;margin-bottom:5px}
+.trait{display:flex;gap:9px;justify-content:space-between;align-items:flex-start;padding:12px 0;border-bottom:1px solid #273750;font-size:13px}.trait:last-child{border-bottom:0}
+.trait strong{max-width:54%;text-align:right;font-weight:600}
+#loginNotice,#chatNotice{color:#abbdd8}
+footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
+@media(max-width:760px){.two,.fields{grid-template-columns:1fr}header{padding:0 16px}section,.panel{padding:17px}}
+</style></head>
+<body>
+<header><div class="brand">✦ Reality</div><div class="pill">Independent migration preview</div></header>
+<main>
+<h1>Your world. Your continuity.</h1>
+<p class="sub">A preview of Reality served from GitHub and Vercel, independent of Base44. The full Base44 interface and historical data have not been migrated. No customer-facing deployment has been changed.</p>
+<section>
+<h2>Live chat connection status</h2>
+<p class="sub" id="readinessSummary">Checking the isolated preview configuration…</p>
+<div id="readinessMissing" class="notice" role="status"></div>
+<small>This displays configuration only. Passing this check would not prove a working Supabase login, durable database write, or real model response.</small>
+</section>
+<section id="signIn">
+<h2>Sign in to a separate Reality account</h2>
+<p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here. After signing in once, your session is saved on this device and refreshed as needed until you log out, the provider revokes it, or browser storage is cleared. Only use this option on your own device.</p>
+<div class="fields"><div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@example.com"></div>
+<div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"></div></div>
+<div class="actions"><button id="login">Sign in</button><button class="secondary" id="signup">Create preview account</button><button class="secondary" id="resend">Resend confirmation email</button></div>
+<div id="loginNotice" class="notice" role="status"></div>
+</section>
+<div id="workspace">
+<div class="actions" style="justify-content:space-between;margin-bottom:19px">
+<div class="pill">Personal world · Independently authenticated</div>
+<button id="logout" class="secondary">Sign out</button></div>
+<div class="two">
+<div>
+<section>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Continuous conversation</h2><button id="newConversation" class="secondary">New thought</button></div>
+<div id="savedConversations" class="notice" role="status">Finding saved conversations…</div><button type="button" id="retryRecovery" class="secondary">Retry saved conversations</button><div id="legacyRecovery" class="notice" role="status"></div>
+<div id="conversation" aria-live="polite"></div>
+<label for="prompt">What should Reality work on?</label>
+<textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
+<div class="actions"><button id="send">Send</button><button type="button" id="runContinuityProof" class="secondary">Run 2-turn continuity test</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button type="button" class="secondary" id="inspectRecovery">Inspect recovery evidence (read-only)</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
+<div id="continuityProof" class="notice" role="status"></div><div id="unresolvedPicker" class="notice" role="status"></div><div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
+</section>
+</div>
+<aside>
+<div class="panel"><h2>Continuity and integrity</h2>
+<div class="trait"><span>Conversation ledger</span><strong id="ledger">Not tested</strong></div>
+<div class="trait"><span>Source-fact integrity</span><strong id="fact">Not evaluated</strong></div>
+<div class="trait"><span>Conversation drift</span><strong id="drift">Not evaluated</strong></div>
+<div class="trait"><span>Retrospective recovery</span><strong id="retro">Not evaluated</strong></div>
+<div class="trait"><span>Model hallucination rate</span><strong>Not independently measured</strong></div></div>
+<div class="panel"><h2>Evidence status</h2><p class="sub" id="evidence">No verified work has been submitted in this preview.</p>
+<small>A flagged candidate is not a verified hallucination. A reply is not evidence that an outside action occurred.</small></div>
+</aside>
+</div>
+</div>
+<footer>Migration proof, not a production release. A Vercel deployment's READY status does not establish authenticated continuity or accuracy. Publishing and customer-data migration require separate approval.</footer>
+</main>
+<script type="module">
+import {createPreviewSession} from '/reality-preview-session-v1.js';
+const $=id=>document.getElementById(id);
+const pendingKey='reality-standalone-pending-turn-v01';
+let pending=null;
+try{pending=JSON.parse(localStorage.getItem(pendingKey)||sessionStorage.getItem(pendingKey)||'null')}catch{pending=null}
+const priorConversationId=localStorage.getItem('reality-standalone-conversation-v01');
+const state={config:null,accessToken:null,
+ conversationId:priorConversationId||crypto.randomUUID(),
+ pendingTurn:pending?.turnId&&pending?.conversationId?pending:null,
+ pendingRetryApproved:false,discoveryReady:false,
+ serverUnresolved:[],reviewSelection:null};
+if(!priorConversationId)localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+const savePending=()=>{if(state.pendingTurn)localStorage.setItem(pendingKey,JSON.stringify(state.pendingTurn));
+ else localStorage.removeItem(pendingKey);
+ sessionStorage.removeItem(pendingKey)};
+const status=(id,text,error=false)=>{$(id).textContent=text;$(id).className='notice'+(error?' error':'')};
+const newConversation=()=>{
+ if((state.pendingTurn||state.serverUnresolved.length)&&
+    !window.confirm('An earlier turn is unresolved. Its server evidence stays preserved. Start a new conversation?'))return;
+ state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+ state.serverUnresolved=[];state.reviewSelection=null;
+ $('unresolvedPicker').replaceChildren();$('recoveryEvidence').replaceChildren();
+ state.conversationId=crypto.randomUUID();
+ localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+ $('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity();
+};
+const resetIntegrity=()=>{for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';$('evidence').textContent='No independently verified outcome yet.'};
+$('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
+async function config(){
+ if(state.config)return state.config;
+ const res=await fetch('/api/reality/standalone-config',{cache:'no-store'});
+ const data=await res.json();
+ if(!res.ok||!data?.auth_url||!data?.publishable_key)
+  throw Error(data?.error||'Migration preview is not enabled.');
+ state.config=data;return data;
+}
+const session=createPreviewSession({
+ getConfig:config,storage:window.localStorage,
+ onToken:token=>{state.accessToken=token;},
+});
+async function authFetch(path,options={}){
+ let token=await session.accessToken();
+ const headers=new Headers(options.headers||{});
+ headers.set('Authorization','Bearer '+token);
+ let response=await fetch(path,{...options,headers});
+ if(response.status===401){
+  // Only one retry after a fresh provider-issued token, never a replay of work
+  // unless the request was a read-only GET. POST retries can duplicate effects.
+  if((options.method||'GET').toUpperCase()!=='GET')return response;
+  token=await session.refresh();
+  headers.set('Authorization','Bearer '+token);
+  response=await fetch(path,{...options,headers});
+ }
+ return response;
+}
+async function enterWorkspace(message){
+ $('password').value='';
+ $('signIn').style.display='none';$('workspace').style.display='block';
+ status('chatNotice',message||'Session restored. Checking server-owned history...');
+ try{await refreshConversationInventory();await refreshHistory();}
+ catch(error){
+  state.discoveryReady=false;
+  $('savedConversations').textContent='Saved conversations could not be verified. Use Retry saved conversations.';
+  status('chatNotice','Signed in, but server history is not verified: '+error.message,true);
+ }
+}
+async function authorize(create){
+ const button=create?$('signup'):$('login');
+ button.disabled=true;
+ status('loginNotice','Contacting the independent identity provider...');
+ try{
+  const {auth_url,publishable_key,confirmation_redirect_url}=await config();
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password)throw Error('Email and password are required.');
+  const url=create?'/auth/v1/signup?redirect_to='+encodeURIComponent(confirmation_redirect_url):'/auth/v1/token?grant_type=password';
+  const res=await fetch(auth_url+url,{method:'POST',headers:{
+   apikey:publishable_key,'Content-Type':'application/json'
+  },body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(!res.ok){
+   if(data?.error_code==='email_not_confirmed'||data?.code==='email_not_confirmed')
+    throw Error('Email not confirmed. After fixing the test project redirect URL, select Resend confirmation email.');
+   throw Error(data?.msg||data?.error_description||data?.message||'Authentication failed');
+  }
+  if(!data.access_token) {
+   status('loginNotice','Account requested. Use your confirmation email. If it points to localhost, the Supabase test project Site URL must be corrected, then select Resend confirmation email.');
+   return;
+  }
+  await session.accept(data);
+  await enterWorkspace('Signed in with a renewable session. Rechecking server-owned history...');
+ }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
+ finally{button.disabled=false}
+}
+async function refreshConversationInventory(){
+ state.discoveryReady=false;
+ if(!state.accessToken)throw Error('An authenticated account is required.');
+ const res=await authFetch('/api/reality/standalone-conversations',{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}
+ });
+ const data=await res.json();
+ if(!res.ok||!Array.isArray(data.conversations))
+  throw Error(data?.error||'Server-side conversation discovery failed.');
+ const resumable=data.conversations.filter(x=>
+  x.recovery_mode==='RESUMABLE_BY_SELECTOR'&&typeof x.conversation_id==='string');
+ if(!state.pendingTurn&&resumable.length&&
+    !resumable.some(x=>x.conversation_id===state.conversationId)){
+  state.conversationId=resumable[0].conversation_id;
+  localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+ }
+ const list=$('savedConversations');list.replaceChildren();
+ if(!data.conversations.length)list.textContent='No stored preview conversations found for this account.';
+ for(const item of data.conversations){
+  const button=document.createElement('button');
+  button.className='secondary';button.type='button';button.style.margin='4px';
+  if(item.recovery_mode==='RESUMABLE_BY_SELECTOR'){
+   button.textContent='Open conversation '+item.conversation_id.slice(0,8);
+   button.addEventListener('click',async()=>{
+    if(state.pendingTurn&&state.pendingTurn.conversationId!==item.conversation_id){
+     status('chatNotice','Review your interrupted turn before changing conversations.',true);return;
+    }
+    state.conversationId=item.conversation_id;
+    localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+    try{await refreshHistory()}catch(e){status('chatNotice',e.message,true)}
+   });
+  }else{
+   button.textContent='Review older saved conversation (read-only)';
+   button.addEventListener('click',async()=>{
+    try{
+     const q=new URLSearchParams({root_id:item.recovery_root});
+     const response=await authFetch('/api/reality/standalone-legacy-preview?'+q,{
+      cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
+     const result=await response.json();
+     if(!response.ok||result.read_only!==true)throw Error(result.error||'Read-only recovery failed');
+     const panel=$('legacyRecovery');panel.replaceChildren();
+     const note=document.createElement('p');
+     note.textContent='Saved messages from a previous conversation. Read-only: completion and response were not verified.';
+     panel.append(note);
+     for(const message of result.messages){
+      const p=document.createElement('p');p.textContent=message.text;panel.append(p);
+     }
+    }catch(e){status('chatNotice','Legacy recovery: '+e.message,true)}
+   });
+  }
+  list.append(button);
+ }
+ state.discoveryReady=true;
+}
+async function refreshHistory(){
+ if(!state.accessToken)throw Error('An authenticated session is required.');
+ const selected=state.conversationId;
+ const q=new URLSearchParams({conversation_id:selected,thought_id:'personal'});
+ const res=await authFetch('/api/reality/standalone-history?'+q.toString(),{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
+ });
+ const data=await res.json();
+ if(!res.ok)throw Error(data?.error||'Authenticated history request failed.');
+ if(selected!==state.conversationId)return;
+ if(!Array.isArray(data.messages))throw Error('Invalid history response.');
+ $('conversation').replaceChildren();
+ for(const turn of data.messages){
+  if(!['user','assistant'].includes(turn.role)||typeof turn.text!=='string')continue;
+  render(turn.role==='assistant'?'Reality':'user',turn.text);
+ }
+ $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
+ const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
+ if(unresolved.some(x=>typeof x?.turn_id!=='string'||!/^[A-Za-z0-9:_-]{1,96}$/.test(x.turn_id))||
+    new Set(unresolved.map(x=>x.turn_id)).size!==unresolved.length)
+  throw Error('SERVER_UNRESOLVED_TURN_INDEX_INVALID');
+ // Only owner-authenticated server history may select an interrupted turn for review.
+ // Browser pending markers remain independent and are NOT required for read-only review.
+ state.serverUnresolved=unresolved.map(x=>Object.freeze({
+  conversationId:selected,turnId:x.turn_id,status:x.status,
+ }));
+ if(!state.reviewSelection||state.reviewSelection.conversationId!==selected||
+   !state.serverUnresolved.some(x=>x.turnId===state.reviewSelection.turnId))
+  state.reviewSelection=state.serverUnresolved.length===1?state.serverUnresolved[0]:null;
+ const picker=$('unresolvedPicker');picker.replaceChildren();
+ if(state.serverUnresolved.length>1){
+  const hint=document.createElement('p');
+  hint.textContent='Choose an interrupted turn for read-only inspection.';
+  picker.append(hint);
+  state.serverUnresolved.forEach((target,i)=>{
+   const b=document.createElement('button');b.type='button';b.className='secondary';
+   b.style.margin='4px';b.textContent='Select interrupted turn '+(i+1);
+   b.addEventListener('click',()=>{
+    state.reviewSelection=target;
+    status('chatNotice','Selected server-verified interrupted turn '+(i+1)+
+     '. Choose Inspect recovery evidence (read-only).',true);
+   });
+   picker.append(b);
+  });
+ }
+ status('chatNotice',unresolved.length?
+  'Restored '+data.messages.length+' saved message(s); '+unresolved.length+
+  ' interrupted or uncommitted turn(s) require review. No unverified model reply has been published.':
+  'Restored '+data.messages.length+' verified-history message(s). Earlier history may exist beyond this bounded view.',
+  unresolved.length>0);
+}
+// The confirmation link returns a one-time Supabase access token through
+// the URL fragment. Never store or log it; verify with Supabase before use.
+async function consumeConfirmationCallback(){
+ const fragment=new URLSearchParams(window.location.hash.slice(1));
+ const token=fragment.get('access_token');
+ const errorDescription=fragment.get('error_description');
+ if(!token&&!errorDescription)return;
+ // Clear fragment immediately to keep auth credentials out of copied URLs.
+ window.history.replaceState(null,'',window.location.pathname+window.location.search);
+ if(errorDescription){
+  status('loginNotice','Email confirmation failed. Request a new confirmation email.',true);
+  return;
+ }
+ try{
+  const {auth_url,publishable_key}=await config();
+  const verified=await fetch(auth_url+'/auth/v1/user',{
+   headers:{apikey:publishable_key,Authorization:'Bearer '+token},
+   cache:'no-store',
+  });
+  if(!verified.ok)throw Error('Email session could not be verified');
+  const user=await verified.json();
+  if(!user?.id||user.is_anonymous)throw Error('Authenticated user unavailable');
+  const refreshToken=fragment.get('refresh_token');
+  if(refreshToken)await session.accept({access_token:token,refresh_token:refreshToken,
+    expires_in:Number(fragment.get('expires_in'))||3600});
+  else state.accessToken=token; // one-time confirmation only; normal sign-in is needed to persist.
+  await enterWorkspace(refreshToken?
+    'Email confirmed. Renewable session established.':
+    'Email confirmed. Sign in with your password to keep the session across reloads.');
+ }catch(e){state.discoveryReady=false;state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
+}
+async function resendConfirmation(){
+ const btn=$('resend');btn.disabled=true;
+ try{
+  const {auth_url,publishable_key,confirmation_redirect_url}=await config();
+  const email=$('email').value.trim();
+  if(!email)throw Error('Enter the same email you used to create your preview account.');
+  const response=await fetch(auth_url+'/auth/v1/resend?redirect_to='+encodeURIComponent(confirmation_redirect_url),{
+   method:'POST',headers:{apikey:publishable_key,'Content-Type':'application/json'},
+   body:JSON.stringify({type:'signup',email}),
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data?.error_description||data?.msg||data?.message||'Could not resend the confirmation.');
+  status('loginNotice','If the account is eligible, a new confirmation link was requested. Check email and Spam. Open the newest link.');
+ }catch(e){status('loginNotice',e.message,true)}
+ finally{btn.disabled=false}
+}
+
+function render(role,text){
+ const item=document.createElement('div');item.className='message'+(role==='user'?' user':'');
+ const name=document.createElement('div');name.className='who';name.textContent=role;
+ const content=document.createElement('div');content.textContent=text;
+ item.append(name,content);$('conversation').append(item);item.scrollIntoView({block:'end',behavior:'smooth'});
+}
+function readout(result){
+ const c=result?.context||{},ledger=c.continuity||{};
+ $('ledger').textContent=ledger.cognitive_readback_verified?'Stored and read back':'Not independently verified';
+ $('fact').textContent=c.model_output_integrity?.status||'Not evaluated';
+ $('drift').textContent=c.conversation_drift?.status||'Not evaluated';
+ $('retro').textContent=c.conversation_trajectory?.status||'Not evaluated';
+ const findings=[...(c.model_output_integrity?.findings||[]),...(c.conversation_drift?.findings||[]),
+  ...(c.conversation_trajectory?.findings||[])];
+ $('evidence').textContent=findings.length?findings.slice(0,3).map(f=>
+  f.classification+': '+(f.original_user_text||f.excerpt||'Evidence review required')).join('\n\n'):
+  'No issue flagged within available, limited assessment coverage. This does not prove zero drift.';
+}
+$('login').addEventListener('click',()=>authorize(false));
+$('signup').addEventListener('click',()=>authorize(true));
+$('resend').addEventListener('click',resendConfirmation);
+$('logout').addEventListener('click',async()=>{
+ let revoked=false;
+ try{revoked=(await session.signOut()).provider_logout_confirmed;}
+ catch{session.clear();}
+ state.discoveryReady=false;
+ $('workspace').style.display='none';$('signIn').style.display='block';
+ $('conversation').replaceChildren();resetIntegrity();
+ status('loginNotice',revoked?'Signed out on this device and the provider.':
+   'Signed out on this device. Provider revocation could not be confirmed.');
+});
+$('newConversation').addEventListener('click',newConversation);
+$('retryRecovery').addEventListener('click',async()=>{
+ if(!state.accessToken){status('chatNotice','Sign in to inspect saved conversations.',true);return}
+ $('retryRecovery').disabled=true;
+ try{await refreshConversationInventory();await refreshHistory();}
+ catch(e){state.discoveryReady=false;$('savedConversations').textContent='Server recovery still unavailable. Nothing was deleted.';status('chatNotice','Recovery verification failed: '+e.message,true);}
+ finally{$('retryRecovery').disabled=false}
+});
+async function checkPendingTurn(){
+ if(!state.accessToken)throw Error('Sign in to inspect a turn.');
+ const pending=state.pendingTurn;
+ if(!pending)throw Error('No pending turn is recorded on this device.');
+ const q=new URLSearchParams({
+  conversation_id:pending.conversationId,thought_id:'personal',turn_id:pending.turnId,
+ });
+ const res=await authFetch('/api/reality/standalone-turn-status?'+q,{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
+ });
+ const data=await res.json();
+ if(!res.ok)throw Error(data.error||'Turn receipt could not be checked');
+ $('reconcileTurn').hidden=data.status!=='SEQUENCE_FENCE_UNRESOLVED';
+ if(data.status==='COMMITTED'&&data.receipt?.verified_chain){
+  state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+  if(pending.conversationId===state.conversationId)await refreshHistory();
+  status('chatNotice','Confirmed: the prior turn completed with verified receipts. Its reply was restored from storage.');
+ }else if(data.status==='NOT_RECEIVED'){
+  state.pendingRetryApproved=true;
+  status('chatNotice','The original turn ID has no durable customer record. You can press Send once more with the ORIGINAL message; Reality will reuse the same turn ID.');
+ }else{
+  state.pendingRetryApproved=false;
+  status('chatNotice','Turn '+data.status+'. No verified completion. Do not submit it again; it needs reconciliation.',true);
+ }
+ return data;
+}
+$('checkTurn').addEventListener('click',async()=>{
+ try{await checkPendingTurn()}
+ catch(e){status('chatNotice',e.message||'Status unavailable',true)}
+});
+$('inspectRecovery').addEventListener('click',async()=>{
+ const pending=state.reviewSelection||
+  (state.pendingTurn?.conversationId===state.conversationId?state.pendingTurn:null);
+ if(!state.accessToken||!pending){
+  status('chatNotice','Sign in and choose an interrupted turn in the recovered conversation.',true);return;
+ }
+ $('inspectRecovery').disabled=true;
+ try{
+  const params=new URLSearchParams({conversation_id:pending.conversationId,
+   thought_id:'personal',turn_id:pending.turnId});
+  const response=await authFetch('/api/reality/standalone-recovery-review?'+params,{
+   method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
+  const result=await response.json();
+  if(!response.ok||result.review_is_a_durable_receipt!==false)
+   throw Error(result?.error||'Recovery review could not be verified');
+  const resultBox=$('recoveryEvidence');resultBox.replaceChildren();
+  const lines=[
+   'Recovery classification: '+result.review.status,
+   'Saved user message: '+(result.phase_evidence.user_message_saved?'YES':'NO'),
+   'Processing receipt: '+(result.phase_evidence.processing_receipt_saved?'YES':'NO'),
+   'Interruption receipt: '+(result.phase_evidence.interruption_receipt_saved?'YES':'NO'),
+   'Verified assistant completion: '+(result.phase_evidence.committed_result_verified?'YES':'NO'),
+   'Model call outcome: NOT ESTABLISHED',
+   'Action outcome: NOT ESTABLISHED',
+   'Next step: '+result.review.next_action,
+   'No model calls, evidence changes or fence releases were performed by this review.',
+  ];
+  for(const line of lines){
+   const p=document.createElement('p');p.textContent=line;resultBox.append(p);
+  }
+ }catch(e){status('chatNotice','Recovery evidence inspection failed: '+e.message,true)}
+ finally{$('inspectRecovery').disabled=false}
+});
+$('reconcileTurn').addEventListener('click',async()=>{
+ const pending=state.pendingTurn;
+ if(!state.accessToken||!pending){status('chatNotice','Sign in and check the interrupted turn first.',true);return}
+ $('reconcileTurn').disabled=true;
+ try{
+  const res=await authFetch('/api/reality/standalone-reconcile',{
+   method:'POST',cache:'no-store',
+   headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},
+   body:JSON.stringify({conversation_id:pending.conversationId,
+    thought_id:'personal',turn_id:pending.turnId}),
+  });
+  const data=await res.json();
+  if(!res.ok)throw Error(data.error||'Recovery evidence could not be verified');
+  if(!data.recovered){
+   status('chatNotice','Turn requires review: '+(data.underlying_turn_status||'not independently completed')+
+    '. No model retry or lock release occurred.',true);
+   return;
+  }
+  if(data.receipt?.verified_chain!==true||data.receipt?.sequence_status!=='FINISHED')
+   throw Error('Recovery was not independently confirmed.');
+  state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+  $('reconcileTurn').hidden=true;
+  if(pending.conversationId===state.conversationId)await refreshHistory();
+  status('chatNotice','Previously saved reply verified and recovered without another AI generation.');
+ }catch(error){
+  status('chatNotice',error.message||'Recovery remains unresolved',true);
+ }finally{$('reconcileTurn').disabled=false}
+});
+$('send').addEventListener('click',async()=>{
+ const message=$('prompt').value.trim();
+ if(!message)return;
+ if(!state.accessToken){status('chatNotice','Sign in first.',true);return}
+ if(!state.discoveryReady){status('chatNotice','Account recovery must succeed before sending.',true);return}
+ if(state.serverUnresolved.length){
+  status('chatNotice','This conversation has a server-verified unresolved turn. Inspect its evidence instead of sending.',true);return;
+ }
+ if(state.pendingTurn&&(!state.pendingRetryApproved||
+    state.pendingTurn.conversationId!==state.conversationId)){
+  status('chatNotice','An earlier turn has not been verified. Check interrupted turn before sending anything else.',true);
+  return;
+ }
+ const turnId=state.pendingTurn?.turnId||crypto.randomUUID();
+ if(!state.pendingTurn){
+  state.pendingTurn={turnId,conversationId:state.conversationId};
+  savePending();
+ }
+ state.pendingRetryApproved=false;
+ $('send').disabled=true;status('chatNotice','Submitting to independent Reality...');
+ try{
+  const res=await authFetch('/api/reality/standalone-chat',{method:'POST',headers:{
+   'Content-Type':'application/json',Authorization:'Bearer '+state.accessToken,
+  },body:JSON.stringify({message,conversation_id:state.conversationId,thought_id:'personal',
+   turn_id:turnId})});
+  const data=await res.json();
+  if(!res.ok)throw Error(data?.error||'Reality could not confirm the turn.');
+  if(data.receipt?.verified_chain!==true||data.receipt?.turn_commit_status!=='COMMITTED'||
+    (data.receipt?.sequence_num!==undefined&&data.receipt?.sequence_status!=='FINISHED'))
+   throw Error('No independently verified and finalized causal-turn receipt.');
+  state.pendingTurn=null;savePending();$('reconcileTurn').hidden=true;
+  // Never represent a model response as published unless a commit was read back.
+  await refreshHistory();
+  $('prompt').value='';
+  if(data.result)readout(data.result);
+  localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+  status('chatNotice','Completed: customer message, model output and cognition are linked by an independently verified commit.');
+ }catch(err){
+  status('chatNotice',(err.message||'Unable to complete the turn')+
+   ' This turn has been held for reconciliation. Select Check interrupted turn.',true);
+ }
+ finally{$('send').disabled=false}
+});
+// One-click live pilot: exactly TWO application chat turns, never any automatic
+// restart or model retry. Underlying orchestration may make more provider calls.
+$('runContinuityProof').addEventListener('click',async()=>{
+ if(state.testRunning)return;
+ if(!state.accessToken||!state.discoveryReady){
+  status('continuityProof','Sign in and restore verified conversations first.',true);return;
+ }
+ if(state.pendingTurn||state.serverUnresolved.length){
+  status('continuityProof','An existing turn needs review. Resolve its status before a live test; no evidence was changed.',true);return;
+ }
+ if(!window.confirm('Run two fresh Reality chat turns with the real model? This may incur provider charges and the underlying engine can make multiple model calls per turn. Stop on the first failure; never automatically retry.')){
+  return;
+ }
+ state.testRunning=true;$('runContinuityProof').disabled=true;
+ const firstMessage='For the construction job, do not send an estimate until the homeowner approves it.';
+ const secondMessage='What exact rule did I give you about sending the estimate?';
+ const conversationId=crypto.randomUUID();
+ state.conversationId=conversationId;
+ state.serverUnresolved=[];state.reviewSelection=null;
+ localStorage.setItem('reality-standalone-conversation-v01',conversationId);
+ $('conversation').replaceChildren();
+ $('conversationIdLabel').textContent='Automated test '+conversationId.slice(0,8);
+ $('unresolvedPicker').replaceChildren();
+ const sendProofTurn=async (message,turnNumber)=>{
+  const turnId=crypto.randomUUID();
+  state.pendingTurn={conversationId,turnId};savePending();
+  status('continuityProof','Testing turn '+turnNumber+'/2. Awaiting independently verified commit...');
+  const response=await authFetch('/api/reality/standalone-chat',{
+   method:'POST',cache:'no-store',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({message,conversation_id:conversationId,thought_id:'personal',turn_id:turnId}),
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error('Turn '+turnNumber+' returned '+(payload.error||'HTTP '+response.status));
+  if(payload?.receipt?.verified_chain!==true||
+     payload?.receipt?.turn_commit_status!=='COMMITTED'||
+     (payload.receipt.sequence_num!==undefined&&payload.receipt.sequence_status!=='FINISHED')){
+    throw Error('Turn '+turnNumber+' has no verified and finalized commit receipt');
+  }
+  state.pendingTurn=null;savePending();
+  return payload;
+ };
+ try{
+  const first=await sendProofTurn(firstMessage,1);
+  const second=await sendProofTurn(secondMessage,2);
+  const query=new URLSearchParams({conversation_id:conversationId,thought_id:'personal'});
+  const res=await authFetch('/api/reality/standalone-history?'+query,{
+   method:'GET',cache:'no-store',
+  });
+  const history=await res.json().catch(()=>({}));
+  if(!res.ok||!Array.isArray(history.messages))
+   throw Error('Server-owned history could not be independently reloaded.');
+  const messages=history.messages;
+  const userInstructions=messages.filter(m=>m.role==='user').map(m=>m.text);
+  const assistantMessages=messages.filter(m=>m.role==='assistant').map(m=>m.text);
+  if(!userInstructions.includes(firstMessage)||!userInstructions.includes(secondMessage)||
+     assistantMessages.length<2||(history.unresolved_turns||[]).length){
+   throw Error('Committed turn history could not be restored exactly. Review evidence before continuing.');
+  }
+  await refreshHistory();
+  status('continuityProof','PASS: two app turns committed and both user instructions survived a fresh server read.\n'+
+    'Original rule: '+firstMessage+'\n'+
+    'Reality reply to recall check: '+(second.response||assistantMessages.at(-1))+'\n'+
+    'Cognition accuracy and cross-reload browser persistence still need evaluation.');
+  status('chatNotice','Automated two-turn continuity pilot completed. Reload the page to confirm your session and history are restored.');
+ }catch(e){
+  // Leave the exact failed turn selector intact for manual read-only inspection.
+  status('continuityProof','STOPPED: '+(e?.message||'Unknown failure')+
+   '. No failed turn was retried. Inspect its recorded status before continuing.',true);
+  status('chatNotice','The test stopped without inventing a success receipt.',true);
+ }finally{
+  state.testRunning=false;$('runContinuityProof').disabled=false;
+ }
+});
+
+async function refreshReadiness(){
+ try{
+  const response=await fetch('/api/reality/standalone-readiness',{cache:'no-store'});
+  const state=await response.json();
+  if(!response.ok||!state.ok)throw Error(state.error||'Readiness status unavailable');
+  $('readinessSummary').textContent=state.status==='NOT_READY'
+    ? 'Chat is intentionally disabled until its sandbox server and model configuration are complete.'
+    : 'Required settings are present. Live authentication and persistence are NOT yet verified.';
+  $('readinessMissing').textContent=state.missing.length?
+    'Required settings not ready: '+state.missing.join(', '):
+    'No configuration items missing. Live provider testing is still required.';
+  if(state.status!=='CONFIGURED_NOT_LIVE_VERIFIED'){
+    $('login').disabled=true;$('signup').disabled=true;
+  }
+ }catch(e){
+  $('readinessSummary').textContent='Could not check readiness: '+e.message;
+  $('login').disabled=true;$('signup').disabled=true;
+ }
+}
+refreshReadiness();
+config().then(async()=>{
+ status('loginNotice','Independent identity configuration present.');
+ await consumeConfirmationCallback();
+ if(!state.accessToken){
+  try{if(await session.restore())await enterWorkspace('Welcome back. Your saved session was restored.');}
+  catch(e){status('loginNotice','Previous sign-in could not be restored: '+e.message,true);}
+ }
+}).catch(e=>status('loginNotice',e.message,true));
+const keepSessionFresh=()=>{
+ if(!document.hidden&&state.accessToken)session.accessToken().catch(e=>{
+  status('chatNotice','Your session needs attention: '+e.message,true);
+ });
+};
+document.addEventListener('visibilitychange',keepSessionFresh);
+window.addEventListener('focus',keepSessionFresh);
+</script>
+</body></html>
