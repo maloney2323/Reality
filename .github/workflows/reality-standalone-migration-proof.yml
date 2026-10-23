@@ -9,6 +9,8 @@ on:
       - src/reality-verified-layer-handoff-v0.1.js
       - test/reality-verified-layer-handoff-v0.1.test.js
       - sql/REVIEW_ONLY_preview_atomic_abandonment_v1.sql
+      - src/reality-abandoned-turn-readback-v1.js
+      - test/reality-abandoned-turn-readback-v1.test.js
       - src/reality-standalone-abandonment-v1.js
       - api/reality/standalone-abandonment.js
       - test/reality-standalone-abandonment-v1.test.js
@@ -61,6 +63,7 @@ jobs:
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-native-universe-persistence-v1.0.js
           node --check src/reality-verified-layer-handoff-v0.1.js
+          node --check src/reality-abandoned-turn-readback-v1.js
           node --check src/reality-standalone-abandonment-v1.js
           node --check api/reality/standalone-abandonment.js
           node --check src/reality-incomplete-turn-abandonment-plan-v0.1.js
@@ -83,6 +86,8 @@ jobs:
         run: node --test test/reality-verified-layer-handoff-v0.1.test.js
       - name: Browser restoration and server-owned interrupted-turn selection
         run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
+      - name: Preserve original user intent and verify abandoned-turn evidence hashes
+        run: node --test test/reality-abandoned-turn-readback-v1.test.js
       - name: Owner-confirmed server-only abandoned-turn recovery (mocked database)
         run: node --test test/reality-standalone-abandonment-v1.test.js
       - name: SQL static review guards (NOT live SQL integration)
