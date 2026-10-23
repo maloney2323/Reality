@@ -4,6 +4,9 @@
 import {createUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
 import {persistUniverseEntry,retrievePersistedUniverse} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
+import {retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
+import {loadStandaloneObligations,captureStandaloneObligations,assessStandaloneObligationProposal}
+ from './reality-standalone-obligations-v0.1.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,
  rejectUnsafeStandalonePayload,scopedTurnEntryId,requireStandaloneReady,
  STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
@@ -75,6 +78,7 @@ export async function processStandaloneChat(req,{
  fetchImpl=fetch,env=process.env,
  load=retrievePersistedUniverse,store=persistUniverseEntry,
  run=runLiveIntelligenceOrchestration,
+ obligationLookup=retrieveOptionalPersistedUniverseEntry,
  now=()=>new Date().toISOString(),
 }={}){
  if(env.REALITY_STANDALONE_CHAT_ENABLED!=='true')
@@ -96,6 +100,10 @@ export async function processStandaloneChat(req,{
  if(stored?.status!=='AVAILABLE'||!Array.isArray(stored.entries))
   throw error('STANDALONE_LEDGER_UNAVAILABLE',503);
  const history=reconstructStandaloneHistory({entries:stored.entries,scope});
+ // Explicit Preview-only experiment. Load owner-scoped observations from the
+ // standalone Universe; never trust a browser or model-supplied observation.
+ const observedObligations=env.REALITY_STANDALONE_OBLIGATION_OBSERVATION_ENABLED==='true'
+   ?await loadStandaloneObligations({scope,load,fetchImpl}):null;
  const userEntryId=scopedTurnEntryId({
   root:scope.continuity_root_id,turnId:input.turnId,role:'user'});
  if(stored.entries.some(x=>x.entry_id===userEntryId))
@@ -120,6 +128,13 @@ export async function processStandaloneChat(req,{
    // Explicitly avoid accepting browser supplied external facts.
    universe_entries:[],connected_world_observations:[],
    verified_conversation_context:history.map(x=>x.role.toUpperCase()+': '+x.text).join('\n'),
+   ...(observedObligations?{verified_user_condition_observations:
+     observedObligations.view.observed_conditions.slice(-32).map(o=>({
+       original_user_text:o.original_user_text,
+       action_text:o.action_text,condition_text:o.condition_text,
+       evidence_ref:o.observation_entry_id,
+       authority:'OBSERVED_USER_INTENT_NOT_EXTERNAL_APPROVAL',
+     }))}:{}),
   },
   fetchImpl,
  });
@@ -133,6 +148,28 @@ export async function processStandaloneChat(req,{
  if(typeof rawAnswer!=='string'||!rawAnswer.trim()||
     typeof displayedAnswer!=='string')
   throw error('STANDALONE_RESPONSE_MISSING',503);
+ let observedObligationReceipt=null;
+ if(observedObligations){
+  const newlyRecorded=await captureStandaloneObligations({
+   scope,userEntry:accepted.entry,signalHandoffVerified:true,
+   store,lookup:obligationLookup,fetchImpl,
+  });
+  const observedAll=[...observedObligations.entries,...newlyRecorded.observation_entries];
+  const assessed=assessStandaloneObligationProposal({
+   scope,entries:observedAll,modelAnswer:rawAnswer,
+   modelResponseId:result?.intelligence?.response_id||'untracked',
+  });
+  observedObligationReceipt=Object.freeze({
+   captured_from_this_turn:newlyRecorded.created_count,
+   observed_conditions_scoped:assessed.observed_condition_count,
+   proposal_assessment_status:assessed.status,
+   candidate_findings:assessed.candidate_findings,
+   independent_approval_verification:assessed.independent_approval_verification,
+   coverage_full_history_verified:false,
+   underlying_drift_rate:null,residual_drift_rate:null,
+   action_authorized:false,action_executed:false,
+  });
+ }
  const assistantEntryId=scopedTurnEntryId({
   root:scope.continuity_root_id,turnId:input.turnId,role:'assistant'});
  const assistant=await store(makeTurnEntry({
@@ -155,6 +192,7 @@ export async function processStandaloneChat(req,{
    cognitive_readback_verified:true,
    history_window_count:history.length,
    history_is_complete:false,
+   ...(observedObligationReceipt?{observed_obligations:observedObligationReceipt}:{}),
   },
   external_action_executed:false,
  });
