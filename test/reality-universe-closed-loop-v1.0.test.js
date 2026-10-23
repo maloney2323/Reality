@@ -155,7 +155,7 @@ test('ledger has immutable entry identities, conflicting entries fail',async()=>
  await assert.rejects(ledger.append(createUniverseEntry({...entry,payload:{version:2}})),
   /UNIVERSE_IMMUTABLE_ENTRY_VIOLATION/);
 });
-test('model extraction is trusted for neither span invention nor source identity',async()=>{
+test('invalid invented claim span triggers bounded repair and safe uncertainty, never silent verification',async()=>{
  const raw='I will send the final estimate now.';
  const fx=fixture(raw,'unused',()=>[claim('ACTION_COMMITMENT',
    'Fabricated span not in the real model answer')]);
@@ -163,7 +163,9 @@ test('model extraction is trusted for neither span invention nor source identity
  const r=await runUniverseClosedLoopTurn(args(fx,ledger));
  assert.equal(r.original_typed_claims.length,0);
  assert.equal(r.evidence_repair_verified,false);
- assert.equal(r.final_answer,raw);
+ assert.equal(r.correction_attempted,true);
+ assert.equal(r.delivery_status,'UNCERTAINTY_DISCLOSED_ACTION_WITHHELD');
+ assert.notEqual(r.final_answer,raw);
 });
 
 
