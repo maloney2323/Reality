@@ -54,6 +54,6 @@ export function getEvaluatorOracle(){
   expected_answers:exactArithmetic,
   reference_rules:CTB_GRADING_ANCHORS,
   semantic_targets:CTB_SEMANTIC_TARGETS,
-  100_turns_expected:CTB_TURNS.length,
+  expected_turn_count:CTB_TURNS.length,
  };
 }
