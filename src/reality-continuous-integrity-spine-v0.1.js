@@ -137,7 +137,7 @@ export function advanceIntegritySpine({
     });
   }
   for(const issue of observedModelFindings){
-    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW','CONVERSATIONAL_RETROSPECTIVE_DRIFT'].includes(issue.classification)||
+    if(!nonempty(issue?.issue_id)||!['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM','CONTESTED_SOURCE_REFERENCE','CONVERSATIONAL_PRECONDITION_DRIFT','CONVERSATIONAL_REVISION_REQUIRES_REVIEW','CONVERSATIONAL_RETROSPECTIVE_DRIFT','STALE_RESPONSE_REPLAY','POSSIBLE_CURRENT_TURN_MISALIGNMENT'].includes(issue.classification)||
        issue.origin_stage!==stage||issue.independently_adjudicated!==false||
        !Array.isArray(issue.source_receipt_refs)||!issue.source_receipt_refs.length||
        !issue.source_receipt_refs.every(nonempty))throw Error('SPINE_MODEL_FINDING_UNTRUSTED');
@@ -282,6 +282,66 @@ function possibleRevision(t,anchor){
  return /\b(?:actually|instead|change|override|no longer|you can now|go ahead|forget the earlier|remove the restriction)\b/i.test(t)&&
    matchesAction(t,anchor);
 }
+// One bounded, source-backed response-to-request check in the existing Spine.
+// This is a diagnostic candidate, never an independent semantic truth verdict.
+// Reuses authenticated turns; does not trust client supplied chat history.
+function tokenOverlap(a,b){
+  const left=new Set(terms(a)),right=new Set(terms(b));
+  if(!left.size||!right.size)return 0;
+  let hits=0;for(const token of left)if(right.has(token))hits++;
+  return hits/left.size;
+}
+function tokenJaccard(a,b){
+  const left=new Set(terms(a)),right=new Set(terms(b));
+  if(!left.size||!right.size)return 0;
+  let hits=0;for(const token of left)if(right.has(token))hits++;
+  return hits/(left.size+right.size-hits);
+}
+function findTurnAlignmentCandidate({priorTurns,currentUserMessage,modelAnswer,
+  continuityRootId,modelResponseId,currentUserSourceRef,authenticated}){
+  if(!authenticated||!currentUserMessage.trim()||!modelAnswer.trim())return null;
+  const lastAssistantIndex=priorTurns.map((t,i)=>t.role==='assistant'?i:-1).filter(i=>i>=0).at(-1);
+  if(lastAssistantIndex===undefined)return null;
+  const previous=priorTurns[lastAssistantIndex];
+  const previousUser=priorTurns.slice(0,lastAssistantIndex).reverse().find(t=>t.role==='user');
+  if(!previousUser)return null;
+  const currentWords=new Set(terms(currentUserMessage));
+  const responseWords=new Set(terms(modelAnswer));
+  // Short acknowledgements and vague follow-ups cannot be classified reliably.
+  if(currentWords.size<4||responseWords.size<6)return null;
+  const responseReplay=tokenJaccard(modelAnswer,previous.text);
+  const userTopicShift=tokenJaccard(currentUserMessage,previousUser.text);
+  const currentRequestCoverage=tokenOverlap(currentUserMessage,modelAnswer);
+  const priorRequestCoverage=tokenOverlap(previousUser.text,modelAnswer);
+  // Prioritize high-evidence recycled answers. A repeated question is not drift.
+  const stale=responseReplay>=0.58&&userTopicShift<=0.35&&currentRequestCoverage<=0.29;
+  // Detect some paraphrased old-topic answers, but do not treat lexical
+  // differences or synonym use alone as independent proof of wrong meaning.
+  const oldTopic= !stale&&userTopicShift<=0.24&&
+    currentRequestCoverage<=0.13&&priorRequestCoverage>=0.5&&
+    responseReplay>=0.3;
+  if(!stale&&!oldTopic)return null;
+  const classification=stale?'STALE_RESPONSE_REPLAY':'POSSIBLE_CURRENT_TURN_MISALIGNMENT';
+  return Object.freeze({
+    issue_id:'conversation-drift:'+sha([continuityRootId,currentUserSourceRef,
+      modelResponseId,classification,previous.source_ref]).slice(7,39),
+    classification,origin_stage:'COGNITION',
+    source_receipt_refs:[currentUserSourceRef,previousUser.source_ref,
+      previous.source_ref,'model-response:'+modelResponseId],
+    original_user_text:currentUserMessage.slice(0,400),
+    observed_model_text:modelAnswer.slice(0,400),
+    reason:'Reply appears to follow the previous turn rather than the current request',
+    diagnostic_signals:{
+      prior_response_similarity:responseReplay,
+      prior_user_topic_similarity:userTopicShift,
+      current_request_token_coverage:currentRequestCoverage,
+      prior_request_token_coverage:priorRequestCoverage,
+    },
+    assessment_scope:'BOUNDED_LEXICAL_REPLAY_CANDIDATE_NOT_SEMANTIC_TRUTH',
+    independently_adjudicated:false,verified_hallucination:false,
+    auto_correction_authorized:false,
+  });
+}
 export function inspectConversationDrift({
  priorTurns=[],currentUserMessage='',modelAnswer='',continuityRootId,
  modelResponseId='untracked',currentUserSourceRef='current:user:signal',
@@ -307,6 +367,10 @@ export function inspectConversationDrift({
  for(const anchor of extractUserIntentAnchors(currentUserMessage,currentUserSourceRef,eligible.length))
   if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
  const findings=[],revisions=[];
+ const turnAlignment=findTurnAlignmentCandidate({priorTurns:eligible,
+   currentUserMessage,modelAnswer,continuityRootId,modelResponseId,
+   currentUserSourceRef,authenticated});
+ if(turnAlignment)findings.push(turnAlignment);
  for(const anchor of anchors){
   if(anchor.source_ref!==currentUserSourceRef&&possibleRevision(currentUserMessage,anchor)){
    revisions.push({anchor_id:anchor.anchor_id,status:'REVISION_PROPOSED_NOT_ADJUDICATED'});
@@ -344,7 +408,7 @@ export function inspectConversationDrift({
   version:CONVERSATIONAL_CONTINUITY_VERSION,
   status:findings.length?'EARLY_CONVERSATION_DRIFT_RISK':
    anchors.length?'LIMITED_CONVERSATION_CHECK_NO_FLAG':'NO_EXTRACTABLE_CONVERSATION_ANCHOR',
-  assessment_scope:'EXPLICIT_USER_CONDITIONAL_INTENT_AND_AFFIRMATIVE_ACTION_PROPOSALS_ONLY',
+  assessment_scope:'EXPLICIT_CONDITIONS_AND_BOUNDED_CURRENT_TURN_ALIGNMENT',
   history_scope:authenticated?'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT':'CURRENT_USER_TURN_ONLY',
   observed_prior_turn_count:eligible.length,anchor_count:anchors.length,
   anchors,revision_candidates:revisions,findings,
