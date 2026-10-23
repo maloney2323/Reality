@@ -152,6 +152,7 @@ async function loadReport(selected=conversationId){
    'Factual: '+fmt(t.factual_integrity_status),
    'Drift: '+fmt(t.drift_status),
    'Replay: '+fmt(t.trajectory_status),
+   'Intelligence Spine v1: '+fmt(t.intelligence_spine_v1_status),
    'Spine: '+traces.length+'/4',
    'Findings: '+(t.detector_findings||[]).length]){
    evidence.append(el('span',label));
@@ -161,6 +162,15 @@ async function loadReport(selected=conversationId){
   details.append(el('p','User receipt: '+fmt(t.user_source_entry_id),'micro'));
   details.append(el('p','Assistant receipt: '+fmt(t.assistant_source_entry_id),'micro'));
   details.append(el('p','Continuity receipt: '+fmt(t.diagnostic_entry_id),'micro'));
+  details.append(el('p','Intelligence Spine v1 receipt: '+fmt(t.intelligence_spine_v1_receipt),'micro'));
+  if(t.intelligence_spine_v1_coverage){
+   const cv=t.intelligence_spine_v1_coverage;
+   for(const [area,obj] of Object.entries(cv))
+    details.append(el('p','v1 '+area+': '+fmt(obj?.status)+
+      (obj?.independent_truth_adjudication?' · independent truth: '+obj.independent_truth_adjudication:''),'micro'));
+   details.append(el('p','v1 candidates: '+t.intelligence_spine_v1_candidate_count+
+    ' · no verified hallucination percentage or self-certified correction','micro'));
+  }
   for(const cp of t.integrity_spine_checkpoints||[])
    details.append(el('p',cp.stage+' · '+fmt(cp.hash)+' · truth verdict '+fmt(cp.independent_truth_verdict),'micro'));
   for(const f of t.detector_findings||[])
