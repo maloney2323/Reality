@@ -8,6 +8,9 @@ on:
       - src/reality-native-universe-persistence-v1.0.js
       - src/reality-verified-layer-handoff-v0.1.js
       - test/reality-verified-layer-handoff-v0.1.test.js
+      - src/reality-turn-recovery-review-v1.0.js
+      - api/reality/standalone-recovery-review.js
+      - test/reality-turn-recovery-review-v1.0.test.js
       - src/reality-standalone-conversation-recovery-v0.1.js
       - api/reality/standalone-conversations.js
       - api/reality/standalone-legacy-preview.js
@@ -49,6 +52,8 @@ jobs:
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-native-universe-persistence-v1.0.js
           node --check src/reality-verified-layer-handoff-v0.1.js
+          node --check src/reality-turn-recovery-review-v1.0.js
+          node --check api/reality/standalone-recovery-review.js
           node --check src/reality-standalone-conversation-recovery-v0.1.js
           node --check api/reality/standalone-conversations.js
           node --check api/reality/standalone-legacy-preview.js
@@ -64,6 +69,8 @@ jobs:
           node --check api/reality/standalone-readiness.js
       - name: Signal cleaner JSONB receipt integrity and durable handoff
         run: node --test test/reality-verified-layer-handoff-v0.1.test.js
+      - name: Preview-only read-only recovery classifier; no paid model calls
+        run: node --test test/reality-turn-recovery-review-v1.0.test.js
       - name: Independent Auth and owner-root continuity
         run: node --test test/reality-standalone-chat-v0.1.test.js
       - name: Authenticated conversation discovery and legacy recovery (no provider calls)
