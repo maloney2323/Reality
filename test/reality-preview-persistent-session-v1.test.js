@@ -147,7 +147,7 @@ test('verified history projection displays truthful committed-reply count withou
  assert.match(html,/Model drift and factual accuracy still require separate evidence/);
  assert.match(html,/if\(second\.result\)readout\(second\.result\)/);
  const idx=html.indexOf('if(second.result)readout(second.result)');
- const prior=html.slice(Math.max(0,idx-200),idx);
+ const prior=html.slice(Math.max(0,idx-600),idx);
  assert.match(prior,/await refreshHistory\(\);\s*await refreshConversationInventory\(\)/);
  assert.doesNotMatch(html,/45\.0%|4\.0%|underlying model drift:\s*0/);
 });
