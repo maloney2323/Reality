@@ -202,7 +202,7 @@ test('authenticated history displays only committed model replies; unfinished us
  const x=rig({failCommit:true});
  await assert.rejects(()=>processCausalTurn(req(),x.opts),
    /SYNTHETIC_COMMIT_STORAGE_OUTAGE/);
- const history=await getCommittedStandaloneHistory(req(),{
+ const history=await getCommittedStandaloneHistory({...req(),query:{conversation_id:'job-1',thought_id:'personal'}},{
   env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
  });
  assert.equal(history.messages.length,1);
@@ -215,7 +215,7 @@ test('authenticated history displays only committed model replies; unfinished us
 test('authenticated committed history presents only fully verified two-message turn',async()=>{
  const x=rig();
  await processCausalTurn(req(),x.opts);
- const history=await getCommittedStandaloneHistory(req(),{
+ const history=await getCommittedStandaloneHistory({...req(),query:{conversation_id:'job-1',thought_id:'personal'}},{
   env,fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
  });
  assert.equal(history.messages.length,2);
