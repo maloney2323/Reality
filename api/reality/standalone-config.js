@@ -1,4 +1,4 @@
-import {authConfiguration,assertStandalonePreviewIsolation} from '../../src/reality-standalone-auth-v0.1.js';
+import {authConfiguration,assertStandalonePreviewIsolation,standaloneConfirmationRedirect} from '../../src/reality-standalone-auth-v0.1.js';
 export default function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  if(req.method!=='GET')return res.status(405).json({ok:false,error:'METHOD_NOT_ALLOWED'});
@@ -8,6 +8,6 @@ export default function handler(req,res){
   // A Supabase publishable key is designed to be shipped in browser clients.
   // Never expose SUPABASE_SECRET_KEY or Reality's persistence credentials.
   assertStandalonePreviewIsolation();
-  return res.status(200).json({ok:true,...authConfiguration()});
+  return res.status(200).json({ok:true,...authConfiguration(),confirmation_redirect_url:standaloneConfirmationRedirect()});
  }catch{return res.status(503).json({ok:false,error:'STANDALONE_AUTH_NOT_CONFIGURED'})}
 }
