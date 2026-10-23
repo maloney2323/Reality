@@ -1,0 +1,57 @@
+name: Reality Disposable PostgreSQL Abandonment Proof
+on:
+  pull_request:
+    paths:
+      - sql/REVIEW_ONLY_preview_atomic_abandonment_v1.sql
+      - src/reality-standalone-abandonment-v1.js
+      - src/reality-abandoned-turn-readback-v1.js
+      - test/fixtures/ephemeral-postgres-recovery-schema.sql
+      - test/fixtures/generate-ephemeral-abandonment-fixture.mjs
+      - .github/workflows/reality-ephemeral-abandonment-postgres.yml
+permissions:
+  contents: read
+jobs:
+  ephemeral-postgres-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: syntheticonly
+          POSTGRES_DB: reality_ephemeral_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reality_ephemeral_test"
+          --health-interval 5s --health-timeout 4s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: syntheticonly
+      PGDATABASE: reality_ephemeral_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Confirm isolated PostgreSQL service and schema
+        run: |
+          psql --version
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/ephemeral-postgres-recovery-schema.sql
+      - name: Load REVIEW ONLY function into throwaway database
+        run: |
+          psql -v ON_ERROR_STOP=1 -f sql/REVIEW_ONLY_preview_atomic_abandonment_v1.sql
+      - name: Generate actual JS Universe receipt hashes and synthetic SQL
+        run: node test/fixtures/generate-ephemeral-abandonment-fixture.mjs
+      - name: Verify signed hash parity, atomic abandonment, idempotency, late-write ban, role denial
+        run: |
+          psql -v ON_ERROR_STOP=1 -f /tmp/reality-ephemeral-fixture.sql
+      - name: Explicit proof limits
+        run: |
+          echo "POSTGRESQL WAS AN EPHEMERAL GITHUB SERVICE; NOT REALITY SUPABASE."
+          echo "Synthetic records only; no customer account, model call, or live lock touched."
+          echo "This job does not approve deploying the SQL or enabling abandonment."
