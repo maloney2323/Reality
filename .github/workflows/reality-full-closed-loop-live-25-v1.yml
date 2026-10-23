@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: JS source and runner syntax
+      - name: Parse all real-model and epistemic-uncertainty source
         run: |
           node --check src/reality-universe-closed-loop-v1.0.js
           node --check scripts/run-reality-25-live-closed-loop-v1.mjs
