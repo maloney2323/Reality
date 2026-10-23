@@ -105,20 +105,20 @@ END;
 $finish$;
 
 
--- Recovery only for an already-verified COMMITTED turn whose fence is still
--- active because the original finalization response was lost or process died.
--- No timer or blanket release; remains blocked for all incomplete turns.
+-- Verified recovery of an already-committed turn whose finish ACK was lost.
+-- No release for a partial answer, no lease stealing, no model invocation.
 CREATE OR REPLACE FUNCTION public.reality_reconcile_committed_conversation_turn(
  p_root_id text,p_owner_user_id uuid,p_turn_id text,
  p_commit_entry_id text,p_commit_hash text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $recover$
-DECLARE r public.reality_conversation_turn_fences%ROWTYPE;
-DECLARE e public.reality_universe_entries%ROWTYPE;
-DECLARE predecessor public.reality_universe_entries%ROWTYPE;
-DECLARE u public.reality_universe_entries%ROWTYPE;
-DECLARE a public.reality_universe_entries%ROWTYPE;
-DECLARE processing public.reality_universe_entries%ROWTYPE;
-DECLARE cognition public.reality_universe_entries%ROWTYPE;
+DECLARE
+ r public.reality_conversation_turn_fences%ROWTYPE;
+ e public.reality_universe_entries%ROWTYPE;
+ predecessor public.reality_universe_entries%ROWTYPE;
+ u public.reality_universe_entries%ROWTYPE;
+ a public.reality_universe_entries%ROWTYPE;
+ processing public.reality_universe_entries%ROWTYPE;
+ cognition public.reality_universe_entries%ROWTYPE;
 BEGIN
  IF current_user <> 'service_role' THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_CALLER_DENIED';
@@ -126,34 +126,8 @@ BEGIN
  IF p_root_id IS NULL OR p_owner_user_id IS NULL OR
     p_turn_id IS NULL OR p_commit_entry_id IS NULL OR
     p_commit_hash IS NULL OR
-    p_turn_id !~ '^[A-Za-z0-9:_-]{1,96}
-REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) TO service_role;
-GRANT EXECUTE ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) TO service_role;
-REVOKE ALL ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) TO service_role;
-COMMIT;
-
--- Fail-closed known limitation: if a process dies after durable COMMITTED but
--- before finish RPC, active_turn_id can be released ONLY by the verified
--- COMMITTED evidence reconciliation RPC. Uncommitted work remains blocked.
--- TEST BEFORE RELEASE: simultaneous distinct IDs, same ID, crash, lost finish
--- response, wrong principal, missing commit, corrupted hash, non-service caller.
- OR
-    p_commit_hash !~ '^[0-9a-f]{64}
-REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) TO service_role;
-GRANT EXECUTE ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) TO service_role;
-COMMIT;
-
--- Fail-closed known limitation: if a process dies after durable COMMITTED but
--- before finish RPC, active_turn_id remains locked until a separately verified
--- repair protocol exists. Never clear it on a timer.
--- TEST BEFORE RELEASE: simultaneous distinct IDs, same ID, crash, lost finish
--- response, wrong principal, missing commit, corrupted hash, non-service caller.
- THEN
+    p_turn_id !~ '^[A-Za-z0-9:_-]{1,96}$' OR
+    p_commit_hash !~ '^[0-9a-f]{64}$' THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_INPUT_INVALID';
  END IF;
  SELECT * INTO STRICT r FROM public.reality_conversation_turn_fences
@@ -162,8 +136,7 @@ COMMIT;
     r.worldline_id IS DISTINCT FROM 'reality:primary' THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_OWNER_OR_WORLDLINE_MISMATCH';
  END IF;
- -- The only legal no-op retry is the same most-recent fully committed turn.
- -- Never unlock another active turn or reapply an older commit.
+ -- Safe no-op only for the currently most recent verified commit.
  IF r.active_turn_id IS NULL THEN
   IF r.last_committed_turn_id IS DISTINCT FROM p_turn_id OR
      r.last_committed_entry_id IS DISTINCT FROM p_commit_entry_id OR
@@ -192,19 +165,19 @@ COMMIT;
     e.payload->>'prior_commit_hash' IS DISTINCT FROM r.last_committed_entry_hash OR
     e.payload->>'user_message_entry_id' IS NULL OR
     e.payload->>'assistant_message_entry_id' IS NULL OR
+    e.payload->>'processing_receipt_entry_id' IS NULL OR
     e.payload->>'cognition_ledger_event_id' IS NULL THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_COMMIT_EVIDENCE_INVALID';
  END IF;
- -- Cross-check all four underlying immutable receipts under the same root,
- -- not just a self-asserted COMMITTED row.
+ -- The underlying receipts, not the model, establish durable completion.
  SELECT * INTO STRICT u FROM public.reality_universe_entries
- WHERE entry_id=e.payload->>'user_message_entry_id';
+  WHERE entry_id=e.payload->>'user_message_entry_id';
  SELECT * INTO STRICT a FROM public.reality_universe_entries
- WHERE entry_id=e.payload->>'assistant_message_entry_id';
+  WHERE entry_id=e.payload->>'assistant_message_entry_id';
  SELECT * INTO STRICT processing FROM public.reality_universe_entries
- WHERE entry_id=e.payload->>'processing_receipt_entry_id';
+  WHERE entry_id=e.payload->>'processing_receipt_entry_id';
  SELECT * INTO STRICT cognition FROM public.reality_universe_entries
- WHERE entry_id=e.payload->>'cognition_ledger_event_id';
+  WHERE entry_id=e.payload->>'cognition_ledger_event_id';
  IF u.continuity_root_id IS DISTINCT FROM p_root_id OR
     u.worldline_id IS DISTINCT FROM r.worldline_id OR
     u.event_kind IS DISTINCT FROM 'AUTHENTICATED_CONVERSATION_MESSAGE' OR
@@ -232,12 +205,13 @@ COMMIT;
     cognition.ledger_entry_hash IS DISTINCT FROM e.payload->>'cognition_ledger_hash' THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_DURABLE_CHAIN_INVALID';
  END IF;
- -- Guard predecessor existence and exact hash/sequence in the database too.
+ -- A recovered turn's predecessor must still exist with the same hash.
  IF r.sequence_num>1 THEN
   SELECT * INTO STRICT predecessor FROM public.reality_universe_entries
    WHERE entry_id=r.last_committed_entry_id;
   IF predecessor.ledger_entry_hash IS DISTINCT FROM r.last_committed_entry_hash OR
      predecessor.continuity_root_id IS DISTINCT FROM p_root_id OR
+     predecessor.worldline_id IS DISTINCT FROM r.worldline_id OR
      predecessor.event_kind IS DISTINCT FROM 'REALITY_CAUSAL_TURN_RECEIPT' OR
      predecessor.payload->>'phase' IS DISTINCT FROM 'COMMITTED' OR
      (predecessor.payload->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num-1 THEN
@@ -265,10 +239,11 @@ REVOKE ALL ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,tex
 REVOKE ALL ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_conversation_turn(text,text,uuid,text,uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.reality_finish_conversation_turn(text,uuid,text,uuid,text,text) TO service_role;
-COMMIT;
+REVOKE ALL ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_reconcile_committed_conversation_turn(text,uuid,text,text,text) TO service_role;
 
 -- Fail-closed known limitation: if a process dies after durable COMMITTED but
--- before finish RPC, active_turn_id remains locked until a separately verified
--- repair protocol exists. Never clear it on a timer.
+-- before finish RPC, recover only after validating the complete committed
+-- evidence chain. Incomplete turns remain blocked; never clear on a timer.
 -- TEST BEFORE RELEASE: simultaneous distinct IDs, same ID, crash, lost finish
 -- response, wrong principal, missing commit, corrupted hash, non-service caller.
