@@ -34,6 +34,12 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <main>
 <h1>Your world. Your continuity.</h1>
 <p class="sub">A preview of Reality served from GitHub and Vercel, independent of Base44. The full Base44 interface and historical data have not been migrated. No customer-facing deployment has been changed.</p>
+<section>
+<h2>Live chat connection status</h2>
+<p class="sub" id="readinessSummary">Checking the isolated preview configuration…</p>
+<div id="readinessMissing" class="notice" role="status"></div>
+<small>This displays configuration only. Passing this check would not prove a working Supabase login, durable database write, or real model response.</small>
+</section>
 <section id="signIn">
 <h2>Sign in to a separate Reality account</h2>
 <p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here.</p>
@@ -173,7 +179,27 @@ $('send').addEventListener('click',async()=>{
  }catch(err){status('chatNotice',err.message||'Unable to complete the turn',true)}
  finally{$('send').disabled=false}
 });
-config().then(()=>status('loginNotice','Preview identity provider configured.'))
+async function refreshReadiness(){
+ try{
+  const response=await fetch('/api/reality/standalone-readiness',{cache:'no-store'});
+  const state=await response.json();
+  if(!response.ok||!state.ok)throw Error(state.error||'Readiness status unavailable');
+  $('readinessSummary').textContent=state.status==='NOT_READY'
+    ? 'Chat is intentionally disabled until its sandbox server and model configuration are complete.'
+    : 'Required settings are present. Live authentication and persistence are NOT yet verified.';
+  $('readinessMissing').textContent=state.missing.length?
+    'Required settings not ready: '+state.missing.join(', '):
+    'No configuration items missing. Live provider testing is still required.';
+  if(state.status!=='CONFIGURED_NOT_LIVE_VERIFIED'){
+    $('login').disabled=true;$('signup').disabled=true;
+  }
+ }catch(e){
+  $('readinessSummary').textContent='Could not check readiness: '+e.message;
+  $('login').disabled=true;$('signup').disabled=true;
+ }
+}
+refreshReadiness();
+config().then(()=>status('loginNotice','Independent identity configuration present.'))
  .catch(e=>status('loginNotice',e.message,true));
 </script>
 </body></html>
