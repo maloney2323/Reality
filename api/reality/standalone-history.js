@@ -1,4 +1,4 @@
-import {getStandaloneConversationHistory} from '../../src/reality-standalone-chat-v0.1.js';
+import {getCommittedStandaloneHistory} from '../../src/reality-causal-turn-commit-v0.1.js';
 
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store, private');
@@ -6,7 +6,7 @@ export default async function handler(req,res){
   if(req.method!=='GET')
     return res.status(405).json({ok:false,error:'METHOD_NOT_ALLOWED'});
   try{
-    const result=await getStandaloneConversationHistory(req);
+    const result=await getCommittedStandaloneHistory(req);
     return res.status(200).json(result);
   }catch(e){
     const allowed=new Set([400,401,403,409,503]);
