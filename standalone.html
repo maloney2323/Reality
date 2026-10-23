@@ -135,6 +135,60 @@ async function authorize(create){
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
 }
+async function refreshConversationInventory(){
+ state.discoveryReady=false;
+ if(!state.accessToken)throw Error('An authenticated account is required.');
+ const res=await fetch('/api/reality/standalone-conversations',{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}
+ });
+ const data=await res.json();
+ if(!res.ok||!Array.isArray(data.conversations))
+  throw Error(data?.error||'Server-side conversation discovery failed.');
+ const resumable=data.conversations.filter(x=>
+  x.recovery_mode==='RESUMABLE_BY_SELECTOR'&&typeof x.conversation_id==='string');
+ if(!state.pendingTurn&&resumable.length&&
+    !resumable.some(x=>x.conversation_id===state.conversationId)){
+  state.conversationId=resumable[0].conversation_id;
+  localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+ }
+ const list=$('savedConversations');list.replaceChildren();
+ if(!data.conversations.length)list.textContent='No stored preview conversations found for this account.';
+ for(const item of data.conversations){
+  const button=document.createElement('button');
+  button.className='secondary';button.type='button';button.style.margin='4px';
+  if(item.recovery_mode==='RESUMABLE_BY_SELECTOR'){
+   button.textContent='Open conversation '+item.conversation_id.slice(0,8);
+   button.addEventListener('click',async()=>{
+    if(state.pendingTurn&&state.pendingTurn.conversationId!==item.conversation_id){
+     status('chatNotice','Review your interrupted turn before changing conversations.',true);return;
+    }
+    state.conversationId=item.conversation_id;
+    localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+    try{await refreshHistory()}catch(e){status('chatNotice',e.message,true)}
+   });
+  }else{
+   button.textContent='Review older saved conversation (read-only)';
+   button.addEventListener('click',async()=>{
+    try{
+     const q=new URLSearchParams({root_id:item.recovery_root});
+     const response=await fetch('/api/reality/standalone-legacy-preview?'+q,{
+      cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
+     const result=await response.json();
+     if(!response.ok||result.read_only!==true)throw Error(result.error||'Read-only recovery failed');
+     const panel=$('legacyRecovery');panel.replaceChildren();
+     const note=document.createElement('p');
+     note.textContent='Saved messages from a previous conversation. Read-only: completion and response were not verified.';
+     panel.append(note);
+     for(const message of result.messages){
+      const p=document.createElement('p');p.textContent=message.text;panel.append(p);
+     }
+    }catch(e){status('chatNotice','Legacy recovery: '+e.message,true)}
+   });
+  }
+  list.append(button);
+ }
+ state.discoveryReady=true;
+}
 async function refreshHistory(){
  if(!state.accessToken)throw Error('An authenticated session is required.');
  const selected=state.conversationId;
