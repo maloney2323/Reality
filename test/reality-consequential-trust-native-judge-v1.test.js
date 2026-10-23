@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assessIntelligenceSpineV1} from '../src/reality-intelligence-spine-v1.0.js';
-import {CTB_TURNS} from '../benchmarks/consequential-trust-llm-v1.js';
+import {CTB_TURNS,getModelFacingSequence} from '../benchmarks/consequential-trust-llm-v1.js';
+import {compareConsequentialTrustNativeRuns}
+ from '../benchmarks/consequential-trust-llm-v1.report.js';
 import {realityJudgeTurn,auditRealityJudgments}
  from '../benchmarks/consequential-trust-native-judge-v1.js';
 
@@ -108,4 +110,47 @@ test('no cross-world replay and no forged native receipts',()=>{
     audit_receipt_hash:'sha256:replay',
     classification:'STALE_RESPONSE_REPLAY'}]}),
    /NATIVE_JUDGE_RETROSPECTIVE_ORDER_INVALID/);
+});
+
+test('Reality alone scores both underlying model and Reality treatment; no external referee needed',()=>{
+ const makeArm=mode=>({
+  mode,model:'identical-underlying-model',model_version:'test-lock',
+  sampling_config_hash:'sha256:same-fixed-config',
+  inputs:getModelFacingSequence(),
+  responses:CTB_TURNS.map(t=>({turn_id:t.turn_id,
+    text:'synthetic output',response_id:'response:'+t.turn_id})),
+ });
+ const b=makeArm('DIRECT_NO_REALITY_CONTEXT');
+ const r=makeArm('REALITY_LAYER_ENABLED');
+ const baselineJudgments=CTB_TURNS.map((_,i)=>realityJudgeTurn(makeTurn(i,i<8)));
+ const realityJudgments=CTB_TURNS.map((_,i)=>realityJudgeTurn(makeTurn(i,i<2)));
+ const out=compareConsequentialTrustNativeRuns({
+  baseline:b,reality:r,baselineJudgments,realityJudgments});
+ assert.equal(out.status,'REALITY_NATIVE_SCORES_COMPLETE');
+ assert.equal(out.scoring_authority,'REALITY_NATIVE_INTELLIGENCE_SPINE');
+ assert.equal(out.human_oracle_required,false);
+ assert.equal(out.independent_llm_judge_required,false);
+ assert.equal(out.baseline.audit.self_reported_clear_pct,92);
+ assert.equal(out.reality.audit.self_reported_clear_pct,98);
+ assert.equal(out.self_reported_clear_rate_change_pp,6);
+ assert.equal(out.true_accuracy_pct,null);
+ assert.equal(out.verified_model_uplift,null);
+});
+test('Reality native comparison with missing judge evidence cannot claim full result',()=>{
+ const makeArm=mode=>({
+  mode,model:'identical-underlying-model',model_version:'test-lock',
+  sampling_config_hash:'sha256:same-fixed-config',
+  inputs:getModelFacingSequence(),
+  responses:CTB_TURNS.map(t=>({turn_id:t.turn_id,
+    text:'synthetic output',response_id:'response:'+t.turn_id})),
+ });
+ const out=compareConsequentialTrustNativeRuns({
+  baseline:makeArm('DIRECT_NO_REALITY_CONTEXT'),
+  reality:makeArm('REALITY_LAYER_ENABLED'),
+  baselineJudgments:[realityJudgeTurn(makeTurn(0))],
+  realityJudgments:[realityJudgeTurn(makeTurn(0))],
+ });
+ assert.equal(out.status,'REALITY_NATIVE_SCORES_PARTIAL');
+ assert.equal(out.self_reported_clear_rate_change_pp,null);
+ assert.equal(out.true_accuracy_pct,null);
 });
