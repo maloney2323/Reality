@@ -1,0 +1,56 @@
+name: Reality Live OpenAI 25-Turn Detect Repair Comparison
+on:
+  push:
+    branches:
+      - benchmark/real-openai-25turn-detect-repair-20261023
+    paths:
+      - .github/workflows/reality-construction-25-real-llm-repair.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  governed-25-llm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CONSTRUCTION_25_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Preflight syntax and no synthetic answer injection
+        run: |
+          node --check scripts/run-construction-25-real-llm-governed-v1.mjs
+          node --input-type=module -e "import {CONSTRUCTION_25_CASES as c} from './benchmarks/construction-25turn-drift-v1.js'; if(c.length!==25)process.exit(1)"
+      - name: Existing continuity and source evidence regression checks
+        run: |
+          node --test \
+            test/reality-conversation-drift-spine-v0.3.test.js \
+            test/reality-typed-claim-evidence-v1.0.test.js \
+            test/reality-universe-ignorance-manifest-v1.0.test.js \
+            test/reality-universe-ignorance-durable-reconciliation-v1.0.test.js \
+            test/reality-sandbox-repair-proposal-v1.0.test.js
+      - name: Download original 25 live OpenAI replies (frozen baseline)
+        uses: actions/download-artifact@v4
+        with:
+          name: construction-25turn-openai-reality-evidence
+          run-id: 40030861231
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: benchmark-results
+      - name: LIVE 25 OpenAI turns, source-anchored review, repair and next-turn continuity
+        run: node scripts/run-construction-25-real-llm-governed-v1.mjs
+      - name: Upload governed side-by-side UI and original evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-real-openai-25turn-detect-repair
+          path: |
+            benchmark-results/construction-25-real-llm-repair.json
+            benchmark-results/construction-25-real-llm-repair.html
+          retention-days: 7
+          if-no-files-found: ignore
