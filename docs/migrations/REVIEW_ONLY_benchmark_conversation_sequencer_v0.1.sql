@@ -63,44 +63,35 @@ BEGIN
 END;
 $claim$;
 
+-- Finalization deliberately uses the exact same durable evidence checks as
+-- crash recovery. A valid claim token is required for the live worker.
 CREATE OR REPLACE FUNCTION public.reality_finish_conversation_turn(
  p_root_id text,p_owner_user_id uuid,p_turn_id text,
  p_claim_token uuid,p_commit_entry_id text,p_commit_hash text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $finish$
 DECLARE
  r public.reality_conversation_turn_fences%ROWTYPE;
- e public.reality_universe_entries%ROWTYPE;
+ recovery jsonb;
 BEGIN
- IF current_user <> 'service_role' THEN RAISE EXCEPTION 'REALITY_SEQUENCE_CALLER_DENIED'; END IF;
+ IF current_user <> 'service_role' THEN
+  RAISE EXCEPTION 'REALITY_SEQUENCE_CALLER_DENIED';
+ END IF;
  SELECT * INTO STRICT r FROM public.reality_conversation_turn_fences
   WHERE root_id=p_root_id FOR UPDATE;
- IF r.owner_user_id<>p_owner_user_id OR
+ IF r.owner_user_id IS DISTINCT FROM p_owner_user_id OR
     r.active_turn_id IS DISTINCT FROM p_turn_id OR
-    r.active_claim_token IS DISTINCT FROM p_claim_token THEN
+    r.active_claim_token IS DISTINCT FROM p_claim_token OR
+    p_claim_token IS NULL THEN
   RAISE EXCEPTION 'REALITY_SEQUENCE_CLAIM_STALE_OR_WRONG_OWNER';
  END IF;
- SELECT * INTO STRICT e FROM public.reality_universe_entries
-  WHERE entry_id=p_commit_entry_id;
- IF e.continuity_root_id<>p_root_id OR
-    e.worldline_id<>r.worldline_id OR
-    e.event_kind<>'REALITY_CAUSAL_TURN_RECEIPT' OR
-    e.ledger_entry_hash<>p_commit_hash OR
-    e.payload->>'phase'<>'COMMITTED' OR
-    e.payload->>'turn_id'<>p_turn_id OR
-    e.payload->>'authenticated_user_id'<>p_owner_user_id::text OR
-    (e.payload->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num OR
-    e.payload->>'prior_commit_entry_id' IS DISTINCT FROM r.last_committed_entry_id OR
-    e.payload->>'prior_commit_hash' IS DISTINCT FROM r.last_committed_entry_hash THEN
-  RAISE EXCEPTION 'REALITY_SEQUENCE_UNVERIFIED_COMMIT';
+ recovery:=public.reality_reconcile_committed_conversation_turn(
+  p_root_id,p_owner_user_id,p_turn_id,p_commit_entry_id,p_commit_hash);
+ IF recovery->>'status' IS DISTINCT FROM 'RECOVERED' OR
+    (recovery->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num THEN
+  RAISE EXCEPTION 'REALITY_SEQUENCE_RECOVERY_PROOF_INVALID';
  END IF;
- UPDATE public.reality_conversation_turn_fences SET
-  active_turn_id=NULL,active_claim_token=NULL,
-  last_committed_turn_id=p_turn_id,
-  last_committed_entry_id=p_commit_entry_id,
-  last_committed_entry_hash=p_commit_hash,
-  changed_at=clock_timestamp()
-  WHERE root_id=p_root_id;
- RETURN jsonb_build_object('status','FINISHED','sequence_num',r.sequence_num,
+ RETURN jsonb_build_object(
+  'status','FINISHED','sequence_num',r.sequence_num,
   'commit_entry_id',p_commit_entry_id,'commit_hash',p_commit_hash);
 END;
 $finish$;
