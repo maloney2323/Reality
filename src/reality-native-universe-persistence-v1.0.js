@@ -147,6 +147,7 @@ export async function retrievePersistedUniverse({
   continuityRootId = null,
   worldlineId = null,
   assertionTime = null,
+  eventKind = null,
   limit = 100,
   fetchImpl = fetch,
 } = {}) {
@@ -157,6 +158,13 @@ export async function retrievePersistedUniverse({
   if (continuityRootId) params.set('continuity_root_id', `eq.${continuityRootId}`);
   if (worldlineId) params.set('worldline_id', `eq.${worldlineId}`);
   if (assertionTime) params.set('assertion_time', `lte.${assertionTime}`);
+  // Allow retrieval by event kind so recent diagnostic activity cannot evict
+  // authenticated conversation turns from the available history window.
+  if (eventKind) {
+    if (typeof eventKind !== 'string' || !/^[A-Z][A-Z0-9_]{1,96}$/.test(eventKind))
+      throw Error('UNIVERSE_EVENT_KIND_FILTER_INVALID');
+    params.set('event_kind', `eq.${eventKind}`);
+  }
 
   const response = await request(`/rest/v1/reality_universe_entries?${params}`, {
     method: 'GET',
