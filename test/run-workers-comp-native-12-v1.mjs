@@ -49,7 +49,7 @@ async function run(){
   try{
    const resp=await fetch('https://api.openai.com/v1/responses',{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
-    body:JSON.stringify({model,input:history,store:false,max_output_tokens:400}),
+    body:JSON.stringify({model,input:history,store:false,max_output_tokens:800}),
     signal:AbortSignal.timeout(60000),
    });
    data=await resp.json().catch(()=>({}));
@@ -74,7 +74,11 @@ async function run(){
    priorConversationSource:'AUTHENTICATED_CONVERSATION_MESSAGES',
    authenticatedHistoryVerified:true,conversationDrift:drift,
    modelIntegrity:{status:'NO_TRUSTED_REFERENCE',findings:[]},
-   trajectoryReplay:replay,semanticReviews:sourceCandidates(answer,i+1,userRef,answerRef),
+   trajectoryReplay:replay,
+   providerMetadata:{source:'TRUSTED_PROVIDER_RUNTIME',status:data.status||null,
+     incomplete_reason:data.incomplete_details?.reason||null,
+     output_tokens:Number.isInteger(data.usage?.output_tokens)?data.usage.output_tokens:null,
+     max_output_tokens:800},
   });
   const judge=realityJudgeTurn({
    turn_id:id,continuity_root_id:root,
@@ -90,6 +94,8 @@ async function run(){
   judgements.push(judge);
   rows.push({turn:id,name,prompt,openai_response:answer,
    response_id:data.id,model:data.model||model,latency_ms:Date.now()-start,
+   openai_provider_status:data.status||null,
+   openai_incomplete_reason:data.incomplete_details?.reason||null,
    usage:data.usage||null,reality_verdict:judge.verdict,
    reality_candidate_findings:judge.findings,
    reality_judge_receipt:judge.judge_receipt_hash,
@@ -109,6 +115,7 @@ async function run(){
   openai_calls:rows.length,no_independent_llm_judge:true,
   true_hallucination_rate:null,true_drift_rate:null,
   no_live_insurer_or_supabase_connection:true,
+  v1_provenance_and_completeness_checks_enabled:true,
   provenance:'GITHUB_ACTIONS_EPHEMERAL_TEST_HARNESS_NOT_CUSTOMER_WORLD',
   openai_tokens:{input:inTokens,output:outTokens},
   native_reality_self_score:audit,turns:rows};
