@@ -145,7 +145,7 @@ test('replacement claim with same turn and sequence cannot reuse original challe
 test('older USER-only turn, foreign identity fields and production rejected',async()=>{
  const f=fixture();
  await assert.rejects(prepareOwnerAbandonment(getReq,{
-  env,...f,inspect:async()=>({...status,status:'RECEIVED',
+  env,...f,now:()=>clock,inspect:async()=>({...status,status:'RECEIVED',
    evidence:{interruption_recorded:false}})}),/ABANDONMENT_NOT_ELIGIBLE/);
  await assert.rejects(prepareOwnerAbandonment({method:'GET',query:{
   ...getReq.query,owner_user_id:'foreign'}},{env,...f}),/ABANDONMENT_SELECTOR_INVALID/);
