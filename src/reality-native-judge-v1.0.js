@@ -129,6 +129,11 @@ export function auditRealityJudgments({judgments=[],replayFindings=[]}={}){
  const flagged=judgments.filter(x=>x.finding_count>0).length;
  const noFlags=reviewed-flagged;
  const selfScore=percent(noFlags,reviewed);
+ const newlyDiscoveredTurnIds=new Set(later.filter(x=>x.status===
+  'NEW_RETROSPECTIVE_CANDIDATE').map(x=>x.origin_turn_id));
+ const revisedClear=judgments.filter(x=>x.finding_count===0&&
+   !newlyDiscoveredTurnIds.has(x.turn_id)).length;
+ const revisedSelfScore=percent(revisedClear,reviewed);
  const answer={
   version:REALITY_NATIVE_JUDGE_VERSION,
   status:reviewed?'REALITY_SELF_AUDIT_AVAILABLE':'NOT_RUN',
@@ -136,6 +141,9 @@ export function auditRealityJudgments({judgments=[],replayFindings=[]}={}){
   turns_with_candidate_findings:flagged,
   self_reported_clear_turns:noFlags,
   self_reported_clear_pct:selfScore,
+  retrospective_revised_clear_pct:revisedSelfScore,
+  retrospectively_reclassified_turn_count:newlyDiscoveredTurnIds.size,
+  original_self_score_preserved:true,
   // A perfect score is only no flags observed, not zero false negatives.
   score_meaning:'NO_DETECTED_CANDIDATES_IN_PERFORMED_CHECKS_ONLY',
   true_accuracy_pct:null,actual_escaped_errors:null,
