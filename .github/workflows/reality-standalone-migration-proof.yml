@@ -7,13 +7,16 @@ on:
     paths:
       - src/reality-standalone-auth-v0.1.js
       - src/reality-standalone-chat-v0.1.js
+      - src/reality-causal-turn-commit-v0.1.js
       - src/reality-live-intelligence-orchestration-v0.1.js
       - api/reality/standalone-chat.js
+      - api/reality/standalone-turn-status.js
       - api/reality/standalone-history.js
       - api/reality/standalone-config.js
       - api/reality/standalone-readiness.js
       - standalone.html
       - test/reality-standalone-chat-v0.1.test.js
+      - test/reality-causal-turn-commit-v0.1.test.js
       - test/reality-12turn-standalone-construction-v0.1.test.js
       - .github/workflows/reality-standalone-migration-proof.yml
 permissions:
@@ -33,12 +36,16 @@ jobs:
         run: |
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-standalone-chat-v0.1.js
+          node --check src/reality-causal-turn-commit-v0.1.js
           node --check api/reality/standalone-chat.js
+          node --check api/reality/standalone-turn-status.js
           node --check api/reality/standalone-history.js
           node --check api/reality/standalone-config.js
           node --check api/reality/standalone-readiness.js
       - name: Independent Auth and owner-root continuity
         run: node --test test/reality-standalone-chat-v0.1.test.js
+      - name: Causal turn commit and crash-recovery safety (no provider calls)
+        run: node --test test/reality-causal-turn-commit-v0.1.test.js
       - name: Twelve-turn synthetic construction full-stack challenge (no provider charges)
         run: node --test test/reality-12turn-standalone-construction-v0.1.test.js
       - name: Existing live cognition and Integrity Spine regressions
