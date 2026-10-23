@@ -183,7 +183,9 @@ async function refreshConversationInventory(){
   throw Error(data?.error||'Server-side conversation discovery failed.');
  const resumable=data.conversations.filter(x=>
   x.recovery_mode==='RESUMABLE_BY_SELECTOR'&&typeof x.conversation_id==='string');
- if(!state.pendingTurn&&resumable.length&&
+ // Respect an explicitly selected or newly started local conversation.
+ // Otherwise a cold reload may reselect an older interrupted conversation.
+ if(!priorConversationId&&!state.pendingTurn&&resumable.length&&
     !resumable.some(x=>x.conversation_id===state.conversationId)){
   state.conversationId=resumable[0].conversation_id;
   localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
@@ -505,18 +507,29 @@ $('runContinuityProof').addEventListener('click',async()=>{
  if(!state.accessToken||!state.discoveryReady){
   status('continuityProof','Sign in and restore verified conversations first.',true);return;
  }
- if(state.pendingTurn||state.serverUnresolved.length){
-  status('continuityProof','An existing turn needs review. Resolve its status before a live test; no evidence was changed.',true);return;
+ const earlierUnresolved=Boolean(state.pendingTurn||state.serverUnresolved.length);
+ const confirmation=earlierUnresolved
+  ? 'The selected conversation contains unfinished work. It will remain preserved for read-only review. Run exactly TWO new Reality chat turns in a SEPARATE conversation? This may incur provider charges; the engine can make multiple model calls per turn. Never retry a failed turn automatically.'
+  : 'Run two fresh Reality chat turns with the real model? This may incur provider charges and the underlying engine can make multiple model calls per turn. Stop on the first failure; never automatically retry.';
+ if(!window.confirm(confirmation))return;
+ // A local pending marker is only a client pointer. Keep a bounded bookmark
+ // for review; the server's immutable interruption evidence is authoritative.
+ if(state.pendingTurn){
+  localStorage.setItem('reality-standalone-previous-pending-review-v01',
+   JSON.stringify({conversationId:state.pendingTurn.conversationId,
+    turnId:state.pendingTurn.turnId}));
  }
- if(!window.confirm('Run two fresh Reality chat turns with the real model? This may incur provider charges and the underlying engine can make multiple model calls per turn. Stop on the first failure; never automatically retry.')){
-  return;
- }
+ state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
  state.testRunning=true;$('runContinuityProof').disabled=true;
  const firstMessage='For the construction job, do not send an estimate until the homeowner approves it.';
  const secondMessage='What exact rule did I give you about sending the estimate?';
  const conversationId=crypto.randomUUID();
  state.conversationId=conversationId;
  state.serverUnresolved=[];state.reviewSelection=null;
+ $('recoveryEvidence').replaceChildren();
+ status('continuityProof',earlierUnresolved
+  ? 'Previous interruption preserved for review. Starting separate two-turn test...'
+  : 'Starting separate two-turn test...');
  localStorage.setItem('reality-standalone-conversation-v01',conversationId);
  $('conversation').replaceChildren();
  $('conversationIdLabel').textContent='Automated test '+conversationId.slice(0,8);
@@ -558,6 +571,7 @@ $('runContinuityProof').addEventListener('click',async()=>{
    throw Error('Committed turn history could not be restored exactly. Review evidence before continuing.');
   }
   await refreshHistory();
+  await refreshConversationInventory();
   status('continuityProof','PASS: two app turns committed and both user instructions survived a fresh server read.\n'+
     'Original rule: '+firstMessage+'\n'+
     'Reality reply to recall check: '+(second.response||assistantMessages.at(-1))+'\n'+
