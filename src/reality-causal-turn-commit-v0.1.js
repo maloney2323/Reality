@@ -312,6 +312,7 @@ export async function processCausalTurn(req,{
 }
 export async function getCausalTurnStatus(req,{
  env=process.env,fetchImpl=fetch,lookup=retrieveOptionalPersistedUniverseEntry,
+ inspectAbandonment=inspectAbandonedTurn,inspectFence=inspectConversationSlot,
 }={}){
  requireStandaloneReady(env);
  const principal=await verifyStandaloneUser(req,{fetchImpl,env});
@@ -326,8 +327,28 @@ export async function getCausalTurnStatus(req,{
  const status=await inspectCausalTurn({
   scope,turnId:q.turn_id,lookup,fetchImpl,
  });
+ // Verified archived turns are neither completed model replies nor unresolved
+ // work. Do not report abandonment while its exact sequence is still locked.
+ const archived=!status.committed
+  ?await inspectAbandonment({scope,turnId:q.turn_id,turn:status,lookup,fetchImpl})
+  :null;
+ if(archived?.verified_chain){
+  if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
+   const held=await inspectFence({scope,env,fetchImpl});
+   if(held.status==='BUSY'&&held.active_turn_id===q.turn_id)
+    throw fail('ABANDONED_TURN_FENCE_STILL_BUSY');
+  }
+  return Object.freeze({ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
+   continuity_root_id:scope.continuity_root_id,
+   status:'ABANDONED_AFTER_OWNER_REVIEW',turn_id:q.turn_id,
+   committed:false,abandoned:true,verified_resolution_receipt_id:archived.receipt_id,
+   verified_resolution_receipt_hash:archived.receipt_hash,
+   model_call_outcome:'UNKNOWN',response:null,model_called:false,
+   retry_policy:'DO_NOT_REPLAY_ABANDONED_TURN_ID',
+  });
+ }
  if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
-  const fence=await inspectConversationSlot({scope,env,fetchImpl});
+  const fence=await inspectFence({scope,env,fetchImpl});
   if(fence.status==='BUSY'&&fence.active_turn_id===q.turn_id){
    return Object.freeze({
     ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
