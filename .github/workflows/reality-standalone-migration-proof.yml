@@ -40,6 +40,8 @@ on:
       - public/intelligence-12turn.html
       - test/reality-12turn-comparison-v0.1.test.js
       - src/reality-continuous-integrity-spine-v0.1.js
+      - src/reality-intelligence-spine-v1.0.js
+      - test/reality-intelligence-spine-v1.0.test.js
       - test/reality-obligation-observation-v0.1.test.js
       - docs/reality-obligation-observation-v0.1.md
       - api/reality/standalone-chat.js
@@ -145,7 +147,8 @@ jobs:
         run: node --test test/reality-12turn-standalone-construction-v0.1.test.js
       - name: Existing live cognition and Integrity Spine regressions
         run: |
-          node --test test/reality-live-model-output-integrity-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js test/reality-trajectory-replay-continuity-v0.4.test.js
+          node --check src/reality-intelligence-spine-v1.0.js
+          node --test test/reality-intelligence-spine-v1.0.test.js test/reality-live-model-output-integrity-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js test/reality-trajectory-replay-continuity-v0.4.test.js
       - name: Proven limitations
         run: |
           echo "Auth and DB are mocked. No real Supabase customer account was accessed."
