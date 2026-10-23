@@ -239,6 +239,23 @@ async function refreshHistory(){
  if(!res.ok)throw Error(data?.error||'Authenticated history request failed.');
  if(selected!==state.conversationId)return;
  if(!Array.isArray(data.messages))throw Error('Invalid history response.');
+ // History is a bounded, owner-authenticated projection. A visible assistant
+ // reply is emitted only after the backend verifies its committed turn.
+ // Never infer a drift percentage or independent factual accuracy from that.
+ resetIntegrity();
+ const committedReplies=data.assistant_messages_require_verified_commit===true
+  ? data.messages.filter(m=>m.role==='assistant'&&typeof m.text==='string').length:0;
+ if(data.assistant_messages_require_verified_commit===true){
+  $('ledger').textContent=committedReplies>0
+   ? committedReplies+' committed '+(committedReplies===1?'reply':'replies')+' restored'
+   : 'No committed replies in this view';
+  $('evidence').textContent=committedReplies>0
+   ? 'Authenticated committed conversation history restored. Model drift and factual accuracy still require separate evidence.'
+   : 'No committed model replies verified in this bounded conversation view.';
+  $('fact').textContent='Not loaded from history';
+  $('drift').textContent='Not measured from history';
+  $('retro').textContent='Not loaded from history';
+ }
  $('conversation').replaceChildren();
  for(const turn of data.messages){
   if(!['user','assistant'].includes(turn.role)||typeof turn.text!=='string')continue;
@@ -572,6 +589,10 @@ $('runContinuityProof').addEventListener('click',async()=>{
   }
   await refreshHistory();
   await refreshConversationInventory();
+  // Display the server-returned integrity observations only after both
+  // verified commits and an independently reloaded transcript. These are
+  // diagnostics, not independent hallucination or zero-drift findings.
+  if(second.result)readout(second.result);
   status('continuityProof','PASS: two app turns committed and both user instructions survived a fresh server read.\n'+
     'Original rule: '+firstMessage+'\n'+
     'Reality reply to recall check: '+(second.response||assistantMessages.at(-1))+'\n'+
