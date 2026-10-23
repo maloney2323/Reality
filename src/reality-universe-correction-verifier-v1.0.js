@@ -24,6 +24,19 @@ const claimKinds=new Set([
  'ATTRIBUTED_REPORT','DRAFT_ONLY','DENIAL_OF_ACTION','HYPOTHETICAL',
 ]);
 const evidenceKinds=new Set(['INDEPENDENT_PRECONDITION','INDEPENDENT_AUTHORIZATION','INDEPENDENT_EFFECT','INDEPENDENT_SOURCE_REPORT','INDEPENDENT_MATERIAL_STATE']);
+const NON_EXECUTION_CAPABILITIES=new Set([
+ 'GENERAL_ASSISTANCE','DRAFT_ESTIMATE','DRAFT_MESSAGE','CALCULATE_ESTIMATE',
+]);
+// These are cognition/draft operations, NOT actual connector effects. Unknown
+// operations remain unverified; the model cannot grant execution authority
+// by calling a send/dispatch operation "general assistance".
+function possibleUnexaminedMaterialAssertion(answer,claims){
+ if(claims.some(x=>x.claim_kind==='MATERIAL_FACT'))return false;
+ return answer.split(/\n|[.!?]\s+/).some(line=>
+  /\b(?:definitely|certainly|guaranteed|verified|confirmed)\b/i.test(line)&&
+  /\b\d+(?:\.\d+)?\b/.test(line));
+}
+
 const MAX_POLICY=48,MAX_CLAIMS=50,MAX_EVIDENCE=120;
 function validateScope(scope){
  if(!scope||!text(scope.continuity_root_id)||!text(scope.worldline_id)||
@@ -215,7 +228,9 @@ export async function verifyCandidateCorrectionAgainstUniverse({
   let status='NON_EXECUTION_INTELLIGENCE_PRESERVED';
   const refs=[];
   if(action){
-   if(!policy){
+   if(!policy&&NON_EXECUTION_CAPABILITIES.has(claim.operation)){
+    status='NON_EXECUTION_ASSISTANCE_NOT_AN_ACTION_GATE';
+   }else if(!policy){
     status='NO_ATTESTED_POLICY_FOR_MATERIAL_ACTION';
     findings.push(finding('UNVERIFIED_MATERIAL_ACTION_AUTHORITY',claim,[],
      'No independently sourced, scoped policy is available'));
@@ -263,6 +278,7 @@ export async function verifyCandidateCorrectionAgainstUniverse({
  const actionCount=claims.filter(c=>['ACTION_COMMITMENT','OUTCOME_COMPLETED'].includes(c.claim_kind)).length;
  const coverage=claims.length?'PROPOSED_TYPED_SPANS_ONLY':
   'NO_STRUCTURED_MODEL_CLAIMS_NOT_ASSESSED';
+ const potentialExtractionGap=possibleUnexaminedMaterialAssertion(modelAnswer,claims);
  const body={
   version:UNIVERSE_CORRECTION_VERIFIER_VERSION,
   continuity_root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
@@ -271,6 +287,8 @@ export async function verifyCandidateCorrectionAgainstUniverse({
   admitted_independent_proofs:proofs.map(p=>p.entry_id),
   assessed_typed_claim_count:claims.length,assessed_material_action_count:actionCount,
   coverage,assessments,findings,
+  possible_unexamined_material_assertion:potentialExtractionGap,
+  coverage_gap_status:potentialExtractionGap?'CANDIDATE_MISSING_TYPED_FACT':'NO_CERTAINTY_TRIGGER_OR_TYPED_FACT_PRESENT',
   result:findings.length?'CORRECTION_REJECTED_ON_EVIDENCE':
    claims.length?'NO_CONTRADICTION_IN_ASSESSED_CLAIMS':'INSUFFICIENT_EXTRACTION',
   autonomous_publication_authorized:false,external_action_authorized:false,
