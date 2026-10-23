@@ -165,3 +165,35 @@ test('model extraction is trusted for neither span invention nor source identity
  assert.equal(r.evidence_repair_verified,false);
  assert.equal(r.final_answer,raw);
 });
+
+
+test('clear negated commitment wrongly labeled by extractor must stay permissible without repair',async()=>{
+ const raw='I will not send the estimate without a signed homeowner scope. I can draft it.';
+ const fx=fixture(raw,'unused',()=>[
+  claim('ACTION_COMMITMENT','I will not send the estimate without a signed homeowner scope'),
+  claim('DRAFT_ONLY','I can draft it','DRAFT_ESTIMATE'),
+ ]);
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ const r=await runUniverseClosedLoopTurn(args(fx,ledger));
+ assert.equal(r.original_findings.length,0);
+ assert.equal(r.original_typed_claims[0].claim_kind,'DENIAL_OF_ACTION');
+ assert.equal(r.correction_attempted,false);
+ assert.equal(r.final_answer,raw);
+});
+test('malformed MATERIAL_FACT extraction cannot crash or silently earn no-error result',async()=>{
+ const raw='There are definitely 152 items onsite.';
+ const repaired='Foreman A says 152 and foreman B says 155; the physical count remains unresolved.';
+ const fx=fixture(raw,repaired,s=>s===raw?[{
+  claim_kind:'MATERIAL_FACT',operation:'REPORT_INVENTORY',resource:'job:WR-41',
+  source_span:'definitely 152 items onsite',entity_ref:null,state_key:null,value:null
+ }]:[claim('ATTRIBUTED_REPORT','Foreman A says 152','REPORT_INVENTORY'),
+  claim('ATTRIBUTED_REPORT','foreman B says 155','REPORT_INVENTORY')]);
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ const r=await runUniverseClosedLoopTurn(args(fx,ledger));
+ assert.equal(r.correction_attempted,true);
+ assert.equal(r.original_typed_claims.length,0);
+ assert.equal(r.repaired_in_history,true);
+ assert.equal(r.final_answer,repaired);
+ assert.ok((await ledger.list()).some(e=>e.event_kind==='LLM_CLAIM_VERIFICATION'&&
+  e.payload.invalid_claim_count===1));
+});
