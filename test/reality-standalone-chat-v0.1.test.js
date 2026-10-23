@@ -19,7 +19,7 @@ const env={
  REALITY_STANDALONE_EXPECTED_PROJECT_REF:'reality-example',
  REALITY_UNIVERSE_PERSISTENCE_URL:'https://reality-example.supabase.co',
  REALITY_UNIVERSE_PERSISTENCE_KEY:'sb_secret_TEST_ONLY_NOT_REAL_abcdefgh123456789',
- OPENAI_API_KEY:'sk-TEST_ONLY_NOT_REAL_abcdefgh123456789',
+ REALITY_STANDALONE_OPENAI_API_KEY:'sk-TEST_ONLY_NOT_REAL_abcdefgh123456789',
  REALITY_OPENAI_MODEL:'gpt-4.1-mini',
  VERCEL_ENV:'preview',
 };
@@ -398,12 +398,12 @@ test('standalone readiness reports missing explicit secret and model without lea
  const missing=inspectStandaloneReadiness({
    ...env,REALITY_STANDALONE_CHAT_ENABLED:'false',
    REALITY_UNIVERSE_PERSISTENCE_KEY:'',
-   OPENAI_API_KEY:'',
+   REALITY_STANDALONE_OPENAI_API_KEY:'',
  });
  assert.equal(missing.status,'NOT_READY');
  assert.equal(missing.checks.preview_isolation,true);
  assert.ok(missing.missing.includes('REALITY_UNIVERSE_PERSISTENCE_KEY'));
- assert.ok(missing.missing.includes('OPENAI_API_KEY'));
+ assert.ok(missing.missing.includes('REALITY_STANDALONE_OPENAI_API_KEY'));
  assert.ok(missing.missing.includes('REALITY_STANDALONE_CHAT_ENABLED'));
  assert.equal(JSON.stringify(missing).includes('sb_secret_TEST_ONLY_NOT_REAL'),false);
  assert.equal(JSON.stringify(missing).includes('sk-TEST_ONLY_NOT_REAL'),false);
@@ -433,7 +433,7 @@ test('dedicated server persistence key must exist even if a generic shared previ
 test('model configuration must exist before a user turn is written into Universe',async()=>{
  let touched=false;
  await assert.rejects(()=>processStandaloneChat(request(),{
-   env:{...env,OPENAI_API_KEY:'',REALITY_OPENAI_MODEL:''},
+   env:{...env,REALITY_STANDALONE_OPENAI_API_KEY:'',REALITY_OPENAI_MODEL:''},
    fetchImpl:async()=>{touched=true;throw Error('MUST_NOT_AUTH')},
    load:async()=>{touched=true},
    store:async()=>{touched=true},
