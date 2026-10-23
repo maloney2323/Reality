@@ -77,7 +77,10 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <small>A flagged candidate is not a verified hallucination. A reply is not evidence that an outside action occurred.</small></div>
 <div class="panel"><h2>Saved approval rules · Evidence</h2>
 <p class="sub">User-stated conditions recovered from server-owned records. They are not proof of external approval or completion.</p>
-<div id="conditionReceipts" class="notice" role="status">No saved conditions loaded.</div></div>
+<div id="conditionReceipts" class="notice" role="status">No saved conditions loaded.</div>
+<button id="runConflictProbe" type="button" class="secondary">Test approval guard · no AI charge</button>
+<div id="conflictProbeResult" class="notice" role="status">No synthetic conflict probe run in this view.</div>
+</div>
 </aside>
 </div>
 </div>
@@ -114,7 +117,7 @@ const resetIntegrity=()=>{
  for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';
  $('obligations').textContent='Not loaded';
  $('obligationAssessment').textContent='Not evaluated for this view';
- $('conditionReceipts').replaceChildren();
+ $('conditionReceipts').replaceChildren();$('conflictProbeResult').textContent='No synthetic conflict probe run in this view.';
  $('evidence').textContent='No independently verified outcome yet.';
 };
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
@@ -287,6 +290,50 @@ function displayObligationAssessment(receipt){
   info.proposal_assessment_status==='LIMITED_CHECK_NO_CONFLICT'?
   'Limited check: no conflict flagged':'No observed condition evaluated';
 }
+
+// Read-only demonstration. The server constructs the conflicting proposal,
+// selects verified owner-scoped evidence, and performs NO actual SEND_ESTIMATE.
+$('runConflictProbe').addEventListener('click',async()=>{
+ if(!state.accessToken||!state.discoveryReady){
+  status('conflictProbeResult','Sign in and load your saved conversation first.',true);return;
+ }
+ const selected=state.conversationId;
+ $('runConflictProbe').disabled=true;
+ status('conflictProbeResult','Running a fixed synthetic proposal against saved evidence (no AI charge)...');
+ try{
+  const q=new URLSearchParams({conversation_id:selected,thought_id:'personal'});
+  const response=await authFetch('/api/reality/standalone-conflict-probe?'+q.toString(),{
+   method:'GET',cache:'no-store',
+  });
+  const r=await response.json().catch(()=>({}));
+  if(selected!==state.conversationId)return;
+  if(!response.ok||r.ok!==true)throw Error(r.error||'Conflict probe unavailable');
+  if(r.stimulus_type!=='SYNTHETIC_MODEL_PROPOSAL_NOT_ACTUAL_LLM_OUTPUT'||
+    r.real_model_was_called!==false||r.external_action_executed!==false||
+    r.actual_business_tool_wired!==false)
+   throw Error('Unverified probe provenance. Results cannot be published.');
+  const records=[
+   'SYNTHETIC TEST — not a real LLM reply or actual business execution.',
+   'Injected proposal: '+r.injected_model_proposal,
+   'Observed user conditions: '+r.observed_conditions,
+   'Drift detector: '+r.detected,
+   'Detector candidates: '+r.candidate_count,
+   'Simulated authority boundary: '+r.simulated_decision,
+   'Real business actions executed: NO',
+   'Actual send-tool enforcement tested: NO',
+   'Real LLM drift rate: NOT MEASURED',
+   'Residual Reality drift rate: NOT MEASURED',
+   'Evidence-backed source references: '+r.evidence_references.length,
+   'Read-only receipt hash: '+r.deterministic_receipt_hash,
+  ];
+  const area=$('conflictProbeResult');area.replaceChildren();
+  for(const record of records){
+   const line=document.createElement('p');line.textContent=record;area.append(line);
+  }
+ }catch(e){
+  if(selected===state.conversationId)status('conflictProbeResult','Probe failed: '+e.message,true);
+ }finally{$('runConflictProbe').disabled=false;}
+});
 
 async function refreshHistory(){
  if(!state.accessToken)throw Error('An authenticated session is required.');
