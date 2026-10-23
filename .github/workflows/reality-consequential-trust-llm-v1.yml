@@ -3,11 +3,14 @@ on:
   push:
     branches:
       - feature/consequential-trust-llm-breakingpoints-20261023
+      - feature/consequential-trust-native-judge-20261023
   pull_request:
     paths:
       - benchmarks/consequential-trust-llm-v1.js
       - benchmarks/consequential-trust-llm-v1.oracle.js
       - benchmarks/consequential-trust-llm-v1.report.js
+      - benchmarks/consequential-trust-native-judge-v1.js
+      - test/reality-consequential-trust-native-judge-v1.test.js
       - test/reality-consequential-trust-llm-v1.test.js
       - .github/workflows/reality-consequential-trust-llm-v1.yml
 permissions:
@@ -28,10 +31,11 @@ jobs:
           node --check benchmarks/consequential-trust-llm-v1.js
           node --check benchmarks/consequential-trust-llm-v1.oracle.js
           node --check benchmarks/consequential-trust-llm-v1.report.js
+          node --check benchmarks/consequential-trust-native-judge-v1.js
       - name: Verify blinded inputs, ground truth isolation and scoring boundaries
-        run: node --test test/reality-consequential-trust-llm-v1.test.js
+        run: node --test test/reality-consequential-trust-llm-v1.test.js test/reality-consequential-trust-native-judge-v1.test.js
       - name: Explicitly reject model-accuracy claims from this CI
         run: |
           echo 'Only benchmark design, versioning and fairness contracts tested.'
           echo 'No underlying model requests. No Reality execution. No scores.'
-          echo 'Independent human adjudication and sandbox tool receipts required.'
+          echo 'Reality native scoring measures recorded detector findings, not unknowable false negatives.'
