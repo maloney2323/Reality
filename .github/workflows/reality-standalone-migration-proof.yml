@@ -13,6 +13,7 @@ on:
       - api/reality/standalone-config.js
       - standalone.html
       - test/reality-standalone-chat-v0.1.test.js
+      - test/reality-12turn-standalone-construction-v0.1.test.js
       - .github/workflows/reality-standalone-migration-proof.yml
 permissions:
   contents: read
@@ -36,6 +37,8 @@ jobs:
           node --check api/reality/standalone-config.js
       - name: Independent Auth and owner-root continuity
         run: node --test test/reality-standalone-chat-v0.1.test.js
+      - name: Twelve-turn synthetic construction full-stack challenge (no provider charges)
+        run: node --test test/reality-12turn-standalone-construction-v0.1.test.js
       - name: Existing live cognition and Integrity Spine regressions
         run: |
           node --test test/reality-live-model-output-integrity-v0.1.test.js test/reality-conversation-drift-spine-v0.3.test.js test/reality-trajectory-replay-continuity-v0.4.test.js
