@@ -127,7 +127,12 @@ async function loadReport(selected=conversationId){
   (out.reality_native_judged_turns?
     ' Reality native judge: '+out.reality_native_judged_turns+' scoped receipts, '+
     out.reality_native_self_score_pct+'% self-reported clear turns. This is not true error accuracy or guaranteed detection.':
-    ' Native judge: no persisted commit-scoped judge receipts in this run; historical results are not retroactively rescored.');
+    ' Native judge: no persisted commit-scoped judge receipts in this run; historical results are not retroactively rescored.')+
+  (out.reality_native_latest_retrospective_receipt?
+    ' Native retrospective replay: revised clear-turn self-score '+
+    (out.reality_native_latest_revised_clear_pct===null?'not established':
+      out.reality_native_latest_revised_clear_pct+'%')+
+    '; original turn verdicts retained.':'');
  $('receipt').textContent='Authenticated reconstruction receipt: '+out.comparison_receipt_hash+
   ' · Historical window: bounded · Independent error adjudication: not performed';
  const root=$('turns');root.replaceChildren();
@@ -158,6 +163,7 @@ async function loadReport(selected=conversationId){
    'Replay: '+fmt(t.trajectory_status),
    'Intelligence Spine v1: '+fmt(t.intelligence_spine_v1_status),
    'Reality native judge: '+fmt(t.reality_native_judge_status),
+   'Retrospective: '+fmt(t.reality_native_retrospective_status),
    'Spine: '+traces.length+'/4',
    'Findings: '+(t.detector_findings||[]).length]){
    evidence.append(el('span',label));
@@ -171,6 +177,12 @@ async function loadReport(selected=conversationId){
   details.append(el('p','Reality judge receipt: '+fmt(t.reality_native_judge_receipt)+
     ' · candidates '+fmt(t.reality_native_judge_findings)+
     ' · assessed-dimension coverage '+fmt(t.reality_native_judge_coverage_pct)+'%','micro'));
+  details.append(el('p','Retrospective receipt: '+fmt(t.reality_native_retrospective_receipt)+
+    ' · newly discovered earlier candidates '+fmt(t.reality_native_retrospective_new_candidates),'micro'));
+  for(const prior of t.reality_native_retrospective_candidates||[])
+   details.append(el('p','Original turn '+fmt(prior.origin_turn_id)+
+    ' → found at turn '+fmt(prior.discovered_at_turn_id)+
+    ' · '+fmt(prior.classification)+' · '+fmt(prior.status),'small amber'));
   if(t.intelligence_spine_v1_coverage){
    const cv=t.intelligence_spine_v1_coverage;
    for(const [area,obj] of Object.entries(cv))
