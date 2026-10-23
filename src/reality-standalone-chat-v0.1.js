@@ -62,7 +62,8 @@ export function reconstructStandaloneHistory({entries,scope}={}){
      : String(a.payload.turn_id).localeCompare(String(b.payload.turn_id)))||
    a.entry_id.localeCompare(b.entry_id))
   .slice(-60).map(e=>Object.freeze({
-   role:e.payload.role,text:e.payload.text.slice(0,12000),
+   role:e.payload.role,turn_id:e.payload.turn_id,
+   text:e.payload.text.slice(0,12000),
    display_text:String(e.payload.display_text||e.payload.text).slice(0,16000),
    source_ref:'reality:universe:'+e.entry_id,
   }));
@@ -191,7 +192,8 @@ export async function getStandaloneConversationHistory(req,{
     ok:true,version:STANDALONE_CHAT_VERSION,
     continuity_root_id:scope.continuity_root_id,
     messages:history.map(h=>Object.freeze({
-      role:h.role,text:h.display_text,source_ref:h.source_ref,
+      role:h.role,turn_id:h.turn_id,
+      text:h.display_text,source_ref:h.source_ref,
     })),
     displayed_history_not_full_ledger:true,
     history_is_complete:false,
