@@ -4,6 +4,7 @@ on:
     branches:
       - feature/consequential-trust-llm-breakingpoints-20261023
       - feature/consequential-trust-native-judge-20261023
+      - feature/live-native-retrospective-audit-20261023
   pull_request:
     paths:
       - benchmarks/consequential-trust-llm-v1.js
@@ -12,6 +13,9 @@ on:
       - benchmarks/consequential-trust-native-judge-v1.js
       - test/reality-consequential-trust-native-judge-v1.test.js
       - src/reality-native-judge-v1.0.js
+      - src/reality-native-retrospective-bridge-v1.0.js
+      - src/reality-intelligence-spine-v1.0.js
+      - test/reality-causal-turn-commit-v0.1.test.js
       - src/reality-causal-turn-commit-v0.1.js
       - src/reality-12turn-comparison-v0.1.js
       - test/reality-12turn-comparison-v0.1.test.js
@@ -38,10 +42,12 @@ jobs:
           node --check benchmarks/consequential-trust-llm-v1.report.js
           node --check benchmarks/consequential-trust-native-judge-v1.js
           node --check src/reality-native-judge-v1.0.js
+          node --check src/reality-native-retrospective-bridge-v1.0.js
+          node --check src/reality-intelligence-spine-v1.0.js
           node --check src/reality-causal-turn-commit-v0.1.js
           node --check src/reality-12turn-comparison-v0.1.js
       - name: Verify blinded inputs, ground truth isolation and scoring boundaries
-        run: node --test test/reality-consequential-trust-llm-v1.test.js test/reality-consequential-trust-native-judge-v1.test.js test/reality-12turn-comparison-v0.1.test.js
+        run: node --test test/reality-consequential-trust-llm-v1.test.js test/reality-consequential-trust-native-judge-v1.test.js test/reality-12turn-comparison-v0.1.test.js test/reality-causal-turn-commit-v0.1.test.js test/reality-intelligence-spine-v1.0.test.js
       - name: Explicitly reject model-accuracy claims from this CI
         run: |
           echo 'Only benchmark design, versioning and fairness contracts tested.'
