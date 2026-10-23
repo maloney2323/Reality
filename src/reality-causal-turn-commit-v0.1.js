@@ -131,6 +131,32 @@ export async function inspectCausalTurn({scope,turnId,
      cognition.continuity_root_id!==scope.continuity_root_id||
      cognition.worldline_id!==scope.worldline_id)
    throw fail('CAUSAL_TURN_COGNITION_CHAIN_BROKEN');
+  // Sequence-enabled turns are chained to the immediately preceding
+  // independently persisted COMMITTED receipt. This is evidence, not a
+  // model-supplied recollection or an inferred ordering.
+  if(Object.hasOwn(committed.payload,'sequence_num')){
+   const n=committed.payload.sequence_num;
+   if(!Number.isSafeInteger(n)||n<1)throw fail('CAUSAL_SEQUENCE_NUMBER_INVALID');
+   if(n===1){
+    if(committed.payload.prior_commit_entry_id!=null||
+       committed.payload.prior_commit_hash!=null)
+     throw fail('CAUSAL_SEQUENCE_GENESIS_PREDECESSOR_INVALID');
+   }else{
+    const predecessorId=committed.payload.prior_commit_entry_id;
+    const previous=typeof predecessorId==='string'
+     ?await lookup({entryId:predecessorId,fetchImpl}):null;
+    if(!previous)throw fail('CAUSAL_SEQUENCE_PREDECESSOR_MISSING');
+    validateUniverseEntry(previous);
+    if(previous.ledger_entry_hash!==committed.payload.prior_commit_hash||
+       previous.continuity_root_id!==scope.continuity_root_id||
+       previous.worldline_id!==scope.worldline_id||
+       previous.event_kind!==CAUSAL_TURN_KIND||
+       previous.payload?.phase!=='COMMITTED'||
+       previous.payload?.authenticated_user_id!==scope.authenticated_user_id||
+       previous.payload?.sequence_num!==n-1)
+     throw fail('CAUSAL_SEQUENCE_PREDECESSOR_INVALID');
+   }
+  }
   return Object.freeze({
    status:'COMMITTED',turn_id:turnId,committed:true,
    response:assistant.payload.display_text||assistant.payload.text,
