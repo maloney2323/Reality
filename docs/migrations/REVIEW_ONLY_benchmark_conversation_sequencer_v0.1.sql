@@ -67,8 +67,9 @@ CREATE OR REPLACE FUNCTION public.reality_finish_conversation_turn(
  p_root_id text,p_owner_user_id uuid,p_turn_id text,
  p_claim_token uuid,p_commit_entry_id text,p_commit_hash text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $finish$
-DECLARE r public.reality_conversation_turn_fences%ROWTYPE;
-DECLARE e public.reality_universe_entries%ROWTYPE;
+DECLARE
+ r public.reality_conversation_turn_fences%ROWTYPE;
+ e public.reality_universe_entries%ROWTYPE;
 BEGIN
  IF current_user <> 'service_role' THEN RAISE EXCEPTION 'REALITY_SEQUENCE_CALLER_DENIED'; END IF;
  SELECT * INTO STRICT r FROM public.reality_conversation_turn_fences
