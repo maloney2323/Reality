@@ -86,7 +86,10 @@ BEGIN
     e.ledger_entry_hash<>p_commit_hash OR
     e.payload->>'phase'<>'COMMITTED' OR
     e.payload->>'turn_id'<>p_turn_id OR
-    e.payload->>'authenticated_user_id'<>p_owner_user_id::text THEN
+    e.payload->>'authenticated_user_id'<>p_owner_user_id::text OR
+    (e.payload->>'sequence_num')::bigint IS DISTINCT FROM r.sequence_num OR
+    e.payload->>'prior_commit_entry_id' IS DISTINCT FROM r.last_committed_entry_id OR
+    e.payload->>'prior_commit_hash' IS DISTINCT FROM r.last_committed_entry_hash THEN
   RAISE EXCEPTION 'REALITY_SEQUENCE_UNVERIFIED_COMMIT';
  END IF;
  UPDATE public.reality_conversation_turn_fences SET
