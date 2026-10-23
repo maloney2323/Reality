@@ -3,6 +3,7 @@
 // An LLM judge alone is not independent grading. No side effects.
 import {CTB_TURNS,CTB_MANIFEST,validateSameModelInputs}
  from './consequential-trust-llm-v1.js';
+import {auditRealityJudgments} from './consequential-trust-native-judge-v1.js';
 export const CTB_REPORT_VERSION='consequential-trust-readonly-report-v1.0';
 const categories=['task_miss','drift','hallucination','instruction_loss',
  'authority_violation','false_execution_claim','legitimate_work_blocked'];
@@ -82,4 +83,60 @@ export function compareConsequentialTrustRuns({
   external_outcome_verification:'REQUIRES_SEPARATE_TOOL_READBACK',
   human_adjudication_required:true,
  });
+}
+
+// FIRST-CLASS REALITY-NATIVE JUDGING: no separate model/human referee required.
+// Both baseline and treatment output are audited by the SAME Reality Spine in
+// a read-only benchmark analysis; baseline generation receives no Reality help.
+// These results are self-reported candidate coverage, NOT true-error accuracy.
+export function compareConsequentialTrustNativeRuns({
+ baseline=null,reality=null,
+ baselineJudgments=[],realityJudgments=[],
+ baselineReplayFindings=[],realityReplayFindings=[],
+}={}){
+ const base={
+  version:CTB_REPORT_VERSION,scoring_authority:'REALITY_NATIVE_INTELLIGENCE_SPINE',
+  scoring_ground:'OWNER_SCOPED_UNIVERSE_AND_CONTINUITY_RECEIPTS',
+  independent_llm_judge_required:false,human_oracle_required:false,
+  true_accuracy_pct:null,verified_model_uplift:null,
+  corpus_version:CTB_MANIFEST.version,
+ };
+ if(!baseline||!reality)return Object.freeze({...base,status:'UNRUN'});
+ requireRows(baseline);requireRows(reality);
+ if(baseline.mode!=='DIRECT_NO_REALITY_CONTEXT'||reality.mode!=='REALITY_LAYER_ENABLED')
+  throw Error('CTB_WRONG_ARM_ASSIGNMENT');
+ const fairness=validateSameModelInputs(baseline.inputs,reality.inputs);
+ if(baseline.model!==reality.model||
+   baseline.model_version!==reality.model_version||
+   baseline.sampling_config_hash!==reality.sampling_config_hash)
+   throw Error('CTB_MODEL_SAMPLING_MISMATCH');
+ function score(arm,judgments,replay){
+  if(!Array.isArray(judgments)||!Array.isArray(replay))
+   throw Error('CTB_NATIVE_JUDGE_INPUTS_INVALID');
+  const responses=new Set(arm.responses.map(x=>x.turn_id));
+  const index=new Set();
+  for(const judgement of judgments){
+   if(!responses.has(judgement?.turn_id)||index.has(judgement.turn_id))
+    throw Error('CTB_NATIVE_JUDGE_UNMATCHED_RESPONSE');
+   index.add(judgement.turn_id);
+  }
+  const audited=auditRealityJudgments({judgments,replayFindings:replay});
+  return {turns_with_model_responses:responses.size,judged_turns:audited.evaluated_turn_count,
+   audit:audited,
+   coverage_complete:responses.size===100&&audited.evaluated_turn_count===100};
+ }
+ const b=score(baseline,baselineJudgments,baselineReplayFindings);
+ const r=score(reality,realityJudgments,realityReplayFindings);
+ const complete=b.coverage_complete&&r.coverage_complete;
+ const result={...base,
+  status:complete?'REALITY_NATIVE_SCORES_COMPLETE':'REALITY_NATIVE_SCORES_PARTIAL',
+  fairness,baseline:b,reality:r,
+  self_reported_clear_rate_change_pp:complete
+    ?Number((r.audit.self_reported_clear_pct-b.audit.self_reported_clear_pct).toFixed(2))
+    :null,
+  score_meaning:'DETECTED_CANDIDATES_ONLY; DOES_NOT_MEASURE_UNKNOWN_MISSES',
+  self_repair_accuracy_unmeasured:true,
+  automatic_human_ground_truth_check:'NOT_USED',
+ };
+ return Object.freeze(result);
 }

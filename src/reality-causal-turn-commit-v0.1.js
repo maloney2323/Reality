@@ -10,6 +10,7 @@ import {createUniverseEntry,validateUniverseEntry} from './reality-universe-pers
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {processStandaloneChat,getStandaloneConversationHistory} from './reality-standalone-chat-v0.1.js';
+import {realityJudgeTurn} from './reality-native-judge-v1.0.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,scopedTurnEntryId,
  rejectUnsafeStandalonePayload,requireStandaloneReady,STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
@@ -274,12 +275,29 @@ export async function processCausalTurn(req,{
   if(cognition.continuity_root_id!==scope.continuity_root_id||
     cognition.worldline_id!==scope.worldline_id)
    throw fail('CAUSAL_TURN_COGNITION_SCOPE_MISMATCH');
+  // Reality is its own operational judge. Only issue a verdict after scoped
+  // user/assistant/continuity records have been independently read back.
+  // No extra model, external judge, or change to existing execution authority.
+  const nativeSpine=cognition.payload?.intelligence_spine_v1||null;
+  const nativeJudgment=nativeSpine
+   ?realityJudgeTurn({
+      turn_id:input.turnId,
+      continuity_root_id:scope.continuity_root_id,
+      user_source_ref:nativeSpine.request_source_ref,
+      answer_source_ref:nativeSpine.answer_source_ref,
+      request:user.payload.text,answer:assistant.payload.text,
+      owner_scoped_readback_verified:true,
+      user_message_receipt_hash:user.ledger_entry_hash,
+      assistant_message_receipt_hash:assistant.ledger_entry_hash,
+      spine:nativeSpine,
+    }):null;
   await appendPhase({scope,turnId:input.turnId,phase:'COMMITTED',
    payload:{
     user_message_entry_id:ids.user,user_message_hash:user.ledger_entry_hash,
     assistant_message_entry_id:ids.assistant,assistant_message_hash:assistant.ledger_entry_hash,
     processing_receipt_entry_id:ids.processing,processing_receipt_hash:started.ledger_entry_hash,
     cognition_ledger_event_id:cognition.entry_id,cognition_ledger_hash:cognition.ledger_entry_hash,
+    ...(nativeJudgment?{native_judge_receipt:nativeJudgment}:{}),
     ...(claim?{sequence_num:claim.sequence_num,
       prior_commit_entry_id:claim.prior_commit_entry_id,
       prior_commit_hash:claim.prior_commit_hash}:{})
@@ -292,6 +310,7 @@ export async function processCausalTurn(req,{
    ...reply,version:CAUSAL_TURN_CONTRACT_VERSION,
    receipt:Object.freeze({...reply.receipt,...verified.receipt,turn_commit_status:'COMMITTED',
     ...(fence?{sequence_num:fence.sequence_num,sequence_status:'FINISHED'}:{})}),
+   native_judge:nativeJudgment,
    idempotent_replay:false,
   });
  }catch(cause){

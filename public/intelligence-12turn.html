@@ -121,9 +121,13 @@ async function loadReport(selected=conversationId){
  $('progress').style.width=Math.min(100,100*out.verified_commits/12)+'%';
  $('runIdentity').textContent='Conversation '+selected.slice(0,8)+' · '+out.turn_count+
   ' observed turns · '+out.observed_user_conditions+' server-linked user conditions';
- $('comparisonNote').textContent=out.completed_pre_registered_benchmark?
+ $('comparisonNote').textContent=(out.completed_pre_registered_benchmark?
   'All 12 specified turns have verified commits. This is a SAME-PATH raw-model vs Reality comparison, not an independent baseline or measured hallucination reduction.':
-  'Incomplete benchmark: '+out.verified_commits+'/12 verified commits. No score or success is inferred for unfinished turns.';
+  'Incomplete benchmark: '+out.verified_commits+'/12 verified commits.')+
+  (out.reality_native_judged_turns?
+    ' Reality native judge: '+out.reality_native_judged_turns+' scoped receipts, '+
+    out.reality_native_self_score_pct+'% self-reported clear turns. This is not true error accuracy or guaranteed detection.':
+    ' Native judge: no persisted commit-scoped judge receipts in this run; historical results are not retroactively rescored.');
  $('receipt').textContent='Authenticated reconstruction receipt: '+out.comparison_receipt_hash+
   ' · Historical window: bounded · Independent error adjudication: not performed';
  const root=$('turns');root.replaceChildren();
@@ -153,6 +157,7 @@ async function loadReport(selected=conversationId){
    'Drift: '+fmt(t.drift_status),
    'Replay: '+fmt(t.trajectory_status),
    'Intelligence Spine v1: '+fmt(t.intelligence_spine_v1_status),
+   'Reality native judge: '+fmt(t.reality_native_judge_status),
    'Spine: '+traces.length+'/4',
    'Findings: '+(t.detector_findings||[]).length]){
    evidence.append(el('span',label));
@@ -163,6 +168,9 @@ async function loadReport(selected=conversationId){
   details.append(el('p','Assistant receipt: '+fmt(t.assistant_source_entry_id),'micro'));
   details.append(el('p','Continuity receipt: '+fmt(t.diagnostic_entry_id),'micro'));
   details.append(el('p','Intelligence Spine v1 receipt: '+fmt(t.intelligence_spine_v1_receipt),'micro'));
+  details.append(el('p','Reality judge receipt: '+fmt(t.reality_native_judge_receipt)+
+    ' · candidates '+fmt(t.reality_native_judge_findings)+
+    ' · assessed-dimension coverage '+fmt(t.reality_native_judge_coverage_pct)+'%','micro'));
   if(t.intelligence_spine_v1_coverage){
    const cv=t.intelligence_spine_v1_coverage;
    for(const [area,obj] of Object.entries(cv))

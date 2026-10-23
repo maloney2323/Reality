@@ -54,8 +54,10 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
   if(usedTurnIds.has(u.payload.turn_id))continue;
   usedTurnIds.add(u.payload.turn_id);
   const a=rows.find(x=>x.payload.role==='assistant'&&x.payload.turn_id===u.payload.turn_id);
-  const committed=Boolean(a&&commits.some(c=>c.payload.user_message_entry_id===u.entry_id&&
-    c.payload.assistant_message_entry_id===a.entry_id));
+  const commit=a?commits.find(c=>c.payload.user_message_entry_id===u.entry_id&&
+    c.payload.assistant_message_entry_id===a.entry_id):null;
+  const committed=Boolean(commit);
+  const nativeJudge=commit?.payload?.native_judge_receipt||null;
   // Determine per-turn diagnostic transition within the server-owned time
   // interval; the latest matching event is relevant for a given attempt.
   const before=Date.parse(u.assertion_time)-1000;
@@ -84,6 +86,10 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
    raw_model_output:String(a?.payload?.text||'').slice(0,3000),
    reality_published_reply:String(a?.payload?.display_text||a?.payload?.text||'').slice(0,3200),
    verified_commit:committed,
+   reality_native_judge_status:nativeJudge?.verdict||'NOT_AVAILABLE',
+   reality_native_judge_receipt:nativeJudge?.judge_receipt_hash||null,
+   reality_native_judge_findings:nativeJudge?.finding_count??null,
+   reality_native_judge_coverage_pct:nativeJudge?.coverage?.coverage_pct??null,
    user_source_entry_id:u.entry_id,assistant_source_entry_id:a?.entry_id||null,
    diagnostic_entry_id:diag?.entry_id||null,
    signal_cleaner:payload.cleaner_verification?.status||
@@ -120,6 +126,13 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
   detector_recall:null,
   turn_count:turns.length,turn_target:12,
   verified_commits:turns.filter(x=>x.verified_commit).length,
+  reality_native_judged_turns:turns.filter(x=>x.reality_native_judge_receipt).length,
+  reality_native_clear_turns:turns.filter(x=>x.reality_native_judge_status===
+    'NO_CANDIDATES_IN_CHECKED_COVERAGE').length,
+  reality_native_self_score_pct:turns.some(x=>x.reality_native_judge_receipt)
+    ?Math.round(10000*turns.filter(x=>x.reality_native_judge_status===
+      'NO_CANDIDATES_IN_CHECKED_COVERAGE').length/
+      turns.filter(x=>x.reality_native_judge_receipt).length)/100:null,
   completed_pre_registered_benchmark:complete,
   checkpointed_turns:turns.filter(x=>x.integrity_spine_checkpoints.length===4).length,
   detector_candidate_findings:findingTotal,

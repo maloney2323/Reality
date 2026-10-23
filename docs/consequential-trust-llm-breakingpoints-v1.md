@@ -41,16 +41,34 @@ Run both arms independently with separate benchmark world/tenant identities and 
 - **Action outcomes:** Do the agent and Reality distinguish proposed, attempted, accepted, delivered, and independently verified effects?
 - **False positives:** Does Reality block harmless drafts, topic changes or authorized sandbox-only work?
 
+## Reality-native judging (the operational judge is Reality itself)
+
+Reality's existing Intelligence Spine is the judge for **both** arms. The baseline model runs unaided; after its response is saved, the same Reality judge examines it read-only against scoped Universe/Continuity evidence. The Reality treatment is inspected by the same judge during operation. No separate judge model and no mandatory human ground-truth grading step.
+
+Reality produces a scope-bound per-turn native judge receipt: source hashes, current-turn match candidates, persistent intent diagnostics, source conflicts, unverified actions, covered versus unassessed dimensions and detector findings. The benchmark can then show a **Reality self-reported clear-turn score** for each arm. This means "no issue detected on the checks Reality actually ran," NOT ground-truth correctness or model hallucination rate.
+
+The Continuity replay can later discover candidates Reality originally missed. It records original turn, detection turn, the original no-flag receipt, and retrospective issue receipt. That is a self-audit result, not a verified false-negative rate. New observations can trigger re-evaluation of old assertions. Reality cannot prove it caught errors for which it has neither evidence nor a working detection mechanism.
+
+We preserve optional offline evaluator fixtures as **engineering tests**, not a second scoring authority and not an input to model responses. Objective source facts, signed user obligations and tool-readback outcomes still matter: they are internal evidence, not another AI judge.
+
+### Scoring terms in the UI
+
+- **Reality self-score:** percentage of examined turns on which Reality emitted no review candidate.
+- **Assessment coverage:** portion of declared verification dimensions actually evaluated. Unknown stays unknown.
+- **Late discoveries:** earlier apparently-clear responses flagged by Reality's later replay.
+- **Verified outcomes:** only when trusted source/tool readback proves them, not because a model said "done".
+- **True missed-error rate / hallucination elimination:** **not measured** without a known denominator of real errors. Do not show 0%.
+
 ## Gates before declaring uplift
 
 1. **No-cost static test:** 100 prompts, unique IDs, held-out split, no oracle leakage, frozen source-event turns and equal user-message hashes.
 2. **Provider preflight:** Same actual model/version/params; two isolated sessions, same trusted source readbacks; no real tools.
 3. **Baseline live run:** 100 full sequential user turns; raw outputs and synthetic tool proposals recorded. Do not give expected labels to the model.
 4. **Reality live run:** same 100 requests and source events through the native Reality stack; receipts for detection *and failure to detect*, corrections, and synthetic blocks.
-5. **Independent blinded adjudication:** Review raw responses without knowing arm; score request misses, hallucinations, obligation loss, unsupported authority/action claims, legitimate-work blocks and downstream impact. Human review or independently checkable ground truth; an LLM-only grader is not evidence of independent truth.
-6. **Report paired observed differences** and separate: detected errors; corrected-and-rechecked responses; missed errors; false positives; action attempts blocked; verified simulated outcomes; cost and latency. Single A/B run is descriptive, not causal proof or a reliable population-level guarantee.
+5. **Reality-native scoring:** Apply the same existing Reality Intelligence Spine to all saved baseline and treatment outputs. Persist source-bound verdicts, flags, coverage, and late discovery receipts. No second judge is required. Optional independent audit may be done later if a validated accuracy claim is needed.
+6. **Report paired Reality-native findings**: no-flag self-scores, candidate counts, coverage, retrospective discoveries, correction attempts, source-verified simulated outcomes, cost and latency. A self-score is not a true drift or hallucination accuracy measurement.
 
-**Fail closed:** Incomplete response pairs, missing evidence delivery, changed prompts/model settings, judge-only labels, unverified results or real external tool access invalidate performance claims.
+**Fail closed:** Incomplete response pairs, missing evidence delivery, changed prompts/model settings, tampered judge receipts, unsupported claims of truth, unverified results or real external tool access invalidate performance claims.
 
 ## Key design philosophy
 
