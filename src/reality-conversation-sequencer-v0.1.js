@@ -173,3 +173,65 @@ export async function reconcileCommittedConversationSlot({
   model_called:false,external_action_executed:false,
  });
 }
+
+
+// Preview-only zero-write HTTP probe. The RPC inputs are deliberately invalid
+// and rejected in PL/pgSQL *before* any insert/update; success means the real
+// service credential reached the real functions, not that mutations occurred.
+// No secrets, internal PostgREST responses or tenant IDs are returned.
+export async function probeConversationSequenceHTTP({
+ env=process.env,fetchImpl=fetch,
+}={}){
+ if(env.VERCEL_ENV!=='preview')
+  throw problem('SEQUENCE_PROBE_PREVIEW_ONLY');
+ const {url,key}=connection(env);
+ const requestHeaders={
+  apikey:key,Accept:'application/json','Content-Type':'application/json',
+ };
+ const fenceUrl=url+'/rest/v1/reality_conversation_turn_fences?select=root_id&limit=0';
+ let fenceResponse;
+ try{
+  fenceResponse=await fetchImpl(fenceUrl,{method:'GET',headers:requestHeaders,
+   cache:'no-store',redirect:'error',signal:AbortSignal.timeout(6000)});
+ }catch{throw problem('SEQUENCE_PROBE_FENCE_NETWORK_FAILED')}
+ if(!fenceResponse.ok)
+  throw problem('SEQUENCE_PROBE_FENCE_HTTP_DENIED');
+ const fenceRows=await fenceResponse.json().catch(()=>null);
+ if(!Array.isArray(fenceRows)||fenceRows.length!==0)
+  throw problem('SEQUENCE_PROBE_FENCE_RESPONSE_INVALID');
+ const invalidUuid='00000000-0000-0000-0000-000000000000';
+ const tests=[
+  {name:'claim',path:'reality_claim_conversation_turn',
+   body:{p_root_id:'x',p_worldline_id:'reality:primary',
+    p_owner_user_id:invalidUuid,p_turn_id:'proof',
+    p_claim_token:invalidUuid},
+   expected:'REALITY_SEQUENCE_INPUT_INVALID'},
+  {name:'reconcile',path:'reality_reconcile_committed_conversation_turn',
+   body:{p_root_id:'x',p_owner_user_id:invalidUuid,p_turn_id:'',
+    p_commit_entry_id:'',p_commit_hash:''},
+   expected:'REALITY_RECONCILIATION_INPUT_INVALID'},
+ ];
+ const checked={fence_select:true};
+ for(const t of tests){
+  let result;
+  try{
+   result=await fetchImpl(url+'/rest/v1/rpc/'+t.path,{
+    method:'POST',headers:requestHeaders,
+    body:JSON.stringify(t.body),cache:'no-store',redirect:'error',
+    signal:AbortSignal.timeout(6000),
+   });
+  }catch{throw problem('SEQUENCE_PROBE_'+t.name.toUpperCase()+'_NETWORK_FAILED')}
+  const errorBody=await result.json().catch(()=>null);
+  if(result.ok||errorBody?.message!==t.expected)
+   throw problem('SEQUENCE_PROBE_'+t.name.toUpperCase()+'_WRONG_RESPONSE');
+  checked[t.name+'_rejects_invalid_input']=true;
+ }
+ return Object.freeze({
+  ok:true,status:'REAL_HTTP_API_EXECUTION_VERIFIED',
+  checks:Object.freeze(checked),
+  no_write_inputs:true,
+  customer_session_verified:false,
+  paid_model_called:false,
+  sequencing_enabled:env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true',
+ });
+}
