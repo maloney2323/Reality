@@ -40,6 +40,60 @@ export function assertStandalonePreviewIsolation(env=process.env){
  return Object.freeze({project_ref:ref,auth_and_universe_bound:true,production_allowed:false});
 }
 
+
+// Standalone preview must explicitly provide its OWN scoped service credential.
+// The native storage adapter has compatibility fallbacks for older applications;
+// this boundary never permits a generic Preview SUPABASE_SECRET_KEY fallback.
+// Do not attempt any user/data write if the model or storage is unconfigured.
+export function inspectStandaloneReadiness(env=process.env){
+ let projectBindingError=null;
+ try{assertStandalonePreviewIsolation(env)}catch(e){
+   projectBindingError=e.message||'STANDALONE_PREVIEW_PROJECT_UNVERIFIED';
+ }
+ const explicitKey=String(env.REALITY_UNIVERSE_PERSISTENCE_KEY||'');
+ const dedicatedServiceCredential=/^sb_secret_[A-Za-z0-9_-]{16,}$/.test(explicitKey);
+ const paidModelKey=String(env.OPENAI_API_KEY||'');
+ const modelReady=paidModelKey.startsWith('sk-')&&paidModelKey.length>=20;
+ const modelNameReady=typeof env.REALITY_OPENAI_MODEL==='string'&&
+   /^[a-z0-9][a-z0-9.-]{1,90}$/.test(env.REALITY_OPENAI_MODEL);
+ const checks=Object.freeze({
+   preview_isolation:projectBindingError===null,
+   preview_project_id:String(env.REALITY_STANDALONE_EXPECTED_PROJECT_REF||'')||
+     'NOT_CONFIGURED',
+   standalone_enabled:env.REALITY_STANDALONE_CHAT_ENABLED==='true',
+   universe_durability_enabled:env.REALITY_UNIVERSE_PERSISTENCE_ENABLED==='true',
+   dedicated_server_storage_key:dedicatedServiceCredential,
+   model_api_key:modelReady,
+   explicit_model_selection:modelNameReady,
+ });
+ const missing=Object.freeze([
+   ...(checks.preview_isolation?[]:['PREVIEW_AUTH_UNIVERSE_PROJECT_BINDING']),
+   ...(checks.universe_durability_enabled?[]:['REALITY_UNIVERSE_PERSISTENCE_ENABLED']),
+   ...(checks.dedicated_server_storage_key?[]:['REALITY_UNIVERSE_PERSISTENCE_KEY']),
+   ...(checks.model_api_key?[]:['OPENAI_API_KEY']),
+   ...(checks.explicit_model_selection?[]:['REALITY_OPENAI_MODEL']),
+   ...(checks.standalone_enabled?[]:['REALITY_STANDALONE_CHAT_ENABLED']),
+ ]);
+ return Object.freeze({
+   version:'reality-standalone-readiness-v0.1',
+   status:missing.length?'NOT_READY':'CONFIGURED_NOT_LIVE_VERIFIED',
+   checks,missing,
+   live_authentication_verified:false,
+   live_database_write_verified:false,
+   real_model_call_verified:false,
+ });
+}
+export function requireStandaloneReady(env=process.env){
+ const readiness=inspectStandaloneReadiness(env);
+ if(!readiness.checks.preview_isolation)
+   throw failure('STANDALONE_PREVIEW_PROJECT_BINDING_INVALID',503);
+ if(!readiness.checks.dedicated_server_storage_key)
+   throw failure('STANDALONE_DEDICATED_STORAGE_KEY_REQUIRED',503);
+ if(!readiness.checks.model_api_key||!readiness.checks.explicit_model_selection)
+   throw failure('STANDALONE_MODEL_CONFIGURATION_REQUIRED',503);
+ return readiness;
+}
+
 function bearer(req){
  const h=req?.headers?.authorization||req?.headers?.Authorization||'';
  const m=typeof h==='string'?h.match(/^Bearer ([a-zA-Z0-9._-]{24,4096})$/):null;
