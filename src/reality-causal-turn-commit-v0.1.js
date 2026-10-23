@@ -7,10 +7,11 @@
 import {createHash} from 'node:crypto';
 import {claimConversationSlot,finishConversationSlot,inspectConversationSlot,reconcileCommittedConversationSlot} from './reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry,validateUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
-import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
+import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry,retrievePersistedUniverse} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {processStandaloneChat,getStandaloneConversationHistory} from './reality-standalone-chat-v0.1.js';
 import {realityJudgeTurn} from './reality-native-judge-v1.0.js';
+import {buildCommittedNativeRetrospectiveAudit} from './reality-native-retrospective-bridge-v1.0.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,scopedTurnEntryId,
  rejectUnsafeStandalonePayload,requireStandaloneReady,STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
@@ -291,6 +292,23 @@ export async function processCausalTurn(req,{
       assistant_message_receipt_hash:assistant.ledger_entry_hash,
       spine:nativeSpine,
     }):null;
+  // This is an additive Preview-only capability. Even a late detector finding
+  // is a candidate; no old receipt is rewritten and no model call is retried.
+  let nativeRetrospective=null;
+  if(nativeJudgment&&env.REALITY_NATIVE_RETROSPECTIVE_ENABLED==='true'){
+   const readAll=load||retrievePersistedUniverse;
+   const prior=await readAll({
+    continuityRootId:scope.continuity_root_id,
+    worldlineId:scope.worldline_id,
+    eventKind:CAUSAL_TURN_KIND,limit:80,fetchImpl,
+   });
+   if(prior?.status!=='AVAILABLE'||!Array.isArray(prior.entries))
+    throw fail('NATIVE_RETROSPECTIVE_READBACK_UNAVAILABLE');
+   nativeRetrospective=buildCommittedNativeRetrospectiveAudit({
+    scope,currentJudgment:nativeJudgment,
+    cognitionEntry:cognition,historicalCommitEntries:prior.entries,
+   });
+  }
   await appendPhase({scope,turnId:input.turnId,phase:'COMMITTED',
    payload:{
     user_message_entry_id:ids.user,user_message_hash:user.ledger_entry_hash,
@@ -298,6 +316,7 @@ export async function processCausalTurn(req,{
     processing_receipt_entry_id:ids.processing,processing_receipt_hash:started.ledger_entry_hash,
     cognition_ledger_event_id:cognition.entry_id,cognition_ledger_hash:cognition.ledger_entry_hash,
     ...(nativeJudgment?{native_judge_receipt:nativeJudgment}:{}),
+    ...(nativeRetrospective?{native_retrospective_audit:nativeRetrospective}:{}),
     ...(claim?{sequence_num:claim.sequence_num,
       prior_commit_entry_id:claim.prior_commit_entry_id,
       prior_commit_hash:claim.prior_commit_hash}:{})
@@ -311,6 +330,7 @@ export async function processCausalTurn(req,{
    receipt:Object.freeze({...reply.receipt,...verified.receipt,turn_commit_status:'COMMITTED',
     ...(fence?{sequence_num:fence.sequence_num,sequence_status:'FINISHED'}:{})}),
    native_judge:nativeJudgment,
+   native_retrospective:nativeRetrospective,
    idempotent_replay:false,
   });
  }catch(cause){
