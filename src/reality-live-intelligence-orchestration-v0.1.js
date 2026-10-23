@@ -353,6 +353,12 @@ export async function runLiveIntelligenceOrchestration({
         userSourceRef:governedSignal.packet.packet_id,
         modelSourceRef:'model-response:'+(cognitiveResult.response_id||'untracked'),
         currentRequest:message,rawAnswer:rawModelAnswer,
+        providerMetadata:cognitiveResult.provider_status?{
+          source:'TRUSTED_PROVIDER_RUNTIME',status:cognitiveResult.provider_status,
+          incomplete_reason:cognitiveResult.provider_incomplete_reason,
+          output_tokens:cognitiveResult.provider_output_tokens,
+          max_output_tokens:cognitiveResult.provider_max_output_tokens,
+        }:null,
         priorConversationSource:historyAuthenticated
           ?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
         authenticatedHistoryVerified:historyAuthenticated,
@@ -390,7 +396,8 @@ export async function runLiveIntelligenceOrchestration({
   }
   // Conversation drift is *diagnostic*, not a new action gate. Continue
   // to apply only the pre-existing factual-output proposal policy.
-  const conversationReviewNeeded=conversationDrift.findings.length>0||trajectoryReplay.findings.length>0;
+  const conversationReviewNeeded=conversationDrift.findings.length>0||trajectoryReplay.findings.length>0||
+    (intelligenceSpineV1?.findings?.length||0)>0;
   const integrityRequiresReview=modelIntegrity.findings.some(x=>
     ['POTENTIAL_MATERIAL_DRIFT','UNVERIFIED_EXECUTION_CLAIM',
       'CONTESTED_SOURCE_REFERENCE'].includes(x.classification));
