@@ -140,6 +140,9 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     authority_granted: false,
     execution_authorized: false,
     provider_status: body.status || null,
+    provider_incomplete_reason: body.incomplete_details?.reason || null,
+    provider_output_tokens: Number.isInteger(body.usage?.output_tokens)?body.usage.output_tokens:null,
+    provider_max_output_tokens: null,
   };
 }
 
