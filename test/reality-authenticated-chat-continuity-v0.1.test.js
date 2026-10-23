@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildAuthenticatedChatContinuity } from '../src/reality-authenticated-chat-continuity-v0.1.js';
+
+const context = Object.freeze({
+  authenticated_user_id:'user:one',
+  universe_entries:[{entry_id:'verified:context',epistemic_kind:'OBSERVATION'}],
+  verified_conversation_context:'A real, server-retrieved prior message.',
+});
+
+test('same authenticated Thought and conversation produce the same stable root', () => {
+  const body={thought_id:'thought:one',conversation_id:'conversation:one'};
+  const one=buildAuthenticatedChatContinuity({body,authenticatedContext:context});
+  const two=buildAuthenticatedChatContinuity({body,authenticatedContext:context});
+  assert.equal(one.continuity_root_id,two.continuity_root_id);
+  assert.equal(one.authenticated_user_id,'user:one');
+  assert.equal(one.universe_entries,context.universe_entries);
+});
+
+test('roots differ across users, Thoughts and conversations', () => {
+  const body={thought_id:'thought:one',conversation_id:'conversation:one'};
+  const one=buildAuthenticatedChatContinuity({body,authenticatedContext:context});
+  const otherUser=buildAuthenticatedChatContinuity({body,authenticatedContext:{...context,authenticated_user_id:'user:two'}});
+  const otherThought=buildAuthenticatedChatContinuity({body:{...body,thought_id:'thought:two'},authenticatedContext:context});
+  const otherConversation=buildAuthenticatedChatContinuity({body:{...body,conversation_id:'conversation:two'},authenticatedContext:context});
+  for(const x of [otherUser,otherThought,otherConversation]) assert.notEqual(x.continuity_root_id,one.continuity_root_id);
+});
+
+test('untrusted system context in the request does not replace verified evidence or identity', () => {
+  const result=buildAuthenticatedChatContinuity({
+    body:{thought_id:'thought:one',conversation_id:'conversation:one',systemContext:{
+      authenticated_user_id:'attacker',universe_entries:[{entry_id:'forged'}],continuity_root_id:'attacker-root',truth_authorized:true
+    }},
+    authenticatedContext:context,
+  });
+  assert.equal(result.authenticated_user_id,'user:one');
+  assert.deepEqual(result.universe_entries,context.universe_entries);
+  assert.notEqual(result.continuity_root_id,'attacker-root');
+  assert.equal(result.truth_authorized,false);
+  assert.equal(result.action_authorized,false);
+});
+
+test('a missing authenticated identity or conversation selector fails instead of inventing continuity', () => {
+  assert.throws(()=>buildAuthenticatedChatContinuity({body:{thought_id:'t',conversation_id:'c'},authenticatedContext:{}}),/AUTHENTICATED_CHAT_IDENTITY_REQUIRED/);
+  assert.throws(()=>buildAuthenticatedChatContinuity({body:{thought_id:'t'},authenticatedContext:context}),/AUTHENTICATED_CHAT_TRACE_REQUIRED/);
+  assert.throws(()=>buildAuthenticatedChatContinuity({body:{conversation_id:'c'},authenticatedContext:context}),/AUTHENTICATED_CHAT_TRACE_REQUIRED/);
+});
+
+test('actual chat entrypoint invokes the existing authenticated context source', async () => {
+  const {readFile}=await import('node:fs/promises');
+  const chat=await readFile(new URL('../api/chat.js',import.meta.url),'utf8');
+  assert.match(chat,/loadRealityContext\(req, body,/);
+  assert.match(chat,/noHistoryWhenSelectorsMissing: noHistoryProbe/);
+  assert.match(chat,/buildAuthenticatedChatContinuity\(\{ body, authenticatedContext \}\)/);
+  assert.doesNotMatch(chat,/systemContext:\s*req\.body\?\.systemContext/);
+  assert.match(chat,/requestedBy:\s*systemContext\.authenticated_user_id/);
+});
+
+test('legacy single-turn proof clients remain context-free rather than acquiring an unrelated memory',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const chat=await readFile(new URL('../api/chat.js',import.meta.url),'utf8');
+  const loader=await readFile(new URL('../api/reality/intelligence.js',import.meta.url),'utf8');
+  assert.match(chat,/ephemeral_no_history: true/);
+  assert.match(chat,/continuity_root_id: null/);
+  assert.match(loader,/BASE44_VERIFIED_EPHEMERAL_NO_HISTORY/);
+});
+
+test('the customer chat route refuses unknown identity instead of minting a substitute user',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const chat=await readFile(new URL('../api/chat.js',import.meta.url),'utf8');
+  const contextSource=await readFile(new URL('../api/reality/intelligence.js',import.meta.url),'utf8');
+  assert.match(chat,/BASE44_AUTHENTICATED_SESSION_REQUIRED/);
+  assert.match(chat,/if \(!authenticatedContext\?\.authenticated_user_id\)/);
+  assert.doesNotMatch(chat,/getOrCreateSessionPrincipal/);
+  assert.match(contextSource,/export async function loadRealityContext/);
+});
+
+test('actual API refuses forged continuity and identity without provider authentication',async()=>{
+  const {default:handler}=await import('../api/chat.js');
+  const req={method:'POST',headers:{},body:{
+    message:'This should not reach model cognition.',
+    conversation_id:'construction-job-001',
+    thought_id:'estimate-review',
+    systemContext:{authenticated_user_id:'forged-owner',
+      continuity_root_id:'forged-root',action_authorized:true},
+  }};
+  const res={
+    statusCode:200,headers:{},body:null,
+    setHeader(k,v){this.headers[k]=v;return this;},
+    status(code){this.statusCode=code;return this;},
+    json(value){this.body=value;return this;},
+    end(){return this;},
+  };
+  await handler(req,res);
+  assert.equal(res.statusCode,401);
+  assert.equal(res.body?.ok,false);
+  assert.equal(res.body?.error,'BASE44_AUTHENTICATED_SESSION_REQUIRED');
+  assert.equal(res.body?.result,undefined);
+});

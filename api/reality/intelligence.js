@@ -127,7 +127,7 @@ async function observeConnectedWorld() {
   return observations;
 }
 
-async function loadRealityContext(req, body) {
+export async function loadRealityContext(req, body, { noHistoryWhenSelectorsMissing = false } = {}) {
   const authorization = bearer(req);
   if (!authorization) return null;
 
@@ -136,7 +136,22 @@ async function loadRealityContext(req, body) {
 
   const thoughtId = String(body?.thought_id || '').trim();
   const conversationId = String(body?.conversation_id || '').trim();
-  if (!thoughtId || !conversationId) throw new Error('REALITY_CHAT_TRACE_REQUIRED');
+  if (!thoughtId || !conversationId) {
+    if (noHistoryWhenSelectorsMissing === true) {
+      // Older proof consoles intentionally request a new, context-free
+      // model session. Verify their real Base44 principal but do not inject
+      // cross-Thought memory or invent a continuity root for these probes.
+      return {
+        authenticated_user_id: user.id,
+        universe_entries: [],
+        context_source: 'BASE44_VERIFIED_EPHEMERAL_NO_HISTORY',
+        authority: 'AUTHENTICATED_USER_CONTEXT_ONLY',
+        truth_authorized: false,
+        action_authorized: false,
+      };
+    }
+    throw new Error('REALITY_CHAT_TRACE_REQUIRED');
+  }
 
   const q = encodeURIComponent(JSON.stringify({
     user_id: user.id,
@@ -223,6 +238,13 @@ async function loadRealityContext(req, body) {
     authenticated_user_id: user.id,
     profile: safeProfile,
     verified_conversation_context: historyText || '(No earlier conversation context is available.)',
+    // Explicit speaker boundaries and message provenance, from the authenticated
+    // Base44 read only. Do not infer role from arbitrary text prefixes.
+    authenticated_conversation_turns: historyRows.map((item,index)=>({
+      role:item.role,
+      text:String(item.text||'').slice(0,12000),
+      source_ref:'authenticated-conversation:'+conversationId+':'+String(item.id||item.created_date||index),
+    })),
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
     universe_entries,
     context_source: 'BASE44_AUTHENTICATED_PERSONAL_REALITY',
