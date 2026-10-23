@@ -50,6 +50,7 @@ export function makeCausalTurnReceipt({scope,turnId,phase,observedAt,payload}){
    // These identity and authority fields are structural, not caller-writable.
    version:CAUSAL_TURN_CONTRACT_VERSION,phase,turn_id:turnId,
    authenticated_user_id:scope.authenticated_user_id,
+   authority_granted:false,truth_authorized:false,
    action_authorized:false,external_action_executed:false,
   },
   evidence_references:[
