@@ -94,6 +94,19 @@ export function requireStandaloneReady(env=process.env){
  return readiness;
 }
 
+// One branch-scoped callback only. Caller-controlled email/redirect URLs cannot
+// redirect authentication tokens to arbitrary sites or localhost.
+export function standaloneConfirmationRedirect(env=process.env){
+ const raw=String(env.REALITY_STANDALONE_AUTH_CALLBACK_URL||'');
+ let url;
+ try{url=new URL(raw)}catch{throw failure('STANDALONE_CONFIRMATION_CALLBACK_REQUIRED',503)}
+ if(url.protocol!=='https:'||url.username||url.password||url.port||
+    !/^[a-z0-9-]+\\.vercel\\.app$/i.test(url.hostname)||
+    url.pathname!=='/standalone.html'||url.search||url.hash)
+   throw failure('STANDALONE_CONFIRMATION_CALLBACK_INVALID',503);
+ return url.href;
+}
+
 function bearer(req){
  const h=req?.headers?.authorization||req?.headers?.Authorization||'';
  const m=typeof h==='string'?h.match(/^Bearer ([a-zA-Z0-9._-]{24,4096})$/):null;
