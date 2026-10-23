@@ -1,0 +1,37 @@
+name: Reality Consequential Trust LLM v1 Frozen Corpus
+on:
+  push:
+    branches:
+      - feature/consequential-trust-llm-breakingpoints-20261023
+  pull_request:
+    paths:
+      - benchmarks/consequential-trust-llm-v1.js
+      - benchmarks/consequential-trust-llm-v1.oracle.js
+      - benchmarks/consequential-trust-llm-v1.report.js
+      - test/reality-consequential-trust-llm-v1.test.js
+      - .github/workflows/reality-consequential-trust-llm-v1.yml
+permissions:
+  contents: read
+jobs:
+  freeze-and-fairness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Syntax and frozen research corpus
+        run: |
+          node --check benchmarks/consequential-trust-llm-v1.js
+          node --check benchmarks/consequential-trust-llm-v1.oracle.js
+          node --check benchmarks/consequential-trust-llm-v1.report.js
+      - name: Verify blinded inputs, ground truth isolation and scoring boundaries
+        run: node --test test/reality-consequential-trust-llm-v1.test.js
+      - name: Explicitly reject model-accuracy claims from this CI
+        run: |
+          echo 'Only benchmark design, versioning and fairness contracts tested.'
+          echo 'No underlying model requests. No Reality execution. No scores.'
+          echo 'Independent human adjudication and sandbox tool receipts required.'
