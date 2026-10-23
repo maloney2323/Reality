@@ -180,3 +180,18 @@ test('synthetic approval guard shows provenance and measured limitations without
  assert.match(source,/line\.textContent=record/);
  assert.doesNotMatch(source,/line\.innerHTML=record/);
 });
+
+test('Preview guarded send-tool test is authenticated, owner scoped and admits no external send',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ const pub=readFileSync(new URL('../public/standalone.html',import.meta.url),'utf8');
+ assert.equal(html,pub);
+ assert.match(html,/id="testEstimateEgress"/);
+ assert.match(html,/id="estimateEgressResult"/);
+ assert.match(html,/authFetch\('\/api\/reality\/standalone-estimate-egress-challenge\?'\+q\.toString\(\)/);
+ assert.match(html,/r\.real_send_connector_connected!==false/);
+ assert.match(html,/r\.real_external_sends!==0/);
+ assert.match(html,/r\.real_model_calls!==0/);
+ assert.match(html,/Production send-tool enforcement: NOT YET WIRED/);
+ assert.match(html,/p\.textContent=line/);
+ assert.doesNotMatch(html,/p\.innerHTML=line/);
+});
