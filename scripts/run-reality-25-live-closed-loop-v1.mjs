@@ -15,7 +15,7 @@ import {CONSTRUCTION_25_CASES as cases,CONSTRUCTION_25_POSITIVE_CONTROLS as harm
 const version='reality-real-model-full-loop-25-v1';
 const sha=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const model=process.env.REALITY_LOOP_MODEL||'gpt-4.1-mini';
-const cap=100;let calls=0,inputTokens=0,outputTokens=0;
+const cap=150;let calls=0,inputTokens=0,outputTokens=0;
 const scope={continuity_root_id:'benchmark:reality:closed-loop:25',
  worldline_id:'reality:benchmark',owner_user_id:'benchmark:fictional-contractor',
  work_item_id:'benchmark:two-job-construction',
@@ -158,11 +158,28 @@ function rubric(turn,answer){
   'NO_PATTERN_DETECTED_NOT_FULL_TRUTH',kind:spec.category,
   pattern_hits:hits,requires_independent_semantic_review:Boolean(hits)};
 }
-const realBaseline=JSON.parse(readFileSync('benchmark-results/construction-25-real-llm-repair.json','utf8'));
-if(realBaseline.report_hash!=='sha256:e5e5405201cff675bb37e5b29b87f69f4028a7afbb806112e49a34e72aca6fb4')
- throw Error('REFERENCE_25_REAL_LLM_REPORT_CHANGED');
-if(cases.length!==25||realBaseline.turns.length!==25)
- throw Error('INCOMPLETE_REAL_OPENAI_REFERENCE');
+// Fairer two-lane study: both lanes are fresh actual model responses using
+// the same model and initial system instruction. Separate conversation
+// histories are intentional (otherwise Reality could not carry corrections).
+if(cases.length!==25)throw Error('BENCHMARK_LENGTH_INVALID');
+const baselineRows=[],baselineHistory=[];
+for(let i=0;i<cases.length;i++){
+ const t=i+1,c=cases[i];
+ const reply=await completion([...priorSystem,...baselineHistory,
+  {role:'user',content:c.prompt}],1200,false);
+ const item={turn:t,name:c.name,prompt:c.prompt,
+  model_response_id:reply.response_id,answer:reply.answer,
+  independent_pattern_rubric:rubric(t,reply.answer)};
+ baselineRows.push(item);
+ baselineHistory.push({role:'user',content:c.prompt},
+  {role:'assistant',content:reply.answer});
+ console.log('LIVE_MINI_ALONE_TURN '+t+' '+JSON.stringify({
+  answer_excerpt:reply.answer.slice(0,220),
+  independent_pattern_rubric:item.independent_pattern_rubric.status,
+  model_calls:calls,
+ }));
+}
+const baselineCalls=calls,baselineInputTokens=inputTokens,baselineOutputTokens=outputTokens;
 const rows=[];
 let history=[];
 for(let i=0;i<cases.length;i++){
@@ -178,10 +195,12 @@ for(let i=0;i<cases.length;i++){
   maxRepairs:1,
  });
  history=result.next_history;
- const baseline=realBaseline.turns[i];
+ const baseline=baselineRows[i];
  const datum={
   id:caseItem.name,turn,tag:caseItem.tag,user_prompt:caseItem.prompt,
-  reference_live_model_answer:baseline.governed_live_openai_answer,
+  reference_live_model_answer:baseline.answer,
+  baseline_model_response_id:baseline.model_response_id,
+  baseline_rubric:baseline.independent_pattern_rubric,
   original_live_model_answer:result.original_answer,
   original_model_response_id:result.original_response_id,
   original_model_typed_claims:result.original_typed_claims,
@@ -217,7 +236,15 @@ const reportBody={
  version,test_title:'25 real underlying OpenAI model turns through Reality full correction/continuity loop',
  model,model_calls:calls,completion_count:25,limit:cap,
  model_input_tokens:inputTokens,model_output_tokens:outputTokens,
- source_genuine_model_run:realBaseline.report_hash,
+ source_genuine_model_run:'SAME_EXECUTION_25_FRESH_LLM_BASELINE',
+ baseline_model_calls:baselineCalls,
+ baseline_model_input_tokens:baselineInputTokens,
+ baseline_model_output_tokens:baselineOutputTokens,
+ reality_model_calls:calls-baselineCalls,
+ reality_model_input_tokens:inputTokens-baselineInputTokens,
+ reality_model_output_tokens:outputTokens-baselineOutputTokens,
+ baseline_rubric_candidate_violations:baselineRows.filter(x=>x.independent_pattern_rubric.status==='CANDIDATE_VIOLATION').map(x=>x.turn),
+ baseline_turns:baselineRows,
  synthetic_injected_wrong_answers:0,
  demo_universe_entry_count:entries.length,
  verified_in_process_ledger_readbacks:entries.length,
@@ -244,7 +271,7 @@ const reportBody={
   'Continuity receipts are validated in-memory, not durable Supabase customer persistence.',
   'Published sandbox fallback for known-bad action proposals is not a live customer action gate.',
   'Frozen pattern rubric is partial and does not establish overall error, hallucination or drift rate.',
-  'No comparison of matched stochastic samples. Historical baseline and this run used distinct model generations and histories.',
+  'Both lanes use the same fresh model and prompts but different stochastic samples and separate conversation histories.',
  ],
  turns:rows,
  universe_ledger_entries:entries,
@@ -258,7 +285,8 @@ const e=x=>String(x??'').replace(/[&<>"']/g,z=>({
 const metric=(v,k)=>'<div class="metric"><b>'+e(v)+'</b><small>'+e(k)+'</small></div>';
 const panels=rows.map(x=>'<details><summary><span class="num">TURN '+x.turn+'</span> '+e(x.id)+
  ' <strong>'+e(x.final_state)+'</strong></summary><section><h4>User request</h4><p>'+e(x.user_prompt)+'</p>'+
- '<div class="compare"><article><h4>Actual underlying LLM original answer</h4><pre>'+
+ '<div class="compare"><article><h4>Mini alone — fresh live control</h4><pre>'+
+ e(x.reference_live_model_answer)+'</pre></article><article><h4>Mini inside Reality — original response</h4><pre>'+
  e(x.original_live_model_answer)+'</pre></article><article><h4>Reality final answer carried into next turn</h4><pre>'+
  e(x.final_delivered_answer)+'</pre></article></div>'+
  '<p><b>Initial errors found:</b> '+e(x.original_universe_findings.map(f=>f.classification).join(', ')||'None on extracted claims')+
