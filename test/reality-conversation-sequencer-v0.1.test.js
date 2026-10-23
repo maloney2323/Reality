@@ -28,7 +28,7 @@ const req=(turnId,message)=>({
 function rig({failFirst=false,blockFirst=false}={}){
  const entries=new Map();
  const counts={models:0,writes:[],claims:0,finishes:0};
- const queue={active:null,sequence:0};
+ const queue={active:null,sequence:0,lastCommitId:null,lastCommitHash:null};
  let release;const barrier=new Promise(resolve=>release=resolve);
  let signal;const started=new Promise(resolve=>signal=resolve);
  const fetchImpl=async url=>{
@@ -54,12 +54,16 @@ function rig({failFirst=false,blockFirst=false}={}){
    queue.sequence++;
    queue.active=turnId;
    return {status:'CLAIMED',turn_id:turnId,root:s.continuity_root_id,
-    sequence_num:queue.sequence,token:'fixture-claim-'+queue.sequence};
+    sequence_num:queue.sequence,token:'fixture-claim-'+queue.sequence,
+    prior_commit_entry_id:queue.lastCommitId,
+    prior_commit_hash:queue.lastCommitHash};
   },
   finish:async ({claim,committed})=>{
    assert.equal(queue.active,claim.turn_id);
    assert.equal(committed.receipt.verified_chain,true);
    counts.finishes++;
+   queue.lastCommitId=committed.receipt.commit_entry_id;
+   queue.lastCommitHash=committed.receipt.commit_entry_hash;
    queue.active=null;
    return {status:'FINISHED',sequence_num:claim.sequence_num};
   },
@@ -112,6 +116,10 @@ test('two DISTINCT simultaneous turn IDs: second cannot write or call model unti
  assert.equal(x.counts.finishes,1);
  const next=await processCausalTurn(req('revision-2','Homeowner approved reviewing only.'),x.opts);
  assert.equal(next.receipt.sequence_num,2);
+ const secondCommit=x.entries.get(next.receipt.commit_entry_id);
+ assert.equal(secondCommit.payload.sequence_num,2);
+ assert.equal(secondCommit.payload.prior_commit_entry_id,done.receipt.commit_entry_id);
+ assert.equal(secondCommit.payload.prior_commit_hash,done.receipt.commit_entry_hash);
  assert.equal(x.counts.models,2);
  const replay=await processCausalTurn(req('revision-1','Cabinets are still undecided.'),x.opts);
  assert.equal(replay.idempotent_replay,true);
