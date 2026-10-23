@@ -59,7 +59,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
-<div class="actions"><button id="send">Send</button><small id="conversationIdLabel"></small></div>
+<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><small id="conversationIdLabel"></small></div>
 <div id="chatNotice" class="notice" role="status"></div>
 </section>
 </div>
@@ -79,9 +79,18 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 </main>
 <script type="module">
 const $=id=>document.getElementById(id);
-const state={config:null,accessToken:null,conversationId:localStorage.getItem('reality-standalone-conversation-v01')||crypto.randomUUID()};
+const pendingKey='reality-standalone-pending-turn-v01';
+let pending=null;
+try{pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null')}catch{pending=null}
+const state={config:null,accessToken:null,
+ conversationId:localStorage.getItem('reality-standalone-conversation-v01')||crypto.randomUUID(),
+ pendingTurn:pending?.turnId&&pending?.conversationId?pending:null,
+ pendingRetryApproved:false};
+const savePending=()=>{if(state.pendingTurn)sessionStorage.setItem(pendingKey,JSON.stringify(state.pendingTurn));
+ else sessionStorage.removeItem(pendingKey)};
 const status=(id,text,error=false)=>{$(id).textContent=text;$(id).className='notice'+(error?' error':'')};
-const newConversation=()=>{state.conversationId=crypto.randomUUID();localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);$('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity()};
+const newConversation=()=>{if(state.pendingTurn&&!window.confirm('An earlier turn is unresolved. Start a different conversation without resolving it?'))return;
+ state.conversationId=crypto.randomUUID();localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);$('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity()};
 const resetIntegrity=()=>{for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';$('evidence').textContent='No independently verified outcome yet.'};
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
 async function config(){
@@ -139,7 +148,11 @@ async function refreshHistory(){
   render(turn.role==='assistant'?'Reality':'user',turn.text);
  }
  $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
- status('chatNotice','Restored '+data.messages.length+' messages from the server-owned ledger. Earlier history may exist beyond this bounded view.');
+ const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
+ status('chatNotice',unresolved.length?
+  'Restored committed messages. '+unresolved.length+' interrupted or uncommitted turn(s) still require reconciliation; no model reply has been published for them.':
+  'Restored '+data.messages.length+' committed-history messages from the ledger. Earlier history may exist beyond this bounded view.',
+  unresolved.length>0);
 }
 // The confirmation link returns a one-time Supabase access token through
 // the URL fragment. Never store or log it; verify with Supabase before use.
@@ -210,24 +223,71 @@ $('signup').addEventListener('click',()=>authorize(true));
 $('resend').addEventListener('click',resendConfirmation);
 $('logout').addEventListener('click',()=>{state.accessToken=null;$('workspace').style.display='none';$('signIn').style.display='block';$('conversation').replaceChildren();resetIntegrity();status('loginNotice','Signed out.');});
 $('newConversation').addEventListener('click',newConversation);
+async function checkPendingTurn(){
+ if(!state.accessToken)throw Error('Sign in to inspect a turn.');
+ const pending=state.pendingTurn;
+ if(!pending)throw Error('No pending turn is recorded on this device.');
+ const q=new URLSearchParams({
+  conversation_id:pending.conversationId,thought_id:'personal',turn_id:pending.turnId,
+ });
+ const res=await fetch('/api/reality/standalone-turn-status?'+q,{
+  method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken},
+ });
+ const data=await res.json();
+ if(!res.ok)throw Error(data.error||'Turn receipt could not be checked');
+ if(data.status==='COMMITTED'&&data.receipt?.verified_chain){
+  state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+  if(pending.conversationId===state.conversationId)await refreshHistory();
+  status('chatNotice','Confirmed: the prior turn completed with verified receipts. Its reply was restored from storage.');
+ }else if(data.status==='NOT_RECEIVED'){
+  state.pendingRetryApproved=true;
+  status('chatNotice','The original turn ID has no durable customer record. You can press Send once more with the ORIGINAL message; Reality will reuse the same turn ID.');
+ }else{
+  state.pendingRetryApproved=false;
+  status('chatNotice','Turn '+data.status+'. No verified completion. Do not submit it again; it needs reconciliation.',true);
+ }
+ return data;
+}
+$('checkTurn').addEventListener('click',async()=>{
+ try{await checkPendingTurn()}
+ catch(e){status('chatNotice',e.message||'Status unavailable',true)}
+});
 $('send').addEventListener('click',async()=>{
  const message=$('prompt').value.trim();
  if(!message)return;
  if(!state.accessToken){status('chatNotice','Sign in first.',true);return}
+ if(state.pendingTurn&&(!state.pendingRetryApproved||
+    state.pendingTurn.conversationId!==state.conversationId)){
+  status('chatNotice','An earlier turn has not been verified. Check interrupted turn before sending anything else.',true);
+  return;
+ }
+ const turnId=state.pendingTurn?.turnId||crypto.randomUUID();
+ if(!state.pendingTurn){
+  state.pendingTurn={turnId,conversationId:state.conversationId};
+  savePending();
+ }
+ state.pendingRetryApproved=false;
  $('send').disabled=true;status('chatNotice','Submitting to independent Reality...');
  try{
   const res=await fetch('/api/reality/standalone-chat',{method:'POST',headers:{
    'Content-Type':'application/json',Authorization:'Bearer '+state.accessToken,
   },body:JSON.stringify({message,conversation_id:state.conversationId,thought_id:'personal',
-   turn_id:crypto.randomUUID()})});
+   turn_id:turnId})});
   const data=await res.json();
   if(!res.ok)throw Error(data?.error||'Reality could not confirm the turn.');
-  render('user',message);render('Reality',data.response||'(No response)');
-  $('prompt').value='';readout(data.result);
+  if(!data.receipt?.verified_chain&&!data.receipt?.turn_commit_status)
+   throw Error('No independently verified causal-turn commit receipt.');
+  state.pendingTurn=null;savePending();
+  // Never represent a model response as published unless a commit was read back.
+  await refreshHistory();
+  $('prompt').value='';
+  if(data.result)readout(data.result);
   localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
-  $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
-  status('chatNotice','Response stored with independently verified ledger readback.');
- }catch(err){status('chatNotice',err.message||'Unable to complete the turn',true)}
+  status('chatNotice','Completed: customer message, model output and cognition are linked by an independently verified commit.');
+ }catch(err){
+  status('chatNotice',(err.message||'Unable to complete the turn')+
+   ' This turn has been held for reconciliation. Select Check interrupted turn.',true);
+ }
  finally{$('send').disabled=false}
 });
 async function refreshReadiness(){
