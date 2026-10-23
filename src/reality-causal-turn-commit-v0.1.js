@@ -82,13 +82,19 @@ export async function inspectCausalTurn({scope,turnId,
  const read=async(id,kind)=>checked(await lookup({entryId:id,fetchImpl}),scope,turnId,id,kind);
  const user=await read(ids.user,'message');
  const committed=await read(ids.committed,'phase');
- if(!user&&!committed)return Object.freeze({
-  status:'NOT_RECEIVED',turn_id:turnId,committed:false,
-  retry_policy:'NEW_TURN_ALLOWED_ONLY_IF_NO_DURABLE_USER_ENTRY',
- });
+ // Exact identity checks include every phase, not just the two terminal IDs.
+ // A corrupted/partially deleted ledger can never be labelled NOT_RECEIVED.
  const assistant=await read(ids.assistant,'message');
  const started=await read(ids.processing,'phase');
  const interrupted=await read(ids.interrupted,'phase');
+ if(!user&&!committed){
+  if(assistant||started||interrupted)
+   throw fail('CAUSAL_TURN_ORPHANED_EVIDENCE');
+  return Object.freeze({
+   status:'NOT_RECEIVED',turn_id:turnId,committed:false,
+   retry_policy:'NEW_TURN_ALLOWED_ONLY_IF_NO_DURABLE_EVIDENCE',
+  });
+ }
  if(!user){
   throw fail('CAUSAL_TURN_ORPHANED_COMMIT');
  }
