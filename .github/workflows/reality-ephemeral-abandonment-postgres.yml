@@ -9,6 +9,7 @@ on:
       - test/fixtures/ephemeral-postgres-privilege-audit.sql
       - test/fixtures/generate-ephemeral-abandonment-fixture.mjs
       - test/fixtures/run-ephemeral-parallel-abandonment.sh
+      - test/fixtures/run-ephemeral-source-tamper.sh
       - src/reality-causal-turn-commit-v0.1.js
       - standalone.html
       - .github/workflows/reality-ephemeral-abandonment-postgres.yml
@@ -56,6 +57,8 @@ jobs:
       - name: Verify signed hash parity, atomic abandonment, idempotency, late-write ban, role denial
         run: |
           psql -v ON_ERROR_STOP=1 -f /tmp/reality-ephemeral-fixture.sql
+      - name: Reject tampered original user, processing and interruption records; rollback
+        run: bash test/fixtures/run-ephemeral-source-tamper.sh
       - name: Competing simultaneous claims for same synthetic turn; verify exactly one resolution
         run: bash test/fixtures/run-ephemeral-parallel-abandonment.sh
       - name: Explicit proof limits
