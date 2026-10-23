@@ -46,9 +46,11 @@ export function makeCausalTurnReceipt({scope,turnId,phase,observedAt,payload}){
   assertion_time:observedAt,effective_time:observedAt,
   source_ref:'reality:causal-turn-commit-contract',
   payload:{
+   ...payload,
+   // These identity and authority fields are structural, not caller-writable.
    version:CAUSAL_TURN_CONTRACT_VERSION,phase,turn_id:turnId,
    authenticated_user_id:scope.authenticated_user_id,
-   action_authorized:false,external_action_executed:false,...payload,
+   action_authorized:false,external_action_executed:false,
   },
   evidence_references:[
    ...[payload.user_message_hash,payload.assistant_message_hash,
