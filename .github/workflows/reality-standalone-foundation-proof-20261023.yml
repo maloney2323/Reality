@@ -12,6 +12,10 @@ on:
       - 'test/reality-causal-turn-commit-v0.1.test.js'
       - 'test/reality-conversation-sequencer-v0.1.test.js'
       - 'test/reality-authenticated-chat-continuity-v0.1.test.js'
+      - 'public/reality-preview-session-v1.js'
+      - 'standalone.html'
+      - 'test/reality-preview-persistent-session-v1.test.js'
+      - 'test/reality-preview-server-recovery-selection-v0.1.test.js'
   workflow_dispatch:
 
 permissions:
@@ -34,4 +38,6 @@ jobs:
             test/reality-standalone-chat-v0.1.test.js \
             test/reality-causal-turn-commit-v0.1.test.js \
             test/reality-conversation-sequencer-v0.1.test.js \
-            test/reality-authenticated-chat-continuity-v0.1.test.js
+            test/reality-authenticated-chat-continuity-v0.1.test.js \
+            test/reality-preview-persistent-session-v1.test.js \
+            test/reality-preview-server-recovery-selection-v0.1.test.js
