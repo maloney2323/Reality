@@ -58,6 +58,7 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
     c.payload.assistant_message_entry_id===a.entry_id):null;
   const committed=Boolean(commit);
   const nativeJudge=commit?.payload?.native_judge_receipt||null;
+  const nativeAudit=commit?.payload?.native_retrospective_audit||null;
   // Determine per-turn diagnostic transition within the server-owned time
   // interval; the latest matching event is relevant for a given attempt.
   const before=Date.parse(u.assertion_time)-1000;
@@ -90,6 +91,10 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
    reality_native_judge_receipt:nativeJudge?.judge_receipt_hash||null,
    reality_native_judge_findings:nativeJudge?.finding_count??null,
    reality_native_judge_coverage_pct:nativeJudge?.coverage?.coverage_pct??null,
+   reality_native_retrospective_status:nativeAudit?.status||'NOT_AVAILABLE',
+   reality_native_retrospective_receipt:nativeAudit?.bridge_receipt_hash||null,
+   reality_native_retrospective_new_candidates:nativeAudit?.report?.previously_unflagged_candidates_discovered_later??null,
+   reality_native_retrospective_candidates:nativeAudit?.report?.retrospective_candidates||[],
    user_source_entry_id:u.entry_id,assistant_source_entry_id:a?.entry_id||null,
    diagnostic_entry_id:diag?.entry_id||null,
    signal_cleaner:payload.cleaner_verification?.status||
@@ -114,6 +119,7 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
  }
  const complete=turns.length===12&&turns.every(x=>x.verified_commit&&x.prescribed_prompt_matches);
  const findingTotal=turns.reduce((n,x)=>n+x.detector_findings.length,0);
+ const latestNativeAudit=[...turns].reverse().find(x=>x.reality_native_retrospective_receipt)||null;
  const body={
   version:TWELVE_TURN_COMPARISON_VERSION,
   test_type:'ACTUAL_MODEL_WITH_REALITY_OVERLAY_SINGLE_PATH',
@@ -133,6 +139,10 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
     ?Math.round(10000*turns.filter(x=>x.reality_native_judge_status===
       'NO_CANDIDATES_IN_CHECKED_COVERAGE').length/
       turns.filter(x=>x.reality_native_judge_receipt).length)/100:null,
+  reality_native_latest_revised_clear_pct:latestNativeAudit?
+    commits.find(c=>c.payload?.native_retrospective_audit?.bridge_receipt_hash===
+      latestNativeAudit.reality_native_retrospective_receipt)?.payload?.native_retrospective_audit?.report?.retrospective_revised_clear_pct??null:null,
+  reality_native_latest_retrospective_receipt:latestNativeAudit?.reality_native_retrospective_receipt||null,
   completed_pre_registered_benchmark:complete,
   checkpointed_turns:turns.filter(x=>x.integrity_spine_checkpoints.length===4).length,
   detector_candidate_findings:findingTotal,

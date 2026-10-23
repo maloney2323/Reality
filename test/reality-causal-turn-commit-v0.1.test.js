@@ -5,6 +5,8 @@ import {createStandaloneConversationScope} from '../src/reality-standalone-auth-
 import {processCausalTurn,getCausalTurnStatus,inspectCausalTurn,causalTurnIds,
  makeCausalTurnReceipt,getCommittedStandaloneHistory} from '../src/reality-causal-turn-commit-v0.1.js';
 import {retrieveOptionalPersistedUniverseEntry} from '../src/reality-native-universe-persistence-v1.0.js';
+import {assessIntelligenceSpineV1} from '../src/reality-intelligence-spine-v1.0.js';
+import {replayConversationTrajectory} from '../src/reality-continuous-integrity-spine-v0.1.js';
 
 const userA='e83340ec-4266-4c95-a6cd-929bc58b445e';
 const userB='f44440ec-4266-4c95-a6cd-929bc58b445f';
@@ -30,7 +32,7 @@ const authFetch=(id=userA)=>async (url)=>{
  assert.equal(url,'https://reality-example.supabase.co/auth/v1/user');
  return {ok:true,status:200,json:async()=>({id,is_anonymous:false})};
 };
-function rig({userId=userA,failRun=false,failCommit=false,failInterruption=false}={}){
+function rig({userId=userA,failRun=false,failCommit=false,failInterruption=false,nativeRetrospectiveScenario=false}={}){
  const entries=new Map(),calls={model:0,store:[],get:[]};
  let time=0;
  const scope=createStandaloneConversationScope({userId,conversationId:'job-1'});
@@ -56,12 +58,33 @@ function rig({userId=userA,failRun=false,failCommit=false,failInterruption=false
     x.continuity_root_id===continuityRootId&&
     x.worldline_id===worldlineId&&x.event_kind===eventKind),
  });
- const run=async({systemContext,apiKey,model})=>{
+ const run=async({message,systemContext,apiKey,model})=>{
   calls.model++;
   assert.equal(systemContext.continuity_root_id,scope.continuity_root_id);
   assert.equal(apiKey,env.REALITY_STANDALONE_OPENAI_API_KEY);
   assert.equal(model,env.REALITY_OPENAI_MODEL);
   if(failRun)throw Error('SYNTHETIC_PROVIDER_TIMEOUT');
+  const rawAnswer=nativeRetrospectiveScenario&&calls.model===1
+   ?"I'll send the estimate now, without checking homeowner approval."
+   :'I will preserve homeowner approval.';
+  const replay=nativeRetrospectiveScenario&&calls.model>1
+   ?replayConversationTrajectory({
+     priorTurns:systemContext.authenticated_conversation_turns||[],
+     historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+     continuityRootId:scope.continuity_root_id,
+   }):null;
+  const nativeSpine=nativeRetrospectiveScenario
+   ?assessIntelligenceSpineV1({
+     continuityRootId:scope.continuity_root_id,
+     userSourceRef:'signal:synthetic:'+calls.model,
+     modelSourceRef:'model-response:synthetic:'+calls.model,
+     currentRequest:message,rawAnswer,
+     priorConversationSource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+     authenticatedHistoryVerified:true,
+     conversationDrift:{status:'LIMITED_CONVERSATION_CHECK_NO_FLAG',findings:[]},
+     modelIntegrity:{status:'NO_TRUSTED_REFERENCE',findings:[]},
+     trajectoryReplay:replay||{status:'LIMITED_REPLAY_NO_DRIFT_FLAGGED',findings:[]},
+   }):null;
   const cognition=createUniverseEntry({
    entry_id:'continuity:event:synthetic-'+calls.model,
    continuity_root_id:scope.continuity_root_id,
@@ -70,13 +93,15 @@ function rig({userId=userA,failRun=false,failCommit=false,failInterruption=false
    epistemic_kind:'OBSERVATION',
    assertion_time:now(),effective_time:'2026-10-22T20:00:00.000Z',
    source_ref:'synthetic:cognition:readback',
-   payload:{mode:'MODEL_COGNITION_UNVERIFIED_OUTSIDE_TEST',next_state:'ACTIVE'},
+   payload:{mode:'MODEL_COGNITION_UNVERIFIED_OUTSIDE_TEST',next_state:'ACTIVE',
+    ...(nativeSpine?{intelligence_spine_v1:nativeSpine,
+      conversation_trajectory:replay||{findings:[]}}:{})},
    evidence_references:[],provenance:{source:'synthetic:cognition'},
   });
   entries.set(cognition.entry_id,cognition);
   return {intelligence:{
-   raw_model_answer:'I will preserve homeowner approval.',
-   answer:'I will preserve homeowner approval.',
+   raw_model_answer:rawAnswer,
+   answer:rawAnswer,
   },context:{continuity:{
    root_id:scope.continuity_root_id,cognitive_readback_verified:true,
    signal_handoff_status:'STORED_AND_READ_BACK',event_id:cognition.entry_id,
@@ -283,4 +308,35 @@ test('orphaned processing receipt must never be mistaken for a safe new turn',as
   scope:x.scope,turnId:'turn-1',lookup:x.lookup,
  }),/CAUSAL_TURN_ORPHANED_EVIDENCE/);
  assert.equal(x.calls.model,0);
+});
+
+test('live causal two-turn synthetic run: late Reality replay finds an earlier unflagged violation, keeps both immutable commit receipts',async()=>{
+ const x=rig({nativeRetrospectiveScenario:true});
+ const flags={...env,REALITY_NATIVE_RETROSPECTIVE_ENABLED:'true'};
+ const options={...x.opts,env:flags};
+ const first=await processCausalTurn(req('turn-1',original),options);
+ assert.equal(first.receipt.turn_commit_status,'COMMITTED');
+ assert.equal(first.native_judge.verdict,'NO_CANDIDATES_IN_CHECKED_COVERAGE');
+ assert.equal(first.native_retrospective.report.self_reported_clear_pct,100);
+ const firstId=causalTurnIds(x.scope,'turn-1').committed;
+ const originalReceiptHash=x.entries.get(firstId).ledger_entry_hash;
+ const followup=await processCausalTurn(req('turn-2',
+   'Review whether sending the estimate without homeowner approval was allowed.'),options);
+ assert.equal(followup.receipt.turn_commit_status,'COMMITTED');
+ assert.equal(followup.native_retrospective.status,'RETROSPECTIVE_CANDIDATES_LINKED');
+ assert.equal(followup.native_retrospective.report.evaluated_turn_count,2);
+ assert.equal(followup.native_retrospective.report.previously_unflagged_candidates_discovered_later,1);
+ assert.equal(followup.native_retrospective.report.self_reported_clear_pct,100);
+ assert.equal(followup.native_retrospective.report.retrospective_revised_clear_pct,50);
+ assert.equal(followup.native_retrospective.report.retrospective_candidates[0].origin_turn_id,'turn-1');
+ assert.equal(followup.native_retrospective.report.retrospective_candidates[0].discovered_at_turn_id,'turn-2');
+ assert.equal(followup.native_retrospective.independent_truth_verification,'NOT_PERFORMED');
+ assert.equal(followup.external_action_executed,false);
+ assert.equal(x.entries.get(firstId).ledger_entry_hash,originalReceiptHash);
+ const durable=x.entries.get(causalTurnIds(x.scope,'turn-2').committed);
+ assert.equal(durable.payload.native_retrospective_audit.bridge_receipt_hash,
+   followup.native_retrospective.bridge_receipt_hash);
+ const persisted=await inspectCausalTurn({scope:x.scope,turnId:'turn-2',lookup:x.lookup});
+ assert.equal(persisted.committed,true);
+ assert.equal(x.calls.model,2,'one synthetic model invocation per user turn; no extra judge LLM');
 });

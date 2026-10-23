@@ -78,7 +78,10 @@ export function assessIntelligenceSpineV1({
  const factual=result('MODEL_OUTPUT_INTEGRITY',modelIntegrity);
  const replay=result('TRAJECTORY',trajectoryReplay);
  const semantic=semanticCandidates(semanticReviews,{userSourceRef,modelSourceRef});
- const findings=[...drift,...factual,...replay,...semantic];
+ // Historical replay findings belong to their *original assistant turn*.
+ // Attaching them to the current answer would falsely count one past problem
+ // as a new current-answer failure and inflate the native self-score penalty.
+ const findings=[...drift,...factual,...semantic];
  const deduped=[...new Map(findings.map(f=>[f.issue_id,f])).values()];
  const responseCandidateCount=deduped.filter(f=>DRIFT_CLASSES.has(f.classification)||
   f.classification==='POSSIBLE_MISMATCH').length;
@@ -94,6 +97,8 @@ export function assessIntelligenceSpineV1({
   request_hash:digest(currentRequest),
   raw_answer_hash:digest(rawAnswer),
   status,findings:deduped,
+  historical_replay_findings:replay,
+  historical_replay_candidate_count:replay.length,
   coverage:{
    request_alignment:{
     status:conversationDrift?'BOUNDED_CHECK':'NOT_EVALUATED',
