@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {createUniverseEntry,validateUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
-import {processStandaloneChat} from './reality-standalone-chat-v0.1.js';
+import {processStandaloneChat,getStandaloneConversationHistory} from './reality-standalone-chat-v0.1.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,scopedTurnEntryId,
  rejectUnsafeStandalonePayload,requireStandaloneReady,STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
@@ -272,4 +272,45 @@ export async function getCausalTurnStatus(req,{
  });
  return Object.freeze({ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
   continuity_root_id:scope.continuity_root_id,...status});
+}
+
+
+// The browser must never render an uncommitted assistant message as an
+// approved reply. Authenticated history can include a user turn whose
+// processing crashed; these remain visible as explicit unresolved work.
+export async function getCommittedStandaloneHistory(req,{
+ env=process.env,fetchImpl=fetch,
+ load,lookup=retrieveOptionalPersistedUniverseEntry,
+}={}){
+ const transcript=await getStandaloneConversationHistory(req,{
+  env,fetchImpl,...(load?{load}:{})
+ });
+ const principal=await verifyStandaloneUser(req,{env,fetchImpl});
+ const q=req.query||{};
+ const scope=createStandaloneConversationScope({
+  userId:principal.user_id,conversationId:q.conversation_id,
+  thoughtId:q.thought_id??'personal',
+ });
+ const ids=[...new Set(transcript.messages.map(m=>m.turn_id))];
+ const statuses=new Map();
+ // Concurrency is bounded to avoid overwhelming Supabase on long threads.
+ for(let i=0;i<ids.length;i+=5){
+  const slice=ids.slice(i,i+5);
+  await Promise.all(slice.map(async turnId=>{
+   statuses.set(turnId,await inspectCausalTurn({
+    scope,turnId,lookup,fetchImpl,
+   }));
+  }));
+ }
+ const messages=transcript.messages.filter(m=>
+  m.role==='user'||statuses.get(m.turn_id)?.committed===true);
+ const unresolved=ids.filter(id=>statuses.get(id)?.committed!==true)
+  .map(id=>Object.freeze({turn_id:id,status:statuses.get(id)?.status||'UNVERIFIED'}));
+ return Object.freeze({
+  ...transcript,
+  messages:messages.map(m=>Object.freeze(m)),
+  unresolved_turns:unresolved,
+  assistant_messages_require_verified_commit:true,
+  history_is_complete:false,
+ });
 }
