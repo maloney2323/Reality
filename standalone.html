@@ -59,7 +59,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
-<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><small id="conversationIdLabel"></small></div>
+<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
 <div id="chatNotice" class="notice" role="status"></div>
 </section>
 </div>
@@ -235,6 +235,7 @@ async function checkPendingTurn(){
  });
  const data=await res.json();
  if(!res.ok)throw Error(data.error||'Turn receipt could not be checked');
+ $('reconcileTurn').hidden=data.status!=='SEQUENCE_FENCE_UNRESOLVED';
  if(data.status==='COMMITTED'&&data.receipt?.verified_chain){
   state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
   if(pending.conversationId===state.conversationId)await refreshHistory();
@@ -251,6 +252,34 @@ async function checkPendingTurn(){
 $('checkTurn').addEventListener('click',async()=>{
  try{await checkPendingTurn()}
  catch(e){status('chatNotice',e.message||'Status unavailable',true)}
+});
+$('reconcileTurn').addEventListener('click',async()=>{
+ const pending=state.pendingTurn;
+ if(!state.accessToken||!pending){status('chatNotice','Sign in and check the interrupted turn first.',true);return}
+ $('reconcileTurn').disabled=true;
+ try{
+  const res=await fetch('/api/reality/standalone-reconcile',{
+   method:'POST',cache:'no-store',
+   headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},
+   body:JSON.stringify({conversation_id:pending.conversationId,
+    thought_id:'personal',turn_id:pending.turnId}),
+  });
+  const data=await res.json();
+  if(!res.ok)throw Error(data.error||'Recovery evidence could not be verified');
+  if(!data.recovered){
+   status('chatNotice','Turn requires review: '+(data.underlying_turn_status||'not independently completed')+
+    '. No model retry or lock release occurred.',true);
+   return;
+  }
+  if(data.receipt?.verified_chain!==true||data.receipt?.sequence_status!=='FINISHED')
+   throw Error('Recovery was not independently confirmed.');
+  state.pendingTurn=null;state.pendingRetryApproved=false;savePending();
+  $('reconcileTurn').hidden=true;
+  if(pending.conversationId===state.conversationId)await refreshHistory();
+  status('chatNotice','Previously saved reply verified and recovered without another AI generation.');
+ }catch(error){
+  status('chatNotice',error.message||'Recovery remains unresolved',true);
+ }finally{$('reconcileTurn').disabled=false}
 });
 $('send').addEventListener('click',async()=>{
  const message=$('prompt').value.trim();
@@ -275,9 +304,10 @@ $('send').addEventListener('click',async()=>{
    turn_id:turnId})});
   const data=await res.json();
   if(!res.ok)throw Error(data?.error||'Reality could not confirm the turn.');
-  if(!data.receipt?.verified_chain&&!data.receipt?.turn_commit_status)
-   throw Error('No independently verified causal-turn commit receipt.');
-  state.pendingTurn=null;savePending();
+  if(data.receipt?.verified_chain!==true||data.receipt?.turn_commit_status!=='COMMITTED'||
+    (data.receipt?.sequence_num!==undefined&&data.receipt?.sequence_status!=='FINISHED'))
+   throw Error('No independently verified and finalized causal-turn receipt.');
+  state.pendingTurn=null;savePending();$('reconcileTurn').hidden=true;
   // Never represent a model response as published unless a commit was read back.
   await refreshHistory();
   $('prompt').value='';
