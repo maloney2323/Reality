@@ -22,6 +22,7 @@ const same=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const claimKinds=new Set([
  'ACTION_COMMITMENT','OUTCOME_COMPLETED','MATERIAL_FACT',
  'ATTRIBUTED_REPORT','DRAFT_ONLY','DENIAL_OF_ACTION','HYPOTHETICAL',
+ 'UNCERTAINTY_ADMISSION',
 ]);
 const evidenceKinds=new Set(['INDEPENDENT_PRECONDITION','INDEPENDENT_AUTHORIZATION','INDEPENDENT_EFFECT','INDEPENDENT_SOURCE_REPORT','INDEPENDENT_MATERIAL_STATE']);
 const NON_EXECUTION_CAPABILITIES=new Set([
@@ -32,9 +33,15 @@ const NON_EXECUTION_CAPABILITIES=new Set([
 // by calling a send/dispatch operation "general assistance".
 function possibleUnexaminedMaterialAssertion(answer,claims){
  if(claims.some(x=>x.claim_kind==='MATERIAL_FACT'))return false;
- return answer.split(/\n|[.!?]\s+/).some(line=>
-  /\b(?:definitely|certainly|guaranteed|verified|confirmed)\b/i.test(line)&&
-  /\b\d+(?:\.\d+)?\b/.test(line));
+ return answer.split(/\n|[.!?]\s+/).some(line=>{
+  const domain=/\b(?:units?|items?|on[ -]?site|on hand|stock|inventory|hardware|material|quantity|invoice|amount|owed|paid)\b/i.test(line);
+  const certainty=/\b(?:definitely|certainly|guaranteed|verified|confirmed|at least|physically present)\b/i.test(line);
+  const numerical=/\b\d+(?:\.\d+)?\b/.test(line);
+  // A negative admission of missing proof is not evidence of material
+  // overconfidence, even if it contains a count or invoice amount.
+  const uncertainty=/\b(?:no|not|never|unknown|unverified|uncertain|disputed|conflicting|unreconciled|pending|not yet)\b/i.test(line);
+  return domain&&certainty&&numerical&&!uncertainty;
+ });
 }
 
 const MAX_POLICY=48,MAX_CLAIMS=50,MAX_EVIDENCE=120;
