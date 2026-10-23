@@ -22,6 +22,24 @@ export function authConfiguration(env=process.env) {
   throw failure('STANDALONE_PUBLISHABLE_KEY_INVALID',503);
  return Object.freeze({auth_url:url.origin,publishable_key:key});
 }
+
+// The isolated migration pilot must NEVER attach a new authenticated identity
+// to an unrelated or production Universe database. Exact URL/root binding is
+// a prerequisite even when both Supabase projects happen to be accessible.
+export function assertStandalonePreviewIsolation(env=process.env){
+ if(env.VERCEL_ENV==='production')
+  throw failure('STANDALONE_PRODUCTION_RELEASE_NOT_AUTHORIZED',503);
+ const ref=String(env.REALITY_STANDALONE_EXPECTED_PROJECT_REF||'');
+ if(!/^[a-z0-9-]{10,40}$/.test(ref))
+  throw failure('STANDALONE_PREVIEW_PROJECT_BINDING_REQUIRED',503);
+ const required='https://'+ref+'.supabase.co';
+ const auth=authConfiguration(env);
+ const persistence=String(env.REALITY_UNIVERSE_PERSISTENCE_URL||'').replace(/\/$/,'');
+ if(auth.auth_url!==required||persistence!==required)
+  throw failure('STANDALONE_AUTH_UNIVERSE_PROJECT_MISMATCH',503);
+ return Object.freeze({project_ref:ref,auth_and_universe_bound:true,production_allowed:false});
+}
+
 function bearer(req){
  const h=req?.headers?.authorization||req?.headers?.Authorization||'';
  const m=typeof h==='string'?h.match(/^Bearer ([a-zA-Z0-9._-]{24,4096})$/):null;
