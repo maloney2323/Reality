@@ -125,3 +125,51 @@ export async function inspectConversationSlot({scope,env=process.env,fetchImpl=f
   last_committed_entry_hash:row.last_committed_entry_hash||null,
  });
 }
+
+
+// Crash after durable COMMITTED but before finish RPC: reclaim ONLY the
+// existing verified result. Never re-run cognition or perform any action.
+// SQL atomically refuses another active turn, another owner, or a mismatched
+// commit, and only service_role can invoke the RPC.
+export async function reconcileCommittedConversationSlot({
+ scope,turnId,verified,env=process.env,fetchImpl=fetch,
+}={}){
+ validScope(scope);
+ if(typeof turnId!=='string'||!/^[A-Za-z0-9:_-]{1,96}$/.test(turnId))
+  throw problem('SEQUENCE_RECONCILE_TURN_INVALID',400);
+ if(!verified?.committed||verified?.turn_id!==turnId||
+   verified?.receipt?.verified_chain!==true||
+   typeof verified.receipt.commit_entry_id!=='string'||
+   !/^[a-f0-9]{64}$/.test(verified.receipt.commit_entry_hash||''))
+  throw problem('SEQUENCE_RECONCILE_UNVERIFIED_COMMIT');
+ const receipt=await storageCall({
+  env,fetchImpl,path:'/rest/v1/rpc/reality_reconcile_committed_conversation_turn',
+  body:{
+   p_root_id:scope.continuity_root_id,
+   p_owner_user_id:scope.authenticated_user_id,
+   p_turn_id:turnId,
+   p_commit_entry_id:verified.receipt.commit_entry_id,
+   p_commit_hash:verified.receipt.commit_entry_hash,
+  },
+ });
+ if(!['RECOVERED','ALREADY_FINISHED'].includes(receipt.status)||
+    receipt.commit_entry_id!==verified.receipt.commit_entry_id||
+    receipt.commit_hash!==verified.receipt.commit_entry_hash||
+    !Number.isSafeInteger(receipt.sequence_num)||
+    receipt.sequence_num<1)
+  throw problem('SEQUENCE_RECONCILE_RECEIPT_INVALID');
+ const readback=await inspectConversationSlot({scope,env,fetchImpl});
+ if(readback.status!=='IDLE'||
+    readback.sequence_num!==receipt.sequence_num||
+    readback.last_committed_entry_id!==verified.receipt.commit_entry_id||
+    readback.last_committed_entry_hash!==verified.receipt.commit_entry_hash)
+  throw problem('SEQUENCE_RECONCILE_FENCE_READBACK_MISMATCH');
+ return Object.freeze({
+  status:receipt.status,
+  sequence_num:receipt.sequence_num,
+  commit_entry_id:verified.receipt.commit_entry_id,
+  commit_entry_hash:verified.receipt.commit_entry_hash,
+  verified_fence_readback:true,
+  model_called:false,external_action_executed:false,
+ });
+}
