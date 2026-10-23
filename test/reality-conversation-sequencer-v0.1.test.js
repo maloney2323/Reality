@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStandaloneConversationScope} from '../src/reality-standalone-auth-v0.1.js';
-import {processCausalTurn} from '../src/reality-causal-turn-commit-v0.1.js';
+import {processCausalTurn,getCausalTurnStatus,getCommittedStandaloneHistory} from '../src/reality-causal-turn-commit-v0.1.js';
 import {claimConversationSlot,finishConversationSlot,inspectConversationSlot}
  from '../src/reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
@@ -199,4 +199,37 @@ test('fence readback enforces principal and verified environment, fail-closed wh
   env:{...env,REALITY_UNIVERSE_PERSISTENCE_URL:'https://unrelated.supabase.co'},
   fetchImpl:async()=>{throw Error('SHOULD_NOT_FETCH')},
  }),/SEQUENCE_DATABASE_PROJECT_MISMATCH/);
+});
+
+
+test('status and history do not publish a committed assistant reply while DB fence is unresolved',async()=>{
+ const x=rig();
+ const turn=await processCausalTurn(req('turn-1','Estimate still needs approval.'),x.opts);
+ assert.equal(turn.receipt.turn_commit_status,'COMMITTED');
+ // Simulate crash after storing COMMITTED but before DB fence is released.
+ x.queue.active='turn-1';
+ const dbFetch=async (url)=>{
+  if(url.endsWith('/auth/v1/user'))
+   return {ok:true,json:async()=>({id:user,is_anonymous:false})};
+  if(url.includes('/rest/v1/reality_conversation_turn_fences?'))
+   return {ok:true,json:async()=>[{
+    root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,owner_user_id:user,
+    sequence_num:1,active_turn_id:'turn-1',
+    last_committed_entry_id:null,last_committed_entry_hash:null,
+   }]};
+  throw Error('UNKNOWN_TEST_FETCH');
+ };
+ const status=await getCausalTurnStatus({
+  headers:req('turn-1').headers,
+  query:{conversation_id:'parallel-kitchen',thought_id:'personal',turn_id:'turn-1'},
+ },{env,fetchImpl:dbFetch,lookup:x.opts.lookup});
+ assert.equal(status.status,'SEQUENCE_FENCE_UNRESOLVED');
+ assert.equal(status.committed,false);
+ assert.equal(status.response,undefined);
+ const history=await getCommittedStandaloneHistory({
+  headers:req('turn-1').headers,
+  query:{conversation_id:'parallel-kitchen',thought_id:'personal'},
+ },{env,fetchImpl:dbFetch,lookup:x.opts.lookup,load:x.opts.load});
+ assert.deepEqual(history.messages.map(m=>m.role),['user']);
+ assert.deepEqual(history.unresolved_turns.map(x=>x.status),['SEQUENCE_FENCE_UNRESOLVED']);
 });
