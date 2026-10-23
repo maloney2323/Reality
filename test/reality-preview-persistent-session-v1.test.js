@@ -117,3 +117,23 @@ test('public Preview page matches the tested canonical HTML source',()=>{
  const publicPage=readFileSync(new URL('../public/standalone.html',import.meta.url),'utf8');
  assert.equal(publicPage,source,'Vercel static page must not drift from the tested HTML');
 });
+
+test('older interrupted conversations do not block a fresh, explicitly consented live pilot',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(html,/const earlierUnresolved=Boolean\(state\.pendingTurn\|\|state\.serverUnresolved\.length\)/);
+ assert.match(html,/unfinished work\. It will remain preserved for read-only review/);
+ assert.match(html,/window\.confirm\(confirmation\)/);
+ assert.match(html,/reality-standalone-previous-pending-review-v01/);
+ assert.match(html,/state\.pendingTurn=null;state\.pendingRetryApproved=false;savePending\(\);/);
+ assert.doesNotMatch(html,/An existing turn needs review\. Resolve its status before a live test/);
+ assert.match(html,/const conversationId=crypto\.randomUUID\(\)/);
+ assert.match(html,/await refreshHistory\(\);\s*await refreshConversationInventory\(\)/);
+});
+test('reload respects explicit locally selected conversation, not the first old interrupted conversation',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(html,/if\(!priorConversationId&&!state\.pendingTurn&&resumable\.length&&/);
+ const open=html.indexOf('async function refreshConversationInventory()');
+ const close=html.indexOf('async function refreshHistory()',open);
+ assert.ok(open>=0&&close>open);
+ assert.ok(html.slice(open,close).includes("localStorage.setItem('reality-standalone-conversation-v01'"));
+});
