@@ -330,12 +330,26 @@ test('history preserves original user content but archives a hash-verified aband
  assert.equal(after.unresolved_turns.length,0);
  assert.equal(after.resolved_turns.length,1);
  assert.equal(after.resolved_turns[0].model_outcome,'UNKNOWN');
+ const afterStatus=await getCausalTurnStatus(req(),{
+  env,fetchImpl:authFetch(),lookup:x.lookup,
+ });
+ assert.equal(afterStatus.status,'ABANDONED_AFTER_OWNER_REVIEW');
+ assert.equal(afterStatus.committed,false);
+ assert.equal(afterStatus.abandoned,true);
+ assert.equal(afterStatus.response,null);
+ assert.equal(afterStatus.model_call_outcome,'UNKNOWN');
+ assert.equal(afterStatus.retry_policy,'DO_NOT_REPLAY_ABANDONED_TURN_ID');
  assert.equal(after.messages.length,1);
  assert.equal(after.messages[0].role,'user');
  assert.equal(after.messages[0].turn_resolution,'ABANDONED_AFTER_OWNER_REVIEW');
  assert.match(after.messages[0].text,/homeowner approval/);
  assert.equal(x.calls.model,1,'never repeat interrupted LLM execution in read-only recovery');
  // A signed resolution receipt cannot override a STILL-active server processing lock.
+ await assert.rejects(getCausalTurnStatus(req(),{
+  env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'true'},
+  fetchImpl:authFetch(),lookup:x.lookup,
+  inspectFence:async()=>({status:'BUSY',active_turn_id:tid,sequence_num:1}),
+ }),/ABANDONED_TURN_FENCE_STILL_BUSY/);
  await assert.rejects(getCommittedStandaloneHistory(historyReq,{
   env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'true'},
   fetchImpl:authFetch(),load:x.load,lookup:x.lookup,
