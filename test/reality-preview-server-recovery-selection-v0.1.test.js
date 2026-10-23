@@ -7,7 +7,7 @@ const scripts=[...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].
 
 test('Preview module remains valid JavaScript after server-owned recovery selection',()=>{
  assert.equal(scripts.length,1);
- assert.doesNotThrow(()=>new Function(scripts[0]));
+ assert.doesNotThrow(()=>new Function(scripts[0].replace(/^import \{createPreviewSession\} from '[^']+';?\\s*/m,'')));
 });
 test('read-only inspection selects only owner-authenticated history turns, not browser-only markers',()=>{
  const script=scripts[0];
