@@ -214,7 +214,9 @@ begin
   where entry_id=proposed_id and event_kind='REALITY_TURN_RESOLUTION_RECEIPT'
     and continuity_root_id=p_root_id and worldline_id=p_worldline_id;
  if found then
-  if old_resolution.payload->>'turn_id' is distinct from p_turn_id
+  if old_resolution.ledger_entry_hash is distinct from p_resolution_entry->>'ledger_entry_hash'
+     or old_resolution.payload->>'approval_receipt_hash' is distinct from p_approval_entry->>'ledger_entry_hash'
+     or old_resolution.payload->>'turn_id' is distinct from p_turn_id
      or old_resolution.payload->>'owner_user_id' is distinct from p_owner_user_id::text
      or old_resolution.payload->>'resolution_status' is distinct from 'ABANDONED'
      or f.active_turn_id is not null
