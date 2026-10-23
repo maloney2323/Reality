@@ -9,6 +9,7 @@ on:
       - src/reality-standalone-chat-v0.1.js
       - src/reality-live-intelligence-orchestration-v0.1.js
       - api/reality/standalone-chat.js
+      - api/reality/standalone-history.js
       - api/reality/standalone-config.js
       - standalone.html
       - test/reality-standalone-chat-v0.1.test.js
@@ -31,6 +32,7 @@ jobs:
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-standalone-chat-v0.1.js
           node --check api/reality/standalone-chat.js
+          node --check api/reality/standalone-history.js
           node --check api/reality/standalone-config.js
       - name: Independent Auth and owner-root continuity
         run: node --test test/reality-standalone-chat-v0.1.test.js
