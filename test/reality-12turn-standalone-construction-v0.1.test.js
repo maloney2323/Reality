@@ -46,9 +46,11 @@ test('12-turn standalone construction lifecycle rehydrates persistent user inten
  const priorKey=process.env.OPENAI_API_KEY;
  const priorPersistence=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
  const priorStorage=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+ const priorPersistenceUrl=process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
  process.env.OPENAI_API_KEY='SYNTHETIC_OFFLINE_KEY_DO_NOT_USE';
  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
  process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='SYNTHETIC_OFFLINE_KEY_DO_NOT_USE';
+ process.env.REALITY_UNIVERSE_PERSISTENCE_URL=env.SUPABASE_URL;
  const entries=new Map(),snapshots=[],calls=[],messages=[];
  const fakeFetch=async(url,opts={})=>{
   const u=new URL(url);
@@ -155,5 +157,7 @@ test('12-turn standalone construction lifecycle rehydrates persistent user inten
   else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=priorPersistence;
   if(priorStorage===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=priorStorage;
+  if(priorPersistenceUrl===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_URL=priorPersistenceUrl;
  }
 });
