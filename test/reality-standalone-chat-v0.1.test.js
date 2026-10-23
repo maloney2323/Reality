@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createStandaloneConversationScope,verifyStandaloneUser,
  rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation}
  from '../src/reality-standalone-auth-v0.1.js';
-import {processStandaloneChat,reconstructStandaloneHistory}
+import {processStandaloneChat,reconstructStandaloneHistory,getStandaloneConversationHistory}
  from '../src/reality-standalone-chat-v0.1.js';
 import {retrievePersistedUniverse} from '../src/reality-native-universe-persistence-v1.0.js';
 import {createUniverseEntry,validateUniverseEntry}
@@ -307,4 +307,74 @@ test('assistant persistence failure cannot produce successful customer reply',as
   }),
  }),/STANDALONE_ASSISTANT_MESSAGE_NOT_DURABLY_CONFIRMED/);
  assert.equal(writes,2);
+});
+
+
+test('authenticated cold-start history endpoint returns only this user and the displayed model response',async()=>{
+ const scopeA=createStandaloneConversationScope({userId:userA,conversationId:'job-1'});
+ const scopeB=createStandaloneConversationScope({userId:userB,conversationId:'job-1'});
+ const one=chatEntry(scopeA,'user','Do not send estimate before approval','a1','2026-10-22T19:00:00.000Z');
+ const model=chatEntry(scopeA,'assistant',"I'll send it now.",'a1','2026-10-22T19:00:01.000Z');
+ const modelWithNotice=createUniverseEntry({...model,
+  payload:{...model.payload,display_text:"I'll send it now.\\n\\nReality integrity notice: potential drift."}});
+ const other=chatEntry(scopeB,'user','Confidential other owner text','b1','2026-10-22T19:00:00.000Z');
+ const load=async scope=>{
+  assert.equal(scope.eventKind,'AUTHENTICATED_CONVERSATION_MESSAGE');
+  return {status:'AVAILABLE',entries:[one,modelWithNotice,other]};
+ };
+ const query={conversation_id:'job-1',thought_id:'personal'};
+ const a=await getStandaloneConversationHistory({
+  headers:request().headers,query,
+ },{env,fetchImpl:authFetch({id:userA}),load});
+ assert.equal(a.history_is_complete,false);
+ assert.equal(a.messages.length,2);
+ assert.match(a.messages[1].text,/Reality integrity notice/);
+ assert.equal(a.messages.some(x=>x.text.includes('Confidential')),false);
+ const b=await getStandaloneConversationHistory({
+  headers:request().headers,query,
+ },{env,fetchImpl:authFetch({id:userB}),load});
+ assert.equal(b.messages.length,1);
+ assert.equal(b.messages[0].text,'Confidential other owner text');
+ assert.notEqual(a.continuity_root_id,b.continuity_root_id);
+});
+test('read-only history refuses spoofed authority or unrelated query fields',async()=>{
+ let called=false;
+ await assert.rejects(()=>getStandaloneConversationHistory({
+  headers:request().headers,
+  query:{conversation_id:'job-1',thought_id:'personal',principal_id:userB},
+ },{
+  env,fetchImpl:authFetch(),
+  load:async()=>{called=true;return {status:'AVAILABLE',entries:[]}},
+ }),/STANDALONE_HISTORY_SELECTOR_INVALID/);
+ assert.equal(called,false);
+});
+test('history route refuses a disabled pilot before touching auth or ledger',async()=>{
+ let called=false;
+ await assert.rejects(()=>getStandaloneConversationHistory({
+  headers:request().headers,query:{conversation_id:'job-1'}
+ },{
+  env:{...env,REALITY_STANDALONE_CHAT_ENABLED:'false'},
+  fetchImpl:async()=>{called=true},
+  load:async()=>{called=true},
+ }),/STANDALONE_CHAT_DISABLED/);
+ assert.equal(called,false);
+});
+test('assistant message persists both raw words and exactly displayed warning',async()=>{
+ const scope=createStandaloneConversationScope({userId:userA,conversationId:'job-1'});
+ const entries=[];
+ await processStandaloneChat(request(),{
+  env,fetchImpl:authFetch(),load:async()=>({status:'AVAILABLE',entries:[]}),
+  store:async entry=>{entries.push(entry);return {status:'PERSISTED',entry}},
+  now:()=> '2026-10-22T20:00:00.000Z',
+  run:async()=>({
+   intelligence:{raw_model_answer:"I'll send the estimate now.",
+    answer:"I'll send the estimate now.\\n\\nReality integrity notice: review customer approval."},
+   context:{continuity:{root_id:scope.continuity_root_id,
+    signal_handoff_status:'STORED_AND_READ_BACK',
+    cognitive_readback_verified:true,event_id:'synthetic:event'}}
+  }),
+ });
+ const record=entries.find(x=>x.payload.role==='assistant');
+ assert.equal(record.payload.text,"I'll send the estimate now.");
+ assert.match(record.payload.display_text,/Reality integrity notice/);
 });
