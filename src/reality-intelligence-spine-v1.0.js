@@ -3,6 +3,7 @@
 // Never treats model agreement as independent fact, never executes tools, and never
 // promotes an unverified correction or modifies authoritative history.
 import {createHash} from 'node:crypto';
+import {inspectResponseEvidenceBoundary} from './reality-evidence-boundary-v1.0.js';
 
 export const INTELLIGENCE_SPINE_V1='reality-intelligence-spine-v1.0';
 const validText=x=>typeof x==='string'&&x.trim().length>0;
@@ -69,7 +70,7 @@ export function assessIntelligenceSpineV1({
  continuityRootId,userSourceRef,modelSourceRef,currentRequest,rawAnswer,
  priorConversationSource='NOT_ATTESTED',authenticatedHistoryVerified=false,
  conversationDrift=null,modelIntegrity=null,trajectoryReplay=null,
- semanticReviews=[],
+ semanticReviews=[],providerCompletion=null,
 }={}){
  const args={continuityRootId,userSourceRef,modelSourceRef,currentRequest,rawAnswer,
   priorConversationSource,authenticatedHistoryVerified};
@@ -78,16 +79,26 @@ export function assessIntelligenceSpineV1({
  const factual=result('MODEL_OUTPUT_INTEGRITY',modelIntegrity);
  const replay=result('TRAJECTORY',trajectoryReplay);
  const semantic=semanticCandidates(semanticReviews,{userSourceRef,modelSourceRef});
+ const boundary=inspectResponseEvidenceBoundary({
+  userMessage:currentRequest,modelAnswer:rawAnswer,
+  userSourceRef,modelSourceRef,
+  providerStatus:providerCompletion?.status??null,
+  providerIncompleteReason:providerCompletion?.incomplete_reason??null,
+  outputTokens:providerCompletion?.output_tokens??null,
+  maxOutputTokens:providerCompletion?.max_output_tokens??null,
+ });
+ const evidenceBoundary=result('NATIVE_EVIDENCE_BOUNDARY',boundary);
  // Historical replay findings belong to their *original assistant turn*.
  // Attaching them to the current answer would falsely count one past problem
  // as a new current-answer failure and inflate the native self-score penalty.
- const findings=[...drift,...factual,...semantic];
+ const findings=[...drift,...factual,...semantic,...evidenceBoundary];
  const deduped=[...new Map(findings.map(f=>[f.issue_id,f])).values()];
  const responseCandidateCount=deduped.filter(f=>DRIFT_CLASSES.has(f.classification)||
   f.classification==='POSSIBLE_MISMATCH').length;
  const groundingCandidateCount=deduped.filter(f=>REFERENCE_CLASSES.has(f.classification)||
   f.classification==='POSSIBLE_HALLUCINATION'||
-  f.classification==='UNSUPPORTED_CLAIM').length;
+  f.classification==='UNSUPPORTED_CLAIM'||
+  f.classification==='UNTRUSTED_SOURCE_EVENT_PROMOTION').length;
  const status=deduped.length?'REVIEW_REQUIRED':'LIMITED_COVERAGE_NO_CANDIDATES';
  const basis={
   version:INTELLIGENCE_SPINE_V1,
@@ -99,6 +110,7 @@ export function assessIntelligenceSpineV1({
   status,findings:deduped,
   historical_replay_findings:replay,
   historical_replay_candidate_count:replay.length,
+  evidence_boundary:boundary,
   coverage:{
    request_alignment:{
     status:conversationDrift?'BOUNDED_CHECK':'NOT_EVALUATED',
@@ -123,6 +135,11 @@ export function assessIntelligenceSpineV1({
    retrospective_replay:{
     status:trajectoryReplay?.status||'NOT_EVALUATED',
    },
+   evidence_provenance:{status:boundary.coverage.untrusted_source_boundary,
+    candidate_count:evidenceBoundary.filter(x=>x.classification==='UNTRUSTED_SOURCE_EVENT_PROMOTION').length,
+    independent_fact_adjudication:'NOT_PERFORMED'},
+   response_completeness:{status:boundary.coverage.response_completeness,
+    candidate_count:evidenceBoundary.filter(x=>x.classification==='MODEL_RESPONSE_INCOMPLETE').length},
    business_outcome:{
     status:'NOT_OBSERVED',
     independent_external_readback:false,
