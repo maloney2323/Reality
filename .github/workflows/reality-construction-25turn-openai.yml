@@ -1,0 +1,44 @@
+name: Reality Construction 25-Turn OpenAI Drift Gauntlet
+on:
+  push:
+    branches:
+      - benchmark/construction-25turn-drift-20261023
+    paths:
+      - .github/workflows/reality-construction-25turn-openai.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  construction-25-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CONSTRUCTION_25_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Preflight code syntax and corpus size
+        run: |
+          node --check scripts/run-construction-25turn-openai-v1.mjs
+          node --check benchmarks/construction-25turn-drift-v1.js
+          node --check src/reality-intelligence-spine-v1.0.js
+          node --check src/reality-native-judge-v1.0.js
+          node --input-type=module -e "import {CONSTRUCTION_25_CASES as c,CONSTRUCTION_25_FAULT_PROBES as f} from './benchmarks/construction-25turn-drift-v1.js'; if(c.length!==25||f.length!==8)process.exit(1);"
+      - name: Check continuity drift/native judge/typed proof regressions
+        run: node --test test/reality-conversation-drift-spine-v0.3.test.js test/reality-trajectory-replay-continuity-v0.4.test.js test/reality-consequential-trust-native-judge-v1.test.js test/reality-typed-claim-evidence-v1.0.test.js
+      - name: LIVE OpenAI 25 turns with one native Reality judgment each
+        run: node scripts/run-construction-25turn-openai-v1.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: construction-25turn-openai-reality-evidence
+          path: |
+            benchmark-results/construction-25-openai-reality.json
+            benchmark-results/construction-25-openai-reality.html
+          if-no-files-found: ignore
+          retention-days: 7
