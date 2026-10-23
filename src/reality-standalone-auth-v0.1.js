@@ -101,7 +101,7 @@ export function standaloneConfirmationRedirect(env=process.env){
  let url;
  try{url=new URL(raw)}catch{throw failure('STANDALONE_CONFIRMATION_CALLBACK_REQUIRED',503)}
  if(url.protocol!=='https:'||url.username||url.password||url.port||
-    !/^[a-z0-9-]+\\.vercel\\.app$/i.test(url.hostname)||
+    !/^[a-z0-9-]+\.vercel\.app$/i.test(url.hostname)||
     url.pathname!=='/standalone.html'||url.search||url.hash)
    throw failure('STANDALONE_CONFIRMATION_CALLBACK_INVALID',503);
  return url.href;
