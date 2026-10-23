@@ -30,6 +30,20 @@ Demonstrate an actual, server-owned authenticated Vercel path into the **existin
 - **Independent model evaluation:** no real model used in tests. The new code reuses existing, incomplete drift extraction; does not establish a verified hallucination percentage, 100-turn performance, or ROI.
 - **Deployment:** no merge or production alias reassignment. Auto-created Vercel previews may be deployment-protected.
 
+## Live preview isolation check — 2026-10-22
+
+Read-only checks confirmed two Supabase projects: **reality-universe** (existing main Universe; 1 Auth user and 2 ledger entries) and **reality-continuity-benchmark** (separate benchmark project; 0 Auth users, compatible `reality_universe_entries` table). Both have row-level security enabled. The main Universe exposes a service-role-only policy; the benchmark has no public table policies.
+
+The draft migration branch has its own Vercel **Preview-only** public configuration pointing Auth and Universe to the benchmark Supabase project (`hvkfreoagbrphwghjajw`). This update did **not** touch production environments, add a server secret, create any user, or write a database row. `REALITY_STANDALONE_CHAT_ENABLED=false` remains explicitly set for that preview branch.
+
+The pilot now fails closed unless all the following hold before even calling authentication:
+- it is **not** a Vercel production runtime;
+- `REALITY_STANDALONE_EXPECTED_PROJECT_REF` is explicitly set;
+- the Supabase Auth URL and Reality Universe persistence URL **exactly match** that selected project;
+- separate server-only persistence credentials and the chat flag are configured.
+
+**Important:** The preview build will be redeployed to pick up these Preview-only environment settings, but signing in and running full live cognition will remain disabled until the sandbox server secret, correct role permissions, retry behavior, and live account tests are independently verified. Never copy the main Universe database's secret into the benchmark preview.
+
 ## Approval/release path
 1. Review PR changes and merge dependencies: this draft branches from the earlier unmerged drift/continuity stack (#77, #79–86). Must establish the single canonical release commit before promotion.
 2. Confirm \`SUPABASE_URL\` and public key refer to the same dedicated Reality Auth project, and server-only persistence uses the intended tenant-isolated Universe. Do not read or paste secrets into chat.
