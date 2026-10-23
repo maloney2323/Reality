@@ -5,6 +5,7 @@ on:
       - migration/vercel-independent-chat-proof-20261022
       - feature/persistent-obligation-observation-20261023
       - feature/construction-conflict-probe-20261023
+      - feature/estimate-egress-boundary-20261023
   pull_request:
     paths:
       - src/reality-native-universe-persistence-v1.0.js
@@ -30,6 +31,9 @@ on:
       - src/reality-construction-conflict-probe-v0.1.js
       - api/reality/standalone-conflict-probe.js
       - test/reality-construction-conflict-probe-v0.1.test.js
+      - src/reality-estimate-egress-guard-v0.1.js
+      - api/reality/standalone-estimate-egress-challenge.js
+      - test/reality-estimate-egress-guard-v0.1.test.js
       - src/reality-continuous-integrity-spine-v0.1.js
       - test/reality-obligation-observation-v0.1.test.js
       - docs/reality-obligation-observation-v0.1.md
@@ -102,6 +106,11 @@ jobs:
           node --check src/reality-construction-conflict-probe-v0.1.js
           node --check api/reality/standalone-conflict-probe.js
           node --test test/reality-construction-conflict-probe-v0.1.test.js
+      - name: Controlled send-tool boundary bypass challenge (no network send)
+        run: |
+          node --check src/reality-estimate-egress-guard-v0.1.js
+          node --check api/reality/standalone-estimate-egress-challenge.js
+          node --test test/reality-estimate-egress-guard-v0.1.test.js
       - name: Browser restoration and server-owned interrupted-turn selection
         run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
       - name: Persistent login rotation, logout and bounded authenticated pilot UI
