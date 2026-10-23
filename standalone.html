@@ -498,6 +498,81 @@ $('send').addEventListener('click',async()=>{
  }
  finally{$('send').disabled=false}
 });
+// One-click live pilot: exactly TWO application chat turns, never any automatic
+// restart or model retry. Underlying orchestration may make more provider calls.
+$('runContinuityProof').addEventListener('click',async()=>{
+ if(state.testRunning)return;
+ if(!state.accessToken||!state.discoveryReady){
+  status('continuityProof','Sign in and restore verified conversations first.',true);return;
+ }
+ if(state.pendingTurn||state.serverUnresolved.length){
+  status('continuityProof','An existing turn needs review. Resolve its status before a live test; no evidence was changed.',true);return;
+ }
+ if(!window.confirm('Run two fresh Reality chat turns with the real model? This may incur provider charges and the underlying engine can make multiple model calls per turn. Stop on the first failure; never automatically retry.')){
+  return;
+ }
+ state.testRunning=true;$('runContinuityProof').disabled=true;
+ const firstMessage='For the construction job, do not send an estimate until the homeowner approves it.';
+ const secondMessage='What exact rule did I give you about sending the estimate?';
+ const conversationId=crypto.randomUUID();
+ state.conversationId=conversationId;
+ state.serverUnresolved=[];state.reviewSelection=null;
+ localStorage.setItem('reality-standalone-conversation-v01',conversationId);
+ $('conversation').replaceChildren();
+ $('conversationIdLabel').textContent='Automated test '+conversationId.slice(0,8);
+ $('unresolvedPicker').replaceChildren();
+ const sendProofTurn=async (message,turnNumber)=>{
+  const turnId=crypto.randomUUID();
+  state.pendingTurn={conversationId,turnId};savePending();
+  status('continuityProof','Testing turn '+turnNumber+'/2. Awaiting independently verified commit...');
+  const response=await authFetch('/api/reality/standalone-chat',{
+   method:'POST',cache:'no-store',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({message,conversation_id:conversationId,thought_id:'personal',turn_id:turnId}),
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error('Turn '+turnNumber+' returned '+(payload.error||'HTTP '+response.status));
+  if(payload?.receipt?.verified_chain!==true||
+     payload?.receipt?.turn_commit_status!=='COMMITTED'||
+     (payload.receipt.sequence_num!==undefined&&payload.receipt.sequence_status!=='FINISHED')){
+    throw Error('Turn '+turnNumber+' has no verified and finalized commit receipt');
+  }
+  state.pendingTurn=null;savePending();
+  return payload;
+ };
+ try{
+  const first=await sendProofTurn(firstMessage,1);
+  const second=await sendProofTurn(secondMessage,2);
+  const query=new URLSearchParams({conversation_id:conversationId,thought_id:'personal'});
+  const res=await authFetch('/api/reality/standalone-history?'+query,{
+   method:'GET',cache:'no-store',
+  });
+  const history=await res.json().catch(()=>({}));
+  if(!res.ok||!Array.isArray(history.messages))
+   throw Error('Server-owned history could not be independently reloaded.');
+  const messages=history.messages;
+  const userInstructions=messages.filter(m=>m.role==='user').map(m=>m.text);
+  const assistantMessages=messages.filter(m=>m.role==='assistant').map(m=>m.text);
+  if(!userInstructions.includes(firstMessage)||!userInstructions.includes(secondMessage)||
+     assistantMessages.length<2||(history.unresolved_turns||[]).length){
+   throw Error('Committed turn history could not be restored exactly. Review evidence before continuing.');
+  }
+  await refreshHistory();
+  status('continuityProof','PASS: two app turns committed and both user instructions survived a fresh server read.\n'+
+    'Original rule: '+firstMessage+'\n'+
+    'Reality reply to recall check: '+(second.response||assistantMessages.at(-1))+'\n'+
+    'Cognition accuracy and cross-reload browser persistence still need evaluation.');
+  status('chatNotice','Automated two-turn continuity pilot completed. Reload the page to confirm your session and history are restored.');
+ }catch(e){
+  // Leave the exact failed turn selector intact for manual read-only inspection.
+  status('continuityProof','STOPPED: '+(e?.message||'Unknown failure')+
+   '. No failed turn was retried. Inspect its recorded status before continuing.',true);
+  status('chatNotice','The test stopped without inventing a success receipt.',true);
+ }finally{
+  state.testRunning=false;$('runContinuityProof').disabled=false;
+ }
+});
+
 async function refreshReadiness(){
  try{
   const response=await fetch('/api/reality/standalone-readiness',{cache:'no-store'});
