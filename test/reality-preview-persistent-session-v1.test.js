@@ -137,3 +137,17 @@ test('reload respects explicit locally selected conversation, not the first old 
  assert.ok(open>=0&&close>open);
  assert.ok(html.slice(open,close).includes("localStorage.setItem('reality-standalone-conversation-v01'"));
 });
+
+test('verified history projection displays truthful committed-reply count without inventing drift',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(html,/data\.assistant_messages_require_verified_commit===true/);
+ assert.match(html,/committedReplies=data\.assistant_messages_require_verified_commit===true/);
+ assert.match(html,/committed replies?\'?/);
+ assert.match(html,/Not measured from history/);
+ assert.match(html,/Model drift and factual accuracy still require separate evidence/);
+ assert.match(html,/if\(second\.result\)readout\(second\.result\)/);
+ const idx=html.indexOf('if(second.result)readout(second.result)');
+ const prior=html.slice(Math.max(0,idx-200),idx);
+ assert.match(prior,/await refreshHistory\(\);\s*await refreshConversationInventory\(\)/);
+ assert.doesNotMatch(html,/45\.0%|4\.0%|underlying model drift:\s*0/);
+});
