@@ -299,6 +299,18 @@ export async function getCausalTurnStatus(req,{
  const status=await inspectCausalTurn({
   scope,turnId:q.turn_id,lookup,fetchImpl,
  });
+ if(env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'){
+  const fence=await inspectConversationSlot({scope,env,fetchImpl});
+  if(fence.status==='BUSY'&&fence.active_turn_id===q.turn_id){
+   return Object.freeze({
+    ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
+    continuity_root_id:scope.continuity_root_id,
+    status:'SEQUENCE_FENCE_UNRESOLVED',turn_id:q.turn_id,committed:false,
+    evidence:status.evidence||null,
+    retry_policy:'REQUIRES_RECONCILIATION_NO_AUTOMATIC_MODEL_RERUN',
+   });
+  }
+ }
  return Object.freeze({ok:true,version:CAUSAL_TURN_CONTRACT_VERSION,
   continuity_root_id:scope.continuity_root_id,...status});
 }
@@ -322,13 +334,18 @@ export async function getCommittedStandaloneHistory(req,{
  });
  const ids=[...new Set(transcript.messages.map(m=>m.turn_id))];
  const statuses=new Map();
+ // A COMMITTED entry is insufficient if the DB atomic fence has not been
+ // finalized. The customer-visible reply must remain withheld.
+ const fence=env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'
+  ?await inspectConversationSlot({scope,env,fetchImpl}):null;
  // Concurrency is bounded to avoid overwhelming Supabase on long threads.
  for(let i=0;i<ids.length;i+=5){
   const slice=ids.slice(i,i+5);
   await Promise.all(slice.map(async turnId=>{
-   statuses.set(turnId,await inspectCausalTurn({
-    scope,turnId,lookup,fetchImpl,
-   }));
+   const status=await inspectCausalTurn({scope,turnId,lookup,fetchImpl});
+   statuses.set(turnId,fence?.status==='BUSY'&&fence.active_turn_id===turnId
+    ?Object.freeze({...status,committed:false,status:'SEQUENCE_FENCE_UNRESOLVED'})
+    :status);
   }));
  }
  const messages=transcript.messages.filter(m=>
