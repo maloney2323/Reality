@@ -83,15 +83,34 @@ revoke all on function public.reality_verify_resolution_entry_v1(jsonb)
 grant execute on function public.reality_verify_resolution_entry_v1(jsonb)
  to service_role;
 
--- Independently verify reconstructed original source hash (not only hash pointer).
+-- Recompute original source hashes, not merely check hash pointers.
 create or replace function public.reality_verify_stored_source_entry_v1(
  p_entry public.reality_universe_entries)
 returns boolean language plpgsql stable strict set search_path = ''
-as $
+as $$
 declare original jsonb;
 begin
- if p_entry.entry_id is null or p_entry.ledger_entry_hash !~ '^[a-f0-9]{64}
--- behind the SAME fence row that an abandonment RPC locks. A model response
+ original:=pg_catalog.jsonb_build_object(
+  'entry_id',p_entry.entry_id,
+  'continuity_root_id',p_entry.continuity_root_id,
+  'worldline_id',p_entry.worldline_id,
+  'event_kind',p_entry.event_kind,
+  'epistemic_kind',p_entry.epistemic_kind,
+  'assertion_time',pg_catalog.to_char(p_entry.assertion_time at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'effective_time',pg_catalog.to_char(p_entry.effective_time at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'source_ref',p_entry.source_ref,
+  'payload',p_entry.payload,
+  'evidence_references',p_entry.evidence_references,
+  'provenance',p_entry.provenance,
+  'ledger_entry_hash',p_entry.ledger_entry_hash);
+ return coalesce(public.reality_verify_resolution_entry_v1(original),false);
+exception when others then return false;
+end;
+$$;
+revoke all on function public.reality_verify_stored_source_entry_v1(public.reality_universe_entries) from public,anon,authenticated;
+grant execute on function public.reality_verify_stored_source_entry_v1(public.reality_universe_entries) to service_role;
+
+-- Late-write tombstone. Every assistant/COMMITTED insert is serialized that an abandonment RPC locks. A model response
 -- already in flight after interruption cannot commit a completion afterward.
 create or replace function public.reality_reject_late_abandoned_turn_v1()
 returns trigger
