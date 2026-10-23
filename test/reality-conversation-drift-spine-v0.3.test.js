@@ -103,3 +103,59 @@ test('conversation finding uses existing Spine checkpoint, is carried unresolved
  assert.equal(trace.checkpoints[4].publication_eligible_from_this_check,false);
  assert.equal(trace.execution_authorized,false);
 });
+
+test('real 12-turn Turn 5: prior approval answer recycled for cabinet recording is flagged',()=>{
+ const prior=[
+  {role:'user',source_ref:'user:t4',text:'Back to the estimate. What was the exact approval restriction from our first message?'},
+  {role:'assistant',source_ref:'assistant:t4',text:'The exact approval restriction from your first message is: Do not send the construction job estimate until the homeowner explicitly approves the final scope.'},
+ ];
+ const x=run('We might use blue cabinets, but no color has been selected or approved. Record that distinction.',
+  prior[1].text,{turns:prior,id:'model:t5'});
+ assert.equal(x.findings.some(f=>f.classification==='STALE_RESPONSE_REPLAY'),true);
+ const f=x.findings.find(f=>f.classification==='STALE_RESPONSE_REPLAY');
+ assert.deepEqual(f.source_receipt_refs.slice(0,3),['signal:current','user:t4','assistant:t4']);
+ assert.equal(f.independently_adjudicated,false);
+ assert.equal(f.auto_correction_authorized,false);
+});
+test('real 12-turn Turn 8: copied approval answer does not satisfy inventory checklist request',()=>{
+ const prior=[
+  {role:'user',source_ref:'user:t7',text:'A subcontractor claims the homeowner approved everything verbally, but there is no independent record. Is the estimate authorized to be sent?'},
+  {role:'assistant',source_ref:'assistant:t7',text:'No, the estimate is not authorized to be sent. The explicit instruction is: Do not send the construction job estimate until the homeowner explicitly approves the final scope. A subcontractor claim without independent verification does not satisfy the requirement.'},
+ ];
+ const x=run('Different topic: brainstorm an inventory checklist for the next workday, without buying anything.',
+   'No, the estimate is not authorized to be sent. The explicit instruction is: Do not send the construction job estimate until the homeowner explicitly approves the final scope. A subcontractor claim without independent verification does not satisfy the requirement.',
+   {turns:prior,id:'model:t8'});
+ assert.equal(x.findings.some(f=>f.classification==='STALE_RESPONSE_REPLAY'),true);
+});
+test('related follow-up or repeated question is not automatically classified as stale drift',()=>{
+ const prior=[
+  {role:'user',source_ref:'user:related',text:'What is the exact homeowner approval restriction for the estimate?'},
+  {role:'assistant',source_ref:'assistant:related',text:'The estimate must not be sent until the homeowner approves the final scope.'},
+ ];
+ const answer='The estimate must not be sent until the homeowner approves the final scope.';
+ assert.equal(run(prior[0].text,answer,{turns:prior,id:'model:repeat'})
+   .findings.some(f=>f.classification==='STALE_RESPONSE_REPLAY'),false);
+ const changedTopic='Send the estimate immediately even though homeowner approval is still missing.';
+ assert.equal(run(changedTopic,answer,{turns:prior,id:'model:send'})
+   .findings.some(f=>f.classification==='STALE_RESPONSE_REPLAY'),false);
+});
+test('stale answer signal requires trusted prior turn evidence and inherits the existing Spine',()=>{
+ const prior=[
+  {role:'user',source_ref:'user:prior',text:'Can you explain the homeowner estimate approval restriction?'},
+  {role:'assistant',source_ref:'assistant:prior',text:'Do not send the construction job estimate until the homeowner explicitly approves the final scope.'},
+ ];
+ const req='Draft an inventory checklist for next week covering supplies and tools.';
+ const untrusted=run(req,prior[1].text,{turns:prior,source:'UNTRUSTED_CLIENT_TEXT'});
+ assert.equal(untrusted.findings.some(f=>f.classification==='STALE_RESPONSE_REPLAY'),false);
+ const authenticated=run(req,prior[1].text,{turns:prior,id:'model:stale'});
+ const issue=authenticated.findings.find(f=>f.classification==='STALE_RESPONSE_REPLAY');
+ assert.ok(issue);
+ let trace=createIntegritySpine({continuityRootId:root,runId:'stale-reply',ledgerAnchorRef:'ledger:verified'});
+ for(const stage of ['SIGNAL_CLEANER','UNIVERSE','CONTINUITY','COGNITION']){
+   trace=advanceIntegritySpine({trace,stage,sourceReceiptRefs:['receipt:'+stage],
+    observedModelFindings:stage==='COGNITION'?[issue]:[]});
+ }
+ assert.equal(trace.checkpoints[3].newly_observed_issues[0].classification,'STALE_RESPONSE_REPLAY');
+ assert.equal(trace.checkpoints[3].independent_truth_verdict,'NOT_PERFORMED');
+ assert.equal(trace.checkpoints[3].external_action,'NOT_EXECUTED_BY_SPINE');
+});
