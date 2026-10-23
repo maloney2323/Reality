@@ -239,3 +239,93 @@ export function selectLearningFormsForNextTurn({
  }
  return Object.freeze(selected);
 }
+
+
+// This is the *automatic absorption* seam: from a real closed-loop turn and
+// its actual Universe readbacks, propose candidate reusable competencies.
+// The LLM can generate hypotheses. It cannot label itself verified.
+export async function absorbClosedLoopMistakesIntoLearningForms({
+ scope,turnResult,readLedger,generateHypothesis,at,
+}={}){
+ const current=scopeOf(scope);
+ if(!turnResult||!Number.isInteger(turnResult.turn)||
+   !text(turnResult.original_response_id)||!text(turnResult.original_answer)||
+   !Array.isArray(turnResult.original_findings)||
+   !Array.isArray(turnResult.receipts)||
+   typeof readLedger!=='function'||
+   typeof generateHypothesis!=='function'||
+   !Number.isFinite(Date.parse(at)))
+   fail('INTELLIGENCE_FORM_CLOSED_LOOP_PROOF_REQUIRED');
+ if(turnResult.original_findings.length>24)
+   fail('INTELLIGENCE_FORM_DETECTION_BOUNDS_EXCEEDED');
+ if(!turnResult.original_findings.length)return Object.freeze([]);
+ const originalReceipt=turnResult.receipts.find(r=>r.kind==='LLM_ORIGINAL_RESPONSE');
+ const verifiedReceipt=turnResult.receipts.find(r=>r.kind==='LLM_CLAIM_VERIFICATION');
+ if(!text(originalReceipt?.entry_id)||!text(verifiedReceipt?.entry_id)||
+  !originalReceipt.readback_verified||!verifiedReceipt.readback_verified)
+   fail('INTELLIGENCE_FORM_SOURCE_READBACK_REQUIRED');
+ const originals=await Promise.all([
+  readLedger(originalReceipt.entry_id),readLedger(verifiedReceipt.entry_id),
+ ]);
+ for(let i=0;i<2;i++){
+  const e=originals[i];
+  if(!e)fail('INTELLIGENCE_FORM_SOURCE_ENTRY_MISSING');
+  validateUniverseEntry(e);
+  if(e.entry_id!==[originalReceipt,verifiedReceipt][i].entry_id||
+   e.ledger_entry_hash!==[originalReceipt,verifiedReceipt][i].hash||
+   e.continuity_root_id!==current.continuity_root_id||
+   e.worldline_id!==current.worldline_id||
+   e.provenance?.owner_user_id!==current.owner_user_id||
+   e.provenance?.work_item_id!==current.work_item_id)
+    fail('INTELLIGENCE_FORM_SOURCE_PROOF_SCOPE_INVALID');
+ }
+ const [original,verification]=originals;
+ if(original.event_kind!=='LLM_ORIGINAL_RESPONSE'||
+  original.payload?.response_id!==turnResult.original_response_id||
+  original.payload?.text!==turnResult.original_answer||
+  verification.event_kind!=='LLM_CLAIM_VERIFICATION'||
+  verification.payload?.stage!=='INITIAL'||
+  verification.payload?.model_response_ref!=='model:'+turnResult.original_response_id||
+  hash(verification.payload?.findings)!==hash(turnResult.original_findings))
+    fail('INTELLIGENCE_FORM_SOURCE_FAILURE_MISMATCH');
+ const forms=[];
+ for(const finding of turnResult.original_findings){
+  if(!classes.has(finding?.classification))continue;
+  if(!text(finding.observed_answer_span)||
+    !turnResult.original_answer.includes(finding.observed_answer_span))
+    fail('INTELLIGENCE_FORM_ORIGINAL_MODEL_SPAN_MISMATCH');
+  const proposition=await generateHypothesis({
+   source_turn_id:String(turnResult.turn),
+   source_model_response_id:turnResult.original_response_id,
+   failure_class:finding.classification,
+   real_model_answer_span:finding.observed_answer_span,
+   stated_reason:finding.reason,
+   source_evidence_refs:finding.proof_refs,
+   scope:current,
+   allowed_effect:'CANDIDATE_CAPABILITY_ONLY',
+  });
+  if(!text(proposition?.hypothesis)||!text(proposition?.generalization)||
+   !text(proposition?.competence_coordinate))
+   fail('INTELLIGENCE_FORM_LLM_HYPOTHESIS_INVALID');
+  const candidate=proposeIntelligenceForm({
+   scope:current,origin:'LIVE_LLM_TURN',
+   sourceTurnId:String(turnResult.turn),
+   sourceModelRef:'model:'+turnResult.original_response_id,
+   sourceTurnReceiptId:original.entry_id,
+   sourceVerificationReceiptId:verification.entry_id,
+   failureClass:finding.classification,
+   competenceCoordinate:proposition.competence_coordinate,
+   hypothesis:proposition.hypothesis,
+   proposedGeneralization:proposition.generalization,
+   detectorVersion:verification.source_ref,
+  });
+  forms.push(Object.freeze({candidate,
+   universe_candidate_entry:intelligenceFormCandidateEntry({form:candidate,at}),
+   candidate_is_verified_learning:false,
+   automated_hypothesis_created:true,
+   model_training_performed:false,
+   independent_root_cause_confirmed:false,
+  }));
+ }
+ return Object.freeze(forms);
+}
