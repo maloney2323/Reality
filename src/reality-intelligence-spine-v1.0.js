@@ -4,6 +4,7 @@
 // promotes an unverified correction or modifies authoritative history.
 import {createHash} from 'node:crypto';
 import {inspectResponseEvidenceBoundary} from './reality-evidence-boundary-v1.0.js';
+import {compareTypedClaimsToUniverse} from './reality-typed-claim-evidence-v1.0.js';
 
 export const INTELLIGENCE_SPINE_V1='reality-intelligence-spine-v1.0';
 const validText=x=>typeof x==='string'&&x.trim().length>0;
@@ -71,6 +72,7 @@ export function assessIntelligenceSpineV1({
  priorConversationSource='NOT_ATTESTED',authenticatedHistoryVerified=false,
  conversationDrift=null,modelIntegrity=null,trajectoryReplay=null,
  semanticReviews=[],providerCompletion=null,
+ typedModelClaims=[],attestedUniverseEntries=[],worldlineId='reality:primary',evaluatedAt=null,
 }={}){
  const args={continuityRootId,userSourceRef,modelSourceRef,currentRequest,rawAnswer,
   priorConversationSource,authenticatedHistoryVerified};
@@ -88,10 +90,15 @@ export function assessIntelligenceSpineV1({
   maxOutputTokens:providerCompletion?.max_output_tokens??null,
  });
  const evidenceBoundary=result('NATIVE_EVIDENCE_BOUNDARY',boundary);
+ const typedEvidence=compareTypedClaimsToUniverse({
+  proposedClaims:typedModelClaims,ledgerEntries:attestedUniverseEntries,
+  continuityRootId,worldlineId,modelSourceRef,modelAnswer:rawAnswer,asOf:evaluatedAt,
+ });
+ const typedFindings=result('ATTESTED_UNIVERSE_TYPED_CLAIMS',typedEvidence);
  // Historical replay findings belong to their *original assistant turn*.
  // Attaching them to the current answer would falsely count one past problem
  // as a new current-answer failure and inflate the native self-score penalty.
- const findings=[...drift,...factual,...semantic,...evidenceBoundary];
+ const findings=[...drift,...factual,...semantic,...evidenceBoundary,...typedFindings];
  const deduped=[...new Map(findings.map(f=>[f.issue_id,f])).values()];
  const responseCandidateCount=deduped.filter(f=>DRIFT_CLASSES.has(f.classification)||
   f.classification==='POSSIBLE_MISMATCH').length;
@@ -111,6 +118,7 @@ export function assessIntelligenceSpineV1({
   historical_replay_findings:replay,
   historical_replay_candidate_count:replay.length,
   evidence_boundary:boundary,
+  typed_claim_evidence:typedEvidence,
   coverage:{
    request_alignment:{
     status:conversationDrift?'BOUNDED_CHECK':'NOT_EVALUATED',
@@ -140,6 +148,12 @@ export function assessIntelligenceSpineV1({
     independent_fact_adjudication:'NOT_PERFORMED'},
    response_completeness:{status:boundary.coverage.response_completeness,
     candidate_count:evidenceBoundary.filter(x=>x.classification==='MODEL_RESPONSE_INCOMPLETE').length},
+   structured_claim_grounding:{
+    status:typedEvidence.status,
+    claim_count:typedEvidence.proposed_claim_count,
+    compared_claim_count:typedEvidence.compared_claim_count,
+    unsupported_claim_count:typedEvidence.unsupported_claim_count,
+    source_truth_proven:false},
    business_outcome:{
     status:'NOT_OBSERVED',
     independent_external_readback:false,

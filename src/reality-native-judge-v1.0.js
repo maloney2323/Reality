@@ -55,7 +55,7 @@ function trustedHistory(turn){
 }
 const kinds=['request_alignment','continuity','factual_grounding',
  'semantic_reasoning','retrospective_replay','business_outcome',
- 'evidence_provenance','response_completeness'];
+ 'evidence_provenance','response_completeness','structured_claim_grounding'];
 function coverage(spine){
  const entries=kinds.map(k=>[k,spine.coverage[k]?.status||'NOT_EVALUATED']);
  const evaluated=entries.filter(([key,state])=>
@@ -66,6 +66,7 @@ function coverage(spine){
    key==='retrospective_replay' ? !['NOT_EVALUATED','NO_AUTHENTICATED_TRAJECTORY'].includes(state):
    key==='evidence_provenance' ? state==='BOUNDED_LEXICAL_CHECK':
    key==='response_completeness' ? !['NOT_EVALUATED'].includes(state):
+   key==='structured_claim_grounding' ? ['BOUNDED_CHECK_COMPLETE','REVIEW_REQUIRED'].includes(state):
    state==='INDEPENDENTLY_OBSERVED');
  return {assessments:entries.map(([area,status])=>({area,status})),
   assessed_dimension_count:evaluated.length,unassessed_dimension_count:kinds.length-evaluated.length,

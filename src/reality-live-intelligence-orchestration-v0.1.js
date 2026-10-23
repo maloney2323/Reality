@@ -357,6 +357,13 @@ export async function runLiveIntelligenceOrchestration({
           ?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
         authenticatedHistoryVerified:historyAuthenticated,
         conversationDrift,modelIntegrity,trajectoryReplay,
+        // Only server-derived model propositions are eligible. Raw prompt text
+        // never becomes a trusted statement or a source observation.
+        typedModelClaims:Array.isArray(cognitiveResult.typed_model_claims)
+          ?cognitiveResult.typed_model_claims:[],
+        attestedUniverseEntries:universeContext.persisted_attested_entries||[],
+        worldlineId:systemContext?.worldline_id||'reality:primary',
+        evaluatedAt:observedAt||new Date().toISOString(),
         providerCompletion:{
           status:cognitiveResult.provider_status??null,
           incomplete_reason:cognitiveResult.provider_incomplete_reason??null,
