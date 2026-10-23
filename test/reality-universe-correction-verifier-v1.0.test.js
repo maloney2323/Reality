@@ -230,4 +230,31 @@ test('model cannot forge readback, original answer scope, or omitted claims coun
   span('DENIAL_OF_ACTION',answer,'the estimate was sent','SEND_ESTIMATE'),
  ]}),/CORRECTION_MODEL_CLAIM_UNTRUSTED/);
 });
+
+test('ordinary model offers to help draft and comply with rules are not consequential actions',async()=>{
+ const a='I can help draft a checklist or daily planner template based on these ideas.';
+ const b='I will follow these rules moving forward.';
+ for(const answer of [a,b]){
+  const r=await check({policyEntries:[policy('SEND_ESTIMATE','job:WR-41')],
+   answer,claims:[span('ACTION_COMMITMENT',answer,answer,
+    'GENERAL_ASSISTANCE',{resource:'general'})]});
+  assert.equal(r.findings.length,0);
+  assert.equal(r.assessments[0].status,'NON_EXECUTION_ASSISTANCE_NOT_AN_ACTION_GATE');
+  assert.equal(r.external_action_authorized,false);
+ }
+});
+test('certain-sounding numeric assertion unexamined by extraction is tracked as possible coverage gap',async()=>{
+ const answer='The only number we can say is definitely present is at least 152 units on site.';
+ const r=await check({answer,claims:[]});
+ assert.equal(r.findings.length,0);
+ assert.equal(r.result,'INSUFFICIENT_EXTRACTION');
+ assert.equal(r.coverage_gap_status,'CANDIDATE_MISSING_TYPED_FACT');
+ assert.equal(r.possible_unexamined_material_assertion,true);
+});
+test('ordinary hypothetical arithmetic is not a missing-material-fact coverage gap',async()=>{
+ const answer='Eight boxes at $12.50 and $9 delivery is $109.00 before tax.';
+ const r=await check({answer,claims:[]});
+ assert.equal(r.coverage_gap_status,'NO_CERTAINTY_TRIGGER_OR_TYPED_FACT_PRESENT');
+});
+
 export {policy,proof,check,span,scope,estimate,installation,independentEvidenceVerifier};
