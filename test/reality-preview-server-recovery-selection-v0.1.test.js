@@ -23,5 +23,5 @@ test('read-only inspection selects only owner-authenticated history turns, not b
 test('saved uncommitted user message is not misrepresented as a committed reply',()=>{
  assert.doesNotMatch(html,/Restored committed messages\./);
  assert.match(html,/interrupted or uncommitted turn\(s\) require review/);
- assert.match(html,/No unverified model reply has been published/);
+ assert.match(html,/No unverified model reply (?:has been|was) published/);
 });
