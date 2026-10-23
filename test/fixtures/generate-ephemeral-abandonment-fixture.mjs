@@ -7,7 +7,7 @@ const owner='e83340ec-4266-4c95-a6cd-929bc58b445e';
 const root='continuity:'+'a'.repeat(32),world='reality:primary',tid='synthetic-interrupted';
 const claim='6617c2a8-5ed7-40ff-bde7-6c0d13726844';
 const timestamp=new Date().toISOString();
-const q=v=>JSON.stringify(v).replaceAll("'","''");
+const q=v=>(typeof v==='string'?v:JSON.stringify(v)).replaceAll("'","''");
 const literal=x=>"'"+q(x)+"'";
 const entry=(id,kind,payload,evidence_references=[],source='SYNTHETIC_TEST')=>
  createUniverseEntry({entry_id:id,continuity_root_id:root,worldline_id:world,
