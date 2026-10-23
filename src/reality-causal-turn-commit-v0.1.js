@@ -10,6 +10,7 @@ import {createUniverseEntry,validateUniverseEntry} from './reality-universe-pers
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {processStandaloneChat,getStandaloneConversationHistory} from './reality-standalone-chat-v0.1.js';
+import {inspectAbandonedTurn} from './reality-abandoned-turn-readback-v1.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,scopedTurnEntryId,
  rejectUnsafeStandalonePayload,requireStandaloneReady,STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
@@ -348,6 +349,7 @@ export async function getCausalTurnStatus(req,{
 export async function getCommittedStandaloneHistory(req,{
  env=process.env,fetchImpl=fetch,
  load,lookup=retrieveOptionalPersistedUniverseEntry,
+ inspectAbandonment=inspectAbandonedTurn,
 }={}){
  const transcript=await getStandaloneConversationHistory(req,{
   env,fetchImpl,...(load?{load}:{})
@@ -369,6 +371,19 @@ export async function getCommittedStandaloneHistory(req,{
   const slice=ids.slice(i,i+5);
   await Promise.all(slice.map(async turnId=>{
    const status=await inspectCausalTurn({scope,turnId,lookup,fetchImpl});
+   if(!status.committed){
+    const abandonment=await inspectAbandonment({scope,turnId,turn:status,lookup,fetchImpl});
+    if(abandonment?.verified_chain){
+     if(fence?.status==='BUSY'&&fence.active_turn_id===turnId)
+      throw fail('ABANDONED_TURN_FENCE_STILL_BUSY');
+     statuses.set(turnId,Object.freeze({
+      ...status,status:'ABANDONED_AFTER_OWNER_REVIEW',
+      committed:false,archived:true,
+      resolution_receipt_id:abandonment.receipt_id,
+     }));
+     return;
+    }
+   }
    statuses.set(turnId,fence?.status==='BUSY'&&fence.active_turn_id===turnId
     ?Object.freeze({...status,committed:false,status:'SEQUENCE_FENCE_UNRESOLVED'})
     :status);
@@ -376,12 +391,25 @@ export async function getCommittedStandaloneHistory(req,{
  }
  const messages=transcript.messages.filter(m=>
   m.role==='user'||statuses.get(m.turn_id)?.committed===true);
- const unresolved=ids.filter(id=>statuses.get(id)?.committed!==true)
+ const unresolved=ids.filter(id=>statuses.get(id)?.committed!==true&&
+  statuses.get(id)?.archived!==true)
   .map(id=>Object.freeze({turn_id:id,status:statuses.get(id)?.status||'UNVERIFIED'}));
+ const resolved=ids.filter(id=>statuses.get(id)?.archived===true)
+  .map(id=>Object.freeze({
+   turn_id:id,status:'ABANDONED_AFTER_OWNER_REVIEW',
+   resolution_receipt_id:statuses.get(id)?.resolution_receipt_id,
+   model_outcome:'UNKNOWN',
+   assistant_completion_verified:false,
+  }));
  return Object.freeze({
   ...transcript,
-  messages:messages.map(m=>Object.freeze(m)),
+  messages:messages.map(m=>Object.freeze({
+   ...m,
+   ...(statuses.get(m.turn_id)?.archived===true&&m.role==='user'
+    ?{turn_resolution:'ABANDONED_AFTER_OWNER_REVIEW'}:{}),
+  })),
   unresolved_turns:unresolved,
+  resolved_turns:resolved,
   assistant_messages_require_verified_commit:true,
   history_is_complete:false,
  });
