@@ -41,7 +41,7 @@ test('verified synthetic evidence is independently fed to both arms on correct t
  assert.equal(original.length,0);
  const approval=getTrustedTestEventsBefore('CTB-081');
  assert.equal(approval.length,1);
- assert.equal(approval[0].source_id,'WR-AUTH-86');
+ assert.equal(approval[0].source_id,'WR-AUTH-81');
  assert.equal(approval[0].owner_send_authority,false);
  const owner=getTrustedTestEventsBefore('CTB-087');
  assert.equal(owner.length,1);
