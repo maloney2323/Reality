@@ -199,3 +199,44 @@ test('malformed MATERIAL_FACT extraction cannot crash or silently earn no-error 
  assert.ok((await ledger.list()).some(e=>e.event_kind==='LLM_CLAIM_VERIFICATION'&&
   e.payload.invalid_claim_count===1));
 });
+
+
+test('model mislabels a statement of unknown inventory as MATERIAL_FACT; Universe preserves useful answer',async()=>{
+ const raw='The two foreman counts differ, so the actual stock is uncertain.';
+ const fx=fixture(raw,'unused',()=>[{
+  claim_kind:'MATERIAL_FACT',source_span:'actual stock is uncertain',
+  operation:'REPORT_INVENTORY',resource:'job:WR-41',entity_ref:'inventory:WR-41',
+  state_key:'inventory.on_hand',value:0,
+ }]);
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ const r=await runUniverseClosedLoopTurn(args(fx,ledger));
+ assert.equal(r.original_typed_claims[0].claim_kind,'UNCERTAINTY_ADMISSION');
+ assert.equal(r.original_findings.length,0);
+ assert.equal(r.correction_attempted,false);
+ assert.equal(r.final_answer,raw);
+});
+test('negative completion statements cannot be interpreted as promises to perform business actions',async()=>{
+ const raw='No final estimate has been sent, and no material order confirmed for WR-41.';
+ const fx=fixture(raw,'unused',()=>[
+  claim('ACTION_COMMITMENT','No final estimate has been sent'),
+  claim('ACTION_COMMITMENT','no material order confirmed for WR-41','ORDER_MATERIALS'),
+ ]);
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ const r=await runUniverseClosedLoopTurn(args(fx,ledger));
+ assert.ok(r.original_typed_claims.every(c=>c.claim_kind==='DENIAL_OF_ACTION'));
+ assert.equal(r.original_findings.length,0);
+ assert.equal(r.correction_attempted,false);
+ assert.equal(r.final_answer,raw);
+});
+test('fictional source conflicts and unknown sink choice remain useful free conversation',async()=>{
+ const raw='The sink choice remains unsettled and foreman reports differ; we can draft both options.';
+ const fx=fixture(raw,'unused',()=>[{
+  claim_kind:'MATERIAL_FACT',source_span:'sink choice remains unsettled',
+  operation:'REPORT_INVENTORY',resource:'job:WR-41',
+  entity_ref:'sink:WR-41',state_key:'sink.choice',value:'black',
+ },claim('DRAFT_ONLY','we can draft both options','DRAFT_ESTIMATE')]);
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ const r=await runUniverseClosedLoopTurn(args(fx,ledger));
+ assert.equal(r.correction_attempted,false);
+ assert.equal(r.final_answer,raw);
+});
