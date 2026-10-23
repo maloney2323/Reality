@@ -126,16 +126,14 @@ export function compareTypedClaimsToUniverse({
     JSON.stringify(canonical(r.claim.value))));
   let status;
   if(c.kind==='OUTCOME'){
-   const outcome=eligible.filter(r=>
-    r.claim.verification_level==='INDEPENDENT_OUTCOME_READBACK');
-   const proof=outcome.filter(r=>r.claim.value===c.value);
-   status=proof.length&&new Set(outcome.map(r=>
-      JSON.stringify(canonical(r.claim.value)))).size===1
-      ?'OUTCOME_SOURCE_READBACK_MATCH':'OUTCOME_NOT_INDEPENDENTLY_VERIFIED';
-   if(status==='OUTCOME_NOT_INDEPENDENTLY_VERIFIED')
-    findings.push(newFinding({classification:'UNVERIFIED_EXECUTION_CLAIM',
+   // Source metadata can *claim* independent verification but cannot grant
+   // execution truth. A distinct external effect readback must be checked by
+   // the governed execution/outcome layer; this module deliberately has no
+   // such authority. Hence ALL completed-action claims remain unresolved.
+   status='OUTCOME_REQUIRES_SEPARATE_EFFECT_READBACK';
+   findings.push(newFinding({classification:'UNVERIFIED_EXECUTION_CLAIM',
       c,refs:sources,modelSourceRef,
-      reason:'No matching independent outcome readback for asserted action completion'}));
+      reason:'A source record is not independently verified execution or delivery'}));
   } else if(!eligible.length){
    status='UNKNOWN_NO_ATTESTED_SOURCE'; // do not call unknown a hallucination
   } else if(observedValues.size>1){
