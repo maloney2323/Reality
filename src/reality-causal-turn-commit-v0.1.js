@@ -349,7 +349,7 @@ export async function getCausalTurnStatus(req,{
 export async function getCommittedStandaloneHistory(req,{
  env=process.env,fetchImpl=fetch,
  load,lookup=retrieveOptionalPersistedUniverseEntry,
- inspectAbandonment=inspectAbandonedTurn,
+ inspectAbandonment=inspectAbandonedTurn,inspectFence=inspectConversationSlot,
 }={}){
  const transcript=await getStandaloneConversationHistory(req,{
   env,fetchImpl,...(load?{load}:{})
@@ -365,7 +365,7 @@ export async function getCommittedStandaloneHistory(req,{
  // A COMMITTED entry is insufficient if the DB atomic fence has not been
  // finalized. The customer-visible reply must remain withheld.
  const fence=env.REALITY_CAUSAL_SEQUENCE_ENABLED==='true'
-  ?await inspectConversationSlot({scope,env,fetchImpl}):null;
+  ?await inspectFence({scope,env,fetchImpl}):null;
  // Concurrency is bounded to avoid overwhelming Supabase on long threads.
  for(let i=0;i<ids.length;i+=5){
   const slice=ids.slice(i,i+5);
