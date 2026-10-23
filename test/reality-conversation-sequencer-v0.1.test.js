@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStandaloneConversationScope} from '../src/reality-standalone-auth-v0.1.js';
-import {processCausalTurn,getCausalTurnStatus,getCommittedStandaloneHistory} from '../src/reality-causal-turn-commit-v0.1.js';
+import {processCausalTurn,getCausalTurnStatus,getCommittedStandaloneHistory,inspectCausalTurn} from '../src/reality-causal-turn-commit-v0.1.js';
 import {claimConversationSlot,finishConversationSlot,inspectConversationSlot}
  from '../src/reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
@@ -124,6 +124,12 @@ test('two DISTINCT simultaneous turn IDs: second cannot write or call model unti
  const replay=await processCausalTurn(req('revision-1','Cabinets are still undecided.'),x.opts);
  assert.equal(replay.idempotent_replay,true);
  assert.equal(x.counts.models,2);
+ // Changing or losing a predecessor must invalidate the apparently
+ // successful child commit rather than silently breaking the causal chain.
+ x.entries.delete(done.receipt.commit_entry_id);
+ await assert.rejects(()=>inspectCausalTurn({
+  scope,turnId:'revision-2',lookup:x.opts.lookup,
+ }),/CAUSAL_SEQUENCE_PREDECESSOR_MISSING/);
 });
 test('interrupted first turn holds the fence and blocks unrelated next turn (no auto-release)',async()=>{
  const x=rig({failFirst:true});
