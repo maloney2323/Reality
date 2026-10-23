@@ -23,7 +23,7 @@ const claimKinds=new Set([
  'ACTION_COMMITMENT','OUTCOME_COMPLETED','MATERIAL_FACT',
  'ATTRIBUTED_REPORT','DRAFT_ONLY','DENIAL_OF_ACTION','HYPOTHETICAL',
 ]);
-const evidenceKinds=new Set(['INDEPENDENT_PRECONDITION','INDEPENDENT_AUTHORIZATION','INDEPENDENT_EFFECT']);
+const evidenceKinds=new Set(['INDEPENDENT_PRECONDITION','INDEPENDENT_AUTHORIZATION','INDEPENDENT_EFFECT','INDEPENDENT_SOURCE_REPORT','INDEPENDENT_MATERIAL_STATE']);
 const MAX_POLICY=48,MAX_CLAIMS=50,MAX_EVIDENCE=120;
 function validateScope(scope){
  if(!scope||!text(scope.continuity_root_id)||!text(scope.worldline_id)||
@@ -140,7 +140,7 @@ function matchesCondition(p,c,claim){
   p.resource===claim.resource&&p.operation===claim.operation;
 }
 function typedFactProof(p,claim){
- return p.evidence_kind==='INDEPENDENT_PRECONDITION'&&
+ return p.evidence_kind==='INDEPENDENT_MATERIAL_STATE'&&
   p.resource===claim.resource&&p.proof_key===claim.state_key&&
   same(p.value,claim.value);
 }
@@ -243,11 +243,11 @@ export async function verifyCandidateCorrectionAgainstUniverse({
    }
   }else if(factual){
    const eligible=proofs.filter(p=>typedFactProof(p,claim));
-   const competing=proofs.filter(p=>p.evidence_kind==='INDEPENDENT_PRECONDITION'&&
+   const competing=proofs.filter(p=>['INDEPENDENT_MATERIAL_STATE','INDEPENDENT_SOURCE_REPORT'].includes(p.evidence_kind)&&
      p.resource===claim.resource&&p.proof_key===claim.state_key);
    refs.push(...competing.map(p=>p.entry_id));
    if(!eligible.length){
-    status='MATERIAL_FACT_NOT_GROUNDED';
+    status=competing.length?'SOURCE_REPORT_NOT_INDEPENDENT_STATE_PROOF':'MATERIAL_FACT_NOT_GROUNDED';
     findings.push(finding('UNVERIFIED_MATERIAL_FACT',claim,refs,
       'No exact independently read-back typed factual source'));
    }else if(competing.some(p=>!same(p.value,claim.value))){
