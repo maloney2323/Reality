@@ -45,7 +45,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <p class="sub">This preview uses Supabase authentication, not your Base44 account. Existing Base44 credentials and conversation history will not automatically work here.</p>
 <div class="fields"><div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@example.com"></div>
 <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"></div></div>
-<div class="actions"><button id="login">Sign in</button><button class="secondary" id="signup">Create preview account</button></div>
+<div class="actions"><button id="login">Sign in</button><button class="secondary" id="signup">Create preview account</button><button class="secondary" id="resend">Resend confirmation email</button></div>
 <div id="loginNotice" class="notice" role="status"></div>
 </section>
 <div id="workspace">
@@ -97,17 +97,21 @@ async function authorize(create){
  button.disabled=true;
  status('loginNotice','Contacting the independent identity provider...');
  try{
-  const {auth_url,publishable_key}=await config();
+  const {auth_url,publishable_key,confirmation_redirect_url}=await config();
   const email=$('email').value.trim(),password=$('password').value;
   if(!email||!password)throw Error('Email and password are required.');
-  const url=create?'/auth/v1/signup':'/auth/v1/token?grant_type=password';
+  const url=create?'/auth/v1/signup?redirect_to='+encodeURIComponent(confirmation_redirect_url):'/auth/v1/token?grant_type=password';
   const res=await fetch(auth_url+url,{method:'POST',headers:{
    apikey:publishable_key,'Content-Type':'application/json'
   },body:JSON.stringify({email,password})});
   const data=await res.json();
-  if(!res.ok)throw Error(data?.msg||data?.error_description||data?.message||'Authentication failed');
+  if(!res.ok){
+   if(data?.error_code==='email_not_confirmed'||data?.code==='email_not_confirmed')
+    throw Error('Email not confirmed. After fixing the test project redirect URL, select Resend confirmation email.');
+   throw Error(data?.msg||data?.error_description||data?.message||'Authentication failed');
+  }
   if(!data.access_token) {
-   status('loginNotice','Account requested. Confirm your email if required, then sign in.');
+   status('loginNotice','Account requested. Use your confirmation email. If it points to localhost, the Supabase test project Site URL must be corrected, then select Resend confirmation email.');
    return;
   }
   state.accessToken=data.access_token; $('password').value='';
@@ -137,6 +141,52 @@ async function refreshHistory(){
  $('conversationIdLabel').textContent='Conversation '+selected.slice(0,8);
  status('chatNotice','Restored '+data.messages.length+' messages from the server-owned ledger. Earlier history may exist beyond this bounded view.');
 }
+// The confirmation link returns a one-time Supabase access token through
+// the URL fragment. Never store or log it; verify with Supabase before use.
+async function consumeConfirmationCallback(){
+ const fragment=new URLSearchParams(window.location.hash.slice(1));
+ const token=fragment.get('access_token');
+ const errorDescription=fragment.get('error_description');
+ if(!token&&!errorDescription)return;
+ // Clear fragment immediately to keep auth credentials out of copied URLs.
+ window.history.replaceState(null,'',window.location.pathname+window.location.search);
+ if(errorDescription){
+  status('loginNotice','Email confirmation failed. Request a new confirmation email.',true);
+  return;
+ }
+ try{
+  const {auth_url,publishable_key}=await config();
+  const verified=await fetch(auth_url+'/auth/v1/user',{
+   headers:{apikey:publishable_key,Authorization:'Bearer '+token},
+   cache:'no-store',
+  });
+  if(!verified.ok)throw Error('Email session could not be verified');
+  const user=await verified.json();
+  if(!user?.id||user.is_anonymous)throw Error('Authenticated user unavailable');
+  state.accessToken=token;
+  $('password').value='';
+  $('signIn').style.display='none';$('workspace').style.display='block';
+  status('chatNotice','Email confirmed. Checking continuity from the verified account...');
+  await refreshHistory();
+ }catch(e){state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
+}
+async function resendConfirmation(){
+ const btn=$('resend');btn.disabled=true;
+ try{
+  const {auth_url,publishable_key,confirmation_redirect_url}=await config();
+  const email=$('email').value.trim();
+  if(!email)throw Error('Enter the same email you used to create your preview account.');
+  const response=await fetch(auth_url+'/auth/v1/resend?redirect_to='+encodeURIComponent(confirmation_redirect_url),{
+   method:'POST',headers:{apikey:publishable_key,'Content-Type':'application/json'},
+   body:JSON.stringify({type:'signup',email}),
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data?.error_description||data?.msg||data?.message||'Could not resend the confirmation.');
+  status('loginNotice','If the account is eligible, a new confirmation link was requested. Check email and Spam. Open the newest link.');
+ }catch(e){status('loginNotice',e.message,true)}
+ finally{btn.disabled=false}
+}
+
 function render(role,text){
  const item=document.createElement('div');item.className='message'+(role==='user'?' user':'');
  const name=document.createElement('div');name.className='who';name.textContent=role;
@@ -157,6 +207,7 @@ function readout(result){
 }
 $('login').addEventListener('click',()=>authorize(false));
 $('signup').addEventListener('click',()=>authorize(true));
+$('resend').addEventListener('click',resendConfirmation);
 $('logout').addEventListener('click',()=>{state.accessToken=null;$('workspace').style.display='none';$('signIn').style.display='block';$('conversation').replaceChildren();resetIntegrity();status('loginNotice','Signed out.');});
 $('newConversation').addEventListener('click',newConversation);
 $('send').addEventListener('click',async()=>{
@@ -199,7 +250,9 @@ async function refreshReadiness(){
  }
 }
 refreshReadiness();
-config().then(()=>status('loginNotice','Independent identity configuration present.'))
- .catch(e=>status('loginNotice',e.message,true));
+config().then(async()=>{
+ status('loginNotice','Independent identity configuration present.');
+ await consumeConfirmationCallback();
+}).catch(e=>status('loginNotice',e.message,true));
 </script>
 </body></html>
