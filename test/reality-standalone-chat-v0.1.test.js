@@ -103,7 +103,10 @@ test('complete standalone proof: provider auth -> scope -> persisted user -> sam
   store:async entry=>{validateUniverseEntry(entry);log.push(entry.payload.role);
    assert.equal(entry.continuity_root_id,root);
    return {status:'PERSISTED',entry}},
-  run:async input=>{log.push('run');assert.equal(input.systemContext.continuity_root_id,root);
+  run:async input=>{log.push('run');
+   assert.equal(input.apiKey,env.REALITY_STANDALONE_OPENAI_API_KEY);
+   assert.equal(input.model,env.REALITY_OPENAI_MODEL);
+   assert.equal(input.systemContext.continuity_root_id,root);
    assert.equal(input.systemContext.authenticated_conversation_turns.length,1);
    assert.match(input.systemContext.authenticated_conversation_turns[0].text,/customer approves/);
    assert.equal(input.systemContext.action_authorized,false);
@@ -468,5 +471,25 @@ test('native Universe adapter sends opaque Supabase sb_secret only as apikey, re
    REALITY_UNIVERSE_PERSISTENCE_KEY:original.key,
    REALITY_UNIVERSE_PERSISTENCE_URL:original.url,
   })){if(value===undefined)delete process.env[key];else process.env[key]=value}
+ }
+});
+
+
+test('preview chat cannot silently borrow existing production OPENAI_API_KEY',async()=>{
+ const productionKey=process.env.OPENAI_API_KEY;
+ try{
+  process.env.OPENAI_API_KEY='sk-PRODUCTION-KEY-MUST-NOT-USE-abcdefgh123456';
+  let used=false;
+  const isolated={...env,REALITY_STANDALONE_OPENAI_API_KEY:''};
+  await assert.rejects(()=>processStandaloneChat(request(),{
+   env:isolated,fetchImpl:async()=>{used=true;throw Error('AUTH_CALLED')},
+   load:async()=>{used=true;return {status:'AVAILABLE',entries:[]}},
+   store:async()=>{used=true},
+   run:async()=>{used=true},
+  }),/STANDALONE_MODEL_CONFIGURATION_REQUIRED/);
+  assert.equal(used,false,'production key must not activate preview');
+ }finally{
+  if(productionKey===undefined)delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY=productionKey;
  }
 });
