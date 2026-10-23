@@ -278,9 +278,11 @@ export async function runUniverseClosedLoopTurn({
  // Candidate formation is optional and deliberately separate from the chat
  // success path and all consequential authority.
  const learningCandidates=[];
+ let learningCandidateStatus='NOT_CONFIGURED';
  if(generateLearningHypothesis!==null){
   if(typeof generateLearningHypothesis!=='function')
    fail('CLOSED_LOOP_LEARNING_GENERATOR_INVALID');
+  try{
   const candidateForms=await absorbClosedLoopMistakesIntoLearningForms({
    scope,at:stamp,
    readLedger:id=>ledger.read(id),
@@ -304,6 +306,13 @@ export async function runUniverseClosedLoopTurn({
     available_to_apply_as_verified_competence:false,
    });
   }
+  learningCandidateStatus=learningCandidates.length?'CANDIDATES_RECORDED_UNVERIFIED':'NO_EVIDENCE_GROUNDED_FAILURES';
+  }catch(error){
+   // A learning subsystem outage must never rewrite/lose the already
+   // committed conversation. Expose failure as a status for monitoring;
+   // retry candidate formation separately with immutable original receipts.
+   learningCandidateStatus='CANDIDATE_FORMATION_FAILED:'+String(error?.message||'unknown').slice(0,120);
+  }
  }
  return Object.freeze({
   turn,prompt,
@@ -321,6 +330,7 @@ export async function runUniverseClosedLoopTurn({
   independently_verified_full_semantics:false,
   evidence_entries_read_back:first.e.admitted_independent_proofs,
   intelligence_form_candidates:learningCandidates,
+  learning_candidate_status:learningCandidateStatus,
   candidate_forms_are_not_verified_learning:true,
   receipts,continuity_receipt_id:continuitySaved.entry_id,
   next_history:newHistory,
