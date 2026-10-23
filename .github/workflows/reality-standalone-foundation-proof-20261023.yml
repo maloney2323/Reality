@@ -1,0 +1,37 @@
+name: Reality Standalone Foundation Proof
+on:
+  push:
+    branches:
+      - migration/vercel-independent-chat-proof-20261022
+    paths:
+      - '.github/workflows/reality-standalone-foundation-proof-20261023.yml'
+      - 'src/reality-standalone-*.js'
+      - 'src/reality-causal-turn-commit-v0.1.js'
+      - 'src/reality-conversation-sequencer-v0.1.js'
+      - 'test/reality-standalone-chat-v0.1.test.js'
+      - 'test/reality-causal-turn-commit-v0.1.test.js'
+      - 'test/reality-conversation-sequencer-v0.1.test.js'
+      - 'test/reality-authenticated-chat-continuity-v0.1.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-provider-foundation-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exactly tested repository commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Record Node version
+        run: node --version
+      - name: Test identity, cold restart, receipts, sequencing, and interruption
+        run: |
+          node --test \
+            test/reality-standalone-chat-v0.1.test.js \
+            test/reality-causal-turn-commit-v0.1.test.js \
+            test/reality-conversation-sequencer-v0.1.test.js \
+            test/reality-authenticated-chat-continuity-v0.1.test.js
