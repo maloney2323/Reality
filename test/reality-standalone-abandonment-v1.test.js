@@ -6,7 +6,7 @@ import {createStandaloneConversationScope}
  from '../src/reality-standalone-auth-v0.1.js';
 import {causalTurnIds} from '../src/reality-causal-turn-commit-v0.1.js';
 import {prepareOwnerAbandonment,confirmOwnerAbandonment,
- ACKNOWLEDGMENT_TEXT} from '../src/reality-standalone-abandonment-v1.js';
+ ACKNOWLEDGMENT_TEXT,requireRecentProviderAuthentication} from '../src/reality-standalone-abandonment-v1.js';
 const user='e83340ec-4266-4c95-a6cd-929bc58b445e';
 const cid='contract-case',tid='held';
 const scope=createStandaloneConversationScope({userId:user,conversationId:cid});
@@ -60,8 +60,21 @@ function fixture(){
     receipt_hash:resolution.ledger_entry_hash};
   },get rpcCount(){return rpcCount;},stale:()=>{f={...f,sequence_num:2}}};
 }
-const sessionA='Bearer SYNTHETIC_SESSION_TOKEN_FOR_TEST_OWNER_1234567890';
-const sessionB='Bearer DIFFERENT_SYNTHETIC_SESSION_TOKEN_SAME_OWNER_12345';
+function syntheticBearer({authAt=Math.floor(clock/1000),issuedAt=Math.floor(clock/1000),
+ owner=user,session='9a6752e4-a9a5-4755-9f14-160301d62ec6'}={}){
+ // A mocked, non-cryptographic JWT accepted ONLY by the injected test verifier.
+ // Production requires the matching token verified by Supabase Auth first.
+ const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+ const payload=Buffer.from(JSON.stringify({
+  sub:owner,iss:env.SUPABASE_URL+'/auth/v1',
+  aud:'authenticated',role:'authenticated',aal:'aal1',
+  session_id:session,iat:issuedAt,exp:Math.floor(clock/1000)+3600,
+  amr:[{method:'password',timestamp:authAt}]
+ })).toString('base64url');
+ return 'Bearer '+header+'.'+payload+'.synthetic_signature';
+}
+const sessionA=syntheticBearer();
+const sessionB=syntheticBearer({session:'59f8bbdb-2c5f-49e2-ae2b-793364ea89d1'});
 const getReq={method:'GET',headers:{authorization:sessionA},
  query:{conversation_id:cid,turn_id:tid}};
 const approvals=(challenge)=>({method:'POST',headers:{authorization:sessionA},body:{
@@ -140,4 +153,18 @@ test('older USER-only turn, foreign identity fields and production rejected',asy
   env:{...env,VERCEL_ENV:'production'},...f}),
  /STANDALONE_PRODUCTION_RELEASE_NOT_AUTHORIZED/);
  assert.equal(f.rpcCount,0);
+});
+
+test('recent auth-method timestamp is required; merely refreshing access token is insufficient',()=>{
+ const valid={method:'POST',headers:{authorization:sessionA}};
+ assert.equal(requireRecentProviderAuthentication(valid,{user_id:user},
+  {env,now:()=>clock}).provider_authenticated_recently,true);
+ const stale={method:'POST',headers:{authorization:syntheticBearer({
+  authAt:Math.floor(clock/1000)-1000,issuedAt:Math.floor(clock/1000)
+ })}};
+ assert.throws(()=>requireRecentProviderAuthentication(stale,{user_id:user},
+  {env,now:()=>clock}),/ABANDONMENT_PROVIDER_REAUTH_REQUIRED/);
+ assert.throws(()=>requireRecentProviderAuthentication({
+  headers:{authorization:syntheticBearer({owner:'f44440ec-4266-4c95-a6cd-929bc58b445f'})}
+ },{user_id:user},{env,now:()=>clock}),/ABANDONMENT_PROVIDER_REAUTH_REQUIRED/);
 });
