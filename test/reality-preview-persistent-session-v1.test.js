@@ -195,3 +195,27 @@ test('Preview guarded send-tool test is authenticated, owner scoped and admits n
  assert.match(html,/p\.textContent=line/);
  assert.doesNotMatch(html,/p\.innerHTML=line/);
 });
+
+test('12-turn Intelligence Control Center uses authenticated session, real post calls and honest baseline labels',()=>{
+ const page=readFileSync(new URL('../public/intelligence-12turn.html',import.meta.url),'utf8');
+ const chat=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(chat,/href="\/intelligence-12turn\.html"/);
+ assert.match(page,/createPreviewSession/);
+ assert.match(page,/12-Turn Test/);
+ assert.match(page,/Run 12 live turns/);
+ assert.match(page,/standalone-12turn-comparison\?/);
+ assert.match(page,/authGet\(/);
+ assert.match(page,/method:'POST',cache:'no-store'/);
+ assert.match(page,/standalone-chat/);
+ assert.match(page,/turn_commit_status!=='COMMITTED'/);
+ assert.match(page,/prescribed_prompt_matches!==true/);
+ assert.match(page,/No failed request was retried/);
+ assert.match(page,/independent_model_only_baseline_available!==false/);
+ assert.match(page,/independent_adjudication_performed!==false/);
+ assert.match(page,/hallucination|Hallucination/i);
+ assert.match(page,/Not measured/);
+ assert.match(page,/integrity_spine_checkpoints/);
+ assert.match(page,/textContent=text/);
+ assert.doesNotMatch(page,/innerHTML\s*=/);
+ assert.doesNotMatch(page,/<script[^>]+src="https:/);
+});
