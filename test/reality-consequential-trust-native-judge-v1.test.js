@@ -67,6 +67,9 @@ test('retrospective Reality replay discovers previously missed candidates',()=>{
     audit_receipt_hash:'sha256:trusted-replay-audit',
     classification:'STALE_RESPONSE_REPLAY'}]});
  assert.equal(report.self_reported_clear_pct,100);
+ assert.equal(report.retrospective_revised_clear_pct,50);
+ assert.equal(report.retrospectively_reclassified_turn_count,1);
+ assert.equal(report.original_self_score_preserved,true);
  assert.equal(report.previously_unflagged_candidates_discovered_later,1);
  assert.equal(report.retrospective_candidates[0].status,'NEW_RETROSPECTIVE_CANDIDATE');
  assert.equal(report.retrospective_candidates[0].independently_verified_hallucination,false);
