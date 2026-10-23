@@ -1,6 +1,6 @@
 # Reality Obligation Observation v0.1
 
-**Status:** feature-branch candidate, unit-tested; not integrated with the authenticated runtime, persistence API or UI. No customer data was modified.
+**Status:** feature-branch candidate with opt-in authenticated Preview runtime adapter and mocked integration tests. Off by default. Not deployed or verified with real customer data, not present in production UI.
 
 ## Why
 The first live 2-turn construction test committed both model responses and correctly recalled a homeowner-approval condition. However, the Conversation Drift Spine reported `NO_EXTRACTABLE_CONVERSATION_ANCHOR`, partly because the exact instruction included a contextual preface: "For the construction job, do not send an estimate until the homeowner approves it."
@@ -15,11 +15,10 @@ The first live 2-turn construction test committed both model responses and corre
 - No percentage claims unless there are independently adjudicated, correctly denominated decision samples and coverage/false-negative evidence.
 
 ## Next integration gate
-1. Server-side, authenticated admission of actual user-turn source record; readback and append-only persistence only after source integrity verification.
-2. Authenticated, bounded retrieval of the user's obligation observations from Universe before cognition, separated by work item, not dependent on the newest 80 chat turns.
-3. Verified, material authority-transition path for revising/satisfying/superseding an instruction.
-4. Feature-gated integration into the existing Continuity Spine and Intelligence Receipt presentation.
-5. Real test of a deliberately conflicting underlying model candidate, with independently recorded pre- and post-Reality outputs, and verified execution consequences.
-6. Repeat across >100 turns and interrupted/restarted sessions; measure error capture and escapes independently.
+1. **Implemented but not live-verified:** authenticated standalone Preview adapter, gated on `REALITY_STANDALONE_OBLIGATION_OBSERVATION_ENABLED=true`, reads scoped observations from Universe, appends and independently reads back user-stated condition observations only after the cognition path confirms the Signal Cleaner handoff, and returns a tentative proposal assessment in the receipt.
+2. **Implemented under mock I/O:** two-turn replay demonstrates that the later model receives the first user's observed rule even when conversation history is bounded.
+3. **Next:** deploy only to an isolated, fully configured Preview (never production) and verify real Supabase persistence, cold-readback, auth, and model response. A UI readout and model error/adjudication measurement remain separate.
+4. **Not yet implemented:** verified authority-transition path for revising/satisfying/superseding a work-item condition, cross-conversation business work-item identity, unbounded source-history completeness proof, and independently confirmed execution consequences.
+5. **Next benchmark:** deliberately conflicting live model proposal, paired reference decisions, evidence-backed before/after model and Reality performance, 100+ turns and restart/recovery without false drift percentages.
 
 **Explicit limitation:** This feature branch proves extraction and contract behavior in mocked tests. It does *not* prove 0% drift, real model-repair efficacy, a verified customer ROI, or live long-horizon obligation persistence. It does not touch production.
