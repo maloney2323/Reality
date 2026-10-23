@@ -11,6 +11,11 @@ on:
       - benchmarks/consequential-trust-llm-v1.report.js
       - benchmarks/consequential-trust-native-judge-v1.js
       - test/reality-consequential-trust-native-judge-v1.test.js
+      - src/reality-native-judge-v1.0.js
+      - src/reality-causal-turn-commit-v0.1.js
+      - src/reality-12turn-comparison-v0.1.js
+      - test/reality-12turn-comparison-v0.1.test.js
+      - public/intelligence-12turn.html
       - test/reality-consequential-trust-llm-v1.test.js
       - .github/workflows/reality-consequential-trust-llm-v1.yml
 permissions:
@@ -32,8 +37,11 @@ jobs:
           node --check benchmarks/consequential-trust-llm-v1.oracle.js
           node --check benchmarks/consequential-trust-llm-v1.report.js
           node --check benchmarks/consequential-trust-native-judge-v1.js
+          node --check src/reality-native-judge-v1.0.js
+          node --check src/reality-causal-turn-commit-v0.1.js
+          node --check src/reality-12turn-comparison-v0.1.js
       - name: Verify blinded inputs, ground truth isolation and scoring boundaries
-        run: node --test test/reality-consequential-trust-llm-v1.test.js test/reality-consequential-trust-native-judge-v1.test.js
+        run: node --test test/reality-consequential-trust-llm-v1.test.js test/reality-consequential-trust-native-judge-v1.test.js test/reality-12turn-comparison-v0.1.test.js
       - name: Explicitly reject model-accuracy claims from this CI
         run: |
           echo 'Only benchmark design, versioning and fairness contracts tested.'
