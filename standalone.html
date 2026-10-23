@@ -56,7 +56,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div>
 <section>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Continuous conversation</h2><button id="newConversation" class="secondary">New thought</button></div>
-<div id="savedConversations" class="notice" role="status">Finding saved conversations…</div><div id="legacyRecovery" class="notice" role="status"></div>
+<div id="savedConversations" class="notice" role="status">Finding saved conversations…</div><button type="button" id="retryRecovery" class="secondary">Retry saved conversations</button><div id="legacyRecovery" class="notice" role="status"></div>
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
@@ -131,7 +131,7 @@ async function authorize(create){
   $('signIn').style.display='none';$('workspace').style.display='block';
   status('chatNotice','Signed in. Rechecking your own Reality conversation history...');
   try{await refreshConversationInventory();await refreshHistory()}
-  catch(error){state.discoveryReady=false;status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
+  catch(error){state.discoveryReady=false;$('savedConversations').textContent='Saved conversations could not be verified. Use Retry saved conversations.';status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
 }
@@ -281,6 +281,13 @@ $('signup').addEventListener('click',()=>authorize(true));
 $('resend').addEventListener('click',resendConfirmation);
 $('logout').addEventListener('click',()=>{state.accessToken=null;$('workspace').style.display='none';$('signIn').style.display='block';$('conversation').replaceChildren();resetIntegrity();status('loginNotice','Signed out.');});
 $('newConversation').addEventListener('click',newConversation);
+$('retryRecovery').addEventListener('click',async()=>{
+ if(!state.accessToken){status('chatNotice','Sign in to inspect saved conversations.',true);return}
+ $('retryRecovery').disabled=true;
+ try{await refreshConversationInventory();await refreshHistory();}
+ catch(e){state.discoveryReady=false;$('savedConversations').textContent='Server recovery still unavailable. Nothing was deleted.';status('chatNotice','Recovery verification failed: '+e.message,true);}
+ finally{$('retryRecovery').disabled=false}
+});
 async function checkPendingTurn(){
  if(!state.accessToken)throw Error('Sign in to inspect a turn.');
  const pending=state.pendingTurn;
