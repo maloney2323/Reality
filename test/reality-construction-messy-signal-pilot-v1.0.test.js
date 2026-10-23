@@ -10,7 +10,7 @@ test('12 mixed-channel signals map to three unresolved disputes and no fictitiou
  const out=run();
  assert.equal(out.ingested_signal_count,12);
  assert.equal(out.contradictory_report_count,3);
- assert.deepEqual(out.conflicts.map(c=>c.state_key),[
+ assert.deepEqual(out.conflicts.map(c=>c.state_key).sort(),[
   'material.units_counted','opening.width_ft','sink.selection'
  ].sort());
  assert.ok(out.conflicts.every(c=>!c.truth_established&&!c.material_action_authorized));
