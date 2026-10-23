@@ -75,6 +75,9 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div class="trait"><span>Model hallucination rate</span><strong>Not independently measured</strong></div></div>
 <div class="panel"><h2>Evidence status</h2><p class="sub" id="evidence">No verified work has been submitted in this preview.</p>
 <small>A flagged candidate is not a verified hallucination. A reply is not evidence that an outside action occurred.</small></div>
+<div class="panel"><h2>Saved approval rules · Evidence</h2>
+<p class="sub">User-stated conditions recovered from server-owned records. They are not proof of external approval or completion.</p>
+<div id="conditionReceipts" class="notice" role="status">No saved conditions loaded.</div></div>
 </aside>
 </div>
 </div>
@@ -111,6 +114,7 @@ const resetIntegrity=()=>{
  for(const id of ['ledger','fact','drift','retro'])$(id).textContent='Not evaluated';
  $('obligations').textContent='Not loaded';
  $('obligationAssessment').textContent='Not evaluated for this view';
+ $('conditionReceipts').replaceChildren();
  $('evidence').textContent='No independently verified outcome yet.';
 };
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
@@ -250,6 +254,26 @@ async function refreshSavedObligations(selectedConversationId){
  $('obligations').textContent=data.scoped_observation_count+
    ' source-linked '+(data.scoped_observation_count===1?'condition':'conditions')+
    ' (bounded view)';
+ const display=$('conditionReceipts');display.replaceChildren();
+ for(const item of data.observed_conditions.slice(0,80)){
+  if(typeof item?.original_user_text!=='string'||
+     typeof item?.observation_entry_id!=='string'||
+     typeof item?.condition_text!=='string')
+   throw Error('CONDITION_RECEIPT_FORMAT_INVALID');
+  const block=document.createElement('div');block.className='message';
+  const caption=document.createElement('div');caption.className='who';
+  caption.textContent='USER RULE · EVIDENCE-LINKED';
+  const rule=document.createElement('p');rule.textContent=item.original_user_text;
+  const condition=document.createElement('small');
+  condition.textContent='Required condition: '+item.condition_text+
+    ' · Approval independently verified: NO';
+  const ref=document.createElement('small');ref.style.display='block';
+  ref.textContent='Observation reference: '+item.observation_entry_id.slice(0,64);
+  block.append(caption,rule,condition,ref);
+  display.append(block);
+ }
+ if(data.observed_conditions.length===0)
+  display.textContent='No observed user conditions stored for this conversation yet.';
  // Deliberately not a drift score or approved/fulfilled obligations total.
  $('obligationAssessment').textContent='No independent approval or drift rate measured';
 }
@@ -302,6 +326,7 @@ async function refreshHistory(){
  catch(err){
   $('obligations').textContent='Readback unavailable';
   $('obligationAssessment').textContent='Not evaluated';
+  $('conditionReceipts').textContent='Stored-rule readback unavailable.';
   $('evidence').textContent='User-condition readback unavailable: '+err.message;
  }
  const unresolved=Array.isArray(data.unresolved_turns)?data.unresolved_turns:[];
