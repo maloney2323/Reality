@@ -12,6 +12,7 @@ on:
       - src/reality-live-intelligence-orchestration-v0.1.js
       - api/reality/standalone-chat.js
       - api/reality/standalone-turn-status.js
+      - api/reality/standalone-reconcile.js
       - api/reality/standalone-history.js
       - api/reality/standalone-config.js
       - api/reality/standalone-readiness.js
@@ -42,6 +43,7 @@ jobs:
           node --check src/reality-conversation-sequencer-v0.1.js
           node --check api/reality/standalone-chat.js
           node --check api/reality/standalone-turn-status.js
+          node --check api/reality/standalone-reconcile.js
           node --check api/reality/standalone-history.js
           node --check api/reality/standalone-config.js
           node --check api/reality/standalone-readiness.js
