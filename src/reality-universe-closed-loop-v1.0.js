@@ -85,7 +85,27 @@ function filterClaims(extracted,answer,scope,modelRef){
     !text(x.operation)||!text(x.resource)){
     rejected.push({reason:'INVALID_VERBATIM_MODEL_CLAIM'});continue;
   }
-  accepted.push({...x,model_source_ref:modelRef,
+  const isFact=x.claim_kind==='MATERIAL_FACT';
+  if(isFact&&(!text(x.entity_ref)||!text(x.state_key)||
+   !Object.hasOwn(x,'value')||
+   (typeof x.value!=='string'&&typeof x.value!=='number'&&typeof x.value!=='boolean')||
+   (typeof x.value==='number'&&!Number.isFinite(x.value)))){
+   rejected.push({reason:'MALFORMED_MATERIAL_FACT_EXTRACTION',
+     source_span:x.source_span});continue;
+  }
+  // Minimal native semantic rescue of a *clearly negated* verbatim claim:
+  // "I will not send" cannot be treated as "I will send" even if a model
+  // extractor mislabels its kind. This is a correction of intent TYPE only,
+  // never proof the underlying facts or authorizations are true.
+  const negated=/(?:\b(?:will|would|shall)\s+not\s+(?:send|schedule|confirm|order|dispatch)|\b(?:cannot|can't|won't|shouldn't|must not|do not|never)\s+(?:send|schedule|confirm|order|dispatch|proceed)|\b(?:not|never)\s+(?:be\s+)?(?:sent|scheduled|ordered|confirmed|dispatched))\b/i.test(x.source_span);
+  const draftOnly=/\b(?:draft|prepare a draft|unsent draft)\b/i.test(x.source_span)&&
+   !/\b(?:send|sent|publish|dispatched|confirmed)\b/i.test(x.source_span);
+  let normalizedKind=x.claim_kind;
+  if(['ACTION_COMMITMENT','OUTCOME_COMPLETED'].includes(normalizedKind)){
+   if(negated)normalizedKind='DENIAL_OF_ACTION';
+   else if(draftOnly)normalizedKind='DRAFT_ONLY';
+  }
+  accepted.push({...x,claim_kind:normalizedKind,model_source_ref:modelRef,
    continuity_root_id:scope.continuity_root_id});
  }
  return {accepted,rejected};
@@ -164,7 +184,8 @@ export async function runUniverseClosedLoopTurn({
  const first=await evaluate(original.answer,original.response_id,'INITIAL');
  let chosen=original,latest=first,usedRepair=false;
  const needRepair=first.e.findings.some(f=>REVIEWABLE.has(f.classification))||
-  first.e.possible_unexamined_material_assertion;
+  first.e.possible_unexamined_material_assertion||
+  first.parsed.rejected.length>0;
  const repairs=[];
  if(needRepair){
   for(let i=0;i<maxRepairs;i++){
