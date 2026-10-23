@@ -21,7 +21,7 @@ jobs:
         run: |
           node --check src/reality-universe-intelligence-forms-v1.0.js
           node --check test/reality-universe-intelligence-forms-v1.0.test.js
-      - name: Model-error absorption, independent competence learning and previous full-loop regression
+      - name: Full closed-loop learning candidate generation, independent gate and harmless-task regressions
         run: |
           node --test \
             test/reality-universe-intelligence-forms-v1.0.test.js \
