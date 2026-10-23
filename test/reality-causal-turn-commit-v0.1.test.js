@@ -222,3 +222,50 @@ test('authenticated committed history presents only fully verified two-message t
  assert.deepEqual(history.messages.map(x=>x.role),['user','assistant']);
  assert.equal(history.unresolved_turns.length,0);
 });
+
+
+
+test('receipt identity and authority metadata are immutable even when a caller supplies conflicting payload',()=>{
+ const x=rig();
+ const entry=makeCausalTurnReceipt({
+  scope:x.scope,turnId:'t-1',phase:'PROCESSING',
+  observedAt:'2026-10-22T20:00:00.000Z',
+  payload:{
+   turn_id:'spoofed',phase:'COMMITTED',authenticated_user_id:userB,
+   authority_granted:true,action_authorized:true,
+   external_action_executed:true,user_message_hash:'synthetic',
+  },
+ });
+ assert.equal(entry.payload.turn_id,'t-1');
+ assert.equal(entry.payload.phase,'PROCESSING');
+ assert.equal(entry.payload.authenticated_user_id,userA);
+ assert.equal(entry.payload.action_authorized,false);
+ assert.equal(entry.payload.external_action_executed,false);
+});
+test('same-turn concurrent requests may race intake but can never both enter model cognition',async()=>{
+ const x=rig();
+ const ids=causalTurnIds(x.scope,'turn-1');
+ const baseLookup=x.opts.lookup;
+ let userPreflightReads=0,unlock=()=>{};
+ const release=new Promise(res=>{unlock=res});
+ const lookup=async ({entryId,...rest})=>{
+  if(entryId===ids.user&&userPreflightReads<2){
+   userPreflightReads++;
+   if(userPreflightReads===2)unlock();
+   await release;
+  }
+  return baseLookup({entryId,...rest});
+ };
+ const options={...x.opts,lookup};
+ const both=await Promise.allSettled([
+  processCausalTurn(req(),options),
+  processCausalTurn(req(),options),
+ ]);
+ assert.equal(both.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(both.filter(x=>x.status==='rejected').length,1);
+ assert.equal(x.calls.model,1);
+ const terminal=await inspectCausalTurn({
+  scope:x.scope,turnId:'turn-1',lookup:x.lookup,
+ });
+ assert.equal(terminal.status,'COMMITTED');
+});
