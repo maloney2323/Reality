@@ -24,6 +24,8 @@ on:
       - src/reality-obligation-observation-v0.1.js
       - src/reality-standalone-obligations-v0.1.js
       - test/reality-standalone-obligation-adapter-v0.1.test.js
+      - api/reality/standalone-obligations.js
+      - test/reality-standalone-obligations-http-v0.1.test.js
       - src/reality-continuous-integrity-spine-v0.1.js
       - test/reality-obligation-observation-v0.1.test.js
       - docs/reality-obligation-observation-v0.1.md
@@ -89,6 +91,8 @@ jobs:
           node --check src/reality-standalone-obligations-v0.1.js
           node --check src/reality-standalone-chat-v0.1.js
           node --test test/reality-standalone-obligation-adapter-v0.1.test.js
+          node --check api/reality/standalone-obligations.js
+          node --test test/reality-standalone-obligations-http-v0.1.test.js
       - name: Browser restoration and server-owned interrupted-turn selection
         run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
       - name: Persistent login rotation, logout and bounded authenticated pilot UI
