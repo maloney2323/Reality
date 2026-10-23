@@ -5,7 +5,7 @@
 // No automatic rerun from a partially committed turn: that would permit
 // double billing, duplicate execution claims, and conflicting model answers.
 import {createHash} from 'node:crypto';
-import {claimConversationSlot,finishConversationSlot,inspectConversationSlot} from './reality-conversation-sequencer-v0.1.js';
+import {claimConversationSlot,finishConversationSlot,inspectConversationSlot,reconcileCommittedConversationSlot} from './reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry,validateUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
 import {persistUniverseEntry,retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
@@ -384,5 +384,73 @@ export async function getCommittedStandaloneHistory(req,{
   unresolved_turns:unresolved,
   assistant_messages_require_verified_commit:true,
   history_is_complete:false,
+ });
+}
+
+
+// Explicit owner-authenticated recovery. Never accepts a caller-provided
+// receipt, hash, root, authority grant or model output. The persisted ledger
+// and DB fence must agree before the atomic release of the blocked slot.
+// Incomplete model work remains blocked for separate human review.
+export async function reconcileCausalTurn(req,{
+ env=process.env,fetchImpl=fetch,
+ lookup=retrieveOptionalPersistedUniverseEntry,
+ sequence={inspect:inspectConversationSlot,reconcile:reconcileCommittedConversationSlot},
+}={}){
+ requireStandaloneReady(env);
+ if(env.REALITY_CAUSAL_SEQUENCE_ENABLED!=='true')
+  throw fail('CAUSAL_RECONCILIATION_NOT_ENABLED');
+ const principal=await verifyStandaloneUser(req,{env,fetchImpl});
+ const body=req?.body;
+ if(!body||typeof body!=='object'||Array.isArray(body)||
+    Object.keys(body).some(k=>!['conversation_id','thought_id','turn_id'].includes(k)))
+  throw fail('CAUSAL_RECONCILIATION_SELECTOR_INVALID',400);
+ const scope=createStandaloneConversationScope({
+  userId:principal.user_id,conversationId:body.conversation_id,
+  thoughtId:body.thought_id??'personal',
+ });
+ const turnId=body.turn_id;
+ // A full cryptographic entry/phase/cognition/predecessor readback is
+ // mandatory. An apparent success flag from the original caller is not proof.
+ const verified=await inspectCausalTurn({scope,turnId,lookup,fetchImpl});
+ const fence=await sequence.inspect({scope,env,fetchImpl});
+ if(!verified.committed){
+  return Object.freeze({
+   ok:true,recovered:false,status:'REVIEW_REQUIRED',
+   underlying_turn_status:verified.status,
+   active_turn_matches:fence.status==='BUSY'&&fence.active_turn_id===turnId,
+   rationale:'NO_VERIFIED_COMPLETE_TURN; NO_MODEL_RETRY_OR_SLOT_RELEASE',
+   external_action_executed:false,
+  });
+ }
+ if(fence.status==='NO_FENCE'||(fence.status==='BUSY'&&fence.active_turn_id!==turnId))
+  throw fail('CAUSAL_RECONCILIATION_FENCE_CONFLICT',409);
+ // Only idle with this exact most recent commit can be replayed safely.
+ if(fence.status==='IDLE'&&(
+   fence.last_committed_entry_id!==verified.receipt.commit_entry_id||
+   fence.last_committed_entry_hash!==verified.receipt.commit_entry_hash))
+  throw fail('CAUSAL_RECONCILIATION_NOT_CURRENT_COMMIT',409);
+ const receipt=await sequence.reconcile({
+  scope,turnId,verified,env,fetchImpl,
+ });
+ if(!['RECOVERED','ALREADY_FINISHED'].includes(receipt?.status)||
+    receipt.verified_fence_readback!==true||
+    receipt.commit_entry_id!==verified.receipt.commit_entry_id)
+  throw fail('CAUSAL_RECONCILIATION_INDEPENDENT_READBACK_FAILED');
+ // Re-read durable turn *after* database reconciliation. No new AI call.
+ const reread=await inspectCausalTurn({scope,turnId,lookup,fetchImpl});
+ if(!reread.committed||
+    reread.receipt.commit_entry_hash!==receipt.commit_entry_hash)
+  throw fail('CAUSAL_RECONCILIATION_COMMIT_CHANGED');
+ return Object.freeze({
+  ok:true,recovered:true,status:receipt.status,
+  response:reread.response,
+  receipt:Object.freeze({
+   ...reread.receipt,
+   sequence_num:receipt.sequence_num,
+   sequence_status:'FINISHED',
+   reconciliation_kind:'VERIFIED_EXISTING_COMMIT_NO_MODEL_RERUN',
+  }),
+  external_action_executed:false,model_called:false,
  });
 }
