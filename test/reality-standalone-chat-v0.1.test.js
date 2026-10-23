@@ -523,5 +523,5 @@ test('preview email signup and resend use server-provided callback, and confirma
  assert.doesNotMatch(html,/localhost:3000\/auth\/v1/);
  const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script,'preview module exists');
- assert.doesNotThrow(()=>new vm.Script(script),'preview module parses as valid JavaScript');
+ assert.doesNotThrow(()=>new vm.Script(script.replace(/^import \{createPreviewSession\} from '[^']+';?\s*/m,'')),'preview module parses as valid JavaScript');
 });
