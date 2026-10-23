@@ -13,7 +13,7 @@ const env={
   REALITY_STANDALONE_EXPECTED_PROJECT_REF:'reality-example',
   REALITY_UNIVERSE_PERSISTENCE_URL:'https://reality-example.supabase.co',
  REALITY_UNIVERSE_PERSISTENCE_KEY:'sb_secret_TEST_ONLY_NOT_REAL_abcdefgh123456789',
- OPENAI_API_KEY:'sk-TEST_ONLY_NOT_REAL_abcdefgh123456789',
+ REALITY_STANDALONE_OPENAI_API_KEY:'sk-TEST_ONLY_NOT_REAL_abcdefgh123456789',
  REALITY_OPENAI_MODEL:'gpt-4.1-mini',
   REALITY_STANDALONE_CHAT_ENABLED:'true',
   REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
@@ -46,11 +46,11 @@ const script=[
   'Do not send the estimate until customer approval. No external action was executed.'],
 ];
 test('12-turn standalone construction lifecycle rehydrates persistent user intent, preserves receipts, and discovers prior drift',async()=>{
- const priorKey=process.env.OPENAI_API_KEY;
+ const priorKey=process.env.REALITY_STANDALONE_OPENAI_API_KEY;
  const priorPersistence=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
  const priorStorage=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
  const priorPersistenceUrl=process.env.REALITY_UNIVERSE_PERSISTENCE_URL;
- process.env.OPENAI_API_KEY='SYNTHETIC_OFFLINE_KEY_DO_NOT_USE';
+ process.env.REALITY_STANDALONE_OPENAI_API_KEY='SYNTHETIC_OFFLINE_KEY_DO_NOT_USE';
  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
  process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='SYNTHETIC_OFFLINE_KEY_DO_NOT_USE';
  process.env.REALITY_UNIVERSE_PERSISTENCE_URL=env.SUPABASE_URL;
@@ -155,7 +155,7 @@ test('12-turn standalone construction lifecycle rehydrates persistent user inten
   assert.equal(roots.size,1);
   assert.equal(snapshots.every(x=>x.ledger),true);
  }finally{
-  if(priorKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=priorKey;
+  if(priorKey===undefined)delete process.env.REALITY_STANDALONE_OPENAI_API_KEY;else process.env.REALITY_STANDALONE_OPENAI_API_KEY=priorKey;
   if(priorPersistence===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
   else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=priorPersistence;
   if(priorStorage===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
