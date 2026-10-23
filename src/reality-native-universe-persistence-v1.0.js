@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { createUniverseEntry, validateUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
+import { createUniverseEntry, validateUniverseEntry, hashUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
 
 export const REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION =
   'reality-native-universe-persistence-v1.0';
@@ -32,22 +32,45 @@ function headers() {
   return {apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'};
 }
 
-function mapRow(row) {
-  return {
-    entry_id: row.entry_id,
-    continuity_root_id: row.continuity_root_id,
-    worldline_id: row.worldline_id,
-    event_kind: row.event_kind,
-    epistemic_kind: row.epistemic_kind,
-    assertion_time: row.assertion_time,
-    effective_time: row.effective_time,
-    source_ref: row.source_ref,
-    payload: row.payload,
-    evidence_references: row.evidence_references || [],
-    provenance: row.provenance,
-    ledger_entry_hash: row.ledger_entry_hash,
-  };
+// PostgREST adds transport columns (e.g. created_at) and serializes
+// timestamptz values with offsets and trimmed fractions. The immutable
+// Universe hash was calculated over the original JS ISO-millisecond times
+// and only the canonical entry fields. Restore that representation BEFORE
+// validating; NEVER recompute or replace the stored ledger_entry_hash.
+function canonicalTime(value) {
+  if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return value;
+  return new Date(value).toISOString();
 }
+export function restoreCanonicalUniverseRow(row) {
+  if(!row||typeof row!=='object'||Array.isArray(row))
+    throw Error('UNIVERSE_ROW_INVALID');
+  const original={
+    entry_id:row.entry_id,
+    continuity_root_id:row.continuity_root_id,
+    worldline_id:row.worldline_id,
+    event_kind:row.event_kind,
+    epistemic_kind:row.epistemic_kind,
+    assertion_time:row.assertion_time,
+    effective_time:row.effective_time,
+    source_ref:row.source_ref,
+    payload:row.payload,
+    evidence_references:row.evidence_references,
+    provenance:row.provenance,
+    ledger_entry_hash:row.ledger_entry_hash,
+  };
+  // Existing historical entries and test fixtures may have been signed over
+  // another valid timestamp string. First preserve any already-verifiable
+  // representation. Only try canonical ISO if the original is NOT valid.
+  if(hashUniverseEntry(original)===original.ledger_entry_hash)return original;
+  const normalized={...original,
+    assertion_time:canonicalTime(original.assertion_time),
+    effective_time:canonicalTime(original.effective_time)};
+  if(hashUniverseEntry(normalized)===normalized.ledger_entry_hash)return normalized;
+  // The caller's validator must reject a genuinely unverifiable record.
+  // Never invent, recalculate, or replace any signed ledger hash.
+  return original;
+}
+const mapRow=restoreCanonicalUniverseRow;
 
 async function request(path, options = {}, fetchImpl = fetch) {
   let response;
