@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStandaloneConversationScope,verifyStandaloneUser,
- rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId}
+ rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation}
  from '../src/reality-standalone-auth-v0.1.js';
 import {processStandaloneChat,reconstructStandaloneHistory}
  from '../src/reality-standalone-chat-v0.1.js';
@@ -15,6 +15,9 @@ const env={
  SUPABASE_PUBLISHABLE_KEY:'sb_publishable_example_public_key',
  REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
  REALITY_STANDALONE_CHAT_ENABLED:'true',
+ REALITY_STANDALONE_EXPECTED_PROJECT_REF:'reality-example',
+ REALITY_UNIVERSE_PERSISTENCE_URL:'https://reality-example.supabase.co',
+ VERCEL_ENV:'preview',
 };
 const request=(other={})=>({
  method:'POST',headers:{authorization:'Bearer signed-session-test-token-abc123'},
@@ -149,4 +152,25 @@ test('a model response without real continuity readback must not be presented as
     cognitive_readback_verified:false,signal_handoff_status:'NO'}}}),
  }),/STANDALONE_COGNITION_NOT_DURABLY_CONFIRMED/);
  assert.equal(persisted,1);
+});
+
+
+test('migration pilot refuses to mix standalone user auth with a different Universe project',async()=>{
+ for(const config of [
+  {REALITY_UNIVERSE_PERSISTENCE_URL:'https://another-project.supabase.co'},
+  {SUPABASE_URL:'https://another-project.supabase.co'},
+  {REALITY_STANDALONE_EXPECTED_PROJECT_REF:'another-project'},
+  {VERCEL_ENV:'production'},
+  {REALITY_STANDALONE_EXPECTED_PROJECT_REF:''},
+ ]){
+  let touched=false;
+  const environment={...env,...config};
+  assert.throws(()=>assertStandalonePreviewIsolation(environment),
+    /STANDALONE_(?:PRODUCTION_RELEASE_NOT_AUTHORIZED|PREVIEW_PROJECT_BINDING_REQUIRED|AUTH_UNIVERSE_PROJECT_MISMATCH)/);
+  await assert.rejects(()=>processStandaloneChat(request(),{
+    env:environment,fetchImpl:async()=>{touched=true;throw Error('AUTH_USED')},
+    load:async()=>{touched=true},store:async()=>{touched=true},run:async()=>{touched=true},
+  }),/STANDALONE_(?:PRODUCTION_RELEASE_NOT_AUTHORIZED|PREVIEW_PROJECT_BINDING_REQUIRED|AUTH_UNIVERSE_PROJECT_MISMATCH)/);
+  assert.equal(touched,false,'failed environment isolation must prevent all reads/writes');
+ }
 });
