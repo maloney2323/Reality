@@ -164,3 +164,61 @@ end $do$;
 select 'EPHEMERAL_ATOMIC_ABANDONMENT_PASSED' as status;
 `;
 writeFileSync('/tmp/reality-ephemeral-fixture.sql',sql,{mode:0o600});
+
+/*
+ * Separate disposable DB fixtures for TWO simultaneous sessions contending
+ * on one exact processing fence. Nothing here references a live user or DB.
+ */
+const changedApproval=entry(approval.entry_id,
+ 'REALITY_TURN_ABANDONMENT_APPROVAL',
+ {...approval.payload,synthetic_second_request:true},
+ approval.evidence_references,'REALITY_STANDALONE_OWNER_AUTHORIZED');
+const changedResolution=entry(resolution.entry_id,
+ 'REALITY_TURN_RESOLUTION_RECEIPT',
+ {...resolution.payload,approval_receipt_hash:changedApproval.ledger_entry_hash,
+  synthetic_second_request:true},
+ resolution.evidence_references,'REALITY_STANDALONE_VERIFIED_RESOLUTION');
+const parallelCall=(a,b)=>`set role service_role;
+select (public.reality_abandon_incomplete_conversation_turn_v1(
+ ${literal(root)},${literal(world)},${literal(owner)}::uuid,
+ ${literal(tid)},${literal(claim)}::uuid,1,
+ ${literal(a)}::jsonb,${literal(b)}::jsonb))->>'status';
+`;
+const parallelSeed=`\\set ON_ERROR_STOP on
+insert into public.reality_conversation_turn_fences(
+ root_id,worldline_id,owner_user_id,sequence_num,active_turn_id,active_claim_token)
+ values (${literal(root)},${literal(world)},${literal(owner)}::uuid,
+  1,${literal(tid)},${literal(claim)}::uuid);
+${sourceEntries.map(insert).join('\n')}
+-- Delay first approval inside the transaction, so the second simultaneous
+-- session must contend for the SAME row-level sequence lock.
+create function public.synthetic_concurrent_delay()
+ returns trigger language plpgsql as $delay$
+begin
+ if new.event_kind='REALITY_TURN_ABANDONMENT_APPROVAL' then
+  perform pg_sleep(0.75);
+ end if;
+ return new;
+end $delay$;
+create trigger synthetic_concurrent_delay before insert
+ on public.reality_universe_entries for each row
+ execute function public.synthetic_concurrent_delay();
+`;
+writeFileSync('/tmp/reality-parallel-seed.sql',parallelSeed,{mode:0o600});
+writeFileSync('/tmp/reality-parallel-call.sql',parallelCall(approval,resolution),{mode:0o600});
+writeFileSync('/tmp/reality-parallel-conflict.sql',
+ parallelCall(changedApproval,changedResolution),{mode:0o600});
+const verification=`\\set ON_ERROR_STOP on
+do $do$ begin
+ if (select count(*) from public.reality_universe_entries
+   where event_kind='REALITY_TURN_RESOLUTION_RECEIPT')<>1
+   or (select count(*) from public.reality_universe_entries
+   where event_kind='REALITY_TURN_ABANDONMENT_APPROVAL')<>1
+   or (select count(*) from public.reality_conversation_turn_fences
+   where active_turn_id is null and active_claim_token is null
+   and sequence_num=0)<>1
+ then raise exception 'SIMULTANEOUS_RECOVERY_WROTE_DUPLICATES_OR_BROKE_FENCE'; end if;
+end $do$;
+select 'CONCURRENT_SAME_TURN_SERIALIZED' as evidence;
+`;
+writeFileSync('/tmp/reality-parallel-verify.sql',verification,{mode:0o600});
