@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
+import {validateUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
+import {restoreCanonicalUniverseRow} from '../src/reality-native-universe-persistence-v1.0.js';
 import {createStandaloneConversationScope,STANDALONE_HISTORY_PROVENANCE}
  from '../src/reality-standalone-auth-v0.1.js';
 import {summarizeOwnerConversations,listOwnerConversations,
@@ -101,4 +103,39 @@ test('legacy preview cannot read another user root',async()=>{
 test('invalid bearer and production environment fail before storage discovery',async()=>{
  await assert.rejects(listOwnerConversations({headers:{},query:{}},{env,fetchImpl:async()=>{throw Error('must not call')}}),/AUTHENTICATED_SESSION_REQUIRED/);
  await assert.rejects(readOwnerConversationRows({userId:owner,env:{...env,VERCEL_ENV:'production'},fetchImpl:async()=>{throw Error('must not call')}}),/STANDALONE_PRODUCTION_RELEASE_NOT_AUTHORIZED/);
+});
+
+// A real PostgREST row contains DB-only created_at and emits timestamptz with
+// a normalized offset; the source hash was signed over ISO millisecond strings.
+function sqlRow(entry){
+ return {...entry,
+  created_at:'2026-10-23T05:27:45.679+00:00',
+  assertion_time:entry.assertion_time.replace('.679Z','.679+00:00'),
+  effective_time:entry.effective_time.replace('.679Z','.679+00:00'),
+ };
+}
+test('canonical readback excludes DB-only columns and restores signed timestamps',()=>{
+ const signed=entry(owner,'original-saved','turn-original',false);
+ const raw=sqlRow(signed);
+ assert.throws(()=>validateUniverseEntry(raw),/UNIVERSE_LEDGER_HASH_MISMATCH/);
+ const restored=restoreCanonicalUniverseRow(raw);
+ assert.equal(restored.assertion_time,signed.assertion_time);
+ assert.equal(restored.effective_time,signed.effective_time);
+ assert.equal(Object.hasOwn(restored,'created_at'),false);
+ assert.equal(restored.ledger_entry_hash,signed.ledger_entry_hash);
+ assert.equal(validateUniverseEntry(restored).valid,true);
+});
+test('PostgREST-normalized owner history remains recoverable without regenerating an answer',async()=>{
+ const signed=entry(owner,'old-locked-chat','turn-original',false);
+ const rows=await readOwnerConversationRows({userId:owner,env,fetchImpl:async()=>response([sqlRow(signed)])});
+ const inventory=summarizeOwnerConversations(rows,owner);
+ assert.equal(inventory.length,1);
+ assert.equal(inventory[0].recovery_mode,'LEGACY_READ_ONLY');
+ assert.equal(inventory[0].saved_user_message_count,1);
+});
+test('corrupted persisted content is rejected and never silently rehashed',async()=>{
+ const signed=entry(owner,'original-saved','turn-original',false);
+ const forged={...sqlRow(signed),payload:{...signed.payload,text:'altered without a new receipt'}};
+ await assert.rejects(readOwnerConversationRows({userId:owner,env,
+  fetchImpl:async()=>response([forged])}),/RECOVERY_LEDGER_ENTRY_INTEGRITY_FAILED/);
 });
