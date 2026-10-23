@@ -2,6 +2,8 @@
 // create append-only, read-back-observed *candidate* obligations. Off by default.
 import {observeUserConditions,projectUserConditions,assessProposalAgainstObservedConditions,
  OBLIGATION_OBSERVATION_KIND} from './reality-obligation-observation-v0.1.js';
+import {requireStandaloneReady,verifyStandaloneUser,createStandaloneConversationScope}
+ from './reality-standalone-auth-v0.1.js';
 import {retrievePersistedUniverse,persistUniverseEntry,
  retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
 
@@ -74,4 +76,30 @@ export async function captureStandaloneObligations({
 export function assessStandaloneObligationProposal({scope,entries=[],modelAnswer,modelResponseId}={}){
  return assessProposalAgainstObservedConditions({trustedScope:standaloneObligationScope(scope),
   entries,modelAnswer,modelResponseId});
+}
+
+export async function getAuthenticatedStandaloneObligations(req,{
+ env=process.env,fetchImpl=fetch,load=retrievePersistedUniverse,
+}={}){
+ requireStandaloneReady(env);
+ if(env.REALITY_STANDALONE_OBLIGATION_OBSERVATION_ENABLED!=='true')
+  fail('STANDALONE_OBLIGATION_OBSERVATIONS_DISABLED');
+ const principal=await verifyStandaloneUser(req,{fetchImpl,env});
+ const q=req?.query;
+ if(!q||typeof q!=='object'||Array.isArray(q)||
+    Object.keys(q).some(k=>!['conversation_id','thought_id'].includes(k)))
+  fail('STANDALONE_OBLIGATION_SELECTOR_INVALID');
+ const scope=createStandaloneConversationScope({
+  userId:principal.user_id,conversationId:q.conversation_id,
+  thoughtId:q.thought_id??'personal',
+ });
+ const stored=await loadStandaloneObligations({scope,load,fetchImpl,limit:80});
+ return Object.freeze({ok:true,version:STANDALONE_OBLIGATION_ADAPTER_VERSION,
+  conversation_id:scope.client_conversation_selector,
+  observed_conditions:stored.view.observed_conditions,
+  scoped_observation_count:stored.view.observed_conditions.length,
+  full_history_verified:false,
+  independent_approval_verified:false,
+  model_hallucination_percentage:null,
+  action_authorized:false,external_action_executed:false});
 }
