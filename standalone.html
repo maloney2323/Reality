@@ -80,6 +80,8 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div id="conditionReceipts" class="notice" role="status">No saved conditions loaded.</div>
 <button id="runConflictProbe" type="button" class="secondary">Test approval guard · no AI charge</button>
 <div id="conflictProbeResult" class="notice" role="status">No synthetic conflict probe run in this view.</div>
+<button id="testEstimateEgress" type="button" class="secondary">Test execution boundary · no sending</button>
+<div id="estimateEgressResult" class="notice" role="status">No in-process execution boundary test run.</div>
 </div>
 </aside>
 </div>
@@ -118,6 +120,7 @@ const resetIntegrity=()=>{
  $('obligations').textContent='Not loaded';
  $('obligationAssessment').textContent='Not evaluated for this view';
  $('conditionReceipts').replaceChildren();$('conflictProbeResult').textContent='No synthetic conflict probe run in this view.';
+ $('estimateEgressResult').textContent='No in-process execution boundary test run.';
  $('evidence').textContent='No independently verified outcome yet.';
 };
 $('conversationIdLabel').textContent='Conversation '+state.conversationId.slice(0,8);
@@ -333,6 +336,57 @@ $('runConflictProbe').addEventListener('click',async()=>{
  }catch(e){
   if(selected===state.conversationId)status('conflictProbeResult','Probe failed: '+e.message,true);
  }finally{$('runConflictProbe').disabled=false;}
+});
+
+// Four server-owned attempts actually invoke the guarded execution adapter.
+// No real send connector is connected, and no LLM is called.
+$('testEstimateEgress').addEventListener('click',async()=>{
+ if(!state.accessToken||!state.discoveryReady){
+  status('estimateEgressResult','Sign in and restore your saved construction conversation first.',true);return;
+ }
+ const selected=state.conversationId;
+ $('testEstimateEgress').disabled=true;
+ status('estimateEgressResult','Running four in-process guarded send attempts, without any network send...');
+ try{
+  const q=new URLSearchParams({conversation_id:selected,thought_id:'personal'});
+  const response=await authFetch('/api/reality/standalone-estimate-egress-challenge?'+q.toString(),{
+   method:'GET',cache:'no-store',
+  });
+  const r=await response.json().catch(()=>({}));
+  if(selected!==state.conversationId)return;
+  if(!response.ok||r.ok!==true)throw Error(r.error||'Execution boundary test unavailable');
+  if(r.purpose!=='NO_NETWORK_EGRESS_EXECUTION_BOUNDARY_CHALLENGE'||
+    r.boundary_exercised_in_process!==true||r.real_send_connector_connected!==false||
+    r.real_external_sends!==0||r.real_model_calls!==0||
+    !Array.isArray(r.simulated_attempts))
+   throw Error('Unverified execution-probe provenance');
+  const records=[
+   'IN-PROCESS TOOL BOUNDARY TEST — not a real estimate or external send.',
+   'Guarded dispatch attempts: '+r.simulated_attempts.length,
+   'Blocked attempts: '+r.blocked_attempt_count,
+   'Send connector invocations: '+r.connector_invocation_count,
+   'Independent homeowner approval service connected: NO',
+   'Actual estimate connector connected: NO',
+   'External emails or estimates sent: NO',
+   'LLM calls and charges: 0',
+  ];
+  for(const attempt of r.simulated_attempts){
+   if(attempt.dispatch_state!=='BLOCKED'||attempt.transport_invoked!==false)
+    throw Error('Unexpected send-tool boundary result');
+   records.push(attempt.scenario+': '+attempt.blocked_reason+
+    ' · detector candidates '+attempt.detector_candidate_count);
+  }
+  records.push('Source evidence references: '+(r.simulated_attempts[0]?.evidence_references?.length||0));
+  records.push('Challenge hash: '+r.challenge_hash);
+  records.push('Production send-tool enforcement: NOT YET WIRED');
+  const panel=$('estimateEgressResult');panel.replaceChildren();
+  for(const line of records){
+   const p=document.createElement('p');p.textContent=line;panel.append(p);
+  }
+ }catch(e){
+  if(selected===state.conversationId)
+   status('estimateEgressResult','Boundary test stopped: '+e.message,true);
+ }finally{$('testEstimateEgress').disabled=false;}
 });
 
 async function refreshHistory(){
