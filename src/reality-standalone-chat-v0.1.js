@@ -5,7 +5,7 @@ import {createUniverseEntry} from './reality-universe-persistence-contract-v1.0.
 import {persistUniverseEntry,retrievePersistedUniverse} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {verifyStandaloneUser,createStandaloneConversationScope,
- rejectUnsafeStandalonePayload,scopedTurnEntryId,
+ rejectUnsafeStandalonePayload,scopedTurnEntryId,assertStandalonePreviewIsolation,
  STANDALONE_HISTORY_PROVENANCE} from './reality-standalone-auth-v0.1.js';
 
 export const STANDALONE_CHAT_VERSION='reality-standalone-chat-v0.1';
@@ -64,6 +64,7 @@ export async function processStandaloneChat(req,{
   throw error('STANDALONE_CHAT_DISABLED',503);
  if(env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
   throw error('STANDALONE_DURABILITY_REQUIRED',503);
+ assertStandalonePreviewIsolation(env);
  const principal=await verifyStandaloneUser(req,{fetchImpl,env});
  const input=rejectUnsafeStandalonePayload(req.body);
  const scope=createStandaloneConversationScope({
