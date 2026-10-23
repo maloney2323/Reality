@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 import {createStandaloneConversationScope,verifyStandaloneUser,
- rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation,inspectStandaloneReadiness,requireStandaloneReady}
+ rejectUnsafeStandalonePayload,authConfiguration,scopedTurnEntryId,assertStandalonePreviewIsolation,inspectStandaloneReadiness,requireStandaloneReady,standaloneConfirmationRedirect}
  from '../src/reality-standalone-auth-v0.1.js';
 import {processStandaloneChat,reconstructStandaloneHistory,getStandaloneConversationHistory}
  from '../src/reality-standalone-chat-v0.1.js';
@@ -492,4 +494,34 @@ test('preview chat cannot silently borrow existing production OPENAI_API_KEY',as
   if(productionKey===undefined)delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY=productionKey;
  }
+});
+
+
+test('email confirmation must return to stable preview, never localhost or arbitrary origin',()=>{
+ const valid={...env,
+  REALITY_STANDALONE_AUTH_CALLBACK_URL:'https://reality-git-migration-vercel-c37abd-maloney2323-5310s-projects.vercel.app/standalone.html'};
+ assert.equal(standaloneConfirmationRedirect(valid),valid.REALITY_STANDALONE_AUTH_CALLBACK_URL);
+ for(const bad of [
+  '', 'http://localhost:3000', 'http://localhost:3000/standalone.html',
+  'https://evil.example/standalone.html',
+  'https://reality-test.vercel.app@evil.example/standalone.html',
+  'https://reality-test.vercel.app/api',
+  'https://reality-test.vercel.app/standalone.html?redirect=https://evil.example',
+ ]){
+  assert.throws(()=>standaloneConfirmationRedirect({
+   ...env,REALITY_STANDALONE_AUTH_CALLBACK_URL:bad
+  }),/STANDALONE_CONFIRMATION_CALLBACK_REQUIRED|STANDALONE_CONFIRMATION_CALLBACK_INVALID/);
+ }
+});
+test('preview email signup and resend use server-provided callback, and confirmation checks real user',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(html,/signup\?redirect_to=.*encodeURIComponent\(confirmation_redirect_url\)/);
+ assert.match(html,/\/auth\/v1\/resend\?redirect_to=/);
+ assert.match(html,/type:'signup'/);
+ assert.match(html,/\/auth\/v1\/user/);
+ assert.match(html,/window\.history\.replaceState/);
+ assert.doesNotMatch(html,/localhost:3000\/auth\/v1/);
+ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script,'preview module exists');
+ assert.doesNotThrow(()=>new vm.Script(script),'preview module parses as valid JavaScript');
 });
