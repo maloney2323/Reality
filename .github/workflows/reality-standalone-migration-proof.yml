@@ -8,6 +8,7 @@ on:
       - src/reality-standalone-auth-v0.1.js
       - src/reality-standalone-chat-v0.1.js
       - src/reality-causal-turn-commit-v0.1.js
+      - src/reality-conversation-sequencer-v0.1.js
       - src/reality-live-intelligence-orchestration-v0.1.js
       - api/reality/standalone-chat.js
       - api/reality/standalone-turn-status.js
@@ -17,6 +18,7 @@ on:
       - standalone.html
       - test/reality-standalone-chat-v0.1.test.js
       - test/reality-causal-turn-commit-v0.1.test.js
+      - test/reality-conversation-sequencer-v0.1.test.js
       - test/reality-12turn-standalone-construction-v0.1.test.js
       - .github/workflows/reality-standalone-migration-proof.yml
 permissions:
@@ -37,6 +39,7 @@ jobs:
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-standalone-chat-v0.1.js
           node --check src/reality-causal-turn-commit-v0.1.js
+          node --check src/reality-conversation-sequencer-v0.1.js
           node --check api/reality/standalone-chat.js
           node --check api/reality/standalone-turn-status.js
           node --check api/reality/standalone-history.js
@@ -46,6 +49,8 @@ jobs:
         run: node --test test/reality-standalone-chat-v0.1.test.js
       - name: Causal turn commit and crash-recovery safety (no provider calls)
         run: node --test test/reality-causal-turn-commit-v0.1.test.js
+      - name: Distinct-turn atomic sequencing and crash fence tests (no provider charges)
+        run: node --test test/reality-conversation-sequencer-v0.1.test.js
       - name: Twelve-turn synthetic construction full-stack challenge (no provider charges)
         run: node --test test/reality-12turn-standalone-construction-v0.1.test.js
       - name: Existing live cognition and Integrity Spine regressions
