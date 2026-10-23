@@ -151,3 +151,16 @@ test('verified history projection displays truthful committed-reply count withou
  assert.match(prior,/await refreshHistory\(\);\s*await refreshConversationInventory\(\)/);
  assert.doesNotMatch(html,/45\.0%|4\.0%|underlying model drift:\s*0/);
 });
+
+test('saved homeowner approval conditions render only authenticated readback and escape model-supplied HTML',()=>{
+ const html=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ assert.match(html,/id="conditionReceipts"/);
+ assert.match(html,/async function refreshSavedObligations\(selectedConversationId\)/);
+ assert.match(html,/authFetch\('\/api\/reality\/standalone-obligations\?'\+q/);
+ assert.match(html,/if\(selectedConversationId!==state\.conversationId\)return/);
+ assert.match(html,/rule\.textContent=item\.original_user_text/);
+ assert.match(html,/condition\.textContent='Required condition: '/);
+ assert.match(html,/display\.append\(block\)/);
+ assert.match(html,/No observed user conditions stored for this conversation yet/);
+ assert.doesNotMatch(html,/rule\.innerHTML|condition\.innerHTML/);
+});
