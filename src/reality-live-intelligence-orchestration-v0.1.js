@@ -9,6 +9,7 @@ import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootI
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 import { inspectModelOutputWithContinuity } from './reality-model-output-integrity-v0.1.js';
 import { createIntegritySpine, advanceIntegritySpine, summarizeIntegritySpine, inspectConversationDrift, replayConversationTrajectory, inspectTrajectoryRecovery } from './reality-continuous-integrity-spine-v0.1.js';
+import {assessIntelligenceSpineV1} from './reality-intelligence-spine-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
@@ -343,6 +344,20 @@ export async function runLiveIntelligenceOrchestration({
     ...trajectoryReplay,recovery:trajectoryRecovery,
     detection_turn_semantics:'OBSERVED_BY_THIS_REPLAY_NOT_PROVEN_FIRST_EVER',
   };
+  // V1 composes the existing findings into a single proof/coverage receipt.
+  // No extra model calls, no changes to publication/authority, and no
+  // fabricated semantic or hallucination verdicts.
+  const intelligenceSpineV1=effectiveContinuityRootId
+    ?assessIntelligenceSpineV1({
+        continuityRootId:effectiveContinuityRootId,
+        userSourceRef:governedSignal.packet.packet_id,
+        modelSourceRef:'model-response:'+(cognitiveResult.response_id||'untracked'),
+        currentRequest:message,rawAnswer:rawModelAnswer,
+        priorConversationSource:historyAuthenticated
+          ?'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
+        authenticatedHistoryVerified:historyAuthenticated,
+        conversationDrift,modelIntegrity,trajectoryReplay,
+      }):null;
   const combinedIntegrityFindings=[
     ...modelIntegrity.findings,...conversationDrift.findings,
     ...trajectoryReplay.findings.filter(x=>!x.previously_recorded_detection),
@@ -438,6 +453,7 @@ export async function runLiveIntelligenceOrchestration({
           model_output_integrity:modelIntegrityPublic,
           conversation_drift:conversationDriftPublic,
           conversation_trajectory:trajectoryPublic,
+          intelligence_spine_v1:intelligenceSpineV1,
           integrity_spine:spine?spine:null,
           contradiction_diagnostics:'NARROW_EXPLICIT_MODEL_CLAIMS_COMPARED_NOT_FULL_SEMANTIC_VERIFICATION',
         },
@@ -456,6 +472,7 @@ export async function runLiveIntelligenceOrchestration({
        continuityReadback.payload?.model_output_integrity?.status!==modelIntegrityPublic.status ||
        continuityReadback.payload?.conversation_drift?.status!==conversationDriftPublic.status ||
        continuityReadback.payload?.conversation_trajectory?.status!==trajectoryPublic.status ||
+       (intelligenceSpineV1 && continuityReadback.payload?.intelligence_spine_v1?.evidence_receipt_hash!==intelligenceSpineV1.evidence_receipt_hash) ||
        (spine && continuityReadback.payload?.integrity_spine?.trace_hash!==spine.trace_hash))
       throw new Error('CONTINUITY_LEDGER_COGNITION_READBACK_MISMATCH');
   }
@@ -549,6 +566,7 @@ export async function runLiveIntelligenceOrchestration({
       model_output_integrity:clone(modelIntegrityPublic),
       conversation_drift:clone(conversationDriftPublic),
       conversation_trajectory:clone(trajectoryPublic),
+      intelligence_spine_v1:intelligenceSpineV1?clone(intelligenceSpineV1):{status:'NO_VERIFIED_CONTEXT'},
       integrity_spine:spineSummary?clone(spineSummary):{status:'NOT_DURABLY_ANCHORED'},
       continuity: {
       root_id: effectiveContinuityRootId,

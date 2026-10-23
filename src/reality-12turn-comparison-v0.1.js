@@ -67,6 +67,7 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
   const drift=payload.conversation_drift||{};
   const facts=payload.model_output_integrity||{};
   const trajectory=payload.conversation_trajectory||{};
+  const v1=payload.intelligence_spine_v1||null;
   const flags=[
    ...isArr(drift.findings).map(x=>({...x,source_detector:'CONVERSATION_DRIFT'})),
    ...isArr(facts.findings).map(x=>({...x,source_detector:'MODEL_OUTPUT_INTEGRITY'})),
@@ -95,6 +96,10 @@ export function buildTwelveTurnComparison({scope,messageEntries=[],
    factual_integrity_status:String(facts.status||'NOT_EVALUATED'),
    drift_status:String(drift.status||'NOT_EVALUATED'),
    trajectory_status:String(trajectory.status||'NOT_EVALUATED'),
+   intelligence_spine_v1_status:String(v1?.status||'NOT_RECORDED_FOR_THIS_TURN'),
+   intelligence_spine_v1_receipt:v1?.evidence_receipt_hash||null,
+   intelligence_spine_v1_coverage:v1?.coverage||null,
+   intelligence_spine_v1_candidate_count:Array.isArray(v1?.findings)?v1.findings.length:0,
    detector_findings:flags,
    publications_differ:Boolean(a?.payload?.display_text&&a.payload.display_text!==a.payload.text),
    external_action_evidence:'NO_EXTERNAL_SEND_PROOF_IN_THIS_VIEW',
