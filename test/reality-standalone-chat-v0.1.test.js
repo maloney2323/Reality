@@ -5,6 +5,7 @@ import {createStandaloneConversationScope,verifyStandaloneUser,
  from '../src/reality-standalone-auth-v0.1.js';
 import {processStandaloneChat,reconstructStandaloneHistory}
  from '../src/reality-standalone-chat-v0.1.js';
+import {retrievePersistedUniverse} from '../src/reality-native-universe-persistence-v1.0.js';
 import {createUniverseEntry,validateUniverseEntry}
  from '../src/reality-universe-persistence-contract-v1.0.js';
 
@@ -173,4 +174,137 @@ test('migration pilot refuses to mix standalone user auth with a different Unive
   }),/STANDALONE_(?:PRODUCTION_RELEASE_NOT_AUTHORIZED|PREVIEW_PROJECT_BINDING_REQUIRED|AUTH_UNIVERSE_PROJECT_MISMATCH)/);
   assert.equal(touched,false,'failed environment isolation must prevent all reads/writes');
  }
+});
+
+
+test('database query selects only authenticated conversation events within the owner root',async()=>{
+ const scope=createStandaloneConversationScope({userId:userA,conversationId:'job-1'});
+ const prev=process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+ process.env.REALITY_UNIVERSE_PERSISTENCE_KEY='unit-test-only';
+ let seen=false;
+ try{
+  const x=await retrievePersistedUniverse({
+   continuityRootId:scope.continuity_root_id,
+   worldlineId:scope.worldline_id,
+   eventKind:'AUTHENTICATED_CONVERSATION_MESSAGE',
+   limit:80,
+   fetchImpl:async(url,opt)=>{
+    const p=new URL(url).searchParams;
+    assert.equal(p.get('event_kind'),'eq.AUTHENTICATED_CONVERSATION_MESSAGE');
+    assert.equal(p.get('continuity_root_id'),'eq.'+scope.continuity_root_id);
+    assert.equal(p.get('worldline_id'),'eq.reality:primary');
+    assert.equal(p.get('limit'),'80');
+    assert.equal(opt.method,'GET');
+    seen=true;
+    return {ok:true,status:200,json:async()=>[]};
+   },
+  });
+  assert.equal(seen,true);
+  assert.equal(x.status,'AVAILABLE');
+  assert.equal(x.count,0);
+  await assert.rejects(()=>retrievePersistedUniverse({
+   eventKind:'AUTHENTICATED_CONVERSATION_MESSAGE,eq.public',
+   fetchImpl:async()=>{throw Error('INVALID_FILTER_SHOULD_NOT_FETCH')},
+  }),/UNIVERSE_EVENT_KIND_FILTER_INVALID/);
+ }finally{
+  if(prev===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_KEY;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_KEY=prev;
+ }
+});
+
+test('cold restart restores Turn 1 intent for Turn 2 without browser-provided history',async()=>{
+ const persisted=new Map(),calls=[];
+ let stamp=0;
+ const store=async entry=>{
+  assert.equal(persisted.has(entry.entry_id),false);
+  persisted.set(entry.entry_id,entry);
+  return {status:'PERSISTED',entry};
+ };
+ const makeHandler=()=>({ // Fresh handler instance; only persisted ledger survives.
+  env,
+  fetchImpl:authFetch(),
+  store,
+  load:async scope=>{
+   calls.push({scope:scope.continuityRootId,kind:scope.eventKind});
+   return {status:'AVAILABLE',
+    entries:[...persisted.values()].filter(e=>
+     e.continuity_root_id===scope.continuityRootId&&
+     e.worldline_id===scope.worldlineId&&
+     e.event_kind===scope.eventKind)};
+  },
+  now:()=>new Date(Date.UTC(2026,9,22,19,stamp++,0)).toISOString(),
+  run:async ({systemContext,message})=>{
+   calls.push({history:systemContext.authenticated_conversation_turns.map(x=>x.text),
+     history_source:systemContext.context_source,message});
+   return {intelligence:{raw_model_answer:'I will maintain the approval condition.',
+      answer:'I will maintain the approval condition.'},
+    context:{continuity:{root_id:systemContext.continuity_root_id,
+      signal_handoff_status:'STORED_AND_READ_BACK',cognitive_readback_verified:true,
+      event_id:'verified:cognition:synthetic'}}};
+  },
+ });
+ const original=request({message:'Do not send the estimate until the homeowner approves it.',turn_id:'t1'});
+ const first=await processStandaloneChat(original,makeHandler());
+ assert.equal(first.receipt.history_window_count,0);
+ const second=await processStandaloneChat(request({
+  message:'Any updates?',turn_id:'t2'}),makeHandler());
+ assert.equal(second.receipt.history_window_count,2);
+ const replay=calls.find(x=>x.message==='Any updates?');
+ assert.equal(replay.history_source,'REALITY_STANDALONE_AUTHENTICATED');
+ assert.equal(replay.history[0],original.body.message);
+ assert.equal(replay.history[1],'I will maintain the approval condition.');
+ assert.equal(calls.filter(x=>x.kind==='AUTHENTICATED_CONVERSATION_MESSAGE').length,2);
+ assert.equal(persisted.size,4);
+});
+
+test('identical conversation selector for two users does not expose an earlier user history',async()=>{
+ const persisted=new Map();
+ const store=async entry=>{persisted.set(entry.entry_id,entry);return {status:'PERSISTED',entry}};
+ const seen=[];
+ const handler=id=>({
+  env,fetchImpl:authFetch({id}),store,
+  now:()=> '2026-10-22T19:10:00.000Z',
+  load:async scope=>({status:'AVAILABLE',entries:[...persisted.values()].filter(e=>
+    e.continuity_root_id===scope.continuityRootId&&e.event_kind===scope.eventKind)}),
+  run:async arg=>{
+   seen.push({id,root:arg.systemContext.continuity_root_id,
+    prior:arg.systemContext.authenticated_conversation_turns});
+   return {intelligence:{raw_model_answer:'Acknowledged',answer:'Acknowledged'},
+    context:{continuity:{root_id:arg.systemContext.continuity_root_id,
+      signal_handoff_status:'STORED_AND_READ_BACK',cognitive_readback_verified:true,
+      event_id:'verified:synthetic'}}};
+  },
+ });
+ const a=await processStandaloneChat(request({message:'Owner A secret',turn_id:'a1'}),handler(userA));
+ const b=await processStandaloneChat(request({message:'Owner B confidential',turn_id:'b1'}),handler(userB));
+ assert.notEqual(a.continuity_root_id,b.continuity_root_id);
+ assert.equal(seen[0].prior.length,0);
+ assert.equal(seen[1].prior.length,0);
+ assert.equal(b.response,'Acknowledged');
+});
+
+test('storage race duplicate must never trigger a second model call',async()=>{
+ let modelCalled=false;
+ await assert.rejects(()=>processStandaloneChat(request(),{
+  env,fetchImpl:authFetch(),load:async()=>({status:'AVAILABLE',entries:[]}),
+  store:async entry=>({status:'DUPLICATE_IDENTICAL_CONCURRENT',entry}),
+  run:async()=>{modelCalled=true},
+ }),/STANDALONE_USER_MESSAGE_NOT_DURABLY_CONFIRMED/);
+ assert.equal(modelCalled,false);
+});
+
+test('assistant persistence failure cannot produce successful customer reply',async()=>{
+ let writes=0;
+ await assert.rejects(()=>processStandaloneChat(request(),{
+  env,fetchImpl:authFetch(),load:async()=>({status:'AVAILABLE',entries:[]}),
+  store:async entry=>{writes++;
+    return {status:writes===1?'PERSISTED':'DUPLICATE_IDENTICAL',entry}},
+  run:async ({systemContext})=>({
+   intelligence:{raw_model_answer:'Prepared only.',answer:'Prepared only.'},
+   context:{continuity:{root_id:systemContext.continuity_root_id,
+    signal_handoff_status:'STORED_AND_READ_BACK',
+    cognitive_readback_verified:true,event_id:'synthetic:durable'}}
+  }),
+ }),/STANDALONE_ASSISTANT_MESSAGE_NOT_DURABLY_CONFIRMED/);
+ assert.equal(writes,2);
 });
