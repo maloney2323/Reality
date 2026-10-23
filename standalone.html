@@ -60,8 +60,8 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
-<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
-<div id="chatNotice" class="notice" role="status"></div>
+<div class="actions"><button id="send">Send</button><button class="secondary" id="checkTurn">Check interrupted turn</button><button type="button" class="secondary" id="inspectRecovery">Inspect recovery evidence (read-only)</button><button class="secondary" id="reconcileTurn" hidden>Verify and recover saved result</button><small id="conversationIdLabel"></small></div>
+<div id="chatNotice" class="notice" role="status"></div><div id="recoveryEvidence" class="notice" role="status"></div>
 </section>
 </div>
 <aside>
@@ -317,6 +317,38 @@ async function checkPendingTurn(){
 $('checkTurn').addEventListener('click',async()=>{
  try{await checkPendingTurn()}
  catch(e){status('chatNotice',e.message||'Status unavailable',true)}
+});
+$('inspectRecovery').addEventListener('click',async()=>{
+ const pending=state.pendingTurn;
+ if(!state.accessToken||!pending){
+  status('chatNotice','Sign in and select the interrupted turn to inspect.',true);return;
+ }
+ $('inspectRecovery').disabled=true;
+ try{
+  const params=new URLSearchParams({conversation_id:pending.conversationId,
+   thought_id:'personal',turn_id:pending.turnId});
+  const response=await fetch('/api/reality/standalone-recovery-review?'+params,{
+   method:'GET',cache:'no-store',headers:{Authorization:'Bearer '+state.accessToken}});
+  const result=await response.json();
+  if(!response.ok||result.review_is_a_durable_receipt!==false)
+   throw Error(result?.error||'Recovery review could not be verified');
+  const resultBox=$('recoveryEvidence');resultBox.replaceChildren();
+  const lines=[
+   'Recovery classification: '+result.review.status,
+   'Saved user message: '+(result.phase_evidence.user_message_saved?'YES':'NO'),
+   'Processing receipt: '+(result.phase_evidence.processing_receipt_saved?'YES':'NO'),
+   'Interruption receipt: '+(result.phase_evidence.interruption_receipt_saved?'YES':'NO'),
+   'Verified assistant completion: '+(result.phase_evidence.committed_result_verified?'YES':'NO'),
+   'Model call outcome: NOT ESTABLISHED',
+   'Action outcome: NOT ESTABLISHED',
+   'Next step: '+result.review.next_action,
+   'No model calls, evidence changes or fence releases were performed by this review.',
+  ];
+  for(const line of lines){
+   const p=document.createElement('p');p.textContent=line;resultBox.append(p);
+  }
+ }catch(e){status('chatNotice','Recovery evidence inspection failed: '+e.message,true)}
+ finally{$('inspectRecovery').disabled=false}
 });
 $('reconcileTurn').addEventListener('click',async()=>{
  const pending=state.pendingTurn;
