@@ -106,7 +106,7 @@ test('browser wiring restores before chat; live pilot requires click, two turns 
  assert.match(html,/const sendProofTurn=async \(message,turnNumber\)/);
  assert.match(html,/verified_chain!==true/);
  assert.match(html,/turn_commit_status!=='COMMITTED'/);
- assert.match(html,/window\.confirm\('Run two fresh Reality chat turns/);
+ assert.match(html,/window\.confirm\(confirmation\)/);
  assert.match(html,/\$\('runContinuityProof'\)\.addEventListener\('click'/);
  assert.doesNotMatch(html,/setInterval\([^]*sendProofTurn/);
  assert.match(html,/No failed turn was retried/);
