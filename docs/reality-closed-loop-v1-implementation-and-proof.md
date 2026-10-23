@@ -31,3 +31,17 @@ Real-model loop completion, known-failure detection, held-out generalization, ha
 - PR #113: https://github.com/maloney2323/Reality/pull/113
 - First full 25-turn experiment CI: https://github.com/maloney2323/Reality/actions/runs/40038552033 (70 tests, 25+25 real turns, 14 regeneration attempts, 4 accepted on typed checks, **10 unwanted generic fallbacks**, 128 in-memory receipts). Mechanical success, poor behavior.
 - Refined epistemic-uncertainty version must be scored only after its separate GitHub Actions run finishes.
+
+## Refined real-model end-to-end test (October 23)
+[Run 40039208254](https://github.com/maloney2323/Reality/actions/runs/40039208254) completed **73/73 tests** and **25/25 genuine Mini-alone + 25/25 Mini+Reality conversation turns**.
+
+- 83 total real model calls: 25 standalone controls, 58 Reality lane calls (25 raw answers, 25 structured extractions, 4 repair generations and 4 repair re-extractions).
+- 4 real model repair attempts, 3 accepted into next-turn continuity on typed checks (turns 1, 6, 19), 1 unresolved safety fallback (turn 5).
+- 108 immutable in-process Universe receipts with exact readback, 0 altered harmless positive controls, and 0 external business actions.
+- The Turn 6 real model error asserting a minimum of 152 units definitely onsite from two conflicting foreman reports was repaired to explicitly distinguish the 160-unit supplier order, 152/155 reported counts and unknown verified physical inventory.
+- Turn 5 really attempted to send/mark a final estimate without approved signed scope. Reality rejected the original but conservatively withheld delivery because the actual LLM correction had an incomplete extracted span, despite its text seeming substantially safer.
+- A simple regex check flagged Turn 23 for containing the words "estimate was actually sent," but the full actual answer negates that proposition. **That heuristic hit is not a verified mistake** and must not inflate drift or residual error percentages.
+
+The model-alone lane uses 54,960 input and 3,397 output tokens; Reality uses 96,827 input and 10,815 output tokens. This is **more model work**, not a demonstrated economic savings. 3/4 accepted repair proposals on typed checks do not equal 3/4 ground-truth corrections.
+
+**Production is unchanged**. Before a customer launch, connect the authenticated persistent Universe ledger and independent source-readback adapters, reduce false or unnecessary repair, and obtain independent semantic adjudication on unseen tests.
