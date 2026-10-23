@@ -219,7 +219,10 @@ export async function processCausalTurn(req,{
   if(!user)throw fail('CAUSAL_TURN_USER_RECORD_MISSING');
   started=await appendPhase({scope,turnId:input.turnId,phase:'PROCESSING',
    payload:{user_message_entry_id:user.entry_id,
-    user_message_hash:user.ledger_entry_hash},
+    user_message_hash:user.ledger_entry_hash,
+    ...(claim?{sequence_num:claim.sequence_num,
+      prior_commit_entry_id:claim.prior_commit_entry_id,
+      prior_commit_hash:claim.prior_commit_hash}:{})},
    store,lookup,fetchImpl,now});
   return run(args);
  };
@@ -251,6 +254,9 @@ export async function processCausalTurn(req,{
     assistant_message_entry_id:ids.assistant,assistant_message_hash:assistant.ledger_entry_hash,
     processing_receipt_entry_id:ids.processing,processing_receipt_hash:started.ledger_entry_hash,
     cognition_ledger_event_id:cognition.entry_id,cognition_ledger_hash:cognition.ledger_entry_hash,
+    ...(claim?{sequence_num:claim.sequence_num,
+      prior_commit_entry_id:claim.prior_commit_entry_id,
+      prior_commit_hash:claim.prior_commit_hash}:{})
    },store,lookup,fetchImpl,now});
   const verified=await inspectCausalTurn({scope,turnId:input.turnId,lookup,fetchImpl});
   if(!verified.committed)throw fail('CAUSAL_TURN_COMMIT_VERIFICATION_FAILED');
