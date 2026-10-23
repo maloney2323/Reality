@@ -52,7 +52,7 @@ export function inspectStandaloneReadiness(env=process.env){
  }
  const explicitKey=String(env.REALITY_UNIVERSE_PERSISTENCE_KEY||'');
  const dedicatedServiceCredential=/^sb_secret_[A-Za-z0-9_-]{16,}$/.test(explicitKey);
- const paidModelKey=String(env.OPENAI_API_KEY||'');
+ const paidModelKey=String(env.REALITY_STANDALONE_OPENAI_API_KEY||'');
  const modelReady=paidModelKey.startsWith('sk-')&&paidModelKey.length>=20;
  const modelNameReady=typeof env.REALITY_OPENAI_MODEL==='string'&&
    /^[a-z0-9][a-z0-9.-]{1,90}$/.test(env.REALITY_OPENAI_MODEL);
@@ -70,7 +70,7 @@ export function inspectStandaloneReadiness(env=process.env){
    ...(checks.preview_isolation?[]:['PREVIEW_AUTH_UNIVERSE_PROJECT_BINDING']),
    ...(checks.universe_durability_enabled?[]:['REALITY_UNIVERSE_PERSISTENCE_ENABLED']),
    ...(checks.dedicated_server_storage_key?[]:['REALITY_UNIVERSE_PERSISTENCE_KEY']),
-   ...(checks.model_api_key?[]:['OPENAI_API_KEY']),
+   ...(checks.model_api_key?[]:['REALITY_STANDALONE_OPENAI_API_KEY']),
    ...(checks.explicit_model_selection?[]:['REALITY_OPENAI_MODEL']),
    ...(checks.standalone_enabled?[]:['REALITY_STANDALONE_CHAT_ENABLED']),
  ]);
