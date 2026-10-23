@@ -4,6 +4,7 @@ on:
     branches:
       - migration/vercel-independent-chat-proof-20261022
       - feature/persistent-obligation-observation-20261023
+      - feature/construction-conflict-probe-20261023
   pull_request:
     paths:
       - src/reality-native-universe-persistence-v1.0.js
@@ -26,6 +27,9 @@ on:
       - test/reality-standalone-obligation-adapter-v0.1.test.js
       - api/reality/standalone-obligations.js
       - test/reality-standalone-obligations-http-v0.1.test.js
+      - src/reality-construction-conflict-probe-v0.1.js
+      - api/reality/standalone-conflict-probe.js
+      - test/reality-construction-conflict-probe-v0.1.test.js
       - src/reality-continuous-integrity-spine-v0.1.js
       - test/reality-obligation-observation-v0.1.test.js
       - docs/reality-obligation-observation-v0.1.md
@@ -93,6 +97,11 @@ jobs:
           node --test test/reality-standalone-obligation-adapter-v0.1.test.js
           node --check api/reality/standalone-obligations.js
           node --test test/reality-standalone-obligations-http-v0.1.test.js
+      - name: Synthetic conflict detector and dry-run execution gate (read-only; no paid provider)
+        run: |
+          node --check src/reality-construction-conflict-probe-v0.1.js
+          node --check api/reality/standalone-conflict-probe.js
+          node --test test/reality-construction-conflict-probe-v0.1.test.js
       - name: Browser restoration and server-owned interrupted-turn selection
         run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
       - name: Persistent login rotation, logout and bounded authenticated pilot UI
