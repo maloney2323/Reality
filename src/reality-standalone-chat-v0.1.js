@@ -73,7 +73,9 @@ export async function processStandaloneChat(req,{
  });
  // No global scan or client-supplied history: the server selects one owner root.
  const stored=await load({continuityRootId:scope.continuity_root_id,
-  worldlineId:scope.worldline_id,limit:100,fetchImpl});
+  worldlineId:scope.worldline_id,
+  // Conversation-only index: other Universe events must not age out dialogue.
+  eventKind:'AUTHENTICATED_CONVERSATION_MESSAGE',limit:80,fetchImpl});
  if(stored?.status!=='AVAILABLE'||!Array.isArray(stored.entries))
   throw error('STANDALONE_LEDGER_UNAVAILABLE',503);
  const history=reconstructStandaloneHistory({entries:stored.entries,scope});
@@ -86,7 +88,8 @@ export async function processStandaloneChat(req,{
   scope,turnId:input.turnId,role:'user',
   text:input.message,observedAt,
  }),{fetchImpl});
- if(!['PERSISTED','DUPLICATE_IDENTICAL','DUPLICATE_IDENTICAL_CONCURRENT'].includes(accepted?.status)||
+ // A competing duplicate must NOT enter model cognition as a new user turn.
+ if(accepted?.status!=='PERSISTED'||
      accepted?.entry?.entry_id!==userEntryId)
   throw error('STANDALONE_USER_MESSAGE_NOT_DURABLY_CONFIRMED',503);
  const result=await run({
@@ -116,7 +119,7 @@ export async function processStandaloneChat(req,{
   scope,turnId:input.turnId,role:'assistant',text:rawAnswer,
   observedAt:now(),
  }),{fetchImpl});
- if(!['PERSISTED','DUPLICATE_IDENTICAL','DUPLICATE_IDENTICAL_CONCURRENT'].includes(assistant?.status)||
+ if(assistant?.status!=='PERSISTED'||
     assistant?.entry?.entry_id!==assistantEntryId)
   throw error('STANDALONE_ASSISTANT_MESSAGE_NOT_DURABLY_CONFIRMED',503);
  return Object.freeze({
