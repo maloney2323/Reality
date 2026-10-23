@@ -32,22 +32,34 @@ function headers() {
   return {apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'};
 }
 
-function mapRow(row) {
+// PostgREST adds transport columns (e.g. created_at) and serializes
+// timestamptz values with offsets and trimmed fractions. The immutable
+// Universe hash was calculated over the original JS ISO-millisecond times
+// and only the canonical entry fields. Restore that representation BEFORE
+// validating; NEVER recompute or replace the stored ledger_entry_hash.
+function canonicalTime(value) {
+  if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return value;
+  return new Date(value).toISOString();
+}
+export function restoreCanonicalUniverseRow(row) {
+  if(!row||typeof row!=='object'||Array.isArray(row))
+    throw Error('UNIVERSE_ROW_INVALID');
   return {
-    entry_id: row.entry_id,
-    continuity_root_id: row.continuity_root_id,
-    worldline_id: row.worldline_id,
-    event_kind: row.event_kind,
-    epistemic_kind: row.epistemic_kind,
-    assertion_time: row.assertion_time,
-    effective_time: row.effective_time,
-    source_ref: row.source_ref,
-    payload: row.payload,
-    evidence_references: row.evidence_references || [],
-    provenance: row.provenance,
-    ledger_entry_hash: row.ledger_entry_hash,
+    entry_id:row.entry_id,
+    continuity_root_id:row.continuity_root_id,
+    worldline_id:row.worldline_id,
+    event_kind:row.event_kind,
+    epistemic_kind:row.epistemic_kind,
+    assertion_time:canonicalTime(row.assertion_time),
+    effective_time:canonicalTime(row.effective_time),
+    source_ref:row.source_ref,
+    payload:row.payload,
+    evidence_references:row.evidence_references,
+    provenance:row.provenance,
+    ledger_entry_hash:row.ledger_entry_hash,
   };
 }
+const mapRow=restoreCanonicalUniverseRow;
 
 async function request(path, options = {}, fetchImpl = fetch) {
   let response;
