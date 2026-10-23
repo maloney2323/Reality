@@ -56,6 +56,7 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 <div>
 <section>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Continuous conversation</h2><button id="newConversation" class="secondary">New thought</button></div>
+<div id="savedConversations" class="notice" role="status">Finding saved conversations…</div><div id="legacyRecovery" class="notice" role="status"></div>
 <div id="conversation" aria-live="polite"></div>
 <label for="prompt">What should Reality work on?</label>
 <textarea id="prompt" maxlength="10000" placeholder="Talk naturally. Reality should preserve what matters across turns."></textarea>
@@ -81,13 +82,16 @@ footer{margin-top:30px;font-size:12px;color:#a5b5cc;line-height:1.6}
 const $=id=>document.getElementById(id);
 const pendingKey='reality-standalone-pending-turn-v01';
 let pending=null;
-try{pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null')}catch{pending=null}
+try{pending=JSON.parse(localStorage.getItem(pendingKey)||sessionStorage.getItem(pendingKey)||'null')}catch{pending=null}
+const priorConversationId=localStorage.getItem('reality-standalone-conversation-v01');
 const state={config:null,accessToken:null,
- conversationId:localStorage.getItem('reality-standalone-conversation-v01')||crypto.randomUUID(),
+ conversationId:priorConversationId||crypto.randomUUID(),
  pendingTurn:pending?.turnId&&pending?.conversationId?pending:null,
- pendingRetryApproved:false};
-const savePending=()=>{if(state.pendingTurn)sessionStorage.setItem(pendingKey,JSON.stringify(state.pendingTurn));
- else sessionStorage.removeItem(pendingKey)};
+ pendingRetryApproved:false,discoveryReady:false};
+if(!priorConversationId)localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);
+const savePending=()=>{if(state.pendingTurn)localStorage.setItem(pendingKey,JSON.stringify(state.pendingTurn));
+ else localStorage.removeItem(pendingKey);
+ sessionStorage.removeItem(pendingKey)};
 const status=(id,text,error=false)=>{$(id).textContent=text;$(id).className='notice'+(error?' error':'')};
 const newConversation=()=>{if(state.pendingTurn&&!window.confirm('An earlier turn is unresolved. Start a different conversation without resolving it?'))return;
  state.conversationId=crypto.randomUUID();localStorage.setItem('reality-standalone-conversation-v01',state.conversationId);$('conversation').replaceChildren();$('conversationIdLabel').textContent='New conversation';resetIntegrity()};
@@ -126,8 +130,8 @@ async function authorize(create){
   state.accessToken=data.access_token; $('password').value='';
   $('signIn').style.display='none';$('workspace').style.display='block';
   status('chatNotice','Signed in. Rechecking your own Reality conversation history...');
-  try{await refreshHistory()}
-  catch(error){status('chatNotice','Signed in, but history could not be verified: '+error.message,true)}
+  try{await refreshConversationInventory();await refreshHistory()}
+  catch(error){status('chatNotice','Signed in, but conversation discovery could not be verified: '+error.message,true)}
  }catch(err){status('loginNotice',err.message||'Unable to sign in',true)}
  finally{button.disabled=false}
 }
@@ -180,7 +184,7 @@ async function consumeConfirmationCallback(){
   $('password').value='';
   $('signIn').style.display='none';$('workspace').style.display='block';
   status('chatNotice','Email confirmed. Checking continuity from the verified account...');
-  await refreshHistory();
+  await refreshConversationInventory();await refreshHistory();
  }catch(e){state.accessToken=null;status('loginNotice','Email confirmation finished, but sign-in needs to be retried: '+e.message,true)}
 }
 async function resendConfirmation(){
@@ -285,6 +289,7 @@ $('send').addEventListener('click',async()=>{
  const message=$('prompt').value.trim();
  if(!message)return;
  if(!state.accessToken){status('chatNotice','Sign in first.',true);return}
+ if(!state.discoveryReady){status('chatNotice','Account recovery must succeed before sending.',true);return}
  if(state.pendingTurn&&(!state.pendingRetryApproved||
     state.pendingTurn.conversationId!==state.conversationId)){
   status('chatNotice','An earlier turn has not been verified. Check interrupted turn before sending anything else.',true);
