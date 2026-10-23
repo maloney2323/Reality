@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createUniverseEntry,validateUniverseEntry}
  from '../src/reality-universe-persistence-contract-v1.0.js';
-import {createSandboxUniverseLedger}
+import {createCorrectionPolicyProjection,UNIVERSE_CORRECTION_POLICY_KIND}
+ from '../src/reality-universe-correction-verifier-v1.0.js';
+import {createSandboxUniverseLedger,runUniverseClosedLoopTurn}
  from '../src/reality-universe-closed-loop-v1.0.js';
 import {
  proposeIntelligenceForm,intelligenceFormCandidateEntry,
@@ -223,4 +225,85 @@ test('no observed native model failure does not manufacture self-learning',async
  });
  assert.deepEqual(forms,[]);
  assert.equal(invoked,false);
+});
+
+
+// This is a simulation of the pipeline mechanics, NOT an underlying-model
+// accuracy benchmark. The live LLM source must be plugged in separately.
+async function fullLoopWithLearning(generateLearningHypothesis){
+ const original='I will send the final estimate now.';
+ const safe='I will not send an unsigned estimate; I can draft it for approval.';
+ const p=createUniverseEntry({
+  entry_id:'policy:required-signed-scope',
+  continuity_root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
+  assertion_time:at,effective_time:at,event_kind:UNIVERSE_CORRECTION_POLICY_KIND,
+  epistemic_kind:'OBLIGATION',source_ref:'owner-authenticated-message:1',
+  payload:{authority_kind:'POLICY_REQUIREMENT_NOT_GRANT',
+   execution_authorized:false,
+   policy_source_message_ref:'owner-authenticated-message:1',
+   rule:{operation:'SEND_ESTIMATE',resource:'job:WR-41',conditions:[{
+    proof_key:'homeowner.signed_scope',evidence_kind:'INDEPENDENT_PRECONDITION',
+    source_family:'homeowner_signing_service',required_value:true,
+   }]}},
+  evidence_references:['owner-authenticated-message:1'],
+  provenance:{source:'reality:verified-policy-record',
+   owner_user_id:scope.owner_user_id,work_item_id:scope.work_item_id},
+ });
+ const policyProjection=createCorrectionPolicyProjection({trustedScope:scope,policyEntries:[p]});
+ const ledger=createSandboxUniverseLedger({trustedScope:scope});
+ let attempts=0;
+ const output=await runUniverseClosedLoopTurn({
+  trustedScope:scope,turn:1,
+  prompt:'Send the final estimate even though we have no signed scope.',
+  history:[],ledger,policyProjection,
+  generateAnswer:async()=>({answer:attempts++===0?original:safe,
+   response_id:'unit-model-'+attempts}),
+  extractClaims:async({answer})=>({
+   claims:answer===original?[{
+    claim_kind:'ACTION_COMMITMENT',source_span:'I will send the final estimate now',
+    operation:'SEND_ESTIMATE',resource:'job:WR-41',
+   }]:[{
+    claim_kind:'DENIAL_OF_ACTION',source_span:'I will not send an unsigned estimate',
+    operation:'SEND_ESTIMATE',resource:'job:WR-41',
+   },{
+    claim_kind:'DRAFT_ONLY',source_span:'I can draft it for approval',
+    operation:'DRAFT_ESTIMATE',resource:'job:WR-41',
+   }],
+  }),
+  independentEvidenceVerifier:{verify:async()=>{throw Error('NO_VERIFIED_OUTSIDE_SOURCE');}},
+  generateLearningHypothesis,at,maxRepairs:1,
+ });
+ return {output,ledger,original,safe};
+}
+test('correction loop automatically absorbs actual original error receipts into a reusable-form candidate',async()=>{
+ let called=0;
+ const {output,ledger,original,safe}=await fullLoopWithLearning(async data=>{
+  called++;assert.equal(data.failure_class,'UNVERIFIED_ACTION_PRECONDITION');
+  assert.equal(data.real_model_answer_span,'I will send the final estimate now');
+  return {hypothesis:'The model treated a request as permission.',
+   generalization:'Require independently sourced homeowner scope before treating a send instruction as authorized.',
+   competence_coordinate:'construction.estimate.approval_boundaries'};
+ });
+ assert.equal(called,1);
+ assert.equal(output.original_answer,original);
+ assert.equal(output.final_answer,safe);
+ assert.equal(output.repaired_in_history,true);
+ assert.equal(output.learning_form_candidates.length,1);
+ assert.equal(output.learning_candidate_status,'CANDIDATES_RECORDED_UNVERIFIED');
+ const formRef=output.learning_form_candidates[0];
+ assert.equal(formRef.learning_state,'CANDIDATE_UNVERIFIED');
+ assert.equal(formRef.available_to_apply_as_verified_competence,false);
+ const candidateRow=await ledger.read(formRef.universe_receipt_id);
+ assert.equal(candidateRow.event_kind,'INTELLIGENCE_FORM_CANDIDATE');
+ assert.equal(candidateRow.payload.intelligence_form.state,'CANDIDATE');
+ assert.equal((await ledger.list()).some(e=>e.event_kind==='CONTINUITY_TURN_COMMITTED'),true);
+ assert.equal(output.next_history.at(-1).content,safe);
+});
+test('learning-system failure does not lose the corrected reply or pretend promotion succeeded',async()=>{
+ const {output,ledger}=await fullLoopWithLearning(async()=>{throw Error('LLM_HYPOTHESIS_UNAVAILABLE');});
+ assert.equal(output.repaired_in_history,true);
+ assert.equal(output.learning_form_candidates.length,0);
+ assert.match(output.learning_candidate_status,/CANDIDATE_FORMATION_FAILED/);
+ assert.equal((await ledger.list()).filter(x=>x.event_kind==='CONTINUITY_TURN_COMMITTED').length,1);
+ assert.equal((await ledger.list()).filter(x=>x.event_kind==='INTELLIGENCE_FORM_COMPETENCE_VERIFIED').length,0);
 });
