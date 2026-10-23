@@ -3,6 +3,7 @@
 // Never treats model agreement as independent fact, never executes tools, and never
 // promotes an unverified correction or modifies authoritative history.
 import {createHash} from 'node:crypto';
+import {inspectBoundedEvidenceIntegrityV1} from './reality-evidence-provenance-v1.0.js';
 
 export const INTELLIGENCE_SPINE_V1='reality-intelligence-spine-v1.0';
 const validText=x=>typeof x==='string'&&x.trim().length>0;
@@ -18,7 +19,7 @@ const DRIFT_CLASSES=new Set([
 ]);
 const REFERENCE_CLASSES=new Set([
  'POTENTIAL_MATERIAL_DRIFT','CONTESTED_SOURCE_REFERENCE',
- 'UNVERIFIED_EXECUTION_CLAIM',
+ 'UNVERIFIED_EXECUTION_CLAIM','UNTRUSTED_SOURCE_PROMOTED_TO_EVENT',
 ]);
 function result(source,sourceResult){
  return array(sourceResult?.findings).map(f=>({
@@ -69,22 +70,26 @@ export function assessIntelligenceSpineV1({
  continuityRootId,userSourceRef,modelSourceRef,currentRequest,rawAnswer,
  priorConversationSource='NOT_ATTESTED',authenticatedHistoryVerified=false,
  conversationDrift=null,modelIntegrity=null,trajectoryReplay=null,
- semanticReviews=[],
+ semanticReviews=[],providerMetadata=null,
 }={}){
  const args={continuityRootId,userSourceRef,modelSourceRef,currentRequest,rawAnswer,
   priorConversationSource,authenticatedHistoryVerified};
  validation(args);
  const drift=result('CONTINUITY',conversationDrift);
  const factual=result('MODEL_OUTPUT_INTEGRITY',modelIntegrity);
+ const boundary=inspectBoundedEvidenceIntegrityV1({currentRequest,rawAnswer,
+  userSourceRef,modelSourceRef,providerMetadata});
+ const sourceFindings=result('REALITY_PROVENANCE_BOUNDARY',boundary);
  const replay=result('TRAJECTORY',trajectoryReplay);
  const semantic=semanticCandidates(semanticReviews,{userSourceRef,modelSourceRef});
  // Historical replay findings belong to their *original assistant turn*.
  // Attaching them to the current answer would falsely count one past problem
  // as a new current-answer failure and inflate the native self-score penalty.
- const findings=[...drift,...factual,...semantic];
+ const findings=[...drift,...factual,...sourceFindings,...semantic];
  const deduped=[...new Map(findings.map(f=>[f.issue_id,f])).values()];
  const responseCandidateCount=deduped.filter(f=>DRIFT_CLASSES.has(f.classification)||
-  f.classification==='POSSIBLE_MISMATCH').length;
+  f.classification==='POSSIBLE_MISMATCH'||
+  ['MODEL_RESPONSE_INCOMPLETE','MODEL_RESPONSE_COMPLETION_UNCONFIRMED'].includes(f.classification)).length;
  const groundingCandidateCount=deduped.filter(f=>REFERENCE_CLASSES.has(f.classification)||
   f.classification==='POSSIBLE_HALLUCINATION'||
   f.classification==='UNSUPPORTED_CLAIM').length;
@@ -97,6 +102,8 @@ export function assessIntelligenceSpineV1({
   request_hash:digest(currentRequest),
   raw_answer_hash:digest(rawAnswer),
   status,findings:deduped,
+  evidence_boundary_status:boundary.status,
+  evidence_boundary_version:boundary.version,
   historical_replay_findings:replay,
   historical_replay_candidate_count:replay.length,
   coverage:{
@@ -114,6 +121,11 @@ export function assessIntelligenceSpineV1({
     status:modelIntegrity?.status||'NOT_EVALUATED',
     candidate_count:groundingCandidateCount,
     independent_truth_adjudication:'NOT_PERFORMED',
+    untrusted_instruction_promotion_check:boundary.provenance_check_performed,
+   },
+   response_completeness:{
+    status:boundary.provider_completion_check_performed?boundary.status:'NOT_EVALUATED',
+    provider_metadata_verified:boundary.provider_completion_check_performed,
    },
    semantic_reasoning:{
     status:semanticReviews.length?'CANDIDATE_REVIEW_ONLY':'NOT_EVALUATED',
