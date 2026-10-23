@@ -60,8 +60,11 @@ function fixture(){
     receipt_hash:resolution.ledger_entry_hash};
   },get rpcCount(){return rpcCount;},stale:()=>{f={...f,sequence_num:2}}};
 }
-const getReq={method:'GET',query:{conversation_id:cid,turn_id:tid}};
-const approvals=(challenge)=>({method:'POST',body:{
+const sessionA='Bearer SYNTHETIC_SESSION_TOKEN_FOR_TEST_OWNER_1234567890';
+const sessionB='Bearer DIFFERENT_SYNTHETIC_SESSION_TOKEN_SAME_OWNER_12345';
+const getReq={method:'GET',headers:{authorization:sessionA},
+ query:{conversation_id:cid,turn_id:tid}};
+const approvals=(challenge)=>({method:'POST',headers:{authorization:sessionA},body:{
  conversation_id:cid,turn_id:tid,challenge,
  typed_acknowledgment:ACKNOWLEDGMENT_TEXT,
  confirmed_uncertain_execution:true,confirmed_possible_billing:true}});
@@ -104,6 +107,26 @@ test('race: owner review expires when claimed sequence changes',async()=>{
  f.stale();
  await assert.rejects(confirmOwnerAbandonment(approvals(challenge),{
   env,...f,now:()=>clock+1}),/ABANDONMENT_NOT_ELIGIBLE_PRIOR_COMMIT_EVIDENCE_REQUIRED/);
+ assert.equal(f.rpcCount,0);
+});
+test('review challenge cannot cross bearer sessions for the same owner',async()=>{
+ const f=fixture();
+ const challenge=(await prepareOwnerAbandonment(getReq,{env,...f,now:()=>clock})).challenge;
+ const other=approvals(challenge);
+ other.headers.authorization=sessionB;
+ await assert.rejects(confirmOwnerAbandonment(other,{
+  env,...f,now:()=>clock+1}),/ABANDONMENT_CHALLENGE_EXPIRED_OR_STALE/);
+ assert.equal(f.rpcCount,0);
+});
+test('replacement claim with same turn and sequence cannot reuse original challenge',async()=>{
+ const f=fixture();
+ const challenge=(await prepareOwnerAbandonment(getReq,{env,...f,now:()=>clock})).challenge;
+ await assert.rejects(confirmOwnerAbandonment(approvals(challenge),{
+  env,...f,now:()=>clock+1,
+  loadClaim:async()=>({
+   ...await f.loadClaim(),active_claim_token:'95e5fd0b-05b8-4725-b599-10f49bc4d781'
+  })
+ }),/ABANDONMENT_CHALLENGE_EXPIRED_OR_STALE/);
  assert.equal(f.rpcCount,0);
 });
 test('older USER-only turn, foreign identity fields and production rejected',async()=>{
