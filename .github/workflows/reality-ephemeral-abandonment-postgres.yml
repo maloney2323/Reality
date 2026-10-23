@@ -6,6 +6,7 @@ on:
       - src/reality-standalone-abandonment-v1.js
       - src/reality-abandoned-turn-readback-v1.js
       - test/fixtures/ephemeral-postgres-recovery-schema.sql
+      - test/fixtures/ephemeral-postgres-privilege-audit.sql
       - test/fixtures/generate-ephemeral-abandonment-fixture.mjs
       - test/fixtures/run-ephemeral-parallel-abandonment.sh
       - src/reality-causal-turn-commit-v0.1.js
@@ -48,6 +49,8 @@ jobs:
       - name: Load REVIEW ONLY function into throwaway database
         run: |
           psql -v ON_ERROR_STOP=1 -f sql/REVIEW_ONLY_preview_atomic_abandonment_v1.sql
+      - name: Audit RLS, table privileges, SECURITY INVOKER and function EXECUTE roles
+        run: psql -v ON_ERROR_STOP=1 -f test/fixtures/ephemeral-postgres-privilege-audit.sql
       - name: Generate actual JS Universe receipt hashes and synthetic SQL
         run: node test/fixtures/generate-ephemeral-abandonment-fixture.mjs
       - name: Verify signed hash parity, atomic abandonment, idempotency, late-write ban, role denial
