@@ -23,11 +23,13 @@ function headers() {
     error.code = 'UNIVERSE_PERSISTENCE_UNAVAILABLE';
     throw error;
   }
-  return {
-    apikey: key,
-    Authorization: 'Bearer ' + key,
-    'Content-Type': 'application/json',
-  };
+  // New Supabase sb_secret keys are opaque, not JWTs. Sending these as a
+  // Bearer token triggers Invalid JWT; route them only as an apikey.
+  // Legacy JWT service_role headers retain their original behavior.
+  if (key.startsWith('sb_secret_')) {
+    return {apikey:key,'Content-Type':'application/json'};
+  }
+  return {apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'};
 }
 
 function mapRow(row) {
