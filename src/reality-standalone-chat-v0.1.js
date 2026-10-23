@@ -107,6 +107,9 @@ export async function processStandaloneChat(req,{
   throw error('STANDALONE_USER_MESSAGE_NOT_DURABLY_CONFIRMED',503);
  const result=await run({
   message:input.message,requestedBy:principal.user_id,
+  // Explicit preview-only model credential; never inherit production's OPENAI_API_KEY.
+  model:env.REALITY_OPENAI_MODEL,
+  apiKey:env.REALITY_STANDALONE_OPENAI_API_KEY,
   systemContext:{
    ...scope,
    authenticated_conversation_turns:history,
