@@ -115,6 +115,10 @@ CREATE OR REPLACE FUNCTION public.reality_reconcile_committed_conversation_turn(
 DECLARE r public.reality_conversation_turn_fences%ROWTYPE;
 DECLARE e public.reality_universe_entries%ROWTYPE;
 DECLARE predecessor public.reality_universe_entries%ROWTYPE;
+DECLARE u public.reality_universe_entries%ROWTYPE;
+DECLARE a public.reality_universe_entries%ROWTYPE;
+DECLARE processing public.reality_universe_entries%ROWTYPE;
+DECLARE cognition public.reality_universe_entries%ROWTYPE;
 BEGIN
  IF current_user <> 'service_role' THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_CALLER_DENIED';
@@ -190,6 +194,43 @@ COMMIT;
     e.payload->>'assistant_message_entry_id' IS NULL OR
     e.payload->>'cognition_ledger_event_id' IS NULL THEN
   RAISE EXCEPTION 'REALITY_RECONCILIATION_COMMIT_EVIDENCE_INVALID';
+ END IF;
+ -- Cross-check all four underlying immutable receipts under the same root,
+ -- not just a self-asserted COMMITTED row.
+ SELECT * INTO STRICT u FROM public.reality_universe_entries
+ WHERE entry_id=e.payload->>'user_message_entry_id';
+ SELECT * INTO STRICT a FROM public.reality_universe_entries
+ WHERE entry_id=e.payload->>'assistant_message_entry_id';
+ SELECT * INTO STRICT processing FROM public.reality_universe_entries
+ WHERE entry_id=e.payload->>'processing_receipt_entry_id';
+ SELECT * INTO STRICT cognition FROM public.reality_universe_entries
+ WHERE entry_id=e.payload->>'cognition_ledger_event_id';
+ IF u.continuity_root_id IS DISTINCT FROM p_root_id OR
+    u.worldline_id IS DISTINCT FROM r.worldline_id OR
+    u.event_kind IS DISTINCT FROM 'AUTHENTICATED_CONVERSATION_MESSAGE' OR
+    u.payload->>'role' IS DISTINCT FROM 'user' OR
+    u.payload->>'turn_id' IS DISTINCT FROM p_turn_id OR
+    u.payload->>'principal_id' IS DISTINCT FROM p_owner_user_id::text OR
+    u.ledger_entry_hash IS DISTINCT FROM e.payload->>'user_message_hash' OR
+    a.continuity_root_id IS DISTINCT FROM p_root_id OR
+    a.worldline_id IS DISTINCT FROM r.worldline_id OR
+    a.event_kind IS DISTINCT FROM 'AUTHENTICATED_CONVERSATION_MESSAGE' OR
+    a.payload->>'role' IS DISTINCT FROM 'assistant' OR
+    a.payload->>'turn_id' IS DISTINCT FROM p_turn_id OR
+    a.payload->>'principal_id' IS DISTINCT FROM p_owner_user_id::text OR
+    a.ledger_entry_hash IS DISTINCT FROM e.payload->>'assistant_message_hash' OR
+    processing.continuity_root_id IS DISTINCT FROM p_root_id OR
+    processing.worldline_id IS DISTINCT FROM r.worldline_id OR
+    processing.event_kind IS DISTINCT FROM 'REALITY_CAUSAL_TURN_RECEIPT' OR
+    processing.payload->>'phase' IS DISTINCT FROM 'PROCESSING' OR
+    processing.payload->>'turn_id' IS DISTINCT FROM p_turn_id OR
+    processing.payload->>'authenticated_user_id' IS DISTINCT FROM p_owner_user_id::text OR
+    processing.payload->>'user_message_hash' IS DISTINCT FROM u.ledger_entry_hash OR
+    processing.ledger_entry_hash IS DISTINCT FROM e.payload->>'processing_receipt_hash' OR
+    cognition.continuity_root_id IS DISTINCT FROM p_root_id OR
+    cognition.worldline_id IS DISTINCT FROM r.worldline_id OR
+    cognition.ledger_entry_hash IS DISTINCT FROM e.payload->>'cognition_ledger_hash' THEN
+  RAISE EXCEPTION 'REALITY_RECONCILIATION_DURABLE_CHAIN_INVALID';
  END IF;
  -- Guard predecessor existence and exact hash/sequence in the database too.
  IF r.sequence_num>1 THEN
