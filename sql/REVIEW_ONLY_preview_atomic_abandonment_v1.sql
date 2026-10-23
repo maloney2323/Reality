@@ -275,7 +275,7 @@ begin
     or not (p_resolution_entry->'evidence_references' @>
            pg_catalog.jsonb_build_array(u.entry_id,processing.entry_id,
                 interrupted.entry_id,p_approval_entry->>'entry_id'))
-    or pg_catalog.abs(pg_catalog.extract(epoch from
+    or pg_catalog.abs(extract(epoch from
        (pg_catalog.clock_timestamp() -
         (p_approval_entry->>'assertion_time')::timestamptz))) > 300
     or processing.payload->>'user_message_hash' is distinct from u.ledger_entry_hash
