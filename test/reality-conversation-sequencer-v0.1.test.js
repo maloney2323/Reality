@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStandaloneConversationScope} from '../src/reality-standalone-auth-v0.1.js';
-import {processCausalTurn,getCausalTurnStatus,getCommittedStandaloneHistory,inspectCausalTurn} from '../src/reality-causal-turn-commit-v0.1.js';
-import {claimConversationSlot,finishConversationSlot,inspectConversationSlot}
+import {processCausalTurn,getCausalTurnStatus,getCommittedStandaloneHistory,inspectCausalTurn,reconcileCausalTurn} from '../src/reality-causal-turn-commit-v0.1.js';
+import {claimConversationSlot,finishConversationSlot,inspectConversationSlot,reconcileCommittedConversationSlot}
  from '../src/reality-conversation-sequencer-v0.1.js';
 import {createUniverseEntry} from '../src/reality-universe-persistence-contract-v1.0.js';
 
@@ -25,9 +25,9 @@ const req=(turnId,message)=>({
  headers:{authorization:'Bearer mock-verified-session-token'},
  body:{conversation_id:'parallel-kitchen',thought_id:'personal',turn_id:turnId,message},
 });
-function rig({failFirst=false,blockFirst=false}={}){
+function rig({failFirst=false,blockFirst=false,failFinish=false}={}){
  const entries=new Map();
- const counts={models:0,writes:[],claims:0,finishes:0};
+ const counts={models:0,writes:[],claims:0,finishes:0,reconciles:0};
  const queue={active:null,sequence:0,lastCommitId:null,lastCommitHash:null};
  let release;const barrier=new Promise(resolve=>release=resolve);
  let signal;const started=new Promise(resolve=>signal=resolve);
@@ -61,6 +61,7 @@ function rig({failFirst=false,blockFirst=false}={}){
   finish:async ({claim,committed})=>{
    assert.equal(queue.active,claim.turn_id);
    assert.equal(committed.receipt.verified_chain,true);
+   if(failFinish)throw Error('SYNTHETIC_FINISH_RPC_RESPONSE_LOST');
    counts.finishes++;
    queue.lastCommitId=committed.receipt.commit_entry_id;
    queue.lastCommitHash=committed.receipt.commit_entry_hash;
@@ -68,7 +69,20 @@ function rig({failFirst=false,blockFirst=false}={}){
    return {status:'FINISHED',sequence_num:claim.sequence_num};
   },
   inspect:async()=>({status:queue.active?'BUSY':'IDLE',
-    active_turn_id:queue.active,sequence_num:queue.sequence}),
+    active_turn_id:queue.active,sequence_num:queue.sequence,
+    last_committed_entry_id:queue.lastCommitId,
+    last_committed_entry_hash:queue.lastCommitHash}),
+  reconcile:async({turnId,verified})=>{
+    counts.reconciles++;
+    if(!verified.committed||verified.turn_id!==turnId||
+       queue.active!==turnId)throw Error('RECONCILE_NOT_VERIFIED');
+    queue.lastCommitId=verified.receipt.commit_entry_id;
+    queue.lastCommitHash=verified.receipt.commit_entry_hash;
+    queue.active=null;
+    return {status:'RECOVERED',sequence_num:queue.sequence,
+      commit_entry_id:queue.lastCommitId,commit_entry_hash:queue.lastCommitHash,
+      verified_fence_readback:true};
+  },
  };
  let counter=0;
  const now=()=>{
@@ -238,4 +252,157 @@ test('status and history do not publish a committed assistant reply while DB fen
  },{env,fetchImpl:dbFetch,lookup:x.opts.lookup,load:x.opts.load});
  assert.deepEqual(history.messages.map(m=>m.role),['user']);
  assert.deepEqual(history.unresolved_turns.map(x=>x.status),['SEQUENCE_FENCE_UNRESOLVED']);
+});
+
+
+test('lost finish acknowledgment: reconcile durable COMMITTED exactly once, with no second model call',async()=>{
+ const x=rig({failFinish:true});
+ await assert.rejects(
+  ()=>processCausalTurn(req('recovery-1','Do not send estimate yet.'),x.opts),
+  /SYNTHETIC_FINISH_RPC_RESPONSE_LOST/,
+ );
+ const ledger=await inspectCausalTurn({
+  scope,turnId:'recovery-1',lookup:x.opts.lookup,
+ });
+ assert.equal(ledger.status,'COMMITTED');
+ assert.equal(x.queue.active,'recovery-1');
+ const r=await reconcileCausalTurn({
+  headers:req('recovery-1').headers,
+  body:{conversation_id:'parallel-kitchen',thought_id:'personal',turn_id:'recovery-1'},
+ },{
+  env,fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,sequence:x.opts.sequence,
+ });
+ assert.equal(r.recovered,true);
+ assert.equal(r.status,'RECOVERED');
+ assert.equal(r.receipt.verified_chain,true);
+ assert.equal(r.model_called,false);
+ assert.equal(x.counts.models,1);
+ assert.equal(x.counts.reconciles,1);
+ assert.equal(x.queue.active,null);
+ // Second manual request is an idempotent observation, not a new model call.
+ const recheck=await reconcileCausalTurn({
+  headers:req('recovery-1').headers,
+  body:{conversation_id:'parallel-kitchen',thought_id:'personal',turn_id:'recovery-1'},
+ },{
+  env,fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,
+  sequence:{...x.opts.sequence,reconcile:async({verified})=>{
+   assert.equal(verified.committed,true);
+   return {status:'ALREADY_FINISHED',sequence_num:x.queue.sequence,
+    commit_entry_id:x.queue.lastCommitId,commit_entry_hash:x.queue.lastCommitHash,
+    verified_fence_readback:true};
+  }},
+ });
+ assert.equal(recheck.status,'ALREADY_FINISHED');
+ assert.equal(x.counts.models,1);
+});
+test('unfinished cognition requires review and cannot unlock slot or generate again',async()=>{
+ const x=rig({failFirst:true});
+ await assert.rejects(
+  ()=>processCausalTurn(req('pending-1','Approval is unresolved.'),x.opts),
+  /SYNTHETIC_FIRST_MODEL_TIMEOUT/,
+ );
+ const assessment=await reconcileCausalTurn({
+  headers:req('pending-1').headers,
+  body:{conversation_id:'parallel-kitchen',turn_id:'pending-1'},
+ },{
+  env,fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,sequence:x.opts.sequence,
+ });
+ assert.equal(assessment.status,'REVIEW_REQUIRED');
+ assert.equal(assessment.recovered,false);
+ assert.equal(assessment.underlying_turn_status,'INTERRUPTED');
+ assert.equal(x.queue.active,'pending-1');
+ assert.equal(x.counts.reconciles,0);
+ assert.equal(x.counts.models,1);
+});
+test('reconciliation rejects client-supplied source, authority and commit hash',async()=>{
+ const x=rig();
+ for(const intrusion of [
+  {principal_id:user},{commit_hash:'a'.repeat(64)},{action_authorized:true},
+  {continuity_root_id:scope.continuity_root_id},{model_output:'fake success'},
+ ]){
+  await assert.rejects(()=>reconcileCausalTurn({
+    headers:req('none').headers,
+    body:{conversation_id:'parallel-kitchen',turn_id:'none',...intrusion},
+  },{
+   env,fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,sequence:x.opts.sequence,
+  }),/CAUSAL_RECONCILIATION_SELECTOR_INVALID/);
+ }
+ assert.equal(x.counts.reconciles,0);
+ assert.equal(x.counts.models,0);
+});
+test('reconciliation remains disabled without explicit preview sequencing flag',async()=>{
+ const x=rig();
+ await assert.rejects(()=>reconcileCausalTurn({
+  headers:req('none').headers,body:{conversation_id:'parallel-kitchen',turn_id:'none'},
+ },{
+  env:{...env,REALITY_CAUSAL_SEQUENCE_ENABLED:'false'},
+  fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,sequence:x.opts.sequence,
+ }),/CAUSAL_RECONCILIATION_NOT_ENABLED/);
+ assert.equal(x.counts.models,0);
+});
+test('reconciliation never touches another active turn or prior historical commit',async()=>{
+ const x=rig();
+ await processCausalTurn(req('one','Cabinets undecided.'),x.opts);
+ await processCausalTurn(req('two','Approval is still required.'),x.opts);
+ await assert.rejects(()=>reconcileCausalTurn({
+  headers:req('one').headers,
+  body:{conversation_id:'parallel-kitchen',turn_id:'one'},
+ },{
+  env,fetchImpl:x.opts.fetchImpl,lookup:x.opts.lookup,sequence:x.opts.sequence,
+ }),/CAUSAL_RECONCILIATION_NOT_CURRENT_COMMIT/);
+ assert.equal(x.counts.models,2);
+ assert.equal(x.counts.reconciles,0);
+});
+test('reconciliation RPC uses only sandbox secret and checks durable fence readback',async()=>{
+ const e=env,token='a'.repeat(64),commitId='reality:turn:fixture';
+ const verified={committed:true,turn_id:'fixed',receipt:{
+  verified_chain:true,commit_entry_id:commitId,commit_entry_hash:token}};
+ let requestCount=0;
+ const fetchImpl=async (url,opt)=>{
+  requestCount++;
+  assert.equal(opt.headers.apikey,e.REALITY_UNIVERSE_PERSISTENCE_KEY);
+  assert.equal(Object.hasOwn(opt.headers,'Authorization'),false);
+  if(url.endsWith('/rest/v1/rpc/reality_reconcile_committed_conversation_turn')){
+   const body=JSON.parse(opt.body);
+   assert.equal(body.p_root_id,scope.continuity_root_id);
+   assert.equal(body.p_commit_entry_id,commitId);
+   return {ok:true,json:async()=>({status:'RECOVERED',
+    sequence_num:1,commit_entry_id:commitId,commit_hash:token})};
+  }
+  assert.match(url,/\/rest\/v1\/reality_conversation_turn_fences\?/);
+  return {ok:true,json:async()=>[{
+   root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
+   owner_user_id:user,active_turn_id:null,
+   sequence_num:1,last_committed_entry_id:commitId,
+   last_committed_entry_hash:token,
+  }]};
+ };
+ const good=await reconcileCommittedConversationSlot({
+  scope,turnId:'fixed',verified,env:e,fetchImpl,
+ });
+ assert.equal(good.verified_fence_readback,true);
+ assert.equal(good.model_called,false);
+ assert.equal(requestCount,2);
+ await assert.rejects(()=>reconcileCommittedConversationSlot({
+  scope,turnId:'fixed',verified:{...verified,committed:false},env:e,
+  fetchImpl:async()=>{throw Error('SHOULD_NOT_CALL')},
+ }),/SEQUENCE_RECONCILE_UNVERIFIED_COMMIT/);
+});
+test('unconfirmed reconciliation fence readback does not claim recovered success',async()=>{
+ const hash='b'.repeat(64),entry='committed:fixture';
+ const verified={committed:true,turn_id:'fixed',receipt:{
+  verified_chain:true,commit_entry_id:entry,commit_entry_hash:hash,
+ }};
+ const fetchImpl=async (url)=>{
+  if(url.endsWith('/rest/v1/rpc/reality_reconcile_committed_conversation_turn'))
+   return {ok:true,json:async()=>({status:'RECOVERED',
+    sequence_num:2,commit_entry_id:entry,commit_hash:hash})};
+  return {ok:true,json:async()=>[{root_id:scope.continuity_root_id,
+   owner_user_id:user,worldline_id:scope.worldline_id,
+   active_turn_id:'fixed',sequence_num:2,
+   last_committed_entry_id:null,last_committed_entry_hash:null}]};
+ };
+ await assert.rejects(()=>reconcileCommittedConversationSlot({
+  scope,turnId:'fixed',verified,env,fetchImpl,
+ }),/SEQUENCE_RECONCILE_FENCE_READBACK_MISMATCH/);
 });
