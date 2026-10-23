@@ -8,6 +8,8 @@ on:
       - src/reality-native-universe-persistence-v1.0.js
       - src/reality-verified-layer-handoff-v0.1.js
       - test/reality-verified-layer-handoff-v0.1.test.js
+      - src/reality-incomplete-turn-abandonment-plan-v0.1.js
+      - test/reality-incomplete-turn-abandonment-plan-v0.1.test.js
       - src/reality-turn-recovery-review-v1.0.js
       - api/reality/standalone-recovery-review.js
       - test/reality-turn-recovery-review-v1.0.test.js
@@ -54,6 +56,7 @@ jobs:
           node --check src/reality-standalone-auth-v0.1.js
           node --check src/reality-native-universe-persistence-v1.0.js
           node --check src/reality-verified-layer-handoff-v0.1.js
+          node --check src/reality-incomplete-turn-abandonment-plan-v0.1.js
           node --check src/reality-turn-recovery-review-v1.0.js
           node --check api/reality/standalone-recovery-review.js
           node --check src/reality-standalone-conversation-recovery-v0.1.js
@@ -73,6 +76,8 @@ jobs:
         run: node --test test/reality-verified-layer-handoff-v0.1.test.js
       - name: Browser restoration and server-owned interrupted-turn selection
         run: node --test test/reality-preview-server-recovery-selection-v0.1.test.js
+      - name: Fail-closed incomplete-turn abandonment eligibility (proposal only)
+        run: node --test test/reality-incomplete-turn-abandonment-plan-v0.1.test.js
       - name: Preview-only read-only recovery classifier; no paid model calls
         run: node --test test/reality-turn-recovery-review-v1.0.test.js
       - name: Independent Auth and owner-root continuity
