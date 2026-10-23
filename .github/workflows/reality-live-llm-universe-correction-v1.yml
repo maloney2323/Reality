@@ -1,0 +1,49 @@
+name: Reality Live LLM Universe Correction Acceptance V1
+on:
+  push:
+    branches:
+      - feature/universe-correction-verifier-v1-20261023
+    paths:
+      - .github/workflows/reality-live-llm-universe-correction-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  live-llm-universe-correction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CORRECTION_VERIFIER_EXTRACTOR_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse and unit-test source boundaries
+        run: |
+          node --check scripts/replay-construction-25-live-llm-universe-correction-v1.mjs
+          node --check src/reality-universe-correction-verifier-v1.0.js
+          node --test test/reality-universe-correction-verifier-v1.0.test.js
+      - name: Fetch pinned 25-turn live OpenAI outputs and actual model-generated repairs
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-real-openai-25turn-detect-repair
+          run-id: 40034886368
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: benchmark-results
+      - name: Live model claim extraction over 25 actual turns and 2 generated repairs
+        run: node scripts/replay-construction-25-live-llm-universe-correction-v1.mjs
+      - name: Publish real LLM versus Universe scoped verifier HTML and receipts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-live-25turn-universe-correction
+          path: |
+            benchmark-results/construction-25-real-llm-universe-verifier.json
+            benchmark-results/construction-25-real-llm-universe-verifier.html
+          retention-days: 7
+          if-no-files-found: ignore

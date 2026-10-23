@@ -1,0 +1,46 @@
+name: Reality Refined Universe Correction and Coverage Replay
+on:
+  push:
+    branches:
+      - feature/universe-correction-verifier-v1-20261023
+    paths:
+      - .github/workflows/reality-refined-universe-correction-replay-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  refined-correction-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Syntax and regression proof of no intelligence suppression
+        run: |
+          node --check src/reality-universe-correction-verifier-v1.0.js
+          node --check scripts/replay-construction-25-universe-correction-refined-v1.mjs
+          node --test test/reality-universe-correction-verifier-v1.0.test.js
+      - name: Retrieve actual live OpenAI typed extraction artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-live-25turn-universe-correction
+          run-id: 40036035958
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: benchmark-results
+      - name: Replay genuine claims against improved policy and source verifier
+        run: node scripts/replay-construction-25-universe-correction-refined-v1.mjs
+      - name: Upload mobile diagnostic report and JSON
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-refined-25turn-universe-correction
+          path: |
+            benchmark-results/construction-25-universe-correction-refined.json
+            benchmark-results/construction-25-universe-correction-refined.html
+          retention-days: 7
+          if-no-files-found: ignore
