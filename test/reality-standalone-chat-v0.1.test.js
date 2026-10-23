@@ -378,3 +378,14 @@ test('assistant message persists both raw words and exactly displayed warning',a
  assert.equal(record.payload.text,"I'll send the estimate now.");
  assert.match(record.payload.display_text,/Reality integrity notice/);
 });
+
+
+test('two messages from the same turn keep user-before-model order even at identical timestamps',()=>{
+ const scope=createStandaloneConversationScope({userId:userA,conversationId:'same-ms'});
+ const at='2026-10-22T20:00:00.000Z';
+ const u=chatEntry(scope,'user','Do not send until customer approval.','t1',at);
+ const a=chatEntry(scope,'assistant','I will wait for approval.','t1',at);
+ const history=reconstructStandaloneHistory({entries:[a,u],scope});
+ assert.deepEqual(history.map(e=>e.role),['user','assistant']);
+ assert.deepEqual(history.map(e=>e.text),[u.payload.text,a.payload.text]);
+});
