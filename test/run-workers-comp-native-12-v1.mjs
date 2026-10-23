@@ -75,6 +75,10 @@ async function run(){
    authenticatedHistoryVerified:true,conversationDrift:drift,
    modelIntegrity:{status:'NO_TRUSTED_REFERENCE',findings:[]},
    trajectoryReplay:replay,semanticReviews:sourceCandidates(answer,i+1,userRef,answerRef),
+   providerCompletion:{status:data.status??null,
+     incomplete_reason:data.incomplete_details?.reason??null,
+     output_tokens:data.usage?.output_tokens??null,
+     max_output_tokens:400}, 
   });
   const judge=realityJudgeTurn({
    turn_id:id,continuity_root_id:root,
@@ -90,11 +94,13 @@ async function run(){
   judgements.push(judge);
   rows.push({turn:id,name,prompt,openai_response:answer,
    response_id:data.id,model:data.model||model,latency_ms:Date.now()-start,
+   provider_status:data.status??null,provider_incomplete_reason:data.incomplete_details?.reason??null,
    usage:data.usage||null,reality_verdict:judge.verdict,
    reality_candidate_findings:judge.findings,
    reality_judge_receipt:judge.judge_receipt_hash,
    reality_spine_receipt:spine.evidence_receipt_hash,
    reality_coverage:judge.coverage,
+   reality_evidence_boundary:spine.evidence_boundary,
    reality_retrospective_candidates:replay.findings.length,
    third_party_source_validation:'NOT_PERFORMED',
    real_external_actions:'NONE'});
