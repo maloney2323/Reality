@@ -73,6 +73,40 @@ insert into public.reality_conversation_turn_fences(
 values (${literal(root)},${literal(world)},${literal(owner)}::uuid,
  1,${literal(tid)},${literal(claim)}::uuid);
 ${sourceEntries.map(insert).join('\n')}
+-- Synthetic failure AFTER the approval receipt insert but BEFORE resolution
+-- commit must roll back both inserts and preserve the original busy claim.
+create or replace function public.synthetic_abort_resolution_write()
+returns trigger language plpgsql as $abort$
+begin
+ if new.event_kind='REALITY_TURN_RESOLUTION_RECEIPT' then
+  raise exception 'SYNTHETIC_INJECTED_RESOLUTION_WRITE_FAILURE';
+ end if;
+ return new;
+end $abort$;
+create trigger synthetic_abort_resolution_write
+ before insert on public.reality_universe_entries for each row
+ execute function public.synthetic_abort_resolution_write();
+set role service_role;
+do $do$ begin
+ begin
+  perform ${call};
+  raise exception 'INJECTED_FAILURE_WAS_NOT_TRIGGERED';
+ exception when others then
+  if sqlerrm<>'SYNTHETIC_INJECTED_RESOLUTION_WRITE_FAILURE' then
+   raise;
+  end if;
+ end;
+ if exists(select 1 from public.reality_universe_entries
+    where entry_id in (${literal(approval.entry_id)},${literal(resolution.entry_id)}))
+ then raise exception 'ATOMIC_ROLLBACK_LEFT_PARTIAL_RECEIPT'; end if;
+ if not exists(select 1 from public.reality_conversation_turn_fences
+  where root_id=${literal(root)} and active_turn_id=${literal(tid)}
+    and sequence_num=1)
+ then raise exception 'ATOMIC_ROLLBACK_DID_NOT_PRESERVE_FENCE'; end if;
+end $do$;
+reset role;
+drop trigger synthetic_abort_resolution_write on public.reality_universe_entries;
+drop function public.synthetic_abort_resolution_write();
 set role service_role;
 do $do$
 declare x jsonb;
