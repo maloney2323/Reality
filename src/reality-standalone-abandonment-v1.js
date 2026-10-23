@@ -42,7 +42,7 @@ export function requireRecentProviderAuthentication(req,principal,{
  let c;
  try{c=JSON.parse(Buffer.from(segments[1],'base64url').toString('utf8'))}
  catch{throw fail('ABANDONMENT_PROVIDER_REAUTH_REQUIRED',403)}
- const authOrigin=String(env.SUPABASE_URL||'').replace(/\\/$/,'');
+ const authOrigin=String(env.SUPABASE_URL||'').replace(/\/$/,'');
  const sec=Math.floor(now()/1000);
  const validSession=typeof c?.session_id==='string'&&
   /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(c.session_id);
@@ -131,10 +131,10 @@ function verifyChallenge(token,key,expected,now){
  return claims;
 }
 async function ownerEvidence(req,{env,fetchImpl,verify=verifyStandaloneUser,
- inspect=inspectCausalTurn,inspectFence=inspectConversationSlot}={}){
+ inspect=inspectCausalTurn,inspectFence=inspectConversationSlot,now=Date.now}={}){
  const x=verifySelector(req,req.method);
  const principal=await verify(req,{env,fetchImpl});
- requireRecentProviderAuthentication(req,principal,{env});
+ requireRecentProviderAuthentication(req,principal,{env,now});
  const scope=createStandaloneConversationScope({userId:principal.user_id,
   conversationId:x.conversation_id,thoughtId:'personal'});
  const turn=await inspect({scope,turnId:x.turn_id,fetchImpl});
@@ -150,7 +150,7 @@ export async function prepareOwnerAbandonment(req,{
 }={}){
  const {key}=config(env);
  if(req.method!=='GET')throw fail('METHOD_NOT_ALLOWED',405);
- const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence});
+ const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence,now});
  const claim=await loadClaim({scope:r.scope,env,fetchImpl});
  if(claim.active_turn_id!==r.input.turn_id||
     claim.sequence_num!==r.fence.sequence_num||
@@ -226,7 +226,7 @@ export async function confirmOwnerAbandonment(req,{
   x.confirmed_uncertain_execution!==true||
   x.confirmed_possible_billing!==true)
   throw fail('ABANDONMENT_EXPLICIT_CONFIRMATION_REQUIRED',403);
- const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence});
+ const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence,now});
  const claim=await loadClaim({scope:r.scope,env,fetchImpl});
  verifyChallenge(x.challenge,key,{
   principal:r.scope.authenticated_user_id,root:r.scope.continuity_root_id,
