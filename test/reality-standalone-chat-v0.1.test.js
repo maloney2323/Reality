@@ -18,6 +18,9 @@ const env={
  REALITY_STANDALONE_CHAT_ENABLED:'true',
  REALITY_STANDALONE_EXPECTED_PROJECT_REF:'reality-example',
  REALITY_UNIVERSE_PERSISTENCE_URL:'https://reality-example.supabase.co',
+ REALITY_UNIVERSE_PERSISTENCE_KEY:'sb_secret_TEST_ONLY_NOT_REAL_abcdefgh123456789',
+ OPENAI_API_KEY:'sk-TEST_ONLY_NOT_REAL_abcdefgh123456789',
+ REALITY_OPENAI_MODEL:'gpt-4.1-mini',
  VERCEL_ENV:'preview',
 };
 const request=(other={})=>({
