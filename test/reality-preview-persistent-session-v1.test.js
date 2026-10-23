@@ -164,3 +164,19 @@ test('saved homeowner approval conditions render only authenticated readback and
  assert.match(html,/No observed user conditions stored for this conversation yet/);
  assert.doesNotMatch(html,/rule\.innerHTML|condition\.innerHTML/);
 });
+
+test('synthetic approval guard shows provenance and measured limitations without a paid model call',()=>{
+ const source=readFileSync(new URL('../standalone.html',import.meta.url),'utf8');
+ const publicPage=readFileSync(new URL('../public/standalone.html',import.meta.url),'utf8');
+ assert.equal(source,publicPage,'public served file must match tested Preview source');
+ assert.match(source,/id="runConflictProbe"/);
+ assert.match(source,/id="conflictProbeResult"/);
+ assert.match(source,/async\(\)=>\{\n if\(!state\.accessToken\|\|!state\.discoveryReady\)/);
+ assert.match(source,/authFetch\('\/api\/reality\/standalone-conflict-probe\?'\+q\.toString\(\)/);
+ assert.match(source,/SYNTHETIC_MODEL_PROPOSAL_NOT_ACTUAL_LLM_OUTPUT/);
+ assert.match(source,/Actual send-tool enforcement tested: NO/);
+ assert.match(source,/Real LLM drift rate: NOT MEASURED/);
+ assert.match(source,/Residual Reality drift rate: NOT MEASURED/);
+ assert.match(source,/line\.textContent=record/);
+ assert.doesNotMatch(source,/line\.innerHTML=record/);
+});
