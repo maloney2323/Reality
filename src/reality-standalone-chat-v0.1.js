@@ -28,6 +28,9 @@ function makeTurnEntry({scope,turnId,role,text,displayText,observedAt}){
    // A customer utterance is evidence of intent, not external-world truth.
    epistemic_status:role==='user'?'USER_ASSERTED_INTENT':'MODEL_OUTPUT_UNVERIFIED',
    turn_id:turnId,principal_id:scope.authenticated_user_id,
+   // Server-derived selector permits owner-authenticated conversation discovery.
+   client_conversation_selector:scope.client_conversation_selector,
+   thought_id:scope.thought_id,
   },
   evidence_references:[],
   provenance:{
