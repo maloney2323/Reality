@@ -4,7 +4,9 @@
 // CANDIDATE flags are not proven wrong answers. Self-score != true accuracy.
 import {createHash} from 'node:crypto';
 export const REALITY_NATIVE_JUDGE_VERSION='reality-consequential-native-judge-v1.0';
-const hash=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
+const canonical=x=>Array.isArray(x)?x.map(canonical):x&&typeof x==='object'
+ ?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
+const hash=x=>'sha256:'+createHash('sha256').update(JSON.stringify(canonical(x))).digest('hex');
 const fail=x=>{throw Error(x)};
 const nonempty=x=>typeof x==='string'&&x.trim().length>0;
 const validIssues=new Set([
@@ -23,6 +25,11 @@ function checkSpine(spine,turn){
     !nonempty(spine.evidence_receipt_hash)||
     !Array.isArray(spine.findings)||!spine.coverage)
   fail('NATIVE_JUDGE_SPINE_EVIDENCE_REQUIRED');
+ const {evidence_receipt_hash,...spineBody}=spine;
+ if(hash(spineBody)!==evidence_receipt_hash||
+    spine.request_hash!==hash(turn.request)||
+    spine.raw_answer_hash!==hash(turn.answer))
+   fail('NATIVE_JUDGE_SPINE_HASH_OR_CONTENT_MISMATCH');
  if(!['REVIEW_REQUIRED','LIMITED_COVERAGE_NO_CANDIDATES'].includes(spine.status))
   fail('NATIVE_JUDGE_SPINE_STATUS_INVALID');
  // A self-reported successful check does not mean an independent truth verdict.
@@ -95,6 +102,8 @@ export function auditRealityJudgments({judgments=[],replayFindings=[]}={}){
   if(entry?.version!==REALITY_NATIVE_JUDGE_VERSION||
      !nonempty(entry.judge_receipt_hash)||!nonempty(entry.answer_source_ref)||
      unique.has(entry.turn_id))fail('NATIVE_JUDGE_AUDIT_JUDGMENT_INVALID');
+  const {judge_receipt_hash,...auditedBody}=entry;
+  if(hash(auditedBody)!==judge_receipt_hash)fail('NATIVE_JUDGE_AUDIT_RECEIPT_TAMPERED');
   unique.add(entry.turn_id);byAnswer.set(entry.answer_source_ref,entry);
  }
  const later=[];
@@ -105,6 +114,9 @@ export function auditRealityJudgments({judgments=[],replayFindings=[]}={}){
   const original=byAnswer.get(f.original_answer_source_ref);
   if(!original||original.continuity_root_id!==f.continuity_root_id||
      !unique.has(f.discovery_turn_id))fail('NATIVE_JUDGE_AUDIT_CROSS_SCOPE_OR_MISSING_TURN');
+  const from=judgments.findIndex(x=>x.turn_id===original.turn_id);
+  const to=judgments.findIndex(x=>x.turn_id===f.discovery_turn_id);
+  if(to<=from)fail('NATIVE_JUDGE_RETROSPECTIVE_ORDER_INVALID');
   const originalDetected=original.findings.some(x=>x.classification===f.classification);
   later.push({origin_turn_id:original.turn_id,
     discovered_at_turn_id:f.discovery_turn_id,classification:f.classification,
