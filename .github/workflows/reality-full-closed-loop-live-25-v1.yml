@@ -37,7 +37,7 @@ jobs:
             test/reality-universe-persistence-contract-v1.0.test.js \
             test/reality-typed-claim-evidence-v1.0.test.js \
             test/reality-intelligence-spine-v1.0.test.js
-      - name: 25 fresh LLM-alone turns plus 25 LLM with Reality closed-loop repairs
+      - name: 25 fresh real Mini baseline turns and a closed-loop Reality correction run
         run: node scripts/run-reality-25-live-closed-loop-v1.mjs
       - name: Upload source-preserved evidence and mobile visual benchmark
         uses: actions/upload-artifact@v4
@@ -52,4 +52,5 @@ jobs:
       - name: Boundary claim
         run: |
           echo 'No customer persistence, authorized business execution, or independently complete semantic audit.'
+          echo 'Malformed LLM claim extraction is treated as unknown evidence and tested for safe recovery.'
           echo 'No synthetic model errors in the scored live run.'
