@@ -15,6 +15,32 @@ import {planIncompleteTurnAbandonment}
  from './reality-incomplete-turn-abandonment-plan-v0.1.js';
 
 export const ACKNOWLEDGMENT_TEXT='ABANDON THIS INTERRUPTED TURN';
+function sessionFingerprint(req){
+ const h=req?.headers?.authorization||req?.headers?.Authorization||'';
+ const match=typeof h==='string'
+  ?h.match(/^Bearer ([A-Za-z0-9._-]{24,4096})$/):null;
+ if(!match)throw fail('AUTHENTICATED_SESSION_REQUIRED',401);
+ // A digest of the bearer string, NEVER its value, is signed into this
+ // challenge. The review cannot be confirmed from a different token/session.
+ return createHash('sha256')
+  .update('reality:abandonment:owner-session:v1:')
+  .update(match[1]).digest('hex');
+}
+function claimFingerprint(scope,claim){
+ if(!claim||claim.root_id!==scope.continuity_root_id||
+  claim.owner_user_id!==scope.authenticated_user_id||
+  claim.worldline_id!==scope.worldline_id||
+  !/^[0-9a-f-]{36}$/i.test(claim.active_claim_token||'')||
+  typeof claim.active_turn_id!=='string'||
+  !Number.isSafeInteger(claim.sequence_num)||claim.sequence_num<1)
+  throw fail('ABANDONMENT_CLAIM_BINDING_INVALID',409);
+ return createHash('sha256').update(JSON.stringify([
+  scope.continuity_root_id,scope.authenticated_user_id,
+  claim.active_turn_id,claim.active_claim_token,claim.sequence_num,
+  claim.last_committed_entry_id??null,claim.last_committed_entry_hash??null
+ ])).digest('hex');
+}
+
 const fail=(code,status=409)=>{const e=new Error(code);e.status=status;return e;};
 const entryId=(scope,turnId,suffix)=>
  'reality-abandonment:'+createHash('sha256').update(
@@ -84,15 +110,23 @@ async function ownerEvidence(req,{env,fetchImpl,verify=verifyStandaloneUser,
 }
 export async function prepareOwnerAbandonment(req,{
  env=process.env,fetchImpl=fetch,now=Date.now,
- verify,inspect,inspectFence,newNonce=randomUUID
+ verify,inspect,inspectFence,loadClaim=loadServerClaim,newNonce=randomUUID
 }={}){
  const {key}=config(env);
  if(req.method!=='GET')throw fail('METHOD_NOT_ALLOWED',405);
  const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence});
+ const claim=await loadClaim({scope:r.scope,env,fetchImpl});
+ if(claim.active_turn_id!==r.input.turn_id||
+    claim.sequence_num!==r.fence.sequence_num||
+    claim.last_committed_entry_id!==r.fence.last_committed_entry_id||
+    claim.last_committed_entry_hash!==r.fence.last_committed_entry_hash)
+  throw fail('ABANDONMENT_CLAIM_CHANGED',409);
  const expires=now()+300000;
  const challenge=sign({
   principal:r.scope.authenticated_user_id,root:r.scope.continuity_root_id,
   turn:r.input.turn_id,sequence:r.fence.sequence_num,
+  claim_fingerprint:claimFingerprint(r.scope,claim),
+  session_fingerprint:sessionFingerprint(req),
   nonce:newNonce(),exp:expires
  },key);
  return Object.freeze({
@@ -157,11 +191,13 @@ export async function confirmOwnerAbandonment(req,{
   x.confirmed_possible_billing!==true)
   throw fail('ABANDONMENT_EXPLICIT_CONFIRMATION_REQUIRED',403);
  const r=await ownerEvidence(req,{env,fetchImpl,verify,inspect,inspectFence});
+ const claim=await loadClaim({scope:r.scope,env,fetchImpl});
  verifyChallenge(x.challenge,key,{
   principal:r.scope.authenticated_user_id,root:r.scope.continuity_root_id,
   turn:x.turn_id,sequence:r.fence.sequence_num,
+  claim_fingerprint:claimFingerprint(r.scope,claim),
+  session_fingerprint:sessionFingerprint(req),
  },now);
- const claim=await loadClaim({scope:r.scope,env,fetchImpl});
  if(claim.active_turn_id!==x.turn_id||
   !/^[0-9a-f-]{36}$/i.test(claim.active_claim_token||'')||
   claim.sequence_num!==r.fence.sequence_num||
