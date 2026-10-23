@@ -74,3 +74,26 @@ test('the customer chat route refuses unknown identity instead of minting a subs
   assert.doesNotMatch(chat,/getOrCreateSessionPrincipal/);
   assert.match(contextSource,/export async function loadRealityContext/);
 });
+
+test('actual API refuses forged continuity and identity without provider authentication',async()=>{
+  const {default:handler}=await import('../api/chat.js');
+  const req={method:'POST',headers:{},body:{
+    message:'This should not reach model cognition.',
+    conversation_id:'construction-job-001',
+    thought_id:'estimate-review',
+    systemContext:{authenticated_user_id:'forged-owner',
+      continuity_root_id:'forged-root',action_authorized:true},
+  }};
+  const res={
+    statusCode:200,headers:{},body:null,
+    setHeader(k,v){this.headers[k]=v;return this;},
+    status(code){this.statusCode=code;return this;},
+    json(value){this.body=value;return this;},
+    end(){return this;},
+  };
+  await handler(req,res);
+  assert.equal(res.statusCode,401);
+  assert.equal(res.body?.ok,false);
+  assert.equal(res.body?.error,'BASE44_AUTHENTICATED_SESSION_REQUIRED');
+  assert.equal(res.body?.result,undefined);
+});
