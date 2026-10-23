@@ -44,6 +44,17 @@ The pilot now fails closed unless all the following hold before even calling aut
 
 **Important:** The preview build will be redeployed to pick up these Preview-only environment settings, but signing in and running full live cognition will remain disabled until the sandbox server secret, correct role permissions, retry behavior, and live account tests are independently verified. Never copy the main Universe database's secret into the benchmark preview.
 
+## Cold-start continuity and UI readback hardening (draft)
+
+- The standalone transport now retrieves `AUTHENTICATED_CONVERSATION_MESSAGE` entries with an explicit owner-root/worldline/event-kind query rather than naively selecting the most recent 100 events of *all* types. Work diagnostics and other Universe events cannot evict chat messages from that bounded history window.
+- The existing Universe retrieval function supports an optional exact validated `eventKind` filter; unrecognized filter syntax is rejected, and unfiltered existing callers continue to behave as before.
+- The server refuses both synthetic and concurrent duplicate `turn_id` persistence outcomes before triggering a second model call, and refuses to acknowledge an assistant reply until its own message write is confirmed. A durable, exact-once request-recovery protocol is **not** yet implemented.
+- Each assistant message stores the **unmodified raw model output** for retrospective drift comparison and the **exact displayed reply** (including an integrity notice) for the customer-facing transcript. This prevents a customer reopening a thought from seeing a different message from the one previously displayed.
+- The read-only `GET /api/reality/standalone-history?conversation_id=...&thought_id=...` endpoint verifies the server-side Supabase user and derives the exact same owner-scoped root as POST. It refuses extra query fields and returns only that principal's bounded previous messages; the frontend reloads them when the user signs in.
+- A recovered 60-message window is **not** a verified complete history, global memory, or proof all business commitments survived selection. The canonical Universe/Continuity remains separate from the customer-visible transcript.
+- New mocked tests simulate two calls across fresh handler instances while preserving only a durable ledger map, two authenticated users with identical conversation selectors, storage conflicts, output readback failures, and historical drift notices. All external providers are stubbed; independent live sign-in and real Supabase write/readback remain **unverified**.
+- No real accounts were created, no benchmark DB records were changed, and no production alias was reassigned. `REALITY_STANDALONE_CHAT_ENABLED=false` remains the Preview-branch default.
+
 ## Approval/release path
 1. Review PR changes and merge dependencies: this draft branches from the earlier unmerged drift/continuity stack (#77, #79–86). Must establish the single canonical release commit before promotion.
 2. Confirm \`SUPABASE_URL\` and public key refer to the same dedicated Reality Auth project, and server-only persistence uses the intended tenant-isolated Universe. Do not read or paste secrets into chat.
