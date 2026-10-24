@@ -218,13 +218,19 @@ export async function runLiveIntelligenceOrchestration({
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
   };
+  const controlledPreviewModel = process.env.VERCEL_ENV === 'preview' &&
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
+  const resolvedModel = model || (controlledPreviewModel ?
+    process.env.REALITY_RELIABILITY_MODEL : undefined);
+  const resolvedApiKey = apiKey || (controlledPreviewModel ?
+    process.env.REALITY_STANDALONE_OPENAI_API_KEY : undefined);
   const cognitiveResult = await runRealityCognitiveRuntime({
     message,
     governedSignal,
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
-    model,
-    apiKey,
+    model:resolvedModel,
+    apiKey:resolvedApiKey,
     fetchImpl,
   });
   const modelResult = {
@@ -248,8 +254,8 @@ export async function runLiveIntelligenceOrchestration({
       if (grounded.source_receipt_ids.length) {
         const extraction = await extractReliabilityClaims({
           modelOutput:String(modelResult?.answer || ''),worldId:systemContext.world_id,
-          snapshot:grounded,apiKey:apiKey||process.env.OPENAI_API_KEY,
-          model:model||process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',fetchImpl,
+          snapshot:grounded,apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,
+          model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',fetchImpl,
         });
         reliabilityCandidate = extraction.candidate;
         reliabilityExtractionStatus = extraction.extraction_status;
