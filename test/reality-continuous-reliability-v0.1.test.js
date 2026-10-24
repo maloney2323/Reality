@@ -90,14 +90,21 @@ test('second request links its RAW_SIGNAL to prior persisted VERIFICATION receip
     assert.equal(second.result.evaluation_status,'NOT_EVALUATED');
     assert.equal(second.result.drift_rate_pct,null);
     assert.equal(second.result.hallucination_rate_pct,null);
+    assert.equal(second.result.trust_pulse.status,'COVERAGE_INSUFFICIENT');
+    assert.equal(second.result.trust_pulse.drift_free_claim_allowed,false);
   });
 });
 
 test('25 turns produce a verified, correctly scoped backcheck without invented scores', async()=>{
   await withPersistence(async()=>{
     const f=mockUniverse();
-    let last;
-    for(let n=1;n<=25;n++) last=await turn(n,f);
+    let last, tenth;
+    for(let n=1;n<=25;n++) { last=await turn(n,f); if(n===10)tenth=last; }
+    assert.equal(tenth.result.trust_pulse.digest.window_end,10);
+    assert.equal(tenth.result.trust_pulse.digest.assessment_receipts,10);
+    assert.equal(tenth.result.trust_pulse.digest.independently_fully_adjudicated_turns,0);
+    assert.equal(tenth.result.trust_pulse.digest.insufficient_or_partially_assessed_turns,10);
+    assert.equal(tenth.result.trust_pulse.digest.all_clear,false);
     assert.equal(last.result.turn,25);
     assert.equal(last.result.checkpoint.window_start,1);
     assert.equal(last.result.checkpoint.window_end,25);
@@ -160,6 +167,8 @@ test('independently attested structured contradiction proposes recovery but neve
     assert.deepEqual(result.drift,['FACT_DRIFT']);
     assert.deepEqual(result.hallucination_suspected,['UNSUPPORTED_CLAIM']);
     assert.equal(result.correction_proposed,true);
+    assert.equal(result.trust_pulse.status,'DETECTED_AND_CONTAINED');
+    assert.equal(result.trust_pulse.repair_independently_verified,false);
     assert.equal(result.correction_published_to_active_state,false);
     assert.equal(result.hallucination_rate_pct,null);
     assert.equal(result.readback_verified,true);
