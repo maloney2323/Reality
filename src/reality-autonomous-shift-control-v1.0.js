@@ -20,6 +20,22 @@ export function validateCronCredential(req,secret){
  return valid?{ok:true,reason:'CRON_AUTHENTICATED',http:200}:
   {ok:false,reason:'CRON_AUTH_INVALID',http:401};
 }
+export function authorizeShiftConfigWrite({existingConfig,principalId,bootstrapPrincipalId}={}){
+ if(typeof principalId!=='string'||!principalId.trim())
+  return {ok:false,reason:'SHIFT_SIGNED_OWNER_REQUIRED'};
+ if(existingConfig){
+  if(typeof existingConfig.updated_by!=='string'||!existingConfig.updated_by)
+   return {ok:false,reason:'SHIFT_OWNER_NOT_ESTABLISHED'};
+  return existingConfig.updated_by===principalId
+   ?{ok:true,reason:'SIGNED_ORIGINAL_OWNER'}
+   :{ok:false,reason:'SHIFT_OWNERSHIP_MISMATCH'};
+ }
+ // A brand-new anonymous session must never automatically own the global
+ // cron and run up model charges. Bootstrap requires operator provisioning.
+ return bootstrapPrincipalId&&bootstrapPrincipalId===principalId
+  ?{ok:true,reason:'PROVISIONED_BOOTSTRAP_OWNER'}
+  :{ok:false,reason:'SHIFT_BOOTSTRAP_OWNER_REQUIRED'};
+}
 export function autonomousShiftSlot({config,now=new Date()}={}){
  if(!config||config.enabled!==true)return {status:'DISABLED',phase:null};
  if(!(now instanceof Date)||!Number.isFinite(now.valueOf()))
