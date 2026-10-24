@@ -139,7 +139,7 @@ for(const t of turns){
    verification_type:'FROZEN_REGEX_DIAGNOSTIC_NOT_SEMANTIC_ORACLE',
    scorer_independent_of_model_generation:true,
   },[rawReceipt.entry_id]);
-  if(originalProbe.candidate_error){
+  if(originalProbe.candidate_error&&t.probe.auto_repair_authorized===true){
    // The repair input contains exact original, earlier human-provided messages
    // (read back from immutable source receipts), never the hidden regex keys.
    // It does NOT give a hand-written "correct answer" to the repairing model.
@@ -188,6 +188,11 @@ for(const t of turns){
     // remains original; mark the unresolved risk rather than overblock
     // ordinary conversation with a generic canned reply.
    }
+  }else if(originalProbe.candidate_error){
+   // A lexical mismatch alone is not evidence that a model answer is false.
+   // It cannot authorize a source-retrieval rewrite of the user's requested
+   // content. The earlier pilot exposed real prompt drift caused by that bug.
+   repairStatus='EVALUATOR_CANDIDATE_ONLY_HUMAN_OR_INDEPENDENT_ADJUDICATION_NEEDED';
   }
  }
  const deliveryReceipt=await append('CONVERSATION_FINAL_DELIVERY',t,{
