@@ -9,6 +9,7 @@ on:
       - 'api/reality/shift.js'
       - 'index.html'
       - 'test/reality-autonomous-shift-handoff-v1.0.test.js'
+      - 'test/reality-work-discovery-foundation-v1.0.test.js'
   workflow_dispatch:
 permissions:
   contents: read
