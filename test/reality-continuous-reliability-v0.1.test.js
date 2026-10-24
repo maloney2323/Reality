@@ -251,7 +251,7 @@ test('source attestation requires explicit supersession and rejects ungrounded c
     await recordSourceAttestedEvidence({
       continuityRuntime:runtime,worldId:'construction:site-a',
       sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier:2',sourceDigest:'sha-two',
-      facts:[{key:'cabinet_delivery_date',value:'October 27'}],observedAt:at,
+      facts:[{key:'cabinet_delivery_date',value:'2026-10-27'}],observedAt:at,
     });
     assert.throws(()=>readGroundedEvidence(orderContinuityHistory(fixture.events),{worldId:'construction:site-a'}),
       /RELIABILITY_CONFLICTING_ATTESTED_FACTS/);
