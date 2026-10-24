@@ -272,6 +272,20 @@ export async function runLiveIntelligenceOrchestration({
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
   const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus };
+  if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
+    const corrections=(continuousReliability.source_attested_correction_proposals||[])
+      .map(f=>String(f.key)+': '+JSON.stringify(f.source_attested_value)+
+        ' (source receipt '+String(f.source_receipt_id)+')');
+    modelResult.answer = [
+      'Reality detected an unverified or contradictory model statement and withheld the affected answer.',
+      ...(corrections.length
+        ? ['The independently retrieved, source-attested record currently states: '+corrections.join('; ')+'.']
+        : []),
+      'The original model claim is preserved in the reliability receipt. No external action was authorized. Confirm the source if it is disputed.',
+    ].join(' ');
+    modelResult.reliability_intervention='QUARANTINED_PRIOR_TO_DISPLAY';
+  }
+
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
