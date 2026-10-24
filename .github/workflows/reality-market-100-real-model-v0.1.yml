@@ -1,0 +1,36 @@
+name: Reality 100 Turn Real Model Sandbox
+on:
+  push:
+    branches:
+      - feature/reality-drift-live-continuity-v1-20261024
+    paths:
+      - 'test/reality-market-100-real-model-endurance-v0.1.js'
+      - '.github/workflows/reality-market-100-real-model-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reality-one-hundred-real-model-benchmark
+  cancel-in-progress: false
+jobs:
+  bounded-100-real-model-turns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_BENCHMARK_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run 100 real model responses against fictional business and mock tools
+        run: node test/reality-market-100-real-model-endurance-v0.1.js
+      - name: Save 100-turn independent-evaluation candidate receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-one-hundred-model-turns-sandbox
+          path: artifacts/reality-market-100-real-model-v0.1.json
+          if-no-files-found: warn
+          retention-days: 7
