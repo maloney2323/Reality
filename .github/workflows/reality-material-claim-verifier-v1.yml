@@ -8,6 +8,9 @@ on:
       - 'src/reality-universe-material-claim-verifier-v1.0.js'
       - 'test/reality-universe-material-claim-verifier-v1.0.test.js'
       - 'src/reality-universe-postcomposition-verifier-v1.0.js'
+      - 'src/reality-standalone-material-delivery-v1.0.js'
+      - 'src/reality-standalone-chat-v0.1.js'
+      - 'test/reality-standalone-material-delivery-v1.0.test.js'
       - 'scripts/replay-reality-material-claim-turn79-v1.mjs'
   workflow_dispatch:
 permissions:
@@ -27,10 +30,15 @@ jobs:
         run: |
           node --check src/reality-universe-material-claim-verifier-v1.0.js
           node --check test/reality-universe-material-claim-verifier-v1.0.test.js
+          node --check src/reality-standalone-material-delivery-v1.0.js
+          node --check src/reality-standalone-chat-v0.1.js
+          node --check test/reality-standalone-material-delivery-v1.0.test.js
       - name: Turn 79 real-response replay, source time, attestation, original-preservation and coverage tests
         run: |
           node --test \
             test/reality-universe-material-claim-verifier-v1.0.test.js \
+            test/reality-standalone-material-delivery-v1.0.test.js \
+            test/reality-standalone-chat-v0.1.test.js \
             test/reality-universe-composition-contract-v1.0.test.js \
             test/reality-adversarial-100turn-v1.test.js \
             test/reality-natural-consequence-drift-v3.test.js \
@@ -54,4 +62,5 @@ jobs:
           echo 'Source authentication and complete material-claim coverage are test adapters only.'
           echo 'Not independently verified real municipal source truth or production integration.'
           echo 'No false claims that all natural-language assertions are checked.'
-          echo 'No automatic chat rewrite; no external action; no production deployment.'
+          echo 'Preview-only opt-in pre-delivery gating verified through real standalone path with mocked provider. Default external attestation is denied.'
+          echo 'No model API charges; no customer actions; no production deployment.'
