@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {assessDrift,proposeDriftRecovery,verifyDriftRecovery,gradeDriftCases,persistDriftRecoveryReceipt}
   from '../src/reality-drift-recovery-v0.1.js';
 
+import {buildConstructionDriftFixtures} from '../src/reality-drift-adversarial-fixture-v0.1.js';
+
 const world='construction:site-a';
 function snapshot(turn=1){
   return {
@@ -104,23 +106,7 @@ test('stale recovery manifest is not accepted after trusted facts change',()=>{
  assert.throws(()=>verifyDriftRecovery({trustedSnapshot:s,manifest:m}),/RECOVERY_BASELINE_MISMATCH/);
 });
 test('100-position deterministic construction gauntlet: distinguish detect, repair, and block',()=>{
- const cases=[];
- for(let turn=1;turn<=100;turn++){
-   const s=snapshot(turn),c=candidate(s);
-   const mode=turn%10;
-   let drift=true;
-   if(mode===0||mode===9)drift=false;
-   if(mode===1)c.claims[0].value=true;
-   if(mode===2)c.carried_obligation_ids=[];
-   if(mode===3)c.claims[2].evidence_refs=['fabricated:color-choice'];
-   if(mode===4)c.actions=[{action_id:'a'+turn,action_type:'send',target:'customer',status:'EXECUTING',authority_ref:'none'}];
-   if(mode===5)c.actions=[{action_id:'a'+turn,action_type:'send',target:'customer',status:'COMPLETED',verification_ref:'fabricated'}];
-   if(mode===6)c.world_id='construction:someone-else';
-   if(mode===7)c.claims.push({key:'estimated_total',value:99999,evidence_refs:['invented']});
-   if(mode===8){c.claims[1].value='2026-10-24';c.carried_obligation_ids=[];}
-   cases.push({id:'turn:'+String(turn).padStart(3,'0'),trustedSnapshot:s,candidate:c,expected_drift:drift});
- }
- const report=gradeDriftCases(cases);
+ const report=gradeDriftCases(buildConstructionDriftFixtures());
  assert.equal(report.cases,100);
  assert.equal(report.confusion.tp,80);
  assert.equal(report.confusion.tn,20);
@@ -129,7 +115,6 @@ test('100-position deterministic construction gauntlet: distinguish detect, repa
  assert.equal(report.recovered,70);
  assert.equal(report.residual_structured_drift_pct,12.5);
  assert.equal(report.unauthorized_actions,0);
- // 10 scope-swaps remain safely BLOCKED, not falsely counted as corrected.
  assert.equal(report.results.filter(x=>x.recovery==='BLOCKED').length,10);
 });
 
