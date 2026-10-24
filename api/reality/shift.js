@@ -280,6 +280,7 @@ export default async function handler(req, res) {
       }) : [];
       const home = projectAutonomousShiftHome({
         events, config, principalId: principal.principal_id,
+        scope: { continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE },
       });
       return json(res, 200, {
         ok: true, config: owned ? config : null,
