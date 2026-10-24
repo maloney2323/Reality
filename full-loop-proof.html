@@ -24,6 +24,16 @@ button:hover{filter:brightness(1.15)}
 .event b{display:block;margin-bottom:9px;font-size:13px;word-break:break-word}
 .event p{margin:0;color:#aac3d3;font-size:12px;word-break:break-word}
 .num{border-radius:50%;background:#265c5d;color:#b8ffec;font-size:12px;font-weight:800;width:27px;height:27px;display:grid;place-items:center;margin-bottom:10px}
+
+.telemetry{background:#101f2d;border:1px solid #2a5d68;border-radius:14px;padding:22px;margin-top:28px}
+.telemetry-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}
+.telemetry-grid .card{background:#122c39;border-color:#2c5d63;padding:15px}
+.telemetry .value{font-size:27px;overflow-wrap:anywhere}
+.measurement{display:flex;gap:14px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #274354;color:#b7cad5;font-size:13px}
+.measurement strong{margin-left:auto;color:#f0fbfc;text-align:right}
+.unknown{color:#ffd397!important}
+.telemetry-note{color:#a3c5c7;font-size:12px;line-height:1.6}
+@media(max-width:700px){.telemetry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .metricrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .metricrow .value{font-size:22px}
 .diagnostics{background:#152534;border:1px solid #324858;border-radius:12px;padding:19px;margin:24px 0}
@@ -54,6 +64,28 @@ a{color:#75e6d4}
 <div class="card"><div class="small">Cognition resumed</div><div class="value" id="resumed">—</div></div>
 <div class="card"><div class="small">Real external actions</div><div class="value">0</div></div>
 </div>
+<section class="telemetry" aria-label="Live receipt-derived proof telemetry">
+ <div class="small">CONTINUOUS PROOF TELEMETRY · THIS PAGE SESSION · SYNTHETIC WORK</div>
+ <h2 style="margin-top:9px">What the receipts prove—on every run</h2>
+ <p class="telemetry-note">Every number below is computed from the current execution receipts. Re-run success, denied authority and failed read-back to test whether Reality stops unsupported completion claims. This is NOT a model-vs-competitor comparison or a production business KPI.</p>
+ <div class="telemetry-grid">
+  <div class="card"><div class="small">Attempted sandbox retries</div><div class="value" id="tele-attempts">—</div></div>
+  <div class="card"><div class="small">Read-back verified recoveries</div><div class="value" id="tele-verified">—</div></div>
+  <div class="card"><div class="small">Sandbox recovery yield</div><div class="value" id="tele-yield">—</div></div>
+  <div class="card"><div class="small">Unverified completion claims</div><div class="value" id="tele-unverified">—</div></div>
+ </div>
+ <h2 style="margin-top:24px">Verification and measurement boundaries</h2>
+ <div class="measurement"><span>Receipt hash-chain integrity</span><strong id="tele-chain">Not run</strong></div>
+ <div class="measurement"><span>Sandbox read-back divergence (claimed success without verified read-back)</span><strong id="tele-delta">Not measured</strong></div>
+ <div class="measurement"><span>Independent external-system success claims checked</span><strong id="tele-external">Not measured</strong></div>
+ <div class="measurement"><span>Independent model hallucination and drift rates</span><strong class="unknown">Not measured</strong></div>
+ <div class="measurement"><span>ASRI: zero-human-touch verified real work</span><strong class="unknown">Not measured</strong></div>
+ <div class="measurement"><span>Model tokens per recovered customer task</span><strong class="unknown">Not measured</strong></div>
+ <div class="measurement"><span>Customer supervision minutes saved</span><strong class="unknown">Not measured</strong></div>
+ <div class="measurement"><span>Other agent/framework comparison</span><strong class="unknown">No matched baseline run</strong></div>
+ <div class="measurement"><span>Bitemporal event audit / externally anchored signature</span><strong class="unknown">Not captured in this sandbox</strong></div>
+ <p class="telemetry-note" id="tele-run-note">No receipts measured yet. Session totals reset when the page reloads; permanent business metrics require authenticated durable evidence.</p>
+</section>
 <h2 style="margin-top:31px">Receipts from the actual run</h2>
 <div class="trace" id="trace"></div>
 <div class="diagnostics">
@@ -67,6 +99,29 @@ a{color:#75e6d4}
 <script>
 const get=id=>document.getElementById(id);
 const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sessionTelemetry=[];
+const showRate=v=>v===null||v===undefined?'N/A':v.toFixed(1)+'%';
+function renderTelemetry(t){
+ sessionTelemetry.push(t);
+ const good=sessionTelemetry.filter(x=>x.receipt_chain_valid===true);
+ const total=k=>good.reduce((sum,x)=>sum+(Number.isSafeInteger(x[k])?x[k]:0),0);
+ const attempts=total('attempted_retries');
+ const verified=total('verified_sandbox_recoveries');
+ const claims=total('attempted_completion_claims');
+ const unresolved=total('unresolved_completion_claims');
+ const pct=(n,d)=>d?100*n/d:null;
+ get('tele-attempts').textContent=String(attempts);
+ get('tele-verified').textContent=String(verified);
+ get('tele-yield').textContent=showRate(pct(verified,attempts));
+ get('tele-unverified').textContent=String(unresolved);
+ get('tele-chain').textContent=t.receipt_chain_valid?'VALID (sandbox hash chain)':'INVALID — not scored';
+ get('tele-delta').textContent=showRate(pct(unresolved,claims))+
+   (claims?' ('+unresolved+'/'+claims+' sandbox success claims)':' (no completion claims)');
+ get('tele-external').textContent='0 eligible external claims';
+ get('tele-run-note').textContent=
+   'Current page session: '+sessionTelemetry.length+' runs, '+good.length+
+   ' intact receipt chains. This is a sandbox read-back check, not a signed bitemporal audit or an independent customer outcome. No cross-run persistence.';
+}
 const labels={
 WORK_DISCOVERED:'Real work discovery contract',
 ORIGINAL_WORK_BLOCKED:'Unapproved attempt denied',
@@ -90,6 +145,9 @@ async function run(mode){
   const body=await response.json();
   if(!response.ok||!body.ok)throw Error(body.code||'Proof endpoint unavailable');
   const proof=body.result;
+  if(!body.telemetry||body.telemetry.evidence_scope!=='EPHEMERAL_SANDBOX_RECONSTRUCTION')
+    throw Error('Receipt-derived telemetry missing or wrong scope');
+  renderTelemetry(body.telemetry);
   const rows=proof.receipts||proof.steps||[];
   get('state').textContent=proof.status;
   get('work').textContent='Same task '+(proof.original_attempt_blocked?'preserved':'unverified');
