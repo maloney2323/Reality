@@ -65,7 +65,7 @@ export function orderContinuityHistory(history) {
       if(!original || Number.isNaN(date.getTime()))
         throw new Error('RELIABILITY_HISTORY_TIMESTAMP_INVALID');
       const canonical=date.toISOString();
-      return [...new Set([original,canonical,canonical.replace(/\\.000Z$/, 'Z')])];
+      return [...new Set([original,canonical,canonical.replace(/\.000Z$/, 'Z')])];
     };
     let hashMatches=false;
     for (const effectiveTime of variants(event.effective_time)) {
