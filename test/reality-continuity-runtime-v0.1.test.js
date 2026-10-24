@@ -5,11 +5,11 @@ import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-
 
 test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on one UUID spine', async () => {
   const previous = {
-    enabled: process.env.REALITY_CONTINUITY_SPINE_ENABLED,
+    enabled: process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED,
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_SECRET_KEY,
   };
-  process.env.REALITY_CONTINUITY_SPINE_ENABLED = 'true';
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SECRET_KEY = 'test-key';
 
@@ -60,8 +60,8 @@ test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on o
     assert.equal(rows[2].provenance.continuity_spine.prior_lineage_hash, rows[1].lineage_hash);
   } finally {
     global.fetch = originalFetch;
-    if (previous.enabled === undefined) delete process.env.REALITY_CONTINUITY_SPINE_ENABLED;
-    else process.env.REALITY_CONTINUITY_SPINE_ENABLED = previous.enabled;
+    if (previous.enabled === undefined) delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = previous.enabled;
     if (previous.url === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = previous.url;
     if (previous.key === undefined) delete process.env.SUPABASE_SECRET_KEY;
@@ -71,11 +71,11 @@ test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on o
 
 test('enabled continuity fails closed when durable persistence is unavailable', async () => {
   const previous = {
-    enabled: process.env.REALITY_CONTINUITY_SPINE_ENABLED,
+    enabled: process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED,
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_SECRET_KEY,
   };
-  process.env.REALITY_CONTINUITY_SPINE_ENABLED = 'true';
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SECRET_KEY = 'test-key';
 
@@ -97,8 +97,8 @@ test('enabled continuity fails closed when durable persistence is unavailable', 
       /CONTINUITY_PERSISTENCE_REQUIRED/
     );
   } finally {
-    if (previous.enabled === undefined) delete process.env.REALITY_CONTINUITY_SPINE_ENABLED;
-    else process.env.REALITY_CONTINUITY_SPINE_ENABLED = previous.enabled;
+    if (previous.enabled === undefined) delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = previous.enabled;
     if (previous.url === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = previous.url;
     if (previous.key === undefined) delete process.env.SUPABASE_SECRET_KEY;
