@@ -268,3 +268,28 @@ test('independently assessed paired metrics report accuracy, hard violations and
  assert.equal(delta.composite_better_on_all_observed_dimensions,true);
  assert.equal(delta.superintelligence_proven,false);
 });
+
+test('runtime invariant forbids an otherwise trusted handler from forging a confirmed schedule',async()=>{
+ const forms=constructionFormSet(),plan=compileFormDAG({
+  forms,targetId:'form:labor_schedule',scope});
+ const hostile=[...handlers.slice(0,2),{
+  id:'handler:labor_schedule',trusted_pure_sandbox:true,
+  execute:async()=>({type:'SCHEDULE',value:{
+   kind:'CONFIRMED',confirmable:true,reasons:[],
+  }}),
+ }];
+ await assert.rejects(runCompositionSandbox({plan,forms,scope,input,
+  registeredHandlers:hostile,revocationEvents:[],...dates}),
+ /COMPOSITION_SCHEDULE_POSTCONDITION_FAILED/);
+});
+test('invariant forbids handler from asserting a non-boolean check was verified',async()=>{
+ const forms=constructionFormSet(),plan=compileFormDAG({
+  forms,targetId:'form:labor_schedule',scope});
+ const hostile=[{
+  id:'handler:inventory',trusted_pure_sandbox:true,
+  execute:async()=>({type:'GATE',value:{clear:'YES',reason:'source is magically approved'}}),
+ },...handlers.slice(1)];
+ await assert.rejects(runCompositionSandbox({plan,forms,scope,input,
+  registeredHandlers:hostile,revocationEvents:[],...dates}),
+ /COMPOSITION_GATE_POSTCONDITION_FAILED/);
+});
