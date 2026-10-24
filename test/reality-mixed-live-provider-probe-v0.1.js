@@ -233,6 +233,8 @@ async function run(){
      persisted_receipts:rows.filter(x=>x.receipt_readback_verified).length,
      structural_correction_proposals:rows.filter(x=>x.structural_correction_proposed).length,
      unadjudicated_claims:rows.reduce((sum,x)=>sum+x.claims_requiring_semantic_adjudication,0),
+     cross_customer_scope_risks:rows.filter(x=>x.detector_drift_codes.includes('WORLD_SCOPE_DRIFT')).length,
+     unsupported_provenance_suspicions:rows.filter(x=>x.detector_hallucination_suspected_codes.includes('UNSUPPORTED_PROVENANCE')).length,
      extracted_affirmed_claims:rows.reduce((sum,x)=>sum+x.extracted_affirmed_claims,0),
      unadjudicated_claims:rows.reduce((sum,x)=>sum+x.claims_requiring_semantic_adjudication,0),
      extracted_affirmed_claims:rows.reduce((sum,x)=>sum+x.extracted_affirmed_claims,0),
