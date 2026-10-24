@@ -249,7 +249,7 @@ export async function runLiveIntelligenceOrchestration({
         observedAt: observedAt || new Date().toISOString(),
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
-  continuousReliability.extraction_status = reliabilityExtractionStatus;
+  const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus };
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
@@ -369,7 +369,7 @@ export async function runLiveIntelligenceOrchestration({
     },
     governed_signal: clone(governedSignal),
     intelligence: clone(modelResult),
-    reliability: clone(continuousReliability),
+    reliability: clone(reliabilityWithExtraction),
     authority: {
       granted: false,
       execution_authorized: false,
