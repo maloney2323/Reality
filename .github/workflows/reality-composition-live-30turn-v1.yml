@@ -1,0 +1,54 @@
+name: Reality 30-Turn Live Universe Composition Benchmark
+on:
+  push:
+    branches:
+      - feature/universe-composition-30turn-live-v1-20261023
+    paths:
+      - .github/workflows/reality-composition-live-30turn-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-30turn-paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Validate genuine-model benchmark syntax
+        run: |
+          node --check scripts/run-reality-composition-30turn-live-v1.mjs
+          node --check src/reality-universe-composition-contract-v1.0.js
+      - name: Verify evidence scope, typing, provenance, revocation and continuity contracts before API costs
+        run: |
+          node --test \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-universe-intelligence-forms-v1.0.test.js \
+            test/reality-universe-closed-loop-v1.0.test.js \
+            test/reality-universe-correction-verifier-v1.0.test.js \
+            test/reality-universe-persistence-contract-v1.0.test.js
+      - name: Two real independent thirty-turn GPT-4.1-mini model conversations
+        run: node scripts/run-reality-composition-30turn-live-v1.mjs
+      - name: Publish every turn, grading result, receipt and mobile report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-30turn-composition-live-model-receipts
+          path: |
+            benchmark-results/reality-composition-live-30turn.json
+            benchmark-results/reality-composition-live-30turn.html
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Interpretation boundary
+        run: |
+          echo 'Thirty-turn benchmark with real model calls, not invented failures.'
+          echo 'Scoring uses fictional typed state and a deterministic narrow rubric, not independent external truth.'
+          echo 'No autonomous capability synthesis or competence promotion is proven.'
+          echo 'No customer database mutation or real-world action.'
