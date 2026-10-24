@@ -6,6 +6,7 @@ import { assessDrift, proposeDriftRecovery, verifyDriftRecovery } from './realit
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { sealModelOutput } from './reality-reliability-private-replay-v0.1.js';
+import { buildConversationTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
@@ -293,6 +294,9 @@ export async function runContinuousReliabilityCycle({
   const copied = after.find(e => e.event_id === committed.event_id);
   if (!copied || !semanticJsonEqual(copied.payload,payload))
     throw new Error('RELIABILITY_RECEIPT_READBACK_UNVERIFIED');
+  // The history is already content-hash/readback validated above. Derive
+  // the per-turn status and 10-turn digest from committed receipts only.
+  const trustPulse=buildConversationTrustPulse({history:after,turn});
   let backcheck = computeHistoricalBackcheck(after);
   let checkpointReadbackVerified = false;
   if (backcheck) {
@@ -316,6 +320,7 @@ export async function runContinuousReliabilityCycle({
   }
   return Object.freeze({
     version: CONTINUOUS_RELIABILITY_VERSION, turn,
+    trust_pulse: trustPulse,
     evaluation_status: payload.evaluation_status,
     extraction_completeness_verified: false,
     drift: categories.drift,
