@@ -14,6 +14,8 @@ on:
       - 'src/reality-continuity-spine-runtime-v0.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-market-proof-gauntlet-v0.1.test.js'
+      - 'src/reality-market-proof-gauntlet-v0.1.js'
       - 'test/reality-continuity-runtime-v0.1.test.js'
       - '.github/workflows/reality-continuous-reliability-v0.1.yml'
   pull_request:
@@ -28,6 +30,8 @@ on:
       - 'src/reality-continuity-spine-runtime-v0.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-market-proof-gauntlet-v0.1.test.js'
+      - 'src/reality-market-proof-gauntlet-v0.1.js'
       - 'test/reality-continuity-runtime-v0.1.test.js'
 jobs:
   contract-tests:
@@ -39,4 +43,4 @@ jobs:
         with:
           node-version: '22'
       - name: Continuous reliability and continuity tests
-        run: node --test test/reality-continuous-reliability-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-drift-recovery-v0.1.test.js test/reality-live-intelligence-orchestration-v0.1.test.js
+        run: node --test test/reality-market-proof-gauntlet-v0.1.test.js test/reality-continuous-reliability-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-drift-recovery-v0.1.test.js test/reality-live-intelligence-orchestration-v0.1.test.js
