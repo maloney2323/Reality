@@ -330,6 +330,10 @@ test('real orchestration path sees prior ledger evidence and detects model contr
       assert.deepEqual(result.reliability.drift,['FACT_DRIFT']);
       assert.equal(result.reliability.readback_verified,true);
       assert.equal(result.reliability.correction_proposed,true);
+      assert.equal(result.reliability.model_output_quarantined,true);
+      assert.match(result.intelligence.answer,/October 27/);
+      assert.doesNotMatch(result.intelligence.answer,/October 24/);
+      assert.equal(result.intelligence.reliability_intervention,'QUARANTINED_PRIOR_TO_DISPLAY');
       assert.equal(result.reliability.correction_published_to_active_state,false);
       assert.equal(result.reliability.hallucination_rate_pct,null);
       assert.ok(receipt.event_id);
