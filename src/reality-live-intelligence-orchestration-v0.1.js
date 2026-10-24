@@ -4,6 +4,7 @@ import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistC
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
+import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -208,6 +209,19 @@ export async function runLiveIntelligenceOrchestration({
     cognitive_runtime_version: cognitiveResult.runtime_version,
   };
 
+  // Preview-only, explicitly opted-in continuous evidence receipts. Never
+  // treat an unstructured model answer as verified facts or report 0% drift.
+  const continuousReliability = process.env.VERCEL_ENV === 'preview' &&
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true'
+    ? await runContinuousReliabilityCycle({
+        continuityRuntime,
+        modelOutput: String(modelResult?.answer || ''),
+        modelResponseId: modelResult?.response_id || null,
+        packetId: governedSignal.packet.packet_id,
+        observedAt: observedAt || new Date().toISOString(),
+      })
+    : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
+
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
     message,
@@ -326,6 +340,7 @@ export async function runLiveIntelligenceOrchestration({
     },
     governed_signal: clone(governedSignal),
     intelligence: clone(modelResult),
+    reliability: clone(continuousReliability),
     authority: {
       granted: false,
       execution_authorized: false,
