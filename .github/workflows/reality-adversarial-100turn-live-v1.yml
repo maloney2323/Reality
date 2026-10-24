@@ -1,0 +1,59 @@
+name: Reality-Only 100-Turn Adversarial Construction Gauntlet
+on:
+  push:
+    branches:
+      - feature/reality-adversarial-100turn-v1-20261023
+    paths:
+      - '.github/workflows/reality-adversarial-100turn-live-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reality-100turn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate frozen adversarial test, actual verifier and real model runner syntax
+        run: |
+          node --check benchmarks/reality-construction-100turn-adversarial-v1.mjs
+          node --check src/reality-universe-postcomposition-verifier-v1.0.js
+          node --check scripts/run-reality-adversarial-100turn-v1.mjs
+          node --check test/reality-adversarial-100turn-v1.test.js
+      - name: Verify 100 frozen events, tenant isolation, form purity, correction ledger and non-regression before spending API credits
+        run: |
+          node --test \
+            test/reality-adversarial-100turn-v1.test.js \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-universe-intelligence-forms-v1.0.test.js \
+            test/reality-universe-closed-loop-v1.0.test.js \
+            test/reality-universe-correction-verifier-v1.0.test.js \
+            test/reality-universe-persistence-contract-v1.0.test.js
+      - name: 100 real GPT-4.1 mini turns inside Reality with native detection and real repair attempts only
+        run: node scripts/run-reality-adversarial-100turn-v1.mjs
+      - name: Preserve every original model answer, native verifier finding, correction, fixture rubric and ledger receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-adversarial-100turn-all-originals-and-corrections
+          path: |
+            benchmark-results/reality-adversarial-100turn.json
+            benchmark-results/reality-adversarial-100turn.html
+            benchmark-results/reality-adversarial-100turn-checkpoint.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Interpret results without hiding failures
+        run: |
+          echo 'NO standalone OpenAI baseline: one Reality integrated live-model lane.'
+          echo 'Actual original LLM mistakes are preserved even when Reality corrects them.'
+          echo 'Fictional scenario evidence is NOT customer-authenticated evidence.'
+          echo 'Typed fixture score, NOT a verified general hallucination rate or live Base44 scoreboard.'
+          echo 'No production actions, customer DB writes, or automatic capability promotion.'
