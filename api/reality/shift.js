@@ -7,7 +7,7 @@ import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
-import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome, authorizeShiftConfigWrite } from '../../src/reality-autonomous-shift-control-v1.0.js';
+import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome, authorizeShiftConfigWrite, authorizeManualShiftRun } from '../../src/reality-autonomous-shift-control-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -41,19 +41,16 @@ async function readConfig(persistence) {
 
 async function runTick({ config, phase, local, persistence }) {
   const tickId = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
-  const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
-  await appendOperationEvent({
-    persistence,
-    continuityRootId: CONFIG_ROOT,
-    worldlineId: WORLDLINE,
-    event: createOperationEvent({
-      operation_id: operationId,
-      stage: 'question',
-      outcome: 'not_started',
-      payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
-    }),
-    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+  // Read persisted state BEFORE starting a new model call: one run per 15-minute
+  // manual/scheduled slot, and never retry an incomplete run silently.
+  const priorShift = await persistence.reconstruct({
+    continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE,
   });
+  if (priorShift.some(e => e.event_id === tickId)) return {
+    skipped: true, tick_id: tickId,
+    status: priorShift.some(e => e.event_id === tickId + ':result') ? 'RECORDED' : 'INCOMPLETE',
+  };
+  const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
   try {
     await persistence.appendEvent({
       event_id: tickId,
@@ -71,10 +68,22 @@ async function runTick({ config, phase, local, persistence }) {
       provenance: { source: 'reality-autonomous-shift-v0.1' },
     });
   } catch (e) {
-    if (/23505|409|duplicate|already exists/i.test(e.message)) return { skipped: true, tick_id: tickId };
+    if (/23505|409|duplicate|already exists|CONTINUITY_EVENT_ID_COLLISION/i.test(e.message)) return { skipped: true, tick_id: tickId, status: 'INCOMPLETE_OR_CONCURRENT' };
     throw e;
   }
 
+  await appendOperationEvent({
+    persistence,
+    continuityRootId: CONFIG_ROOT,
+    worldlineId: WORLDLINE,
+    event: createOperationEvent({
+      operation_id: operationId,
+      stage: 'question',
+      outcome: 'not_started',
+      payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
+    }),
+    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+  });
   const commits = await githubCommits();
   const observations = buildShadowObservations({
     observedAt: new Date().toISOString(),
@@ -86,8 +95,16 @@ async function runTick({ config, phase, local, persistence }) {
     })),
   });
 
+  // GitHub commit observation IDs are stable, but observed_at changes on every tick.
+  // Never reappend a prior immutable event with a different timestamp/payload.
+  const knownShadow = await persistence.reconstruct({
+    continuityRootId: SHADOW_CONTINUITY_ROOT_ID,
+    worldlineId: SHADOW_WORLDLINE_ID,
+  });
+  const seenObservationIds = new Set(knownShadow.map(e => e.event_id));
   let persisted = 0;
   for (const o of observations) {
+    if (seenObservationIds.has(o.observation_id)) continue;
     try {
       await persistence.appendEvent({
         event_id: o.observation_id, event_kind: 'observation', entity_type: 'shadow_activity',
@@ -99,7 +116,7 @@ async function runTick({ config, phase, local, persistence }) {
       });
       persisted++;
     } catch (e) {
-      if (!/23505|409|duplicate|already exists/i.test(e.message)) throw e;
+      if (!/23505|409|duplicate|already exists|CONTINUITY_EVENT_ID_COLLISION/i.test(e.message)) throw e;
     }
   }
 
@@ -227,7 +244,9 @@ async function runTick({ config, phase, local, persistence }) {
     entity_id: tickId,
     continuity_root_id: CONFIG_ROOT,
     worldline_id: WORLDLINE,
-    parent_event_id: tickId,
+    // The immutable ledger requires the current tail, not the earlier tick (which
+    // has intervening question/evidence/decision operation events).
+    parent_event_id: null,
     effective_time: new Date().toISOString(),
     assertion_time: new Date().toISOString(),
     epistemic_status: 'OBSERVED',
@@ -245,6 +264,35 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const principal = getOrCreateSessionPrincipal(req, res);
+      if (req.body?.action === 'RUN_ONCE_NOW') {
+        // A browser-origin owner click may run discovery immediately, without
+        // weakening the Vercel cron secret or taking control of someone else's shift.
+        let sameOrigin = false;
+        try {
+          const origin = new URL(String(req.headers?.origin || ''));
+          sameOrigin = origin.protocol === 'https:' && origin.host === String(req.headers?.host || '');
+        } catch {}
+        if (!sameOrigin) return json(res, 403, {
+          ok:false, status:'BLOCKED', error:'SHIFT_SAME_ORIGIN_REQUIRED',
+        });
+        const config = await readConfig(persistence);
+        const owner = authorizeManualShiftRun({config,principalId:principal.principal_id});
+        if (!owner.ok) return json(res,403,{
+          ok:false,status:'BLOCKED',error:owner.reason,
+          external_effects_permitted:false,
+        });
+        const time = autonomousShiftSlot({config,now:new Date()});
+        const result = await runTick({
+          config, phase:'MANUAL', local:time.local, persistence,
+        });
+        return json(res,result.skipped && result.status !== 'RECORDED' ? 409 : 200,{
+          ok:!result.skipped || result.status === 'RECORDED',
+          status:result.skipped ? (result.status || 'INCOMPLETE'):'WORKED',
+          result, scheduled_slot:time.scheduled_slot,
+          work_authority_granted:false,
+          independent_verification_required:true,
+        });
+      }
       const previousConfig = await readConfig(persistence);
       const auth = authorizeShiftConfigWrite({
         existingConfig: previousConfig,

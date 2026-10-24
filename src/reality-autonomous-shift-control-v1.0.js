@@ -36,6 +36,11 @@ export function authorizeShiftConfigWrite({existingConfig,principalId,bootstrapP
   ?{ok:true,reason:'PROVISIONED_BOOTSTRAP_OWNER'}
   :{ok:false,reason:'SHIFT_BOOTSTRAP_OWNER_REQUIRED'};
 }
+// A manual run is an owner-authorized one-shot discovery, NOT a grant of work-execution authority.
+export function authorizeManualShiftRun({config,principalId}={}){
+ if(!config || config.enabled!==true)return {ok:false,reason:'SHIFT_NOT_ENABLED'};
+ return authorizeShiftConfigWrite({existingConfig:config,principalId});
+}
 export function autonomousShiftSlot({config,now=new Date()}={}){
  if(!config||config.enabled!==true)return {status:'DISABLED',phase:null};
  if(!(now instanceof Date)||!Number.isFinite(now.valueOf()))
