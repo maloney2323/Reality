@@ -64,3 +64,37 @@ test('executor success without independent verification cannot become verified o
  assert.equal(r.outcome.outcome_state,'UNRESOLVED');
  assert.equal(r.outcome.verified,false);
 });
+
+test('a verifier self-asserting success without independent verification remains UNRESOLVED',async()=>{
+ const r=await executeAuthorizedWork({
+   workItem,workflowId:workItem.workflow_id,authorization:auth(),
+   connector:{execute:async()=>({
+     providerExecutionId:'provider-self-report',
+     observation:{state:'written'},
+   })},
+   independentVerifier:{verify:async()=>({
+     verified:true,independent:false,basis:'same-executor-self-attestation',
+     observedState:{state:'written'},
+   })},
+ });
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.outcome.verified,false);
+ assert.equal(r.outcome.independent,false);
+ assert.equal(r.outcome.outcome_state,'UNRESOLVED');
+});
+
+test('missing independence attestation is not a verified external outcome',async()=>{
+ const r=await executeAuthorizedWork({
+   workItem,workflowId:workItem.workflow_id,authorization:auth(),
+   connector:{execute:async()=>({
+     providerExecutionId:'provider-opaque',
+     observation:{state:'written'},
+   })},
+   independentVerifier:{verify:async()=>({
+     verified:true,basis:'unspecified-source',
+     observedState:{state:'written'},
+   })},
+ });
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.outcome.verified,false);
+});
