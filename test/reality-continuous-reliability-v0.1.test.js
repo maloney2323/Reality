@@ -556,3 +556,33 @@ test('identical packets in different worlds receive distinct append-only event I
     assert.equal(one.length,3);assert.equal(two.length,3);
   });
 });
+
+test('JSONB reorder of receipt keys does not falsely fail independent read-back',async()=>{
+ await withPersistence(async()=>{
+   const fixture=mockUniverse();
+   const fetchImpl=async(url,options)=>{
+     const result=await fixture.fetchImpl(url,options);
+     if(options?.method==='POST') {
+       const last=fixture.events.at(-1);
+       if(last?.event_kind==='VERIFICATION') {
+         last.payload=Object.fromEntries(Object.entries(last.payload).reverse());
+       }
+     }
+     return result;
+   };
+   const observedAt='2026-10-01T12:00:01.000Z';
+   const signal=buildGovernedChatSignal({
+     message:'Synthetic JSONB ordering test',observedAt,
+   });
+   const runtime=await startContinuityRuntime({
+     continuityRootSource:'jsonb-test-root',worldlineSource:'world:jsonb-test',
+     subjectId:'synthetic-test',signal,observedAt,fetchImpl,
+   });
+   const result=await runContinuousReliabilityCycle({
+      continuityRuntime:runtime,modelOutput:'Synthetic model text; not scored',
+      packetId:signal.packet.packet_id,observedAt,
+   });
+   assert.equal(result.readback_verified,true);
+   assert.equal(result.evaluation_status,'NOT_EVALUATED');
+ });
+});
