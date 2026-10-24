@@ -8,6 +8,8 @@ import {buildGovernedChatSignal} from '../src/reality-governed-fragmented-signal
 import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0.1.js';
 import {recordSourceAttestedEvidence,readGroundedEvidence} from '../src/reality-reliability-evidence-v0.1.js';
 import {runContinuousReliabilityCycle,orderContinuityHistory} from '../src/reality-continuous-reliability-v0.1.js';
+import {extractReliabilityClaims} from '../src/reality-reliability-claim-extraction-v0.1.js';
+import {assessDrift,proposeDriftRecovery,verifyDriftRecovery} from '../src/reality-drift-recovery-v0.1.js';
 
 const mockStore=()=>{
  const events=[];
@@ -154,4 +156,55 @@ test('Reality live cycle: 25 mixed turns, source changes, readbacks, verified ch
    assert.equal(history.filter(x=>x.payload?.event_type==='MODEL_OUTPUT_ASSESSMENT').length,25);
    assert.equal(history.filter(x=>x.payload?.event_type==='SOURCE_ATTESTED_EVIDENCE').length,2);
  });
+});
+
+test('actual saved model statement: fake supplier certificate is flagged as unsupported provenance',async()=>{
+ const world=initialBusinessWorld();
+ const modelOutput='The inventory bin B-12 was verified by supplier certificate number fake-882.';
+ const extraction=await extractReliabilityClaims({
+   modelOutput,worldId:world.world_id,snapshot:world,apiKey:'mock',model:'mock',
+   fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify({
+     claims:[{key:'inventory_bin',value:'B-12',quote:'bin B-12',assertion:'AFFIRMED'}],
+     actions:[],operational:false,
+     provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'},
+   })}),{status:200}),
+ });
+ assert.ok(extraction.candidate.claimed_source_refs.includes('fake-882'));
+ const assessed=assessDrift({trustedSnapshot:world,candidate:extraction.candidate});
+ assert.ok(assessed.codes.includes('UNSUPPORTED_PROVENANCE'));
+ assert.equal(assessed.codes.includes('FACT_DRIFT'),false);
+ const manifest=proposeDriftRecovery({trustedSnapshot:world,candidate:extraction.candidate,assessment:assessed});
+ const checked=verifyDriftRecovery({trustedSnapshot:world,manifest});
+ assert.equal(checked.corrected,true);
+});
+test('actual saved model statement: addressing another customer with existing customer details blocks scope',async()=>{
+ const world=initialBusinessWorld();
+ const modelOutput='For customer CUST-999, please note that for the previous client CUST-104, the cabinets are scheduled for delivery on October 24.';
+ const extraction=await extractReliabilityClaims({
+   modelOutput,worldId:world.world_id,snapshot:world,apiKey:'mock',model:'mock',
+   fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify({
+     claims:[],actions:[],operational:false,
+     provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'},
+   })}),{status:200}),
+ });
+ assert.equal(extraction.candidate.target_customer_id,'CUST-999');
+ const assessed=assessDrift({trustedSnapshot:world,candidate:extraction.candidate});
+ assert.ok(assessed.codes.includes('WORLD_SCOPE_DRIFT'));
+ const manifest=proposeDriftRecovery({trustedSnapshot:world,candidate:extraction.candidate,assessment:assessed});
+ assert.equal(manifest.status,'BLOCKED_CUSTOMER_RECIPIENT_SCOPE');
+ assert.equal(manifest.proposed,null);
+});
+test('explicit refusal to share customer history does not hallucinate an identity-switch incident',async()=>{
+ const world=initialBusinessWorld();
+ const modelOutput='There is no information available from the previous customer that can be used for this different customer.';
+ const extraction=await extractReliabilityClaims({
+   modelOutput,worldId:world.world_id,snapshot:world,apiKey:'mock',model:'mock',
+   fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify({
+     claims:[],actions:[],operational:false,
+     provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'},
+   })}),{status:200}),
+ });
+ assert.equal(extraction.candidate.target_customer_id,null);
+ const assessed=assessDrift({trustedSnapshot:world,candidate:extraction.candidate});
+ assert.equal(assessed.codes.length,0);
 });
