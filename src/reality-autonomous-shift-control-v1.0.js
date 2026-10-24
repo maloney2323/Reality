@@ -55,13 +55,14 @@ function eligibleEvent(event,config){
   typeof event?.assertion_time==='string';
 }
 // A saved shift's work is a proposal, NOT an executed or verified effect.
-export function projectAutonomousShiftHome({events=[],config,principalId}={}){
+export function projectAutonomousShiftHome({events=[],config,principalId,scope}={}){
  if(!config||config.enabled!==true)return {status:'DISABLED',work:[],attention:[],recent_shifts:0};
  if(!principalId||config.updated_by!==principalId)
   return {status:'OWNER_SESSION_REQUIRED',work:[],attention:[],recent_shifts:0};
  if(!Array.isArray(events))throw Error('SHIFT_EVENTS_REQUIRED');
- const expected={...config,continuity_root_id:'7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001',
-  worldline_id:'7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002'};
+ if(!scope?.continuity_root_id||!scope?.worldline_id)
+  throw Error('SHIFT_HOME_SCOPE_REQUIRED');
+ const expected=scope;
  const seen=new Set();
  const ordered=events.filter(e=>eligibleEvent(e,expected)).sort(
   (a,b)=>String(b.assertion_time).localeCompare(String(a.assertion_time)));
