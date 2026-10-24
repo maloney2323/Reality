@@ -2,6 +2,7 @@
 // The authorization principal, observations and work are SYNTHETIC.
 // Not the production autonomous agent and never a proof of customer ROI.
 import {runFullLoopSandboxProof} from '../../src/reality-full-loop-sandbox-proof-v0.1.js';
+import {scoreFullLoopProof} from '../../src/reality-proof-telemetry-v0.1.js';
 const TARGET_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
@@ -26,6 +27,7 @@ export default async function handler(req,res){
       paid_model_calls:0,
       expected_scenario:mode,
       result,
+      telemetry:scoreFullLoopProof(result),
     });
   } catch(e){
     return res.status(500).json({
