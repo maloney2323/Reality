@@ -21,13 +21,15 @@ export function readGroundedEvidence(history,{worldId,asOf=null}={}){
     sources.push(event.event_id);
     for(const f of p.facts||[]){
       if(!valid(f.key))throw Error('RELIABILITY_FACT_KEY_REQUIRED');
-      if(facts.has(f.key) && JSON.stringify(facts.get(f.key).value)!==JSON.stringify(f.value))
+      if(facts.has(f.key) && JSON.stringify(facts.get(f.key).value)!==JSON.stringify(f.value) &&
+        f.supersedes_evidence_ref !== facts.get(f.key).evidence_ref)
         throw Error('RELIABILITY_CONFLICTING_ATTESTED_FACTS');
       facts.set(f.key,{...normalize(f),evidence_ref:event.event_id});
     }
     for(const o of p.obligations||[]){
       if(!valid(o.id))throw Error('RELIABILITY_OBLIGATION_ID_REQUIRED');
-      if(obligations.has(o.id)&&obligations.get(o.id).active!==o.active)
+      if(obligations.has(o.id)&&obligations.get(o.id).active!==o.active &&
+        o.supersedes_evidence_ref!==obligations.get(o.id).evidence_ref)
         throw Error('RELIABILITY_CONFLICTING_ATTESTED_OBLIGATIONS');
       obligations.set(o.id,{...normalize(o),evidence_ref:event.event_id});
     }
@@ -60,8 +62,8 @@ export async function recordSourceAttestedEvidence({
     payload:{
       evidence_contract:RELIABILITY_EVIDENCE_VERSION,event_type:'SOURCE_ATTESTED_EVIDENCE',
       world_id:worldId,source_kind:sourceKind,source_ref:sourceRef,source_digest:sourceDigest,
-      facts:facts.map(x=>({key:x.key,value:normalize(x.value),world_id:worldId,evidence_ref:null})),
-      obligations:obligations.map(x=>({id:x.id,active:x.active,world_id:worldId,evidence_ref:null})),
+      facts:facts.map(x=>({key:x.key,value:normalize(x.value),world_id:worldId,evidence_ref:null,supersedes_evidence_ref:x.supersedes_evidence_ref||null})),
+      obligations:obligations.map(x=>({id:x.id,active:x.active,world_id:worldId,evidence_ref:null,supersedes_evidence_ref:x.supersedes_evidence_ref||null})),
     },
     provenance:{source:'reality_verified_evidence_adapter'},
   });
