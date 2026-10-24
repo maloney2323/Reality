@@ -1,0 +1,42 @@
+name: Reality 3 Form Live Model Comparison Pilot
+on:
+  push:
+    branches:
+      - feature/universe-composition-contract-v1-20261023
+    paths:
+      - .github/workflows/reality-3form-live-model-pilot-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-model-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify benchmark source syntax and composition regressions
+        run: |
+          node --check scripts/run-reality-3form-live-model-pilot-v1.mjs
+          node --test test/reality-universe-composition-contract-v1.0.test.js
+      - name: Run eight real Mini model responses with bounded OpenAI usage
+        run: node scripts/run-reality-3form-live-model-pilot-v1.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-live-three-form-model-pilot
+          path: |
+            benchmark-results/reality-3form-live-model-pilot.json
+            benchmark-results/reality-3form-live-model-pilot.html
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: State pilot interpretation
+        run: |
+          echo 'This is a FOUR case mini pilot. No independent accuracy improvement established.'
+          echo 'No real business actions performed. Not production integration.'
