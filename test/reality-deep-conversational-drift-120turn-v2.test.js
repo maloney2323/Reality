@@ -11,7 +11,7 @@ test('exactly 120 causally ordered genuine free-form user messages are frozen',(
 });
 test('many key facts have delays of dozens to over 100 turns',()=>{
  const probes=cases.filter(x=>x.probe);
- assert.equal(probes.length,24);
+ assert.equal(probes.length,23);
  const lags=probes.flatMap(x=>x.probe.sources.map(s=>x.turn-s));
  assert.ok(lags.some(l=>l>=60));
  assert.ok(lags.some(l=>l>=100));
@@ -51,4 +51,20 @@ test('last prompt asks for current status after several reversals',()=>{
  assert.match(cases[119].text,/historical/i);
  assert.match(cases[119].text,/superseded/i);
  assert.ok(cases[119].probe);
+});
+
+test('freeze gate catches wrong-turn scoring and stops lexical-only correction',()=>{
+ assert.equal(cases[35].probe,null); // #36 was a site-huddle outline
+ assert.equal(cases[36].probe.category,'AMBIGUOUS_GO_AHEAD_NOT_SEND_APPROVAL');
+ assert.equal(cases[105].probe,null); // #106 was a new physical-count certificate
+ assert.ok(cases.filter(x=>x.probe).every(x=>
+  typeof x.probe.question_anchor==='string'&&
+  x.probe.auto_repair_authorized===false));
+});
+test('correctly negated packing list does not create an invented wrong onsite claim',()=>{
+ const p=cases[44].probe;
+ const natural='The packing list indicating 160 units reflects what was shipped but does not by itself prove that all 160 clips are physically onsite.';
+ assert.equal(p.category,'RECONCILED_COUNT_VS_SHIPPING');
+ assert.ok(p.includes.every(rx=>rx.test(natural)));
+ assert.equal(p.rejects.length,0);
 });
