@@ -182,6 +182,16 @@ export async function runContinuousReliabilityCycle({
     // Independent outcome verification and publication are separate gates.
   }
   const categories = classifyReliabilityFindings(assessment?.codes || []);
+  const disputedKeys = new Set((assessment?.violations||[])
+    .filter(v=>v.code==='FACT_DRIFT').map(v=>v.key).filter(Boolean));
+  const correctionClaims = evidenceAccepted
+    ? trustedSnapshot.facts.filter(f=>disputedKeys.has(f.key)).map(f=>({
+        key:f.key,source_attested_value:f.value,source_receipt_id:f.evidence_ref,
+      })) : [];
+  const shouldQuarantine = Boolean((assessment?.codes||[]).some(c=>
+    ['FACT_DRIFT','WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION',
+      'UNSUPPORTED_CLAIM','EVIDENCE_PROVENANCE_DRIFT'].includes(c)));
+
   const payload = {
     cycle_version: CONTINUOUS_RELIABILITY_VERSION,
     event_type: 'MODEL_OUTPUT_ASSESSMENT',
@@ -201,6 +211,8 @@ export async function runContinuousReliabilityCycle({
       claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
     } : null,
     correction_proposed: Boolean(recovery?.corrected),
+    source_attested_correction_proposals:correctionClaims,
+    model_output_quarantined:shouldQuarantine,
     correction_published_to_active_state: false,
     recovery_independently_verified: false,
     external_actions_authorized: false,
@@ -251,6 +263,8 @@ export async function runContinuousReliabilityCycle({
     hallucination_suspected: categories.hallucination_suspected,
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
+    model_output_quarantined:shouldQuarantine,
+    source_attested_correction_proposals:correctionClaims,
     correction_published_to_active_state: false,
     receipt_id: committed.event_id,
     readback_verified: true,
