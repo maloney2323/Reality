@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/reality-drift-recovery-v0.1.yml'
       - 'src/reality-drift-recovery-v0.1.js'
+      - 'src/reality-drift-adversarial-fixture-v0.1.js'
+      - 'api/reality/drift-recovery-diagnostic.js'
       - 'test/reality-drift-recovery-v0.1.test.js'
       - 'docs/reality-drift-recovery-audit-20261024.md'
   workflow_dispatch:
@@ -25,6 +27,8 @@ jobs:
       - name: Parse module and test cases
         run: |
           node --check src/reality-drift-recovery-v0.1.js
+          node --check src/reality-drift-adversarial-fixture-v0.1.js
+          node --check api/reality/drift-recovery-diagnostic.js
           node --check test/reality-drift-recovery-v0.1.test.js
       - name: Verify structured drift recovery and 100-position construction replay
         run: node --test test/reality-drift-recovery-v0.1.test.js
