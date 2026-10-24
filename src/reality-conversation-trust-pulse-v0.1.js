@@ -10,6 +10,7 @@ const STATUS=Object.freeze({
  INSUFFICIENT:'COVERAGE_INSUFFICIENT',
  NOT_MONITORED:'NOT_MONITORED',
  CONVERSATION_RISK:'CONVERSATIONAL_DRIFT_RISK',
+ USER_REVISION:'USER_INTENT_REVISION_REVIEW',
 });
 const unique=a=>[...new Set(a)];
 const integer=x=>Number.isInteger(x)&&x>=0;
@@ -44,10 +45,12 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
  const classified=unique([...(p.drift||[]),...(p.hallucination_suspected||[])]);
  const hasFindings=classified.length>0;
  const conversationFindings=Array.isArray(p.conversational_drift?.findings)?p.conversational_drift.findings:[];
- const conversationRisk=conversationFindings.length>0;
+ const modelDriftCandidates=conversationFindings.filter(f=>f.classification!=='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
+ const userRevisions=conversationFindings.filter(f=>f.classification==='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
+ const conversationRisk=modelDriftCandidates.length>0;
  const contained=p.model_output_quarantined===true;
  const wholeResponse=evaluated && p.independent_truth_adjudication===true &&
-   p.extraction_completeness_verified===true && !hasFindings && !conversationRisk;
+   p.extraction_completeness_verified===true && !hasFindings && conversationFindings.length===0;
  let status,headline,note;
  if(hasFindings){
   status=contained?STATUS.DETECTED_CONTAINED:STATUS.FINDINGS_NEED_REVIEW;
@@ -55,9 +58,13 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
   note='Typed findings were recorded against source attestations. Correction is not a verified real-world repair.';
  }else if(conversationRisk){
   status=STATUS.CONVERSATION_RISK;
-  headline=conversationFindings.some(f=>f.recurrence_count>=2)
+  headline=modelDriftCandidates.some(f=>f.recurrence_count>=2)
     ?'Recurring conversational drift risk' : 'Possible conversational drift detected';
   note='Reality found a possible deviation from authenticated user intent or the current question. This is a limited diagnostic, not a verified semantic error or an executed repair.';
+ }else if(userRevisions.length){
+  status=STATUS.USER_REVISION;
+  headline='User changed a prior instruction · Review needed';
+  note='Reality preserved the earlier condition and recorded a possible user revision. This is NOT classified as an AI drift error.';
  }else if(wholeResponse){
   status=STATUS.FULL_CHECK_CLEAR;
   headline='Checked answer · No findings';
@@ -118,6 +125,7 @@ function buildDigest(findings,{windowEnd,interval,sourceReceipts}){
    [...(e.payload.drift||[]),...(e.payload.hallucination_suspected||[])].length>0);
  const unresolved=allIncidentTurns.filter(e=>e.payload.recovery_independently_verified!==true);
  const conversationFindings=subset.flatMap(e=>e.payload.conversational_drift?.findings||[]);
+ const modelDriftCandidates=conversationFindings.filter(f=>f.classification!=='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
  const allConversationFindings=findings.filter(e=>e.payload.turn<=windowEnd)
    .flatMap(e=>e.payload.conversational_drift?.findings||[]);
  const unverifiedConvo=new Set(allConversationFindings.filter(f=>!integer(f.repair_verified_turn))
@@ -133,8 +141,9 @@ function buildDigest(findings,{windowEnd,interval,sourceReceipts}){
   independently_fully_adjudicated_turns:complete.length,
   insufficient_or_partially_assessed_turns:interval-complete.length,
   turns_with_typed_findings:detected.length,
-  turns_with_conversational_risks:subset.filter(e=>(e.payload.conversational_drift?.findings||[]).length>0).length,
-  conversational_risk_observations:conversationFindings.length,
+  turns_with_conversational_risks:subset.filter(e=>(e.payload.conversational_drift?.findings||[]).some(f=>f.classification!=='CONVERSATIONAL_REVISION_REQUIRES_REVIEW')).length,
+  conversational_risk_observations:modelDriftCandidates.length,
+  user_intent_revision_reviews:conversationFindings.length-modelDriftCandidates.length,
   recurring_conversational_risks:conversationFindings.filter(f=>f.recurrence_count>=2).length,
   unresolved_conversational_incident_anchors:unverifiedConvo.size,
   authenticated_historical_alignment_checks:conversationalCoverage,
