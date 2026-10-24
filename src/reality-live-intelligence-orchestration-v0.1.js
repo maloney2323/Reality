@@ -5,6 +5,8 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
+import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
+import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -211,16 +213,43 @@ export async function runLiveIntelligenceOrchestration({
 
   // Preview-only, explicitly opted-in continuous evidence receipts. Never
   // treat an unstructured model answer as verified facts or report 0% drift.
-  const continuousReliability = process.env.VERCEL_ENV === 'preview' &&
-    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true'
+  const reliabilityPreviewEnabled = process.env.VERCEL_ENV === 'preview' &&
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
+  let reliabilityCandidate = null;
+  let reliabilityExtractionStatus = 'NOT_ATTEMPTED';
+  if (reliabilityPreviewEnabled &&
+      process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED === 'true' &&
+      systemContext?.world_id && continuityRuntime?.enabled) {
+    try {
+      const evidenceHistory = await continuityRuntime.readback();
+      const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
+      if (grounded.source_receipt_ids.length) {
+        const extraction = await extractReliabilityClaims({
+          modelOutput:String(modelResult?.answer || ''),worldId:systemContext.world_id,
+          snapshot:grounded,apiKey,model,fetchImpl,
+        });
+        reliabilityCandidate = extraction.candidate;
+        reliabilityExtractionStatus = extraction.extraction_status;
+      } else {
+        reliabilityExtractionStatus = 'NO_ATTESTED_SOURCE';
+      }
+    } catch (error) {
+      // The answer still exists; its reliability simply must NOT be scored
+      // as accurate. A later backcheck must see this coverage gap.
+      reliabilityExtractionStatus = 'FAILED:'+String(error?.message || 'UNKNOWN').slice(0,80);
+    }
+  }
+  const continuousReliability = reliabilityPreviewEnabled
     ? await runContinuousReliabilityCycle({
         continuityRuntime,
         modelOutput: String(modelResult?.answer || ''),
         modelResponseId: modelResult?.response_id || null,
         packetId: governedSignal.packet.packet_id,
+        structuredCandidate:reliabilityCandidate,
         observedAt: observedAt || new Date().toISOString(),
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
+  continuousReliability.extraction_status = reliabilityExtractionStatus;
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
