@@ -8,6 +8,7 @@ on:
       - 'src/reality-universe-material-claim-verifier-v1.0.js'
       - 'test/reality-universe-material-claim-verifier-v1.0.test.js'
       - 'src/reality-universe-postcomposition-verifier-v1.0.js'
+      - 'scripts/replay-reality-material-claim-turn79-v1.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +36,18 @@ jobs:
             test/reality-natural-consequence-drift-v3.test.js \
             test/reality-universe-persistence-contract-v1.0.test.js \
             test/reality-universe-closed-loop-v1.0.test.js
+      - name: Replay exact old model failure with bitemporal receipts and no model spend
+        run: |
+          node --check scripts/replay-reality-material-claim-turn79-v1.mjs
+          node scripts/replay-reality-material-claim-turn79-v1.mjs
+      - name: Preserve evidence inspector for mobile and machine-readable JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-turn79-material-claim-evidence-and-readback
+          path: |
+            benchmark-results/reality-material-claim-turn79-replay.json
+            benchmark-results/reality-material-claim-turn79-replay.html
+          retention-days: 14
       - name: Interpretation and cost
         run: |
           echo 'No model API calls. Tests use immutable original Turn79 text from the real GPT-4.1 mini run.'
