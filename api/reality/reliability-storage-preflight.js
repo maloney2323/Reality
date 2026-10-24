@@ -1,6 +1,7 @@
 // Preview-only, read-only credential compatibility check. Does not mutate
 // records, enable reliability monitoring, run a model or expose any secrets.
 import { resolveReliabilityBenchmarkDb } from '../../src/reality-reliability-db-boundary-v0.1.js';
+import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 const ALLOWED_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
@@ -23,6 +24,7 @@ export default async function handler(req,res){
   }
   let status='UNVERIFIED';
   let external_canary_readback_verified=false;
+  let runtime_reconstruct_verified=false;
   try{
     const response=await fetch(db.url+'/rest/v1/universe_events?select=event_id&limit=1',{
       method:'GET',
@@ -49,6 +51,18 @@ export default async function handler(req,res){
           rows[0].entity_type==='benchmark_storage_canary'&&
           rows[0].payload?.test_id==='reality-pr124-20261024'&&
           rows[0].payload?.synthetic===true;
+        if(external_canary_readback_verified){
+          const persistence=createUniversePostgresPersistence({
+            url:db.url,secretKey:db.secretKey,strictSecrets:true,
+          });
+          const reconstructed=await persistence.reconstruct({
+            continuityRootId:root,
+            worldlineId:'b2b50cc0-2026-4024-9025-000000000002',
+          });
+          runtime_reconstruct_verified=Array.isArray(reconstructed)&&
+            reconstructed.some(event=>event.event_id===id &&
+              event.payload?.test_id==='reality-pr124-20261024');
+        }
       }
     }
   }catch{status='READ_FAILED';}
@@ -58,6 +72,8 @@ export default async function handler(req,res){
     benchmark_connection_verified:status==='READ_AUTHORIZED',
     status,
     external_canary_readback_verified,
+    runtime_reconstruct_verified,
+    runtime_lineage_integrity_verified:false,
     write_permission_verified:false,
     model_calls:0,writes:0,
     monitoring_enabled:process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED==='true',
