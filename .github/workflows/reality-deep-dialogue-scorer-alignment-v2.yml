@@ -1,0 +1,37 @@
+name: Reality Deep Dialogue Scorer Alignment and No-Harm Gate
+on:
+  push:
+    branches:
+      - feature/reality-long-conversation-drift-v2-20261023
+    paths:
+      - '.github/workflows/reality-deep-dialogue-scorer-alignment-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scorer-probe-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check scorer-to-current-question alignment and causal evidence
+        run: |
+          node --check benchmarks/reality-deep-conversational-drift-120turn-v2.mjs
+          node --check scripts/run-reality-deep-dialogue-120turn-v2.mjs
+          node --test test/reality-deep-conversational-drift-120turn-v2.test.js
+      - name: Run pre-existing Universe verifier regressions
+        run: |
+          node --test \
+            test/reality-adversarial-100turn-v1.test.js \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-universe-intelligence-forms-v1.0.test.js
+      - name: Clarify this run does not spend API credits or repair models
+        run: |
+          echo 'Static contract verification only: 0 real-model calls.'
+          echo 'A regex candidate is not independently adjudicated drift.'
+          echo 'Any automatic correction must have independent evidence authority, not pattern matching.'
