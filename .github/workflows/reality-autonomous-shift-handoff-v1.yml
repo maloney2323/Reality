@@ -1,0 +1,45 @@
+name: Reality Autonomous Shift Continuity and Home Handoff V1
+on:
+  push:
+    branches:
+      - feature/reality-autonomous-shift-handoff-v1-20261024
+    paths:
+      - '.github/workflows/reality-autonomous-shift-handoff-v1.yml'
+      - 'src/reality-autonomous-shift-control-v1.0.js'
+      - 'api/reality/shift.js'
+      - 'index.html'
+      - 'test/reality-autonomous-shift-handoff-v1.0.test.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  autonomous-shift-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate authentic shift and owner-scoped Home source
+        run: |
+          node --check src/reality-autonomous-shift-control-v1.0.js
+          node --check api/reality/shift.js
+          node --check test/reality-autonomous-shift-handoff-v1.0.test.js
+      - name: Test security and continuity without model calls or real business effects
+        run: node --test test/reality-autonomous-shift-handoff-v1.0.test.js
+      - name: Check existing work discovery and continuity engine regressions
+        run: |
+          node --test \
+            test/reality-work-discovery-foundation-v1.0.test.js \
+            test/reality-discovered-work-v0.1.test.js \
+            test/reality-self-question-engine-v1.0.test.js \
+            test/reality-continuity-spine-v2.0.test.js
+      - name: Clarify experimental limits
+        run: |
+          echo '0 paid model calls; no production cron requested; no work authorized or executed.'
+          echo 'A simulated shift-result fixture is not proof that unattended cron completed.'
+          echo 'Production cron needs CRON_SECRET in the production environment before safe enablement.'
+          echo 'Source to deployed Vercel alias is feat/continuity-spine-v2, not current GitHub main.'
