@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
- validateCronCredential,autonomousShiftSlot,projectAutonomousShiftHome,
+ validateCronCredential,autonomousShiftSlot,projectAutonomousShiftHome,authorizeShiftConfigWrite,
 } from '../src/reality-autonomous-shift-control-v1.0.js';
 const secret='a-value-with-at-least-32-characters-to-check';
 const cfg={enabled:true,readinessTime:'16:30',shiftStart:'17:00',
@@ -104,4 +104,18 @@ test('Home auto refreshes persisted work but does not execute a discovered task 
  assert.match(html,/fetch\('\/api\/reality\/shift',\{cache:'no-store'\}\)/);
  const onload=html.split('async function refreshSavedShiftHome')[1].split('</script>')[0];
  assert.doesNotMatch(onload,/fetch\('\/api\/reality\/(?:execute|authority|intelligence)'/);
+});
+
+test('global shift settings cannot be seized or toggled by a fresh anonymous session',()=>{
+ const current={updated_by:'signed-owner-1',enabled:true};
+ assert.equal(authorizeShiftConfigWrite({existingConfig:current,principalId:'signed-owner-1'}).ok,true);
+ assert.equal(authorizeShiftConfigWrite({existingConfig:current,principalId:'attacker'}).ok,false);
+ assert.equal(authorizeShiftConfigWrite({existingConfig:null,principalId:'attacker'}).ok,false);
+ assert.equal(authorizeShiftConfigWrite({existingConfig:null,principalId:'new-owner',
+  bootstrapPrincipalId:'new-owner'}).ok,true);
+ assert.equal(authorizeShiftConfigWrite({existingConfig:{},principalId:'new-owner',
+  bootstrapPrincipalId:'new-owner'}).ok,false);
+ const code=readFileSync(new URL('../api/reality/shift.js',import.meta.url),'utf8');
+ assert.match(code,/authorizeShiftConfigWrite\(\{/);
+ assert.match(code,/if \(!auth\.ok\) return json\(res, 403/);
 });
