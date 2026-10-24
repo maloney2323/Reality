@@ -6,6 +6,7 @@ import { recordSourceAttestedEvidence, readGroundedEvidence } from '../src/reali
 import { extractReliabilityClaims } from '../src/reality-reliability-claim-extraction-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
 import { resolveReliabilityBenchmarkDb } from '../src/reality-reliability-db-boundary-v0.1.js';
+import {sealModelOutput,openModelOutput} from '../src/reality-reliability-private-replay-v0.1.js';
 import {
   classifyReliabilityFindings, computeHistoricalBackcheck, orderContinuityHistory,
   runContinuousReliabilityCycle,
@@ -417,4 +418,36 @@ test('benchmark storage refuses inherited production credentials and project sco
     REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'qkzvjfiegihyaoabiniy'}),
     /PROJECT_NOT_ALLOWLISTED/);
   assert.equal(resolveReliabilityBenchmarkDb({...base,VERCEL_ENV:'production'}),null);
+});
+
+test('encrypted replay is bound to continuity scope and private model output stays out of plaintext receipts',()=>{
+ const key='test-only-private-replay-key';
+ const scope='root:a|world:1';
+ const model='Private customer instruction: no estimate without approval';
+ const encrypted=sealModelOutput(model,{key,scope});
+ assert.equal(encrypted.status,'ENCRYPTED_REPLAY_AVAILABLE');
+ assert.equal(JSON.stringify(encrypted).includes('Private customer'),false);
+ assert.equal(openModelOutput(encrypted,{key,scope}),model);
+ assert.throws(()=>openModelOutput(encrypted,{key,scope:'root:b|world:1'}),
+   /RELIABILITY_REPLAY_DECRYPT_OR_SCOPE_FAILED/);
+ assert.throws(()=>openModelOutput(encrypted,{key:'wrong-key',scope}),
+   /RELIABILITY_REPLAY_DECRYPT_OR_SCOPE_FAILED/);
+ assert.equal(sealModelOutput(model,{key:'',scope}).status,'NOT_RETAINED');
+});
+test('historical audit distinguishes replayable from permanently missing original model output',async()=>{
+ await withPersistence(async()=>{
+   const fixture=mockUniverse();
+   const previous=process.env.REALITY_RELIABILITY_REPLAY_KEY;
+   process.env.REALITY_RELIABILITY_REPLAY_KEY='test-replay-key';
+   try{
+     for(let n=1;n<=25;n++)await turn(n,fixture);
+     const audit=computeHistoricalBackcheck(fixture.events);
+     assert.equal(audit.replayable_unassessed_receipt_ids.length,25);
+     assert.equal(audit.unreplayable_unassessed_receipt_ids.length,0);
+     assert.equal(audit.hallucination_rate_pct,null);
+   }finally{
+     if(previous===undefined)delete process.env.REALITY_RELIABILITY_REPLAY_KEY;
+     else process.env.REALITY_RELIABILITY_REPLAY_KEY=previous;
+   }
+ });
 });
