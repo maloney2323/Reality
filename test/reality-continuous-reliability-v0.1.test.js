@@ -160,3 +160,37 @@ test('independently attested structured contradiction proposes recovery but neve
     assert.equal(result.readback_verified,true);
   });
 });
+
+test('50-turn historical audit overlaps turn 25 and carries all unassessed incidents',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse();
+    let last;
+    for(let n=1;n<=50;n++)last=await turn(n,fixture);
+    const checkpoints=fixture.events.filter(e=>e.payload?.event_type==='HISTORICAL_BACKCHECK');
+    assert.equal(checkpoints.length,2);
+    assert.deepEqual(checkpoints.map(e=>e.payload.window_start),[1,25]);
+    assert.deepEqual(checkpoints.map(e=>e.payload.window_end),[25,50]);
+    assert.equal(last.result.checkpoint.unresolved_or_unassessed_receipt_ids.length,50);
+    assert.equal(last.result.checkpoint.missing_assessment_turns,0);
+    assert.equal(last.result.checkpoint.recorded_assessments,26);
+    assert.equal(last.result.checkpoint.hallucination_rate_pct,null);
+  });
+});
+
+test('missing model output assessment stays visible in checkpoint, not counted as clean',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse();
+    const at='2026-10-24T12:59:01.000Z';
+    const signal=buildGovernedChatSignal({message:'Unanswered customer question',observedAt:at});
+    await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal,observedAt:at,fetchImpl:fixture.fetchImpl,
+    });
+    for(let n=2;n<=25;n++)await turn(n,fixture);
+    const report=computeHistoricalBackcheck(fixture.events);
+    assert.equal(report.total_turns,25);
+    assert.equal(report.missing_assessment_turns,1);
+    assert.equal(report.recorded_assessments,24);
+    assert.equal(report.drift_rate_pct,null);
+  });
+});
