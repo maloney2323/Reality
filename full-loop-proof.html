@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reality · Full Loop Proof</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9f1f8;background:#0b1320}*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 8% -5%,#17434a 0%,transparent 39%),#0b1320}
+main{max-width:1050px;padding:32px 18px 80px;margin:auto}
+h1{font-size:clamp(32px,5vw,53px);line-height:1.08;letter-spacing:-.05em;max-width:850px;margin:40px 0 16px}
+h2{font-size:20px;margin:0 0 15px}p{line-height:1.6;color:#afc1d2}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-size:24px;font-weight:750;letter-spacing:-.05em}.brand span{color:#53d9c8}
+.tag{font-size:12px;border:1px solid #54716f;border-radius:25px;padding:8px 12px;color:#b8e2d9}
+.alert{padding:15px 18px;border:1px solid #806441;border-radius:12px;color:#f5deb4;background:#302519;font-size:13px;line-height:1.65;margin:25px 0}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:20px 0}
+button{border-radius:10px;border:1px solid #376b71;background:#244e53;color:#effffb;font-size:14px;font-weight:700;padding:13px 16px;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}button:not(:first-child){background:#172737;border-color:#34495d}
+button:hover{filter:brightness(1.15)}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}
+.card{border:1px solid #2c4051;background:#131f2d;border-radius:13px;padding:21px}
+.small{font-size:12px;color:#91aec0;text-transform:uppercase;letter-spacing:.07em;font-weight:650}
+.value{font-size:25px;font-weight:750;margin-top:8px;letter-spacing:-.04em}
+.trace{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:19px 0}
+.event{border:1px solid #2e4556;background:#14222e;padding:16px;border-radius:11px}
+.event b{display:block;margin-bottom:9px;font-size:13px;word-break:break-word}
+.event p{margin:0;color:#aac3d3;font-size:12px;word-break:break-word}
+.num{border-radius:50%;background:#265c5d;color:#b8ffec;font-size:12px;font-weight:800;width:27px;height:27px;display:grid;place-items:center;margin-bottom:10px}
+.metricrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.metricrow .value{font-size:22px}
+.diagnostics{background:#152534;border:1px solid #324858;border-radius:12px;padding:19px;margin:24px 0}
+.status{border-radius:20px;border:1px solid #3c786b;padding:5px 10px;background:#1a473e;color:#9bf6d4;font-size:11px;font-weight:750}
+.status.warn{border-color:#806641;background:#3f3120;color:#f7d6a3}
+footer{color:#849bb0;font-size:12px;line-height:1.7;margin-top:34px}
+a{color:#75e6d4}
+@media(max-width:700px){.hero,.trace{grid-template-columns:1fr}.metricrow{grid-template-columns:1fr 1fr}main{padding:23px 14px 60px}}
+</style></head>
+<body><main>
+<header><div class="brand"><span>✦</span> Reality <small style="font-size:12px;color:#87a7ae;letter-spacing:normal;margin-left:9px">PROOF LAB</small></div><div class="tag">Preview · Isolated work sandbox</div></header>
+<h1>Does Reality finish the work after something goes wrong?</h1>
+<p style="max-width:770px">One original work item. One blocked attempt. Then capability checking, exact scoped authorization, successful sandbox execution, independent read-back, learning, Universe update and continued cognition. Inspect the individual receipts, or deliberately break authority and verification.</p>
+<div class="alert"><b>This demonstrates the executable architecture, not a commercial outcome.</b> The customer, owner approval, source records, and work are all simulated inside an isolated in-memory sandbox. No real emails, purchases, deployments, payments or production changes occur. No real customer supervision savings are claimed.</div>
+<div class="actions">
+<button id="run" data-mode="success">Run full recovery loop</button>
+<button id="approval" data-mode="withhold_approval">Withhold authorization</button>
+<button id="verification" data-mode="failed_readback">Force verification failure</button>
+</div>
+<div id="message" style="color:#a7c4ce;font-size:14px;margin:10px 0 22px">Choose a scenario to run the actual Preview contracts.</div>
+<section id="results" hidden>
+<div class="hero">
+<div class="card"><div class="small">Result</div><div class="value" id="state">—</div><div id="statusline" style="margin-top:8px;font-size:13px;color:#bfd4da">—</div></div>
+<div class="card"><div class="small">Original work preserved</div><div class="value" id="work">—</div><div style="margin-top:8px;font-size:13px;color:#abc6cb">One task identity from first attempt through retry</div></div>
+</div>
+<div class="metricrow">
+<div class="card"><div class="small">Independent sandbox read-back</div><div class="value" id="readback">—</div></div>
+<div class="card"><div class="small">Cognition resumed</div><div class="value" id="resumed">—</div></div>
+<div class="card"><div class="small">Real external actions</div><div class="value">0</div></div>
+</div>
+<h2 style="margin-top:31px">Receipts from the actual run</h2>
+<div class="trace" id="trace"></div>
+<div class="diagnostics">
+<h2>What's proven — and what's not</h2>
+<p style="margin:0 0 12px">The positive case requires independently reconstructed sandbox state before it can commit learning or resume. Denied authorization must block execution. Withheld verification must block completion.</p>
+<p style="margin:0">The proof does <b>not</b> yet cover a real customer connector, independent external source, generated code acquisition, production merge, human supervision time, or an unattended real deployment. Those must be independently tested next.</p>
+</div>
+</section>
+<footer>Reality Full Loop Proof v0.1 · <a href="https://github.com/maloney2323/Reality/pull/124">Review draft source and CI</a> · Always Preview only. Nothing is promoted to production.</footer>
+</main>
+<script>
+const get=id=>document.getElementById(id);
+const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const labels={
+WORK_DISCOVERED:'Real work discovery contract',
+ORIGINAL_WORK_BLOCKED:'Unapproved attempt denied',
+CAPABILITY_GAP_CONFIRMED:'Missing capability linked to original work',
+SANDBOX_CAPABILITY_VERIFIED:'Sandbox capability acquired and tested',
+ORIGINAL_WORK_RETRIED:'Same original task retried',
+INDEPENDENT_SANDBOX_RECONSTRUCTION:'Result rebuilt from sandbox event ledger',
+CONTINUED_FROM_VERIFIED_UNIVERSE:'Cognition continued from verified Universe state',
+APPROVAL_NEEDED:'Approval absent — stop',
+FAIL_CLOSED:'Verifier did not establish the outcome',
+NOT_COMPLETED:'No valid completion recorded'
+};
+async function run(mode){
+ document.querySelectorAll('button').forEach(b=>b.disabled=true);
+ get('message').textContent='Running '+mode.replaceAll('_',' ')+' using Preview-only contracts…';
+ try{
+  const response=await fetch('/api/reality/full-loop-sandbox-proof',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode}),
+    cache:'no-store',
+  });
+  const body=await response.json();
+  if(!response.ok||!body.ok)throw Error(body.code||'Proof endpoint unavailable');
+  const proof=body.result;
+  const rows=proof.receipts||proof.steps||[];
+  get('state').textContent=proof.status;
+  get('work').textContent='Same task '+(proof.original_attempt_blocked?'preserved':'unverified');
+  get('statusline').textContent=proof.verified_full_loop?'Sandbox recovery completed with verified read-back.':'Stopped safely without claiming a completed outcome.';
+  get('readback').textContent=proof.independent_sandbox_readback_verified?'Verified':'Not verified';
+  get('resumed').textContent=proof.cognition_resumed?'Yes':'No';
+  get('trace').innerHTML=rows.map((r,i)=>'<div class="event"><div class="num">'+(i+1)+'</div><b>'+escapeHtml(labels[r.step]||r.step)+'</b><p>'+escapeHtml(r.step)+'</p><p style="margin-top:8px">Receipt '+escapeHtml((r.hash||'').slice(0,18))+'…</p></div>').join('');
+  get('results').hidden=false;
+  get('message').innerHTML='<span class="status '+(proof.verified_full_loop?'':'warn')+'">'+(proof.verified_full_loop?'Completed in sandbox':'Safely blocked')+'</span> &nbsp; '+rows.length+' receipts · no customer effects';
+ }catch(error){get('message').textContent='Could not run this isolated test: '+error.message;}
+ finally{document.querySelectorAll('button').forEach(b=>b.disabled=false);}
+}
+document.querySelectorAll('button[data-mode]').forEach(button=>{
+ button.addEventListener('click',()=>run(button.dataset.mode));
+});
+</script></body></html>
