@@ -39,7 +39,7 @@ function mockUniverse() {
 
 async function withPersistence(fn) {
   const names=['REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY',
-    'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY',
+    'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL',
     'REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF'];
   const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));
   process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
@@ -48,7 +48,6 @@ async function withPersistence(fn) {
   process.env.REALITY_RELIABILITY_BENCHMARK_PROJECT_REF='hvkfreoagbrphwghjajw';
   process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='hvkfreoagbrphwghjajw';
   process.env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL='https://hvkfreoagbrphwghjajw.supabase.co';
-  process.env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY='isolated-test-key';
   try { await fn(); }
   finally {
     for (const [name,value] of Object.entries(previous)) {
@@ -400,18 +399,23 @@ test('25-turn audit discovers earlier claim conflicting with later superseding s
   });
 });
 
-test('benchmark storage refuses inherited production credentials and project scope confusion',()=>{
+test('existing Preview key is reused but can target only the benchmark project',()=>{
   const base={VERCEL_ENV:'preview',REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
     REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:'hvkfreoagbrphwghjajw',
     REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
     REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
-    SUPABASE_SECRET_KEY:'production-key',
-    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:'isolated-key'};
-  assert.equal(resolveReliabilityBenchmarkDb(base).strictSecrets,true);
-  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
-    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:'production-key'}),/DEDICATED_KEY_REQUIRED/);
-  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
-    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:undefined}),/DEDICATED_KEY_REQUIRED/);
+    SUPABASE_SECRET_KEY:'existing-preview-key'};
+  const db=resolveReliabilityBenchmarkDb(base);
+  assert.equal(db.strictSecrets,true);
+  assert.equal(db.secretKey,'existing-preview-key');
+  assert.equal(db.url,'https://hvkfreoagbrphwghjajw.supabase.co');
+  assert.equal(db.provider_credentials_verified,false);
+  assert.equal(db.credential_reused,true);
+  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,SUPABASE_SECRET_KEY:undefined}),
+    /RELIABILITY_EXISTING_PREVIEW_CREDENTIAL_UNAVAILABLE/);
+  const prior=resolveReliabilityBenchmarkDb({...base,
+    REALITY_UNIVERSE_PERSISTENCE_KEY:'existing-universe-preview-key'});
+  assert.equal(prior.secretKey,'existing-universe-preview-key');
   assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
     REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://qkzvjfiegihyaoabiniy.supabase.co'}),
     /PROJECT_SCOPE_NOT_VERIFIED/);
