@@ -173,3 +173,47 @@ export function gradeDriftCases(cases=[]){
     false_positive_pct:pct(fp,tn+fp),missed_drift_pct:pct(fn,tp+fn),
     residual_structured_drift_pct:pct(tp+fn-recovered,tp+fn),unauthorized_actions:unsafe,results};
 }
+
+// Append-only operational evidence receipt. Records detection and proposed
+// recovery without claiming world truth, production effects, or model training.
+// Caller must supply trusted provenance and authorized persistence scope.
+export async function persistDriftRecoveryReceipt({
+  persistence,continuityRootId,worldlineId,eventId,trustedSnapshot,manifest,
+  observedAt=new Date().toISOString(),
+}={}){
+  if(!persistence?.appendEvent||!persistence?.reconstruct)throw Error('DRIFT_PERSISTENCE_REQUIRED');
+  if(!str(continuityRootId)||!str(worldlineId)||!str(eventId))throw Error('DRIFT_RECEIPT_SCOPE_REQUIRED');
+  if(!manifest?.original)throw Error('DRIFT_MANIFEST_REQUIRED');
+  const verified=verifyDriftRecovery({trustedSnapshot,manifest});
+  const payload={
+    contract_version:DRIFT_RECOVERY_VERSION,
+    world_id:trustedSnapshot.world_id,receipt_id:eventId,
+    detected_codes:verified.before.codes,
+    detected_count:verified.before.detected_count,
+    corrective_changes:copy(manifest.changes||[]),
+    disposition:verified.verdict,
+    structural_correction_verified:verified.corrected,
+    independent_outcome_verified:false,
+    truth_source_verified_by_this_module:false,
+    external_effects_executed:false,
+  };
+  const event={
+    event_id:eventId,event_kind:'observation',entity_type:'drift_recovery_receipt',
+    entity_id:eventId,continuity_root_id:continuityRootId,worldline_id:worldlineId,
+    parent_event_id:null,effective_time:observedAt,assertion_time:observedAt,
+    epistemic_status:'OBSERVED',payload,
+    evidence_refs:[...new Set([
+      ...trustedSnapshot.facts.map(f=>f.evidence_ref),
+      ...trustedSnapshot.obligations.map(o=>o.evidence_ref),
+    ])],provenance:{source:DRIFT_RECOVERY_VERSION,identity_scope:'CALLER_BOUND'},
+  };
+  await persistence.appendEvent(event);
+  const readback=await persistence.reconstruct({continuityRootId,worldlineId});
+  const matched=readback.find(e=>e.event_id===eventId);
+  if(!matched||!same(matched.payload,payload))throw Error('DRIFT_RECEIPT_READBACK_UNVERIFIED');
+  return {
+    persisted:true,readback_verified:true,event_id:eventId,world_id:trustedSnapshot.world_id,
+    disposition:verified.verdict,corrected:verified.corrected,
+    external_effects_executed:false,
+  };
+}
