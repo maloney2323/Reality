@@ -194,3 +194,14 @@ test('missing model output assessment stays visible in checkpoint, not counted a
     assert.equal(report.drift_rate_pct,null);
   });
 });
+
+test('tampered historical payload is rejected even when stored hash pointers are unchanged',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse();
+    await turn(1,fixture);
+    const before=fixture.events.length;
+    fixture.events[0].payload.raw_content_digest='sha256:tampered';
+    await assert.rejects(turn(2,fixture),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
+    assert.equal(fixture.events.length,before);
+  });
+});
