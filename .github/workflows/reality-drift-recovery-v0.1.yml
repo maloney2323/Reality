@@ -1,0 +1,35 @@
+name: Reality Drift Recovery Adversarial Contract
+on:
+  push:
+    branches:
+      - feature/reality-drift-recovery-proof-v1-20261024
+    paths:
+      - '.github/workflows/reality-drift-recovery-v0.1.yml'
+      - 'src/reality-drift-recovery-v0.1.js'
+      - 'test/reality-drift-recovery-v0.1.test.js'
+      - 'docs/reality-drift-recovery-audit-20261024.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  drift-recovery-adversarial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Parse module and test cases
+        run: |
+          node --check src/reality-drift-recovery-v0.1.js
+          node --check test/reality-drift-recovery-v0.1.test.js
+      - name: Verify structured drift recovery and 100-position construction replay
+        run: node --test test/reality-drift-recovery-v0.1.test.js
+      - name: Keep performance claims bounded
+        run: |
+          echo 'Static deterministic fixture test only; not 100 turns of live model output.'
+          echo 'No paid LLM calls, no autonomous external effects, no production release.'
+          echo 'False positives, missed cases, and residual unresolved drift are graded independently.'
