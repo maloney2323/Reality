@@ -296,7 +296,7 @@ test('real orchestration path sees prior ledger evidence and detects model contr
         continuityRuntime:prior,worldId:'construction:site-a',
         sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier:confirmed-delivery',
         sourceDigest:'supplier-receipt:oct27',
-        facts:[{key:'cabinet_delivery_date',value:'October 27'}],
+        facts:[{key:'cabinet_delivery_date',value:'2026-10-27'}],
         obligations:[{id:'do_not_send_estimate_without_approval',active:true}],
         observedAt:at,
       });
