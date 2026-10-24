@@ -8,6 +8,7 @@ on:
       - 'src/reality-continuity-spine-runtime-v0.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-continuity-runtime-v0.1.test.js'
       - '.github/workflows/reality-continuous-reliability-v0.1.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'src/reality-continuity-spine-runtime-v0.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-continuity-runtime-v0.1.test.js'
 jobs:
   contract-tests:
     runs-on: ubuntu-latest
