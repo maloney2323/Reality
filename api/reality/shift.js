@@ -7,7 +7,7 @@ import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
-import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome } from '../../src/reality-autonomous-shift-control-v1.0.js';
+import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome, authorizeShiftConfigWrite } from '../../src/reality-autonomous-shift-control-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -245,6 +245,16 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const principal = getOrCreateSessionPrincipal(req, res);
+      const previousConfig = await readConfig(persistence);
+      const auth = authorizeShiftConfigWrite({
+        existingConfig: previousConfig,
+        principalId: principal.principal_id,
+        bootstrapPrincipalId: process.env.REALITY_SHIFT_BOOTSTRAP_PRINCIPAL_ID,
+      });
+      if (!auth.ok) return json(res, 403, {
+        ok: false, error: auth.reason,
+        persisted: false, work_executed: false,
+      });
       const b = req.body && typeof req.body === 'object' ? req.body : {};
       const config = {
         enabled: b.enabled === true,
