@@ -5,6 +5,9 @@ on:
       - feature/reality-natural-consequence-drift-v3-20261023
     paths:
       - '.github/workflows/reality-natural-consequence-120turn-v3.yml'
+      - 'benchmarks/reality-natural-consequence-drift-120turn-v3.mjs'
+      - 'scripts/run-reality-natural-drift-120turn-v3.mjs'
+      - 'test/reality-natural-consequence-drift-v3.test.js'
   workflow_dispatch:
 permissions:
   contents: read
