@@ -19,6 +19,8 @@ on:
       - 'test/reality-market-100-turn-endurance-v0.1.test.js'
       - 'src/reality-business-proof-scoring-v0.1.js'
       - 'src/reality-full-loop-sandbox-proof-v0.1.js'
+      - 'src/reality-proof-telemetry-v0.1.js'
+      - 'test/reality-proof-telemetry-v0.1.test.js'
       - 'test/reality-full-loop-sandbox-proof-v0.1.test.js'
       - 'test/reality-full-loop-preview-api-v0.1.test.js'
       - 'api/reality/full-loop-sandbox-proof.js'
@@ -42,6 +44,8 @@ on:
       - 'test/reality-market-100-turn-endurance-v0.1.test.js'
       - 'src/reality-business-proof-scoring-v0.1.js'
       - 'src/reality-full-loop-sandbox-proof-v0.1.js'
+      - 'src/reality-proof-telemetry-v0.1.js'
+      - 'test/reality-proof-telemetry-v0.1.test.js'
       - 'test/reality-full-loop-sandbox-proof-v0.1.test.js'
       - 'test/reality-full-loop-preview-api-v0.1.test.js'
       - 'api/reality/full-loop-sandbox-proof.js'
@@ -57,4 +61,4 @@ jobs:
         with:
           node-version: '22'
       - name: Continuous reliability and continuity tests
-        run: node --test test/reality-full-loop-preview-api-v0.1.test.js test/reality-full-loop-sandbox-proof-v0.1.test.js test/reality-business-proof-scoring-v0.1.test.js test/reality-market-100-turn-endurance-v0.1.test.js test/reality-market-proof-gauntlet-v0.1.test.js test/reality-continuous-reliability-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-drift-recovery-v0.1.test.js test/reality-live-intelligence-orchestration-v0.1.test.js
+        run: node --test test/reality-proof-telemetry-v0.1.test.js test/reality-full-loop-preview-api-v0.1.test.js test/reality-full-loop-sandbox-proof-v0.1.test.js test/reality-business-proof-scoring-v0.1.test.js test/reality-market-100-turn-endurance-v0.1.test.js test/reality-market-proof-gauntlet-v0.1.test.js test/reality-continuous-reliability-v0.1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-drift-recovery-v0.1.test.js test/reality-live-intelligence-orchestration-v0.1.test.js
