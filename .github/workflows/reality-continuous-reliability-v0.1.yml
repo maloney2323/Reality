@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/reality-continuous-reliability-v0.1.js'
       - 'src/reality-reliability-db-boundary-v0.1.js'
+      - 'src/reality-reliability-private-replay-v0.1.js'
       - 'src/reality-native-universe-persistence-v1.0.js'
       - 'src/reality-universe-postgres-persistence-v0.1.js'
       - 'src/reality-continuity-spine-runtime-v0.1.js'
@@ -17,6 +18,7 @@ on:
     paths:
       - 'src/reality-continuous-reliability-v0.1.js'
       - 'src/reality-reliability-db-boundary-v0.1.js'
+      - 'src/reality-reliability-private-replay-v0.1.js'
       - 'src/reality-native-universe-persistence-v1.0.js'
       - 'src/reality-universe-postgres-persistence-v0.1.js'
       - 'src/reality-continuity-spine-runtime-v0.1.js'
