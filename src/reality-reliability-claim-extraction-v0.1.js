@@ -167,10 +167,10 @@ export async function extractReliabilityClaims({
   // when the quote extractor omits an explicitly named certificate.
   const cited=new Set(providedSourceAssertions
     .filter(x=>x.assertion==='AFFIRMED'&&x.reference).map(x=>trim(x.reference)));
-  const sourcePattern=/\\b(?:verified|confirmed|documented)\\s+(?:by|in|with)\\s+(?:[a-z-]+\\s+){0,4}(?:certificate|receipt|reference|record|document)\\s+(?:number\\s+|no\\.\\s*|#\\s*)?([A-Za-z][\\w-]{3,})/ig;
+  const sourcePattern=/\b(?:verified|confirmed|documented)\s+(?:by|in|with)\s+(?:[a-z-]+\s+){0,4}(?:certificate|receipt|reference|record|document)\s+(?:number\s+|no\.\s*|#\s*)?([A-Za-z][\w-]{3,})/ig;
   for(const m of modelOutput.matchAll(sourcePattern))cited.add(m[1]);
   const authorizedCustomer=snapshot.facts.find(x=>x.key==='customer_id');
-  const directTarget=modelOutput.match(/\\bfor customer\\s+([\\w-]+)/i);
+  const directTarget=modelOutput.match(/\bfor customer\s+([\w-]+)/i);
   const candidateTarget=recipientScope.assertion==='AFFIRMED'&&recipientScope.target_id?
     trim(recipientScope.target_id):directTarget?.[1]||'';
   // A mismatch is high confidence only when the output also reveals the
