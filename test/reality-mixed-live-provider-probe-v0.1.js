@@ -4,6 +4,7 @@
 // Separates scripted independent source assertions from model interpretation;
 // no hallucination or ROI % without independent truth adjudication.
 import fs from 'node:fs';
+import {readPriorMixedProviderOutputs} from './reality-mixed-live-replay-20261024.js';
 import {MIXED_BUSINESS_SCENARIOS,initialBusinessWorld} from '../src/reality-market-proof-gauntlet-v0.1.js';
 import {buildGovernedChatSignal} from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0.1.js';
@@ -12,6 +13,9 @@ import {extractReliabilityClaims} from '../src/reality-reliability-claim-extract
 import {runContinuousReliabilityCycle,orderContinuityHistory} from '../src/reality-continuous-reliability-v0.1.js';
 
 const MODEL=process.env.REALITY_BENCHMARK_MODEL || 'gpt-4.1-mini';
+// Replay the exact 25 previously generated real responses to isolate detector
+// changes; do not spend again to regenerate the same raw model baseline.
+const REPLAY_SAME_MODEL_OUTPUTS=true;
 const SECRET=process.env.OPENAI_API_KEY||process.env.REALITY_STANDALONE_OPENAI_API_KEY||'';
 const MAX_CALLS=50,MAX_TURNS=25,MAX_OUTPUT_TOKENS=240;
 const ROOT='live-provider-mixed-fixture-20261024';
@@ -156,7 +160,10 @@ async function run(){
      }
      const source=readGroundedEvidence(
        orderContinuityHistory(await runtime.readback()),{worldId:world.world_id});
-     const model=await modelCall({scenario,world:source,previous:prev});
+     const model=archived?{
+       text:archived.rows.find(r=>r.turn===scenario.turn).text,
+       id:'previous-provider-turn:'+scenario.turn,
+     }:await modelCall({scenario,world:source,previous:prev});
      prev.push(model.text);
      let extraction=null,extractionStatus='NOT_ATTEMPTED';
      try{
@@ -197,7 +204,11 @@ async function run(){
  }
  const report={
    status:error?'PARTIAL_ERROR':rows.length===25&&checkpoint?.readback_verified?'COMPLETED_LIVE_MODEL_LAB':'PARTIAL',
-   benchmark_kind:'ACTUAL_PROVIDER_MODEL_OUTPUT_ON_SYNTHETIC_BUSINESS_WORLD',
+   benchmark_kind:archived?'REPLAY_SAME_25_ACTUAL_PROVIDER_OUTPUTS_WITH_UPDATED_EXTRACTOR':
+     'ACTUAL_PROVIDER_MODEL_OUTPUT_ON_SYNTHETIC_BUSINESS_WORLD',
+   original_actual_model_output_source_run:archived?40119540286:null,
+   model_generation_calls_this_run:archived?0:25,
+   actual_prior_model_responses_reused:archived?25:0,
    model:MODEL,model_calls:calls,max_model_calls:MAX_CALLS,
    turns_completed:rows.length,turns_requested:25,
    model_usage:{input_tokens:inputTokens,output_tokens:outputTokens,
@@ -216,6 +227,8 @@ async function run(){
      quarantined_raw_outputs:rows.filter(x=>x.model_output_quarantined).length,
      persisted_receipts:rows.filter(x=>x.receipt_readback_verified).length,
      structural_correction_proposals:rows.filter(x=>x.structural_correction_proposed).length,
+     unadjudicated_claims:rows.reduce((sum,x)=>sum+x.claims_requiring_semantic_adjudication,0),
+     extracted_affirmed_claims:rows.reduce((sum,x)=>sum+x.extracted_affirmed_claims,0),
      independent_outcome_verifications:0,
    },
    checkpoint:checkpoint?{
