@@ -90,7 +90,7 @@ export function initialBusinessWorld(){
    id,active:true,world_id:WORLD,evidence_ref:'fixture:obligation:'+id,
  })),authorities:[],receipts:[],as_of:'2026-10-24T12:00:00Z'};
 }
-function candidateFromScenario(s,world){
+export function candidateFromScenario(s,world){
  const v=s.change;
  const lookup=new Map(world.facts.map(f=>[f.key,f]));
  return {
