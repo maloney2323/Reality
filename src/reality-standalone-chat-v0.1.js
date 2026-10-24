@@ -2,6 +2,7 @@
 // Continuity Ledger and Integrity Spine. Server-owned identity and evidence.
 // This is a preview pilot until the full frontend/data migration is verified.
 import {createUniverseEntry} from './reality-universe-persistence-contract-v1.0.js';
+import {screenStandaloneMaterialDelivery} from './reality-standalone-material-delivery-v1.0.js';
 import {persistUniverseEntry,retrievePersistedUniverse} from './reality-native-universe-persistence-v1.0.js';
 import {runLiveIntelligenceOrchestration} from './reality-live-intelligence-orchestration-v0.1.js';
 import {retrieveOptionalPersistedUniverseEntry} from './reality-native-universe-persistence-v1.0.js';
@@ -79,6 +80,9 @@ export async function processStandaloneChat(req,{
  load=retrievePersistedUniverse,store=persistUniverseEntry,
  run=runLiveIntelligenceOrchestration,
  obligationLookup=retrieveOptionalPersistedUniverseEntry,
+ materialClaimGate=screenStandaloneMaterialDelivery,
+ // No persisted source is trusted without an independent server attestor.
+ materialSourceAttestor=async()=>({verified:false}),
  now=()=>new Date().toISOString(),
 }={}){
  if(env.REALITY_STANDALONE_CHAT_ENABLED!=='true')
@@ -148,6 +152,20 @@ export async function processStandaloneChat(req,{
  if(typeof rawAnswer!=='string'||!rawAnswer.trim()||
     typeof displayedAnswer!=='string')
   throw error('STANDALONE_RESPONSE_MISSING',503);
+ // Preview server option only; no model/user payload may enable verification.
+ let materialDelivery=null;
+ if(env.REALITY_STANDALONE_MATERIAL_VERIFIER_ENABLED==='true'){
+  materialDelivery=await materialClaimGate({
+   scope,rawAnswer,displayedAnswer,
+   modelResponseId:result?.intelligence?.response_id||null,
+   observedAt:now(),load,store,lookup:obligationLookup,fetchImpl,
+   independentSourceAttestor:materialSourceAttestor,
+  });
+  if(typeof materialDelivery?.response!=='string'||
+     typeof materialDelivery?.status!=='string')
+   throw error('STANDALONE_MATERIAL_DELIVERY_INVALID',503);
+ }
+ const verifiedDisplay=materialDelivery?materialDelivery.response:displayedAnswer;
  let observedObligationReceipt=null;
  if(observedObligations){
   const newlyRecorded=await captureStandaloneObligations({
@@ -174,14 +192,14 @@ export async function processStandaloneChat(req,{
   root:scope.continuity_root_id,turnId:input.turnId,role:'assistant'});
  const assistant=await store(makeTurnEntry({
   scope,turnId:input.turnId,role:'assistant',text:rawAnswer,
-  displayText:displayedAnswer,observedAt:now(),
+  displayText:verifiedDisplay,observedAt:now(),
  }),{fetchImpl});
  if(assistant?.status!=='PERSISTED'||
     assistant?.entry?.entry_id!==assistantEntryId)
   throw error('STANDALONE_ASSISTANT_MESSAGE_NOT_DURABLY_CONFIRMED',503);
  return Object.freeze({
   ok:true,version:STANDALONE_CHAT_VERSION,
-  response:displayedAnswer,
+  response:verifiedDisplay,
   result,
   identity_basis:scope.identity_basis,
   continuity_root_id:scope.continuity_root_id,
@@ -193,6 +211,15 @@ export async function processStandaloneChat(req,{
    history_window_count:history.length,
    history_is_complete:false,
    ...(observedObligationReceipt?{observed_obligations:observedObligationReceipt}:{}),
+   ...(materialDelivery?{material_claim_gate:{
+    status:materialDelivery.status,
+    detected_claims:materialDelivery.detected_claims,
+    contradictory_claims:materialDelivery.contradictory_claims||0,
+    independent_full_answer_coverage_verified:false,
+    verification_receipt_id:materialDelivery.verification_receipt_id,
+    verified_readback:materialDelivery.verified_readback||false,
+    external_actions_executed:0,
+   }}:{}),
   },
   external_action_executed:false,
  });

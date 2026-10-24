@@ -1,0 +1,66 @@
+name: Reality Universe Material Claim Coverage and Drift Gate V1
+on:
+  push:
+    branches:
+      - feature/universe-material-claim-verifier-v1-20261023
+    paths:
+      - '.github/workflows/reality-material-claim-verifier-v1.yml'
+      - 'src/reality-universe-material-claim-verifier-v1.0.js'
+      - 'test/reality-universe-material-claim-verifier-v1.0.test.js'
+      - 'src/reality-universe-postcomposition-verifier-v1.0.js'
+      - 'src/reality-standalone-material-delivery-v1.0.js'
+      - 'src/reality-standalone-chat-v0.1.js'
+      - 'test/reality-standalone-material-delivery-v1.0.test.js'
+      - 'scripts/replay-reality-material-claim-turn79-v1.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  typed-material-claim-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate contracts and regression fixture syntax
+        run: |
+          node --check src/reality-universe-material-claim-verifier-v1.0.js
+          node --check test/reality-universe-material-claim-verifier-v1.0.test.js
+          node --check src/reality-standalone-material-delivery-v1.0.js
+          node --check src/reality-standalone-chat-v0.1.js
+          node --check test/reality-standalone-material-delivery-v1.0.test.js
+      - name: Turn 79 real-response replay, source time, attestation, original-preservation and coverage tests
+        run: |
+          node --test \
+            test/reality-universe-material-claim-verifier-v1.0.test.js \
+            test/reality-standalone-material-delivery-v1.0.test.js \
+            test/reality-standalone-chat-v0.1.test.js \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-adversarial-100turn-v1.test.js \
+            test/reality-natural-consequence-drift-v3.test.js \
+            test/reality-universe-persistence-contract-v1.0.test.js \
+            test/reality-universe-closed-loop-v1.0.test.js
+      - name: Replay exact old model failure with bitemporal receipts and no model spend
+        run: |
+          node --check scripts/replay-reality-material-claim-turn79-v1.mjs
+          node scripts/replay-reality-material-claim-turn79-v1.mjs
+      - name: Preserve evidence inspector for mobile and machine-readable JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-turn79-material-claim-evidence-and-readback
+          path: |
+            benchmark-results/reality-material-claim-turn79-replay.json
+            benchmark-results/reality-material-claim-turn79-replay.html
+          retention-days: 14
+      - name: Interpretation and cost
+        run: |
+          echo 'No model API calls. Tests use immutable original Turn79 text from the real GPT-4.1 mini run.'
+          echo 'Source authentication and complete material-claim coverage are test adapters only.'
+          echo 'Not independently verified real municipal source truth or production integration.'
+          echo 'No false claims that all natural-language assertions are checked.'
+          echo 'Preview-only opt-in pre-delivery gating verified through real standalone path with mocked provider. Default external attestation is denied.'
+          echo 'No model API charges; no customer actions; no production deployment.'
