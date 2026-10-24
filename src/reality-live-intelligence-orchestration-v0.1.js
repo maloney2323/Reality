@@ -6,6 +6,7 @@ import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootI
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
+import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -118,6 +119,9 @@ export async function runLiveIntelligenceOrchestration({
   observedAt,
   requestedBy = 'chat_user',
   systemContext = null,
+  // This parameter is supplied ONLY by a trusted server-side history adapter.
+  // Client-provided systemContext cannot impersonate authenticated past turns.
+  verifiedConversationTurns = null,
   model,
   apiKey,
   fetchImpl,
@@ -246,6 +250,21 @@ export async function runLiveIntelligenceOrchestration({
     process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
   let reliabilityCandidate = null;
   let reliabilityExtractionStatus = 'NOT_ATTEMPTED';
+  // Inspect the actual model output BEFORE any quarantine/replacement.
+  // Prior conversational anchors are eligible only from the server adapter;
+  // the Signal Cleaner owns the current user turn and its packet provenance.
+  const conversationalAssessment = reliabilityPreviewEnabled
+    ? inspectConversationDrift({
+        priorTurns: Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        historySource: Array.isArray(verifiedConversationTurns)
+          ? 'AUTHENTICATED_CONVERSATION_MESSAGES' : 'NOT_ATTESTED',
+        currentUserMessage: message,
+        currentUserSourceRef: governedSignal.packet.packet_id,
+        modelAnswer: String(modelResult?.answer || ''),
+        continuityRootId: effectiveContinuityRootId,
+        modelResponseId: modelResult?.response_id || governedSignal.packet.packet_id,
+      })
+    : null;
   if (reliabilityPreviewEnabled &&
       process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED === 'true' &&
       systemContext?.world_id && continuityRuntime?.enabled) {
@@ -276,12 +295,20 @@ export async function runLiveIntelligenceOrchestration({
         modelResponseId: modelResult?.response_id || null,
         packetId: governedSignal.packet.packet_id,
         structuredCandidate:reliabilityCandidate,
+        conversationalAssessment,
         authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null,
         trust_pulse: buildUnmonitoredTrustPulse() };
-  const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus };
+  const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus,
+    conversational_assessment: conversationalAssessment?{
+      status:conversationalAssessment.status,
+      coverage:conversationalAssessment.assessment_scope,
+      findings_count:conversationalAssessment.findings?.length||0,
+      history_scope:conversationalAssessment.history_scope,
+    }:null,
+  };
   if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
     const corrections=(continuousReliability.source_attested_correction_proposals||[])
       .map(f=>String(f.key)+': '+JSON.stringify(f.source_attested_value)+
