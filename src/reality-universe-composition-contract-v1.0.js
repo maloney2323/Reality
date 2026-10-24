@@ -193,6 +193,22 @@ export async function runCompositionSandbox({
   const result=await handler.execute(structuredClone(vals));
   if(!result||typeof result!=='object'||result.type!==f.output.type)
    err('COMPOSITION_OUTPUT_TYPE_VIOLATION');
+  if(f.output.type==='GATE'&&
+   (!result.value||typeof result.value!=='object'||
+    typeof result.value.clear!=='boolean'||!nonempty(result.value.reason)))
+   err('COMPOSITION_GATE_POSTCONDITION_FAILED');
+  // No "confirmed" schedules leave a composition sandbox even if a
+  // supposedly trusted handler is later changed or compromised.
+  if(f.output.type==='SCHEDULE'&&
+   (!result.value||result.value.kind!=='DRAFT_ONLY'||
+    result.value.confirmable!==false||
+    !Array.isArray(result.value.reasons)))
+   err('COMPOSITION_SCHEDULE_POSTCONDITION_FAILED');
+  if(f.output.type==='BOOLEAN'&&typeof result.value!=='boolean')
+   err('COMPOSITION_BOOLEAN_POSTCONDITION_FAILED');
+  if(f.output.type==='NUMBER'&&
+   (typeof result.value!=='number'||!Number.isFinite(result.value)))
+   err('COMPOSITION_NUMBER_POSTCONDITION_FAILED');
   values.set(id,structuredClone(result.value));
   trace.push({id,handler_id:f.handler_id,output_hash:hash(result.value)});
  }
