@@ -55,7 +55,7 @@ export async function recordSourceAttestedEvidence({
     throw Error('RELIABILITY_SOURCE_EVIDENCE_SHAPE_INVALID');
   // No implicit trust in free-form claims. This must only be called after a
   // trusted adapter independently checks the referenced provider/user-policy.
-  const eventId='source-evidence:'+sourceRef+':'+sourceDigest;
+  const eventId='source-evidence:'+sourceRef+':'+sourceDigest+':'+observedAt;
   const event=await continuityRuntime.appendStage({
     stage:'OBSERVATION',entityId:eventId,eventId,
     epistemicStatus:'OBSERVED',effectiveTime:observedAt,assertionTime:observedAt,
