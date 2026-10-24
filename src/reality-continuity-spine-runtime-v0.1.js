@@ -181,7 +181,8 @@ export async function startContinuityRuntime({
   return Object.freeze({
     status: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
     enabled: persistenceEnabled,
-    spine,
+    // The runtime advances after its initial three stages; expose the live tail.
+    get spine() { return spine; },
     nodes: Object.freeze(nodes),
     prior_event_count: priorEventCount,
     readback: persistence ? async () => persistence.reconstruct({continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id}) : null,
