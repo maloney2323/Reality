@@ -500,7 +500,7 @@ test('GitHub evidence adapter rejects wrong repo, forged response and provider o
      subjectId:'conversation:contractor',signal,observedAt:'2026-10-24T14:31:00.000Z',fetchImpl:fixture.fetchImpl,
    });
    const before=fixture.events.length;
-   const base={continuityRuntime,allowedRepository:'maloney2323/Reality',worldId:'developer:repo'};
+   const base={continuityRuntime:runtime,allowedRepository:'maloney2323/Reality',worldId:'developer:repo'};
    await assert.rejects(captureGithubRepositoryEvidence({...base,repository:'another/repo'}),
      /RELIABILITY_GITHUB_REPOSITORY_NOT_ALLOWLISTED/);
    await assert.rejects(captureGithubRepositoryEvidence({...base,
