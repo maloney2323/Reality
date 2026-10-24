@@ -7,6 +7,7 @@ import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
+import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome } from '../../src/reality-autonomous-shift-control-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -19,10 +20,6 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
-function cronRequest(req) {
-  return String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
-}
 
 async function githubCommits() {
   const [owner, repo] = SHADOW_REPO.split('/');
@@ -41,19 +38,6 @@ async function readConfig(persistence) {
   return configs.at(-1)?.payload || null;
 }
 
-function localParts(date, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  }).formatToParts(date);
-  return Object.fromEntries(parts.filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
-}
-
-function withinShift(nowMinutes, startMinutes, lengthHours) {
-  let elapsed = nowMinutes - startMinutes;
-  if (elapsed < 0) elapsed += 1440;
-  return elapsed >= 0 && elapsed < lengthHours * 60;
-}
 
 async function runTick({ config, phase, local, persistence }) {
   const tickId = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
@@ -212,7 +196,8 @@ async function runTick({ config, phase, local, persistence }) {
   const intelligence = await runLiveIntelligenceOrchestration({
     message: mission,
     requestedBy: 'reality-autonomous-shift',
-    systemContext: JSON.stringify({ shift_config: config, evidence }),
+    // The Universe context reader only admits an object; JSON text silently discarded evidence.
+    systemContext: { shift_config: config, shift_evidence: evidence, connected_world_observations: observations.slice(0, 30) },
   });
 
   const result = {
@@ -283,31 +268,46 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
-    if (!cronRequest(req)) {
+    const hasBearer = typeof req.headers?.authorization === 'string';
+    const cronLike = hasBearer || String(req.headers?.['user-agent'] || '').includes('vercel-cron/');
+    if (!cronLike) {
+      // Read-only Home query, with no model invocation, cron execution or work authority.
+      const principal = getOrCreateSessionPrincipal(req, res);
       const config = await readConfig(persistence);
-      return json(res, 200, { ok: true, config, runtime: 'server_backed' });
+      const owned = config?.updated_by === principal.principal_id;
+      const events = owned ? await persistence.reconstruct({
+        continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE,
+      }) : [];
+      const home = projectAutonomousShiftHome({
+        events, config, principalId: principal.principal_id,
+      });
+      return json(res, 200, {
+        ok: true, config: owned ? config : null,
+        home, runtime: 'server_backed', execution_invoked: false,
+      });
     }
+
+    // A user agent is spoofable and ANY Bearer token previously triggered work.
+    // Only the exact server-side Vercel cron secret may enter the autonomous lane.
+    const authorized = validateCronCredential(req, process.env.CRON_SECRET);
+    if (!authorized.ok) return json(res, authorized.http, {
+      ok: false, status: 'BLOCKED', error: authorized.reason,
+      external_effects_permitted: false,
+    });
 
     const config = await readConfig(persistence);
     if (!config?.enabled) return json(res, 200, { ok: true, status: 'DISABLED' });
 
-    const now = new Date();
-    const local = localParts(now, config.timeZone || 'America/New_York');
-    const nowMinutes = Number(local.hour) * 60 + Number(local.minute);
-    const [rh, rm] = String(config.readinessTime || '20:00').split(':').map(Number);
-    const [sh, sm] = String(config.shiftStart || '21:00').split(':').map(Number);
-    const readiness = rh * 60 + rm;
-    const start = sh * 60 + sm;
+    const due = autonomousShiftSlot({ config, now: new Date() });
+    if (!due.phase) return json(res, 200, {
+      ok: true, status: 'WAITING', local: due.local, config,
+      scheduled_slot: due.scheduled_slot,
+    });
 
-    let phase = null;
-    if (nowMinutes === readiness) phase = 'READINESS';
-    if (nowMinutes === start) phase = 'SHIFT_START';
-    if (!phase && withinShift(nowMinutes, start, Number(config.shiftLength || 8)) && Number(local.minute) % 15 === 0) phase = 'OPERATING';
-
-    if (!phase) return json(res, 200, { ok: true, status: 'WAITING', local, config });
-
-    const result = await runTick({ config, phase, local, persistence });
-    return json(res, 200, { ok: true, status: 'WORKED', result });
+    const result = await runTick({
+      config, phase: due.phase, local: due.local, persistence,
+    });
+    return json(res, 200, { ok: true, status: 'WORKED', result, scheduled_slot: due.scheduled_slot });
   } catch (error) {
     return json(res, 500, { ok: false, status: 'ERROR', error: error.message });
   }
