@@ -517,3 +517,18 @@ test('GitHub evidence adapter rejects wrong repo, forged response and provider o
    assert.equal(fixture.events.length,before);
  });
 });
+test('PostgreSQL normalizes timestamp wire format without falsely invalidating event hashes',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse();
+    await turn(1,fixture);
+    for(const event of fixture.events){
+      event.effective_time=event.effective_time.replace('.000Z','+00:00');
+      event.assertion_time=event.assertion_time.replace('.000Z','+00:00');
+    }
+    const ordered=orderContinuityHistory(fixture.events);
+    assert.equal(ordered.length,4);
+    const continued=await turn(2,fixture);
+    assert.equal(continued.result.readback_verified,true);
+    assert.equal(continued.result.turn,2);
+  });
+});
