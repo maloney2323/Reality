@@ -58,3 +58,23 @@ A buyer should be able to inspect:
 - G2 2026 AI Agents Insight Report: 31% of surveyed B2B buyers reported 6+ hours/week overseeing agents; 45% report oversight/rework consume over 1/4 of expected productivity gains.
 
 These surveys identify a problem but do not independently validate Reality or a specific price. Customer pilot receipts are required.
+
+## Actual-model mixed-workstream execution (verified October 24, 2026)
+
+**Original paid model run:** [GitHub Actions #40119540286](https://github.com/maloney2323/Reality/actions/runs/40119540286). 25 real gpt-4.1-mini responses were obtained to the frozen mixed-business scenarios, plus 25 quote-based extraction attempts. The model received a changing subset of source evidence and previous responses; all business records were synthetic. Raw outputs preserved via a lossless, checksum-validated replay fixture.
+
+**Initial detector result:** 25 source-bound structured assessment receipts, 22 turns with a drift code, 6 with a suspected unsupported/fabricated claim code, and 23 proposals to quarantine. Reading the actual answers revealed many unwarranted flags: correct numeric 42, stated dates in natural language, denials like "the deposit has not cleared", and cautious approval refusals. Therefore **22/25 is NOT a model drift rate**. This high false-alarm rate exposed the semantic extraction problem.
+
+**Repair:** Assertion polarity (affirmed/denied/uncertain), type-aware fact normalization, no laundering a known citation onto a contrary value, explicit source-ambiguity abstention, and no obligation-loss penalty merely because an answer omitted an obligation. Then extracted source provenance and recipient/customer identities as first-class claims, tied to recorded world evidence; unverified certificate references are suspected, and cross-world recipient identity must be escalated.
+
+**Same-output final replay:** [GitHub Actions #40120834326](https://github.com/maloney2323/Reality/actions/runs/40120834326) with [auditable JSON artifact](https://github.com/maloney2323/Reality/actions/runs/40120834326/artifacts/12571052135). The **identical original 25 real AI outputs** were reevaluated with the changed detector (no new main-model generation in this replay). Results:
+- 25/25 quote-anchored extractor calls returned structured results; 25/25 source-bound structured receipts survived test-ledger read-back.
+- **1 customer-recipient scope risk**, turn 8: the response addressed CUST-999 while disclosing CUST-104 context. Flagged `WORLD_SCOPE_DRIFT` and held for identity reconciliation.
+- **1 unsupported provenance risk**, turn 9: source certificate `fake-882` asserted without a matching trusted receipt. Flagged `UNSUPPORTED_PROVENANCE` as a suspicion, not an independently proven hallucination.
+- **2 of 25 responses flagged for quarantine**, down from 23 on identical raw model text. This demonstrates reduced detector overflagging in these examples, **not** independently measured production precision or "21 prevented customer mistakes".
+- **15 model claim interpretations unadjudicated**, 4 retrospective claim/source discrepancies requiring temporal investigation, 0 independently verified external-world recovery outcomes, and **no independent real-model drift or hallucination rate**.
+- The original run made 25 generation calls plus extraction. The final replay reused saved generation outputs and made 25 extraction calls using the preexisting GitHub model credential. No new secret was created.
+
+**Business relevance:** Wrong-customer information and invented verification records are tangible categories of owner-operator harm. Market-facing value still requires supervised customer pilots showing fewer oversight minutes, reduced corrected rework, and fewer unsafe outcomes versus no Reality, with operating costs deducted. No dollar ROI claimed from these synthetic business cases.
+
+**Truthfulness warning:** This is one integrated benchmark with two complementary environments: real provider generation and mocked ledger for the 25-turn sequence, plus previously independently verified real Supabase/Vercel cross-request persistence. It is not yet the same 25 real provider turns persisted end-to-end to the deployed customer database with independently verified recovery.
