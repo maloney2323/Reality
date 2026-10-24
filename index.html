@@ -167,7 +167,7 @@ $('plan').onclick=async()=>{
   const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
   $('error').textContent=''; $('plan').disabled=true; $('trustPulseTitle').textContent='Checking this turn…'; $('trustPulseDetail').textContent='Waiting for source-scoped receipt. An answer alone is not verification.';
   try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:trustConversationId()})});
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:trustConversationId(),thought_id:trustConversationId()})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
     $('brief').classList.add('open');
