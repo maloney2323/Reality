@@ -203,6 +203,7 @@ export async function runContinuousReliabilityCycle({
 
   let assessment = null;
   let recovery = null;
+  let recoveryManifest = null;
   // Model-supplied world identity is NOT authorization. If the caller's
   // authorized world is known, retrieve only that world's evidence and let
   // assessDrift surface a cross-world claim as WORLD_SCOPE_DRIFT.
@@ -222,6 +223,7 @@ export async function runContinuousReliabilityCycle({
     const manifest = proposeDriftRecovery({
       trustedSnapshot, candidate: structuredCandidate, assessment
     });
+    recoveryManifest = manifest;
     recovery = verifyDriftRecovery({trustedSnapshot, manifest});
     // Structural correction is not a published world-state update.
     // Independent outcome verification and publication are separate gates.
@@ -251,6 +253,13 @@ export async function runContinuousReliabilityCycle({
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
+    // Retain exact location/code and trusted evidence references for individual
+    // incident cards. No unverified root cause or confirmed hallucination claims.
+    violation_details: (assessment?.violations || []).map(v=>({
+      code:v.code,path:v.path,key:v.key||null,
+      canonical_evidence_ref:v.canonical_evidence_ref||null,
+      action_id:v.action_id||null,obligation_id:v.obligation_id||null,
+    })),
     hallucination_confirmed: null,
     independent_truth_adjudication: false,
     extraction_completeness_verified: false,
@@ -258,7 +267,9 @@ export async function runContinuousReliabilityCycle({
       world_id: structuredCandidate.world_id,
       claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
     } : null,
-    correction_proposed: Boolean(recovery?.corrected),
+    correction_proposed: Boolean(recoveryManifest?.changes?.length),
+    correction_change_types: (recoveryManifest?.changes||[]).map(change=>change.type),
+    structural_correction_verified: Boolean(recovery?.corrected),
     source_attested_correction_proposals:correctionClaims,
     model_output_quarantined:shouldQuarantine,
     correction_published_to_active_state: false,
