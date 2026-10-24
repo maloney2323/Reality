@@ -5,6 +5,7 @@ import {
 } from './reality-continuity-spine-v2.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
 import { orderContinuityHistory } from './reality-continuous-reliability-v0.1.js';
+import { resolveReliabilityBenchmarkDb } from './reality-reliability-db-boundary-v0.1.js';
 
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.1';
 
@@ -30,7 +31,10 @@ export async function startContinuityRuntime({
     subjectId,
   });
   const persistenceEnabled = enabled();
-  const persistence = persistenceEnabled ? createUniversePostgresPersistence({ fetchImpl }) : null;
+  const isolated = resolveReliabilityBenchmarkDb();
+  const persistence = persistenceEnabled ? createUniversePostgresPersistence({
+    fetchImpl, ...(isolated||{}),
+  }) : null;
   const nodes = [];
   // Share the same integrity verifier with the historical backcheck.
   let priorEventCount = 0;
