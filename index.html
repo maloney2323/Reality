@@ -27,7 +27,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <main>
   <div class="top"><div class="brand">REALITY</div><div class="state">GOVERNED CHAT · v0.1</div></div>
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
-  <h1>Tell Reality what you need.</h1>
+  <h1>Reality finds work. Ask when you want.</h1>
   <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
 
   <section class="shift-settings" aria-label="Reality daily shift settings">
@@ -161,7 +161,7 @@ function renderWork(source){
 }
 async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
 realityWork.onclick=async()=>{
-  realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
+  manualWorkActive=true;realityWork.disabled=true;realityWork.textContent='Reality is looking…';workResult.classList.add('open');workResult.textContent='Discovering legitimate work…';
   try{
     const r=await fetch('/api/reality/stewardship');const b=await r.json();if(!r.ok)throw new Error(b.error||'stewardship discovery failed');
     renderWork(b.work||[]);
@@ -169,6 +169,38 @@ realityWork.onclick=async()=>{
     $('liveHeadline').textContent='Reality has started looking for work.';$('liveDetail').textContent='Discovery is observation. Authorization remains explicit.';
   }catch(e){workResult.textContent='Reality stopped honestly: '+e.message}
   finally{realityWork.disabled=false;realityWork.textContent='Put Reality to work'}
-};</script>
+};
+let manualWorkActive=false;
+async function refreshSavedShiftHome(){
+  try{
+    const r=await fetch('/api/reality/shift',{cache:'no-store'});
+    if(!r.ok)throw new Error('Saved shift status unavailable');
+    const b=await r.json();
+    if(b.config){
+      $('shiftEnabled').checked=b.config.enabled===true;
+      if(b.config.readinessTime)$('readinessTime').value=b.config.readinessTime;
+      if(b.config.shiftStart)$('shiftStart').value=b.config.shiftStart;
+      if([8,12].includes(Number(b.config.shiftLength)))$('shiftLength').value=String(b.config.shiftLength);
+      updateShiftBanner();
+    }
+    if(manualWorkActive)return;
+    if(b.home?.status==='RECORDED'){
+      renderWork(b.home.work||[]);
+      const date=b.home.latest_shift_at?new Date(b.home.latest_shift_at).toLocaleString():'unknown';
+      workResult.textContent='Loaded '+String((b.home.work||[]).length)+' discovered work items from saved shifts. Last shift: '+date+'. Discovery alone does not mean the work was executed.';
+      $('liveHeadline').textContent='Reality has persisted work to review.';
+      $('liveDetail').textContent='Showing saved observations, not unverified execution claims.';
+    }else if(b.home?.status==='NO_RECORDED_SHIFT'){
+      workResult.textContent='Shift enabled but no completed autonomous shift result is recorded yet. The schedule and runtime need verification.';
+    }
+  }catch(err){
+    if(!manualWorkActive)workResult.textContent='Saved autonomous shift results could not be verified: '+err.message;
+  }
+}
+// Loading saved discoveries is automatic; it never starts a new LLM call,
+// authorizes a tool, or runs the cron handler.
+refreshSavedShiftHome();
+setInterval(refreshSavedShiftHome,300000);
+</script>
 </body>
 </html>
