@@ -32,6 +32,60 @@ export async function startContinuityRuntime({
   const persistence = persistenceEnabled ? createUniversePostgresPersistence({ fetchImpl }) : null;
   const nodes = [];
 
+  // A new HTTP request is not a new continuity chain. Reconstruct the
+  // authoritative tail before computing any new event's parent and hash.
+  // Validate by parent references, never by timestamps: several events in a
+  // single turn share assertion_time and may sort in arbitrary UUID order.
+  let priorEventCount = 0;
+  if (persistence) {
+    try {
+      const history = await persistence.reconstruct({
+        continuityRootId: spine.continuity_root_id,
+        worldlineId: spine.worldline_id,
+      });
+      if (!Array.isArray(history)) throw new Error('CONTINUITY_HISTORY_NOT_ARRAY');
+      priorEventCount = history.length;
+      if (history.length) {
+        const byId = new Map();
+        const parents = new Set();
+        for (const event of history) {
+          if (!event?.event_id || !event.lineage_hash ||
+              event.continuity_root_id !== spine.continuity_root_id ||
+              event.worldline_id !== spine.worldline_id ||
+              byId.has(event.event_id)) throw new Error('CONTINUITY_HISTORY_INVALID');
+          byId.set(event.event_id, event);
+          if (event.parent_event_id) parents.add(event.parent_event_id);
+        }
+        const tips = history.filter(e => !parents.has(e.event_id));
+        if (tips.length !== 1) throw new Error('CONTINUITY_HISTORY_FORKED');
+        let cursor = tips[0];
+        const visited = new Set();
+        while (cursor) {
+          if (visited.has(cursor.event_id)) throw new Error('CONTINUITY_HISTORY_CYCLE');
+          visited.add(cursor.event_id);
+          const parent = cursor.parent_event_id ? byId.get(cursor.parent_event_id) : null;
+          if (cursor.parent_event_id && !parent) throw new Error('CONTINUITY_HISTORY_PARENT_MISSING');
+          const priorHash = cursor.provenance?.continuity_spine?.prior_lineage_hash ?? null;
+          if (parent && priorHash !== parent.lineage_hash) throw new Error('CONTINUITY_HISTORY_HASH_LINK_INVALID');
+          if (!parent && priorHash) throw new Error('CONTINUITY_HISTORY_ORPHAN_HASH');
+          cursor = parent;
+        }
+        if (visited.size !== history.length) throw new Error('CONTINUITY_HISTORY_DISCONNECTED');
+        spine = Object.freeze({
+          ...spine,
+          last_event_id: tips[0].event_id,
+          last_lineage_hash: tips[0].lineage_hash,
+          current_stage: tips[0].event_kind,
+        });
+      }
+    } catch (error) {
+      const failure = new Error('CONTINUITY_REHYDRATION_FAILED:' + (error?.message || 'UNKNOWN'));
+      failure.code = 'CONTINUITY_REHYDRATION_FAILED';
+      failure.cause = error;
+      throw failure;
+    }
+  }
+
   async function appendStage({
     stage,
     entityId,
@@ -129,6 +183,8 @@ export async function startContinuityRuntime({
     enabled: persistenceEnabled,
     spine,
     nodes: Object.freeze(nodes),
+    prior_event_count: priorEventCount,
+    readback: persistence ? async () => persistence.reconstruct({continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id}) : null,
     appendStage,
   });
 }
