@@ -79,6 +79,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <strong id="trustPulseTitle">Not checked in this session</strong>
 <span id="trustPulseDetail">Monitoring state comes from Reality's committed reliability receipt, not from model confidence.</span>
 </div>
+<details id="trustFindings" class="trust-digest" hidden>
+<summary id="trustFindingsTitle">Conversation drift details</summary>
+<div id="trustFindingsBody"></div>
+</details>
 <details id="trustDigest" class="trust-digest" hidden>
 <summary id="trustDigestTitle">10-turn conversation review</summary>
 <div id="trustDigestBody"></div>
@@ -117,7 +121,7 @@ function trustConversationId(){
 function renderTrustPulse(value){
  const p=value&&value.version==='reality-conversation-trust-pulse-v0.1'?value:null;
  const state=p?.status||'NOT_MONITORED';
- const tone=state==='DETECTED_AND_CONTAINED'||state==='FINDINGS_NEED_REVIEW'?'review':
+ const tone=state==='DETECTED_AND_CONTAINED'||state==='FINDINGS_NEED_REVIEW'||state==='CONVERSATIONAL_DRIFT_RISK'?'review':
    state==='CHECKED_NO_FINDINGS_FULLY_ADJUDICATED'?'verified':'limited';
  $('trustPulse').dataset.tone=tone;
  $('trustPulseTitle').textContent=p?.headline||'Monitoring result unavailable';
@@ -125,6 +129,20 @@ function renderTrustPulse(value){
    (p.turn?'Turn '+p.turn+' · ':'')+p.note+
     (p.evidence_receipt_id?' Receipt '+p.evidence_receipt_id.slice(0,24):' No verified receipt.') :
    'No complete reliability receipt was returned. No drift-free conclusion is possible.';
+ const cf=p?.conversational_drift_findings||[];
+ $('trustFindings').hidden=!cf.length;
+ if(cf.length){
+  $('trustFindingsTitle').textContent=cf.length+' conversational drift candidate(s) · inspect original words';
+  $('trustFindingsBody').innerHTML=cf.map(f=>
+   '<div class="row"><div><strong>'+esc(f.classification)+'</strong>'+ 
+   '<div class="muted">First detected turn '+esc(f.first_detected_turn)+
+   ' · Current turn '+esc(f.detected_turn)+' · Occurrence '+esc(f.recurrence_count)+'</div>'+ 
+   '<div class="muted">User intent: '+esc(f.original_user_text||'see source receipt')+'</div>'+ 
+   '<div class="muted">Model response: '+esc(f.observed_model_text||'see model receipt')+'</div>'+ 
+   '<div class="muted">Evidence: '+esc((f.source_receipt_refs||[]).join(', '))+'</div>'+ 
+   '<div class="trust-unknown">Semantic verification and repair: not performed</div></div></div>').join('');
+  $('trustFindings').open=true;
+ }
  const d=p?.digest;
  $('trustDigest').hidden=!d;
  if(d){
@@ -135,7 +153,11 @@ function renderTrustPulse(value){
      ' · Independently fully adjudicated: '+esc(d.independently_fully_adjudicated_turns)+'</div>'+
      '<div>Turns with potential mistakes: '+esc(d.turns_with_typed_findings)+
      ' · Contained model outputs: '+esc(d.model_outputs_contained)+
-     ' · Unverified/open incident turns: '+esc(d.open_or_unverified_incident_turns)+'</div>'+
+     ' · Unverified/open incident turns: '+esc(d.open_or_unverified_incident_turns)+'</div>'+ 
+     '<div>Conversational drift candidates in window: '+esc(d.conversational_risk_observations||0)+
+     ' · Repeat candidates: '+esc(d.recurring_conversational_risks||0)+
+     ' · Unverified conversational anchors: '+esc(d.unresolved_conversational_incident_anchors||0)+
+     ' · Authenticated historical checks: '+esc(d.authenticated_historical_alignment_checks||0)+'</div>'+ 
      '<div class="trust-unknown">Not scored: complete-conversation drift and hallucination rates. '+
      esc(d.insufficient_or_partially_assessed_turns)+' of '+esc(d.expected_turns)+
      ' turns lacked full independent adjudication. Historical incidents stay visible until verified closed.</div>';
