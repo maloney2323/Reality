@@ -346,3 +346,54 @@ test('real orchestration path sees prior ledger evidence and detects model contr
     }
   });
 });
+
+test('25-turn audit discovers earlier claim conflicting with later superseding source',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse(),worldId='construction:site-a';
+    const at1='2026-10-24T14:00:01.000Z';
+    const original=buildGovernedChatSignal({message:'Cabinet delivery is October 24',observedAt:at1});
+    const first=await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal:original,observedAt:at1,fetchImpl:fixture.fetchImpl,
+    });
+    const firstEvidence=await recordSourceAttestedEvidence({
+      continuityRuntime:first,worldId,sourceKind:'CONNECTED_PROVIDER_READBACK',
+      sourceRef:'supplier:preliminary',sourceDigest:'readback:preliminary',
+      facts:[{key:'cabinet_delivery_date',value:'October 24'}],observedAt:at1,
+    });
+    const initial=await runContinuousReliabilityCycle({
+      continuityRuntime:first,modelOutput:'Cabinet delivery is October 24.',
+      packetId:original.packet.packet_id,observedAt:at1,
+      structuredCandidate:{world_id:worldId,scope:'CONVERSATIONAL',actions:[],
+        carried_obligation_ids:[],claims:[{key:'cabinet_delivery_date',value:'October 24',
+          evidence_refs:[firstEvidence.event_id],original_quote:'October 24'}]},
+    });
+    assert.equal(initial.evaluation_status,'EVALUATED_AGAINST_SOURCE_ATTESTATION');
+    assert.equal(initial.drift.length,0);
+    for(let n=2;n<25;n++)await turn(n,fixture);
+    const at25='2026-10-24T14:00:25.000Z';
+    const signal=buildGovernedChatSignal({message:'Supplier changed delivery plan',observedAt:at25});
+    const later=await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal,observedAt:at25,fetchImpl:fixture.fetchImpl,
+    });
+    const newEvidence=await recordSourceAttestedEvidence({
+      continuityRuntime:later,worldId,sourceKind:'CONNECTED_PROVIDER_READBACK',
+      sourceRef:'supplier:confirmed',sourceDigest:'readback:confirmed',
+      facts:[{key:'cabinet_delivery_date',value:'October 27',
+        supersedes_evidence_ref:firstEvidence.event_id}],observedAt:at25,
+    });
+    const result=await runContinuousReliabilityCycle({
+      continuityRuntime:later,modelOutput:'Acknowledged.',
+      packetId:signal.packet.packet_id,observedAt:at25,
+    });
+    assert.equal(result.turn,25);
+    assert.equal(result.checkpoint.retrospective_discrepancies.length,1);
+    const incident=result.checkpoint.retrospective_discrepancies[0];
+    assert.equal(incident.original_turn,1);
+    assert.equal(incident.new_source_receipt_id,newEvidence.event_id);
+    assert.equal(incident.status,'NEW_EVIDENCE_CONTRADICTION_PENDING_TEMPORAL_ADJUDICATION');
+    assert.equal(result.checkpoint.hallucination_rate_pct,null);
+    assert.equal(result.checkpoint.readback_verified,true);
+  });
+});
