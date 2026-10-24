@@ -532,3 +532,27 @@ test('PostgreSQL normalizes timestamp wire format without falsely invalidating e
     assert.equal(continued.result.turn,2);
   });
 });
+
+test('identical packets in different worlds receive distinct append-only event IDs',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse();
+    const observedAt='2026-10-01T12:00:01.000Z';
+    const signal=buildGovernedChatSignal({message:'Same words in two different customer worlds',observedAt});
+    const first=await startContinuityRuntime({
+      continuityRootSource:'client:A',worldlineSource:'world:construction:A',
+      subjectId:'customer:A',signal,observedAt,fetchImpl:fixture.fetchImpl,
+    });
+    const second=await startContinuityRuntime({
+      continuityRootSource:'client:B',worldlineSource:'world:construction:B',
+      subjectId:'customer:B',signal,observedAt,fetchImpl:fixture.fetchImpl,
+    });
+    assert.notEqual(first.nodes[0].event_id,second.nodes[0].event_id);
+    assert.notEqual(first.nodes[1].event_id,second.nodes[1].event_id);
+    assert.equal(fixture.events.length,6);
+    const one=orderContinuityHistory(fixture.events.filter(e=>
+      e.continuity_root_id===first.spine.continuity_root_id));
+    const two=orderContinuityHistory(fixture.events.filter(e=>
+      e.continuity_root_id===second.spine.continuity_root_id));
+    assert.equal(one.length,3);assert.equal(two.length,3);
+  });
+});
