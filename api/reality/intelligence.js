@@ -298,6 +298,7 @@ export default async function handler(req, res) {
       message: body?.message,
       requestedBy: realityContext?.authenticated_user_id || principal.principal_id,
       systemContext: operationalContext,
+      verifiedConversationTurns: realityContext?.authenticated_conversation_turns || null,
     });
 
     return res.status(200).json({
