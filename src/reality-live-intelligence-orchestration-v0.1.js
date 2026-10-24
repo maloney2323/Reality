@@ -5,6 +5,7 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
+import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -278,7 +279,8 @@ export async function runLiveIntelligenceOrchestration({
         authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
       })
-    : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
+    : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null,
+        trust_pulse: buildUnmonitoredTrustPulse() };
   const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus };
   if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
     const corrections=(continuousReliability.source_attested_correction_proposals||[])
