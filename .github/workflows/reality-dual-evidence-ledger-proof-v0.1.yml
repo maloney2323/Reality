@@ -8,6 +8,9 @@ on:
       - 'src/reality-incident-comparison-v0.1.js'
       - 'src/reality-continuous-reliability-v0.1.js'
       - 'src/reality-conversation-trust-pulse-v0.1.js'
+      - 'src/reality-conversation-drift-integrity-v0.1.js'
+      - 'test/reality-conversation-drift-integrity-v0.1.test.js'
+      - 'api/reality/intelligence.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-conversation-trust-pulse-v0.1.test.js'
       - 'test/reality-continuous-reliability-v0.1.test.js'
@@ -33,6 +36,8 @@ jobs:
         run: |
           node --check src/reality-incident-comparison-v0.1.js
           node --check src/reality-conversation-trust-pulse-v0.1.js
+          node --check src/reality-conversation-drift-integrity-v0.1.js
+          node --check api/reality/intelligence.js
           node --check src/reality-live-intelligence-orchestration-v0.1.js
           node --check src/reality-continuous-reliability-v0.1.js
           node --check api/reality/full-loop-sandbox-proof.js
@@ -41,6 +46,7 @@ jobs:
         run: |
           node --test test/reality-incident-comparison-v0.1.test.js \
             test/reality-conversation-trust-pulse-v0.1.test.js \
+            test/reality-conversation-drift-integrity-v0.1.test.js \
             test/reality-proof-telemetry-v0.1.test.js \
             test/reality-full-loop-sandbox-proof-v0.1.test.js \
             test/reality-continuous-reliability-v0.1.test.js
