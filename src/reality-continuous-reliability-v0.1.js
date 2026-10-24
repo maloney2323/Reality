@@ -3,6 +3,7 @@
 // verified evidence is recorded as NOT_EVALUATED, never as a clean result.
 import crypto from 'node:crypto';
 import { assessDrift, proposeDriftRecovery, verifyDriftRecovery } from './reality-drift-recovery-v0.1.js';
+import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
@@ -49,6 +50,25 @@ export function orderContinuityHistory(history) {
     seen.add(event.event_id);
     const parent = event.parent_event_id ? byId.get(event.parent_event_id) : null;
     if (event.parent_event_id && !parent) throw new Error('RELIABILITY_HISTORY_PARENT_MISSING');
+    // Recompute the event hash from persisted content, not from a self-asserted
+    // hash pointer. A chain of unverified hashes does not prove record integrity.
+    const {continuity_spine: lineageMetadata, ...originalProvenance} = event.provenance || {};
+    const expectedHash = computeContinuityLineageHash({
+      continuityRootId: event.continuity_root_id,
+      worldlineId: event.worldline_id,
+      parentEventId: event.parent_event_id,
+      priorLineageHash: lineageMetadata?.prior_lineage_hash || null,
+      stage: event.event_kind,
+      entityId: event.entity_id,
+      evidenceRefs: event.evidence_refs || [],
+      transformationReceiptId: lineageMetadata?.transformation_receipt_id || null,
+      effectiveTime: event.effective_time,
+      assertionTime: event.assertion_time,
+      epistemicStatus: event.epistemic_status,
+      payload: event.payload,
+      provenance: originalProvenance,
+    });
+    if (expectedHash !== event.lineage_hash) throw new Error('RELIABILITY_HISTORY_CONTENT_HASH_INVALID');
     if (parent) {
       if (parent.continuity_root_id !== event.continuity_root_id ||
           parent.worldline_id !== event.worldline_id) throw new Error('RELIABILITY_HISTORY_SCOPE_BREAK');
