@@ -262,19 +262,19 @@ test('source attestation requires explicit supersession and rejects ungrounded c
 });
 
 test('quote-anchored extractor rejects invented quotes and cannot prove accuracy by itself',async()=>{
-  const snapshot={world_id:'construction:site-a',facts:[{key:'delivery',value:'October 27',evidence_ref:'source:1'}],obligations:[]};
+  const snapshot={world_id:'construction:site-a',facts:[{key:'delivery',value:'2026-10-27',evidence_ref:'source:1'}],obligations:[]};
   const modelOutput='Delivery is October 24 and the price is $4500.';
   const extract=async value=>extractReliabilityClaims({
     snapshot,worldId:snapshot.world_id,modelOutput,apiKey:'test-key',model:'test-model',
     fetchImpl:async()=>new Response(JSON.stringify({id:'extract:1',output_text:JSON.stringify(value)}),{status:200}),
   });
   const ok=await extract({claims:[
-    {key:'delivery',value:'October 24',quote:'Delivery is October 24'},
-    {key:'price',value:'4500',quote:'the price is $4500'},
+    {key:'delivery',value:'October 24',quote:'Delivery is October 24',assertion:'AFFIRMED'},
+    {key:'price',value:'4500',quote:'the price is $4500',assertion:'AFFIRMED'},
   ],actions:[],operational:false});
   assert.equal(ok.candidate.claims.length,2);
   assert.equal(ok.completeness_independently_verified,false);
-  await assert.rejects(extract({claims:[{key:'price',value:'4500',quote:'I verified the price'}],
+  await assert.rejects(extract({claims:[{key:'price',value:'4500',quote:'I verified the price',assertion:'AFFIRMED'}],
     actions:[],operational:false}),/RELIABILITY_EXTRACTION_QUOTE_NOT_IN_MODEL_OUTPUT/);
 });
 
@@ -308,7 +308,7 @@ test('real orchestration path sees prior ledger evidence and detects model contr
           modelCalls.push(request);
           if(request.text?.format?.name==='reliability_assertions'){
             return new Response(JSON.stringify({id:'extract:1',status:'completed',output_text:JSON.stringify({
-              claims:[{key:'cabinet_delivery_date',value:'October 24',quote:'October 24'}],
+              claims:[{key:'cabinet_delivery_date',value:'October 24',quote:'October 24',assertion:'AFFIRMED'}],
               actions:[],operational:false,
             })}),{status:200});
           }
@@ -325,14 +325,14 @@ test('real orchestration path sees prior ledger evidence and detects model contr
         fetchImpl:fakeFetch,
       });
       assert.equal(modelCalls.length,2);
-      assert.equal(modelCalls[0].input[1].content[0].text.includes('October 27'),true);
+      assert.equal(modelCalls[0].input[1].content[0].text.includes('2026-10-27'),true);
       assert.equal(modelCalls[0].input[1].content[0].text.includes('do_not_send_estimate_without_approval'),true);
       assert.equal(result.reliability.evaluation_status,'EVALUATED_AGAINST_SOURCE_ATTESTATION');
       assert.deepEqual(result.reliability.drift,['FACT_DRIFT']);
       assert.equal(result.reliability.readback_verified,true);
       assert.equal(result.reliability.correction_proposed,true);
       assert.equal(result.reliability.model_output_quarantined,true);
-      assert.match(result.intelligence.answer,/October 27/);
+      assert.match(result.intelligence.answer,/2026-10-27/);
       assert.doesNotMatch(result.intelligence.answer,/October 24/);
       assert.equal(result.intelligence.reliability_intervention,'QUARANTINED_PRIOR_TO_DISPLAY');
       assert.equal(result.reliability.correction_published_to_active_state,false);
@@ -585,4 +585,43 @@ test('JSONB reorder of receipt keys does not falsely fail independent read-back'
    assert.equal(result.readback_verified,true);
    assert.equal(result.evaluation_status,'NOT_EVALUATED');
  });
+});
+
+test('real-model extraction does not flag exact numeric facts, denials or mere missing obligations',async()=>{
+  const snapshot={
+    world_id:'business:demo',facts:[
+      {key:'bolts_on_hand',value:42,evidence_ref:'inventory:readback'},
+      {key:'customer_contact_status',value:'DRAFT',evidence_ref:'crm:status'},
+    ],
+    obligations:[{id:'homeowner_approval_before_estimate_send',active:true,evidence_ref:'owner:policy'}],
+  };
+  const modelOutput='There are 42 bolts on hand, not 420. The estimate has not been sent.';
+  const parsed={claims:[
+    {key:'bolts_on_hand',value:'42',quote:'42 bolts on hand',assertion:'AFFIRMED'},
+    {key:'bolts_on_hand',value:'420',quote:'not 420',assertion:'DENIED'},
+    {key:'customer_contact_status',value:'not sent',quote:'estimate has not been sent',assertion:'AFFIRMED'},
+  ],actions:[],operational:true};
+  const result=await extractReliabilityClaims({
+    modelOutput,worldId:snapshot.world_id,snapshot,apiKey:'test',
+    model:'mock',fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify(parsed)}),{status:200}),
+  });
+  assert.equal(result.candidate.claims.length,1);
+  assert.equal(result.candidate.claims[0].value,42);
+  assert.deepEqual(result.candidate.claims[0].evidence_refs,['inventory:readback']);
+  assert.deepEqual(result.candidate.carried_obligation_ids,['homeowner_approval_before_estimate_send']);
+  assert.equal(result.unadjudicated_claims.length,2);
+});
+test('an affirmed contradictory numeric claim cannot borrow a genuine source citation',async()=>{
+  const snapshot={world_id:'business:demo',
+    facts:[{key:'bolts_on_hand',value:42,evidence_ref:'inventory:readback'}],obligations:[]};
+  const modelOutput='There are 420 bolts on hand.';
+  const result=await extractReliabilityClaims({
+    modelOutput,worldId:snapshot.world_id,snapshot,apiKey:'test',model:'mock',
+    fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify({
+      claims:[{key:'bolts_on_hand',value:'420',quote:'420 bolts',assertion:'AFFIRMED'}],
+      actions:[],operational:false,
+    })}),{status:200}),
+  });
+  assert.equal(result.candidate.claims[0].value,420);
+  assert.deepEqual(result.candidate.claims[0].evidence_refs,[]);
 });
