@@ -22,6 +22,10 @@ const scopeOf=x=>{
 };
 const sameScope=(a,b)=>['continuity_root_id','worldline_id',
  'owner_user_id','work_item_id'].every(k=>a?.[k]===b?.[k]);
+const sameEntryScope=(e,s)=>e?.continuity_root_id===s.continuity_root_id&&
+ e?.worldline_id===s.worldline_id&&
+ e?.provenance?.owner_user_id===s.owner_user_id&&
+ e?.provenance?.work_item_id===s.work_item_id;
 const TYPES=new Set(['STRING','NUMBER','BOOLEAN','REPORTS','GATE','INVENTORY','SCHEDULE']);
 const port=x=>{
  if(!nonempty(x?.name)||!TYPES.has(x?.type))err('COMPOSITION_PORT_INVALID');
@@ -119,8 +123,8 @@ export function compileFormDAG({forms,targetId,scope}={}){
    const parent=map.get(edge.parent_id);
    if(!parent)err('COMPOSITION_DEPENDENCY_MISSING');
    const port=f.inputs.find(p=>p.name===edge.input_name);
-   if(port.type!==parent.output.type)err('COMPOSITION_TYPE_MISMATCH');
    dfs(parent.form_id);
+   if(port.type!==parent.output.type)err('COMPOSITION_TYPE_MISMATCH');
   }
   visiting.delete(id);visited.add(id);order.push(id);
  }
@@ -217,9 +221,7 @@ export function createBitemporalGhostFork({
   err('GHOST_INVALID_INPUT');
  const source=entries.filter(e=>{
   validateUniverseEntry(e);
-  return sameScope(e.provenance,trusted)&&
-   e.continuity_root_id===trusted.continuity_root_id&&
-   e.worldline_id===trusted.worldline_id&&
+  return sameEntryScope(e,trusted)&&
    Date.parse(e.effective_time)<=Date.parse(v)&&
    Date.parse(e.assertion_time)<=Date.parse(k)&&
    e.event_kind==='OPERATIONAL_SNAPSHOT';
@@ -287,9 +289,7 @@ export function computeRevocationClosure({
  for(const e of revocationEvents){
   validateUniverseEntry(e);
   if(e.event_kind!=='CAPABILITY_REVOKED')continue;
-  if(e.continuity_root_id!==s.continuity_root_id||
-   e.worldline_id!==s.worldline_id||
-   !sameScope(e.provenance,s))err('REVOCATION_FOREIGN_SCOPE_REJECTED');
+  if(!sameEntryScope(e,s))err('REVOCATION_FOREIGN_SCOPE_REJECTED');
   if(Date.parse(e.assertion_time)>k||Date.parse(e.effective_time)>v)continue;
   if(map.has(e.payload?.form_id)){
    revoked.add(e.payload.form_id);direct.push(e.payload.form_id);
