@@ -20,6 +20,7 @@ export async function startContinuityRuntime({
   signal,
   observedAt = new Date().toISOString(),
   fetchImpl = fetch,
+  previewProofPersistence = null,
 } = {}) {
   if (!continuityRootSource || !subjectId || !signal?.packet?.packet_id) {
     return Object.freeze({ status: 'NO_CONTINUITY_ROOT', enabled: false, nodes: [] });
@@ -30,11 +31,18 @@ export async function startContinuityRuntime({
     worldlineId: worldlineSource,
     subjectId,
   });
-  const persistenceEnabled = enabled();
+  if (previewProofPersistence && (
+    process.env.VERCEL_ENV !== 'preview' ||
+    process.env.VERCEL_GIT_COMMIT_REF !== 'feature/reality-drift-live-continuity-v1-20261024' ||
+    typeof previewProofPersistence.appendEvent !== 'function' ||
+    typeof previewProofPersistence.reconstruct !== 'function')) {
+    throw new Error('RELIABILITY_PREVIEW_PROOF_PERSISTENCE_FORBIDDEN');
+  }
+  const persistenceEnabled = enabled() || Boolean(previewProofPersistence);
   const isolated = resolveReliabilityBenchmarkDb();
-  const persistence = persistenceEnabled ? createUniversePostgresPersistence({
+  const persistence = previewProofPersistence || (persistenceEnabled ? createUniversePostgresPersistence({
     fetchImpl, ...(isolated||{}),
-  }) : null;
+  }) : null);
   const nodes = [];
   // Share the same integrity verifier with the historical backcheck.
   let priorEventCount = 0;
