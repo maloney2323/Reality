@@ -250,7 +250,7 @@ export async function runContinuousReliabilityCycle({
   const committed = await continuityRuntime.appendStage({
     stage: 'VERIFICATION',
     entityId: 'reliability:'+packetId,
-    eventId: 'reliability:'+packetId,
+    eventId: 'reliability:'+continuityRuntime.spine.continuity_root_id+':'+continuityRuntime.spine.worldline_id+':'+packetId,
     epistemicStatus: 'UNVERIFIED',
     effectiveTime: observedAt, assertionTime: observedAt,
     evidenceRefs: evidenceAccepted ? [
@@ -270,7 +270,7 @@ export async function runContinuousReliabilityCycle({
     const checkpoint = await continuityRuntime.appendStage({
       stage: 'VERIFICATION',
       entityId: 'historical-backcheck:'+String(backcheck.total_turns),
-      eventId: 'historical-backcheck:'+String(backcheck.total_turns)+':'+continuityRuntime.spine.continuity_root_id,
+      eventId: 'historical-backcheck:'+String(backcheck.total_turns)+':'+continuityRuntime.spine.continuity_root_id+':'+continuityRuntime.spine.worldline_id,
       epistemicStatus: 'UNVERIFIED',
       payload: {
         cycle_version: CONTINUOUS_RELIABILITY_VERSION,
