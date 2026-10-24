@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGovernedChatSignal } from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-v0.1.js';
+import { recordSourceAttestedEvidence, readGroundedEvidence } from '../src/reality-reliability-evidence-v0.1.js';
+import { extractReliabilityClaims } from '../src/reality-reliability-claim-extraction-v0.1.js';
 import {
   classifyReliabilityFindings, computeHistoricalBackcheck, orderContinuityHistory,
   runContinuousReliabilityCycle,
@@ -142,15 +144,16 @@ test('independently attested structured contradiction proposes recovery but neve
         {key:'cabinet_price',value:4500,evidence_refs:['model:invented']},
       ],
     };
-    const receipt={
-      independent:true,verified:true,world_id:snapshot.world_id,
-      source_kind:'EXTERNAL_EVIDENCE_VERIFIER',
-    };
+    const evidence = await recordSourceAttestedEvidence({
+      continuityRuntime:runtime,worldId:snapshot.world_id,
+      sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier-delivery-verified',
+      sourceDigest:'readback-hash-v1',facts:[{key:'cabinet_delivery_date',value:'2026-10-27'}],observedAt:at,
+    });
+    candidate.claims[0].evidence_refs=[evidence.event_id];
     const result=await runContinuousReliabilityCycle({
       continuityRuntime:runtime,modelOutput:'Cabinets October 24; price $4500',
       packetId:signal.packet.packet_id,
-      structuredCandidate:candidate,independentlyVerifiedSnapshot:snapshot,
-      evidenceVerifierReceipt:receipt,observedAt:at,
+      structuredCandidate:candidate,observedAt:at,
     });
     assert.deepEqual(result.drift,['FACT_DRIFT']);
     assert.deepEqual(result.hallucination_suspected,['UNSUPPORTED_CLAIM']);
@@ -204,4 +207,71 @@ test('tampered historical payload is rejected even when stored hash pointers are
     await assert.rejects(turn(2,fixture),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
     assert.equal(fixture.events.length,before);
   });
+});
+
+test('source evidence cannot be supplied through the assessment as an arbitrary trust snapshot',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse(),at='2026-10-24T13:01:00.000Z';
+    const signal=buildGovernedChatSignal({message:'Prepare cabinet schedule',observedAt:at});
+    const runtime=await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal,observedAt:at,fetchImpl:fixture.fetchImpl,
+    });
+    const fake={
+      world_id:'construction:site-a',facts:[{key:'delivery',value:'tomorrow',world_id:'construction:site-a',evidence_ref:'fake'}],
+      obligations:[],authorities:[],receipts:[],
+    };
+    const result=await runContinuousReliabilityCycle({
+      continuityRuntime:runtime,modelOutput:'Delivery tomorrow',
+      packetId:signal.packet.packet_id,independentlyVerifiedSnapshot:fake,
+      evidenceVerifierReceipt:{verified:true,independent:true,source_kind:'EXTERNAL_EVIDENCE_VERIFIER'},
+      structuredCandidate:{world_id:'construction:site-a',scope:'CONVERSATIONAL',claims:[{key:'delivery',value:'tomorrow',evidence_refs:['fake']}],actions:[],carried_obligation_ids:[]},
+      observedAt:at,
+    });
+    assert.equal(result.evaluation_status,'NOT_EVALUATED');
+    assert.equal(result.hallucination_rate_pct,null);
+  });
+});
+
+test('source attestation requires explicit supersession and rejects ungrounded contradictory updates',async()=>{
+  await withPersistence(async()=>{
+    const fixture=mockUniverse(),at='2026-10-24T13:02:00.000Z';
+    const signal=buildGovernedChatSignal({message:'Delivery review',observedAt:at});
+    const runtime=await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal,observedAt:at,fetchImpl:fixture.fetchImpl,
+    });
+    const a=await recordSourceAttestedEvidence({
+      continuityRuntime:runtime,worldId:'construction:site-a',
+      sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier:1',sourceDigest:'sha-one',
+      facts:[{key:'cabinet_delivery_date',value:'October 24'}],observedAt:at,
+    });
+    await recordSourceAttestedEvidence({
+      continuityRuntime:runtime,worldId:'construction:site-a',
+      sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier:2',sourceDigest:'sha-two',
+      facts:[{key:'cabinet_delivery_date',value:'October 27'}],observedAt:at,
+    });
+    assert.throws(()=>readGroundedEvidence(orderContinuityHistory(fixture.events),{worldId:'construction:site-a'}),
+      /RELIABILITY_CONFLICTING_ATTESTED_FACTS/);
+    // With an explicit supersession chain the active fact advances, not history.
+    // A different root is required after a conflicting source was appended.
+    assert.ok(a.event_id);
+  });
+});
+
+test('quote-anchored extractor rejects invented quotes and cannot prove accuracy by itself',async()=>{
+  const snapshot={world_id:'construction:site-a',facts:[{key:'delivery',value:'October 27',evidence_ref:'source:1'}],obligations:[]};
+  const modelOutput='Delivery is October 24 and the price is $4500.';
+  const extract=async value=>extractReliabilityClaims({
+    snapshot,worldId:snapshot.world_id,modelOutput,apiKey:'test-key',model:'test-model',
+    fetchImpl:async()=>new Response(JSON.stringify({id:'extract:1',output_text:JSON.stringify(value)}),{status:200}),
+  });
+  const ok=await extract({claims:[
+    {key:'delivery',value:'October 24',quote:'Delivery is October 24'},
+    {key:'price',value:'4500',quote:'the price is $4500'},
+  ],actions:[],operational:false});
+  assert.equal(ok.candidate.claims.length,2);
+  assert.equal(ok.completeness_independently_verified,false);
+  await assert.rejects(extract({claims:[{key:'price',value:'4500',quote:'I verified the price'}],
+    actions:[],operational:false}),/RELIABILITY_EXTRACTION_QUOTE_NOT_IN_MODEL_OUTPUT/);
 });
