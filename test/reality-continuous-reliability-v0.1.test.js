@@ -7,6 +7,7 @@ import { extractReliabilityClaims } from '../src/reality-reliability-claim-extra
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
 import { resolveReliabilityBenchmarkDb } from '../src/reality-reliability-db-boundary-v0.1.js';
 import {sealModelOutput,openModelOutput} from '../src/reality-reliability-private-replay-v0.1.js';
+import {captureGithubRepositoryEvidence} from '../src/reality-reliability-github-evidence-v0.1.js';
 import {
   classifyReliabilityFindings, computeHistoricalBackcheck, orderContinuityHistory,
   runContinuousReliabilityCycle,
@@ -449,5 +450,66 @@ test('historical audit distinguishes replayable from permanently missing origina
      if(previous===undefined)delete process.env.REALITY_RELIABILITY_REPLAY_KEY;
      else process.env.REALITY_RELIABILITY_REPLAY_KEY=previous;
    }
+ });
+});
+test('authenticated real-provider adapter records scoped GitHub facts and superseding changes',async()=>{
+ await withPersistence(async()=>{
+   const fixture=mockUniverse();
+   const signal=buildGovernedChatSignal({message:'Inspect Reality repository',observedAt:'2026-10-24T14:30:00.000Z'});
+   const runtime=await startContinuityRuntime({
+      continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+      subjectId:'conversation:contractor',signal,observedAt:'2026-10-24T14:30:00.000Z',fetchImpl:fixture.fetchImpl,
+   });
+   let branch='main',reads=0;
+   const provider=async(url,options)=>{
+     assert.equal(url,'https://api.github.com/repos/maloney2323/Reality');
+     assert.equal(options.method,'GET');reads++;
+     return new Response(JSON.stringify({
+       id:1388852445,full_name:'maloney2323/Reality',
+       default_branch:branch,archived:false,
+     }),{status:200});
+   };
+   const first=await captureGithubRepositoryEvidence({
+     continuityRuntime:runtime,allowedRepository:'maloney2323/Reality',
+     worldId:'developer:repo',fetchImpl:provider,
+     observedAt:'2026-10-24T14:30:01.000Z',
+   });
+   assert.equal(first.readback_verified,true);
+   assert.equal(first.facts.default_branch,'main');
+   branch='master';
+   const next=await captureGithubRepositoryEvidence({
+     continuityRuntime:runtime,allowedRepository:'maloney2323/Reality',
+     worldId:'developer:repo',fetchImpl:provider,
+     observedAt:'2026-10-24T14:30:02.000Z',
+   });
+   assert.equal(next.facts.default_branch,'master');
+   assert.equal(reads,2);
+   const snapshot=readGroundedEvidence(orderContinuityHistory(fixture.events),{worldId:'developer:repo'});
+   const fact=snapshot.facts.find(x=>x.key==='default_branch');
+   assert.equal(fact.value,'master');
+   assert.equal(fact.evidence_ref,next.source_receipt_id);
+   assert.equal(snapshot.source_receipt_ids.length,2);
+ });
+});
+test('GitHub evidence adapter rejects wrong repo, forged response and provider outage',async()=>{
+ await withPersistence(async()=>{
+   const fixture=mockUniverse();
+   const signal=buildGovernedChatSignal({message:'Observe',observedAt:'2026-10-24T14:31:00.000Z'});
+   const runtime=await startContinuityRuntime({
+     continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+     subjectId:'conversation:contractor',signal,observedAt:'2026-10-24T14:31:00.000Z',fetchImpl:fixture.fetchImpl,
+   });
+   const before=fixture.events.length;
+   const base={continuityRuntime,allowedRepository:'maloney2323/Reality',worldId:'developer:repo'};
+   await assert.rejects(captureGithubRepositoryEvidence({...base,repository:'another/repo'}),
+     /RELIABILITY_GITHUB_REPOSITORY_NOT_ALLOWLISTED/);
+   await assert.rejects(captureGithubRepositoryEvidence({...base,
+     fetchImpl:async()=>new Response(JSON.stringify({
+       id:1,full_name:'attacker/clone',default_branch:'main',archived:false,
+     }),{status:200})}),/RELIABILITY_GITHUB_PROVIDER_DATA_INVALID/);
+   await assert.rejects(captureGithubRepositoryEvidence({...base,
+     fetchImpl:async()=>new Response('unavailable',{status:503})}),
+     /RELIABILITY_GITHUB_PROVIDER_READ_FAILED_503/);
+   assert.equal(fixture.events.length,before);
  });
 });
