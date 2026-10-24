@@ -127,7 +127,8 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
     return Number.isInteger(n) && n >= windowStart && n <= windowEnd;
   });
   const carriedUnresolved = findings.filter(event =>
-    event.payload.evaluation_status !== 'EVALUATED_WITH_INDEPENDENT_EVIDENCE' ||
+    event.payload.evaluation_status !== 'EVALUATED_AGAINST_SOURCE_ATTESTATION' ||
+    event.payload.extraction_completeness_verified !== true ||
     (event.payload.drift?.length || 0) > 0 ||
     (event.payload.hallucination_suspected?.length || 0) > 0
   );
@@ -153,13 +154,17 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
       }
     }
   }
+  const sourcedStructured = inWindow.filter(event =>
+    event.payload.evaluation_status === 'EVALUATED_AGAINST_SOURCE_ATTESTATION').length;
   const independentlyEvaluated = inWindow.filter(event =>
-    event.payload.evaluation_status === 'EVALUATED_WITH_INDEPENDENT_EVIDENCE').length;
+    event.payload.independent_truth_adjudication === true &&
+    event.payload.extraction_completeness_verified === true).length;
   return Object.freeze({
     window_start: windowStart, window_end: windowEnd, total_turns: turn,
     raw_turns_in_window: windowIds.size,
     recorded_assessments: inWindow.length,
     missing_assessment_turns: Math.max(0, windowIds.size - inWindow.length),
+    source_attested_structured_turns: sourcedStructured,
     independently_evaluated_turns: independentlyEvaluated,
     unresolved_or_unassessed_receipt_ids: [...new Set(carriedUnresolved.map(event => event.event_id))],
     replayable_unassessed_receipt_ids:inWindow.filter(e=>
