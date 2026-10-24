@@ -121,7 +121,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'RAW_SIGNAL',
     entityId: signal.packet.packet_id,
-    eventId: `raw:${signal.packet.packet_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:raw:${signal.packet.packet_id}`,
     payload: {
       packet_id: signal.packet.packet_id,
       source: signal.packet.source,
@@ -134,7 +134,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'TRANSFORMATION',
     entityId: signal.transformation_receipt.receipt_id,
-    eventId: `transform:${signal.transformation_receipt.receipt_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:transform:${signal.transformation_receipt.receipt_id}`,
     evidenceRefs: [signal.packet.packet_id],
     transformationReceiptId: signal.transformation_receipt.receipt_id,
     payload: {
@@ -151,7 +151,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'OBSERVATION',
     entityId: signal.packet.packet_id + ':observation',
-    eventId: `observation:${signal.packet.packet_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:observation:${signal.packet.packet_id}`,
     evidenceRefs: signal.fragments.map((fragment) => fragment.fragment_id),
     transformationReceiptId: signal.transformation_receipt.receipt_id,
     payload: {
