@@ -184,6 +184,7 @@ export async function runContinuousReliabilityCycle({
   modelResponseId = null,
   packetId,
   structuredCandidate = null,
+  authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
   evidenceVerifierReceipt = null,
   observedAt = new Date().toISOString(),
@@ -197,8 +198,12 @@ export async function runContinuousReliabilityCycle({
 
   let assessment = null;
   let recovery = null;
-  const ledgerSnapshot = structuredCandidate?.world_id
-    ? readGroundedEvidence(before,{worldId:structuredCandidate.world_id}) : null;
+  // Model-supplied world identity is NOT authorization. If the caller's
+  // authorized world is known, retrieve only that world's evidence and let
+  // assessDrift surface a cross-world claim as WORLD_SCOPE_DRIFT.
+  const evidenceWorldId = authorizedWorldId || structuredCandidate?.world_id || null;
+  const ledgerSnapshot = evidenceWorldId && structuredCandidate
+    ? readGroundedEvidence(before,{worldId:evidenceWorldId}) : null;
   // A fake caller-provided truth snapshot cannot override ledger evidence.
   const evidenceAccepted = Boolean(structuredCandidate && ledgerSnapshot?.source_receipt_ids.length &&
     (!independentlyVerifiedSnapshot ||
