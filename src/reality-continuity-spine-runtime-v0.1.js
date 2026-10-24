@@ -4,6 +4,8 @@ import {
   advanceSpine,
 } from './reality-continuity-spine-v2.0.js';
 import { createUniversePostgresPersistence } from './reality-universe-postgres-persistence-v0.1.js';
+import { orderContinuityHistory } from './reality-continuous-reliability-v0.1.js';
+import { resolveReliabilityBenchmarkDb } from './reality-reliability-db-boundary-v0.1.js';
 
 export const REALITY_CONTINUITY_RUNTIME_VERSION = 'reality-continuity-runtime-v0.1';
 
@@ -29,8 +31,36 @@ export async function startContinuityRuntime({
     subjectId,
   });
   const persistenceEnabled = enabled();
-  const persistence = persistenceEnabled ? createUniversePostgresPersistence({ fetchImpl }) : null;
+  const isolated = resolveReliabilityBenchmarkDb();
+  const persistence = persistenceEnabled ? createUniversePostgresPersistence({
+    fetchImpl, ...(isolated||{}),
+  }) : null;
   const nodes = [];
+  // Share the same integrity verifier with the historical backcheck.
+  let priorEventCount = 0;
+  if (persistence) {
+    try {
+      const history = await persistence.reconstruct({
+        continuityRootId: spine.continuity_root_id,
+        worldlineId: spine.worldline_id,
+      });
+      const ordered = orderContinuityHistory(history);
+      priorEventCount = ordered.length;
+      const tail = ordered.at(-1);
+      if (tail) {
+        spine = Object.freeze({
+          ...spine, last_event_id: tail.event_id,
+          last_lineage_hash: tail.lineage_hash,
+          current_stage: tail.event_kind,
+        });
+      }
+    } catch (error) {
+      const failure = new Error('CONTINUITY_REHYDRATION_FAILED:' + (error?.message || 'UNKNOWN'));
+      failure.code = 'CONTINUITY_REHYDRATION_FAILED';
+      failure.cause = error;
+      throw failure;
+    }
+  }
 
   async function appendStage({
     stage,
@@ -83,7 +113,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'RAW_SIGNAL',
     entityId: signal.packet.packet_id,
-    eventId: `raw:${signal.packet.packet_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:raw:${signal.packet.packet_id}`,
     payload: {
       packet_id: signal.packet.packet_id,
       source: signal.packet.source,
@@ -96,7 +126,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'TRANSFORMATION',
     entityId: signal.transformation_receipt.receipt_id,
-    eventId: `transform:${signal.transformation_receipt.receipt_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:transform:${signal.transformation_receipt.receipt_id}`,
     evidenceRefs: [signal.packet.packet_id],
     transformationReceiptId: signal.transformation_receipt.receipt_id,
     payload: {
@@ -113,7 +143,7 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'OBSERVATION',
     entityId: signal.packet.packet_id + ':observation',
-    eventId: `observation:${signal.packet.packet_id}`,
+    eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:observation:${signal.packet.packet_id}`,
     evidenceRefs: signal.fragments.map((fragment) => fragment.fragment_id),
     transformationReceiptId: signal.transformation_receipt.receipt_id,
     payload: {
@@ -127,8 +157,11 @@ export async function startContinuityRuntime({
   return Object.freeze({
     status: persistenceEnabled ? 'PERSISTED' : 'IN_MEMORY_ONLY',
     enabled: persistenceEnabled,
-    spine,
-    nodes: Object.freeze(nodes),
+    // The runtime advances after its initial three stages; expose the live tail.
+    get spine() { return spine; },
+    get nodes() { return Object.freeze(nodes.slice()); },
+    prior_event_count: priorEventCount,
+    readback: persistence ? async () => persistence.reconstruct({continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id}) : null,
     appendStage,
   });
 }

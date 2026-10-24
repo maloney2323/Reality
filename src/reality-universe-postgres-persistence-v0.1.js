@@ -20,13 +20,14 @@ export function createUniversePostgresPersistence({
   url = process.env.SUPABASE_URL,
   secretKey = process.env.SUPABASE_SECRET_KEY || process.env.supabase_secret_key,
   fetchImpl = fetch,
+  strictSecrets = false,
 } = {}) {
   const baseUrl = required('SUPABASE_URL', url).replace(/\/$/, '');
-  const keys = [
+  const keys = (strictSecrets ? [secretKey] : [
     secretKey,
     process.env.SUPABASE_SECRET_KEY,
     process.env.supabase_secret_key,
-  ].filter((value, index, values) => typeof value === 'string' && value.length > 0 && values.indexOf(value) === index);
+  ]).filter((value, index, values) => typeof value === 'string' && value.length > 0 && values.indexOf(value) === index);
   if (!keys.length) throw new Error('SUPABASE_SECRET_KEY_REQUIRED');
 
   async function request(path, { method = 'GET', body, headers = {} } = {}) {
