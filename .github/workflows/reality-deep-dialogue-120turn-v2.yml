@@ -1,0 +1,49 @@
+name: Reality Deep Conversational Drift 120-Turn V2
+on:
+  push:
+    branches:
+      - feature/reality-long-conversation-drift-v2-20261023
+    paths:
+      - '.github/workflows/reality-deep-dialogue-120turn-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reality-deep-conversation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify scenario, chronology, source references and runner syntax before paid model calls
+        run: |
+          node --check benchmarks/reality-deep-conversational-drift-120turn-v2.mjs
+          node --check scripts/run-reality-deep-dialogue-120turn-v2.mjs
+          node --test test/reality-deep-conversational-drift-120turn-v2.test.js
+      - name: Run single 120-turn natural conversation and bounded Reality evidence correction
+        run: node scripts/run-reality-deep-dialogue-120turn-v2.mjs
+      - name: Preserve raw answers, source receipts, long-delay probe grades and mobile dashboard even on partial failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-120turn-deep-conversation-drift-originals-repairs
+          path: |
+            benchmark-results/reality-deep-dialogue-120turn.json
+            benchmark-results/reality-deep-dialogue-120turn.html
+            benchmark-results/reality-deep-dialogue-120turn-checkpoint.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Explain interpretation
+        run: |
+          echo 'No standalone OpenAI baseline lane.'
+          echo 'Drift rates only cover 24 frozen delayed-recall pattern checks, not 120-turn full semantics.'
+          echo 'Same genuine model conversation, source-message retrieval and actual repair only when needed.'
+          echo 'Never describe lexical matches as independently adjudicated full correctness.'
+          echo 'No customer data changes, outbound sends or automatic production deployment.'
