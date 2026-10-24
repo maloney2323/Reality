@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assessDrift,proposeDriftRecovery,verifyDriftRecovery,gradeDriftCases}
+import {assessDrift,proposeDriftRecovery,verifyDriftRecovery,gradeDriftCases,persistDriftRecoveryReceipt}
   from '../src/reality-drift-recovery-v0.1.js';
 
 const world='construction:site-a';
@@ -131,4 +131,43 @@ test('100-position deterministic construction gauntlet: distinguish detect, repa
  assert.equal(report.unauthorized_actions,0);
  // 10 scope-swaps remain safely BLOCKED, not falsely counted as corrected.
  assert.equal(report.results.filter(x=>x.recovery==='BLOCKED').length,10);
+});
+
+test('persisted recovery receipt is only confirmed after exact readback',async()=>{
+ const s=snapshot(),c=candidate(s);c.claims[0].value=true;
+ const manifest=proposeDriftRecovery({trustedSnapshot:s,candidate:c});
+ const events=[];
+ const persistence={
+  appendEvent:async event=>{events.push(structuredClone(event));},
+  reconstruct:async()=>structuredClone(events),
+ };
+ const saved=await persistDriftRecoveryReceipt({
+  persistence,continuityRootId:'root:construction',worldlineId:'line:construction',
+  eventId:'drift:receipt:1',trustedSnapshot:s,manifest,
+ });
+ assert.equal(saved.persisted,true);
+ assert.equal(saved.readback_verified,true);
+ assert.equal(saved.external_effects_executed,false);
+ assert.equal(events[0].entity_type,'drift_recovery_receipt');
+ assert.equal(events[0].payload.independent_outcome_verified,false);
+});
+test('ledger write alone is never counted as verified recovery',async()=>{
+ const s=snapshot(),c=candidate(s);c.claims[0].value=true;
+ const m=proposeDriftRecovery({trustedSnapshot:s,candidate:c});
+ await assert.rejects(()=>persistDriftRecoveryReceipt({
+  persistence:{appendEvent:async()=>({status:'PERSISTED'}),reconstruct:async()=>[]},
+  continuityRootId:'r',worldlineId:'w',eventId:'drift:no-readback',
+  trustedSnapshot:s,manifest:m,
+ }),/DRIFT_RECEIPT_READBACK_UNVERIFIED/);
+});
+test('a repeated prior mistake is detected on a later turn, not erased by prior recovery',()=>{
+ const s=snapshot(),prior=candidate(s);prior.claims[0].value=true;
+ const first=inspect(s,prior);
+ assert.equal(first.proof.corrected,true);
+ const later=structuredClone(first.manifest.proposed);
+ later.claims[0].value=true;
+ const again=inspect(s,later);
+ assert.ok(again.before.codes.includes('FACT_DRIFT'));
+ assert.equal(again.proof.corrected,true);
+ assert.equal(first.manifest.original.claims[0].value,true);
 });
