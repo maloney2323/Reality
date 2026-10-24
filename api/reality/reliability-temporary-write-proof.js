@@ -9,7 +9,7 @@ import { buildGovernedChatSignal } from '../../src/reality-governed-fragmented-s
 import { runContinuousReliabilityCycle,orderContinuityHistory } from '../../src/reality-continuous-reliability-v0.1.js';
 import { createContinuitySpine } from '../../src/reality-continuity-spine-v2.0.js';
 const BRANCH='feature/reality-drift-live-continuity-v1-20261024';
-const ROOT='isolated-reliability-preview-ledger-write-proof-v1';
+const ROOT='isolated-reliability-preview-ledger-write-proof-v2';
 const WORLD='isolated-reliability-proof-world-not-customer';
 const subject='synthetic-benchmark-probe';
 const countTurn=events=>events.filter(x=>x.event_kind==='RAW_SIGNAL').length;
