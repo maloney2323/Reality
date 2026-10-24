@@ -23,5 +23,7 @@ test('money priority cannot create a revenue claim',()=>{
  ]});
  const ranked=rankWorkForMoney(work);
  assert.equal(ranked.expected_revenue,null);
- assert.equal(ranked.money_priority_score,100/5);
+ // Two observed recurrences contribute (2 / 5) * 100 score points;
+ // these are priority points, not dollars or an inferred revenue claim.
+ assert.equal(ranked.money_priority_score,(2/5)*100);
 });
