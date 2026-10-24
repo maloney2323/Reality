@@ -18,6 +18,14 @@ const HALLUCINATION_SUSPECT_CODES = new Set([
 function digest(v) {
   return crypto.createHash('sha256').update(String(v ?? '')).digest('hex');
 }
+function stableJson(value) {
+  if (value===null||typeof value!=='object') return value;
+  if (Array.isArray(value)) return value.map(stableJson);
+  return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stableJson(value[key])]));
+}
+function semanticJsonEqual(a,b) {
+  return JSON.stringify(stableJson(a))===JSON.stringify(stableJson(b));
+}
 
 export function classifyReliabilityFindings(codes = []) {
   const unique = [...new Set(codes)];
@@ -262,7 +270,7 @@ export async function runContinuousReliabilityCycle({
   });
   const after = orderContinuityHistory(await continuityRuntime.readback());
   const copied = after.find(e => e.event_id === committed.event_id);
-  if (!copied || JSON.stringify(copied.payload) !== JSON.stringify(payload))
+  if (!copied || !semanticJsonEqual(copied.payload,payload))
     throw new Error('RELIABILITY_RECEIPT_READBACK_UNVERIFIED');
   let backcheck = computeHistoricalBackcheck(after);
   let checkpointReadbackVerified = false;
