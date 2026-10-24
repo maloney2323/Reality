@@ -248,7 +248,8 @@ export async function runLiveIntelligenceOrchestration({
       if (grounded.source_receipt_ids.length) {
         const extraction = await extractReliabilityClaims({
           modelOutput:String(modelResult?.answer || ''),worldId:systemContext.world_id,
-          snapshot:grounded,apiKey,model,fetchImpl,
+          snapshot:grounded,apiKey:apiKey||process.env.OPENAI_API_KEY,
+          model:model||process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',fetchImpl,
         });
         reliabilityCandidate = extraction.candidate;
         reliabilityExtractionStatus = extraction.extraction_status;
