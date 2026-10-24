@@ -1,0 +1,42 @@
+name: Reality Dual Evidence Ledger Proof v0.1
+on:
+  push:
+    branches:
+      - feature/reality-incident-lifecycle-evidence-v1-20261024
+    paths:
+      - '.github/workflows/reality-dual-evidence-ledger-proof-v0.1.yml'
+      - 'src/reality-incident-comparison-v0.1.js'
+      - 'src/reality-continuous-reliability-v0.1.js'
+      - 'test/reality-incident-comparison-v0.1.test.js'
+      - 'api/reality/full-loop-sandbox-proof.js'
+      - 'full-loop-proof.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-two-sided-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse module and server code
+        run: |
+          node --check src/reality-incident-comparison-v0.1.js
+          node --check src/reality-continuous-reliability-v0.1.js
+          node --check api/reality/full-loop-sandbox-proof.js
+          node --check test/reality-incident-comparison-v0.1.test.js
+      - name: Test complete incident and receipt scope
+        run: |
+          node --test test/reality-incident-comparison-v0.1.test.js \
+            test/reality-proof-telemetry-v0.1.test.js \
+            test/reality-full-loop-sandbox-proof-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js
+      - name: State measurement limitations
+        run: |
+          echo 'No paid LLM calls; no model-vs-Reality rate from the sandbox.'
+          echo 'No production changes and no independently measured customer financial ROI.'
