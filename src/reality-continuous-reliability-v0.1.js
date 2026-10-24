@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import { assessDrift, proposeDriftRecovery, verifyDriftRecovery } from './reality-drift-recovery-v0.1.js';
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
+import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
@@ -103,6 +104,28 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
     (event.payload.drift?.length || 0) > 0 ||
     (event.payload.hallucination_suspected?.length || 0) > 0
   );
+  // Back-check original recorded claims against later source attestations.
+  // Later evidence proves a discrepancy, NOT that the old claim was false at
+  // its historical effective time. Temporal adjudication remains a separate gate.
+  const retrospectiveDiscrepancies = [];
+  for (const finding of findings) {
+    const prior = finding.payload;
+    if (!prior.structured_candidate?.claims?.length) continue;
+    const snapshot = readGroundedEvidence(ordered,{worldId:prior.structured_candidate.world_id});
+    if (!snapshot.source_receipt_ids.length) continue;
+    for (const claim of prior.structured_candidate.claims) {
+      const fact = snapshot.facts.find(f=>f.key===claim.key);
+      if (fact && JSON.stringify(String(fact.value))!==JSON.stringify(String(claim.value))) {
+        retrospectiveDiscrepancies.push({
+          original_turn:prior.turn,
+          original_receipt_id:finding.event_id,
+          claim_key:claim.key,
+          new_source_receipt_id:fact.evidence_ref,
+          status:'NEW_EVIDENCE_CONTRADICTION_PENDING_TEMPORAL_ADJUDICATION',
+        });
+      }
+    }
+  }
   const independentlyEvaluated = inWindow.filter(event =>
     event.payload.evaluation_status === 'EVALUATED_WITH_INDEPENDENT_EVIDENCE').length;
   return Object.freeze({
@@ -112,6 +135,7 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
     missing_assessment_turns: Math.max(0, windowIds.size - inWindow.length),
     independently_evaluated_turns: independentlyEvaluated,
     unresolved_or_unassessed_receipt_ids: [...new Set(carriedUnresolved.map(event => event.event_id))],
+    retrospective_discrepancies: retrospectiveDiscrepancies,
     drift_rate_pct: null,
     hallucination_rate_pct: null,
     status: 'REQUIRES_INDEPENDENT_ADJUDICATION',
@@ -138,19 +162,22 @@ export async function runContinuousReliabilityCycle({
 
   let assessment = null;
   let recovery = null;
-  const evidenceAccepted = Boolean(structuredCandidate && independentlyVerifiedSnapshot &&
-    evidenceVerifierReceipt?.independent === true &&
-    evidenceVerifierReceipt?.verified === true &&
-    evidenceVerifierReceipt?.world_id === independentlyVerifiedSnapshot.world_id &&
-    evidenceVerifierReceipt?.source_kind === 'EXTERNAL_EVIDENCE_VERIFIER');
+  const ledgerSnapshot = structuredCandidate?.world_id
+    ? readGroundedEvidence(before,{worldId:structuredCandidate.world_id}) : null;
+  // A fake caller-provided truth snapshot cannot override ledger evidence.
+  const evidenceAccepted = Boolean(structuredCandidate && ledgerSnapshot?.source_receipt_ids.length &&
+    (!independentlyVerifiedSnapshot ||
+     JSON.stringify(independentlyVerifiedSnapshot.facts.map(f=>({key:f.key,value:f.value})))===
+     JSON.stringify(ledgerSnapshot.facts.map(f=>({key:f.key,value:f.value})))));
+  const trustedSnapshot = evidenceAccepted ? ledgerSnapshot : null;
   if (evidenceAccepted) {
     // The caller-supplied structured candidate is never treated as a trusted fact.
     // The verifier's receipt must originate at the trusted execution boundary.
-    assessment = assessDrift({trustedSnapshot: independentlyVerifiedSnapshot, candidate: structuredCandidate});
+    assessment = assessDrift({trustedSnapshot, candidate: structuredCandidate});
     const manifest = proposeDriftRecovery({
-      trustedSnapshot: independentlyVerifiedSnapshot, candidate: structuredCandidate, assessment
+      trustedSnapshot, candidate: structuredCandidate, assessment
     });
-    recovery = verifyDriftRecovery({trustedSnapshot: independentlyVerifiedSnapshot, manifest});
+    recovery = verifyDriftRecovery({trustedSnapshot, manifest});
     // Structural correction is not a published world-state update.
     // Independent outcome verification and publication are separate gates.
   }
@@ -162,12 +189,17 @@ export async function runContinuousReliabilityCycle({
     packet_digest: digest(packetId),
     model_output_digest: digest(modelOutput),
     model_response_digest: modelResponseId ? digest(modelResponseId) : null,
-    evaluation_status: evidenceAccepted ? 'EVALUATED_WITH_INDEPENDENT_EVIDENCE' : 'NOT_EVALUATED',
+    evaluation_status: evidenceAccepted ? 'EVALUATED_AGAINST_SOURCE_ATTESTATION' : 'NOT_EVALUATED',
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
     hallucination_confirmed: null,
     independent_truth_adjudication: false,
+    extraction_completeness_verified: false,
+    structured_candidate: evidenceAccepted ? {
+      world_id: structuredCandidate.world_id,
+      claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
+    } : null,
     correction_proposed: Boolean(recovery?.corrected),
     correction_published_to_active_state: false,
     recovery_independently_verified: false,
@@ -180,8 +212,8 @@ export async function runContinuousReliabilityCycle({
     epistemicStatus: 'UNVERIFIED',
     effectiveTime: observedAt, assertionTime: observedAt,
     evidenceRefs: evidenceAccepted ? [
-      ...independentlyVerifiedSnapshot.facts.map(f=>f.evidence_ref),
-      ...independentlyVerifiedSnapshot.obligations.map(o=>o.evidence_ref),
+      ...trustedSnapshot.facts.map(f=>f.evidence_ref),
+      ...trustedSnapshot.obligations.map(o=>o.evidence_ref),
     ] : [],
     payload,
     provenance: {source: CONTINUOUS_RELIABILITY_VERSION, evaluation_model: 'deterministic'},
@@ -214,6 +246,7 @@ export async function runContinuousReliabilityCycle({
   return Object.freeze({
     version: CONTINUOUS_RELIABILITY_VERSION, turn,
     evaluation_status: payload.evaluation_status,
+    extraction_completeness_verified: false,
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
     hallucination_rate_pct: null, drift_rate_pct: null,
