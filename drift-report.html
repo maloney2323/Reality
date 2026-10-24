@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Reality | Drift Recovery Test</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b1018;color:#ecf2fa}
+*{box-sizing:border-box}body{margin:0}main{max-width:1040px;margin:auto;padding:24px 18px 72px}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #243041;padding-bottom:18px}
+.brand{font-weight:850;font-size:20px;letter-spacing:.08em}.brand span{color:#86d2ff}
+.kicker{text-transform:uppercase;letter-spacing:.14em;font-size:11px;color:#9bbee1;font-weight:700}
+h1{font-size:clamp(30px,5vw,52px);line-height:1.09;letter-spacing:-.04em;margin:24px 0 12px}
+p{color:#b1bfcd;line-height:1.65;max-width:780px}a{color:#a1dafa}button{cursor:pointer}
+.actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:24px 0}
+.primary{background:#c1e6ff;color:#0d1e2f;border:0;padding:13px 18px;border-radius:10px;font-weight:760}
+.primary:disabled{opacity:.6;cursor:wait}
+.note{font-size:13px;color:#9bb0c8}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metric,.panel{background:#111b29;border:1px solid #283649;border-radius:14px;padding:20px}
+.metric small{display:block;color:#a9bed2;font-size:12px;margin-bottom:9px}
+.metric strong{font-size:clamp(25px,3.7vw,40px);letter-spacing:-.04em;font-weight:760}
+.metric em{font-style:normal;font-size:12px;color:#9cb0c6;display:block;margin-top:7px}
+section{margin-top:26px}.panel h2{font-size:19px;margin:0 0 12px}
+.bar{display:flex;border-radius:9px;overflow:hidden;height:17px;background:#263346;margin:16px 0 7px}
+.seg{height:100%;min-width:0}.fixed{background:#63b59a}.blocked{background:#ddb779}.clean{background:#7889a5}
+.legend{display:flex;gap:18px;flex-wrap:wrap;color:#b8c6d6;font-size:12px}.legend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.warn{border-left:3px solid #ddb779;padding:12px 16px;background:#261f1a;color:#ddccb1;border-radius:0 10px 10px 0;line-height:1.5}
+.tabrow{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.tab{border:1px solid #37506a;color:#c7ddf0;background:transparent;padding:9px 13px;border-radius:9px}
+.tab[aria-pressed=true]{background:#294b66;border-color:#6ca6ce}
+.tablewrap{max-height:430px;overflow:auto;border:1px solid #27384d;border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}
+th{position:sticky;top:0;background:#17253a;color:#c2d6e7;padding:11px 12px;text-align:left}
+td{border-top:1px solid #283649;padding:10px 12px;vertical-align:top;line-height:1.4}
+code{font-family:ui-monospace,Menlo,monospace;color:#b7d9ed}
+.meta{font-size:12px;color:#96a9bc}.pill{font-size:11px;font-weight:750;border-radius:5px;padding:3px 7px;display:inline-block;background:#25384a}
+footer{margin-top:35px;color:#8da2b8;font-size:12px}
+@media(max-width:780px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric,.panel{padding:15px}.tablewrap{max-height:360px}}
+</style></head>
+<body><main><header><div class="brand"><span>✦</span> REALITY</div><span class="kicker">Experimental · Isolated Preview</span></header>
+<h1>Drift detection.<br>Correction. Proof.</h1>
+<p>This test deliberately introduces mistakes into structured construction-business records, then measures whether Reality detects them, safely reconstructs correct state, or blocks unresolved conflicts. A detection is <strong>not</strong> automatically counted as a correction.</p>
+<div class="actions"><button id="run" class="primary" type="button">Run 100-case test again</button><span id="liveStatus" role="status" class="note">Loading server results…</span></div>
+<div class="metrics">
+<div class="metric"><small>Injected drift caught</small><strong id="detected">—</strong><em id="recall">—</em></div>
+<div class="metric"><small>Corrected and rechecked</small><strong id="corrected">—</strong><em>Canonical facts / obligations only</em></div>
+<div class="metric"><small>Safely blocked, unresolved</small><strong id="blocked">—</strong><em>Requires world reconciliation</em></div>
+<div class="metric"><small>Residual unresolved</small><strong id="residual">—</strong><em>Target: below 5% in future live test</em></div>
+</div>
+<section class="panel"><h2>What the test proved</h2><div class="bar" aria-label="70 corrected, 10 safely blocked, 20 clean controls"><div class="seg fixed" id="segFixed" style="width:0"></div><div class="seg blocked" id="segBlocked" style="width:0"></div><div class="seg clean" id="segClean" style="width:0"></div></div>
+<div class="legend"><span><b style="background:#63b59a"></b>Corrected</span><span><b style="background:#ddb779"></b>Blocked</span><span><b style="background:#7889a5"></b>Clean control</span></div>
+<p class="meta" id="summary">Checking Vercel Preview…</p>
+<div class="warn"><strong>Scope of this evidence:</strong> These are 100 generated, labeled, structured cases—not 100 real conversation turns, not live LLM hallucination scores, and not evidence of completed business actions. The separate under-5% goal is still unverified.</div>
+</section>
+<section class="panel"><h2>What kinds of drift appeared?</h2><div id="failureTypes" class="meta">Loading categories…</div></section>
+<section class="panel"><h2>Individual test receipts</h2><p class="meta">Select corrected, blocked, or clean cases. Every row is a simulated test case with its detector result; it is not a customer incident.</p>
+<div class="tabrow" id="tabs">
+<button class="tab" data-filter="all" aria-pressed="true" type="button">All</button>
+<button class="tab" data-filter="corrected" aria-pressed="false" type="button">Corrected</button>
+<button class="tab" data-filter="blocked" aria-pressed="false" type="button">Blocked</button>
+<button class="tab" data-filter="clean" aria-pressed="false" type="button">Clean controls</button>
+</div>
+<div class="tablewrap"><table><thead><tr><th>Case</th><th>Detected failure</th><th>Result</th></tr></thead><tbody id="rows"><tr><td colspan="3">Loading…</td></tr></tbody></table></div>
+</section><footer>Reality • Experimental detector contract v0.1 • Results are recomputed by the isolated Preview server • No AI API calls, private record reads, or external actions.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id),btn=$('run');let cases=[],filter='all';
+function setText(id,value){$(id).textContent=String(value)}
+function fillRows(){
+ const chosen=cases.filter(x=>filter==='all'||(filter==='corrected'&&x.corrected)||
+ (filter==='blocked'&&x.recovery==='BLOCKED')||(filter==='clean'&&!x.expected_drift));
+ const body=$('rows');body.replaceChildren();
+ if(!chosen.length){const row=body.insertRow(),cell=row.insertCell();cell.colSpan=3;cell.textContent='No matching test cases.';return}
+ for(const x of chosen){
+  const row=body.insertRow();
+  const a=row.insertCell(),b=row.insertCell(),c=row.insertCell();
+  a.textContent=x.id;b.textContent=x.codes.length?x.codes.join(' · '):'No injected error';
+  c.textContent=x.recovery;
+ }
+}
+async function run(){
+ btn.disabled=true;setText('liveStatus','Executing deterministic cases on Vercel Preview…');
+ try{
+  const response=await fetch('/api/reality/drift-recovery-diagnostic',{cache:'no-store'});
+  const d=await response.json();
+  if(!response.ok||!d.ok)throw Error(d.error||'Diagnostic unavailable');
+  if(d.benchmark_kind!=='DETERMINISTIC_SYNTHETIC_CONSTRUCTION_FIXTURES')throw Error('Wrong evidence source');
+  const m=d.metrics;
+  cases=d.case_results||[];
+  setText('detected',m.confusion.tp+' / '+(m.confusion.tp+m.confusion.fn));
+  setText('recall',m.detection_recall_pct+'% recall on injected structured drift');
+  setText('corrected',m.recovered+' / '+(m.confusion.tp+m.confusion.fn));
+  const blocked=cases.filter(x=>x.recovery==='BLOCKED').length;
+  setText('blocked',blocked);
+  setText('residual',m.residual_structured_drift_pct+'%');
+  setText('summary',m.cases+' cases · '+m.confusion.tn+' clean controls · '+
+    m.confusion.fp+' false positives · '+m.confusion.fn+' missed structured errors · '+
+    m.unauthorized_actions+' simulated unauthorized actions');
+  $('segFixed').style.width=(m.recovered/m.cases*100)+'%';
+  $('segBlocked').style.width=(blocked/m.cases*100)+'%';
+  $('segClean').style.width=(m.confusion.tn/m.cases*100)+'%';
+  const cats=Object.entries(d.failure_categories||{}).sort((a,b)=>b[1]-a[1]);
+  setText('failureTypes',cats.map(([n,v])=>n.replaceAll('_',' ')+' ('+v+')').join(' · '));
+  fillRows();setText('liveStatus','Recomputed successfully · Preview only · 0 model calls');
+ }catch(e){setText('liveStatus','Test could not be verified: '+e.message)}
+ finally{btn.disabled=false}
+}
+$('tabs').addEventListener('click',event=>{
+ const b=event.target.closest('button[data-filter]');if(!b)return;
+ filter=b.dataset.filter;for(const tab of $('tabs').querySelectorAll('button'))tab.setAttribute('aria-pressed',String(tab===b));
+ fillRows();
+});
+btn.addEventListener('click',run);run();
+</script></body></html>
