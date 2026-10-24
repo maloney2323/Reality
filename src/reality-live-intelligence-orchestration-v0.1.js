@@ -275,6 +275,7 @@ export async function runLiveIntelligenceOrchestration({
         modelResponseId: modelResult?.response_id || null,
         packetId: governedSignal.packet.packet_id,
         structuredCandidate:reliabilityCandidate,
+        authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
