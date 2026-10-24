@@ -1,0 +1,55 @@
+name: Reality Natural Consequence Drift 120-Turn V3
+on:
+  push:
+    branches:
+      - feature/reality-natural-consequence-drift-v3-20261023
+    paths:
+      - '.github/workflows/reality-natural-consequence-120turn-v3.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unprompted-high-consequence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check frozen 120-turn high-consequence scenario and source
+        run: |
+          node --check benchmarks/reality-natural-consequence-drift-120turn-v3.mjs
+          node --check scripts/run-reality-natural-drift-120turn-v3.mjs
+          node --test test/reality-natural-consequence-drift-v3.test.js
+      - name: Verify pre-existing Reality governance and Universe typed form regressions
+        run: |
+          node --test \
+            test/reality-adversarial-100turn-v1.test.js \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-universe-closed-loop-v1.0.test.js
+      - name: One naturally continuous 120-turn original conversation, then independent Reality claim extraction on high-consequence turns
+        run: node scripts/run-reality-natural-drift-120turn-v3.mjs
+      - name: Preserve every uncorrected original answer and evidence receipt even after partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-natural-consequence-120turn-v3-originals-scores
+          path: |
+            benchmark-results/reality-natural-drift-v3.json
+            benchmark-results/reality-natural-drift-v3.html
+            benchmark-results/reality-natural-drift-v3-partial.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Interpret without overclaiming
+        run: |
+          echo 'No separate OpenAI baseline lane.'
+          echo 'Original model receives generic helpful assistant system prompt only.'
+          echo 'Native Reality production scoring NOT executed.'
+          echo 'Model-assisted extracted choices are candidate findings, not independently verified drift.'
+          echo 'No automatic repair from unadjudicated extraction; no external customer effects.'
