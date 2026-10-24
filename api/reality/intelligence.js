@@ -222,6 +222,16 @@ async function loadRealityContext(req, body) {
   return {
     authenticated_user_id: user.id,
     profile: safeProfile,
+    // Only server-fetched, account-scoped Base44 user/assistant turns may be
+    // examined as history evidence. Client-supplied conversation text is NOT
+    // eligible to establish the user's earlier restrictions.
+    authenticated_conversation_turns: historyRows
+      .filter(item=>typeof item?.id==='string' && item.id.trim() &&
+        typeof item?.text==='string' && ['user','assistant'].includes(item.role))
+      .map(item=>({role:item.role,text:item.text.slice(0,12000),
+        source_ref:'base44:PersonalMessage:'+item.id,
+        created_at:item.created_date||null})),
+    conversation_history_source:'AUTHENTICATED_CONVERSATION_MESSAGES',
     verified_conversation_context: historyText || '(No earlier conversation context is available.)',
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
     universe_entries,
