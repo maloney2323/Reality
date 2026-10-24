@@ -4,6 +4,7 @@ import { buildGovernedChatSignal } from '../src/reality-governed-fragmented-sign
 import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-v0.1.js';
 import { recordSourceAttestedEvidence, readGroundedEvidence } from '../src/reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from '../src/reality-reliability-claim-extraction-v0.1.js';
+import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
 import {
   classifyReliabilityFindings, computeHistoricalBackcheck, orderContinuityHistory,
   runContinuousReliabilityCycle,
@@ -274,4 +275,70 @@ test('quote-anchored extractor rejects invented quotes and cannot prove accuracy
   assert.equal(ok.completeness_independently_verified,false);
   await assert.rejects(extract({claims:[{key:'price',value:'4500',quote:'I verified the price'}],
     actions:[],operational:false}),/RELIABILITY_EXTRACTION_QUOTE_NOT_IN_MODEL_OUTPUT/);
+});
+
+test('real orchestration path sees prior ledger evidence and detects model contradiction via quote extraction',async()=>{
+  await withPersistence(async()=>{
+    const prev={environment:process.env.VERCEL_ENV,cycle:process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED,
+      extraction:process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED};
+    process.env.VERCEL_ENV='preview';
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED='true';
+    process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED='true';
+    try{
+      const fixture=mockUniverse(),at='2026-10-24T13:15:00.000Z';
+      const signal=buildGovernedChatSignal({message:'Record supplier confirmation',observedAt:at});
+      const prior=await startContinuityRuntime({
+        continuityRootSource:'continuity:reliability-test',worldlineSource:'world:construction',
+        subjectId:'conversation:contractor',signal,observedAt:at,fetchImpl:fixture.fetchImpl,
+      });
+      const receipt=await recordSourceAttestedEvidence({
+        continuityRuntime:prior,worldId:'construction:site-a',
+        sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:'supplier:confirmed-delivery',
+        sourceDigest:'supplier-receipt:oct27',
+        facts:[{key:'cabinet_delivery_date',value:'October 27'}],
+        obligations:[{id:'do_not_send_estimate_without_approval',active:true}],
+        observedAt:at,
+      });
+      const modelCalls=[];
+      const fakeFetch=async (url,options={})=>{
+        if(String(url).includes('/rest/v1/reality_universe_entries'))return new Response('[]',{status:200});
+        if(String(url).includes('api.openai.com/v1/responses')){
+          const request=JSON.parse(options.body);
+          modelCalls.push(request);
+          if(request.text?.format?.name==='reliability_assertions'){
+            return new Response(JSON.stringify({id:'extract:1',status:'completed',output_text:JSON.stringify({
+              claims:[{key:'cabinet_delivery_date',value:'October 24',quote:'October 24'}],
+              actions:[],operational:false,
+            })}),{status:200});
+          }
+          return new Response(JSON.stringify({id:'model:1',status:'completed',
+            output_text:'The cabinet delivery is October 24.'}),{status:200});
+        }
+        return fixture.fetchImpl(url,options);
+      };
+      const result=await runLiveIntelligenceOrchestration({
+        message:'What is the cabinet delivery?',model:'test-model',apiKey:'test-key',
+        systemContext:{continuity_root_id:'continuity:reliability-test',
+          conversation_id:'conversation:contractor',worldline_id:'world:construction',
+          world_id:'construction:site-a'},observedAt:'2026-10-24T13:16:00.000Z',
+        fetchImpl:fakeFetch,
+      });
+      assert.equal(modelCalls.length,2);
+      assert.equal(modelCalls[0].input[1].content[0].text.includes('October 27'),true);
+      assert.equal(modelCalls[0].input[1].content[0].text.includes('do_not_send_estimate_without_approval'),true);
+      assert.equal(result.reliability.evaluation_status,'EVALUATED_AGAINST_SOURCE_ATTESTATION');
+      assert.deepEqual(result.reliability.drift,['FACT_DRIFT']);
+      assert.equal(result.reliability.readback_verified,true);
+      assert.equal(result.reliability.correction_proposed,true);
+      assert.equal(result.reliability.correction_published_to_active_state,false);
+      assert.equal(result.reliability.hallucination_rate_pct,null);
+      assert.ok(receipt.event_id);
+    }finally{
+      for(const [k,v] of [['VERCEL_ENV',prev.environment],
+        ['REALITY_CONTINUOUS_RELIABILITY_ENABLED',prev.cycle],
+        ['REALITY_RELIABILITY_EXTRACTION_ENABLED',prev.extraction]]){
+        if(v===undefined)delete process.env[k]; else process.env[k]=v;
+      }
+    }
+  });
 });
