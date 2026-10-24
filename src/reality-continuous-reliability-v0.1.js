@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { assessDrift, proposeDriftRecovery, verifyDriftRecovery } from './reality-drift-recovery-v0.1.js';
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
+import { sealModelOutput } from './reality-reliability-private-replay-v0.1.js';
 
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
@@ -135,6 +136,14 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
     missing_assessment_turns: Math.max(0, windowIds.size - inWindow.length),
     independently_evaluated_turns: independentlyEvaluated,
     unresolved_or_unassessed_receipt_ids: [...new Set(carriedUnresolved.map(event => event.event_id))],
+    replayable_unassessed_receipt_ids:inWindow.filter(e=>
+      e.payload?.evaluation_status==='NOT_EVALUATED' &&
+      e.payload?.encrypted_model_output?.status==='ENCRYPTED_REPLAY_AVAILABLE')
+      .map(e=>e.event_id),
+    unreplayable_unassessed_receipt_ids:inWindow.filter(e=>
+      e.payload?.evaluation_status==='NOT_EVALUATED' &&
+      e.payload?.encrypted_model_output?.status!=='ENCRYPTED_REPLAY_AVAILABLE')
+      .map(e=>e.event_id),
     retrospective_discrepancies: retrospectiveDiscrepancies,
     drift_rate_pct: null,
     hallucination_rate_pct: null,
@@ -198,6 +207,9 @@ export async function runContinuousReliabilityCycle({
     turn,
     packet_digest: digest(packetId),
     model_output_digest: digest(modelOutput),
+    encrypted_model_output:sealModelOutput(modelOutput,{
+      scope:continuityRuntime.spine.continuity_root_id+'|'+continuityRuntime.spine.worldline_id,
+    }),
     model_response_digest: modelResponseId ? digest(modelResponseId) : null,
     evaluation_status: evidenceAccepted ? 'EVALUATED_AGAINST_SOURCE_ATTESTATION' : 'NOT_EVALUATED',
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
