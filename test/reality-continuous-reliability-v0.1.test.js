@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGovernedChatSignal } from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
+import { inspectConversationDrift } from '../src/reality-conversation-drift-integrity-v0.1.js';
 import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-v0.1.js';
 import { recordSourceAttestedEvidence, readGroundedEvidence } from '../src/reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from '../src/reality-reliability-claim-extraction-v0.1.js';
@@ -634,4 +635,53 @@ test('an affirmed contradictory numeric claim cannot borrow a genuine source cit
   });
   assert.equal(result.candidate.claims[0].value,420);
   assert.deepEqual(result.candidate.claims[0].evidence_refs,[]);
+});
+
+test('live continuity receipts preserve subtle repeated conversational drift from user condition',async()=>{
+ await withPersistence(async()=>{
+  const fixture=mockUniverse();
+  const prior=[
+    {role:'user',source_ref:'base44:PersonalMessage:owner-condition',
+     text:'Do not send the estimate until the homeowner approves it.'},
+    {role:'assistant',source_ref:'base44:PersonalMessage:assistant-answer',
+     text:'I will prepare the estimate and await approval.'},
+  ];
+  const outputs=["We'll send the estimate when it's ready.",
+    "We'll send the estimate when it's ready."];
+  for(let i=0;i<2;i++){
+    const observedAt=new Date(Date.UTC(2026,9,24,16,i,5)).toISOString();
+    const signal=buildGovernedChatSignal({
+      message:i?'Any update on the draft?':'Can you prepare the draft?',observedAt});
+    const runtime=await startContinuityRuntime({
+      continuityRootSource:'continuity:conversational-drift-test',
+      worldlineSource:'world:construction',
+      subjectId:'conversation:owner',signal,observedAt,fetchImpl:fixture.fetchImpl,
+    });
+    const conversation=inspectConversationDrift({
+      priorTurns:prior,currentUserMessage:signal.packet.raw_content,
+      modelAnswer:outputs[i],continuityRootId:runtime.spine.continuity_root_id,
+      modelResponseId:'model:drifting:'+i,
+      currentUserSourceRef:signal.packet.packet_id,
+      historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+    });
+    const result=await runContinuousReliabilityCycle({
+      continuityRuntime:runtime,modelOutput:outputs[i],
+      modelResponseId:'model:drifting:'+i,
+      packetId:signal.packet.packet_id,
+      conversationalAssessment:conversation,observedAt,
+    });
+    assert.equal(result.trust_pulse.status,'CONVERSATIONAL_DRIFT_RISK');
+    assert.equal(result.trust_pulse.whole_response_verified,false);
+    assert.equal(result.trust_pulse.drift_free_claim_allowed,false);
+    const stored=fixture.events.find(e=>e.event_id===result.receipt_id);
+    assert.ok(stored,'the risk was written to the same verified ledger');
+    assert.equal(stored.payload.conversational_drift.findings[0].classification,
+      'CONVERSATIONAL_PRECONDITION_DRIFT');
+    assert.equal(stored.payload.conversational_drift.findings[0].detected_turn,i+1);
+    assert.equal(stored.payload.conversational_drift.findings[0].recurrence_count,i+1);
+    assert.equal(stored.payload.conversational_drift.findings[0].first_detected_turn,1);
+    assert.equal(stored.payload.conversational_drift.findings[0].repair_verified_turn,null);
+    assert.equal(stored.payload.hallucination_confirmed,null);
+  }
+ });
 });
