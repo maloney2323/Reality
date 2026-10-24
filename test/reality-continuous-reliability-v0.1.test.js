@@ -5,6 +5,7 @@ import { startContinuityRuntime } from '../src/reality-continuity-spine-runtime-
 import { recordSourceAttestedEvidence, readGroundedEvidence } from '../src/reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from '../src/reality-reliability-claim-extraction-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../src/reality-live-intelligence-orchestration-v0.1.js';
+import { resolveReliabilityBenchmarkDb } from '../src/reality-reliability-db-boundary-v0.1.js';
 import {
   classifyReliabilityFindings, computeHistoricalBackcheck, orderContinuityHistory,
   runContinuousReliabilityCycle,
@@ -35,21 +36,20 @@ function mockUniverse() {
 }
 
 async function withPersistence(fn) {
-  const previous = {
-    enabled: process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED,
-    url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_SECRET_KEY,
-  };
+  const names=['REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY',
+    'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY',
+    'REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF'];
+  const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));
   process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SECRET_KEY = 'test-only';
+  process.env.REALITY_RELIABILITY_BENCHMARK_PROJECT_REF='hvkfreoagbrphwghjajw';
+  process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='hvkfreoagbrphwghjajw';
+  process.env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL='https://hvkfreoagbrphwghjajw.supabase.co';
+  process.env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY='isolated-test-key';
   try { await fn(); }
   finally {
-    for (const [name,value] of [
-      ['REALITY_UNIVERSE_PERSISTENCE_ENABLED',previous.enabled],
-      ['SUPABASE_URL',previous.url],
-      ['SUPABASE_SECRET_KEY',previous.key],
-    ]) {
+    for (const [name,value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[name]; else process.env[name] = value;
     }
   }
@@ -396,4 +396,25 @@ test('25-turn audit discovers earlier claim conflicting with later superseding s
     assert.equal(result.checkpoint.hallucination_rate_pct,null);
     assert.equal(result.checkpoint.readback_verified,true);
   });
+});
+
+test('benchmark storage refuses inherited production credentials and project scope confusion',()=>{
+  const base={VERCEL_ENV:'preview',REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
+    REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:'hvkfreoagbrphwghjajw',
+    REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
+    REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
+    SUPABASE_SECRET_KEY:'production-key',
+    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:'isolated-key'};
+  assert.equal(resolveReliabilityBenchmarkDb(base).strictSecrets,true);
+  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
+    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:'production-key'}),/DEDICATED_KEY_REQUIRED/);
+  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
+    REALITY_RELIABILITY_BENCHMARK_SUPABASE_SECRET_KEY:undefined}),/DEDICATED_KEY_REQUIRED/);
+  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
+    REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://qkzvjfiegihyaoabiniy.supabase.co'}),
+    /PROJECT_SCOPE_NOT_VERIFIED/);
+  assert.throws(()=>resolveReliabilityBenchmarkDb({...base,
+    REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'qkzvjfiegihyaoabiniy'}),
+    /PROJECT_NOT_ALLOWLISTED/);
+  assert.equal(resolveReliabilityBenchmarkDb({...base,VERCEL_ENV:'production'}),null);
 });
