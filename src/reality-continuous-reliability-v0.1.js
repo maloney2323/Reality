@@ -89,6 +89,7 @@ export function computeHistoricalBackcheck(history, interval = BACKCHECK_INTERVA
     window_start: windowStart, window_end: windowEnd, total_turns: turn,
     raw_turns_in_window: windowIds.size,
     recorded_assessments: inWindow.length,
+    missing_assessment_turns: Math.max(0, windowIds.size - inWindow.length),
     independently_evaluated_turns: independentlyEvaluated,
     unresolved_or_unassessed_receipt_ids: [...new Set(carriedUnresolved.map(event => event.event_id))],
     drift_rate_pct: null,
