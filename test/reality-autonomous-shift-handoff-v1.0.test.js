@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
- validateCronCredential,autonomousShiftSlot,projectAutonomousShiftHome,authorizeShiftConfigWrite,
+ validateCronCredential,autonomousShiftSlot,projectAutonomousShiftHome,authorizeShiftConfigWrite,authorizeManualShiftRun,
 } from '../src/reality-autonomous-shift-control-v1.0.js';
 const secret='a-value-with-at-least-32-characters-to-check';
 const cfg={enabled:true,readinessTime:'16:30',shiftStart:'17:00',
@@ -118,4 +118,38 @@ test('global shift settings cannot be seized or toggled by a fresh anonymous ses
  const code=readFileSync(new URL('../api/reality/shift.js',import.meta.url),'utf8');
  assert.match(code,/authorizeShiftConfigWrite\(\{/);
  assert.match(code,/if \(!auth\.ok\) return json\(res, 403/);
+});
+
+test('only signed original owner can initiate one manual discovery cycle',()=>{
+ assert.equal(authorizeManualShiftRun({config:cfg,principalId:'signed-owner-1'}).ok,true);
+ assert.equal(authorizeManualShiftRun({config:cfg,principalId:'not-the-owner'}).ok,false);
+ assert.equal(authorizeManualShiftRun({config:cfg,principalId:null}).ok,false);
+ assert.equal(authorizeManualShiftRun({config:{...cfg,enabled:false},principalId:'signed-owner-1'}).ok,false);
+ assert.equal(authorizeManualShiftRun({config:null,principalId:'signed-owner-1'}).ok,false);
+});
+test('manual entry is checked before configuration writes and never bypasses cron authentication',()=>{
+ const code=readFileSync(new URL('../api/reality/shift.js',import.meta.url),'utf8');
+ assert.match(code,/req\\.body\\?\\.action === 'RUN_ONCE_NOW'/);
+ assert.match(code,/authorizeManualShiftRun\\(\\{config,principalId:principal\\.principal_id\\}\\)/);
+ assert.match(code,/SHIFT_SAME_ORIGIN_REQUIRED/);
+ assert.match(code,/runTick\\(\\{\\s*config, phase:'MANUAL', local:time\\.local/);
+ assert.match(code,/validateCronCredential\\(req, process\\.env\\.CRON_SECRET\\)/);
+ assert.ok(code.indexOf('RUN_ONCE_NOW')<code.indexOf('if (!auth.ok) return json(res, 403'));
+});
+test('shift tick replay is checked before any model call, and result follows ledger tail',()=>{
+ const code=readFileSync(new URL('../api/reality/shift.js',import.meta.url),'utf8');
+ const claim=code.slice(code.indexOf('async function runTick'),code.indexOf('export default async function handler'));
+ assert.ok(claim.indexOf('priorShift.some(e => e.event_id === tickId)')<claim.indexOf("await githubCommits()"));
+ assert.ok(claim.indexOf('priorShift.some(e => e.event_id === tickId)')<claim.indexOf('runLiveIntelligenceOrchestration'));
+ assert.match(claim,/entity_type: 'shift_result'[\\s\\S]*?parent_event_id: null/);
+ assert.doesNotMatch(claim,/parent_event_id: tickId/);
+ assert.match(claim,/seenObservationIds\\.has\\(o\\.observation_id\\)/);
+});
+test('Home manual run requires persisted receipt readback before claiming success',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/id="runShiftNow"/);
+ assert.match(html,/action:'RUN_ONCE_NOW'/);
+ assert.match(html,/saved\\.home\\.latest_tick_id!==result\\.result\\?\\.tick_id/);
+ assert.match(html,/SHIFT_RESULT_NOT_YET_READ_BACK_VERIFIED/);
+ assert.match(html,/No work execution verified/);
 });
