@@ -55,7 +55,10 @@ export async function executeAuthorizedWork({
     providerResult,
   });
 
-  const verified = verification?.verified === true;
+  // A successful self-report or same-adapter check is not independent verification.
+  // Never elevate external execution to a verified outcome without an explicit
+  // independent read-back assertion from the designated verifier.
+  const verified = verification?.verified === true && verification?.independent === true;
   const outcome = Object.freeze({
     outcome_state:verified?'VERIFIED_OUTCOME':'UNRESOLVED',
     verified,
