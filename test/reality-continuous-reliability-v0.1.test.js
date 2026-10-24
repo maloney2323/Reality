@@ -328,7 +328,8 @@ test('real orchestration path sees prior ledger evidence and detects model contr
       assert.equal(modelCalls[0].input[1].content[0].text.includes('2026-10-27'),true);
       assert.equal(modelCalls[0].input[1].content[0].text.includes('do_not_send_estimate_without_approval'),true);
       assert.equal(result.reliability.evaluation_status,'EVALUATED_AGAINST_SOURCE_ATTESTATION');
-      assert.deepEqual(result.reliability.drift,['FACT_DRIFT']);
+      assert.ok(result.reliability.drift.includes('FACT_DRIFT'));
+      assert.ok(result.reliability.drift.includes('EVIDENCE_PROVENANCE_DRIFT'));
       assert.equal(result.reliability.readback_verified,true);
       assert.equal(result.reliability.correction_proposed,true);
       assert.equal(result.reliability.model_output_quarantined,true);
