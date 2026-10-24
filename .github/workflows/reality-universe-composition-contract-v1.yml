@@ -1,0 +1,36 @@
+name: Reality Universe Compositional Intelligence V1 Proof
+on:
+  push:
+    branches:
+      - feature/universe-composition-contract-v1-20261023
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  composition-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Validate novel composition syntax
+        run: |
+          node --check src/reality-universe-composition-contract-v1.0.js
+          node --check test/reality-universe-composition-contract-v1.0.test.js
+      - name: Three-form composition, BEI propagation, ghost time, revocation, Reasoning Delta
+        run: |
+          node --test \
+            test/reality-universe-composition-contract-v1.0.test.js \
+            test/reality-universe-intelligence-forms-v1.0.test.js \
+            test/reality-universe-closed-loop-v1.0.test.js \
+            test/reality-universe-correction-verifier-v1.0.test.js \
+            test/reality-universe-persistence-contract-v1.0.test.js
+      - name: This is a sandbox contract proof, not a live model benchmark
+        run: |
+          echo 'No external business tools called; no customer data modified.'
+          echo 'Hypothetical calibration numbers are mathematical test inputs, not real empirical confidence.'
+          echo 'No code signing, OS-level sandbox isolation, or independent accuracy proof is claimed.'
