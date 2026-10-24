@@ -25,7 +25,7 @@ const MAX_TOTAL_TOKENS=4000000;
 const scope={continuity_root_id:'benchmark:reality:continuous:120-v2',
  worldline_id:'reality:benchmark',owner_user_id:'fictional:construction-owner',
  work_item_id:'conversation:contractor-deep-continuity',
- as_of:'2026-10-23T22:00:00.000Z'};
+ as_of:'2026-11-16T10:00:00.000Z'};
 const ledger=createSandboxUniverseLedger({trustedScope:scope});
 const history=[];
 let calls=0,inputTokens=0,outputTokens=0,originalCalls=0,repairCalls=0;
@@ -47,7 +47,7 @@ async function modelCall(messages,stage,turn){
  const r=await fetch('https://api.openai.com/v1/responses',{
   method:'POST',headers:{'content-type':'application/json',
    Authorization:'Bearer '+process.env.OPENAI_API_KEY},
-  body:JSON.stringify({model,store:false,max_output_tokens:420,input:messages}),
+  body:JSON.stringify({model,store:false,max_output_tokens:650,input:messages}),
   signal:AbortSignal.timeout(65000),
  });
  const data=await r.json().catch(()=>({}));
