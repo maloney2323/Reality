@@ -6,6 +6,8 @@ import { assessDrift, proposeDriftRecovery, verifyDriftRecovery } from './realit
 import { computeContinuityLineageHash } from './reality-continuity-spine-v2.0.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { sealModelOutput } from './reality-reliability-private-replay-v0.1.js';
+import { buildConversationTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
+import { trackConversationalDriftAccumulation } from './reality-conversation-drift-integrity-v0.1.js';
 
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
@@ -189,6 +191,7 @@ export async function runContinuousReliabilityCycle({
   modelResponseId = null,
   packetId,
   structuredCandidate = null,
+  conversationalAssessment = null,
   authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
   evidenceVerifierReceipt = null,
@@ -200,9 +203,14 @@ export async function runContinuousReliabilityCycle({
   const before = orderContinuityHistory(await continuityRuntime.readback());
   const turn = before.filter(e => e.event_kind === 'RAW_SIGNAL').length;
   if (!turn) throw new Error('RELIABILITY_RAW_TURN_MISSING');
+  const conversational = conversationalAssessment
+    ? trackConversationalDriftAccumulation({priorReceipts:before,
+        assessment:conversationalAssessment,turn})
+    : null;
 
   let assessment = null;
   let recovery = null;
+  let recoveryManifest = null;
   // Model-supplied world identity is NOT authorization. If the caller's
   // authorized world is known, retrieve only that world's evidence and let
   // assessDrift surface a cross-world claim as WORLD_SCOPE_DRIFT.
@@ -222,6 +230,7 @@ export async function runContinuousReliabilityCycle({
     const manifest = proposeDriftRecovery({
       trustedSnapshot, candidate: structuredCandidate, assessment
     });
+    recoveryManifest = manifest;
     recovery = verifyDriftRecovery({trustedSnapshot, manifest});
     // Structural correction is not a published world-state update.
     // Independent outcome verification and publication are separate gates.
@@ -251,6 +260,42 @@ export async function runContinuousReliabilityCycle({
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
+    // Conversational drift compares the model to user-origin intent and prior
+    // authenticated turns; it is a candidate signal, not independent truth.
+    conversational_drift:conversational?{
+      version:conversational.version,
+      status:conversational.status,
+      assessment_scope:conversational.assessment_scope,
+      history_scope:conversational.history_scope,
+      anchor_count:conversational.anchor_count,
+      observed_prior_turn_count:conversational.observed_prior_turn_count,
+      findings:conversational.findings.map(f=>({
+        issue_id:f.issue_id,classification:f.classification,
+        origin_stage:f.origin_stage,anchor_id:f.anchor_id||null,
+        original_user_text:String(f.original_user_text||'').slice(0,400),
+        observed_model_text:String(f.observed_model_text||'').slice(0,400),
+        expected_condition:f.expected_condition||null,
+        proposed_action:f.proposed_action||null,
+        source_receipt_refs:f.source_receipt_refs||[],
+        detected_turn:f.detected_turn,
+        first_detected_turn:f.first_detected_turn,
+        recurrence_count:f.recurrence_count,
+        escalation:f.escalation,
+        independent_semantic_verdict:'NOT_PERFORMED',
+        repair_verified_turn:null,
+      })),
+      semantic_recall:null,
+      false_negative_rate:null,
+      verified_hallucination_rate:null,
+      action_authorized:false,
+    }:null,
+    // Retain exact location/code and trusted evidence references for individual
+    // incident cards. No unverified root cause or confirmed hallucination claims.
+    violation_details: (assessment?.violations || []).map(v=>({
+      code:v.code,path:v.path,key:v.key||null,
+      canonical_evidence_ref:v.canonical_evidence_ref||null,
+      action_id:v.action_id||null,obligation_id:v.obligation_id||null,
+    })),
     hallucination_confirmed: null,
     independent_truth_adjudication: false,
     extraction_completeness_verified: false,
@@ -258,7 +303,9 @@ export async function runContinuousReliabilityCycle({
       world_id: structuredCandidate.world_id,
       claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
     } : null,
-    correction_proposed: Boolean(recovery?.corrected),
+    correction_proposed: Boolean(recoveryManifest?.changes?.length),
+    correction_change_types: (recoveryManifest?.changes||[]).map(change=>change.type),
+    structural_correction_verified: Boolean(recovery?.corrected),
     source_attested_correction_proposals:correctionClaims,
     model_output_quarantined:shouldQuarantine,
     correction_published_to_active_state: false,
@@ -282,6 +329,9 @@ export async function runContinuousReliabilityCycle({
   const copied = after.find(e => e.event_id === committed.event_id);
   if (!copied || !semanticJsonEqual(copied.payload,payload))
     throw new Error('RELIABILITY_RECEIPT_READBACK_UNVERIFIED');
+  // The history is already content-hash/readback validated above. Derive
+  // the per-turn status and 10-turn digest from committed receipts only.
+  const trustPulse=buildConversationTrustPulse({history:after,turn});
   let backcheck = computeHistoricalBackcheck(after);
   let checkpointReadbackVerified = false;
   if (backcheck) {
@@ -305,10 +355,12 @@ export async function runContinuousReliabilityCycle({
   }
   return Object.freeze({
     version: CONTINUOUS_RELIABILITY_VERSION, turn,
+    trust_pulse: trustPulse,
     evaluation_status: payload.evaluation_status,
     extraction_completeness_verified: false,
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
+    conversational_drift: payload.conversational_drift,
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
     model_output_quarantined:shouldQuarantine,

@@ -20,6 +20,15 @@ button{border:0;border-radius:12px;padding:11px 16px;background:#eef1f7;color:#1
 section{padding:17px 18px;border-bottom:1px solid #202633}.row{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #1b212c}.row:last-child{border-bottom:0}.muted{color:#98a3b5}.ok{color:#a9d7b5}.blocked{color:#f0b0aa}.step{padding:6px 0}.proof li{margin:8px 0;color:#bdc5d3}
 details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.pill{border:1px solid #2b3341;padding:6px 9px;border-radius:999px;font-size:11px;color:#aeb8c9}
 .error{color:#f0b0aa;margin-top:10px;white-space:pre-wrap}
+.trust-pulse{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;background:#151e2a;border:1px solid #455161;border-radius:12px;font-size:12px;line-height:1.6}
+.trust-pulse[data-tone="review"]{border-color:#aa7253}
+.trust-pulse[data-tone="limited"]{border-color:#8d8056}
+.trust-pulse[data-tone="verified"]{border-color:#487a6f}
+.trust-pulse strong{color:#f0f5ff}
+.trust-pulse span{color:#b3c2d4}
+.trust-digest{background:#111a26;border:1px solid #3b5264;border-radius:12px;padding:13px;margin-top:9px;font-size:12px;line-height:1.65;color:#b7c9dc}
+.trust-digest summary{cursor:pointer;font-weight:700;color:#eef1f7}
+.trust-digest .trust-unknown{color:#f5d6a4}
 @media(max-width:600px){main{padding:20px 12px}.row{display:block}.row span{display:block;margin-top:4px}}
 .shift-settings{margin:0 0 28px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.shift-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.shift-head strong{font-size:18px}.switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#cbd3e0;font-size:12px}.switch input{accent-color:#eef1f7}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.shift-grid label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8792a6}.shift-grid input,.shift-grid select{display:block;width:100%;margin-top:7px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:10px;padding:10px;font:inherit}.shift-work{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 12px;border:1px solid #202938;border-radius:12px;color:#aeb8c9;font-size:12px}.shift-work span:first-child{color:#eef1f7;font-weight:700}.shift-scope{margin-top:12px;border-top:1px solid #202938;padding-top:12px}.shift-scope summary{cursor:pointer;color:#cbd3e0;font-size:12px}.shift-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.shift-columns div{border:1px solid #202938;border-radius:12px;padding:11px}.shift-columns strong{display:block;color:#eef1f7;font-size:12px;margin-bottom:7px}.shift-columns ul{margin:0;padding-left:17px;color:#98a3b5;font-size:11px;line-height:1.6}.saved{font-size:12px;color:#a9d7b5;margin-left:8px}@media(max-width:600px){.shift-head{display:block}.switch{margin-top:12px}.shift-grid,.shift-columns{grid-template-columns:1fr}} .shift-banner{margin:0 0 22px;padding:18px 20px;border:1px solid #52627d;border-radius:18px;background:linear-gradient(135deg,#151d2b,#0d121b);display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(0,0,0,.22)}.shift-banner strong{display:block;font-size:18px;line-height:1.4}.shift-banner p{margin:7px 0 0;color:#aeb8c9;font-size:12px}.shift-banner button{margin:0;white-space:nowrap}@media(max-width:600px){.shift-banner{display:block}.shift-banner button{margin-top:12px;width:100%}} .reality-console{margin:0 0 28px;display:grid;grid-template-columns:1.35fr .85fr;gap:14px}.console-card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.console-card h3{margin:4px 0 5px}.console-card .count{font-size:28px;font-weight:800}.work-item{border:1px solid #283242;border-radius:13px;padding:12px;margin-top:10px}.work-item strong{display:block}.work-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.attention-item{border:1px solid #5b4a2f;border-radius:13px;padding:12px;margin-top:10px;background:#17130c}.attention-item button{margin-top:10px;width:100%}.attention-empty{color:#8f9aac;font-size:12px;padding-top:10px}@media(max-width:760px){.reality-console{grid-template-columns:1fr}} .reality-matrix{margin:0 0 22px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.matrix-head{display:flex;justify-content:space-between;gap:12px;align-items:end}.matrix-head h2{margin:4px 0 0;font-size:20px}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:92px}.matrix-card strong{display:block;margin-bottom:6px}.matrix-card p{margin:0;color:#98a3b5;font-size:12px;line-height:1.5}.matrix-card .matrix-count{font-size:24px;font-weight:800;color:#eef1f7}@media(max-width:700px){.matrix-grid{grid-template-columns:1fr}}</style>
 </head>
@@ -64,7 +73,23 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <div id="brief" class="brief">
       <div class="brief-head"><strong>Reality Brief</strong><span id="status" class="badge"></span></div>
       <section><div class="label">1 · Understood</div><div id="understood"></div></section>
-      <section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
+      <section class="trust-scope" aria-label="Conversation reliability">
+<div class="label">CONTINUITY & DRIFT MONITOR</div>
+<div id="trustPulse" class="trust-pulse" data-tone="limited" role="status" aria-live="polite">
+<strong id="trustPulseTitle">Not checked in this session</strong>
+<span id="trustPulseDetail">Monitoring state comes from Reality's committed reliability receipt, not from model confidence.</span>
+</div>
+<details id="trustFindings" class="trust-digest" hidden>
+<summary id="trustFindingsTitle">Conversation drift details</summary>
+<div id="trustFindingsBody"></div>
+</details>
+<details id="trustDigest" class="trust-digest" hidden>
+<summary id="trustDigestTitle">10-turn conversation review</summary>
+<div id="trustDigestBody"></div>
+</details>
+<p class="muted" style="font-size:11px">A clean result is only about checks actually completed. Unknown or unchecked is never counted as zero drift.</p>
+</section>
+<section><div class="label">2 · Intended plan</div><div id="steps"></div></section>
       <section><div class="label">3 · Authority map</div><div id="authority"></div></section>
       <section><div class="label">4 · Expected effect</div><div id="effect"></div></section>
       <section class="proof"><div class="label">5 · Proof plan</div><ul id="proof"></ul></section>
@@ -84,6 +109,61 @@ function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH
 function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
 function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
 
+const TRUST_SESSION_KEY='reality.preview.conversation.v1';
+function trustConversationId(){
+ try{
+  const existing=localStorage.getItem(TRUST_SESSION_KEY);
+  if(existing&&/^[a-zA-Z0-9:_-]{12,100}$/.test(existing))return existing;
+  const next='proof-chat:'+crypto.randomUUID();
+  localStorage.setItem(TRUST_SESSION_KEY,next);return next;
+ }catch{return null}
+}
+function renderTrustPulse(value){
+ const p=value&&value.version==='reality-conversation-trust-pulse-v0.1'?value:null;
+ const state=p?.status||'NOT_MONITORED';
+ const tone=state==='DETECTED_AND_CONTAINED'||state==='FINDINGS_NEED_REVIEW'||state==='CONVERSATIONAL_DRIFT_RISK'?'review':
+   state==='CHECKED_NO_FINDINGS_FULLY_ADJUDICATED'?'verified':'limited';
+ $('trustPulse').dataset.tone=tone;
+ $('trustPulseTitle').textContent=p?.headline||'Monitoring result unavailable';
+ $('trustPulseDetail').textContent=p ?
+   (p.turn?'Turn '+p.turn+' · ':'')+p.note+
+    (p.evidence_receipt_id?' Receipt '+p.evidence_receipt_id.slice(0,24):' No verified receipt.') :
+   'No complete reliability receipt was returned. No drift-free conclusion is possible.';
+ const cf=p?.conversational_drift_findings||[];
+ $('trustFindings').hidden=!cf.length;
+ if(cf.length){
+  $('trustFindingsTitle').textContent=cf.length+' conversational drift candidate(s) · inspect original words';
+  $('trustFindingsBody').innerHTML=cf.map(f=>
+   '<div class="row"><div><strong>'+esc(f.classification)+'</strong>'+ 
+   '<div class="muted">First detected turn '+esc(f.first_detected_turn)+
+   ' · Current turn '+esc(f.detected_turn)+' · Occurrence '+esc(f.recurrence_count)+'</div>'+ 
+   '<div class="muted">User intent: '+esc(f.original_user_text||'see source receipt')+'</div>'+ 
+   '<div class="muted">Model response: '+esc(f.observed_model_text||'see model receipt')+'</div>'+ 
+   '<div class="muted">Evidence: '+esc((f.source_receipt_refs||[]).join(', '))+'</div>'+ 
+   '<div class="trust-unknown">Semantic verification and repair: not performed</div></div></div>').join('');
+  $('trustFindings').open=true;
+ }
+ const d=p?.digest;
+ $('trustDigest').hidden=!d;
+ if(d){
+   $('trustDigestTitle').textContent='Turns '+d.window_start+'–'+d.window_end+' · Evidence review';
+   $('trustDigestBody').innerHTML=
+     '<div>Turn receipts: '+esc(d.assessment_receipts)+' / '+esc(d.expected_turns)+
+     ' · Source-attested structured checks: '+esc(d.source_attested_structured_checks)+
+     ' · Independently fully adjudicated: '+esc(d.independently_fully_adjudicated_turns)+'</div>'+
+     '<div>Turns with potential mistakes: '+esc(d.turns_with_typed_findings)+
+     ' · Contained model outputs: '+esc(d.model_outputs_contained)+
+     ' · Unverified/open incident turns: '+esc(d.open_or_unverified_incident_turns)+'</div>'+ 
+     '<div>Conversational drift candidates in window: '+esc(d.conversational_risk_observations||0)+
+     ' · Repeat candidates: '+esc(d.recurring_conversational_risks||0)+
+     ' · Unverified conversational anchors: '+esc(d.unresolved_conversational_incident_anchors||0)+
+     ' · Authenticated historical checks: '+esc(d.authenticated_historical_alignment_checks||0)+'</div>'+ 
+     '<div class="trust-unknown">Not scored: complete-conversation drift and hallucination rates. '+
+     esc(d.insufficient_or_partially_assessed_turns)+' of '+esc(d.expected_turns)+
+     ' turns lacked full independent adjudication. Historical incidents stay visible until verified closed.</div>';
+   $('trustDigest').open=true;
+ }
+}
 const SHIFT_KEY='reality.dailyShift.v1';
 function loadShift(){try{const s=JSON.parse(localStorage.getItem(SHIFT_KEY)||'{}');if(typeof s.enabled==='boolean')$('shiftEnabled').checked=s.enabled;if(s.readinessTime)$('readinessTime').value=s.readinessTime;if(s.shiftStart)$('shiftStart').value=s.shiftStart;if(s.shiftLength)$('shiftLength').value=String(s.shiftLength)}catch{}}
 $('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const r=await fetch('/api/reality/shift',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent='Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',2500)}};
@@ -107,12 +187,13 @@ function render(b){
 }
 $('plan').onclick=async()=>{
   const statement=$('request').value.trim(); if(!statement){$('error').textContent='Tell Reality what you need first.';return}
-  $('error').textContent=''; $('plan').disabled=true;
+  $('error').textContent=''; $('plan').disabled=true; $('trustPulseTitle').textContent='Checking this turn…'; $('trustPulseDetail').textContent='Waiting for source-scoped receipt. An answer alone is not verification.';
   try{
-    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement})});
+    const r=await fetch('/api/reality/intelligence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:statement,conversation_id:trustConversationId(),thought_id:trustConversationId()})});
     const b=await r.json(); if(!r.ok)throw new Error(b.error||'Reality intelligence request failed');
     const intelligence=b.result?.intelligence||{};
     $('brief').classList.add('open');
+    renderTrustPulse(b.result?.reliability?.trust_pulse);
     $('status').textContent=(intelligence.mode||'LIVE').toUpperCase()+' · '+(intelligence.cognitive_runtime_version||'REALITY');
     $('understood').innerHTML='<strong>'+esc(intelligence.answer||'Reality returned no answer.')+'</strong><p class="muted">Live Reality cognitive runtime · '+esc(intelligence.model||'model')+'</p>'; addReadAloudButton($('understood'), intelligence.answer||'Reality returned no answer.');
     $('steps').innerHTML=(intelligence.lanes||[]).map(x=>'<div class="step"><strong>'+esc(x.name)+'</strong>: '+esc(x.answer)+'</div>').join('')||'<div class="step">Fast cognitive path completed.</div>';
@@ -122,7 +203,7 @@ $('plan').onclick=async()=>{
     $('timeline').innerHTML=['SIGNAL_ADMITTED','CONTEXT_RETRIEVED','COGNITION','GOVERNANCE_CHECK','NOT_EXECUTED'].map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
     $('execution').textContent='NOT_EXECUTED · cognition only';
     $('verification').textContent='No external outcome claimed';
-  }catch(e){$('error').textContent=e.message}finally{$('plan').disabled=false}
+  }catch(e){$('error').textContent=e.message;renderTrustPulse(null)}finally{$('plan').disabled=false}
 };
 const realityWork=$('findWork');const workResult=$('workResult');
 function renderWork(source){
