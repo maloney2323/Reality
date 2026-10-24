@@ -17,19 +17,19 @@ export function readGroundedEvidence(history,{worldId,asOf=null}={}){
        event.provenance?.source!=='reality_verified_evidence_adapter')continue;
     if(event.epistemic_status!=='OBSERVED' || p.source_kind==='MODEL_GENERATED')continue;
     const items=[...(p.facts||[]),...(p.obligations||[])];
-    if(!items.every(x=>x?.world_id===worldId&&x.evidence_ref===event.event_id))continue;
+    if(!items.every(x=>x?.world_id===worldId&&(x.evidence_ref==null||x.evidence_ref===event.event_id)))continue;
     sources.push(event.event_id);
     for(const f of p.facts||[]){
       if(!valid(f.key))throw Error('RELIABILITY_FACT_KEY_REQUIRED');
       if(facts.has(f.key) && JSON.stringify(facts.get(f.key).value)!==JSON.stringify(f.value))
         throw Error('RELIABILITY_CONFLICTING_ATTESTED_FACTS');
-      facts.set(f.key,normalize(f));
+      facts.set(f.key,{...normalize(f),evidence_ref:event.event_id});
     }
     for(const o of p.obligations||[]){
       if(!valid(o.id))throw Error('RELIABILITY_OBLIGATION_ID_REQUIRED');
       if(obligations.has(o.id)&&obligations.get(o.id).active!==o.active)
         throw Error('RELIABILITY_CONFLICTING_ATTESTED_OBLIGATIONS');
-      obligations.set(o.id,normalize(o));
+      obligations.set(o.id,{...normalize(o),evidence_ref:event.event_id});
     }
   }
   return Object.freeze({
@@ -65,9 +65,7 @@ export async function recordSourceAttestedEvidence({
     },
     provenance:{source:'reality_verified_evidence_adapter'},
   });
-  // Normalized event IDs are UUIDs in the actual spine; the attested source
-  // must refer to the committed ID. We only patch our local expected digest
-  // through the return path below; a persisted envelope cannot be rewritten.
+  // Evidence refs are resolved from committed UUIDs on read-back.
   const rows=await continuityRuntime.readback();
   const saved=rows.find(x=>x.event_id===event.event_id);
   if(!saved||saved.payload?.source_digest!==sourceDigest)
