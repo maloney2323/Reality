@@ -55,22 +55,40 @@ export function orderContinuityHistory(history) {
     // Recompute the event hash from persisted content, not from a self-asserted
     // hash pointer. A chain of unverified hashes does not prove record integrity.
     const {continuity_spine: lineageMetadata, ...originalProvenance} = event.provenance || {};
-    const expectedHash = computeContinuityLineageHash({
-      continuityRootId: event.continuity_root_id,
-      worldlineId: event.worldline_id,
-      parentEventId: event.parent_event_id,
-      priorLineageHash: lineageMetadata?.prior_lineage_hash || null,
-      stage: event.event_kind,
-      entityId: event.entity_id,
-      evidenceRefs: event.evidence_refs || [],
-      transformationReceiptId: lineageMetadata?.transformation_receipt_id || null,
-      effectiveTime: event.effective_time,
-      assertionTime: event.assertion_time,
-      epistemicStatus: event.epistemic_status,
-      payload: event.payload,
-      provenance: originalProvenance,
-    });
-    if (expectedHash !== event.lineage_hash) throw new Error('RELIABILITY_HISTORY_CONTENT_HASH_INVALID');
+    // PostgreSQL timestamptz normalizes wire formatting: an event hashed
+    // with 2026-10-01T12:00:01.000Z can round-trip as
+    // 2026-10-01T12:00:01+00:00. Compare equivalent representations
+    // without weakening the cryptographic verification of the instant.
+    const variants = value => {
+      const original=String(value||'');
+      const date=new Date(original);
+      if(!original || Number.isNaN(date.getTime()))
+        throw new Error('RELIABILITY_HISTORY_TIMESTAMP_INVALID');
+      const canonical=date.toISOString();
+      return [...new Set([original,canonical,canonical.replace(/\\.000Z$/, 'Z')])];
+    };
+    let hashMatches=false;
+    for (const effectiveTime of variants(event.effective_time)) {
+      for (const assertionTime of variants(event.assertion_time)) {
+        const expectedHash = computeContinuityLineageHash({
+          continuityRootId: event.continuity_root_id,
+          worldlineId: event.worldline_id,
+          parentEventId: event.parent_event_id,
+          priorLineageHash: lineageMetadata?.prior_lineage_hash || null,
+          stage: event.event_kind,
+          entityId: event.entity_id,
+          evidenceRefs: event.evidence_refs || [],
+          transformationReceiptId: lineageMetadata?.transformation_receipt_id || null,
+          effectiveTime, assertionTime,
+          epistemicStatus: event.epistemic_status,
+          payload: event.payload,
+          provenance: originalProvenance,
+        });
+        if(expectedHash===event.lineage_hash)hashMatches=true;
+      }
+      if(hashMatches)break;
+    }
+    if(!hashMatches) throw new Error('RELIABILITY_HISTORY_CONTENT_HASH_INVALID');
     if (parent) {
       if (parent.continuity_root_id !== event.continuity_root_id ||
           parent.worldline_id !== event.worldline_id) throw new Error('RELIABILITY_HISTORY_SCOPE_BREAK');
