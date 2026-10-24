@@ -185,8 +185,30 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Ground the NEXT cognitive turn from the reconstructed ledger, not from
+  // the previous model answer. A superseded source claim is never inherited.
+  let reliabilityGrounding = null;
+  if (process.env.VERCEL_ENV === 'preview' &&
+      process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
+      continuityRuntime?.enabled && systemContext?.world_id) {
+    const evidenceHistory = await continuityRuntime.readback();
+    const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
+    if (grounded.source_receipt_ids.length) {
+      reliabilityGrounding = {
+        world_id:grounded.world_id,
+        evidence_basis:grounded.epistemic_basis,
+        facts:grounded.facts.map(f=>({key:f.key,value:f.value,source_receipt_id:f.evidence_ref})),
+        active_obligations:grounded.obligations.filter(o=>o.active).map(o=>({
+          id:o.id,source_receipt_id:o.evidence_ref,
+        })),
+        evidence_source_receipt_ids:grounded.source_receipt_ids,
+        source_attestations_are_not_infallible:true,
+      };
+    }
+  }
   const cognitionContext = {
     ...(systemContext || {}),
+    reliability_grounding:reliabilityGrounding,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
