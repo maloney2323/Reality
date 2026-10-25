@@ -101,9 +101,12 @@ test('160 authenticated turns share one persisted epistemic frame in Cognition a
    }
    const root=u.searchParams.get('continuity_root_id')?.replace(/^eq\./,'');
    const worldline=u.searchParams.get('worldline_id')?.replace(/^eq\./,'');
-   let events=persisted.filter(e=>(!root||e.continuity_root_id===root)&&
+   const id=u.searchParams.get('event_id')?.replace(/^eq\./,'');
+   let events=persisted.filter(e=>(!id||e.event_id===id)&&
+    (!root||e.continuity_root_id===root)&&
     (!worldline||e.worldline_id===worldline));
-   if(u.searchParams.get('limit')==='1')events=events.slice(-1);else events.reverse();
+   if(u.searchParams.get('limit')==='1')events=events.slice(-1);
+   // Return provider-order ledger records, never a fake event for an ID lookup.
    return new Response(JSON.stringify(events),{status:200});
   }
   if(u.origin!=='https://api.openai.com')throw Error('UNEXPECTED_FETCH '+url);
