@@ -6,6 +6,7 @@ import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootI
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
+import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
@@ -458,13 +459,17 @@ export async function runLiveIntelligenceOrchestration({
                 kind:x.kind,reason:x.reason,
               })),
               source_corrections:continuousReliability.source_attested_correction_proposals||[],
+              original_answer_for_targeted_revision:originalModelText.slice(0,5000),
             },
             cognitive_instruction:[
               'This is a correction attempt within Reality.',
               'Answer the CURRENT user request directly, not a previous question.',
               'Use the supplied source-attested records and respect time/order of supersessions.',
               'Do not claim any action was executed or approved without evidence.',
-              'Do not reproduce or justify the rejected answer.',
+              'Perform a MINIMAL evidence-backed revision: preserve accurate source-backed claims and requested deliverables.',
+              'Do not treat an untrusted reviewer concern as evidence that an otherwise supported statement is false.',
+              'Clearly qualify external effects or reliability claims not established by the supplied source records.',
+              'If the user requested an internal draft, still deliver the draft; never externally send or publish it.',
             ].join(' '),
           },
           model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
@@ -493,6 +498,16 @@ export async function runLiveIntelligenceOrchestration({
       const safeToRelease=secondReviewPass &&
         (!continuousReliability.model_output_quarantined ||
           provedSourceConflict);
+      const actionClaimRisk=Boolean(review?.issues?.some(issue=>
+        issue.kind==='FALSE_COMPLETION'||issue.kind==='AUTHORITY_CONFUSION'));
+      // Explicitly disclose reviewer-only unresolved evidence concerns
+      // without deleting a good answer or pretending the detector proved
+      // the quoted claim false. This is NOT a verified correction.
+      const unresolvedEvidenceNotice=(!safeToRelease && materialUnsupportedClaim &&
+        !actionClaimRisk)
+        ? qualifyUnresolvedEvidence({originalAnswer:originalModelText,
+            initialReview:review,repairVerified:false})
+        : null;
       // Both review calls use the same replaceable model; this is NOT an
       // independently adjudicated accuracy finding, and no effects execute.
       const correctionReceipt=await continuityRuntime.appendStage({
@@ -516,6 +531,9 @@ export async function runLiveIntelligenceOrchestration({
           disposition:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
             'CORRECTION_NOT_VERIFIED',
           correction_error:retryFailure,
+          released_unresolved_evidence_notice:unresolvedEvidenceNotice?.qualified===true,
+          released_qualification_quotes:unresolvedEvidenceNotice?.issue_quotes||[],
+          independent_source_entailment_verified:false,
           independently_verified_semantic_correctness:false,
           external_action_authorized:false,
         },
@@ -525,15 +543,15 @@ export async function runLiveIntelligenceOrchestration({
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
       } else if(materialUnsupportedClaim) {
-        const riskOfFalseCompletion=review?.issues?.some(issue=>
-          issue.kind==='FALSE_COMPLETION'||issue.kind==='AUTHORITY_CONFUSION');
-        if(riskOfFalseCompletion){
+        if(actionClaimRisk){
           // Consequential unverified action claims must not be released as fact.
           modelResult.answer='Reality cannot verify the claimed external action or authority from the connected records. No external action was executed by Reality.';
           modelResult.reliability_intervention='UNVERIFIED_ACTION_CLAIM_WITHHELD';
+        } else if(unresolvedEvidenceNotice?.qualified===true) {
+          modelResult.answer=unresolvedEvidenceNotice.answer;
+          modelResult.reliability_intervention=
+            'UNRESOLVED_EVIDENCE_DISCLOSED_NOT_VERIFIED_CORRECTION';
         } else {
-          // A semantic review alone is not evidence to overwrite a correct
-          // source-supported answer. Keep it, and record uncertain review.
           modelResult.reliability_intervention='UNASSESSED_SEMANTIC_REVIEW_ORIGINAL_PRESERVED';
         }
       }
@@ -546,6 +564,8 @@ export async function runLiveIntelligenceOrchestration({
         second_review_id:retryReview?.response_id||null,
         source_violation_codes:deterministicReview?.codes||null,
         receipt_id:correctionReceipt.event_id,
+        released_evidence_notice:unresolvedEvidenceNotice?.qualified===true,
+        qualification_issue_quotes:unresolvedEvidenceNotice?.issue_quotes||[],
         independently_verified_correctness:false,external_action_authorized:false,
       };
       // Quarantine only if a source-backed contradiction was NOT corrected.

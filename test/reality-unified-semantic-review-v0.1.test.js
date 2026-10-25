@@ -381,11 +381,51 @@ test('real business CI success must not be replaced with generic uncertainty bas
     model:'test-model',apiKey:'test-only',systemContext:context(),
     verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
    });
-   assert.equal(got.intelligence.answer,original);
+   assert.ok(got.intelligence.answer.startsWith(original));
+   assert.match(got.intelligence.answer,/Reality evidence review/);
+   assert.match(got.intelligence.answer,/test run succeeded/);
+   assert.match(got.intelligence.answer,/not a verified correction/);
    assert.equal(got.intelligence.reliability_intervention,
-     'UNASSESSED_SEMANTIC_REVIEW_ORIGINAL_PRESERVED');
+     'UNRESOLVED_EVIDENCE_DISCLOSED_NOT_VERIFIED_CORRECTION');
+   assert.equal(got.reliability.semantic_repair.released_evidence_notice,true);
    assert.equal(got.reliability.semantic_repair.status,'CORRECTION_NOT_VERIFIED');
    assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
+
+test('actual Reality CI evidence: unsupported external effectiveness claim is disclosed after failed correction',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{facts:[
+     {key:'signal_v11_test_run_conclusion',value:'SUCCESS'},
+   ]});
+   const original='The CI test passed. This proves customer hallucinations are now eliminated.';
+   const badRepair='The test passed and all customer hallucinations are gone.';
+   const stub=semanticCallStub(f,{
+    draft:original,repair:badRepair,
+    first:review({issues:[{kind:'UNSUPPORTED_FACT',
+      quote:'This proves customer hallucinations are now eliminated',
+      reason:'CI status does not measure customer production hallucinations.'}]}),
+    second:review({issues:[{kind:'UNSUPPORTED_FACT',
+      quote:'all customer hallucinations are gone',
+      reason:'No customer evidence supplied.'}]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Did the test pass?',observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.ok(got.intelligence.answer.startsWith(original));
+   assert.match(got.intelligence.answer,/semantic reviewer raised an evidence concern/);
+   assert.match(got.intelligence.answer,/Do not treat the quoted claim as a verified operational result/);
+   assert.equal(got.reliability.semantic_repair.status,'CORRECTION_NOT_VERIFIED');
+   assert.equal(got.reliability.semantic_repair.released_evidence_notice,true);
+   const receipt=f.events.find(e=>e.event_id===got.reliability.semantic_repair.receipt_id);
+   assert.equal(receipt.payload.released_unresolved_evidence_notice,true);
+   assert.ok(receipt.payload.released_qualification_quotes.includes(
+     'This proves customer hallucinations are now eliminated'));
    assert.equal(got.execution.status,'NOT_EXECUTED');
   }finally{restoreSemantic()}
  });
