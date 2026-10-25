@@ -464,7 +464,7 @@ export async function runLiveIntelligenceOrchestration({
     const conversationalRepairCandidate=releaseRelevantIssues.some(x=>
       ['FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind));
     const structuralIntegrityFindings=(conversationalAssessment?.findings||[]).filter(f=>
-      ['EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION'].includes(f.classification));
+      ['EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION','UNATTESTED_MATERIAL_ENTAILMENT'].includes(f.classification));
     const structuralRelationCandidate=structuralIntegrityFindings.length>0;
     const semanticRepairCandidate=structuralRelationCandidate||conversationalRepairCandidate||userObjectiveNotAddressed||
       provedSourceConflict||materialUnsupportedClaim;
