@@ -613,3 +613,55 @@ test('conversation comparison: do not modify a correct answer and do not promote
   }finally{restoreSemantic()}
  });
 });
+
+
+test('user-goal trajectory drift enters existing repair and Continuity receipt; authorized user goal remains governing',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const firstUserRef='customer:user:intent-1';
+   const older=[
+    {role:'user',source_ref:firstUserRef,
+      text:'We need to finish the estimate for the homeowner this afternoon. Keep that the objective.'},
+    {role:'assistant',source_ref:'assistant:old-2',
+      text:'I will focus on the homeowner estimate.'},
+    {role:'user',source_ref:'customer:user:detour-3',
+      text:'Quick detour to inventory, then return to the estimate.'},
+    {role:'assistant',source_ref:'assistant:old-4',
+      text:'I can review the stock first; the estimate is still the requested outcome.'},
+   ];
+   const incorrect='Instead, let us launch a social-media campaign this afternoon.';
+   const correct='The homeowner estimate remains the goal. Check pricing and prepare the internal draft.';
+   const stub=semanticCallStub(f,{
+    draft:incorrect,repair:correct,
+    first:{...review(),goal_trajectory_review:{
+      goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      answer_alignment:'ASSISTANT_DRIFTED_OFF_OBJECTIVE',
+      answer_quote:'launch a social-media campaign',
+      reason:'The user asked to return to the estimate, not launch an unsolicited campaign.',
+    }},
+    second:{...review(),goal_trajectory_review:{
+      goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      answer_alignment:'ON_USER_DIRECTED_OBJECTIVE',
+      answer_quote:'',reason:'The answer returns to the requested estimate.',
+    }},
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Back to the homeowner estimate now. What remains to finish it?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:older,fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,correct);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,1);
+   assert.ok(got.reliability.conversational_drift.findings.some(x=>
+    x.classification==='CONVERSATION_TOPIC_DRIFT_CANDIDATE'&&
+    x.detector_channel==='EXISTING_SEMANTIC_CONVERSATION_REVIEW'));
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   const modelReq=stub.calls.find(x=>x.mode==='MODEL');
+   assert.ok(JSON.stringify(modelReq.request).includes('user_goal_trajectory'));
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
