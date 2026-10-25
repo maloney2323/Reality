@@ -1,0 +1,71 @@
+name: Reality Selective Cognitive Alignment v0.2 — 12-Turn A/B
+on:
+  push:
+    branches:
+      - experiment/reality-pre-cognition-alignment-probe-20261024
+    paths:
+      - '.github/workflows/reality-selective-cognitive-alignment-v0.2.yml'
+      - 'src/reality-selective-cognitive-alignment-v0.2.js'
+      - 'test/reality-selective-cognitive-alignment-v0.2.test.js'
+      - 'scripts/run-reality-selective-cognitive-alignment-v0.2-12turn.mjs'
+      - 'docs/reality-selective-cognitive-alignment-v0.2-evidence.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selective-alignment-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse selective runtime and paired experiment
+        run: |
+          node --check src/reality-selective-cognitive-alignment-v0.2.js
+          node --check scripts/run-reality-selective-cognitive-alignment-v0.2-12turn.mjs
+      - name: Hold old invariants and test turn-priority / bitemporal scope
+        run: |
+          node --test test/reality-selective-cognitive-alignment-v0.2.test.js \
+            test/reality-alignment-invariant-contract-v0.1.test.js \
+            test/reality-pre-cognition-alignment-probe-v0.1.test.js \
+            test/reality-conversation-drift-integrity-v0.1.test.js
+      - name: Declare non-claims
+        run: |
+          echo 'Tests do not establish measured long-horizon improvement.'
+          echo 'The selective packet is NOT a deterministic action gateway.'
+  paired-exploratory-model-experiment:
+    needs: selective-alignment-contract
+    if: contains(github.event.head_commit.message, '[live-selective-v02]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_PROBE_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: One frozen 12x2 Reality-only comparative experiment (24 provider-call limit)
+        run: node scripts/run-reality-selective-cognitive-alignment-v0.2-12turn.mjs
+      - name: Preserve full raw answers, scoped source receipts and costs even if incomplete
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-selective-alignment-v02-12turn-paired-raw
+          path: benchmark-results/reality-selective-alignment-v0.2-12turn.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Disclose measurement scope
+        if: always()
+        run: |
+          echo 'One model gateway, synthetic source fixtures and no second model judge.'
+          echo 'Manual independent interpretation needed for factual vs conversational drift.'
+          echo 'Zero production writes or external customer actions.'
+          echo 'Only actual calls/tokens/latency measured; provider latency not guaranteed.'

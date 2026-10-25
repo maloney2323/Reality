@@ -1,0 +1,65 @@
+name: Reality Pre-Cognition Alignment Mini Experiment v0.1
+on:
+  push:
+    branches:
+      - experiment/reality-pre-cognition-alignment-probe-20261024
+    paths:
+      - '.github/workflows/reality-pre-cognition-alignment-mini-v0.1.yml'
+      - 'src/reality-pre-cognition-alignment-probe-v0.1.js'
+      - 'test/reality-pre-cognition-alignment-probe-v0.1.test.js'
+      - 'scripts/run-reality-pre-cognition-alignment-mini-v0.1.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-alignment-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify unchanged cognitive contract and experimental code
+        run: |
+          node --check src/reality-pre-cognition-alignment-probe-v0.1.js
+          node --check scripts/run-reality-pre-cognition-alignment-mini-v0.1.mjs
+          node --test test/reality-pre-cognition-alignment-probe-v0.1.test.js test/reality-conversation-drift-integrity-v0.1.test.js
+      - name: Limit claims
+        run: |
+          echo "Source/contract checks are NOT proof of improved LLM drift prevention."
+          echo "Only a tiny model A/B could indicate a direction; independent review is still required."
+  six-call-live-paired-probe:
+    needs: source-alignment-contract
+    if: contains(github.event.head_commit.message, '[live-alignment-probe]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_PROBE_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Three matched fictional cases, two Reality context modes, maximum six provider requests
+        run: node scripts/run-reality-pre-cognition-alignment-mini-v0.1.mjs
+      - name: Preserve original model responses and detector candidates for human review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-pre-cognition-alignment-mini-original-pairs
+          path: benchmark-results/reality-pre-cognition-alignment-mini.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: State hard limits
+        if: always()
+        run: |
+          echo "This is a fictional, 3-pair, at-most-six-API-call experiment."
+          echo "The two arms both use the SAME Reality model gateway; there is no extra model judge."
+          echo "No successful case establishes measured customer drift reduction."
+          echo "No production write, customer data, business send, or authorized external effect."

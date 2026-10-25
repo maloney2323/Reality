@@ -1,0 +1,69 @@
+name: Reality 12-Turn Pre-Cognition Invariant Stress Test
+on:
+  push:
+    branches:
+      - experiment/reality-pre-cognition-alignment-probe-20261024
+    paths:
+      - '.github/workflows/reality-pre-cognition-12turn-v0.1.yml'
+      - 'src/reality-alignment-invariant-contract-v0.1.js'
+      - 'benchmarks/reality-pre-cognition-alignment-12turn-v0.1.mjs'
+      - 'test/reality-alignment-invariant-contract-v0.1.test.js'
+      - 'scripts/run-reality-pre-cognition-alignment-12turn-v0.1.mjs'
+      - 'docs/reality-pre-cognition-invariant-12turn-spec-20261024.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  invariant-scope-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse pre-cognition source, casepack, and benchmark scripts
+        run: |
+          node --check src/reality-alignment-invariant-contract-v0.1.js
+          node --check src/reality-pre-cognition-alignment-probe-v0.1.js
+          node --check benchmarks/reality-pre-cognition-alignment-12turn-v0.1.mjs
+          node --check scripts/run-reality-pre-cognition-alignment-12turn-v0.1.mjs
+      - name: No-provider invariant, bitemporal and original detector regressions
+        run: |
+          node --test test/reality-alignment-invariant-contract-v0.1.test.js \
+            test/reality-pre-cognition-alignment-probe-v0.1.test.js \
+            test/reality-conversation-drift-integrity-v0.1.test.js
+  one-time-24-call-exploratory-probe:
+    needs: invariant-scope-tests
+    if: contains(github.event.head_commit.message, '[live-12turn-alignment]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_PROBE_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Run fictional 12-turn pair through the SAME Reality gateway
+        run: node scripts/run-reality-pre-cognition-alignment-12turn-v0.1.mjs
+      - name: Save ALL original responses and incomplete evidence on any failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-pre-cognition-12turn-original-model-pairs
+          path: benchmark-results/reality-pre-cognition-alignment-12turn-v0.1.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: No autonomous execution or exaggerated claim
+        if: always()
+        run: |
+          echo 'At most 24 real gpt-4.1-mini responses, never a second model judge.'
+          echo 'Fictional source records only. No customer-world read or write.'
+          echo 'No independently graded zero-drift or prevented-incident rate.'
+          echo 'Prompt guidance is NOT hard enforcement. Sandbox preflight never executes.'

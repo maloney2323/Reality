@@ -69,13 +69,20 @@ function negativeAction(t,anchor){
  return new RegExp("\\b(?:do not|don't|never|won't|will not|cannot|can't|not going to|avoid|hold off on)\\s+(?:\\w+\\s+){0,2}"+v+"\\b",'i').test(t);
 }
 function retainsCondition(t,anchor){
+ // Supported source user condition: "send estimate once homeowner approves".
  const parts=t.split(/\b(?:after|until|once|unless|when|only if|provided that|if)\b/i);
- if(parts.length<2)return false;
- return parts.slice(1).some(x=>{
+ const hasCondition=x=>{
   const observed=terms(x),c=anchor.condition_tokens;
   return c.length===1?observed.includes(c[0]):
    c.filter(token=>observed.includes(token)).length>=Math.min(2,c.length);
- });
+ };
+ if(parts.length>=2&&parts.slice(1).some(hasCondition))return true;
+ // Equivalent reversed syntax: "wait for approval BEFORE sending estimate".
+ // The opposite, "send estimate BEFORE approval", must NOT pass this check.
+ const beforeParts=t.split(/\bbefore\b/i);
+ if(beforeParts.length<2)return false;
+ return hasCondition(beforeParts[0]) &&
+  beforeParts.slice(1).some(x=>matchesAction(x,anchor));
 }
 function possibleRevision(t,anchor){
  return /\b(?:actually|instead|change|override|no longer|you can now|go ahead|forget the earlier|remove the restriction)\b/i.test(t)&&
