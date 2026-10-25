@@ -196,8 +196,13 @@ const summary={
   'USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR',
  ].includes(e.payload.goal_trajectory_review?.user_direction)).length,
  goal_drift_coverage_counts:{
-  unassessed:records.filter(e=>!e.payload.goal_drift_coverage ||
-   e.payload.goal_drift_coverage.status==='NOT_SEMANTICALLY_ASSESSED').length,
+  unassessed:records.filter(e=>
+   e.payload.goal_drift_coverage?.status==='NOT_SEMANTICALLY_ASSESSED'||
+   (!e.payload.goal_drift_coverage&&
+    /^(UNASSESSED|NOT_ASSESSED)/.test(e.payload.semantic_review_coverage||''))).length,
+  legacy_coverage_status_not_recorded:records.filter(e=>
+   !e.payload.goal_drift_coverage&&
+   /^(REVIEWED)/.test(e.payload.semantic_review_coverage||'')).length,
   limited:records.filter(e=>
    e.payload.goal_drift_coverage?.status==='LIMITED_REVIEW_NO_CANDIDATES').length,
   unresolved:records.filter(e=>
