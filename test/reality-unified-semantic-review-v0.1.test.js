@@ -250,3 +250,59 @@ test('semantics: unanchored review cannot be counted as successful detection',as
   }finally{restoreSemantic()}
  });
 });
+
+test('partial quote-anchoring failure is reported and does not erase semantic coverage',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const answer='Cabinet delivery is 2026-10-27.';
+   const stub=semanticCallStub(f,{
+    draft:answer,first:review({claims:[
+     claim('cabinet_delivery_date','2026-10-27','made-up quote'),
+     claim('cabinet_delivery_date','2026-10-27','2026-10-27'),
+    ]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,answer);
+   assert.equal(got.reliability.semantic_review.status,'REVIEWED_PARTIAL_COVERAGE');
+   assert.equal(got.reliability.semantic_review.unassessed_claims.length,1);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
+test('real-business scope: an unsupported customer-live assertion is corrected to uncertainty',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'pr132_is_merged',value:'NO'}],
+   });
+   const original='This code is now live for customers.';
+   const corrected='GitHub shows PR #132 is not merged. Those records alone cannot establish whether a separate deployment exists. Customer rollout is unverified.';
+   const stub=semanticCallStub(f,{
+    draft:original,repair:corrected,
+    first:review({issues:[{kind:'UNSUPPORTED_FACT',
+      quote:'live for customers',
+      reason:'A PR state alone cannot confirm customer deployment.'}]}),
+    second:review({}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Is our PR #132 code already deployed to customers?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,corrected);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.semantic_repair.status,
+    'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
