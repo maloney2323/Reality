@@ -13,6 +13,5 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ],
-  "buildCommand": "node scripts/run-reality-live-durable-adversarial-v1.mjs first && mkdir -p public && printf 'Reality isolated adversarial preview\\n' > public/index.html"
+  ]
 }
