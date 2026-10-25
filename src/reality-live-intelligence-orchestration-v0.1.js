@@ -394,9 +394,11 @@ export async function runLiveIntelligenceOrchestration({
         capsule:preCognitionAlignment.capsule,
         modelAnswer:String(modelResult?.answer||''),
       }) : null;
-  const focusNeedsRepair=Boolean((originalFocus?.candidate_codes||[]).some(code=>
-    ['CURRENT_REQUESTED_ACTION_NOT_ADDRESSED_CANDIDATE',
-      'CURRENT_TASK_TOPIC_NOT_ADDRESSED_CANDIDATE'].includes(code)));
+  // Only an explicit CURRENT action omission is eligible for automatic
+  // bounded retry. General topic-keyword heuristics are review signals:
+  // a correct inventory checklist must not be silently rewritten.
+  const focusNeedsRepair=Boolean(originalFocus?.candidate_codes?.includes(
+    'CURRENT_REQUESTED_ACTION_NOT_ADDRESSED_CANDIDATE'));
   if (reliabilityPreviewEnabled &&
       process.env.REALITY_DETECTOR_REPAIR_ENABLED === 'true' &&
       focusNeedsRepair &&
