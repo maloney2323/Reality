@@ -1,5 +1,6 @@
 import {buildCleanerConversationContext} from './reality-cleaner-conversation-context-v0.1.js';
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
+import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -240,11 +241,13 @@ export async function runLiveIntelligenceOrchestration({
   // Ground the NEXT cognitive turn from the reconstructed ledger, not from
   // the previous model answer. A superseded source claim is never inherited.
   let reliabilityGrounding = null;
+  let sourceAttestedFrameSnapshot = null;
   if (process.env.VERCEL_ENV === 'preview' &&
       process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
       continuityRuntime?.enabled && systemContext?.world_id) {
     const evidenceHistory = await continuityRuntime.readback();
     const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
+    sourceAttestedFrameSnapshot = grounded;
     if (grounded.source_receipt_ids.length) {
       reliabilityGrounding = {
         world_id:grounded.world_id,
@@ -264,6 +267,19 @@ export async function runLiveIntelligenceOrchestration({
   const authenticatedConversationContinuity=buildCognitionContinuityHandoff({
     governedSignal,verifiedConversationTurns,latestMessage:message,
   });
+  // One projection shared across ingestion, cognition, evidence review and
+  // durable Continuity. A report is still not verified truth.
+  const canonicalEpistemicFrame=buildCanonicalEpistemicFrame({
+    governedSignal,conversationContinuity:authenticatedConversationContinuity,
+    sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
+    worldId:systemContext?.world_id||null,
+    continuityRootId:effectiveContinuityRootId,
+    observedAt:observedAt||new Date().toISOString(),
+    historyMayBeIncomplete:Boolean(systemContext?.conversation_history_older_messages_may_be_missing),
+  });
+  const epistemicFrameReceipt=await recordCanonicalEpistemicFrame({
+    frame:canonicalEpistemicFrame,continuityRuntime,
+  });
   // The original server-side message array is used to form the bounded,
   // source-linked projection. Never duplicate the entire raw transcript in
   // every observer/verifier/adversary/synthesis model request.
@@ -275,6 +291,8 @@ export async function runLiveIntelligenceOrchestration({
   const cognitionContext = {
     ...boundedCognitionInput,
     conversation_continuity:authenticatedConversationContinuity,
+    canonical_epistemic_state:canonicalEpistemicFrame,
+    canonical_epistemic_receipt:epistemicFrameReceipt,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
     signal_typed_intake:governedSignal.typed_epistemic_intake||null,
@@ -328,7 +346,9 @@ export async function runLiveIntelligenceOrchestration({
   const conversationalAssessment = reliabilityPreviewEnabled
     ? inspectConversationDrift({
         cleanerConversationContext,
-        priorTurns: Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        // Lexical replay is bounded; full 240-message typed conditions are
+        // provided by the source-linked Cleaner conversation projection.
+        priorTurns: Array.isArray(verifiedConversationTurns)?verifiedConversationTurns.slice(-80):[],
         historySource: Array.isArray(verifiedConversationTurns)
           ? 'AUTHENTICATED_CONVERSATION_MESSAGES' : 'NOT_ATTESTED',
         currentUserMessage: message,
@@ -384,7 +404,7 @@ export async function runLiveIntelligenceOrchestration({
       }
       semanticFirst=await reviewRealityAnswer({
         cleanerConversationContext,
-        conversationEvidence:authenticatedConversationContinuity.conversation_evidence||null,
+        conversationEvidence:canonicalEpistemicFrame.conversation_evidence||null,
         currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
@@ -432,6 +452,7 @@ export async function runLiveIntelligenceOrchestration({
         structuredCandidate:reliabilityCandidate,
         conversationalAssessment,
         detectorShadow,
+        epistemicFrameReference:epistemicFrameReceipt,
         semanticReview:semanticFirst?.review||{status:semanticReviewStatus,
           independent_semantic_adjudication:false,external_action_authorized:false},
         semanticRelevantClaimKeys:semanticModeEnabled?
@@ -446,6 +467,10 @@ export async function runLiveIntelligenceOrchestration({
     semantic_review:semanticFirst?.review||{status:semanticReviewStatus,
       independent_semantic_adjudication:false},
     detector_shadow:detectorShadow,
+    canonical_epistemic_state:{frame_hash:canonicalEpistemicFrame.frame_hash,
+      status:epistemicFrameReceipt.status,history_coverage:canonicalEpistemicFrame.history_coverage,
+      source_receipt_id:epistemicFrameReceipt.source_receipt_id,
+      reported_claim_count:canonicalEpistemicFrame.reported_claims.length},
     conversational_assessment: conversationalAssessment?{
       status:conversationalAssessment.status,
       coverage:conversationalAssessment.assessment_scope,
@@ -514,7 +539,7 @@ export async function runLiveIntelligenceOrchestration({
         });
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
-          conversationEvidence:authenticatedConversationContinuity.conversation_evidence||null,
+          conversationEvidence:canonicalEpistemicFrame.conversation_evidence||null,
           currentUserMessage:message,
           modelAnswer:String(retry.answer||''),
           sourceSnapshot:semanticSourceSnapshot,
