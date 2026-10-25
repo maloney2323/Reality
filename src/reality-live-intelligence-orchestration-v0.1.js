@@ -408,6 +408,7 @@ export async function runLiveIntelligenceOrchestration({
       semanticFirst=await reviewRealityAnswer({
         cleanerConversationContext,
         conversationEvidence:canonicalEpistemicFrame.conversation_evidence||null,
+          userGoalTrajectory:canonicalEpistemicFrame.user_goal_trajectory||null,
         currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
@@ -591,6 +592,7 @@ export async function runLiveIntelligenceOrchestration({
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
           conversationEvidence:canonicalEpistemicFrame.conversation_evidence||null,
+          userGoalTrajectory:canonicalEpistemicFrame.user_goal_trajectory||null,
           currentUserMessage:message,
           modelAnswer:String(retry.answer||''),
           sourceSnapshot:semanticSourceSnapshot,
