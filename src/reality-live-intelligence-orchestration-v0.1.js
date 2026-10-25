@@ -7,6 +7,7 @@ import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
+import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -265,6 +266,38 @@ export async function runLiveIntelligenceOrchestration({
         modelResponseId: modelResult?.response_id || governedSignal.packet.packet_id,
       })
     : null;
+  // Preview-only shadow read of the existing Continuity/Universe snapshot.
+  // This may generate CANDIDATES; it cannot change an answer, authorize an
+  // external effect, or replace the original Integrity Spine assessment.
+  const shadowEnabled = reliabilityPreviewEnabled &&
+    process.env.REALITY_DETECTOR_SHADOW_ENABLED === 'true';
+  let detectorShadow = null;
+  if (shadowEnabled) {
+    try {
+      detectorShadow = await inspectLiveDetectorShadow({
+        enabled:true,continuityRuntime,
+        worldId:systemContext?.world_id || null,
+        continuityRootId:effectiveContinuityRootId,
+        currentUserMessage:message,
+        currentUserSourceRef:governedSignal.packet.packet_id,
+        modelAnswer:String(modelResult?.answer || ''),
+        modelResponseId:modelResult?.response_id || null,
+        observedAt:observedAt || new Date().toISOString(),
+        priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        authenticatedHistory:Array.isArray(verifiedConversationTurns),
+        existingDetectorFindings:conversationalAssessment?.findings || [],
+      });
+    } catch (error) {
+      // Shadow failures are recorded as unassessed. No invented 0% scores,
+      // and the original model reply / deterministic authority remain intact.
+      detectorShadow = {
+        status:'SHADOW_SOURCE_OR_PROJECTION_ERROR',
+        failure_code:String(error?.code || error?.message || 'UNKNOWN').slice(0,100),
+        independently_verified_error_count:null,drift_rate_pct:null,
+        live_execution_authorized:false,automated_intervention:false,
+      };
+    }
+  }
   if (reliabilityPreviewEnabled &&
       process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED === 'true' &&
       systemContext?.world_id && continuityRuntime?.enabled) {
@@ -296,12 +329,14 @@ export async function runLiveIntelligenceOrchestration({
         packetId: governedSignal.packet.packet_id,
         structuredCandidate:reliabilityCandidate,
         conversationalAssessment,
+        detectorShadow,
         authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
       })
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null,
         trust_pulse: buildUnmonitoredTrustPulse() };
   const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus,
+    detector_shadow:detectorShadow,
     conversational_assessment: conversationalAssessment?{
       status:conversationalAssessment.status,
       coverage:conversationalAssessment.assessment_scope,
