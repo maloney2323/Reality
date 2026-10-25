@@ -26,3 +26,25 @@ Every step records original model response, Reality displayed response, source r
 
 ## Current limitations
 Even a passed run is only a **real-model, synthetic-source, mocked-durable-store** proof. It does not establish production source authenticity, authorized execution of external effects, or broad elimination of hallucination and conversational drift. The Proof Lab UI requires its own evidence presentation and should show these limitations visibly.
+
+## Real model outcome — completed and preserved
+
+GitHub run: https://github.com/maloney2323/Reality/actions/runs/40152303807
+Artifact: `reality-real-model-full-loop-original-evidence` (ID 12583092453)
+Exactly **16 real model generations** and **16 quote-extraction calls**, 32 provider requests, **0 standalone baseline calls**, total 61,699 input tokens and 4,433 output tokens, all with `gpt-4.1-mini`. Each original provider answer, Reality final answer, source-backed verification receipt and detector flags was preserved.
+
+### Non-blind preliminary review — DO NOT market as verified rates
+A manual examination of all 16 original-vs-final response pairs against the frozen fictional casepack observed:
+- **Original model apparent error turns:** 9 (contradictory homeowner-approval reasoning), 14 (answered prior HOLD rumor instead of current email permission), 15 (answered prior estimate-send question instead of current dispatch request). Three apparent error turns in 16.
+- **Reality final apparent error turns:** 1 and 5 (incorrectly quarantined correct original responses), 9 (a cabinet date source correction displaced the actual approval question), 14 and 15 (same wrong-topic responses were released). Five apparent error turns in 16.
+- One Reality focus candidate flagged Turn 14 but **did not contain** the output; Turn 15 originally did not trigger a focus candidate despite answering the wrong action. The experimental focus matcher is now extended with a requested-action coverage review and exact original-response regression cases.
+- Three total quarantines at Turns 1, 5, 9; **none establishes a verified corrected user objective** in this review. Quarantine count must NOT be marketed as “errors prevented.”
+- Quote extraction failed its source-quote invariant on Turns 2, 6, 14, 16; the reliability receipt correctly marks those as **NOT_EVALUATED**. This makes broad error-rate claims inappropriate.
+- No externally authorized business effects or real provider-connected source events took place. The source-ledger and Continuity DB are simulated. Provider inference was real.
+
+These findings **do not support a reliability improvement in this run**. Initial observed error-turn counts (3 raw versus 5 final) are specifically labeled **non-blind provisional review**, not independent semantic adjudication or causal performance estimates.
+
+### Correct development decision
+Keep this PR draft and prevent production promotion. Improve the source-claim extraction false positives, stop inappropriate containment, enforce current requested action coverage, and separately verify corrections and publish-gate behavior. Rerun Reality-only on held-out turns only after source-backed regression acceptance. Do NOT waste budget on standalone model baselines or silently revise these original receipts.
+
+The existing `full-loop-proof.html` Proof Lab UI now contains a Reality internal comparison section that accepts this experiment's JSON and shows the true original provider output versus the actual final response, its candidate findings and source receipts. It is preview-branch code, **not yet a verified customer-facing deployment**.
