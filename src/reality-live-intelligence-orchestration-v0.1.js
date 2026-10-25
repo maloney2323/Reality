@@ -1,7 +1,7 @@
 import {buildCleanerConversationContext} from './reality-cleaner-conversation-context-v0.1.js';
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
-import {buildUserGoalContinuityState,recoverPriorUserGoalState} from './reality-user-goal-continuity-state-v0.1.js';
+import {buildUserGoalContinuityState,recoverPriorUserGoalState,projectProvisionalGoalLifecycle} from './reality-user-goal-continuity-state-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -274,9 +274,11 @@ export async function runLiveIntelligenceOrchestration({
   // No assistant suggestion or inferred pivot can silently rewrite it.
   const normalizedContinuityRoot=continuityRuntime?.spine?.continuity_root_id||
     effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id);
+  const priorGoalContinuityHistory=continuityRuntime?.enabled?
+    await continuityRuntime.readback():[];
   const oldGoalState=continuityRuntime?.enabled?
     recoverPriorUserGoalState({
-      continuityHistory:await continuityRuntime.readback(),
+      continuityHistory:priorGoalContinuityHistory,
       continuityRootId:normalizedContinuityRoot,
       worldId:systemContext?.world_id||null,
     }):null;
@@ -289,6 +291,12 @@ export async function runLiveIntelligenceOrchestration({
     priorState:oldGoalState,
     conversationHistoryMayBeIncomplete:Boolean(
       systemContext?.conversation_history_older_messages_may_be_missing),
+  });
+  const goalLifecycle=projectProvisionalGoalLifecycle({
+    continuityHistory:priorGoalContinuityHistory,
+    continuityRootId:normalizedContinuityRoot,
+    worldId:systemContext?.world_id||null,
+    goalState:userGoalContinuityState,
   });
   const sourceLinkedOriginal={
     source_ref:userGoalContinuityState.original_user_goal_source_ref,
@@ -304,11 +312,16 @@ export async function runLiveIntelligenceOrchestration({
       goal_lifecycle_reconciliation_status:
         userGoalContinuityState.lifecycle_reconciliation_status,
       assistant_suggestions_can_change_goal:false,
+      // Working interpretation from prior source-linked *user* turns, not
+      // an autonomous change of user intent or execution authority.
+      working_goal_lifecycle:goalLifecycle,
     },
     user_goal_continuity_summary:{
       original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
       current_user_evidence_id:userGoalContinuityState.current_user_evidence_id,
       lifecycle_status:userGoalContinuityState.lifecycle_reconciliation_status,
+      provisional_working_goal_ref:goalLifecycle.working_goal.source_ref,
+      unresolved_semantic_transitions:goalLifecycle.unresolved_semantic_transitions,
       active_goal_verified:false,
       unresolved_transition_count:userGoalContinuityState.unresolved_user_goal_transitions.length,
       earlier_evidence_omitted_at_least:userGoalContinuityState.goal_evidence_records_omitted_at_least,
@@ -318,7 +331,7 @@ export async function runLiveIntelligenceOrchestration({
   // durable Continuity. A report is still not verified truth.
   const canonicalEpistemicFrame=buildCanonicalEpistemicFrame({
     governedSignal,conversationContinuity:goalAwareContinuity,
-    userGoalContinuityState,
+    userGoalContinuityState,userGoalLifecycle:goalLifecycle,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
     // The Continuity spine canonicalizes the root to a UUID. Use that
