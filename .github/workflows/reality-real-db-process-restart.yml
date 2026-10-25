@@ -1,0 +1,70 @@
+name: Reality Benchmark DB — Fresh Process Continuity Recovery
+on:
+  push:
+    branches:
+      - experiment/reality-evidence-adjudication-20261025
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Source arbitration and DB runtime contracts — no provider use
+        run: |
+          node --check scripts/probe-reality-real-db-restart-v1.mjs
+          node --test test/reality-source-review-adjudication-v0.1.test.js \
+            test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-continuity-runtime-v0.1.test.js
+  live-isolated-benchmark:
+    needs: preflight
+    if: contains(github.event.head_commit.message, '[run-real-db-restart]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      VERCEL_ENV: preview
+      REALITY_CONTINUOUS_RELIABILITY_ENABLED: 'true'
+      REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
+      REALITY_RELIABILITY_BENCHMARK_PROJECT_REF: hvkfreoagbrphwghjajw
+      REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF: hvkfreoagbrphwghjajw
+      REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+      REALITY_UNIVERSE_PERSISTENCE_KEY: ${{ secrets.REALITY_BENCHMARK_SUPABASE_SECRET_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Confirm independently scoped credential availability without exposing value
+        id: bench-key
+        shell: bash
+        run: |
+          if [ -z "${REALITY_UNIVERSE_PERSISTENCE_KEY:-}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "NOT_RUN: dedicated benchmark Supabase credential is not configured."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Dedicated benchmark credential available; all DB calls pinned to isolated project."
+          fi
+      - name: Three fresh processes — seed, supersede, recover
+        if: steps.bench-key.outputs.ready == 'true'
+        run: |
+          node scripts/probe-reality-real-db-restart-v1.mjs seed
+          node scripts/probe-reality-real-db-restart-v1.mjs supersede
+          node scripts/probe-reality-real-db-restart-v1.mjs verify
+      - name: Evidence boundary
+        if: always()
+        run: |
+          echo "No LLM token use or customer action."
+          echo "Do not mistake absent benchmark credentials for a persistence pass."
+          echo "No production Supabase URL or fallback credentials are used."
