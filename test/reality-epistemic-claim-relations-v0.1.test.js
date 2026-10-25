@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectEpistemicClaimRelations} from '../src/reality-epistemic-claim-relations-v0.1.js';
 import {inspectConversationDrift} from '../src/reality-conversation-drift-integrity-v0.1.js';
+import {reviewRealityAnswer} from '../src/reality-semantic-review-v0.1.js';
 const prior=[{role:'user',source_ref:'previous:workers-comp',
  text:"Workers' compensation EDI analyst says 'payer acknowledged the file', contractor says 'homeowner approved' and engineering says 'CI green'. None has authenticated payer or homeowner evidence."}];
 const inspect=(answer,message='What is actually verified?')=>inspectEpistemicClaimRelations({
@@ -68,4 +69,27 @@ test('integrated Continuity detection returns relation findings as candidates',(
  assert.ok(out.findings.some(f=>f.classification==='EVENT_TYPE_COLLAPSE'));
  assert.equal(out.coverage.relation_candidate_count,1);
  assert.equal(out.coverage.general_semantic_drift_assessed,false);
+});
+
+test('semantic reviewer receives relation candidates from the existing Continuity detector, not as ground truth',async()=>{
+ const answer='Payer acknowledgment (payment or financing confirmation) remains UNKNOWN.';
+ const structural=inspect(answer).findings;
+ let supplied=null;
+ const reviewed=await reviewRealityAnswer({
+  currentUserMessage:'Separate EDI acknowledgment from financial effects.',
+  modelAnswer:answer,structuralFindings:structural,worldId:'benchmark:world',
+  sourceSnapshot:null,priorTurns:prior,apiKey:'offline-fixture',model:'fixture',
+  fetchImpl:async(url,opts)=>{
+    assert.equal(url,'https://api.openai.com/v1/responses');
+    const request=JSON.parse(opts.body);
+    supplied=JSON.parse(request.input[1].content[0].text);
+    return new Response(JSON.stringify({id:'review:fixture',
+     output_text:JSON.stringify({addresses_current_request:true,issues:[],claims:[],actions:[]})}),{status:200});
+  },
+ });
+ assert.equal(supplied.structural_claim_relation_candidates.length,1);
+ assert.equal(supplied.structural_claim_relation_candidates[0].classification,'EVENT_TYPE_COLLAPSE');
+ assert.equal(supplied.verified_source_fact_records.length,0);
+ assert.equal(reviewed.review.independent_semantic_adjudication,false);
+ assert.equal(reviewed.review.issues.length,0);
 });
