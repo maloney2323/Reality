@@ -9,6 +9,7 @@ import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootI
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
+import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverage-v0.1.js';
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
@@ -474,6 +475,18 @@ export async function runLiveIntelligenceOrchestration({
       independently_adjudicated:false,verified_hallucination:false,
       auto_correction_authorized:false,
     }));
+  // One existing review pass; make missing/partial semantic coverage explicit
+  // BEFORE persisting the ordinary Continuity verification receipt. A zero
+  // candidate count is never a measured zero drift rate.
+  const goalDriftCoverage=assessGoalDriftCoverage({
+    semanticReview:semanticFirst?.review||null,semanticReviewStatus,
+    userGoalTrajectory:canonicalEpistemicFrame.user_goal_trajectory,
+    historyMayBeIncomplete:Boolean(
+      systemContext?.conversation_history_older_messages_may_be_missing||
+      canonicalEpistemicFrame.history_incomplete),
+    trustedConversationHistory:Array.isArray(verifiedConversationTurns),
+    findings:[...(conversationalAssessment?.findings||[]),...semanticConversationFindings],
+  });
   const combinedConversationalAssessment=conversationalAssessment?{
     ...conversationalAssessment,
     status:semanticConversationFindings.length?'EARLY_CONVERSATION_DRIFT_RISK':
@@ -483,7 +496,8 @@ export async function runLiveIntelligenceOrchestration({
       semantic_review_source:'SINGLE_EXISTING_REVIEW_PASS',
       semantic_comparison_independently_verified:false,
       reviewer_status:semanticFirst?.review?.status||'NOT_ASSESSED',
-      comparison_may_omit_earlier_user_history:true},
+      comparison_may_omit_earlier_user_history:true,
+      goal_drift_coverage:goalDriftCoverage},
     findings:[...conversationalAssessment.findings,...semanticConversationFindings],
   }:null;
   const continuousReliability = reliabilityPreviewEnabled
@@ -521,6 +535,7 @@ export async function runLiveIntelligenceOrchestration({
       semantic_conversation_candidates:semanticConversationFindings.length,
       history_scope:combinedConversationalAssessment.history_scope,
       independently_verified_drift_rate:null,
+      goal_drift_coverage:goalDriftCoverage,
     }:null,
   };
   // Meaning-first correction. Never accept a candidate because its keyword
