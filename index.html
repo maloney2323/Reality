@@ -454,6 +454,12 @@ setInterval(refreshSavedShiftHome,300000);
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
      ' · Paused possibilities: '+(goalContext.paused_goal_candidate_count||0)):
     'User-goal continuity not yet recovered';
+   const goalGovernance=reliability.assistant_goal_governance||{};
+   const goalGovernanceText=goalGovernance.status==='ASSISTANT_GOAL_MUTATION_BLOCKED'
+    ? 'Assistant-proposed goal change BLOCKED; user has not authorized it'
+    :goalGovernance.status==='NO_GOAL_MUTATION_PROPOSAL'
+     ? 'No goal-state change proposed; not proof of zero drift'
+     : 'Goal proposal review not available';
    const driftStatus=trajectory.status||'NOT_SEMANTICALLY_ASSESSED';
    const driftText=driftStatus==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION'
     ? 'Potential goal drift detected; needs verification'
@@ -469,6 +475,7 @@ setInterval(refreshSavedShiftHome,300000);
     ' · Semantic review: '+assessed+
     ' · '+goalContextStatus+
     ' · Goal authority: '+goalAuthorityText+
+    ' · Goal transition: '+goalGovernanceText+
     ' · Goal tracking: '+driftText+
     ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
     ' · Review candidates: '+issues+
