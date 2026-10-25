@@ -149,7 +149,7 @@ export function projectProvisionalGoalLifecycle({
  // Typed, provisional relationships. They are linked to source receipts;
  // they do not assert that a model's intent reading is user-approved truth.
  const goalParentCandidates=new Map();
- const transitions=[],assistantAlignmentHistory=[];
+ const transitions=[],assistantAlignmentHistory=[],lifecycleEvidence=[];
  let possibleConsecutiveOffGoalReviews=0;
  for(const e of continuityHistory){
   if(e?.payload?.event_type!=='MODEL_OUTPUT_ASSESSMENT')continue;
@@ -166,6 +166,43 @@ export function projectProvisionalGoalLifecycle({
   const sourceAnchored=state.user_goal_evidence.some(x=>
    x.source_ref===review.goal_source_ref);
   if(!directUser||!sourceAnchored)continue;
+  const lc=e.payload.semantic_review?.goal_lifecycle_review;
+  if(lc?.status==='SOURCE_LINKED_REVIEWER_CANDIDATE'){
+   // Source receipt + frame hash + SAME root and world were already verified.
+   // Verify that the named target belongs to this user's earlier goal graph.
+   const available=[first,active,...paused,...goalState.user_goal_evidence];
+   const target=available.find(g=>g?.source_ref===lc.target_goal_source_ref);
+   const userSourceValid=lc.speaker==='CURRENT_USER'&&
+     lc.current_user_source_ref===directUser.source_ref&&
+     lc.source_quote&&directUser.text.includes(lc.source_quote);
+   const assistantSourceValid=lc.speaker==='ASSISTANT'&&
+     lc.relation==='ASSISTANT_PROPOSED_COMPLETION';
+   if(target&&(userSourceValid||assistantSourceValid)){
+    const kind=lc.relation;
+    const status=kind==='CONVERSATIONAL_EXIT'?
+      'CONVERSATION_EXIT_NOT_BUSINESS_COMPLETION':
+      kind==='USER_REPORTED_BUSINESS_COMPLETION'?
+       'USER_REPORTED_OUTCOME_UNVERIFIED':
+       kind==='USER_REQUESTED_ABANDONMENT'?
+        'USER_REQUESTED_STOP_PENDING_RECONCILIATION':
+        'ASSISTANT_COMPLETION_CLAIM_DENIED';
+    lifecycleEvidence.push({
+      verification_receipt_id:e.event_id,
+      canonical_frame_receipt_id:origin.source_receipt_id,
+      target_goal_evidence_id:target.goal_evidence_id,
+      target_user_goal_source_ref:target.source_ref,
+      origin_user_turn_source_ref:directUser.source_ref,
+      relation:kind,
+      source_quote:lc.source_quote,
+      outcome_or_transition_status:status,
+      user_statement_is_external_outcome_proof:false,
+      user_report_finalizes_business_completion:false,
+      assistant_claim_can_mutate_goal_state:false,
+      independently_verified_business_completion:false,
+      authorizes_external_action:false,
+    });
+   }
+  }
   const answerAlignment=review.answer_alignment;
   if(['ON_USER_DIRECTED_OBJECTIVE','ASSISTANT_DRIFTED_OFF_OBJECTIVE',
       'INSUFFICIENT_EVIDENCE'].includes(answerAlignment)){
@@ -289,6 +326,21 @@ export function projectProvisionalGoalLifecycle({
     relationship:'TEMPORARY_SUBGOAL_CANDIDATE',
     independently_verified:false,source_authority_granted:false,
    })),
+  // Explicit lifecycle evidence is separate from changes of conversational
+  // focus. No LLM judge, user report or chat exit can verify task completion.
+  lifecycle_evidence: lifecycleEvidence.slice(-16),
+  conversation_exit_candidates:lifecycleEvidence.filter(x=>
+    x.relation==='CONVERSATIONAL_EXIT').slice(-8),
+  user_reported_business_completion_candidates:lifecycleEvidence.filter(x=>
+    x.relation==='USER_REPORTED_BUSINESS_COMPLETION').slice(-8),
+  user_requested_abandonment_candidates:lifecycleEvidence.filter(x=>
+    x.relation==='USER_REQUESTED_ABANDONMENT').slice(-8),
+  rejected_assistant_completion_claims:lifecycleEvidence.filter(x=>
+    x.relation==='ASSISTANT_PROPOSED_COMPLETION').slice(-8),
+  completion_verification_status:'NO_INDEPENDENT_BUSINESS_OUTCOME_RECEIPT',
+  completed_goals_verified:[],
+  conversational_exit_is_completion:false,
+  user_report_is_completion_proof:false,
   recent_transition_receipts:transitions.slice(-12),
   assistant_goal_alignment_history:assistantAlignmentHistory.slice(-16),
   possible_consecutive_off_goal_reviews:possibleConsecutiveOffGoalReviews,
