@@ -66,7 +66,7 @@ function observe(text){
   const negation=/\b(?:not|never|no longer|without|cannot|can't|won't|isn't|wasn't|didn't|doesn't|haven't|hasn't|unverified|unconfirmed|withdrawn|revoked|not_sent|not_verified|not_approved)\b/i.test(direct);
   const prohibit=new RegExp("\\b(?:do not|don't|never|must not|cannot|can't)\\s+(?:(?:\\w+)[\\s-]+){0,3}"+actionVerb+"\\b",'i').test(direct);
   const hypothetical=/\b(?:if|unless|would|could|hypothetically|suppose|assuming)\b/i.test(direct);
-  const uncertain=/\b(?:might|perhaps|possibly|probably|maybe|may not|unsure|unverified|unconfirmed|pending)\b/i.test(direct);
+  const uncertain=/\b(?:might|may|perhaps|possibly|probably|maybe|unsure|unverified|unconfirmed|pending)\b/i.test(direct);
   const retracted=/\b(?:withdrawn|revoked|cancelled|canceled|rescinded|no longer)\b/i.test(direct);
   const temporal=/\b(?:now|previously|used to|latest|supersed(?:es|ed|ing)?|updated|changed|withdrawn|revoked)\b/i.test(direct);
   const attributed=quotes.length>0||/\b(?:someone|supplier|customer|homeowner|foreman|supervisor|vendor|note|rumou?r)\s+(?:said|says|claimed|claims|heard|reported)\b/i.test(direct);
