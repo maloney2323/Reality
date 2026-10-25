@@ -22,6 +22,14 @@ jobs:
         run: |
           node --check src/reality-live-intelligence-orchestration-v0.1.js
           node --check src/reality-semantic-review-v0.1.js
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const html=readFileSync('full-loop-proof.html','utf8');
+          const start=html.indexOf('<script>'),end=html.lastIndexOf('</script>');
+          if(start<0||end<=start)throw Error('PROOF_LAB_SCRIPT_MISSING');
+          new Function(html.slice(start+8,end));
+          console.log('Reality Proof Lab business evidence rendering: syntax valid');
+          JS
           node --check src/reality-continuous-reliability-v0.1.js
       - name: Prove source-backed correction and good-answer preservation
         run: |
