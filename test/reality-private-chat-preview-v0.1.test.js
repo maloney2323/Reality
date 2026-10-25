@@ -41,7 +41,7 @@ function provider(){
     if(method==='GET'){
      const id=u.searchParams.get('conversation_id')?.slice(3);
      const uid=u.searchParams.get('user_id')?.slice(3);
-     const out=messages.filter(m=>m.conversation_id===id&&m.user_id===uid)
+     const out=messages.filter(m=>(!id||m.conversation_id===id)&&m.user_id===uid)
       .slice().reverse().slice(0,Number(u.searchParams.get('limit')||241));
      return new Response(JSON.stringify(out),{status:200});
     }
@@ -122,6 +122,9 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.equal(restored.payload.messages.length,4);
   assert.equal(restored.payload.continuity.recovered_messages,4);
   assert.ok(restored.payload.messages.every(m=>m.source_ref.startsWith('supabase:reality_chat_messages:')));
+  const listing=await call(chatApi,'GET',null,cookie);
+  assert.equal(listing.status,200);
+  // Conversation list uses a separate GET ?list=1 route (test below).
   const signedOut=await call(sessionApi,'DELETE',null,cookie);
   assert.equal(signedOut.status,200);
   assert.match(signedOut.headers['Set-Cookie'],/Max-Age=0/);
@@ -147,11 +150,25 @@ test('production feature remains hidden and disabled',async()=>{
   assert.equal((await call(chatApi,'GET')).status,404);
  });
 });
+test('legacy Universe/reliability persistence flags block the personal chat pilot',async()=>{
+ await runFixture(async({call,provider:p})=>{
+  const login=await call(sessionApi,'POST',{email:'test@example.com',password:'correct'});
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+  const response=await call(chatApi,'POST',{
+   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Do not lose this context.'},cookie);
+  assert.equal(response.status,503);
+  assert.equal(response.payload.error,'CHAT_ISOLATION_FLAGS_REQUIRED');
+  assert.equal(p.messages.length,0);
+ });
+});
 test('preview UI is wired to authenticated chat routes, not client-side access token storage',async()=>{
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  assert.match(html,/id="privateChat"/);
  assert.match(html,/api\/reality\/personal-session/);
  assert.match(html,/api\/reality\/personal-chat/);
  assert.match(html,/Start a new conversation/);
+ assert.match(html,/id="privateConversations"/);
+ assert.match(html,/api\/reality\/personal-chat\?list=1/);
  assert.doesNotMatch(html,/localStorage\.setItem\(['"]supabase_access_token/);
 });
