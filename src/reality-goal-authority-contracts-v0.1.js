@@ -36,6 +36,14 @@ export function projectGoalStateContract({lifecycle,goalEvidence,worldId=null}={
   description:bounded(goal.text,700),scope_boundaries:[],
   // A reviewer proposal cannot independently prove ACTIVE/PAUSED/COMPLETED.
   status:'UNRESOLVED',working_status:'PROVISIONAL_ACTIVE_CANDIDATE',
+  // Talking about finishing a goal and reporting success are distinct from
+  // independently confirmed completion of real business work.
+  conversation_exit_not_completion:true,
+  user_reported_outcome_unverified:(lifecycle.user_reported_business_completion_candidates||[])
+    .some(x=>x.target_goal_evidence_id===goal.goal_evidence_id),
+  business_completion_verified:false,
+  business_completion_source_receipt_id:null,
+  user_stop_request_requires_reconciliation:true,
   world_id:worldId||null,
   provenance:{origin_turn_id:goal.source_ref,evidence_payload_ref:goal.goal_evidence_id,
     source_kind:'USER_CHANNEL_UTTERANCE',
@@ -95,6 +103,11 @@ export function projectAssistantGoalProposal({
   firstAnswer.includes(review.answer_quote);
  const detectedShift=Boolean(assessed&&quoted&&
   review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE');
+ const lifecycle=semanticReview?.goal_lifecycle_review;
+ const claimedCompletion=Boolean(lifecycle?.status==='SOURCE_LINKED_REVIEWER_CANDIDATE'&&
+  lifecycle.relation==='ASSISTANT_PROPOSED_COMPLETION'&&
+  lifecycle.speaker==='ASSISTANT'&&nonempty(lifecycle.source_quote)&&
+  firstAnswer.includes(lifecycle.source_quote));
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
   proposal_id:id('assistant-goal-proposal',[currentTurnId,modelResponseId,goalState.goal_id]),
@@ -103,19 +116,30 @@ export function projectAssistantGoalProposal({
   target_goal_id:goalState.goal_id,
   intended_state_mutations:{
    resource_mutations:[],
-   goal_mutations:detectedShift?[{
-    type:'SHIFT_OBJECTIVE',target_goal_id:goalState.goal_id,
-    proposed_change_quote:bounded(review.answer_quote,350),
-    rationale:bounded(review.reason,350),
-    authorized_by:'ASSISTANT_PROPOSAL',
-    authorization_state:'UNAUTHORIZED',
-   }]:[],
+   goal_mutations:[
+    ...(detectedShift?[{
+      type:'SHIFT_OBJECTIVE',target_goal_id:goalState.goal_id,
+      proposed_change_quote:bounded(review.answer_quote,350),
+      rationale:bounded(review.reason,350),
+      authorized_by:'ASSISTANT_PROPOSAL',authorization_state:'UNAUTHORIZED',
+    }]:[]),
+    ...(claimedCompletion?[{
+      type:'CLAIM_BUSINESS_COMPLETION',target_goal_id:goalState.goal_id,
+      claimed_user_goal_source_ref:lifecycle.target_goal_source_ref,
+      proposed_change_quote:bounded(lifecycle.source_quote,350),
+      rationale:bounded(lifecycle.reason,350),
+      authorized_by:'ASSISTANT_PROPOSAL',
+      authorization_state:'UNAUTHORIZED',
+      independent_outcome_receipt:null,
+    }]:[]),
+   ],
   },
   direction_evaluation:{
    status:assessed?'REVIEWER_CANDIDATE_NOT_INDEPENDENTLY_VERIFIED':'NOT_SEMANTICALLY_ASSESSED',
    aligns_with_active_objective:assessed?
     review.answer_alignment==='ON_USER_DIRECTED_OBJECTIVE':null,
    introduces_new_unauthorized_objective:detectedShift,
+   claims_unverified_business_completion:claimedCompletion,
    drops_existing_obligation:null,
    reviewer_goal_source_ref:assessed?review.goal_source_ref:null,
    reviewer_response_id:reviewerResponseId,
@@ -136,21 +160,40 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
  if(candidate&&(candidate.authorized_by!=='ASSISTANT_PROPOSAL'||
     candidate.authorization_state!=='UNAUTHORIZED'))
   throw Error('GOAL_BOUNDARY_ASSISTANT_ESCALATION_REJECTED');
- const blocked=Boolean(candidate);
+ const completion=shift.find(x=>x.type==='CLAIM_BUSINESS_COMPLETION');
+ if(completion&&(completion.authorized_by!=='ASSISTANT_PROPOSAL'||
+    completion.authorization_state!=='UNAUTHORIZED'||
+    completion.independent_outcome_receipt!==null))
+   throw Error('GOAL_BOUNDARY_COMPLETION_AUTHORITY_ESCALATION_REJECTED');
+ const blocked=Boolean(candidate||completion);
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
   proposal_id:proposal.proposal_id,
   goal_id:goalState.goal_id,
-  status:blocked?'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED':
+  status:completion?'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED':
+    candidate?'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED':
     proposal.direction_evaluation.status==='NOT_SEMANTICALLY_ASSESSED'?
       'NOT_SEMANTICALLY_ASSESSED':'NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED',
   authorized_goal_mutations:0,external_actions_authorized:false,
   original_goal_preserved:true,
-  flagged_quote:candidate?.proposed_change_quote||null,
+  flagged_quote:candidate?.proposed_change_quote||
+    completion?.proposed_change_quote||null,
+  prevented_unverified_goal_completion:Boolean(completion),
   source_goal_ref:goalState.provenance.origin_turn_id,
   independent_semantic_correctness_verified:false,
   verified_drift_rate:null,
  });
+}
+export function pendingGoalCompletionEvidenceResponse({goalState,decision}={}){
+ if(!nonempty(goalState?.description)||!nonempty(decision?.flagged_quote)||
+    decision?.status!=='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED')
+  throw Error('GOAL_COMPLETION_EVIDENCE_REQUIRED');
+ return 'Reality withheld an unverified statement of business completion: "'+
+  bounded(decision.flagged_quote,240)+'". The work is not marked completed. '+
+  'The recorded goal remains: "'+bounded(goalState.description,220)+'". '+
+  'A user report or the end of a conversation does not independently verify a '+
+  'customer-facing outcome. Confirm completion against a matching external '+
+  'outcome receipt before updating the business status.';
 }
 export function pendingGoalAuthorizationResponse({goalState}={}){
  if(!nonempty(goalState?.description)||!nonempty(goalState?.provenance?.origin_turn_id))
