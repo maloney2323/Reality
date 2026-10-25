@@ -14,5 +14,5 @@
       "schedule": "0 * * * *"
     }
   ],
-  "buildCommand": "node scripts/run-reality-cold-chain-independent-v0.1.mjs first && mkdir -p public && printf 'Fresh Real GPT-4.1-mini benchmark: first six turns persisted\\n' > public/index.html"
+  "buildCommand": "node scripts/run-reality-cold-chain-independent-v0.1.mjs second && mkdir -p public && printf 'Fresh real benchmark: all twelve turns committed\\n' > public/index.html"
 }
