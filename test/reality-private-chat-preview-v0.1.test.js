@@ -7,7 +7,11 @@ import chatApi from '../api/reality/personal-chat.js';
 const envKeys=['VERCEL_ENV','REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF',
  'REALITY_PERSONAL_CHAT_SUPABASE_URL','REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY',
  'REALITY_CHAT_RECEIPT_HMAC_KEY','REALITY_UNIVERSE_PERSISTENCE_ENABLED',
- 'REALITY_CONTINUOUS_RELIABILITY_ENABLED','OPENAI_API_KEY',
+ 'REALITY_CONTINUOUS_RELIABILITY_ENABLED','REALITY_SEMANTIC_REVIEW_ENABLED',
+ 'REALITY_DETECTOR_REPAIR_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED',
+ 'REALITY_DETECTOR_SHADOW_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY',
+ 'REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF',
+ 'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','OPENAI_API_KEY',
  'REALITY_STANDALONE_OPENAI_API_KEY','REALITY_GITHUB_TOKEN'];
 function mockResponse(){
  const state={headers:{},status:null,payload:null};
@@ -17,7 +21,7 @@ function mockResponse(){
  return r;
 }
 function provider(){
- const messages=[],calls=[],user=crypto.randomUUID(),conversation=crypto.randomUUID();
+ const messages=[],ledger=[],calls=[],user=crypto.randomUUID(),conversation=crypto.randomUUID();
  const access='access-token-fixture',refresh='refresh-token-fixture';
  let rejectHistory=false;
  const fetch=async(url,opts={})=>{
@@ -35,6 +39,21 @@ function provider(){
     return new Response(JSON.stringify({id:user,email:'test@example.com'}),{status:200});
    }
    if(u.pathname==='/auth/v1/logout')return new Response('{}',{status:200});
+   if(u.pathname==='/rest/v1/universe_events'){
+    if(method==='POST'){
+     const evt=JSON.parse(opts.body);ledger.push(evt);
+     return new Response(JSON.stringify([evt]),{status:201});
+    }
+    const id=u.searchParams.get('event_id')?.replace(/^eq\./,'');
+    const root=u.searchParams.get('continuity_root_id')?.replace(/^eq\./,'');
+    const worldline=u.searchParams.get('worldline_id')?.replace(/^eq\./,'');
+    let subset=ledger.filter(e=>(!id||e.event_id===id)&&
+      (!root||e.continuity_root_id===root)&&(!worldline||e.worldline_id===worldline));
+    if(u.searchParams.get('limit')==='1')subset=subset.slice(-1);
+    return new Response(JSON.stringify(subset),{status:200});
+   }
+   if(u.pathname==='/rest/v1/reality_universe_entries')
+    return new Response('[]',{status:200});
    if(u.pathname==='/rest/v1/reality_chat_messages'){
     if(rejectHistory)return new Response(JSON.stringify({message:'storage failure'}),{status:503});
     if(opts.headers?.authorization!=='Bearer '+access)return new Response('{}',{status:401});
@@ -56,6 +75,20 @@ function provider(){
   }
   if(u.hostname==='api.openai.com'){
    const body=JSON.parse(opts.body||'{}');
+   if(body.text?.format?.name==='reality_semantic_review'){
+    const payload=JSON.parse(body.input[1].content[0].text);
+    const items=payload.conversation_evidence?.candidates||[];
+    return new Response(JSON.stringify({id:'review-model',status:'completed',
+      output_text:JSON.stringify({
+       addresses_current_request:true,issues:[],claims:[],actions:[],
+       provenance_checks:items.map(item=>({
+        source_ref:item.source_ref,clause_id:item.clause_id,
+        relation:'NOT_MENTIONED',answer_quote:'',verified_source_ref:'',
+        reason:'Not stated in the model answer.',
+       })),
+      }),
+    }),{status:200});
+   }
    if(body.input[1].content[0].text.includes('conversation_continuity')){
     const context=JSON.parse(body.input[1].content[0].text).system_context.conversation_continuity;
     if(context.source_message_count>=2&&messages.length>=3)
@@ -66,7 +99,7 @@ function provider(){
   }
   throw Error('UNEXPECTED_PROVIDER_URL '+url);
  };
- return {fetch,messages,calls,user,conversation,setFailure:v=>{rejectHistory=v}};
+ return {fetch,messages,ledger,calls,user,conversation,setFailure:v=>{rejectHistory=v}};
 }
 async function runFixture(fn){
  const saved=Object.fromEntries(envKeys.map(x=>[x,process.env[x]]));
@@ -77,8 +110,17 @@ async function runFixture(fn){
   REALITY_PERSONAL_CHAT_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
   REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY:'sb_publishable_fixture',
   REALITY_CHAT_RECEIPT_HMAC_KEY:'a-long-test-only-cookie-encryption-key',
-  REALITY_UNIVERSE_PERSISTENCE_ENABLED:'false',
-  REALITY_CONTINUOUS_RELIABILITY_ENABLED:'false',
+  REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+  REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
+  REALITY_SEMANTIC_REVIEW_ENABLED:'true',
+  REALITY_DETECTOR_REPAIR_ENABLED:'false',
+  REALITY_RELIABILITY_EXTRACTION_ENABLED:'false',
+  REALITY_DETECTOR_SHADOW_ENABLED:'false',
+  SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
+  SUPABASE_SECRET_KEY:'test-only-preview-service-key',
+  REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:'hvkfreoagbrphwghjajw',
+  REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
+  REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
   REALITY_STANDALONE_OPENAI_API_KEY:'fixture-only',
  });
  delete process.env.REALITY_GITHUB_TOKEN;
@@ -112,6 +154,9 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.equal(first.status,200,JSON.stringify(first.payload));
   assert.equal(first.payload.answer,'First answer saved.');
   assert.equal(first.payload.continuity.current_answer_persisted,true);
+  assert.equal(first.payload.reliability.canonical_epistemic_state.status,'PERSISTED_AND_READBACK_VERIFIED');
+  assert.equal(first.payload.reliability.independently_verified_semantic_correctness,false);
+  assert.ok(p.ledger.some(x=>x.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'));
   const second=await call(chatApi,'POST',{
    conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'What did we ask first?'},cookie);
   assert.equal(second.status,200,JSON.stringify(second.payload));
@@ -152,15 +197,21 @@ test('production feature remains hidden and disabled',async()=>{
   assert.equal((await call(chatApi,'GET')).status,404);
  });
 });
-test('legacy Universe/reliability persistence flags block the personal chat pilot',async()=>{
+test('isolated database or missing reliability never silently downgrades the personal chat to unmonitored mode',async()=>{
  await runFixture(async({call,provider:p})=>{
   const login=await call(sessionApi,'POST',{email:'test@example.com',password:'correct'});
   const cookie=login.headers['Set-Cookie'].split(';')[0];
-  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+  process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='wrongprojectwrongpr';
   const response=await call(chatApi,'POST',{
    conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Do not lose this context.'},cookie);
   assert.equal(response.status,503);
-  assert.equal(response.payload.error,'CHAT_ISOLATION_FLAGS_REQUIRED');
+  assert.match(response.payload.error,/RELIABILITY_BENCHMARK_PROJECT_NOT_ALLOWLISTED/);
+  process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='hvkfreoagbrphwghjajw';
+  process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED='false';
+  const downgraded=await call(chatApi,'POST',{
+   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Do not lose this context.'},cookie);
+  assert.equal(downgraded.status,503);
+  assert.equal(downgraded.payload.error,'CHAT_UNIFIED_RELIABILITY_REQUIRED');
   assert.equal(p.messages.length,0);
  });
 });
