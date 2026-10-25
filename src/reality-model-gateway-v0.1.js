@@ -51,6 +51,7 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
       raw_content_digest: governedSignal.packet.raw_content_digest,
       fragments,
       intake_semantics:clone(governedSignal.intake_semantics||null),
+      typed_epistemic_intake:clone(governedSignal.typed_epistemic_intake||null),
       transformation_receipt: clone(governedSignal.transformation_receipt),
       lineage: clone(governedSignal.lineage),
     },
