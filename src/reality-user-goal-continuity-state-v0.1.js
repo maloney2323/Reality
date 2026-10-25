@@ -125,3 +125,103 @@ export function recoverPriorUserGoalState({
  }
  return null;
 }
+
+
+// Replay ONLY prior source-linked reviewer *interpretations* from the existing
+// Continuity verification ledger. These are useful provisional working goals,
+// not authorized business actions or a claim that user intent is infallibly
+// understood. Current user input remains a newer directive and may change it.
+export function projectProvisionalGoalLifecycle({
+ continuityHistory,continuityRootId,worldId=null,goalState,
+}={}){
+ if(!Array.isArray(continuityHistory)||
+    !accept(goalState,continuityRootId,worldId))
+  throw Error('USER_GOAL_LIFECYCLE_SOURCE_REQUIRED');
+ const frames=new Map(continuityHistory.filter(e=>
+  e?.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'&&
+  e.payload.frame?.continuity_root_id===continuityRootId&&
+  e.payload.frame?.world_id===(worldId||null))
+  .map(e=>[e.event_id,e.payload.frame]));
+ const first=goalState.user_goal_evidence.find(x=>
+  x.goal_evidence_id===goalState.original_user_goal_evidence_id);
+ if(!first)throw Error('USER_GOAL_LIFECYCLE_ORIGINAL_SOURCE_NOT_PRESENT');
+ let active=first,paused=[],applied=0,ambiguous=0;
+ const transitions=[];
+ for(const e of continuityHistory){
+  if(e?.payload?.event_type!=='MODEL_OUTPUT_ASSESSMENT')continue;
+  const review=e.payload.semantic_review?.goal_trajectory_review;
+  const origin=e.payload.canonical_epistemic_frame;
+  if(!origin?.source_receipt_id||!review||
+     review.status!=='REVIEWED_GOAL_TRAJECTORY_CANDIDATE')continue;
+  const frame=frames.get(origin.source_receipt_id);
+  if(!frame||frame.frame_hash!==origin.frame_hash)continue;
+  const state=frame.user_goal_continuity_state;
+  if(!state||!accept(state,continuityRootId,worldId))continue;
+  const directUser=state.user_goal_evidence.find(x=>
+   x.goal_evidence_id===state.current_user_evidence_id);
+  const sourceAnchored=state.user_goal_evidence.some(x=>
+   x.source_ref===review.goal_source_ref);
+  if(!directUser||!sourceAnchored)continue;
+  const direction=review.user_direction;
+  const validDirections=['CONTINUING_USER_OBJECTIVE','USER_AUTHORIZED_DETOUR',
+    'USER_AUTHORIZED_PIVOT','USER_RETURNED_TO_OBJECTIVE','UNCLEAR'];
+  if(!validDirections.includes(direction))continue;
+  const priorActive=active;
+  const record={
+   verification_receipt_id:e.event_id,
+   source_frame_receipt_id:origin.source_receipt_id,
+   source_user_goal_ref:directUser.source_ref,
+   proposed_interpretation:direction,
+   reviewer_only_not_user_approval:true,
+   independent_semantic_confirmation:false,
+  };
+  if(direction==='USER_AUTHORIZED_DETOUR'){
+   if(active&&active.goal_evidence_id!==directUser.goal_evidence_id)
+    paused.push(active);
+   active=directUser;
+   applied++;
+  }else if(direction==='USER_AUTHORIZED_PIVOT'){
+   // A new immediate direction does not prove permanent supersession of the
+   // earlier business objective. Keep it recoverable.
+   if(active&&active.goal_evidence_id!==directUser.goal_evidence_id)
+    paused.push(active);
+   active=directUser;
+   applied++;
+  }else if(direction==='USER_RETURNED_TO_OBJECTIVE'){
+   active=paused.pop()||first;
+   applied++;
+  }else if(direction==='UNCLEAR'){
+   ambiguous++;
+  }
+  if(priorActive!==active||direction==='UNCLEAR'){
+   transitions.push(record);
+  }
+ }
+ return deepFreeze({
+  version:USER_GOAL_CONTINUITY_STATE_VERSION,
+  status:'PROVISIONAL_SEMANTIC_USER_GOAL_RECONCILIATION',
+  working_goal:{
+   goal_evidence_id:active.goal_evidence_id,
+   source_ref:active.source_ref,text:active.text,
+   interpretive_status:'PROVISIONAL_ACTIVE_GOAL_NOT_USER_CONFIRMED',
+  },
+  preserved_original_goal:{
+   goal_evidence_id:first.goal_evidence_id,source_ref:first.source_ref,
+   text:first.text,
+   interpretation:'ORIGINAL_GOAL_CANDIDATE_NOT_PERMANENTLY_REVOKED',
+  },
+  paused_goal_candidates:paused.slice(-8).map(x=>({
+   goal_evidence_id:x.goal_evidence_id,
+   source_ref:x.source_ref,text:x.text,
+   status:'PROVISIONAL_PAUSED_NOT_PERMANENTLY_SUPERSEDED',
+  })),
+  recent_transition_receipts:transitions.slice(-12),
+  applied_provisional_transitions:applied,
+  unresolved_semantic_transitions:ambiguous,
+  current_user_message_may_change_working_goal:true,
+  permanent_goal_supersession_proven:false,
+  user_intent_semantically_verified:false,
+  action_execution_authorized:false,
+  zero_drift_established:false,
+ });
+}
