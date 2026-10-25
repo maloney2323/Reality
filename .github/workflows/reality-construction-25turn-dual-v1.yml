@@ -1,0 +1,68 @@
+name: Reality 25-Turn Dual Drift Challenge
+on:
+  push:
+    branches:
+      - experiment/reality-adversarial-25turn-dual-score-20261024
+    paths:
+      - '.github/workflows/reality-construction-25turn-dual-v1.yml'
+      - 'benchmarks/reality-construction-25turn-dual-v1.mjs'
+      - 'scripts/run-reality-construction-25turn-dual-v1.mjs'
+      - 'test/reality-construction-25turn-dual-v1.test.js'
+      - 'docs/reality-25turn-dual-evidence-contract-20261024.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frozen-casepack-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Static runner syntax and frozen casepack checks
+        run: |
+          node --check benchmarks/reality-construction-25turn-dual-v1.mjs
+          node --check scripts/run-reality-construction-25turn-dual-v1.mjs
+          node --test test/reality-construction-25turn-dual-v1.test.js \
+            test/reality-selective-cognitive-alignment-v0.2.test.js \
+            test/reality-alignment-invariant-contract-v0.1.test.js
+      - name: Keep interpretations bounded
+        run: |
+          echo 'Fixture checks do not prove model accuracy or real-business safety.'
+          echo 'Model calls require one explicit triggering commit.'
+  live-25turn-model-reality-pair:
+    needs: frozen-casepack-preflight
+    if: contains(github.event.head_commit.message, '[live-25turn-dual]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_PROBE_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Original model against Reality, 25 user turns each, no retries
+        run: node scripts/run-reality-construction-25turn-dual-v1.mjs
+      - name: Preserve original model responses and receipts even on error
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-construction-25turn-dual-original-results
+          path: benchmark-results/reality-construction-25turn-dual-v1.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Measurement limitations
+        if: always()
+        run: |
+          echo '50 maximum actual model calls with gpt-4.1-mini.'
+          echo 'Zero external actions; source history synthetic and source readback simulated.'
+          echo 'All drift flags are provisional until independent semantic review.'
+          echo 'Prompted governance is not independent execution enforcement.'

@@ -59,7 +59,13 @@ export function buildInvariantFrame({
  const state=Object.fromEntries(keys.map(key=>[key,at(scoped,key,instant)]));
  const prohibited=ALLOWED_ACTIONS.filter(action=>{
   const policy=POLICY_FACTS[action];
-  return state[policy.key]?.state!=='RECORDED'||state[policy.key].value!==policy.required;
+  const primaryMissing=state[policy.key]?.state!=='RECORDED'||state[policy.key].value!==policy.required;
+  // FROZEN construction policy: verified coordinator approval is necessary,
+  // but cannot override the independent official inspection / city HOLD gate.
+  // Missing or ambiguous inspection clearance fails closed in this sandbox.
+  const city=state.inspection_wr41;
+  const cityCleared=city?.state==='RECORDED'&&['PASS','CLEAR'].includes(city.value);
+  return primaryMissing||(action==='DISPATCH_CREW'&&!cityCleared);
  });
  // Even if these facts show VERIFIED, matching human-approved *execution
  // authority* is a separate, mandatory prerequisite.
@@ -70,6 +76,10 @@ export function buildInvariantFrame({
   time_scoped_state:state,
   prohibited_transitions:prohibited,
   policy_requirements:POLICY_FACTS,
+  sandbox_joint_preconditions:{
+   DISPATCH_CREW:{inspection_wr41_allowed_values:['PASS','CLEAR'],
+    coordinator_record_required:true,missing_city_clearance:'DENY'},
+  },
   semantic_uncertainty:'MODEL_COMPLIANCE_NOT_GUARANTEED',
   execution_authority:'NOT_GRANTED_BY_ORIENTATION',
   externally_verified_customer_facts:false,
