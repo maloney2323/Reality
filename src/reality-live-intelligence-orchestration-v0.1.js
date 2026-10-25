@@ -525,11 +525,17 @@ export async function runLiveIntelligenceOrchestration({
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
       } else if(materialUnsupportedClaim) {
-        // A consequential unsupported outcome claim is not a sourced fact.
-        // The reviewer alone cannot prove it false, so communicate uncertainty,
-        // not an invented correction or the unqualified original claim.
-        modelResult.answer='Reality cannot verify the claimed operational outcome from the connected source records. The record does not establish whether that action or deployment occurred. No external action was taken.';
-        modelResult.reliability_intervention='UNVERIFIED_OPERATIONAL_CLAIM_WITHHELD';
+        const riskOfFalseCompletion=review?.issues?.some(issue=>
+          issue.kind==='FALSE_COMPLETION'||issue.kind==='AUTHORITY_CONFUSION');
+        if(riskOfFalseCompletion){
+          // Consequential unverified action claims must not be released as fact.
+          modelResult.answer='Reality cannot verify the claimed external action or authority from the connected records. No external action was executed by Reality.';
+          modelResult.reliability_intervention='UNVERIFIED_ACTION_CLAIM_WITHHELD';
+        } else {
+          // A semantic review alone is not evidence to overwrite a correct
+          // source-supported answer. Keep it, and record uncertain review.
+          modelResult.reliability_intervention='UNASSESSED_SEMANTIC_REVIEW_ORIGINAL_PRESERVED';
+        }
       }
       reliabilityWithExtraction.semantic_repair={
         status:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
