@@ -1,4 +1,5 @@
 import {buildCleanerConversationContext} from './reality-cleaner-conversation-context-v0.1.js';
+import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -257,8 +258,15 @@ export async function runLiveIntelligenceOrchestration({
       };
     }
   }
+  // Project server-authenticated conversation history BEFORE generation.
+  // This fills the continuity handoff gap without treating prior model text
+  // or Cleaner candidate interpretations as independently verified truth.
+  const authenticatedConversationContinuity=buildCognitionContinuityHandoff({
+    governedSignal,verifiedConversationTurns,latestMessage:message,
+  });
   const cognitionContext = {
     ...(systemContext || {}),
+    conversation_continuity:authenticatedConversationContinuity,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
     signal_typed_intake:governedSignal.typed_epistemic_intake||null,
