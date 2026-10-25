@@ -231,10 +231,14 @@ export function projectProvisionalGoalLifecycle({
      x.goal_evidence_id!==directUser.goal_evidence_id);
    if(target){
     targetCandidate=target.goal_evidence_id;
+    // Returning to earlier work is NOT evidence the interrupted temporary
+    // task was completed or abandoned. Preserve it as a recoverable candidate.
+    paused=paused.filter(x=>x.goal_evidence_id!==target.goal_evidence_id&&
+      x.goal_evidence_id!==priorActive.goal_evidence_id);
+    if(priorActive.goal_evidence_id!==target.goal_evidence_id)
+      paused.push(priorActive);
     active=target;
-    paused=paused.filter(x=>x.goal_evidence_id!==target.goal_evidence_id);
-    // Explicitly unwinds to the identified previous user goal. Nested or
-    // independent paused tasks remain provisional, never marked complete.
+    // Resumption is provisional. Other simultaneous goals are preserved.
     applied++;
     relation='RETURN_TO_SOURCE_LINKED_EARLIER_GOAL_CANDIDATE';
    }else{
