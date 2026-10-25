@@ -256,6 +256,7 @@ export async function runLiveIntelligenceOrchestration({
   const cognitionContext = {
     ...(systemContext || {}),
     reliability_grounding:reliabilityGrounding,
+    signal_intake:governedSignal.intake_semantics||null,
     current_turn_alignment:preCognitionAlignment?.capsule||null,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
