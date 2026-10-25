@@ -163,7 +163,7 @@ export async function extractReliabilityClaims({
   // evidence merely because a probabilistic extractor mislabeled assertion.
   // On ambiguity, preserve the quote for review; do not grant execution.
   const explicitActionDenial=q=>
-    /\\bno\\s+attempt\\s+to\\b|\\b(?:did|does|do|has|have|had|was|were|is|are|will|would)\\s+not\\s+(?:(?:been|yet|actually)\\s+){0,2}(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed|complete|completed)\\b|\\b(?:not|never)\\s+(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed)\\b/i.test(q);
+    /\bno\s+attempt\s+to\b|\b(?:did|does|do|has|have|had|was|were|is|are|will|would)\s+not\s+(?:(?:been|yet|actually)\s+){0,2}(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed|complete|completed)\b|\b(?:not|never)\s+(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed)\b/i.test(q);
   const safeActions=[];
   for(const a of parsed.actions){
     if(a.assertion!=='AFFIRMED')continue;
