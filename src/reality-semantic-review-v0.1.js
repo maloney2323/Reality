@@ -7,6 +7,20 @@ const clean=s=>String(s??'').trim();
 const clone=x=>JSON.parse(JSON.stringify(x));
 const kinds=new Set(['WRONG_TASK','FACT_CONTRADICTION','UNSUPPORTED_FACT',
  'FORGOTTEN_OBLIGATION','FALSE_COMPLETION','AUTHORITY_CONFUSION','OTHER']);
+// An extracted value must be explicitly present in its exact quoted text
+// before a typed comparison can justify intervention. Model interpretation
+// of a negative phrase alone is not source proof.
+function valueAnchoredInQuote(value,quote){
+ const literal=clean(value).toUpperCase(),text=clean(quote).toUpperCase();
+ if(!literal||!text)return false;
+ let i=text.indexOf(literal);
+ while(i>=0){
+   const before=i?text[i-1]:' ',after=text[i+literal.length]||' ';
+   if(!/[A-Z0-9]/.test(before)&&!/[A-Z0-9]/.test(after))return true;
+   i=text.indexOf(literal,i+1);
+ }
+ return false;
+}
 const normalize=(v,original)=>{
  if(typeof original==='number'){
    if(typeof v==='number'&&Number.isFinite(v))return {comparable:true,value:v};
@@ -74,6 +88,10 @@ function validate(parsed,answer,snapshot,worldId){
      unassessed.push({key:clean(claim?.key).slice(0,120)||'UNKNOWN',
        reason:'CLAIM_EXTRACTION_UNANCHORED_OR_INVALID'});
      continue; // Do not invalidate a whole semantic review over one bad quote.
+   }
+   if(!valueAnchoredInQuote(claim.asserted_value,claim.quote)){
+     unassessed.push({key:claim.key,reason:'ASSERTED_VALUE_NOT_EXPLICIT_IN_QUOTE'});
+     continue;
    }
    const fact=records.get(claim.key);
    if(!fact){
