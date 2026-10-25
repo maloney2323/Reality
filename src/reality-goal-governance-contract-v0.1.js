@@ -8,8 +8,6 @@ const valid=x=>typeof x==='string'&&x.trim().length>0;
 const digest=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const freeze=x=>{if(x&&typeof x==='object'){for(const y of Object.values(x))freeze(y);Object.freeze(x)}return x};
 const required=(x,msg)=>{if(!x)throw Error(msg)};
-const mutationKinds=['ADVANCE','PAUSE','SHIFT_OBJECTIVE','INTRODUCE_SUBTASK'];
-const proposalStatuses=['NO_GOAL_MUTATION_PROPOSED','UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_CANDIDATE','UNASSESSED_GOAL_PROPOSAL'];
 /**
  * "Verified user said X" != "X was semantically an authorization".
  * Authorized business-goal transitions need an independently attested,
@@ -37,15 +35,11 @@ export function createGoalTransitionContract({
  required(durationLimitMinutes===null||
   (Number.isInteger(durationLimitMinutes)&&durationLimitMinutes>0),
   'GOAL_TRANSITION_DURATION_INVALID');
- // Explicitly require a separate, trusted adapter attestation, not a string
- // claiming authorized_by USER. The current preview has no such attestation.
- const independentlyAuthorized=proposedBy==='USER'&&valid(userSourceRef)&&
-  semanticAuthorizationEvidence?.issuer==='AUTHENTICATED_USER_INTENT_VERIFIER'&&
-  semanticAuthorizationEvidence?.user_source_ref===userSourceRef&&
-  semanticAuthorizationEvidence?.goal_id===goalId&&
-  semanticAuthorizationEvidence?.source_frame_hash===sourceFrameHash&&
-  semanticAuthorizationEvidence?.scope_root_id===scopeRootId&&
-  semanticAuthorizationEvidence?.verified===true;
+ // This module has no authenticated authorization verifier. A passed-in
+ // issuer string or boolean is forgeable. NEVER grant goal transitions here,
+ // even when user-source identity is known. A future verified adapter must
+ // implement separate receipt-bound and anti-replay authorization.
+ const independentlyAuthorized=false;
  const base={
   version:GOAL_GOVERNANCE_CONTRACT_VERSION,
   goal_id:goalId,scope_root_id:scopeRootId,world_id:worldId,
