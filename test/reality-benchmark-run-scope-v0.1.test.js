@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {makeAdversarialRunScope,LEGACY_ADVERSARIAL_ROOT,
-  DEFAULT_COMPARISON_RUN_ID,DEFAULT_MINI_RUN_ID} from '../src/reality-benchmark-run-scope-v0.1.js';
+  DEFAULT_COMPARISON_RUN_ID,DEFAULT_MINI_RUN_ID,nextAdversarialSegmentTurn} from '../src/reality-benchmark-run-scope-v0.1.js';
 
 test('a replay never shares any scoped persistence identity with the 16-turn original',()=>{
   const a=makeAdversarialRunScope(DEFAULT_COMPARISON_RUN_ID);
@@ -27,4 +27,16 @@ test('unsafe run identifiers cannot escape the isolated continuity namespace',()
 });
 test('scope is immutable',()=>{
   assert.equal(Object.isFrozen(makeAdversarialRunScope(DEFAULT_COMPARISON_RUN_ID)),true);
+});
+
+test('first phase cannot replay or spend tokens on any preexisting turn',()=>{
+  assert.equal(nextAdversarialSegmentTurn({from:1,to:8,savedTurnCount:0}),1);
+  assert.throws(()=>nextAdversarialSegmentTurn({from:1,to:8,savedTurnCount:8}),/RUN_ID_ALREADY_HAS_TURNS/);
+});
+test('phase two resumes after a cap without repaying for committed turns',()=>{
+  assert.equal(nextAdversarialSegmentTurn({from:9,to:16,savedTurnCount:8}),9);
+  assert.equal(nextAdversarialSegmentTurn({from:9,to:16,savedTurnCount:13}),14);
+  assert.equal(nextAdversarialSegmentTurn({from:9,to:16,savedTurnCount:16}),17);
+  assert.throws(()=>nextAdversarialSegmentTurn({from:9,to:16,savedTurnCount:7}),/RECOVERY_MISSING/);
+  assert.throws(()=>nextAdversarialSegmentTurn({from:9,to:16,savedTurnCount:17}),/RECOVERY_MISSING/);
 });
