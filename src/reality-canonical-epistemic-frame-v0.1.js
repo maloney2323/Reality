@@ -9,7 +9,7 @@ const nonempty=x=>typeof x==='string'&&x.trim().length>0;
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x)}return x};
 export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
- userGoalContinuityState=null,
+ userGoalContinuityState=null,userGoalLifecycle=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
  if(!governedSignal?.packet?.packet_id||!nonempty(continuityRootId)||
@@ -60,6 +60,11 @@ export function buildCanonicalEpistemicFrame({
  if(worldId&&sourceAttestedSnapshot?.world_id&&
    sourceAttestedSnapshot.world_id!==worldId)
   throw Error('CANONICAL_EPISTEMIC_CROSS_WORLD_FACT');
+ if(userGoalLifecycle&&(
+    userGoalLifecycle.action_execution_authorized!==false||
+    userGoalLifecycle.user_intent_semantically_verified!==false||
+    userGoalLifecycle.permanent_goal_supersession_proven!==false))
+   throw Error('CANONICAL_GOAL_LIFECYCLE_UNVERIFIED_AUTHORITY');
  if(userGoalContinuityState&&(
   userGoalContinuityState.continuity_root_id!==continuityRootId||
   userGoalContinuityState.world_id!==(worldId||null)||
@@ -87,6 +92,7 @@ export function buildCanonicalEpistemicFrame({
   // Canonical projection of user-channel goal evidence, retained from the
   // existing append-only Continuity ledger; lifecycle status is NOT inferred.
   user_goal_continuity_state:userGoalContinuityState?copy(userGoalContinuityState):null,
+  user_goal_lifecycle_projection:userGoalLifecycle?copy(userGoalLifecycle):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
