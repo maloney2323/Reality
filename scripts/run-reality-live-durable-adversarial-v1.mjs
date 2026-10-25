@@ -11,7 +11,7 @@ import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0
 import {recordSourceAttestedEvidence,readGroundedEvidence} from '../src/reality-reliability-evidence-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../src/reality-reliability-db-boundary-v0.1.js';
-import {makeAdversarialRunScope,DEFAULT_COMPARISON_RUN_ID,DEFAULT_MINI_RUN_ID} from '../src/reality-benchmark-run-scope-v0.1.js';
+import {makeAdversarialRunScope,nextAdversarialSegmentTurn,DEFAULT_COMPARISON_RUN_ID,DEFAULT_MINI_RUN_ID} from '../src/reality-benchmark-run-scope-v0.1.js';
 
 const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const PROJECT='hvkfreoagbrphwghjajw',DB='https://'+PROJECT+'.supabase.co';
@@ -186,13 +186,15 @@ async function runSegment(from,to){
  const started=await openRuntime('Start or resume the real-business operator benchmark from durable PostgreSQL Continuity.');
  const first=await read(started);
  const saved=benchTurns(first);
- assert.equal(saved.length,from-1,from===1?'BENCHMARK_RUN_ID_ALREADY_HAS_TURNS_CHOOSE_NEW_ID':'DURABLE_CONVERSATION_RECOVERY_MISSING');
+ const nextTurn=nextAdversarialSegmentTurn({from,to,savedTurnCount:saved.length});
+ for(let i=0;i<saved.length;i++)
+   assert.equal(saved[i].payload.turn,i+1,'DURABLE_CONVERSATION_SEQUENCE_INVALID');
  const chat=[];
  for(const e of saved){
    chat.push({role:'user',text:e.payload.message,source_ref:e.event_id+':user'});
    chat.push({role:'assistant',text:e.payload.reality_final,source_ref:e.event_id+':assistant'});
  }
- for(let i=from;i<=to;i++){
+ for(let i=nextTurn;i<=to;i++){
   const item=cases[i-1];
   const clock=now();
   const idx=globalThis.__responses.length;
@@ -260,7 +262,7 @@ async function runSegment(from,to){
  console.log('DURABLE_REALITY_PHASE '+JSON.stringify({run_id:RUN_ID,stage:from+'-'+to,
    turns:to-from+1,model:MODEL,paid_calls:globalThis.__paidCount,
    input_tokens:globalThis.__totalInput,output_tokens:globalThis.__totalOutput,
-   durable_memory_loaded_from_prior_process:saved.length,
+   durable_memory_loaded_from_prior_process:saved.length,resume_from_turn:nextTurn,
    actual_postgres:true,no_customer_actions:true}));
 }
 async function report(){
