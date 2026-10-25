@@ -360,7 +360,7 @@ export async function runLiveIntelligenceOrchestration({
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
         worldId:systemContext?.world_id||null,
-        model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
+        model:process.env.REALITY_SEMANTIC_REVIEW_MODEL||cognitiveResult.model||resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
         apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,fetchImpl,
       });
       semanticReviewStatus=semanticFirst.review.status;
@@ -472,7 +472,7 @@ export async function runLiveIntelligenceOrchestration({
           sourceSnapshot:semanticSourceSnapshot,
           priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
           worldId:systemContext?.world_id||null,
-          model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
+          model:process.env.REALITY_SEMANTIC_REVIEW_MODEL||cognitiveResult.model||resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
           apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,fetchImpl,
         });
         if(semanticSourceSnapshot&&retryReview.candidate)
