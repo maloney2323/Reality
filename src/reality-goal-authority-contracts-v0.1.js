@@ -16,11 +16,14 @@ export function projectGoalStateContract({lifecycle,goalEvidence,worldId=null}={
  const goal=lifecycle?.working_goal;
  if(!nonempty(goal?.goal_evidence_id)||!nonempty(goal.source_ref)||
     !nonempty(goal.text)||goalEvidence?.world_id!==(worldId||null)||
-    goalEvidence?.user_goal_evidence?.every(x=>x.goal_evidence_id!==goal.goal_evidence_id))
+    !Array.isArray(goalEvidence?.user_goal_evidence))
   throw Error('GOAL_STATE_SOURCE_LINKAGE_REQUIRED');
  const current=goalEvidence.user_goal_evidence.find(x=>x.goal_evidence_id===goal.goal_evidence_id);
- if(!current||current.source_ref!==goal.source_ref)
+ if(current&&current.source_ref!==goal.source_ref)
   throw Error('GOAL_STATE_USER_EVIDENCE_MISMATCH');
+ // An earlier SOURCE-LINKED user goal can survive in canonical Continuity
+ // even after its original utterance falls outside the bounded user cache.
+ // This is disclosed; it never becomes an authorization grant.
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
   goal_id:goal.goal_evidence_id,parent_id:null,
@@ -28,8 +31,10 @@ export function projectGoalStateContract({lifecycle,goalEvidence,worldId=null}={
   // A reviewer proposal cannot independently prove ACTIVE/PAUSED/COMPLETED.
   status:'UNRESOLVED',working_status:'PROVISIONAL_ACTIVE_CANDIDATE',
   world_id:worldId||null,
-  provenance:{origin_turn_id:goal.source_ref,evidence_payload_ref:current.goal_evidence_id,
-    source_kind:'USER_CHANNEL_UTTERANCE'},
+  provenance:{origin_turn_id:goal.source_ref,evidence_payload_ref:goal.goal_evidence_id,
+    source_kind:'USER_CHANNEL_UTTERANCE',
+    source_in_current_bounded_goal_cache:Boolean(current),
+    lineage:'CANONICAL_CONTINUITY_VERIFICATION_REPLAY'},
   uncertainty_profile:{
    ambiguities:['Goal identity and lifecycle state are not independently reconciled'],
    user_corrections_count:null,
@@ -144,8 +149,8 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
 export function pendingGoalAuthorizationResponse({goalState}={}){
  if(!nonempty(goalState?.description)||!nonempty(goalState?.provenance?.origin_turn_id))
   throw Error('GOAL_CLARIFICATION_SOURCE_REQUIRED');
- return 'Reality detected a possible change of objective in its draft and withheld that direction. '+
-  'The earlier user-stated goal remains: "'+bounded(goalState.description,260)+
-  '". That goal has not been changed by an assistant suggestion. '+
-  'Would you like to authorize a different objective, or continue with your current request?';
+ return 'Reality flagged a possible change of direction in its draft and withheld that proposal. '+
+  'An earlier user message currently tracked as a possible working objective was: "'+
+  bounded(goalState.description,260)+'". No assistant suggestion has changed your goal. '+
+  'Would you like to pursue a different objective, or continue with your current request?';
 }
