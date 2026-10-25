@@ -9,7 +9,7 @@ const nonempty=x=>typeof x==='string'&&x.trim().length>0;
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x)}return x};
 export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
- userGoalContinuityState=null,userGoalLifecycle=null,
+ userGoalContinuityState=null,userGoalLifecycle=null,userGoalStateContract=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
  if(!governedSignal?.packet?.packet_id||!nonempty(continuityRootId)||
@@ -60,6 +60,12 @@ export function buildCanonicalEpistemicFrame({
  if(worldId&&sourceAttestedSnapshot?.world_id&&
    sourceAttestedSnapshot.world_id!==worldId)
   throw Error('CANONICAL_EPISTEMIC_CROSS_WORLD_FACT');
+ if(userGoalStateContract&&(
+    userGoalStateContract.goal_id!==userGoalLifecycle?.working_goal?.goal_evidence_id||
+    userGoalStateContract.provenance?.origin_turn_id!==userGoalLifecycle?.working_goal?.source_ref||
+    userGoalStateContract.source_user_authorization_verified!==false||
+    userGoalStateContract.permits_external_execution!==false))
+   throw Error('CANONICAL_GOAL_STATE_SOURCE_OR_AUTHORITY_INVALID');
  if(userGoalLifecycle&&(
     userGoalLifecycle.action_execution_authorized!==false||
     userGoalLifecycle.user_intent_semantically_verified!==false||
@@ -93,6 +99,7 @@ export function buildCanonicalEpistemicFrame({
   // existing append-only Continuity ledger; lifecycle status is NOT inferred.
   user_goal_continuity_state:userGoalContinuityState?copy(userGoalContinuityState):null,
   user_goal_lifecycle_projection:userGoalLifecycle?copy(userGoalLifecycle):null,
+  user_goal_state_contract:userGoalStateContract?copy(userGoalStateContract):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
