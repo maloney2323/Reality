@@ -12,6 +12,28 @@ import { trackConversationalDriftAccumulation } from './reality-conversation-dri
 export const CONTINUOUS_RELIABILITY_VERSION = 'reality-continuous-reliability-v0.1';
 export const BACKCHECK_INTERVAL = 25;
 
+// A verifier must not replace a correct response because a quote extractor
+// speculated about an unrelated or unsupported statement. Flag those as
+// review candidates; preserve the answer. Executable authority remains
+// independently fail-closed. The narrow factual intervention additionally
+// requires relevance to THIS user objective.
+function relevantToCurrentRequest(key,message){
+  const q=String(message||'').toLowerCase(), k=String(key||'').toLowerCase();
+  if(!q.trim())return false;
+  const known={
+    cabinet_delivery_date:/\b(?:cabinet|delivery|shipment|arrival)\b/,
+    cabinet_color:/\b(?:cabinet|color|colour|finish)\b/,
+    inspection_wr41:/\b(?:inspection|city|permit|hold|wr.?41|dispatch|crew|mobiliz)\b/,
+    homeowner_scope_approval:/\b(?:homeowner|scope|approve|approval|estimate|quote|email|send)\b/,
+    estimate_external_send_status:/\b(?:estimate|email|send|deliver|quote)\b/,
+    dispatch_approval:/\b(?:dispatch|coordinator|crew|mobiliz)\b/,
+    materials_purchase_approval:/\b(?:purchase|materials|order|buy)\b/,
+  };
+  if(known[k])return known[k].test(q);
+  const significant=k.split(/[_-]+/).filter(t=>t.length>4&& !['status','approval','verified'].includes(t));
+  return significant.some(t=>q.includes(t));
+}
+
 const DRIFT_CODES = new Set(['FACT_DRIFT','OBLIGATION_LOSS','WORLD_SCOPE_DRIFT','EVIDENCE_PROVENANCE_DRIFT']);
 const HALLUCINATION_SUSPECT_CODES = new Set([
   'UNSUPPORTED_CLAIM','UNSUPPORTED_PROVENANCE','FALSE_COMPLETION','EVIDENCE_PROVENANCE_DRIFT','FABRICATED_OBLIGATION',
@@ -193,6 +215,7 @@ export async function runContinuousReliabilityCycle({
   structuredCandidate = null,
   conversationalAssessment = null,
   detectorShadow = null,
+  currentUserMessage = '',
   authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
   evidenceVerifierReceipt = null,
@@ -243,9 +266,13 @@ export async function runContinuousReliabilityCycle({
     ? trustedSnapshot.facts.filter(f=>disputedKeys.has(f.key)).map(f=>({
         key:f.key,source_attested_value:f.value,source_receipt_id:f.evidence_ref,
       })) : [];
-  const shouldQuarantine = Boolean((assessment?.codes||[]).some(c=>
-    ['FACT_DRIFT','WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION',
-      'UNSUPPORTED_CLAIM','UNSUPPORTED_PROVENANCE','EVIDENCE_PROVENANCE_DRIFT'].includes(c)));
+  const relevantTypedFactDrift=Boolean((assessment?.violations||[]).some(v=>
+    v.code==='FACT_DRIFT'&&relevantToCurrentRequest(v.key,currentUserMessage)));
+  const actionIntegrityViolation=Boolean((assessment?.codes||[]).some(c=>
+    ['WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION'].includes(c)));
+  const shouldQuarantine=relevantTypedFactDrift||actionIntegrityViolation;
+  const quarantineDecision=shouldQuarantine?'SOURCE_BACKED_RELEVANT_FACT_OR_ACTION_VIOLATION':
+    (assessment?.violations||[]).length?'DETECTION_RECORDED_NO_ANSWER_OVERRIDE':'NO_VERIFIED_INTERVENTION_NEEDED';
 
   const payload = {
     cycle_version: CONTINUOUS_RELIABILITY_VERSION,
@@ -313,6 +340,7 @@ export async function runContinuousReliabilityCycle({
     structural_correction_verified: Boolean(recovery?.corrected),
     source_attested_correction_proposals:correctionClaims,
     model_output_quarantined:shouldQuarantine,
+    quarantine_decision:quarantineDecision,
     correction_published_to_active_state: false,
     recovery_independently_verified: false,
     external_actions_authorized: false,
@@ -370,6 +398,7 @@ export async function runContinuousReliabilityCycle({
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
     model_output_quarantined:shouldQuarantine,
+    quarantine_decision:quarantineDecision,
     source_attested_correction_proposals:correctionClaims,
     correction_published_to_active_state: false,
     receipt_id: committed.event_id,
