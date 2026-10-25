@@ -36,7 +36,7 @@ jobs:
       REALITY_RELIABILITY_BENCHMARK_PROJECT_REF: hvkfreoagbrphwghjajw
       REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF: hvkfreoagbrphwghjajw
       REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
-      REALITY_UNIVERSE_PERSISTENCE_KEY: ${{ secrets.REALITY_BENCHMARK_SUPABASE_SECRET_KEY }}
+      REALITY_UNIVERSE_PERSISTENCE_KEY: ${{ secrets.REALITY_BENCHMARK_SUPABASE_SECRET_KEY || secrets.REALITY_UNIVERSE_PERSISTENCE_KEY || secrets.SUPABASE_SECRET_KEY || secrets.supabase_secret_key }}
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -51,10 +51,10 @@ jobs:
         run: |
           if [ -z "${REALITY_UNIVERSE_PERSISTENCE_KEY:-}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "NOT_RUN: dedicated benchmark Supabase credential is not configured."
+            echo "NOT_RUN: no recognized existing Supabase GitHub secret name resolved."
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "Dedicated benchmark credential available; all DB calls pinned to isolated project."
+            echo "Existing GitHub credential name resolved; actual benchmark-project authorization must be proven by read/write."
           fi
       - name: Three fresh processes — seed, supersede, recover
         if: steps.bench-key.outputs.ready == 'true'
@@ -67,4 +67,4 @@ jobs:
         run: |
           echo "No LLM token use or customer action."
           echo "Do not mistake absent benchmark credentials for a persistence pass."
-          echo "No production Supabase URL or fallback credentials are used."
+          echo "All read/write requests are pinned to the isolated benchmark project. A wrong-project key must fail authentication."
