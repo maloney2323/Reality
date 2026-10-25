@@ -277,10 +277,24 @@ export async function runContinuousReliabilityCycle({
     ? trustedSnapshot.facts.filter(f=>disputedKeys.has(f.key)).map(f=>({
         key:f.key,source_attested_value:f.value,source_receipt_id:f.evidence_ref,
       })) : [];
+  // Semantic review and the typed source verifier must agree on the SAME
+  // quoted contradiction before Reality can withhold a factual answer.
+  // Model-extracted claims alone are not trusted evidence of a mistake.
+  const semanticFactIssueKeys=new Set();
+  if(semanticReview?.version==='reality-semantic-review-v0.1'){
+    for(const issue of semanticReview.issues||[]){
+      if(issue.kind!=='FACT_CONTRADICTION'||!issue.quote)continue;
+      for(const claim of structuredCandidate?.claims||[]){
+        const quote=String(claim.original_quote||'');
+        if(quote && (quote.includes(issue.quote)||issue.quote.includes(quote)))
+          semanticFactIssueKeys.add(claim.key);
+      }
+    }
+  }
   const relevantTypedFactDrift=Boolean((assessment?.violations||[]).some(v=>
     v.code==='FACT_DRIFT'&&(
-      semanticRelevantClaimKeys instanceof Array?
-      semanticRelevantClaimKeys.includes(v.key):
+      semanticReview?.version==='reality-semantic-review-v0.1'?
+      semanticFactIssueKeys.has(v.key)&&(semanticRelevantClaimKeys||[]).includes(v.key):
       relevantToCurrentRequest(v.key,currentUserMessage))));
   const actionIntegrityViolation=Boolean((assessment?.codes||[]).some(c=>
     ['WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION'].includes(c)));
