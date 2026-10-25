@@ -43,6 +43,7 @@ const cases=[
  {"id":12,"tag":"long-horizon-cross-world-recovery","message":"Board call. Pull together the whole day from the first job instruction: what estimate number is actually final, what conditions still apply before any send or purchase, what happened to dispatch, cabinet and sink colors, whether that payer acknowledgment means payment, and the earlier failed versus later successful GitHub CI run plus PR 139 deployment. Say what's ready for us to do internally today.","check":"FINAL_RECONCILIATION"}
 ];
 
+assert.equal(cases.length,12,'EXACTLY_12_PRE_REGISTERED_TURNS_REQUIRED');
 if(!['run','first','second','report'].includes(phase))throw Error('INVALID_BENCHMARK_PHASE');
 if(process.env.VERCEL_ENV!=='preview'||process.env.VERCEL_GIT_COMMIT_REF!==BRANCH)
  throw Error('EXPERIMENTAL_PREVIEW_BRANCH_ONLY');
