@@ -14,5 +14,5 @@
       "schedule": "0 * * * *"
     }
   ],
-  "buildCommand": "node scripts/run-reality-founder-live-50-v0.1.mjs run 11 15"
+  "buildCommand": "node scripts/run-reality-founder-live-50-v0.1.mjs run 16 18"
 }
