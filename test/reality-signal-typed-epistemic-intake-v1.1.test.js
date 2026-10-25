@@ -102,3 +102,22 @@ test('negation and uncertainty remain candidates, never verified facts',()=>{
   assert.ok(result.clauses.some(c=>c.kind==='PROHIBITION_CANDIDATE'));
   assert.ok(result.clauses.every(c=>c.epistemic.external_truth_established===false));
 });
+
+test('a condition appearing AFTER the requested action remains an unverified dependency',()=>{
+  const signal=clean('Prepare the receipt if payment clears.');
+  const clauses=typed(signal).clauses;
+  assert.equal(clauses.length,1);
+  assert.equal(clauses[0].kind,'TASK_REQUEST_CANDIDATE');
+  assert.ok(clauses[0].epistemic_modalities.includes('CONDITIONAL'));
+  assert.equal(clauses[0].agency.candidate,'AUTONOMOUS_CONDITIONAL_CANDIDATE');
+  assert.equal(clauses[0].candidate_dependency.condition_status,'UNRESOLVED');
+  assert.equal(clauses[0].candidate_dependency.creates_execution_hook,false);
+  assert.equal(typed(signal).unresolved_conditions.length,1);
+});
+test('an ordinary direct task request without conditions stays an unapproved request',()=>{
+  const clause=typed(clean('Prepare an estimate.')).clauses[0];
+  assert.equal(clause.kind,'TASK_REQUEST_CANDIDATE');
+  assert.equal(clause.candidate_dependency,null);
+  assert.equal(clause.agency.candidate,'DIRECT_REQUEST_NOT_AUTHORIZED');
+  assert.equal(clause.agency.execution_authorized,false);
+});
