@@ -263,6 +263,13 @@ export async function runContinuousReliabilityCycle({
     // Structural correction is not a published world-state update.
     // Independent outcome verification and publication are separate gates.
   }
+  // A clean model-review opinion with zero extracted/source-compared claims
+  // is NOT a verified clean answer. Evidence coverage must remain explicit.
+  const reviewerProvided=Boolean(semanticReview?.version==='reality-semantic-review-v0.1');
+  const verifiedAssertionCandidates=Boolean(structuredCandidate &&
+    ((structuredCandidate.claims||[]).length>0 ||
+      (structuredCandidate.actions||[]).length>0));
+  const sourceScopeAssessed=evidenceAccepted && (!reviewerProvided||verifiedAssertionCandidates);
   const categories = classifyReliabilityFindings(assessment?.codes || []);
   const disputedKeys = new Set((assessment?.violations||[])
     .filter(v=>v.code==='FACT_DRIFT').map(v=>v.key).filter(Boolean));
@@ -291,7 +298,8 @@ export async function runContinuousReliabilityCycle({
       scope:continuityRuntime.spine.continuity_root_id+'|'+continuityRuntime.spine.worldline_id,
     }),
     model_response_digest: modelResponseId ? digest(modelResponseId) : null,
-    evaluation_status: evidenceAccepted ? 'EVALUATED_AGAINST_SOURCE_ATTESTATION' : 'NOT_EVALUATED',
+    evaluation_status:sourceScopeAssessed?'EVALUATED_AGAINST_SOURCE_ATTESTATION':
+      (reviewerProvided?'SEMANTIC_REVIEW_WITHOUT_SOURCE_COMPARABLE_ASSERTIONS':'NOT_EVALUATED'),
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
@@ -339,6 +347,8 @@ export async function runContinuousReliabilityCycle({
     hallucination_confirmed: null,
     independent_truth_adjudication: false,
     extraction_completeness_verified: false,
+    source_compared_assertion_count:sourceScopeAssessed?
+      ((structuredCandidate.claims||[]).length+(structuredCandidate.actions||[]).length):0,
     structured_candidate: evidenceAccepted ? {
       world_id: structuredCandidate.world_id,
       claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
