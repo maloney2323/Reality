@@ -4,6 +4,9 @@ import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistC
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
+import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
+import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
+import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
 async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
@@ -182,8 +185,30 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Ground the NEXT cognitive turn from the reconstructed ledger, not from
+  // the previous model answer. A superseded source claim is never inherited.
+  let reliabilityGrounding = null;
+  if (process.env.VERCEL_ENV === 'preview' &&
+      process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
+      continuityRuntime?.enabled && systemContext?.world_id) {
+    const evidenceHistory = await continuityRuntime.readback();
+    const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
+    if (grounded.source_receipt_ids.length) {
+      reliabilityGrounding = {
+        world_id:grounded.world_id,
+        evidence_basis:grounded.epistemic_basis,
+        facts:grounded.facts.map(f=>({key:f.key,value:f.value,source_receipt_id:f.evidence_ref})),
+        active_obligations:grounded.obligations.filter(o=>o.active).map(o=>({
+          id:o.id,source_receipt_id:o.evidence_ref,
+        })),
+        evidence_source_receipt_ids:grounded.source_receipt_ids,
+        source_attestations_are_not_infallible:true,
+      };
+    }
+  }
   const cognitionContext = {
     ...(systemContext || {}),
+    reliability_grounding:reliabilityGrounding,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
@@ -193,13 +218,19 @@ export async function runLiveIntelligenceOrchestration({
     universe_context_status: universeContext.status,
     universe_context_count: universeContext.count,
   };
+  const controlledPreviewModel = process.env.VERCEL_ENV === 'preview' &&
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
+  const resolvedModel = model || (controlledPreviewModel ?
+    process.env.REALITY_RELIABILITY_MODEL : undefined);
+  const resolvedApiKey = apiKey || (controlledPreviewModel ?
+    process.env.REALITY_STANDALONE_OPENAI_API_KEY : undefined);
   const cognitiveResult = await runRealityCognitiveRuntime({
     message,
     governedSignal,
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
-    model,
-    apiKey,
+    model:resolvedModel,
+    apiKey:resolvedApiKey,
     fetchImpl,
   });
   const modelResult = {
@@ -207,6 +238,62 @@ export async function runLiveIntelligenceOrchestration({
     answer: cognitiveResult.answer,
     cognitive_runtime_version: cognitiveResult.runtime_version,
   };
+
+  // Preview-only, explicitly opted-in continuous evidence receipts. Never
+  // treat an unstructured model answer as verified facts or report 0% drift.
+  const reliabilityPreviewEnabled = process.env.VERCEL_ENV === 'preview' &&
+    process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
+  let reliabilityCandidate = null;
+  let reliabilityExtractionStatus = 'NOT_ATTEMPTED';
+  if (reliabilityPreviewEnabled &&
+      process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED === 'true' &&
+      systemContext?.world_id && continuityRuntime?.enabled) {
+    try {
+      const evidenceHistory = await continuityRuntime.readback();
+      const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
+      if (grounded.source_receipt_ids.length) {
+        const extraction = await extractReliabilityClaims({
+          modelOutput:String(modelResult?.answer || ''),worldId:systemContext.world_id,
+          snapshot:grounded,apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,
+          model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna',fetchImpl,
+        });
+        reliabilityCandidate = extraction.candidate;
+        reliabilityExtractionStatus = extraction.extraction_status;
+      } else {
+        reliabilityExtractionStatus = 'NO_ATTESTED_SOURCE';
+      }
+    } catch (error) {
+      // The answer still exists; its reliability simply must NOT be scored
+      // as accurate. A later backcheck must see this coverage gap.
+      reliabilityExtractionStatus = 'FAILED:'+String(error?.message || 'UNKNOWN').slice(0,80);
+    }
+  }
+  const continuousReliability = reliabilityPreviewEnabled
+    ? await runContinuousReliabilityCycle({
+        continuityRuntime,
+        modelOutput: String(modelResult?.answer || ''),
+        modelResponseId: modelResult?.response_id || null,
+        packetId: governedSignal.packet.packet_id,
+        structuredCandidate:reliabilityCandidate,
+        authorizedWorldId:systemContext?.world_id || null,
+        observedAt: observedAt || new Date().toISOString(),
+      })
+    : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null };
+  const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus };
+  if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
+    const corrections=(continuousReliability.source_attested_correction_proposals||[])
+      .map(f=>String(f.key)+': '+JSON.stringify(f.source_attested_value)+
+        ' (source receipt '+String(f.source_receipt_id)+')');
+    modelResult.answer = [
+      'Reality detected an unverified or contradictory model statement and withheld the affected answer.',
+      ...(corrections.length
+        ? ['The independently retrieved, source-attested record currently states: '+corrections.join('; ')+'.']
+        : []),
+      'The original model claim is preserved in the reliability receipt. No external action was authorized. Confirm the source if it is disputed.',
+    ].join(' ');
+    modelResult.reliability_intervention='QUARANTINED_PRIOR_TO_DISPLAY';
+  }
+
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
@@ -251,7 +338,7 @@ export async function runLiveIntelligenceOrchestration({
     const observations = Array.isArray(systemContext?.connected_world_observations)
       ? systemContext.connected_world_observations : [];
     const evidence = [
-      governedSignal?.signal_hash ? { ref: governedSignal.signal_hash, kind: 'governed_signal' } : null,
+      governedSignal?.packet?.packet_id ? { ref: governedSignal.packet.packet_id, kind: 'governed_signal_unverified' } : null,
       ...observations.map((item) => item?.entry_id ? {
         ref: item.entry_id,
         kind: item.event_kind || 'connected_world_observation',
@@ -326,6 +413,7 @@ export async function runLiveIntelligenceOrchestration({
     },
     governed_signal: clone(governedSignal),
     intelligence: clone(modelResult),
+    reliability: clone(reliabilityWithExtraction),
     authority: {
       granted: false,
       execution_authorized: false,

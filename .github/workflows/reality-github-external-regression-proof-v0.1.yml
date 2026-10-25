@@ -1,0 +1,35 @@
+name: Reality External GitHub Regression Proof v0.1
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/reality-drift-live-continuity-v1-20261024
+    paths:
+      - 'src/reality-github-regression-evidence-v0.1.js'
+      - 'test/reality-github-regression-evidence-v0.1.test.js'
+      - 'test/run-reality-github-regression-evidence-v0.1.mjs'
+      - '.github/workflows/reality-github-external-regression-proof-v0.1.yml'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  independent-github-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validate scorer, source scope, and false-proof refusal
+        run: node --test test/reality-github-regression-evidence-v0.1.test.js
+      - name: Read real GitHub Actions before and after evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node test/run-reality-github-regression-evidence-v0.1.mjs
+      - name: Preserve machine-readable external evidence receipt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-github-historical-regression-evidence
+          path: artifacts/reality-github-regression-evidence-v0.1.json
+          retention-days: 30

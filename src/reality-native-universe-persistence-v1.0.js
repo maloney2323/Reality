@@ -1,9 +1,12 @@
 import { createUniverseEntry, validateUniverseEntry } from './reality-universe-persistence-contract-v1.0.js';
+import { resolveReliabilityBenchmarkDb } from './reality-reliability-db-boundary-v0.1.js';
 
 export const REALITY_NATIVE_UNIVERSE_PERSISTENCE_VERSION =
   'reality-native-universe-persistence-v1.0';
 
 function persistenceKey() {
+  const isolated = resolveReliabilityBenchmarkDb();
+  if (isolated) return isolated.secretKey;
   return process.env.REALITY_UNIVERSE_PERSISTENCE_KEY
     || process.env.supabase_secret_key
     || process.env.SUPABASE_SECRET_KEY
@@ -11,6 +14,8 @@ function persistenceKey() {
 }
 
 function endpoint(path = '') {
+  const isolated = resolveReliabilityBenchmarkDb();
+  if (isolated) return isolated.url + path;
   const base = process.env.REALITY_UNIVERSE_PERSISTENCE_URL || 'https://qkzvjfiegihyaoabiniy.supabase.co';
   return base.replace(/\/$/, '') + path;
 }

@@ -1,0 +1,36 @@
+name: Reality Mixed Live Market Proof
+on:
+  push:
+    branches:
+      - feature/reality-drift-live-continuity-v1-20261024
+    paths:
+      - 'test/reality-mixed-live-provider-probe-v0.1.js'
+      - '.github/workflows/reality-mixed-live-market-proof-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reality-mixed-live-proof-once
+  cancel-in-progress: false
+jobs:
+  mixed-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_BENCHMARK_MODEL: gpt-4.1-mini
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: One bounded mixed-market model benchmark
+        run: node test/reality-mixed-live-provider-probe-v0.1.js
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-mixed-market-live-report
+          path: artifacts/reality-market-live-provider-v0.1.json
+          if-no-files-found: warn
+          retention-days: 7

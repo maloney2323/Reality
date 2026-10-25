@@ -53,6 +53,18 @@ export function assessDrift({trustedSnapshot,candidate}={}){
     ...trustedSnapshot.receipts.filter(r=>r.verified===true && r.independent===true).map(r=>r.id),
   ]);
   if(candidate.world_id!==trustedSnapshot.world_id)add('WORLD_SCOPE_DRIFT','world_id');
+  const authorizedCustomer=trustedSnapshot.facts.find(f=>f.key==='customer_id');
+  if(authorizedCustomer && str(candidate.target_customer_id) &&
+      candidate.target_customer_id!==authorizedCustomer.value)
+    add('WORLD_SCOPE_DRIFT','target_customer_id',{
+      claimed_target_customer_id:candidate.target_customer_id,
+      canonical_evidence_ref:authorizedCustomer.evidence_ref,
+    });
+  for (const ref of Array.isArray(candidate.claimed_source_refs)?candidate.claimed_source_refs:[]) {
+    if(str(ref) && !evidence.has(ref))
+      add('UNSUPPORTED_PROVENANCE','claimed_source_refs',{claimed_ref:ref});
+  }
+
   candidate.claims.forEach((claim,i)=>{
     const path='claims['+i+']';
     const fact=facts.get(claim.key);
@@ -98,6 +110,23 @@ export function proposeDriftRecovery({trustedSnapshot,candidate,assessment}={}){
       proposed:null,changes:[],original_violations:actual.violations,
       external_action_permitted:false};
   const facts=new Map(trustedSnapshot.facts.map(f=>[f.key,f]));
+  const authorizedCustomer=trustedSnapshot.facts.find(f=>f.key==='customer_id');
+  if(authorizedCustomer && str(fixed.target_customer_id) &&
+      fixed.target_customer_id!==authorizedCustomer.value)
+    return {version:DRIFT_RECOVERY_VERSION,status:'BLOCKED_CUSTOMER_RECIPIENT_SCOPE',
+      original:copy(candidate),proposed:null,changes:[],original_violations:actual.violations,
+      external_action_permitted:false};
+  const trustedEvidence=new Set([
+    ...trustedSnapshot.facts.map(f=>f.evidence_ref),
+    ...trustedSnapshot.obligations.map(o=>o.evidence_ref),
+    ...trustedSnapshot.receipts.filter(r=>r.independent===true&&r.verified===true).map(r=>r.id),
+  ]);
+  if(Array.isArray(fixed.claimed_source_refs)){
+    const beforeRefs=fixed.claimed_source_refs.slice();
+    fixed.claimed_source_refs=beforeRefs.filter(ref=>trustedEvidence.has(ref));
+    if(fixed.claimed_source_refs.length!==beforeRefs.length)
+      changes.push({type:'QUARANTINE_UNSUPPORTED_EVIDENCE_REFERENCE'});
+  }
   fixed.claims=fixed.claims.filter(claim=>{
     if(facts.has(claim.key))return true;
     changes.push({type:'QUARANTINE_UNSUPPORTED_CLAIM',key:claim.key});
