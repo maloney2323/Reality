@@ -25,7 +25,8 @@ function materialityForFragments(fragments = []) {
   // Legacy signals still receive conservative lexical handling.
   const consequential = fragments.some(f =>
     f.intake_observation?.markers
-      ? f.intake_observation.markers.direct_action_cue_present
+      ? f.intake_observation.markers.direct_action_cue_present &&
+        !f.intake_observation.markers.explicit_prohibition
       : /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/i.test(f.cleaned_text||''));
   return {
     mode: consequential ? 'ACTION_CANDIDATE' : 'CONVERSATIONAL',
