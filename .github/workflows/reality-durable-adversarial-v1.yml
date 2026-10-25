@@ -20,6 +20,7 @@ jobs:
       - name: Parse live runner and regression existing source, continuity, semantic review
         run: |
           node --check scripts/run-reality-live-durable-adversarial-v1.mjs
+          node --check scripts/run-reality-12turn-authentic-continuity-v1.mjs
           node --check src/reality-live-intelligence-orchestration-v0.1.js
           node --check src/reality-source-review-adjudication-v0.1.js
           node --test test/reality-benchmark-run-scope-v0.1.test.js test/reality-authenticated-conversation-history-v0.1.test.js test/reality-live-history-api-v0.1.test.js test/reality-private-chat-preview-v0.1.test.js test/reality-cognition-continuity-handoff-v0.1.test.js test/reality-benchmark-report-page-v0.1.test.js test/reality-source-review-adjudication-v0.1.test.js \
