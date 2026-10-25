@@ -227,6 +227,12 @@ async function runSegment(from,to){
    reality_smoke:scoreSimple(answer,item.check),
    response_altered:original!==answer,
    detected_codes:receipt.drift||[],
+   conversational_findings:(receipt.conversational_drift?.findings||[]).map(x=>({
+     classification:x.classification,issue_id:x.issue_id,observed_model_text:x.observed_model_text,
+     claim_spans:x.claim_spans,claim_relation:x.claim_relation,
+     source_receipt_refs:x.source_receipt_refs,reason:x.reason,
+   })),
+   conversational_coverage:receipt.conversational_drift?.coverage||null,
    semantic_review_status:receipt.semantic_review?.status||null,
    semantic_issue_kinds:(receipt.semantic_review?.issues||[]).map(x=>x.kind),
    semantic_repair_status:receipt.semantic_repair?.status||null,
@@ -287,11 +293,13 @@ async function report(){
  const changed=hist.filter(x=>x.payload.response_altered).length;
  const totalCalls=hist.reduce((n,x)=>n+x.payload.paid_model_requests,0);
  const withIssues=hist.filter(x=>x.payload.semantic_issue_kinds.length>0).length;
+ const relationFlagged=hist.filter(x=>x.payload.conversational_findings?.length>0).length;
  const scoreboard={
   status:'COMPLETE_NOT_INDEPENDENTLY_SEMANTIC_SCORED',run_id:RUN_ID,model:MODEL,
   turns:total,original_smoke_matches:originalMatches,reality_smoke_matches:realityMatches,
   original_smoke_misses:total-originalMatches,reality_smoke_misses:total-realityMatches,
   answers_changed:changed,turns_with_reviewer_issues:withIssues,
+  turns_with_conversational_findings:relationFlagged,
   model_requests_inside_reality:totalCalls,source_readback_from_actual_database:true,
   durable_conversation_recovered_between_processes:true,
   total_persisted_events:events.length,source_receipts:source.source_receipt_ids.length,
