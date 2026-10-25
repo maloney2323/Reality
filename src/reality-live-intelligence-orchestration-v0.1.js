@@ -504,8 +504,11 @@ export async function runLiveIntelligenceOrchestration({
       (continuousReliability.drift||[]).includes('FACT_DRIFT'));
     const materialUnsupportedClaim=Boolean(releaseRelevantIssues.some(x=>
       ['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION'].includes(x.kind)));
+    // Contradictions against authenticated USER conversation are eligible for
+    // the existing revise-once / re-review path, just like lost obligations.
+    // A finding is still a candidate, never independently proven truth.
     const conversationalRepairCandidate=releaseRelevantIssues.some(x=>
-      ['FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind));
+      ['FACT_CONTRADICTION','FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind));
     const semanticRepairCandidate=conversationalRepairCandidate||userObjectiveNotAddressed||
       provedSourceConflict||materialUnsupportedClaim;
     if (semanticRepairCandidate &&
@@ -522,14 +525,18 @@ export async function runLiveIntelligenceOrchestration({
               status:'UNTRUSTED_REVIEW_CANDIDATE',
               cleaner_conversation_context:cleanerConversationContext,
               mistakes:releaseRelevantIssues.map(x=>({
-                kind:x.kind,reason:x.reason,
+                kind:x.kind,quote:x.quote,reason:x.reason,
               })),
+              conversation_comparison_must_preserve_current_user_scope:true,
               source_corrections:continuousReliability.source_attested_correction_proposals||[],
               original_answer_for_targeted_revision:originalModelText.slice(0,5000),
             },
             cognitive_instruction:[
               'This is a correction attempt within Reality.',
               'Answer the CURRENT user request directly, not a previous question.',
+              'Compare the exact source-linked earlier user statements and later corrections. Preserve scope, negations and current unresolved status.',
+              'Do not turn a missing confirmation into confirmation of the opposite event. Unverified delivery means delivery unknown, not delivered and not NOT DELIVERED.',
+              'Revise only the issue quoted by the reviewer. Do not add a generic warning to an otherwise valid answer.',
               'Use the supplied source-attested records and respect time/order of supersessions.',
               'Do not claim any action was executed or approved without evidence.',
               'Perform a MINIMAL evidence-backed revision: preserve accurate source-backed claims and requested deliverables.',
