@@ -15,9 +15,9 @@ const deepFreeze=x=>{
 function accept(r,root,world){
  return r?.version===USER_GOAL_CONTINUITY_STATE_VERSION &&
   r.continuity_root_id===root&&r.world_id===(world||null)&&
-  Array.isArray(r.user_goal_evidence)&&r.user_goal_evidence.length<=64&&
+  Array.isArray(r.user_goal_evidence)&&r.user_goal_evidence.length<=24&&
   r.user_goal_evidence.every(x=>has(x.source_ref)&&has(x.text)&&has(x.goal_evidence_id)&&
-   x.source_role==='AUTHENTICATED_USER_UTTERANCE'&&
+   x.source_role==='USER_CHANNEL_UTTERANCE'&&
    x.lifecycle_status==='REQUIRES_SEMANTIC_RECONCILIATION');
 }
 export function buildUserGoalContinuityState({
@@ -47,8 +47,8 @@ export function buildUserGoalContinuityState({
    if(!records.has(turn.source_ref)){
     records.set(turn.source_ref,{
      goal_evidence_id:hash([continuityRootId,worldId,turn.source_ref]),
-     source_ref:turn.source_ref,text:turn.text.slice(0,1400),
-     source_role:'AUTHENTICATED_USER_UTTERANCE',
+     source_ref:turn.source_ref,text:turn.text.slice(0,700),
+     source_role:'USER_CHANNEL_UTTERANCE',
      lifecycle_status:'REQUIRES_SEMANTIC_RECONCILIATION',
      asserts_external_truth:false,
      grants_execution_authority:false,
@@ -58,24 +58,24 @@ export function buildUserGoalContinuityState({
  }
  const candidate={
   goal_evidence_id:hash([continuityRootId,worldId,currentUserSourceRef]),
-  source_ref:currentUserSourceRef,text:currentUserMessage.slice(0,1400),
+  source_ref:currentUserSourceRef,text:currentUserMessage.slice(0,700),
   // Current input originates from current authenticated channel for the
   // server pathway; without trusted prior history, mark reduced coverage.
-  source_role:'AUTHENTICATED_USER_UTTERANCE',
+  source_role:'USER_CHANNEL_UTTERANCE',
   lifecycle_status:'REQUIRES_SEMANTIC_RECONCILIATION',
   asserts_external_truth:false,
   grants_execution_authority:false,
  };
  records.set(candidate.source_ref,candidate);
  const all=[...records.values()];
- // Keep the original user objective candidate and the last 63 user turns.
+ // Keep the original user objective candidate and the last 23 user turns.
  // Prior Continuity snapshots carry the original even after chat retrieval
  // truncates; no assistant-origin text can replace that anchor.
  const original=priorState?.original_user_goal_evidence_id?
   all.find(x=>x.goal_evidence_id===priorState.original_user_goal_evidence_id):
   all[0];
  if(!original)throw Error('USER_GOAL_CONTINUITY_EMPTY_SOURCE');
- const max=64;
+ const max=24;
  const tail=all.filter(x=>x.goal_evidence_id!==original.goal_evidence_id).slice(-(max-1));
  const retained=[original,...tail];
  return deepFreeze({
@@ -86,12 +86,11 @@ export function buildUserGoalContinuityState({
   original_user_goal_candidate:original.text,
   current_user_evidence_id:candidate.goal_evidence_id,
   user_goal_evidence:retained,
-  user_turn_evidence_seen:Math.max(all.length,
-   (priorState?.user_turn_evidence_seen||0)+(all.length-before.length)),
+  user_turn_evidence_seen_lower_bound:Math.max(all.length,priorState?.user_turn_evidence_seen_lower_bound||0),
   source_history_truncated:Boolean(conversationHistoryMayBeIncomplete)||
    Boolean(priorState?.source_history_truncated)||!authorized,
-  goal_evidence_records_omitted:Math.max(0,all.length-retained.length)+
-   (priorState?.goal_evidence_records_omitted||0),
+  goal_evidence_records_omitted_at_least:Math.max(0,all.length-retained.length,
+   priorState?.goal_evidence_records_omitted_at_least||0),
   // Crucial: neither the intake classifier nor model suggestions get to
   // change these lifecycle states by silently inferring user approval.
   active_goals:[],
