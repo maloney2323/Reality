@@ -8,6 +8,8 @@ import { runContinuousReliabilityCycle } from './reality-continuous-reliability-
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
+import { buildInvariantFrame } from './reality-alignment-invariant-contract-v0.1.js';
+import { buildSelectiveCognitiveAlignmentV02, assessCurrentTurnFocusV02 } from './reality-selective-cognitive-alignment-v0.2.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -29,6 +31,7 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
+import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
 import {
   createIntentRecord,
   structureIntent,
@@ -191,6 +194,42 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Align the current task BEFORE generation, from the SAME existing source
+  // readback as Continuity. This is a projection, not new memory or authority.
+  let preCognitionAlignment = null;
+  if (process.env.VERCEL_ENV === 'preview' &&
+      process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
+      continuityRuntime?.enabled && systemContext?.world_id) {
+    const history = await continuityRuntime.readback();
+    const grounded = readGroundedEvidence(history,{worldId:systemContext.world_id,
+      asOf:observedAt||new Date().toISOString()});
+    if (grounded.source_receipt_ids.length) {
+      const receiptById = new Map(history.map(x=>[x.event_id,x]));
+      const facts = grounded.facts.map(f=>{
+        const event = receiptById.get(f.evidence_ref);
+        if (!event?.assertion_time || !event?.effective_time)
+          throw Error('PRE_COGNITION_SOURCE_TIME_MISSING');
+        return {key:f.key,value:f.value,world_id:systemContext.world_id,
+          source_receipt_id:f.evidence_ref,system_time:event.assertion_time,
+          valid_from:event.effective_time,source_kind:'SOURCE_ATTESTED_CONTINUITY_READBACK'};
+      });
+      const asOf=observedAt||new Date().toISOString();
+      const frame=buildInvariantFrame({
+        records:facts,asOf,worldId:systemContext.world_id,
+        continuityRootId:effectiveContinuityRootId,
+        activeObjective:message,sourceKind:'SOURCE_ATTESTED_CONTINUITY_READBACK',
+      });
+      preCognitionAlignment=buildSelectiveCognitiveAlignmentV02({
+        currentUserMessage:message,
+        currentUserSourceRef:governedSignal.packet.packet_id,
+        priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        historySource:Array.isArray(verifiedConversationTurns)?
+          'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
+        frame,continuityRootId:effectiveContinuityRootId,
+      });
+    }
+  }
+
   // Ground the NEXT cognitive turn from the reconstructed ledger, not from
   // the previous model answer. A superseded source claim is never inherited.
   let reliabilityGrounding = null;
@@ -215,6 +254,7 @@ export async function runLiveIntelligenceOrchestration({
   const cognitionContext = {
     ...(systemContext || {}),
     reliability_grounding:reliabilityGrounding,
+    current_turn_alignment:preCognitionAlignment?.capsule||null,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
@@ -330,6 +370,7 @@ export async function runLiveIntelligenceOrchestration({
         structuredCandidate:reliabilityCandidate,
         conversationalAssessment,
         detectorShadow,
+        currentUserMessage:message,
         authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
       })
@@ -344,6 +385,98 @@ export async function runLiveIntelligenceOrchestration({
       history_scope:conversationalAssessment.history_scope,
     }:null,
   };
+  // Repair a suspected previous-topic reply WITHIN REALITY, not via an
+  // independent baseline. Keep original response and its verification receipt.
+  // Restrict automatic retry to explicit unanswered current action or topic;
+  // the focus checker is heuristic, so a retry is not an adjudicated truth.
+  const originalFocus = preCognitionAlignment
+    ? assessCurrentTurnFocusV02({
+        capsule:preCognitionAlignment.capsule,
+        modelAnswer:String(modelResult?.answer||''),
+      }) : null;
+  // Only an explicit CURRENT action omission is eligible for automatic
+  // bounded retry. General topic-keyword heuristics are review signals:
+  // a correct inventory checklist must not be silently rewritten.
+  const focusNeedsRepair=Boolean(originalFocus?.candidate_codes?.includes(
+    'CURRENT_REQUESTED_ACTION_NOT_ADDRESSED_CANDIDATE'));
+  if (reliabilityPreviewEnabled &&
+      process.env.REALITY_DETECTOR_REPAIR_ENABLED === 'true' &&
+      focusNeedsRepair &&
+      !continuousReliability.model_output_quarantined) {
+    const originalResponseId=modelResult.response_id||null;
+    const originalText=String(modelResult.answer||'');
+    const contextForRetry={
+      ...cognitionContext,
+      // The original broad assistant dialogue is explicitly excluded on
+      // bounded retry, to avoid repeating the previous wrong topic.
+      verified_conversation_context:null,
+      current_turn_alignment:preCognitionAlignment.capsule,
+      cognitive_instruction: [
+        'CORRECTION ATTEMPT: The previous draft did not answer the current request.',
+        'Answer ONLY current_turn_alignment.PRIMARY_OBJECTIVE.original_current_user_request.',
+        'Treat older assistant text as NOT authoritative; do not repeat an earlier topic.',
+        'Use source-attested facts in reliability_grounding and applicable obligations.',
+        'Do not claim external action or authorization. Be short and direct.',
+      ].join(' '),
+      previous_draft_issue_codes:originalFocus.candidate_codes,
+      previous_draft_snippet:originalText.slice(0,450),
+    };
+    let retryResult=null, retryFocus=null, retryError=null;
+    try {
+      retryResult=await invokeRealityModel({
+        governedSignal,systemContext:contextForRetry,
+        model:resolvedModel,apiKey:resolvedApiKey,
+        fetchImpl,
+      });
+      retryFocus=assessCurrentTurnFocusV02({
+        capsule:preCognitionAlignment.capsule,
+        modelAnswer:String(retryResult.answer||''),
+      });
+    } catch (error) {
+      retryError=String(error?.code||error?.message||'MODEL_RETRY_FAILED').slice(0,100);
+    }
+    const repaired=Boolean(retryResult?.answer?.trim()&&
+      retryFocus?.candidate_codes?.length===0);
+    // This receipt is diagnostics and CONTINUITY, not independent semantic
+    // or external outcome verification. Never promote model text to truth.
+    const repairEvent=await continuityRuntime.appendStage({
+      stage:'VERIFICATION',
+      entityId:'focus-repair:'+governedSignal.packet.packet_id,
+      eventId:'focus-repair:'+continuityRuntime.spine.continuity_root_id+
+        ':'+governedSignal.packet.packet_id,
+      epistemicStatus:'UNVERIFIED',
+      evidenceRefs:[continuousReliability.receipt_id].filter(Boolean),
+      payload:{
+        event_type:'MODEL_ANSWER_FOCUS_REPAIR',
+        original_response_id:originalResponseId,
+        retry_response_id:retryResult?.response_id||null,
+        original_reliability_receipt_id:continuousReliability.receipt_id,
+        current_user_packet_id:governedSignal.packet.packet_id,
+        initial_focus_candidates:originalFocus.candidate_codes,
+        retry_focus_candidates:retryFocus?.candidate_codes||null,
+        disposition:repaired?'FOCUS_CANDIDATES_CLEARED':
+          'FOCUS_REPAIR_NOT_ESTABLISHED',
+        retry_error:retryError,
+        independently_verified_semantic_correctness:false,
+        external_action_authorized:false,
+      },
+      provenance:{source:'reality_existing_live_orchestration_focus_repair'},
+    });
+    if (repaired) {
+      modelResult.answer=String(retryResult.answer);
+      modelResult.reliability_intervention='CURRENT_TURN_FOCUS_REGENERATED';
+    }
+    reliabilityWithExtraction.focus_repair={
+      status:repaired?'FOCUS_CANDIDATES_CLEARED_NOT_SEMANTICALLY_ADJUDICATED':
+        'FOCUS_REPAIR_NOT_ESTABLISHED',
+      original_response_id:originalResponseId,
+      retry_response_id:retryResult?.response_id||null,
+      original_focus_candidate_codes:originalFocus.candidate_codes,
+      retry_focus_candidate_codes:retryFocus?.candidate_codes||null,
+      receipt_id:repairEvent.event_id,
+      independently_verified_correctness:false,
+    };
+  }
   if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
     const corrections=(continuousReliability.source_attested_correction_proposals||[])
       .map(f=>String(f.key)+': '+JSON.stringify(f.source_attested_value)+

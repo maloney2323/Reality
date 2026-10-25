@@ -36,7 +36,7 @@ const fixtures=[
 ];
 const sha=v=>'sha256:'+createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const casepackHash=sha(fixtures);
-const vars=['VERCEL_ENV','REALITY_CONTINUOUS_RELIABILITY_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED','REALITY_DETECTOR_SHADOW_ENABLED','REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY','REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF','REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_RELIABILITY_REPLAY_KEY'];
+const vars=['VERCEL_ENV','REALITY_CONTINUOUS_RELIABILITY_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED','REALITY_DETECTOR_SHADOW_ENABLED','REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY','REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF','REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_RELIABILITY_REPLAY_KEY','REALITY_DETECTOR_REPAIR_ENABLED'];
 const prev=Object.fromEntries(vars.map(k=>[k,process.env[k]]));
 const db=[],responses=[],callTrace=[],historyReality=[];
 let calls=0,tokens=0,spentIn=0,spentOut=0;
@@ -95,6 +95,7 @@ function persist(status='PARTIAL',error=null){
   status,error,model:MODEL,fixture_world:true,provider_is_real_model:true,
   provider_persistence_is_mock:true,full_loop_live_customer_claimed:false,
   frozen_casepack_sha256:casepackHash,turns:fixtures.length,
+  intervention_mode:'PRE_COGNITION_ALIGNMENT_AND_BOUNDED_SAME_TURN_FOCUS_REPAIR',
   comparison:'INTERNAL_ORIGINAL_MODEL_OUTPUT_VS_REALITY_FINAL_OUTPUT',
   standalone_model_requests:0,
   paid_call_cap:MAX_PAID_CALLS,paid_calls:callTrace.length,call_attempts:calls,
@@ -153,6 +154,7 @@ async function run(){
   REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
   REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
   REALITY_RELIABILITY_REPLAY_KEY:'test-only-stable-key-for-benchmark',
+  REALITY_DETECTOR_REPAIR_ENABLED:'true',
  });
  const startup=buildGovernedChatSignal({message:'Fixture source observation',observedAt:at(0)});
  const runtime=await startContinuityRuntime({
@@ -191,13 +193,18 @@ async function run(){
   assert.equal(live.reliability.readback_verified,true);
   const realityCalls=callTrace.slice(beforeReality);
   const generated=realityCalls.filter(c=>c.kind==='REALITY_GENERATOR');
-  const rawReality=generated.at(-1)?.output_text||null;
+  // First provider generation is the true original; further calls are
+  // Reality's correction attempts and must not replace raw model evidence.
+  const rawReality=generated[0]?.output_text||null;
+  const retryReality=generated.length>1?generated.at(-1)?.output_text:null;
   const published=live.intelligence.answer;
   const row={
    turn:x.turn,trap:x.trap,original_user_turn:x.text,
    independent_source_update:source?.event_id||null,expected_behavior:x.expected,
    reality:{response_id:live.intelligence.response_id,original_model_answer:rawReality,
     displayed_answer:published,raw_answer_sha256:sha(rawReality),
+    retry_model_answer:retryReality,
+    focus_repair:live.reliability.focus_repair||null,
     cognitive_mode:live.intelligence.mode,
     generator_calls:generated.length,extractor_calls:realityCalls.filter(c=>c.kind==='QUOTE_EXTRACTOR').length,
     source_evaluation:live.reliability.evaluation_status,
