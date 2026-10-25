@@ -376,7 +376,7 @@ test('real business CI success must not be replaced with generic uncertainty bas
      quote:'generic deployment',reason:'Does not answer CI status question'}]}),
    });
    const got=await runLiveIntelligenceOrchestration({
-    message:'Did the test run succeed? Does that prove customer accuracy?',
+    message:'Did the test run succeed?',
     observedAt:'2026-10-24T15:01:00.000Z',
     model:'test-model',apiKey:'test-only',systemContext:context(),
     verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
