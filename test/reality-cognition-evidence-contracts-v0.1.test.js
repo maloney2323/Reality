@@ -5,6 +5,7 @@ import {EVENTS,stamp} from '../benchmarks/reality-construction-25turn-dual-v1.mj
 import {buildStateDeltaEnvelope,assessDualAxisEvidence,extractNarrowInspectionClaims}
  from '../src/reality-cognition-evidence-contracts-v0.1.js';
 const root='fictional:construction:25turn-comparison-v1';
+const clock={source_kind:'FROZEN_SYNTHETIC_BENCHMARK_CLOCK',turn1_at:stamp(1),step_ms:60000};
 const frame=n=>buildInvariantFrame({records:EVENTS,asOf:stamp(n),
  worldId:'fictional:construction',continuityRootId:root,
  activeObjective:'Complete safe construction without fabricating approvals'});
@@ -56,7 +57,7 @@ test('Turn 21 original model text yields a source-backed temporal contradiction 
   currentUserMessage:'At Turn 19 what did our system know versus later effective date?',
   modelAnswer:turn21ModelText,
   currentUserSourceRef:'frozen:user:turn:21',
-  recordedTurn:20,validFromTurn:18,
+  sourceTimeline:clock,
   existingDetectorFindings:[],
  });
  assert.equal(review.temporal_axis.status,'CONTRADICTION_CANDIDATE');
@@ -71,7 +72,7 @@ test('correct Turn 21 Reality time statement does not yield a false temporal mis
  const r=assessDualAxisEvidence({
   frame:frame(21),currentUserMessage:'What happened to the city inspection?',
   modelAnswer:text,currentUserSourceRef:'frozen:user:turn:21',
-  temporalClaims:claims,validFromTurn:18,recordedTurn:20,
+  temporalClaims:claims,sourceTimeline:clock,
  });
  assert.equal(r.temporal_axis.errors.length,0);
  assert.equal(r.temporal_axis.status,'EXPLICIT_CLAIMS_NO_DETECTED_MISMATCH');
@@ -82,13 +83,13 @@ test('ordinary mention HOLD applies for turn 19 is NOT a claim HOLD began at tur
  assert.equal(c.filter(x=>x.kind==='VALID_FROM_TURN').length,0);
  const r=assessDualAxisEvidence({frame:frame(21),
   currentUserMessage:'What was effective during turn 19?',modelAnswer:text,
-  currentUserSourceRef:'frozen:user:turn:21',validFromTurn:18});
+  currentUserSourceRef:'frozen:user:turn:21',sourceTimeline:clock});
  assert.equal(r.temporal_axis.errors.length,0);
 });
 test('unclear prose abstains, does not invent a clean temporal bill of health',()=>{
  const r=assessDualAxisEvidence({frame:frame(21),
   currentUserMessage:'When was it effective?',modelAnswer:'It was applied retroactively.',
-  currentUserSourceRef:'frozen:user:turn:21',validFromTurn:18});
+  currentUserSourceRef:'frozen:user:turn:21',sourceTimeline:clock});
  assert.equal(r.temporal_axis.status,'NOT_EVALUATED_NO_SUPPORTED_ASSERTION');
  assert.equal(r.source_semantic_adjudication,'REQUIRED');
 });
@@ -146,4 +147,23 @@ test('source evidence is mandatory, not a hallucination score from ungrounded te
  assert.throws(()=>assessDualAxisEvidence({
   frame:frame(16),currentUserMessage:'Can we send it?',modelAnswer:'',
  }),/AXIS_INPUT_INVALID/);
+});
+
+test('temporal verifier derives the source validity time from the bitemporal frame and cannot accept a supplied answer key',()=>{
+ const r=assessDualAxisEvidence({
+  frame:frame(21),sourceTimeline:clock,
+  currentUserMessage:'What was the time of the HOLD?',modelAnswer:turn21ModelText,
+  currentUserSourceRef:'frozen:user:turn:21',
+ });
+ assert.equal(r.temporal_axis.expected_source_valid_from_turn,18);
+ assert.equal(r.temporal_axis.expected_source_recorded_turn,20);
+ assert.equal(r.temporal_axis.errors[0].expected,18);
+});
+test('missing trusted clock abstains rather than pretending it checked the timestamp',()=>{
+ const r=assessDualAxisEvidence({
+  frame:frame(21),currentUserMessage:'When did the HOLD start?',
+  modelAnswer:turn21ModelText,currentUserSourceRef:'frozen:user:turn:21',
+ });
+ assert.equal(r.temporal_axis.status,'NOT_EVALUATED_UNTRUSTED_TIMELINE');
+ assert.equal(r.temporal_axis.errors.length,0);
 });
