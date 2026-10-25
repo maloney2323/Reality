@@ -11,6 +11,11 @@ import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
 import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverage-v0.1.js';
+import {
+ projectGoalStateContract,projectGoalTransitionContract,
+ projectAssistantGoalProposal,enforceGoalTransitionBoundary,
+ pendingGoalAuthorizationResponse,
+} from './reality-goal-authority-contracts-v0.1.js';
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
@@ -298,6 +303,10 @@ export async function runLiveIntelligenceOrchestration({
     worldId:systemContext?.world_id||null,
     goalState:userGoalContinuityState,
   });
+  const userGoalStateContract=projectGoalStateContract({
+    lifecycle:goalLifecycle,goalEvidence:userGoalContinuityState,
+    worldId:systemContext?.world_id||null,
+  });
   const sourceLinkedOriginal={
     source_ref:userGoalContinuityState.original_user_goal_source_ref,
     text:userGoalContinuityState.original_user_goal_candidate,
@@ -356,6 +365,7 @@ export async function runLiveIntelligenceOrchestration({
     conversation_continuity:goalAwareContinuity,
     canonical_epistemic_state:canonicalEpistemicFrame,
     canonical_epistemic_receipt:epistemicFrameReceipt,
+    user_goal_state_contract:userGoalStateContract,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
     signal_typed_intake:governedSignal.typed_epistemic_intake||null,
@@ -546,6 +556,24 @@ export async function runLiveIntelligenceOrchestration({
     trustedConversationHistory:Array.isArray(verifiedConversationTurns),
     findings:[...(conversationalAssessment?.findings||[]),...semanticConversationFindings],
   });
+  const userGoalTransitionContract=projectGoalTransitionContract({
+    currentTurnId:governedSignal.packet.packet_id,
+    goalState:userGoalStateContract,
+    userDirection:semanticFirst?.review?.goal_trajectory_review?.user_direction||'UNCLEAR',
+    sourceUserTurnId:governedSignal.packet.packet_id,
+    reviewerEvidenceId:semanticFirst?.response_id||null,
+  });
+  const assistantGoalProposal=projectAssistantGoalProposal({
+    firstAnswer:String(modelResult.answer||''),
+    modelResponseId:modelResult.response_id||null,
+    currentTurnId:governedSignal.packet.packet_id,
+    goalState:userGoalStateContract,
+    semanticReview:semanticFirst?.review||null,
+    reviewerResponseId:semanticFirst?.response_id||null,
+  });
+  const assistantGoalDecision=enforceGoalTransitionBoundary({
+    proposal:assistantGoalProposal,goalState:userGoalStateContract,
+  });
   const combinedConversationalAssessment=conversationalAssessment?{
     ...conversationalAssessment,
     status:semanticConversationFindings.length?'EARLY_CONVERSATION_DRIFT_RISK':
@@ -587,6 +615,13 @@ export async function runLiveIntelligenceOrchestration({
       status:epistemicFrameReceipt.status,history_coverage:canonicalEpistemicFrame.history_coverage,
       source_receipt_id:epistemicFrameReceipt.source_receipt_id,
       reported_claim_count:canonicalEpistemicFrame.reported_claims.length},
+    goal_authority_contracts:{
+      goal_state:userGoalStateContract,
+      goal_transition:userGoalTransitionContract,
+      assistant_proposal:assistantGoalProposal,
+      boundary_decision:assistantGoalDecision,
+      confirmed_user_authority_transition:false,
+    },
     user_goal_continuity:{
       original_user_source_ref:userGoalContinuityState.original_user_goal_source_ref,
       preserved_original_goal_across_turns:Boolean(oldGoalState),
@@ -887,6 +922,63 @@ export async function runLiveIntelligenceOrchestration({
     modelResult.reliability_intervention='QUARANTINED_PRIOR_TO_DISPLAY';
   }
 
+
+  // Native pre-publication goal-authority boundary. The initial Cognition
+  // answer is ALWAYS a proposal, never an instruction to mutate user goals.
+  // If the same semantic review identified a quoted assistant-origin shift,
+  // release only a re-reviewed correction; otherwise withhold the shift.
+  // A missing semantic review is NOT evidence that no drift occurred.
+  const unreviewedGoalShift=assistantGoalDecision.status===
+    'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'&&
+    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED';
+  if(unreviewedGoalShift){
+    modelResult.answer=pendingGoalAuthorizationResponse({
+      goalState:userGoalStateContract,
+    });
+    modelResult.reliability_intervention='ASSISTANT_GOAL_SHIFT_WITHHELD_PENDING_USER_DIRECTION';
+  }
+  let goalAuthorityReceipt=null;
+  if(continuityRuntime?.enabled){
+    const proposalEvent=await continuityRuntime.appendStage({
+      stage:'VERIFICATION',
+      entityId:'goal-proposal:'+governedSignal.packet.packet_id,
+      eventId:'goal-proposal:'+continuityRuntime.spine.continuity_root_id+
+        ':'+governedSignal.packet.packet_id,
+      epistemicStatus:'UNVERIFIED',
+      evidenceRefs:[epistemicFrameReceipt.source_receipt_id,
+        continuousReliability?.receipt_id].filter(Boolean),
+      payload:{
+        event_type:'ASSISTANT_GOAL_PROPOSAL_AND_AUTHORITY_DECISION',
+        goal_state_contract:userGoalStateContract,
+        goal_transition:userGoalTransitionContract,
+        assistant_proposal:assistantGoalProposal,
+        verifier_decision:assistantGoalDecision,
+        original_model_response_id:modelResult.response_id||null,
+        released_intervention:modelResult.reliability_intervention||null,
+        external_goal_state_mutations:0,
+        external_actions_authorized:false,
+        independently_verified_goal_alignment:false,
+      },
+      provenance:{source:'reality_native_goal_authority_before_publication'},
+    });
+    const confirmed=(await continuityRuntime.readback()).some(e=>
+      e.event_id===proposalEvent.event_id&&
+      e.payload?.event_type==='ASSISTANT_GOAL_PROPOSAL_AND_AUTHORITY_DECISION'&&
+      e.payload?.assistant_proposal?.proposal_id===assistantGoalProposal.proposal_id&&
+      e.payload?.verifier_decision?.status===assistantGoalDecision.status);
+    if(!confirmed)throw Error('GOAL_PROPOSAL_AUTHORITY_READBACK_NOT_VERIFIED');
+    goalAuthorityReceipt=proposalEvent.event_id;
+  }
+  reliabilityWithExtraction.goal_authority={
+    proposal_id:assistantGoalProposal.proposal_id,
+    boundary_status:assistantGoalDecision.status,
+    source_goal_ref:userGoalStateContract.provenance.origin_turn_id,
+    source_receipt_id:goalAuthorityReceipt,
+    goal_state_changed:false,
+    external_execution_authorized:false,
+    reviewer_coverage:semanticFirst?.review?.status||semanticReviewStatus,
+    independently_verified_goal_alignment:false,
+  };
 
   const materiality = materialityFromSignal(governedSignal);
   const trainingExperience = createIntelligenceTrainingExperience({
