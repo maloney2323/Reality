@@ -45,6 +45,8 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
  const classified=unique([...(p.drift||[]),...(p.hallucination_suspected||[])]);
  const hasFindings=classified.length>0;
  const conversationFindings=Array.isArray(p.conversational_drift?.findings)?p.conversational_drift.findings:[];
+ const goalCoverage=p.conversational_drift?.coverage?.goal_drift_coverage||null;
+ const goalCoverageStatus=goalCoverage?.status||'NOT_SEMANTICALLY_ASSESSED';
  const modelDriftCandidates=conversationFindings.filter(f=>f.classification!=='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
  const userRevisions=conversationFindings.filter(f=>f.classification==='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
  const conversationRisk=modelDriftCandidates.length>0;
@@ -101,6 +103,10 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
     repair_verified_turn:null,
   })),
   conversational_coverage:p.conversational_drift?.assessment_scope||'NOT_EVALUATED',
+  goal_drift_review_status:goalCoverageStatus,
+  goal_drift_review_limitations:goalCoverage?.coverage_limitations||['GOAL_DRIFT_COVERAGE_UNAVAILABLE'],
+  goal_drift_independently_verified_rate:null,
+  zero_alerts_proves_no_drift:false,
   model_output_quarantined:contained,
   correction_proposed:p.correction_proposed===true,
   repair_independently_verified:p.recovery_independently_verified===true,
@@ -130,6 +136,13 @@ function buildDigest(findings,{windowEnd,interval,sourceReceipts}){
    .flatMap(e=>e.payload.conversational_drift?.findings||[]);
  const unverifiedConvo=new Set(allConversationFindings.filter(f=>!integer(f.repair_verified_turn))
    .map(f=>f.anchor_id || f.classification+'|'+(f.source_receipt_refs||[])[0]));
+ const goalStatus=e=>e.payload.conversational_drift?.coverage?.goal_drift_coverage?.status||
+  'NOT_SEMANTICALLY_ASSESSED';
+ const goalUnassessed=subset.filter(e=>goalStatus(e)==='NOT_SEMANTICALLY_ASSESSED').length;
+ const goalLimited=subset.filter(e=>[
+  'LIMITED_REVIEW_NO_CANDIDATES','GOAL_ALIGNMENT_UNRESOLVED'
+ ].includes(goalStatus(e))).length;
+ const goalReviewCandidates=subset.filter(e=>goalStatus(e)==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION').length;
  const conversationalCoverage=subset.filter(e=>e.payload.conversational_drift?.history_scope===
    'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT').length;
  return Object.freeze({
@@ -147,6 +160,10 @@ function buildDigest(findings,{windowEnd,interval,sourceReceipts}){
   recurring_conversational_risks:conversationFindings.filter(f=>f.recurrence_count>=2).length,
   unresolved_conversational_incident_anchors:unverifiedConvo.size,
   authenticated_historical_alignment_checks:conversationalCoverage,
+  goal_drift_unassessed_turns:goalUnassessed,
+  goal_drift_limited_or_unresolved_turns:goalLimited,
+  goal_drift_candidate_turns:goalReviewCandidates,
+  goal_drift_independently_graded_turns:0,
   model_outputs_contained:contained.length,
   open_or_unverified_incident_turns:unresolved.length,
   missed_error_rate_pct:null,
