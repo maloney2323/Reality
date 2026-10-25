@@ -255,40 +255,72 @@ document.querySelectorAll('button[data-mode]').forEach(button=>{
 
 const realProof={rows:[],source:null};
 function openRealProof(data){
- if(!data||!Array.isArray(data.rows)||!String(data.experiment||'').includes('REAL_MODEL_REALITY_INTERNAL_RAW_VS_CORRECTED'))throw Error('This is not a Reality internal original-versus-final evidence file.');
- realProof.rows=data.rows;
- realProof.source=data;
- const selector=get('real-proof-turn');
- selector.replaceChildren();
- data.rows.forEach((x,i)=>{
+ const isRealBusiness=data?.test==='REALITY_BUSINESS_SEMANTIC_REVIEW'&&Array.isArray(data.turns);
+ const isLegacy=Array.isArray(data?.rows)&&
+  String(data?.experiment||'').includes('REAL_MODEL_REALITY_INTERNAL_RAW_VS_CORRECTED');
+ if(!isRealBusiness&&!isLegacy)throw Error('Unsupported Reality original-vs-final receipt bundle.');
+ const rows=isRealBusiness?data.turns.map(x=>({
+  turn:x.turn,trap:'LIVE_REAL_BUSINESS_EVIDENCE',
+  expected_behavior:'Real GitHub state · no independent accuracy score',
+  reality:{
+   original_model_answer:x.original_model_answer,
+   displayed_answer:x.reality_displayed_answer,
+   source_evaluation:x.source_evaluation,
+   detector_candidates:[],
+   shadow_focus_flags:[],
+   quarantined:x.original_quarantined,
+   correction_receipts:[],
+   verification_receipt_id:x.source_verification_receipt,
+   verification_readback:x.verification_readback,
+   semantic_review_status:x.review_status,
+   semantic_review_current_turn:x.review_current_request,
+   semantic_issue_candidates:x.review_issue_candidates||[],
+   semantic_repair:x.semantic_repair,
+  },original_user_turn:x.user_question,
+ })):data.rows;
+ realProof.rows=rows;realProof.source=data;
+ const selector=get('real-proof-turn');selector.replaceChildren();
+ rows.forEach((x,i)=>{
   const opt=document.createElement('option');opt.value=String(i);
   opt.textContent='Turn '+x.turn+' · '+String(x.trap||'scenario');
   selector.appendChild(opt);
  });
- selector.disabled=!data.rows.length;
- get('real-proof-stats').hidden=false;
- get('rp-turns').textContent=String(data.rows.length);
- get('rp-quarantined').textContent=String(data.rows.filter(x=>x.reality?.quarantined).length);
- get('real-proof-state').textContent='Original real model responses loaded · '+data.status+' · '+data.paid_calls+' total real provider requests (generator + quote extractor). Raw original and final scores require independent review.';
+ selector.disabled=!rows.length;get('real-proof-stats').hidden=false;
+ get('rp-turns').textContent=String(rows.length);
+ get('rp-quarantined').textContent=String(rows.filter(x=>x.reality?.quarantined).length);
+ get('real-proof-state').textContent=isRealBusiness?
+  'REAL business evidence read from GitHub · '+String(data.result_status)+
+  ' · '+data.paid_calls+' paid Reality provider calls · '+
+  'Reviewer full '+(data.review_coverage?.full??'?')+
+  ', partial '+(data.review_coverage?.partial??'?')+
+  ', unassessed '+(data.review_coverage?.unassessed??'?')+
+  '. In-memory persistence only. No independent accuracy rate.' :
+  'Original model responses loaded · '+data.status+' · '+data.paid_calls+
+  ' total provider calls. Raw original and final scores require independent review.';
  renderRealProofTurn(0);
 }
 function renderRealProofTurn(i){
  const row=realProof.rows[i];if(!row)return;
  const r=row.reality||{};
  get('rp-left-header').textContent='Turn '+row.turn+' · Original model · '+String(row.trap);
- get('rp-right-header').textContent=r.quarantined?'Reality quarantined original answer':'Reality released answer without quarantine';
- get('rp-raw').textContent=r.original_model_answer||'No captured original generation. Do not score this turn.';
+ get('rp-right-header').textContent=r.quarantined?'Reality quarantined original answer':
+  r.semantic_repair?.status?.startsWith('CORRECTION_CANDIDATE')?'Reality re-reviewed a correction':
+  'Reality released original answer (not necessarily independently verified)';
+ get('rp-raw').textContent=r.original_model_answer||'No captured original generation. Do not score.';
  get('rp-final').textContent=r.displayed_answer||'No released answer.';
  get('rp-receipt').textContent=
- 'Expected: '+String(row.expected_behavior||'Not pregraded')+
- ' · Source evaluation: '+String(r.source_evaluation)+
- ' · Detector candidates: '+JSON.stringify(r.detector_candidates||[])+
- ' · Conversational flags: '+JSON.stringify(r.shadow_focus_flags||[])+
- ' · Quarantine: '+String(!!r.quarantined)+
- ' · Source-linked corrections: '+JSON.stringify(r.correction_receipts||[])+
- ' · Continuity verification receipt: '+String(r.verification_receipt_id||'NOT_AVAILABLE')+
- ' · Readback verified: '+String(!!r.verification_readback)+
- ' · Independent real-world outcome: not established';
+ 'Current request: '+String(row.original_user_turn||'unknown')+
+ '\nSource evaluation: '+String(r.source_evaluation||'NOT_EVALUATED')+
+ '\nSemantic review coverage: '+String(r.semantic_review_status||'Not recorded')+
+ '\nCurrent-turn evaluation: '+String(r.semantic_review_current_turn??'Not independently checked')+
+ '\nSemantic issue candidates: '+JSON.stringify(r.semantic_issue_candidates||[])+
+ '\nSemantic repair: '+JSON.stringify(r.semantic_repair||null)+
+ '\nOther detector candidates: '+JSON.stringify(r.detector_candidates||[])+
+ '\nOriginal quarantined: '+String(!!r.quarantined)+
+ '\nCorrections: '+JSON.stringify(r.correction_receipts||[])+
+ '\nContinuity verification receipt: '+String(r.verification_receipt_id||'NOT_AVAILABLE')+
+ '\nReadback verified: '+String(!!r.verification_readback)+
+ '\nIndependent accuracy/real-world outcome verification: NOT ESTABLISHED';
 }
 get('real-proof-turn').addEventListener('change',e=>renderRealProofTurn(Number(e.target.value)));
 get('real-proof-upload').addEventListener('change',async e=>{
