@@ -360,3 +360,33 @@ test('captured real-business negation must NOT be quarantined when reviewer gues
   }finally{restoreSemantic()}
  });
 });
+
+test('real business CI success must not be replaced with generic uncertainty based on a reviewer-only false alarm',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{facts:[
+     {key:'signal_v11_test_run_conclusion',value:'SUCCESS'},
+   ]});
+   const original='Yes, the v1.1 test run succeeded, but that alone does not establish customer accuracy.';
+   const stub=semanticCallStub(f,{draft:original,
+    repair:'A generic deployment claim without source evidence.',
+    first:review({issues:[{kind:'UNSUPPORTED_FACT',
+     quote:'test run succeeded',reason:'False alarm: source run is indeed SUCCESS'}]}),
+    second:review({addressed:false,issues:[{kind:'WRONG_TASK',
+     quote:'generic deployment',reason:'Does not answer CI status question'}]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Did the test run succeed? Does that prove customer accuracy?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.intelligence.reliability_intervention,
+     'UNASSESSED_SEMANTIC_REVIEW_ORIGINAL_PRESERVED');
+   assert.equal(got.reliability.semantic_repair.status,'CORRECTION_NOT_VERIFIED');
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
