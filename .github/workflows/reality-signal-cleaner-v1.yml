@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: read
 jobs:
   cleaner-contract-and-integration:
     runs-on: ubuntu-latest
@@ -31,6 +32,18 @@ jobs:
             test/reality-repair-the-loop-v0.1.test.js \
             test/reality-live-intelligence-orchestration-v0.1.test.js \
             test/reality-continuous-reliability-v0.1.test.js
+      - name: Actual Take Intelligence GitHub signal intake (read-only, zero model tokens)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/audit-reality-real-business-intake-v1.mjs
+      - name: Preserve only digests, markers, source offsets, no PR text
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-signal-cleaner-v1-real-business-readonly-evidence
+          path: benchmark-results/reality-signal-cleaner-v1-real-business.json
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Privacy and release boundary
         if: always()
         run: |
