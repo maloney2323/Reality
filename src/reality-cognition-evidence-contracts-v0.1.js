@@ -110,6 +110,35 @@ export function extractNarrowInspectionClaims(answer=''){
 /** All axes are independently evaluated. A valid refusal can coexist with
  * wrong-topic drift or an incorrect time claim. A refusal NEVER bypasses drift.
  * This module does not turn classifier heuristics into verdicts. */
+/** Report actual provider metering without fabricating caching success.
+ * Token counts are NOT automatically monetary savings. Price comparison
+ * belongs to a separate model/version/time aware billing adapter.
+ */
+export function summarizeProviderTokenUsage({usage=null,elapsedMs=null}={}){
+ if(!usage||!Number.isFinite(usage.input_tokens)||!Number.isFinite(usage.output_tokens))
+  return Object.freeze({
+   status:'PROVIDER_USAGE_NOT_AVAILABLE',
+   input_tokens:null,output_tokens:null,cached_read_tokens:null,
+   cache_hit_rate:null,actual_billed_cost_usd:null,
+   realized_savings_verified:false,
+  });
+ const details=usage.input_tokens_details||{};
+ const cached=Number.isFinite(details.cached_tokens)?details.cached_tokens:null;
+ const written=Number.isFinite(details.cache_write_tokens)?details.cache_write_tokens:null;
+ const regular=cached==null?null:Math.max(0,usage.input_tokens-cached-(written||0));
+ return Object.freeze({
+  status:cached==null?'CACHE_BREAKDOWN_NOT_REPORTED':'ACTUAL_USAGE_RECORDED',
+  input_tokens:usage.input_tokens,output_tokens:usage.output_tokens,
+  cached_read_tokens:cached,cache_write_tokens:written,
+  other_input_tokens:regular,
+  cache_hit_rate:cached==null||usage.input_tokens===0?null:
+   cached/usage.input_tokens,
+  elapsed_ms:Number.isFinite(elapsedMs)?elapsedMs:null,
+  actual_billed_cost_usd:null, // price and model-specific write/rate details unavailable
+  realized_savings_verified:false,
+ });
+}
+
 export function assessDualAxisEvidence({
  currentUserMessage='',modelAnswer='',frame,
  action=null,executionAuthorizationStatus='UNKNOWN',focusCandidateCodes=[],existingDetectorFindings=[],
