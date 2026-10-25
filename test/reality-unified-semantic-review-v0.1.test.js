@@ -569,6 +569,11 @@ test('conversation comparison: revise an unknown-vs-false answer using authentic
    assert.equal(reviewRequest.conversation_source_history.prior_assistant_messages_are_not_evidence,true);
    assert.equal(got.intelligence.answer,corrected);
    assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,1);
+   assert.equal(got.reliability.conversational_drift.findings.some(x=>
+     x.classification==='CONVERSATION_FACT_CONTRADICTION_CANDIDATE'&&
+     x.reason.includes('user:receipt:01')&&
+     x.detector_channel==='EXISTING_SEMANTIC_CONVERSATION_REVIEW'),true);
    assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
    assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
    assert.equal(got.execution.status,'NOT_EXECUTED');
@@ -602,6 +607,8 @@ test('conversation comparison: do not modify a correct answer and do not promote
    assert.equal(comparison.prior_assistant_messages_are_not_evidence,true);
    assert.equal(got.intelligence.answer,original);
    assert.equal(got.intelligence.reliability_intervention,undefined);
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,0);
+   assert.equal(got.reliability.conversational_drift.findings.length,0);
    assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
   }finally{restoreSemantic()}
  });
