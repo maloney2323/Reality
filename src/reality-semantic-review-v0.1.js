@@ -70,8 +70,11 @@ function validate(parsed,answer,snapshot,worldId){
  for(const claim of parsed.claims){
    if(!valid(claim.key)||!valid(claim.quote)||!answer.includes(claim.quote)||
        typeof claim.asserted_value!=='string'||
-       typeof claim.relevant_to_current_request!=='boolean')
-     throw Error('SEMANTIC_REVIEW_UNANCHORED_CLAIM');
+       typeof claim.relevant_to_current_request!=='boolean'){
+     unassessed.push({key:clean(claim?.key).slice(0,120)||'UNKNOWN',
+       reason:'CLAIM_EXTRACTION_UNANCHORED_OR_INVALID'});
+     continue; // Do not invalidate a whole semantic review over one bad quote.
+   }
    const fact=records.get(claim.key);
    if(!fact){
      unassessed.push({key:claim.key,reason:'NOT_IN_SOURCE_RECORD'});
@@ -131,6 +134,11 @@ export async function reviewRealityAnswer({
    'false claims of completed actions and unjustified authority. Do not invent issues to fill a quota.',
    'Existing records are the evidence baseline, not the assistant text or user assertions.',
    'A fact absent from records is UNKNOWN, not automatically false.',
+   'Source coverage is narrow. GitHub PR and CI status can establish repository facts, but cannot alone establish',
+   'whether a change is deployed by another method, whether customers use it, whether it fixes customer issues,',
+   'or whether a customer was contacted. Avoid inferring external operational outcomes from adjacent records.',
+   'Flag any categorically asserted external outcome without direct source support as UNSUPPORTED_FACT;',
+   'the claim may be true or false, but must remain explicitly UNKNOWN without provider evidence.',
    'For every issue include a short EXACT substring from the answer plus why it is problematic.',
    'For claims, extract only AFFIRMED explicit operational assertions concerning named source fact keys.',
    'Copy their asserted value verbatim as a compact string; do not convert vague implications into facts.',
