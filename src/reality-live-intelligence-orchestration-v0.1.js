@@ -258,6 +258,7 @@ export async function runLiveIntelligenceOrchestration({
     ...(systemContext || {}),
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
+    signal_typed_intake:governedSignal.typed_epistemic_intake||null,
     current_turn_alignment:preCognitionAlignment?.capsule||null,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
