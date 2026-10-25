@@ -13,5 +13,6 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "buildCommand": "node scripts/run-reality-structured-provenance-recheck-v0.1.mjs"
 }
