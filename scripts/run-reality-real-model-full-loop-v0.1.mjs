@@ -1,6 +1,7 @@
-// REAL provider challenge, 16 turns x two lanes. NO scripted model outputs.
-// Models see same authored stimuli; Reality additionally sees independent
-// fictional source-attested receipts through its actual orchestration runtime.
+// REAL provider challenge, Reality ONLY; no paid standalone baseline.
+ // Compare raw ORIGINAL model responses inside Reality to Reality's own
+ // detection, containment, displayed answer and source-linked receipts.
+ // No scripted model outputs. All construction evidence is synthetic.
 // No real customer state, real provider-connected database, or action performed.
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
@@ -37,7 +38,7 @@ const sha=v=>'sha256:'+createHash('sha256').update(JSON.stringify(v)).digest('he
 const casepackHash=sha(fixtures);
 const vars=['VERCEL_ENV','REALITY_CONTINUOUS_RELIABILITY_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED','REALITY_DETECTOR_SHADOW_ENABLED','REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY','REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF','REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_RELIABILITY_REPLAY_KEY'];
 const prev=Object.fromEntries(vars.map(k=>[k,process.env[k]]));
-const db=[],responses=[],callTrace=[],historyUnderlying=[],historyReality=[];
+const db=[],responses=[],callTrace=[],historyReality=[];
 let calls=0,tokens=0,spentIn=0,spentOut=0;
 const providerResponses=(x)=>{
  if(typeof x.output_text==='string')return x.output_text;
@@ -90,15 +91,19 @@ const realFetch=async(url,options={})=>{
 };
 function persist(status='PARTIAL',error=null){
  const result={
-  experiment:'REAL_MODEL_ACTUAL_REALITY_ORCHESTRATION_CHALLENGE_V0_1',
+  experiment:'REAL_MODEL_REALITY_INTERNAL_RAW_VS_CORRECTED_V0_2',
   status,error,model:MODEL,fixture_world:true,provider_is_real_model:true,
   provider_persistence_is_mock:true,full_loop_live_customer_claimed:false,
-  frozen_casepack_sha256:casepackHash,expected_turns_per_arm:fixtures.length,
+  frozen_casepack_sha256:casepackHash,turns:fixtures.length,
+  comparison:'INTERNAL_ORIGINAL_MODEL_OUTPUT_VS_REALITY_FINAL_OUTPUT',
+  standalone_model_requests:0,
   paid_call_cap:MAX_PAID_CALLS,paid_calls:callTrace.length,call_attempts:calls,
   input_tokens:spentIn,output_tokens:spentOut,
   independent_blind_grade_complete:false,
   confirmed_model_error_turns:null,confirmed_reality_error_turns:null,
-  verified_prevented_error_turns:null,underlying_error_pct:null,reality_error_pct:null,
+  verified_prevented_error_turns:null,original_model_error_pct:null,reality_final_error_pct:null,
+  observable_quarantined_turns:responses.filter(x=>x.reality.quarantined).map(x=>x.turn),
+  observed_source_grounded_corrections:responses.filter(x=>x.reality.quarantined&&x.reality.correction_receipts.length).map(x=>x.turn),
   actual_external_business_actions:0,
   receipt_rows:db.filter(e=>e.payload?.event_type==='MODEL_OUTPUT_ASSESSMENT')
    .map(e=>({event_id:e.event_id,model_output_quarantined:e.payload.model_output_quarantined,
@@ -167,17 +172,7 @@ async function run(){
  assert.equal(first.verified_readback,true);
  for(const x of fixtures){
   const source= x.update ? await actualSource(runtime,x.turn,x.update):null;
-  const beforeBaselineCalls=calls;
-  const baseInput=[{role:'system',content:'You are a helpful assistant. Answer the current request accurately; do not claim external actions without evidence.'},
-   ...historyUnderlying.map(h=>({role:h.role,content:h.text})),
-   {role:'user',content:x.text}];
-  const baseResponse=await realFetch('https://api.openai.com/v1/responses',{
-   body:JSON.stringify({model:MODEL,store:false,max_output_tokens:420,input:baseInput}),
-  });
-  const base=await baseResponse.json();
-  const baseAnswer=providerResponses(base);
-  historyUnderlying.push({role:'user',text:x.text},{role:'assistant',text:baseAnswer});
-  if(calls!==beforeBaselineCalls+1)throw Error('BASELINE_MULTIPLE_MODEL_CALLS');
+  // Reality's own generation and source-grounded verification is the sole paid path.
   const beforeReality=callTrace.length;
   const live=await runLiveIntelligenceOrchestration({
    message:x.text,observedAt:at(x.turn*2+1),
@@ -201,8 +196,6 @@ async function run(){
   const row={
    turn:x.turn,trap:x.trap,original_user_turn:x.text,
    independent_source_update:source?.event_id||null,expected_behavior:x.expected,
-   underlying:{response_id:base.id,original_answer:baseAnswer,
-    answer_sha256:sha(baseAnswer)},
    reality:{response_id:live.intelligence.response_id,original_model_answer:rawReality,
     displayed_answer:published,raw_answer_sha256:sha(rawReality),
     cognitive_mode:live.intelligence.mode,
@@ -225,15 +218,15 @@ async function run(){
   historyReality.push({role:'user',text:x.text},{role:'assistant',text:published});
   persist('PARTIAL_RAW_UNGRADED');
   console.log('REAL_MODEL_FULL_LOOP_TURN '+JSON.stringify({
-   turn:x.turn,trap:x.trap,original_base:baseAnswer.slice(0,150),
-   original_reality:rawReality?.slice(0,150),
+   turn:x.turn,trap:x.trap,original_reality:rawReality?.slice(0,150),
    quarantined:row.reality.quarantined,drift:row.reality.detector_candidates,
    shadow:row.reality.shadow_status,provider_calls:calls,source_update:!!source,
   }));
  }
- const final=persist('COMPLETE_ALL_32_ORIGINAL_MODEL_ANSWERS_WITH_SOURCE_RECEIPTS_UNGRADED');
+ const final=persist('COMPLETE_REALITY_ONLY_RAW_VS_POST_VERIFIER_RESPONSES_UNGRADED');
  console.log('REAL_MODEL_FULL_LOOP_TOTAL '+JSON.stringify({
   status:final.status,turns:fixtures.length,model:MODEL,paid_calls:calls,
+  no_separate_model_baseline:true,
   input_tokens:spentIn,output_tokens:spentOut,
   reality_quarantined:responses.filter(x=>x.reality.quarantined).map(x=>x.turn),
   raw_results:'benchmark-results/reality-real-model-full-loop-v0.1.json',
