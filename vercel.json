@@ -14,5 +14,5 @@
       "schedule": "0 * * * *"
     }
   ],
-  "buildCommand": "node scripts/run-reality-cold-chain-independent-v0.1.mjs second && mkdir -p public && printf 'Fresh real benchmark: all twelve turns committed\\n' > public/index.html"
+  "buildCommand": "node scripts/run-reality-cold-chain-independent-v0.1.mjs report"
 }
