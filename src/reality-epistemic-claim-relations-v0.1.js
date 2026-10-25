@@ -54,7 +54,7 @@ const eventBoundaries=Object.freeze([
   targetPattern:/\b(?:deployment|deployed|shipped|published|released)\b/i},
  {source:'EDI_FILE_ACKNOWLEDGMENT',target:'CLAIM_ADJUDICATION',
   sourcePattern:/\b(?:payer|edi|file|claim)\s+(?:file\s+)?acknowledg(?:e)?ment\b|\b(?:acknowledged|acknowledgment)\s+(?:the\s+)?(?:edi\s+)?file\b/i,
-  targetPattern:/\b(?:accepted\s+claim|approved\s+claim|claim\s+(?:approved|accepted|paid|adjudicated))\b/i},
+  targetPattern:/\b(?:accepted\s+claim|approved\s+claim|claim\s+(?:approved|accepted|paid|adjudicated|adjudication))\b/i},
 ]);
 // Check only asserted equivalences, not co-mentions, contrasts, or questions.
 const equivPatterns=[
