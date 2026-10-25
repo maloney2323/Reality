@@ -439,9 +439,22 @@ setInterval(refreshSavedShiftHome,300000);
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
    const issues=reliability.semantic_issue_candidates?.length||0;
    const assessed=reliability.semantic_review_provenance_status||'NOT_ASSESSED';
+   const trajectory=reliability.goal_drift_coverage||{};
+   const driftStatus=trajectory.status||'NOT_SEMANTICALLY_ASSESSED';
+   const driftText=driftStatus==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION'
+    ? 'Potential goal drift detected; needs verification'
+    :driftStatus==='REVIEWED_NO_CANDIDATES_NOT_VALIDATED'
+     ? 'Goal checked; no candidates, not independently verified'
+     :driftStatus==='LIMITED_REVIEW_NO_CANDIDATES'
+      ? 'Goal drift review limited; unknown if drift missed'
+      :driftStatus==='GOAL_ALIGNMENT_UNRESOLVED'
+       ? 'Goal alignment unresolved'
+       : 'Goal drift NOT fully assessed';
    status((data.continuity?.recovered_messages||0)+' source-linked messages · '+
     (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
     ' · Semantic review: '+assessed+
+    ' · Goal tracking: '+driftText+
+    ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
     ' · Review candidates: '+issues+
     ' · Corrections: '+(reliability.intervention||'none')+
     (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':'')+
