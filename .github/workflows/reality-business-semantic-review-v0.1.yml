@@ -40,6 +40,7 @@ jobs:
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GITHUB_TOKEN: ${{ github.token }}
+      REALITY_REAL_BUSINESS_CASES: '2,5'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -47,7 +48,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Six real-business questions with current provider-sourced GitHub records
+      - name: Targeted real-business deployment and PR truth questions
         run: node scripts/run-reality-business-semantic-review-v0.1.mjs
       - name: Preserve first model output, semantic candidates and Reality final answer
         if: always()
