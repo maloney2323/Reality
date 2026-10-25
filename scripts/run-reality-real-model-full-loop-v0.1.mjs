@@ -191,13 +191,18 @@ async function run(){
   assert.equal(live.reliability.readback_verified,true);
   const realityCalls=callTrace.slice(beforeReality);
   const generated=realityCalls.filter(c=>c.kind==='REALITY_GENERATOR');
-  const rawReality=generated.at(-1)?.output_text||null;
+  // First provider generation is the true original; further calls are
+  // Reality's correction attempts and must not replace raw model evidence.
+  const rawReality=generated[0]?.output_text||null;
+  const retryReality=generated.length>1?generated.at(-1)?.output_text:null;
   const published=live.intelligence.answer;
   const row={
    turn:x.turn,trap:x.trap,original_user_turn:x.text,
    independent_source_update:source?.event_id||null,expected_behavior:x.expected,
    reality:{response_id:live.intelligence.response_id,original_model_answer:rawReality,
     displayed_answer:published,raw_answer_sha256:sha(rawReality),
+    retry_model_answer:retryReality,
+    focus_repair:live.reliability.focus_repair||null,
     cognitive_mode:live.intelligence.mode,
     generator_calls:generated.length,extractor_calls:realityCalls.filter(c=>c.kind==='QUOTE_EXTRACTOR').length,
     source_evaluation:live.reliability.evaluation_status,
