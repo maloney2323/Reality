@@ -11,6 +11,7 @@ import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
 import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverage-v0.1.js';
+import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation } from './reality-goal-governance-contract-v0.1.js';
 import {
  projectGoalStateContract,projectGoalTransitionContract,
  projectAssistantGoalProposal,enforceGoalTransitionBoundary,
@@ -645,6 +646,7 @@ export async function runLiveIntelligenceOrchestration({
       goal_drift_coverage:goalDriftCoverage,
     }:null,
   };
+  const initialAssistantProposalText=String(modelResult?.answer||'');
   // Meaning-first correction. Never accept a candidate because its keyword
   // flags went away: regenerate ONCE, then review source claims and objective
   // again. All semantic judgments remain provisional, not verified world truth.
@@ -1084,6 +1086,59 @@ export async function runLiveIntelligenceOrchestration({
     });
   }
 
+  // Pre-output governance: a reviewer may interpret assistant drift but
+  // cannot make a model suggestion into a user goal or execution permission.
+  const goalGovernanceContract=buildAssistantGoalGovernance({
+    canonicalFrame:canonicalEpistemicFrame,
+    modelAnswer:initialAssistantProposalText,
+    finalAnswer:String(modelResult?.answer||''),
+    modelResponseId:modelResult?.response_id||null,
+    semanticReview:semanticFirst?.review||null,
+    observedAt:observedAt||new Date().toISOString(),
+  });
+  const goalGovernanceDecision=verifyGoalGovernanceBeforeStateMutation({
+    contract:goalGovernanceContract,canonicalFrame:canonicalEpistemicFrame,
+  });
+  let goalGovernanceReceipt=null;
+  if(continuityRuntime?.enabled){
+    const receipt=await continuityRuntime.appendStage({
+      stage:'VERIFICATION',
+      entityId:'goal-governance:'+governedSignal.packet.packet_id,
+      eventId:'goal-governance:'+continuityRuntime.spine.continuity_root_id+':'+governedSignal.packet.packet_id,
+      epistemicStatus:'UNVERIFIED',
+      evidenceRefs:[epistemicFrameReceipt.source_receipt_id,
+        continuousReliability?.receipt_id].filter(Boolean),
+      payload:{
+        event_type:'MODEL_GOAL_PROPOSAL_GOVERNANCE',
+        canonical_frame_receipt_id:epistemicFrameReceipt.source_receipt_id,
+        canonical_frame_hash:canonicalEpistemicFrame.frame_hash,
+        goal_governance_contract:goalGovernanceContract,
+        goal_governance_decision:goalGovernanceDecision,
+        semantic_goal_reviewer_response_id:semanticFirst?.response_id||null,
+        final_response_is_independently_goal_verified:false,
+        source_speaker_is_not_execution_authority:true,
+        external_action_executed:false,
+      },
+      provenance:{source:'reality_existing_continuity_and_integrity_goal_contract'},
+    });
+    const readback=await continuityRuntime.readback();
+    if(!readback.some(e=>e.event_id===receipt.event_id&&
+       e.payload?.goal_governance_contract?.contract_hash===goalGovernanceContract.contract_hash&&
+       e.payload?.canonical_frame_hash===canonicalEpistemicFrame.frame_hash))
+      throw Error('GOAL_GOVERNANCE_RECEIPT_READBACK_INVALID');
+    goalGovernanceReceipt=receipt.event_id;
+  }
+  reliabilityWithExtraction.goal_governance={
+    status:goalGovernanceDecision.status,
+    review_disposition:goalGovernanceContract.verification_disposition,
+    candidate_goal_mutations:goalGovernanceContract.assistant_proposal.intended_state_mutations.goal_mutations.length,
+    original_proposal_id:goalGovernanceContract.assistant_proposal.proposal_id,
+    canonical_frame_hash:canonicalEpistemicFrame.frame_hash,
+    governance_receipt_id:goalGovernanceReceipt,
+    state_mutation_executed:false,
+    external_execution_authorized:false,
+    independently_verified_goal_alignment:false,
+  };
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
     continuity_spine: {
