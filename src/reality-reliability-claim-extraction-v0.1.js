@@ -157,7 +157,24 @@ export async function extractReliabilityClaims({
       original_quote:claim.quote,
     });
   }
-  const actions=parsed.actions.filter(a=>a.assertion==='AFFIRMED').map((a,i)=>({
+  // Field-test regression (adversarial turn 4): a model extractor once
+  // transformed "No attempt to publish ... has been made" into an AFFIRMED
+  // completed external action. A denied action MUST NOT become completion
+  // evidence merely because a probabilistic extractor mislabeled assertion.
+  // On ambiguity, preserve the quote for review; do not grant execution.
+  const explicitActionDenial=q=>
+    /\\bno\\s+attempt\\s+to\\b|\\b(?:did|does|do|has|have|had|was|were|is|are|will|would)\\s+not\\s+(?:(?:been|yet|actually)\\s+){0,2}(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed|complete|completed)\\b|\\b(?:not|never)\\s+(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed)\\b/i.test(q);
+  const safeActions=[];
+  for(const a of parsed.actions){
+    if(a.assertion!=='AFFIRMED')continue;
+    if(explicitActionDenial(a.quote)){
+      unadjudicated.push({key:'external_action',reason:'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION',
+        quote:a.quote.slice(0,200)});
+      continue;
+    }
+    safeActions.push(a);
+  }
+  const actions=safeActions.map((a,i)=>({
     action_id:'model-claim:'+String(i),action_type:a.action_type,
     target:a.target,status:a.status,authority_ref:null,
     verification_ref:null,original_quote:a.quote,
