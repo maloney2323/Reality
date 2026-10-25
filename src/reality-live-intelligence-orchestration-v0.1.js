@@ -109,15 +109,16 @@ function extractGitHubIssueProposal(answer) {
 }
 
 function materialityFromSignal(signal) {
-  const fragments = (signal?.fragments || []).map((f) => f.cleaned_text || '');
-  const actionableText = fragments
-    .filter((text) => !isExplicitlyProhibitedFragment(text))
-    .join('\n')
-    .toLowerCase();
-
-  return /\b(create|execute|send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(actionableText)
-    ? 'ACTION_CANDIDATE'
-    : 'CONVERSATIONAL';
+  // The Cleaner owns quote scope. External quoted instructions are not
+  // user requests. Materiality indicates review risk, NOT execution authority.
+  const candidate=(signal?.fragments||[]).some(f=>{
+    const direct=f.intake_observation?.markers;
+    if(direct)return direct.direct_action_cue_present&&!direct.explicit_prohibition;
+    const text=f.cleaned_text||'';
+    return !isExplicitlyProhibitedFragment(text)&&
+      /\b(create|execute|send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/i.test(text);
+  });
+  return candidate?'ACTION_CANDIDATE':'CONVERSATIONAL';
 }
 
 export async function runLiveIntelligenceOrchestration({
@@ -256,6 +257,7 @@ export async function runLiveIntelligenceOrchestration({
   const cognitionContext = {
     ...(systemContext || {}),
     reliability_grounding:reliabilityGrounding,
+    signal_intake:governedSignal.intake_semantics||null,
     current_turn_alignment:preCognitionAlignment?.capsule||null,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',

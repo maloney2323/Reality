@@ -1,0 +1,51 @@
+name: Reality Signal Cleaner v1 — Intake Integrity and Existing Loop
+on:
+  push:
+    branches:
+      - experiment/reality-signal-cleaner-v1-20261025
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  cleaner-contract-and-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax validation
+        run: |
+          node --check src/reality-governed-fragmented-signal-cleaner-v0.1.js
+          node --check src/reality-model-gateway-v0.1.js
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+      - name: Test upgraded intake and existing operational recovery path, no provider calls
+        run: |
+          node --test test/reality-signal-cleaner-v1.0.test.js \
+            test/reality-governed-fragmented-signal-cleaner-v0.1.test.js \
+            test/reality-model-gateway-v0.1.test.js \
+            test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-repair-the-loop-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js
+      - name: Actual Take Intelligence GitHub signal intake (read-only, zero model tokens)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/audit-reality-real-business-intake-v1.mjs
+      - name: Preserve only digests, markers, source offsets, no PR text
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-signal-cleaner-v1-real-business-readonly-evidence
+          path: benchmark-results/reality-signal-cleaner-v1-real-business.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Privacy and release boundary
+        if: always()
+        run: |
+          echo 'No model API calls or business actions performed.'
+          echo 'Experimental branch only, not promoted to production.'
