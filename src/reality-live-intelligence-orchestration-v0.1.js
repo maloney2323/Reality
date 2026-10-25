@@ -384,6 +384,7 @@ export async function runLiveIntelligenceOrchestration({
       }
       semanticFirst=await reviewRealityAnswer({
         cleanerConversationContext,
+        conversationEvidence:authenticatedConversationContinuity.conversation_evidence||null,
         currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
@@ -513,6 +514,7 @@ export async function runLiveIntelligenceOrchestration({
         });
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
+          conversationEvidence:authenticatedConversationContinuity.conversation_evidence||null,
           currentUserMessage:message,
           modelAnswer:String(retry.answer||''),
           sourceSnapshot:semanticSourceSnapshot,
