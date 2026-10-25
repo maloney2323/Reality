@@ -74,7 +74,7 @@ function quoteRanges(text){
   if(open)add(text.length,false);
   return result;
 }
-const actionVerb='(?:send|email|dispatch|approve|purchase|buy|pay|transfer|deploy|merge|delete|publish|post|cancel|schedule|execute|write|change)';
+const actionVerb='(?:create|send|reply|email|dispatch|approve|purchase|buy|pay|transfer|deploy|merge|delete|publish|post|cancel|schedule|execute|update|write|change)';
 function observe(text){
   const quotes=quoteRanges(text),chars=text.split('');
   for(const q of quotes)for(let i=q.start;i<q.end;i++)chars[i]=' ';
