@@ -306,3 +306,26 @@ test('real-business scope: an unsupported customer-live assertion is corrected t
   }finally{restoreSemantic()}
  });
 });
+
+test('a clean semantic opinion with zero source-compared claims cannot masquerade as verified truth',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const stub=semanticCallStub(f,{
+    draft:'GitHub records do not establish whether the application was deployed.',
+    first:review({}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Do these records prove this application is deployed?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.reliability.evaluation_status,
+    'SEMANTIC_REVIEW_WITHOUT_SOURCE_COMPARABLE_ASSERTIONS');
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.reliability.semantic_review.issues.length,0);
+   assert.equal(got.reliability.semantic_review.independent_semantic_adjudication,false);
+  }finally{restoreSemantic()}
+ });
+});
