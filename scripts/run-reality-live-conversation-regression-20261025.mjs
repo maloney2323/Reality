@@ -109,7 +109,22 @@ const prompts=[
   "Give me a compact final handoff covering what we actually know versus only heard: CX-204 QC hold, alleged pallet delivery, CX-205 document, invoice 8841 payment, software pull-request deployment claim, and cancellation scope. What internal work can continue? Do not infer an outside action was completed."},
 ];
 const all=[...prior],results=[];
-for(let i=0;i<prompts.length;i++){
+const resumedReader=await runtime(LIVE,'Read saved actual-model benchmark output before new provider calls.');
+const committed=(await resumedReader.readback())
+ .filter(x=>x.payload?.benchmark_kind==='GENUINE_LLM_CONVERSATION_COMPARISON'&&
+  x.payload?.run_id==='real-conversation-proof-20261025-a')
+ .sort((a,b)=>a.payload.turn-b.payload.turn);
+if(committed.length>prompts.length)throw Error('BENCHMARK_RECEIPT_OVERFLOW');
+for(let i=0;i<committed.length;i++){
+ const event=committed[i],stored=event.payload;
+ if(stored.turn!==i+1||stored.source_prompt!==prompts[i].text||
+    !stored.underlying_first_answer||!stored.reality_released_answer)
+  throw Error('BENCHMARK_RESUME_MISMATCH');
+ results.push({...stored,receipt_id:event.event_id});
+ all.push({role:'user',text:stored.source_prompt,source_ref:event.event_id+':user'});
+ all.push({role:'assistant',text:stored.reality_released_answer,source_ref:event.event_id+':assistant'});
+}
+for(let i=committed.length;i<prompts.length;i++){
  const obj=prompts[i],prevCalls=calls.length,observedAt=now();
  const live=await runLiveIntelligenceOrchestration({
   message:obj.text,observedAt,model:'gpt-4.1-mini',apiKey,
