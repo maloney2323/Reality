@@ -1,0 +1,61 @@
+name: Reality Evidence Release — One Real Model Case
+on:
+  push:
+    branches:
+      - experiment/reality-semantic-release-evidence-20261025
+    paths:
+      - '.github/workflows/reality-semantic-release-onecase.yml'
+      - 'scripts/run-reality-semantic-release-onecase.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check test runner and offline evidence release
+        run: |
+          node --check scripts/run-reality-semantic-release-onecase.mjs
+          node --test test/reality-unified-semantic-review-v0.1.test.js
+  bounded-real-provider:
+    needs: preflight
+    if: contains(github.event.head_commit.message, '[live-evidence-release-trial]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      REALITY_REAL_HISTORY_CASES: '4'
+      REALITY_SEMANTIC_REVIEW_MODEL: gpt-4.1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Real GitHub evidence, one Reality-only model case with original and final receipts
+        run: node scripts/run-reality-semantic-release-onecase.mjs
+      - name: Preserve complete original answer, final answer, and unresolved review receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-one-case-evidence-release-proof
+          path: benchmark-results/reality-semantic-release-onecase.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Scope disclosure
+        if: always()
+        run: |
+          echo 'One Reality-only real-model case; original and final are recorded.'
+          echo 'Real Github history but in-loop continuity is a database mock.'
+          echo 'No standalone baseline, production changes, or customer actions.'
+          echo 'No independent real-world reliability accuracy claim.'
