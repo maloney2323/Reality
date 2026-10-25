@@ -4,6 +4,8 @@
 // Two independent Node processes; truth correction is source-attested.
 // No email, deployment, customer access, real business execution or baseline.
 import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {renderBenchmarkReportPage} from '../src/reality-benchmark-report-page-v0.1.js';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {buildGovernedChatSignal} from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
@@ -285,7 +287,7 @@ async function report(){
  const changed=hist.filter(x=>x.payload.response_altered).length;
  const totalCalls=hist.reduce((n,x)=>n+x.payload.paid_model_requests,0);
  const withIssues=hist.filter(x=>x.payload.semantic_issue_kinds.length>0).length;
- console.log('DURABLE_REALITY_SCOREBOARD '+JSON.stringify({
+ const scoreboard={
   status:'COMPLETE_NOT_INDEPENDENTLY_SEMANTIC_SCORED',run_id:RUN_ID,model:MODEL,
   turns:total,original_smoke_matches:originalMatches,reality_smoke_matches:realityMatches,
   original_smoke_misses:total-originalMatches,reality_smoke_misses:total-realityMatches,
@@ -296,7 +298,11 @@ async function report(){
   external_actions:0,
   measured_customer_hallucination_rate:null,measured_drift_reduction_rate:null,
   note:'Lexical smoke probes only. All source-sensitive semantic scores require human adjudication.',
- }));
+ };
+ await mkdir('public',{recursive:true});
+ await writeFile('public/index.html',renderBenchmarkReportPage({score:scoreboard,turns:hist.map(x=>x.payload)}),'utf8');
+ console.log('DURABLE_REALITY_SCOREBOARD '+JSON.stringify(scoreboard));
+ console.log('DURABLE_REALITY_PREVIEW_REPORT_WRITTEN public/index.html');
 }
 if(phase==='run'){
  for(const step of ['first','second','report'])
