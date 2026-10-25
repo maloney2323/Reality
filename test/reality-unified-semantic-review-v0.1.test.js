@@ -659,6 +659,13 @@ test('user-goal trajectory drift enters existing repair and Continuity receipt; 
     x.classification==='CONVERSATION_TOPIC_DRIFT_CANDIDATE'&&
     x.detector_channel==='EXISTING_SEMANTIC_CONVERSATION_REVIEW'));
    assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   const coverage=got.reliability.conversational_assessment.goal_drift_coverage;
+   assert.equal(coverage.status,'DRIFT_CANDIDATES_REQUIRE_ADJUDICATION');
+   assert.equal(coverage.independently_verified_drift_rate,null);
+   assert.equal(coverage.candidate_count_zero_means_drift_free,false);
+   const durable=f.events.find(e=>e.payload?.event_type==='MODEL_OUTPUT_ASSESSMENT');
+   assert.equal(durable.payload.conversational_drift.coverage.goal_drift_coverage.status,
+     'DRIFT_CANDIDATES_REQUIRE_ADJUDICATION');
    const modelReq=stub.calls.find(x=>x.mode==='MODEL');
    assert.ok(JSON.stringify(modelReq.request).includes('user_goal_trajectory'));
    assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
