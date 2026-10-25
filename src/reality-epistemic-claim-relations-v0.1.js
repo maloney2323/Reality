@@ -96,7 +96,7 @@ const inferredTransitions=[
   observed:/\b(?:unsigned|anonymous|unattribut(?:ed|able)|redacted|forwarded|unverified)\b.{0,45}\b(?:screenshot|text|photo|message|email|note)\b/i,
   outcome:/\b(?:customer|client|homeowner|owner)\b.{0,45}\b(?:approv(?:ed|al)|accept(?:ed|ance)|consent|sign(?:ed|off))\b/i},
 ];
-const connector=/\b(?:and\s+therefore|therefore|thus|hence|so|which\s+(?:confirms?|proves?|shows?|means?|establishes?|indicates?)|means?|confirms?|proves?)\b/i;
+const connector=/\b(?:and\s+therefore|therefore|thus|hence|so|which\s+(?:confirms?|proves?|shows?|means?|establishes?|indicates?)|means?|confirms?|proves?|confirming|proving|establishing)\b/i;
 function unsupportedInferences(answer,{continuityRootId,modelResponseId,refs,currentUserSourceRef}){
  const candidates=[];
  for(const m of answer.matchAll(/[^.!?\n]{16,300}/g)){
