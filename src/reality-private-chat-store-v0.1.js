@@ -57,3 +57,21 @@ export async function recordPrivateMessage(session,{conversationId,requestId,rol
  if(rows.length!==1||!validUuid(rows[0].id))throw Error('CHAT_WRITE_READBACK_FAILED');
  return {source_ref:'supabase:reality_chat_messages:'+rows[0].id};
 }
+
+
+export async function listPrivateConversations(session,{fetchImpl=fetch}={}){
+ const q='?select=conversation_id,created_at,role,content'+
+  '&user_id=eq.'+encodeURIComponent(session.user_id)+
+  '&order=created_at.desc&limit=500';
+ const rows=await storageRequest(session,q,{fetchImpl});
+ const unique=new Map();
+ for(const row of rows){
+  if(!validUuid(row.conversation_id)||typeof row.content!=='string')throw Error('CHAT_LIST_ROW_INVALID');
+  if(!unique.has(row.conversation_id))unique.set(row.conversation_id,{
+   conversation_id:row.conversation_id,
+   last_message:row.content.slice(0,72),
+   last_message_at:row.created_at,
+  });
+ }
+ return Array.from(unique.values()).slice(0,50);
+}
