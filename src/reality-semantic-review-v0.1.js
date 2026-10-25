@@ -52,7 +52,7 @@ function textOf(data){
    .map(x=>x.text).join('');
 }
 const jsonSchema={
- type:'object',additionalProperties:false,required:['addresses_current_request','issues','claims','actions','provenance_checks','goal_trajectory_review'],
+ type:'object',additionalProperties:false,required:['addresses_current_request','issues','claims','actions','provenance_checks','goal_trajectory_review','goal_lifecycle_review'],
  properties:{
    addresses_current_request:{type:'boolean'},
    issues:{type:'array',items:{type:'object',additionalProperties:false,
@@ -79,6 +79,19 @@ const jsonSchema={
          'INSUFFICIENT_EVIDENCE']},
        answer_quote:{type:'string'},reason:{type:'string'},
      }},
+   // Semantics proposed by SAME existing reviewer; deterministic continuity
+   // admits only source-anchored USER evidence and never marks outcome verified.
+   goal_lifecycle_review:{type:'object',additionalProperties:false,
+     required:['relation','speaker','target_goal_source_ref','source_quote','reason'],
+     properties:{
+       relation:{type:'string',enum:[
+         'NO_LIFECYCLE_CHANGE','CONVERSATIONAL_EXIT',
+         'USER_REPORTED_BUSINESS_COMPLETION','USER_REQUESTED_ABANDONMENT',
+         'ASSISTANT_PROPOSED_COMPLETION','UNCLEAR']},
+       speaker:{type:'string',enum:['CURRENT_USER','ASSISTANT','NONE','UNCLEAR']},
+       target_goal_source_ref:{type:'string'},
+       source_quote:{type:'string'},reason:{type:'string'},
+     }},
    provenance_checks:{type:'array',items:{type:'object',additionalProperties:false,
      required:['source_ref','clause_id','relation','answer_quote','verified_source_ref','reason'],
      properties:{
@@ -102,7 +115,7 @@ function isProspectiveAdviceQuote(quote){
  return clauses.length>0&&clauses.every(c=>
   ['TASK_REQUEST_CANDIDATE','PROHIBITION_CANDIDATE','CONSTRAINT_CANDIDATE'].includes(c.kind));
 }
-function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalTrajectory=null){
+function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalTrajectory=null,currentUserMessage=''){
  if(!parsed||typeof parsed!=='object'||typeof parsed.addresses_current_request!=='boolean'||
     !Array.isArray(parsed.issues)||!Array.isArray(parsed.claims)||!Array.isArray(parsed.actions)||
     parsed.issues.length>10||parsed.claims.length>20||parsed.actions.length>8)
@@ -168,6 +181,59 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
            goal.goal_source_ref+': '+goal.reason.slice(0,250)+
            ' This is a reviewer candidate, not independent truth.'});
    }
+ }
+ // Lifecycle interpretation is an untrusted candidate, not an authorized
+ // mutation. Prove source quote, current speaker and target identity first.
+ const lc=parsed.goal_lifecycle_review;
+ const recognized=['CONVERSATIONAL_EXIT','USER_REPORTED_BUSINESS_COMPLETION',
+   'USER_REQUESTED_ABANDONMENT','ASSISTANT_PROPOSED_COMPLETION'];
+ const knownTargets=new Set([
+   goalTrajectory?.original_user_goal_candidate?.source_ref,
+   goalTrajectory?.working_goal_lifecycle?.working_goal?.source_ref,
+   goalTrajectory?.working_goal_lifecycle?.preserved_original_goal?.source_ref,
+   ...(goalTrajectory?.working_goal_lifecycle?.paused_goal_candidates||[])
+     .map(x=>x.source_ref),
+ ].filter(Boolean));
+ const currentSource=goalTrajectory?.current_user_direction?.source_ref;
+ const explicit=lc&&recognized.includes(lc.relation);
+ const validRel=lc&&['NO_LIFECYCLE_CHANGE',...recognized,'UNCLEAR'].includes(lc.relation);
+ const validSpeaker=lc&&['CURRENT_USER','ASSISTANT','NONE','UNCLEAR'].includes(lc.speaker);
+ const linked=lc&&(!explicit||knownTargets.has(lc.target_goal_source_ref));
+ const quoteValid=lc&&typeof lc.source_quote==='string'&&(
+   lc.speaker==='CURRENT_USER'
+      ?Boolean(lc.source_quote&&currentUserMessage.includes(lc.source_quote))
+      :lc.speaker==='ASSISTANT'
+       ?Boolean(lc.source_quote&&answer.includes(lc.source_quote))
+       :!lc.source_quote);
+ const speakerValid=lc&&(!explicit||
+   (lc.relation==='ASSISTANT_PROPOSED_COMPLETION'
+     ?lc.speaker==='ASSISTANT'
+     :lc.speaker==='CURRENT_USER'&&valid(currentSource)));
+ let goalLifecycleReview={
+   status:'NOT_SEMANTICALLY_RECONCILED',
+   relation:'UNCLEAR',authorization_state:'UNVERIFIED',
+   business_outcome_verified:false,goal_mutation_authorized:false,
+   action_execution_authorized:false,
+ };
+ if(validRel&&validSpeaker&&linked&&quoteValid&&speakerValid&&
+    valid(lc.reason)&&
+    (!explicit||valid(lc.target_goal_source_ref))){
+   goalLifecycleReview={
+    status:explicit?'SOURCE_LINKED_REVIEWER_CANDIDATE':
+       'NO_LIFECYCLE_TRANSITION_ASSESSED',
+    relation:lc.relation,speaker:lc.speaker,
+    target_goal_source_ref:lc.target_goal_source_ref,
+    // No reviewer can attest third-party business outcomes.
+    current_user_source_ref:lc.speaker==='CURRENT_USER'?currentSource:null,
+    source_quote:lc.source_quote.slice(0,250),
+    reason:lc.reason.slice(0,350),
+    authorization_state:'REVIEWER_INTERPRETATION_ONLY',
+    business_outcome_verified:false,goal_mutation_authorized:false,
+    action_execution_authorized:false,
+   };
+ }else{
+   unassessed.push({key:'goal_lifecycle',
+     reason:'LIFECYCLE_RELATION_UNRESOLVED_OR_SOURCE_NOT_LINKED'});
  }
  const claims=[],relevantKeys=[];
  // A typed source candidate must receive an explicit per-claim assessment.
@@ -294,6 +360,7 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
      provenance_claims_expected:expected.size,
      provenance_claims_assessed:checks.length,
      goal_trajectory_review:goalTrajectoryReview,
+     goal_lifecycle_review:goalLifecycleReview,
      source_fact_count:records.size,
      independent_semantic_adjudication:false,external_action_authorized:false,
    },
@@ -341,6 +408,7 @@ export async function reviewRealityAnswer({
    'The cleaner_conversation_context preserves source-linked user intent interpretations, not verified external facts or authority.',
    'Use its exact clauses, negation, conditions, dependencies and source references to check scope and obligations across turns.',
    'PRIMARY GOAL-TRAJECTORY CHECK: compare user_goal_trajectory.original_user_goal_candidate, working_goal_lifecycle, recent_user_directions, current_user_direction and observed assistant behavior against the proposed answer. The lifecycle is a PROVISIONAL reconstruction from older user-source-linked reviews: it is not verified user intent. The current user request overrides an older provisional working goal when the user unambiguously changes direction. Treat multiple concurrent goals as potentially distinct, not one topic string. A temporary detour is a candidate child objective; a pivot is a candidate alternate objective and does not itself permanently abandon prior work. Do not assume any goal was COMPLETED or ABANDONED merely because an assistant said the work was done; those lifecycle states require separately reconciled user evidence. For USER_AUTHORIZED_PIVOT and USER_AUTHORIZED_DETOUR, goal_source_ref MUST identify the CURRENT USER turn that requests the change. For USER_RETURNED_TO_OBJECTIVE, goal_source_ref MUST identify the EARLIER USER goal being resumed (not merely the current turn); if its target cannot be established, choose UNCLEAR and INSUFFICIENT_EVIDENCE rather than pretending to resume a specific goal. A topic shift proposed by an earlier assistant NEVER proves user authorization. Check the semantic trajectory of the assistant recommendation, not just topical nouns. Output goal_trajectory_review for EVERY answer. Only flag assistant-led diversion actually present in the answer, using the exact answer_quote and a USER source_ref. Preserve ambiguity when a user-directed change or supersession is unclear. No semantic review can grant external action authorization. For an aligned answer leave answer_quote empty.',
+   'GOAL LIFECYCLE SEMANTICS: return one goal_lifecycle_review for the CURRENT turn: distinguish CONVERSATIONAL_EXIT (finished discussing, not finished work), USER_REPORTED_BUSINESS_COMPLETION (user claims work happened; external result NOT verified), USER_REQUESTED_ABANDONMENT (explicitly wants to stop the identified goal), ASSISTANT_PROPOSED_COMPLETION (assistant implies a goal is finished without current user evidence), NO_LIFECYCLE_CHANGE or UNCLEAR. Require target_goal_source_ref of an EXISTING earlier user goal from user_goal_trajectory; never pick a random task. Require source_quote exactly copied from CURRENT USER input for user-origin events, or from proposed answer for assistant-origin claims. For no change use empty source_quote. A user report never provides external outcome proof. Ending a chat topic does not complete the business task. An assistant proposal can never change user goal state. Ambiguous target => UNCLEAR, not a guessed status.',
    'PRIMARY CONVERSATION CHECK: compare the proposed answer against conversation_source_history.user_statements, the current user message, and source-linked Cleaner context. Did the assistant change an earlier user condition, contradict a later correction, swap an entity or status, answer the previous topic, or assert completion not stated? If yes, return FACT_CONTRADICTION, FORGOTTEN_OBLIGATION, WRONG_TASK or FALSE_COMPLETION with the EXACT contradictory answer quote, and cite the earlier user source_ref in the reason. Never silently call that answer consistent.',
    'Important: AUTHENTICATED_USER_STATEMENT means verified provenance of what the user said, not truth of an external event. An unverified delivery or payment is UNKNOWN; do not promote it to DELIVERED/PAID or to NOT DELIVERED/UNPAID without evidence. A hold on shipping does not bar internal drafting. Later explicit user corrections may supersede older wording in the same scope.',
    'If historical evidence is truncated, assess only what is supported by supplied conversation, and state coverage limitations in the review; no findings is not proof of correctness.',
@@ -405,7 +473,7 @@ export async function reviewRealityAnswer({
    ':'+String(body.error?.code||'UNKNOWN').slice(0,60));
  let parsed;
  try{parsed=JSON.parse(textOf(body));}catch{throw Error('SEMANTIC_REVIEW_NOT_JSON');}
- const normalized=validate(parsed,modelAnswer,sourceSnapshot,worldId,conversationEvidence,userGoalTrajectory);
+ const normalized=validate(parsed,modelAnswer,sourceSnapshot,worldId,conversationEvidence,userGoalTrajectory,currentUserMessage);
  return Object.freeze({...normalized,
    review:{...normalized.review,
      typed_report_candidates_reviewed:conversationEvidence?.candidates?.length||0,
