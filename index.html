@@ -62,7 +62,29 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
 </section>
 
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><div class="chat">
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><section id="privateChat" style="display:none" class="console-card" aria-label="Persistent private Reality conversation">
+ <div class="label">REALITY · PERSISTENT PERSONAL CONVERSATION (PREVIEW)</div>
+ <h3>Continue the conversation</h3>
+ <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
+ <div id="privateLogin" style="display:none">
+  <label for="privateEmail">Account email</label>
+  <input id="privateEmail" type="email" autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <label for="privatePassword">Password</label>
+  <input id="privatePassword" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <button id="privateSignIn" type="button">Sign in to continuous chat</button>
+ </div>
+ <div id="privateReady" style="display:none">
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+   <button id="privateNew" type="button">New conversation</button>
+   <button id="privateSignOut" type="button">Sign out</button>
+  </div>
+  <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
+  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <button id="privateSend" type="button">Send to Reality</button>
+ </div>
+ <p id="privateStatus" class="muted" role="status"></p>
+</section>
+<div class="chat">
     <div class="bubble user">
       <div class="label">Your request</div>
       <textarea id="request" placeholder="Try: Review unread business emails, identify follow-ups, draft responses, and send them."></textarea>
@@ -312,6 +334,91 @@ $('runShiftNow').onclick=async()=>{
 // authorizes a tool, or runs the cron handler.
 refreshSavedShiftHome();
 setInterval(refreshSavedShiftHome,300000);
+
+(function(){
+ const el=id=>document.getElementById(id);
+ const status=s=>el('privateStatus').textContent=s;
+ const endpoint='/api/reality/personal-session';
+ function conversationId(){
+  let id=localStorage.getItem('reality.private.chat.conversation.v1');
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id)){
+   id=crypto.randomUUID();localStorage.setItem('reality.private.chat.conversation.v1',id);
+  }
+  return id;
+ }
+ function showSignedIn(yes){
+  el('privateLogin').style.display=yes?'none':'block';
+  el('privateReady').style.display=yes?'block':'none';
+ }
+ function bubble(role,text){
+  const node=document.createElement('div');
+  node.className='bubble '+(role==='user'?'user':'');
+  const head=document.createElement('div');head.className='label';
+  head.textContent=role==='user'?'YOU':'REALITY';
+  const body=document.createElement('div');body.style.whiteSpace='pre-wrap';
+  body.textContent=String(text||'');
+  node.append(head,body);el('privateTranscript').append(node);
+ }
+ async function loadSaved(){
+  const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
+  el('privateTranscript').replaceChildren();
+  for(const message of data.messages||[])bubble(message.role,message.text);
+  status((data.messages?.length||0)+' saved messages restored'+
+   (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
+  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+ }
+ async function init(){
+  try{
+   const r=await fetch(endpoint,{cache:'no-store'});
+   if(r.status===404)return; // Preview-only feature; production remains unchanged.
+   el('privateChat').style.display='block';
+   if(!r.ok)throw Error('Private conversation service is unavailable.');
+   const data=await r.json();
+   showSignedIn(data.authenticated===true);
+   if(data.authenticated)await loadSaved();
+   else status('Sign in with your existing Supabase account to resume your conversation.');
+  }catch(e){if(el('privateChat').style.display==='block')status(e.message)}
+ }
+ el('privateSignIn').onclick=async()=>{
+  el('privateSignIn').disabled=true;status('Checking account…');
+  try{
+   const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
+   el('privatePassword').value='';showSignedIn(true);await loadSaved();
+  }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
+ };
+ el('privateSignOut').onclick=async()=>{
+  el('privateSignOut').disabled=true;
+  try{
+   await fetch(endpoint,{method:'DELETE'});
+   el('privateTranscript').replaceChildren();showSignedIn(false);status('Signed out.');
+  }catch(e){status(e.message)}finally{el('privateSignOut').disabled=false}
+ };
+ el('privateNew').onclick=async()=>{
+  if(!confirm('Start a new conversation? The previous one remains saved under its earlier conversation ID.'))return;
+  localStorage.setItem('reality.private.chat.conversation.v1',crypto.randomUUID());
+  el('privateTranscript').replaceChildren();status('New conversation ready.');
+ };
+ el('privateSend').onclick=async()=>{
+  const value=el('privatePrompt').value.trim();if(!value)return;
+  el('privateSend').disabled=true;status('Reality is working with saved context…');
+  try{
+   const r=await fetch('/api/reality/personal-chat',{method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:conversationId(),request_id:crypto.randomUUID(),message:value})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
+   el('privatePrompt').value='';
+   await loadSaved();
+   status((data.continuity?.recovered_messages||0)+' source-linked messages · Response persisted'+
+    (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':''));
+  }catch(e){status(e.message+' · Saved user messages may still be recoverable.');}
+  finally{el('privateSend').disabled=false}
+ };
+ init();
+})();
+
 </script>
 </body>
 </html>
