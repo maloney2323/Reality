@@ -145,7 +145,9 @@ export function assessCurrentTurnFocusV02({capsule,modelAnswer}={}){
  const aligned=expected.filter(x=>actual.includes(x));
  const missing=expected.filter(x=>!actual.includes(x));
  const current=String(capsule.PRIMARY_OBJECTIVE?.original_current_user_request||'');
- const wantsForeman=/\bforeman\b/i.test(current);
+ // Mentioning a foreman as context does not oblige us to repeat that word.
+ // Require foreman-targeted communication only for explicit communication tasks.
+ const wantsForeman=/(?:\b(?:tell|inform|notify|message|communicate|respond to)\b.{0,80}\bforeman\b|\bforeman\b.{0,80}\b(?:tell|inform|notify|message|communicate|respond)\b)/i.test(current);
  const addressesForeman=!wantsForeman ||
   /\b(?:foreman|tell (?:him|them)|inform|communicat|notify|explain to)\b/i.test(modelAnswer);
  const candidateCodes=[
