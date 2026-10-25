@@ -25,6 +25,7 @@ jobs:
           node --check scripts/run-reality-structured-provenance-recheck-v0.1.mjs
           node --check scripts/run-reality-canonical-live-smoke-v0.1.mjs
           node --check scripts/run-reality-cold-chain-independent-v0.1.mjs
+          node --check scripts/run-reality-authentic-conversation-regression-v0.1.mjs
           node --check scripts/run-reality-live-conversation-regression-20261025.mjs
           node --check src/reality-live-intelligence-orchestration-v0.1.js
           node --check src/reality-source-review-adjudication-v0.1.js
