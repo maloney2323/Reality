@@ -17,7 +17,7 @@ const RULES=[
   keys:['dispatch_approval','inspection_wr41']},
  {id:'purchases',re:/\b(?:order|ordering|buy|purchase|material|inventory|stock)\b/i,
   keys:['materials_purchase_approval']},
- {id:'inspection',re:/\b(?:inspect|inspection|permit|city|wr[- ]?41|site board|status|hold)\b/i,
+ {id:'inspection',re:/\b(?:inspect|inspection|permit|city|wr[- ]?41|site board|municipal)\b/i,
   keys:['inspection_wr41']},
  {id:'cabinets',re:/\b(?:cabinet|color|colour|blue|finish)\b/i,
   keys:['cabinet_color']},
@@ -132,5 +132,37 @@ export function buildSelectiveCognitiveAlignmentV02({
   prior_user_rules_coverage_limited:old.unreviewed_older_anchor_count>0,
   causal_performance_not_yet_verified:true,
   capsule:Object.freeze({...capsule,capsule_hash:sha(capsule)}),
+ });
+}
+
+// BOUNDED post-answer current-turn relevance check; supplements existing
+// Integrity Spine without turning lexical checks into semantic verdicts.
+export function assessCurrentTurnFocusV02({capsule,modelAnswer}={}){
+ if(capsule?.version!==SELECTIVE_ALIGNMENT_VERSION ||!str(modelAnswer))
+  throw Error('SELECTIVE_ALIGNMENT_RESPONSE_REQUIRED');
+ const expected=capsule.PRIMARY_OBJECTIVE?.active_topics||[];
+ const actual=RULES.filter(r=>r.re.test(modelAnswer)).map(r=>r.id);
+ const aligned=expected.filter(x=>actual.includes(x));
+ const missing=expected.filter(x=>!actual.includes(x));
+ const current=String(capsule.PRIMARY_OBJECTIVE?.original_current_user_request||'');
+ const wantsForeman=/\bforeman\b/i.test(current);
+ const addressesForeman=!wantsForeman ||
+  /\b(?:foreman|tell (?:him|them)|inform|communicat|notify|explain to)\b/i.test(modelAnswer);
+ const candidateCodes=[
+  ...(expected.length&&aligned.length===0?['CURRENT_TASK_TOPIC_NOT_ADDRESSED_CANDIDATE']:[]),
+  ...(wantsForeman&&!addressesForeman?['CURRENT_ENTITY_RESPONSE_MISSING_CANDIDATE']:[]),
+ ];
+ return Object.freeze({
+  version:SELECTIVE_ALIGNMENT_VERSION,
+  current_turn_source_ref:capsule.PRIMARY_OBJECTIVE?.source_ref,
+  expected_topic_ids:expected,observed_answer_topic_ids:actual,
+  covered_topic_ids:aligned,missing_topic_ids:missing,
+  candidate_codes:candidateCodes,
+  status:expected.length===0?'INSUFFICIENT_DOMAIN_SIGNAL':
+   candidateCodes.length?'CURRENT_TURN_ALIGNMENT_REVIEW':
+   missing.length?'PARTIAL_TOPIC_COVERAGE_REVIEW':'LIMITED_CURRENT_TURN_CHECK_NO_FLAG',
+  assessment_scope:'BOUNDED_LEXICAL_AND_ENTITY_COVERAGE_NOT_SEMANTIC_GROUND_TRUTH',
+  independent_error_adjudication:false,
+  action_authority_granted:false,
  });
 }
