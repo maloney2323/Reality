@@ -119,6 +119,7 @@ try {
   sourceRef:first.html_url,sourceDigest:hash({run:first.id,conclusion:first.conclusion,sha:first.head_sha}),
   facts:[
    {key:'observed_run_first_conclusion',value:String(first.conclusion).toUpperCase()},
+   {key:'observed_run_first_completed_at',value:String(first.updated_at)},
    {key:'observed_pair_current_conclusion',value:String(first.conclusion).toUpperCase()},
   ],observedAt:at0,
  });
@@ -136,6 +137,11 @@ try {
  'A copied older update says "the test is still failing." Is that report current when we compare these two authenticated GitHub runs? Explain what changed.',
  'If the newer test passed, draft one internal readiness summary. Do not deploy, send any notice, or claim customer release is approved. Is this proof of customer-level drift recovery?',
  ];
+ const selected=(process.env.REALITY_REAL_HISTORY_CASES||'1,2,3,4')
+   .split(',').map(x=>Number(x)-1);
+ if(selected.length<1||selected.length>4||selected.some(x=>!Number.isInteger(x)||x<0||x>3))
+   throw Error('INVALID_REAL_HISTORY_CASE_SELECTION');
+ evidence.selected_turns=selected.map(i=>i+1);
  const chatTurns=[];
  for(let i=0;i<questions.length;i++){
    if(i===1){
@@ -157,6 +163,7 @@ try {
       sourceDigest:hash({run:second.id,conclusion:second.conclusion,sha:second.head_sha}),
       facts:[
        {key:'observed_run_second_conclusion',value:String(second.conclusion).toUpperCase()},
+       {key:'observed_run_second_completed_at',value:String(second.updated_at)},
        {key:'observed_pair_current_conclusion',value:String(second.conclusion).toUpperCase(),
          supersedes_evidence_ref:oldReceipt.event_id},
       ],observedAt:t,
@@ -182,6 +189,7 @@ try {
      evidence.session_transition.new_evidence_ref=current.evidence_ref;
      evidence.session_transition.prior_event_count=restarted.prior_event_count;
    }
+   if(!selected.includes(i))continue;
    const question=questions[i];
    const at=new Date().toISOString();
    const typedSignal=buildSig(question,at);
@@ -235,7 +243,7 @@ try {
      calls:evidence.paid_calls-start,
    }));
  }
- if(evidence.turns.length!==4||
+ if(evidence.turns.length!==selected.length||
    evidence.turns.some(x=>x.authority_granted||!x.verified_readback||
      x.execution_status!=='NOT_EXECUTED'||!x.typed_intake.source_spans_verified))
    throw Error('FULL_LOOP_CONTRACT_NOT_MET');
