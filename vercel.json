@@ -13,5 +13,6 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "buildCommand": "REALITY_BENCHMARK_MODEL=gpt-4.1-mini node scripts/run-reality-12turn-authentic-continuity-v1.mjs first && mkdir -p public && printf 'Isolated live-model test, first six turns complete\\n' > public/index.html"
 }
