@@ -28,7 +28,8 @@ jobs:
         run: node --check scripts/run-reality-real-model-full-loop-v0.1.mjs
       - name: Existing continuity detector source and live orchestration regressions
         run: |
-          node --test test/reality-live-detector-shadow-v0.1.test.js \
+          node --test test/reality-real-model-failure-replay-v0.1.test.js \
+            test/reality-live-detector-shadow-v0.1.test.js \
             test/reality-live-intelligence-orchestration-v0.1.test.js \
             test/reality-continuous-reliability-v0.1.test.js \
             test/reality-cognition-evidence-contracts-v0.1.test.js
