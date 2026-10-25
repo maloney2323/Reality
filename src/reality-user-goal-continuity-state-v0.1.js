@@ -146,6 +146,9 @@ export function projectProvisionalGoalLifecycle({
   x.goal_evidence_id===goalState.original_user_goal_evidence_id);
  if(!first)throw Error('USER_GOAL_LIFECYCLE_ORIGINAL_SOURCE_NOT_PRESENT');
  let active=first,paused=[],applied=0,ambiguous=0;
+ // Typed, provisional relationships. They are linked to source receipts;
+ // they do not assert that a model's intent reading is user-approved truth.
+ const goalParentCandidates=new Map();
  const transitions=[],assistantAlignmentHistory=[];
  let possibleConsecutiveOffGoalReviews=0;
  for(const e of continuityHistory){
@@ -182,6 +185,9 @@ export function projectProvisionalGoalLifecycle({
   if(!validDirections.includes(direction))continue;
   const priorActive=active;
   let transitionUnresolved=false;
+  let relation='UNCHANGED';
+  let parentCandidate=null;
+  let targetCandidate=null;
   const record={
    verification_receipt_id:e.event_id,
    source_frame_receipt_id:origin.source_receipt_id,
@@ -190,18 +196,32 @@ export function projectProvisionalGoalLifecycle({
    reviewer_only_not_user_approval:true,
    independent_semantic_confirmation:false,
   };
-  if(direction==='USER_AUTHORIZED_DETOUR'){
-   if(active&&active.goal_evidence_id!==directUser.goal_evidence_id)
+  if(direction==='USER_AUTHORIZED_DETOUR'||
+     direction==='USER_AUTHORIZED_PIVOT'){
+   // The semantic reviewer may propose a transition, but the evidence it
+   // interprets MUST be the current user utterance, not any old user turn or
+   // an assistant suggestion. Otherwise the previous focus is unchanged.
+   if(review.goal_source_ref!==directUser.source_ref){
+    ambiguous++;
+    transitionUnresolved=true;
+    relation='GOAL_RELATION_NOT_ANCHORED_TO_CURRENT_USER';
+   }else if(active.goal_evidence_id!==directUser.goal_evidence_id){
+    // De-duplicate suspended goals and preserve parent relationship for an
+    // explicitly temporary detour. A pivot is NOT permanent abandonment.
+    paused=paused.filter(x=>x.goal_evidence_id!==active.goal_evidence_id);
     paused.push(active);
-   active=directUser;
-   applied++;
-  }else if(direction==='USER_AUTHORIZED_PIVOT'){
-   // A new immediate direction does not prove permanent supersession of the
-   // earlier business objective. Keep it recoverable.
-   if(active&&active.goal_evidence_id!==directUser.goal_evidence_id)
-    paused.push(active);
-   active=directUser;
-   applied++;
+    if(direction==='USER_AUTHORIZED_DETOUR'){
+     parentCandidate=active.goal_evidence_id;
+     goalParentCandidates.set(directUser.goal_evidence_id,parentCandidate);
+     relation='TEMPORARY_CHILD_OBJECTIVE_CANDIDATE';
+    }else{
+     relation='ALTERNATE_ROOT_OBJECTIVE_CANDIDATE';
+    }
+    active=directUser;
+    applied++;
+   }else{
+    relation='REPEATED_CURRENT_GOAL_NO_CHANGE';
+   }
   }else if(direction==='USER_RETURNED_TO_OBJECTIVE'){
    // Never pop a random "last detour". Return only to a goal explicitly
    // identified by the review's USER source reference. If the reviewer
@@ -210,19 +230,33 @@ export function projectProvisionalGoalLifecycle({
    const target=candidates.find(x=>x.source_ref===review.goal_source_ref &&
      x.goal_evidence_id!==directUser.goal_evidence_id);
    if(target){
+    targetCandidate=target.goal_evidence_id;
     active=target;
     paused=paused.filter(x=>x.goal_evidence_id!==target.goal_evidence_id);
+    // Explicitly unwinds to the identified previous user goal. Nested or
+    // independent paused tasks remain provisional, never marked complete.
     applied++;
+    relation='RETURN_TO_SOURCE_LINKED_EARLIER_GOAL_CANDIDATE';
    }else{
     ambiguous++;
     transitionUnresolved=true;
+    relation='RETURN_TARGET_NOT_SOURCE_RESOLVED';
    }
   }else if(direction==='UNCLEAR'){
    ambiguous++;
+   transitionUnresolved=true;
+   relation='SEMANTIC_RELATION_UNRESOLVED';
+  }else{
+   relation='CONTINUING_GOAL_NO_MUTATION';
   }
   if(priorActive!==active||direction==='UNCLEAR'||transitionUnresolved){
-   transitions.push({...record,
-    status:transitionUnresolved?'RETURN_TARGET_NOT_SOURCE_RESOLVED':'PROVISIONAL_REVIEWER_TRANSITION'});
+   transitions.push({...record,relation,
+    from_goal_evidence_id:priorActive?.goal_evidence_id||null,
+    to_goal_evidence_id:active?.goal_evidence_id||null,
+    parent_goal_evidence_id:parentCandidate,
+    resumed_goal_evidence_id:targetCandidate,
+    status:transitionUnresolved?'UNRESOLVED_SOURCE_LINKAGE':
+      'PROVISIONAL_REVIEWER_TRANSITION_NOT_USER_AUTHORIZATION'});
   }
  }
  return deepFreeze({
@@ -243,6 +277,14 @@ export function projectProvisionalGoalLifecycle({
    source_ref:x.source_ref,text:x.text,
    status:'PROVISIONAL_PAUSED_NOT_PERMANENTLY_SUPERSEDED',
   })),
+  // Source-linked parent-child relationships are meaningful *candidates*,
+  // not inferred permanent lifecycle transitions.
+  goal_relationship_candidates:[...goalParentCandidates].slice(-12)
+   .map(([child_goal_id,parent_goal_id])=>({
+    child_goal_id,parent_goal_id,
+    relationship:'TEMPORARY_SUBGOAL_CANDIDATE',
+    independently_verified:false,source_authority_granted:false,
+   })),
   recent_transition_receipts:transitions.slice(-12),
   assistant_goal_alignment_history:assistantAlignmentHistory.slice(-16),
   possible_consecutive_off_goal_reviews:possibleConsecutiveOffGoalReviews,
