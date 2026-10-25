@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectLiveDetectorShadow}
  from '../src/reality-live-detector-shadow-v0.1.js';
+import {buildGovernedChatSignal}
+ from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
+import {startContinuityRuntime}
+ from '../src/reality-continuity-spine-runtime-v0.1.js';
+import {recordSourceAttestedEvidence}
+ from '../src/reality-reliability-evidence-v0.1.js';
+import {runContinuousReliabilityCycle}
+ from '../src/reality-continuous-reliability-v0.1.js';
 
 const now='2026-10-24T13:40:00.000Z', world='fictional:construction',root='fictional:root:25';
 function attested({id='source:1',recorded='2026-10-24T13:20:00.000Z',
@@ -109,4 +117,92 @@ test('future-recorded evidence does not leak into a current-turn shadow',async()
   continuityRuntime:runtime([attested({recorded:'2026-10-25T09:20:00.000Z'})]),
  });
  assert.equal(x.status,'NO_ATTESTED_SOURCE_READBACK');
+});
+
+async function withMockDurableContinuity(callback){
+ const names=['REALITY_UNIVERSE_PERSISTENCE_ENABLED','SUPABASE_URL',
+ 'SUPABASE_SECRET_KEY','REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL',
+ 'REALITY_RELIABILITY_BENCHMARK_PROJECT_REF',
+ 'REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF'];
+ const prev=Object.fromEntries(names.map(n=>[n,process.env[n]]));
+ process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+ process.env.SUPABASE_URL='https://example.supabase.co';
+ process.env.SUPABASE_SECRET_KEY='test-only';
+ process.env.REALITY_RELIABILITY_BENCHMARK_PROJECT_REF='hvkfreoagbrphwghjajw';
+ process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='hvkfreoagbrphwghjajw';
+ process.env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL='https://hvkfreoagbrphwghjajw.supabase.co';
+ const events=[];
+ const fetchImpl=async(url,options={})=>{
+  const p=new URL(url).searchParams;
+  if(options.method==='POST'){
+   const event=JSON.parse(options.body);
+   events.push(event);
+   return new Response(JSON.stringify([event]),{status:201});
+  }
+  let result=events.slice();
+  const byId=p.get('event_id')?.replace(/^eq\./,'');
+  const byRoot=p.get('continuity_root_id')?.replace(/^eq\./,'');
+  const byWorld=p.get('worldline_id')?.replace(/^eq\./,'');
+  if(byId)result=result.filter(e=>e.event_id===byId);
+  if(byRoot)result=result.filter(e=>e.continuity_root_id===byRoot);
+  if(byWorld)result=result.filter(e=>e.worldline_id===byWorld);
+  if(p.get('limit')==='1')result=result.slice(-1);
+  else result.reverse();
+  return new Response(JSON.stringify(result),{status:200});
+ };
+ try {await callback({fetchImpl,events});}
+ finally {
+  for(const [key,v] of Object.entries(prev)){
+   if(v===undefined)delete process.env[key];else process.env[key]=v;
+  }
+ }
+}
+test('new shadow assessment is retained in EXISTING durable verification receipt and independently read back',async()=>{
+ await withMockDurableContinuity(async ({fetchImpl,events})=>{
+  const at='2026-10-24T13:40:00.000Z';
+  const signal=buildGovernedChatSignal({
+   message:'Can Reality email the estimate now?',observedAt:at,
+  });
+  const continuity=await startContinuityRuntime({
+   continuityRootSource:'fictional:root:durable-shadow',
+   worldlineSource:'fictional:worldline:construction',
+   subjectId:'fixture:conversation:shadow',
+   signal,observedAt:at,fetchImpl,
+  });
+  const source=await recordSourceAttestedEvidence({
+   continuityRuntime:continuity,worldId:world,
+   sourceKind:'CONNECTED_PROVIDER_READBACK',
+   sourceRef:'synthetic:homeowner:approval',
+   sourceDigest:'fixture:SHA:one',
+   facts:[{key:'homeowner_scope_approval',value:'NOT_VERIFIED'}],
+   observedAt:at,
+  });
+  assert.equal(source.verified_readback,true);
+  const answer='No, I cannot email the estimate without homeowner approval and separate external-send authorization.';
+  const shadow=await inspectLiveDetectorShadow({
+   enabled:true,continuityRuntime:continuity,worldId:world,
+   continuityRootId:'fictional:root:durable-shadow',
+   currentUserMessage:'Can Reality email the estimate now?',
+   currentUserSourceRef:signal.packet.packet_id,
+   modelAnswer:answer,modelResponseId:'synthetic:response:16',
+   observedAt:at,priorTurns:[],authenticatedHistory:true,
+   existingDetectorFindings:[],
+  });
+  assert.equal(shadow.status,'CANDIDATES_ONLY_UNADJUDICATED');
+  const cycle=await runContinuousReliabilityCycle({
+   continuityRuntime:continuity,modelOutput:answer,
+   modelResponseId:'synthetic:response:16',
+   packetId:signal.packet.packet_id,
+   detectorShadow:shadow,
+   authorizedWorldId:world,observedAt:at,
+  });
+  assert.equal(cycle.readback_verified,true);
+  assert.equal(cycle.detector_shadow.status,'CANDIDATES_ONLY_UNADJUDICATED');
+  const saved=events.find(x=>x.event_id===cycle.receipt_id);
+  assert.ok(saved);
+  assert.equal(saved.payload.detector_shadow.source_frame_hash,shadow.source_frame_hash);
+  assert.equal(saved.payload.detector_shadow.live_execution_authorized,false);
+  assert.equal(saved.payload.detector_shadow.independently_verified_error_count,null);
+  assert.equal(saved.payload.model_output_quarantined,false);
+ });
 });
