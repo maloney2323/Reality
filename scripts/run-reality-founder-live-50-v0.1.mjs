@@ -15,6 +15,8 @@ import {makeAdversarialRunScope}
  from '../src/reality-benchmark-run-scope-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../src/reality-reliability-db-boundary-v0.1.js';
+import {scoreIndependentlyLabeledGoalDrift}
+ from '../src/reality-independent-goal-drift-scorecard-v0.1.js';
 
 const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const PROJECT='hvkfreoagbrphwghjajw',DB='https://'+PROJECT+'.supabase.co';
@@ -173,8 +175,18 @@ if(phase==='run'){
   external_actions:0,
  }));
 }
+const independentScorecard=scoreIndependentlyLabeledGoalDrift(records.map(e=>({
+ turn:e.payload.turn,
+ detector_candidate:e.payload.goal_trajectory_review?.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'||
+   (e.payload.goal_drift_receipt_findings||[]).some(x=>
+    ['CONVERSATION_TOPIC_DRIFT_CANDIDATE','STALE_RESPONSE_REPLAY',
+     'POSSIBLE_CURRENT_TURN_MISALIGNMENT'].includes(x.classification)),
+ // Frozen script has no human adjudications: do not invent them.
+ original_label:'NOT_GRADED',released_label:'NOT_GRADED',
+})));
 const summary={
  run_id:RUN,business:'Take Intelligence LLC',product:'Reality',
+ independent_scorecard:independentScorecard,
  frozen_turns:50,completed_real_model_turns:records.length,
  source_state_readback_turns:records.filter(e=>e.payload.source_frame_receipt_id).length,
  original_vs_final_changed:records.filter(e=>e.payload.answer_changed).length,
