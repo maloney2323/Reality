@@ -142,8 +142,17 @@ try {
      // The new event is separately source-attested, and explicitly supersedes
      // the older "pair current status"; the old run fact remains immutable.
      const t=new Date().toISOString();
+     // New runtime instance must rehydrate the current durable tail before
+     // writing; retaining a stale runtime object would violate append-only
+     // lineage after the first conversation turn.
+     const writer=await startContinuityRuntime({
+       continuityRootSource:root,worldlineSource:worldline,
+       subjectId:'Real-CI-run-transition',signal:buildSig(
+         'Observe a later verified GitHub workflow result.',t),
+       observedAt:t,fetchImpl:io,
+     });
      const newReceipt=await recordSourceAttestedEvidence({
-      continuityRuntime:oldRuntime,worldId:world,
+      continuityRuntime:writer,worldId:world,
       sourceKind:'CONNECTED_PROVIDER_READBACK',sourceRef:second.html_url,
       sourceDigest:hash({run:second.id,conclusion:second.conclusion,sha:second.head_sha}),
       facts:[
