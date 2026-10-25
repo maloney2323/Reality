@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildInvariantFrame} from '../src/reality-alignment-invariant-contract-v0.1.js';
 import {EVENTS,stamp} from '../benchmarks/reality-construction-25turn-dual-v1.mjs';
-import {buildStateDeltaEnvelope,assessDualAxisEvidence,extractNarrowInspectionClaims}
+import {buildStateDeltaEnvelope,assessDualAxisEvidence,extractNarrowInspectionClaims,summarizeProviderTokenUsage}
  from '../src/reality-cognition-evidence-contracts-v0.1.js';
 const root='fictional:construction:25turn-comparison-v1';
 const clock={source_kind:'FROZEN_SYNTHETIC_BENCHMARK_CLOCK',turn1_at:stamp(1),step_ms:60000};
@@ -166,4 +166,24 @@ test('missing trusted clock abstains rather than pretending it checked the times
  });
  assert.equal(r.temporal_axis.status,'NOT_EVALUATED_UNTRUSTED_TIMELINE');
  assert.equal(r.temporal_axis.errors.length,0);
+});
+
+test('provider report uses actual cached-input telemetry but never invents dollar savings',()=>{
+ const m=summarizeProviderTokenUsage({usage:{
+  input_tokens:5000,output_tokens:100,
+  input_tokens_details:{cached_tokens:3000,cache_write_tokens:0},
+ },elapsedMs:250});
+ assert.equal(m.cached_read_tokens,3000);
+ assert.equal(m.cache_hit_rate,0.6);
+ assert.equal(m.other_input_tokens,2000);
+ assert.equal(m.actual_billed_cost_usd,null);
+ assert.equal(m.realized_savings_verified,false);
+});
+test('absent cached-token metrics are UNKNOWN and cannot be called zero cache usage',()=>{
+ const m=summarizeProviderTokenUsage({usage:{input_tokens:5000,output_tokens:100}});
+ assert.equal(m.status,'CACHE_BREAKDOWN_NOT_REPORTED');
+ assert.equal(m.cached_read_tokens,null);
+ assert.equal(m.cache_hit_rate,null);
+ const n=summarizeProviderTokenUsage();
+ assert.equal(n.status,'PROVIDER_USAGE_NOT_AVAILABLE');
 });
