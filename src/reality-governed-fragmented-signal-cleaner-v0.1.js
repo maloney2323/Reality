@@ -50,12 +50,28 @@ function segmentRaw(raw){
   return spans;
 }
 function quoteRanges(text){
-  const result=[],re=/"[^"\n]*"|\u201c[^\u201d\n]*\u201d|\x60[^\x60\n]*\x60/g;
-  let m;
-  while((m=re.exec(text))){
-    result.push({start:m.index,end:m.index+m[0].length,quote:m[0],
-      untrusted_instruction_candidate:/\b(?:system|ignore|override|send|email|transfer|pay|deploy|merge|delete|execute)\b/i.test(m[0])});
+  // Quoted messages and fenced code can span lines. Unterminated quotations
+  // remain untrusted through end-of-input, not actionable free text.
+  const result=[];let open=null,start=-1;
+  const tick='\x60';
+  const add=(end,closed)=>{
+    const q=text.slice(start,end);
+    result.push({start,end,quote:q,closed,
+      untrusted_instruction_candidate:/\b(?:system|ignore|override|send|email|transfer|pay|deploy|merge|delete|execute)\b/i.test(q)});
+    open=null;start=-1;
+  };
+  for(let i=0;i<text.length;i++){
+    const ch=text[i],triple=text.slice(i,i+3)===tick.repeat(3);
+    if(!open){
+      if(triple){open:'FENCE';start=i;i+=2;}
+      else if(ch==='"'||ch==='“'||ch===tick){
+        open=ch==='“'?'”':ch;start=i;
+      }
+    }else if(open==='FENCE'){
+      if(triple){add(i+3,true);i+=2;}
+    }else if(ch===open&&text[i-1]!=='\\')add(i+1,true);
   }
+  if(open)add(text.length,false);
   return result;
 }
 const actionVerb='(?:send|email|dispatch|approve|purchase|buy|pay|transfer|deploy|merge|delete|publish|post|cancel|schedule|execute|write|change)';
@@ -71,6 +87,7 @@ function observe(text){
   const temporal=/\b(?:now|previously|used to|latest|supersed(?:es|ed|ing)?|updated|changed|withdrawn|revoked)\b/i.test(direct);
   const attributed=quotes.length>0||/\b(?:someone|supplier|customer|homeowner|foreman|supervisor|vendor|note|rumou?r)\s+(?:said|says|claimed|claims|heard|reported)\b/i.test(direct);
   const question=/\?/.test(direct)||/^\s*(?:can we|could we|should we|is it|did|does|what|who|why|how|when|where)\b/i.test(direct);
+  const directActionCue=new RegExp('\\b'+actionVerb+'\\b','i').test(direct);
   const imperative=new RegExp('^\\s*(?:please\\s+)?'+actionVerb+'\\b','i').test(direct)||
     new RegExp("\\b(?:please|go ahead and|can you|could you)\\s+(?:"+actionVerb+")\\b",'i').test(direct);
   const kind=!direct.trim()?'QUOTED_CONTENT_ONLY':
@@ -83,7 +100,8 @@ function observe(text){
     markers:{negation_present:negation,explicit_prohibition:prohibit,
       hypothetical_present:hypothetical,uncertainty_present:uncertain,
       retraction_present:retracted,temporal_change_present:temporal,
-      quoted_or_attributed_source_present:attributed},
+      quoted_or_attributed_source_present:attributed,
+      direct_action_cue_present:directActionCue},
     quoted_spans:quotes,
     trust:'TEXT_OBSERVED_NOT_FACT_VERIFIED',
     execution_authority:'NONE',
@@ -137,6 +155,7 @@ export function cleanFragmentedSignal({packet,cleanerVersion=GOVERNED_FRAGMENTED
       retraction_present:all.some(m=>m.retraction_present),
       temporal_change_present:all.some(m=>m.temporal_change_present),
       quoted_or_attributed_source_present:all.some(m=>m.quoted_or_attributed_source_present),
+      direct_action_cue_present:all.some(m=>m.direct_action_cue_present),
     },
     fragment_count:fragments.length,interpretation_status:'CANDIDATE_NOT_VERIFIED',
   });
