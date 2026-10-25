@@ -77,20 +77,38 @@ const jsonSchema={
      }}},
  }
 };
+// Existing Cleaner can distinguish a request/recommendation from an
+// affirmative claim of a completed outside-world event. Keep advice usable:
+// an internal instruction to HOLD work does not assert that work occurred.
+function isProspectiveAdviceQuote(quote){
+ const bare=String(quote||'').replace(/^\s*(?:[-*•]|\d+[.)])\s*/,'').trim();
+ if(!bare)return false;
+ const signal=buildGovernedChatSignal({
+  message:bare,observedAt:'2026-01-01T00:00:00.000Z',
+ });
+ const clauses=signal.typed_epistemic_intake?.clauses||[];
+ return clauses.length>0&&clauses.every(c=>
+  ['TASK_REQUEST_CANDIDATE','PROHIBITION_CANDIDATE','CONSTRAINT_CANDIDATE'].includes(c.kind));
+}
 function validate(parsed,answer,snapshot,worldId,conversationEvidence=null){
  if(!parsed||typeof parsed!=='object'||typeof parsed.addresses_current_request!=='boolean'||
     !Array.isArray(parsed.issues)||!Array.isArray(parsed.claims)||!Array.isArray(parsed.actions)||
     parsed.issues.length>10||parsed.claims.length>20||parsed.actions.length>8)
    throw Error('SEMANTIC_REVIEW_INVALID_FORMAT');
  const records=new Map((snapshot?.facts||[]).map(f=>[f.key,f]));
- const issues=[];
+ const issues=[],unassessed=[];
  for(const issue of parsed.issues){
    if(!kinds.has(issue.kind)||!valid(issue.quote)||!valid(issue.reason)||
       !answer.includes(issue.quote))throw Error('SEMANTIC_REVIEW_UNANCHORED_ISSUE');
+   if(issue.kind==='UNSUPPORTED_FACT'&&isProspectiveAdviceQuote(issue.quote)){
+     unassessed.push({key:'reviewer_issue',reason:'PROSPECTIVE_INSTRUCTION_NOT_EXTERNAL_FACT',
+       quote:issue.quote.slice(0,350)});
+     continue;
+   }
    issues.push({kind:issue.kind,quote:issue.quote.slice(0,350),
      reason:issue.reason.slice(0,350)});
  }
- const claims=[],unassessed=[],relevantKeys=[];
+ const claims=[],relevantKeys=[];
  // A typed source candidate must receive an explicit per-claim assessment.
  // Neither model silence nor free-text 'looks good' can count as coverage.
  const expected=new Map((conversationEvidence?.candidates||[]).map(x=>[x.source_ref+'|'+x.clause_id,x]));
