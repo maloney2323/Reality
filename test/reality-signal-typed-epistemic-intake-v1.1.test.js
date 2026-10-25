@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildGovernedChatSignal} from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 import {buildModelInput} from '../src/reality-model-gateway-v0.1.js';
+import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0.1.js';
 import {TYPED_SIGNAL_INTAKE_VERSION} from '../src/reality-signal-typed-epistemic-intake-v1.1.js';
 
 const at='2026-10-25T04:00:00.000Z';
@@ -120,4 +121,32 @@ test('an ordinary direct task request without conditions stays an unapproved req
   assert.equal(clause.candidate_dependency,null);
   assert.equal(clause.agency.candidate,'DIRECT_REQUEST_NOT_AUTHORIZED');
   assert.equal(clause.agency.execution_authorized,false);
+});
+
+test('existing bitemporal Continuity stores only unverified typed candidate manifest and keeps execution disabled',async()=>{
+  const old=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+  process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='false';
+  try {
+    const signal=clean('If the payment clears, prepare the receipt. Do not send it.');
+    const state=await startContinuityRuntime({
+      continuityRootSource:'private-test:typed-intake',worldlineSource:'test:business',
+      subjectId:'operator:example',signal,observedAt:at,
+    });
+    assert.equal(state.status,'IN_MEMORY_ONLY');
+    const observation=state.nodes.find(x=>x.event_kind==='OBSERVATION');
+    const manifest=observation?.payload?.typed_signal_manifest;
+    assert.equal(manifest.version,TYPED_SIGNAL_INTAKE_VERSION);
+    assert.equal(manifest.projection_digest,typed(signal).projection_digest);
+    assert.equal(manifest.source_digest,signal.packet.raw_content_digest);
+    assert.equal(manifest.status,'INTERPRETATION_CANDIDATES_NOT_GROUND_TRUTH');
+    assert.equal(manifest.execution_authorized,false);
+    assert.ok(manifest.clauses.length>=3);
+    assert.ok(manifest.clauses.every(c=>
+      c.epistemic_status==='UNVERIFIED_INTAKE'&&!Object.hasOwn(c,'exact_source_text')));
+    assert.equal(manifest.unresolved_conditions.length,1);
+    assert.ok(observation.assertion_time&&observation.effective_time);
+  }finally{
+    if(old===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+    else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=old;
+  }
 });
