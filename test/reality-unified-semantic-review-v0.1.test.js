@@ -83,7 +83,7 @@ function restoreSemantic(){
  if(priorSemantic===undefined)delete process.env.REALITY_SEMANTIC_REVIEW_ENABLED;
  else process.env.REALITY_SEMANTIC_REVIEW_ENABLED=priorSemantic;
 }
-function semanticCallStub(f,{draft,first,repair,second}={}){
+function semanticCallStub(f,{draft,first,repair,second,completeProvenance=false}={}){
  const calls=[];
  const fetchImpl=async(url,options={})=>{
   if(!String(url).includes('api.openai.com/v1/responses'))return f.fetch(url,options);
@@ -93,8 +93,19 @@ function semanticCallStub(f,{draft,first,repair,second}={}){
   const isReview=req.text?.format?.name==='reality_semantic_review';
   const mode=isReview?'REVIEW':'MODEL';
   calls.push({mode,request:req});
-  const text=isReview?
-    JSON.stringify(calls.filter(x=>x.mode==='REVIEW').length===1?first:second):
+  const reviewPass=calls.filter(x=>x.mode==='REVIEW').length;
+  const selected=isReview?(reviewPass===1?first:second):null;
+  const comparison=isReview?JSON.parse(req.input[1].content[0].text):null;
+  const covered=completeProvenance?{
+    ...selected,provenance_checks:(comparison?.conversation_evidence?.candidates||[]).map(c=>({
+      source_ref:c.source_ref,clause_id:c.clause_id,
+      relation:reviewPass===1?'ASSERTED_AS_FACT':'REPORTED_WITH_UNCERTAINTY',
+      answer_quote:reviewPass===1?'NOT DELIVERED':'delivery remains unconfirmed',
+      verified_source_ref:'',
+      reason:'Compare the exact prior reported-delivery status with this answer.',
+    })),
+  }:selected;
+  const text=isReview?JSON.stringify(covered):
     calls.filter(x=>x.mode==='MODEL').length===1?draft:repair;
   return new Response(JSON.stringify({id:'fake-'+calls.length,
    status:'completed',output_text:text}),{status:200});
@@ -541,7 +552,7 @@ test('conversation comparison: revise an unknown-vs-false answer using authentic
     first:review({issues:[{
       kind:'FACT_CONTRADICTION',quote:'NOT DELIVERED',
       reason:'user:receipt:01 says delivery unconfirmed, not proven not delivered.'}]}),
-    second:review(),
+    second:review(),completeProvenance:true,
    });
    const got=await runLiveIntelligenceOrchestration({
     message:'What should our status say? Keep this as a draft only.',
