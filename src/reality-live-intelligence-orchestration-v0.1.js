@@ -273,7 +273,10 @@ export async function runLiveIntelligenceOrchestration({
     governedSignal,conversationContinuity:authenticatedConversationContinuity,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
-    continuityRootId:effectiveContinuityRootId,
+    // The Continuity spine canonicalizes the root to a UUID. Use that
+    // exact root for durable readback; unscoped chat remains explicitly ephemeral.
+    continuityRootId:continuityRuntime?.spine?.continuity_root_id||
+      effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id),
     observedAt:observedAt||new Date().toISOString(),
     historyMayBeIncomplete:Boolean(systemContext?.conversation_history_older_messages_may_be_missing),
   });
