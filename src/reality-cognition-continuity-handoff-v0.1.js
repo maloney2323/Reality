@@ -48,7 +48,9 @@ export function buildCognitionContinuityHandoff({
   current_user_message:latestMessage,
   history_source:'NOT_ATTESTED',recent_turns:[],earliest_available_user_message:null,
   older_user_conditions:[],older_coverage:'NOT_AVAILABLE',
-  conversation_evidence:{status:'NOT_AVAILABLE',candidates:[],total_candidates:0,external_truth_established:false},
+  conversation_evidence:projectConversationEvidenceCandidates(buildCleanerConversationContext({
+    governedSignal,priorTurns:[],authenticatedHistory:false,
+  })),
   model_text_is_external_truth:false,external_actions_authorized:false,
  });
  if(!Array.isArray(verifiedConversationTurns)||
