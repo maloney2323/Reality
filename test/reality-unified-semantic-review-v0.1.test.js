@@ -430,3 +430,32 @@ test('actual Reality CI evidence: unsupported external effectiveness claim is di
   }finally{restoreSemantic()}
  });
 });
+
+test('a false-positive reviewer warning about literally verified CI conclusion is source-adjudicated before any retry',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{facts:[
+     {key:'latest_ci_conclusion',value:'SUCCESS'},
+   ]});
+   const good='The latest CI conclusion is SUCCESS.';
+   const stub=semanticCallStub(f,{
+    draft:good,
+    first:review({issues:[{kind:'UNSUPPORTED_FACT',
+     quote:'SUCCESS',reason:'Reviewer mistakenly thinks this value was unverified.'}],
+     claims:[claim('latest_ci_conclusion','SUCCESS','SUCCESS')]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'What is the latest CI conclusion?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,good);
+   assert.equal(got.reliability.source_review_adjudication.source_supported_count,1);
+   assert.equal(got.reliability.source_review_adjudication.unresolved_count,0);
+   assert.equal(got.reliability.semantic_repair,undefined);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});

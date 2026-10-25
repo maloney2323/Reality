@@ -1,0 +1,33 @@
+name: Reality Evidence Adjudication — Source Truth vs Review Opinion
+on:
+  push:
+    branches:
+      - experiment/reality-evidence-adjudication-20261025
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-review-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate evidence arbitration and live-loop regression, zero provider calls
+        run: |
+          node --check src/reality-source-review-adjudication-v0.1.js
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --test test/reality-source-review-adjudication-v0.1.test.js \
+            test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-continuity-runtime-v0.1.test.js \
+            test/reality-signal-typed-epistemic-intake-v1.1.test.js \
+            test/reality-repair-the-loop-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js
+      - name: Disclose scope
+        if: always()
+        run: |
+          echo 'Offline trusted-source and untrusted-reviewer simulations. No real model calls or database writes.'

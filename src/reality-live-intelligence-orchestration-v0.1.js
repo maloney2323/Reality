@@ -7,6 +7,7 @@ import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
+import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
@@ -434,12 +435,22 @@ export async function runLiveIntelligenceOrchestration({
   if (semanticModeEnabled) {
     const review=semanticFirst?.review;
     const originalModelText=String(modelResult.answer||'');
+    const sourceAdjudication=adjudicateSourceReview({
+      answer:originalModelText,review,candidate:semanticFirst?.candidate,
+      sourceSnapshot:semanticSourceSnapshot,
+    });
+    reliabilityWithExtraction.source_review_adjudication=sourceAdjudication;
+    const explicitlySupportedIssueQuotes=new Set(
+      sourceAdjudication.source_supported_issue_quotes.map(x=>x.issue_quote));
+    const releaseRelevantIssues=(review?.issues||[]).filter(issue=>
+      issue.kind!=='UNSUPPORTED_FACT' ||
+      !explicitlySupportedIssueQuotes.has(issue.quote));
     const userObjectiveNotAddressed=Boolean(review &&
       review.addresses_current_request===false &&
       review.issues.some(x=>x.kind==='WRONG_TASK'));
     const provedSourceConflict=Boolean(continuousReliability.model_output_quarantined &&
       (continuousReliability.drift||[]).includes('FACT_DRIFT'));
-    const materialUnsupportedClaim=Boolean(review?.issues?.some(x=>
+    const materialUnsupportedClaim=Boolean(releaseRelevantIssues.some(x=>
       ['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION'].includes(x.kind)));
     const semanticRepairCandidate=userObjectiveNotAddressed||
       provedSourceConflict||materialUnsupportedClaim;
@@ -455,7 +466,7 @@ export async function runLiveIntelligenceOrchestration({
             current_turn_alignment:preCognitionAlignment?.capsule||null,
             semantic_review_feedback:{
               status:'UNTRUSTED_REVIEW_CANDIDATE',
-              mistakes:(review?.issues||[]).map(x=>({
+              mistakes:releaseRelevantIssues.map(x=>({
                 kind:x.kind,reason:x.reason,
               })),
               source_corrections:continuousReliability.source_attested_correction_proposals||[],
@@ -498,7 +509,7 @@ export async function runLiveIntelligenceOrchestration({
       const safeToRelease=secondReviewPass &&
         (!continuousReliability.model_output_quarantined ||
           provedSourceConflict);
-      const actionClaimRisk=Boolean(review?.issues?.some(issue=>
+      const actionClaimRisk=Boolean(releaseRelevantIssues.some(issue=>
         issue.kind==='FALSE_COMPLETION'||issue.kind==='AUTHORITY_CONFUSION'));
       // Explicitly disclose reviewer-only unresolved evidence concerns
       // without deleting a good answer or pretending the detector proved
@@ -525,6 +536,7 @@ export async function runLiveIntelligenceOrchestration({
           post_repair_review_response_id:retryReview?.response_id||null,
           source_reliability_receipt_id:continuousReliability.receipt_id,
           initial_issues:review?.issues||[],
+          source_adjudication:sourceAdjudication,
           post_repair_issues:retryReview?.review?.issues||null,
           post_repair_source_violation_codes:deterministicReview?.codes||null,
           original_output_digest:continuousReliability.receipt_id,
