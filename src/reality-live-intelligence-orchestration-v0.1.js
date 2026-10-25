@@ -1,3 +1,4 @@
+import {buildCleanerConversationContext} from './reality-cleaner-conversation-context-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -304,8 +305,13 @@ export async function runLiveIntelligenceOrchestration({
   // Inspect the actual model output BEFORE any quarantine/replacement.
   // Prior conversational anchors are eligible only from the server adapter;
   // the Signal Cleaner owns the current user turn and its packet provenance.
+  const cleanerConversationContext = reliabilityPreviewEnabled
+    ? buildCleanerConversationContext({governedSignal,
+        priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        authenticatedHistory:Array.isArray(verifiedConversationTurns)}) : null;
   const conversationalAssessment = reliabilityPreviewEnabled
     ? inspectConversationDrift({
+        cleanerConversationContext,
         priorTurns: Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
         historySource: Array.isArray(verifiedConversationTurns)
           ? 'AUTHENTICATED_CONVERSATION_MESSAGES' : 'NOT_ATTESTED',
@@ -361,6 +367,7 @@ export async function runLiveIntelligenceOrchestration({
         if (available.source_receipt_ids.length)semanticSourceSnapshot=available;
       }
       semanticFirst=await reviewRealityAnswer({
+        cleanerConversationContext,
         currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
@@ -452,7 +459,9 @@ export async function runLiveIntelligenceOrchestration({
       (continuousReliability.drift||[]).includes('FACT_DRIFT'));
     const materialUnsupportedClaim=Boolean(releaseRelevantIssues.some(x=>
       ['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION'].includes(x.kind)));
-    const semanticRepairCandidate=userObjectiveNotAddressed||
+    const conversationalRepairCandidate=releaseRelevantIssues.some(x=>
+      ['FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind));
+    const semanticRepairCandidate=conversationalRepairCandidate||userObjectiveNotAddressed||
       provedSourceConflict||materialUnsupportedClaim;
     if (semanticRepairCandidate &&
         process.env.REALITY_DETECTOR_REPAIR_ENABLED==='true') {
@@ -466,6 +475,7 @@ export async function runLiveIntelligenceOrchestration({
             current_turn_alignment:preCognitionAlignment?.capsule||null,
             semantic_review_feedback:{
               status:'UNTRUSTED_REVIEW_CANDIDATE',
+              cleaner_conversation_context:cleanerConversationContext,
               mistakes:releaseRelevantIssues.map(x=>({
                 kind:x.kind,reason:x.reason,
               })),
@@ -486,6 +496,7 @@ export async function runLiveIntelligenceOrchestration({
           model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
         });
         retryReview=await reviewRealityAnswer({
+          cleanerConversationContext,
           currentUserMessage:message,
           modelAnswer:String(retry.answer||''),
           sourceSnapshot:semanticSourceSnapshot,
@@ -941,3 +952,4 @@ export async function runLiveIntelligenceOrchestration({
     },
   };
 }
+

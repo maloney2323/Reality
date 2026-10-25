@@ -148,10 +148,46 @@ function findTurnAlignmentCandidate({priorTurns,currentUserMessage,modelAnswer,
     auto_correction_authorized:false,
   });
 }
+// Consume explicit dependency links owned by the Cleaner. Do not re-parse
+// raw history when this typed path is available. Other clause types remain
+// visible to semantic review without becoming deterministic truth.
+function typedConditionAnchors(context){
+ const anchors=[];
+ for(const record of [...context.history,context.current]){
+  const byId=new Map(record.clauses.map(c=>[c.clause_id,c]));
+  for(const clause of record.clauses){
+   const condition=byId.get(clause.candidate_dependency?.condition_clause_id);
+   if(!condition){
+    // Preserve supported legacy conditions, but only within the Cleaner's
+    // direct, source-scoped clauses (never arbitrary quoted history text).
+    if(!clause.contains_quoted_text&&
+      !clause.epistemic_modalities.some(m=>['QUOTED','HEARSAY','HYPOTHETICAL'].includes(m))&&
+      ['PROHIBITION_CANDIDATE','CONSTRAINT_CANDIDATE','TASK_REQUEST_CANDIDATE'].includes(clause.kind)){
+     for(const a of extractUserIntentAnchors(clause.exact_source_text,record.source_ref,0))
+      anchors.push({...a,clause_id:clause.clause_id});
+    }
+    continue;
+   }
+   if(clause.kind!=='TASK_REQUEST_CANDIDATE')continue;
+   if([clause,condition].some(c=>c.contains_quoted_text||
+     c.epistemic_modalities.some(m=>['QUOTED','HEARSAY','HYPOTHETICAL'].includes(m))))continue;
+   const action=clause.exact_source_text,requirement=condition.exact_source_text;
+   const actionTokens=terms(action.replace(/^(?:and|then|please)\s+/i,''));
+   const conditionTokens=terms(requirement);
+   if(actionTokens.length<2||!conditionTokens.length)continue;
+   anchors.push({anchor_id:'conversation:'+sha([record.source_ref,clause.clause_id,condition.clause_id]).slice(7,39),
+    source_ref:record.source_ref,clause_id:clause.clause_id,condition_clause_id:condition.clause_id,
+    original_user_text:requirement+', '+action,action_text:action,condition_text:requirement,
+    action_tokens:actionTokens,condition_tokens:conditionTokens,
+    authority:'USER_STATED_INTENT_NOT_EXTERNAL_FACT'});
+  }
+ }
+ return anchors;
+}
 export function inspectConversationDrift({
  priorTurns=[],currentUserMessage='',modelAnswer='',continuityRootId,
  modelResponseId='untracked',currentUserSourceRef='current:user:signal',
- historySource='NOT_ATTESTED',
+ historySource='NOT_ATTESTED',cleanerConversationContext=null,
 }={}){
  if(!nonempty(continuityRootId))return Object.freeze({
   version:CONVERSATIONAL_CONTINUITY_VERSION,status:'NO_CONTINUITY_ROOT',
@@ -167,10 +203,10 @@ export function inspectConversationDrift({
   if(!['user','assistant'].includes(turn?.role)||typeof turn?.text!=='string'||
      !nonempty(turn?.source_ref))throw Error('CONVERSATION_HISTORY_PROVENANCE_INVALID');
   if(turn.role!=='user')continue;
-  for(const anchor of extractUserIntentAnchors(turn.text,turn.source_ref,i))
+  for(const anchor of (cleanerConversationContext?[]:extractUserIntentAnchors(turn.text,turn.source_ref,i)))
    if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
  }
- for(const anchor of extractUserIntentAnchors(currentUserMessage,currentUserSourceRef,eligible.length))
+ for(const anchor of (cleanerConversationContext?typedConditionAnchors(cleanerConversationContext):extractUserIntentAnchors(currentUserMessage,currentUserSourceRef,eligible.length)))
   if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
  const findings=[],revisions=[];
  const turnAlignment=findTurnAlignmentCandidate({priorTurns:eligible,
@@ -184,7 +220,7 @@ export function inspectConversationDrift({
     issue_id:'conversation-drift:'+sha([continuityRootId,anchor.anchor_id,modelResponseId,'revision']).slice(7,39),
     classification:'CONVERSATIONAL_REVISION_REQUIRES_REVIEW',
     origin_stage:'COGNITION',source_receipt_refs:[anchor.source_ref,currentUserSourceRef],
-    anchor_id:anchor.anchor_id,original_user_text:anchor.original_user_text,
+    anchor_id:anchor.anchor_id,clause_id:anchor.clause_id||null,condition_clause_id:anchor.condition_clause_id||null,original_user_text:anchor.original_user_text,
     observed_model_text:currentUserMessage.slice(0,400),
     reason:'Customer revised a previously expressed condition; version history must be preserved',
     independently_adjudicated:false,verified_hallucination:false,
@@ -201,7 +237,7 @@ export function inspectConversationDrift({
     issue_id:'conversation-drift:'+sha([continuityRootId,anchor.anchor_id,modelResponseId,t]).slice(7,39),
     classification:'CONVERSATIONAL_PRECONDITION_DRIFT',
     origin_stage:'COGNITION',source_receipt_refs:[anchor.source_ref,'model-response:'+modelResponseId],
-    anchor_id:anchor.anchor_id,original_user_text:anchor.original_user_text,
+    anchor_id:anchor.anchor_id,clause_id:anchor.clause_id||null,condition_clause_id:anchor.condition_clause_id||null,original_user_text:anchor.original_user_text,
     expected_condition:anchor.condition_text,proposed_action:anchor.action_text,
     observed_model_text:t.slice(0,400),
     reason:'Assistant proposes an action but no longer carries the user-stated condition',
@@ -222,6 +258,12 @@ export function inspectConversationDrift({
    received_prior_message_count:priorTurns.length,
    inspected_prior_message_count:eligible.length,
    extracted_anchor_count:anchors.length,
+   interpretation_source:cleanerConversationContext?'SIGNAL_CLEANER_TYPED_INTAKE':'LEGACY_TEXT_PATTERNS',
+   typed_clause_count:cleanerConversationContext?
+    [...cleanerConversationContext.history,cleanerConversationContext.current].reduce((n,r)=>n+r.clauses.length,0):0,
+   typed_source_refs:cleanerConversationContext?
+    [...cleanerConversationContext.history,cleanerConversationContext.current].map(r=>({source_ref:r.source_ref,projection_digest:r.projection_digest})):[],
+   typed_scope_and_negation_require_semantic_review:true,
    general_semantic_drift_assessed:false,
    no_findings_proves_no_drift:false,
   },

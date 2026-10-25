@@ -335,6 +335,7 @@ export async function runContinuousReliabilityCycle({
       findings:conversational.findings.map(f=>({
         issue_id:f.issue_id,classification:f.classification,
         origin_stage:f.origin_stage,anchor_id:f.anchor_id||null,
+        clause_id:f.clause_id||null,condition_clause_id:f.condition_clause_id||null,
         original_user_text:String(f.original_user_text||'').slice(0,400),
         observed_model_text:String(f.observed_model_text||'').slice(0,400),
         expected_condition:f.expected_condition||null,

@@ -92,7 +92,7 @@ function semanticCallStub(f,{draft,first,repair,second}={}){
     throw Error('OLD_EXTRACTOR_SHOULD_NOT_RUN_WHEN_SEMANTIC_ENABLED');
   const isReview=req.text?.format?.name==='reality_semantic_review';
   const mode=isReview?'REVIEW':'MODEL';
-  calls.push({mode});
+  calls.push({mode,request:req});
   const text=isReview?
     JSON.stringify(calls.filter(x=>x.mode==='REVIEW').length===1?first:second):
     calls.filter(x=>x.mode==='MODEL').length===1?draft:repair;
@@ -484,6 +484,39 @@ test('turn 4 active semantic path retains the internal draft and persists covera
    assert.equal(receipt.payload.conversational_drift.coverage.status,'INSUFFICIENT_ANCHOR_COVERAGE');
    assert.equal(got.reliability.readback_verified,true);
    assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
+
+test('Cleaner scope clauses reach both reviews and a forgotten-obligation finding triggers bounded repair',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const message="We are NOT cancelling the construction project; we're cancelling ONLY the draft announcement.";
+   const original='The cancellation of the draft announcement is on hold.';
+   const corrected='Your requested scope cancels only the draft announcement. Construction is not cancelled. No external change has been executed.';
+   const stub=semanticCallStub(f,{draft:original,repair:corrected,
+    first:review({addressed:true,issues:[{kind:'FORGOTTEN_OBLIGATION',quote:original,
+     reason:'The requested cancellation is reversed into holding the cancellation.'}]}),second:review({})});
+   const got=await runLiveIntelligenceOrchestration({message,
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',apiKey:'test-only',
+    systemContext:context(),verifiedConversationTurns:[],fetchImpl:stub.fetchImpl});
+   assert.equal(got.intelligence.answer,corrected);
+   assert.deepEqual(stub.calls.map(c=>c.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   for(const call of stub.calls.filter(c=>c.mode==='REVIEW')){
+    const input=JSON.parse(call.request.input[1].content[0].text);
+    const typed=input.cleaner_conversation_context;
+    assert.equal(typed.current.clauses.length,2);
+    assert.match(typed.current.clauses[0].exact_source_text,/NOT cancelling/);
+    assert.match(typed.current.clauses[1].exact_source_text,/ONLY the draft/);
+    assert.equal(typed.execution_authorized,false);
+   }
+   const receipt=f.events.find(e=>e.event_id===got.reliability.receipt_id);
+   assert.equal(receipt.payload.conversational_drift.coverage.interpretation_source,'SIGNAL_CLEANER_TYPED_INTAKE');
+   assert.equal(receipt.payload.conversational_drift.coverage.typed_clause_count,2);
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.authority.granted,false);
   }finally{restoreSemantic()}
  });
 });
