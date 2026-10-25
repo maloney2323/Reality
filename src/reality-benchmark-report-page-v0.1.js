@@ -10,11 +10,14 @@ export function renderBenchmarkReportPage({score,turns}={}){
  const metric=(label,value)=>'<div class="metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>';
  const cards=turns.map(p=>{
   const detection=Array.isArray(p.detected_codes)?p.detected_codes:[];
+  const conversation=Array.isArray(p.conversational_findings)?p.conversational_findings:[];
   const reviewer=Array.isArray(p.semantic_issue_kinds)?p.semantic_issue_kinds:[];
   const changed=Boolean(p.response_altered);
   const review=String(p.semantic_review_status||'UNASSESSED');
   const data=[
-   ['Detector findings',detection.length?JSON.stringify(detection):'None recorded'],
+   ['Source-backed detector codes',detection.length?JSON.stringify(detection):'None recorded'],
+   ['Conversational claim findings',conversation.length?JSON.stringify(conversation):'None recorded'],
+   ['Conversational coverage',p.conversational_coverage?JSON.stringify(p.conversational_coverage):'Not reported in historical run'],
    ['Semantic issues',reviewer.length?JSON.stringify(reviewer):'None recorded'],
    ['Review status',review],
    ['Repair status',p.semantic_repair_status||'No repair'],
@@ -31,7 +34,8 @@ export function renderBenchmarkReportPage({score,turns}={}){
  }).join('');
  const overview=[
   metric('Persisted turns',score.turns+'/'+turns.length),
-  metric('Detector findings',turns.filter(x=>Array.isArray(x.detected_codes)&&x.detected_codes.length>0).length),
+  metric('Detector candidate turns',turns.filter(x=>(Array.isArray(x.detected_codes)&&x.detected_codes.length>0)||
+    (Array.isArray(x.conversational_findings)&&x.conversational_findings.length>0)).length),
   metric('Changed answers',score.answers_changed),
   metric('Model requests',score.model_requests_inside_reality),
   metric('Unassessed turns',turns.filter(x=>String(x.semantic_review_status||'').startsWith('UNASSESSED')).length),
