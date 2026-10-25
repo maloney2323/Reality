@@ -24,7 +24,7 @@ jobs:
           node --check src/reality-reliability-claim-extraction-v0.1.js
       - name: Test source arbitration, typed epistemic intake and Continuity locally
         run: |
-          node --test test/reality-adversarial-negative-external-action-regression.test.js \
+          node --test test/reality-active-path-audit-regression.test.js test/reality-adversarial-negative-external-action-regression.test.js \
             test/reality-source-review-adjudication-v0.1.test.js \
             test/reality-unified-semantic-review-v0.1.test.js \
             test/reality-signal-typed-epistemic-intake-v1.1.test.js \
@@ -34,3 +34,4 @@ jobs:
       - name: No paid calls in this workflow
         if: always()
         run: echo 'This GitHub workflow verifies code only; no OpenAI or Supabase credentials required.'
+

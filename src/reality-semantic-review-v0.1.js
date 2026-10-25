@@ -1,3 +1,4 @@
+import {isExplicitActionDenial} from './reality-action-assertion-v0.1.js';
 // Reality semantic detection — one evidence-aware LLM review inside the EXISTING
 // intelligence path. The reviewer is not truth, authority, or an independent
 // accuracy judge. Source claims are checked against immutable Continuity state.
@@ -115,7 +116,11 @@ function validate(parsed,answer,snapshot,worldId){
    if(!valid(a.quote)||!answer.includes(a.quote)||!valid(a.status)||
      !valid(a.action_type)||!valid(a.target))
      throw Error('SEMANTIC_REVIEW_UNANCHORED_ACTION');
-   actions.push({action_id:'semantic:claimed:'+actions.length,
+   if(isExplicitActionDenial(a.quote)){
+   unassessed.push({key:'external_action',reason:'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION',quote:a.quote.slice(0,350)});
+   continue;
+  }
+  actions.push({action_id:'semantic:claimed:'+actions.length,
      action_type:a.action_type,target:a.target,status:a.status,
      authority_ref:null,verification_ref:null,original_quote:a.quote.slice(0,350)});
  }
@@ -200,3 +205,4 @@ export async function reviewRealityAnswer({
      input_tokens:body.usage.input_tokens||0,output_tokens:body.usage.output_tokens||0,
    }:null});
 }
+

@@ -459,3 +459,31 @@ test('a false-positive reviewer warning about literally verified CI conclusion i
   }finally{restoreSemantic()}
  });
 });
+
+
+test('turn 4 active semantic path retains the internal draft and persists coverage gap',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const original='Internal release draft. No attempt to publish or externally announce this summary has been made.';
+   const quote='No attempt to publish or externally announce this summary has been made.';
+   const stub=semanticCallStub(f,{draft:original,first:review({actions:[{
+    action_type:'publish',target:'release summary',status:'COMPLETED',quote,
+   }]})});
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Prepare an internal release summary without publishing it.',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',apiKey:'test-only',
+    systemContext:context(),verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_review.unassessed_claims[0].reason,
+    'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION');
+   const receipt=f.events.find(e=>e.event_id===got.reliability.receipt_id);
+   assert.equal(receipt.payload.conversational_drift.coverage.status,'INSUFFICIENT_ANCHOR_COVERAGE');
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});

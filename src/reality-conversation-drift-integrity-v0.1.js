@@ -217,6 +217,14 @@ export function inspectConversationDrift({
   assessment_scope:'EXPLICIT_CONDITIONS_AND_BOUNDED_CURRENT_TURN_ALIGNMENT',
   history_scope:authenticated?'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT':'CURRENT_USER_TURN_ONLY',
   observed_prior_turn_count:eligible.length,anchor_count:anchors.length,
+  coverage: {
+   status:anchors.length?'LIMITED_PATTERN_COVERAGE':'INSUFFICIENT_ANCHOR_COVERAGE',
+   received_prior_message_count:priorTurns.length,
+   inspected_prior_message_count:eligible.length,
+   extracted_anchor_count:anchors.length,
+   general_semantic_drift_assessed:false,
+   no_findings_proves_no_drift:false,
+  },
   anchors,revision_candidates:revisions,findings,
   unknown_semantic_claims_possible:true,
   semantic_recall:null,drift_rate:null,false_positive_rate:null,
@@ -260,3 +268,4 @@ export function trackConversationalDriftAccumulation({priorReceipts=[],assessmen
    never_claims_zero_unobserved_drift:true,
  });
 }
+

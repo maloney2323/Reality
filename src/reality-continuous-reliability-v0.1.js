@@ -329,6 +329,7 @@ export async function runContinuousReliabilityCycle({
       status:conversational.status,
       assessment_scope:conversational.assessment_scope,
       history_scope:conversational.history_scope,
+      coverage:conversational.coverage||null,
       anchor_count:conversational.anchor_count,
       observed_prior_turn_count:conversational.observed_prior_turn_count,
       findings:conversational.findings.map(f=>({
@@ -439,3 +440,4 @@ export async function runContinuousReliabilityCycle({
     checkpoint: backcheck ? { ...backcheck, readback_verified: checkpointReadbackVerified } : null,
   });
 }
+

@@ -1,3 +1,4 @@
+import {isExplicitActionDenial} from './reality-action-assertion-v0.1.js';
 // Quote-anchored extraction v0.2. Model-derived extraction is NOT evidence.
 // The extractor must separate affirmed claims from denials and uncertainty.
 // Known fields are compared by conservative type-aware canonicalization;
@@ -162,12 +163,10 @@ export async function extractReliabilityClaims({
   // completed external action. A denied action MUST NOT become completion
   // evidence merely because a probabilistic extractor mislabeled assertion.
   // On ambiguity, preserve the quote for review; do not grant execution.
-  const explicitActionDenial=q=>
-    /\bno\s+attempt\s+to\b|\b(?:did|does|do|has|have|had|was|were|is|are|will|would)\s+not\s+(?:(?:been|yet|actually)\s+){0,2}(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed|complete|completed)\b|\b(?:not|never)\s+(?:send|sent|publish|published|deploy|deployed|execute|executed|issue|issued|contact|contacted|email|emailed)\b/i.test(q);
   const safeActions=[];
   for(const a of parsed.actions){
     if(a.assertion!=='AFFIRMED')continue;
-    if(explicitActionDenial(a.quote)){
+    if(isExplicitActionDenial(a.quote)){
       unadjudicated.push({key:'external_action',reason:'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION',
         quote:a.quote.slice(0,200)});
       continue;
@@ -217,3 +216,4 @@ export async function extractReliabilityClaims({
     provider_response_id:body.id||null,
   };
 }
+
