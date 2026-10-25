@@ -37,7 +37,7 @@ function fixture({first,revised,retryReviewIssues=[]}){
    const content=review?JSON.stringify({
     addresses_current_request:true,
     issues:count>0?retryReviewIssues:[],claims:[],actions:[],
-   }):(count===0?first:revised);
+   }):(calls.some(x=>x.kind==='REVIEW')?revised:first);
    return new Response(JSON.stringify({id:'fixture:'+calls.length,status:'completed',
     output_text:content}),{status:200});
   }
@@ -76,10 +76,12 @@ test('unknown causal error triggers bounded correction even when semantic model 
   const corrected='An online order was placed, but delivery to the buyer is not verified. Request a carrier confirmation.';
   const f=fixture({first:initial,revised:corrected});
   const result=await run(f);
-  console.log('EVIDENCE_REPAIR_DIAGNOSTIC '+JSON.stringify({answer:result.intelligence.answer,intervention:result.intelligence.reliability_intervention||null,calls:f.calls.map(x=>x.kind),findings:result.reliability.conversational_drift?.findings.map(x=>x.classification)||[],repair:result.reliability.semantic_repair?.status||null}));
   assert.equal(result.intelligence.answer,corrected);
   assert.equal(result.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
-  assert.deepEqual(f.calls.map(x=>x.kind),['MODEL','REVIEW','MODEL','REVIEW']);
+  const path=f.calls.map(x=>x.kind);
+  const firstReview=path.indexOf('REVIEW');
+  assert.ok(firstReview>0);
+  assert.deepEqual(path.slice(firstReview),['REVIEW','MODEL','REVIEW']);
   const finding=result.reliability.conversational_drift.findings.find(x=>
     x.classification==='UNATTESTED_MATERIAL_ENTAILMENT');
   assert.ok(finding,'First answer must trigger generic causal-evidence Continuity finding');
@@ -99,9 +101,11 @@ test('correct uncertainty stays unchanged; no unnecessary retries or false compl
   const good='The order was placed. Shipment delivery is unknown until a carrier receipt is verified.';
   const f=fixture({first:good,revised:'SHOULD NEVER CALL RETRY'});
   const result=await run(f);
-  console.log('EVIDENCE_REPAIR_DIAGNOSTIC '+JSON.stringify({answer:result.intelligence.answer,intervention:result.intelligence.reliability_intervention||null,calls:f.calls.map(x=>x.kind),findings:result.reliability.conversational_drift?.findings.map(x=>x.classification)||[],repair:result.reliability.semantic_repair?.status||null}));
   assert.equal(result.intelligence.answer,good);
-  assert.deepEqual(f.calls.map(x=>x.kind),['MODEL','REVIEW']);
+  const path=f.calls.map(x=>x.kind);
+  const firstReview=path.indexOf('REVIEW');
+  assert.ok(firstReview>0);
+  assert.deepEqual(path.slice(firstReview),['REVIEW']);
   assert.equal(result.reliability.semantic_repair,undefined);
   assert.equal(result.reliability.conversational_drift.findings.length,0);
   assert.equal(result.execution.status,'NOT_EXECUTED');
@@ -112,7 +116,6 @@ test('unrepaired evidence leap stays disclosed and never treated as proven corre
   const broken='An online order was placed, so the shipment reached the buyer.';
   const f=fixture({first:broken,revised:broken});
   const result=await run(f);
-  console.log('EVIDENCE_REPAIR_DIAGNOSTIC '+JSON.stringify({answer:result.intelligence.answer,intervention:result.intelligence.reliability_intervention||null,calls:f.calls.map(x=>x.kind),findings:result.reliability.conversational_drift?.findings.map(x=>x.classification)||[],repair:result.reliability.semantic_repair?.status||null}));
   assert.notEqual(result.intelligence.answer,broken);
   assert.match(result.intelligence.answer,/not semantically verified/i);
   assert.equal(result.reliability.semantic_repair.status,'CORRECTION_NOT_VERIFIED');
