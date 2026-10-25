@@ -16,7 +16,7 @@ const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const PROJECT='hvkfreoagbrphwghjajw',DB='https://'+PROJECT+'.supabase.co';
 const ROOT='actual-business-adversarial:20261025:original-versus-reality:16';
 const WORLDLINE='reality:benchmark:business-ops',WORLD='reality:benchmark:company-operations';
-const MODEL='gpt-4.1',MAX_CALLS_PER_PHASE=28,MAX_INPUT_PER_PHASE=190000,MAX_OUTPUT_PER_PHASE=21000;
+const MODEL='gpt-4.1',MAX_CALLS_PER_PHASE=42,MAX_INPUT_PER_PHASE=260000,MAX_OUTPUT_PER_PHASE=38000;
 const phase=process.argv[2]||'run',now=()=>new Date().toISOString();
 const digest=o=>'sha256:'+createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const facts={oldRun:40164102484,newRun:40164146058,pr:139};
