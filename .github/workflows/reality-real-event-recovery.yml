@@ -1,0 +1,62 @@
+name: Reality — Actual CI Change / End-to-End Recovery Trial
+on:
+  push:
+    branches:
+      - experiment/reality-real-event-recovery-20261025
+    paths:
+      - '.github/workflows/reality-real-event-recovery.yml'
+      - 'scripts/run-reality-real-github-event-recovery.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax, Continuity and Signal Cleaner
+        run: |
+          node --check scripts/run-reality-real-github-event-recovery.mjs
+          node --test test/reality-signal-typed-epistemic-intake-v1.1.test.js \
+            test/reality-continuity-runtime-v0.1.test.js \
+            test/reality-unified-semantic-review-v0.1.test.js
+  reality-changing-business-records:
+    needs: preflight
+    if: contains(github.event.head_commit.message, '[run-real-event-recovery]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      REALITY_SEMANTIC_REVIEW_MODEL: gpt-4.1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Four Reality-only model turns with authentic changing GitHub evidence
+        run: node scripts/run-reality-real-github-event-recovery.mjs
+      - name: Save raw model and verified Reality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-github-changing-truth-and-recovery
+          path: benchmark-results/reality-real-event-recovery-20261025.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Scope disclosure
+        if: always()
+        run: |
+          echo 'GitHub workflow statuses are authentic; prompts authored for test.'
+          echo 'Reality model is real; within-loop storage here is simulated.'
+          echo 'Separate real benchmark Supabase persistence verified independently.'
+          echo 'No production actions or independently certified error rate.'
