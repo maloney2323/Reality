@@ -1,6 +1,6 @@
 // Isolated, authenticated Personal Reality conversation. No customer actions.
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {readPrivateChat,recordPrivateMessage,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,recordPrivateMessage,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
@@ -13,6 +13,8 @@ export default async function handler(req,res){
   if(req.method==='POST')assertSameOrigin(req);
   const session=await authenticatedChatSession(req,res);
   if(!session)fail('CHAT_SIGN_IN_REQUIRED',401);
+  if(req.method==='GET'&&String(req.query?.list||'')==='1')
+   return res.status(200).json({ok:true,conversations:await listPrivateConversations(session)});
   const conversationId=String((req.method==='GET'?req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
   const history=await readPrivateChat(session,conversationId);
