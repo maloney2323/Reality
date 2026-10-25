@@ -62,6 +62,143 @@ const equivPatterns=[
  /\b(?:payer|edi|file|claim)\s+(?:file\s+)?acknowledg(?:e)?ment\s+(?:is|means|proves|confirms|guarantees|counts\s+as|equals|is\s+equivalent\s+to)\s+([^.!?\n]{2,100})/gi,
  /\b(?:ci|checks?|tests?|build)\s+(?:is\s+)?(?:green|passed|passing|successful|success)\s+(?:means|proves|confirms|guarantees|equals|is\s+equivalent\s+to)\s+([^.!?\n]{2,100})/gi,
 ];
+
+// General relation path. Observed events and downstream operational states
+// are TYPE families. A causal leap across them is a candidate, not ground truth.
+// The same rules apply to new wording; no single business scenario or quote
+// is individually hard-coded as an answer.
+const inferredTransitions=[
+ {source:'INGESTION_RECEIPT',target:'MONEY_OR_ADJUDICATION',
+  observed:/\b(?:edi|999|acknowledg(?:e)?ment|transmission|claim(?:s)?|submission)\b.{0,75}\b(?:receipt|received|acknowledg(?:ed|ment)|transmi(?:t|ssion))\b|\b(?:receipt|acknowledg(?:ed|ment))\b.{0,55}\b(?:edi|999|claim|batch|submiss|transmiss)/i,
+  outcome:/\b(?:paid|payment|reimburs(?:ement|ed)|deposited|deposit|funds?|financ(?:ing|ial)|adjudicat(?:ed|ion)|claim\s+(?:approved|accepted))\b/i},
+ {source:'INTERNAL_FULFILLMENT',target:'CUSTOMER_DELIVERY',
+  observed:/\b(?:warehouse|picked?|pick.?list|pick\s+ticket|fulfillment|fulfilment|packing|scann?ed)\b/i,
+  outcome:/\b(?:delivered|delivery|customer.{0,30}(?:received|got|took)|buyer.{0,25}(?:received|got)|possession|reached\s+(?:the\s+)?buyer|arrived)\b/i},
+ {source:'ESTIMATE_DRAFT',target:'CUSTOMER_APPROVAL',
+  observed:/\b(?:estimate|proposal|quote|change\s+order)\b.{0,50}\b(?:creat(?:ed|ion)|draft(?:ed)?|prepar(?:ed|ation)|issued|submitted|exists?)\b|\b(?:creat(?:ed|ion)|draft(?:ed)?|prepar(?:ed|ation))\b.{0,40}\b(?:estimate|proposal|quote|change\s+order)\b/i,
+  outcome:/\b(?:homeowner|customer|client|owner)\b.{0,45}\b(?:approv(?:ed|al)|accept(?:ed|ance)|signed?|consent|authoriz(?:ed|ation))\b/i},
+ {source:'TEST_RESULT',target:'CUSTOMER_RELEASE',
+  observed:/\b(?:automated\s+)?(?:tests?|checks?|build|ci)\b.{0,30}\b(?:pass(?:ed|ing)?|success(?:ful)?|green)\b/i,
+  outcome:/\b(?:live\s+for\s+customers?|production|released?|deployed?|shipped?|launch(?:ed)?)\b/i},
+ {source:'INVOICE_SUBMISSION',target:'MONEY_SETTLEMENT',
+  observed:/\b(?:invoice|bill)\b.{0,40}\b(?:submitt?ed|sent|created?|issued?|entered|raised)\b/i,
+  outcome:/\b(?:paid|payment|settle(?:d|ment)|deposited|reimburs(?:ed|ement))\b/i},
+ {source:'PERSONNEL_ONBOARDING',target:'PROTECTED_ACCESS_AUTHORITY',
+  observed:/\b(?:hr|human resources|onboard(?:ed|ing)|employee\s+start)\b/i,
+  outcome:/\b(?:phi|hipaa|production|health\s+record|protected)\b.{0,35}\b(?:access|permission|authoriz(?:ed|ation)|granted)\b/i},
+ {source:'INSPECTION_APPOINTMENT',target:'PERMIT_APPROVAL',
+  observed:/\b(?:inspector|inspection|appointment)\b.{0,30}\b(?:schedul(?:ed|ing)|booked|appointment)\b/i,
+  outcome:/\b(?:permit|inspection)\b.{0,35}\b(?:pass(?:ed)?|approv(?:ed|al)|sign.?off)\b/i},
+ {source:'PAYMENT_AUTHORIZATION',target:'SETTLEMENT',
+  observed:/\b(?:card|processor|payment)\b.{0,40}\b(?:authoriz(?:ed|ation)|hold|pre.?auth)\b/i,
+  outcome:/\b(?:funds?|payment|charge)\b.{0,35}\b(?:settle(?:d|ment)|clear(?:ed|ance)|transferr?ed|captured)\b/i},
+ {source:'UNATTRIBUTED_COMMUNICATION',target:'CUSTOMER_APPROVAL',
+  observed:/\b(?:unsigned|anonymous|unattribut(?:ed|able)|redacted|forwarded|unverified)\b.{0,45}\b(?:screenshot|text|photo|message|email|note)\b/i,
+  outcome:/\b(?:customer|client|homeowner|owner)\b.{0,45}\b(?:approv(?:ed|al)|accept(?:ed|ance)|consent|sign(?:ed|off))\b/i},
+];
+const connector=/\b(?:and\s+therefore|therefore|thus|hence|so|which\s+(?:confirms?|proves?|shows?|means?|establishes?|indicates?)|means?|confirms?|proves?)\b/i;
+function unsupportedInferences(answer,{continuityRootId,modelResponseId,refs,currentUserSourceRef}){
+ const candidates=[];
+ for(const m of answer.matchAll(/[^.!?\n]{16,300}/g)){
+  const text=m[0],bridge=connector.exec(text);
+  if(!bridge)continue;
+  const lhs=text.slice(0,bridge.index),rhs=text.slice(bridge.index+bridge[0].length);
+  // A separate receipt, explicit negation or acknowledged uncertainty on
+  // the outcome side prevents an unsupported success classification.
+  if(!lhs.trim()||!rhs.trim()||
+     /\b(?:not|never|unknown|unverified|unconfirmed|could|might|may|cannot|can't|no\s+evidence|without)\b/i.test(rhs))continue;
+  const start=m.index||0;
+  const intro=answer.slice(Math.max(0,start-80),start+Math.min(75,text.length));
+  if(/\b(?:vendor|manager|supplier|someone|analyst|contractor|client|employee|team)\s+(?:wrote|said|says|claimed|claims|reported|reports|quoted|argued)\b/i.test(intro) ||
+     /["“][^"”]{0,120}$/.test(intro.slice(-120)))continue;
+  for(const transition of inferredTransitions){
+   if(!transition.observed.test(lhs)||!transition.outcome.test(rhs))continue;
+   candidates.push(finding({
+    classification:'UNSUPPORTED_STATE_TRANSITION',left:m,answer,
+    continuityRootId,modelResponseId,
+    sourceRefs:refs.filter(r=>transition.observed.test(r.text)).map(r=>r.source_ref).concat([currentUserSourceRef]),
+    reason:'Assistant presents an upstream event as sufficient evidence of an independently verifiable downstream operational state.',
+    relation:{source_event_type:transition.source,inferred_outcome_type:transition.target,
+     claim_relation:'MISSING_INDEPENDENT_TRANSITION_EVIDENCE',
+     source_is_not_outcome:true,independent_evidence_required:true},
+   }));
+  }
+ }
+ return candidates;
+}
+const namedSubjects=[
+ ['PAYER',/\b(?:payer|insurance|insurer)\b/i],
+ ['STATUS',/\b(?:status|statuses)\b/i],
+ ['INVOICE',/\b(?:invoice|bill)\b/i],
+ ['SEND_AUTHORITY',/\b(?:send|email|permission|authoriz(?:ed|ation))\b/i],
+ ['HOMEOWNER',/\b(?:homeowner|homeowners?)\b/i],
+ ['CUSTOMER',/\b(?:customer|client)\b/i],
+ ['PROPOSAL',/\b(?:proposal|estimate|quote|revision)\b/i],
+ ['PAYMENT',/\b(?:payment|settle(?:d|ment)|paid|funds?)\b/i],
+ ['CI',/\b(?:ci|tests?|build|checks?|github)\b/i],
+ ['RUN',/\b(?:run|latest\s+(?:verified\s+)?status)\b/i],
+ ['PERMIT',/\b(?:permit|inspection)\b/i],
+ ['CLAIM',/\b(?:claim|benefit)\b/i],
+ ['DELIVERY',/\b(?:delivered|delivery|shipment)\b/i],
+];
+function sentencesWithPositions(answer){
+ const list=[];
+ for(const m of answer.matchAll(/[^.!?\n;]{14,260}/g)){
+  const str=m[0].trim();
+  if(str)list.push({text:str,index:(m.index||0)+m[0].indexOf(str)});
+ }
+ return list;
+}
+function statusOf(text){
+ // Provenance scope matters: report/quote should not become assistant truth.
+ if(/\b(?:vendor|supplier|contractor|analyst|manager|someone|they)\s+(?:said|says|reports?|claims?|wrote)\b/i.test(text))return null;
+ if(/\b(?:no|not|none|nobody|no\s+one|unknown|unverified|unconfirmed|cannot|can't|haven't|hasn't|not\s+a\s+single|failure|failed|not\s+established)\b/i.test(text)){
+   if(/\b(?:verif(?:ied|ication)|confirm(?:ed|ation)|establish(?:ed|ment)|proven|settle(?:d|ment)|approv(?:ed|al)|authoriz(?:ed|ation)|signed\s+off|fail(?:ure|ed))\b/i.test(text))return 'NOT_ESTABLISHED';
+ }
+ if(/\b(?:verified|confirmed|proven|settled|approved|signed\s+off|passing|successful|success)\b/i.test(text))return 'ESTABLISHED';
+ return null;
+}
+function subjects(text){
+ const s=new Set();
+ for(const [key,pattern] of namedSubjects)if(pattern.test(text))s.add(key);
+ if(/\b(?:latest|same\s+latest|current)\s+(?:verified\s+)?(?:ci\s+)?(?:run|status)\b/i.test(text))
+   s.add('LATEST_WORKFLOW');
+ return s;
+}
+function generalizedStatusContradictions(answer,{continuityRootId,modelResponseId,refs,currentUserSourceRef}){
+ const clauses=sentencesWithPositions(answer),out=[];
+ for(let i=0;i<clauses.length;i++){
+  const lhs=clauses[i],pa=statusOf(lhs.text);
+  if(!pa)continue;
+  const a=subjects(lhs.text);
+  for(let j=i+1;j<clauses.length&&j<=i+6;j++){
+   const rhs=clauses[j],pb=statusOf(rhs.text);
+   if(!pb||pa===pb)continue;
+   const b=subjects(rhs.text);
+   const intersection=[...a].filter(x=>b.has(x));
+   // 'CI verified; homeowner approval not verified' is correct;
+   // both statements need to refer to a reasonably matching subject.
+   if(!intersection.length||(
+    /\b(?:on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|yesterday|tomorrow)\b/i.test(lhs.text+rhs.text)
+    &&!/\b(?:same|still|current|latest)\b/i.test(lhs.text+rhs.text)
+   ))continue;
+   const left=Object.assign([lhs.text],{index:lhs.index});
+   const right=Object.assign([rhs.text],{index:rhs.index});
+   out.push(finding({
+    classification:'EPISTEMIC_STATUS_SELF_CONTRADICTION',left,right,answer,
+    continuityRootId,modelResponseId,
+    sourceRefs:refs.filter(r=>intersection.some(t=>namedSubjects.some(([key,pat])=>
+      key===t&&pat.test(r.text)))).map(r=>r.source_ref).concat([currentUserSourceRef]),
+    reason:'Two model statements give opposing verification/outcome status for apparently the same entity or active workflow scope. Check actor, time and provenance.',
+    relation:{left_status:pa,right_status:pb,shared_subjects:intersection,
+      claim_relation:'POTENTIAL_SAME_SUBJECT_POLARITY_CONFLICT'},
+   }));
+   break;
+  }
+ }
+ return out;
+}
+
 export function inspectEpistemicClaimRelations({
  modelAnswer='',currentUserMessage='',priorTurns=[],continuityRootId='untracked',
  modelResponseId='untracked',currentUserSourceRef='current:user',
@@ -86,6 +223,9 @@ export function inspectEpistemicClaimRelations({
    relation:{left_status:'VERIFIED',right_status:'NOT_VERIFIED',claim_relation:'POTENTIAL_SAME_SET'},
   }));
  }
+ const structural={continuityRootId,modelResponseId,refs,currentUserSourceRef};
+ findings.push(...unsupportedInferences(answer,structural));
+ findings.push(...generalizedStatusContradictions(answer,structural));
  const seen=new Set();
  for(const re of equivPatterns){
   for(const m of answer.matchAll(re)){
