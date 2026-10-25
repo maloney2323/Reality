@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 export const TYPED_SIGNAL_INTAKE_VERSION='signal-epistemic-intake-v1.1.0';
 const digest=x=>'sha256:'+crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x)}return x};
-const verbs='(?:check|verify|find|research|look|review|prepare|draft|create|make|send|email|reply|dispatch|approve|purchase|buy|pay|transfer|deploy|merge|delete|publish|post|cancel|schedule|execute|update|write|change|show|tell|compare|summarize|open|close|hold)';
+const verbs='(?:check|verify|find|research|look|review|prepare|draft|create|make|send|email|reply|dispatch|approve|purchase|buy|pay|transfer|deploy|merge|delete|publish|post|cancel|schedule|execute|update|write|change|show|tell|compare|summarize|explain|cite|describe|identify|state|list|open|close|hold)';
 const actionStart=new RegExp('^(?:(?:please|just|now)\\s+)?'+verbs+'\\b','i');
 const questionStart=/^(?:what|why|where|when|who|how|which|whose|did|does|do|are|is|was|were|can|could|should|would|will|have|has)\b/i;
 const prohibition=/\b(?:do not|don't|never|must not|cannot|can't|no one should|without permission to)\s+(?:(?:\w+)[\s-]+){0,3}(?:send|email|dispatch|approve|pay|transfer|deploy|merge|delete|publish|post|execute|buy|purchase|contact|notify|issue)\b/i;
@@ -69,7 +69,8 @@ function interpret(clause,fragment,rawText){
   const direct=maskedDirect(fragment,begin,end,text).replace(/^(?:and|but|then)\s+/i,'').trim();
   const quotation=quoteOnly(fragment,begin,end);
   const prohibited=prohibition.test(direct);
-  const isQuestion=questionStart.test(direct)||/\?/.test(direct);
+  const negativeInstruction=/^(?:do not|don't|never|avoid)\b/i.test(direct);
+  const isQuestion=(questionStart.test(direct)&&!negativeInstruction)||/\?/.test(direct);
   const conditional=conditionStart.test(direct);
   const inlineCondition=!conditional&&/\b(?:if|unless|once|provided that|assuming that)\b/i.test(direct);
   const isCommand=actionStart.test(direct)||/^(?:can|could|would)\s+you\s+/i.test(direct);
@@ -90,6 +91,7 @@ function interpret(clause,fragment,rawText){
   if(!modality.length)modality.push('ASSERTED_CANDIDATE');
   const kind=quotation?'QUOTED_EVIDENCE':
     prohibited?'PROHIBITION_CANDIDATE':
+    negativeInstruction?'CONSTRAINT_CANDIDATE':
     conditional?'CONDITION_CANDIDATE':
     isQuestion?'QUESTION_CANDIDATE':
     isResponse?'RESPONSE_CANDIDATE':
@@ -125,7 +127,7 @@ function interpret(clause,fragment,rawText){
       creates_execution_hook:false,
     }:null,
     requires_semantic_review:!!(reported||corrected||conditional||inlineCondition||quotation||
-      uncertain||hypo||isResponse),
+      uncertain||hypo||isResponse||negativeInstruction),
   };
 }
 export function buildTypedEpistemicIntake({packet,fragments}={}){
