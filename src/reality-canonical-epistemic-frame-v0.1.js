@@ -73,6 +73,8 @@ export function buildCanonicalEpistemicFrame({
   history_incomplete:incomplete,
   history_coverage:incomplete?'PARTIAL_OR_NOT_ATTESTED':'BOUNDED_SOURCE_LINKED',
   reported_claim_count_all_available:reports.total_candidates||0,
+  // One frozen source projection shared by cognition and the reviewer; no separate parser.
+  conversation_evidence:copy(reports),
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
