@@ -60,7 +60,7 @@ const fetchImpl=async(url,opts={})=>{
  }
  if(u.origin!=='https://api.openai.com'||u.pathname!=='/v1/responses')
   throw Error('UNAPPROVED_NETWORK_DESTINATION');
- if(calls.length>=limit||input>=145000||output>=17500)
+ if(calls.length>=limit||input>=290000||output>=25000)
   throw Error('MODEL_PROVIDER_BUDGET_LIMIT');
  const body=JSON.parse(opts.body||'{}');
  const response=await fetch(url,{...opts,signal:AbortSignal.timeout(110000)});
@@ -88,7 +88,11 @@ const getTurns=events=>events.filter(e=>
 async function runSegment(from,to){
  const opened=await runtime('Read trusted source-linked benchmark transcript.');
  const saved=getTurns(await opened.readback());
- const next=nextAdversarialSegmentTurn({from,to,savedTurnCount:saved.length});
+ // Recovery after a budget-capped partial first phase: never replay paid,
+ // already committed turns; strictly verify saved sequence below.
+ const next=from===1&&saved.length>0&&saved.length<to
+   ?saved.length+1
+   :nextAdversarialSegmentTurn({from,to,savedTurnCount:saved.length});
  for(let i=0;i<saved.length;i++)assert.equal(saved[i].payload.turn,i+1);
  const transcript=[];
  for(const e of saved)transcript.push(
