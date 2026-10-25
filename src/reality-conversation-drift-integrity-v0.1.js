@@ -3,6 +3,7 @@
 // Findings are candidates; independent semantic adjudication is NOT performed.
 // Never authorize external actions from conversational observations.
 import {createHash} from 'node:crypto';
+import {inspectEpistemicClaimRelations} from './reality-epistemic-claim-relations-v0.1.js';
 const nonempty=x=>typeof x==='string'&&x.trim().length>0;
 const sha=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 // Conversation drift is part of the Continuity Spine, not a new independent
@@ -208,7 +209,11 @@ export function inspectConversationDrift({
  }
  for(const anchor of (cleanerConversationContext?typedConditionAnchors(cleanerConversationContext):extractUserIntentAnchors(currentUserMessage,currentUserSourceRef,eligible.length)))
   if(!seen.has(anchor.anchor_id)){seen.add(anchor.anchor_id);anchors.push(anchor)}
- const findings=[],revisions=[];
+ const relationAssessment=inspectEpistemicClaimRelations({
+   modelAnswer,currentUserMessage,priorTurns:eligible,continuityRootId,
+   modelResponseId,currentUserSourceRef,
+ });
+ const findings=[...relationAssessment.findings],revisions=[];
  const turnAlignment=findTurnAlignmentCandidate({priorTurns:eligible,
    currentUserMessage,modelAnswer,continuityRootId,modelResponseId,
    currentUserSourceRef,authenticated});
@@ -250,7 +255,7 @@ export function inspectConversationDrift({
   version:CONVERSATIONAL_CONTINUITY_VERSION,
   status:findings.length?'EARLY_CONVERSATION_DRIFT_RISK':
    anchors.length?'LIMITED_CONVERSATION_CHECK_NO_FLAG':'NO_EXTRACTABLE_CONVERSATION_ANCHOR',
-  assessment_scope:'EXPLICIT_CONDITIONS_AND_BOUNDED_CURRENT_TURN_ALIGNMENT',
+  assessment_scope:'EXPLICIT_CONDITIONS_BOUNDED_TURN_ALIGNMENT_AND_EPISTEMIC_CLAIM_RELATIONS',
   history_scope:authenticated?'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT':'CURRENT_USER_TURN_ONLY',
   observed_prior_turn_count:eligible.length,anchor_count:anchors.length,
   coverage: {
@@ -264,6 +269,8 @@ export function inspectConversationDrift({
    typed_source_refs:cleanerConversationContext?
     [...cleanerConversationContext.history,cleanerConversationContext.current].map(r=>({source_ref:r.source_ref,projection_digest:r.projection_digest})):[],
    typed_scope_and_negation_require_semantic_review:true,
+   relation_inspection:relationAssessment.assessed_scope,
+   relation_candidate_count:relationAssessment.findings.length,
    general_semantic_drift_assessed:false,
    no_findings_proves_no_drift:false,
   },
