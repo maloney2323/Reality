@@ -45,7 +45,7 @@ for(const c of cases){
   modelResponseId:'heldout:'+c.id,currentUserSourceRef:'benchmark:user:'+c.id,
   priorTurns:[],historySource:'NOT_ATTESTED',
  });
- const flagged=(r.findings||[]).filter(x=>['EVENT_TYPE_COLLAPSE','EPISTEMIC_STATUS_SELF_CONTRADICTION','UNSUPPORTED_STATE_TRANSITION'].includes(x.classification));
+ const flagged=(r.findings||[]).filter(x=>['EVENT_TYPE_COLLAPSE','EPISTEMIC_STATUS_SELF_CONTRADICTION','UNSUPPORTED_STATE_TRANSITION','UNATTESTED_MATERIAL_ENTAILMENT'].includes(x.classification));
  const expectedError=c.expected!=='CLEAN';
  const detected=flagged.length>0;
  if(expectedError&&detected)tp++;
