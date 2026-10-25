@@ -71,6 +71,7 @@ function interpret(clause,fragment,rawText){
   const prohibited=prohibition.test(direct);
   const isQuestion=questionStart.test(direct)||/\?/.test(direct);
   const conditional=conditionStart.test(direct);
+  const inlineCondition=!conditional&&/\b(?:if|unless|once|provided that|assuming that)\b/i.test(direct);
   const isCommand=actionStart.test(direct)||/^(?:can|could|would)\s+you\s+/i.test(direct);
   const isResponse=responseOnly.test(direct);
   const reported=hearsay.test(direct);
@@ -79,7 +80,7 @@ function interpret(clause,fragment,rawText){
   const modality=[];
   if(quotation)modality.push('QUOTED');
   if(reported)modality.push('HEARSAY');
-  if(conditional)modality.push('CONDITIONAL');
+  if(conditional||inlineCondition)modality.push('CONDITIONAL');
   if(hypo)modality.push('HYPOTHETICAL');
   if(uncertain)modality.push('UNCERTAIN');
   if(neg)modality.push('NEGATED');
@@ -96,6 +97,7 @@ function interpret(clause,fragment,rawText){
     isCommand?'TASK_REQUEST_CANDIDATE':
     reported?'REPORTED_ASSERTION_CANDIDATE':'STATEMENT_CANDIDATE';
   const agency=prohibited?'AUTONOMOUS_PROHIBITED_CANDIDATE':
+    (isCommand&&inlineCondition&&!quotation)?'AUTONOMOUS_CONDITIONAL_CANDIDATE':
     (isCommand&&!quotation)?'DIRECT_REQUEST_NOT_AUTHORIZED':
     conditional?'CONDITIONAL_PREMISE_ONLY':'NO_EXECUTION_DIRECTIVE';
   const sourceStart=fragment.raw_span.start+begin,sourceEnd=fragment.raw_span.start+end;
@@ -116,8 +118,13 @@ function interpret(clause,fragment,rawText){
     candidate_relations:corrected?[{kind:'MAY_SUPERSEDE',target_signal_id:null,
       status:'CONTINUITY_RECONCILIATION_REQUIRED'}]:[],
     // Intentionally unresolved: no inferred target, verified approval or money.
-    candidate_dependency:null,
-    requires_semantic_review:!!(reported||corrected||conditional||quotation||
+    candidate_dependency:(inlineCondition&&isCommand)?{
+      condition_clause_id:null,condition_status:'UNRESOLVED',
+      condition_source_clause_id:null,
+      handoff:'WORK_RUNTIME_AFTER_CONTINUITY_VERIFICATION',
+      creates_execution_hook:false,
+    }:null,
+    requires_semantic_review:!!(reported||corrected||conditional||inlineCondition||quotation||
       uncertain||hypo||isResponse),
   };
 }
@@ -156,7 +163,8 @@ export function buildTypedEpistemicIntake({packet,fragments}={}){
     version:TYPED_SIGNAL_INTAKE_VERSION,
     packet_id:packet.packet_id,source_digest:packet.raw_content_digest,
     clause_count:clauses.length,clauses,
-    unresolved_conditions:clauses.filter(c=>c.kind==='CONDITION_CANDIDATE')
+    unresolved_conditions:clauses.filter(c=>c.kind==='CONDITION_CANDIDATE'||
+      (c.candidate_dependency?.condition_clause_id===null))
       .map(c=>({condition_clause_id:c.clause_id,status:'UNRESOLVED',
         resolved_by_intake:false})),
     correction_candidates:clauses.flatMap(c=>c.candidate_relations.map(r=>({
