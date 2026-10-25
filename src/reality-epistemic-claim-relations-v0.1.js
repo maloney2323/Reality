@@ -106,6 +106,7 @@ function unsupportedInferences(answer,{continuityRootId,modelResponseId,refs,cur
   // A separate receipt, explicit negation or acknowledged uncertainty on
   // the outcome side prevents an unsupported success classification.
   if(!lhs.trim()||!rhs.trim()||
+     /\b(?:does\s+not|do\s+not|is\s+not|cannot|can't|doesn't|isn't)\s*$/i.test(lhs)||
      /\b(?:not|never|unknown|unverified|unconfirmed|could|might|may|cannot|can't|no\s+evidence|without)\b/i.test(rhs))continue;
   const start=m.index||0;
   const intro=answer.slice(Math.max(0,start-80),start+Math.min(75,text.length));
