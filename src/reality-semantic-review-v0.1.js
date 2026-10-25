@@ -189,7 +189,7 @@ export async function reviewRealityAnswer({
  const request={
    cleaner_conversation_context:cleanerConversationContext,
    structural_claim_relation_candidates:(Array.isArray(structuralFindings)?structuralFindings:[]).slice(0,8)
-     .filter(f=>['EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION'].includes(f.classification))
+     .filter(f=>['EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION','UNATTESTED_MATERIAL_ENTAILMENT'].includes(f.classification))
      .map(f=>({classification:f.classification,observed_model_text:f.observed_model_text,
        claim_spans:f.claim_spans,relation:f.relation,source_receipt_refs:f.source_receipt_refs})),
    current_user_request:currentUserMessage,
