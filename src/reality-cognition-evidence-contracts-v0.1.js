@@ -113,8 +113,8 @@ export function extractNarrowInspectionClaims(answer=''){
 export function assessDualAxisEvidence({
  currentUserMessage='',modelAnswer='',frame,
  action=null,executionAuthorizationStatus='UNKNOWN',focusCandidateCodes=[],existingDetectorFindings=[],
- temporalClaims=null,expectedTurnIndex=null,
- referenceAsOfTurn=null,recordedTurn=null,validFromTurn=null,
+ temporalClaims=null,sourceTimeline=null,
+ referenceAsOfTurn=null,
  currentUserSourceRef='benchmark:user:current',
 }={}){
  scopeCheck(frame);
@@ -141,9 +141,23 @@ export function assessDualAxisEvidence({
   'POSSIBLE_CURRENT_TURN_DRIFT':'NOT_ESTABLISHED_BY_LIMITED_CHECK';
  const claims=temporalClaims||extractNarrowInspectionClaims(modelAnswer);
  const errors=[];
+ // Only an explicitly trusted, frozen benchmark timeline is understood by
+ // this Turn-N extractor. The expectations are derived from SOURCE FRAME
+ // timestamps; the caller cannot inject a convenient "correct" Turn number.
+ const validTimeline=sourceTimeline?.source_kind==='FROZEN_SYNTHETIC_BENCHMARK_CLOCK'&&
+  Number.isFinite(Date.parse(sourceTimeline?.turn1_at))&&
+  sourceTimeline?.step_ms===60000;
+ const inspection=frame.time_scoped_state?.inspection_wr41;
+ const sourceRefPresent=Array.isArray(inspection?.source_refs)&&inspection.source_refs.length>0;
+ const deriveTurn=timestamp=>{
+  if(!validTimeline||!sourceRefPresent||!valid(timestamp))return null;
+  const offset=(Date.parse(timestamp)-Date.parse(sourceTimeline.turn1_at))/
+   sourceTimeline.step_ms;
+  return Number.isInteger(offset)&&offset>=0?offset+1:null;
+ };
  for(const c of claims){
-  const expected=c.kind==='VALID_FROM_TURN'?validFromTurn:
-   c.kind==='RECORDED_AT_TURN'?recordedTurn:null;
+  const expected=c.kind==='VALID_FROM_TURN'?deriveTurn(inspection?.valid_from):
+   c.kind==='RECORDED_AT_TURN'?deriveTurn(inspection?.system_time):null;
   if(!Number.isInteger(expected))continue;
   if(c.asserted_turn!==expected)errors.push({
    code:'TEMPORAL_ASSERTION_MISMATCH_CANDIDATE',
@@ -154,6 +168,8 @@ export function assessDualAxisEvidence({
   });
  }
  const temporalStatus=errors.length?'CONTRADICTION_CANDIDATE':
+  claims.length&&!validTimeline?'NOT_EVALUATED_UNTRUSTED_TIMELINE':
+  claims.length&&!sourceRefPresent?'NOT_EVALUATED_NO_SOURCE_RECEIPT':
   claims.length?'EXPLICIT_CLAIMS_NO_DETECTED_MISMATCH':
   'NOT_EVALUATED_NO_SUPPORTED_ASSERTION';
  return Object.freeze({
@@ -170,6 +186,9 @@ export function assessDualAxisEvidence({
    skip_drift_due_to_refusal:false},
   temporal_axis:{status:temporalStatus,claim_count:claims.length,errors,
    claims:clean(claims),reference_as_of_turn:referenceAsOfTurn,
+   expected_source_valid_from_turn:deriveTurn(inspection?.valid_from),
+   expected_source_recorded_turn:deriveTurn(inspection?.system_time),
+   benchmark_clock_source:validTimeline?sourceTimeline.source_kind:null,
    extractor_covers_all_temporal_meanings:false},
   source_semantic_adjudication:'REQUIRED',
   external_action_authorized:false,
