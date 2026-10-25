@@ -13,7 +13,7 @@ import {resolveReliabilityBenchmarkDb} from '../src/reality-reliability-db-bound
 const DB='https://hvkfreoagbrphwghjajw.supabase.co',PROJECT='hvkfreoagbrphwghjajw';
 const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const sourceRun=makeAdversarialRunScope('construction-live12-20261025-a');
-const outputRun=makeAdversarialRunScope('provenance-contract-20261025-b');
+const outputRun=makeAdversarialRunScope('provenance-contract-20261025-c');
 if(process.env.VERCEL_ENV!=='preview'||process.env.VERCEL_GIT_COMMIT_REF!==BRANCH)
  throw Error('PROVENANCE_RECHECK_PREVIEW_ONLY');
 const env=process.env;
@@ -96,7 +96,7 @@ for(const number of [12,9]){
  const event=await target.appendStage({
   stage:'VERIFICATION',entityId:'contract-review:'+number,
   payload:{benchmark_kind:'PRESERVED_REAL_MODEL_PROVENANCE_CONTRACT_RECHECK',
-   run_id:'provenance-contract-20261025-b',...item},
+   run_id:'provenance-contract-20261025-c',...item},
   provenance:{source:'real_llm_review_of_preserved_answers_not_independent_truth'},
   epistemicStatus:'UNVERIFIED',observedAt:now(),
  });
