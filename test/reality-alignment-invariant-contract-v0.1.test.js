@@ -90,3 +90,14 @@ test('unknown and conflicting records do not unlock a prohibited action',()=>{
  assert.equal(f.time_scoped_state.homeowner_scope_approval.state,'UNKNOWN');
  assert.ok(f.prohibited_transitions.includes('SEND_ESTIMATE'));
 });
+
+test('delta handles a previously unknown fact that first appears on turn five',()=>{
+ const turn4=build(4),turn5=build(5);
+ assert.equal(turn4.time_scoped_state.office_estimate_review,undefined);
+ assert.equal(turn5.time_scoped_state.office_estimate_review.value,'COMPLETE');
+ const diff=compareInvariantFrames(turn4,turn5);
+ const item=diff.changes.find(x=>x.key==='office_estimate_review');
+ assert.ok(item);
+ assert.equal(item.before.state,'UNKNOWN');
+ assert.equal(item.after.value,'COMPLETE');
+});
