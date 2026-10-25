@@ -316,7 +316,7 @@ test('a clean semantic opinion with zero source-compared claims cannot masquerad
     first:review({}),
    });
    const got=await runLiveIntelligenceOrchestration({
-    message:'Do these records prove this application is deployed?',
+    message:'Is this application deployed?',
     observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
     apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
     fetchImpl:stub.fetchImpl,
