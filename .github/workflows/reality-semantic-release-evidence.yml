@@ -1,0 +1,33 @@
+name: Reality — Evidence-qualified Semantic Repair Regression
+on:
+  push:
+    branches:
+      - experiment/reality-semantic-release-evidence-20261025
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-qualified-release-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate evidence-backed release policy and full local loop without provider calls
+        run: |
+          node --check src/reality-evidence-release-qualification-v0.1.js
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --test test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-signal-typed-epistemic-intake-v1.1.test.js \
+            test/reality-repair-the-loop-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-continuity-runtime-v0.1.test.js
+      - name: Scope
+        if: always()
+        run: |
+          echo 'Offline mocks and existing Source-Continuity regression only; 0 OpenAI calls.'
+          echo 'No actual Supabase write or production deployment.'
