@@ -441,6 +441,14 @@ setInterval(refreshSavedShiftHome,300000);
    const assessed=reliability.semantic_review_provenance_status||'NOT_ASSESSED';
    const trajectory=reliability.goal_drift_coverage||{};
    const goalContext=reliability.user_goal_continuity||{};
+   const authority=reliability.goal_authority||{};
+   const goalAuthorityText=authority.boundary_status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'
+    ? 'Assistant-proposed change BLOCKED; original user goal preserved'
+    :authority.boundary_status==='NOT_SEMANTICALLY_ASSESSED'
+     ? 'Goal-shift authority: not semantically assessed'
+     :authority.boundary_status==='NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED'
+      ? 'No assistant goal mutation established (not independent proof)'
+      : 'Goal authority not yet available';
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
@@ -460,6 +468,7 @@ setInterval(refreshSavedShiftHome,300000);
     (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
     ' · Semantic review: '+assessed+
     ' · '+goalContextStatus+
+    ' · Goal authority: '+goalAuthorityText+
     ' · Goal tracking: '+driftText+
     ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
     ' · Review candidates: '+issues+
