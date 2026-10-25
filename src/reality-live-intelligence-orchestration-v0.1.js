@@ -12,6 +12,7 @@ import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
+import { inspectEpistemicClaimRelations } from './reality-epistemic-claim-relations-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
 import { buildInvariantFrame } from './reality-alignment-invariant-contract-v0.1.js';
 import { buildSelectiveCognitiveAlignmentV02, assessCurrentTurnFocusV02 } from './reality-selective-cognitive-alignment-v0.2.js';
@@ -368,6 +369,7 @@ export async function runLiveIntelligenceOrchestration({
       }
       semanticFirst=await reviewRealityAnswer({
         cleanerConversationContext,
+        structuralFindings:conversationalAssessment?.findings||[],
         currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
         sourceSnapshot:semanticSourceSnapshot,
         priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
@@ -461,12 +463,15 @@ export async function runLiveIntelligenceOrchestration({
       ['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION'].includes(x.kind)));
     const conversationalRepairCandidate=releaseRelevantIssues.some(x=>
       ['FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind));
-    const semanticRepairCandidate=conversationalRepairCandidate||userObjectiveNotAddressed||
+    const structuralIntegrityFindings=(conversationalAssessment?.findings||[]).filter(f=>
+      ['EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE'].includes(f.classification));
+    const structuralRelationCandidate=structuralIntegrityFindings.length>0;
+    const semanticRepairCandidate=structuralRelationCandidate||conversationalRepairCandidate||userObjectiveNotAddressed||
       provedSourceConflict||materialUnsupportedClaim;
     if (semanticRepairCandidate &&
         process.env.REALITY_DETECTOR_REPAIR_ENABLED==='true') {
       const originalResponseId=modelResult.response_id||null;
-      let retry=null, retryReview=null, retryFailure=null, deterministicReview=null;
+      let retry=null, retryReview=null, retryFailure=null, deterministicReview=null, retryRelations=null;
       try{
         retry=await invokeRealityModel({
           governedSignal,
@@ -476,9 +481,12 @@ export async function runLiveIntelligenceOrchestration({
             semantic_review_feedback:{
               status:'UNTRUSTED_REVIEW_CANDIDATE',
               cleaner_conversation_context:cleanerConversationContext,
-              mistakes:releaseRelevantIssues.map(x=>({
+              mistakes:[...releaseRelevantIssues.map(x=>({
                 kind:x.kind,reason:x.reason,
-              })),
+              })),...structuralIntegrityFindings.map(x=>({
+                kind:x.classification,reason:x.reason,claim_relation:x.relation,
+                observed_model_text:x.observed_model_text,
+              }))],
               source_corrections:continuousReliability.source_attested_correction_proposals||[],
               original_answer_for_targeted_revision:originalModelText.slice(0,5000),
             },
@@ -487,6 +495,9 @@ export async function runLiveIntelligenceOrchestration({
               'Answer the CURRENT user request directly, not a previous question.',
               'Use the supplied source-attested records and respect time/order of supersessions.',
               'Do not claim any action was executed or approved without evidence.',
+              'Preserve epistemic consistency: a stated verified fact cannot also be unverified for the same scope.',
+              'Do not equate a workers-compensation EDI acknowledgment with payment, financing, or adjudication.',
+              'Do not equate a successful CI check with deployment or launch.',
               'Perform a MINIMAL evidence-backed revision: preserve accurate source-backed claims and requested deliverables.',
               'Do not treat an untrusted reviewer concern as evidence that an otherwise supported statement is false.',
               'Clearly qualify external effects or reliability claims not established by the supplied source records.',
@@ -495,8 +506,16 @@ export async function runLiveIntelligenceOrchestration({
           },
           model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
         });
+        retryRelations=inspectEpistemicClaimRelations({
+          modelAnswer:String(retry.answer||''),currentUserMessage:message,
+          priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+          continuityRootId:effectiveContinuityRootId,
+          modelResponseId:retry.response_id||'retry',
+          currentUserSourceRef:governedSignal.packet.packet_id,
+        });
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
+          structuralFindings:retryRelations.findings,
           currentUserMessage:message,
           modelAnswer:String(retry.answer||''),
           sourceSnapshot:semanticSourceSnapshot,
@@ -516,6 +535,7 @@ export async function runLiveIntelligenceOrchestration({
         retryReview.review.addresses_current_request===true &&
         retryReview.review.issues.length===0 &&
         retryReview.review.unassessed_claims.length===0 &&
+        (!retryRelations||retryRelations.findings.length===0) &&
         (!deterministicReview||deterministicReview.codes.length===0));
       const safeToRelease=secondReviewPass &&
         (!continuousReliability.model_output_quarantined ||
@@ -547,6 +567,14 @@ export async function runLiveIntelligenceOrchestration({
           post_repair_review_response_id:retryReview?.response_id||null,
           source_reliability_receipt_id:continuousReliability.receipt_id,
           initial_issues:review?.issues||[],
+          structural_relation_candidates:structuralIntegrityFindings.map(f=>({
+            issue_id:f.issue_id,classification:f.classification,
+            claim_spans:f.claim_spans,relation:f.relation,
+            source_receipt_refs:f.source_receipt_refs,
+          })),
+          post_repair_relation_findings:retryRelations?.findings.map(f=>({
+            classification:f.classification,claim_spans:f.claim_spans,relation:f.relation,
+          }))||null,
           source_adjudication:sourceAdjudication,
           post_repair_issues:retryReview?.review?.issues||null,
           post_repair_source_violation_codes:deterministicReview?.codes||null,
@@ -565,6 +593,13 @@ export async function runLiveIntelligenceOrchestration({
       if(safeToRelease){
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
+      } else if(structuralRelationCandidate){
+        // No independent proof of correctness: do not silently mark the
+        // original error as cleared. Preserve its evidence and disclose risk.
+        const codes=structuralIntegrityFindings.map(f=>f.classification).join(', ');
+        modelResult.answer='Reality detected an unresolved claim-consistency concern ('+codes+
+          '). The following draft is not semantically verified; check the cited operational event types and verification status before using it.\\n\\n'+originalModelText;
+        modelResult.reliability_intervention='UNRESOLVED_CLAIM_RELATION_DISCLOSED_NOT_VERIFIED';
       } else if(materialUnsupportedClaim) {
         if(actionClaimRisk){
           // Consequential unverified action claims must not be released as fact.
@@ -586,6 +621,8 @@ export async function runLiveIntelligenceOrchestration({
         first_review_id:semanticFirst?.response_id||null,
         second_review_id:retryReview?.response_id||null,
         source_violation_codes:deterministicReview?.codes||null,
+        structural_relation_candidates:structuralIntegrityFindings.map(f=>f.classification),
+        post_repair_relation_candidates:retryRelations?.findings.map(f=>f.classification)||null,
         receipt_id:correctionReceipt.event_id,
         released_evidence_notice:unresolvedEvidenceNotice?.qualified===true,
         qualification_issue_quotes:unresolvedEvidenceNotice?.issue_quotes||[],
