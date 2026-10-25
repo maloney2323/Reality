@@ -127,6 +127,12 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
    goalTrajectory?.original_user_goal_candidate?.source_ref,
    goalTrajectory?.current_user_direction?.source_ref,
    ...(goalTrajectory?.recent_user_directions||[]).map(x=>x.source_ref),
+   // Existing Continuity retains source-linked earlier user goals beyond
+   // the reviewer input's recent-message window.
+   goalTrajectory?.working_goal_lifecycle?.working_goal?.source_ref,
+   goalTrajectory?.working_goal_lifecycle?.preserved_original_goal?.source_ref,
+   ...(goalTrajectory?.working_goal_lifecycle?.paused_goal_candidates||[])
+      .map(x=>x.source_ref),
  ].filter(Boolean));
  let goalTrajectoryReview={status:'NOT_ASSESSED_BY_REVIEWER',
   user_authorized_pivot_not_drift:true,independently_verified:false};
