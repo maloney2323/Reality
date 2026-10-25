@@ -1,4 +1,5 @@
 import {isExplicitActionDenial} from './reality-action-assertion-v0.1.js';
+import {buildGovernedChatSignal} from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 // Reality semantic detection — one evidence-aware LLM review inside the EXISTING
 // intelligence path. The reviewer is not truth, authority, or an independent
 // accuracy judge. Source claims are checked against immutable Continuity state.
@@ -122,6 +123,26 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null){
      verified_source_ref:backed?cited:null,
      reviewer_reason:check.reason.slice(0,350),
      independently_verified_semantics:false};
+   // Structural cross-check using the SAME existing Signal Cleaner. A
+   // reviewer cannot call an exact answer quote 'reported/uncertain' when
+   // that quote has no report/uncertainty semantics, and no independent
+   // source receipt. This is a review candidate, NOT proof the claim is false.
+   if(check.relation==='REPORTED_WITH_UNCERTAINTY' &&
+      check.answer_quote.trim()&&!backed){
+     const answerSignal=buildGovernedChatSignal({
+       message:check.answer_quote,observedAt:'2026-01-01T00:00:00.000Z',
+     });
+     const semantics=answerSignal.typed_epistemic_intake.clauses.flatMap(c=>c.epistemic_modalities);
+     const hasVisibleQualification=semantics.some(m=>
+       ['HEARSAY','UNCERTAIN','HYPOTHETICAL','CONDITIONAL','INTERROGATIVE','NEGATED'].includes(m));
+     if(!hasVisibleQualification){
+       row.reviewer_relation_conflicts_with_answer_quote=true;
+       row.assessment_kind='TYPED_SIGNAL_CLEANER_REVIEWER_CONSISTENCY_CANDIDATE';
+       if(!issues.some(x=>x.kind==='UNSUPPORTED_FACT'&&x.quote===check.answer_quote))
+         issues.push({kind:'UNSUPPORTED_FACT',quote:check.answer_quote.slice(0,350),
+           reason:'Reviewer labeled this external-event assertion as qualified, but the quoted answer contains no uncertainty or reporting modality in the Signal Cleaner, and no independent confirming source receipt exists. Candidate requiring semantic reconciliation.'});
+     }
+   }
    checks.push(row);
    if(check.relation==='UNRESOLVED')
      unassessed.push({key:check.clause_id,reason:'REVIEWER_PROVENANCE_UNRESOLVED'});
