@@ -102,3 +102,21 @@ test('answer visibly attributes claim as a report, preventing false provenance a
  assert.equal(r.review.issues.length,0);
  assert.equal(r.review.provenance_checks.some(x=>x.reviewer_relation_conflicts_with_answer_quote),false);
 });
+
+test('internal hold recommendation is not mislabeled as unsupported outside-world fact',async()=>{
+ const {message,turns,evidence}=context();
+ const quote='- Hold all purchases until actual approval is confirmed.';
+ const fetchImpl=async()=>new Response(JSON.stringify({id:'review-issue-false-positive-fixture',
+   output_text:JSON.stringify({
+    addresses_current_request:true,
+    issues:[{kind:'UNSUPPORTED_FACT',quote,reason:'No provider evidence that purchases were held.'}],
+    claims:[],actions:[],
+    provenance_checks:rows(evidence.candidates,()=> 'NOT_MENTIONED'),
+   }),
+ }),{status:200});
+ const r=await reviewRealityAnswer({currentUserMessage:message,
+  modelAnswer:quote,conversationEvidence:evidence,priorTurns:turns,
+  model:'fixture',apiKey:'fixture',fetchImpl});
+ assert.equal(r.review.issues.length,0);
+ assert.ok(r.review.unassessed_claims.some(x=>x.reason==='PROSPECTIVE_INSTRUCTION_NOT_EXTERNAL_FACT'));
+});
