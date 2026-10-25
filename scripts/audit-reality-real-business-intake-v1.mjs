@@ -10,7 +10,7 @@ import {buildModelInput} from '../src/reality-model-gateway-v0.1.js';
 const repo='maloney2323/Reality';
 const numbers=[132,133,134];
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
-const output={experiment:'SIGNAL_CLEANER_V1_ACTUAL_REALITY_BUSINESS_READ_ONLY',
+const output={experiment:'SIGNAL_CLEANER_V11_TYPED_ACTUAL_REALITY_BUSINESS_READ_ONLY',
   source:'AUTHENTICATED_GITHUB_PULL_REQUEST_READBACK',
   approved_read_only:true,
   no_model_api_calls:true,no_external_business_actions:true,
@@ -43,6 +43,14 @@ for(const prNumber of numbers){
       .replace(/\r\n/g,'\n').replace(/[ \t]+/g,' ').trim()===f.cleaned_text));
   assert.equal(signal.packet.raw_content,text);
   assert.equal(signal.intake_semantics.fragment_count,signal.fragments.length);
+  assert.equal(signal.typed_epistemic_intake.execution_authorized,false);
+  assert.equal(signal.typed_epistemic_intake.source_digest,signal.packet.raw_content_digest);
+  assert.equal(signal.transformation_receipt.typed_intake_projection_digest,
+    signal.typed_epistemic_intake.projection_digest);
+  assert.ok(signal.typed_epistemic_intake.clauses.every(c=>
+    text.slice(c.source_span.start,c.source_span.end)===c.exact_source_text &&
+    c.agency.execution_authorized===false &&
+    c.epistemic.external_truth_established===false));
   output.records.push({
     source_url:pr.html_url,
     fetched_source_digest:'sha256:'+hash(text),
@@ -51,6 +59,12 @@ for(const prNumber of numbers){
     signal_receipt_id:signal.transformation_receipt.receipt_id,
     cleaner_version:signal.cleaner_version,
     fragment_count:signal.fragments.length,
+    typed_clause_count:signal.typed_epistemic_intake.clause_count,
+    typed_projection_digest:signal.typed_epistemic_intake.projection_digest,
+    unresolved_condition_count:signal.typed_epistemic_intake.unresolved_conditions.length,
+    correction_candidate_count:signal.typed_epistemic_intake.correction_candidates.length,
+    semantic_review_recommended:signal.typed_epistemic_intake.review_recommended,
+    typed_clauses_source_spans_verified:true,
     quote_scope_count:signal.fragments.reduce((n,f)=>
       n+f.intake_observation.quoted_spans.length,0),
     markers:signal.intake_semantics.markers,
@@ -63,6 +77,7 @@ for(const prNumber of numbers){
   console.log('ACTUAL_GITHUB_SIGNAL_CLEANER '+JSON.stringify({
     pr:prNumber,fragments:signal.fragments.length,
     quoteScopes:output.records.at(-1).quote_scope_count,
+    typedClauses:signal.typed_epistemic_intake.clause_count,
     sourceSpansVerified:true,authorityGranted:false,
   }));
 }
@@ -71,6 +86,7 @@ writeFileSync('benchmark-results/reality-signal-cleaner-v1-real-business.json',
   JSON.stringify(output,null,2));
 console.log('REAL_BUSINESS_INTAKE_TOTAL '+JSON.stringify({
   records:output.records.length,provider_model_calls:0,
-  source_spans_verified:output.records.every(x=>x.clean_source_spans_verified),
+  source_spans_verified:output.records.every(x=>x.clean_source_spans_verified&&x.typed_clauses_source_spans_verified),
+  typed_clauses:output.records.reduce((n,x)=>n+x.typed_clause_count,0),
   external_actions:0,
 }));
