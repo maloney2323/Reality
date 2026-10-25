@@ -86,6 +86,7 @@ export default async function handler(req,res){
     current_answer_persisted:true},
    reliability:{canonical_epistemic_state:result.reliability.canonical_epistemic_state,
      user_goal_continuity:result.reliability.user_goal_continuity||null,
+     goal_authority:result.reliability.goal_authority||null,
      semantic_review_status:result.reliability.semantic_review?.status||'NOT_ASSESSED',
      semantic_review_provenance_status:result.reliability.semantic_review?.provenance_review_status||'NOT_ASSESSED',
      semantic_issue_candidates:(result.reliability.semantic_review?.issues||[]).map(issue=>({
