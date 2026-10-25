@@ -19,7 +19,9 @@ export const BACKCHECK_INTERVAL = 25;
 // requires relevance to THIS user objective.
 function relevantToCurrentRequest(key,message){
   const q=String(message||'').toLowerCase(), k=String(key||'').toLowerCase();
-  if(!q.trim())return false;
+  // Direct structured verification has no natural-language objective. A
+  // source-confirmed FACT_DRIFT still requires containment in that case.
+  if(!q.trim())return true;
   const known={
     cabinet_delivery_date:/\b(?:cabinet|delivery|shipment|arrival)\b/,
     cabinet_color:/\b(?:cabinet|color|colour|finish)\b/,
