@@ -19,7 +19,7 @@ export function buildCognitionContinuityHandoff({
   version:COGNITION_CONTINUITY_HANDOFF_VERSION,
   status:'NO_AUTHENTICATED_CONVERSATION_HISTORY_AVAILABLE',
   current_user_message:latestMessage,
-  history_source:'NOT_ATTESTED',recent_turns:[],original_user_request:null,
+  history_source:'NOT_ATTESTED',recent_turns:[],earliest_available_user_message:null,
   older_user_conditions:[],older_coverage:'NOT_AVAILABLE',
   model_text_is_external_truth:false,external_actions_authorized:false,
  });
@@ -63,9 +63,9 @@ export function buildCognitionContinuityHandoff({
   source_message_count:prior.length,
   current_user_source_ref:governedSignal.packet.packet_id,
   current_user_message:latestMessage,
-  original_user_request:first?{
+  earliest_available_user_message:first?{
    source_ref:first.source_ref,text:limitText(first.text,1200),
-   status:'HISTORICAL_OBJECTIVE_MAY_BE_SUPERSEDED',
+   status:'EARLIEST_RETRIEVED_UTTERANCE_MAY_BE_SUPERSEDED_OR_WINDOW_TRUNCATED',
   }:null,
   recent_turns:recent,
   older_user_conditions:[...distinct.values()].map(({historical_index,...x})=>x),
