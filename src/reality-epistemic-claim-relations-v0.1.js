@@ -34,14 +34,14 @@ function speakerOwned(answer,match){
 }
 const statusAffirm=/\b(?:the\s+)?(?:only\s+)?(?:facts?|claims?|approvals?|items?|statements?)\s+(?:that\s+|which\s+)?(?:are|were|have\s+been|is|was)\s+(?:actually\s+|independently\s+)?verified\b/gi;
 const statusReject=/\b(?:no|none\s+of\s+the|not\s+one)\s+(?:facts?|claims?|approvals?|items?|statements?)\b[^.!?\n]{0,90}?\b(?:verified|confirmed|authenticated)\b/gi;
-function sourceRefsForContext(currentUserMessage,priorTurns){
+function sourceRefsForContext(currentUserMessage,priorTurns,currentUserSourceRef){
  // These are conversation references, NOT fact attestations or permission.
  const refs=[];
  for(const t of priorTurns||[]){
   if(t?.role==='user'&&typeof t.text==='string'&&t.source_ref)
    refs.push({text:t.text,source_ref:t.source_ref});
  }
- return refs.concat([{text:String(currentUserMessage||''),source_ref:'current:user'}]);
+ return refs.concat([{text:String(currentUserMessage||''),source_ref:currentUserSourceRef}]);
 }
 // An event type is not interchangeable with an outcome in a different world.
 // The list is a declarative TYPE boundary catalog, not an evidence database.
@@ -69,7 +69,7 @@ export function inspectEpistemicClaimRelations({
  if(typeof modelAnswer!=='string'||!Array.isArray(priorTurns))
   throw Error('EPISTEMIC_RELATIONS_INPUT_INVALID');
  const answer=cleanText(modelAnswer);
- const refs=sourceRefsForContext(currentUserMessage,priorTurns);
+ const refs=sourceRefsForContext(currentUserMessage,priorTurns,currentUserSourceRef);
  const findings=[];
  const positives=[...answer.matchAll(statusAffirm)].filter(m=>speakerOwned(answer,m));
  const negatives=[...answer.matchAll(statusReject)].filter(m=>speakerOwned(answer,m));
