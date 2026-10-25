@@ -136,6 +136,8 @@ export async function startContinuityRuntime({
       cleaner_version: signal.transformation_receipt.cleaner_version,
       fragment_count: signal.transformation_receipt.fragment_count,
       meaning_change_claimed: signal.transformation_receipt.meaning_change_claimed === true,
+      typed_intake_projection_digest:signal.typed_epistemic_intake?.projection_digest||null,
+      typed_clause_count:signal.typed_epistemic_intake?.clause_count??null,
     },
     provenance: { source: 'reality_governed_signal_cleaner' },
   });
