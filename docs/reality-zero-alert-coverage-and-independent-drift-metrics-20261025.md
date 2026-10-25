@@ -29,6 +29,10 @@ Added evidence-backed *independent* scorecard with `DRIFT / NO_DRIFT / UNRESOLVE
 - End-to-end existing semantic reviewer → Continuity readback test checks persisted coverage and source receipt.
 - GitHub five no-cost checks passed (commit after this documentation).
 
+## Trust pulse / 10-turn digest hardening
+
+The existing trust pulse now reads the same persisted goal-drift coverage status from the Continuity receipt. A source-fact-only assessment cannot display a fully checked green answer when independent goal-drift adjudication is missing. Its 10-turn digest separately counts goal review unassessed, partial/unresolved, and candidate turns, while all true drift rates remain null. Added offline regression tests for those states and the former factual all-clear trap. This change is instrumentation, not a claim of improved detection recall.
+
 ## Still unsolved
 The detection model itself may miss semantic or gradual objective drift and sometimes flag benign language. Tracking and grading coverage **fixes misleading observability and confidence claims**, not semantic recall. The next evidence-based improvement must independently grade saved underlying-model and released answers, examine missed goal deviations and legitimate topic switches, and calibrate the *existing* semantic comparison without another stack of guards. Do not claim a reduced drift rate until those labels exist and a distinct held-out run reproduces the gain.
 
