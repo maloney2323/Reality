@@ -37,7 +37,7 @@ for(const c of cases){
   modelResponseId:'fixture:'+c.id,currentUserSourceRef:'input:'+c.id,
  });
  const detected=r.findings.some(f=>[
-  'EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION'
+  'EPISTEMIC_STATUS_SELF_CONTRADICTION','EVENT_TYPE_COLLAPSE','UNSUPPORTED_STATE_TRANSITION','UNATTESTED_MATERIAL_ENTAILMENT'
  ].includes(f.classification));
  if(c.expected==='ERROR'&&detected)tp++;
  else if(c.expected==='ERROR')fn++;
