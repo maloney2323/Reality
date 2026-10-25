@@ -22,8 +22,8 @@ test('source-linked original user condition survives past 96 later authenticated
  assert.equal(result.current_user_message,message);
  assert.equal(result.recent_turns.length,12);
  assert.ok(result.recent_turns.every(x=>!x.source_ref.includes('turn:1:')));
- assert.equal(result.original_user_request.source_ref,'turn:1:user');
- assert.match(result.original_user_request.text,/homeowner explicitly approves/i);
+ assert.equal(result.earliest_available_user_message.source_ref,'turn:1:user');
+ assert.match(result.earliest_available_user_message.text,/homeowner explicitly approves/i);
  assert.ok(result.older_user_conditions.some(x=>x.source_ref==='turn:1:user'&&/do not send/i.test(x.exact_user_text)),
    JSON.stringify(result.older_user_conditions));
  assert.ok(result.rules_of_use.some(x=>/CURRENT/.test(x)));
@@ -50,7 +50,7 @@ test('hypothetical and quoted instructions do not become older user obligations'
 test('no server-attested chat history does not pretend to recover previous context',()=>{
  const result=buildCognitionContinuityHandoff({governedSignal:signal,latestMessage:message});
  assert.equal(result.history_source,'NOT_ATTESTED');
- assert.equal(result.original_user_request,null);
+ assert.equal(result.earliest_available_user_message,null);
  assert.deepEqual(result.recent_turns,[]);
 });
 test('invalid or forged history cannot be silently treated as user conversation',()=>{
@@ -80,7 +80,7 @@ test('live orchestration sends previous authenticated user intent and newest top
  const projected=supplied[0].input[1].content[0].text;
  const cognition=JSON.parse(projected).system_context.conversation_continuity;
  assert.equal(cognition.source_message_count,98);
- assert.match(cognition.original_user_request.text,/homeowner/i);
+ assert.match(cognition.earliest_available_user_message.text,/homeowner/i);
  assert.equal(cognition.recent_turns.at(-1).role,'assistant');
  assert.equal(cognition.current_user_message,message);
  assert.ok(cognition.older_user_conditions.some(x=>x.source_ref==='turn:1:user'));
