@@ -329,3 +329,34 @@ test('a clean semantic opinion with zero source-compared claims cannot masquerad
   }finally{restoreSemantic()}
  });
 });
+
+test('captured real-business negation must NOT be quarantined when reviewer guesses merged YES',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'pr132_is_merged',value:'NO'}],
+   });
+   // Preserved from the REAL provider response; extraction below models the
+   // witnessed false-positive from the stronger semantic reviewer.
+   const original='GitHub records show that PR #132 is currently:\n- Open (not closed or merged)\n- A draft pull request\n- Not merged into any branch yet';
+   const stub=semanticCallStub(f,{
+    draft:original,
+    first:review({claims:[
+     claim('pr132_is_merged','YES','Not merged into any branch yet'),
+    ]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Has PR #132 reached the default branch?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.equal(got.reliability.semantic_review.unassessed_claims.length,1);
+   assert.equal(got.reliability.semantic_review.unassessed_claims[0].reason,
+    'ASSERTED_VALUE_NOT_EXPLICIT_IN_QUOTE');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
