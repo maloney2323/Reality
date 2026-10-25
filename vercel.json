@@ -13,5 +13,6 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "buildCommand": "node scripts/probe-reality-preview-db-build.mjs run"
 }
