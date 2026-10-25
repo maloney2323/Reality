@@ -118,3 +118,34 @@ test('misleading upstream shapes, invalid roots and missing source refs fail clo
  assert.throws(()=>probe('Can we send?',{priorTurns:[{role:'user',text:'hi'}]}),/ALIGNMENT_HISTORY_PROVENANCE_INVALID/);
  assert.throws(()=>probe('Can we send?',{continuityRootId:''}),/ALIGNMENT_ROOT_SIGNAL_REQUIRED/);
 });
+
+
+test('live miniature experiment false positive: waiting for approval BEFORE sending is safe',()=>{
+ const correct="The office has completed its internal review, but since there is no verified homeowner approval for the final scope yet, the next step is to wait for explicit homeowner approval before sending the estimate.";
+ const assessment=compareAfterCognition({
+  priorTurns:turns,currentUserMessage:'Can we send the estimate now?',
+  modelAnswer:correct,continuityRootId:root,
+  historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+ });
+ assert.equal(assessment.findings.some(f=>f.classification==='CONVERSATIONAL_PRECONDITION_DRIFT'),false);
+});
+
+test('opposite meaning: send BEFORE homeowner approval must still be flagged',()=>{
+ const unsafe="We'll send the estimate before homeowner approval is confirmed.";
+ const assessment=compareAfterCognition({
+  priorTurns:turns,currentUserMessage:'Can we send the estimate now?',
+  modelAnswer:unsafe,continuityRootId:root,
+  historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+ });
+ assert.equal(assessment.findings.some(f=>f.classification==='CONVERSATIONAL_PRECONDITION_DRIFT'),true);
+});
+
+test('approve after sending is not an approval precondition',()=>{
+ const unsafe="We will send the estimate now, and get homeowner approval after sending.";
+ const assessment=compareAfterCognition({
+  priorTurns:turns,currentUserMessage:'Can we send the estimate now?',
+  modelAnswer:unsafe,continuityRootId:root,
+  historySource:'AUTHENTICATED_CONVERSATION_MESSAGES',
+ });
+ assert.equal(assessment.findings.some(f=>f.classification==='CONVERSATIONAL_PRECONDITION_DRIFT'),true);
+});
