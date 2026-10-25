@@ -26,7 +26,13 @@ export function projectGoalStateContract({lifecycle,goalEvidence,worldId=null}={
  // This is disclosed; it never becomes an authorization grant.
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
-  goal_id:goal.goal_evidence_id,parent_id:null,
+  goal_id:goal.goal_evidence_id,
+  // Parent relation comes only from a source-bound user detour candidate.
+  // It remains provisional, never granted task/execution authority.
+  parent_id:(lifecycle.goal_relationship_candidates||[]).find(x=>
+    x.child_goal_id===goal.goal_evidence_id&&
+    x.relationship==='TEMPORARY_SUBGOAL_CANDIDATE')?.parent_goal_id||null,
+  parent_relationship_status:'PROVISIONAL_NOT_INDEPENDENTLY_VERIFIED',
   description:bounded(goal.text,700),scope_boundaries:[],
   // A reviewer proposal cannot independently prove ACTIVE/PAUSED/COMPLETED.
   status:'UNRESOLVED',working_status:'PROVISIONAL_ACTIVE_CANDIDATE',
