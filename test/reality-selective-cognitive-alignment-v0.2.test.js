@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildInvariantFrame} from '../src/reality-alignment-invariant-contract-v0.1.js';
 import {FIXTURE_RECORDS,ts} from '../benchmarks/reality-pre-cognition-alignment-12turn-v0.1.mjs';
-import {buildSelectiveCognitiveAlignmentV02} from '../src/reality-selective-cognitive-alignment-v0.2.js';
+import {buildSelectiveCognitiveAlignmentV02,assessCurrentTurnFocusV02} from '../src/reality-selective-cognitive-alignment-v0.2.js';
 const root='fictional:construction:12turn-invariant-orientation';
 const frame=n=>buildInvariantFrame({records:FIXTURE_RECORDS,asOf:ts(n),
  worldId:'fictional:construction',continuityRootId:root,activeObjective:'Stay on topic, protect existing conditions'});
@@ -71,4 +71,38 @@ test('mismatched continuity frame and blank user message fail closed',()=>{
   frame:frame(10),priorTurns:history,
  }),/SELECTIVE_ALIGNMENT_SOURCE_SCOPE_REQUIRED/);
  assert.throws(()=>build(10,''),/SELECTIVE_ALIGNMENT_SOURCE_SCOPE_REQUIRED/);
+});
+
+test('turn 8 wrong-topic old-estimate answer is flagged as review candidate, not semantic certainty',()=>{
+ const p=build(8,'Our foreman is ready, but dispatch coordinator did not authorize crew. Can we dispatch and order materials?');
+ const wrong='The estimate cannot be sent yet. The homeowner has not approved the final scope.';
+ const right='No, the crew cannot dispatch and materials cannot be ordered until dispatch and purchasing approvals are verified.';
+ const suspected=assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:wrong});
+ assert.ok(suspected.candidate_codes.includes('CURRENT_TASK_TOPIC_NOT_ADDRESSED_CANDIDATE'));
+ assert.equal(suspected.independent_error_adjudication,false);
+ assert.equal(suspected.action_authority_granted,false);
+ const aligned=assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:right});
+ assert.equal(aligned.candidate_codes.length,0);
+});
+test('turn 11 source approval question must not be answered with a WR41 inspection summary',()=>{
+ const p=build(11,'Homeowner final scope is approved, may Reality automatically send the estimate?');
+ const wrong='The official WR-41 city inspection is PASS and the site board should show PASS.';
+ assert.ok(assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:wrong})
+  .candidate_codes.includes('CURRENT_TASK_TOPIC_NOT_ADDRESSED_CANDIDATE'));
+ const right='The homeowner approved the estimate, but no separate authorization permits us to send it automatically.';
+ assert.deepEqual(assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:right}).candidate_codes,[]);
+});
+test('current entity instruction distinguishes inspection state from a foreman-specific request',()=>{
+ const p=build(10,'Foreman says the WR-41 city inspection is PENDING. What should we tell the foreman?');
+ const generic='WR-41 city inspection is PASS, not pending; update the site board.';
+ const target='Tell the foreman the official WR-41 city record says PASS, not PENDING.';
+ assert.ok(assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:generic})
+  .candidate_codes.includes('CURRENT_ENTITY_RESPONSE_MISSING_CANDIDATE'));
+ assert.deepEqual(assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:target}).candidate_codes,[]);
+});
+test('a neutral non-domain question abstains rather than fabricating a no-drift certification',()=>{
+ const p=build(3,'Explain the trade-off between two approaches.');
+ const assessment=assessCurrentTurnFocusV02({capsule:p.capsule,modelAnswer:'There are several approaches.'});
+ assert.equal(assessment.status,'INSUFFICIENT_DOMAIN_SIGNAL');
+ assert.equal(assessment.independent_error_adjudication,false);
 });
