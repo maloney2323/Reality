@@ -12,7 +12,6 @@ const conditionClause=c=>['CONDITION_CANDIDATE','CONSTRAINT_CANDIDATE','PROHIBIT
 const limitText=(s,n)=>String(s).slice(0,n);
 
 const isUnverifiedReport=c=>
-  !c.contains_quoted_text &&
   Array.isArray(c.epistemic_modalities) &&
   c.epistemic_modalities.some(m=>['HEARSAY','UNCERTAIN'].includes(m));
 export function projectConversationEvidenceCandidates(cleaner,{limit=20}={}){
@@ -26,7 +25,7 @@ export function projectConversationEvidenceCandidates(cleaner,{limit=20}={}){
    record.clauses.filter(isUnverifiedReport).map(c=>({
     source_ref:record.source_ref,clause_id:c.clause_id,
     exact_user_text:limitText(c.exact_source_text,600),
-    epistemic_modalities:c.epistemic_modalities.filter(m=>['HEARSAY','UNCERTAIN','HYPOTHETICAL','NEGATED','INTERROGATIVE'].includes(m)),
+    epistemic_modalities:c.epistemic_modalities.filter(m=>['HEARSAY','UNCERTAIN','QUOTED','HYPOTHETICAL','NEGATED','INTERROGATIVE'].includes(m)),
     epistemic_status:'USER_REPORTED_OR_UNCERTAIN_NOT_PROVIDER_ATTESTED',
     external_claim_verified:false,
    })));
