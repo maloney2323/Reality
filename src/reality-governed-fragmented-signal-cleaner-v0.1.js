@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
+import {buildTypedEpistemicIntake} from './reality-signal-typed-epistemic-intake-v1.1.js';
 
 // v1 is faithful intake, not a new judge, truth database or authorization gate.
-export const GOVERNED_FRAGMENTED_SIGNAL_CLEANER_VERSION = '1.0.0';
+export const GOVERNED_FRAGMENTED_SIGNAL_CLEANER_VERSION = '1.1.0';
 export const CANONICAL_PACKET_VERSION = 'raw-signal-packet-v0.1';
 export const SIGNAL_INTAKE_VERSION = 'signal-intake-semantics-v1.0';
 
@@ -159,9 +160,10 @@ export function cleanFragmentedSignal({packet,cleanerVersion=GOVERNED_FRAGMENTED
     },
     fragment_count:fragments.length,interpretation_status:'CANDIDATE_NOT_VERIFIED',
   });
+  const typedIntake=buildTypedEpistemicIntake({packet,fragments});
   const transformationReceipt=frozen({
-    receipt_version:'transformation-receipt-v1.0',
-    receipt_id:'tr:'+hash({packet_id:packet.packet_id,cleanerVersion,fragments,intake}).slice(0,32),
+    receipt_version:'transformation-receipt-v1.1',
+    receipt_id:'tr:'+hash({packet_id:packet.packet_id,cleanerVersion,fragments,intake,typed_digest:typedIntake.projection_digest}).slice(0,32),
     packet_id:packet.packet_id,cleaner_version:cleanerVersion,
     input_digest:packet.raw_content_digest,
     output_digest:'sha256:'+hash(fragments.map(x=>x.cleaned_text_digest)),
@@ -171,10 +173,13 @@ export function cleanFragmentedSignal({packet,cleanerVersion=GOVERNED_FRAGMENTED
       input_digest:x.raw_text_digest,output_digest:x.cleaned_text_digest,raw_span:x.raw_span,
     })),
     intake_observation_digest:'sha256:'+hash(intake),
+    typed_intake_projection_digest:typedIntake.projection_digest,
+    typed_clause_count:typedIntake.clause_count,
     meaning_change_claimed:false,created_at:new Date().toISOString(),
   });
   return frozen({
     cleaner_version:cleanerVersion,packet,fragments,intake_semantics:intake,
+    typed_epistemic_intake:typedIntake,
     transformation_receipt:transformationReceipt,
     lineage:{
       packet_id:packet.packet_id,

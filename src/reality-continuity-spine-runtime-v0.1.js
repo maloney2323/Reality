@@ -136,6 +136,8 @@ export async function startContinuityRuntime({
       cleaner_version: signal.transformation_receipt.cleaner_version,
       fragment_count: signal.transformation_receipt.fragment_count,
       meaning_change_claimed: signal.transformation_receipt.meaning_change_claimed === true,
+      typed_intake_projection_digest:signal.typed_epistemic_intake?.projection_digest||null,
+      typed_clause_count:signal.typed_epistemic_intake?.clause_count??null,
     },
     provenance: { source: 'reality_governed_signal_cleaner' },
   });
@@ -150,6 +152,24 @@ export async function startContinuityRuntime({
       packet_id: signal.packet.packet_id,
       fragment_ids: signal.fragments.map((fragment) => fragment.fragment_id),
       fragment_count: signal.fragments.length,
+      typed_signal_manifest:signal.typed_epistemic_intake?{
+        version:signal.typed_epistemic_intake.version,
+        projection_digest:signal.typed_epistemic_intake.projection_digest,
+        source_digest:signal.typed_epistemic_intake.source_digest,
+        status:'INTERPRETATION_CANDIDATES_NOT_GROUND_TRUTH',
+        execution_authorized:false,
+        clauses:signal.typed_epistemic_intake.clauses.map(c=>({
+          clause_id:c.clause_id,fragment_id:c.fragment_id,
+          source_span:c.source_span,source_text_digest:c.source_text_digest,
+          kind:c.kind,modalities:c.epistemic_modalities,
+          agency_candidate:c.agency.candidate,
+          candidate_dependency:c.candidate_dependency,
+          candidate_relations:c.candidate_relations,
+          epistemic_status:'UNVERIFIED_INTAKE',
+        })),
+        unresolved_conditions:signal.typed_epistemic_intake.unresolved_conditions,
+        correction_candidates:signal.typed_epistemic_intake.correction_candidates,
+      }:null,
     },
     provenance: { source: 'reality_live_intelligence_orchestration' },
   });

@@ -10,7 +10,7 @@ const clean=text=>buildGovernedChatSignal({message:text,observedAt:at});
 test('major upgrade v1 is a substantive, non-authorizing intake with stable receipt',()=>{
  const a=clean('The homeowner might approve. Can we send the estimate?');
  const b=clean('The homeowner might approve. Can we send the estimate?');
- assert.equal(GOVERNED_FRAGMENTED_SIGNAL_CLEANER_VERSION,'1.0.0');
+ assert.equal(GOVERNED_FRAGMENTED_SIGNAL_CLEANER_VERSION,'1.1.0');
  assert.equal(a.intake_semantics.intake_version,SIGNAL_INTAKE_VERSION);
  assert.equal(a.packet.packet_id,b.packet.packet_id);
  assert.equal(a.transformation_receipt.receipt_id,b.transformation_receipt.receipt_id);

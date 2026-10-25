@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - experiment/reality-signal-cleaner-v1-20261025
+      - experiment/reality-signal-cleaner-typed-intake-v11-20261025
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,11 +22,13 @@ jobs:
       - name: Syntax validation
         run: |
           node --check src/reality-governed-fragmented-signal-cleaner-v0.1.js
+          node --check src/reality-signal-typed-epistemic-intake-v1.1.js
           node --check src/reality-model-gateway-v0.1.js
           node --check src/reality-live-intelligence-orchestration-v0.1.js
       - name: Test upgraded intake and existing operational recovery path, no provider calls
         run: |
-          node --test test/reality-signal-cleaner-v1.0.test.js \
+          node --test test/reality-signal-typed-epistemic-intake-v1.1.test.js \
+            test/reality-signal-cleaner-v1.0.test.js \
             test/reality-governed-fragmented-signal-cleaner-v0.1.test.js \
             test/reality-model-gateway-v0.1.test.js \
             test/reality-unified-semantic-review-v0.1.test.js \
