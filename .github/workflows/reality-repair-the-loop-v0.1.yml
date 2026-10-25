@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - experiment/reality-repair-the-loop-20261024
+      - experiment/reality-semantic-detection-unified-20261024
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,10 +21,20 @@ jobs:
       - name: Check original Reality path
         run: |
           node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --check src/reality-semantic-review-v0.1.js
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const html=readFileSync('full-loop-proof.html','utf8');
+          const start=html.indexOf('<script>'),end=html.lastIndexOf('</script>');
+          if(start<0||end<=start)throw Error('PROOF_LAB_SCRIPT_MISSING');
+          new Function(html.slice(start+8,end));
+          console.log('Reality Proof Lab business evidence rendering: syntax valid');
+          JS
           node --check src/reality-continuous-reliability-v0.1.js
       - name: Prove source-backed correction and good-answer preservation
         run: |
-          node --test test/reality-repair-the-loop-v0.1.test.js \
+          node --test test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-repair-the-loop-v0.1.test.js \
             test/reality-real-model-failure-replay-v0.1.test.js \
             test/reality-live-intelligence-orchestration-v0.1.test.js \
             test/reality-continuous-reliability-v0.1.test.js \

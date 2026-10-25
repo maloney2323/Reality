@@ -217,6 +217,8 @@ export async function runContinuousReliabilityCycle({
   structuredCandidate = null,
   conversationalAssessment = null,
   detectorShadow = null,
+  semanticReview = null,
+  semanticRelevantClaimKeys = null,
   currentUserMessage = '',
   authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
@@ -261,6 +263,13 @@ export async function runContinuousReliabilityCycle({
     // Structural correction is not a published world-state update.
     // Independent outcome verification and publication are separate gates.
   }
+  // A clean model-review opinion with zero extracted/source-compared claims
+  // is NOT a verified clean answer. Evidence coverage must remain explicit.
+  const reviewerProvided=Boolean(semanticReview?.version==='reality-semantic-review-v0.1');
+  const verifiedAssertionCandidates=Boolean(structuredCandidate &&
+    ((structuredCandidate.claims||[]).length>0 ||
+      (structuredCandidate.actions||[]).length>0));
+  const sourceScopeAssessed=evidenceAccepted && (!reviewerProvided||verifiedAssertionCandidates);
   const categories = classifyReliabilityFindings(assessment?.codes || []);
   const disputedKeys = new Set((assessment?.violations||[])
     .filter(v=>v.code==='FACT_DRIFT').map(v=>v.key).filter(Boolean));
@@ -268,8 +277,25 @@ export async function runContinuousReliabilityCycle({
     ? trustedSnapshot.facts.filter(f=>disputedKeys.has(f.key)).map(f=>({
         key:f.key,source_attested_value:f.value,source_receipt_id:f.evidence_ref,
       })) : [];
+  // Semantic review and the typed source verifier must agree on the SAME
+  // quoted contradiction before Reality can withhold a factual answer.
+  // Model-extracted claims alone are not trusted evidence of a mistake.
+  const semanticFactIssueKeys=new Set();
+  if(semanticReview?.version==='reality-semantic-review-v0.1'){
+    for(const issue of semanticReview.issues||[]){
+      if(issue.kind!=='FACT_CONTRADICTION'||!issue.quote)continue;
+      for(const claim of structuredCandidate?.claims||[]){
+        const quote=String(claim.original_quote||'');
+        if(quote && (quote.includes(issue.quote)||issue.quote.includes(quote)))
+          semanticFactIssueKeys.add(claim.key);
+      }
+    }
+  }
   const relevantTypedFactDrift=Boolean((assessment?.violations||[]).some(v=>
-    v.code==='FACT_DRIFT'&&relevantToCurrentRequest(v.key,currentUserMessage)));
+    v.code==='FACT_DRIFT'&&(
+      semanticReview?.version==='reality-semantic-review-v0.1'?
+      semanticFactIssueKeys.has(v.key)&&(semanticRelevantClaimKeys||[]).includes(v.key):
+      relevantToCurrentRequest(v.key,currentUserMessage))));
   const actionIntegrityViolation=Boolean((assessment?.codes||[]).some(c=>
     ['WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION'].includes(c)));
   const shouldQuarantine=relevantTypedFactDrift||actionIntegrityViolation;
@@ -286,7 +312,8 @@ export async function runContinuousReliabilityCycle({
       scope:continuityRuntime.spine.continuity_root_id+'|'+continuityRuntime.spine.worldline_id,
     }),
     model_response_digest: modelResponseId ? digest(modelResponseId) : null,
-    evaluation_status: evidenceAccepted ? 'EVALUATED_AGAINST_SOURCE_ATTESTATION' : 'NOT_EVALUATED',
+    evaluation_status:sourceScopeAssessed?'EVALUATED_AGAINST_SOURCE_ATTESTATION':
+      (reviewerProvided?'SEMANTIC_REVIEW_WITHOUT_SOURCE_COMPARABLE_ASSERTIONS':'NOT_EVALUATED'),
     evaluation_scope: evidenceAccepted ? 'STRUCTURED_ASSERTIONS_ONLY' : 'NO_VERIFIED_STRUCTURED_CANDIDATE',
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
@@ -296,6 +323,7 @@ export async function runContinuousReliabilityCycle({
     // Continuity verification receipt; it never mutates truth or blocks output.
     // Readback validation below guarantees receipt inclusion when enabled.
     detector_shadow:detectorShadow?JSON.parse(JSON.stringify(detectorShadow)):null,
+    semantic_review:semanticReview?JSON.parse(JSON.stringify(semanticReview)):null,
     conversational_drift:conversational?{
       version:conversational.version,
       status:conversational.status,
@@ -333,6 +361,8 @@ export async function runContinuousReliabilityCycle({
     hallucination_confirmed: null,
     independent_truth_adjudication: false,
     extraction_completeness_verified: false,
+    source_compared_assertion_count:sourceScopeAssessed?
+      ((structuredCandidate.claims||[]).length+(structuredCandidate.actions||[]).length):0,
     structured_candidate: evidenceAccepted ? {
       world_id: structuredCandidate.world_id,
       claims: structuredCandidate.claims.slice(0,24).map(c=>({key:c.key,value:c.value,quote:String(c.original_quote||'').slice(0,300)})),
@@ -397,6 +427,7 @@ export async function runContinuousReliabilityCycle({
     hallucination_suspected: categories.hallucination_suspected,
     conversational_drift: payload.conversational_drift,
     detector_shadow:payload.detector_shadow,
+    semantic_review:payload.semantic_review,
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
     model_output_quarantined:shouldQuarantine,

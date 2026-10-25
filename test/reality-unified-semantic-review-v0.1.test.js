@@ -1,0 +1,362 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {buildGovernedChatSignal} from '../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
+import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0.1.js';
+import {recordSourceAttestedEvidence} from '../src/reality-reliability-evidence-v0.1.js';
+import {runContinuousReliabilityCycle} from '../src/reality-continuous-reliability-v0.1.js';
+import {runLiveIntelligenceOrchestration} from '../src/reality-live-intelligence-orchestration-v0.1.js';
+
+const world='construction:real-model-regression',root='continuity:real-model-regression';
+const stamp='2026-10-24T15:00:00.000Z';
+const vars=['VERCEL_ENV','REALITY_CONTINUOUS_RELIABILITY_ENABLED',
+ 'REALITY_UNIVERSE_PERSISTENCE_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED',
+ 'REALITY_DETECTOR_SHADOW_ENABLED','REALITY_DETECTOR_REPAIR_ENABLED',
+ 'SUPABASE_URL','SUPABASE_SECRET_KEY','REALITY_RELIABILITY_BENCHMARK_PROJECT_REF',
+ 'REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF',
+ 'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL'];
+async function environment(fn){
+ const p=Object.fromEntries(vars.map(x=>[x,process.env[x]]));
+ Object.assign(process.env,{
+  VERCEL_ENV:'preview',REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
+  REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+  REALITY_RELIABILITY_EXTRACTION_ENABLED:'true',
+  REALITY_DETECTOR_SHADOW_ENABLED:'true',REALITY_DETECTOR_REPAIR_ENABLED:'true',
+  SUPABASE_URL:'https://example.supabase.co',SUPABASE_SECRET_KEY:'test-only',
+  REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:'hvkfreoagbrphwghjajw',
+  REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
+  REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
+ });
+ try{await fn();}finally{
+  for(const [k,v] of Object.entries(p)){
+   if(v===undefined)delete process.env[k];else process.env[k]=v;
+  }
+ }
+}
+function fixture(){
+ const events=[];
+ return {events,fetch:async(url,options={})=>{
+  const u=new URL(url);
+  if(u.pathname.includes('reality_universe_entries'))return new Response('[]',{status:200});
+  if(u.pathname.startsWith('/rest/v1/')){
+   if(options.method==='POST'){
+    const e=JSON.parse(options.body);events.push(e);
+    return new Response(JSON.stringify([e]),{status:201});
+   }
+   let rows=events.slice();
+   for(const [q,key] of [['event_id','event_id'],
+    ['continuity_root_id','continuity_root_id'],['worldline_id','worldline_id']]){
+    const v=u.searchParams.get(q)?.replace(/^eq\./,'');
+    if(v)rows=rows.filter(x=>x[key]===v);
+   }
+   if(u.searchParams.get('limit')==='1')rows=rows.slice(-1);
+   else rows.reverse();
+   return new Response(JSON.stringify(rows),{status:200});
+  }
+  throw Error('Unexpected '+url);
+ }};
+}
+async function bootstrap(f,{
+ userMessage='Record source',
+ worldId=world,rootId=root,
+ facts=[{key:'cabinet_delivery_date',value:'2026-10-27'}],
+}={}){
+ const sig=buildGovernedChatSignal({message:userMessage,observedAt:stamp});
+ const live=await startContinuityRuntime({
+  continuityRootSource:rootId,worldlineSource:'world:construction',
+  subjectId:'fictional:contractor',signal:sig,observedAt:stamp,
+  fetchImpl:f.fetch,
+ });
+ const source=await recordSourceAttestedEvidence({
+  continuityRuntime:live,worldId,sourceKind:'CONNECTED_PROVIDER_READBACK',
+  sourceRef:'fixture:verified',sourceDigest:'fixture:sha',
+  facts,observedAt:stamp,
+ });
+ return {live,sig,source};
+}
+
+
+const priorSemantic=process.env.REALITY_SEMANTIC_REVIEW_ENABLED;
+function previewSemantic(){
+ process.env.REALITY_SEMANTIC_REVIEW_ENABLED='true';
+}
+function restoreSemantic(){
+ if(priorSemantic===undefined)delete process.env.REALITY_SEMANTIC_REVIEW_ENABLED;
+ else process.env.REALITY_SEMANTIC_REVIEW_ENABLED=priorSemantic;
+}
+function semanticCallStub(f,{draft,first,repair,second}={}){
+ const calls=[];
+ const fetchImpl=async(url,options={})=>{
+  if(!String(url).includes('api.openai.com/v1/responses'))return f.fetch(url,options);
+  const req=JSON.parse(options.body);
+  if(req.text?.format?.name==='reliability_assertions')
+    throw Error('OLD_EXTRACTOR_SHOULD_NOT_RUN_WHEN_SEMANTIC_ENABLED');
+  const isReview=req.text?.format?.name==='reality_semantic_review';
+  const mode=isReview?'REVIEW':'MODEL';
+  calls.push({mode});
+  const text=isReview?
+    JSON.stringify(calls.filter(x=>x.mode==='REVIEW').length===1?first:second):
+    calls.filter(x=>x.mode==='MODEL').length===1?draft:repair;
+  return new Response(JSON.stringify({id:'fake-'+calls.length,
+   status:'completed',output_text:text}),{status:200});
+ };
+ return {fetchImpl,calls};
+}
+function review({addressed=true,issues=[],claims=[],actions=[]}={}){
+ return {addresses_current_request:addressed,issues,claims,actions};
+}
+function claim(key,value,quote,relevant=true){
+ return {key,asserted_value:value,quote,relevant_to_current_request:relevant};
+}
+function context(){
+ return {continuity_root_id:root,worldline_id:'world:construction',
+  world_id:world,conversation_id:'fictional:contractor'};
+}
+test('semantics: preserve a good on-topic answer with sourced factual proof and no retry',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'cabinet_delivery_date',value:'2026-10-27'}],
+   });
+   const original='The cabinet delivery is 2026-10-27.';
+   const stub=semanticCallStub(f,{draft:original,
+    first:review({claims:[claim('cabinet_delivery_date','2026-10-27','2026-10-27')]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_review.addresses_current_request,true);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.reliability.semantic_repair,undefined);
+  }finally{restoreSemantic()}
+ });
+});
+test('semantics: recognize previous topic by meaning; regenerate; re-review; preserve correction receipt',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'inspection_wr41',value:'HOLD'},
+      {key:'homeowner_scope_approval',value:'WITHDRAWN'}],
+   });
+   const old='The city inspection remains HOLD, so no crew may mobilize.';
+   const corrected='No. Homeowner scope approval was WITHDRAWN, so you cannot email the estimate.';
+   const stub=semanticCallStub(f,{
+    draft:old,repair:corrected,
+    first:review({addressed:false,
+      issues:[{kind:'WRONG_TASK',quote:'no crew may mobilize',
+       reason:'This answers dispatch, not the current estimate email question.'}],
+      claims:[claim('inspection_wr41','HOLD','HOLD',false)]}),
+    second:review({claims:[claim('homeowner_scope_approval','WITHDRAWN','WITHDRAWN')]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Homeowner withdrew approval. Can we email the estimate now?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,corrected);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_repair.status,
+    'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED');
+   const event=f.events.find(e=>e.event_id===got.reliability.semantic_repair.receipt_id);
+   assert.equal(event.payload.event_type,'MODEL_SEMANTIC_REVIEW_AND_REPAIR');
+   assert.equal(event.payload.post_repair_source_violation_codes.length,0);
+   assert.equal(event.payload.external_action_authorized,false);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+   assert.equal(got.authority.granted,false);
+  }finally{restoreSemantic()}
+ });
+});
+test('semantics: source contradiction is corrected and compared again against Continuity',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'cabinet_delivery_date',value:'2026-10-27'}],
+   });
+   const stub=semanticCallStub(f,{
+    draft:'Cabinet delivery is 2026-10-24.',
+    repair:'Cabinet delivery is 2026-10-27.',
+    first:review({issues:[{kind:'FACT_CONTRADICTION',
+      quote:'2026-10-24',reason:'Contradicts the source record October 27.'}],
+      claims:[claim('cabinet_delivery_date','2026-10-24','2026-10-24')]}),
+    second:review({claims:[claim('cabinet_delivery_date','2026-10-27','2026-10-27')]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,'Cabinet delivery is 2026-10-27.');
+   assert.equal(got.reliability.model_output_quarantined,true);
+   assert.equal(got.reliability.source_conflict_resolved_before_release,true);
+   assert.equal(got.reliability.semantic_repair.status,
+    'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
+test('semantics: bad proposed correction stays uncommitted and wrong output is not called verified',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const stub=semanticCallStub(f,{
+    draft:'The inspection HOLD is active. Wait for city release.',
+    repair:'You can dispatch right now; the city approved it.',
+    first:review({addressed:false,issues:[{kind:'WRONG_TASK',
+     quote:'Wait for city release',reason:'Ignores user request for the cabinet delivery date.'}]}),
+    second:review({addressed:false,issues:[{kind:'WRONG_TASK',
+     quote:'You can dispatch',reason:'Still unrelated and unsupported.'}]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.notEqual(got.intelligence.answer,stub.fetchImpl.repair);
+   assert.equal(got.reliability.semantic_repair.status,'CORRECTION_NOT_VERIFIED');
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   assert.equal(got.reliability.readback_verified,true);
+  }finally{restoreSemantic()}
+ });
+});
+test('semantics: unanchored review cannot be counted as successful detection',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const good='Cabinet delivery is 2026-10-27.';
+   const stub=semanticCallStub(f,{
+    draft:good,
+    first:review({addressed:false,issues:[{kind:'WRONG_TASK',
+     quote:'made-up source phrase',reason:'invalid quote'}]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,good);
+   assert.ok(got.reliability.extraction_status.startsWith('UNASSESSED:'));
+   assert.equal(got.reliability.evaluation_status,'NOT_EVALUATED');
+   assert.equal(got.reliability.semantic_repair,undefined);
+  }finally{restoreSemantic()}
+ });
+});
+
+test('partial quote-anchoring failure is reported and does not erase semantic coverage',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const answer='Cabinet delivery is 2026-10-27.';
+   const stub=semanticCallStub(f,{
+    draft:answer,first:review({claims:[
+     claim('cabinet_delivery_date','2026-10-27','made-up quote'),
+     claim('cabinet_delivery_date','2026-10-27','2026-10-27'),
+    ]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'When are the cabinets being delivered?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,answer);
+   assert.equal(got.reliability.semantic_review.status,'REVIEWED_PARTIAL_COVERAGE');
+   assert.equal(got.reliability.semantic_review.unassessed_claims.length,1);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
+test('real-business scope: an unsupported customer-live assertion is corrected to uncertainty',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'pr132_is_merged',value:'NO'}],
+   });
+   const original='This code is now live for customers.';
+   const corrected='GitHub shows PR #132 is not merged. Those records alone cannot establish whether a separate deployment exists. Customer rollout is unverified.';
+   const stub=semanticCallStub(f,{
+    draft:original,repair:corrected,
+    first:review({issues:[{kind:'UNSUPPORTED_FACT',
+      quote:'live for customers',
+      reason:'A PR state alone cannot confirm customer deployment.'}]}),
+    second:review({}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Is our PR #132 code already deployed to customers?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,corrected);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.semantic_repair.status,
+    'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
+
+test('a clean semantic opinion with zero source-compared claims cannot masquerade as verified truth',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const stub=semanticCallStub(f,{
+    draft:'GitHub records do not establish whether the application was deployed.',
+    first:review({}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Is this application deployed?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.reliability.evaluation_status,
+    'SEMANTIC_REVIEW_WITHOUT_SOURCE_COMPARABLE_ASSERTIONS');
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.reliability.semantic_review.issues.length,0);
+   assert.equal(got.reliability.semantic_review.independent_semantic_adjudication,false);
+  }finally{restoreSemantic()}
+ });
+});
+
+test('captured real-business negation must NOT be quarantined when reviewer guesses merged YES',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f,{
+    facts:[{key:'pr132_is_merged',value:'NO'}],
+   });
+   // Preserved from the REAL provider response; extraction below models the
+   // witnessed false-positive from the stronger semantic reviewer.
+   const original='GitHub records show that PR #132 is currently:\n- Open (not closed or merged)\n- A draft pull request\n- Not merged into any branch yet';
+   const stub=semanticCallStub(f,{
+    draft:original,
+    first:review({claims:[
+     claim('pr132_is_merged','YES','Not merged into any branch yet'),
+    ]}),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Has PR #132 reached the default branch?',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',
+    apiKey:'test-only',systemContext:context(),verifiedConversationTurns:[],
+    fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.equal(got.reliability.semantic_review.unassessed_claims.length,1);
+   assert.equal(got.reliability.semantic_review.unassessed_claims[0].reason,
+    'ASSERTED_VALUE_NOT_EXPLICIT_IN_QUOTE');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
