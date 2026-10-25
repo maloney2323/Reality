@@ -22,7 +22,7 @@ jobs:
           node --check scripts/run-reality-live-durable-adversarial-v1.mjs
           node --check src/reality-live-intelligence-orchestration-v0.1.js
           node --check src/reality-source-review-adjudication-v0.1.js
-          node --test test/reality-benchmark-run-scope-v0.1.test.js test/reality-authenticated-conversation-history-v0.1.test.js test/reality-live-history-api-v0.1.test.js test/reality-cognition-continuity-handoff-v0.1.test.js test/reality-benchmark-report-page-v0.1.test.js test/reality-source-review-adjudication-v0.1.test.js \
+          node --test test/reality-benchmark-run-scope-v0.1.test.js test/reality-authenticated-conversation-history-v0.1.test.js test/reality-live-history-api-v0.1.test.js test/reality-private-chat-preview-v0.1.test.js test/reality-cognition-continuity-handoff-v0.1.test.js test/reality-benchmark-report-page-v0.1.test.js test/reality-source-review-adjudication-v0.1.test.js \
             test/reality-unified-semantic-review-v0.1.test.js \
             test/reality-continuity-runtime-v0.1.test.js \
             test/reality-signal-typed-epistemic-intake-v1.1.test.js
