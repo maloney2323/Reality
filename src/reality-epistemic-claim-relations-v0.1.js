@@ -133,7 +133,7 @@ function unsupportedInferences(answer,{continuityRootId,modelResponseId,refs,cur
 // source must independently attest the resulting operational state. This
 // produces an EVIDENCE GAP candidate, never a verified hallucination verdict.
 const assertedMaterialOutcome=/\b(?:live\s+for\s+customers?|production|deliver(?:ed|y)|reached\s+(?:the\s+)?buyer|arrived|paid|payment|fund(?:ed|s)|settle(?:d|ment)|deposited|approv(?:ed|al)|accept(?:ed|ance)|signed?\s*off|access\s+(?:was\s+)?granted|grant(?:ed|ing)\s+(?:access|permission)|authoriz(?:ed|ation)|consent|customer.{0,35}(?:problem|issue).{0,20}(?:fixed|gone|disappear(?:ed)?)|(?:problem|issue)\s+(?:disappear(?:ed)?|was\s+fixed|resolved))\b/i;
-const independentOutcomeEvidence=/\b(?:separate|independent|attested|source[- ]backed|carrier\s+signature|bank\s+ledger|signed\s+(?:delivery|payment)\s+receipt)\b/i;
+const independentOutcomeEvidence=/\b(?:separate|independent|attested|source[- ]backed|carrier\s+signature|bank\s+(?:ledger|deposit|transfer\s+receipt)|signed\s+(?:delivery|payment)\s+receipt)\b/i;
 function domainAgnosticInferenceGaps(answer,{continuityRootId,modelResponseId,refs,currentUserSourceRef}){
  const out=[];
  for(const m of answer.matchAll(/[^.!?\n]{16,300}/g)){
@@ -175,7 +175,7 @@ const namedSubjects=[
  ['CI',/\b(?:ci|tests?|build|checks?|github)\b/i],
  ['RUN',/\b(?:run|latest\s+(?:verified\s+)?status)\b/i],
  ['PERMIT',/\b(?:permit|inspection)\b/i],
- ['CLAIM',/\b(?:claim|benefit)\b/i],
+ ['CLAIM',/\b(?:claims?|benefits?)\b/i],
  ['DELIVERY',/\b(?:delivered|delivery|shipment)\b/i],
 ];
 function sentencesWithPositions(answer){
