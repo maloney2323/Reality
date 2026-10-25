@@ -1,6 +1,7 @@
 import {buildCleanerConversationContext} from './reality-cleaner-conversation-context-v0.1.js';
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
+import {buildUserGoalContinuityState,recoverPriorUserGoalState} from './reality-user-goal-continuity-state-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -268,16 +269,61 @@ export async function runLiveIntelligenceOrchestration({
   const authenticatedConversationContinuity=buildCognitionContinuityHandoff({
     governedSignal,verifiedConversationTurns,latestMessage:message,
   });
+  // Restore user-owned goal EVIDENCE from prior canonical frames in the SAME
+  // Continuity spine. The oldest source survives bounded chat retrieval.
+  // No assistant suggestion or inferred pivot can silently rewrite it.
+  const normalizedContinuityRoot=continuityRuntime?.spine?.continuity_root_id||
+    effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id);
+  const oldGoalState=continuityRuntime?.enabled?
+    recoverPriorUserGoalState({
+      continuityHistory:await continuityRuntime.readback(),
+      continuityRootId:normalizedContinuityRoot,
+      worldId:systemContext?.world_id||null,
+    }):null;
+  const userGoalContinuityState=buildUserGoalContinuityState({
+    continuityRootId:normalizedContinuityRoot,
+    worldId:systemContext?.world_id||null,
+    verifiedConversationTurns,
+    currentUserMessage:message,
+    currentUserSourceRef:governedSignal.packet.packet_id,
+    priorState:oldGoalState,
+    conversationHistoryMayBeIncomplete:Boolean(
+      systemContext?.conversation_history_older_messages_may_be_missing),
+  });
+  const sourceLinkedOriginal={
+    source_ref:userGoalContinuityState.original_user_goal_source_ref,
+    text:userGoalContinuityState.original_user_goal_candidate,
+    source_role:'USER_CHANNEL_GOAL_CANDIDATE_NOT_RESOLVED',
+  };
+  const goalAwareContinuity={
+    ...authenticatedConversationContinuity,
+    user_goal_trajectory:{
+      ...authenticatedConversationContinuity.user_goal_trajectory,
+      original_user_goal_candidate:sourceLinkedOriginal,
+      original_goal_survived_history_window:Boolean(oldGoalState),
+      goal_lifecycle_reconciliation_status:
+        userGoalContinuityState.lifecycle_reconciliation_status,
+      assistant_suggestions_can_change_goal:false,
+    },
+    user_goal_continuity_summary:{
+      original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
+      current_user_evidence_id:userGoalContinuityState.current_user_evidence_id,
+      lifecycle_status:userGoalContinuityState.lifecycle_reconciliation_status,
+      active_goal_verified:false,
+      unresolved_transition_count:userGoalContinuityState.unresolved_user_goal_transitions.length,
+      earlier_evidence_omitted_at_least:userGoalContinuityState.goal_evidence_records_omitted_at_least,
+    },
+  };
   // One projection shared across ingestion, cognition, evidence review and
   // durable Continuity. A report is still not verified truth.
   const canonicalEpistemicFrame=buildCanonicalEpistemicFrame({
-    governedSignal,conversationContinuity:authenticatedConversationContinuity,
+    governedSignal,conversationContinuity:goalAwareContinuity,
+    userGoalContinuityState,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
     // The Continuity spine canonicalizes the root to a UUID. Use that
     // exact root for durable readback; unscoped chat remains explicitly ephemeral.
-    continuityRootId:continuityRuntime?.spine?.continuity_root_id||
-      effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id),
+    continuityRootId:normalizedContinuityRoot,
     observedAt:observedAt||new Date().toISOString(),
     historyMayBeIncomplete:Boolean(systemContext?.conversation_history_older_messages_may_be_missing),
   });
@@ -294,7 +340,7 @@ export async function runLiveIntelligenceOrchestration({
   }=systemContext||{};
   const cognitionContext = {
     ...boundedCognitionInput,
-    conversation_continuity:authenticatedConversationContinuity,
+    conversation_continuity:goalAwareContinuity,
     canonical_epistemic_state:canonicalEpistemicFrame,
     canonical_epistemic_receipt:epistemicFrameReceipt,
     reliability_grounding:reliabilityGrounding,
