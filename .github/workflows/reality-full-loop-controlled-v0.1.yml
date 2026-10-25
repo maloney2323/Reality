@@ -1,0 +1,46 @@
+name: Reality Complete Loop — Controlled End-to-End
+on:
+  push:
+    branches:
+      - experiment/reality-complete-loop-controlled-20261024
+    paths:
+      - '.github/workflows/reality-full-loop-controlled-v0.1.yml'
+      - 'scripts/run-reality-full-loop-controlled-v0.1.mjs'
+      - 'docs/reality-full-loop-controlled-v0.1.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-loop-controlled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Check controlled integration script
+        run: node --check scripts/run-reality-full-loop-controlled-v0.1.mjs
+      - name: Run actual Reality orchestration and fake provider against isolated mock persistent ledger
+        run: node scripts/run-reality-full-loop-controlled-v0.1.mjs
+      - name: Preserve stage-by-stage original and corrected answers, receipts and blockers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-full-loop-controlled-evidence
+          path: benchmark-results/reality-full-loop-controlled-v0.1.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Existing detector and Continuity regressions
+        run: |
+          node --test test/reality-live-detector-shadow-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js
+      - name: No misleading claims
+        if: always()
+        run: |
+          echo 'ZERO live provider calls. Fake scripted model, fake DB.'
+          echo 'Source attestation is a frozen synthetic fixture, not a real supplier.'
+          echo 'No production merge, preview activation, external effect or outcome verification.'
