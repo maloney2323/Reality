@@ -90,6 +90,9 @@ export default async function handler(req,res){
      semantic_issue_candidates:(result.reliability.semantic_review?.issues||[]).map(issue=>({
        kind:issue.kind,quote:issue.quote,reason:issue.reason})),
      conversational_drift_findings_count:result.reliability.conversational_assessment?.findings_count||0,
+     goal_drift_coverage:result.reliability.conversational_assessment?.goal_drift_coverage||{
+       status:'NOT_SEMANTICALLY_ASSESSED',candidate_count_zero_means_drift_free:false,
+       independently_verified_drift_rate:null},
      intervention:result.intelligence?.reliability_intervention||null,
      independently_verified_semantic_correctness:false,
    },
