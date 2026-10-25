@@ -150,3 +150,17 @@ test('existing bitemporal Continuity stores only unverified typed candidate mani
     else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=old;
   }
 });
+
+test('live business regression: coordinated prohibition also covers later comma-separated commands',()=>{
+ const message='I might have approved rollout. Do not deploy, send announcements, or claim approval occurred.';
+ const typedSignal=typed(clean(message));
+ const clauses=typedSignal.clauses;
+ const deploy=clauses.find(c=>/^Do not deploy/i.test(c.exact_source_text));
+ const announcement=clauses.find(c=>/^send announcements/i.test(c.exact_source_text));
+ assert.ok(deploy&&announcement,JSON.stringify(clauses.map(x=>x.exact_source_text)));
+ assert.equal(deploy.kind,'PROHIBITION_CANDIDATE');
+ assert.equal(announcement.kind,'PROHIBITION_CANDIDATE');
+ assert.equal(announcement.agency.candidate,'AUTONOMOUS_PROHIBITED_CANDIDATE');
+ assert.ok(announcement.epistemic_modalities.includes('NEGATION_SCOPE_CANDIDATE'));
+ assert.equal(announcement.agency.execution_authorized,false);
+});
