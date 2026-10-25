@@ -21,6 +21,7 @@ jobs:
         run: |
           node scripts/reality-blind-epistemic-gauntlet-v0.1.mjs
           node scripts/reality-independent-confirmation-v0.1.mjs
+          node scripts/reality-sealed-semantic-challenge-v0.1.mjs
           echo 'This job reports actual misses and false positives but does not invent a drift rate.'
       - name: No external effects
         run: echo 'No providers, no database, no credentials, no customer effects.'
