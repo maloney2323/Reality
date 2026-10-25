@@ -131,6 +131,7 @@ if(phase==='run'){
    answer_changed:original!==released,
    detected_semantic_issues:reliability.semantic_review?.issues||[],
    goal_trajectory_review:reliability.semantic_review?.goal_trajectory_review||null,
+   goal_drift_coverage:reliability.conversational_assessment?.goal_drift_coverage||null,
    semantic_review_coverage:reliability.semantic_review?.status||'NOT_ASSESSED',
    goal_drift_receipt_findings:reliability.conversational_drift?.findings||[],
    correction_disposition:reliability.semantic_repair?.status||null,
@@ -158,6 +159,7 @@ if(phase==='run'){
    turn:t.turn,phase:t.phase,
    source_state_verified:true,answer_changed:row.answer_changed,
    goal_alignment:row.goal_trajectory_review?.answer_alignment||'NOT_ASSESSED',
+   goal_review_coverage:row.goal_drift_coverage?.status||'NOT_SEMANTICALLY_ASSESSED',
    goal_direction:row.goal_trajectory_review?.user_direction||'NOT_ASSESSED',
    drift_candidates:row.goal_drift_receipt_findings.length,
    repair:row.released_intervention,
@@ -181,6 +183,19 @@ const summary={
  turns_with_authorized_pivot:records.filter(e=>[
   'USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR',
  ].includes(e.payload.goal_trajectory_review?.user_direction)).length,
+ goal_drift_coverage_counts:{
+  unassessed:records.filter(e=>!e.payload.goal_drift_coverage ||
+   e.payload.goal_drift_coverage.status==='NOT_SEMANTICALLY_ASSESSED').length,
+  limited:records.filter(e=>
+   e.payload.goal_drift_coverage?.status==='LIMITED_REVIEW_NO_CANDIDATES').length,
+  unresolved:records.filter(e=>
+   e.payload.goal_drift_coverage?.status==='GOAL_ALIGNMENT_UNRESOLVED').length,
+  drift_candidates:records.filter(e=>
+   e.payload.goal_drift_coverage?.status==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION').length,
+  reviewed_not_independently_validated:records.filter(e=>
+   e.payload.goal_drift_coverage?.status==='REVIEWED_NO_CANDIDATES_NOT_VALIDATED').length,
+ },
+ zero_alerts_proves_no_drift:false,
  turns_with_rewrite_correction:records.filter(e=>
   e.payload.released_intervention==='SEMANTIC_REVIEW_CORRECTED').length,
  external_actions:0,
