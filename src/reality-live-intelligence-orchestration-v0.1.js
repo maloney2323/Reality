@@ -446,6 +446,45 @@ export async function runLiveIntelligenceOrchestration({
       reliabilityExtractionStatus = 'FAILED:'+String(error?.message || 'UNKNOWN').slice(0,80);
     }
   }
+  // Merge conversation-specific semantic review candidates into the EXISTING
+  // Continuity conversational-drift receipt. This is not another detector or
+  // another model call: the same reviewer compared the exact source-linked
+  // user messages against the proposed answer. No candidate is ground truth.
+  const comparedUserRefs=Array.isArray(verifiedConversationTurns)
+    ? verifiedConversationTurns.filter(t=>t?.role==='user').slice(-24)
+      .map(t=>t.source_ref).filter(Boolean) : [];
+  const semanticConversationFindings=(semanticFirst?.review?.issues||[])
+    .filter(x=>['FACT_CONTRADICTION','FORGOTTEN_OBLIGATION','WRONG_TASK'].includes(x.kind))
+    .map((issue,i)=>({
+      issue_id:'semantic-conversation:'+String(semanticFirst.response_id||governedSignal.packet.packet_id)+':'+i,
+      classification:({
+        FACT_CONTRADICTION:'CONVERSATION_FACT_CONTRADICTION_CANDIDATE',
+        FORGOTTEN_OBLIGATION:'CONVERSATION_OBLIGATION_LOSS_CANDIDATE',
+        WRONG_TASK:'CONVERSATION_TOPIC_DRIFT_CANDIDATE',
+      })[issue.kind],
+      origin_stage:'COGNITION',
+      detector_channel:'EXISTING_SEMANTIC_CONVERSATION_REVIEW',
+      source_receipt_refs:[governedSignal.packet.packet_id,
+        ...comparedUserRefs,'semantic-review:'+String(semanticFirst.response_id||'untracked')],
+      original_user_text:String(message).slice(0,400),
+      observed_model_text:issue.quote,
+      reason:issue.reason,
+      reviewer_response_id:semanticFirst.response_id||null,
+      independently_adjudicated:false,verified_hallucination:false,
+      auto_correction_authorized:false,
+    }));
+  const combinedConversationalAssessment=conversationalAssessment?{
+    ...conversationalAssessment,
+    status:semanticConversationFindings.length?'EARLY_CONVERSATION_DRIFT_RISK':
+      conversationalAssessment.status,
+    assessment_scope:'TYPED_CONDITIONS_LEXICAL_REPLAY_AND_SEMANTIC_USER_CONVERSATION_CANDIDATES',
+    coverage:{...conversationalAssessment.coverage,
+      semantic_review_source:'SINGLE_EXISTING_REVIEW_PASS',
+      semantic_comparison_independently_verified:false,
+      reviewer_status:semanticFirst?.review?.status||'NOT_ASSESSED',
+      comparison_may_omit_earlier_user_history:true},
+    findings:[...conversationalAssessment.findings,...semanticConversationFindings],
+  }:null;
   const continuousReliability = reliabilityPreviewEnabled
     ? await runContinuousReliabilityCycle({
         continuityRuntime,
@@ -453,7 +492,7 @@ export async function runLiveIntelligenceOrchestration({
         modelResponseId: modelResult?.response_id || null,
         packetId: governedSignal.packet.packet_id,
         structuredCandidate:reliabilityCandidate,
-        conversationalAssessment,
+        conversationalAssessment:combinedConversationalAssessment,
         detectorShadow,
         epistemicFrameReference:epistemicFrameReceipt,
         semanticReview:semanticFirst?.review||{status:semanticReviewStatus,
@@ -474,11 +513,13 @@ export async function runLiveIntelligenceOrchestration({
       status:epistemicFrameReceipt.status,history_coverage:canonicalEpistemicFrame.history_coverage,
       source_receipt_id:epistemicFrameReceipt.source_receipt_id,
       reported_claim_count:canonicalEpistemicFrame.reported_claims.length},
-    conversational_assessment: conversationalAssessment?{
-      status:conversationalAssessment.status,
-      coverage:conversationalAssessment.assessment_scope,
-      findings_count:conversationalAssessment.findings?.length||0,
-      history_scope:conversationalAssessment.history_scope,
+    conversational_assessment: combinedConversationalAssessment?{
+      status:combinedConversationalAssessment.status,
+      coverage:combinedConversationalAssessment.assessment_scope,
+      findings_count:combinedConversationalAssessment.findings?.length||0,
+      semantic_conversation_candidates:semanticConversationFindings.length,
+      history_scope:combinedConversationalAssessment.history_scope,
+      independently_verified_drift_rate:null,
     }:null,
   };
   // Meaning-first correction. Never accept a candidate because its keyword
