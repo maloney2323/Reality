@@ -92,12 +92,13 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null){
  const claims=[],unassessed=[],relevantKeys=[];
  // A typed source candidate must receive an explicit per-claim assessment.
  // Neither model silence nor free-text 'looks good' can count as coverage.
- const expected=new Map((conversationEvidence?.candidates||[]).map(x=>[x.clause_id,x]));
+ const expected=new Map((conversationEvidence?.candidates||[]).map(x=>[x.source_ref+'|'+x.clause_id,x]));
  const checks=[],covered=new Set();
  for(const check of (Array.isArray(parsed.provenance_checks)?parsed.provenance_checks:[])){
-   const source=expected.get(check?.clause_id);
+   const provenanceKey=String(check?.source_ref)+'|'+String(check?.clause_id);
+   const source=expected.get(provenanceKey);
    if(!source||source.source_ref!==check.source_ref||
-      covered.has(check.clause_id)||
+      covered.has(provenanceKey)||
       typeof check.answer_quote!=='string'||typeof check.verified_source_ref!=='string'||
       !valid(check.reason)||!['NOT_MENTIONED','REPORTED_WITH_UNCERTAINTY',
         'ASSERTED_AS_FACT','INDEPENDENT_SOURCE_CITED','UNRESOLVED'].includes(check.relation)){
@@ -105,7 +106,7 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null){
        reason:'MALFORMED_OR_UNANCHORED_PROVENANCE_ASSESSMENT'});
      continue;
    }
-   covered.add(check.clause_id);
+   covered.add(provenanceKey);
    if(check.answer_quote&&!answer.includes(check.answer_quote)){
      unassessed.push({key:check.clause_id,reason:'PROVENANCE_ANSWER_QUOTE_NOT_ANCHORED'});
      continue;
