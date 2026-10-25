@@ -217,6 +217,7 @@ export async function runContinuousReliabilityCycle({
   structuredCandidate = null,
   conversationalAssessment = null,
   detectorShadow = null,
+  epistemicFrameReference = null,
   semanticReview = null,
   semanticRelevantClaimKeys = null,
   currentUserMessage = '',
@@ -229,6 +230,13 @@ export async function runContinuousReliabilityCycle({
       typeof continuityRuntime.readback !== 'function') throw new Error('RELIABILITY_DURABLE_CONTINUITY_REQUIRED');
   if (!packetId || typeof modelOutput !== 'string') throw new Error('RELIABILITY_MODEL_OUTPUT_REQUIRED');
   const before = orderContinuityHistory(await continuityRuntime.readback());
+  // Verify the same pre-cognition frame reached the durable Continuity spine.
+  if(epistemicFrameReference?.status==='PERSISTED_AND_READBACK_VERIFIED'){
+    const prior=before.find(e=>e.event_id===epistemicFrameReference.source_receipt_id);
+    if(!prior||prior.payload?.event_type!=='CANONICAL_EPISTEMIC_FRAME'||
+       prior.payload?.frame_hash!==epistemicFrameReference.frame_hash)
+      throw Error('RELIABILITY_CANONICAL_EPISTEMIC_FRAME_MISMATCH');
+  }
   const turn = before.filter(e => e.event_kind === 'RAW_SIGNAL').length;
   if (!turn) throw new Error('RELIABILITY_RAW_TURN_MISSING');
   const conversational = conversationalAssessment
@@ -304,6 +312,10 @@ export async function runContinuousReliabilityCycle({
 
   const payload = {
     cycle_version: CONTINUOUS_RELIABILITY_VERSION,
+    canonical_epistemic_frame:epistemicFrameReference?
+      {frame_hash:epistemicFrameReference.frame_hash,
+       source_receipt_id:epistemicFrameReference.source_receipt_id,
+       readback_status:epistemicFrameReference.status}:null,
     event_type: 'MODEL_OUTPUT_ASSESSMENT',
     turn,
     packet_digest: digest(packetId),
