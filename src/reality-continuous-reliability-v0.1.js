@@ -192,6 +192,7 @@ export async function runContinuousReliabilityCycle({
   packetId,
   structuredCandidate = null,
   conversationalAssessment = null,
+  detectorShadow = null,
   authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
   evidenceVerifierReceipt = null,
@@ -262,6 +263,10 @@ export async function runContinuousReliabilityCycle({
     hallucination_suspected: categories.hallucination_suspected,
     // Conversational drift compares the model to user-origin intent and prior
     // authenticated turns; it is a candidate signal, not independent truth.
+    // Shadow-only evaluation is an annotation to the EXISTING immutable
+    // Continuity verification receipt; it never mutates truth or blocks output.
+    // Readback validation below guarantees receipt inclusion when enabled.
+    detector_shadow:detectorShadow?JSON.parse(JSON.stringify(detectorShadow)):null,
     conversational_drift:conversational?{
       version:conversational.version,
       status:conversational.status,
@@ -361,6 +366,7 @@ export async function runContinuousReliabilityCycle({
     drift: categories.drift,
     hallucination_suspected: categories.hallucination_suspected,
     conversational_drift: payload.conversational_drift,
+    detector_shadow:payload.detector_shadow,
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
     model_output_quarantined:shouldQuarantine,
