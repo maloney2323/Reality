@@ -153,6 +153,8 @@ function sentencesWithPositions(answer){
 function statusOf(text){
  // Provenance scope matters: report/quote should not become assistant truth.
  if(/\b(?:vendor|supplier|contractor|analyst|manager|someone|they)\s+(?:said|says|reports?|claims?|wrote)\b/i.test(text))return null;
+ if(/\b(?:cannot\s+tell|unclear|not\s+known)\b/i.test(text)&&
+    /\b(?:final|version|proposal|estimate|quote|approved|status)\b/i.test(text))return 'NOT_ESTABLISHED';
  if(/\b(?:no|not|none|nobody|no\s+one|unknown|unverified|unconfirmed|cannot|can't|haven't|hasn't|not\s+a\s+single|failure|failed|not\s+established)\b/i.test(text)){
    if(/\b(?:verif(?:ied|ication)|confirm(?:ed|ation)|establish(?:ed|ment)|proven|settle(?:d|ment)|approv(?:ed|al)|authoriz(?:ed|ation)|signed\s+off|fail(?:ure|ed))\b/i.test(text))return 'NOT_ESTABLISHED';
  }
