@@ -176,6 +176,13 @@ try{
    no_external_effects:answer.execution?.status==='NOT_EXECUTED',
   }));
  }
+ evidence.review_coverage={
+  full:evidence.turns.filter(t=>t.review_status==='REVIEWED_CANDIDATES_NOT_TRUTH').length,
+  partial:evidence.turns.filter(t=>t.review_status==='REVIEWED_PARTIAL_COVERAGE').length,
+  unassessed:evidence.turns.filter(t=>!t.review_status||t.review_status.startsWith('UNASSESSED')).length,
+  source_readback_verified:evidence.turns.filter(t=>t.verification_readback).length,
+  reviewer_issues_observed:evidence.turns.reduce((n,t)=>n+t.review_issue_candidates.length,0),
+ };
  evidence.result_status='COMPLETE_REAL_GITHUB_SOURCE_REAL_MODEL_REVIEW_NO_CUSTOMER_EFFECT';
  save();
  console.log('REAL_BUSINESS_REVIEW_TOTAL '+JSON.stringify({
