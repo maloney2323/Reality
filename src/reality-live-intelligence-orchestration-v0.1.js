@@ -8,6 +8,8 @@ import { runContinuousReliabilityCycle } from './reality-continuous-reliability-
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
+import { buildInvariantFrame } from './reality-alignment-invariant-contract-v0.1.js';
+import { buildSelectiveCognitiveAlignmentV02, assessCurrentTurnFocusV02 } from './reality-selective-cognitive-alignment-v0.2.js';
 import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
@@ -29,6 +31,7 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
 }
 
 import { runRealityCognitiveRuntime } from './reality-cognitive-runtime-v1.0.js';
+import { invokeRealityModel } from './reality-model-gateway-v0.1.js';
 import {
   createIntentRecord,
   structureIntent,
@@ -191,6 +194,42 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // Align the current task BEFORE generation, from the SAME existing source
+  // readback as Continuity. This is a projection, not new memory or authority.
+  let preCognitionAlignment = null;
+  if (process.env.VERCEL_ENV === 'preview' &&
+      process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
+      continuityRuntime?.enabled && systemContext?.world_id) {
+    const history = await continuityRuntime.readback();
+    const grounded = readGroundedEvidence(history,{worldId:systemContext.world_id,
+      asOf:observedAt||new Date().toISOString()});
+    if (grounded.source_receipt_ids.length) {
+      const receiptById = new Map(history.map(x=>[x.event_id,x]));
+      const facts = grounded.facts.map(f=>{
+        const event = receiptById.get(f.evidence_ref);
+        if (!event?.assertion_time || !event?.effective_time)
+          throw Error('PRE_COGNITION_SOURCE_TIME_MISSING');
+        return {key:f.key,value:f.value,world_id:systemContext.world_id,
+          source_receipt_id:f.evidence_ref,system_time:event.assertion_time,
+          valid_from:event.effective_time,source_kind:'SOURCE_ATTESTED_CONTINUITY_READBACK'};
+      });
+      const asOf=observedAt||new Date().toISOString();
+      const frame=buildInvariantFrame({
+        records:facts,asOf,worldId:systemContext.world_id,
+        continuityRootId:effectiveContinuityRootId,
+        activeObjective:message,sourceKind:'SOURCE_ATTESTED_CONTINUITY_READBACK',
+      });
+      preCognitionAlignment=buildSelectiveCognitiveAlignmentV02({
+        currentUserMessage:message,
+        currentUserSourceRef:governedSignal.packet.packet_id,
+        priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        historySource:Array.isArray(verifiedConversationTurns)?
+          'AUTHENTICATED_CONVERSATION_MESSAGES':'NOT_ATTESTED',
+        frame,continuityRootId:effectiveContinuityRootId,
+      });
+    }
+  }
+
   // Ground the NEXT cognitive turn from the reconstructed ledger, not from
   // the previous model answer. A superseded source claim is never inherited.
   let reliabilityGrounding = null;
@@ -215,6 +254,7 @@ export async function runLiveIntelligenceOrchestration({
   const cognitionContext = {
     ...(systemContext || {}),
     reliability_grounding:reliabilityGrounding,
+    current_turn_alignment:preCognitionAlignment?.capsule||null,
     continuity_root_id: effectiveContinuityRootId,
     continuity_status: persistedContinuity?.status || 'NO_CONTINUITY_ROOT',
     continuity_latest_state: persistedContinuity?.latest_state || null,
