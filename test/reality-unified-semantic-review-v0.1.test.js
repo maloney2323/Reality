@@ -520,3 +520,78 @@ test('Cleaner scope clauses reach both reviews and a forgotten-obligation findin
   }finally{restoreSemantic()}
  });
 });
+
+
+test('conversation comparison: revise an unknown-vs-false answer using authenticated user source, then re-review',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const turns=[
+    {role:'user',source_ref:'user:receipt:01',
+     text:"Carrier said the CX-204 delivery probably happened, but we have no signed proof of delivery. Delivery is unconfirmed."},
+    {role:'assistant',source_ref:'model:receipt:02',
+     text:'We should keep the delivery status unconfirmed until verified.'},
+    {role:'user',source_ref:'user:receipt:03',
+     text:'We are only preparing a draft update. Do not send it.'},
+   ];
+   const original='Keep the CX-204 order marked NOT DELIVERED.';
+   const corrected='CX-204 delivery remains unconfirmed. Prepare an internal status draft, but do not send it.';
+   const stub=semanticCallStub(f,{
+    draft:original,repair:corrected,
+    first:review({issues:[{
+      kind:'FACT_CONTRADICTION',quote:'NOT DELIVERED',
+      reason:'user:receipt:01 says delivery unconfirmed, not proven not delivered.'}]}),
+    second:review(),
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'What should our status say? Keep this as a draft only.',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:turns,fetchImpl:stub.fetchImpl,
+   });
+   const reviewRequest=JSON.parse(stub.calls.find(x=>x.mode==='REVIEW')
+     .request.input[1].content[0].text);
+   assert.equal(reviewRequest.conversation_source_history.user_statements.length,2);
+   assert.equal(reviewRequest.conversation_source_history.user_statements[0].source_ref,
+     'user:receipt:01');
+   assert.match(reviewRequest.conversation_source_history.user_statements[0].text,/unconfirmed/);
+   assert.equal(reviewRequest.conversation_source_history.prior_assistant_messages_are_not_evidence,true);
+   assert.equal(got.intelligence.answer,corrected);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+   const receipt=f.events.find(e=>e.event_id===got.reliability.semantic_repair.receipt_id);
+   assert.equal(receipt.payload.initial_issues[0].kind,'FACT_CONTRADICTION');
+   assert.equal(receipt.payload.post_repair_issues.length,0);
+  }finally{restoreSemantic()}
+ });
+});
+test('conversation comparison: do not modify a correct answer and do not promote prior assistant text to fact',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const turns=[
+    {role:'user',source_ref:'user:first',
+     text:'The carrier says delivery may have happened; no independent proof is available.'},
+    {role:'assistant',source_ref:'assistant:previous',
+     text:'Delivery is confirmed and completed.'},
+   ];
+   const original='The carrier reported possible delivery; the actual status remains unconfirmed.';
+   const stub=semanticCallStub(f,{draft:original,first:review()});
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Summarize delivery without inventing verification.',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:turns,fetchImpl:stub.fetchImpl,
+   });
+   const comparison=JSON.parse(stub.calls.find(x=>x.mode==='REVIEW')
+     .request.input[1].content[0].text).conversation_source_history;
+   assert.deepEqual(comparison.user_statements.map(x=>x.source_ref),['user:first']);
+   assert.equal(comparison.prior_assistant_messages_are_not_evidence,true);
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.intelligence.reliability_intervention,undefined);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
