@@ -150,7 +150,16 @@ export function assessCurrentTurnFocusV02({capsule,modelAnswer}={}){
  const wantsForeman=/(?:\b(?:tell|inform|notify|message|communicate|respond to)\b.{0,80}\bforeman\b|\bforeman\b.{0,80}\b(?:tell|inform|notify|message|communicate|respond)\b)/i.test(current);
  const addressesForeman=!wantsForeman ||
   /\b(?:foreman|tell (?:him|them)|inform|communicat|notify|explain to)\b/i.test(modelAnswer);
+ const currentAction = /\b(?:can|may|should|could|are we allowed to|is it permitted to)\b[^?.]{0,125}\b(?:dispatch|mobiliz\w*|email|send|order|purchase)\b/i.test(current)
+   ? (/\b(?:dispatch|mobiliz\w*|crew)\b/i.test(current)?'DISPATCH':
+      /\b(?:email|send|estimate)\b/i.test(current)?'SEND':'PURCHASE')
+   : null;
+ const actionCovered=!currentAction||
+   (currentAction==='DISPATCH'?/\b(?:dispatch|mobiliz\w*|crew)\b/i.test(modelAnswer):
+    currentAction==='SEND'?/\b(?:email|send|estimate|quote)\b/i.test(modelAnswer):
+    /\b(?:order|purchase|buy|materials)\b/i.test(modelAnswer));
  const candidateCodes=[
+  ...(currentAction&&!actionCovered?['CURRENT_REQUESTED_ACTION_NOT_ADDRESSED_CANDIDATE']:[]),
   ...(expected.length&&aligned.length===0?['CURRENT_TASK_TOPIC_NOT_ADDRESSED_CANDIDATE']:[]),
   ...(wantsForeman&&!addressesForeman?['CURRENT_ENTITY_RESPONSE_MISSING_CANDIDATE']:[]),
  ];

@@ -1,0 +1,66 @@
+name: Reality Raw Model vs Corrected Output — Live Internal Proof
+on:
+  push:
+    branches:
+      - experiment/reality-real-model-full-loop-proof-20261024
+    paths:
+      - '.github/workflows/reality-real-model-full-loop-v0.1.yml'
+      - 'scripts/run-reality-real-model-full-loop-v0.1.mjs'
+      - 'docs/reality-real-model-full-loop-v0.1.md'
+      - 'src/reality-selective-cognitive-alignment-v0.2.js'
+      - 'test/reality-real-model-failure-replay-v0.1.test.js'
+      - 'full-loop-proof.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight-no-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse live runner
+        run: node --check scripts/run-reality-real-model-full-loop-v0.1.mjs
+      - name: Existing continuity detector source and live orchestration regressions
+        run: |
+          node --test test/reality-real-model-failure-replay-v0.1.test.js \
+            test/reality-live-detector-shadow-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js \
+            test/reality-cognition-evidence-contracts-v0.1.test.js
+  bounded-live-model-challenge:
+    needs: preflight-no-provider
+    if: contains(github.event.head_commit.message, '[live-real-model-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Run real OpenAI model ONLY within Reality and compare original to final answer
+        run: node scripts/run-reality-real-model-full-loop-v0.1.mjs
+      - name: Preserve Reality original, detected, corrected, and verified answer and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-model-full-loop-original-evidence
+          path: benchmark-results/reality-real-model-full-loop-v0.1.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Disclose limits
+        if: always()
+        run: |
+          echo 'Real model; synthetic source facts and mock durable DB.'
+          echo 'Results are ungraded until independent raw-answer review.'
+          echo 'Reality-only real model; NO standalone baseline. 70 max provider calls including model and extractor.'
+          echo 'No real customer actions, production deployment, or independent outcome verification.'
