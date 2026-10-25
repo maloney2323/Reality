@@ -20,3 +20,13 @@ export function makeAdversarialRunScope(runId){
   if(scope.root===LEGACY_ADVERSARIAL_ROOT)throw Error('BENCHMARK_LEGACY_ROOT_FORBIDDEN');
   return scope;
 }
+
+export function nextAdversarialSegmentTurn({from,to,savedTurnCount}){
+  if(!Number.isInteger(from)||!Number.isInteger(to)||!Number.isInteger(savedTurnCount)||
+     from<1||to<from||savedTurnCount<0)throw Error('BENCHMARK_SEGMENT_INVALID');
+  if(from===1 && savedTurnCount!==0)
+    throw Error('BENCHMARK_RUN_ID_ALREADY_HAS_TURNS_CHOOSE_NEW_ID');
+  if(from>1 && (savedTurnCount<from-1||savedTurnCount>to))
+    throw Error('DURABLE_CONVERSATION_RECOVERY_MISSING_OR_OUTSIDE_SEGMENT');
+  return Math.max(from,savedTurnCount+1);
+}
