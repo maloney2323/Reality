@@ -28,8 +28,7 @@ test('source spans are exact raw-character offsets with leading spaces, CRLF, no
  const a=clean(text);
  assert.equal(a.packet.raw_content,text);
  for(const f of a.fragments){
-   assert.equal(text.slice(f.raw_span.start,f.raw_span.end).trim(),f.cleaned_text.trim()
-     .replace(/ {2,}/g,' ')); // this sample has one normalized multi-space
+   assert.equal(text.slice(f.raw_span.start,f.raw_span.end).replace(/\r\n/g,'\n').replace(/[ \t]+/g,' ').trim(),f.cleaned_text);
    assert.ok(f.raw_text_digest.startsWith('sha256:'));
  }
  assert.equal(a.intake_semantics.markers.negation_present,true);
