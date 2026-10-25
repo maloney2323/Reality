@@ -146,7 +146,8 @@ export function projectProvisionalGoalLifecycle({
   x.goal_evidence_id===goalState.original_user_goal_evidence_id);
  if(!first)throw Error('USER_GOAL_LIFECYCLE_ORIGINAL_SOURCE_NOT_PRESENT');
  let active=first,paused=[],applied=0,ambiguous=0;
- const transitions=[];
+ const transitions=[],assistantAlignmentHistory=[];
+ let possibleConsecutiveOffGoalReviews=0;
  for(const e of continuityHistory){
   if(e?.payload?.event_type!=='MODEL_OUTPUT_ASSESSMENT')continue;
   const review=e.payload.semantic_review?.goal_trajectory_review;
@@ -162,6 +163,19 @@ export function projectProvisionalGoalLifecycle({
   const sourceAnchored=state.user_goal_evidence.some(x=>
    x.source_ref===review.goal_source_ref);
   if(!directUser||!sourceAnchored)continue;
+  const answerAlignment=review.answer_alignment;
+  if(['ON_USER_DIRECTED_OBJECTIVE','ASSISTANT_DRIFTED_OFF_OBJECTIVE',
+      'INSUFFICIENT_EVIDENCE'].includes(answerAlignment)){
+   assistantAlignmentHistory.push({
+    verification_receipt_id:e.event_id,
+    user_goal_source_ref:review.goal_source_ref,
+    answer_alignment_candidate:answerAlignment,
+    reviewer_not_independent_truth:true,
+   });
+   if(answerAlignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE')
+    possibleConsecutiveOffGoalReviews++;
+   else possibleConsecutiveOffGoalReviews=0;
+  }
   const direction=review.user_direction;
   const validDirections=['CONTINUING_USER_OBJECTIVE','USER_AUTHORIZED_DETOUR',
     'USER_AUTHORIZED_PIVOT','USER_RETURNED_TO_OBJECTIVE','UNCLEAR'];
@@ -216,6 +230,12 @@ export function projectProvisionalGoalLifecycle({
    status:'PROVISIONAL_PAUSED_NOT_PERMANENTLY_SUPERSEDED',
   })),
   recent_transition_receipts:transitions.slice(-12),
+  assistant_goal_alignment_history:assistantAlignmentHistory.slice(-16),
+  possible_consecutive_off_goal_reviews:possibleConsecutiveOffGoalReviews,
+  trajectory_signal:possibleConsecutiveOffGoalReviews>=2?
+    'REPEATED_ASSISTANT_GOAL_DRIFT_CANDIDATES_NOT_VERIFIED':
+    'NO_REPEATED_DRIFT_CANDIDATE_NOT_A_CLEAR_PASS',
+  verified_zero_goal_drift:false,
   applied_provisional_transitions:applied,
   unresolved_semantic_transitions:ambiguous,
   current_user_message_may_change_working_goal:true,
