@@ -435,7 +435,10 @@ export async function runLiveIntelligenceOrchestration({
       review.issues.some(x=>x.kind==='WRONG_TASK'));
     const provedSourceConflict=Boolean(continuousReliability.model_output_quarantined &&
       (continuousReliability.drift||[]).includes('FACT_DRIFT'));
-    const semanticRepairCandidate=userObjectiveNotAddressed||provedSourceConflict;
+    const materialUnsupportedClaim=Boolean(review?.issues?.some(x=>
+      ['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION'].includes(x.kind)));
+    const semanticRepairCandidate=userObjectiveNotAddressed||
+      provedSourceConflict||materialUnsupportedClaim;
     if (semanticRepairCandidate &&
         process.env.REALITY_DETECTOR_REPAIR_ENABLED==='true') {
       const originalResponseId=modelResult.response_id||null;
@@ -518,6 +521,12 @@ export async function runLiveIntelligenceOrchestration({
       if(safeToRelease){
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
+      } else if(materialUnsupportedClaim) {
+        // A consequential unsupported outcome claim is not a sourced fact.
+        // The reviewer alone cannot prove it false, so communicate uncertainty,
+        // not an invented correction or the unqualified original claim.
+        modelResult.answer='Reality cannot verify the claimed operational outcome from the connected source records. The record does not establish whether that action or deployment occurred. No external action was taken.';
+        modelResult.reliability_intervention='UNVERIFIED_OPERATIONAL_CLAIM_WITHHELD';
       }
       reliabilityWithExtraction.semantic_repair={
         status:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
