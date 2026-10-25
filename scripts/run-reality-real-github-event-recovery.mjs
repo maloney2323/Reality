@@ -58,7 +58,7 @@ const io=async(url,opt={})=>{
    if(raw?.startsWith('eq.'))result=result.filter(e=>e[key]===raw.slice(3));
   }
   if(u.searchParams.get('limit')==='1')result=result.slice(-1);
-  else result.reverse();
+  else if((u.searchParams.get('order')||'').includes('.desc'))result.reverse();
   return new Response(JSON.stringify(result),{status:200});
  }
  if(u.hostname!=='api.openai.com'||u.pathname!=='/v1/responses')
