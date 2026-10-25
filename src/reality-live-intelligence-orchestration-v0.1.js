@@ -264,8 +264,16 @@ export async function runLiveIntelligenceOrchestration({
   const authenticatedConversationContinuity=buildCognitionContinuityHandoff({
     governedSignal,verifiedConversationTurns,latestMessage:message,
   });
+  // The original server-side message array is used to form the bounded,
+  // source-linked projection. Never duplicate the entire raw transcript in
+  // every observer/verifier/adversary/synthesis model request.
+  const {
+    authenticated_conversation_turns:_unboundedRawConversationHistory,
+    verified_conversation_context:_redundantFlattenedConversationHistory,
+    ...boundedCognitionInput
+  }=systemContext||{};
   const cognitionContext = {
-    ...(systemContext || {}),
+    ...boundedCognitionInput,
     conversation_continuity:authenticatedConversationContinuity,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
