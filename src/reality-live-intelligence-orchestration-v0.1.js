@@ -5,6 +5,8 @@ import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.j
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
 import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.js';
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
+import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
+import { assessDrift } from './reality-drift-recovery-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
@@ -291,6 +293,9 @@ export async function runLiveIntelligenceOrchestration({
     process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true';
   let reliabilityCandidate = null;
   let reliabilityExtractionStatus = 'NOT_ATTEMPTED';
+  const semanticModeEnabled=reliabilityPreviewEnabled &&
+    process.env.REALITY_SEMANTIC_REVIEW_ENABLED === 'true';
+  let semanticFirst=null, semanticSourceSnapshot=null, semanticReviewStatus='NOT_ATTEMPTED';
   // Inspect the actual model output BEFORE any quarantine/replacement.
   // Prior conversational anchors are eligible only from the server adapter;
   // the Signal Cleaner owns the current user turn and its packet provenance.
@@ -338,7 +343,35 @@ export async function runLiveIntelligenceOrchestration({
       };
     }
   }
-  if (reliabilityPreviewEnabled &&
+  // Single meaning-based review replaces keyword-based release decisions and
+  // the separate LLM quote extractor when enabled. Both originate from THIS
+  // Reality runtime; the reviewer has no truth or execution authority.
+  if (semanticModeEnabled) {
+    try {
+      if (systemContext?.world_id && continuityRuntime?.enabled) {
+        const sourceHistory=await continuityRuntime.readback();
+        const available=readGroundedEvidence(sourceHistory,{
+          worldId:systemContext.world_id,
+        });
+        if (available.source_receipt_ids.length)semanticSourceSnapshot=available;
+      }
+      semanticFirst=await reviewRealityAnswer({
+        currentUserMessage:message,modelAnswer:String(modelResult.answer||''),
+        sourceSnapshot:semanticSourceSnapshot,
+        priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+        worldId:systemContext?.world_id||null,
+        model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
+        apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,fetchImpl,
+      });
+      semanticReviewStatus=semanticFirst.review.status;
+      reliabilityCandidate=semanticFirst.candidate;
+      reliabilityExtractionStatus='SEMANTIC_REVIEW_'+semanticReviewStatus;
+    } catch (error) {
+      semanticReviewStatus='UNASSESSED:'+String(error?.message||'UNKNOWN').slice(0,100);
+      reliabilityExtractionStatus=semanticReviewStatus;
+    }
+  }
+  if (!semanticModeEnabled && reliabilityPreviewEnabled &&
       process.env.REALITY_RELIABILITY_EXTRACTION_ENABLED === 'true' &&
       systemContext?.world_id && continuityRuntime?.enabled) {
     try {
@@ -370,6 +403,10 @@ export async function runLiveIntelligenceOrchestration({
         structuredCandidate:reliabilityCandidate,
         conversationalAssessment,
         detectorShadow,
+        semanticReview:semanticFirst?.review||{status:semanticReviewStatus,
+          independent_semantic_adjudication:false,external_action_authorized:false},
+        semanticRelevantClaimKeys:semanticModeEnabled?
+          (semanticFirst?.review?.relevant_source_keys||[]):null,
         currentUserMessage:message,
         authorizedWorldId:systemContext?.world_id || null,
         observedAt: observedAt || new Date().toISOString(),
@@ -377,6 +414,8 @@ export async function runLiveIntelligenceOrchestration({
     : { evaluation_status: 'DISABLED', drift_rate_pct: null, hallucination_rate_pct: null,
         trust_pulse: buildUnmonitoredTrustPulse() };
   const reliabilityWithExtraction = { ...continuousReliability, extraction_status: reliabilityExtractionStatus,
+    semantic_review:semanticFirst?.review||{status:semanticReviewStatus,
+      independent_semantic_adjudication:false},
     detector_shadow:detectorShadow,
     conversational_assessment: conversationalAssessment?{
       status:conversationalAssessment.status,
@@ -385,6 +424,117 @@ export async function runLiveIntelligenceOrchestration({
       history_scope:conversationalAssessment.history_scope,
     }:null,
   };
+  // Meaning-first correction. Never accept a candidate because its keyword
+  // flags went away: regenerate ONCE, then review source claims and objective
+  // again. All semantic judgments remain provisional, not verified world truth.
+  if (semanticModeEnabled) {
+    const review=semanticFirst?.review;
+    const originalModelText=String(modelResult.answer||'');
+    const userObjectiveNotAddressed=Boolean(review &&
+      review.addresses_current_request===false &&
+      review.issues.some(x=>x.kind==='WRONG_TASK'));
+    const provedSourceConflict=Boolean(continuousReliability.model_output_quarantined &&
+      (continuousReliability.drift||[]).includes('FACT_DRIFT'));
+    const semanticRepairCandidate=userObjectiveNotAddressed||provedSourceConflict;
+    if (semanticRepairCandidate &&
+        process.env.REALITY_DETECTOR_REPAIR_ENABLED==='true') {
+      const originalResponseId=modelResult.response_id||null;
+      let retry=null, retryReview=null, retryFailure=null, deterministicReview=null;
+      try{
+        retry=await invokeRealityModel({
+          governedSignal,
+          systemContext:{
+            ...cognitionContext,
+            current_turn_alignment:preCognitionAlignment?.capsule||null,
+            semantic_review_feedback:{
+              status:'UNTRUSTED_REVIEW_CANDIDATE',
+              mistakes:(review?.issues||[]).map(x=>({
+                kind:x.kind,reason:x.reason,
+              })),
+              source_corrections:continuousReliability.source_attested_correction_proposals||[],
+            },
+            cognitive_instruction:[
+              'This is a correction attempt within Reality.',
+              'Answer the CURRENT user request directly, not a previous question.',
+              'Use the supplied source-attested records and respect time/order of supersessions.',
+              'Do not claim any action was executed or approved without evidence.',
+              'Do not reproduce or justify the rejected answer.',
+            ].join(' '),
+          },
+          model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
+        });
+        retryReview=await reviewRealityAnswer({
+          currentUserMessage:message,
+          modelAnswer:String(retry.answer||''),
+          sourceSnapshot:semanticSourceSnapshot,
+          priorTurns:Array.isArray(verifiedConversationTurns)?verifiedConversationTurns:[],
+          worldId:systemContext?.world_id||null,
+          model:resolvedModel||process.env.REALITY_OPENAI_MODEL||'gpt-4.1-mini',
+          apiKey:resolvedApiKey||process.env.OPENAI_API_KEY,fetchImpl,
+        });
+        if(semanticSourceSnapshot&&retryReview.candidate)
+          deterministicReview=assessDrift({
+            trustedSnapshot:semanticSourceSnapshot,candidate:retryReview.candidate,
+          });
+      }catch(error){
+        retryFailure=String(error?.message||'UNKNOWN').slice(0,110);
+      }
+      const secondReviewPass=Boolean(retryReview?.review &&
+        retryReview.review.addresses_current_request===true &&
+        retryReview.review.issues.length===0 &&
+        retryReview.review.unassessed_claims.length===0 &&
+        (!deterministicReview||deterministicReview.codes.length===0));
+      const safeToRelease=secondReviewPass &&
+        (!continuousReliability.model_output_quarantined ||
+          provedSourceConflict);
+      // Both review calls use the same replaceable model; this is NOT an
+      // independently adjudicated accuracy finding, and no effects execute.
+      const correctionReceipt=await continuityRuntime.appendStage({
+        stage:'VERIFICATION',
+        entityId:'semantic-repair:'+governedSignal.packet.packet_id,
+        eventId:'semantic-repair:'+continuityRuntime.spine.continuity_root_id+
+          ':'+governedSignal.packet.packet_id,
+        epistemicStatus:'UNVERIFIED',
+        evidenceRefs:[continuousReliability.receipt_id].filter(Boolean),
+        payload:{
+          event_type:'MODEL_SEMANTIC_REVIEW_AND_REPAIR',
+          original_response_id:originalResponseId,
+          review_response_id:semanticFirst?.response_id||null,
+          retry_response_id:retry?.response_id||null,
+          post_repair_review_response_id:retryReview?.response_id||null,
+          source_reliability_receipt_id:continuousReliability.receipt_id,
+          initial_issues:review?.issues||[],
+          post_repair_issues:retryReview?.review?.issues||null,
+          post_repair_source_violation_codes:deterministicReview?.codes||null,
+          original_output_digest:continuousReliability.receipt_id,
+          disposition:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
+            'CORRECTION_NOT_VERIFIED',
+          correction_error:retryFailure,
+          independently_verified_semantic_correctness:false,
+          external_action_authorized:false,
+        },
+        provenance:{source:'reality_existing_orchestration_semantic_review'},
+      });
+      if(safeToRelease){
+        modelResult.answer=String(retry.answer);
+        modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
+      }
+      reliabilityWithExtraction.semantic_repair={
+        status:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
+          'CORRECTION_NOT_VERIFIED',
+        original_response_id:originalResponseId,
+        retry_response_id:retry?.response_id||null,
+        first_review_id:semanticFirst?.response_id||null,
+        second_review_id:retryReview?.response_id||null,
+        source_violation_codes:deterministicReview?.codes||null,
+        receipt_id:correctionReceipt.event_id,
+        independently_verified_correctness:false,external_action_authorized:false,
+      };
+      // Quarantine only if a source-backed contradiction was NOT corrected.
+      if(safeToRelease && provedSourceConflict)
+        reliabilityWithExtraction.source_conflict_resolved_before_release=true;
+    }
+  } else {
   // Repair a suspected previous-topic reply WITHIN REALITY, not via an
   // independent baseline. Keep original response and its verification receipt.
   // Restrict automatic retry to explicit unanswered current action or topic;
@@ -477,7 +627,9 @@ export async function runLiveIntelligenceOrchestration({
       independently_verified_correctness:false,
     };
   }
-  if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined) {
+  }
+  if (reliabilityPreviewEnabled && continuousReliability.model_output_quarantined &&
+      reliabilityWithExtraction.source_conflict_resolved_before_release!==true) {
     const corrections=(continuousReliability.source_attested_correction_proposals||[])
       .map(f=>String(f.key)+': '+JSON.stringify(f.source_attested_value)+
         ' (source receipt '+String(f.source_receipt_id)+')');
