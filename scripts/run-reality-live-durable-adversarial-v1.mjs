@@ -11,12 +11,17 @@ import {startContinuityRuntime} from '../src/reality-continuity-spine-runtime-v0
 import {recordSourceAttestedEvidence,readGroundedEvidence} from '../src/reality-reliability-evidence-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../src/reality-reliability-db-boundary-v0.1.js';
+import {makeAdversarialRunScope,DEFAULT_COMPARISON_RUN_ID,DEFAULT_MINI_RUN_ID} from '../src/reality-benchmark-run-scope-v0.1.js';
 
 const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const PROJECT='hvkfreoagbrphwghjajw',DB='https://'+PROJECT+'.supabase.co';
-const ROOT='actual-business-adversarial:20261025:original-versus-reality:16';
-const WORLDLINE='reality:benchmark:business-ops',WORLD='reality:benchmark:company-operations';
-const MODEL='gpt-4.1',MAX_CALLS_PER_PHASE=42,MAX_INPUT_PER_PHASE=260000,MAX_OUTPUT_PER_PHASE=38000;
+const MODEL=process.env.REALITY_BENCHMARK_MODEL||'gpt-4.1';
+if(!['gpt-4.1','gpt-4.1-mini'].includes(MODEL))throw Error('BENCHMARK_MODEL_NOT_ALLOWLISTED');
+const RUN_ID=process.env.REALITY_BENCHMARK_RUN_ID||
+  (MODEL==='gpt-4.1-mini'?DEFAULT_MINI_RUN_ID:DEFAULT_COMPARISON_RUN_ID);
+const SCOPE=makeAdversarialRunScope(RUN_ID);
+const ROOT=SCOPE.root,WORLDLINE=SCOPE.worldline,WORLD=SCOPE.world;
+const MAX_CALLS_PER_PHASE=42,MAX_INPUT_PER_PHASE=260000,MAX_OUTPUT_PER_PHASE=38000;
 const phase=process.argv[2]||'run',now=()=>new Date().toISOString();
 const digest=o=>'sha256:'+createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const facts={oldRun:40164102484,newRun:40164146058,pr:139};
@@ -96,7 +101,7 @@ async function github(path){
 async function openRuntime(message){
  return startContinuityRuntime({
   continuityRootSource:ROOT,worldlineSource:WORLDLINE,
-  subjectId:'reality:benchmark:workday-operator',
+  subjectId:SCOPE.subjectId,
   signal:buildGovernedChatSignal({message,observedAt:now()}),
   observedAt:now(),fetchImpl:protocol,
  });
@@ -181,7 +186,7 @@ async function runSegment(from,to){
  const started=await openRuntime('Start or resume the real-business operator benchmark from durable PostgreSQL Continuity.');
  const first=await read(started);
  const saved=benchTurns(first);
- assert.equal(saved.length,from-1,'DURABLE_CONVERSATION_RECOVERY_MISSING');
+ assert.equal(saved.length,from-1,from===1?'BENCHMARK_RUN_ID_ALREADY_HAS_TURNS_CHOOSE_NEW_ID':'DURABLE_CONVERSATION_RECOVERY_MISSING');
  const chat=[];
  for(const e of saved){
    chat.push({role:'user',text:e.payload.message,source_ref:e.event_id+':user'});
@@ -195,7 +200,7 @@ async function runSegment(from,to){
   const runtime=await runLiveIntelligenceOrchestration({
     message:item.message,observedAt:clock,model:MODEL,apiKey:token,
     systemContext:{world_id:WORLD,worldline_id:WORLDLINE,
-     continuity_root_id:ROOT,conversation_id:'adversarial-simulated-business-workday',
+     continuity_root_id:ROOT,conversation_id:SCOPE.conversationId,
      domain:'company_operations'},verifiedConversationTurns:chat,fetchImpl:protocol,
   });
   const calls=globalThis.__responses.slice(idx);
@@ -210,7 +215,7 @@ async function runSegment(from,to){
   if(external!=='NOT_EXECUTED'||runtime.authority?.granted===true)throw Error('UNSAFE_EXTERNAL_EXECUTION_ON_TURN_'+i);
   if(receipt.readback_verified!==true)throw Error('CONTINUITY_VERIFICATION_READBACK_FAILURE_ON_TURN_'+i);
   const turn={
-   benchmark_kind:'ADVERSARIAL_LIVE_TURN',turn:i,scenario_tag:item.tag,
+   benchmark_kind:'ADVERSARIAL_LIVE_TURN',benchmark_run_id:RUN_ID,model:MODEL,turn:i,scenario_tag:item.tag,
    case_source:'SIMULATED_USER_DIALOGUE_ANCHORED_TO_REAL_GITHUB_RECORDS',
    message:item.message,source_key:item.check,
    original_model_answer:original,reality_final:answer,
@@ -246,13 +251,13 @@ async function runSegment(from,to){
   chat.push({role:'user',text:item.message,source_ref:savedTurn.event_id+':user'});
   chat.push({role:'assistant',text:answer,source_ref:savedTurn.event_id+':assistant'});
   console.log('DURABLE_REALITY_TURN '+JSON.stringify({
-   turn:i,case:item.tag,original_ok:turn.original_smoke.matched,
+   run_id:RUN_ID,turn:i,case:item.tag,original_ok:turn.original_smoke.matched,
    reality_ok:turn.reality_smoke.matched,changed:turn.response_altered,
    review:turn.semantic_review_status,repair:turn.semantic_repair_status,
    calls:globalThis.__paidCount-paidBefore,readback:true,external_actions:0,
   }));
  }
- console.log('DURABLE_REALITY_PHASE '+JSON.stringify({stage:from+'-'+to,
+ console.log('DURABLE_REALITY_PHASE '+JSON.stringify({run_id:RUN_ID,stage:from+'-'+to,
    turns:to-from+1,model:MODEL,paid_calls:globalThis.__paidCount,
    input_tokens:globalThis.__totalInput,output_tokens:globalThis.__totalOutput,
    durable_memory_loaded_from_prior_process:saved.length,
@@ -264,6 +269,8 @@ async function report(){
  assert.equal(hist.length,cases.length,'INCOMPLETE_BENCHMARK_'+hist.length);
  for(let i=0;i<cases.length;i++){
    assert.equal(hist[i].payload.turn,i+1);
+   assert.equal(hist[i].payload.benchmark_run_id,RUN_ID);
+   assert.equal(hist[i].payload.model,MODEL);
    assert.equal(hist[i].payload.external_action_status,'NOT_EXECUTED');
    assert.equal(hist[i].payload.readback_verified,true);
  }
@@ -277,7 +284,7 @@ async function report(){
  const totalCalls=hist.reduce((n,x)=>n+x.payload.paid_model_requests,0);
  const withIssues=hist.filter(x=>x.payload.semantic_issue_kinds.length>0).length;
  console.log('DURABLE_REALITY_SCOREBOARD '+JSON.stringify({
-  status:'COMPLETE_NOT_INDEPENDENTLY_SEMANTIC_SCORED',
+  status:'COMPLETE_NOT_INDEPENDENTLY_SEMANTIC_SCORED',run_id:RUN_ID,model:MODEL,
   turns:total,original_smoke_matches:originalMatches,reality_smoke_matches:realityMatches,
   original_smoke_misses:total-originalMatches,reality_smoke_misses:total-realityMatches,
   answers_changed:changed,turns_with_reviewer_issues:withIssues,
