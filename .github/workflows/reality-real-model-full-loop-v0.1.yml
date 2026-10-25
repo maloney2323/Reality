@@ -7,7 +7,6 @@ on:
       - '.github/workflows/reality-real-model-full-loop-v0.1.yml'
       - 'scripts/run-reality-real-model-full-loop-v0.1.mjs'
       - 'docs/reality-real-model-full-loop-v0.1.md'
-      - 'scripts/render-reality-real-model-report-v0.1.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,17 +45,12 @@ jobs:
           node-version: '22'
       - name: Run real OpenAI model ONLY within Reality and compare original to final answer
         run: node scripts/run-reality-real-model-full-loop-v0.1.mjs
-      - name: Render source-linked original versus Reality-final results dashboard
-        if: always()
-        run: node scripts/render-reality-real-model-report-v0.1.mjs
       - name: Preserve Reality original, detected, corrected, and verified answer and receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reality-real-model-full-loop-original-evidence
-          path: |
-            benchmark-results/reality-real-model-full-loop-v0.1.json
-            benchmark-results/reality-real-model-full-loop-v0.1.html
+          path: benchmark-results/reality-real-model-full-loop-v0.1.json
           retention-days: 14
           if-no-files-found: ignore
       - name: Disclose limits
