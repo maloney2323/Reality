@@ -80,3 +80,25 @@ test('unanchored quote and invented source receipt do not verify or authorize an
  assert.ok(r.review.unassessed_claims.some(x=>x.reason==='CLAIMED_VERIFIED_SOURCE_REF_NOT_FOUND'));
  assert.equal(r.review.external_action_authorized,false);
 });
+
+test('reviewer claiming reported uncertainty without words in answer is challenged by original Signal Cleaner',async()=>{
+ const answer='The payer received the claim file.';
+ const {r}=await judge(answer,candidates=>rows(candidates,
+  c=>/payer contact/i.test(c.exact_user_text)?'REPORTED_WITH_UNCERTAINTY':'NOT_MENTIONED')
+  .map(row=>row.relation==='REPORTED_WITH_UNCERTAINTY'?
+   {...row,answer_quote:'The payer received the claim file.'}:row));
+ assert.equal(r.review.issues.some(x=>x.kind==='UNSUPPORTED_FACT'&&
+   /payer received/.test(x.quote)),true);
+ assert.equal(r.review.provenance_checks.some(x=>
+   x.reviewer_relation_conflicts_with_answer_quote===true),true);
+ assert.equal(r.review.independent_semantic_adjudication,false);
+});
+test('answer visibly attributes claim as a report, preventing false provenance alarm',async()=>{
+ const answer='According to the payer contact, the claim file was received, but payment is not verified.';
+ const {r}=await judge(answer,candidates=>rows(candidates,
+  c=>/payer contact/i.test(c.exact_user_text)?'REPORTED_WITH_UNCERTAINTY':'NOT_MENTIONED')
+  .map(row=>row.relation==='REPORTED_WITH_UNCERTAINTY'?
+    {...row,answer_quote:'According to the payer contact, the claim file was received'}:row));
+ assert.equal(r.review.issues.length,0);
+ assert.equal(r.review.provenance_checks.some(x=>x.reviewer_relation_conflicts_with_answer_quote),false);
+});
