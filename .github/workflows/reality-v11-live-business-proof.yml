@@ -1,0 +1,71 @@
+name: Reality v1.1 — Live Business Full-Loop Trial
+on:
+  push:
+    branches:
+      - experiment/reality-v11-live-business-proof-20261025
+    paths:
+      - '.github/workflows/reality-v11-live-business-proof.yml'
+      - 'scripts/run-reality-v11-live-business-proof.mjs'
+      - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
+      - 'src/reality-signal-typed-epistemic-intake-v1.1.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'test/reality-unified-semantic-review-v0.1.test.js'
+      - 'test/reality-signal-typed-epistemic-intake-v1.1.test.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax and latest full Reality loop
+        run: |
+          node --check scripts/run-reality-v11-live-business-proof.mjs
+          node --check src/reality-governed-fragmented-signal-cleaner-v0.1.js
+          node --check src/reality-signal-typed-epistemic-intake-v1.1.js
+          node --test test/reality-signal-typed-epistemic-intake-v1.1.test.js \
+            test/reality-unified-semantic-review-v0.1.test.js \
+            test/reality-repair-the-loop-v0.1.test.js
+  live-reality-only:
+    needs: offline-contract
+    if: contains(github.event.head_commit.message, '[run-v11-live-business]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      REALITY_SEMANTIC_REVIEW_MODEL: gpt-4.1
+      REALITY_REAL_BUSINESS_CASES: '2,4'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Eight consecutive real business turns, source evidence and receipts
+        run: node scripts/run-reality-v11-live-business-proof.mjs
+      - name: Preserve every original answer, final answer, typed intake and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-v11-live-business-original-vs-final
+          path: benchmark-results/reality-v11-real-business-proof.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Disclosure
+        if: always()
+        run: |
+          echo "Authentic current GitHub data; evaluation questions authored for the test."
+          echo "Real model requests happen within Reality only; no standalone baseline."
+          echo "In-memory DB simulator, not production database or verified customer action."
+          echo "No independent blindness, statistical accuracy, competitor score, or claim of ROI."

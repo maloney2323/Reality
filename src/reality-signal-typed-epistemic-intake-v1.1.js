@@ -143,6 +143,19 @@ export function buildTypedEpistemicIntake({packet,fragments}={}){
       clauses.push(interpret(clause,scoped,rawText));
     }
   }
+  // Preserve coordinated scope for comma-separated negative directives.
+  for(let i=1;i<clauses.length;i++){
+    const a=clauses[i-1],b=clauses[i];
+    const gap=rawText.slice(a.source_span.end,b.source_span.start);
+    const same=a.fragment_id===b.fragment_id&&gap.includes(',')&&!/[.!?]/.test(gap);
+    const continuation=/^(?:(?:and|or)\s+)?(?:send|email|deploy|publish|post|merge|approve|pay|transfer|delete|notify|contact|dispatch)\b/i.test(b.exact_source_text.trim());
+    if(same&&continuation&&a.kind==='PROHIBITION_CANDIDATE'){
+      b.kind='PROHIBITION_CANDIDATE';
+      b.agency={candidate:'AUTONOMOUS_PROHIBITED_CANDIDATE',execution_authorized:false};
+      b.epistemic_modalities=[...b.epistemic_modalities,'NEGATION_SCOPE_CANDIDATE'];
+      b.requires_semantic_review=true;
+    }
+  }
   // Preserve explicit conditions as dependency candidates, without creating
   // a task or asserting that the condition has been satisfied.
   for(let i=1;i<clauses.length;i++){
