@@ -1,0 +1,45 @@
+name: Reality Live Detector Shadow Wiring (Preview Only)
+on:
+  push:
+    branches:
+      - experiment/reality-live-detector-shadow-20261024
+    paths:
+      - '.github/workflows/reality-live-detector-shadow-v0.1.yml'
+      - 'src/reality-live-detector-shadow-v0.1.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'src/reality-continuous-reliability-v0.1.js'
+      - 'test/reality-live-detector-shadow-v0.1.test.js'
+      - 'docs/reality-live-detector-shadow-v0.1.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shadow-contract-and-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Parse live shadow and existing orchestration
+        run: |
+          node --check src/reality-live-detector-shadow-v0.1.js
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --check src/reality-continuous-reliability-v0.1.js
+      - name: Existing orchestration / Continuity plus shadow and original detector regressions
+        run: |
+          node --test test/reality-live-detector-shadow-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-cognition-evidence-contracts-v0.1.test.js \
+            test/reality-conversation-drift-integrity-v0.1.test.js \
+            test/reality-selective-cognitive-alignment-v0.2.test.js \
+            test/reality-alignment-invariant-contract-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js
+      - name: State important limitations
+        run: |
+          echo 'Shadow flag is disabled by default and requires preview + reliability flags.'
+          echo 'No real provider calls, production merge, live customer readback or external actions.'
+          echo 'Any detector result is a candidate, not proven drift or hallucination.'
