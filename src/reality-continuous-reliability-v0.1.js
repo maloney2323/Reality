@@ -217,6 +217,8 @@ export async function runContinuousReliabilityCycle({
   structuredCandidate = null,
   conversationalAssessment = null,
   detectorShadow = null,
+  semanticReview = null,
+  semanticRelevantClaimKeys = null,
   currentUserMessage = '',
   authorizedWorldId = null,
   independentlyVerifiedSnapshot = null,
@@ -269,7 +271,10 @@ export async function runContinuousReliabilityCycle({
         key:f.key,source_attested_value:f.value,source_receipt_id:f.evidence_ref,
       })) : [];
   const relevantTypedFactDrift=Boolean((assessment?.violations||[]).some(v=>
-    v.code==='FACT_DRIFT'&&relevantToCurrentRequest(v.key,currentUserMessage)));
+    v.code==='FACT_DRIFT'&&(
+      semanticRelevantClaimKeys instanceof Array?
+      semanticRelevantClaimKeys.includes(v.key):
+      relevantToCurrentRequest(v.key,currentUserMessage))));
   const actionIntegrityViolation=Boolean((assessment?.codes||[]).some(c=>
     ['WORLD_SCOPE_DRIFT','AUTHORITY_ESCALATION','FALSE_COMPLETION'].includes(c)));
   const shouldQuarantine=relevantTypedFactDrift||actionIntegrityViolation;
@@ -296,6 +301,7 @@ export async function runContinuousReliabilityCycle({
     // Continuity verification receipt; it never mutates truth or blocks output.
     // Readback validation below guarantees receipt inclusion when enabled.
     detector_shadow:detectorShadow?JSON.parse(JSON.stringify(detectorShadow)):null,
+    semantic_review:semanticReview?JSON.parse(JSON.stringify(semanticReview)):null,
     conversational_drift:conversational?{
       version:conversational.version,
       status:conversational.status,
@@ -397,6 +403,7 @@ export async function runContinuousReliabilityCycle({
     hallucination_suspected: categories.hallucination_suspected,
     conversational_drift: payload.conversational_drift,
     detector_shadow:payload.detector_shadow,
+    semantic_review:payload.semantic_review,
     hallucination_rate_pct: null, drift_rate_pct: null,
     correction_proposed: payload.correction_proposed,
     model_output_quarantined:shouldQuarantine,
