@@ -13,5 +13,6 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "buildCommand": "REALITY_BENCHMARK_MODEL=gpt-4.1-mini node scripts/run-reality-live-durable-adversarial-v1.mjs first && mkdir -p public && printf 'Reality isolated mini-model adversarial preview\\n' > public/index.html"
 }
