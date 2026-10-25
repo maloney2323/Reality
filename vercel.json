@@ -13,6 +13,5 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ],
-  "buildCommand": "node scripts/run-reality-live-conversation-regression-20261025.mjs"
+  ]
 }
