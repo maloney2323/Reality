@@ -51,8 +51,12 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
  const userRevisions=conversationFindings.filter(f=>f.classification==='CONVERSATIONAL_REVISION_REQUIRES_REVIEW');
  const conversationRisk=modelDriftCandidates.length>0;
  const contained=p.model_output_quarantined===true;
+ // Independent factual source adjudication is not an independent review of
+ // user-intent/goal drift. Never show a green all-clear without BOTH.
+ const goalIndependentlyGraded=goalCoverage?.independent_drift_accuracy_adjudicated===true;
  const wholeResponse=evaluated && p.independent_truth_adjudication===true &&
-   p.extraction_completeness_verified===true && !hasFindings && conversationFindings.length===0;
+   p.extraction_completeness_verified===true && goalIndependentlyGraded &&
+   !hasFindings && conversationFindings.length===0;
  let status,headline,note;
  if(hasFindings){
   status=contained?STATUS.DETECTED_CONTAINED:STATUS.FINDINGS_NEED_REVIEW;
@@ -106,6 +110,7 @@ export function buildConversationTrustPulse({history,turn,interval=10}={}){
   goal_drift_review_status:goalCoverageStatus,
   goal_drift_review_limitations:goalCoverage?.coverage_limitations||['GOAL_DRIFT_COVERAGE_UNAVAILABLE'],
   goal_drift_independently_verified_rate:null,
+  goal_drift_independently_adjudicated:goalIndependentlyGraded,
   zero_alerts_proves_no_drift:false,
   model_output_quarantined:contained,
   correction_proposed:p.correction_proposed===true,
