@@ -9,6 +9,7 @@ const nonempty=x=>typeof x==='string'&&x.trim().length>0;
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x)}return x};
 export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
+ userGoalContinuityState=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
  if(!governedSignal?.packet?.packet_id||!nonempty(continuityRootId)||
@@ -77,6 +78,9 @@ export function buildCanonicalEpistemicFrame({
   conversation_evidence:copy(reports),
   user_goal_trajectory:conversationContinuity.user_goal_trajectory?
     copy(conversationContinuity.user_goal_trajectory):null,
+  // Canonical projection of user-channel goal evidence, retained from the
+  // existing append-only Continuity ledger; lifecycle status is NOT inferred.
+  user_goal_continuity_state:userGoalContinuityState?copy(userGoalContinuityState):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
