@@ -106,8 +106,10 @@ export function compareInvariantFrames(oldFrame,newFrame){
   throw Error('INVARIANT_COMPARISON_SCOPE_MISMATCH');
  const changes=[];
  for(const key of new Set([...Object.keys(oldFrame.time_scoped_state),...Object.keys(newFrame.time_scoped_state)])){
-  const oldValue=oldFrame.time_scoped_state[key];
-  const newValue=newFrame.time_scoped_state[key];
+  // A newly observed fact has no previous key. Missing is UNKNOWN, never
+  // a null dereference or invented prior state.
+  const oldValue=oldFrame.time_scoped_state[key]||{state:'UNKNOWN',value:null,source_refs:[]};
+  const newValue=newFrame.time_scoped_state[key]||{state:'UNKNOWN',value:null,source_refs:[]};
   if(JSON.stringify([oldValue.state,oldValue.value])!==JSON.stringify([newValue.state,newValue.value]))
    changes.push({key,before:oldValue,after:newValue,
      source_refs:newValue.source_refs||[]});
