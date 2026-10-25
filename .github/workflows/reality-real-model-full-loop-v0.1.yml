@@ -7,6 +7,9 @@ on:
       - '.github/workflows/reality-real-model-full-loop-v0.1.yml'
       - 'scripts/run-reality-real-model-full-loop-v0.1.mjs'
       - 'docs/reality-real-model-full-loop-v0.1.md'
+      - 'src/reality-selective-cognitive-alignment-v0.2.js'
+      - 'test/reality-real-model-failure-replay-v0.1.test.js'
+      - 'full-loop-proof.html'
   workflow_dispatch:
 permissions:
   contents: read
