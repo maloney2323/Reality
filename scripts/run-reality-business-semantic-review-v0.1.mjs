@@ -138,7 +138,12 @@ try{
    verifiedConversationTurns:priorTurns,
   });
   const responses=modelOutputs.slice(n);
-  const original=responses.filter(x=>x.kind==='COGNITION')[0]?.output_text||null;
+  // Deep cognition may produce multiple lane calls and a synthesis. The
+  // original user-facing response is the LAST cognition before reviewer #1,
+  // not the first internal lane analysis.
+  const firstReviewAt=responses.findIndex(x=>x.kind==='SEMANTIC_REVIEW');
+  const original=(firstReviewAt>=0?responses.slice(0,firstReviewAt):responses)
+    .filter(x=>x.kind==='COGNITION').at(-1)?.output_text||null;
   const lastCognition=responses.filter(x=>x.kind==='COGNITION').at(-1)?.output_text||null;
   const answerText=String(answer.intelligence.answer||'');
   evidence.turns.push({
