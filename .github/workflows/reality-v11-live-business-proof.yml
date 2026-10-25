@@ -9,6 +9,8 @@ on:
       - 'src/reality-governed-fragmented-signal-cleaner-v0.1.js'
       - 'src/reality-signal-typed-epistemic-intake-v1.1.js'
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'test/reality-unified-semantic-review-v0.1.test.js'
+      - 'test/reality-signal-typed-epistemic-intake-v1.1.test.js'
   workflow_dispatch:
 permissions:
   contents: read
