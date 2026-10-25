@@ -435,8 +435,17 @@ setInterval(refreshSavedShiftHome,300000);
    const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
    el('privatePrompt').value='';
    await loadSaved();await loadConversations();
-   status((data.continuity?.recovered_messages||0)+' source-linked messages · Response persisted'+
-    (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':''));
+   const reliability=data.reliability||{};
+   const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
+   const issues=reliability.semantic_issue_candidates?.length||0;
+   const assessed=reliability.semantic_review_provenance_status||'NOT_ASSESSED';
+   status((data.continuity?.recovered_messages||0)+' source-linked messages · '+
+    (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
+    ' · Semantic review: '+assessed+
+    ' · Review candidates: '+issues+
+    ' · Corrections: '+(reliability.intervention||'none')+
+    (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':'')+
+    ' · External truth not independently verified');
   }catch(e){status(e.message+' · Saved user messages may still be recoverable.');}
   finally{el('privateSend').disabled=false}
  };
