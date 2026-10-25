@@ -48,3 +48,12 @@ These findings **do not support a reliability improvement in this run**. Initial
 Keep this PR draft and prevent production promotion. Improve the source-claim extraction false positives, stop inappropriate containment, enforce current requested action coverage, and separately verify corrections and publish-gate behavior. Rerun Reality-only on held-out turns only after source-backed regression acceptance. Do NOT waste budget on standalone model baselines or silently revise these original receipts.
 
 The existing `full-loop-proof.html` Proof Lab UI now contains a Reality internal comparison section that accepts this experiment's JSON and shows the true original provider output versus the actual final response, its candidate findings and source receipts. It is preview-branch code, **not yet a verified customer-facing deployment**.
+
+
+## Repair-first rerun — scope
+Run a single opt-in real-model benchmark through the **existing Reality model gateway** with
+pre-generation current-turn alignment, conservative source-backed quarantine and
+a maximum of one current-action correction attempt when required.
+Preserve first original model text, any retry, all receipts and released answers.
+Prior 16-turn raw evidence is frozen and must not be overwritten.
+No standalone model-only lane, no real customer actions, no production merge.
