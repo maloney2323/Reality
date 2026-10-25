@@ -164,3 +164,15 @@ test('live business regression: coordinated prohibition also covers later comma-
  assert.ok(announcement.epistemic_modalities.includes('NEGATION_SCOPE_CANDIDATE'));
  assert.equal(announcement.agency.execution_authorized,false);
 });
+
+test('real GitHub follow-up: do not infer is a constraint, not a question or permission',()=>{
+ const signal=clean('Do not infer later results.');
+ assert.equal(typed(signal).clauses[0].kind,'CONSTRAINT_CANDIDATE');
+ assert.ok(typed(signal).clauses[0].epistemic_modalities.includes('NEGATED'));
+ assert.equal(typed(signal).clauses[0].agency.execution_authorized,false);
+});
+test('real GitHub follow-up: explain what changed is an answerable task request',()=>{
+ const signal=clean('Explain what changed.');
+ assert.equal(typed(signal).clauses[0].kind,'TASK_REQUEST_CANDIDATE');
+ assert.equal(typed(signal).clauses[0].agency.execution_authorized,false);
+});
