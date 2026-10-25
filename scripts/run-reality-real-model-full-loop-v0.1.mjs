@@ -113,6 +113,18 @@ function persist(status='PARTIAL',error=null){
  return result;
 }
 async function actualSource(runtime,turn,changed){
+ // A new canonical spine must rehydrate the latest lineage before ANY
+ // new fixture provider attestation. Reusing an earlier spine creates forks.
+ if(turn>0){
+  const sig=buildGovernedChatSignal({
+   message:'Fixture provider readback for turn '+turn,observedAt:at(turn*2),
+  });
+  runtime=await startContinuityRuntime({
+   continuityRootSource:root,worldlineSource:worldline,
+   subjectId:'fictional:contractor',signal:sig,
+   observedAt:at(turn*2),fetchImpl:dbProvider,
+  });
+ }
  const history=orderContinuityHistory(await runtime.readback());
  const latest=readGroundedEvidence(history,{worldId});
  const facts=Object.entries(changed).map(([key,value])=>{
