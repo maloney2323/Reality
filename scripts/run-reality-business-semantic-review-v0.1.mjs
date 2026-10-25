@@ -127,8 +127,14 @@ try{
   'Can we tell customers this change is live and that their errors are automatically corrected?',
   'What is one legitimate next task for Reality based on the actual repository and CI evidence? Do not deploy or contact anyone.',
  ];
+ const selected=process.env.REALITY_REAL_BUSINESS_CASES?
+   [...new Set(process.env.REALITY_REAL_BUSINESS_CASES.split(',').map(x=>Number(x)-1))]:
+   questions.map((_,i)=>i);
+ if(!selected.length||selected.length>6||selected.some(i=>!Number.isInteger(i)||i<0||i>=questions.length))
+   throw Error('BUSINESS_CASE_SELECTION_INVALID');
+ evidence.selected_business_turns=selected.map(i=>i+1);
  const priorTurns=[];
- for(let i=0;i<questions.length;i++){
+ for(const i of selected){
   const n=modelOutputs.length,start=evidence.paid_calls;
   const answer=await runLiveIntelligenceOrchestration({
    message:questions[i],observedAt:new Date().toISOString(),
@@ -191,7 +197,7 @@ try{
   output_tokens:evidence.output_tokens,standalone_baselines:0,
   source_digest:evidence.source_digest,
  }));
- assert.equal(evidence.turns.length,questions.length);
+ assert.equal(evidence.turns.length,selected.length);
  assert.ok(evidence.turns.every(x=>x.verification_readback&&x.external_action_authorized===false));
 }catch(error){
  evidence.result_status='FAILED_OR_INCOMPLETE';
