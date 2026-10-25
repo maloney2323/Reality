@@ -6,6 +6,9 @@ on:
     paths:
       - '.github/workflows/reality-real-event-recovery.yml'
       - 'scripts/run-reality-real-github-event-recovery.mjs'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-signal-typed-epistemic-intake-v1.1.js'
+      - 'test/reality-signal-typed-epistemic-intake-v1.1.test.js'
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,6 +37,7 @@ jobs:
     timeout-minutes: 15
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_REAL_HISTORY_CASES: '2,4'
       GITHUB_TOKEN: ${{ github.token }}
       REALITY_SEMANTIC_REVIEW_MODEL: gpt-4.1
     steps:
