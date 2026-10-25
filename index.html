@@ -440,6 +440,12 @@ setInterval(refreshSavedShiftHome,300000);
    const issues=reliability.semantic_issue_candidates?.length||0;
    const assessed=reliability.semantic_review_provenance_status||'NOT_ASSESSED';
    const trajectory=reliability.goal_drift_coverage||{};
+   const goalContext=reliability.user_goal_continuity||{};
+   const goalContextStatus=goalContext.provisional_working_goal_source_ref?
+    ('Working objective (provisional, from user text): '+
+     String(goalContext.provisional_working_goal_text||'').slice(0,110)+
+     ' · Paused possibilities: '+(goalContext.paused_goal_candidate_count||0)):
+    'User-goal continuity not yet recovered';
    const driftStatus=trajectory.status||'NOT_SEMANTICALLY_ASSESSED';
    const driftText=driftStatus==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION'
     ? 'Potential goal drift detected; needs verification'
@@ -453,6 +459,7 @@ setInterval(refreshSavedShiftHome,300000);
    status((data.continuity?.recovered_messages||0)+' source-linked messages · '+
     (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
     ' · Semantic review: '+assessed+
+    ' · '+goalContextStatus+
     ' · Goal tracking: '+driftText+
     ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
     ' · Review candidates: '+issues+
