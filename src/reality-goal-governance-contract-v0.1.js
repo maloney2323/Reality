@@ -91,7 +91,7 @@ export function buildAssistantGoalGovernance({
   createGoalTransitionContract({
    goalId,scopeRootId:canonicalFrame.continuity_root_id,
    worldId:canonicalFrame.world_id,
-   fromStatus:'ACTIVE',toStatus:'PAUSED',
+   fromStatus:'UNRESOLVED',toStatus:'UNRESOLVED',
    proposedBy:'ASSISTANT_PROPOSAL',
    sourceFrameHash:canonicalFrame.frame_hash,
    contextLifecycle:'UNRESOLVED',observedAt,
@@ -158,6 +158,12 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
   canonicalFrame?.continuity_root_id===contract.continuity_root_id&&
   canonicalFrame?.world_id===contract.world_id,
   'GOAL_GOVERNANCE_FRAME_SCOPE_MISMATCH');
+ const {contract_hash,...unsigned}=contract;
+ required(digest(unsigned)===contract_hash,'GOAL_GOVERNANCE_CONTRACT_HASH_MISMATCH');
+ required(contract.assistant_proposal?.canonical_frame_hash===canonicalFrame.frame_hash,
+  'GOAL_GOVERNANCE_PROPOSAL_FRAME_MISMATCH');
+ required(contract.assistant_proposal?.intended_state_mutations?.resource_mutations?.length===0,
+  'GOAL_GOVERNANCE_UNAUTHORIZED_RESOURCE_MUTATION');
  // A model proposal NEVER advances, pauses, abandons, or supersedes goals.
  // This governs **state mutation and execution**, not ordinary discussion.
  if(contract.state_mutation_allowed!==false||
