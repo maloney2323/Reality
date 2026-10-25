@@ -1,4 +1,4 @@
-name: Reality Real Model Full Loop Adversarial Proof
+name: Reality Raw Model vs Corrected Output — Live Internal Proof
 on:
   push:
     branches:
@@ -7,6 +7,7 @@ on:
       - '.github/workflows/reality-real-model-full-loop-v0.1.yml'
       - 'scripts/run-reality-real-model-full-loop-v0.1.mjs'
       - 'docs/reality-real-model-full-loop-v0.1.md'
+      - 'scripts/render-reality-real-model-report-v0.1.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,14 +44,19 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Run actual OpenAI model through underlying baseline and real Reality orchestration
+      - name: Run real OpenAI model ONLY within Reality and compare original to final answer
         run: node scripts/run-reality-real-model-full-loop-v0.1.mjs
-      - name: Preserve every original underlying and Reality model answer and verification receipt
+      - name: Render source-linked original versus Reality-final results dashboard
+        if: always()
+        run: node scripts/render-reality-real-model-report-v0.1.mjs
+      - name: Preserve Reality original, detected, corrected, and verified answer and receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reality-real-model-full-loop-original-evidence
-          path: benchmark-results/reality-real-model-full-loop-v0.1.json
+          path: |
+            benchmark-results/reality-real-model-full-loop-v0.1.json
+            benchmark-results/reality-real-model-full-loop-v0.1.html
           retention-days: 14
           if-no-files-found: ignore
       - name: Disclose limits
@@ -58,5 +64,5 @@ jobs:
         run: |
           echo 'Real model; synthetic source facts and mock durable DB.'
           echo 'Results are ungraded until independent raw-answer review.'
-          echo 'Up to 70 model requests; no automatic paid retries.'
+          echo 'Reality-only real model; NO standalone baseline. 70 max provider calls including model and extractor.'
           echo 'No real customer actions, production deployment, or independent outcome verification.'
