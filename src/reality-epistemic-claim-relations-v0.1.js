@@ -127,6 +127,42 @@ function unsupportedInferences(answer,{continuityRootId,modelResponseId,refs,cur
  }
  return candidates;
 }
+
+// A domain-agnostic entailment challenge supplements the typed transition
+// catalog. The assistant's causal "therefore" is not evidence. The actual
+// source must independently attest the resulting operational state. This
+// produces an EVIDENCE GAP candidate, never a verified hallucination verdict.
+const assertedMaterialOutcome=/\b(?:live\s+for\s+customers?|production|deliver(?:ed|y)|reached\s+(?:the\s+)?buyer|arrived|paid|payment|fund(?:ed|s)|settle(?:d|ment)|deposited|approv(?:ed|al)|accept(?:ed|ance)|signed?\s*off|access\s+(?:was\s+)?granted|grant(?:ed|ing)\s+(?:access|permission)|authoriz(?:ed|ation)|consent|customer.{0,35}(?:problem|issue).{0,20}(?:fixed|gone|disappear(?:ed)?)|(?:problem|issue)\s+(?:disappear(?:ed)?|was\s+fixed|resolved))\b/i;
+const independentOutcomeEvidence=/\b(?:separate|independent|attested|source[- ]backed|carrier\s+signature|bank\s+ledger|signed\s+(?:delivery|payment)\s+receipt)\b/i;
+function domainAgnosticInferenceGaps(answer,{continuityRootId,modelResponseId,refs,currentUserSourceRef}){
+ const out=[];
+ for(const m of answer.matchAll(/[^.!?\n]{16,300}/g)){
+  const sentence=m[0],link=connector.exec(sentence);
+  if(!link)continue;
+  const lhs=sentence.slice(0,link.index),rhs=sentence.slice(link.index+link[0].length);
+  if(!lhs.trim()||!rhs.trim()||!assertedMaterialOutcome.test(rhs))continue;
+  if(/\b(?:not|never|unknown|unverified|unconfirmed|might|maybe|could|may|cannot|can't|no\s+evidence|remains?\s+to\s+be)\b/i.test(rhs))continue;
+  if(/\b(?:does\s+not|do\s+not|is\s+not|cannot|can't|doesn't|isn't)\s*$/i.test(lhs))continue;
+  if(independentOutcomeEvidence.test(lhs))continue;
+  const intro=answer.slice(Math.max(0,(m.index||0)-110),(m.index||0)+Math.min(95,sentence.length));
+  if(/\b(?:vendor|manager|supplier|someone|analyst|contractor|client|employee|team)\s+(?:wrote|said|says|claimed|claims|reported|reports|quoted|argued)\b/i.test(intro)||
+    /["“][^"”]{0,150}$/.test(intro.slice(-150)))continue;
+  // Existing typed relations keep their specific classification. This
+  // fallback is for previously unseen semantic relations, without pretending
+  // its concern is independently proven by text alone.
+  out.push(finding({classification:'UNATTESTED_MATERIAL_ENTAILMENT',
+    left:m,answer,continuityRootId,modelResponseId,
+    sourceRefs:refs.map(x=>x.source_ref).concat([currentUserSourceRef]).slice(-12),
+    reason:'Causal language treats an upstream observation as proof of a material outcome, but the claim does not identify an independent outcome observation. Require source attestation or qualify.',
+    relation:{source_event_type:'UNCLASSIFIED_UPSTREAM_OBSERVATION',
+      inferred_outcome_type:'MATERIAL_OPERATIONAL_STATE',
+      claim_relation:'UNASSESSED_CAUSAL_ENTAILMENT_REQUIRES_EXTERNAL_PROOF',
+      independently_source_verified:false,source_is_not_outcome:true},
+  }));
+ }
+ return out;
+}
+
 const namedSubjects=[
  ['PAYER',/\b(?:payer|insurance|insurer)\b/i],
  ['STATUS',/\b(?:status|statuses)\b/i],
@@ -153,6 +189,8 @@ function sentencesWithPositions(answer){
 function statusOf(text){
  // Provenance scope matters: report/quote should not become assistant truth.
  if(/\b(?:vendor|supplier|contractor|analyst|manager|someone|they)\s+(?:said|says|reports?|claims?|wrote)\b/i.test(text))return null;
+ if(/\b(?:unknown|unconfirmed|unverified|no\s+(?:\w+\s+){0,5}(?:on\s+file|recorded|documented))\b/i.test(text) &&
+    subjects(text).size>0)return 'NOT_ESTABLISHED';
  if(/\b(?:cannot\s+tell|unclear|not\s+known)\b/i.test(text)&&
     /\b(?:final|version|proposal|estimate|quote|approved|status)\b/i.test(text))return 'NOT_ESTABLISHED';
  if(/\b(?:no|not|none|nobody|no\s+one|unknown|unverified|unconfirmed|cannot|can't|haven't|hasn't|not\s+a\s+single|failure|failed|not\s+established)\b/i.test(text)){
@@ -228,6 +266,10 @@ export function inspectEpistemicClaimRelations({
  }
  const structural={continuityRootId,modelResponseId,refs,currentUserSourceRef};
  findings.push(...unsupportedInferences(answer,structural));
+ const alreadyTypedSpans=new Set(findings.filter(f=>f.classification==='UNSUPPORTED_STATE_TRANSITION')
+   .flatMap(f=>f.claim_spans.map(p=>p.start)));
+ findings.push(...domainAgnosticInferenceGaps(answer,structural).filter(f=>
+   !f.claim_spans.some(p=>alreadyTypedSpans.has(p.start))));
  findings.push(...generalizedStatusContradictions(answer,structural));
  const seen=new Set();
  for(const re of equivPatterns){
