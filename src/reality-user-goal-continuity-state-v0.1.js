@@ -181,6 +181,7 @@ export function projectProvisionalGoalLifecycle({
     'USER_AUTHORIZED_PIVOT','USER_RETURNED_TO_OBJECTIVE','UNCLEAR'];
   if(!validDirections.includes(direction))continue;
   const priorActive=active;
+  let transitionUnresolved=false;
   const record={
    verification_receipt_id:e.event_id,
    source_frame_receipt_id:origin.source_receipt_id,
@@ -214,12 +215,14 @@ export function projectProvisionalGoalLifecycle({
     applied++;
    }else{
     ambiguous++;
+    transitionUnresolved=true;
    }
   }else if(direction==='UNCLEAR'){
    ambiguous++;
   }
-  if(priorActive!==active||direction==='UNCLEAR'){
-   transitions.push(record);
+  if(priorActive!==active||direction==='UNCLEAR'||transitionUnresolved){
+   transitions.push({...record,
+    status:transitionUnresolved?'RETURN_TARGET_NOT_SOURCE_RESOLVED':'PROVISIONAL_REVIEWER_TRANSITION'});
   }
  }
  return deepFreeze({
