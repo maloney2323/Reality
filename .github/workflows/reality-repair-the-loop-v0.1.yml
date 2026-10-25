@@ -1,0 +1,36 @@
+name: Reality Repair Existing Intelligence Loop
+on:
+  push:
+    branches:
+      - experiment/reality-repair-the-loop-20261024
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrated-loop-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Check original Reality path
+        run: |
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --check src/reality-continuous-reliability-v0.1.js
+      - name: Prove source-backed correction and good-answer preservation
+        run: |
+          node --test test/reality-repair-the-loop-v0.1.test.js \
+            test/reality-real-model-failure-replay-v0.1.test.js \
+            test/reality-live-intelligence-orchestration-v0.1.test.js \
+            test/reality-continuous-reliability-v0.1.test.js \
+            test/reality-cognition-evidence-contracts-v0.1.test.js \
+            test/reality-selective-cognitive-alignment-v0.2.test.js
+      - name: Status
+        if: always()
+        run: |
+          echo 'No live model or standalone baseline called in regression.'
+          echo 'No production deployment or real customer actions authorized.'
