@@ -202,8 +202,19 @@ export function projectProvisionalGoalLifecycle({
    active=directUser;
    applied++;
   }else if(direction==='USER_RETURNED_TO_OBJECTIVE'){
-   active=paused.pop()||first;
-   applied++;
+   // Never pop a random "last detour". Return only to a goal explicitly
+   // identified by the review's USER source reference. If the reviewer
+   // anchors merely the CURRENT user request, the target is unresolved.
+   const candidates=[first,...paused];
+   const target=candidates.find(x=>x.source_ref===review.goal_source_ref &&
+     x.goal_evidence_id!==directUser.goal_evidence_id);
+   if(target){
+    active=target;
+    paused=paused.filter(x=>x.goal_evidence_id!==target.goal_evidence_id);
+    applied++;
+   }else{
+    ambiguous++;
+   }
   }else if(direction==='UNCLEAR'){
    ambiguous++;
   }
