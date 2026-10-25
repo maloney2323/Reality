@@ -21,8 +21,12 @@ function extractOutputText(response) {
 }
 
 function materialityForFragments(fragments = []) {
-  const text = fragments.map((f) => f.cleaned_text || '').join('\n').toLowerCase();
-  const consequential = /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/.test(text);
+  // V1 intake marks only commands/discussions outside quoted untrusted speech.
+  // Legacy signals still receive conservative lexical handling.
+  const consequential = fragments.some(f =>
+    f.intake_observation?.markers
+      ? f.intake_observation.markers.direct_action_cue_present
+      : /\b(send|email|reply|publish|post|delete|buy|purchase|schedule|cancel|transfer|pay|write|update|change|deploy|merge)\b/i.test(f.cleaned_text||''));
   return {
     mode: consequential ? 'ACTION_CANDIDATE' : 'CONVERSATIONAL',
     consequential,
