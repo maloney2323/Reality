@@ -45,7 +45,7 @@ export function adjudicateSourceReview({answer,review,candidate,sourceSnapshot}=
       if(!(c.original_quote===q||c.original_quote.includes(q)||q.includes(c.original_quote)))return false;
       if(!hasStandaloneValue(q,fact.value))return false;
       // A negated quote cannot certify affirmative source support.
-      if(/\b(?:not|never|without|didn't|wasn't|isn't|no longer)\b/i.test(q))return false;
+      if(/\b(?:not|never|without|didn't|wasn't|isn't|no longer|if|unless|maybe|might|could|would|possibly|perhaps)\b/i.test(q))return false;
       return true;
     });
     if(matched) supported.push({
