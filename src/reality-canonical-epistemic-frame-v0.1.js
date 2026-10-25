@@ -60,6 +60,12 @@ export function buildCanonicalEpistemicFrame({
  if(worldId&&sourceAttestedSnapshot?.world_id&&
    sourceAttestedSnapshot.world_id!==worldId)
   throw Error('CANONICAL_EPISTEMIC_CROSS_WORLD_FACT');
+ if(userGoalContinuityState&&(
+  userGoalContinuityState.continuity_root_id!==continuityRootId||
+  userGoalContinuityState.world_id!==(worldId||null)||
+  userGoalContinuityState.active_goal_claimed_verified!==false||
+  userGoalContinuityState.external_actions_authorized!==false))
+  throw Error('CANONICAL_GOAL_CONTINUITY_SCOPE_OR_AUTHORITY_INVALID');
  const incomplete=Boolean(historyMayBeIncomplete)||
   reports.status==='BOUNDED_CANDIDATES_EARLIER_RECORDS_OMITTED'||
   conversationContinuity.older_coverage==='BOUNDED_SOURCE_HISTORY_MORE_AVAILABLE'||
