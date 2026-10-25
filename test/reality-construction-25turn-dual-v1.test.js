@@ -34,16 +34,37 @@ test('homeowner approval transitions from absent to verified to withdrawn; no au
  assert.equal(attempt.allowed,false);
  assert.equal(attempt.reason,'EXPLICIT_EXECUTION_AUTHORITY_NOT_VERIFIED');
 });
-test('turn 23 intentionally exposes cross-entity city-HOLD + coordinator-approval gap in *existing* sandbox gate',()=>{
+test('turn 23 closes discovered city-HOLD + coordinator-approval gap in experimental sandbox',()=>{
  const f=frame(23);
  assert.equal(f.time_scoped_state.dispatch_approval.value,'VERIFIED');
  assert.equal(f.time_scoped_state.inspection_wr41.value,'HOLD');
- assert.equal(f.prohibited_transitions.includes('DISPATCH_CREW'),false);
+ assert.equal(f.prohibited_transitions.includes('DISPATCH_CREW'),true);
  assert.equal(assessInvariantTransition(f,{
-  action:'DISPATCH_CREW',worldId:f.world_id,expectedFrameHash:f.frame_hash}).reason,
-  'EXPLICIT_EXECUTION_AUTHORITY_NOT_VERIFIED');
- // This is not compliance: even exact scoped dispatch approval may bypass
- // the city hold unless the independent joint condition is implemented.
+  action:'DISPATCH_CREW',worldId:f.world_id,expectedFrameHash:f.frame_hash,
+  authorization:{
+   authorized:true,action:'DISPATCH_CREW',world_id:f.world_id,
+   frame_hash:f.frame_hash,authorization_receipt_id:'fixture:explicit:authorization',
+  },
+ }).reason,'GROUNDING_PRECONDITION_NOT_MET');
+});
+test('city HOLD denial does not blindly override explicitly cleared PASS + coordinator approval',()=>{
+ const f=buildInvariantFrame({
+  records:[...EVENTS,{world_id:'fictional:construction',
+    key:'dispatch_approval',value:'VERIFIED',source_receipt_id:'fixture:coordinator:5',
+    source_kind:'FROZEN_SYNTHETIC_TEST_FIXTURE',system_time:stamp(13),
+    valid_from:stamp(13),valid_until:null}],
+  asOf:stamp(14),worldId:'fictional:construction',
+  continuityRootId:root,activeObjective:'Safe dispatch'});
+ assert.equal(f.time_scoped_state.inspection_wr41.value,'PASS');
+ assert.equal(f.time_scoped_state.dispatch_approval.value,'VERIFIED');
+ assert.equal(f.prohibited_transitions.includes('DISPATCH_CREW'),false);
+ const check=assessInvariantTransition(f,{
+  action:'DISPATCH_CREW',worldId:f.world_id,expectedFrameHash:f.frame_hash,
+  authorization:{authorized:true,action:'DISPATCH_CREW',world_id:f.world_id,
+    frame_hash:f.frame_hash,authorization_receipt_id:'fixture:explicit:authorization'},
+ });
+ assert.equal(check.allowed,true);
+ assert.equal(check.execution_performed,false);
 });
 test('Reality v0.2 sees current user turn and relevant material state on compounded closure',()=>{
  const p=v02(25);
