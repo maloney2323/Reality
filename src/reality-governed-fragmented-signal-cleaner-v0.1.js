@@ -63,7 +63,7 @@ function quoteRanges(text){
   for(let i=0;i<text.length;i++){
     const ch=text[i],triple=text.slice(i,i+3)===tick.repeat(3);
     if(!open){
-      if(triple){open:'FENCE';start=i;i+=2;}
+      if(triple){open='FENCE';start=i;i+=2;}
       else if(ch==='"'||ch==='“'||ch===tick){
         open=ch==='“'?'”':ch;start=i;
       }
