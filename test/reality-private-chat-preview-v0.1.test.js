@@ -83,11 +83,11 @@ async function runFixture(fn){
  });
  delete process.env.REALITY_GITHUB_TOKEN;
  globalThis.fetch=providerState.fetch;
- const call=async(api,method,body,cookie)=>{
+ const call=async(api,method,body,cookie,queryOverride=null)=>{
   const response=mockResponse();
   await api({method,headers:{host:'localhost',...(cookie?{cookie}:{}),
     ...(body?{'content-type':'application/json'}:{})},body,
-    query:{conversation_id:providerState.conversation}},response);
+    query:queryOverride||{conversation_id:providerState.conversation}},response);
   return response.state;
  };
  try{await fn({call,provider:providerState})}
@@ -122,9 +122,11 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.equal(restored.payload.messages.length,4);
   assert.equal(restored.payload.continuity.recovered_messages,4);
   assert.ok(restored.payload.messages.every(m=>m.source_ref.startsWith('supabase:reality_chat_messages:')));
-  const listing=await call(chatApi,'GET',null,cookie);
+  const listing=await call(chatApi,'GET',null,cookie,{list:'1'});
   assert.equal(listing.status,200);
-  // Conversation list uses a separate GET ?list=1 route (test below).
+  assert.equal(listing.payload.conversations.length,1);
+  assert.equal(listing.payload.conversations[0].conversation_id,p.conversation);
+  assert.match(listing.payload.conversations[0].last_message,/recall the first question/i);
   const signedOut=await call(sessionApi,'DELETE',null,cookie);
   assert.equal(signedOut.status,200);
   assert.match(signedOut.headers['Set-Cookie'],/Max-Age=0/);
