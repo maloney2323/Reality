@@ -13,6 +13,5 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
-  ],
-  "buildCommand": "node scripts/run-reality-provenance-live-replay-v0.1.mjs"
+  ]
 }
