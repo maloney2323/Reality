@@ -342,6 +342,7 @@ export async function runLiveIntelligenceOrchestration({
   const canonicalEpistemicFrame=buildCanonicalEpistemicFrame({
     governedSignal,conversationContinuity:goalAwareContinuity,
     userGoalContinuityState,userGoalLifecycle:goalLifecycle,
+    userGoalStateContract,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
     // The Continuity spine canonicalizes the root to a UUID. Use that
@@ -366,7 +367,7 @@ export async function runLiveIntelligenceOrchestration({
     conversation_continuity:goalAwareContinuity,
     canonical_epistemic_state:canonicalEpistemicFrame,
     canonical_epistemic_receipt:epistemicFrameReceipt,
-    user_goal_state_contract:userGoalStateContract,
+    user_goal_state_contract:canonicalEpistemicFrame.user_goal_state_contract,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
     signal_typed_intake:governedSignal.typed_epistemic_intake||null,
