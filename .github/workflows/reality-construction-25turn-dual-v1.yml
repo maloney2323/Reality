@@ -8,6 +8,7 @@ on:
       - 'benchmarks/reality-construction-25turn-dual-v1.mjs'
       - 'scripts/run-reality-construction-25turn-dual-v1.mjs'
       - 'test/reality-construction-25turn-dual-v1.test.js'
+      - 'docs/reality-25turn-dual-evidence-contract-20261024.md'
   workflow_dispatch:
 permissions:
   contents: read
