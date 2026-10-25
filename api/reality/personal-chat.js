@@ -24,6 +24,11 @@ export default async function handler(req,res){
      coverage:history.history_status,older_messages_may_be_missing:history.older_missing,
     }});
   }
+  // Explicitly isolate this authenticated chat pilot from any legacy
+  // Universe/reliability persistence that may point at production data.
+  if(process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED==='true'||
+     process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED==='true')
+   fail('CHAT_ISOLATION_FLAGS_REQUIRED',503);
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    fail('CHAT_JSON_REQUIRED',415);
   const requestId=String(req.body?.request_id||''),text=String(req.body?.message||'').trim();
