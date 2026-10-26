@@ -44,19 +44,40 @@ export function projectAssistantTrajectoryBoundary({
     x.authorized_by==='ASSISTANT_PROPOSAL'&&x.authorization_state==='UNAUTHORIZED');
   const classified=p.verifier_decision.status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'||
     p.verifier_decision.status==='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED';
+  const semanticOffGoal=proposal.direction_evaluation?.status==='REVIEWER_CANDIDATE_NOT_INDEPENDENTLY_VERIFIED'&&
+    proposal.direction_evaluation?.aligns_with_active_objective===false;
   const status=blocked&&classified?'BLOCKED_ASSISTANT_REDIRECTION_CANDIDATE':
     p.verifier_decision.status==='NOT_SEMANTICALLY_ASSESSED'?
-      'SEMANTIC_REVIEW_UNASSESSED':'NO_BLOCKED_DIRECTION_CHANGE_RECORDED';
+      'SEMANTIC_REVIEW_UNASSESSED':semanticOffGoal?
+        'SEMANTIC_ASSISTANT_WORK_DIRECTION_SHIFT_CANDIDATE':
+        'NO_BLOCKED_DIRECTION_CHANGE_RECORDED';
   return {
    source_receipt_id:e.event_id,
    proposal_id:p.assistant_proposal.proposal_id,
    current_user_packet_id:p.assistant_proposal.target_turn_id,
    status,reviewer_only_not_independent_truth:true,
+   recommendation_evidence:{
+     original_model_response_id:proposal.model_response_id||null,
+     source_goal_id:proposal.target_goal_id,
+     first_pass_work_excerpt:String(proposal.proposed_response_excerpt||'').slice(0,700),
+     reviewer_goal_source_ref:proposal.direction_evaluation?.reviewer_goal_source_ref||null,
+     reviewer_goal_alignment:proposal.direction_evaluation?.aligns_with_active_objective,
+     semantic_shift_candidate:semanticOffGoal||blocked,
+     user_approved_new_goal:false,
+     independently_verified_semantics:false,
+   },
   };
  });
+ const recommendations=entries.filter(x=>x.recommendation_evidence)
+  .slice(-8).map(x=>({
+    source_receipt_id:x.source_receipt_id,
+    ...x.recommendation_evidence,
+    assessment_status:x.status,
+  }));
  let consecutive=0,reviewGap=false;
  for(let i=entries.length-1;i>=0;i--){
-  if(entries[i].status==='BLOCKED_ASSISTANT_REDIRECTION_CANDIDATE')consecutive++;
+  if(['BLOCKED_ASSISTANT_REDIRECTION_CANDIDATE',
+    'SEMANTIC_ASSISTANT_WORK_DIRECTION_SHIFT_CANDIDATE'].includes(entries[i].status))consecutive++;
   else {if(entries[i].status==='SEMANTIC_REVIEW_UNASSESSED')reviewGap=true;break;}
  }
  return freeze({
@@ -66,6 +87,13 @@ export function projectAssistantTrajectoryBoundary({
   world_id:worldId||null,continuity_root_id:continuityRootId,
   historical_proposals_count:entries.length,
   recent_proposal_receipts:entries,
+  recent_work_direction_evidence:recommendations,
+  recommendation_trajectory_assessment:
+    recommendations.some(x=>x.semantic_shift_candidate)?
+      'SOURCE_LINKED_ASSISTANT_DIRECTION_SHIFT_CANDIDATES':
+      recommendations.length?
+      'WORK_DIRECTION_EVIDENCE_AVAILABLE_NO_VERIFIED_DRIFT_RESULT':
+      'INSUFFICIENT_ASSISTANT_RECOMMENDATION_HISTORY',
   off_goal_streak_counter:consecutive,
   direction_reanchor_recommended:consecutive>=STOP_THRESHOLD-1,
   historical_direction_fault:consecutive>=STOP_THRESHOLD,
