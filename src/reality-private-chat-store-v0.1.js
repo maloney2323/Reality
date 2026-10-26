@@ -82,20 +82,24 @@ export async function listPrivateConversations(session,{fetchImpl=fetch}={}){
 // Requires the reviewed isolated-preview SQL migration. Never downgrade to
 // the two-request check when this atomic path was selected.
 export async function publishPrivateAssistantAtomically(
- session,{conversationId,requestId,text,expectedRevision,expectedLastEventId=null},
+ session,{conversationId,requestId,text,expectedRevision,expectedLastEventId=null,isolatedDb},
  {fetchImpl=fetch}={}
 ){
+ if(!isolatedDb?.strictSecrets||isolatedDb.url!==session.config.url||
+    !isolatedDb?.secretKey||!validUuid(session.user_id))
+  throw Object.assign(new Error('CHAT_ATOMIC_SERVER_DATABASE_SCOPE_INVALID'),{status:503});
  if(!validUuid(conversationId)||!validUuid(requestId)||
     typeof text!=='string'||!text.trim()||text.length>12000||
     !Number.isSafeInteger(expectedRevision)||expectedRevision<0||
     (expectedLastEventId!==null&&!validUuid(expectedLastEventId)))
   throw Object.assign(new Error('CHAT_ATOMIC_PUBLICATION_INPUT_INVALID'),{status:400});
  const response=await fetchImpl(
-  session.config.url+'/rest/v1/rpc/reality_publish_assistant_if_goal_current',{
+  isolatedDb.url+'/rest/v1/rpc/reality_publish_assistant_if_goal_current',{
     method:'POST',
-    headers:{apikey:session.config.key,authorization:'Bearer '+session.access_token,
+    headers:{apikey:isolatedDb.secretKey,authorization:'Bearer '+isolatedDb.secretKey,
       accept:'application/json','content-type':'application/json'},
     body:JSON.stringify({
+      p_user_id:session.user_id,
       p_conversation_id:conversationId,p_request_id:requestId,
       p_content:text,p_expected_goal_revision:expectedRevision,
       p_expected_last_goal_event_id:expectedLastEventId,
