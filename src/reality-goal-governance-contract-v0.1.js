@@ -341,26 +341,34 @@ export function adjudicateFinalAssistantGoalRelease({
     (canonicalFrame.user_goal_lifecycle_projection?.dormant_goal_candidates||[])
       .some(x=>x.source_ref===finalGoalReview.goal_source_ref));
  const originalRisk=originalBlockedQuotes.length>0;
+ // Detection and adjudication are separate: the absence of a review is
+ // a COVERAGE GAP, not affirmative proof of an unauthorized objective. Do
+ // not destroy a useful answer just because the reviewer did not run.
+ // However a KNOWN blocked goal quote or a failed correction NEVER releases.
  const verdict=stillPresent.length?
    'BLOCKED_ORIGINAL_OFF_GOAL_TEXT_SURVIVED':
    finalHasDirectionRisk?
    'BLOCKED_NEW_OR_UNRESOLVED_FINAL_DIRECTION':
-   !finalGoalAssessed||!finalGoalSourceAnchored?
-   'BLOCKED_FINAL_GOAL_REVIEW_MISSING_OR_UNANCHORED':
-   finalGoalReview.answer_alignment==='INSUFFICIENT_EVIDENCE'?
-   'BLOCKED_FINAL_GOAL_ALIGNMENT_UNRESOLVED':
-   lastReview?.addresses_current_request!==true?
-   'BLOCKED_FINAL_ANSWER_MISSED_CURRENT_OBJECTIVE':
-   // The review is about original text, not the changed publication text.
-   // Even an approved-looking warning appendix could conceal a new objective.
-   textChanged&&!revisionReviewBound?
-   'BLOCKED_FINAL_TEXT_NOT_REVIEWED_EXACTLY':
-   originalRisk&&lastReview?.issues?.length>0?
+   originalRisk&&(!textChanged||!revisionReviewBound)?
+   'BLOCKED_GOAL_REVISION_NOT_REVIEWED':
+   originalRisk&&(lastReview?.addresses_current_request!==true||
+     lastReview?.issues?.length>0||
+     lastReview?.unassessed_claims?.length>0||
+     !finalGoalAssessed||!finalGoalSourceAnchored||
+     finalGoalReview.answer_alignment!=='ON_USER_DIRECTED_OBJECTIVE')?
    'BLOCKED_GOAL_REVISION_NOT_CLEARED':
-   originalRisk&&lastReview?.unassessed_claims?.length>0?
-   'BLOCKED_GOAL_REVISION_INCOMPLETE_EVIDENCE':
+   // A review explicitly concluding the answer misses the CURRENT task
+   // must not be promoted into the next turn's goal trajectory.
+   lastReview?.addresses_current_request===false?
+   'BLOCKED_FINAL_ANSWER_MISSED_CURRENT_OBJECTIVE':
+   !finalGoalAssessed||!finalGoalSourceAnchored?
+   'UNASSESSED_DIRECTION_NO_DETECTED_MUTATION_NOT_CERTIFIED':
+   finalGoalReview.answer_alignment==='INSUFFICIENT_EVIDENCE'?
+   'UNRESOLVED_DIRECTION_NO_DETECTED_MUTATION_NOT_CERTIFIED':
+   textChanged&&!revisionReviewBound?
+   'CHANGED_FINAL_TEXT_WITHOUT_EXACT_GOAL_REVIEW_NOT_CERTIFIED':
    'NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE';
- const accepted=verdict==='NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE';
+ const accepted=!verdict.startsWith('BLOCKED_');
  const contract={
   version:GOAL_GOVERNANCE_CONTRACT_VERSION,
   gate_kind:'FINAL_ASSISTANT_DIRECTION_PUBLICATION',
@@ -383,6 +391,8 @@ export function adjudicateFinalAssistantGoalRelease({
   final_semantic_coverage:lastReview?.status||'NOT_ASSESSED',
   status:verdict,
   candidate_answer_release_allowed:accepted,
+  final_goal_direction_assessment_complete:finalGoalAssessed&&finalGoalSourceAnchored&&
+   (!textChanged||Boolean(revisionReviewBound)),
   claim_all_drift_was_detected:false,
   semantic_reviewer_independently_correct:false,
   user_goal_mutated:false,
