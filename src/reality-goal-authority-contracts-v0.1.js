@@ -63,12 +63,52 @@ export function projectGoalStateContract({lifecycle,goalEvidence,worldId=null}={
  */
 export function projectGoalTransitionContract({
  currentTurnId,goalState,userDirection='UNCLEAR',sourceUserTurnId=null,
- reviewerEvidenceId=null,
+ reviewerEvidenceId=null,reviewerGoalReview=null,currentUserMessage=null,
+ goalLifecycle=null,authoritativeUserGoals=null,
 }={}){
  if(!nonempty(currentTurnId)||!nonempty(goalState?.goal_id)||
     !['CONTINUING_USER_OBJECTIVE','USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR',
       'USER_RETURNED_TO_OBJECTIVE','UNCLEAR'].includes(userDirection))
   throw Error('GOAL_TRANSITION_EVIDENCE_REQUIRED');
+ // The semantic review proposes a meaning; the user-source-linked Continuity
+ // projection determines whether that meaning has a legitimate provenance.
+ // Neither one is an explicit authenticated user goal COMMAND.
+ const evaluated=reviewerGoalReview?.status==='REVIEWED_GOAL_TRAJECTORY_CANDIDATE'&&
+   reviewerGoalReview.user_direction===userDirection;
+ const sourceUser=nonempty(sourceUserTurnId)&&sourceUserTurnId===currentTurnId;
+ const sourceIsCurrent=evaluated&&sourceUser&&
+   reviewerGoalReview.goal_source_ref===sourceUserTurnId;
+ const possibleTargets=[
+   goalLifecycle?.working_goal,
+   goalLifecycle?.preserved_original_goal,
+   ...(goalLifecycle?.paused_goal_candidates||[]),
+   ...(goalLifecycle?.dormant_goal_candidates||[]),
+ ].filter(x=>nonempty(x?.source_ref));
+ const possibleTargetIds=new Set(possibleTargets.filter(x=>
+   x.source_ref===reviewerGoalReview?.goal_source_ref).map(x=>x.goal_evidence_id));
+ const sourceLinkedReturn=evaluated&&userDirection==='USER_RETURNED_TO_OBJECTIVE'&&
+   reviewerGoalReview.return_intent==='EXPLICIT_TARGET_RETURN'&&
+   nonempty(reviewerGoalReview.return_request_quote)&&
+   typeof currentUserMessage==='string'&&
+   currentUserMessage.includes(reviewerGoalReview.return_request_quote)&&
+   possibleTargetIds.size===1&&sourceUser&&
+   reviewerGoalReview.goal_source_ref!==sourceUserTurnId;
+ const noUserAuthority=authoritativeUserGoals?.active_goal_id===null&&
+   authoritativeUserGoals?.transition_count>0;
+ const relation=evaluated&&userDirection==='USER_RETURNED_TO_OBJECTIVE'?
+   (sourceLinkedReturn?'SOURCE_LINKED_PROVISIONAL_RETURN':'RETURN_TARGET_UNRESOLVED'):
+   evaluated&&['USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR'].includes(userDirection)?
+     (sourceIsCurrent?'SOURCE_LINKED_PROVISIONAL_USER_DIRECTION':'PIVOT_SOURCE_UNRESOLVED'):
+   evaluated&&userDirection==='CONTINUING_USER_OBJECTIVE'?
+     'REVIEWER_SUGGESTS_CONTINUING_OBJECTIVE':
+   'NOT_MEANINGFULLY_RECONCILED';
+ // A user changing conversation topic never silently changes the verified
+ // pinned active goal, and "no pinned goal" cannot revive an old suggestion.
+ const reconciliationStatus=relation.startsWith('SOURCE_LINKED_')?
+   'SOURCE_BOUND_SEMANTIC_CANDIDATE_NOT_USER_AUTHORIZED':
+   relation==='REVIEWER_SUGGESTS_CONTINUING_OBJECTIVE'?
+     'UNVERIFIED_GOAL_CONTINUATION_CANDIDATE':
+     'UNRESOLVED';
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
   transition_id:id('goal-transition',[currentTurnId,goalState.goal_id,reviewerEvidenceId]),
@@ -81,6 +121,22 @@ export function projectGoalTransitionContract({
   duration_limit_minutes:null,turn_id:currentTurnId,
   source_user_turn_id:sourceUserTurnId,
   semantic_review_receipt_id:reviewerEvidenceId,
+  meaning_aware_reconciliation:{
+   status:reconciliationStatus,relation,
+   review_is_untrusted_interpretation:true,
+   source_user_turn_id:sourceUserTurnId,
+   reviewer_goal_source_ref:evaluated?reviewerGoalReview.goal_source_ref:null,
+   resolved_prior_user_goal_evidence_id:sourceLinkedReturn?
+     [...possibleTargetIds][0]:null,
+   exact_current_user_return_quote:sourceLinkedReturn?
+     reviewerGoalReview.return_request_quote.slice(0,240):null,
+   current_user_source_anchor_verified:Boolean(sourceIsCurrent||sourceLinkedReturn),
+   explicit_authenticated_goal_command_required_for_recorded_change:true,
+   authoritative_active_goal_id:authoritativeUserGoals?.active_goal_id||null,
+   authenticated_no_pinned_goal:noUserAuthority,
+   semantic_confidence_independently_verified:false,
+   future_assistant_proposal_grants_user_direction:false,
+  },
   grants_goal_mutation:false,grants_external_execution:false,
  });
 }
