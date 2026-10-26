@@ -423,8 +423,8 @@ export async function runLiveIntelligenceOrchestration({
     goal_authority_restriction:'ASSISTANT_OUTPUT_AND_SEMANTIC_REVIEW_CANNOT_MUTATE_GOAL_STATE_OR_AUTHORIZE_ACTION',
     assistant_direction_reanchor:assistantTrajectory.direction_reanchor_recommended?{
       status:'REANCHOR_FROM_BLOCKED_ASSISTANT_PROPOSALS_NOT_VERIFIED_DRIFT',
-      controlling_user_goal_source:userGoalStateContract.provenance.origin_turn_id,
-      controlling_goal_candidate:userGoalStateContract.description,
+      controlling_user_goal_source:controllingGoalStateContract.provenance.origin_turn_id,
+      controlling_goal_candidate:controllingGoalStateContract.description,
       prior_blocked_proposal_receipts:assistantTrajectory.recent_proposal_receipts
         .filter(x=>x.status==='BLOCKED_ASSISTANT_REDIRECTION_CANDIDATE')
         .slice(-3).map(x=>x.source_receipt_id),
@@ -1033,7 +1033,7 @@ export async function runLiveIntelligenceOrchestration({
       blockedQuotesStillInRelease);
   if(unreviewedGoalShift){
     modelResult.answer=pendingGoalAuthorizationResponse({
-      goalState:userGoalStateContract,
+      goalState:controllingGoalStateContract,
     });
     modelResult.reliability_intervention=directionFault?
       'REPEATED_ASSISTANT_DIRECTION_FAULT_WITHHELD':
@@ -1050,7 +1050,7 @@ export async function runLiveIntelligenceOrchestration({
     !unreviewedGoalShift&&blockedQuotesStillInRelease;
   if(unverifiedAssistantCompletion){
     modelResult.answer=pendingGoalCompletionEvidenceResponse({
-      goalState:userGoalStateContract,decision:assistantGoalDecision,
+      goalState:controllingGoalStateContract,decision:assistantGoalDecision,
     });
     modelResult.reliability_intervention='UNVERIFIED_ASSISTANT_COMPLETION_WITHHELD';
   }
@@ -1070,7 +1070,9 @@ export async function runLiveIntelligenceOrchestration({
         continuousReliability?.receipt_id].filter(Boolean),
       payload:{
         event_type:'ASSISTANT_GOAL_PROPOSAL_AND_AUTHORITY_DECISION',
-        goal_state_contract:userGoalStateContract,
+        goal_state_contract:controllingGoalStateContract,
+        goal_state_provisional_candidate:userGoalStateContract,
+        explicitly_user_authorized_goal_state:authorizedUserGoals,
         goal_transition:userGoalTransitionContract,
         assistant_proposal:assistantGoalProposal,
         verifier_decision:assistantGoalDecision,
@@ -1104,7 +1106,7 @@ export async function runLiveIntelligenceOrchestration({
   reliabilityWithExtraction.goal_authority={
     proposal_id:assistantGoalProposal.proposal_id,
     boundary_status:assistantGoalDecision.status,
-    source_goal_ref:userGoalStateContract.provenance.origin_turn_id,
+    source_goal_ref:controllingGoalStateContract.provenance.origin_turn_id,
     source_receipt_id:goalAuthorityReceipt,
     goal_state_changed:false,
     external_execution_authorized:false,
