@@ -91,7 +91,7 @@ export function projectGoalTransitionContract({
  */
 export function projectAssistantGoalProposal({
  firstAnswer,modelResponseId,currentTurnId,goalState,semanticReview=null,
- reviewerResponseId=null,
+ reviewerResponseId=null,knownUserGoalSources=[],
 }={}){
  if(!nonempty(firstAnswer)||!nonempty(currentTurnId)||!nonempty(goalState?.goal_id))
   throw Error('ASSISTANT_GOAL_PROPOSAL_SOURCE_REQUIRED');
@@ -104,6 +104,21 @@ export function projectAssistantGoalProposal({
  const detectedShift=Boolean(assessed&&quoted&&
   review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE');
  const lifecycle=semanticReview?.goal_lifecycle_review;
+ const sourceSet=new Set([goalState.provenance.origin_turn_id,
+  ...(Array.isArray(knownUserGoalSources)?knownUserGoalSources:[])].filter(nonempty));
+ const futureMutationCandidates=(semanticReview?.future_goal_proposals||[])
+  .filter(x=>['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.kind)&&
+    nonempty(x.quote)&&firstAnswer.includes(x.quote)&&
+    sourceSet.has(x.target_goal_source_ref)&&
+    x.authorization_state==='ASSISTANT_PROPOSAL_ONLY')
+  .slice(0,8).map(x=>({
+    type:x.kind,target_goal_id:goalState.goal_id,
+    prior_user_goal_source_ref:x.target_goal_source_ref,
+    proposed_change_quote:bounded(x.quote,350),
+    rationale:bounded(x.reason,350),
+    authorized_by:'ASSISTANT_PROPOSAL',authorization_state:'UNAUTHORIZED',
+    no_external_execution_grant:true,
+  }));
  const claimedCompletion=Boolean(lifecycle?.status==='SOURCE_LINKED_REVIEWER_CANDIDATE'&&
   lifecycle.relation==='ASSISTANT_PROPOSED_COMPLETION'&&
   lifecycle.speaker==='ASSISTANT'&&nonempty(lifecycle.source_quote)&&
@@ -123,6 +138,7 @@ export function projectAssistantGoalProposal({
       rationale:bounded(review.reason,350),
       authorized_by:'ASSISTANT_PROPOSAL',authorization_state:'UNAUTHORIZED',
     }]:[]),
+    ...futureMutationCandidates,
     ...(claimedCompletion?[{
       type:'CLAIM_BUSINESS_COMPLETION',target_goal_id:goalState.goal_id,
       claimed_user_goal_source_ref:lifecycle.target_goal_source_ref,
@@ -138,7 +154,9 @@ export function projectAssistantGoalProposal({
    status:assessed?'REVIEWER_CANDIDATE_NOT_INDEPENDENTLY_VERIFIED':'NOT_SEMANTICALLY_ASSESSED',
    aligns_with_active_objective:assessed?
     review.answer_alignment==='ON_USER_DIRECTED_OBJECTIVE':null,
-   introduces_new_unauthorized_objective:detectedShift,
+   introduces_new_unauthorized_objective:detectedShift||
+     futureMutationCandidates.length>0,
+   source_anchored_future_proposal_count:futureMutationCandidates.length,
    claims_unverified_business_completion:claimedCompletion,
    drops_existing_obligation:null,
    reviewer_goal_source_ref:assessed?review.goal_source_ref:null,
@@ -156,7 +174,7 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
   throw Error('GOAL_BOUNDARY_INVALID_OR_MISMATCHED_PROPOSAL');
  const shift=proposal.intended_state_mutations.goal_mutations;
  if(!Array.isArray(shift))throw Error('GOAL_BOUNDARY_UNTRUSTED_MUTATIONS');
- const candidate=shift.find(x=>x.type==='SHIFT_OBJECTIVE');
+ const candidate=shift.find(x=>['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.type));
  if(candidate&&(candidate.authorized_by!=='ASSISTANT_PROPOSAL'||
     candidate.authorization_state!=='UNAUTHORIZED'))
   throw Error('GOAL_BOUNDARY_ASSISTANT_ESCALATION_REJECTED');
@@ -171,6 +189,8 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
   proposal_id:proposal.proposal_id,
   goal_id:goalState.goal_id,
   status:completion?'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED':
+    candidate?.type==='SCHEDULE_FUTURE_WORK'?
+      'UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED':
     candidate?'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED':
     proposal.direction_evaluation.status==='NOT_SEMANTICALLY_ASSESSED'?
       'NOT_SEMANTICALLY_ASSESSED':'NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED',
