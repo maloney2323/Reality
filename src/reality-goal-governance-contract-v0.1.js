@@ -100,6 +100,7 @@ export function buildAssistantGoalGovernance({
   type:'SHIFT_OBJECTIVE',target_goal_id:goalId,
   rationale:String(review.reason||'').slice(0,350),
   proposal_quote:exactQuote.slice(0,350),
+  authorized_by:'ASSISTANT_PROPOSAL',
   authorization_state:'UNAUTHORIZED',
  }:null;
  const proposed={
@@ -173,6 +174,7 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
  for(const mutation of goalChanges){
   required(mutation?.type==='SHIFT_OBJECTIVE'&&
    mutation.target_goal_id===contract.working_goal?.goal_id&&
+   mutation.authorized_by==='ASSISTANT_PROPOSAL'&&
    mutation.authorization_state==='UNAUTHORIZED'&&
    typeof mutation.proposal_quote==='string'&&mutation.proposal_quote.length>0,
    'GOAL_GOVERNANCE_UNAUTHORIZED_GOAL_MUTATION');
