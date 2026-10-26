@@ -291,6 +291,12 @@ export function pendingGoalCompletionEvidenceResponse({goalState,decision}={}){
 export function pendingGoalAuthorizationResponse({goalState}={}){
  if(!nonempty(goalState?.description)||!nonempty(goalState?.provenance?.origin_turn_id))
   throw Error('GOAL_CLARIFICATION_SOURCE_REQUIRED');
+ if(goalState.no_active_goal_explicitly_recorded===true&&
+    goalState.goal_state_kind==='EXPLICIT_NO_ACTIVE_USER_GOAL_BOUNDARY')
+  return 'Reality withheld an assistant-origin suggestion to change the ongoing objective. '+
+    'You have explicitly left no ongoing goal pinned. Your current request can be '+
+    'handled without reviving a previous goal; any newly pinned objective must '+
+    'come from your explicit user direction. No external action was taken.';
  return 'Reality flagged a possible change of direction in its draft and withheld that proposal. '+
   'An earlier user message currently tracked as a possible working objective was: "'+
   bounded(goalState.description,260)+'". No assistant suggestion has changed your goal. '+
