@@ -187,7 +187,28 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
      'USER_AUTHORIZED_DETOUR','USER_RETURNED_TO_OBJECTIVE','UNCLEAR'].includes(goal.user_direction);
    const answerOk=['ON_USER_DIRECTED_OBJECTIVE','ASSISTANT_DRIFTED_OFF_OBJECTIVE',
      'INSUFFICIENT_EVIDENCE'].includes(goal.answer_alignment);
+   // "USER_AUTHORIZED" is a model interpretation, but it must at least
+   // cite the current user's source for a new direction. A RETURN must cite
+   // the earlier intended goal AND quote an explicit return instruction
+   // from the current user; simply selecting an old goal ID is insufficient.
+   const newDirection=['USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR']
+     .includes(goal.user_direction);
+   const directionSourceOk=!newDirection||
+     goal.goal_source_ref===goalTrajectory?.current_user_direction?.source_ref;
+   const returnTargets=new Set([
+     goalTrajectory?.original_user_goal_candidate?.source_ref,
+     goalTrajectory?.working_goal_lifecycle?.preserved_original_goal?.source_ref,
+     ...(goalTrajectory?.working_goal_lifecycle?.paused_goal_candidates||[]).map(x=>x.source_ref),
+     ...(goalTrajectory?.working_goal_lifecycle?.dormant_goal_candidates||[]).map(x=>x.source_ref),
+     ...(goalTrajectory?.authoritative_user_goals?.goals||[]).map(x=>x.source_user_message_ref),
+   ].filter(Boolean));
+   const returnSourceOk=goal.user_direction!=='USER_RETURNED_TO_OBJECTIVE'||
+     (goal.return_intent==='EXPLICIT_TARGET_RETURN'&&
+      returnTargets.has(goal.goal_source_ref)&&
+      goal.goal_source_ref!==goalTrajectory?.current_user_direction?.source_ref&&
+      currentUserMessage.includes(goal.return_request_quote));
    if(!sourceOk||!quoteOk||!reasonOk||!returnIntentOk||!directionOk||!answerOk||
+      !directionSourceOk||!returnSourceOk||
       (goal.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'&&!goal.answer_quote)){
      goalTrajectoryReview={...goalTrajectoryReview,
        status:'INVALID_OR_UNANCHORED_GOAL_ASSESSMENT'};
