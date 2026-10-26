@@ -4,6 +4,9 @@ import {readPrivateChat,recordPrivateMessage,listPrivateConversations,validUuid}
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createHash} from 'node:crypto';
+import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
+import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
+import {appendAuthenticatedUserGoalCommand} from '../../src/reality-authoritative-user-goal-ledger-v0.1.js';
 export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
@@ -43,6 +46,14 @@ export default async function handler(req,res){
    fail('CHAT_JSON_REQUIRED',415);
   const requestId=String(req.body?.request_id||''),text=String(req.body?.message||'').trim();
   if(!validUuid(requestId)||!text||text.length>6000)fail('CHAT_MESSAGE_INVALID',400);
+  // This field originates only from the signed-in USER's explicit UI action,
+  // never from the LLM, conversation text, reviewer or default prompt parser.
+  const goalCommand=req.body?.goal_command;
+  if(goalCommand!==undefined&&goalCommand!==null&&
+     goalCommand!=='SET_ACTIVE'&&goalCommand!=='START_DETOUR')
+   fail('CHAT_GOAL_COMMAND_NOT_SUPPORTED',400);
+  if(goalCommand&&text.length>700)
+   fail('CHAT_GOAL_COMMAND_TEXT_TOO_LONG',400);
   const existing=history.messages.filter(m=>m.request_id===requestId);
   if(existing.length){
    const prior=existing.find(x=>x.role==='assistant');
@@ -55,9 +66,50 @@ export default async function handler(req,res){
   if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
   // continuity success when source persistence fails.
-  await recordPrivateMessage(session,{conversationId,requestId,role:'user',text});
+  const recordedUser=await recordPrivateMessage(session,{
+   conversationId,requestId,role:'user',text,
+  });
+  // RLS readback is the authentication evidence for a USER goal directive.
+  // A supplied model answer, client source_ref or username is never accepted.
+  let verifiedUserGoalCommand=null;
+  if(goalCommand){
+   const verified=await readPrivateChat(session,conversationId);
+   const saved=verified.messages.find(x=>x.role==='user'&&
+    x.request_id===requestId&&x.source_ref===recordedUser.source_ref&&
+    x.text===text);
+   if(!saved)fail('CHAT_GOAL_SOURCE_READBACK_REQUIRED',503);
+   verifiedUserGoalCommand={command:goalCommand,
+    user_message:saved.text,source_ref:saved.source_ref,
+    request_id:requestId};
+  }
   // Root/world scope cannot be forged by the browser or shared across users.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
+  const scopedRoot='personal:chat:'+scope;
+  let goalCommandReceipt=null;
+  if(verifiedUserGoalCommand){
+   // Commit an authoritative CONVERSATIONAL GOAL only through existing
+   // append-only Continuity, before the LLM sees the next state.
+   const observedAt=new Date().toISOString();
+   const writer=await startContinuityRuntime({
+    continuityRootSource:scopedRoot,worldlineSource:scopedRoot,
+    subjectId:conversationId,
+    signal:buildGovernedChatSignal({
+     message:'User explicitly selected ongoing goal for saved message '+requestId,
+     observedAt,
+    }),observedAt,
+   });
+   goalCommandReceipt=await appendAuthenticatedUserGoalCommand({
+    continuityRuntime:writer,worldId:scopedRoot,principalId:session.user_id,
+    command:verifiedUserGoalCommand.command,
+    sourceUserMessage:verifiedUserGoalCommand.user_message,
+    sourceUserMessageRef:verifiedUserGoalCommand.source_ref,
+    sourceRequestId:verifiedUserGoalCommand.request_id,observedAt,
+   });
+   if(!goalCommandReceipt?.event_id||
+      goalCommandReceipt.state?.active_goal?.source_user_message_ref!==
+       verifiedUserGoalCommand.source_ref)
+    fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
+  }
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    model:'gpt-4.1-mini',apiKey:key,
@@ -84,6 +136,12 @@ export default async function handler(req,res){
     recovered_messages:check.messages.length,coverage:check.history_status,
     older_messages_may_be_missing:check.older_missing,
     current_answer_persisted:true},
+   goal_command_receipt:goalCommandReceipt?{
+    status:'COMMITTED_TO_EXISTING_CONTINUITY',
+    event_id:goalCommandReceipt.event_id,
+    active_goal_id:goalCommandReceipt.state.active_goal_id,
+    grants_execution_authority:false,
+   }:null,
    reliability:{canonical_epistemic_state:result.reliability.canonical_epistemic_state,
      user_goal_continuity:result.reliability.user_goal_continuity||null,
      assistant_goal_governance:result.reliability.goal_governance||null,
