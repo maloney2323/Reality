@@ -619,12 +619,19 @@ setInterval(refreshSavedShiftHome,300000);
     goalContext.authenticated_no_active_goal===true?
      'You explicitly paused or ended the active goal. No older inferred objective can restart automatically.' :
      'No user-pinned ongoing objective; current conversation directions are provisional';
+   const currentMeaning=goalContext.current_turn_meaning_reconciliation||{};
+   const currentMeaningStatus=currentMeaning.relation==='RETURN_TARGET_UNRESOLVED'||
+     currentMeaning.relation==='PIVOT_SOURCE_UNRESOLVED'
+     ?' · Goal change ambiguous; earlier objective preserved'
+     :currentMeaning.status==='SOURCE_BOUND_SEMANTIC_CANDIDATE_NOT_USER_AUTHORIZED'
+      ?' · Goal direction source-linked, still provisional'
+      :' · Current goal transition not independently reconciled';
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
      ' · Temporary detours: '+(goalContext.paused_goal_candidate_count||0)+
      ' · Dormant goals saved: '+(goalContext.dormant_goal_candidate_count||0)+
-     ' · Older goals do not override your current request'):
+     ' · Older goals do not override your current request'+currentMeaningStatus):
     'User-goal continuity not yet recovered';
    const finalGate=reliability.final_answer_direction_release||{};
    const finalGateText=finalGate.known_off_goal_text_withheld
