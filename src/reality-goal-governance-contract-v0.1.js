@@ -175,6 +175,7 @@ export function buildAssistantGoalGovernance({
   target_turn_id:canonicalFrame.current_user_packet_id,
   canonical_frame_hash:canonicalFrame.frame_hash,
   proposed_response_text:modelAnswer.slice(0,5200),
+  optional_advice_not_goal_mutations:permittedAdvice,
   intended_state_mutations:{
    resource_mutations:[],
    goal_mutations:[...(proposedMutation?[proposedMutation]:[]),...futureProposals],
