@@ -1,6 +1,6 @@
 // Isolated, authenticated Personal Reality conversation. No customer actions.
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {readPrivateChat,recordPrivateMessage,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createHash} from 'node:crypto';
@@ -166,7 +166,16 @@ export default async function handler(req,res){
   });
   if(publicationGoal.status!=='USER_GOAL_SNAPSHOT_CURRENT')
    fail('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN',409);
-  await recordPrivateMessage(session,{conversationId,requestId,role:'assistant',text:answer});
+  const atomicPublicationEnabled=
+    process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED==='true';
+  const publication=atomicPublicationEnabled?
+    await publishPrivateAssistantAtomically(session,{
+      conversationId,requestId,text:answer,
+      expectedRevision:goalAtGeneration.transition_count,
+      expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
+    }):
+    // Legacy preview remains explicit about the unresolved two-request race.
+    await recordPrivateMessage(session,{conversationId,requestId,role:'assistant',text:answer});
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
    fail('CHAT_ASSISTANT_DURABILITY_NOT_VERIFIED',503);
@@ -174,7 +183,11 @@ export default async function handler(req,res){
    continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',
     recovered_messages:check.messages.length,coverage:check.history_status,
     older_messages_may_be_missing:check.older_missing,
-    current_answer_persisted:true},
+    current_answer_persisted:true,
+    goal_publication_atomicity:atomicPublicationEnabled&&
+      publication?.atomic_goal_revision_checked===true?
+      'ATOMIC_DATABASE_GOAL_REVISION_AND_ASSISTANT_INSERT':
+      'LEGACY_FRESHNESS_CHECK_RACE_NOT_ELIMINATED'},
    goal_command_receipt:goalCommandReceipt?{
     status:'COMMITTED_TO_EXISTING_CONTINUITY',
     event_id:goalCommandReceipt.event_id,
