@@ -945,7 +945,12 @@ export async function runLiveIntelligenceOrchestration({
   // independently verified result. Replace the unproved completion sentence,
   // never append a cosmetic warning while leaving the claim intact.
   const unverifiedAssistantCompletion=assistantGoalDecision.status===
-    'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED';
+    'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED'&&
+    // If an already re-reviewed correction removed the unsupported quoted
+    // claim, do not overwrite a good response with a redundant hold notice.
+    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'&&
+    Boolean(assistantGoalDecision.flagged_quote)&&
+    String(modelResult.answer||'').includes(assistantGoalDecision.flagged_quote);
   if(unverifiedAssistantCompletion){
     modelResult.answer=pendingGoalCompletionEvidenceResponse({
       goalState:userGoalStateContract,decision:assistantGoalDecision,
