@@ -52,6 +52,11 @@ export default async function handler(req,res){
   if(goalCommand!==undefined&&goalCommand!==null&&
      goalCommand!=='SET_ACTIVE'&&goalCommand!=='START_DETOUR')
    fail('CHAT_GOAL_COMMAND_NOT_SUPPORTED',400);
+  // Stronger anti-CSRF requirement for durable user-goal changes. Ordinary
+  // read-only chat can follow the existing session origin checks.
+  if(goalCommand&&(!req.headers?.origin||
+     req.headers?.['sec-fetch-site']==='cross-site'))
+   fail('CHAT_GOAL_COMMAND_SAME_ORIGIN_REQUIRED',403);
   if(goalCommand&&text.length>700)
    fail('CHAT_GOAL_COMMAND_TEXT_TOO_LONG',400);
   const existing=history.messages.filter(m=>m.request_id===requestId);
