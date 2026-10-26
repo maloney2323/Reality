@@ -2,6 +2,7 @@ import {buildCleanerConversationContext} from './reality-cleaner-conversation-co
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
 import {buildUserGoalContinuityState,recoverPriorUserGoalState,projectProvisionalGoalLifecycle} from './reality-user-goal-continuity-state-v0.1.js';
+import {projectAuthoritativeUserGoals} from './reality-authoritative-user-goal-ledger-v0.1.js';
 import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
@@ -283,6 +284,17 @@ export async function runLiveIntelligenceOrchestration({
     effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id);
   const priorGoalContinuityHistory=continuityRuntime?.enabled?
     await continuityRuntime.readback():[];
+  // This is the ONLY authoritative active-goal relationship. It is read from
+  // authenticated user-command events in the SAME append-only Continuity root.
+  // The semantic reviewer and prior assistant messages cannot mutate it.
+  const authorizedUserGoals=continuityRuntime?.enabled&&
+    typeof requestedBy==='string'&&requestedBy.trim()?
+    projectAuthoritativeUserGoals({
+      continuityHistory:priorGoalContinuityHistory,
+      continuityRootId:normalizedContinuityRoot,
+      worldId:systemContext?.world_id||null,
+      principalId:requestedBy,
+    }):null;
   const oldGoalState=continuityRuntime?.enabled?
     recoverPriorUserGoalState({
       continuityHistory:priorGoalContinuityHistory,
@@ -309,8 +321,28 @@ export async function runLiveIntelligenceOrchestration({
     lifecycle:goalLifecycle,goalEvidence:userGoalContinuityState,
     worldId:systemContext?.world_id||null,
   });
+  // Reviewer-created working-goal candidates are NOT allowed to override a
+  // confirmed user-owned objective. This boundary changes conversational
+  // comparison only, not business action execution privileges.
+  const authoritativeActiveGoal=authorizedUserGoals?.active_goal||null;
+  const controllingGoalStateContract=authoritativeActiveGoal?Object.freeze({
+    ...userGoalStateContract,
+    goal_id:authoritativeActiveGoal.goal_id,
+    parent_id:authoritativeActiveGoal.parent_id,
+    description:authoritativeActiveGoal.title,
+    status:'ACTIVE',
+    working_status:'USER_EXPLICITLY_CONFIRMED_ACTIVE_GOAL',
+    provenance:{
+      origin_turn_id:authoritativeActiveGoal.source_user_message_ref,
+      evidence_payload_ref:authoritativeActiveGoal.last_transition_receipt_id,
+      source_kind:'AUTHENTICATED_USER_GOAL_LEDGER_COMMAND',
+      lineage:'SOURCE_LINKED_CONTINUITY_READBACK',
+    },
+    source_user_authorization_verified:true,
+    permits_external_execution:false,
+  }):userGoalStateContract;
   const assistantTrajectory=projectAssistantTrajectoryBoundary({
-    continuityHistory:priorGoalContinuityHistory,goalState:userGoalStateContract,
+    continuityHistory:priorGoalContinuityHistory,goalState:controllingGoalStateContract,
     continuityRootId:normalizedContinuityRoot,worldId:systemContext?.world_id||null,
   });
   const sourceLinkedOriginal={
@@ -330,9 +362,15 @@ export async function runLiveIntelligenceOrchestration({
       // Working interpretation from prior source-linked *user* turns, not
       // an autonomous change of user intent or execution authority.
       working_goal_lifecycle:goalLifecycle,
+      // Explicitly user-approved goal state is authoritative for *recorded
+      // active goal*, while current user instructions can still request
+      // temporary detours without rewriting that record.
+      authoritative_user_goals:authorizedUserGoals,
       assistant_proposal_trajectory:assistantTrajectory,
     },
     user_goal_continuity_summary:{
+      authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authoritative_transition_count:authorizedUserGoals?.transition_count||0,
       original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
       current_user_evidence_id:userGoalContinuityState.current_user_evidence_id,
       lifecycle_status:userGoalContinuityState.lifecycle_reconciliation_status,
@@ -352,6 +390,7 @@ export async function runLiveIntelligenceOrchestration({
     governedSignal,conversationContinuity:goalAwareContinuity,
     userGoalContinuityState,userGoalLifecycle:goalLifecycle,
     userGoalStateContract,
+    authorizedUserGoals,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
     // The Continuity spine canonicalizes the root to a UUID. Use that
@@ -376,7 +415,10 @@ export async function runLiveIntelligenceOrchestration({
     conversation_continuity:goalAwareContinuity,
     canonical_epistemic_state:canonicalEpistemicFrame,
     canonical_epistemic_receipt:epistemicFrameReceipt,
-    user_goal_state_contract:canonicalEpistemicFrame.user_goal_state_contract,
+    user_goal_state_contract:controllingGoalStateContract,
+    authoritative_user_goal_state:canonicalEpistemicFrame.authoritative_user_goals,
+    goal_authority_priority:'ONLY_EXPLICIT_AUTHENTICATED_USER_GOAL_LEDGER_COMMANDS_MUTATE_RECORDED_ACTIVE_GOAL',
+    goal_authority_restriction:'ASSISTANT_OUTPUT_AND_SEMANTIC_REVIEW_CANNOT_MUTATE_GOAL_STATE_OR_AUTHORIZE_ACTION',
     assistant_direction_reanchor:assistantTrajectory.direction_reanchor_recommended?{
       status:'REANCHOR_FROM_BLOCKED_ASSISTANT_PROPOSALS_NOT_VERIFIED_DRIFT',
       controlling_user_goal_source:userGoalStateContract.provenance.origin_turn_id,
@@ -588,13 +630,13 @@ export async function runLiveIntelligenceOrchestration({
     firstAnswer:String(modelResult.answer||''),
     modelResponseId:modelResult.response_id||null,
     currentTurnId:governedSignal.packet.packet_id,
-    goalState:userGoalStateContract,
+    goalState:controllingGoalStateContract,
     semanticReview:semanticFirst?.review||null,
     reviewerResponseId:semanticFirst?.response_id||null,
     knownUserGoalSources:userGoalContinuityState.user_goal_evidence.map(x=>x.source_ref),
   });
   const assistantGoalDecision=enforceGoalTransitionBoundary({
-    proposal:assistantGoalProposal,goalState:userGoalStateContract,
+    proposal:assistantGoalProposal,goalState:controllingGoalStateContract,
   });
   const ambiguousReturn=resolveAmbiguousGoalReturn({
     goalLifecycle,goalReview:semanticFirst?.review?.goal_trajectory_review,
@@ -650,13 +692,18 @@ export async function runLiveIntelligenceOrchestration({
       source_receipt_id:epistemicFrameReceipt.source_receipt_id,
       reported_claim_count:canonicalEpistemicFrame.reported_claims.length},
     goal_authority_contracts:{
-      goal_state:userGoalStateContract,
+      goal_state:controllingGoalStateContract,
+      original_provisional_goal_candidate:userGoalStateContract,
+      authorized_user_goal_state:authorizedUserGoals,
       goal_transition:userGoalTransitionContract,
       assistant_proposal:assistantGoalProposal,
       boundary_decision:assistantGoalDecision,
       confirmed_user_authority_transition:false,
     },
     user_goal_continuity:{
+      authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authoritative_transition_count:authorizedUserGoals?.transition_count||0,
+      authorized_goal_status:authorizedUserGoals?.status||'NOT_AVAILABLE_IN_THIS_RUNTIME',
       original_user_source_ref:userGoalContinuityState.original_user_goal_source_ref,
       preserved_original_goal_across_turns:Boolean(oldGoalState),
       provisional_working_goal_source_ref:goalLifecycle.working_goal.source_ref,
