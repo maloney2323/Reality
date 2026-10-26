@@ -161,6 +161,11 @@ export default async function handler(req,res){
        status:'NOT_SEMANTICALLY_ASSESSED',candidate_count_zero_means_drift_free:false,
        independently_verified_drift_rate:null},
      intervention:result.intelligence?.reliability_intervention||null,
+     corrected_goal_alignment:result.reliability.semantic_repair?.revised_goal_alignment?
+       {status:result.reliability.semantic_repair.revised_goal_alignment.status,
+        reviewer_goal_source_ref:result.reliability.semantic_repair.revised_goal_alignment.reviewed_goal_source_ref,
+        independently_verified_correction:false,
+        external_action_authorized:false}:null,
      independently_verified_semantic_correctness:false,
    },
    execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
