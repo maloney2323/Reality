@@ -68,7 +68,7 @@ where epoch.user_message_revision=0 and epoch.latest_user_request_id is null;
 -- from lock acquisition/commit order, never a racing timestamp comparison.
 create or replace function reality_internal.bump_user_turn_publication_epoch()
 returns trigger language plpgsql security definer
-set search_path='' as $
+set search_path='' as $reality_user_lock$
 begin
  if new.role <> 'user' then return new; end if;
  perform pg_catalog.pg_advisory_xact_lock(
@@ -83,7 +83,7 @@ begin
      updated_at=excluded.updated_at;
  return new;
 end
-$;
+$reality_user_lock$;
 revoke all on function reality_internal.bump_user_turn_publication_epoch()
  from public,anon,authenticated;
 drop trigger if exists reality_user_turn_publication_epoch_bump
