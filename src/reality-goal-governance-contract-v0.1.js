@@ -72,12 +72,29 @@ export function buildAssistantGoalGovernance({
  const original=state?.user_goal_evidence?.find(x=>
   x.goal_evidence_id===state.original_user_goal_evidence_id);
  const working=lifecycle?.working_goal||null;
+ const controlling=canonicalFrame.controlling_user_goal_state_contract||null;
+ const confirmed=canonicalFrame.authoritative_user_goals?.active_goal||null;
+ // An authenticated user-owned goal must be the SAME governing goal for
+ // cognition, comparison, and post-generation integrity. Never fall back to
+ // a reviewer-derived working goal after a confirmed command exists.
+ if(confirmed&&(!controlling||
+    controlling.goal_id!==confirmed.goal_id||
+    controlling.provenance?.origin_turn_id!==confirmed.source_user_message_ref||
+    controlling.provenance?.evidence_payload_ref!==confirmed.last_transition_receipt_id||
+    controlling.source_user_authorization_verified!==true||
+    controlling.permits_external_execution!==false))
+  throw Error('GOAL_GOVERNANCE_CONTROLLING_USER_GOAL_MISMATCH');
+ if(controlling&&(!valid(controlling.goal_id)||
+    controlling.world_id!==canonicalFrame.world_id||
+    controlling.permits_external_execution!==false))
+  throw Error('GOAL_GOVERNANCE_CONTROLLING_STATE_INVALID');
  const current=state?.user_goal_evidence?.find(x=>
   x.goal_evidence_id===state.current_user_evidence_id);
  const review=semanticReview?.goal_trajectory_review||null;
  const reviewerStatus=review?.status==='REVIEWED_GOAL_TRAJECTORY_CANDIDATE';
- const anchoredSource=reviewerStatus&&
-  state?.user_goal_evidence?.some(x=>x.source_ref===review.goal_source_ref);
+ const anchoredSource=reviewerStatus&&Boolean(
+  state?.user_goal_evidence?.some(x=>x.source_ref===review.goal_source_ref)||
+  (confirmed&&review.goal_source_ref===confirmed.source_user_message_ref));
  const exactQuote=String(review?.answer_quote||'');
  const anchoredQuote=valid(exactQuote)&&modelAnswer.includes(exactQuote);
  const userAuthorizedPivotReview=['USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR']
@@ -86,7 +103,7 @@ export function buildAssistantGoalGovernance({
   reviewerStatus&&anchoredSource&&anchoredQuote&&
   review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'&&
   !userAuthorizedPivotReview);
- const goalId=working?.goal_evidence_id||original?.goal_evidence_id||null;
+ const goalId=controlling?.goal_id||working?.goal_evidence_id||original?.goal_evidence_id||null;
  const transition=assistantShiftCandidate&&goalId?
   createGoalTransitionContract({
    goalId,scopeRootId:canonicalFrame.continuity_root_id,
@@ -135,9 +152,12 @@ export function buildAssistantGoalGovernance({
   world_id:canonicalFrame.world_id,
   working_goal:{
    goal_id:goalId,
-   user_source_ref:working?.source_ref||original?.source_ref||null,
-   status:'PROVISIONAL_UNLESS_INDEPENDENTLY_RECONCILED',
+   user_source_ref:controlling?.provenance?.origin_turn_id||
+     working?.source_ref||original?.source_ref||null,
+   status:confirmed?'AUTHENTICATED_USER_CONFIRMED_ACTIVE_GOAL':
+     'PROVISIONAL_UNLESS_INDEPENDENTLY_RECONCILED',
    original_user_goal_evidence_id:original?.goal_evidence_id||null,
+   authoritative_goal_transition_receipt_id:confirmed?.last_transition_receipt_id||null,
   },
   current_user_goal_source_ref:current?.source_ref||null,
   assistant_proposal:proposed,
