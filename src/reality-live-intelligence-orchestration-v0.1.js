@@ -633,6 +633,15 @@ export async function runLiveIntelligenceOrchestration({
       lifecycle_status:goalLifecycle.status,
       paused_goal_candidate_count:goalLifecycle.paused_goal_candidates.length,
       historical_transition_receipt_count:goalLifecycle.recent_transition_receipts.length,
+      conversation_exit_candidates:goalLifecycle.conversation_exit_candidates.length,
+      user_reported_completion_candidates:
+        goalLifecycle.user_reported_business_completion_candidates.length,
+      user_requested_abandonment_candidates:
+        goalLifecycle.user_requested_abandonment_candidates.length,
+      assistant_completion_claims_rejected:
+        goalLifecycle.rejected_assistant_completion_claims.length,
+      business_completion_verified:false,
+      business_completion_evidence_status:goalLifecycle.completion_verification_status,
       persistent_state_receipt_status:epistemicFrameReceipt.status,
       action_execution_authorized:false,
       drift_improvement_verified:false,
