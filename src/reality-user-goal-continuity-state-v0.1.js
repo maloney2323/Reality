@@ -145,7 +145,10 @@ export function projectProvisionalGoalLifecycle({
  const first=goalState.user_goal_evidence.find(x=>
   x.goal_evidence_id===goalState.original_user_goal_evidence_id);
  if(!first)throw Error('USER_GOAL_LIFECYCLE_ORIGINAL_SOURCE_NOT_PRESENT');
- let active=first,paused=[],applied=0,ambiguous=0;
+ // Conversation focus is NOT a permanent lock on the first objective.
+ // Explicit short detours are paused; user-owned shifts leave prior work
+ // DORMANT and recoverable without requiring the user to resume it.
+ let active=first,paused=[],dormant=[],applied=0,ambiguous=0;
  // Typed, provisional relationships. They are linked to source receipts;
  // they do not assert that a model's intent reading is user-approved truth.
  const goalParentCandidates=new Map();
@@ -170,7 +173,7 @@ export function projectProvisionalGoalLifecycle({
   if(lc?.status==='SOURCE_LINKED_REVIEWER_CANDIDATE'){
    // Source receipt + frame hash + SAME root and world were already verified.
    // Verify that the named target belongs to this user's earlier goal graph.
-   const available=[first,active,...paused,...goalState.user_goal_evidence];
+   const available=[first,active,...paused,...dormant,...goalState.user_goal_evidence];
    const target=available.find(g=>g?.source_ref===lc.target_goal_source_ref);
    const userSourceValid=lc.speaker==='CURRENT_USER'&&
      lc.current_user_source_ref===directUser.source_ref&&
@@ -243,16 +246,19 @@ export function projectProvisionalGoalLifecycle({
     transitionUnresolved=true;
     relation='GOAL_RELATION_NOT_ANCHORED_TO_CURRENT_USER';
    }else if(active.goal_evidence_id!==directUser.goal_evidence_id){
-    // De-duplicate suspended goals and preserve parent relationship for an
-    // explicitly temporary detour. A pivot is NOT permanent abandonment.
+    // Only a user-authorized TEMPORARY detour pauses the prior focus.
+    // A broader user-led pivot makes previous work dormant, NOT abandoned,
+    // and never requires a later return to the old business goal.
     paused=paused.filter(x=>x.goal_evidence_id!==active.goal_evidence_id);
-    paused.push(active);
+    dormant=dormant.filter(x=>x.goal_evidence_id!==active.goal_evidence_id);
     if(direction==='USER_AUTHORIZED_DETOUR'){
+     paused.push(active);
      parentCandidate=active.goal_evidence_id;
      goalParentCandidates.set(directUser.goal_evidence_id,parentCandidate);
      relation='TEMPORARY_CHILD_OBJECTIVE_CANDIDATE';
     }else{
-     relation='ALTERNATE_ROOT_OBJECTIVE_CANDIDATE';
+     dormant.push(active);
+     relation='USER_CHANGED_FOCUS_PRIOR_GOAL_DORMANT';
     }
     active=directUser;
     applied++;
@@ -263,19 +269,21 @@ export function projectProvisionalGoalLifecycle({
    // Never pop a random "last detour". Return only to a goal explicitly
    // identified by the review's USER source reference. If the reviewer
    // anchors merely the CURRENT user request, the target is unresolved.
-   const candidates=[first,...paused];
+   const candidates=[first,...paused,...dormant];
    const target=candidates.find(x=>x.source_ref===review.goal_source_ref &&
      x.goal_evidence_id!==directUser.goal_evidence_id);
    if(target){
     targetCandidate=target.goal_evidence_id;
-    // Returning to earlier work is NOT evidence the interrupted temporary
-    // task was completed or abandoned. Preserve it as a recoverable candidate.
+    // A return may restore either a paused detour parent or a dormant goal.
+    // The interrupted task is not assumed completed, cancelled or failed.
     paused=paused.filter(x=>x.goal_evidence_id!==target.goal_evidence_id&&
       x.goal_evidence_id!==priorActive.goal_evidence_id);
+    dormant=dormant.filter(x=>x.goal_evidence_id!==target.goal_evidence_id&&
+      x.goal_evidence_id!==priorActive.goal_evidence_id);
     if(priorActive.goal_evidence_id!==target.goal_evidence_id)
-      paused.push(priorActive);
+      dormant.push(priorActive);
     active=target;
-    // Resumption is provisional. Other simultaneous goals are preserved.
+    // Resumption is provisional. Other user-created goals remain recoverable.
     applied++;
     relation='RETURN_TO_SOURCE_LINKED_EARLIER_GOAL_CANDIDATE';
    }else{
@@ -316,8 +324,24 @@ export function projectProvisionalGoalLifecycle({
   paused_goal_candidates:paused.slice(-8).map(x=>({
    goal_evidence_id:x.goal_evidence_id,
    source_ref:x.source_ref,text:x.text,
-   status:'PROVISIONAL_PAUSED_NOT_PERMANENTLY_SUPERSEDED',
+   status:'PROVISIONAL_PAUSED_FOR_USER_DETOUR_NOT_ABANDONED',
   })),
+  dormant_goal_candidates:dormant.slice(-12).map(x=>({
+   goal_evidence_id:x.goal_evidence_id,
+   source_ref:x.source_ref,text:x.text,
+   status:'DORMANT_RECOVERABLE_NOT_CURRENTLY_GOVERNING',
+   can_be_recalled_when_relevant:true,
+   automatically_reactivate:false,
+  })),
+  focus_policy:{
+   current_user_direction_is_primary:true,
+   original_goal_is_memory_not_permanent_command:true,
+   user_can_switch_topics_without_drift_alert:true,
+   previous_goals_remain_recoverable:true,
+   previous_goals_must_not_be_forced_back_into_current_reply:true,
+   assistant_proposals_never_authorize_focus_change:true,
+   automated_external_actions_authorized:false,
+  },
   // Source-linked parent-child relationships are meaningful *candidates*,
   // not inferred permanent lifecycle transitions.
   goal_relationship_candidates:[...goalParentCandidates].slice(-12)
