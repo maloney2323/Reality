@@ -1063,6 +1063,26 @@ export async function runLiveIntelligenceOrchestration({
       'REPEATED_ASSISTANT_DIRECTION_FAULT_WITHHELD':
       'ASSISTANT_GOAL_SHIFT_WITHHELD_PENDING_USER_DIRECTION';
   }
+  // A first-pass review can find a failed CURRENT request without finding a
+  // new future-goal mutation. If the bounded retry did not establish an
+  // on-goal revised answer, do not publish the acknowledged wrong-task draft.
+  // This keeps assistant-created redirection from becoming conversational
+  // continuity merely because the intended goal mutation never executed.
+  const unresolvedCurrentRequestDrift=Boolean(
+    semanticFirst?.review?.addresses_current_request===false&&
+    (semanticFirst.review.issues||[]).some(x=>
+      x.kind==='WRONG_TASK'&&typeof x.quote==='string'&&
+      x.quote.length>0&&initialAssistantProposalText.includes(x.quote))&&
+    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED');
+  if(unresolvedCurrentRequestDrift&&!unreviewedGoalShift){
+    modelResult.answer=
+      'Reality withheld an answer that may have followed the wrong objective. '+
+      'Your current request remains: "'+String(message).slice(0,300)+'". '+
+      'No change of goal or external action was authorized. '+
+      'I cannot confirm a correct replacement from the available review.';
+    modelResult.reliability_intervention=
+      'UNRESOLVED_CURRENT_USER_GOAL_DRIFT_WITHHELD';
+  }
   // A reviewer-only assistant claim that work is complete cannot close a
   // business goal or be emitted as an established outcome without a matching
   // independently verified result. Replace the unproved completion sentence,
