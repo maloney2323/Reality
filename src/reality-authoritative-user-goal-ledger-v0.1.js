@@ -4,6 +4,7 @@
 // An explicit user instruction changes conversation focus; it NEVER proves a
 // real-world task completed or authorizes external business execution.
 import {createHash} from 'node:crypto';
+import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 export const AUTHORITATIVE_USER_GOAL_LEDGER_VERSION='reality-authoritative-user-goal-ledger-v0.1';
 export const USER_GOAL_COMMANDS=Object.freeze([
  'SET_ACTIVE','START_DETOUR','RESUME','PAUSE','ABANDON','REPORT_COMPLETE',
@@ -43,9 +44,12 @@ export function projectAuthoritativeUserGoals({
 }={}){
  if(!Array.isArray(continuityHistory)||!ok(continuityRootId)||!ok(principalId))
   throw Error('USER_GOAL_AUTHORITY_READ_SCOPE_REQUIRED');
+ // Re-verify the complete chain and its recomputed lineage hashes before
+ // accepting any user-goal authority. Missing history must FAIL CLOSED.
+ const verifiedHistory=orderContinuityHistory(continuityHistory);
  const goals=new Map(),transitions=[],seenRequests=new Set();
  let active=null;
- for(const event of continuityHistory){
+ for(const event of verifiedHistory){
   if(!scopedEvent(event,{continuityRootId,worldId,principalId}))continue;
   const p=event.payload;
   if(seenRequests.has(p.source_request_id))
