@@ -1,4 +1,5 @@
 import { createExecutionReceipt, canExecute } from './reality-governed-work-runtime-v0.1.js';
+import { evaluateGoalExecutionBoundary } from './reality-goal-execution-boundary-v0.1.js';
 
 export const GOVERNED_EXECUTION_ENGINE_VERSION = 'reality-governed-execution-engine-v0.1';
 
@@ -17,6 +18,18 @@ export async function executeAuthorizedWork({
 } = {}) {
   if (!workItem?.work_item_id) throw new Error('WORK_ITEM_REQUIRED');
   if (workItem.workflow_id !== workflowId) throw new Error('WORKFLOW_MISMATCH');
+  // Fail closed even when another caller bypasses the HTTP handler.
+  // Goal-state changes require a separate verified user-origin authority
+  // transition; this generic work executor never mints one.
+  const goalBoundary=evaluateGoalExecutionBoundary({workItem,authorization});
+  if(goalBoundary.status==='BLOCKED'){
+    return Object.freeze({
+      engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+      status:'BLOCKED',blocked_reason:goalBoundary.reason,
+      goal_authority_boundary:goalBoundary,
+      execution:null,verification:null,outcome:null,
+    });
+  }
   if (!connector?.execute || !independentVerifier?.verify) throw new Error('EXECUTION_AND_VERIFICATION_BRIDGE_REQUIRED');
 
   const gate = canExecute({workItem, authorization});
