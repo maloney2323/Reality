@@ -80,6 +80,19 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <button id="privateNew" type="button">New conversation</button>
    <button id="privateSignOut" type="button">Sign out</button>
   </div>
+  <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
+   <strong>Confirmed user objective</strong>
+   <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
+   <label for="privateGoalText">Set your current goal (explicit confirmation)</label>
+   <textarea id="privateGoalText" maxlength="700" placeholder="Example: My active goal is to prepare a supervised construction pilot for the owner."></textarea>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="privateSetGoal" type="button">Confirm this goal</button>
+   </div>
+   <label for="privateSavedGoals">Previously confirmed objectives</label>
+   <select id="privateSavedGoals" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"></select>
+   <button id="privateResumeGoal" type="button">Resume selected goal</button>
+   <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
+  </div>
   <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
   <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
   <button id="privateSend" type="button">Send to Reality</button>
@@ -383,6 +396,67 @@ setInterval(refreshSavedShiftHome,300000);
   localStorage.setItem('reality.private.chat.conversation.v1',id);
   try{await loadSaved();await loadConversations()}catch(e){status(e.message)}
  };
+ async function loadGoals(){
+  const label=el('privateGoalStatus');
+  try{
+   const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Goal ledger unavailable');
+   const state=data.goal_state||{};
+   label.textContent=state.active_goal?
+     ('USER-CONFIRMED active objective: '+String(state.active_goal.title||'').slice(0,250)+
+      ' · Ledger receipt: '+state.active_goal.last_transition_receipt_id):
+     ('No explicitly confirmed active objective in this conversation. Prior suggestions are not authorization.');
+   const select=el('privateSavedGoals');select.replaceChildren();
+   for(const item of state.goals||[]){
+    if(item.goal_id===state.active_goal_id||item.status==='ABANDONED'||
+       item.status==='USER_REPORTED_COMPLETE_UNVERIFIED')continue;
+    const option=document.createElement('option');option.value=item.goal_id;
+    option.textContent=String(item.title||'Prior goal').slice(0,115)+' · '+item.status;
+    select.append(option);
+   }
+   el('privateResumeGoal').disabled=!select.options.length;
+  }catch(e){
+   label.textContent='Confirmed goal ledger not available: '+e.message+
+    '. Do not treat suggestions as approved objectives.';
+   el('privateResumeGoal').disabled=true;
+  }
+ }
+ async function saveGoalCommand(operation,message,target_goal_id=null){
+  const r=await fetch('/api/reality/personal-goals',{method:'POST',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conversationId(),
+    request_id:crypto.randomUUID(),operation,message,target_goal_id})});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Goal change not recorded');
+  if(!data.transition_receipt_id||data.goal_state?.external_execution_authorized!==false)
+   throw Error('GOAL_TRANSITION_READBACK_NOT_VERIFIED');
+  return data;
+ }
+ el('privateSetGoal').onclick=async()=>{
+  const message=el('privateGoalText').value.trim();
+  if(!message)return status('Enter the objective you are explicitly authorizing.');
+  if(!confirm('Confirm that this is your new active conversational objective? This does not authorize any external actions.'))return;
+  el('privateSetGoal').disabled=true;
+  try{
+   await saveGoalCommand('SET_ACTIVE',message);
+   el('privateGoalText').value='';
+   await loadGoals();await loadSaved();await loadConversations();
+   status('User-authorized goal recorded and verified in Continuity.');
+  }catch(e){status('Goal was not confirmed: '+e.message)}
+  finally{el('privateSetGoal').disabled=false}
+ };
+ el('privateResumeGoal').onclick=async()=>{
+  const target=el('privateSavedGoals').value;
+  const selected=el('privateSavedGoals').selectedOptions[0]?.textContent||'';
+  if(!target)return;
+  if(!confirm('Resume this earlier objective? '+selected))return;
+  el('privateResumeGoal').disabled=true;
+  try{
+   await saveGoalCommand('RESUME','I explicitly authorize resuming this earlier objective: '+selected.slice(0,450),target);
+   await loadGoals();await loadSaved();await loadConversations();
+   status('Earlier user-confirmed objective resumed from its source-linked ledger entry.');
+  }catch(e){status('Goal was not resumed: '+e.message)}
+  finally{el('privateResumeGoal').disabled=false}
+ };
  async function loadSaved(){
   const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
@@ -391,6 +465,7 @@ setInterval(refreshSavedShiftHome,300000);
   status((data.messages?.length||0)+' saved messages restored'+
    (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
   el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+  await loadGoals();
  }
  async function init(){
   try{
