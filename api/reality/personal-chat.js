@@ -170,7 +170,7 @@ export default async function handler(req,res){
     process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED==='true';
   const publication=atomicPublicationEnabled?
     await publishPrivateAssistantAtomically(session,{
-      conversationId,requestId,text:answer,
+      conversationId,requestId,text:answer,isolatedDb:isolated,
       expectedRevision:goalAtGeneration.transition_count,
       expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
     }):
