@@ -15,7 +15,7 @@ import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation } 
 import {
  projectGoalStateContract,projectGoalTransitionContract,
  projectAssistantGoalProposal,enforceGoalTransitionBoundary,
- pendingGoalAuthorizationResponse,
+ pendingGoalAuthorizationResponse,pendingGoalCompletionEvidenceResponse,
 } from './reality-goal-authority-contracts-v0.1.js';
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
@@ -940,6 +940,18 @@ export async function runLiveIntelligenceOrchestration({
     });
     modelResult.reliability_intervention='ASSISTANT_GOAL_SHIFT_WITHHELD_PENDING_USER_DIRECTION';
   }
+  // A reviewer-only assistant claim that work is complete cannot close a
+  // business goal or be emitted as an established outcome without a matching
+  // independently verified result. Replace the unproved completion sentence,
+  // never append a cosmetic warning while leaving the claim intact.
+  const unverifiedAssistantCompletion=assistantGoalDecision.status===
+    'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED';
+  if(unverifiedAssistantCompletion){
+    modelResult.answer=pendingGoalCompletionEvidenceResponse({
+      goalState:userGoalStateContract,decision:assistantGoalDecision,
+    });
+    modelResult.reliability_intervention='UNVERIFIED_ASSISTANT_COMPLETION_WITHHELD';
+  }
   let goalAuthorityReceipt=null;
   if(continuityRuntime?.enabled){
     const proposalEvent=await continuityRuntime.appendStage({
@@ -979,6 +991,10 @@ export async function runLiveIntelligenceOrchestration({
     source_receipt_id:goalAuthorityReceipt,
     goal_state_changed:false,
     external_execution_authorized:false,
+    business_completion_verified:false,
+    completion_claim_withheld:unverifiedAssistantCompletion,
+    current_user_lifecycle_candidate:
+      semanticFirst?.review?.goal_lifecycle_review||null,
     reviewer_coverage:semanticFirst?.review?.status||semanticReviewStatus,
     independently_verified_goal_alignment:false,
   };
