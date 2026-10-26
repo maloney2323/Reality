@@ -621,7 +621,7 @@ export async function runLiveIntelligenceOrchestration({
   });
   const userGoalTransitionContract=projectGoalTransitionContract({
     currentTurnId:governedSignal.packet.packet_id,
-    goalState:userGoalStateContract,
+    goalState:controllingGoalStateContract,
     userDirection:semanticFirst?.review?.goal_trajectory_review?.user_direction||'UNCLEAR',
     sourceUserTurnId:governedSignal.packet.packet_id,
     reviewerEvidenceId:semanticFirst?.response_id||null,
