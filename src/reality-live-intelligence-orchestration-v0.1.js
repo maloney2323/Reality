@@ -597,10 +597,10 @@ export async function runLiveIntelligenceOrchestration({
     goalLifecycle,goalReview:semanticFirst?.review?.goal_trajectory_review,
     currentUserMessage:message,
   });
-  const currentAssistantRedirectionBlocked=[
-    'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED',
-    'UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED',
-  ].includes(assistantGoalDecision.status);
+  const blockedMutationTypes=assistantGoalDecision.blocked_mutation_types||[];
+  const blockedGoalQuotes=assistantGoalDecision.blocked_quotes||[];
+  const currentAssistantRedirectionBlocked=blockedMutationTypes.some(x=>
+    ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x));
   const offGoalStreakIncludingCurrent=assistantTrajectory.off_goal_streak_counter+
     (currentAssistantRedirectionBlocked?1:0);
   const directionFault=Boolean(currentAssistantRedirectionBlocked&&
@@ -969,10 +969,11 @@ export async function runLiveIntelligenceOrchestration({
   // If the same semantic review identified a quoted assistant-origin shift,
   // release only a re-reviewed correction; otherwise withhold the shift.
   // A missing semantic review is NOT evidence that no drift occurred.
+  const blockedQuotesStillInRelease=blockedGoalQuotes.some(q=>
+    Boolean(q)&&String(modelResult.answer||'').includes(q));
   const unreviewedGoalShift=currentAssistantRedirectionBlocked&&
     (modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'||
-      Boolean(assistantGoalDecision.flagged_quote&&
-        String(modelResult.answer||'').includes(assistantGoalDecision.flagged_quote)));
+      blockedQuotesStillInRelease);
   if(unreviewedGoalShift){
     modelResult.answer=pendingGoalAuthorizationResponse({
       goalState:userGoalStateContract,
@@ -985,13 +986,13 @@ export async function runLiveIntelligenceOrchestration({
   // business goal or be emitted as an established outcome without a matching
   // independently verified result. Replace the unproved completion sentence,
   // never append a cosmetic warning while leaving the claim intact.
-  const unverifiedAssistantCompletion=assistantGoalDecision.status===
-    'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED'&&
-    // If an already re-reviewed correction removed the unsupported quoted
-    // claim, do not overwrite a good response with a redundant hold notice.
-    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'&&
-    Boolean(assistantGoalDecision.flagged_quote)&&
-    String(modelResult.answer||'').includes(assistantGoalDecision.flagged_quote);
+  const unverifiedAssistantCompletion=blockedMutationTypes.includes(
+    'CLAIM_BUSINESS_COMPLETION')&&
+    // If the corrected release removed *all* blocked content, do not overwrite
+    // it with a redundant hold notice. Otherwise fail closed on the bundle.
+    !unreviewedGoalShift&&
+    (modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'||
+      blockedQuotesStillInRelease);
   if(unverifiedAssistantCompletion){
     modelResult.answer=pendingGoalCompletionEvidenceResponse({
       goalState:userGoalStateContract,decision:assistantGoalDecision,
@@ -1018,6 +1019,8 @@ export async function runLiveIntelligenceOrchestration({
         goal_transition:userGoalTransitionContract,
         assistant_proposal:assistantGoalProposal,
         verifier_decision:assistantGoalDecision,
+        bundled_goal_mutation_count:assistantGoalDecision.blocked_mutation_count,
+        bundled_blocked_mutation_types:assistantGoalDecision.blocked_mutation_types,
         assistant_trajectory:{
           prior_blocked_same_goal_streak:assistantTrajectory.off_goal_streak_counter,
           current_blocked_redirection:currentAssistantRedirectionBlocked,
@@ -1062,6 +1065,8 @@ export async function runLiveIntelligenceOrchestration({
     ambiguous_goal_return:ambiguousReturn,
     future_proposal_count:assistantGoalProposal.direction_evaluation
       .source_anchored_future_proposal_count||0,
+    bundled_blocked_goal_mutation_count:assistantGoalDecision.blocked_mutation_count,
+    bundled_blocked_goal_mutation_types:assistantGoalDecision.blocked_mutation_types,
     independently_verified_goal_alignment:false,
   };
 
