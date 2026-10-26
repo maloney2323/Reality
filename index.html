@@ -564,7 +564,9 @@ setInterval(refreshSavedShiftHome,300000);
    const pinnedGoalStatus=pinnedGoalText?
     ('You explicitly set this ongoing goal: '+String(pinnedGoalText).slice(0,150)+
      ' · Only your user-goal controls can replace it') :
-    'No user-pinned ongoing objective; current conversation directions are provisional';
+    goalContext.authenticated_no_active_goal===true?
+     'You explicitly paused or ended the active goal. No older inferred objective can restart automatically.' :
+     'No user-pinned ongoing objective; current conversation directions are provisional';
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
