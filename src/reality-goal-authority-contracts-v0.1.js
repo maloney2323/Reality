@@ -170,34 +170,50 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
  if(proposal?.version!==GOAL_AUTHORITY_CONTRACT_VERSION||
     !nonempty(goalState?.goal_id)||
     proposal.target_goal_id!==goalState.goal_id||
-    proposal.goal_mutation_authorized!==false)
+    proposal.goal_mutation_authorized!==false||
+    proposal.action_execution_authorized!==false)
   throw Error('GOAL_BOUNDARY_INVALID_OR_MISMATCHED_PROPOSAL');
- const shift=proposal.intended_state_mutations.goal_mutations;
- if(!Array.isArray(shift))throw Error('GOAL_BOUNDARY_UNTRUSTED_MUTATIONS');
- const candidate=shift.find(x=>['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.type));
- if(candidate&&(candidate.authorized_by!=='ASSISTANT_PROPOSAL'||
-    candidate.authorization_state!=='UNAUTHORIZED'))
-  throw Error('GOAL_BOUNDARY_ASSISTANT_ESCALATION_REJECTED');
- const completion=shift.find(x=>x.type==='CLAIM_BUSINESS_COMPLETION');
- if(completion&&(completion.authorized_by!=='ASSISTANT_PROPOSAL'||
-    completion.authorization_state!=='UNAUTHORIZED'||
-    completion.independent_outcome_receipt!==null))
-   throw Error('GOAL_BOUNDARY_COMPLETION_AUTHORITY_ESCALATION_REJECTED');
- const blocked=Boolean(candidate||completion);
+ const mutations=proposal.intended_state_mutations?.goal_mutations;
+ const resourceMutations=proposal.intended_state_mutations?.resource_mutations;
+ if(!Array.isArray(mutations)||mutations.length>20||
+    !Array.isArray(resourceMutations)||resourceMutations.length!==0)
+  throw Error('GOAL_BOUNDARY_UNTRUSTED_MUTATIONS');
+ const allowed=new Set(['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK','CLAIM_BUSINESS_COMPLETION']);
+ // Evaluate the *entire* proposal atomically. An attacker must not be able
+ // to tuck an approved-looking second mutation behind a correctly blocked
+ // first entry. Every modeled change is unauthorized until independent
+ // USER-sourced intent and separately scoped action grants are verified.
+ for(const change of mutations){
+  if(!change||!allowed.has(change.type)||
+     change.target_goal_id!==goalState.goal_id||
+     change.authorized_by!=='ASSISTANT_PROPOSAL'||
+     change.authorization_state!=='UNAUTHORIZED'||
+     !nonempty(change.proposed_change_quote)||
+     change.no_external_execution_grant===false||
+     change.type==='CLAIM_BUSINESS_COMPLETION'&&
+       change.independent_outcome_receipt!==null)
+   throw Error('GOAL_BOUNDARY_ASSISTANT_MUTATION_ESCALATION_REJECTED');
+ }
+ const completion=mutations.find(x=>x.type==='CLAIM_BUSINESS_COMPLETION');
+ const schedule=mutations.find(x=>x.type==='SCHEDULE_FUTURE_WORK');
+ const shift=mutations.find(x=>x.type==='SHIFT_OBJECTIVE');
+ const first=completion||schedule||shift||null;
+ const blockedQuotes=[...new Set(mutations.map(x=>bounded(x.proposed_change_quote,350)))];
  return freeze({
   version:GOAL_AUTHORITY_CONTRACT_VERSION,
   proposal_id:proposal.proposal_id,
   goal_id:goalState.goal_id,
   status:completion?'UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED':
-    candidate?.type==='SCHEDULE_FUTURE_WORK'?
-      'UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED':
-    candidate?'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED':
+    schedule?'UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED':
+    shift?'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED':
     proposal.direction_evaluation.status==='NOT_SEMANTICALLY_ASSESSED'?
       'NOT_SEMANTICALLY_ASSESSED':'NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED',
   authorized_goal_mutations:0,external_actions_authorized:false,
   original_goal_preserved:true,
-  flagged_quote:candidate?.proposed_change_quote||
-    completion?.proposed_change_quote||null,
+  flagged_quote:first?.proposed_change_quote||null,
+  blocked_quotes:blockedQuotes,
+  blocked_mutation_count:mutations.length,
+  blocked_mutation_types:[...new Set(mutations.map(x=>x.type))],
   prevented_unverified_goal_completion:Boolean(completion),
   source_goal_ref:goalState.provenance.origin_turn_id,
   independent_semantic_correctness_verified:false,
