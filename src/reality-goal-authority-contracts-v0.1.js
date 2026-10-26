@@ -296,3 +296,71 @@ export function pendingGoalAuthorizationResponse({goalState}={}){
   bounded(goalState.description,260)+'". No assistant suggestion has changed your goal. '+
   'Would you like to pursue a different objective, or continue with your current request?';
 }
+
+
+/**
+ * Explicit authenticated PAUSE/ABANDON/REPORT_COMPLETE is not an invitation
+ * to resurrect a reviewer-derived historical objective. This is a boundary
+ * SENTINEL, not a real GoalState and NOT an assistant-created user goal.
+ *
+ * A new ordinary user request still governs the immediate answer; a new
+ * pinned ongoing objective requires the existing authenticated user command.
+ */
+export function projectExplicitNoActiveGoalBoundary({
+ authoritativeUserGoals,continuityRootId,worldId=null,
+}={}){
+ if(authoritativeUserGoals?.version!=='reality-authoritative-user-goal-ledger-v0.1'||
+    !nonempty(continuityRootId)||
+    authoritativeUserGoals.continuity_root_id!==continuityRootId||
+    authoritativeUserGoals.world_id!==(worldId||null)||
+    !Number.isInteger(authoritativeUserGoals.transition_count)||
+    authoritativeUserGoals.transition_count<1||
+    authoritativeUserGoals.active_goal_id!==null||
+    authoritativeUserGoals.active_goal!==null||
+    authoritativeUserGoals.assistant_can_mutate_goals!==false||
+    authoritativeUserGoals.semantic_reviewer_can_mutate_goals!==false||
+    authoritativeUserGoals.external_execution_authorized!==false)
+   throw Error('NO_ACTIVE_GOAL_AUTHENTICATED_STATE_REQUIRED');
+ const prior=authoritativeUserGoals.recent_transition_receipts;
+ const last=Array.isArray(prior)?prior.at(-1):null;
+ if(!['PAUSE','ABANDON','REPORT_COMPLETE'].includes(last?.operation)||
+    !nonempty(last.event_id)||!nonempty(last.source_ref)||
+    !nonempty(last.goal_id)||last.confirmed_by_user!==true||
+    last.principal_id!==authoritativeUserGoals.principal_id)
+   throw Error('NO_ACTIVE_GOAL_USER_TRANSITION_RECEIPT_REQUIRED');
+ return freeze({
+   version:GOAL_AUTHORITY_CONTRACT_VERSION,
+   goal_id:id('no-active-user-goal-boundary',[
+      continuityRootId,worldId,authoritativeUserGoals.principal_id,
+      last.event_id]),
+   // This is a contract for a NEGATIVE active-goal state, not a new goal.
+   goal_state_kind:'EXPLICIT_NO_ACTIVE_USER_GOAL_BOUNDARY',
+   represents_user_goal:false,
+   no_active_goal_explicitly_recorded:true,
+   parent_id:null,
+   description:'No active pinned user objective. Follow the current user request; earlier goals are recoverable history, not current instructions.',
+   scope_boundaries:[
+     'DO_NOT_REACTIVATE_AN_EARLIER_OBJECTIVE_WITHOUT_USER_DIRECTION',
+     'ASSISTANT_PROPOSALS_CANNOT_CREATE_USER_GOAL_AUTHORITY',
+   ],
+   status:last.operation==='PAUSE'?'PAUSED':
+     last.operation==='ABANDON'?'ABANDONED':'UNRESOLVED',
+   working_status:'AUTHENTICATED_NO_ACTIVE_GOAL',
+   world_id:worldId||null,
+   provenance:{
+     origin_turn_id:last.source_ref,
+     evidence_payload_ref:last.event_id,
+     source_kind:'AUTHENTICATED_USER_GOAL_LEDGER_NO_ACTIVE_GOAL',
+     lineage:'SOURCE_LINKED_CONTINUITY_READBACK',
+   },
+   authority_transition_operation:last.operation,
+   paused_or_closed_goal_id:last.goal_id,
+   source_user_authorization_verified:true,
+   business_completion_independently_verified:false,
+   permits_external_execution:false,
+   uncertainty_profile:{
+     ambiguities:['No active pinned goal; current user direction is authoritative for conversational focus.'],
+     user_corrections_count:null,
+   },
+ });
+}
