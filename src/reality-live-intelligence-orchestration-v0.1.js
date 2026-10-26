@@ -393,6 +393,7 @@ export async function runLiveIntelligenceOrchestration({
     governedSignal,conversationContinuity:goalAwareContinuity,
     userGoalContinuityState,userGoalLifecycle:goalLifecycle,
     userGoalStateContract,
+    controllingGoalStateContract,
     authorizedUserGoals,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
