@@ -108,12 +108,13 @@ export function buildAssistantGoalGovernance({
   (confirmed&&review.goal_source_ref===confirmed.source_user_message_ref));
  const exactQuote=String(review?.answer_quote||'');
  const anchoredQuote=valid(exactQuote)&&modelAnswer.includes(exactQuote);
- const userAuthorizedPivotReview=['USER_AUTHORIZED_PIVOT','USER_AUTHORIZED_DETOUR']
-  .includes(review?.user_direction);
+ // Authorizing a new USER direction does NOT authorize the assistant
+ // to introduce an additional, unrelated direction. Review alignment against
+ // the ACTUAL user-authorized pivot/detour, not just the original goal.
+ // A legitimate pivot itself produces no finding when the answer stays on it.
  const assistantShiftCandidate=Boolean(
   reviewerStatus&&anchoredSource&&anchoredQuote&&
-  review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'&&
-  !userAuthorizedPivotReview);
+  review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE');
  const goalId=controlling?.goal_id||working?.goal_evidence_id||original?.goal_evidence_id||null;
  // Enforce the SAME existing reviewer-extracted future-work and strategy
  // candidates, in addition to the immediate objective shift. No new judge.
