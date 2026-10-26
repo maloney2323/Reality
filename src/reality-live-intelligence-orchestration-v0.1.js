@@ -1073,7 +1073,9 @@ export async function runLiveIntelligenceOrchestration({
     (semanticFirst.review.issues||[]).some(x=>
       x.kind==='WRONG_TASK'&&typeof x.quote==='string'&&
       x.quote.length>0&&initialAssistantProposalText.includes(x.quote))&&
-    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED');
+    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'&&
+    !['QUARANTINED_PRIOR_TO_DISPLAY','UNVERIFIED_ACTION_CLAIM_WITHHELD']
+      .includes(modelResult.reliability_intervention));
   if(unresolvedCurrentRequestDrift&&!unreviewedGoalShift){
     modelResult.answer=
       'Reality withheld an answer that may have followed the wrong objective. '+
