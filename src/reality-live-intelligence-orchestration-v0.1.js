@@ -648,6 +648,10 @@ export async function runLiveIntelligenceOrchestration({
     userDirection:semanticFirst?.review?.goal_trajectory_review?.user_direction||'UNCLEAR',
     sourceUserTurnId:governedSignal.packet.packet_id,
     reviewerEvidenceId:semanticFirst?.response_id||null,
+    reviewerGoalReview:semanticFirst?.review?.goal_trajectory_review||null,
+    currentUserMessage:message,
+    goalLifecycle,
+    authoritativeUserGoals:authorizedUserGoals,
   });
   const assistantGoalProposal=projectAssistantGoalProposal({
     firstAnswer:String(modelResult.answer||''),
