@@ -137,6 +137,7 @@ export function projectAssistantGoalProposal({
       proposed_change_quote:bounded(review.answer_quote,350),
       rationale:bounded(review.reason,350),
       authorized_by:'ASSISTANT_PROPOSAL',authorization_state:'UNAUTHORIZED',
+      no_external_execution_grant:true,
     }]:[]),
     ...futureMutationCandidates,
     ...(claimedCompletion?[{
@@ -146,6 +147,7 @@ export function projectAssistantGoalProposal({
       rationale:bounded(lifecycle.reason,350),
       authorized_by:'ASSISTANT_PROPOSAL',
       authorization_state:'UNAUTHORIZED',
+      no_external_execution_grant:true,
       independent_outcome_receipt:null,
     }]:[]),
    ],
@@ -189,7 +191,7 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
      change.authorized_by!=='ASSISTANT_PROPOSAL'||
      change.authorization_state!=='UNAUTHORIZED'||
      !nonempty(change.proposed_change_quote)||
-     change.no_external_execution_grant===false||
+     change.no_external_execution_grant!==true||
      change.type==='CLAIM_BUSINESS_COMPLETION'&&
        change.independent_outcome_receipt!==null)
    throw Error('GOAL_BOUNDARY_ASSISTANT_MUTATION_ESCALATION_REJECTED');
