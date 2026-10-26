@@ -62,6 +62,14 @@ export function projectAssistantTrajectoryBoundary({
      first_pass_work_excerpt:String(proposal.proposed_response_excerpt||'').slice(0,700),
      reviewer_goal_source_ref:proposal.direction_evaluation?.reviewer_goal_source_ref||null,
      reviewer_goal_alignment:proposal.direction_evaluation?.aligns_with_active_objective,
+     optional_suggestions:(proposal.optional_advice_not_goal_mutations||[])
+      .filter(x=>x?.grants_goal_transition===false&&x?.grants_external_execution===false)
+      .slice(0,5).map(x=>({
+       quote:String(x.quote||'').slice(0,220),posture:x.posture,
+       user_goal_source_ref:x.user_goal_source_ref,user_accepted:false,
+      })),
+     unauthorized_mutation_proposal_count:mutations.filter(x=>
+      ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.type)).length,
      semantic_shift_candidate:semanticOffGoal||blocked,
      user_approved_new_goal:false,
      independently_verified_semantics:false,
@@ -88,6 +96,12 @@ export function projectAssistantTrajectoryBoundary({
   historical_proposals_count:entries.length,
   recent_proposal_receipts:entries,
   recent_work_direction_evidence:recommendations,
+  historical_optional_suggestion_count:recommendations.reduce((n,x)=>
+   n+(x.optional_suggestions?.length||0),0),
+  historical_unapproved_goal_mutation_candidate_count:recommendations.reduce((n,x)=>
+   n+(x.unauthorized_mutation_proposal_count||0),0),
+  suggestion_history_is_not_user_authorization:true,
+  semantic_reviewer_must_assess_cumulative_direction_not_word_overlap:true,
   recommendation_trajectory_assessment:
     recommendations.some(x=>x.semantic_shift_candidate)?
       'SOURCE_LINKED_ASSISTANT_DIRECTION_SHIFT_CANDIDATES':
