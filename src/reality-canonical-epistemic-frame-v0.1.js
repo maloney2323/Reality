@@ -11,7 +11,7 @@ export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
  userGoalContinuityState=null,userGoalLifecycle=null,userGoalStateContract=null,
  controllingGoalStateContract=null,
- authorizedUserGoals=null,
+ authorizedUserGoals=null,authoritativeGoalGraph=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
  if(!governedSignal?.packet?.packet_id||!nonempty(continuityRootId)||
@@ -71,6 +71,19 @@ export function buildCanonicalEpistemicFrame({
     (authorizedUserGoals.active_goal_id!==null&&
      authorizedUserGoals.active_goal?.goal_id!==authorizedUserGoals.active_goal_id)))
    throw Error('CANONICAL_AUTHORIZED_GOAL_SCOPE_OR_AUTHORITY_INVALID');
+ if(authoritativeGoalGraph){
+  const active=authorizedUserGoals?.active_goal||null;
+  if(!authorizedUserGoals||
+    authoritativeGoalGraph.scope_root_id!==continuityRootId||
+    authoritativeGoalGraph.world_id!==(worldId||null)||
+    authoritativeGoalGraph.principal_id!==authorizedUserGoals.principal_id||
+    authoritativeGoalGraph.active_goal_id!==authorizedUserGoals.active_goal_id||
+    authoritativeGoalGraph.active_goal?.goal_id!==(active?.goal_id||undefined)&&
+      !(authoritativeGoalGraph.active_goal===null&&active===null)||
+    authoritativeGoalGraph.assistant_proposal_may_mutate_graph!==false||
+    authoritativeGoalGraph.action_execution_authorized!==false)
+   throw Error('CANONICAL_AUTHORITATIVE_GOAL_GRAPH_SCOPE_OR_AUTHORITY_INVALID');
+ }
  if(controllingGoalStateContract){
   const confirmed=authorizedUserGoals?.active_goal||null;
   if(!userGoalStateContract||
@@ -154,6 +167,7 @@ export function buildCanonicalEpistemicFrame({
   // Authenticated command receipts outrank reviewer-only goal proposals.
   controlling_user_goal_state_contract:controllingGoalStateContract?copy(controllingGoalStateContract):null,
   authoritative_user_goals:authorizedUserGoals?copy(authorizedUserGoals):null,
+  authoritative_goal_relationship_graph:authoritativeGoalGraph?copy(authoritativeGoalGraph):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
