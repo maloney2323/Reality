@@ -3,7 +3,7 @@
 // No assistant/reviewer/classifier can create, pause, cancel or complete goals.
 // An explicit user instruction changes conversation focus; it NEVER proves a
 // real-world task completed or authorizes external business execution.
-import {createHash} from 'node:crypto';
+import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 export const AUTHORITATIVE_USER_GOAL_LEDGER_VERSION='reality-authoritative-user-goal-ledger-v0.1';
 export const USER_GOAL_COMMANDS=Object.freeze([
@@ -11,6 +11,28 @@ export const USER_GOAL_COMMANDS=Object.freeze([
 ]);
 const ok=x=>typeof x==='string'&&x.trim().length>0;
 const digest=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+function canonical(x){
+ if(x===null||typeof x!=='object')return x;
+ if(Array.isArray(x))return x.map(canonical);
+ return Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])]));
+}
+function issuerMac(unsigned){
+ const secret=process.env.REALITY_CHAT_RECEIPT_HMAC_KEY;
+ if(typeof secret!=='string'||secret.length<16)
+  throw Error('GOAL_AUTHORITY_PRIVATE_ISSUER_SECRET_REQUIRED');
+ return createHmac('sha256',secret).update(
+  'reality:goal-user-message-attestation:v1:'+JSON.stringify(canonical(unsigned))
+ ).digest('hex');
+}
+function verifyServerIssuer(payload){
+ const signature=payload?.server_issuer_hmac;
+ if(typeof signature!=='string'||!/^[0-9a-f]{64}$/.test(signature))
+  throw Error('GOAL_AUTHORITY_USER_ISSUER_ATTESTATION_MISSING');
+ const {server_issuer_hmac,...unsigned}=payload;
+ const actual=Buffer.from(signature,'hex'),expected=Buffer.from(issuerMac(unsigned),'hex');
+ if(!timingSafeEqual(actual,expected))
+  throw Error('GOAL_AUTHORITY_USER_ISSUER_ATTESTATION_INVALID');
+}
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;};
 const goalId=(root,source)=>'user-goal:'+digest([root,source]).slice(0,32);
 const statusCode='AUTHORITATIVE_USER_GOAL_TRANSITION';
@@ -38,12 +60,14 @@ function scopedEvent(e,{continuityRootId,worldId,principalId}){
     e.continuity_root_id!==continuityRootId||
     p.external_execution_authorized!==false||
     p.source_verification!=='AUTHENTICATED_RLS_CHAT_USER_MESSAGE_READBACK'||
-    !ok(p.source_user_message_ref)||!ok(p.source_request_id)||
+    !/^supabase:reality_chat_messages:[0-9a-f-]{36}$/i.test(p.source_user_message_ref||'')||
+    !/^[0-9a-f-]{36}$/i.test(p.source_request_id||'')||
     !/^sha256:[0-9a-f]{64}$/.test(p.source_message_digest||'')||
     !commandSet.has(p.operation)||!ok(p.command_turn_id)||
     p.command_turn_id!==p.source_user_message_ref||
     !Number.isFinite(Date.parse(p.observed_at)))
   throw Error('USER_GOAL_AUTHORITY_EVENT_INTEGRITY_FAILURE');
+ verifyServerIssuer(p);
  return true;
 }
 export function projectAuthoritativeUserGoals({
@@ -134,7 +158,8 @@ export async function appendAuthenticatedUserGoalCommand({
   throw Error('USER_GOAL_AUTHORITY_DURABLE_LEDGER_REQUIRED');
  const root=continuityRuntime.spine.continuity_root_id;
  if(!ok(principalId)||!ok(sourceUserMessage)||sourceUserMessage.length>700||
-    !ok(sourceUserMessageRef)||!ok(sourceRequestId)||
+    !/^supabase:reality_chat_messages:[0-9a-f-]{36}$/i.test(sourceUserMessageRef||'')||
+    !/^[0-9a-f-]{36}$/i.test(sourceRequestId||'')||
     !commandSet.has(command)||!Number.isFinite(Date.parse(observedAt)))
   throw Error('USER_GOAL_AUTHORITY_EXPLICIT_USER_COMMAND_REQUIRED');
  const before=projectAuthoritativeUserGoals({
@@ -168,10 +193,11 @@ export async function appendAuthenticatedUserGoalCommand({
   goal_transition_authority_granted:true,
   ...nonExecution(),
  };
+ const attestedPayload={...payload,server_issuer_hmac:issuerMac(payload)};
  const event=await continuityRuntime.appendStage({
   stage:'VERIFICATION',entityId:goal_id,eventId,
   epistemicStatus:'OBSERVED',observedAt,
-  payload,
+  payload:attestedPayload,
   provenance:{source:authorizedSource,authenticated_user_id:principalId,
    source_message_ref:sourceUserMessageRef,source_digest:messageDigest},
  });
