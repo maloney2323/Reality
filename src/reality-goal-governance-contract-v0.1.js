@@ -162,8 +162,23 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
  required(digest(unsigned)===contract_hash,'GOAL_GOVERNANCE_CONTRACT_HASH_MISMATCH');
  required(contract.assistant_proposal?.canonical_frame_hash===canonicalFrame.frame_hash,
   'GOAL_GOVERNANCE_PROPOSAL_FRAME_MISMATCH');
- required(contract.assistant_proposal?.intended_state_mutations?.resource_mutations?.length===0,
+ const resourceChanges=contract.assistant_proposal?.intended_state_mutations?.resource_mutations;
+ const goalChanges=contract.assistant_proposal?.intended_state_mutations?.goal_mutations;
+ required(Array.isArray(resourceChanges)&&resourceChanges.length===0,
   'GOAL_GOVERNANCE_UNAUTHORIZED_RESOURCE_MUTATION');
+ required(Array.isArray(goalChanges)&&goalChanges.length<=20,
+  'GOAL_GOVERNANCE_UNTRUSTED_GOAL_MUTATIONS');
+ // Do not validate just the first candidate: every goal mutation must match
+ // the immutable current goal and remain an untrusted assistant proposal.
+ for(const mutation of goalChanges){
+  required(mutation?.type==='SHIFT_OBJECTIVE'&&
+   mutation.target_goal_id===contract.working_goal?.goal_id&&
+   mutation.authorization_state==='UNAUTHORIZED'&&
+   typeof mutation.proposal_quote==='string'&&mutation.proposal_quote.length>0,
+   'GOAL_GOVERNANCE_UNAUTHORIZED_GOAL_MUTATION');
+ }
+ required(contract.assistant_proposal.direction_evaluation?.introduces_new_unauthorized_objective===
+  (goalChanges.length>0),'GOAL_GOVERNANCE_UNTRUSTED_DIRECTION_EVALUATION');
  // A model proposal NEVER advances, pauses, abandons, or supersedes goals.
  // This governs **state mutation and execution**, not ordinary discussion.
  if(contract.state_mutation_allowed!==false||
