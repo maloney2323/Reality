@@ -115,7 +115,29 @@ export function buildAssistantGoalGovernance({
   review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'&&
   !userAuthorizedPivotReview);
  const goalId=controlling?.goal_id||working?.goal_evidence_id||original?.goal_evidence_id||null;
- const transition=assistantShiftCandidate&&goalId?
+ // Enforce the SAME existing reviewer-extracted future-work and strategy
+ // candidates, in addition to the immediate objective shift. No new judge.
+ const validUserSources=new Set([
+  ...(state?.user_goal_evidence||[]).map(x=>x.source_ref),
+  confirmed?.source_user_message_ref,
+ ].filter(valid));
+ const futureProposals=(semanticReview?.future_goal_proposals||[])
+  .filter(x=>x&&
+   ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.kind)&&
+   x.authorization_state==='ASSISTANT_PROPOSAL_ONLY'&&
+   valid(x.quote)&&modelAnswer.includes(x.quote)&&
+   valid(x.target_goal_source_ref)&&validUserSources.has(x.target_goal_source_ref)&&
+   valid(x.reason))
+  .slice(0,8).map(x=>({
+   type:x.kind,target_goal_id:goalId,
+   target_user_goal_source_ref:x.target_goal_source_ref,
+   rationale:String(x.reason).slice(0,350),
+   proposal_quote:String(x.quote).slice(0,350),
+   authorized_by:'ASSISTANT_PROPOSAL',
+   authorization_state:'UNAUTHORIZED',
+  }));
+ const anyAssistantGoalChange=assistantShiftCandidate||futureProposals.length>0;
+ const transition=anyAssistantGoalChange&&goalId?
   createGoalTransitionContract({
    goalId,scopeRootId:canonicalFrame.continuity_root_id,
    worldId:canonicalFrame.world_id,
@@ -139,21 +161,25 @@ export function buildAssistantGoalGovernance({
   proposed_response_text:modelAnswer.slice(0,5200),
   intended_state_mutations:{
    resource_mutations:[],
-   goal_mutations:proposedMutation?[proposedMutation]:[],
+   goal_mutations:[...(proposedMutation?[proposedMutation]:[]),...futureProposals],
   },
   direction_evaluation:{
    aligns_with_active_objective:reviewerStatus?
     review.answer_alignment==='ON_USER_DIRECTED_OBJECTIVE':null,
-   introduces_new_unauthorized_objective:assistantShiftCandidate,
+   introduces_new_unauthorized_objective:anyAssistantGoalChange,
+   source_anchored_future_proposal_count:futureProposals.length,
    drops_existing_obligation:null, // Not inferable from goal reviewer alone.
    reviewer_is_ground_truth:false,
   },
  };
- const releaseContainsFlaggedQuote=assistantShiftCandidate&&
-  finalAnswer.includes(exactQuote);
- const disposition=assistantShiftCandidate?
-  (releaseContainsFlaggedQuote?'GOAL_SHIFT_CANDIDATE_IN_RELEASE':
-   'FLAGGED_PHRASE_ABSENT_FROM_RELEASE'):
+ const blockedQuotes=[...new Set([
+  ...(proposedMutation?[proposedMutation.proposal_quote]:[]),
+  ...futureProposals.map(x=>x.proposal_quote),
+ ])];
+ const persistedBlockedQuotes=blockedQuotes.filter(x=>finalAnswer.includes(x));
+ const disposition=anyAssistantGoalChange?
+  (persistedBlockedQuotes.length?'ASSISTANT_GOAL_PROPOSAL_QUOTE_REMAINS_IN_RELEASE':
+   'ASSISTANT_GOAL_PROPOSAL_QUOTES_REMOVED_FROM_RELEASE'):
   reviewerStatus?'NO_UNAUTHORIZED_GOAL_SHIFT_IDENTIFIED_BY_REVIEWER':
    'GOAL_SHIFT_NOT_ASSESSED';
  const base={
@@ -205,11 +231,16 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
  // Do not validate just the first candidate: every goal mutation must match
  // the immutable current goal and remain an untrusted assistant proposal.
  for(const mutation of goalChanges){
-  required(mutation?.type==='SHIFT_OBJECTIVE'&&
+  required(['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(mutation?.type)&&
    mutation.target_goal_id===contract.working_goal?.goal_id&&
    mutation.authorized_by==='ASSISTANT_PROPOSAL'&&
    mutation.authorization_state==='UNAUTHORIZED'&&
-   typeof mutation.proposal_quote==='string'&&mutation.proposal_quote.length>0,
+   typeof mutation.proposal_quote==='string'&&mutation.proposal_quote.length>0&&
+   (!mutation.target_user_goal_source_ref||
+     canonicalFrame.user_goal_continuity_state?.user_goal_evidence?.some(x=>
+      x.source_ref===mutation.target_user_goal_source_ref)||
+     canonicalFrame.authoritative_user_goals?.active_goal?.source_user_message_ref===
+      mutation.target_user_goal_source_ref),
    'GOAL_GOVERNANCE_UNAUTHORIZED_GOAL_MUTATION');
  }
  required(contract.assistant_proposal.direction_evaluation?.introduces_new_unauthorized_objective===
