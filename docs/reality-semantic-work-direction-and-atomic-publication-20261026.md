@@ -1,3 +1,5 @@
+> **October 26 update:** The isolated benchmark Supabase migration has since been applied and the experimental preview atomic publication flag enabled. The statements below about SQL being *not yet applied* describe an earlier checkpoint, not the current configuration. See [current verified rollout checkpoint](./reality-assistant-posture-and-atomic-publication-installed-20261026.md). No concurrent-request behavior or semantic drift improvement has been independently tested.
+
 # Reality: longitudinal work direction + atomic goal publication (Oct 26, 2026)
 
 **Branch:** draft PR #140. **Status:** code changes staged; no new paid model calls, manual benchmark runs, production deployment, or live DDL applied. Founder has paused tests pending foundational drift architecture completion.
