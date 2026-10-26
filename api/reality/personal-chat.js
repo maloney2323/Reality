@@ -146,6 +146,7 @@ export default async function handler(req,res){
      user_goal_continuity:result.reliability.user_goal_continuity||null,
      assistant_goal_governance:result.reliability.goal_governance||null,
      goal_authority:result.reliability.goal_authority||null,
+     authoritative_user_goal_state:result.reliability.goal_authority_contracts?.authorized_user_goal_state||null,
      semantic_review_status:result.reliability.semantic_review?.status||'NOT_ASSESSED',
      semantic_review_provenance_status:result.reliability.semantic_review?.provenance_review_status||'NOT_ASSESSED',
      semantic_issue_candidates:(result.reliability.semantic_review?.issues||[]).map(issue=>({
