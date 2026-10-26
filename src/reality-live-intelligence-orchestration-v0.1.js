@@ -17,6 +17,7 @@ import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation } 
 import {
  projectGoalStateContract,projectGoalTransitionContract,
  projectAssistantGoalProposal,enforceGoalTransitionBoundary,
+ adjudicateRevisedGoalAlignment,
  pendingGoalAuthorizationResponse,pendingGoalCompletionEvidenceResponse,
 } from './reality-goal-authority-contracts-v0.1.js';
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
@@ -828,11 +829,31 @@ export async function runLiveIntelligenceOrchestration({
       }catch(error){
         retryFailure=String(error?.message||'UNKNOWN').slice(0,110);
       }
+      // An earlier off-goal answer cannot be "fixed" merely because a new
+      // reviewer output omits the old warning. Before publication, the
+      // REVISED answer must be compared with the SAME user-owned goal.
+      const goalRevisionRequired=Boolean(
+        currentAssistantRedirectionBlocked||userObjectiveNotAddressed||
+        releaseRelevantIssues.some(x=>x.kind==='WRONG_TASK'));
+      const revisedGoalAlignment=goalRevisionRequired?
+        adjudicateRevisedGoalAlignment({
+          goalState:controllingGoalStateContract,
+          revisionText:String(retry?.answer||''),
+          revisionReview:retryReview?.review||null,
+          currentUserSourceRef:governedSignal.packet.packet_id,
+          knownUserGoalSourceRefs:[
+            ...userGoalContinuityState.user_goal_evidence.map(x=>x.source_ref),
+            ...(goalLifecycle.paused_goal_candidates||[]).map(x=>x.source_ref),
+            ...(goalLifecycle.dormant_goal_candidates||[]).map(x=>x.source_ref),
+          ],
+        }):null;
       const secondReviewPass=Boolean(retryReview?.review &&
         retryReview.review.addresses_current_request===true &&
         retryReview.review.issues.length===0 &&
         retryReview.review.unassessed_claims.length===0 &&
-        (!deterministicReview||deterministicReview.codes.length===0));
+        (!deterministicReview||deterministicReview.codes.length===0) &&
+        (!goalRevisionRequired||
+          revisedGoalAlignment?.can_admit_revised_answer_as_candidate===true));
       const safeToRelease=secondReviewPass &&
         (!continuousReliability.model_output_quarantined ||
           provedSourceConflict);
@@ -866,6 +887,8 @@ export async function runLiveIntelligenceOrchestration({
           source_adjudication:sourceAdjudication,
           post_repair_issues:retryReview?.review?.issues||null,
           post_repair_source_violation_codes:deterministicReview?.codes||null,
+          post_repair_goal_alignment:revisedGoalAlignment,
+          reviewer_issue_disappeared_does_not_establish_goal_alignment:true,
           original_output_digest:continuousReliability.receipt_id,
           disposition:safeToRelease?'CORRECTION_CANDIDATE_CLEARED_NOT_INDEPENDENTLY_VERIFIED':
             'CORRECTION_NOT_VERIFIED',
@@ -902,6 +925,7 @@ export async function runLiveIntelligenceOrchestration({
         first_review_id:semanticFirst?.response_id||null,
         second_review_id:retryReview?.response_id||null,
         source_violation_codes:deterministicReview?.codes||null,
+        revised_goal_alignment:revisedGoalAlignment,
         receipt_id:correctionReceipt.event_id,
         released_evidence_notice:unresolvedEvidenceNotice?.qualified===true,
         qualification_issue_quotes:unresolvedEvidenceNotice?.issue_quotes||[],
