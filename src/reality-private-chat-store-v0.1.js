@@ -75,3 +75,42 @@ export async function listPrivateConversations(session,{fetchImpl=fetch}={}){
  }
  return Array.from(unique.values()).slice(0,50);
 }
+
+
+// Final publication happens inside ONE PostgreSQL transaction that locks
+// the same principal/conversation resource as each authorized goal transition.
+// Requires the reviewed isolated-preview SQL migration. Never downgrade to
+// the two-request check when this atomic path was selected.
+export async function publishPrivateAssistantAtomically(
+ session,{conversationId,requestId,text,expectedRevision,expectedLastEventId=null},
+ {fetchImpl=fetch}={}
+){
+ if(!validUuid(conversationId)||!validUuid(requestId)||
+    typeof text!=='string'||!text.trim()||text.length>12000||
+    !Number.isSafeInteger(expectedRevision)||expectedRevision<0||
+    (expectedLastEventId!==null&&!validUuid(expectedLastEventId)))
+  throw Object.assign(new Error('CHAT_ATOMIC_PUBLICATION_INPUT_INVALID'),{status:400});
+ const response=await fetchImpl(
+  session.config.url+'/rest/v1/rpc/reality_publish_assistant_if_goal_current',{
+    method:'POST',
+    headers:{apikey:session.config.key,authorization:'Bearer '+session.access_token,
+      accept:'application/json','content-type':'application/json'},
+    body:JSON.stringify({
+      p_conversation_id:conversationId,p_request_id:requestId,
+      p_content:text,p_expected_goal_revision:expectedRevision,
+      p_expected_last_goal_event_id:expectedLastEventId,
+    }),
+  });
+ const payload=await response.json().catch(()=>null);
+ if(!response.ok){
+  const message=String(payload?.message||'');
+  const stale=message.includes('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN');
+  throw Object.assign(new Error(stale?
+    'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN':
+    'CHAT_ATOMIC_PUBLICATION_DATABASE_UNAVAILABLE'),{status:stale?409:503});
+ }
+ if(!validUuid(payload))
+  throw Object.assign(new Error('CHAT_ATOMIC_PUBLICATION_RECEIPT_MISSING'),{status:503});
+ return {source_ref:'supabase:reality_chat_messages:'+payload,
+   atomic_goal_revision_checked:true};
+}
