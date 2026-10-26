@@ -41,7 +41,15 @@ async function evaluate({message,prior=history,answer,trajectoryFactory}){
      source_ref:x.source_ref,clause_id:x.clause_id,relation:'NOT_MENTIONED',
      answer_quote:'',verified_source_ref:'',reason:'Not referred to in response.',
     })),
-    goal_trajectory_review:goal,
+    goal_trajectory_review:{
+      return_intent:'NOT_RETURN_REQUEST',return_request_quote:'',...goal,
+    },
+    goal_lifecycle_review:{
+      relation:'NO_LIFECYCLE_CHANGE',speaker:'NONE',
+      target_goal_source_ref:'',source_quote:'',
+      reason:'No user goal completion or abandonment asserted.',
+    },
+    future_goal_proposals:[],
    }),
   }),{status:200});
  };
