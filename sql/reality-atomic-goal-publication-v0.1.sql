@@ -1,4 +1,4 @@
--- Proposed isolated-preview-only migration. NOT applied to production.
+-- Installed on isolated benchmark Supabase project 2026-10-26; NOT production.
 -- Execute as ONE transaction/migration after reviewing the database target.
 -- Ensures authenticated user turn admission, explicit user goal transitions,
 -- and assistant publication share the SAME per-owner/conversation lock.
