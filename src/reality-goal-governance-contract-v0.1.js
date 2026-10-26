@@ -74,6 +74,14 @@ export function buildAssistantGoalGovernance({
  const working=lifecycle?.working_goal||null;
  const controlling=canonicalFrame.controlling_user_goal_state_contract||null;
  const confirmed=canonicalFrame.authoritative_user_goals?.active_goal||null;
+ const goalGraph=canonicalFrame.authoritative_goal_relationship_graph||null;
+ if(goalGraph&&(
+    goalGraph.active_goal_id!==(confirmed?.goal_id||null)||
+    goalGraph.scope_root_id!==canonicalFrame.continuity_root_id||
+    goalGraph.world_id!==canonicalFrame.world_id||
+    goalGraph.assistant_proposal_may_mutate_graph!==false||
+    goalGraph.action_execution_authorized!==false))
+   throw Error('GOAL_GOVERNANCE_AUTHENTICATED_GOAL_GRAPH_MISMATCH');
  const noActiveGoal=Boolean(canonicalFrame.authoritative_user_goals?.transition_count>0&&
    canonicalFrame.authoritative_user_goals?.active_goal_id===null);
  // A user PAUSE/ABANDON command is also authoritative. In particular a
@@ -174,6 +182,13 @@ export function buildAssistantGoalGovernance({
   proposal_id:digest([canonicalFrame.frame_hash,modelResponseId||null,modelAnswer]),
   target_turn_id:canonicalFrame.current_user_packet_id,
   canonical_frame_hash:canonicalFrame.frame_hash,
+  user_goal_relationship_graph:{
+    authority:goalGraph?.authority_origin||'NO_AUTHENTICATED_GOAL_GRAPH',
+    active_goal_id:goalGraph?.active_goal_id||null,
+    source_verified_active_parent_goal_ids:goalGraph?.active_ancestor_goal_ids||[],
+    paused_or_dormant_goal_ids:(goalGraph?.paused_or_dormant_goals||[]).map(x=>x.goal_id),
+    client_may_mutate_graph:false,semantic_model_may_authorize_mutation:false,
+  },
   proposed_response_text:modelAnswer.slice(0,5200),
   optional_advice_not_goal_mutations:permittedAdvice,
   intended_state_mutations:{
@@ -239,6 +254,17 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
  required(digest(unsigned)===contract_hash,'GOAL_GOVERNANCE_CONTRACT_HASH_MISMATCH');
  required(contract.assistant_proposal?.canonical_frame_hash===canonicalFrame.frame_hash,
   'GOAL_GOVERNANCE_PROPOSAL_FRAME_MISMATCH');
+ const projection=contract.assistant_proposal?.user_goal_relationship_graph;
+ const actualGraph=canonicalFrame.authoritative_goal_relationship_graph;
+ required(Boolean(projection)&&
+  projection.active_goal_id===(actualGraph?.active_goal_id||null)&&
+  JSON.stringify(projection.source_verified_active_parent_goal_ids)===
+   JSON.stringify(actualGraph?.active_ancestor_goal_ids||[])&&
+  JSON.stringify(projection.paused_or_dormant_goal_ids)===
+   JSON.stringify((actualGraph?.paused_or_dormant_goals||[]).map(x=>x.goal_id))&&
+  projection.client_may_mutate_graph===false&&
+  projection.semantic_model_may_authorize_mutation===false,
+  'GOAL_GOVERNANCE_ASSISTANT_GRAPH_MUTATION_OR_SCOPE_MISMATCH');
  const resourceChanges=contract.assistant_proposal?.intended_state_mutations?.resource_mutations;
  const goalChanges=contract.assistant_proposal?.intended_state_mutations?.goal_mutations;
  required(Array.isArray(resourceChanges)&&resourceChanges.length===0,
