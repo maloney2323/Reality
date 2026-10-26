@@ -6,7 +6,12 @@ import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-bo
 import {createHash} from 'node:crypto';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
-import {appendAuthenticatedUserGoalCommand} from '../../src/reality-authoritative-user-goal-ledger-v0.1.js';
+import {appendAuthenticatedUserGoalCommand,projectAuthoritativeUserGoals,
+ compareAuthenticatedGoalSnapshots} from '../../src/reality-authoritative-user-goal-ledger-v0.1.js';
+import {createUniversePostgresPersistence}
+ from '../../src/reality-universe-postgres-persistence-v0.1.js';
+import {createContinuitySpine}
+ from '../../src/reality-continuity-spine-v2.0.js';
 export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
@@ -132,6 +137,35 @@ export default async function handler(req,res){
   if(result?.reliability?.canonical_epistemic_state?.status!=='PERSISTED_AND_READBACK_VERIFIED'||
      result?.reliability?.readback_verified!==true)
    fail('CHAT_UNIFIED_RELIABILITY_READBACK_NOT_VERIFIED',503);
+  // Defense-in-depth at the ACTUAL authenticated chat publication boundary.
+  // Even a correct review of the first-pass goal state is stale when another
+  // authenticated user-goal command changed the active objective meanwhile.
+  // Always validate from an independently reconstructed, HMAC-attested
+  // Continuity readback; never accept the client's or model's goal claims.
+  const goalAtGeneration=result?.reliability?.goal_authority_contracts
+    ?.authorized_user_goal_state;
+  if(!goalAtGeneration)
+   fail('CHAT_GOAL_AUTHORITY_SNAPSHOT_MISSING',503);
+  const authoritySpine=createContinuitySpine({
+    continuityRootId:scopedRoot,worldlineId:scopedRoot,
+    subjectId:session.user_id,
+  });
+  const goalHistory=await createUniversePostgresPersistence({
+    ...isolated,
+  }).reconstruct({
+    continuityRootId:authoritySpine.continuity_root_id,
+    worldlineId:authoritySpine.worldline_id,
+  });
+  const currentGoal=projectAuthoritativeUserGoals({
+    continuityHistory:goalHistory,
+    continuityRootId:authoritySpine.continuity_root_id,
+    worldId:scopedRoot,principalId:session.user_id,
+  });
+  const publicationGoal=compareAuthenticatedGoalSnapshots({
+    expected:goalAtGeneration,current:currentGoal,
+  });
+  if(publicationGoal.status!=='USER_GOAL_SNAPSHOT_CURRENT')
+   fail('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN',409);
   await recordPrivateMessage(session,{conversationId,requestId,role:'assistant',text:answer});
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
