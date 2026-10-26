@@ -7,7 +7,7 @@ const VALID_GOAL_STATUS='REVIEWED_GOAL_TRAJECTORY_CANDIDATE';
 const validRef=x=>typeof x==='string'&&x.trim().length>0;
 export function assessGoalDriftCoverage({
  semanticReview=null,semanticReviewStatus='NOT_ATTEMPTED',
- userGoalTrajectory=null,historyMayBeIncomplete=false,
+ userGoalTrajectory=null,authoritativeGoalGraph=null,historyMayBeIncomplete=false,
  trustedConversationHistory=false,findings=[],
 }={}){
  if(!Array.isArray(findings))throw Error('GOAL_DRIFT_COVERAGE_FINDINGS_INVALID');
@@ -19,7 +19,10 @@ export function assessGoalDriftCoverage({
  const reviewerStatus=semanticReview?.status||semanticReviewStatus||'NOT_ATTEMPTED';
  const reviewCompleted=validGoal&&
    ['REVIEWED_CANDIDATES_NOT_TRUTH','REVIEWED_PARTIAL_COVERAGE'].includes(reviewerStatus);
- const missingEvidence=!trustedConversationHistory||Boolean(historyMayBeIncomplete)||
+ const goalGraphHasUnresolvedAncestry=Boolean(
+   authoritativeGoalGraph?.incomplete_parent_relations?.length);
+ const missingEvidence=goalGraphHasUnresolvedAncestry||
+   !trustedConversationHistory||Boolean(historyMayBeIncomplete)||
    Boolean(userGoalTrajectory?.older_user_directions_omitted)||
    Boolean(userGoalTrajectory?.older_assistant_behavior_omitted);
  const semanticCandidate=validGoal&&goal.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE';
@@ -41,6 +44,8 @@ export function assessGoalDriftCoverage({
    reasons.push('OLDER_USER_DIRECTIONS_OMITTED');
  if(userGoalTrajectory?.older_assistant_behavior_omitted)
    reasons.push('OLDER_ASSISTANT_RESPONSES_OMITTED');
+ if(goalGraphHasUnresolvedAncestry)
+   reasons.push('AUTHORITATIVE_PARENT_GOAL_RELATION_INCOMPLETE');
  if(!fullReviewerClaims)reasons.push('SEMANTIC_REVIEW_PARTIAL_OR_NOT_COMPLETED');
  if(goalAmbiguous)reasons.push('GOAL_DIRECTION_AMBIGUOUS');
  if(anyCandidate)reasons.push('SOURCE_LINKED_CANDIDATE_REQUIRES_INDEPENDENT_GRADING');
