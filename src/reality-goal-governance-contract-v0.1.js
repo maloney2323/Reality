@@ -375,6 +375,8 @@ export function adjudicateFinalAssistantGoalRelease({
   canonical_frame_hash:canonicalFrame.frame_hash,
   continuity_root_id:canonicalFrame.continuity_root_id,
   world_id:canonicalFrame.world_id,
+  controlling_user_goal_source_ref:canonicalFrame.controlling_user_goal_state_contract?.provenance?.origin_turn_id||null,
+  current_user_packet_id:canonicalFrame.current_user_packet_id,
   original_answer_hash:digest(originalAnswer),
   candidate_final_answer_hash:digest(finalAnswer),
   original_governance_contract_hash:originalContract.contract_hash,
