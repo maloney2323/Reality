@@ -108,10 +108,14 @@ export async function publishPrivateAssistantAtomically(
  const payload=await response.json().catch(()=>null);
  if(!response.ok){
   const message=String(payload?.message||'');
-  const stale=message.includes('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN');
-  throw Object.assign(new Error(stale?
-    'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN':
-    'CHAT_ATOMIC_PUBLICATION_DATABASE_UNAVAILABLE'),{status:stale?409:503});
+  const newer=message.includes('CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN');
+  const changed=message.includes('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN');
+  const duplicate=message.includes('CHAT_ATOMIC_ASSISTANT_ALREADY_PUBLISHED');
+  const code=newer?'CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN':
+    changed?'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN':
+    duplicate?'CHAT_ATOMIC_ASSISTANT_ALREADY_PUBLISHED':
+    'CHAT_ATOMIC_PUBLICATION_DATABASE_UNAVAILABLE';
+  throw Object.assign(new Error(code),{status:newer||changed||duplicate?409:503});
  }
  if(!validUuid(payload))
   throw Object.assign(new Error('CHAT_ATOMIC_PUBLICATION_RECEIPT_MISSING'),{status:503});
