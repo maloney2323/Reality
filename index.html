@@ -95,6 +95,13 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
   <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
+  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
+   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
+   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
+   <option value="START_DETOUR">Temporarily detour from my active objective</option>
+  </select>
+  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
   <button id="privateSend" type="button">Send to Reality</button>
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
@@ -502,13 +509,16 @@ setInterval(refreshSavedShiftHome,300000);
  };
  el('privateSend').onclick=async()=>{
   const value=el('privatePrompt').value.trim();if(!value)return;
+  const goalCommand=el('privateGoalCommand').value||null;
   el('privateSend').disabled=true;status('Reality is working with saved context…');
   try{
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({conversation_id:conversationId(),request_id:crypto.randomUUID(),message:value})});
+    body:JSON.stringify({conversation_id:conversationId(),request_id:crypto.randomUUID(),
+      message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
    el('privatePrompt').value='';
+   el('privateGoalCommand').value='';
    await loadSaved();await loadConversations();
    const reliability=data.reliability||{};
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
