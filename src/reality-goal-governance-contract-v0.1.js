@@ -263,3 +263,121 @@ export function verifyGoalGovernanceBeforeStateMutation({contract,canonicalFrame
   contract_hash:contract.contract_hash,
  });
 }
+
+
+/**
+ * Final-answer release gate: a blocked assistant-origin direction must not
+ * survive in published *text*, even though it cannot mutate the goal ledger.
+ * Reuse the SAME goal governance contract and reviewer already in Reality.
+ * This proves an observed, source-anchored candidate was contained; NOT that
+ * the probabilistic semantic reviewer detected every instance of drift.
+ */
+export function adjudicateFinalAssistantGoalRelease({
+ canonicalFrame,originalAnswer,finalAnswer,
+ originalReview=null,postRevisionReview=null,
+ postRevisionReviewedAnswer=null,observedAt,
+}={}){
+ required(canonicalFrame?.frame_hash&&valid(originalAnswer)&&
+  typeof finalAnswer==='string'&&valid(finalAnswer)&&
+  Number.isFinite(Date.parse(observedAt)),
+  'FINAL_GOAL_RELEASE_EVIDENCE_REQUIRED');
+ const originalContract=buildAssistantGoalGovernance({
+  canonicalFrame,modelAnswer:originalAnswer,finalAnswer,
+  semanticReview:originalReview,observedAt,
+ });
+ verifyGoalGovernanceBeforeStateMutation({
+  contract:originalContract,canonicalFrame,
+ });
+ const originalMutations=originalContract.assistant_proposal.intended_state_mutations.goal_mutations;
+ const originalWrongTaskQuotes=(originalReview?.issues||[])
+  .filter(x=>x.kind==='WRONG_TASK'&&valid(x.quote)&&originalAnswer.includes(x.quote))
+  .map(x=>x.quote);
+ const originalBlockedQuotes=[...new Set([
+  ...originalMutations.map(x=>x.proposal_quote),
+  ...originalWrongTaskQuotes,
+ ])].filter(valid);
+ const stillPresent=originalBlockedQuotes.filter(x=>finalAnswer.includes(x));
+ const textChanged=finalAnswer!==originalAnswer;
+ // A post-revision review is admissible ONLY for the exact actual final
+ // text it reviewed; no "good" review for a different answer can clear it.
+ const revisionReviewBound=textChanged&&postRevisionReview &&
+  postRevisionReviewedAnswer===finalAnswer &&
+  postRevisionReview.goal_trajectory_review?.status==='REVIEWED_GOAL_TRAJECTORY_CANDIDATE';
+ const lastReview=textChanged?
+  (revisionReviewBound?postRevisionReview:null):originalReview;
+ const lastContract=buildAssistantGoalGovernance({
+  canonicalFrame,modelAnswer:finalAnswer,finalAnswer,
+  semanticReview:lastReview,observedAt,
+ });
+ verifyGoalGovernanceBeforeStateMutation({
+  contract:lastContract,canonicalFrame,
+ });
+ const finalMutations=lastContract.assistant_proposal.intended_state_mutations.goal_mutations;
+ const lastWrongTaskQuotes=(lastReview?.issues||[])
+  .filter(x=>x.kind==='WRONG_TASK'&&valid(x.quote)&&finalAnswer.includes(x.quote))
+  .map(x=>x.quote);
+ const finalReviewOffGoal=lastReview?.goal_trajectory_review?.status===
+   'REVIEWED_GOAL_TRAJECTORY_CANDIDATE'&&
+  lastReview.goal_trajectory_review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE';
+ const needsVerifiedRevision=originalBlockedQuotes.length>0;
+ const finalHasDirectionRisk=finalMutations.length>0||
+  lastWrongTaskQuotes.length>0||finalReviewOffGoal;
+ const verdict=stillPresent.length?
+   'BLOCKED_ORIGINAL_OFF_GOAL_TEXT_SURVIVED':
+   finalHasDirectionRisk?
+   'BLOCKED_NEW_OR_UNRESOLVED_FINAL_DIRECTION':
+   needsVerifiedRevision&&(!textChanged||!revisionReviewBound)?
+   'BLOCKED_GOAL_REVISION_NOT_REVIEWED':
+   needsVerifiedRevision&&(lastReview?.addresses_current_request!==true||
+     lastReview?.issues?.length>0||
+     lastReview?.unassessed_claims?.length>0||
+     lastReview?.goal_trajectory_review?.answer_alignment!=='ON_USER_DIRECTED_OBJECTIVE')?
+   'BLOCKED_GOAL_REVISION_NOT_CLEARED':
+   'NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE';
+ const accepted=verdict==='NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE';
+ const contract={
+  version:GOAL_GOVERNANCE_CONTRACT_VERSION,
+  gate_kind:'FINAL_ASSISTANT_DIRECTION_PUBLICATION',
+  canonical_frame_hash:canonicalFrame.frame_hash,
+  continuity_root_id:canonicalFrame.continuity_root_id,
+  world_id:canonicalFrame.world_id,
+  original_answer_hash:digest(originalAnswer),
+  candidate_final_answer_hash:digest(finalAnswer),
+  original_governance_contract_hash:originalContract.contract_hash,
+  final_governance_contract_hash:lastContract.contract_hash,
+  original_blocked_quotes:originalBlockedQuotes.map(x=>x.slice(0,350)),
+  original_blocked_quotes_still_in_release:stillPresent.map(x=>x.slice(0,350)),
+  final_goal_mutation_count:finalMutations.length,
+  final_wrong_task_quotes:lastWrongTaskQuotes.map(x=>x.slice(0,350)),
+  changed_after_initial_review:textChanged,
+  second_semantic_review_bound_to_exact_final_text:Boolean(revisionReviewBound),
+  final_goal_review_assessment:lastReview?.goal_trajectory_review?.answer_alignment||'NOT_ASSESSED',
+  final_semantic_coverage:lastReview?.status||'NOT_ASSESSED',
+  status:verdict,
+  candidate_answer_release_allowed:accepted,
+  claim_all_drift_was_detected:false,
+  semantic_reviewer_independently_correct:false,
+  user_goal_mutated:false,
+  external_execution_authorized:false,
+ };
+ return freeze({...contract,decision_hash:digest(contract)});
+}
+export function withheldAssistantDirectionAnswer({canonicalFrame}={}){
+ required(canonicalFrame?.frame_hash&&valid(canonicalFrame.current_user_packet_id),
+  'GOAL_PUBLICATION_FALLBACK_FRAME_REQUIRED');
+ const goal=canonicalFrame.controlling_user_goal_state_contract;
+ const current=canonicalFrame.user_goal_continuity_state?.user_goal_evidence
+  ?.find(x=>x.goal_evidence_id===
+    canonicalFrame.user_goal_continuity_state?.current_user_evidence_id);
+ // Built entirely from source-bound *user* evidence; never quote rejected
+ // assistant suggestions or echo unsafe machine instructions.
+ const sourceText=valid(current?.text)?current.text:
+   valid(goal?.description)?goal.description:null;
+ return [
+  'Reality withheld an answer because it could not clear an assistant-origin change of direction.',
+  sourceText?'Your user-stated direction remains: "'+sourceText.slice(0,240)+'".':
+   'The current user direction could not be independently resolved.',
+  'The assistant has not changed your objective or performed an external action.',
+  'Please confirm how you want to proceed if the direction is different.',
+ ].join(' ');
+}
