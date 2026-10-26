@@ -1,7 +1,8 @@
 -- Proposed isolated-preview-only migration. NOT applied to production.
 -- Execute as ONE transaction/migration after reviewing the database target.
--- Ensures an authenticated user goal transition and a proposed assistant
--- publication serialize on the same per-user/per-conversation transaction lock.
+-- Ensures authenticated user turn admission, explicit user goal transitions,
+-- and assistant publication share the SAME per-owner/conversation lock.
+-- An older answer cannot be published after a newer user request commits.
 -- The existing universe_events ledger remains the ONLY goal authority history;
 -- this private table is a derived revision clock, NOT a second goal database.
 begin;
@@ -14,6 +15,10 @@ create table if not exists reality_internal.goal_publication_epochs (
   conversation_id uuid not null,
   revision bigint not null default 0 check (revision >= 0),
   last_transition_event_id uuid,
+  -- A separate monotonic clock for ordinary user turn admission. This is
+  -- NOT a second conversation store; the actual messages remain authoritative.
+  user_message_revision bigint not null default 0 check (user_message_revision>=0),
+  latest_user_request_id uuid,
   updated_at timestamptz not null default now(),
   primary key (user_id,conversation_id)
 );
@@ -24,6 +29,7 @@ revoke all on reality_internal.goal_publication_epochs from public, anon, authen
 -- Historical events are counted only if their user-message source actually
 -- exists in the owner-scoped private chat table.
 lock table public.universe_events in share row exclusive mode;
+lock table public.reality_chat_messages in share row exclusive mode;
 
 insert into reality_internal.goal_publication_epochs
  (user_id,conversation_id,revision,last_transition_event_id)
@@ -40,6 +46,52 @@ where e.payload->>'event_type'='AUTHORITATIVE_USER_GOAL_TRANSITION'
   and e.payload->>'continuity_root_id'=e.continuity_root_id::text
 group by m.user_id,m.conversation_id
 on conflict (user_id,conversation_id) do nothing;
+
+-- Bootstrap the derived user-turn clock from existing committed chat messages.
+-- Future inserts use the actual serialized lock order, not created_at guesses.
+insert into reality_internal.goal_publication_epochs as epoch
+ (user_id,conversation_id,user_message_revision,latest_user_request_id)
+select user_id,conversation_id,
+       count(*) filter (where role='user')::bigint,
+       (array_agg(request_id order by created_at desc,id desc)
+          filter (where role='user'))[1]
+from public.reality_chat_messages
+group by user_id,conversation_id
+on conflict (user_id,conversation_id) do update
+set user_message_revision=excluded.user_message_revision,
+    latest_user_request_id=excluded.latest_user_request_id,
+    updated_at=pg_catalog.now()
+where epoch.user_message_revision=0 and epoch.latest_user_request_id is null;
+
+-- Any authenticated USER admission is serialized on the SAME lock as goal
+-- changes and assistant publication. The latest admitted request ID comes
+-- from lock acquisition/commit order, never a racing timestamp comparison.
+create or replace function reality_internal.bump_user_turn_publication_epoch()
+returns trigger language plpgsql security definer
+set search_path='' as $
+begin
+ if new.role <> 'user' then return new; end if;
+ perform pg_catalog.pg_advisory_xact_lock(
+   pg_catalog.hashtextextended('reality-goal-pub-v1:'||
+    new.user_id::text||':'||new.conversation_id::text,0));
+ insert into reality_internal.goal_publication_epochs
+   (user_id,conversation_id,user_message_revision,latest_user_request_id,updated_at)
+ values(new.user_id,new.conversation_id,1,new.request_id,pg_catalog.now())
+ on conflict (user_id,conversation_id)
+   do update set user_message_revision=goal_publication_epochs.user_message_revision+1,
+     latest_user_request_id=excluded.latest_user_request_id,
+     updated_at=excluded.updated_at;
+ return new;
+end
+$;
+revoke all on function reality_internal.bump_user_turn_publication_epoch()
+ from public,anon,authenticated;
+drop trigger if exists reality_user_turn_publication_epoch_bump
+ on public.reality_chat_messages;
+create trigger reality_user_turn_publication_epoch_bump
+ after insert on public.reality_chat_messages
+ for each row when (new.role='user')
+ execute function reality_internal.bump_user_turn_publication_epoch();
 
 -- Trigger executes inside the existing authoritative-goal event INSERT
 -- transaction; it cannot be bypassed by a racing chat publication.
@@ -115,6 +167,7 @@ declare
   caller_id uuid := p_user_id;
   current_revision bigint;
   last_event uuid;
+  latest_user_request uuid;
   inserted_id uuid;
 begin
   if caller_id is null or p_conversation_id is null or
@@ -127,13 +180,19 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended('reality-goal-pub-v1:'||
       caller_id::text||':'||p_conversation_id::text,0));
-  select e.revision,e.last_transition_event_id
-    into current_revision,last_event
+  select e.revision,e.last_transition_event_id,e.latest_user_request_id
+    into current_revision,last_event,latest_user_request
     from reality_internal.goal_publication_epochs e
    where e.user_id=caller_id and e.conversation_id=p_conversation_id;
   if coalesce(current_revision,0)<>p_expected_goal_revision or
      last_event is distinct from p_expected_last_goal_event_id then
     raise exception 'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN';
+  end if;
+  -- Another instruction/goal command arriving while the model was thinking
+  -- invalidates an older request even when no explicit goal event was yet
+  -- committed. Both user admission and publication hold this same lock.
+  if latest_user_request is distinct from p_request_id then
+    raise exception 'CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN';
   end if;
   if not exists(
     select 1 from public.reality_chat_messages m
