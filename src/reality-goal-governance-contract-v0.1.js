@@ -319,7 +319,6 @@ export function adjudicateFinalAssistantGoalRelease({
  const finalReviewOffGoal=lastReview?.goal_trajectory_review?.status===
    'REVIEWED_GOAL_TRAJECTORY_CANDIDATE'&&
   lastReview.goal_trajectory_review.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE';
- const needsVerifiedRevision=originalBlockedQuotes.length>0;
  const finalHasDirectionRisk=finalMutations.length>0||
   lastWrongTaskQuotes.length>0||finalReviewOffGoal;
  const finalGoalReview=lastReview?.goal_trajectory_review;
@@ -336,7 +335,11 @@ export function adjudicateFinalAssistantGoalRelease({
     canonicalFrame.user_goal_lifecycle_projection?.working_goal?.source_ref===
      finalGoalReview.goal_source_ref||
     canonicalFrame.user_goal_lifecycle_projection?.preserved_original_goal?.source_ref===
-     finalGoalReview.goal_source_ref);
+     finalGoalReview.goal_source_ref||
+    (canonicalFrame.user_goal_lifecycle_projection?.paused_goal_candidates||[])
+      .some(x=>x.source_ref===finalGoalReview.goal_source_ref)||
+    (canonicalFrame.user_goal_lifecycle_projection?.dormant_goal_candidates||[])
+      .some(x=>x.source_ref===finalGoalReview.goal_source_ref));
  const originalRisk=originalBlockedQuotes.length>0;
  const verdict=stillPresent.length?
    'BLOCKED_ORIGINAL_OFF_GOAL_TEXT_SURVIVED':
