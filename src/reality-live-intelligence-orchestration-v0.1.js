@@ -2,7 +2,7 @@ import {buildCleanerConversationContext} from './reality-cleaner-conversation-co
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
 import {buildUserGoalContinuityState,recoverPriorUserGoalState,projectProvisionalGoalLifecycle} from './reality-user-goal-continuity-state-v0.1.js';
-import {projectAuthoritativeUserGoals} from './reality-authoritative-user-goal-ledger-v0.1.js';
+import {projectAuthoritativeUserGoals,compareAuthenticatedGoalSnapshots} from './reality-authoritative-user-goal-ledger-v0.1.js';
 import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
@@ -1104,6 +1104,30 @@ export async function runLiveIntelligenceOrchestration({
     modelResult.answer=ambiguousGoalReturnQuestion({ambiguity:ambiguousReturn});
     modelResult.reliability_intervention='AMBIGUOUS_USER_GOAL_RETURN_NEEDS_SELECTION';
   }
+  // Reconstruct authenticated user goal authority AFTER cognition and review.
+  // A change entered while the model was working invalidates this answer's
+  // old-goal context. Do not let a stale model reply become the next turn's
+  // durable conversational state, even if the semantic reviewer liked it.
+  let publicationGoalFreshness=null;
+  if(authorizedUserGoals){
+    const freshState=projectAuthoritativeUserGoals({
+      continuityHistory:await continuityRuntime.readback(),
+      continuityRootId:normalizedContinuityRoot,
+      worldId:systemContext?.world_id||null,
+      principalId:requestedBy,
+    });
+    publicationGoalFreshness=compareAuthenticatedGoalSnapshots({
+      expected:authorizedUserGoals,current:freshState,
+    });
+    if(publicationGoalFreshness.generated_answer_may_rely_on_stale_goal){
+      modelResult.answer='Reality held this response because your confirmed '+
+        'objective changed while the answer was being prepared. '+
+        'Your latest user-authorized objective now governs this conversation. '+
+        'Please continue with that objective; no external action was taken.';
+      modelResult.reliability_intervention=
+        'STALE_AUTHENTICATED_USER_GOAL_ANSWER_WITHHELD';
+    }
+  }
   let goalAuthorityReceipt=null;
   if(continuityRuntime?.enabled){
     const proposalEvent=await continuityRuntime.appendStage({
@@ -1133,6 +1157,7 @@ export async function runLiveIntelligenceOrchestration({
           semantic_accuracy_verified:false,execution_authorized:false,
         },
         ambiguous_goal_return:ambiguousReturn,
+        publication_goal_freshness:publicationGoalFreshness,
         original_model_response_id:modelResult.response_id||null,
         released_intervention:modelResult.reliability_intervention||null,
         external_goal_state_mutations:0,
@@ -1166,6 +1191,7 @@ export async function runLiveIntelligenceOrchestration({
     trajectory_reanchor_suggested:assistantTrajectory.direction_reanchor_recommended,
     prior_proposal_receipts:assistantTrajectory.recent_proposal_receipts.slice(-6),
     ambiguous_goal_return:ambiguousReturn,
+    publication_goal_freshness:publicationGoalFreshness,
     future_proposal_count:assistantGoalProposal.direction_evaluation
       .source_anchored_future_proposal_count||0,
     bundled_blocked_goal_mutation_count:assistantGoalDecision.blocked_mutation_count,
