@@ -647,6 +647,7 @@ export async function runLiveIntelligenceOrchestration({
   const goalDriftCoverage=assessGoalDriftCoverage({
     semanticReview:semanticFirst?.review||null,semanticReviewStatus,
     userGoalTrajectory:canonicalEpistemicFrame.user_goal_trajectory,
+    authoritativeGoalGraph:canonicalEpistemicFrame.authoritative_goal_relationship_graph,
     historyMayBeIncomplete:Boolean(
       systemContext?.conversation_history_older_messages_may_be_missing||
       canonicalEpistemicFrame.history_incomplete),
