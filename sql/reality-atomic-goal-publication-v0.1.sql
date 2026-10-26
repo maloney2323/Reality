@@ -28,7 +28,7 @@ lock table public.universe_events in share row exclusive mode;
 insert into reality_internal.goal_publication_epochs
  (user_id,conversation_id,revision,last_transition_event_id)
 select m.user_id,m.conversation_id,count(*)::bigint,
-       (array_agg(e.event_id order by e.created_at desc,e.event_id desc))[1]
+       (array_agg(e.event_id order by e.assertion_time desc,e.created_at desc,e.event_id desc))[1]
 from public.universe_events e
 join public.reality_chat_messages m on
   (e.payload->>'source_user_message_ref') =
