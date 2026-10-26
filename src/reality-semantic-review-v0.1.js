@@ -151,6 +151,11 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
  const legitimateRefs=new Set([
    goalTrajectory?.original_user_goal_candidate?.source_ref,
    goalTrajectory?.current_user_direction?.source_ref,
+   // A goal confirmed via the signed-in user's separate explicit goal
+   // command does not have to appear in the last 240 chat messages.
+   goalTrajectory?.authoritative_user_goals?.active_goal?.source_user_message_ref,
+   ...(goalTrajectory?.authoritative_user_goals?.goals||[])
+     .map(g=>g.source_user_message_ref),
    ...(goalTrajectory?.recent_user_directions||[]).map(x=>x.source_ref),
    // Existing Continuity retains source-linked earlier user goals beyond
    // the reviewer input's recent-message window.
@@ -209,6 +214,9 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
  const recognized=['CONVERSATIONAL_EXIT','USER_REPORTED_BUSINESS_COMPLETION',
    'USER_REQUESTED_ABANDONMENT','ASSISTANT_PROPOSED_COMPLETION'];
  const knownTargets=new Set([
+   goalTrajectory?.authoritative_user_goals?.active_goal?.source_user_message_ref,
+   ...(goalTrajectory?.authoritative_user_goals?.goals||[])
+     .map(g=>g.source_user_message_ref),
    goalTrajectory?.original_user_goal_candidate?.source_ref,
    goalTrajectory?.working_goal_lifecycle?.working_goal?.source_ref,
    goalTrajectory?.working_goal_lifecycle?.preserved_original_goal?.source_ref,
