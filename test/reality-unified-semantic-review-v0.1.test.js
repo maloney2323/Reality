@@ -96,15 +96,46 @@ function semanticCallStub(f,{draft,first,repair,second,completeProvenance=false}
   const reviewPass=calls.filter(x=>x.mode==='REVIEW').length;
   const selected=isReview?(reviewPass===1?first:second):null;
   const comparison=isReview?JSON.parse(req.input[1].content[0].text):null;
-  const covered=completeProvenance?{
-    ...selected,provenance_checks:(comparison?.conversation_evidence?.candidates||[]).map(c=>({
-      source_ref:c.source_ref,clause_id:c.clause_id,
-      relation:reviewPass===1?'ASSERTED_AS_FACT':'REPORTED_WITH_UNCERTAINTY',
-      answer_quote:reviewPass===1?'NOT DELIVERED':'delivery remains unconfirmed',
-      verified_source_ref:'',
-      reason:'Compare the exact prior reported-delivery status with this answer.',
-    })),
-  }:selected;
+  // The current real reviewer uses a typed goal trajectory, lifecycle and
+  // proposal contract. Keep old regression cases semantically unchanged while
+  // providing a VALID modern model response to exercise their intended path.
+  // Do not weaken production validation or suppress the negative test quotes.
+  const currentUserRef=comparison?.user_goal_trajectory?.current_user_direction?.source_ref;
+  const goalReview=selected?.goal_trajectory_review||{};
+  const reviewerFields=isReview?{
+    goal_trajectory_review:{
+      goal_source_ref:currentUserRef||'UNKNOWN_CURRENT_USER_SOURCE',
+      user_direction:'CONTINUING_USER_OBJECTIVE',
+      answer_alignment:'ON_USER_DIRECTED_OBJECTIVE',
+      answer_quote:'',
+      reason:'The model candidate is compared with the current user objective.',
+      return_intent:'NOT_RETURN_REQUEST',return_request_quote:'',
+      ...goalReview,
+      // Fields newly mandatory for the actual provider schema; explicit
+      // case values (including false provenance) remain under test.
+      return_intent:goalReview.return_intent||'NOT_RETURN_REQUEST',
+      return_request_quote:goalReview.return_request_quote||'',
+    },
+    goal_lifecycle_review:{
+      relation:'NO_LIFECYCLE_CHANGE',speaker:'NONE',
+      target_goal_source_ref:'',source_quote:'',
+      reason:'No goal lifecycle change in this reviewer fixture.',
+      ...(selected?.goal_lifecycle_review||{}),
+    },
+    future_goal_proposals:selected?.future_goal_proposals||[],
+  }:{};
+  const covered={
+    ...selected,...reviewerFields,
+    ...(completeProvenance?{
+      provenance_checks:(comparison?.conversation_evidence?.candidates||[]).map(c=>({
+        source_ref:c.source_ref,clause_id:c.clause_id,
+        relation:reviewPass===1?'ASSERTED_AS_FACT':'REPORTED_WITH_UNCERTAINTY',
+        answer_quote:reviewPass===1?'NOT DELIVERED':'delivery remains unconfirmed',
+        verified_source_ref:'',
+        reason:'Compare the exact prior reported-delivery status with this answer.',
+      })),
+    }:{provenance_checks:selected?.provenance_checks||[]}),
+  };
   const text=isReview?JSON.stringify(covered):
     calls.filter(x=>x.mode==='MODEL').length===1?draft:repair;
   return new Response(JSON.stringify({id:'fake-'+calls.length,
