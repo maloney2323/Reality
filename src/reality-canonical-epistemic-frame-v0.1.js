@@ -10,6 +10,7 @@ const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Obj
 export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
  userGoalContinuityState=null,userGoalLifecycle=null,userGoalStateContract=null,
+ authorizedUserGoals=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
  if(!governedSignal?.packet?.packet_id||!nonempty(continuityRootId)||
@@ -60,6 +61,15 @@ export function buildCanonicalEpistemicFrame({
  if(worldId&&sourceAttestedSnapshot?.world_id&&
    sourceAttestedSnapshot.world_id!==worldId)
   throw Error('CANONICAL_EPISTEMIC_CROSS_WORLD_FACT');
+ if(authorizedUserGoals&&(
+    authorizedUserGoals.continuity_root_id!==continuityRootId||
+    authorizedUserGoals.world_id!==(worldId||null)||
+    authorizedUserGoals.external_execution_authorized!==false||
+    authorizedUserGoals.assistant_can_mutate_goals!==false||
+    authorizedUserGoals.semantic_reviewer_can_mutate_goals!==false||
+    (authorizedUserGoals.active_goal_id!==null&&
+     authorizedUserGoals.active_goal?.goal_id!==authorizedUserGoals.active_goal_id)))
+   throw Error('CANONICAL_AUTHORIZED_GOAL_SCOPE_OR_AUTHORITY_INVALID');
  if(userGoalStateContract&&(
     userGoalStateContract.goal_id!==userGoalLifecycle?.working_goal?.goal_evidence_id||
     userGoalStateContract.provenance?.origin_turn_id!==userGoalLifecycle?.working_goal?.source_ref||
@@ -100,6 +110,7 @@ export function buildCanonicalEpistemicFrame({
   user_goal_continuity_state:userGoalContinuityState?copy(userGoalContinuityState):null,
   user_goal_lifecycle_projection:userGoalLifecycle?copy(userGoalLifecycle):null,
   user_goal_state_contract:userGoalStateContract?copy(userGoalStateContract):null,
+  authoritative_user_goals:authorizedUserGoals?copy(authorizedUserGoals):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
   fact_reconciliation_policy:'NO_STATUS_PROMOTION_WITHOUT_AUTHENTICATED_SOURCE_RECEIPT',
