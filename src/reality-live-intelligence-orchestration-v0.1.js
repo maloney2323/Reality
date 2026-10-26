@@ -370,6 +370,8 @@ export async function runLiveIntelligenceOrchestration({
     },
     user_goal_continuity_summary:{
       authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authoritative_active_goal_text:authorizedUserGoals?.active_goal?.title||null,
+      authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
       original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
       current_user_evidence_id:userGoalContinuityState.current_user_evidence_id,
@@ -702,6 +704,8 @@ export async function runLiveIntelligenceOrchestration({
     },
     user_goal_continuity:{
       authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authoritative_active_goal_text:authorizedUserGoals?.active_goal?.title||null,
+      authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
       authorized_goal_status:authorizedUserGoals?.status||'NOT_AVAILABLE_IN_THIS_RUNTIME',
       original_user_source_ref:userGoalContinuityState.original_user_goal_source_ref,
