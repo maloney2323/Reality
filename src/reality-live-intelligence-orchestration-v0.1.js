@@ -740,6 +740,10 @@ export async function runLiveIntelligenceOrchestration({
     },
     user_goal_continuity:{
       authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authenticated_parent_goal_ids:authoritativeGoalGraph?.active_ancestor_goal_ids||[],
+      recoverable_authenticated_goal_count:authoritativeGoalGraph?.paused_or_dormant_goals.length||0,
+      unresolved_parent_relation_count:authoritativeGoalGraph?.incomplete_parent_relations.length||0,
+      authoritative_graph_status:authoritativeGoalGraph?.status||'NO_AUTHENTICATED_GOAL_GRAPH',
       authoritative_active_goal_text:authorizedUserGoals?.active_goal?.title||null,
       authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
