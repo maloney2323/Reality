@@ -222,6 +222,61 @@ export function enforceGoalTransitionBoundary({proposal,goalState}={}){
   verified_drift_rate:null,
  });
 }
+/**
+ * A second model review cannot "clear" an off-goal rewrite merely by
+ * omitting the first issue. It must affirm that the actual revised text
+ * serves the current or source-linked user-owned objective.
+ *
+ * This is a deterministic *admission contract* for the review evidence,
+ * not proof the reviewer's semantic judgment was correct. No new judge,
+ * no new database and no execution authorization are introduced.
+ */
+export function adjudicateRevisedGoalAlignment({
+  goalState,revisionText,revisionReview=null,
+  currentUserSourceRef,knownUserGoalSourceRefs=[],
+}={}){
+ if(!nonempty(goalState?.goal_id)||!nonempty(goalState?.provenance?.origin_turn_id)||
+    typeof revisionText!=='string'||!nonempty(currentUserSourceRef)||
+    !Array.isArray(knownUserGoalSourceRefs))
+  throw Error('REVISED_GOAL_ALIGNMENT_SCOPE_REQUIRED');
+ const review=revisionReview?.goal_trajectory_review;
+ const refs=new Set([goalState.provenance.origin_turn_id,currentUserSourceRef,
+   ...knownUserGoalSourceRefs].filter(nonempty));
+ const sourceValid=nonempty(review?.goal_source_ref)&&refs.has(review.goal_source_ref);
+ const reviewed=review?.status==='REVIEWED_GOAL_TRAJECTORY_CANDIDATE';
+ const explicitlyAligned=review?.answer_alignment==='ON_USER_DIRECTED_OBJECTIVE';
+ const directionKnown=['CONTINUING_USER_OBJECTIVE','USER_AUTHORIZED_DETOUR',
+   'USER_AUTHORIZED_PIVOT','USER_RETURNED_TO_OBJECTIVE']
+   .includes(review?.user_direction);
+ const quoteAbsent=!nonempty(review?.answer_quote);
+ const unresolvedChanges=(revisionReview?.future_goal_proposals||[])
+   .filter(x=>['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.kind)&&
+     nonempty(x.quote)&&revisionText.includes(x.quote));
+ const blockedGoalIssues=(revisionReview?.issues||[])
+   .filter(x=>['WRONG_TASK','FORGOTTEN_OBLIGATION'].includes(x.kind));
+ const cleared=Boolean(reviewed&&sourceValid&&explicitlyAligned&&
+   directionKnown&&quoteAbsent&&!unresolvedChanges.length&&!blockedGoalIssues.length);
+ return freeze({
+   version:GOAL_AUTHORITY_CONTRACT_VERSION,
+   status:cleared?'REVIEWER_GOAL_ALIGNMENT_CANDIDATE_CLEARED_NOT_VERIFIED':
+      !reviewed?'POST_REPAIR_GOAL_REVIEW_MISSING':
+      !sourceValid?'POST_REPAIR_USER_GOAL_SOURCE_UNANCHORED':
+      !explicitlyAligned||!directionKnown||!quoteAbsent?
+        'POST_REPAIR_GOAL_ALIGNMENT_UNRESOLVED':
+        'POST_REPAIR_ASSISTANT_GOAL_PROPOSAL_REMAINS',
+   goal_id:goalState.goal_id,
+   controlling_user_goal_source_ref:goalState.provenance.origin_turn_id,
+   reviewed_goal_source_ref:sourceValid?review.goal_source_ref:null,
+   reviewer_alignment_status:review?.answer_alignment||'NOT_ASSESSED',
+   unresolved_goal_proposals:unresolvedChanges.length,
+   unresolved_goal_issue_count:blockedGoalIssues.length,
+   original_user_goal_changed:false,
+   state_mutation_authorized:false,
+   external_action_authorized:false,
+   independently_verified_correction:false,
+   can_admit_revised_answer_as_candidate:cleared,
+ });
+}
 export function pendingGoalCompletionEvidenceResponse({goalState,decision}={}){
  if(!nonempty(goalState?.description)||!nonempty(decision?.flagged_quote)||
     decision?.status!=='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED')
