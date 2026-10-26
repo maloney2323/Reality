@@ -266,12 +266,17 @@ export function projectProvisionalGoalLifecycle({
     relation='REPEATED_CURRENT_GOAL_NO_CHANGE';
    }
   }else if(direction==='USER_RETURNED_TO_OBJECTIVE'){
-   // Never pop a random "last detour". Return only to a goal explicitly
-   // identified by the review's USER source reference. If the reviewer
-   // anchors merely the CURRENT user request, the target is unresolved.
+   // A model cannot resume an earlier goal merely by citing its ID. It must
+   // ground the *return request itself* in this turn's authenticated user
+   // wording and identify exactly which recoverable goal was requested.
+   const hasExplicitReturnEvidence=
+     review.return_intent==='EXPLICIT_TARGET_RETURN'&&
+     has(review.return_request_quote)&&
+     directUser.text.includes(review.return_request_quote);
    const candidates=[first,...paused,...dormant];
-   const target=candidates.find(x=>x.source_ref===review.goal_source_ref &&
+   const matches=candidates.filter(x=>x.source_ref===review.goal_source_ref &&
      x.goal_evidence_id!==directUser.goal_evidence_id);
+   const target=hasExplicitReturnEvidence&&matches.length===1?matches[0]:null;
    if(target){
     targetCandidate=target.goal_evidence_id;
     // A return may restore either a paused detour parent or a dormant goal.
@@ -289,7 +294,9 @@ export function projectProvisionalGoalLifecycle({
    }else{
     ambiguous++;
     transitionUnresolved=true;
-    relation='RETURN_TARGET_NOT_SOURCE_RESOLVED';
+    relation=hasExplicitReturnEvidence?
+      'RETURN_TARGET_NOT_SOURCE_RESOLVED':
+      'RETURN_REQUEST_NOT_ANCHORED_TO_CURRENT_USER_TEXT';
    }
   }else if(direction==='UNCLEAR'){
    ambiguous++;
