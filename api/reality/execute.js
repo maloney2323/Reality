@@ -1,4 +1,5 @@
 import { executeAuthorizedWork } from '../../src/reality-governed-execution-engine-v0.1.js';
+import { evaluateGoalExecutionBoundary } from '../../src/reality-goal-execution-boundary-v0.1.js';
 import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
 import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
@@ -26,6 +27,23 @@ export default async function handler(req, res) {
     const body = req.body || {};
     if (!body.workItem) return res.status(400).json({ ok: false, error: 'WORK_ITEM_REQUIRED' });
     if (body.connector || body.independentVerifier) return res.status(400).json({ ok: false, error: 'CLIENT_SUPPLIED_EXECUTION_BRIDGES_REJECTED' });
+    // This route must never interpret client JSON, assistant proposals, or
+    // customer auto-authority as an authorized mutation to the durable user
+    // objective. Apply the goal boundary BEFORE any authority policy lookup
+    // or privileged connector call, including nonconsequential work items.
+    const goalBoundary=evaluateGoalExecutionBoundary({
+      workItem:body.workItem,authorization:body.authorization||null,
+    });
+    if(goalBoundary.status==='BLOCKED'){
+      return res.status(200).json({
+        ok:true,result:{status:'BLOCKED',
+          blocked_reason:goalBoundary.reason,
+          goal_authority_boundary:goalBoundary,
+          execution:null,verification:null,outcome:null,
+          authority_source:'NONE',
+        },
+      });
+    }
     const principal = getOrCreateSessionPrincipal(req, res);
     let authorization = body.authorization || null;
     let authoritySource = authorization ? 'EXPLICIT_AUTHORIZATION' : 'NONE';
