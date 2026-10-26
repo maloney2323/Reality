@@ -478,7 +478,9 @@ setInterval(refreshSavedShiftHome,300000);
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
-     ' · Paused possibilities: '+(goalContext.paused_goal_candidate_count||0)):
+     ' · Temporary detours: '+(goalContext.paused_goal_candidate_count||0)+
+     ' · Dormant goals saved: '+(goalContext.dormant_goal_candidate_count||0)+
+     ' · Older goals do not override your current request'):
     'User-goal continuity not yet recovered';
    const goalGovernance=reliability.assistant_goal_governance||{};
    const goalGovernanceText=goalGovernance.status==='ASSISTANT_GOAL_MUTATION_BLOCKED'
