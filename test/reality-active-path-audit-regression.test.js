@@ -12,7 +12,8 @@ for(const quote of ['No attempt to publish or externally announce this summary h
  test('both extraction paths reject misclassified denial: '+quote,async()=>{
   const a=await semantic(quote);
   assert.equal(a.candidate.actions.length,0);
-  assert.equal(a.review.unassessed_claims[0].reason,'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION');
+  assert.ok(a.review.unassessed_claims.some(x=>x.reason==='EXPLICIT_DENIAL_NOT_ACTION_COMPLETION'),
+   'The action denial must remain explicitly unassessed even when newer goal/lifecycle fields are also missing');
   const b=await extractReliabilityClaims({modelOutput:quote,worldId:'audit',snapshot,apiKey:'offline',model:'fixture',fetchImpl:async()=>new Response(JSON.stringify({output_text:JSON.stringify({claims:[],actions:[{action_type:'publish',target:'summary',status:'COMPLETED',assertion:'AFFIRMED',quote}],operational:true,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})}),{status:200})});
   assert.equal(b.candidate.actions.length,0);
  });
