@@ -122,6 +122,19 @@ export function projectAssistantGoalProposal({
     authorized_by:'ASSISTANT_PROPOSAL',authorization_state:'UNAUTHORIZED',
     no_external_execution_grant:true,
   }));
+ const optionalAdvice=(semanticReview?.future_goal_proposals||[])
+  .filter(x=>['OPTIONAL_SUGGESTION_ONLY','USER_REQUESTED_PROPOSAL'].includes(
+    x.direction_effect)&&x.authorization_state==='NO_USER_GOAL_MUTATION'&&
+    x.goal_mutation_requested===false&&nonempty(x.quote)&&
+    firstAnswer.includes(x.quote)&&sourceSet.has(x.target_goal_source_ref))
+  .slice(0,8).map(x=>({
+    quote:bounded(x.quote,350),
+    user_goal_source_ref:x.target_goal_source_ref,
+    posture:x.direction_effect,
+    grants_goal_transition:false,
+    grants_external_execution:false,
+    independent_semantic_confirmation:false,
+  }));
  const claimedCompletion=Boolean(lifecycle?.status==='SOURCE_LINKED_REVIEWER_CANDIDATE'&&
   lifecycle.relation==='ASSISTANT_PROPOSED_COMPLETION'&&
   lifecycle.speaker==='ASSISTANT'&&nonempty(lifecycle.source_quote)&&
@@ -131,6 +144,7 @@ export function projectAssistantGoalProposal({
   proposal_id:id('assistant-goal-proposal',[currentTurnId,modelResponseId,goalState.goal_id]),
   target_turn_id:currentTurnId,model_response_id:modelResponseId||null,
   proposed_response_excerpt:bounded(firstAnswer,1500),
+  optional_advice_not_goal_mutations:optionalAdvice,
   target_goal_id:goalState.goal_id,
   intended_state_mutations:{
    resource_mutations:[],
@@ -162,6 +176,7 @@ export function projectAssistantGoalProposal({
    introduces_new_unauthorized_objective:detectedShift||
      futureMutationCandidates.length>0,
    source_anchored_future_proposal_count:futureMutationCandidates.length,
+   source_anchored_optional_advice_count:optionalAdvice.length,
    claims_unverified_business_completion:claimedCompletion,
    drops_existing_obligation:null,
    reviewer_goal_source_ref:assessed?review.goal_source_ref:null,
