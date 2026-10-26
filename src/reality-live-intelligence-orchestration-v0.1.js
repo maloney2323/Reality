@@ -740,6 +740,7 @@ export async function runLiveIntelligenceOrchestration({
       provisional_working_goal_source_ref:goalLifecycle.working_goal.source_ref,
       provisional_working_goal_text:goalLifecycle.working_goal.text.slice(0,300),
       pending_semantic_reconciliation:!goalLifecycle.user_intent_semantically_verified,
+      current_turn_meaning_reconciliation:userGoalTransitionContract.meaning_aware_reconciliation,
       lifecycle_status:goalLifecycle.status,
       paused_goal_candidate_count:goalLifecycle.paused_goal_candidates.length,
       dormant_goal_candidate_count:goalLifecycle.dormant_goal_candidates.length,
