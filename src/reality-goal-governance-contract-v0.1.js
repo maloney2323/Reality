@@ -126,6 +126,9 @@ export function buildAssistantGoalGovernance({
   .filter(x=>x&&
    ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.kind)&&
    x.authorization_state==='ASSISTANT_PROPOSAL_ONLY'&&
+   x.goal_mutation_requested===true&&
+   ['ASSISTANT_DIRECTED_OBJECTIVE_SHIFT',
+    'ASSISTANT_DIRECTED_FUTURE_COMMITMENT'].includes(x.direction_effect)&&
    valid(x.quote)&&modelAnswer.includes(x.quote)&&
    valid(x.target_goal_source_ref)&&validUserSources.has(x.target_goal_source_ref)&&
    valid(x.reason))
@@ -136,6 +139,18 @@ export function buildAssistantGoalGovernance({
    proposal_quote:String(x.quote).slice(0,350),
    authorized_by:'ASSISTANT_PROPOSAL',
    authorization_state:'UNAUTHORIZED',
+  }));
+ const permittedAdvice=(semanticReview?.future_goal_proposals||[])
+  .filter(x=>x&&['OPTIONAL_SUGGESTION_ONLY','USER_REQUESTED_PROPOSAL'].includes(
+    x.direction_effect)&&x.authorization_state==='NO_USER_GOAL_MUTATION'&&
+    x.goal_mutation_requested===false&&valid(x.quote)&&modelAnswer.includes(x.quote)&&
+    valid(x.target_goal_source_ref)&&validUserSources.has(x.target_goal_source_ref))
+  .slice(0,8).map(x=>({
+   quote:String(x.quote).slice(0,350),
+   user_goal_source_ref:x.target_goal_source_ref,
+   direction_effect:x.direction_effect,
+   user_goal_transition_authorized:false,
+   external_action_authorized:false,
   }));
  const anyAssistantGoalChange=assistantShiftCandidate||futureProposals.length>0;
  const transition=anyAssistantGoalChange&&goalId?
