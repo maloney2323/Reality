@@ -667,12 +667,16 @@ test('user-goal trajectory drift enters existing repair and Continuity receipt; 
     draft:incorrect,repair:correct,
     first:{...review(),goal_trajectory_review:{
       goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      return_intent:'EXPLICIT_TARGET_RETURN',
+      return_request_quote:'Back to the homeowner estimate now',
       answer_alignment:'ASSISTANT_DRIFTED_OFF_OBJECTIVE',
       answer_quote:'launch a social-media campaign',
       reason:'The user asked to return to the estimate, not launch an unsolicited campaign.',
     }},
     second:{...review(),goal_trajectory_review:{
       goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      return_intent:'EXPLICIT_TARGET_RETURN',
+      return_request_quote:'Back to the homeowner estimate now',
       answer_alignment:'ON_USER_DIRECTED_OBJECTIVE',
       answer_quote:'',reason:'The answer returns to the requested estimate.',
     }},
