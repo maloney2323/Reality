@@ -276,6 +276,14 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
    authorization_state:'ASSISTANT_PROPOSAL_ONLY',
    independent_semantic_confirmation:false,
   });
+  // A concrete unauthorized *future* change can be a conversational drift
+  // candidate even if today's opening sentence is benign. Feed the already
+  // existing bounded revision mechanism; do NOT automatically execute it.
+  if(!issues.some(x=>x.kind==='WRONG_TASK'&&x.quote===proposal.quote))
+   issues.push({kind:'WRONG_TASK',quote:proposal.quote.slice(0,350),
+     reason:'Assistant-proposed future work is not a user goal transition ('+
+       proposal.target_goal_source_ref+'): '+proposal.reason.slice(0,240)});
+
  }
  const claims=[],relevantKeys=[];
  // A typed source candidate must receive an explicit per-claim assessment.
