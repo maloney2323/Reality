@@ -26,6 +26,11 @@ function scopedEvent(e,{continuityRootId,worldId,principalId}){
  // Unexpected event claiming this authoritative type is an integrity
  // exception, not something to silently ignore while granting "all clear".
  if(e.provenance?.source!==authorizedSource||
+    e.provenance?.authenticated_user_id!==principalId||
+    e.provenance?.source_message_ref!==p.source_user_message_ref||
+    e.provenance?.source_digest!==p.source_message_digest||
+    p.authorized_by!=='AUTHENTICATED_USER_EXPLICIT_GOAL_COMMAND'||
+    p.goal_transition_authority_granted!==true||
     p.version!==AUTHORITATIVE_USER_GOAL_LEDGER_VERSION||
     p.continuity_root_id!==continuityRootId||
     p.world_id!==(worldId||null)||
@@ -34,8 +39,10 @@ function scopedEvent(e,{continuityRootId,worldId,principalId}){
     p.external_execution_authorized!==false||
     p.source_verification!=='AUTHENTICATED_RLS_CHAT_USER_MESSAGE_READBACK'||
     !ok(p.source_user_message_ref)||!ok(p.source_request_id)||
-    !ok(p.source_message_digest)||!commandSet.has(p.operation)||
-    !ok(p.command_turn_id))
+    !/^sha256:[0-9a-f]{64}$/.test(p.source_message_digest||'')||
+    !commandSet.has(p.operation)||!ok(p.command_turn_id)||
+    p.command_turn_id!==p.source_user_message_ref||
+    !Number.isFinite(Date.parse(p.observed_at)))
   throw Error('USER_GOAL_AUTHORITY_EVENT_INTEGRITY_FAILURE');
  return true;
 }
