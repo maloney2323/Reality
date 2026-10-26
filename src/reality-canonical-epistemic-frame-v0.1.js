@@ -77,17 +77,37 @@ export function buildCanonicalEpistemicFrame({
      controllingGoalStateContract.world_id!==(worldId||null)||
      controllingGoalStateContract.permits_external_execution!==false)
    throw Error('CANONICAL_CONTROLLING_GOAL_SCOPE_INVALID');
+  const explicitlyInactive=Boolean(authorizedUserGoals?.transition_count>0&&
+    authorizedUserGoals.active_goal_id===null);
+  const lastVerifiedTransition=authorizedUserGoals?.recent_transition_receipts?.at(-1);
   if(confirmed){
    if(controllingGoalStateContract.goal_id!==confirmed.goal_id||
       controllingGoalStateContract.provenance?.origin_turn_id!==confirmed.source_user_message_ref||
       controllingGoalStateContract.provenance?.evidence_payload_ref!==confirmed.last_transition_receipt_id||
       controllingGoalStateContract.provenance?.source_kind!=='AUTHENTICATED_USER_GOAL_LEDGER_COMMAND'||
       controllingGoalStateContract.source_user_authorization_verified!==true||
-      controllingGoalStateContract.status!=='ACTIVE')
+      controllingGoalStateContract.status!=='ACTIVE'||
+      controllingGoalStateContract.no_active_goal_explicitly_recorded===true)
     throw Error('CANONICAL_CONTROLLING_GOAL_MUST_MATCH_USER_AUTHORITY');
+  }else if(explicitlyInactive){
+   // This negative state is signed user authority, not a model-created goal.
+   // After PAUSE/ABANDON no reviewer working goal can be promoted to ACTIVE.
+   if(!lastVerifiedTransition||
+      !['PAUSE','ABANDON','REPORT_COMPLETE'].includes(lastVerifiedTransition.operation)||
+      controllingGoalStateContract.goal_state_kind!=='EXPLICIT_NO_ACTIVE_USER_GOAL_BOUNDARY'||
+      controllingGoalStateContract.represents_user_goal!==false||
+      controllingGoalStateContract.no_active_goal_explicitly_recorded!==true||
+      controllingGoalStateContract.working_status!=='AUTHENTICATED_NO_ACTIVE_GOAL'||
+      controllingGoalStateContract.provenance?.source_kind!=='AUTHENTICATED_USER_GOAL_LEDGER_NO_ACTIVE_GOAL'||
+      controllingGoalStateContract.provenance?.origin_turn_id!==lastVerifiedTransition.source_ref||
+      controllingGoalStateContract.provenance?.evidence_payload_ref!==lastVerifiedTransition.event_id||
+      controllingGoalStateContract.source_user_authorization_verified!==true||
+      controllingGoalStateContract.permits_external_execution!==false)
+    throw Error('CANONICAL_EXPLICIT_NO_ACTIVE_GOAL_CANNOT_FALL_BACK');
   }else if(controllingGoalStateContract.goal_id!==userGoalStateContract.goal_id||
      controllingGoalStateContract.source_user_authorization_verified!==false||
-     controllingGoalStateContract.provenance?.origin_turn_id!==userGoalStateContract.provenance?.origin_turn_id)
+     controllingGoalStateContract.provenance?.origin_turn_id!==userGoalStateContract.provenance?.origin_turn_id||
+     controllingGoalStateContract.no_active_goal_explicitly_recorded===true)
     throw Error('CANONICAL_UNCONFIRMED_GOAL_MUST_REMAIN_PROVISIONAL');
  }
  if(userGoalStateContract&&(
