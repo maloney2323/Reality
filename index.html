@@ -91,6 +91,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <label for="privateSavedGoals">Previously confirmed objectives</label>
    <select id="privateSavedGoals" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"></select>
    <button id="privateResumeGoal" type="button">Resume selected goal</button>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button id="privatePauseGoal" type="button" disabled>Pause active goal</button>
+    <button id="privateStopGoal" type="button" disabled>Abandon active goal</button>
+    <button id="privateReportGoal" type="button" disabled>Report goal complete (unverified)</button>
+   </div>
    <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
   </div>
   <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
@@ -403,12 +408,17 @@ setInterval(refreshSavedShiftHome,300000);
   localStorage.setItem('reality.private.chat.conversation.v1',id);
   try{await loadSaved();await loadConversations()}catch(e){status(e.message)}
  };
+ let confirmedActiveGoal=null;
  async function loadGoals(){
   const label=el('privateGoalStatus');
   try{
    const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Goal ledger unavailable');
    const state=data.goal_state||{};
+   confirmedActiveGoal=state.active_goal?.goal_id&&state.active_goal_id===state.active_goal.goal_id?
+    {goal_id:state.active_goal.goal_id,title:String(state.active_goal.title||'').slice(0,300)}:null;
+   for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
+    el(id).disabled=!confirmedActiveGoal;
    label.textContent=state.active_goal?
      ('USER-CONFIRMED active objective: '+String(state.active_goal.title||'').slice(0,250)+
       ' · Ledger receipt: '+state.active_goal.last_transition_receipt_id):
@@ -423,6 +433,9 @@ setInterval(refreshSavedShiftHome,300000);
    }
    el('privateResumeGoal').disabled=!select.options.length;
   }catch(e){
+   confirmedActiveGoal=null;
+   for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
+    el(id).disabled=true;
    label.textContent='Confirmed goal ledger not available: '+e.message+
     '. Do not treat suggestions as approved objectives.';
    el('privateResumeGoal').disabled=true;
@@ -464,6 +477,45 @@ setInterval(refreshSavedShiftHome,300000);
   }catch(e){status('Goal was not resumed: '+e.message)}
   finally{el('privateResumeGoal').disabled=false}
  };
+ // Explicit, authenticated user lifecycle controls. Never promote
+ // assistant suggestions or review text to an authorized user transition.
+ async function changeActiveGoal(operation,buttonId){
+  const target=confirmedActiveGoal;
+  if(!target?.goal_id)return status('No confirmed active goal is available to change.');
+  const choices={
+   PAUSE:{
+    prompt:'Pause this active objective? It stays recoverable and no older goal is silently reactivated.',
+    message:'I explicitly pause my active conversational goal: ',
+    success:'Goal paused in authenticated Continuity; nothing was executed.',
+   },
+   ABANDON:{
+    prompt:'Abandon this active objective? This is a conversational decision, not proof the business work is completed.',
+    message:'I explicitly abandon my active conversational goal: ',
+    success:'Goal abandoned by explicit user direction; no external outcome was claimed.',
+   },
+   REPORT_COMPLETE:{
+    prompt:'Report this goal complete? Reality will NOT treat your report as independent proof of business completion.',
+    message:'I report the conversational goal complete, without independently verifying an external outcome: ',
+    success:'User-reported completion recorded as UNVERIFIED, not a verified business outcome.',
+   },
+  };
+  const selected=choices[operation];if(!selected)return;
+  if(!confirm(selected.prompt+' '+target.title))return;
+  const button=el(buttonId);button.disabled=true;
+  try{
+   const data=await saveGoalCommand(operation,
+    (selected.message+target.title).slice(0,700),target.goal_id);
+   if(!data.goal_state||data.goal_state.active_goal_id===target.goal_id)
+    throw Error('GOAL_LIFECYCLE_STATE_DID_NOT_CHANGE');
+   await loadGoals();await loadSaved();await loadConversations();
+   status(selected.success);
+  }catch(e){status('Goal lifecycle change not confirmed: '+e.message)}
+  finally{button.disabled=!confirmedActiveGoal}
+ }
+ el('privatePauseGoal').onclick=()=>changeActiveGoal('PAUSE','privatePauseGoal');
+ el('privateStopGoal').onclick=()=>changeActiveGoal('ABANDON','privateStopGoal');
+ el('privateReportGoal').onclick=()=>changeActiveGoal('REPORT_COMPLETE','privateReportGoal');
+
  async function loadSaved(){
   const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
