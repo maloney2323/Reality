@@ -2,6 +2,7 @@ import {buildCleanerConversationContext} from './reality-cleaner-conversation-co
 import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-handoff-v0.1.js';
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
 import {buildUserGoalContinuityState,recoverPriorUserGoalState,projectProvisionalGoalLifecycle} from './reality-user-goal-continuity-state-v0.1.js';
+import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
@@ -308,6 +309,10 @@ export async function runLiveIntelligenceOrchestration({
     lifecycle:goalLifecycle,goalEvidence:userGoalContinuityState,
     worldId:systemContext?.world_id||null,
   });
+  const assistantTrajectory=projectAssistantTrajectoryBoundary({
+    continuityHistory:priorGoalContinuityHistory,goalState:userGoalStateContract,
+    continuityRootId:normalizedContinuityRoot,worldId:systemContext?.world_id||null,
+  });
   const sourceLinkedOriginal={
     source_ref:userGoalContinuityState.original_user_goal_source_ref,
     text:userGoalContinuityState.original_user_goal_candidate,
@@ -325,6 +330,7 @@ export async function runLiveIntelligenceOrchestration({
       // Working interpretation from prior source-linked *user* turns, not
       // an autonomous change of user intent or execution authority.
       working_goal_lifecycle:goalLifecycle,
+      assistant_proposal_trajectory:assistantTrajectory,
     },
     user_goal_continuity_summary:{
       original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
@@ -368,6 +374,16 @@ export async function runLiveIntelligenceOrchestration({
     canonical_epistemic_state:canonicalEpistemicFrame,
     canonical_epistemic_receipt:epistemicFrameReceipt,
     user_goal_state_contract:canonicalEpistemicFrame.user_goal_state_contract,
+    assistant_direction_reanchor:assistantTrajectory.direction_reanchor_recommended?{
+      status:'REANCHOR_FROM_BLOCKED_ASSISTANT_PROPOSALS_NOT_VERIFIED_DRIFT',
+      controlling_user_goal_source:userGoalStateContract.provenance.origin_turn_id,
+      controlling_goal_candidate:userGoalStateContract.description,
+      prior_blocked_proposal_receipts:assistantTrajectory.recent_proposal_receipts
+        .filter(x=>x.status==='BLOCKED_ASSISTANT_REDIRECTION_CANDIDATE')
+        .slice(-3).map(x=>x.source_receipt_id),
+      instruction:'Honor current user direction and user-source-linked constraints. Prior assistant proposals do not change the goal. Do not repeat blocked shifts; pursue authorized work or ask for clarification.',
+      goal_mutation_authorized:false,
+    }:null,
     reliability_grounding:reliabilityGrounding,
     signal_intake:governedSignal.intake_semantics||null,
     signal_typed_intake:governedSignal.typed_epistemic_intake||null,
@@ -572,10 +588,23 @@ export async function runLiveIntelligenceOrchestration({
     goalState:userGoalStateContract,
     semanticReview:semanticFirst?.review||null,
     reviewerResponseId:semanticFirst?.response_id||null,
+    knownUserGoalSources:userGoalContinuityState.user_goal_evidence.map(x=>x.source_ref),
   });
   const assistantGoalDecision=enforceGoalTransitionBoundary({
     proposal:assistantGoalProposal,goalState:userGoalStateContract,
   });
+  const ambiguousReturn=resolveAmbiguousGoalReturn({
+    goalLifecycle,goalReview:semanticFirst?.review?.goal_trajectory_review,
+    currentUserMessage:message,
+  });
+  const currentAssistantRedirectionBlocked=[
+    'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED',
+    'UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED',
+  ].includes(assistantGoalDecision.status);
+  const offGoalStreakIncludingCurrent=assistantTrajectory.off_goal_streak_counter+
+    (currentAssistantRedirectionBlocked?1:0);
+  const directionFault=Boolean(currentAssistantRedirectionBlocked&&
+    offGoalStreakIncludingCurrent>=assistantTrajectory.threshold);
   const combinedConversationalAssessment=conversationalAssessment?{
     ...conversationalAssessment,
     status:semanticConversationFindings.length?'EARLY_CONVERSATION_DRIFT_RISK':
@@ -940,14 +969,17 @@ export async function runLiveIntelligenceOrchestration({
   // If the same semantic review identified a quoted assistant-origin shift,
   // release only a re-reviewed correction; otherwise withhold the shift.
   // A missing semantic review is NOT evidence that no drift occurred.
-  const unreviewedGoalShift=assistantGoalDecision.status===
-    'UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'&&
-    modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED';
+  const unreviewedGoalShift=currentAssistantRedirectionBlocked&&
+    (modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'||
+      Boolean(assistantGoalDecision.flagged_quote&&
+        String(modelResult.answer||'').includes(assistantGoalDecision.flagged_quote)));
   if(unreviewedGoalShift){
     modelResult.answer=pendingGoalAuthorizationResponse({
       goalState:userGoalStateContract,
     });
-    modelResult.reliability_intervention='ASSISTANT_GOAL_SHIFT_WITHHELD_PENDING_USER_DIRECTION';
+    modelResult.reliability_intervention=directionFault?
+      'REPEATED_ASSISTANT_DIRECTION_FAULT_WITHHELD':
+      'ASSISTANT_GOAL_SHIFT_WITHHELD_PENDING_USER_DIRECTION';
   }
   // A reviewer-only assistant claim that work is complete cannot close a
   // business goal or be emitted as an established outcome without a matching
@@ -966,6 +998,10 @@ export async function runLiveIntelligenceOrchestration({
     });
     modelResult.reliability_intervention='UNVERIFIED_ASSISTANT_COMPLETION_WITHHELD';
   }
+  if(ambiguousReturn.user_selection_required){
+    modelResult.answer=ambiguousGoalReturnQuestion({ambiguity:ambiguousReturn});
+    modelResult.reliability_intervention='AMBIGUOUS_USER_GOAL_RETURN_NEEDS_SELECTION';
+  }
   let goalAuthorityReceipt=null;
   if(continuityRuntime?.enabled){
     const proposalEvent=await continuityRuntime.appendStage({
@@ -982,6 +1018,15 @@ export async function runLiveIntelligenceOrchestration({
         goal_transition:userGoalTransitionContract,
         assistant_proposal:assistantGoalProposal,
         verifier_decision:assistantGoalDecision,
+        assistant_trajectory:{
+          prior_blocked_same_goal_streak:assistantTrajectory.off_goal_streak_counter,
+          current_blocked_redirection:currentAssistantRedirectionBlocked,
+          current_streak:offGoalStreakIncludingCurrent,
+          direction_fault:directionFault,
+          source_prior_receipts:assistantTrajectory.recent_proposal_receipts.slice(-6),
+          semantic_accuracy_verified:false,execution_authorized:false,
+        },
+        ambiguous_goal_return:ambiguousReturn,
         original_model_response_id:modelResult.response_id||null,
         released_intervention:modelResult.reliability_intervention||null,
         external_goal_state_mutations:0,
@@ -1010,6 +1055,13 @@ export async function runLiveIntelligenceOrchestration({
     current_user_lifecycle_candidate:
       semanticFirst?.review?.goal_lifecycle_review||null,
     reviewer_coverage:semanticFirst?.review?.status||semanticReviewStatus,
+    assistant_direction_streak:offGoalStreakIncludingCurrent,
+    direction_fault:directionFault,
+    trajectory_reanchor_suggested:assistantTrajectory.direction_reanchor_recommended,
+    prior_proposal_receipts:assistantTrajectory.recent_proposal_receipts.slice(-6),
+    ambiguous_goal_return:ambiguousReturn,
+    future_proposal_count:assistantGoalProposal.direction_evaluation
+      .source_anchored_future_proposal_count||0,
     independently_verified_goal_alignment:false,
   };
 
