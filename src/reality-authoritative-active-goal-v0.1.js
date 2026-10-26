@@ -86,8 +86,8 @@ export function projectAuthoritativeActiveGoal({
   if(directive.subject_user_id!==subjectUserId||
      directive.conversation_id!==conversationId)
    throw Error('ACTIVE_GOAL_SUBJECT_OR_CONVERSATION_MISMATCH');
-  if(event.entity_id!==directive.goal_id||
-     event.epistemic_status==='VERIFIED_EXTERNAL_FACT')
+  if(event.provenance?.continuity_spine?.source_entity_id!==directive.goal_id||
+     event.epistemic_status!=='USER_DIRECTIVE_OBSERVED')
    throw Error('ACTIVE_GOAL_EVENT_LINKAGE_INVALID');
   if(seen.has(directive.directive_id))
    throw Error('ACTIVE_GOAL_DUPLICATE_DIRECTIVE_UNRESOLVED');
@@ -136,7 +136,7 @@ export async function commitAuthenticatedGoalPin({
   eventId:'reality:authorized-goal:'+directive.directive_id,
   evidenceRefs:[directive.user_message_source_ref],
   epistemicStatus:'USER_DIRECTIVE_OBSERVED',
-  observedAt:directive.issued_at,
+  effectiveTime:directive.issued_at,assertionTime:directive.issued_at,
   payload:{event_type:'AUTHORIZED_USER_GOAL_DIRECTIVE',directive,
     source_is_verified_user_utterance_not_external_truth:true,
     assistant_authority:false,execution_authorized:false},
