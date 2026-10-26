@@ -52,7 +52,7 @@ function textOf(data){
    .map(x=>x.text).join('');
 }
 const jsonSchema={
- type:'object',additionalProperties:false,required:['addresses_current_request','issues','claims','actions','provenance_checks','goal_trajectory_review','goal_lifecycle_review'],
+ type:'object',additionalProperties:false,required:['addresses_current_request','issues','claims','actions','provenance_checks','goal_trajectory_review','goal_lifecycle_review','future_goal_proposals'],
  properties:{
    addresses_current_request:{type:'boolean'},
    issues:{type:'array',items:{type:'object',additionalProperties:false,
@@ -68,7 +68,7 @@ const jsonSchema={
      properties:{action_type:{type:'string'},target:{type:'string'},
        status:{type:'string'},quote:{type:'string'}}}},
    goal_trajectory_review:{type:'object',additionalProperties:false,
-     required:['goal_source_ref','user_direction','answer_alignment','answer_quote','reason'],
+     required:['goal_source_ref','user_direction','answer_alignment','answer_quote','reason','return_intent','return_request_quote'],
      properties:{
        goal_source_ref:{type:'string'},
        user_direction:{type:'string',enum:[
@@ -78,6 +78,9 @@ const jsonSchema={
          'ON_USER_DIRECTED_OBJECTIVE','ASSISTANT_DRIFTED_OFF_OBJECTIVE',
          'INSUFFICIENT_EVIDENCE']},
        answer_quote:{type:'string'},reason:{type:'string'},
+       return_intent:{type:'string',enum:[
+         'NOT_RETURN_REQUEST','EXPLICIT_TARGET_RETURN','AMBIGUOUS_RETURN_TARGET','UNCLEAR']},
+       return_request_quote:{type:'string'},
      }},
    // Semantics proposed by SAME existing reviewer; deterministic continuity
    // admits only source-anchored USER evidence and never marks outcome verified.
@@ -92,6 +95,15 @@ const jsonSchema={
        target_goal_source_ref:{type:'string'},
        source_quote:{type:'string'},reason:{type:'string'},
      }},
+   // Proposed future work is NOT scheduled/executed; exact quotes must be
+   // tied to user-goal sources for the existing Integrity boundary to inspect.
+   future_goal_proposals:{type:'array',items:{type:'object',additionalProperties:false,
+     required:['kind','quote','target_goal_source_ref','reason'],
+     properties:{
+       kind:{type:'string',enum:['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK']},
+       quote:{type:'string'},target_goal_source_ref:{type:'string'},
+       reason:{type:'string'},
+     }}},
    provenance_checks:{type:'array',items:{type:'object',additionalProperties:false,
      required:['source_ref','clause_id','relation','answer_quote','verified_source_ref','reason'],
      properties:{
@@ -154,11 +166,16 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
    const quoteOk=typeof goal.answer_quote==='string'&&
      (!goal.answer_quote||answer.includes(goal.answer_quote));
    const reasonOk=valid(goal.reason);
+   const returnIntentOk=['NOT_RETURN_REQUEST','EXPLICIT_TARGET_RETURN',
+     'AMBIGUOUS_RETURN_TARGET','UNCLEAR'].includes(goal.return_intent)&&
+     typeof goal.return_request_quote==='string'&&
+     (goal.return_intent==='NOT_RETURN_REQUEST'?!goal.return_request_quote:
+       valid(goal.return_request_quote)&&currentUserMessage.includes(goal.return_request_quote));
    const directionOk=['CONTINUING_USER_OBJECTIVE','USER_AUTHORIZED_PIVOT',
      'USER_AUTHORIZED_DETOUR','USER_RETURNED_TO_OBJECTIVE','UNCLEAR'].includes(goal.user_direction);
    const answerOk=['ON_USER_DIRECTED_OBJECTIVE','ASSISTANT_DRIFTED_OFF_OBJECTIVE',
      'INSUFFICIENT_EVIDENCE'].includes(goal.answer_alignment);
-   if(!sourceOk||!quoteOk||!reasonOk||!directionOk||!answerOk||
+   if(!sourceOk||!quoteOk||!reasonOk||!returnIntentOk||!directionOk||!answerOk||
       (goal.answer_alignment==='ASSISTANT_DRIFTED_OFF_OBJECTIVE'&&!goal.answer_quote)){
      goalTrajectoryReview={...goalTrajectoryReview,
        status:'INVALID_OR_UNANCHORED_GOAL_ASSESSMENT'};
@@ -171,6 +188,8 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
        answer_alignment:goal.answer_alignment,
        answer_quote:goal.answer_quote.slice(0,350),
        reason:goal.reason.slice(0,350),
+       return_intent:goal.return_intent,
+       return_request_quote:goal.return_request_quote.slice(0,240),
        user_authorized_pivot_not_drift:true,
        independent_goal_alignment_verified:false,
      };
@@ -234,6 +253,29 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
  }else{
    unassessed.push({key:'goal_lifecycle',
      reason:'LIFECYCLE_RELATION_UNRESOLVED_OR_SOURCE_NOT_LINKED'});
+ }
+ // Only the pre-publication Integrity boundary can decide whether to block
+ // these proposed future objective changes; this model may only SUGGEST.
+ const futureGoalProposals=[];
+ for(const proposal of (Array.isArray(parsed.future_goal_proposals)?
+    parsed.future_goal_proposals:[]).slice(0,8)){
+  const anchored=proposal&&
+   ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(proposal.kind)&&
+   valid(proposal.quote)&&answer.includes(proposal.quote)&&
+   valid(proposal.target_goal_source_ref)&&
+   legitimateRefs.has(proposal.target_goal_source_ref)&&valid(proposal.reason);
+  if(!anchored){
+   unassessed.push({key:'future_goal_proposal',
+     reason:'FUTURE_GOAL_PROPOSAL_NOT_SOURCE_OR_QUOTE_ANCHORED'});
+   continue;
+  }
+  futureGoalProposals.push({
+   kind:proposal.kind,quote:proposal.quote.slice(0,350),
+   target_goal_source_ref:proposal.target_goal_source_ref,
+   reason:proposal.reason.slice(0,350),
+   authorization_state:'ASSISTANT_PROPOSAL_ONLY',
+   independent_semantic_confirmation:false,
+  });
  }
  const claims=[],relevantKeys=[];
  // A typed source candidate must receive an explicit per-claim assessment.
@@ -361,6 +403,7 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
      provenance_claims_assessed:checks.length,
      goal_trajectory_review:goalTrajectoryReview,
      goal_lifecycle_review:goalLifecycleReview,
+     future_goal_proposals:futureGoalProposals,
      source_fact_count:records.size,
      independent_semantic_adjudication:false,external_action_authorized:false,
    },
@@ -407,7 +450,8 @@ export async function reviewRealityAnswer({
    'Return only structured JSON. Never execute actions. This is an untrusted candidate review, NOT ground truth.',
    'The cleaner_conversation_context preserves source-linked user intent interpretations, not verified external facts or authority.',
    'Use its exact clauses, negation, conditions, dependencies and source references to check scope and obligations across turns.',
-   'PRIMARY GOAL-TRAJECTORY CHECK: compare user_goal_trajectory.original_user_goal_candidate, working_goal_lifecycle, recent_user_directions, current_user_direction and observed assistant behavior against the proposed answer. The lifecycle is a PROVISIONAL reconstruction from older user-source-linked reviews: it is not verified user intent. The current user request overrides an older provisional working goal when the user unambiguously changes direction. Treat multiple concurrent goals as potentially distinct, not one topic string. A temporary detour is a candidate child objective; a pivot is a candidate alternate objective and does not itself permanently abandon prior work. Do not assume any goal was COMPLETED or ABANDONED merely because an assistant said the work was done; those lifecycle states require separately reconciled user evidence. For USER_AUTHORIZED_PIVOT and USER_AUTHORIZED_DETOUR, goal_source_ref MUST identify the CURRENT USER turn that requests the change. For USER_RETURNED_TO_OBJECTIVE, goal_source_ref MUST identify the EARLIER USER goal being resumed (not merely the current turn); if its target cannot be established, choose UNCLEAR and INSUFFICIENT_EVIDENCE rather than pretending to resume a specific goal. A topic shift proposed by an earlier assistant NEVER proves user authorization. Check the semantic trajectory of the assistant recommendation, not just topical nouns. Output goal_trajectory_review for EVERY answer. Only flag assistant-led diversion actually present in the answer, using the exact answer_quote and a USER source_ref. Preserve ambiguity when a user-directed change or supersession is unclear. No semantic review can grant external action authorization. For an aligned answer leave answer_quote empty.',
+   'PRIMARY GOAL-TRAJECTORY CHECK: compare user_goal_trajectory.original_user_goal_candidate, working_goal_lifecycle, recent_user_directions, current_user_direction and observed assistant behavior against the proposed answer. The lifecycle is a PROVISIONAL reconstruction from older user-source-linked reviews: it is not verified user intent. The current user request overrides an older provisional working goal when the user unambiguously changes direction. Treat multiple concurrent goals as potentially distinct, not one topic string. A temporary detour is a candidate child objective; a pivot is a candidate alternate objective and does not itself permanently abandon prior work. Do not assume any goal was COMPLETED or ABANDONED merely because an assistant said the work was done; those lifecycle states require separately reconciled user evidence. For USER_AUTHORIZED_PIVOT and USER_AUTHORIZED_DETOUR, goal_source_ref MUST identify the CURRENT USER turn that requests the change. For USER_RETURNED_TO_OBJECTIVE, goal_source_ref MUST identify the EARLIER USER goal being resumed (not merely the current turn); if its target cannot be established, choose UNCLEAR and INSUFFICIENT_EVIDENCE rather than pretending to resume a specific goal. A topic shift proposed by an earlier assistant NEVER proves user authorization. Check the semantic trajectory of the assistant recommendation, not just topical nouns. Output goal_trajectory_review for EVERY answer. Set return_intent to NOT_RETURN_REQUEST with an empty return_request_quote unless CURRENT user text contains a return request; for a return quote copy the exact substring from current user text. If more than one paused prior user-goal target fits and current user did not specify which, set AMBIGUOUS_RETURN_TARGET, choose UNCLEAR user_direction, and do not invent a target. Only flag assistant-led diversion actually present in the answer, using the exact answer_quote and a USER source_ref. Preserve ambiguity when a user-directed change or supersession is unclear. No semantic review can grant external action authorization. For an aligned answer leave answer_quote empty.',
+   'FUTURE PROPOSAL CHECK: provide future_goal_proposals for any concrete model-origin proposal to later change the user business objective or schedule downstream work outside the current authorized goal. Cite an EXACT substring from the current ANSWER and a matching known user goal source ref. Do NOT include harmless hypothetical examples, user-approved detours, normal planned subtasks already within the goal, or ordinary advice. The model must not schedule, execute, or authorize these proposals; they are only typed candidates for the existing Integrity boundary.',
    'GOAL LIFECYCLE SEMANTICS: return one goal_lifecycle_review for the CURRENT turn: distinguish CONVERSATIONAL_EXIT (finished discussing, not finished work), USER_REPORTED_BUSINESS_COMPLETION (user claims work happened; external result NOT verified), USER_REQUESTED_ABANDONMENT (explicitly wants to stop the identified goal), ASSISTANT_PROPOSED_COMPLETION (assistant implies a goal is finished without current user evidence), NO_LIFECYCLE_CHANGE or UNCLEAR. Require target_goal_source_ref of an EXISTING earlier user goal from user_goal_trajectory; never pick a random task. Require source_quote exactly copied from CURRENT USER input for user-origin events, or from proposed answer for assistant-origin claims. For no change use empty source_quote. A user report never provides external outcome proof. Ending a chat topic does not complete the business task. An assistant proposal can never change user goal state. Ambiguous target => UNCLEAR, not a guessed status.',
    'PRIMARY CONVERSATION CHECK: compare the proposed answer against conversation_source_history.user_statements, the current user message, and source-linked Cleaner context. Did the assistant change an earlier user condition, contradict a later correction, swap an entity or status, answer the previous topic, or assert completion not stated? If yes, return FACT_CONTRADICTION, FORGOTTEN_OBLIGATION, WRONG_TASK or FALSE_COMPLETION with the EXACT contradictory answer quote, and cite the earlier user source_ref in the reason. Never silently call that answer consistent.',
    'Important: AUTHENTICATED_USER_STATEMENT means verified provenance of what the user said, not truth of an external event. An unverified delivery or payment is UNKNOWN; do not promote it to DELIVERED/PAID or to NOT DELIVERED/UNPAID without evidence. A hold on shipping does not bar internal drafting. Later explicit user corrections may supersede older wording in the same scope.',
