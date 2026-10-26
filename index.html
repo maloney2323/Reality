@@ -442,10 +442,24 @@ setInterval(refreshSavedShiftHome,300000);
    const trajectory=reliability.goal_drift_coverage||{};
    const goalContext=reliability.user_goal_continuity||{};
    const authority=reliability.goal_authority||{};
+   const ambiguous=authority.ambiguous_goal_return||{};
+   const ambiguityText=ambiguous.user_selection_required
+    ?'Earlier work is ambiguous: please choose the source-linked goal shown in Reality’s response'
+    :ambiguous.status==='UNANCHORED_REVIEWER_RETURN_CANDIDATE'
+      ?'Return intent uncertain; no goal was changed'
+      :'No unresolved multi-goal return decision recorded';
+   const streakText=authority.direction_fault
+    ?'Repeated assistant-origin direction fault; proposal withheld'
+    :authority.trajectory_reanchor_suggested
+      ?'Repeated blocked assistant suggestions; next answer re-anchored to user goal'
+      :'Assistant-goal proposal streak: '+(authority.assistant_direction_streak||0)+
+       ' (reviewer candidates, not verified drift)';
    const goalAuthorityText=authority.boundary_status==='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED'
     ? 'Assistant business-completion claim BLOCKED; independent outcome proof required'
     :authority.boundary_status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'
     ? 'Assistant-proposed change BLOCKED; original user goal preserved'
+    :authority.boundary_status==='UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED'
+    ? 'Unauthorized proposed future work BLOCKED; no task scheduled'
     :authority.boundary_status==='NOT_SEMANTICALLY_ASSESSED'
      ? 'Goal-shift authority: not semantically assessed'
      :authority.boundary_status==='NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED'
@@ -488,6 +502,8 @@ setInterval(refreshSavedShiftHome,300000);
     ' · '+goalContextStatus+
     ' · Completion: '+lifecycleText+
     ' · Goal authority: '+goalAuthorityText+
+    ' · '+streakText+
+    ' · '+ambiguityText+
     ' · Goal transition: '+goalGovernanceText+
     ' · Goal tracking: '+driftText+
     ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
