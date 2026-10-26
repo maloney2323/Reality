@@ -442,13 +442,25 @@ setInterval(refreshSavedShiftHome,300000);
    const trajectory=reliability.goal_drift_coverage||{};
    const goalContext=reliability.user_goal_continuity||{};
    const authority=reliability.goal_authority||{};
-   const goalAuthorityText=authority.boundary_status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'
+   const goalAuthorityText=authority.boundary_status==='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED'
+    ? 'Assistant business-completion claim BLOCKED; independent outcome proof required'
+    :authority.boundary_status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'
     ? 'Assistant-proposed change BLOCKED; original user goal preserved'
     :authority.boundary_status==='NOT_SEMANTICALLY_ASSESSED'
      ? 'Goal-shift authority: not semantically assessed'
      :authority.boundary_status==='NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED'
       ? 'No assistant goal mutation established (not independent proof)'
       : 'Goal authority not yet available';
+   const lifecycle=authority.current_user_lifecycle_candidate||{};
+   const lifecycleText=lifecycle.relation==='CONVERSATIONAL_EXIT'
+    ? 'Conversation topic finished; business task NOT marked complete'
+    :lifecycle.relation==='USER_REPORTED_BUSINESS_COMPLETION'
+     ? 'User reports completion; external outcome NOT VERIFIED'
+     :lifecycle.relation==='USER_REQUESTED_ABANDONMENT'
+      ? 'Stop requested; target and scope pending reconciliation'
+      :lifecycle.relation==='ASSISTANT_PROPOSED_COMPLETION'
+       ? 'Assistant completion claim is NOT outcome proof'
+       : 'Business completion not independently verified';
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
@@ -474,6 +486,7 @@ setInterval(refreshSavedShiftHome,300000);
     (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
     ' · Semantic review: '+assessed+
     ' · '+goalContextStatus+
+    ' · Completion: '+lifecycleText+
     ' · Goal authority: '+goalAuthorityText+
     ' · Goal transition: '+goalGovernanceText+
     ' · Goal tracking: '+driftText+
