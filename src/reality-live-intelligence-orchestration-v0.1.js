@@ -16,7 +16,7 @@ import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverag
 import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation } from './reality-goal-governance-contract-v0.1.js';
 import {
  projectGoalStateContract,projectGoalTransitionContract,
- projectAssistantGoalProposal,enforceGoalTransitionBoundary,
+ projectExplicitNoActiveGoalBoundary,projectAssistantGoalProposal,enforceGoalTransitionBoundary,
  adjudicateRevisedGoalAlignment,
  pendingGoalAuthorizationResponse,pendingGoalCompletionEvidenceResponse,
 } from './reality-goal-authority-contracts-v0.1.js';
@@ -326,6 +326,18 @@ export async function runLiveIntelligenceOrchestration({
   // confirmed user-owned objective. This boundary changes conversational
   // comparison only, not business action execution privileges.
   const authoritativeActiveGoal=authorizedUserGoals?.active_goal||null;
+  // An authenticated PAUSE/ABANDON/REPORT_COMPLETE with no remaining active
+  // user goal MUST outrank the untrusted earlier reviewer-created focus.
+  // Distinguish "no explicit commands" from "explicitly no active goal".
+  const explicitlyNoActiveGoal=Boolean(authorizedUserGoals &&
+    authorizedUserGoals.transition_count>0 &&
+    authorizedUserGoals.active_goal_id===null);
+  const noActiveGoalBoundary=explicitlyNoActiveGoal?
+    projectExplicitNoActiveGoalBoundary({
+      authoritativeUserGoals:authorizedUserGoals,
+      continuityRootId:normalizedContinuityRoot,
+      worldId:systemContext?.world_id||null,
+    }):null;
   const controllingGoalStateContract=authoritativeActiveGoal?Object.freeze({
     ...userGoalStateContract,
     goal_id:authoritativeActiveGoal.goal_id,
@@ -341,7 +353,7 @@ export async function runLiveIntelligenceOrchestration({
     },
     source_user_authorization_verified:true,
     permits_external_execution:false,
-  }):userGoalStateContract;
+  }):noActiveGoalBoundary||userGoalStateContract;
   const assistantTrajectory=projectAssistantTrajectoryBoundary({
     continuityHistory:priorGoalContinuityHistory,goalState:controllingGoalStateContract,
     continuityRootId:normalizedContinuityRoot,worldId:systemContext?.world_id||null,
@@ -367,6 +379,8 @@ export async function runLiveIntelligenceOrchestration({
       // active goal*, while current user instructions can still request
       // temporary detours without rewriting that record.
       authoritative_user_goals:authorizedUserGoals,
+      explicit_no_active_goal_from_user_ledger:explicitlyNoActiveGoal,
+      current_user_request_governs_if_no_active_goal:true,
       assistant_proposal_trajectory:assistantTrajectory,
     },
     user_goal_continuity_summary:{
@@ -374,6 +388,7 @@ export async function runLiveIntelligenceOrchestration({
       authoritative_active_goal_text:authorizedUserGoals?.active_goal?.title||null,
       authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
+      authenticated_no_active_goal:explicitlyNoActiveGoal,
       original_goal_evidence_id:userGoalContinuityState.original_user_goal_evidence_id,
       current_user_evidence_id:userGoalContinuityState.current_user_evidence_id,
       lifecycle_status:userGoalContinuityState.lifecycle_reconciliation_status,
@@ -421,6 +436,7 @@ export async function runLiveIntelligenceOrchestration({
     canonical_epistemic_receipt:epistemicFrameReceipt,
     user_goal_state_contract:controllingGoalStateContract,
     authoritative_user_goal_state:canonicalEpistemicFrame.authoritative_user_goals,
+    no_active_goal_explicitly_recorded:explicitlyNoActiveGoal,
     goal_authority_priority:'ONLY_EXPLICIT_AUTHENTICATED_USER_GOAL_LEDGER_COMMANDS_MUTATE_RECORDED_ACTIVE_GOAL',
     goal_authority_restriction:'ASSISTANT_OUTPUT_AND_SEMANTIC_REVIEW_CANNOT_MUTATE_GOAL_STATE_OR_AUTHORIZE_ACTION',
     assistant_direction_reanchor:assistantTrajectory.direction_reanchor_recommended?{
@@ -710,6 +726,8 @@ export async function runLiveIntelligenceOrchestration({
       authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
       authorized_goal_status:authorizedUserGoals?.status||'NOT_AVAILABLE_IN_THIS_RUNTIME',
+      authenticated_no_active_goal:explicitlyNoActiveGoal,
+      controlling_goal_kind:controllingGoalStateContract.goal_state_kind||'USER_GOAL_EVIDENCE',
       original_user_source_ref:userGoalContinuityState.original_user_goal_source_ref,
       preserved_original_goal_across_turns:Boolean(oldGoalState),
       provisional_working_goal_source_ref:goalLifecycle.working_goal.source_ref,
