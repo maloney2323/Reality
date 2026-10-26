@@ -13,7 +13,10 @@ import { startContinuityRuntime } from './reality-continuity-spine-runtime-v0.1.
 import { runContinuousReliabilityCycle } from './reality-continuous-reliability-v0.1.js';
 import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
 import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverage-v0.1.js';
-import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation } from './reality-goal-governance-contract-v0.1.js';
+import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation,
+  adjudicateFinalAssistantGoalRelease,withheldAssistantDirectionAnswer,
+} from './reality-goal-governance-contract-v0.1.js';
+import {createHash} from 'node:crypto';
 import {
  projectGoalStateContract,projectGoalTransitionContract,
  projectExplicitNoActiveGoalBoundary,projectAssistantGoalProposal,enforceGoalTransitionBoundary,
@@ -763,6 +766,10 @@ export async function runLiveIntelligenceOrchestration({
     }:null,
   };
   const initialAssistantProposalText=String(modelResult?.answer||'');
+  // Only a review of the EXACT final retry may clear an earlier assistant
+  // goal redirection. An unreviewed fallback or disclaimer is not a revision.
+  let acceptedGoalRevisionReview=null;
+  let acceptedGoalRevisionText=null;
   // Meaning-first correction. Never accept a candidate because its keyword
   // flags went away: regenerate ONCE, then review source claims and objective
   // again. All semantic judgments remain provisional, not verified world truth.
@@ -923,6 +930,8 @@ export async function runLiveIntelligenceOrchestration({
       if(safeToRelease){
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
+        acceptedGoalRevisionReview=retryReview?.review||null;
+        acceptedGoalRevisionText=String(retry.answer);
       } else if(materialUnsupportedClaim) {
         if(actionClaimRisk){
           // Consequential unverified action claims must not be released as fact.
@@ -1146,6 +1155,87 @@ export async function runLiveIntelligenceOrchestration({
       modelResult.reliability_intervention=
         'STALE_AUTHENTICATED_USER_GOAL_ANSWER_WITHHELD';
     }
+  }
+  // FINAL ANSWER GATE. The initial proposal was governed already, but the
+  // rewritten/released text must also satisfy the SAME immutable user-goal
+  // contract. Never count the absence of fresh reviewer warnings as proof of
+  // alignment. When a known unauthorized direction remains/newly appears,
+  // publish only a deterministic source-linked withholding explanation.
+  let finalDirectionRelease=null;
+  if(semanticModeEnabled&&reliabilityPreviewEnabled){
+    const candidateRelease=String(modelResult.answer||'');
+    finalDirectionRelease=adjudicateFinalAssistantGoalRelease({
+      canonicalFrame:canonicalEpistemicFrame,
+      originalAnswer:initialAssistantProposalText,
+      finalAnswer:candidateRelease,
+      originalReview:semanticFirst?.review||null,
+      postRevisionReview:acceptedGoalRevisionReview,
+      postRevisionReviewedAnswer:acceptedGoalRevisionText,
+      observedAt:observedAt||new Date().toISOString(),
+    });
+    if(!finalDirectionRelease.candidate_answer_release_allowed){
+      modelResult.answer=withheldAssistantDirectionAnswer({
+        canonicalFrame:canonicalEpistemicFrame,
+      });
+      modelResult.reliability_intervention='FINAL_ASSISTANT_GOAL_DIRECTION_WITHHELD';
+    }
+    // Prove the exact released bytes were committed before output; the
+    // original, rejected candidate can never become the final response via
+    // a later narration or the ordinary work-plan branch.
+    const releasedAnswer=String(modelResult.answer||'');
+    const releasedHash='sha256:'+createHash('sha256').update(
+      JSON.stringify(releasedAnswer)).digest('hex');
+    if(continuityRuntime?.enabled){
+      const releaseEvent=await continuityRuntime.appendStage({
+        stage:'VERIFICATION',
+        entityId:'final-direction-release:'+governedSignal.packet.packet_id,
+        eventId:'final-direction-release:'+
+          continuityRuntime.spine.continuity_root_id+':'+governedSignal.packet.packet_id,
+        epistemicStatus:'UNVERIFIED',
+        evidenceRefs:[epistemicFrameReceipt.source_receipt_id,
+          continuousReliability?.receipt_id].filter(Boolean),
+        payload:{
+          event_type:'ASSISTANT_FINAL_DIRECTION_PUBLICATION_DECISION',
+          canonical_frame_hash:canonicalEpistemicFrame.frame_hash,
+          final_direction_contract:finalDirectionRelease,
+          original_model_response_id:modelResult.response_id||null,
+          first_semantic_reviewer_id:semanticFirst?.response_id||null,
+          final_revision_reviewed:finalDirectionRelease.second_semantic_review_bound_to_exact_final_text,
+          disposition:finalDirectionRelease.candidate_answer_release_allowed?
+            'CANDIDATE_RELEASED_WITHOUT_INDEPENDENT_ACCURACY_PROOF':
+            'OFF_GOAL_TEXT_WITHHELD_AND_REPLACED_WITH_SOURCE_LINKED_NOTICE',
+          released_intervention:modelResult.reliability_intervention||null,
+          actual_released_answer_hash:releasedHash,
+          assistant_goal_mutated:false,
+          external_action_executed:false,
+          true_drift_rate_verified:false,
+        },
+        provenance:{source:'reality_existing_integrity_spine_final_direction_boundary'},
+      });
+      const recorded=(await continuityRuntime.readback()).some(e=>
+        e.event_id===releaseEvent.event_id&&
+        e.payload?.event_type==='ASSISTANT_FINAL_DIRECTION_PUBLICATION_DECISION'&&
+        e.payload?.final_direction_contract?.decision_hash===finalDirectionRelease.decision_hash&&
+        e.payload?.actual_released_answer_hash===releasedHash&&
+        e.payload?.canonical_frame_hash===canonicalEpistemicFrame.frame_hash);
+      if(!recorded)throw Error('FINAL_ASSISTANT_DIRECTION_RELEASE_READBACK_FAILED');
+      finalDirectionRelease={
+        ...finalDirectionRelease,source_receipt_id:releaseEvent.event_id,
+        final_answer_hash:releasedHash,
+      };
+    }
+    reliabilityWithExtraction.final_direction_release={
+      status:finalDirectionRelease.status,
+      release_allowed:finalDirectionRelease.candidate_answer_release_allowed,
+      known_off_goal_text_withheld:
+        !finalDirectionRelease.candidate_answer_release_allowed,
+      exact_final_revision_reviewed:
+        finalDirectionRelease.second_semantic_review_bound_to_exact_final_text,
+      source_receipt_id:finalDirectionRelease.source_receipt_id||null,
+      final_answer_hash:releasedHash,
+      semantic_accuracy_independently_verified:false,
+      no_alerts_prove_no_goal_drift:false,
+    };
   }
   let goalAuthorityReceipt=null;
   if(continuityRuntime?.enabled){
