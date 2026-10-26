@@ -10,6 +10,7 @@ const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Obj
 export function buildCanonicalEpistemicFrame({
  governedSignal,conversationContinuity,sourceAttestedSnapshot=null,
  userGoalContinuityState=null,userGoalLifecycle=null,userGoalStateContract=null,
+ controllingGoalStateContract=null,
  authorizedUserGoals=null,
  worldId=null,continuityRootId,observedAt,historyMayBeIncomplete=false,
 }={}){
@@ -70,6 +71,25 @@ export function buildCanonicalEpistemicFrame({
     (authorizedUserGoals.active_goal_id!==null&&
      authorizedUserGoals.active_goal?.goal_id!==authorizedUserGoals.active_goal_id)))
    throw Error('CANONICAL_AUTHORIZED_GOAL_SCOPE_OR_AUTHORITY_INVALID');
+ if(controllingGoalStateContract){
+  const confirmed=authorizedUserGoals?.active_goal||null;
+  if(!userGoalStateContract||
+     controllingGoalStateContract.world_id!==(worldId||null)||
+     controllingGoalStateContract.permits_external_execution!==false)
+   throw Error('CANONICAL_CONTROLLING_GOAL_SCOPE_INVALID');
+  if(confirmed){
+   if(controllingGoalStateContract.goal_id!==confirmed.goal_id||
+      controllingGoalStateContract.provenance?.origin_turn_id!==confirmed.source_user_message_ref||
+      controllingGoalStateContract.provenance?.evidence_payload_ref!==confirmed.last_transition_receipt_id||
+      controllingGoalStateContract.provenance?.source_kind!=='AUTHENTICATED_USER_GOAL_LEDGER_COMMAND'||
+      controllingGoalStateContract.source_user_authorization_verified!==true||
+      controllingGoalStateContract.status!=='ACTIVE')
+    throw Error('CANONICAL_CONTROLLING_GOAL_MUST_MATCH_USER_AUTHORITY');
+  }else if(controllingGoalStateContract.goal_id!==userGoalStateContract.goal_id||
+     controllingGoalStateContract.source_user_authorization_verified!==false||
+     controllingGoalStateContract.provenance?.origin_turn_id!==userGoalStateContract.provenance?.origin_turn_id)
+    throw Error('CANONICAL_UNCONFIRMED_GOAL_MUST_REMAIN_PROVISIONAL');
+ }
  if(userGoalStateContract&&(
     userGoalStateContract.goal_id!==userGoalLifecycle?.working_goal?.goal_evidence_id||
     userGoalStateContract.provenance?.origin_turn_id!==userGoalLifecycle?.working_goal?.source_ref||
@@ -110,6 +130,9 @@ export function buildCanonicalEpistemicFrame({
   user_goal_continuity_state:userGoalContinuityState?copy(userGoalContinuityState):null,
   user_goal_lifecycle_projection:userGoalLifecycle?copy(userGoalLifecycle):null,
   user_goal_state_contract:userGoalStateContract?copy(userGoalStateContract):null,
+  // The single controlling goal used by BOTH Cognition and Integrity.
+  // Authenticated command receipts outrank reviewer-only goal proposals.
+  controlling_user_goal_state_contract:controllingGoalStateContract?copy(controllingGoalStateContract):null,
   authoritative_user_goals:authorizedUserGoals?copy(authorizedUserGoals):null,
   reported_claims,unresolved_user_conditions:obligations,
   source_attested_facts:sourced,
