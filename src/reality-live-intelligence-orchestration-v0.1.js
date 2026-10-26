@@ -990,9 +990,7 @@ export async function runLiveIntelligenceOrchestration({
     'CLAIM_BUSINESS_COMPLETION')&&
     // If the corrected release removed *all* blocked content, do not overwrite
     // it with a redundant hold notice. Otherwise fail closed on the bundle.
-    !unreviewedGoalShift&&
-    (modelResult.reliability_intervention!=='SEMANTIC_REVIEW_CORRECTED'||
-      blockedQuotesStillInRelease);
+    !unreviewedGoalShift&&blockedQuotesStillInRelease;
   if(unverifiedAssistantCompletion){
     modelResult.answer=pendingGoalCompletionEvidenceResponse({
       goalState:userGoalStateContract,decision:assistantGoalDecision,
