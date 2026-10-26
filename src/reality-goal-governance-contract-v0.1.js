@@ -74,6 +74,17 @@ export function buildAssistantGoalGovernance({
  const working=lifecycle?.working_goal||null;
  const controlling=canonicalFrame.controlling_user_goal_state_contract||null;
  const confirmed=canonicalFrame.authoritative_user_goals?.active_goal||null;
+ const noActiveGoal=Boolean(canonicalFrame.authoritative_user_goals?.transition_count>0&&
+   canonicalFrame.authoritative_user_goals?.active_goal_id===null);
+ // A user PAUSE/ABANDON command is also authoritative. In particular a
+ // reviewer-created provisional focus can never take over on a NULL active goal.
+ if(noActiveGoal&&(!controlling||
+    controlling.goal_state_kind!=='EXPLICIT_NO_ACTIVE_USER_GOAL_BOUNDARY'||
+    controlling.no_active_goal_explicitly_recorded!==true||
+    controlling.represents_user_goal!==false||
+    controlling.source_user_authorization_verified!==true||
+    controlling.permits_external_execution!==false))
+  throw Error('GOAL_GOVERNANCE_EXPLICIT_NO_ACTIVE_GOAL_OVERRIDDEN');
  // An authenticated user-owned goal must be the SAME governing goal for
  // cognition, comparison, and post-generation integrity. Never fall back to
  // a reviewer-derived working goal after a confirmed command exists.
@@ -155,7 +166,9 @@ export function buildAssistantGoalGovernance({
    user_source_ref:controlling?.provenance?.origin_turn_id||
      working?.source_ref||original?.source_ref||null,
    status:confirmed?'AUTHENTICATED_USER_CONFIRMED_ACTIVE_GOAL':
+     noActiveGoal?'AUTHENTICATED_USER_CONFIRMED_NO_ACTIVE_GOAL':
      'PROVISIONAL_UNLESS_INDEPENDENTLY_RECONCILED',
+   no_active_goal_explicitly_recorded:noActiveGoal,
    original_user_goal_evidence_id:original?.goal_evidence_id||null,
    authoritative_goal_transition_receipt_id:confirmed?.last_transition_receipt_id||null,
   },
