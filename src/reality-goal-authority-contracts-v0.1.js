@@ -110,7 +110,10 @@ export function projectAssistantGoalProposal({
   .filter(x=>['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.kind)&&
     nonempty(x.quote)&&firstAnswer.includes(x.quote)&&
     sourceSet.has(x.target_goal_source_ref)&&
-    x.authorization_state==='ASSISTANT_PROPOSAL_ONLY')
+    x.authorization_state==='ASSISTANT_PROPOSAL_ONLY'&&
+    x.goal_mutation_requested===true&&
+    ['ASSISTANT_DIRECTED_OBJECTIVE_SHIFT',
+     'ASSISTANT_DIRECTED_FUTURE_COMMITMENT'].includes(x.direction_effect))
   .slice(0,8).map(x=>({
     type:x.kind,target_goal_id:goalState.goal_id,
     prior_user_goal_source_ref:x.target_goal_source_ref,
