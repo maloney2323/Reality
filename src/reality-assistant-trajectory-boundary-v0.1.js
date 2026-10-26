@@ -96,6 +96,7 @@ export function resolveAmbiguousGoalReturn({
  for(const x of [
   goalLifecycle?.preserved_original_goal,
   ...(goalLifecycle?.paused_goal_candidates||[]),
+  ...(goalLifecycle?.dormant_goal_candidates||[]),
  ]){
   if(!nonempty(x?.goal_evidence_id)||!nonempty(x?.source_ref)||!nonempty(x?.text)||
      x.goal_evidence_id===working?.goal_evidence_id)continue;
