@@ -35,7 +35,11 @@ export default async function handler(req,res){
   privateChatConfig();
   if(!['GET','POST'].includes(req.method))
    return res.status(405).setHeader('Allow','GET, POST').json({ok:false,error:'METHOD_NOT_ALLOWED'});
-  if(req.method==='POST')assertSameOrigin(req);
+  if(req.method==='POST'){
+   // Explicit state-changing user commands require browser-origin proof.
+   if(!req.headers?.origin)fail('GOAL_COMMAND_ORIGIN_REQUIRED',403);
+   assertSameOrigin(req);
+  }
   const session=await authenticatedChatSession(req,res);
   if(!session)fail('CHAT_SIGN_IN_REQUIRED',401);
   const conversationId=String((req.method==='GET'?
