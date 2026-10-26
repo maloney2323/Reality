@@ -28,3 +28,13 @@ Importantly, **blocking state mutation is not equal to removing a bad sentence**
 - No 0% drift or measured improvement claims are supported.
 
 Next architectural decision: continue hardening the user-owned goal lifecycle/obligation graph and exact proposed-answer correction in the existing Continuity projection, followed by independent evaluation **only when the founder chooses to resume testing**.
+
+
+## Authenticated user-goal lifecycle controls added (Oct 26)
+
+A further source inspection found that `api/reality/personal-goals.js` **already** supports the full `SET_ACTIVE / START_DETOUR / RESUME / PAUSE / ABANDON / REPORT_COMPLETE` command contract. These events are issued only after session authentication, same-origin verification and exact Supabase RLS-backed user-message readback, then appended to the **existing** Continuity ledger. The basic UI had only exposed `SET_ACTIVE` and `RESUME` through goal controls, plus `START_DETOUR` through the chat selector.
+
+`index.html` now exposes three additional explicit, user-confirmed choices: **Pause active goal**, **Abandon active goal**, and **Report goal complete (unverified)**. They use the existing dedicated API, never infer commands from the model or reviewer, and check that a source-linked transition was recorded. Pausing or ending an active goal does not silently reactivate an older goal; a completion report cannot independently attest real-world completion and grants no external action authority. Draft PR only. There were **no manual tests or model calls** during this additional UI implementation, consistent with the founder's pause on testing.
+
+Still pending: semantic lifecycle correctness on complex multi-goal conversations and atomic database publication across simultaneous authorized goal changes. A proposed isolated-preview-only SQL migration exists at `sql/reality-atomic-goal-publication-v0.1.sql` but this pass **did not apply it**. Do not imply that the existing optional publication RPC is deployed or that cross-request atomicity is established. Production remains unchanged.
+
