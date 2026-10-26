@@ -95,11 +95,15 @@ create trigger reality_goal_publication_epoch_bump
  after insert on public.universe_events
  for each row execute function reality_internal.bump_goal_publication_epoch();
 
--- The authenticated user JWT is required; the function never takes an
--- owner_id from the request. It inserts only if the initiating human turn
--- belongs to that principal and the goal revision is unchanged.
+-- ONLY Reality's isolated server credential can call this RPC.
+-- The server authenticates the human session and verifies their RLS source
+-- message first. The RPC requires that exact user/conversation/request.
+-- No browser JWT, model or reviewer can publish arbitrary "assistant" history.
 -- PostgREST executes each RPC as one database transaction.
+-- The p_user_id argument is trusted ONLY because EXECUTE is service_role-only.
+-- Never grant authenticated/anon direct EXECUTE access.
 create or replace function public.reality_publish_assistant_if_goal_current(
+ p_user_id uuid,
  p_conversation_id uuid,
  p_request_id uuid,
  p_content text,
@@ -108,7 +112,7 @@ create or replace function public.reality_publish_assistant_if_goal_current(
 ) returns uuid language plpgsql volatile security definer
 set search_path='' as $$
 declare
-  caller_id uuid := auth.uid();
+  caller_id uuid := p_user_id;
   current_revision bigint;
   last_event uuid;
   inserted_id uuid;
@@ -151,9 +155,9 @@ begin
 end
 $$;
 revoke all on function public.reality_publish_assistant_if_goal_current(
- uuid,uuid,text,bigint,uuid) from public,anon;
+ uuid,uuid,uuid,text,bigint,uuid) from public,anon,authenticated;
 grant execute on function public.reality_publish_assistant_if_goal_current(
- uuid,uuid,text,bigint,uuid) to authenticated;
+ uuid,uuid,uuid,text,bigint,uuid) to service_role;
 
 -- No authenticated client may directly INSERT a forged assistant reply,
 -- bypassing the revision check. Server-authenticated user text remains writable.
