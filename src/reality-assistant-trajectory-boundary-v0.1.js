@@ -14,21 +14,31 @@ export function projectAssistantTrajectoryBoundary({
  if(!Array.isArray(continuityHistory)||!nonempty(continuityRootId)||
     !nonempty(goalState?.goal_id)||goalState.world_id!==(worldId||null))
   throw Error('ASSISTANT_TRAJECTORY_SCOPE_REQUIRED');
- const source=continuityHistory.filter(e=>{
-  const p=e?.payload;
-  const state=p?.goal_state_contract,proposal=p?.assistant_proposal;
-  return p?.event_type==='ASSISTANT_GOAL_PROPOSAL_AND_AUTHORITY_DECISION'&&
-    state?.world_id===(worldId||null)&&
-    state?.goal_id===goalState.goal_id&&
-    nonempty(proposal?.proposal_id)&&
-    proposal.target_goal_id===goalState.goal_id&&
-    p?.verifier_decision?.proposal_id===proposal.proposal_id&&
-    p?.verifier_decision?.goal_id===goalState.goal_id&&
-    p?.verifier_decision?.external_actions_authorized===false&&
-    p?.verifier_decision?.authorized_goal_mutations===0;
- }).slice(-MAX_EVENTS);
+ // Do not pre-filter other goals: a legitimate user-owned switch MUST
+ // interrupt the same-goal consecutive assistant redirection streak.
+ const source=continuityHistory.filter(e=>
+   e?.payload?.event_type==='ASSISTANT_GOAL_PROPOSAL_AND_AUTHORITY_DECISION'&&
+   typeof e.event_id==='string'&&
+   e.event_id.startsWith('goal-proposal:'+continuityRootId+':')&&
+   e.payload.goal_state_contract?.world_id===(worldId||null)
+ ).slice(-MAX_EVENTS);
  const entries=source.map(e=>{
-  const p=e.payload,mutations=p.assistant_proposal.intended_state_mutations?.goal_mutations||[];
+  const p=e.payload,state=p.goal_state_contract,proposal=p.assistant_proposal;
+  const sameGoal=state?.goal_id===goalState.goal_id;
+  const validLineage=nonempty(proposal?.proposal_id)&&
+    proposal.target_goal_id===state?.goal_id&&
+    p.verifier_decision?.proposal_id===proposal.proposal_id&&
+    p.verifier_decision?.goal_id===state?.goal_id&&
+    p.verifier_decision?.external_actions_authorized===false&&
+    p.verifier_decision?.authorized_goal_mutations===0;
+  if(!sameGoal||!validLineage)return {
+    source_receipt_id:e.event_id,
+    proposal_id:proposal?.proposal_id||null,
+    status:!sameGoal?'DIFFERENT_USER_GOAL_INTERRUPTED_STREAK':
+      'UNVERIFIED_PROPOSAL_SOURCE_INTERRUPTED_STREAK',
+    reviewer_only_not_independent_truth:true,
+  };
+  const mutations=proposal.intended_state_mutations?.goal_mutations||[];
   const blocked=mutations.some(x=>
    ['SHIFT_OBJECTIVE','SCHEDULE_FUTURE_WORK'].includes(x.type)&&
     x.authorized_by==='ASSISTANT_PROPOSAL'&&x.authorization_state==='UNAUTHORIZED');
