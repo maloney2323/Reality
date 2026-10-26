@@ -626,6 +626,12 @@ setInterval(refreshSavedShiftHome,300000);
      :currentMeaning.status==='SOURCE_BOUND_SEMANTIC_CANDIDATE_NOT_USER_AUTHORIZED'
       ?' · Goal direction source-linked, still provisional'
       :' · Current goal transition not independently reconciled';
+   const parentGoalStatus=goalContext.authoritative_graph_status==='PARTIAL_AUTHORITATIVE_GOAL_GRAPH'
+    ?'Authenticated goal hierarchy incomplete; verify parent source'
+    :goalContext.authoritative_graph_status==='AUTHENTICATED_ACTIVE_GOAL_GRAPH'
+     ?'Source-linked parent goals: '+(goalContext.authenticated_parent_goal_ids||[]).length+
+      ' · Paused/dormant recoverable: '+(goalContext.recoverable_authenticated_goal_count||0)
+     :'No authenticated active-goal hierarchy available';
    const goalContextStatus=goalContext.provisional_working_goal_source_ref?
     ('Working objective (provisional, from user text): '+
      String(goalContext.provisional_working_goal_text||'').slice(0,110)+
@@ -660,6 +666,7 @@ setInterval(refreshSavedShiftHome,300000);
     ' · Semantic review: '+assessed+
     ' · '+pinnedGoalStatus+
     ' · '+goalContextStatus+
+    ' · '+parentGoalStatus+
     ' · Completion: '+lifecycleText+
     ' · Goal authority: '+goalAuthorityText+
     ' · '+streakText+
