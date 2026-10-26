@@ -215,3 +215,51 @@ export async function appendAuthenticatedUserGoalCommand({
   throw Error('USER_GOAL_AUTHORITY_TRANSITION_NOT_PROJECTED');
  return {event_id:event.event_id,state};
 }
+
+
+/**
+ * Before publishing an answer, project a NEW authenticated goal-ledger
+ * readback and ensure that no user-owned goal transition was recorded
+ * while the model was generating. Do not rely on a reviewer or model text.
+ *
+ * This is not a transactional compare-and-swap across simultaneous writes.
+ */
+export function compareAuthenticatedGoalSnapshots({expected,current}={}){
+ if(expected?.version!==AUTHORITATIVE_USER_GOAL_LEDGER_VERSION||
+    current?.version!==AUTHORITATIVE_USER_GOAL_LEDGER_VERSION||
+    !ok(expected.continuity_root_id)||!ok(expected.principal_id)||
+    current.continuity_root_id!==expected.continuity_root_id||
+    current.world_id!==expected.world_id||
+    current.principal_id!==expected.principal_id||
+    expected.assistant_can_mutate_goals!==false||
+    current.assistant_can_mutate_goals!==false||
+    expected.external_execution_authorized!==false||
+    current.external_execution_authorized!==false||
+    !Number.isInteger(expected.transition_count)||
+    !Number.isInteger(current.transition_count))
+  throw Error('USER_GOAL_PUBLICATION_SCOPE_OR_PROJECTION_INVALID');
+ if(current.transition_count<expected.transition_count)
+  throw Error('USER_GOAL_PUBLICATION_HISTORY_ROLLBACK');
+ const first=expected.active_goal,latest=current.active_goal;
+ const identical=expected.transition_count===current.transition_count&&
+   expected.active_goal_id===current.active_goal_id&&
+   (first?.last_transition_receipt_id||null)===(latest?.last_transition_receipt_id||null);
+ return freeze({
+  version:AUTHORITATIVE_USER_GOAL_LEDGER_VERSION,
+  status:identical?'USER_GOAL_SNAPSHOT_CURRENT':
+    'USER_GOAL_CHANGED_SINCE_COGNITION',
+  continuity_root_id:expected.continuity_root_id,
+  world_id:expected.world_id,principal_id:expected.principal_id,
+  original_active_goal_id:expected.active_goal_id,
+  latest_active_goal_id:current.active_goal_id,
+  original_active_goal_receipt_id:first?.last_transition_receipt_id||null,
+  latest_active_goal_receipt_id:latest?.last_transition_receipt_id||null,
+  transitions_seen_during_answer:current.transition_count-expected.transition_count,
+  generated_answer_may_rely_on_stale_goal:!identical,
+  stale_model_answer_admission_allowed:identical,
+  goal_state_mutated_by_assistant:false,
+  external_execution_authorized:false,
+  independently_verified_semantic_correctness:false,
+  atomic_compare_and_swap_proven:false,
+ });
+}
