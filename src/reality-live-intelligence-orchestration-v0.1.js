@@ -3,6 +3,7 @@ import {buildCognitionContinuityHandoff} from './reality-cognition-continuity-ha
 import {buildCanonicalEpistemicFrame,recordCanonicalEpistemicFrame} from './reality-canonical-epistemic-frame-v0.1.js';
 import {buildUserGoalContinuityState,recoverPriorUserGoalState,projectProvisionalGoalLifecycle} from './reality-user-goal-continuity-state-v0.1.js';
 import {projectAuthoritativeUserGoals,compareAuthenticatedGoalSnapshots} from './reality-authoritative-user-goal-ledger-v0.1.js';
+import {projectAuthoritativeGoalRelationshipGraph} from './reality-authoritative-goal-relationship-graph-v0.1.js';
 import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
@@ -299,6 +300,12 @@ export async function runLiveIntelligenceOrchestration({
       worldId:systemContext?.world_id||null,
       principalId:requestedBy,
     }):null;
+  const authoritativeGoalGraph=authorizedUserGoals?
+    projectAuthoritativeGoalRelationshipGraph({
+      authoritativeState:authorizedUserGoals,
+      scopeRootId:normalizedContinuityRoot,
+      worldId:systemContext?.world_id||null,principalId:requestedBy,
+    }):null;
   const oldGoalState=continuityRuntime?.enabled?
     recoverPriorUserGoalState({
       continuityHistory:priorGoalContinuityHistory,
@@ -382,12 +389,15 @@ export async function runLiveIntelligenceOrchestration({
       // active goal*, while current user instructions can still request
       // temporary detours without rewriting that record.
       authoritative_user_goals:authorizedUserGoals,
+      authoritative_goal_relationship_graph:authoritativeGoalGraph,
       explicit_no_active_goal_from_user_ledger:explicitlyNoActiveGoal,
       current_user_request_governs_if_no_active_goal:true,
       assistant_proposal_trajectory:assistantTrajectory,
     },
     user_goal_continuity_summary:{
       authoritative_active_goal_id:authorizedUserGoals?.active_goal_id||null,
+      authoritative_active_goal_parent_ids:authoritativeGoalGraph?.active_ancestor_goal_ids||[],
+      recoverable_paused_or_dormant_goal_count:authoritativeGoalGraph?.paused_or_dormant_goals.length||0,
       authoritative_active_goal_text:authorizedUserGoals?.active_goal?.title||null,
       authoritative_goal_source_ref:authorizedUserGoals?.active_goal?.source_user_message_ref||null,
       authoritative_transition_count:authorizedUserGoals?.transition_count||0,
@@ -412,7 +422,7 @@ export async function runLiveIntelligenceOrchestration({
     userGoalContinuityState,userGoalLifecycle:goalLifecycle,
     userGoalStateContract,
     controllingGoalStateContract,
-    authorizedUserGoals,
+    authorizedUserGoals,authoritativeGoalGraph,
     sourceAttestedSnapshot:sourceAttestedFrameSnapshot,
     worldId:systemContext?.world_id||null,
     // The Continuity spine canonicalizes the root to a UUID. Use that
@@ -439,6 +449,7 @@ export async function runLiveIntelligenceOrchestration({
     canonical_epistemic_receipt:epistemicFrameReceipt,
     user_goal_state_contract:controllingGoalStateContract,
     authoritative_user_goal_state:canonicalEpistemicFrame.authoritative_user_goals,
+    authoritative_goal_relationship_graph:canonicalEpistemicFrame.authoritative_goal_relationship_graph,
     no_active_goal_explicitly_recorded:explicitlyNoActiveGoal,
     goal_authority_priority:'ONLY_EXPLICIT_AUTHENTICATED_USER_GOAL_LEDGER_COMMANDS_MUTATE_RECORDED_ACTIVE_GOAL',
     goal_authority_restriction:'ASSISTANT_OUTPUT_AND_SEMANTIC_REVIEW_CANNOT_MUTATE_GOAL_STATE_OR_AUTHORIZE_ACTION',
