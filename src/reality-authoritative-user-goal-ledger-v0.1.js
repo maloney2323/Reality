@@ -90,7 +90,8 @@ export function projectAuthoritativeUserGoals({
   if(p.operation==='SET_ACTIVE'||p.operation==='START_DETOUR'){
    const id=goalId(continuityRootId,p.source_user_message_ref);
    if(p.goal_id!==id||goals.has(id)||!ok(p.user_directed_objective)||
-      !ok(p.source_message_digest)||p.user_directed_objective.length>700||
+      p.source_message_digest!=='sha256:'+digest(p.user_directed_objective)||
+      p.user_directed_objective.length>700||
       (p.operation==='START_DETOUR'&&(!active||p.parent_goal_id!==active)))
     throw Error('USER_GOAL_AUTHORITY_CREATE_INVALID');
    if(active){
@@ -144,6 +145,8 @@ export function projectAuthoritativeUserGoals({
   recent_transition_receipts:transitions.slice(-20),
   authority_source:transitions.length?'AUTHENTICATED_RLS_USER_GOAL_COMMAND_AND_LEDGER_READBACK':'NONE',
   assistant_can_mutate_goals:false,semantic_reviewer_can_mutate_goals:false,
+  atomic_compare_and_swap_proven:false,
+  consequential_goal_mutation_authorized:false,
   unknown_user_intent_not_equivalent_to_authorized_goal:true,
   ...nonExecution(),
  });
@@ -196,7 +199,7 @@ export async function appendAuthenticatedUserGoalCommand({
  const attestedPayload={...payload,server_issuer_hmac:issuerMac(payload)};
  const event=await continuityRuntime.appendStage({
   stage:'VERIFICATION',entityId:goal_id,eventId,
-  epistemicStatus:'OBSERVED',observedAt,
+  epistemicStatus:'OBSERVED',effectiveTime:observedAt,assertionTime:observedAt,
   payload:attestedPayload,
   provenance:{source:authorizedSource,authenticated_user_id:principalId,
    source_message_ref:sourceUserMessageRef,source_digest:messageDigest},
