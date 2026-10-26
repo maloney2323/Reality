@@ -770,6 +770,7 @@ export async function runLiveIntelligenceOrchestration({
   // goal redirection. An unreviewed fallback or disclaimer is not a revision.
   let acceptedGoalRevisionReview=null;
   let acceptedGoalRevisionText=null;
+  let acceptedGoalRevisionReviewerId=null;
   // Meaning-first correction. Never accept a candidate because its keyword
   // flags went away: regenerate ONCE, then review source claims and objective
   // again. All semantic judgments remain provisional, not verified world truth.
@@ -932,6 +933,7 @@ export async function runLiveIntelligenceOrchestration({
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
         acceptedGoalRevisionReview=retryReview?.review||null;
         acceptedGoalRevisionText=String(retry.answer);
+        acceptedGoalRevisionReviewerId=retryReview?.response_id||null;
       } else if(materialUnsupportedClaim) {
         if(actionClaimRisk){
           // Consequential unverified action claims must not be released as fact.
@@ -1200,6 +1202,7 @@ export async function runLiveIntelligenceOrchestration({
           final_direction_contract:finalDirectionRelease,
           original_model_response_id:modelResult.response_id||null,
           first_semantic_reviewer_id:semanticFirst?.response_id||null,
+          post_revision_semantic_reviewer_id:acceptedGoalRevisionReviewerId,
           final_revision_reviewed:finalDirectionRelease.second_semantic_review_bound_to_exact_final_text,
           disposition:finalDirectionRelease.candidate_answer_release_allowed?
             'CANDIDATE_RELEASED_WITHOUT_INDEPENDENT_ACCURACY_PROOF':
@@ -1469,6 +1472,15 @@ export async function runLiveIntelligenceOrchestration({
     external_execution_authorized:false,
     independently_verified_goal_alignment:false,
   };
+  // A later layer must never replace a checked/withheld answer without
+  // passing the publication gate again. Verify exact final text at the
+  // unified exit shared by conversational and proposed-work responses.
+  if(semanticModeEnabled&&reliabilityPreviewEnabled){
+    const actualHash='sha256:'+createHash('sha256').update(
+      JSON.stringify(String(modelResult?.answer||''))).digest('hex');
+    if(actualHash!==reliabilityWithExtraction.final_direction_release?.final_answer_hash)
+      throw Error('FINAL_DIRECTION_RELEASE_TEXT_CHANGED_AFTER_VERIFICATION');
+  }
   const base = {
     orchestration_version: LIVE_INTELLIGENCE_ORCHESTRATION_VERSION,
     continuity_spine: {
