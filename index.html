@@ -959,6 +959,50 @@ function wcReceiptHTML(report){
    '</div>':'')+
   '</article>';
 }
+
+async function wcHydrateRecoveryCheckpoints(conv){
+ const buttons=[...$('wcCompletionList').querySelectorAll('button[data-recovery-checkpoint]')];
+ for(const button of buttons){
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  const workId=button.dataset.recoveryCheckpoint;
+  const card=button.closest('[data-recovery-card]');
+  const status=card?.querySelector('[data-recovery-state]');
+  if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||!status)continue;
+  button.disabled=true;
+  status.textContent='Checking saved original-job recovery status · Read only…';
+  try{
+   const response=await fetch('/api/reality/personal-recovery?conversation_id='+
+    encodeURIComponent(conv)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+   const data=await response.json();
+   if(!response.ok||data.ok!==true||data.original_work_id!==workId||
+      data.job_completed!==false||data.external_action_performed!==false)
+    throw Error('Verified recovery readback unavailable');
+   if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+   if(data.checkpoint_persisted===true&&
+      data.state==='RECOVERY_BLOCKED_DURABLY_RECORDED'&&data.checkpoint_receipt_id){
+    button.textContent='Saved recovery · Original job still pending';
+    status.textContent='Restored from Continuity · Receipt '+
+     data.checkpoint_receipt_id+' · Same work '+workId+
+     ' · Repair still unfinished · No re-execution authorized.';
+    button.disabled=true;
+   }else if(data.checkpoint_persisted===false&&
+      data.state==='RECOVERY_BLOCKED_NOT_YET_CHECKPOINTED'){
+    status.textContent='Verified tracking issue found. Original repair remains unfinished. '+
+     'Save this original work once to make its recovery checkpoint durable.';
+    button.disabled=false;
+   }else{
+    throw Error('Recovery projection status unverified');
+   }
+  }catch{
+   // Never allow a blind POST when fresh scoped readback fails.
+   status.textContent='Recovery checkpoint could not be checked. No repair is proven or started. '+
+    'Reconnect, confirm the original conversation goal and refresh receipts.';
+   button.disabled=true;
+  }
+ }
+}
+
 async function wcLoadCompletionReports({focus=false}={}){
  const out=$('wcCompletionList'),status=$('wcCompletionStatus');
  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -981,6 +1025,7 @@ async function wcLoadCompletionReports({focus=false}={}){
    'No persisted execution outcomes found for this conversation. Discoveries and approvals are not completed jobs.';
   out.innerHTML=data.reports.length?data.reports.map(wcReceiptHTML).join(''):
    '<p class="muted">No verified work results yet for this conversation.</p>';
+  if(data.reports.length)await wcHydrateRecoveryCheckpoints(conv);
   if(focus&&data.reports.length&&data.reports[0].action_completed===true)
    $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
  }catch{
