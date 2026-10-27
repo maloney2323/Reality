@@ -684,6 +684,7 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
      const consentText=review.querySelector('[data-run-consent-text]');
      if(consentText)consentText.textContent='Your one-time authorization has been consumed. Do not create another issue for this same attempted work.';
      review.append(link);
+     void wcLoadCompletionReports();
     }else{
      info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
       '. Do not retry automatically; reconcile the provider and reservation receipts.';
@@ -903,6 +904,7 @@ async function wcAuthorizeAndStart(workId){
  }finally{
   wcJobStarting=false;
   wcRender();
+  if(providerDispatchRequested)void wcLoadCompletionReports();
  }
 }
 
@@ -1610,6 +1612,7 @@ async function refreshSavedShiftHome(){
       if([8,12].includes(Number(b.config.shiftLength)))$('shiftLength').value=String(b.config.shiftLength);
       updateShiftBanner();
     }
+    wcRenderShiftEndingReceipt(b.home);
     if(manualWorkActive)return;
     if(b.home?.status==='RECORDED'){
       renderWork(b.home.work||[]);
@@ -1709,7 +1712,7 @@ setInterval(refreshSavedShiftHome,300000);
   const id=el('privateConversations').value;
   if(!id)return;
   localStorage.setItem('reality.private.chat.conversation.v1',id);
-  try{await loadSaved();await loadConversations()}catch(e){status(e.message)}
+  try{await loadSaved();await loadConversations();void wcLoadCompletionReports()}catch(e){status(e.message)}
  };
  let confirmedActiveGoal=null;
  async function loadGoals(){
@@ -1858,8 +1861,10 @@ setInterval(refreshSavedShiftHome,300000);
    if(typeof data.authenticated!=='boolean')
     throw Error('Sign-in service returned an unrecognized session response.');
    showSignedIn(data.authenticated===true);
-   if(data.authenticated){await loadSaved();await loadConversations();}
-   else status('Sign in below with your existing account to resume your conversation.');
+   if(data.authenticated){
+    await loadSaved();await loadConversations();
+    void wcLoadCompletionReports();
+   }else status('Sign in below with your existing account to resume your conversation.');
   }catch(e){
    guidedSetup.authenticated=false;
    guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
@@ -1883,6 +1888,7 @@ setInterval(refreshSavedShiftHome,300000);
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
    el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
+   void wcLoadCompletionReports();
    if(!confirmedActiveGoal)jumpToWorkSetup('goal');
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
@@ -1890,13 +1896,13 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateSignOut').disabled=true;
   try{
    await fetch(endpoint,{method:'DELETE'});
-   el('privateTranscript').replaceChildren();showSignedIn(false);status('Signed out.');
+   el('privateTranscript').replaceChildren();showSignedIn(false);void wcLoadCompletionReports();status('Signed out.');
   }catch(e){status(e.message)}finally{el('privateSignOut').disabled=false}
  };
  el('privateNew').onclick=async()=>{
   if(!confirm('Start a new conversation? The previous one remains saved under its earlier conversation ID.'))return;
   localStorage.setItem('reality.private.chat.conversation.v1',crypto.randomUUID());
-  el('privateTranscript').replaceChildren();await loadConversations();status('New conversation ready.');
+  el('privateTranscript').replaceChildren();await loadConversations();void wcLoadCompletionReports();status('New conversation ready.');
  };
  el('privateSend').onclick=async()=>{
   const value=el('privatePrompt').value.trim();if(!value)return;
