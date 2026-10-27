@@ -35,6 +35,27 @@ export async function verifyPersonalGithubIssueToken({get=githubGet}={}){
   external_action_performed:false,
  });
 }
+// Actual Vercel Preview token, read-only metadata inspection.
+// This cannot establish Issues WRITE permission. Never use a POST to
+// diagnose credentials; external action requires separate owner approval.
+export async function inspectPreviewGithubRepositoryAccessReadOnly({get=githubGet}={}){
+ const [owner,repository,issues]=await Promise.all([
+  get('/user'),get(ROOT),get(ROOT+'/issues?state=open&per_page=1'),
+ ]);
+ if(owner?.login!=='maloney2323'||repository?.full_name!==REPO||
+  !Array.isArray(issues))
+  throw Error('PERSONAL_GITHUB_READ_ONLY_PROBE_SCOPE_NOT_VERIFIED');
+ const flags=Object.freeze({
+  principal_verified:true,
+  repository_metadata_verified:true,
+  issues_read_verified:true,
+  repository_archived:repository.archived===true,
+  issues_feature_enabled:repository.has_issues===true,
+  external_action_performed:false,
+  github_issue_write_permission_not_yet_proven:true,
+ });
+ return flags;
+}
 export async function checkForExistingMaintainerIssue(item,{get=githubGet}={}){
  assertExactMaintainerIssue(item);
  // Do not add a duplicate tracking issue when one with the same exact
