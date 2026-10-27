@@ -12,9 +12,15 @@ export async function readStewardshipGitHub(path,{
 }={}){
  if(!/^\/repos\/maloney2323\/Reality\/(?:actions\/runs\?per_page=\d{1,3}|pulls\?state=open&per_page=\d{1,3})$/.test(path))
   throw Error('DISCOVERY_PUBLIC_GITHUB_SOURCE_OUT_OF_SCOPE');
- if(env.REALITY_GITHUB_TOKEN)return githubGet(path);
- if(env.VERCEL_ENV!=='preview')
-  throw Error('DISCOVERY_AUTHENTICATED_GITHUB_CONNECTOR_REQUIRED');
+ // Preview discovery reads this PUBLIC repo's Actions/PR evidence without
+ // credentials even if an Issues-only write credential is configured.
+ // Fine-grained Issues tokens need not have Actions read permission;
+ // discovery must not silently expand the token's scope.
+ if(env.VERCEL_ENV!=='preview'){
+  if(!env.REALITY_GITHUB_TOKEN)
+   throw Error('DISCOVERY_AUTHENTICATED_GITHUB_CONNECTOR_REQUIRED');
+  return githubGet(path);
+ }
  const response=await fetchImpl('https://api.github.com'+path,{
   method:'GET',
   headers:{Accept:'application/vnd.github+json',
