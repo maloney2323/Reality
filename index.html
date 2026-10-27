@@ -65,6 +65,42 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 #privateChat{scroll-margin-top:18px}#privateLogin,#privateReady{scroll-margin-top:16px}
 #privateGoalText,#attentionQueue{scroll-margin-top:18px}
 @media(max-width:600px){.start-flow{padding:12px}.start-step{padding:14px}.start-flow-head h2{font-size:22px}}
+
+/* Work Center: discovered evidence, solo task plans, and bounded shift planning. */
+.work-center{margin:0 0 24px;padding:20px;background:linear-gradient(150deg,#131d2a,#0d121b 76%);border:1px solid #3e5369;border-radius:18px}
+.wc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.wc-head h2{margin:3px 0 7px;font-size:23px;line-height:1.2}.wc-head p{color:#adbcd0;font-size:13px;line-height:1.55;margin:0;max-width:640px}
+.wc-total{border:1px solid #3a4d63;border-radius:13px;padding:10px 14px;text-align:center;min-width:96px}
+.wc-total strong{font-size:27px;display:block}.wc-total small{display:block;color:#a5b8cf}
+.wc-tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+.wc-tabs button{background:#202b3b;color:#d4e0ef;margin:0;border:1px solid #40516a}
+.wc-tabs button[aria-selected="true"]{background:#e3ecf7;color:#0c1420;border-color:#dceaf5}
+.wc-section-title{font-size:14px;margin:20px 0 11px;color:#e5edf9}
+.wc-categories{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.wc-category{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:8px;min-height:104px;background:#121c29;border:1px solid #314257;color:#d7e2f0;border-radius:12px;padding:11px;margin:0}
+.wc-category[data-active="true"]{border-color:#bed0ea;background:#1c2e40}.wc-category strong{font-size:12px;line-height:1.4}.wc-category small{color:#96aabe;font-weight:500;line-height:1.35}.wc-category .wc-num{font-size:21px;color:#eef4ff}
+.wc-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(255px,.85fr);gap:12px;margin-top:18px;align-items:start}
+.wc-panel{border:1px solid #334256;border-radius:14px;padding:14px;background:#0b131d;min-width:0}
+.wc-panel-head{display:flex;justify-content:space-between;align-items:center;gap:9px}.wc-panel h3{font-size:16px;margin:0}
+.wc-task{padding:13px 0;border-bottom:1px solid #29394c}.wc-task:last-child{border-bottom:none}
+.wc-task-top{display:flex;align-items:flex-start;gap:9px}.wc-task-top label{display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1}
+.wc-task-top input{width:19px;height:19px;flex:none;accent-color:#c9e5d7;margin-top:2px}
+.wc-task strong{font-size:13px;line-height:1.45}.wc-task p,.wc-task .wc-small{font-size:12px;color:#a4b6cc;line-height:1.55;margin:7px 0}
+.wc-tag{display:inline-block;padding:4px 7px;border:1px solid #405169;border-radius:99px;font-size:10px;margin:5px 5px 0 0;color:#ccd9e8}
+.wc-tag[data-risk="true"]{border-color:#ab7454;color:#f4cc9b}
+.wc-task details{margin-top:9px;padding:8px 10px;border:1px solid #334457;border-radius:9px}
+.wc-task details summary{font-size:12px;color:#cfe0f4;cursor:pointer}
+.wc-task a{color:#b9d7fb;overflow-wrap:anywhere}
+.wc-plan-desc{font-size:12px;color:#abbfd3;margin:10px 0;line-height:1.55}
+.wc-inputs{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.wc-inputs label{font-size:12px;color:#bdcee1;display:block}
+.wc-inputs select,.wc-inputs input{font:inherit;color:#eef3fc;background:#131f2d;border:1px solid #465a6f;border-radius:9px;padding:10px;margin-top:6px;width:100%}
+.wc-feedback{font-size:12px;line-height:1.65;padding:12px;background:#152334;border:1px solid #3c526a;border-radius:12px;margin:14px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.wc-plan-button{width:100%;margin-top:0;background:#e1effb;color:#132031}
+.wc-note{font-size:11px;color:#a3b4c8;line-height:1.65;margin-top:11px}
+@media(max-width:800px){.wc-categories{grid-template-columns:repeat(3,minmax(0,1fr))}.wc-layout{grid-template-columns:1fr}}
+@media(max-width:430px){.work-center{padding:14px}.wc-categories{grid-template-columns:repeat(2,minmax(0,1fr))}.wc-category{min-height:93px}.wc-head h2{font-size:21px}}
+
 </style>
 </head>
 <body>
@@ -148,7 +184,46 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
 </section>
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div class="work-guidance"><strong>Approval setup · required steps</strong>
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
+<section class="work-center" id="workCenter" aria-label="Reality Work Center">
+ <div class="wc-head">
+  <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
+   <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
+  <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small></div>
+ </div>
+ <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
+  <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
+  <button type="button" role="tab" data-wc-mode="shift" aria-selected="false">1–8 hour shift</button>
+ </div>
+ <h3 class="wc-section-title">Discoveries by category <span class="muted" style="font-weight:400">· Tap a category to explore</span></h3>
+ <div class="wc-categories" id="wcCategories" aria-label="Clickable work categories"></div>
+ <div class="wc-layout">
+  <div class="wc-panel">
+   <div class="wc-panel-head"><h3 id="wcSelectedTitle">All findings</h3><span class="badge" id="wcSelectedCount">0 found</span></div>
+   <p class="wc-plan-desc">Findings and evidence come from Reality's discovery feed. A discovered problem is not automatically a task Reality can execute.</p>
+   <div id="wcTaskList" aria-live="polite">Loading work…</div>
+  </div>
+  <div class="wc-panel" aria-label="Workload and budget planner">
+   <h3 id="wcPlanTitle">Your task batch</h3>
+   <p class="wc-plan-desc" id="wcPlanIntro">Choose one task, or select several to review together.</p>
+   <div class="wc-inputs">
+    <label id="wcHoursRow" hidden>Maximum shift length
+     <select id="wcHours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4" selected>4 hours</option><option value="5">5 hours</option><option value="6">6 hours</option><option value="7">7 hours</option><option value="8">8 hours</option></select>
+    </label>
+    <label>Plan / billing assumption
+     <select id="wcMetering"><option value="unknown">Plan not verified</option><option value="metered">Model a credit allowance</option><option value="unlimited">Unlimited automation — hypothetical plan</option></select>
+    </label>
+    <label id="wcRateRow" hidden>Assumed credits per active hour (planning only)
+     <input id="wcRate" type="number" min="0.01" max="100000" step="0.01" placeholder="Enter your plan's rate">
+    </label>
+   </div>
+   <div class="wc-feedback" id="wcSummary" role="status" aria-live="polite">Select work to see a planning summary. Credit usage is not metered yet.</div>
+   <button type="button" class="wc-plan-button" id="wcPreview">Preview my task batch</button>
+   <p class="wc-note">Planning does not start a shift, spend credits, create an issue, or approve any external operation. Full-job estimates and real token costs need measured execution receipts. The optional credit rate is your assumption, not an invoice or verified subscription entitlement.</p>
+  </div>
+ </div>
+</section>
+<section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div class="work-guidance"><strong>Approval setup · required steps</strong>
 <div>1. Sign in to your private Reality account.</div>
 <div>2. Confirm or resume your own active business goal.</div>
 <div>3. Verify the discovered work and exact proposed action.</div>
