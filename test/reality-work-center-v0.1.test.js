@@ -16,7 +16,8 @@ test('work center renders eleven clickable category choices in responsive dashbo
   'Research & opportunities','Automation & time returned','View all']){
   assert.ok(html.includes(category),category);
  }
- assert.ok(html.includes('wcLoad(items);'));
+ assert.ok(html.includes('void wcDiscoverCatalog();'));
+ assert.ok(html.includes("fetch('/api/reality/work-catalog'"));
  assert.ok(html.includes('w.evidence_refs'));
 });
 test('individual batch and 1–8h shift are planning-only, not real authorizations',()=>{
