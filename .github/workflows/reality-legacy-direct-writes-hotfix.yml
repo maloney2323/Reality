@@ -2,6 +2,8 @@ name: Reality Legacy Direct Write Hotfix
 on:
   push:
     paths:
+      - 'api/reality/authority.js'
+      - 'api/reality/execute.js'
       - 'api/reality/self-build.js'
       - 'api/reality/intelligence.js'
       - 'src/reality-chat-build-v1.0.js'
@@ -10,6 +12,8 @@ on:
       - '.github/workflows/reality-legacy-direct-writes-hotfix.yml'
   pull_request:
     paths:
+      - 'api/reality/authority.js'
+      - 'api/reality/execute.js'
       - 'api/reality/self-build.js'
       - 'api/reality/intelligence.js'
       - 'src/reality-chat-build-v1.0.js'
