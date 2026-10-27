@@ -307,3 +307,36 @@ test('Home checks signed-in goal before preparing source work and never silently
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
 });
+
+test('top-level three-step flow is the first task and optional tools are out of the way',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const start=html.indexOf('id="startFlow"'),account=html.indexOf('id="privateChat"'),
+  matrix=html.indexOf('class="reality-matrix"'),
+  work=html.indexOf('id="attentionQueue"'),advanced=html.indexOf('id="advancedShift"'),
+  prompt=html.indexOf('id="optionalPrompt"');
+ assert.ok(start>0&&start<account&&account<matrix&&matrix<work&&work<advanced&&advanced<prompt);
+ assert.ok(html.includes('3 steps. That\'s it.'));
+ assert.ok(html.includes('You do <strong>not</strong> need to type a Request'));
+ for(const id of ['startStep1','startStep2','startStep3',
+   'startAction1','startAction2','startAction3',
+   'startStatus1','startStatus2','startStatus3','startNext'])
+  assert.ok(html.includes('id="'+id+'"'),id);
+ assert.ok(html.includes('<details class="advanced-option" id="advancedShift"'));
+ assert.ok(html.includes('<details class="advanced-option" id="optionalPrompt"'));
+});
+test('three-step controls respect signed-in goal readback and do not use model claims as authority',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes("guidedSetup.authenticated=yes"));
+ assert.ok(html.includes("state.active_goal.user_confirmed===true"));
+ assert.ok(html.includes("guidedSetup.goal=confirmedActiveGoal?'confirmed':'missing'"));
+ assert.ok(html.includes("guidedSetup.goal='unavailable'"));
+ assert.ok(html.includes("if(guidedSetup.goal!=='confirmed')return jumpToWorkSetup('goal')"));
+ assert.ok(html.includes("realityWork.click()"));
+ assert.ok(html.includes("if(guidedSetup.workFound)$('attentionQueue').scrollIntoView"));
+ assert.ok(html.includes("guidedSetup.approved=true;paintGuidedSetup()"));
+ assert.ok(html.includes("This preview tests discovery and exact approval only."));
+ assert.ok(!html.includes("fetch('/api/reality/execute',{method:'POST'"));
+ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script));
+});
