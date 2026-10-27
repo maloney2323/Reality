@@ -5,6 +5,8 @@ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 test('work center renders eleven clickable category choices in responsive dashboard',()=>{
  assert.ok(html.includes('id="workCenter"'));
  assert.ok(html.includes('id="wcCategories"'));
+ assert.ok(html.includes('id="wcDiscover"'));
+ assert.ok(html.includes("$('wcDiscover').onclick=()=>{$('findWork').click()}"));
  assert.ok(html.includes('id="wcTaskList"'));
  assert.ok(html.includes('data-wc-cat'));
  for(const category of [
