@@ -94,6 +94,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-plan-desc{font-size:12px;color:#abbfd3;margin:10px 0;line-height:1.55}
 .wc-inputs{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
 .wc-inputs label{font-size:12px;color:#bdcee1;display:block}
+.wc-inputs [hidden]{display:none!important}
 .wc-inputs select,.wc-inputs input{font:inherit;color:#eef3fc;background:#131f2d;border:1px solid #465a6f;border-radius:9px;padding:10px;margin-top:6px;width:100%}
 .wc-feedback{font-size:12px;line-height:1.65;padding:12px;background:#152334;border:1px solid #3c526a;border-radius:12px;margin:14px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .wc-plan-button{width:100%;margin-top:0;background:#e1effb;color:#132031}
@@ -614,6 +615,158 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
 }
 
 
+
+/* Read-only Work Center. Does NOT dispatch, schedule or charge. */
+const workCategories=[
+ ['all','View all','All findings'],['customer','Customer issues & feedback','Customers and service'],
+ ['bugs','Bug fixes','Confirmed defects'],['upgrades','Upgrades & improvements','Proposed changes'],
+ ['features','New features','Missing capabilities'],['reliability','Performance & reliability','Regressions and failures'],
+ ['integrations','Integrations & deployment','Services and releases'],['security','Security, governance & evidence','Trust and authority'],
+ ['operations','Operations & workflow','Business processes'],['research','Research & opportunities','Work to evaluate'],
+ ['automation','Automation & time returned','Repeatable work']
+];
+let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
+function wcClass(w){
+ const s=String((w.work_key||'')+' '+(w.objective||'')).toLowerCase();
+ if(/customer|feedback|support|client/.test(s))return 'customer';
+ if(/security|authority|governance|evidence/.test(s))return 'security';
+ if(/integration|connector|deploy/.test(s))return 'integrations';
+ if(/workflow-failure:|ci |regression|reliabil|performance|latency/.test(s))return 'reliability';
+ if(/bug|defect|broken/.test(s))return 'bugs';
+ if(/upgrade|improv/.test(s))return 'upgrades';
+ if(/feature|capability/.test(s))return 'features';
+ if(/automati|time return/.test(s))return 'automation';
+ if(/research|opportunit/.test(s))return 'research';
+ if(/operations|process|schedule|workday/.test(s))return 'operations';
+ return '';
+}
+function wcTime(w){
+ return w.execution_work_item?.connector==='github'&&
+  w.execution_work_item?.operation==='create_issue'?[1,5]:null;
+}
+function wcSummary(full=false){
+ const tasks=wcWork.filter(w=>wcPicked.has(w.work_id));
+ const estimates=tasks.map(wcTime).filter(Boolean);
+ const sum=i=>estimates.reduce((n,x)=>n+x[i],0);
+ const hours=wcMode==='shift'?Number($('wcHours').value):null;
+ const prior=tasks.filter(w=>wcStatuses.get(w.work_id)==='PRIOR').length;
+ const mode=$('wcMetering').value,rate=Number($('wcRate').value);
+ const credits=mode==='unlimited'?'Unlimited plan is hypothetical; actual entitlement unverified.':
+  mode==='unknown'?'Credits unknown: billing and token metering are not connected.':
+  !(rate>0&&Number.isFinite(rate))?'Enter an assumed credits/hour rate (not a real billing rate).':
+  hours!==null?'Illustrative allowance: '+(hours*rate).toFixed(2)+' credits for '+hours+' hours. This is NOT predicted usage.':
+  estimates.length!==tasks.length?'Credits cannot be estimated for unscoped tasks.':
+  'Illustrative tracking-only credits: '+(sum(0)*rate/60).toFixed(2)+'–'+(sum(1)*rate/60).toFixed(2)+
+  ' using your assumption. Not actual credits.';
+ const lines=[
+  hours!==null?'Shift planning window: '+hours+' hour(s); a CAP, not expected task duration.':
+   'Individual task batch: '+tasks.length+' selected.',
+  tasks.length+' selected · '+prior+' previously attempted · '+(tasks.length-prior)+' others (approval/history still required).',
+  estimates.length?'Tracking operation (uncalibrated): '+sum(0)+'–'+sum(1)+' minutes for '+estimates.length+' issue(s).':
+   'Tracking-operation duration: unknown.',
+  'Full investigation, repair and completed-job duration: UNKNOWN (no measured baseline).',
+  credits,
+  'No credit charge · No shift started · No authority granted.'
+ ];
+ if(full)lines.push('A real run requires fresh exact approval per consequential action and verified evidence of completion.');
+ if(full&&prior)lines.push('Previously attempted work stays locked until reconciliation; do not re-run it.');
+ return lines.join('\n');
+}
+function wcPaintSummary(){
+ const shift=wcMode==='shift';
+ $('wcPlanTitle').textContent=shift?'Your planned shift':'Your task batch';
+ $('wcPlanIntro').textContent=shift?
+  'Choose 1–8 hours and a proposed queue. This does not schedule or run a shift.':
+  'Choose one task, two, three, or more to review as a batch.';
+ $('wcHoursRow').hidden=!shift;
+ $('wcRateRow').hidden=$('wcMetering').value!=='metered';
+ $('wcPreview').textContent=shift?'Review draft shift':'Review selected tasks';
+ $('wcSummary').textContent=wcSummary();
+ document.querySelectorAll('[data-wc-mode]').forEach(b=>
+  b.setAttribute('aria-selected',String(b.dataset.wcMode===wcMode)));
+}
+function wcRender(){
+ $('wcDiscovered').textContent=String(wcWork.length);
+ $('wcCategories').innerHTML=workCategories.map(([id,label,desc])=>{
+  const n=id==='all'?wcWork.length:wcWork.filter(w=>wcClass(w)===id).length;
+  return '<button class="wc-category" type="button" data-wc-cat="'+id+
+    '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
+    '<strong>'+esc(label)+'</strong><span class="wc-num">'+n+'</span><small>'+esc(desc)+'</small></button>';
+ }).join('');
+ $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
+  wcCurrent=b.dataset.wcCat;wcRender()
+ });
+ const category=workCategories.find(x=>x[0]===wcCurrent);
+ const shown=wcCurrent==='all'?wcWork:wcWork.filter(w=>wcClass(w)===wcCurrent);
+ $('wcSelectedTitle').textContent=category?.[1]||'View all';
+ $('wcSelectedCount').textContent=shown.length+' found';
+ $('wcTaskList').innerHTML=shown.length?shown.map((w,i)=>{
+  const time=wcTime(w),status=wcStatuses.get(w.work_id);
+  const src=(w.evidence_refs||[]).filter(u=>
+   /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/\d+$/.test(String(u)));
+  const history=status==='PRIOR'?'PRIOR ATTEMPT · RECONCILE':
+   status==='CLEAR'?'No prior attempt seen · Not authorized':
+   status==='ERROR'?'History unknown · Block execution':'History not checked';
+  return '<div class="wc-task"><div class="wc-task-top"><label>'+
+   '<input type="checkbox" data-wc-task="'+i+'" '+(wcPicked.has(w.work_id)?'checked':'')+'>'+
+   '<span><strong>'+esc(w.objective||w.title||w.work_key||'Finding')+'</strong>'+
+   '<span class="wc-small" style="display:block">'+esc(category?.[0]==='all'?
+    (workCategories.find(x=>x[0]===wcClass(w))?.[1]||'Unclassified'):category[1])+'</span></span></label></div>'+
+   '<span class="wc-tag">'+esc(w.state||'DISCOVERED')+'</span>'+
+   '<span class="wc-tag">'+src.length+' sources</span>'+
+   '<span class="wc-tag" data-risk="'+(status==='PRIOR')+'">'+esc(history)+'</span>'+
+   '<p>Estimated tracking operation: '+(time?time[0]+'–'+time[1]+' min (illustrative)':'Not calibrated')+
+   ' · Full work: not yet estimated.</p>'+
+   '<details><summary>View evidence, scope and next step</summary>'+
+   '<p>'+esc(w.description||w.reason||'Source-backed observation; business value not yet verified.')+'</p>'+
+   '<p>Provider operation: '+esc(w.execution_work_item?.operation||'Not determined')+
+   ' · Priority and time returned: unverified.</p>'+
+   src.map((u,j)=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+
+     '">Evidence '+(j+1)+'</a></div>').join('')+
+   '<p>'+esc(history)+'. A selection is only a plan draft.</p></details></div>';
+ }).join(''):'<div class="attention-empty">No source-backed findings in this category yet.</div>';
+ $('wcTaskList').querySelectorAll('[data-wc-task]').forEach(c=>c.onchange=()=>{
+  const w=shown[Number(c.dataset.wcTask)];
+  if(!w)return;
+  if(c.checked)wcPicked.add(w.work_id);else wcPicked.delete(w.work_id);
+  wcPaintSummary();
+ });
+ wcPaintSummary();
+}
+async function wcCheckPrior(items,epoch){
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))return;
+ for(const w of items.slice(0,15)){
+  if(!/^work:[0-9a-f]{32}$/.test(String(w.work_id||''))||w.kind!=='SYSTEM_MAINTENANCE')continue;
+  try{
+   const r=await fetch('/api/reality/personal-issue-dispatch',{
+    method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id}),
+   });
+   const x=await r.json();
+   if(epoch!==wcEpoch)return;
+   wcStatuses.set(w.work_id,!r.ok||!x.ok?'ERROR':
+    x.previously_attempted===true?'PRIOR':x.can_request_new_approval===true?'CLEAR':'ERROR');
+  }catch{if(epoch!==wcEpoch)return;wcStatuses.set(w.work_id,'ERROR')}
+  wcRender();
+ }
+}
+function wcLoad(items){
+ wcWork=Array.isArray(items)?items:[];
+ wcPicked=new Set([...wcPicked].filter(id=>wcWork.some(w=>w.work_id===id)));
+ wcStatuses=new Map();wcEpoch++;
+ wcRender();
+ void wcCheckPrior(wcWork,wcEpoch);
+}
+document.querySelectorAll('[data-wc-mode]').forEach(b=>b.onclick=()=>{
+ wcMode=b.dataset.wcMode;wcPaintSummary();
+});
+$('wcHours').onchange=wcPaintSummary;
+$('wcMetering').onchange=wcPaintSummary;
+$('wcRate').oninput=wcPaintSummary;
+$('wcPreview').onclick=()=>{$('wcSummary').textContent=wcSummary(true)};
+wcRender();
+
 function renderWork(source){
   const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
   const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
@@ -629,6 +782,7 @@ function renderWork(source){
   $('matrixPresentCount').textContent=String(counts.present);
   $('matrixFutureCount').textContent=String(counts.future);
   $('workCount').textContent=String(items.length);
+   wcLoad(items);
   $('workQueue').innerHTML=items.length?items.map((w,i)=>{
     const evidence=Array.isArray(w.evidence_refs)?w.evidence_refs.length:0;
     return '<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(state(w))+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span><span class="pill">'+esc('Evidence '+evidence)+'</span></div></div>';
