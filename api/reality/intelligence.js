@@ -2,7 +2,6 @@ export const maxDuration = 60;
 
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
-import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
 import { loadAuthenticatedConversationHistory } from '../../src/reality-authenticated-conversation-history-v0.1.js';
 
 const BASE44_API = 'https://base44.app/api';
@@ -247,27 +246,20 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const principal = getOrCreateSessionPrincipal(req, res);
 
-    // Explicit build language in chat enters Reality's governed self-build path.
-    // The resulting authority is bounded to an isolated branch + PR; production
-    // merge/deploy authority remains separate.
-    if (typeof body.message === 'string' && /^(build|create|implement|add|make|fix|modify|change)\\b/i.test(body.message.trim())) {
-      const build = await buildFromChat({
-        message: body.message,
-        requestedBy: principal.principal_id,
-        authorizationRef: body.authorization_id || null,
+    // Legacy automatic self-build is not authorized by natural-language verbs,
+    // a generic session cookie, or a supplied authorization_id.
+    // Block BEFORE model generation, repository reads or external writes.
+    if (typeof body.message === 'string' &&
+        /^(build|create|implement|add|make|fix|modify|change)\\b/i.test(body.message.trim())) {
+      return res.status(403).json({
+        ok: false, status: 'BLOCKED',
+        error: 'CHAT_BUILD_DIRECT_EXECUTION_DISABLED',
+        blocked_reason: 'AUTHENTICATED_GOAL_BOUND_SINGLE_USE_EXECUTION_REQUIRED',
+        external_action_performed: false,
+        paid_model_call_performed: false,
+        branch_created: false,
+        pull_request_opened: false,
       });
-      if (build) {
-        return res.status(200).json({
-          ok: true,
-          result: {
-            mode: 'SELF_BUILD',
-            answer: `Reality built the requested change and opened an isolated build for review.\\n\\nBuild: ${build.objective}\\nBranch: ${build.branch}\\nPull request: ${build.pull_request?.url || 'opened'}`,
-            build,
-            authority: { granted: true, scope: build.authorization.scope, production_merge_permitted: false },
-            execution: { status: 'PR_OPENED', production_deploy: false },
-          },
-        });
-      }
     }
 
     // Never silently proceed as if no conversation existed after provider failure.
