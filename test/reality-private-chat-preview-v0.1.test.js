@@ -11,7 +11,7 @@ const envKeys=['VERCEL_ENV','REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF',
  'REALITY_DETECTOR_REPAIR_ENABLED','REALITY_RELIABILITY_EXTRACTION_ENABLED',
  'REALITY_DETECTOR_SHADOW_ENABLED','SUPABASE_URL','SUPABASE_SECRET_KEY',
  'REALITY_RELIABILITY_BENCHMARK_PROJECT_REF','REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF',
- 'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','OPENAI_API_KEY',
+ 'REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL','REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED','OPENAI_API_KEY',
  'REALITY_STANDALONE_OPENAI_API_KEY','REALITY_GITHUB_TOKEN'];
 function mockResponse(){
  const state={headers:{},status:null,payload:null};
@@ -39,6 +39,22 @@ function provider(){
     return new Response(JSON.stringify({id:user,email:'test@example.com'}),{status:200});
    }
    if(u.pathname==='/auth/v1/logout')return new Response('{}',{status:200});
+   if(u.pathname==='/rest/v1/rpc/reality_publish_assistant_if_goal_current'){
+    const params=JSON.parse(opts.body||'{}');
+    // Matches the signed-in user's saved request and atomically stores exactly
+    // the answer bound to the final direction Integrity receipt.
+    const matching=messages.find(m=>m.user_id===params.p_user_id&&
+     m.conversation_id===params.p_conversation_id&&
+     m.request_id===params.p_request_id&&m.role==='user');
+    if(!matching||params.p_user_id!==user||
+       !Number.isSafeInteger(params.p_expected_goal_revision))
+     return new Response(JSON.stringify({message:'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN'}),{status:409});
+    const id=crypto.randomUUID();
+    messages.push({id,user_id:user,conversation_id:params.p_conversation_id,
+     request_id:params.p_request_id,role:'assistant',content:params.p_content,
+     created_at:new Date().toISOString()});
+    return new Response(JSON.stringify(id),{status:200});
+   }
    if(u.pathname==='/rest/v1/universe_events'){
     if(method==='POST'){
      const evt=JSON.parse(opts.body);ledger.push(evt);
@@ -113,6 +129,7 @@ async function runFixture(fn){
   REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
   REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
   REALITY_SEMANTIC_REVIEW_ENABLED:'true',
+  REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED:'true',
   REALITY_DETECTOR_REPAIR_ENABLED:'false',
   REALITY_RELIABILITY_EXTRACTION_ENABLED:'false',
   REALITY_DETECTOR_SHADOW_ENABLED:'false',
