@@ -377,7 +377,7 @@ test('three-step controls respect signed-in goal readback and do not use model c
  assert.ok(html.includes("realityWork.click()"));
  assert.ok(html.includes("if(guidedSetup.workFound)$('attentionQueue').scrollIntoView"));
  assert.ok(html.includes("guidedSetup.approved=true;paintGuidedSetup()"));
- assert.ok(html.includes("This preview tests discovery and exact approval only."));
+ assert.ok(html.includes("This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation."));
  assert.ok(!html.includes("fetch('/api/reality/execute',{method:'POST'"));
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script);
