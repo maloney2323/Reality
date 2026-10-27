@@ -55,7 +55,10 @@ export default async function handler(req,res){
   const b=req.body||{},keys=Object.keys(b);
   if(keys.some(k=>!['intent','conversation_id','discovered_work_id','confirmation'].includes(k))||
    !validUuid(b.conversation_id)||
-   !/^work:[a-f0-9]{32}$/.test(String(b.discovered_work_id||'')))
+   (b.intent!=='RECONCILE'&&
+    !/^work:[a-f0-9]{32}$/.test(String(b.discovered_work_id||'')))||
+   (b.intent==='RECONCILE'&&b.discovered_work_id!==undefined&&
+    !/^work:[a-f0-9]{32}$/.test(String(b.discovered_work_id||''))))
    return res.status(400).json({ok:false,error:'DISPATCH_UNTRUSTED_CLIENT_FIELDS_OR_SCOPE'});
   if(b.intent==='CHECK'){
    const p=await preparePersonalIssueDispatch({
