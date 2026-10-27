@@ -66,3 +66,18 @@ test('account link and secure sign-in status remain visible before Work Center e
  assert.match(js,/el\('privateRetrySession'\)\.onclick=\(\)=>\{void init\(\)\}/);
  assert.match(js,/el\('privateAccountState'\)\.textContent='Account connection unavailable:/);
 });
+
+test('verified GitHub outcome replaces stale approved-but-not-run status',()=>{
+ const start=js.indexOf('async function revealGap3Action');
+ const end=js.indexOf('Owner-only read-only Preview token diagnostic',start);
+ assert.ok(start>=0&&end>start);
+ const result=js.slice(start,end);
+ assert.match(result,/out\.status==='VERIFIED'&&out\.verified===true/);
+ assert.match(result,/out\.outcome_receipt_id&&out\.reservation_id/);
+ assert.match(result,/verifiedIssue=true/);
+ assert.match(result,/setWorkStep\(card,4,'complete','GitHub issue created · Verified; repair pending'\)/);
+ assert.match(result,/approvalOnly\.textContent='GitHub action completed and verified/);
+ assert.match(result,/setupButton\.textContent='GitHub issue verified · Repair pending'/);
+ assert.match(result,/underlying investigation and repair are still pending/);
+ assert.match(result,/Do not retry/);
+});
