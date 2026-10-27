@@ -35,6 +35,47 @@ export function assertPersonalDispatchEnvironment({session,conversationId,env}={
   fail('PERSONAL_DISPATCH_ISOLATED_DATABASE_BOUNDARY_INVALID');
  return db;
 }
+// A fresh approval NEVER authorizes re-trying a prior provider attempt,
+// including when a new Actions run changes its discovered work_id.
+// Compare stable workflow failure key as well as the exact work source ID.
+export function assertNoPriorPersonalIssueAttempt({
+ history=[],discoveredWorkId,workKey,
+}={}){
+ if(!/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||''))||
+  typeof workKey!=='string'||!workKey.startsWith('workflow-failure:'))
+  fail('PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_SCOPE_INVALID');
+ const related=new Set([discoveredWorkId]);
+ for(const event of history){
+  if(event.entity_type==='personal_discovered_work_handoff'&&
+     event.payload?.work_key===workKey&&
+     /^work:[a-f0-9]{32}$/.test(String(event.payload?.work_id||'')))
+   related.add(event.payload.work_id);
+ }
+ if(history.some(event=>
+    event.entity_type==='personal_issue_execution_outcome'&&
+    related.has(event.payload?.work_id)))
+  fail('PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY');
+ return true;
+}
+export async function ensureNoPriorPersonalIssueAttempt({
+ session,conversationId,env,discoveredWorkId,workKey,
+ persistenceFactory=createUniversePostgresPersistence,
+}={}){
+ const db=assertPersonalDispatchEnvironment({session,conversationId,env});
+ const {personalGoalScope}=await import('./reality-personal-goal-readback-v0.1.js');
+ const scope=personalGoalScope({userId:session.user_id,conversationId});
+ const spine=createContinuitySpine({
+  continuityRootId:scope.root,worldlineId:scope.worldline,
+  subjectId:session.user_id,
+ });
+ const events=orderContinuityHistory(await persistenceFactory({...db}).reconstruct({
+  continuityRootId:spine.continuity_root_id,
+  worldlineId:spine.worldline_id,
+ }));
+ return assertNoPriorPersonalIssueAttempt({
+  history:events,discoveredWorkId,workKey,
+ });
+}
 export async function preparePersonalIssueDispatch({
  session,conversationId,discoveredWorkId,env=process.env,
  discover=runRealityStewardshipPass,
@@ -42,6 +83,7 @@ export async function preparePersonalIssueDispatch({
  readGoal=readFreshPersonalGoalState,
  prepare=prepareAuthenticatedPersonalExecution,
  issueProof=issuePersonalWorkGroundingProof,
+ ensureNoPrior=ensureNoPriorPersonalIssueAttempt,
 }={}){
  assertPersonalDispatchEnvironment({session,conversationId,env});
  if(!/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||'')))
@@ -58,6 +100,12 @@ export async function preparePersonalIssueDispatch({
   x.work_id===discoveredWorkId&&x.work_fingerprint===fingerprint&&
   x.goal_still_current===true&&validUuid(x.continuity_receipt_id));
  if(!saved)fail('PERSONAL_DISPATCH_DURABLE_SOURCE_AND_GOAL_RECEIPT_REQUIRED');
+ // A prior UNRESOLVED or VERIFIED provider attempt must be reconciled,
+ // never bypassed by new owner approval or changing discovery observations.
+ await ensureNoPrior({
+  session,conversationId,env,discoveredWorkId,
+  workKey:source.work_key,
+ });
  const latest=await readGoal({session,conversationId,env});
  if(latest.principal_id!==session.user_id||latest.conversation_id!==conversationId)
   fail('PERSONAL_DISPATCH_AUTHENTICATED_GOAL_READBACK_REQUIRED');
@@ -128,6 +176,9 @@ export async function recordPersonalIssueExecutionOutcome({
   execution_id:executionResult?.execution?.execution_id||null,
   provider_issue_number:executionResult?.verification?.observedState?.issue_number||null,
   provider_issue_url:executionResult?.verification?.observedState?.issue_url||null,
+  provider_failure_stage:executionResult?.provider_failure_stage||null,
+  provider_failure_code:executionResult?.provider_failure_code||null,
+  unverified_provider_issue_number:executionResult?.unverified_provider_claim?.issue_number||null,
   external_action_attempted:['EXECUTED','OUTCOME_UNCERTAIN'].includes(
    executionResult?.execution?.execution_state),
   outcome_state:verified?'VERIFIED_OUTCOME':'UNRESOLVED',
@@ -156,7 +207,10 @@ export async function recordPersonalIssueExecutionOutcome({
   saved.payload?.outcome_state!==payload.outcome_state)
   fail('PERSONAL_DISPATCH_OUTCOME_READBACK_NOT_VERIFIED');
  return Object.freeze({receipt_id:eid,independently_verified:verified,
-  outcome_state:payload.outcome_state,provider_issue_url:payload.provider_issue_url});
+  outcome_state:payload.outcome_state,provider_issue_url:payload.provider_issue_url,
+  failure_stage:payload.provider_failure_stage,
+  failure_code:payload.provider_failure_code,
+  unverified_provider_issue_number:payload.unverified_provider_issue_number});
 }
 export async function runPersonalIssueDispatch({
  session,conversationId,discoveredWorkId,
@@ -228,6 +282,9 @@ export async function runPersonalIssueDispatch({
    outcome_receipt_id:outcome.receipt_id,
    verified:outcome.independently_verified,
    provider_issue_url:outcome.provider_issue_url,
+   provider_failure_stage:outcome.failure_stage||null,
+   provider_failure_code:outcome.failure_code||null,
+   unverified_provider_issue_number:outcome.unverified_provider_issue_number||null,
    external_action_performed:outcome.independently_verified?true:null,
    external_action_may_have_occurred:!outcome.independently_verified,
    no_automatic_retry:true,
