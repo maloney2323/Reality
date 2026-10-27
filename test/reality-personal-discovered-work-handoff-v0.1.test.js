@@ -337,11 +337,17 @@ test('Home guides account, active goal, source review and one explicit required 
 });
 test('Home checks signed-in goal before preparing source work and never silently executes',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const sign=html.indexOf("if($('privateReady')?.style.display!=='block'");
- const goal=html.indexOf("const goalR=await fetch('/api/reality/personal-goals?");
- const prepare=html.indexOf("const prepared=await post('/api/reality/personal-discovered-work'");
- const approval=html.indexOf("const approved=await post('/api/reality/personal-action-authority'");
- const consent=html.indexOf("approve.onclick=async()=>");
+ // Scope the ordering assertion to the guided Attention handler, not the
+ // separate direct-start handler added earlier in the same page.
+ const guidedStart=html.indexOf(" $('attentionQueue').querySelectorAll('[data-auth]').forEach");
+ const guidedEnd=html.indexOf('async function refreshPreparedHomeWork',guidedStart);
+ assert.ok(guidedStart>=0&&guidedEnd>guidedStart);
+ const guided=html.slice(guidedStart,guidedEnd);
+ const sign=guided.indexOf("if($('privateReady')?.style.display!=='block'");
+ const goal=guided.indexOf("const goalR=await fetch('/api/reality/personal-goals?");
+ const prepare=guided.indexOf("const prepared=await post('/api/reality/personal-discovered-work'");
+ const approval=guided.indexOf("const approved=await post('/api/reality/personal-action-authority'");
+ const consent=guided.indexOf("approve.onclick=async()=>");
  assert.ok(sign>=0&&sign<goal&&goal<prepare&&prepare<consent&&consent<approval);
  assert.equal(html.includes("post('/api/reality/personal-execution-admission',{\n        intent:'RESERVE'"),false);
  assert.equal(html.includes("post('/api/reality/execute'"),false);
