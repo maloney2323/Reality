@@ -116,6 +116,15 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .account-shortcut{display:inline-block;text-decoration:none;white-space:nowrap;font-weight:700;border-color:#5b7189;color:#eef5ff}
 #privateChat{scroll-margin-top:16px}
 #privateAccountState{font-size:14px;line-height:1.55;margin:8px 0 10px}
+.wc-completion{margin:16px 0 20px;border:1px solid #466275;background:#101b29;border-radius:16px;padding:16px}
+.wc-completion-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.wc-completion-head h3{margin:0}.wc-completion-head button{margin-top:0}
+.wc-ending-receipt{background:#101d2a;border:1px solid #496579;border-radius:14px;padding:15px;margin:12px 0;overflow-wrap:anywhere}
+.wc-ending-receipt[data-outcome="verified"]{border-color:#4d806f}
+.wc-ending-receipt[data-outcome="unknown"]{border-color:#94735a}
+.wc-ending-receipt h3{margin:0 0 6px}.wc-ending-receipt .wc-receipt-kicker{font-size:12px;font-weight:700;color:#aac6db}
+.wc-ending-receipt ul{padding-left:20px;margin:6px 0 12px}.wc-ending-receipt li{margin:5px 0}
+.wc-ending-receipt a{overflow-wrap:anywhere}.wc-ending-receipt .wc-receipt-proof{font-size:12px;color:#b4c2d2;overflow-wrap:anywhere}
 .wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
 .wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
 .wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -215,6 +224,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
   <span id="wcCredentialResult" role="status" aria-live="polite">GitHub Issue write access has not been proven by read-only checks. Earlier attempts stay locked.</span>
  </div>
+ <div class="wc-completion" id="wcCompletionCenter" role="region" aria-label="Reality end-of-work receipts">
+  <div class="wc-completion-head"><h3>Reality · Work results & ending receipts</h3>
+   <button type="button" id="wcRefreshCompletion">Refresh saved receipts · Read only</button></div>
+  <p id="wcCompletionStatus" class="wc-note" role="status" aria-live="polite">Sign in to view saved, source-backed job outcomes. Discovery is not completion.</p>
+  <div id="wcCompletionList"><p class="muted">No completed-job claim has been established in this view.</p></div>
+ </div>
  <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
   <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
   <button type="button" role="tab" data-wc-mode="shift" aria-selected="false">1–8 hour shift</button>
@@ -296,6 +311,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="runShiftNow" type="button">Run one supervised shift now</button>
 <span class="muted" id="runShiftProof" role="status">Owner-only discovery test. Scheduled shifts remain unchanged; no external work is authorized.</span>
 </div>
+<div id="shiftEndingReceipt" class="wc-ending-receipt" role="status" aria-live="polite" hidden></div>
 <div class="shift-work"><span>Shift work</span><span>Find bugs · recover unfinished work · discover recurring work · research upgrades · watch competition · execute governed work · verify results</span></div>
 <details class="shift-scope"><summary>Show full shift mission</summary>
 <div class="shift-columns">
@@ -889,6 +905,97 @@ async function wcAuthorizeAndStart(workId){
   wcRender();
  }
 }
+
+// Deterministic display ONLY: reports arrive from authenticated, saved
+// Continuity outcomes or independently read-back shift discovery ticks.
+const wcReceiptLink=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
+function wcReceiptHTML(report){
+ const verified=report?.status==='ACTION_VERIFIED_JOB_OPEN';
+ const cycle=report?.type==='SHIFT_DISCOVERY_CYCLE';
+ const title=verified?'I finished this action — the full job is still open':
+  cycle?'I recorded this discovery cycle — the full shift is NOT proven finished':
+  'I cannot verify this action finished';
+ const list=values=>'<ul>'+values.map(x=>'<li>'+esc(String(x))+'</li>').join('')+'</ul>';
+ const completed=Array.isArray(report?.completed_actions)?report.completed_actions:[];
+ const remaining=Array.isArray(report?.pending_work)?report.pending_work:[];
+ const receipt=report.receipt_id||report.source_receipt_id||'Not available';
+ const validURL=verified&&wcReceiptLink.test(String(report.issue_url||''))?report.issue_url:null;
+ const evidence=cycle?
+  'Discovery observations: '+esc(String(report.evidence_observation_count??'Not measured'))+
+   ' · Findings discovered: '+esc(String(report.discovered_work_count??'Not measured'))+
+   ' · Verified executions: 0':
+  'Source evidence references: '+esc(String(report.source_evidence_count??'Unknown'))+
+   ' · Outcome: '+(verified?'Independent GitHub and Continuity readback':'Unverified; do not retry');
+ const date=report.observed_at&&Number.isFinite(Date.parse(report.observed_at))?
+  new Date(report.observed_at).toLocaleString():'Time unavailable';
+ return '<article class="wc-ending-receipt" data-outcome="'+(verified?'verified':'unknown')+'">'+
+  '<div class="wc-receipt-kicker">'+esc(cycle?'SHIFT DISCOVERY RECEIPT':'INDIVIDUAL ACTION RECEIPT')+
+  ' · '+esc(date)+'</div>'+
+  '<h3>'+esc(title)+'</h3>'+
+  '<p>'+esc(String(report.title||report.headline||'Reality work result'))+'</p>'+
+  '<strong>What I actually did</strong>'+list(completed.length?completed:
+    ['No completed action could be independently established from this receipt.'])+
+  '<strong>What remains unfinished</strong>'+list(remaining)+
+  '<p class="wc-receipt-proof"><strong>Verification:</strong> '+evidence+
+  ' · Saved receipt: '+esc(String(receipt))+
+  (report.reservation_id?' · One-time reservation: '+esc(String(report.reservation_id)):'')+
+  (cycle?' · Tick: '+esc(String(report.tick_id||'')):'')+'</p>'+
+  '<p class="wc-receipt-proof"><strong>Time spent:</strong> not measured · <strong>Time returned:</strong> not measured · '+
+  '<strong>Automation cost:</strong> not metered · <strong>Realized cash savings:</strong> not verified.</p>'+
+  '<p><strong>Next step:</strong> '+esc(String(report.next_step||'Review source evidence before any next action.'))+'</p>'+
+  (validURL?'<p><a href="'+esc(validURL)+'" target="_blank" rel="noopener noreferrer">View verified GitHub issue</a></p>':'')+
+  '</article>';
+}
+async function wcLoadCompletionReports(){
+ const out=$('wcCompletionList'),status=$('wcCompletionStatus');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||''))){
+  status.textContent='Sign in to see saved completion receipts. No finished work is assumed.';
+  out.replaceChildren();return;
+ }
+ status.textContent='Reading saved action outcomes · No external writes or model calls…';
+ try{
+  const r=await fetch('/api/reality/personal-completion-reports?conversation_id='+
+   encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+  const data=await r.json();
+  if(!r.ok||!data.ok||data.status!=='PERSISTED_READ_ONLY'||!Array.isArray(data.reports))
+   throw Error('Authenticated Continuity readback unavailable');
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  status.textContent=data.reports.length?
+   'Saved Continuity outcomes · '+data.reports.filter(x=>x.action_completed===true).length+
+    ' verified external action(s). This does not establish completed repairs.':
+   'No persisted execution outcomes found for this conversation. Discoveries and approvals are not completed jobs.';
+  out.innerHTML=data.reports.length?data.reports.map(wcReceiptHTML).join(''):
+   '<p class="muted">No verified work results yet for this conversation.</p>';
+ }catch{
+  status.textContent='Completion receipts could not be restored. No completion claim is being made.';
+  out.textContent='Reconnect and refresh the saved receipts. Do not retry any previously dispatched task.';
+ }
+}
+$('wcRefreshCompletion').onclick=()=>{void wcLoadCompletionReports()};
+function wcRenderShiftEndingReceipt(home){
+ const el=$('shiftEndingReceipt');
+ const cycle=home?.latest_cycle;
+ if(home?.status!=='RECORDED'||!cycle||cycle.tick_id!==home.latest_tick_id||
+    !cycle.source_event_id||!Number.isSafeInteger(cycle.discovered_work_count)){
+  el.hidden=true;el.replaceChildren();return;
+ }
+ el.hidden=false;
+ el.innerHTML=wcReceiptHTML({
+  type:'SHIFT_DISCOVERY_CYCLE',status:'DISCOVERY_CYCLE_RECORDED_SHIFT_NOT_VERIFIED_COMPLETE',
+  headline:'Reality recorded this discovery cycle',
+  observed_at:cycle.observed_at||home.latest_shift_at,
+  source_receipt_id:cycle.source_event_id,tick_id:cycle.tick_id,
+  discovered_work_count:cycle.discovered_work_count,
+  evidence_observation_count:cycle.recent_observation_count,
+  completed_actions:['Observed source activity and persisted this one discovery-cycle result'],
+  pending_work:['Discovered jobs still require separate authorized execution and verification',
+   'Full-shift closure and complete verified job inventory have not been established'],
+  next_step:'Review discoveries and authorize eligible jobs. This is not evidence that a 1–8 hour automation shift finished.'
+ });
+}
+
 let wcCoverage={},wcCatalogStatus='NOT_CHECKED';
 const wcKey=w=>String(w.finding_id||w.work_id||'');
 const wcNeedsSource=id=>({customer:'customer_feedback',operations:'business_operations',research:'external_research'}[id]||null);
