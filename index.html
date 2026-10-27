@@ -404,6 +404,76 @@ function showWorkSetupAction(target,message,kind){
  button.onclick=()=>jumpToWorkSetup(kind);
  target.append(info,button);
 }
+// Gap 3 is never auto-dispatched by Step 3 approval. Only an entirely NEW,
+// deliberate user click can request the server's atomic single-use execution.
+async function revealGap3Action(review,receipt,workItem,conversationId,workId){
+ const info=document.createElement('p');
+ info.textContent='Checking live GitHub execution readiness. Approval alone never dispatches.';
+ review.append(info);
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||!data.ok||data.status!=='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED'){
+   info.textContent='Gap 3 · GitHub write is not configured on this protected preview. No issue can be created here yet. Your Step 3 approval was recorded; do not attempt automatic retries.';
+   return;
+  }
+  info.textContent='Gap 3 · Separate live action. This creates ONE GitHub issue only after a new explicit confirmation. This is not automatic.';
+  const scope=document.createElement('p');
+  scope.textContent='Exact operation: Create one issue in maloney2323/Reality. Title: '+workItem.inputs.title+
+   '\\nNo code changes, merging, purchases or deployment will occur.';
+  const consent=document.createElement('label');
+  const checked=document.createElement('input');checked.type='checkbox';checked.required=true;
+  const terms=document.createElement('span');
+  terms.textContent='Required: I separately authorize creating this one exact GitHub issue now. I understand it cannot be blindly retried if the outcome is uncertain.';
+  consent.append(checked,terms);
+  const run=document.createElement('button');run.type='button';run.disabled=true;
+  run.textContent='Run this one approved GitHub issue';
+  checked.onchange=()=>{run.disabled=!checked.checked;};
+  run.onclick=async()=>{
+   if(!checked.checked||!checked.checkValidity())return;
+   if(!confirm('Create ONE real GitHub issue in maloney2323/Reality named: '+workItem.inputs.title+'?'))return;
+   checked.disabled=true;run.disabled=true;
+   run.textContent='Executing once · Verifying GitHub…';
+   try{
+    const response=await fetch('/api/reality/personal-issue-dispatch',{
+     method:'POST',credentials:'same-origin',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({
+      intent:'RUN',conversation_id:conversationId,discovered_work_id:workId,
+      confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE',
+     }),
+    });
+    const out=await response.json();
+    if(!response.ok||!out.ok)
+     throw Error(out.error||'Execution was not admitted. Review before any retry.');
+    if(out.status==='VERIFIED'&&out.verified===true&&
+       /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(out.provider_issue_url||''))){
+     const link=document.createElement('a');
+     link.textContent='View independently verified GitHub issue';
+     link.href=out.provider_issue_url;link.target='_blank';link.rel='noopener noreferrer';
+     info.textContent='Gap 3 · Verified outcome persisted to Continuity. GitHub readback passed.';
+     receipt.textContent='Verified GitHub issue · Work '+workId+
+      ' · Outcome receipt '+out.outcome_receipt_id+' · Single-use reservation '+out.reservation_id;
+     review.append(link);
+    }else{
+     info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
+      '. Do not retry automatically; reconcile the provider and reservation receipts.';
+     receipt.textContent='Execution outcome not verified · '+String(out.reason||'Manual review required')+
+      ' · No automatic retry.';
+    }
+   }catch(e){
+    info.textContent='Gap 3 could not complete: '+e.message+
+     '. Status may be uncertain. Do not retry automatically.';
+   }
+   run.textContent='Execution attempt finished · Do not retry';
+  };
+  review.append(scope,consent,run);
+ }catch{
+  info.textContent='Gap 3 readiness check unavailable. No external action has been attempted.';
+ }
+}
+
 
 function renderWork(source){
   const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
@@ -568,9 +638,10 @@ function renderWork(source){
             '. No external action has been performed.';
           review.replaceChildren();
           const success=document.createElement('p');
-          success.textContent='Approval recorded and current goal rechecked. The actual provider action has NOT run. A separate single-use dispatch is needed in the next development stage.';
+          success.textContent='Approval recorded and current goal rechecked. No provider action has run. Any live execution needs a new, separate confirmation and a single-use reservation.';
           review.append(success);
           btn.textContent='Approved · Dispatch not enabled';
+          await revealGap3Action(review,receipt,exact,conv,w.work_id);
         }catch(e){
           setWorkStep(card,4,'blocked','Approval or admission · Needs review');
           receipt.textContent='Reality could not finish approval/readiness: '+e.message+
