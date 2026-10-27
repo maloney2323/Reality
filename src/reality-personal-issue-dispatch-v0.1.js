@@ -294,6 +294,7 @@ export async function recordPersonalIssueExecutionOutcome({
   provider_issue_url:executionResult?.verification?.observedState?.issue_url||null,
   provider_failure_stage:executionResult?.provider_failure_stage||null,
   provider_failure_code:executionResult?.provider_failure_code||null,
+  provider_failure_detail:executionResult?.provider_failure_detail||null,
   unverified_provider_issue_number:executionResult?.unverified_provider_claim?.issue_number||null,
   external_action_attempted:['EXECUTED','OUTCOME_UNCERTAIN'].includes(
    executionResult?.execution?.execution_state),
@@ -326,6 +327,7 @@ export async function recordPersonalIssueExecutionOutcome({
   outcome_state:payload.outcome_state,provider_issue_url:payload.provider_issue_url,
   failure_stage:payload.provider_failure_stage,
   failure_code:payload.provider_failure_code,
+  failure_detail:payload.provider_failure_detail,
   unverified_provider_issue_number:payload.unverified_provider_issue_number});
 }
 export async function runPersonalIssueDispatch({
@@ -424,6 +426,7 @@ export async function runPersonalIssueDispatch({
    provider_issue_url:outcome.provider_issue_url,
    provider_failure_stage:outcome.failure_stage||null,
    provider_failure_code:outcome.failure_code||null,
+   provider_failure_detail:outcome.failure_detail||null,
    unverified_provider_issue_number:outcome.unverified_provider_issue_number||null,
    external_action_performed:outcome.independently_verified?true:null,
    external_action_may_have_occurred:!outcome.independently_verified,
