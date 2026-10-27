@@ -4,6 +4,9 @@
 // Persists non-authorizing observed-work receipts in the SAME personal Continuity,
 // preserving the original work/evidence/goal relationship for future stages.
 import {createHash} from 'node:crypto';
+import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
+ from './reality-continuity-spine-v2.0.js';
+import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {runRealityStewardshipPass} from './reality-stewardship-pass-v1.0.js';
 import {readFreshPersonalGoalState} from './reality-personal-goal-readback-v0.1.js';
 import {bindWorkToAuthenticatedGoal} from './reality-execution-goal-grounding-v0.1.js';
@@ -17,6 +20,19 @@ export const PERSONAL_DISCOVERED_WORK_HANDOFF_VERSION='reality-personal-discover
 const REPO='maloney2323/Reality';
 const fail=(code)=>{throw Error(code)};
 const str=x=>typeof x==='string'&&x.trim().length>0;
+function trustedWorkSpine(latest,session){
+ // GoalState is sourced from independently verified Continuity. Its scope
+ // is canonical UUID after the Spine converts the personal:chat source name.
+ const spine=createContinuitySpine({
+  continuityRootId:latest.scope.root,
+  worldlineId:latest.scope.worldline,
+  subjectId:session.user_id,
+ });
+ if(latest.state?.continuity_root_id!==spine.continuity_root_id||
+    latest.state?.world_id!==latest.scope.world)
+  fail('DISCOVERED_WORK_CANONICAL_CONTINUITY_SCOPE_MISMATCH');
+ return spine;
+}
 function stableId(principal,conversation,workId,goalReceipt,fingerprint){
  const hex=createHash('sha256').update(JSON.stringify([
   'personal-discovered-work-handoff-v1',principal,conversation,workId,
@@ -106,10 +122,11 @@ export async function preparePersonalDiscoveredWorkHandoff({
  const fp=fingerprintApprovedWorkItem(workItem);
  const receiptId=stableId(session.user_id,conversationId,
   discoveredWorkId,binding.goal_transition_receipt_id,fp);
+ const spine=trustedWorkSpine(latest,session);
  const store=createPersistence({...db});
- const past=await store.reconstruct({
-  continuityRootId:latest.scope.root,worldlineId:latest.scope.worldline,
- });
+ const past=orderContinuityHistory(await store.reconstruct({
+  continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id,
+ }));
  let event=past.find(x=>x.event_id===receiptId)||null;
  const payload={
   version:PERSONAL_DISCOVERED_WORK_HANDOFF_VERSION,
@@ -131,27 +148,39 @@ export async function preparePersonalDiscoveredWorkHandoff({
      event.payload?.authority!=='NOT_GRANTED')
    fail('DISCOVERED_WORK_RECEIPT_CONFLICT');
  }else{
+  // A live owner-confirmed goal must have an existing, independently hashed
+  // goal receipt in this exact user's Continuity. Never create a second root.
+  const tail=past.at(-1);
+  if(!tail||tail.event_id!==binding.goal_transition_receipt_id||
+     !tail.lineage_hash||tail.continuity_root_id!==spine.continuity_root_id||
+     tail.worldline_id!==spine.worldline_id)
+   fail('DISCOVERED_WORK_GOAL_RECEIPT_NOT_CURRENT_CONTINUITY_TAIL');
   const at=new Date().toISOString();
-  event=await store.appendEvent({
-   event_id:receiptId,event_kind:'observation',
-   entity_type:'personal_discovered_work_handoff',
-   entity_id:discoveredWorkId,
-   continuity_root_id:latest.scope.root,
-   worldline_id:latest.scope.worldline,
-   parent_event_id:null,
-   effective_time:at,assertion_time:at,
-   epistemic_status:'OBSERVED',
-   payload,evidence_refs:[...work.evidence_refs],
+  // The normal Spine path maps source strings to UUID columns and computes
+  // the canonical append-only lineage hash. Never write personal:chat:...
+  // directly into PostgreSQL UUID columns or insert a parentless record.
+  const node=appendContinuityNode({
+   spine,stage:'OBSERVATION',entityId:discoveredWorkId,eventId:receiptId,
+   parentEventId:tail.event_id,priorLineageHash:tail.lineage_hash,
+   effectiveTime:at,assertionTime:at,epistemicStatus:'OBSERVED',
+   payload,evidenceRefs:[...work.evidence_refs],
    provenance:{source:PERSONAL_DISCOVERED_WORK_HANDOFF_VERSION,
     observer:'github_actions',principal_id:session.user_id,
     conversation_id:conversationId},
   });
-  // Never claim a durable work receipt without independent readback.
-  const confirmed=await store.reconstruct({
-   continuityRootId:latest.scope.root,worldlineId:latest.scope.worldline,
+  event=await store.appendEvent({
+   ...node,entity_type:'personal_discovered_work_handoff',
   });
+  // Independently reconstruct and verify the COMPLETE chain after commit.
+  // A provider 200 response alone is not enough to label it persisted.
+  const confirmed=orderContinuityHistory(await store.reconstruct({
+   continuityRootId:spine.continuity_root_id,
+   worldlineId:spine.worldline_id,
+  }));
   const saved=confirmed.find(x=>x.event_id===receiptId);
   if(!saved||saved.entity_type!=='personal_discovered_work_handoff'||
+     saved.entity_id!==continuityUuidFromSource(discoveredWorkId)||
+     saved.parent_event_id!==tail.event_id||
      saved.payload?.work_fingerprint!==fp||
      saved.payload?.goal_transition_receipt_id!==binding.goal_transition_receipt_id)
    fail('DISCOVERED_WORK_HANDOFF_READBACK_FAILED');
@@ -194,22 +223,25 @@ export async function listPersonalDiscoveredWorkHandoffs({
     latest.conversation_id!==conversationId||
     !latest.scope?.root||!latest.scope?.worldline)
   fail('DISCOVERED_WORK_CONTINUITY_SCOPE_NOT_VERIFIED');
- const history=await createPersistence({...db}).reconstruct({
-  continuityRootId:latest.scope.root,worldlineId:latest.scope.worldline,
- });
+ const spine=trustedWorkSpine(latest,session);
+ const history=orderContinuityHistory(await createPersistence({...db}).reconstruct({
+  continuityRootId:spine.continuity_root_id,
+  worldlineId:spine.worldline_id,
+ }));
  const current=latest.state?.active_goal;
  const all=history.filter(e=>
   e.entity_type==='personal_discovered_work_handoff'&&
-  e.continuity_root_id===latest.scope.root&&
-  e.worldline_id===latest.scope.worldline&&
+  e.continuity_root_id===spine.continuity_root_id&&
+  e.worldline_id===spine.worldline_id&&
   e.provenance?.principal_id===session.user_id&&
   e.provenance?.conversation_id===conversationId&&
   e.payload?.version===PERSONAL_DISCOVERED_WORK_HANDOFF_VERSION&&
   e.payload?.authority==='NOT_GRANTED'&&
   e.payload?.external_action_performed===false&&
-  e.payload?.work_id===e.entity_id&&
-  e.payload?.work_item?.discovered_work_id===e.entity_id&&
-  e.payload?.work_item?.work_item_id===e.entity_id&&
+  /^work:[a-f0-9]{32}$/.test(String(e.payload?.work_id||''))&&
+  e.entity_id===continuityUuidFromSource(e.payload.work_id)&&
+  e.payload?.work_item?.discovered_work_id===e.payload.work_id&&
+  e.payload?.work_item?.work_item_id===e.payload.work_id&&
   e.payload?.work_fingerprint===fingerprintApprovedWorkItem(e.payload.work_item)
  ).sort((a,b)=>String(b.assertion_time).localeCompare(String(a.assertion_time)));
  const seen=new Set();
@@ -217,10 +249,10 @@ export async function listPersonalDiscoveredWorkHandoffs({
   status:'READ_ONLY_DISCOVERED_WORK_CONTINUITY',
   conversation_id:conversationId,
   items:all.filter(e=>{
-   if(seen.has(e.entity_id))return false;
-   seen.add(e.entity_id);return true;
+   if(seen.has(e.payload.work_id))return false;
+   seen.add(e.payload.work_id);return true;
   }).slice(0,20).map(e=>Object.freeze({
-   work_id:e.entity_id,
+   work_id:e.payload.work_id,
    continuity_receipt_id:e.event_id,
    goal_id:e.payload.goal_id,
    work_fingerprint:e.payload.work_fingerprint,
