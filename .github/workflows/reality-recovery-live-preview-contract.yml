@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/reality-personal-recovery-checkpoint-v0.1.js'
       - 'scripts/reality-recovery-real-source-proof-v0.1.mjs'
+      - 'scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs'
       - 'src/reality-autonomous-capability-loop-v1.0.js'
       - 'src/reality-autonomous-closure-orchestrator-v1.0.js'
       - 'test/reality-recovery-v1-linkage.test.js'
@@ -25,6 +26,7 @@ on:
     paths:
       - 'src/reality-personal-recovery-checkpoint-v0.1.js'
       - 'scripts/reality-recovery-real-source-proof-v0.1.mjs'
+      - 'scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs'
       - 'src/reality-autonomous-capability-loop-v1.0.js'
       - 'src/reality-autonomous-closure-orchestrator-v1.0.js'
       - 'test/reality-recovery-v1-linkage.test.js'
@@ -58,6 +60,15 @@ jobs:
         run: node --test test/reality-personal-recovery-checkpoint-v0.1.test.js test/reality-completion-report-v0.1.test.js test/reality-personal-unfinished-work-v0.1.test.js test/reality-recovery-evidence-gate-v0.1.test.js test/reality-recovery-v1-linkage.test.js
       - name: Prove actual Git history gap and repaired original-work runtime
         run: node scripts/reality-recovery-real-source-proof-v0.1.mjs
+      - name: Reproduce real old failure and verify isolated repair on historical checkout
+        run: node scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs
+      - name: Archive isolated red/green recovery proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-sandbox-red-green
+          path: reality-recovery-real-sandbox-proof.json
+          retention-days: 14
       - name: Archive independently CI-validated source recovery receipt
         if: success()
         uses: actions/upload-artifact@v4
