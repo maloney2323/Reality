@@ -65,8 +65,11 @@ export default async function handler(req,res){
    external_action_performed:false,
   });
  }catch(error){
+  const raw=String(error?.message||'');
+  const database=/UNIVERSE_POSTGRES_HTTP_|CONTINUITY_PERSISTENCE_REQUIRED|CONTINUITY_REHYDRATION_FAILED/.test(raw);
   return res.status(error.status||503).json({ok:false,
-   error:error.message||'PERSONAL_EXECUTION_ADMISSION_UNAVAILABLE',
+   error:database?'PERSONAL_EXECUTION_CONTINUITY_STORAGE_UNAVAILABLE':
+    raw||'PERSONAL_EXECUTION_ADMISSION_UNAVAILABLE',
    external_action_performed:false});
  }
 }
