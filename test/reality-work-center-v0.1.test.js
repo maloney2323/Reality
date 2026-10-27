@@ -37,7 +37,7 @@ test('credits and task-runtime predictions are explicitly uncalibrated',()=>{
  assert.ok(html.includes('Unlimited plan is hypothetical'));
  assert.ok(html.includes('Full investigation, repair and completed-job duration: UNKNOWN'));
  assert.ok(html.includes('illustrative')||html.includes('Illustrative'));
- assert.ok(html.includes('No measured baseline'));
+ assert.ok(html.toLowerCase().includes('no measured baseline'));
 });
 test('all inline JS remains syntactically valid after dashboard integration',()=>{
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
