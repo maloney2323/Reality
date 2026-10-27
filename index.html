@@ -327,6 +327,55 @@ $('plan').onclick=async()=>{
     $('verification').textContent='No external outcome claimed';
   }catch(e){$('error').textContent=e.message;renderTrustPulse(null)}finally{$('plan').disabled=false}
 };
+// UI-only progress. Server still re-verifies actual identity, goal, source,
+// policy and exact-work authorization before any consequential operation.
+const guidedSetup={authenticated:null,goal:'checking',goalTitle:'',workFound:false,approved:false,accountError:''};
+function paintGuidedSetup(){
+ const signed=guidedSetup.authenticated===true;
+ const pending=guidedSetup.authenticated===null;
+ const goal=signed&&guidedSetup.goal==='confirmed';
+ const set=(n,state,status,label)=>{
+  $('startStep'+n).dataset.state=state;
+  $('startStatus'+n).textContent=status;
+  $('startAction'+n).textContent=label;
+ };
+ set(1,signed?'complete':pending?'pending':'active',
+  signed?'✓ Signed in to your private Reality account':
+  pending?'Checking sign-in…':guidedSetup.accountError||'Required: sign in below with your existing account.',
+  signed?'✓ Step 1 complete · Account':'Step 1 · Go to sign in');
+ set(2,goal?'complete':signed?'active':'pending',
+  goal?'✓ Confirmed goal: '+guidedSetup.goalTitle.slice(0,140):
+   !signed?'First, finish Step 1.':
+   guidedSetup.goal==='unavailable'?'Goal ledger not verified. Check the message below.':
+   'Required: confirm an active goal or resume a previously confirmed goal.',
+  goal?'✓ Step 2 complete · View goal':'Step 2 · Enter or resume goal');
+ set(3,guidedSetup.approved?'complete':goal?'active':'pending',
+  guidedSetup.approved?'✓ Exact work approved. External execution is still disabled.':
+  !goal?'Finish Steps 1 and 2 first.':
+  guidedSetup.workFound?'Work discovered. Review one candidate below.':
+  'Ready: Reality can find source-backed work without a Request.',
+  guidedSetup.approved?'✓ Step 3 complete · Review result':
+  guidedSetup.workFound?'Step 3 · Review work':'Step 3 · Find work');
+ $('startNext').textContent=guidedSetup.approved
+  ?'Test reached exact approval. Dispatch is not enabled.'
+  :!signed?'NEXT → Step 1: Sign in to Reality.'
+  :!goal?'NEXT → Step 2: Confirm the goal you want Reality to work toward.'
+  :guidedSetup.workFound?'NEXT → Step 3: Select a discovered task and review its exact action.'
+  :'NEXT → Step 3: Press Find work. No Request field is needed.';
+}
+$('startAction1').onclick=()=>jumpToWorkSetup('account');
+$('startAction2').onclick=()=>{
+ if(guidedSetup.authenticated!==true)return jumpToWorkSetup('account');
+ jumpToWorkSetup('goal');
+};
+$('startAction3').onclick=()=>{
+ if(guidedSetup.authenticated!==true)return jumpToWorkSetup('account');
+ if(guidedSetup.goal!=='confirmed')return jumpToWorkSetup('goal');
+ if(guidedSetup.workFound||guidedSetup.approved)
+  return $('attentionQueue').scrollIntoView({behavior:'smooth',block:'start'});
+ realityWork.click();
+};
+paintGuidedSetup();
 const realityWork=$('findWork');const workResult=$('workResult');
 let guidedWorkPending=false;
 function jumpToWorkSetup(kind){
@@ -376,6 +425,9 @@ function renderWork(source){
     return '<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(state(w))+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span><span class="pill">'+esc('Evidence '+evidence)+'</span></div></div>';
   }).join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
   const pending=items.filter(w=>w.consequential||w.authority_required?.length||w.authorization_required||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
+  guidedSetup.workFound=pending.some(w=>w.authorization_required===true&&
+    w.execution_work_item?.connector==='github'&&w.execution_work_item?.operation==='create_issue');
+  paintGuidedSetup();
   $('attentionCount').textContent=String(pending.length);
   $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>{
     const prepared=w.kind==='SYSTEM_MAINTENANCE'&&w.state==='QUALIFIED'&&
@@ -509,6 +561,7 @@ function renderWork(source){
              admitted.external_action_performed!==false)
             throw Error('Approved work did not pass the latest goal/readiness check.');
           setWorkStep(card,4,'complete','Exact action · Approved, dispatch still disabled');
+          guidedSetup.approved=true;paintGuidedSetup();
           receipt.textContent='Approved · Dispatch not enabled. Work '+w.work_id+
             ' · Continuity '+prepared.continuity_receipt_id+
             ' · Approval '+approved.policy_id+
@@ -586,6 +639,7 @@ realityWork.onclick=async()=>{
   try{
     const r=await fetch('/api/reality/stewardship');const b=await r.json();if(!r.ok)throw new Error(b.error||'stewardship discovery failed');
     renderWork(b.work||[]);
+    if(guidedSetup.workFound)$('attentionQueue').scrollIntoView({behavior:'smooth',block:'start'});
     workResult.textContent='Discovery completed. Work appears above; attention shows what still requires authorization. No external work was executed.';
     $('liveHeadline').textContent='Reality has started looking for work.';$('liveDetail').textContent='Discovery is observation. Authorization remains explicit.';
   }catch(e){workResult.textContent='Reality stopped honestly: '+e.message}
@@ -663,6 +717,11 @@ setInterval(refreshSavedShiftHome,300000);
  function showSignedIn(yes){
   el('privateLogin').style.display=yes?'none':'block';
   el('privateReady').style.display=yes?'block':'none';
+  guidedSetup.authenticated=yes;
+  guidedSetup.accountError='';
+  if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
+   guidedSetup.workFound=false;guidedSetup.approved=false;}
+  paintGuidedSetup();
  }
  function bubble(role,text){
   const node=document.createElement('div');
@@ -702,8 +761,13 @@ setInterval(refreshSavedShiftHome,300000);
    const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Goal ledger unavailable');
    const state=data.goal_state||{};
-   confirmedActiveGoal=state.active_goal?.goal_id&&state.active_goal_id===state.active_goal.goal_id?
+   confirmedActiveGoal=state.active_goal?.goal_id&&state.active_goal_id===state.active_goal.goal_id&&
+     state.active_goal.status==='ACTIVE'&&state.active_goal.user_confirmed===true?
     {goal_id:state.active_goal.goal_id,title:String(state.active_goal.title||'').slice(0,300)}:null;
+   guidedSetup.goal=confirmedActiveGoal?'confirmed':'missing';
+   guidedSetup.goalTitle=confirmedActiveGoal?.title||'';
+   guidedSetup.approved=false;
+   paintGuidedSetup();
    for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
     el(id).disabled=!confirmedActiveGoal;
    label.textContent=state.active_goal?
@@ -721,6 +785,8 @@ setInterval(refreshSavedShiftHome,300000);
    el('privateResumeGoal').disabled=!select.options.length;
   }catch(e){
    confirmedActiveGoal=null;
+   guidedSetup.goal='unavailable';guidedSetup.goalTitle='';
+   paintGuidedSetup();
    for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
     el(id).disabled=true;
    label.textContent='Confirmed goal ledger not available: '+e.message+
@@ -749,9 +815,9 @@ setInterval(refreshSavedShiftHome,300000);
    await saveGoalCommand('SET_ACTIVE',message);
    el('privateGoalText').value='';
    await loadGoals();await loadSaved();await loadConversations();
-   status('User-authorized goal recorded and verified in Continuity. Return to the work card to continue approval.');
-   if(guidedWorkPending){guidedWorkPending=false;
-     $('attentionQueue')?.scrollIntoView({behavior:'smooth',block:'start'});}
+   status('Goal confirmed. Continue with Step 3: Find work.');
+   guidedWorkPending=false;
+   $('startStep3').scrollIntoView({behavior:'smooth',block:'center'});
   }catch(e){status('Goal was not confirmed: '+e.message)}
   finally{el('privateSetGoal').disabled=false}
  };
@@ -764,7 +830,8 @@ setInterval(refreshSavedShiftHome,300000);
   try{
    await saveGoalCommand('RESUME','I explicitly authorize resuming this earlier objective: '+selected.slice(0,450),target);
    await loadGoals();await loadSaved();await loadConversations();
-   status('Earlier user-confirmed objective resumed from its source-linked ledger entry.');
+   status('Goal resumed. Continue with Step 3: Find work.');
+   $('startStep3').scrollIntoView({behavior:'smooth',block:'center'});
   }catch(e){status('Goal was not resumed: '+e.message)}
   finally{el('privateResumeGoal').disabled=false}
  };
@@ -820,14 +887,24 @@ setInterval(refreshSavedShiftHome,300000);
  async function init(){
   try{
    const r=await fetch(endpoint,{cache:'no-store'});
-   if(r.status===404)return; // Preview-only feature; production remains unchanged.
+   if(r.status===404){
+    guidedSetup.authenticated=false;
+    guidedSetup.accountError='Private sign-in is unavailable on this deployment.';
+    paintGuidedSetup();
+    return; // Preview-only feature; production remains unchanged.
+   }
    el('privateChat').style.display='block';
    if(!r.ok)throw Error('Private conversation service is unavailable.');
    const data=await r.json();
    showSignedIn(data.authenticated===true);
    if(data.authenticated){await loadSaved();await loadConversations();}
    else status('Sign in with your existing Supabase account to resume your conversation.');
-  }catch(e){if(el('privateChat').style.display==='block')status(e.message)}
+  }catch(e){
+   guidedSetup.authenticated=false;
+   guidedSetup.accountError='Sign-in status unavailable: '+e.message;
+   paintGuidedSetup();
+   if(el('privateChat').style.display==='block')status(e.message);
+  }
  }
  el('privateSignIn').onclick=async()=>{
   for(const id of ['privateEmail','privatePassword']){
@@ -839,6 +916,7 @@ setInterval(refreshSavedShiftHome,300000);
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
    el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
+   if(!confirmedActiveGoal)jumpToWorkSetup('goal');
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
