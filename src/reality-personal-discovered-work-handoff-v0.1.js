@@ -93,6 +93,10 @@ export async function preparePersonalDiscoveredWorkHandoff({
     latest.conversation_id!==conversationId||
     !latest.scope?.root||!latest.scope?.worldline)
   fail('DISCOVERED_WORK_CONTINUITY_SCOPE_NOT_VERIFIED');
+ // Distinguish "the owner has not set an active goal" from forged source
+ // authority. Neither condition can be repaired by assistant inference.
+ if(!latest.state?.active_goal_id||!latest.state?.active_goal)
+  fail('DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION');
  const binding=bindWorkToAuthenticatedGoal({
   workItem,authoritativeState:latest.state,
   serverVerifiedPrincipalId:session.user_id,
