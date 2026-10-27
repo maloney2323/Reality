@@ -3,6 +3,7 @@
 // actionable grants, verified defects, or estimates of realized time return.
 import crypto from 'node:crypto';
 import {runRealityStewardshipPass,readStewardshipGitHub} from './reality-stewardship-pass-v1.0.js';
+import {prioritizeEvidenceBackedFindings,VALUE_ASSESSMENT_VERSION} from './reality-work-value-assessment-v0.1.js';
 const API='https://api.github.com';
 const BASE='https://github.com/maloney2323/Reality';
 const paths=Object.freeze({
@@ -131,16 +132,19 @@ export async function buildRealityWorkCatalog({
   });added++;
   }
  }else failures.push('GitHub recent changes unavailable');
+ const ranked=prioritizeEvidenceBackedFindings(findings);
  const groups=Object.fromEntries([
   'customer','bugs','upgrades','features','reliability','integrations',
   'security','operations','research','automation',
- ].map(k=>[k,findings.filter(w=>w.category===k).length]));
+ ].map(k=>[k,ranked.filter(w=>w.category===k).length]));
  return Object.freeze({
   version:'reality-work-catalog-v0.1',
   status:failures.length?'PARTIAL':'OBSERVED',
   observed_at:new Date().toISOString(),
   source_coverage:coverage,source_failures:failures,
-  counts:groups,items:findings.slice(0,90),
+  counts:groups,items:ranked.slice(0,90),
+  ranking_version:VALUE_ASSESSMENT_VERSION,
+  ranked_by:'EVIDENCE_BASED_TRIAGE_ONLY_NOT_VERIFIED_BUSINESS_IMPACT',
   total_findings:findings.length,
   authority:'NONE_GRANTED',execution_enabled:false,credit_metering_verified:false,
   description:'Read-only source observations and review opportunities. Findings are not automatically verified defects or executable business jobs.',
