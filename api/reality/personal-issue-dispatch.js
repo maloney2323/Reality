@@ -7,7 +7,7 @@ import {validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {verifyPersonalGithubIssueToken}
  from '../../src/reality-personal-github-execution-bridge-v0.1.js';
 import {preparePersonalIssueDispatch,runPersonalIssueDispatch,
- inspectPersonalIssueAttemptsReadOnly}
+ inspectPersonalIssueAttemptsReadOnly,inspectPersonalIssueWorkHistoryReadOnly}
  from '../../src/reality-personal-issue-dispatch-v0.1.js';
 export const maxDuration=60;
 export default async function handler(req,res){
@@ -60,6 +60,15 @@ export default async function handler(req,res){
    (b.intent==='RECONCILE'&&b.discovered_work_id!==undefined&&
     !/^work:[a-f0-9]{32}$/.test(String(b.discovered_work_id||''))))
    return res.status(400).json({ok:false,error:'DISPATCH_UNTRUSTED_CLIENT_FIELDS_OR_SCOPE'});
+  if(b.intent==='HISTORY_CHECK'){
+   if(b.confirmation!==undefined)
+    return res.status(400).json({ok:false,error:'WORK_HISTORY_CHECK_READ_ONLY'});
+   const inspected=await inspectPersonalIssueWorkHistoryReadOnly({
+    session,conversationId:b.conversation_id,
+    discoveredWorkId:b.discovered_work_id,
+   });
+   return res.status(200).json({ok:true,...inspected});
+  }
   if(b.intent==='CHECK'){
    const p=await preparePersonalIssueDispatch({
     session,conversationId:b.conversation_id,
