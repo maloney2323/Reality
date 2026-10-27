@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue}
  from '../src/reality-personal-github-execution-bridge-v0.1.js';
 import {runPersonalIssueDispatch,assertPersonalDispatchEnvironment}
@@ -162,4 +163,54 @@ test('request endpoint disallows browser-injected work/connector capability',asy
  }},res);
  assert.equal(record.status,401);
  assert.equal(record.body.error,'CHAT_SIGN_IN_REQUIRED');
+});
+
+test('Gap 3 UI only reveals live execution after credential check and new consent',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes("method:'GET',credentials:'same-origin',cache:'no-store'"));
+ assert.ok(html.includes("data.status!=='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED'"));
+ assert.ok(html.includes("checked.type='checkbox';checked.required=true"));
+ assert.ok(html.includes("run.disabled=true"));
+ assert.ok(html.includes("checked.onchange=()=>{run.disabled=!checked.checked;}"));
+ assert.ok(html.includes("if(!checked.checked||!checked.checkValidity())return"));
+ assert.ok(html.includes("if(!confirm('Create ONE real GitHub issue"));
+ assert.ok(html.includes("confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE'"));
+ assert.ok(html.includes("await revealGap3Action(review,receipt,exact,conv,w.work_id)"));
+ assert.ok(html.includes('Gap 3 · GitHub write is not configured'));
+ assert.ok(!html.includes("fetch('/api/reality/execute',{method:'POST'"));
+ const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script));
+});
+test('server only accepts selected discovered work id and separate explicit RUN consent',()=>{
+ const src=readFileSync(new URL('../api/reality/personal-issue-dispatch.js',import.meta.url),'utf8');
+ assert.ok(src.includes("!['intent','conversation_id','discovered_work_id','confirmation'].includes(k)"));
+ assert.ok(src.includes("b.confirmation!=='EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE'"));
+ assert.ok(src.includes("assertSameOrigin(req)"));
+ assert.ok(src.includes("authenticatedChatSession(req,res)"));
+ assert.ok(src.includes("external_action_performed:false"));
+});
+test('exception after one-time reservation is unresolved, not safe to repeat',async()=>{
+ const e={...env,REALITY_GITHUB_TOKEN:'mock-only-token'};
+ const r=await runPersonalIssueDispatch({
+  session,conversationId,discoveredWorkId:item.work_item_id,
+  confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE',env:e,
+  prepare:async()=>({work_item:item,source_receipt_id:randomUUID(),
+   goal_id:'goal:test',work_fingerprint:'sha256:'+'a'.repeat(64),
+   action_policy_id:'approval:test',internal:{groundingProof:{}}}),
+  checkDuplicate:async()=>({checked:true}),
+  reserve:async()=>({
+   status:'SINGLE_USE_RESERVED_PENDING_DISPATCH',
+   action_policy_id:'approval:test',
+   work_item_fingerprint:'sha256:'+'a'.repeat(64),
+   reservation_id:randomUUID(),
+   internal:{store:{},reservation:{},authorization:{},serverApprovalProof:{},serverFreshGoalAdmission:{}},
+  }),
+  bridgeFactory:()=>({connector:{},independentVerifier:{}}),
+  execute:async()=>{throw Error('UNKNOWN_AFTER_DB_RESERVATION')},
+ });
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.verified,false);
+ assert.equal(r.external_action_may_have_occurred,true);
+ assert.equal(r.no_automatic_retry,true);
 });
