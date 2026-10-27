@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // Preview-only, authenticated exact-work approval inside the EXISTING
 // authority/Continuity ledger. Does not execute work or invent a new goal DB.
 // The explicit signed-in user's approval is separate from their goal command.
@@ -34,6 +35,7 @@ export function policyMatchesGoalBoundWork({
   policy.mode==='auto'&&policy.enabled===true&&
   policy.principal_id===principalId&&
   policy.approved_by===principalId&&
+  (!policy.expires_at||Date.parse(policy.expires_at)>Date.now())&&
   g?.version===PERSONAL_ACTION_AUTHORITY_VERSION&&
   g.user_confirmation==='APPROVE_THIS_EXACT_WORK_ITEM'&&
   g.principal_id===principalId&&
@@ -84,7 +86,7 @@ export async function recordAuthenticatedPersonalActionApproval({
       workItem.inputs?.repository||null}],
   approvedBy:session.user_id,
  });
- const policy=Object.freeze({...base,goal_binding:Object.freeze({
+ const goalBinding=Object.freeze({
   version:PERSONAL_ACTION_AUTHORITY_VERSION,
   user_confirmation:confirmedAction,
   principal_id:session.user_id,
@@ -96,7 +98,12 @@ export async function recordAuthenticatedPersonalActionApproval({
   world_id:signed.binding.world_id,
   goal_source_user_message_ref:signed.binding.goal_source_user_message_ref,
   work_item_fingerprint:signed.binding.work_item_fingerprint,
- })});
+ });
+ const policy=Object.freeze({...base,
+  policy_id:'goal-bound-approval:'+createHash('sha256')
+    .update(JSON.stringify([base.policy_id,goalBinding])).digest('hex'),
+  goal_binding:goalBinding,
+ });
  if(!policyMatchesGoalBoundWork({
   policy,workItem,binding:signed.binding,
   principalId:session.user_id,conversationId,
