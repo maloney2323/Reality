@@ -178,7 +178,7 @@ test('Gap 3 UI only reveals live execution after credential check and new consen
  assert.ok(html.includes("await revealGap3Action(review,receipt,exact,conv,w.work_id)"));
  assert.ok(html.includes('Gap 3 · GitHub write is not configured'));
  assert.ok(!html.includes("fetch('/api/reality/execute',{method:'POST'"));
- const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
 });
