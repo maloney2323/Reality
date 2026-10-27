@@ -47,3 +47,23 @@ test('all inline JS remains syntactically valid after dashboard integration',()=
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
 });
+
+test('ranked work shows evidence-first triage, risk and actionable-next-step without fake impact',()=>{
+ for(const keyword of [
+  'id="wcSort"','value="triage"','value="risk"','value="automation"',
+  'value_assessment','triage_score','next_validation_step',
+  'Business impact: UNMEASURED','Full-task labor: UNKNOWN',
+  'Verified savings: NONE RECORDED',
+ ])assert.ok(html.includes(keyword),keyword);
+});
+test('one-task value simulator requires owner inputs and explicitly labels unverified cash savings',()=>{
+ for(const keyword of [
+  'id="wcManualMinutes"','id="wcFrequency"','id="wcCoverage"',
+  'id="wcLaborRate"','id="wcMonthlyCost"','id="wcValueOutput"',
+  'wcRenderValueScenario()','HYPOTHETICAL scenario',
+  'Real cash savings: NOT VERIFIED',
+  'No workforce reduction can be inferred',
+ ])assert.ok(html.includes(keyword),keyword);
+ assert.ok(!html.includes('id="wcManualMinutes" value='));
+ assert.ok(!html.includes('id="wcFrequency" value='));
+});
