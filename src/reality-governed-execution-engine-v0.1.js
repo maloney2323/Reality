@@ -119,6 +119,7 @@ export async function executeAuthorizedWork({
   }
 
   let providerResult,executed,verification;
+  let providerFailureStage='PROVIDER_WRITE';
   try{
     providerResult=await connector.execute({workItem,authorization,execution});
     executed=Object.freeze({
@@ -127,10 +128,21 @@ export async function executeAuthorizedWork({
       provider_execution_id:providerResult?.providerExecutionId??null,
       completed_at:new Date().toISOString(),
     });
+    providerFailureStage='INDEPENDENT_PROVIDER_READBACK';
     verification=await independentVerifier.verify({
       workItem,authorization,execution:executed,providerResult,
     });
   }catch(error){
+    // Do not expose raw GitHub responses, request headers, credentials,
+    // user-scoped IDs or arbitrary exception strings. Preserve only a
+    // bounded diagnostic category and which provider phase failed.
+    const providerMessage=String(error?.message||'');
+    const http=providerMessage.match(/^GITHUB_CONNECTOR_(401|403|404|409|422|429|500|502|503)$/);
+    const failureCode=http?'GITHUB_HTTP_'+http[1]:
+      providerMessage==='PERSONAL_GITHUB_PROVIDER_CREATE_RESPONSE_UNCERTAIN'?
+       'GITHUB_CREATE_RESPONSE_INVALID':
+      providerMessage==='PERSONAL_GITHUB_PROVIDER_ID_MISSING'?
+       'GITHUB_READBACK_ID_MISSING':'PROVIDER_OR_NETWORK_ERROR';
     // Once DISPATCHING was committed, a network failure cannot be retried
     // blindly. The provider may have performed the effect despite a timeout.
     let settlement='UNCERTAIN_OUTCOME_NOT_DURABLY_SETTLED';
@@ -148,6 +160,11 @@ export async function executeAuthorizedWork({
       engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
       status:'UNRESOLVED',blocked_reason:'PROVIDER_EFFECT_OR_READBACK_UNCERTAIN_NO_RETRY',
       reservation_state:settlement,
+      provider_failure_stage:providerFailureStage,
+      provider_failure_code:failureCode,
+      // Provider POST claims are diagnostic only, NEVER independently verified.
+      unverified_provider_claim:providerResult?.observation?.number?
+       Object.freeze({issue_number:providerResult.observation.number}):null,
       execution:Object.freeze({...execution,execution_state:'OUTCOME_UNCERTAIN'}),
       verification:null,
       outcome:Object.freeze({outcome_state:'UNRESOLVED',verified:false,
