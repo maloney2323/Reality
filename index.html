@@ -983,30 +983,18 @@ async function wcLoadCompletionReports({focus=false}={}){
  }
 }
 $('wcRefreshCompletion').onclick=()=>{void wcLoadCompletionReports()};
-function wcRenderShiftEndingReceipt(home){
+function wcRenderShiftEndingReceipt(report){
  const el=$('shiftEndingReceipt');
  const overview=$('wcShiftReceipt');
- const cycle=home?.latest_cycle;
- if(home?.status!=='RECORDED'||!cycle||cycle.tick_id!==home.latest_tick_id||
-    !cycle.source_event_id||!Number.isSafeInteger(cycle.discovered_work_count)){
+ if(report?.type!=='SHIFT_DISCOVERY_CYCLE'||
+    report?.verification!=='SHIFT_TICK_PERSISTED_READBACK_DISCOVERY_ONLY'||
+    report?.status!=='DISCOVERY_CYCLE_RECORDED_SHIFT_NOT_VERIFIED_COMPLETE'||
+    report?.shift_completed!==false||!report?.source_receipt_id){
   el.hidden=true;el.replaceChildren();
   overview.hidden=true;overview.replaceChildren();return;
  }
- el.hidden=false;
- overview.hidden=false;
- el.innerHTML=wcReceiptHTML({
-  type:'SHIFT_DISCOVERY_CYCLE',status:'DISCOVERY_CYCLE_RECORDED_SHIFT_NOT_VERIFIED_COMPLETE',
-  headline:'Reality recorded this discovery cycle',
-  observed_at:cycle.observed_at||home.latest_shift_at,
-  source_receipt_id:cycle.source_event_id,tick_id:cycle.tick_id,
-  discovered_work_count:cycle.discovered_work_count,
-  discovered_items:cycle.discovered_items||[],
-  evidence_observation_count:cycle.recent_observation_count,
-  completed_actions:['Observed source activity and persisted this one discovery-cycle result'],
-  pending_work:['Discovered jobs still require separate authorized execution and verification',
-   'Full-shift closure and complete verified job inventory have not been established'],
-  next_step:'Review discoveries and authorize eligible jobs. This is not evidence that a 1–8 hour automation shift finished.'
- });
+ el.hidden=false;overview.hidden=false;
+ el.innerHTML=wcReceiptHTML(report);
  overview.innerHTML=el.innerHTML;
 }
 
@@ -1624,7 +1612,7 @@ async function refreshSavedShiftHome(){
       if([8,12].includes(Number(b.config.shiftLength)))$('shiftLength').value=String(b.config.shiftLength);
       updateShiftBanner();
     }
-    wcRenderShiftEndingReceipt(b.home);
+    wcRenderShiftEndingReceipt(b.completion_report);
     if(manualWorkActive)return;
     if(b.home?.status==='RECORDED'){
       renderWork(b.home.work||[]);
