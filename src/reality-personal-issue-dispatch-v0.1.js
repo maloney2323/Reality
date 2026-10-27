@@ -15,7 +15,8 @@ import {executeAuthorizedWork}
  from './reality-governed-execution-engine-v0.1.js';
 import {fingerprintApprovedWorkItem} from './reality-authority-v1.0.js';
 import {createPersonalGithubIssueBridge,checkForExistingMaintainerIssue,
- assertExactMaintainerIssue} from './reality-personal-github-execution-bridge-v0.1.js';
+ assertExactMaintainerIssue,inspectMatchingGithubIssueReadOnly}
+ from './reality-personal-github-execution-bridge-v0.1.js';
 import {createUniversePostgresPersistence} from './reality-universe-postgres-persistence-v0.1.js';
 import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
  from './reality-continuity-spine-v2.0.js';
@@ -74,6 +75,68 @@ export async function ensureNoPriorPersonalIssueAttempt({
  }));
  return assertNoPriorPersonalIssueAttempt({
   history:events,discoveredWorkId,workKey,
+ });
+}
+// Read-only incident reconciliation: reconstruct EXACT original approved
+// payloads from this signed-in user's Continuity. Never call authorization,
+// reserve, GitHub POST or settlement. Existing UNCERTAIN records remain intact.
+export async function inspectPersonalIssueAttemptsReadOnly({
+ session,conversationId,discoveredWorkId,env=process.env,
+ persistenceFactory=createUniversePostgresPersistence,
+ inspectGithub=inspectMatchingGithubIssueReadOnly,
+}={}){
+ const db=assertPersonalDispatchEnvironment({session,conversationId,env});
+ if(!/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||'')))
+  fail('PERSONAL_RECONCILIATION_WORK_ID_INVALID');
+ const {personalGoalScope}=await import('./reality-personal-goal-readback-v0.1.js');
+ const scope=personalGoalScope({userId:session.user_id,conversationId});
+ const spine=createContinuitySpine({
+  continuityRootId:scope.root,worldlineId:scope.worldline,
+  subjectId:session.user_id,
+ });
+ const history=orderContinuityHistory(await persistenceFactory({...db}).reconstruct({
+  continuityRootId:spine.continuity_root_id,
+  worldlineId:spine.worldline_id,
+ }));
+ const handoffs=history.filter(e=>e.entity_type==='personal_discovered_work_handoff'&&
+  /^work:[a-f0-9]{32}$/.test(String(e.payload?.work_id||''))&&
+  typeof e.payload?.work_key==='string');
+ const chosen=handoffs.find(e=>e.payload.work_id===discoveredWorkId);
+ if(!chosen)fail('PERSONAL_RECONCILIATION_SOURCE_NOT_IN_USER_WORLDLINE');
+ const matching=handoffs.filter(e=>e.payload.work_key===chosen.payload.work_key);
+ const permitted=new Set(matching.map(e=>e.payload.work_id));
+ const oldOutcomes=history.filter(e=>
+  e.entity_type==='personal_issue_execution_outcome'&&
+  permitted.has(e.payload?.work_id)&&
+  e.payload?.outcome_state==='UNRESOLVED'&&
+  e.payload?.reservation_state==='UNCERTAIN');
+ if(oldOutcomes.length===0)return Object.freeze({
+  status:'NO_UNCERTAIN_EXECUTION_FOR_THIS_WORK',
+  attempts:[],external_action_performed:false,can_retry:false,
+ });
+ const attempts=[];
+ for(const previous of oldOutcomes.slice(-8)){
+  const source=matching.find(e=>e.payload.work_id===previous.payload.work_id);
+  if(!source)fail('PERSONAL_RECONCILIATION_ORIGINAL_SOURCE_MISSING');
+  const exact=assertExactMaintainerIssue(source.payload.work_item);
+  if(source.payload.work_fingerprint!==fingerprintApprovedWorkItem(exact))
+   fail('PERSONAL_RECONCILIATION_ORIGINAL_SOURCE_FINGERPRINT_MISMATCH');
+  const observation=await inspectGithub({workItem:exact});
+  attempts.push(Object.freeze({
+   original_work_id:previous.payload.work_id,
+   original_outcome_receipt_id:previous.event_id,
+   reservation_id:previous.payload.reservation_id,
+   original_outcome_state:'UNRESOLVED',
+   repository:'maloney2323/Reality',
+   original_title:exact.inputs.title,
+   provider_observation:observation,
+   can_retry:false,no_automatic_retry:true,
+  }));
+ }
+ return Object.freeze({
+  status:'READ_ONLY_RECONCILIATION_COMPLETE_OUTCOMES_STILL_UNCERTAIN',
+  attempts,external_action_performed:false,
+  outcome_records_modified:false,can_retry:false,
  });
 }
 export async function preparePersonalIssueDispatch({
