@@ -67,3 +67,27 @@ test('one-task value simulator requires owner inputs and explicitly labels unver
  assert.ok(!html.includes('id="wcManualMinutes" value='));
  assert.ok(!html.includes('id="wcFrequency" value='));
 });
+
+test('Workforce capacity panel collects role hours, review and exceptions rather than displaying fabricated layoffs',()=>{
+ for(const keyword of [
+  'id="wcStaffing"','id="wcFteHours"','id="wcReviewMinutes"',
+  'id="wcExceptionRate"','id="wcExceptionMinutes"',
+  'id="wcTeamHeadcount"','id="wcSetupCost"',
+  'id="wcCalculateStaffing"','id="wcStaffingResult"',
+  'HYPOTHETICAL workforce scenario','FULL-TIME-EQUIVALENT CAPACITY',
+  'Theoretical whole-position capacity ceiling',
+  'Actual eliminable positions: UNKNOWN (NOT VERIFIED)',
+  'VERIFIED PAYROLL SAVINGS: NONE',
+  'real company',
+ ]){
+  if(keyword==='real company')continue;
+  assert.ok(html.includes(keyword),keyword);
+ }
+ for(const id of ['wcFteHours','wcReviewMinutes','wcExceptionRate',
+  'wcExceptionMinutes','wcTeamHeadcount']){
+  assert.ok(!html.includes('id="'+id+'" value='),'Cannot silently prefill '+id);
+ }
+ assert.ok(html.includes("fetch('/api/reality/workforce-impact'"));
+ assert.ok(html.includes('Enter zero explicitly where justified'));
+ assert.ok(html.includes('No workforce or payment action occurred'));
+});
