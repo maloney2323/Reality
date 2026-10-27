@@ -71,7 +71,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
 .wc-head h2{margin:3px 0 7px;font-size:23px;line-height:1.2}.wc-head p{color:#adbcd0;font-size:13px;line-height:1.55;margin:0;max-width:640px}
 .wc-total{border:1px solid #3a4d63;border-radius:13px;padding:10px 14px;text-align:center;min-width:96px}
-.wc-total strong{font-size:27px;display:block}.wc-total small{display:block;color:#a5b8cf}
+.wc-total strong{font-size:27px;display:block}.wc-total button{font-size:12px;padding:8px 11px;width:100%;background:#dfeaf5;margin-top:8px}.wc-total small{display:block;color:#a5b8cf}
 .wc-tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
 .wc-tabs button{background:#202b3b;color:#d4e0ef;margin:0;border:1px solid #40516a}
 .wc-tabs button[aria-selected="true"]{background:#e3ecf7;color:#0c1420;border-color:#dceaf5}
@@ -190,7 +190,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
  <div class="wc-head">
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
    <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
-  <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small></div>
+  <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small><button type="button" id="wcDiscover">Find work</button></div>
  </div>
  <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
   <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
@@ -751,6 +751,7 @@ async function wcCheckPrior(items,epoch){
   wcRender();
  }
 }
+$('wcDiscover').onclick=()=>{$('findWork').click()};
 function wcLoad(items){
  wcWork=Array.isArray(items)?items:[];
  wcPicked=new Set([...wcPicked].filter(id=>wcWork.some(w=>w.work_id===id)));
