@@ -16,6 +16,7 @@ import { reviewRealityAnswer } from './reality-semantic-review-v0.1.js';
 import { assessGoalDriftCoverage } from './reality-goal-drift-assessment-coverage-v0.1.js';
 import { buildAssistantGoalGovernance,verifyGoalGovernanceBeforeStateMutation,
   adjudicateFinalAssistantGoalRelease,withheldAssistantDirectionAnswer,
+  compileGoalPublicationIntegrityProof,
 } from './reality-goal-governance-contract-v0.1.js';
 import {createHash} from 'node:crypto';
 import {
@@ -1208,6 +1209,22 @@ export async function runLiveIntelligenceOrchestration({
     const releasedAnswer=String(modelResult.answer||'');
     const releasedHash='sha256:'+createHash('sha256').update(
       JSON.stringify(releasedAnswer)).digest('hex');
+    // Compile all three existing user-goal / assistant-proposal contracts
+    // against the exact final bytes and freshness readback BEFORE admitting
+    // the final text into append-only Continuity or returning it to chat.
+    const goalIntegrityProof=compileGoalPublicationIntegrityProof({
+      canonicalFrame:canonicalEpistemicFrame,
+      goalState:controllingGoalStateContract,
+      goalTransition:userGoalTransitionContract,
+      assistantProposal:assistantGoalProposal,
+      assistantDecision:assistantGoalDecision,
+      finalDirectionRelease,
+      publicationGoalFreshness,
+      originalAnswer:initialAssistantProposalText,
+      releasedAnswer,
+    });
+    if(goalIntegrityProof.exact_released_answer_hash!==releasedHash)
+      throw Error('GOAL_PUBLICATION_PROOF_RELEASE_HASH_MISMATCH');
     if(continuityRuntime?.enabled){
       const releaseEvent=await continuityRuntime.appendStage({
         stage:'VERIFICATION',
@@ -1221,6 +1238,7 @@ export async function runLiveIntelligenceOrchestration({
           event_type:'ASSISTANT_FINAL_DIRECTION_PUBLICATION_DECISION',
           canonical_frame_hash:canonicalEpistemicFrame.frame_hash,
           final_direction_contract:finalDirectionRelease,
+          three_contract_integrity_proof:goalIntegrityProof,
           original_model_response_id:modelResult.response_id||null,
           first_semantic_reviewer_id:semanticFirst?.response_id||null,
           post_revision_semantic_reviewer_id:acceptedGoalRevisionReviewerId,
@@ -1240,6 +1258,8 @@ export async function runLiveIntelligenceOrchestration({
         e.event_id===releaseEvent.event_id&&
         e.payload?.event_type==='ASSISTANT_FINAL_DIRECTION_PUBLICATION_DECISION'&&
         e.payload?.final_direction_contract?.decision_hash===finalDirectionRelease.decision_hash&&
+        e.payload?.three_contract_integrity_proof?.proof_hash===goalIntegrityProof.proof_hash&&
+        e.payload?.three_contract_integrity_proof?.exact_released_answer_hash===releasedHash&&
         e.payload?.actual_released_answer_hash===releasedHash&&
         e.payload?.canonical_frame_hash===canonicalEpistemicFrame.frame_hash);
       if(!recorded)throw Error('FINAL_ASSISTANT_DIRECTION_RELEASE_READBACK_FAILED');
@@ -1257,6 +1277,10 @@ export async function runLiveIntelligenceOrchestration({
         finalDirectionRelease.second_semantic_review_bound_to_exact_final_text,
       source_receipt_id:finalDirectionRelease.source_receipt_id||null,
       final_answer_hash:releasedHash,
+      three_contract_integrity_proof_hash:goalIntegrityProof.proof_hash,
+      goal_proposal_id:goalIntegrityProof.assistant_proposal_id,
+      goal_transition_authorization:goalIntegrityProof.proposed_transition_authorization,
+      exact_goal_state_bound:true,
       semantic_accuracy_independently_verified:false,
       no_alerts_prove_no_goal_drift:false,
     };
