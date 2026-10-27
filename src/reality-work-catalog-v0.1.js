@@ -16,9 +16,9 @@ const category=(label,defaultCategory)=>{
  const s=safeString(label,400).toLowerCase();
  if(/customer|client|support|feedback/.test(s))return 'customer';
  if(/security|vulnerab|permission|authority|governance|guard|access|auth/.test(s))return 'security';
- if(/integrat|vercel|deploy|connector|supabase|login|ci\/cd/.test(s))return 'integrations';
- if(/regression|benchmark|reliab|drift|hallucin|stability|failure|preflight|outage/.test(s))return 'reliability';
  if(/\bfix\b|bug|repair|broken|defect|correct/.test(s))return 'bugs';
+ if(/regression|benchmark|reliab|drift|hallucin|stability|failure|preflight|outage/.test(s))return 'reliability';
+ if(/integrat|vercel|deploy|connector|supabase|login|ci\/cd/.test(s))return 'integrations';
  if(/upgrade|improv|refactor|enhanc|hardening|optimiz/.test(s))return 'upgrades';
  if(/\bfeat\b|new feature|capability|add |implement/.test(s))return 'features';
  if(/automation|autonomous|time saved|shift|recurring/.test(s))return 'automation';
