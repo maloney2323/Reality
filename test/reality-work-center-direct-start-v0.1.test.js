@@ -57,3 +57,12 @@ test('page does not label unknown jobs as fully automated',()=>{
  assert.match(html,/This is a finding, not a runnable job yet/);
  assert.match(html,/Current supported action: create one source-backed GitHub tracking issue/);
 });
+test('account link and secure sign-in status remain visible before Work Center even if session fails',()=>{
+ assert.match(html,/<a href="#privateChat" id="accountShortcut"/);
+ assert.match(html,/<section id="privateChat" class="console-card"/);
+ assert.match(html,/id="privateAccountState"/);
+ assert.match(html,/id="privateRetrySession"/);
+ assert.ok(html.indexOf('id="privateChat"')<html.indexOf('id="workCenter"'));
+ assert.match(js,/el\('privateRetrySession'\)\.onclick=\(\)=>\{void init\(\)\}/);
+ assert.match(js,/el\('privateAccountState'\)\.textContent='Account connection unavailable:/);
+});
