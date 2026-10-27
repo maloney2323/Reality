@@ -334,3 +334,33 @@ test('connector timeout consumes reservation, records UNCERTAIN and never auto r
  assert.equal(second.status,'BLOCKED');
  assert.equal(count,1);
 });
+
+test('changed goal epoch at dispatch leaves provider untouched and reservation unspent',async()=>{
+ const grant=approved();let count=0;
+ grant.reservationStore.begin=async()=>{throw Error('EXECUTION_DISPATCH_GROUNDING_CHANGED')};
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{count++}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})},
+ });
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.blocked_reason,'EXECUTION_DISPATCH_GROUNDING_CHANGED');
+ assert.equal(count,0);
+});
+
+test('lost settlement readback never turns a provider result into verified durable outcome',async()=>{
+ const grant=approved();let count=0;
+ grant.reservationStore.settle=async()=>{throw Error('DATABASE_UNAVAILABLE')};
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{count++;return {observation:{state:'written'}}}},
+  independentVerifier:{verify:async()=>({
+   verified:true,independent:true,verification_id:'independent:mock-readback',
+  })},
+ });
+ assert.equal(count,1);
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.blocked_reason,'EXECUTION_SETTLEMENT_UNCONFIRMED_NO_RETRY');
+ assert.equal(r.outcome.verified,false);
+ assert.equal(r.outcome.no_automatic_retry,true);
+});
