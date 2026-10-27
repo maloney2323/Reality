@@ -23,6 +23,8 @@ import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
+import {readPriorIssueEffectsForPrincipal}
+ from './reality-principal-prior-effect-v0.1.js';
 import {recordNextEvidenceBoundImprovement}
  from './reality-verified-improvement-handoff-v0.1.js';
 
@@ -63,6 +65,7 @@ export function assertNoPriorPersonalIssueAttempt({
 export async function ensureNoPriorPersonalIssueAttempt({
  session,conversationId,env,discoveredWorkId,workKey,
  persistenceFactory=createUniversePostgresPersistence,
+ principalHistoryReader=readPriorIssueEffectsForPrincipal,
 }={}){
  const db=assertPersonalDispatchEnvironment({session,conversationId,env});
  const {personalGoalScope}=await import('./reality-personal-goal-readback-v0.1.js');
@@ -75,8 +78,14 @@ export async function ensureNoPriorPersonalIssueAttempt({
   continuityRootId:spine.continuity_root_id,
   worldlineId:spine.worldline_id,
  }));
+ // A different conversation cannot reset the history of a provider
+ // attempt for this principal and stable workflow failure key.
+ // Failure to read the isolated DB is fail-CLOSED, never "no attempts".
+ const global=await principalHistoryReader({session,env,workKey});
+ if(!Array.isArray(global))
+  fail('PERSONAL_DISPATCH_GLOBAL_PRIOR_EFFECT_UNVERIFIED_CLOSED');
  return assertNoPriorPersonalIssueAttempt({
-  history:events,discoveredWorkId,workKey,
+  history:[...events,...global],discoveredWorkId,workKey,
  });
 }
 // Read-only incident reconciliation: reconstruct EXACT original approved
