@@ -4,7 +4,7 @@
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {validUuid} from '../../src/reality-private-chat-store-v0.1.js';
-import {preparePersonalDiscoveredWorkHandoff}
+import {preparePersonalDiscoveredWorkHandoff,listPersonalDiscoveredWorkHandoffs}
  from '../../src/reality-personal-discovered-work-handoff-v0.1.js';
 
 export const maxDuration=60;
@@ -12,10 +12,22 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   privateChatConfig();
-  if(req.method!=='POST')
-   return res.status(405).setHeader('Allow','POST').json({
+  if(!['GET','POST'].includes(req.method))
+   return res.status(405).setHeader('Allow','GET, POST').json({
     ok:false,error:'METHOD_NOT_ALLOWED',
    });
+  if(req.method==='GET'){
+   const id=req.query?.conversation_id;
+   if(!validUuid(id))
+    throw Object.assign(Error('DISCOVERED_WORK_READBACK_CONVERSATION_INVALID'),{status:400});
+   const session=await authenticatedChatSession(req,res);
+   if(!session)
+    throw Object.assign(Error('CHAT_SIGN_IN_REQUIRED'),{status:401});
+   const prior=await listPersonalDiscoveredWorkHandoffs({
+    session,conversationId:id,
+   });
+   return res.status(200).json({ok:true,...prior});
+  }
   if(!req.headers?.origin)
    throw Object.assign(Error('DISCOVERED_WORK_SAME_ORIGIN_REQUIRED'),{status:403});
   assertSameOrigin(req);
