@@ -1,6 +1,7 @@
 import { createExecutionReceipt, canExecute, classifyWorkItemExecutionEffect } from './reality-governed-work-runtime-v0.1.js';
 import { verifyBoundExecutionApproval } from './reality-authority-v1.0.js';
 import { evaluateGoalExecutionBoundary } from './reality-goal-execution-boundary-v0.1.js';
+import { verifyFreshGoalExecutionAdmission } from './reality-fresh-goal-execution-admission-v0.1.js';
 
 export const GOVERNED_EXECUTION_ENGINE_VERSION = 'reality-governed-execution-engine-v0.1';
 
@@ -13,6 +14,7 @@ export async function executeAuthorizedWork({
   workflowId,
   authorization,
   serverApprovalProof=null,
+  serverFreshGoalAdmission=null,
   connector,
   independentVerifier,
   requestSummary = null,
@@ -43,6 +45,20 @@ export async function executeAuthorizedWork({
       engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
       status:'BLOCKED',blocked_reason:verified.reason,
       goal_authority_boundary:goalBoundary,
+      execution:null,verification:null,outcome:null,
+    });
+    // All connector effects are now gated at the exported ENGINE boundary,
+    // not merely by HTTP middleware. The legacy generic-cookie execute route
+    // cannot supply an authenticated source-linked user-goal admission.
+    const grounding=verifyFreshGoalExecutionAdmission({
+      admission:serverFreshGoalAdmission,workItem,authorization,
+      serverApprovalProof,
+    });
+    if(grounding.status!=='FRESH_GOAL_ATTESTED')return Object.freeze({
+      engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+      status:'BLOCKED',blocked_reason:grounding.reason,
+      goal_authority_boundary:goalBoundary,
+      goal_grounding_admission:grounding,
       execution:null,verification:null,outcome:null,
     });
   }
