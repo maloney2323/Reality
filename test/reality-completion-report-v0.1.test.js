@@ -61,7 +61,11 @@ test('reconstructed shift result remains a discovery cycle not a finished shift'
  const home=projectAutonomousShiftHome({events,config:{enabled:true,updated_by:'owner'},
   principalId:'owner',scope});
  assert.equal(home.latest_cycle.discovered_work_count,2);
+ assert.equal(home.latest_cycle.discovered_items.length,2);
+ assert.equal(home.latest_cycle.discovered_items[0].title,'Item A');
+ assert.equal(home.latest_cycle.discovered_items[0].status,'DISCOVERED_NOT_EXECUTED');
  const report=projectShiftCycleCompletion({home});
+ assert.equal(report.discovered_items[0].title,'Item A');
  assert.equal(report.shift_completed,false);
  assert.equal(report.full_job_completed,false);
  assert.equal(report.discovered_work_count,2);
