@@ -89,13 +89,50 @@ test('wrong workflow identity, branch or provider state is not evidence of a rep
   {...r(failIds[0]),workflow_id:workflow+1},
   {...r(failIds[0]),conclusion:'success'},
   {...r(failIds[0]),repository:{full_name:'untrusted/project'}},
-  {...r(failIds[0]),head_branch:'other'},
+  {...r(failIds[0]),name:'Wrong-workflow-title'},
  ];
  for(const replacement of badRuns){
   const m=provider({failed:new Map([[failIds[0],replacement]])});
   await assert.rejects(inspectOriginalWorkRepairEvidence({recovery,
    fetchImpl:fakeFetch(m)}),/RECOVERY_SOURCE_FAILURES_NOT_EQUIVALENT|RECOVERY_PROVIDER_RUN_IDENTITY_UNVERIFIED/);
  }
+});
+test('eight original failures may span PR, feature and preview branches yet require a later SUCCESS on exact preview branch',async()=>{
+ const original={...recovery,source_evidence_refs:[
+  ...recovery.source_evidence_refs,
+  ...[40591258889,40590738531,40590709941,40590701904,40589298483,40589004331]
+   .map(toUrl),
+ ]};
+ const observed=provider();
+ const others=[40591258889,40590738531,40590709941,40590701904,40589298483,40589004331];
+ const branches=['experiment/reality-live-durable-adversarial-20261025',
+  'feature/work-center-direct-authorize-start-20261027',
+  'feature/work-center-direct-authorize-start-20261027',
+  'feature/work-center-direct-authorize-start-20261027',
+  'feature/work-center-direct-authorize-start-20261027',
+  'feature/work-center-direct-authorize-start-20261027'];
+ for(let i=0;i<others.length;i++)observed.set(root+'/actions/runs/'+others[i],
+  {...r(others[i]),head_branch:branches[i]});
+ // Two older pull request runs must not be excluded solely because the
+ // originating branch is not the target preview branch.
+ observed.set(root+'/actions/runs/'+failIds[0],
+  {...r(failIds[0]),head_branch:'feature/work-center-direct-authorize-start-20261027'});
+ const result=await inspectOriginalWorkRepairEvidence({recovery:original,
+  fetchImpl:fakeFetch(observed)});
+ assert.equal(result.verified_historical_failure_count,8);
+ assert.ok(result.historical_failure_branches.length>1);
+ assert.equal(result.checked_proof_branch,branch);
+ assert.equal(result.later_success?.run_id,later);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.capability_gap_proven,false);
+});
+test('a success on another branch is not proof of a passing preview workflow',async()=>{
+ const wrong={...r(later,{success:true}),head_branch:'feature/other'};
+ const result=await inspectOriginalWorkRepairEvidence({recovery,
+  fetchImpl:fakeFetch(provider({success:wrong}))});
+ assert.equal(result.status,'NO_LATER_VERIFIED_SUCCESS_IN_BOUNDED_PROVIDER_WINDOW');
+ assert.equal(result.later_success,null);
+ assert.equal(result.original_job_completed,false);
 });
 test('later workflow success needs second exact provider verification',async()=>{
  const candidate=r(later,{success:true});
