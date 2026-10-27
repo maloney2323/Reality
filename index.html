@@ -96,7 +96,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <button id="startAction3" type="button">Step 3 · Find work</button>
  </div>
  <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
- <p class="start-limit">This preview tests discovery and exact approval only. It does not execute GitHub changes.</p>
+ <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
 </section>
 <section id="privateChat" style="display:none" class="console-card" aria-label="Persistent private Reality conversation">
  <div class="label">REALITY · PERSISTENT PERSONAL CONVERSATION (PREVIEW)</div>
@@ -153,7 +153,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <div>2. Confirm or resume your own active business goal.</div>
 <div>3. Verify the discovered work and exact proposed action.</div>
 <div>4. Check the approval box and explicitly approve that one action.</div>
-<div><strong>Approval is not execution:</strong> no external actions are enabled in this preview.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div><div class="work-guidance" id="realityRecoveryPanel"><strong>Execution recovery · Read only</strong><p>Earlier uncertain attempts remain locked. Review GitHub evidence without re-executing or changing their reservations.</p><button type="button" id="reconcileHistory">Inspect previous execution attempts · No writes</button><div id="reconcileResult" role="status" aria-live="polite"></div></div></div></section>
+<div><strong>Approval is not execution:</strong> a separate, fresh confirmation is required before any GitHub issue creation.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div><div class="work-guidance" id="realityRecoveryPanel"><strong>Execution recovery · Read only</strong><p>Earlier uncertain attempts remain locked. Review GitHub evidence without re-executing or changing their reservations.</p><button type="button" id="reconcileHistory">Inspect previous execution attempts · No writes</button><div id="reconcileResult" role="status" aria-live="polite"></div></div></div></section>
 <details class="advanced-option" id="advancedShift"><summary>Optional · Advanced shift schedule and settings</summary>
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
 
@@ -501,8 +501,16 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
      }),
     });
     const out=await response.json();
-    if(!response.ok||!out.ok)
+    if(!response.ok||!out.ok){
+     if(out.failure_phase==='BEFORE_PROVIDER_DISPATCH'){
+      info.textContent='Gap 3 · Not executed. Admission blocked before GitHub dispatch. '+String(out.error||'Fresh approval required')+
+       '. Review the exact task and current goal. Do not automatically retry.';
+      receipt.textContent='No GitHub execution for this request · Approval/readiness rejected. Prior uncertain attempts remain locked.';
+      run.textContent='Preflight rejected · Not executed';
+      return;
+     }
      throw Error(out.error||'Execution was not admitted. Review before any retry.');
+    }
     if(out.status==='VERIFIED'&&out.verified===true&&
        /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(out.provider_issue_url||''))){
      const link=document.createElement('a');
