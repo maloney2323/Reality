@@ -26,6 +26,8 @@ on:
       - 'test/reality-personal-issue-dispatch-v0.1.test.js'
       - 'test/reality-vertical-slice-proof-v0.1.test.js'
       - 'src/reality-verified-improvement-handoff-v0.1.js'
+      - 'src/reality-principal-prior-effect-v0.1.js'
+      - 'test/reality-principal-prior-effect-v0.1.test.js'
       - 'api/reality/personal-discovered-work.js'
       - 'test/reality-personal-discovered-work-handoff-v0.1.test.js'
       - 'index.html'
@@ -69,6 +71,8 @@ on:
       - 'test/reality-personal-issue-dispatch-v0.1.test.js'
       - 'test/reality-vertical-slice-proof-v0.1.test.js'
       - 'src/reality-verified-improvement-handoff-v0.1.js'
+      - 'src/reality-principal-prior-effect-v0.1.js'
+      - 'test/reality-principal-prior-effect-v0.1.test.js'
       - 'api/reality/personal-discovered-work.js'
       - 'test/reality-personal-discovered-work-handoff-v0.1.test.js'
       - 'index.html'
@@ -93,4 +97,4 @@ jobs:
    - uses: actions/checkout@v4
    - uses: actions/setup-node@v4
      with: {node-version: 22}
-   - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-execution-goal-grounding-v0.1.test.js test/reality-personal-work-grounding-v0.1.test.js test/reality-personal-action-authority-v0.1.test.js test/reality-personal-execution-admission-v0.1.test.js test/reality-single-use-execution-reservation-v0.1.test.js test/reality-legacy-external-write-closure-v0.1.test.js test/reality-personal-discovered-work-handoff-v0.1.test.js test/reality-stewardship-preview-readonly-v0.1.test.js test/reality-personal-issue-dispatch-v0.1.test.js test/reality-vertical-slice-proof-v0.1.test.js
+   - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-execution-goal-grounding-v0.1.test.js test/reality-personal-work-grounding-v0.1.test.js test/reality-personal-action-authority-v0.1.test.js test/reality-personal-execution-admission-v0.1.test.js test/reality-single-use-execution-reservation-v0.1.test.js test/reality-legacy-external-write-closure-v0.1.test.js test/reality-personal-discovered-work-handoff-v0.1.test.js test/reality-stewardship-preview-readonly-v0.1.test.js test/reality-personal-issue-dispatch-v0.1.test.js test/reality-vertical-slice-proof-v0.1.test.js test/reality-principal-prior-effect-v0.1.test.js
