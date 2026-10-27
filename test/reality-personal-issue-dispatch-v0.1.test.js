@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue}
+import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue,verifyPersonalGithubIssueToken}
  from '../src/reality-personal-github-execution-bridge-v0.1.js';
 import {runPersonalIssueDispatch,assertPersonalDispatchEnvironment}
  from '../src/reality-personal-issue-dispatch-v0.1.js';
@@ -213,4 +213,32 @@ test('exception after one-time reservation is unresolved, not safe to repeat',as
  assert.equal(r.verified,false);
  assert.equal(r.external_action_may_have_occurred,true);
  assert.equal(r.no_automatic_retry,true);
+});
+
+test('GitHub preview credential must authenticate owner AND read target issues before RUN is shown',async()=>{
+ const urls=[];
+ const granted=await verifyPersonalGithubIssueToken({get:async path=>{
+  urls.push(path);
+  if(path==='/user')return {login:'maloney2323'};
+  if(path==='/repos/maloney2323/Reality/issues?state=open&per_page=1')return [];
+  throw Error('FORBIDDEN_UNEXPECTED_GITHUB_QUERY');
+ }});
+ assert.deepEqual(urls,['/user','/repos/maloney2323/Reality/issues?state=open&per_page=1']);
+ assert.equal(granted.credential_identity_verified,true);
+ assert.equal(granted.repository_issues_read_verified,true);
+ assert.equal(granted.github_issue_write_permission_not_yet_proven,true);
+ assert.equal(granted.external_action_performed,false);
+ await assert.rejects(verifyPersonalGithubIssueToken({
+  get:async()=>({login:'other-owner'})
+ }),/PERSONAL_GITHUB_CREDENTIAL_OWNER_UNVERIFIED/);
+ await assert.rejects(verifyPersonalGithubIssueToken({
+  get:async p=>p==='/user'?{login:'maloney2323'}:{message:'not accessible'}
+ }),/PERSONAL_GITHUB_CREDENTIAL_ISSUES_READ_UNVERIFIED/);
+});
+test('readiness endpoint checks real credential and never equates token presence with permission',()=>{
+ const source=readFileSync(new URL('../api/reality/personal-issue-dispatch.js',import.meta.url),'utf8');
+ assert.ok(source.includes('verifyPersonalGithubIssueToken()'));
+ assert.ok(source.includes("status='PREVIEW_GITHUB_CREDENTIAL_NOT_VERIFIED'"));
+ assert.ok(source.includes("github_issue_write_permission_not_yet_proven:true"));
+ assert.ok(!source.includes("Boolean(process.env.REALITY_GITHUB_TOKEN)?"));
 });
