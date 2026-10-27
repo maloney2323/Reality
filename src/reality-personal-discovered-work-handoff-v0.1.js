@@ -43,7 +43,7 @@ function stableId(principal,conversation,workId,goalReceipt,fingerprint){
  return [s.slice(0,8),s.slice(8,12),s.slice(12,16),
   s.slice(16,20),s.slice(20,32)].join('-');
 }
-function trustedDiscovery(work){
+export function trustedDiscovery(work){
  if(work?.kind!=='SYSTEM_MAINTENANCE'||work.state!=='QUALIFIED'||
    work.authorization_required!==true||work.recurring!==true||
    !Number.isSafeInteger(work.recurrence_count)||work.recurrence_count<2||
