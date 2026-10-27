@@ -5,6 +5,10 @@ on:
       - 'src/reality-governed-execution-engine-v0.1.js'
       - 'test/reality-governed-execution-engine-v0.1.test.js'
       - 'src/reality-execution-goal-grounding-v0.1.js'
+      - 'src/reality-personal-goal-readback-v0.1.js'
+      - 'src/reality-personal-work-grounding-proof-v0.1.js'
+      - 'api/reality/personal-work-grounding.js'
+      - 'test/reality-personal-work-grounding-v0.1.test.js'
       - 'test/reality-execution-goal-grounding-v0.1.test.js'
       - 'api/reality/execute.js'
       - '.github/workflows/reality-governed-execution-engine-v0.1.yml'
@@ -13,6 +17,10 @@ on:
       - 'src/reality-governed-execution-engine-v0.1.js'
       - 'test/reality-governed-execution-engine-v0.1.test.js'
       - 'src/reality-execution-goal-grounding-v0.1.js'
+      - 'src/reality-personal-goal-readback-v0.1.js'
+      - 'src/reality-personal-work-grounding-proof-v0.1.js'
+      - 'api/reality/personal-work-grounding.js'
+      - 'test/reality-personal-work-grounding-v0.1.test.js'
       - 'test/reality-execution-goal-grounding-v0.1.test.js'
       - 'api/reality/execute.js'
       - '.github/workflows/reality-governed-execution-engine-v0.1.yml'
@@ -23,4 +31,4 @@ jobs:
    - uses: actions/checkout@v4
    - uses: actions/setup-node@v4
      with: {node-version: 22}
-   - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-execution-goal-grounding-v0.1.test.js
+   - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-execution-goal-grounding-v0.1.test.js test/reality-personal-work-grounding-v0.1.test.js
