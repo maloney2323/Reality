@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createContinuitySpine} from '../src/reality-continuity-spine-v2.0.js';
+import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
+
 import {projectPersonalCompletionReports,projectShiftCycleCompletion}
  from '../src/reality-completion-report-v0.1.js';
 import {projectAutonomousShiftHome}
@@ -88,4 +91,23 @@ test('UI binds completion receipts to both execution paths, session and shift sa
  assert.match(js,/\/api\/reality\/personal-completion-reports\?conversation_id=/);
  assert.match(js,/SHIFT_TICK_PERSISTED_READBACK_DISCOVERY_ONLY/);
  assert.doesNotThrow(()=>new Function(js));
+});
+
+test('read-only personal ending receipts resolve canonical Spine UUIDs, not source names',()=>{
+ const source=personalGoalScope({
+  userId:'354a5e1f-6431-4216-a928-5d2e9b9f74e9',
+  conversationId:'a9b63d01-f4b4-4899-bfca-d7e7cfbb3e2a',
+ });
+ const spine=createContinuitySpine({continuityRootId:source.root,
+  worldlineId:source.worldline,subjectId:'354a5e1f-6431-4216-a928-5d2e9b9f74e9'});
+ assert.match(source.root,/^personal:chat:/);
+ assert.match(spine.continuity_root_id,/^[0-9a-f]{8}-[0-9a-f-]{27,}$/);
+ assert.notEqual(spine.continuity_root_id,source.root);
+ const handler=readFileSync(new URL('../api/reality/personal-completion-reports.js',import.meta.url),'utf8');
+ assert.match(handler,/createContinuitySpine\(/);
+ assert.match(handler,/continuityRootId:spine\.continuity_root_id/);
+ assert.match(handler,/worldlineId:spine\.worldline_id/);
+ assert.match(handler,/orderContinuityHistory\(/);
+ assert.match(handler,/COMPLETION_CANONICAL_SCOPE_NOT_VERIFIED/);
+ assert.doesNotMatch(handler,/continuityRootId:grounded\.scope\.root,worldlineId:grounded\.scope\.worldline/);
 });
