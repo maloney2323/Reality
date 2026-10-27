@@ -5,6 +5,8 @@ import {readFileSync} from 'node:fs';
 import {preparePersonalDiscoveredWorkHandoff,listPersonalDiscoveredWorkHandoffs}
  from '../src/reality-personal-discovered-work-handoff-v0.1.js';
 import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
+import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
+ from '../src/reality-continuity-spine-v2.0.js';
 import {verifyPersonalWorkGroundingProof}
  from '../src/reality-personal-work-grounding-proof-v0.1.js';
 import endpoint from '../api/reality/personal-discovered-work.js';
@@ -48,8 +50,43 @@ const candidate={
 };
 const scope=personalGoalScope({userId:principal,conversationId});
 const sourceRef='supabase:reality_chat_messages:'+randomUUID();
+const canonicalSpine=createContinuitySpine({
+ continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:principal,
+});
+// This mock simulates the already-verified authenticated goal ledger with
+// real canonical UUIDs and a linked, replayable tail.
+function persistable(node,entityType=node.entity_type){
+ return {...node,entity_type:entityType,
+  provenance:{...node.provenance,
+   continuity_spine:{version:'reality-continuity-spine-v2.1',
+    prior_lineage_hash:node.prior_lineage_hash||null,
+    transformation_receipt_id:node.transformation_receipt_id||null,
+    source_event_id:node.event_id_source||null,
+    source_entity_id:node.entity_id_source||null,
+    source_continuity_root_id:node.continuity_root_source||null,
+    source_worldline_id:node.worldline_source||null}},
+ };
+}
+function seededGoalHistory(){
+ const at='2026-10-27T12:00:00.000Z';
+ const first=appendContinuityNode({
+  spine:canonicalSpine,stage:'RAW_SIGNAL',entityId:'test:goal:source',
+  eventId:'test:goal:source:event',effectiveTime:at,assertionTime:at,
+  payload:{source:'test-authenticated-user-message'},
+  provenance:{source:'test-goal-source'},
+ });
+ const goal=appendContinuityNode({
+  spine:canonicalSpine,stage:'VERIFICATION',entityId:'test:goal:verification',
+  eventId:goalReceipt,parentEventId:first.event_id,
+  priorLineageHash:first.lineage_hash,effectiveTime:at,assertionTime:at,
+  payload:{source:'test-verified-owner-goal'},
+  provenance:{source:'test-goal-verification'},
+ });
+ return [persistable(first),persistable(goal)];
+}
 const state={
- principal_id:principal,continuity_root_id:scope.root,world_id:scope.world,
+ principal_id:principal,continuity_root_id:canonicalSpine.continuity_root_id,
+ world_id:scope.world,
  authority_source:'AUTHENTICATED_RLS_USER_GOAL_COMMAND_AND_LEDGER_READBACK',
  transition_count:1,active_goal_id:'goal:owner-verified',
  assistant_can_mutate_goals:false,semantic_reviewer_can_mutate_goals:false,
@@ -61,7 +98,7 @@ const state={
   principal_id:principal}],
 };
 function setup({work=candidate,authState=state}={}){
- const events=[],calls={discovery:0,readGoal:0,reconstruct:0,append:0};
+ const events=seededGoalHistory(),calls={discovery:0,readGoal:0,reconstruct:0,append:0};
  const discover=async()=>{calls.discovery++;return {work:work?[work]:[]}};
  const readGoal=async()=>{
   calls.readGoal++;
@@ -72,8 +109,9 @@ function setup({work=candidate,authState=state}={}){
   async reconstruct(){calls.reconstruct++;return [...events]},
   async appendEvent(event){
    calls.append++;
-   events.push({...event,version:'persisted'});
-   return {status:'PERSISTED'};
+   const saved=persistable(event);
+   events.push(saved);
+   return {...saved,status:'PERSISTED'};
   },
  });
  return {events,calls,discover,readGoal,createPersistence};
@@ -98,12 +136,17 @@ test('server reobserves selected work and commits a durable source-linked non-au
  assert.equal(s.calls.readGoal,1);
  assert.equal(s.calls.append,1);
  assert.equal(s.calls.reconstruct,2);
- assert.equal(s.events[0].continuity_root_id,scope.root);
- assert.equal(s.events[0].worldline_id,scope.worldline);
- assert.equal(s.events[0].payload.goal_transition_receipt_id,goalReceipt);
- assert.equal(s.events[0].payload.user_goal_source_ref,sourceRef);
- assert.equal(s.events[0].payload.authority,'NOT_GRANTED');
- assert.equal(got.continuity_receipt_id,s.events[0].event_id);
+ const saved=s.events.find(x=>x.entity_type==='personal_discovered_work_handoff');
+ assert.ok(saved,'expected appended scoped handoff event');
+ assert.equal(saved.continuity_root_id,canonicalSpine.continuity_root_id);
+ assert.equal(saved.worldline_id,canonicalSpine.worldline_id);
+ assert.equal(saved.entity_id,continuityUuidFromSource(workId));
+ assert.equal(saved.event_kind,'OBSERVATION');
+ assert.equal(saved.parent_event_id,goalReceipt);
+ assert.equal(saved.payload.goal_transition_receipt_id,goalReceipt);
+ assert.equal(saved.payload.user_goal_source_ref,sourceRef);
+ assert.equal(saved.payload.authority,'NOT_GRANTED');
+ assert.equal(got.continuity_receipt_id,saved.event_id);
  const proof=verifyPersonalWorkGroundingProof({proof:got.grounding_proof,
   principalId:principal,conversationId,env});
  assert.equal(proof.status,'PROOF_VALID_FOR_FRESHNESS_ONLY');
@@ -339,4 +382,31 @@ test('three-step controls respect signed-in goal readback and do not use model c
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
+});
+
+test('live schema-compatible handoff uses UUID columns, links goal tail and roundtrips original work ID',async()=>{
+ const s=setup();
+ const outcome=await preparePersonalDiscoveredWorkHandoff(args(s));
+ const saved=s.events.at(-1);
+ for(const field of ['event_id','entity_id','continuity_root_id','worldline_id','parent_event_id'])
+  assert.match(saved[field],/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+   field+' must match the real database UUID schema');
+ assert.equal(saved.payload.work_id,workId);
+ assert.equal(saved.event_id,outcome.continuity_receipt_id);
+ const readback=await listPersonalDiscoveredWorkHandoffs({
+  session,conversationId,env,readGoal:s.readGoal,
+  createPersistence:s.createPersistence,
+ });
+ assert.equal(readback.items[0].work_id,workId);
+ assert.equal(readback.items[0].continuity_receipt_id,outcome.continuity_receipt_id);
+ assert.equal(readback.external_action_performed,false);
+});
+test('readback fails closed if stored UUID entity disagrees with immutable work source',async()=>{
+ const s=setup();
+ await preparePersonalDiscoveredWorkHandoff(args(s));
+ s.events.at(-1).entity_id=randomUUID();
+ await assert.rejects(listPersonalDiscoveredWorkHandoffs({
+  session,conversationId,env,readGoal:s.readGoal,
+  createPersistence:s.createPersistence,
+ }),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
 });
