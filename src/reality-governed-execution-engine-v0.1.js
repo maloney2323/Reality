@@ -138,6 +138,11 @@ export async function executeAuthorizedWork({
     // bounded diagnostic category and which provider phase failed.
     const providerMessage=String(error?.message||'');
     const http=providerMessage.match(/^GITHUB_CONNECTOR_(401|403|404|409|422|429|500|502|503)$/);
+    const safeDenial=error?.safeGitHubDenial;
+    const githubFailureDetail=providerMessage==='GITHUB_CONNECTOR_403'&&
+      typeof safeDenial==='string'&&
+      /^(SSO_AUTHORIZATION_REQUIRED|SECONDARY_RATE_LIMIT|PRIMARY_RATE_LIMIT|TOKEN_REPOSITORY_OR_ISSUES_SCOPE_DENIED|NETWORK_ACCESS_POLICY|REPOSITORY_WRITE_UNAVAILABLE|GITHUB_WRITE_POLICY_RESTRICTED|FORBIDDEN_REASON_NOT_DISCLOSED)$/.test(safeDenial)?
+       safeDenial:null;
     const failureCode=http?'GITHUB_HTTP_'+http[1]:
       providerMessage==='PERSONAL_GITHUB_PROVIDER_CREATE_RESPONSE_UNCERTAIN'?
        'GITHUB_CREATE_RESPONSE_INVALID':
@@ -162,6 +167,7 @@ export async function executeAuthorizedWork({
       reservation_state:settlement,
       provider_failure_stage:providerFailureStage,
       provider_failure_code:failureCode,
+      provider_failure_detail:githubFailureDetail,
       // Provider POST claims are diagnostic only, NEVER independently verified.
       unverified_provider_claim:providerResult?.observation?.number?
        Object.freeze({issue_number:providerResult.observation.number}):null,
