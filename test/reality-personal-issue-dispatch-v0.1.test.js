@@ -148,9 +148,14 @@ test('exact provider and saved outcome together may report VERIFIED, not before'
    verification:{independent:true},reservation_settlement:{status:'VERIFIED'}}),
   recordOutcome:async()=>({independently_verified:true,
    receipt_id:randomUUID(),provider_issue_url:'https://github.com/maloney2323/Reality/issues/143'}),
+  recordLearning:async()=>({receipt_id:randomUUID(),authority:'NOT_GRANTED',
+   improvement_applied:false,improvement_tested:false}),
  });
  assert.equal(r.status,'VERIFIED');assert.equal(r.verified,true);
  assert.ok(r.outcome_receipt_id);
+ assert.equal(r.learning_status,'EVIDENCE_BOUND_PROPOSAL_SAVED_NOT_AUTHORIZED');
+ assert.ok(r.learning_receipt_id);
+ assert.equal(r.improvement_applied,false);
 });
 test('request endpoint disallows browser-injected work/connector capability',async()=>{
  const record={status:0,body:null};
@@ -360,4 +365,35 @@ test('read-only recovery endpoint cannot mint reservation, approval or perform G
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
+});
+
+test('missing LEARNING receipt after verified provider effect never triggers a second write',async()=>{
+ const e={...env,REALITY_GITHUB_TOKEN:'fake-token'};
+ let writes=0,learning=0;
+ const r=await runPersonalIssueDispatch({
+  session,conversationId,discoveredWorkId:item.work_item_id,
+  confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE',env:e,
+  prepare:async()=>({work_item:item,source_receipt_id:randomUUID(),
+   goal_id:'goal:test',work_fingerprint:'sha256:'+'a'.repeat(64),
+   action_policy_id:'approval:test',internal:{groundingProof:{}}}),
+  checkDuplicate:async()=>({checked:true}),
+  reserve:async()=>({
+   status:'SINGLE_USE_RESERVED_PENDING_DISPATCH',
+   action_policy_id:'approval:test',
+   work_item_fingerprint:'sha256:'+'a'.repeat(64),
+   reservation_id:randomUUID(),
+   internal:{store:{},reservation:{},authorization:{},serverApprovalProof:{},serverFreshGoalAdmission:{}},
+  }),
+  bridgeFactory:()=>({connector:{},independentVerifier:{}}),
+  execute:async()=>{writes++;return {status:'VERIFIED',outcome:{verified:true},
+   verification:{independent:true},reservation_settlement:{status:'VERIFIED'}}},
+  recordOutcome:async()=>({independently_verified:true,
+   receipt_id:randomUUID(),provider_issue_url:'https://github.com/maloney2323/Reality/issues/143'}),
+  recordLearning:async()=>{learning++;throw Error('LEARNING_DB_DOWN');},
+ });
+ assert.equal(writes,1);assert.equal(learning,1);
+ assert.equal(r.status,'VERIFIED');assert.equal(r.verified,true);
+ assert.equal(r.learning_receipt_id,null);
+ assert.equal(r.learning_status,'LEARNING_READBACK_UNCONFIRMED_NO_PROVIDER_RETRY');
+ assert.equal(r.no_automatic_retry,true);
 });
