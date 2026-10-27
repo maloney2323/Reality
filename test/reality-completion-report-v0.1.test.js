@@ -84,8 +84,8 @@ test('UI binds completion receipts to both execution paths, session and shift sa
  assert.match(html,/id="wcCompletionCenter"/);
  assert.match(html,/id="shiftEndingReceipt"/);
  assert.match(js,/void wcLoadCompletionReports\(\)/);
- assert.match(js,/wcRenderShiftEndingReceipt\(b.home\)/);
+ assert.match(js,/wcRenderShiftEndingReceipt\(b.completion_report\)/);
  assert.match(js,/\/api\/reality\/personal-completion-reports\?conversation_id=/);
- assert.match(js,/This is not evidence that a 1–8 hour automation shift finished/);
+ assert.match(js,/SHIFT_TICK_PERSISTED_READBACK_DISCOVERY_ONLY/);
  assert.doesNotThrow(()=>new Function(js));
 });
