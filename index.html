@@ -947,6 +947,10 @@ function wcUnfinishedHTML(job){
  const action=canSave?
   '<button type="button" data-unfinished-save="'+esc(job.work_id)+
    '" data-unfinished-conversation="'+esc(job.conversation_id)+'">Save for recovery</button>':'';
+ const checkRepair=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+  /Reality Governed Execution Engine v0\.1/.test(String(job.title||''))?
+  '<button type="button" data-repair-check="'+esc(job.work_id)+
+   '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
  return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
   '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
   '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
@@ -955,7 +959,7 @@ function wcUnfinishedHTML(job){
     'The previous action is not independently verified.')+'</p>'+
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
-  '<div class="wc-unfinished-actions">'+action+link+'</div>'+
+  '<div class="wc-unfinished-actions">'+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
@@ -1056,6 +1060,50 @@ $('wcUnfinishedList').onclick=async event=>{
   button.disabled=true;
  }
 };
+
+
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-repair-check]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.repairCheck;
+ const conversationId=button.dataset.repairConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Verifying historical failures and later GitHub runs · Read only…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery-evidence?conversation_id='+
+    encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+  const p=await response.json();
+  if(!response.ok||p.ok!==true||p.original_work_id!==workId||
+     p.original_job_completed!==false||
+     p.external_action_performed!==false||
+     p.execution_authorized!==false||
+     !['LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED',
+       'NO_LATER_VERIFIED_SUCCESS_IN_BOUNDED_PROVIDER_WINDOW'].includes(p.status))
+   throw Error('Fresh original-work verification unavailable');
+  const passed=p.later_success&&
+   /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(
+    String(p.later_success.run_url||''))?
+   p.later_success.run_url:null;
+  if(feedback){
+   feedback.textContent=p.status==='LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED'?
+    'Verified: a later run of the same GitHub workflow passed. This does NOT yet prove the repair root cause or job completion.':
+    'No matching later CI success verified. The repair remains unfinished.';
+   if(passed){
+    feedback.appendChild(document.createTextNode(' '));
+    const link=document.createElement('a');
+    link.href=passed;link.rel='noopener noreferrer';link.target='_blank';
+    link.textContent='View verified passing workflow';
+    feedback.appendChild(link);
+   }
+  }
+ }catch{
+  if(feedback)feedback.textContent='Could not independently verify the repair. No upgrade or external action was executed.';
+ }finally{button.disabled=false}
+});
 
 // Deterministic display ONLY: reports arrive from authenticated, saved
 // Continuity outcomes or independently read-back shift discovery ticks.
