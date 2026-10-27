@@ -44,7 +44,12 @@ function chain(){
    effectiveTime:at,assertionTime:at,
    epistemicStatus,payload,evidenceRefs,
   });
-  const event={...ev,entity_type:entityType};
+  const event={...ev,entity_type:entityType,
+   provenance:{...ev.provenance,continuity_spine:{
+    prior_lineage_hash:ev.prior_lineage_hash,
+    transformation_receipt_id:ev.transformation_receipt_id,
+   }},
+  };
   events.push(event);return event;
  };
  append('RAW_SIGNAL','initial_user_goal',{goal_id:goalId});
@@ -76,7 +81,16 @@ const harness=(initial)=>{
   get history(){return history},
   createPersistence:()=>({
    reconstruct:async()=>[...history],
-   appendEvent:async event=>{writes++;history.push(event);return {...event,status:'PERSISTED'};},
+   appendEvent:async event=>{
+    writes++;
+    const stored={...event,provenance:{
+     ...event.provenance,continuity_spine:{
+      prior_lineage_hash:event.prior_lineage_hash,
+      transformation_receipt_id:event.transformation_receipt_id,
+     },
+    }};
+    history.push(stored);return {...stored,status:'PERSISTED'};
+   },
   }),
  };
 };
@@ -112,14 +126,14 @@ test('recovery checkpoint durable readback is idempotent with same work, no conn
  assert.equal(h.writes,1);
 });
 test('no verified provider effect means no recovery source',()=>{
- const {events,hand}=chain();
+ const {events}=chain();
  assert.throws(()=>projectPersonalRecoverySource({
-  history:events.filter(x=>x!==hand),workId,activeGoalId:goalId,
+  history:events.slice(0,2),workId,activeGoalId:goalId,
  }),/RECOVERY_EXACT_ORIGINAL_SOURCE_AND_OUTCOME_REQUIRED/);
  const source=events.map(x=>x.entity_type==='personal_issue_execution_outcome'?
   {...x,payload:{...x.payload,outcome_state:'UNRESOLVED'}}:x);
  assert.throws(()=>projectPersonalRecoverySource({history:source,workId,
-  activeGoalId:goalId}),/RECOVERY_EXTERNAL_TRACKING_RECEIPT_NOT_VERIFIED/);
+  activeGoalId:goalId}),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
 });
 test('new goal prevents recording an old job under different authorization',async()=>{
  const {events}=chain();const h=harness(events);
