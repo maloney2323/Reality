@@ -6,6 +6,8 @@ import {readFreshPersonalGoalState} from '../../src/reality-personal-goal-readba
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createUniversePostgresPersistence} from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import {projectPersonalCompletionReports} from '../../src/reality-completion-report-v0.1.js';
+import {createContinuitySpine} from '../../src/reality-continuity-spine-v2.0.js';
+import {orderContinuityHistory} from '../../src/reality-continuous-reliability-v0.1.js';
 
 export const maxDuration=60;
 export default async function handler(req,res){
@@ -29,9 +31,25 @@ export default async function handler(req,res){
      db.url!==session.config.url||
      db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
    throw Error('COMPLETION_ISOLATED_READBACK_REQUIRED');
-  const history=await createUniversePostgresPersistence({...db}).reconstruct({
-   continuityRootId:grounded.scope.root,worldlineId:grounded.scope.worldline
+  // Personal scopes are stable SOURCE STRINGS. PostgreSQL universe_events
+  // stores their canonical Spine UUIDs. Never query UUID columns with
+  // personal:chat:* source strings (that silently hid the ending receipts).
+  const spine=createContinuitySpine({
+   continuityRootId:grounded.scope.root,
+   worldlineId:grounded.scope.worldline,
+   subjectId:session.user_id,
   });
+  if(spine.continuity_root_id!==grounded.state?.continuity_root_id||
+     grounded.state?.world_id!==grounded.scope.world)
+   throw Error('COMPLETION_CANONICAL_SCOPE_NOT_VERIFIED');
+  const history=orderContinuityHistory(
+   await createUniversePostgresPersistence({...db}).reconstruct({
+    continuityRootId:spine.continuity_root_id,
+    worldlineId:spine.worldline_id,
+   })
+  );
+  // Full chain recomputation prevents a forged or truncated ledger fragment
+  // from being promoted into a verified completion receipt.
   const reports=projectPersonalCompletionReports({events:history,limit:12});
   return res.status(200).json({ok:true,status:'PERSISTED_READ_ONLY',
    reports,verified_external_actions:reports.filter(x=>x.action_completed).length,
