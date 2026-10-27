@@ -15,6 +15,8 @@ const env={VERCEL_ENV:'preview',REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
  REALITY_UNIVERSE_PERSISTENCE_KEY:'mock-only-secret-not-real',
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
  REALITY_CHAT_RECEIPT_HMAC_KEY:'mock-signing-only-not-real-key-12345678901234567890'};
+Object.assign(process.env,{...env,REALITY_PERSONAL_CHAT_SUPABASE_URL:url,
+ REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY:'sb_publishable_mock_only'});
 const session={user_id:randomUUID(),config:{url}},conversationId=randomUUID();
 const item={work_item_id:'work:'+'a'.repeat(32),workflow_id:'workflow:work:'+'a'.repeat(32),
  connector:'github',operation:'create_issue',consequential:true,
