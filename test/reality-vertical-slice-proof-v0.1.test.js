@@ -205,6 +205,7 @@ test('SINGLE CONTIGUOUS vertical slice: source discovery → confirmed goal → 
   prepare:prepareAdmission,
   ensureNoPrior:args=>ensureNoPriorPersonalIssueAttempt({
    ...args,persistenceFactory:()=>s.continuityStore,
+   principalHistoryReader:async()=>[],
   }),
  });
  const reserve=opts=>reserveAuthenticatedPersonalExecution({
