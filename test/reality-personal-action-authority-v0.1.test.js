@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { bindWorkToAuthenticatedGoal }
  from '../src/reality-execution-goal-grounding-v0.1.js';
 import { issuePersonalWorkGroundingProof }
@@ -71,6 +72,14 @@ test('explicit authenticated approval is durably read back with exact goal revis
  });
  assert.equal(result.action_approved_for_this_exact_goal,true);
  assert.equal(result.external_action_performed,false);
+ // Actual Supabase universe_events columns are UUID. The previous goal-bound
+ // prefix was a non-UUID and failed the live phone test with PostgREST 22P02.
+ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ for(const field of ['event_id','entity_id','continuity_root_id','worldline_id'])
+  assert.match(store.latest[field],uuid,field+' must satisfy database UUID type');
+ assert.match(result.policy_id,uuid);
+ assert.equal(store.latest.entity_id,result.policy_id);
+ assert.equal(store.latest.payload.policy_id,result.policy_id);
  assert.equal(store.latest.payload.goal_binding.goal_id,x.binding.goal_id);
  assert.equal(store.latest.payload.goal_binding.goal_transition_receipt_id,
   x.binding.goal_transition_receipt_id);
@@ -169,4 +178,41 @@ test('approval endpoint refuses raw client authority fields',async()=>{
   authorization:{authorized:true}}},r);
  assert.equal(state.status,400);
  assert.equal(state.body.error,'ACTION_APPROVAL_CLIENT_AUTHORITY_NOT_TRUSTED');
+});
+
+test('separate goal and exact-work approvals always have different typed UUIDs',async()=>{
+ const x=setup();
+ const s1=storage();
+ const first=await recordAuthenticatedPersonalActionApproval({
+  session:x.session,conversationId:conversation,workItem,
+  groundingProof:x.groundingProof,confirmedAction:'APPROVE_THIS_EXACT_WORK_ITEM',
+  env,readGoal:async()=>({state:x.latest}),persistence:s1,
+ });
+ const other={...workItem,inputs:{...workItem.inputs,title:'Another exact issue'}};
+ const binding=bindWorkToAuthenticatedGoal({
+  workItem:other,authoritativeState:x.latest,serverVerifiedPrincipalId:user,
+ });
+ const newProof=issuePersonalWorkGroundingProof({
+  binding,principalId:user,conversationId:conversation,env,
+ });
+ const s2=storage();
+ const second=await recordAuthenticatedPersonalActionApproval({
+  session:x.session,conversationId:conversation,workItem:other,
+  groundingProof:newProof,confirmedAction:'APPROVE_THIS_EXACT_WORK_ITEM',
+  env,readGoal:async()=>({state:x.latest}),persistence:s2,
+ });
+ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ assert.match(first.policy_id,uuid);assert.match(second.policy_id,uuid);
+ assert.notEqual(first.policy_id,second.policy_id);
+ assert.equal(policyMatchesGoalBoundWork({
+  policy:s1.latest.payload,workItem:other,binding,principalId:user,conversationId:conversation,
+ }),false);
+ assert.equal(first.external_action_performed,false);
+ assert.equal(second.external_action_performed,false);
+});
+test('approval endpoint never leaks raw PostgREST database error strings',()=>{
+ const source=readFileSync(new URL('../api/reality/personal-action-authority.js',import.meta.url),'utf8');
+ assert.ok(source.includes('ACTION_APPROVAL_CONTINUITY_STORAGE_UNAVAILABLE'));
+ assert.ok(source.includes('UNIVERSE_POSTGRES_HTTP_'));
+ assert.ok(!source.includes("error:error.message||'ACTION_APPROVAL_UNAVAILABLE'"));
 });
