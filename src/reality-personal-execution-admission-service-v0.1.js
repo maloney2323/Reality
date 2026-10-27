@@ -43,9 +43,14 @@ export async function prepareAuthenticatedPersonalExecution({
  // Force a NEW authenticated source projection, never use the browser's or
  // assistant's claimed user-goal state.
  const latest=await readGoal({session,conversationId,env});
+ const isExactPolicy=policy=>policyMatchesGoalBoundWork({
+  policy,workItem,binding:verified.binding,
+  principalId:session.user_id,conversationId,
+ });
  const policy=loadPolicy?await loadPolicy(session.user_id):
   await getAuthorityPolicy(session.user_id,
-   createUniversePostgresPersistence({...isolated}));
+   createUniversePostgresPersistence({...isolated}),
+   {matches:isExactPolicy});
  if(!policyMatchesGoalBoundWork({
   policy,workItem,binding:verified.binding,
   principalId:session.user_id,conversationId,
