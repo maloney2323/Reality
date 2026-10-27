@@ -45,15 +45,26 @@ export default async function handler(req, res) {
       });
     }
     const principal = getOrCreateSessionPrincipal(req, res);
-    let authorization = body.authorization || null;
-    let authoritySource = authorization ? 'EXPLICIT_AUTHORIZATION' : 'NONE';
-    if (authorization?.principal_id && authorization.principal_id !== principal.principal_id) return res.status(403).json({ ok: false, error: 'AUTHORIZATION_PRINCIPAL_MISMATCH' });
-    if (!authorization) {
-      const policy = await getAuthorityPolicy(principal.principal_id);
-      authorization = autoAuthorize({ policy, workItem: body.workItem });
-      if (authorization) authoritySource = 'CUSTOMER_AUTO_AUTHORITY';
+    // A caller/LLM can manufacture an object with authorized:true. There is
+    // NO cryptographic or persistence-backed explicit-grant verification on
+    // this generic endpoint. Do not treat client JSON as actual USER consent.
+    // User approval must be persisted through the existing scoped authority
+    // policy adapter, then independently loaded by this server.
+    if (body.authorization !== undefined && body.authorization !== null) {
+      return res.status(200).json({
+        ok:true,result:{status:'BLOCKED',
+          blocked_reason:'CLIENT_AUTHORIZATION_NOT_SERVER_VERIFIED',
+          authority_source:'NONE',execution:null,verification:null,outcome:null},
+      });
     }
-    if (!authorization) return res.status(200).json({ ok:true, result:{ status:'BLOCKED', blocked_reason:'EXPLICIT_AUTHORIZATION_REQUIRED', authority_source:'NONE', execution:null, verification:null, outcome:null } });
+    const policy = await getAuthorityPolicy(principal.principal_id);
+    const authorization = autoAuthorize({policy,workItem:body.workItem});
+    const authoritySource = authorization ? 'PERSISTED_CUSTOMER_AUTHORITY_POLICY' : 'NONE';
+    if (!authorization) return res.status(200).json({
+      ok:true,result:{status:'BLOCKED',
+        blocked_reason:'PERSISTED_USER_ACTION_APPROVAL_REQUIRED',
+        authority_source:'NONE',execution:null,verification:null,outcome:null},
+    });
 
     let bridges;
     try { bridges = getServerExecutionBridges(); }
