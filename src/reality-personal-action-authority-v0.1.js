@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { continuityUuidFromSource } from './reality-continuity-spine-v2.0.js';
 // Preview-only, authenticated exact-work approval inside the EXISTING
 // authority/Continuity ledger. Does not execute work or invent a new goal DB.
 // The explicit signed-in user's approval is separate from their goal command.
@@ -100,8 +101,13 @@ export async function recordAuthenticatedPersonalActionApproval({
   work_item_fingerprint:signed.binding.work_item_fingerprint,
  });
  const policy=Object.freeze({...base,
-  policy_id:'goal-bound-approval:'+createHash('sha256')
-    .update(JSON.stringify([base.policy_id,goalBinding])).digest('hex'),
+  // Postgres universe_events.entity_id is UUID. Preserve this binding
+  // via a domain-separated deterministic UUID rather than writing the
+  // human-readable goal-bound-approval:<digest> identifier into that column.
+  // The full exact-work/goal relation remains in goal_binding and scopes.
+  policy_id:continuityUuidFromSource('goal-bound-approval:'+
+    createHash('sha256')
+    .update(JSON.stringify([base.policy_id,goalBinding])).digest('hex')),
   goal_binding:goalBinding,
  });
  if(!policyMatchesGoalBoundWork({
