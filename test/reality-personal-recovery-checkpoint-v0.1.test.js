@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {createContinuitySpine,appendContinuityNode}
  from '../src/reality-continuity-spine-v2.0.js';
 import {personalGoalScope}
@@ -170,4 +171,28 @@ test('canonical parent hash and scoped principal are enforced',async()=>{
  assert.equal(event.continuity_root_id,spine.continuity_root_id);
  assert.equal(event.worldline_id,spine.worldline_id);
  assert.equal(event.provenance.principal_id,userId);
+});
+
+
+test('preview route rejects forged work/authorization input and supports only checkpoint/readback',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-recovery.js',import.meta.url),'utf8');
+ assert.match(api,/authenticatedChatSession/);
+ assert.match(api,/assertSameOrigin/);
+ assert.match(api,/\['intent','conversation_id','work_id'\]/);
+ assert.match(api,/body\.intent!=='CHECKPOINT'/);
+ assert.match(api,/inspectPersonalRecoveryCheckpoint/);
+ assert.match(api,/persistPersonalRecoveryCheckpoint/);
+ assert.doesNotMatch(api,/runPersonalIssueDispatch|githubWrite|executeAuthorizedWork/);
+});
+test('the Work Center recovery button labels the original job unfinished and does not retry issue creation',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const js=html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+ assert.ok(js);
+ assert.doesNotThrow(()=>new Function(js));
+ assert.match(js,/Record original job for recovery/);
+ assert.match(js,/repair job is still unfinished/);
+ assert.match(js,/\/api\/reality\/personal-recovery/);
+ assert.match(js,/data-recovery-checkpoint/);
+ assert.match(js,/data\.job_completed!==false/);
+ assert.match(js,/data\.external_action_performed!==false/);
 });
