@@ -4,7 +4,7 @@
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {validUuid} from '../../src/reality-private-chat-store-v0.1.js';
-import {verifyPersonalGithubIssueToken}
+import {inspectPreviewGithubRepositoryAccessReadOnly}
  from '../../src/reality-personal-github-execution-bridge-v0.1.js';
 import {preparePersonalIssueDispatch,runPersonalIssueDispatch,
  inspectPersonalIssueAttemptsReadOnly,inspectPersonalIssueWorkHistoryReadOnly}
@@ -24,17 +24,26 @@ export default async function handler(req,res){
    let status='PREVIEW_GITHUB_WRITE_ADAPTER_NOT_CONFIGURED';
    let token_identity_verified=false;
    let repository_issue_read_verified=false;
+   let repository_metadata_verified=false;
+   let repository_archived=null;
+   let issues_feature_enabled=null;
    // Token presence is NOT proof that the credential was generated correctly.
    // A protected read-only GitHub /user + repository issues probe checks the
    // actual preview credential before the UI offers any RUN button.
    if(process.env.VERCEL_ENV==='preview'&&process.env.REALITY_GITHUB_TOKEN){
     try{
-     const verified=await verifyPersonalGithubIssueToken();
-     if(verified.credential_identity_verified&&
-        verified.repository_issues_read_verified){
+     const verified=await inspectPreviewGithubRepositoryAccessReadOnly();
+     token_identity_verified=verified.principal_verified===true;
+     repository_issue_read_verified=verified.issues_read_verified===true;
+     repository_metadata_verified=verified.repository_metadata_verified===true;
+     repository_archived=verified.repository_archived;
+     issues_feature_enabled=verified.issues_feature_enabled;
+     if(token_identity_verified&&repository_issue_read_verified&&
+        repository_metadata_verified&&repository_archived===false&&
+        issues_feature_enabled===true){
       status='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED';
-      token_identity_verified=true;
-      repository_issue_read_verified=true;
+     }else{
+      status='PREVIEW_GITHUB_REPOSITORY_ISSUES_UNAVAILABLE';
      }
     }catch{
      status='PREVIEW_GITHUB_CREDENTIAL_NOT_VERIFIED';
@@ -42,6 +51,7 @@ export default async function handler(req,res){
    }
    return res.status(200).json({ok:true,status,
     token_identity_verified,repository_issue_read_verified,
+    repository_metadata_verified,repository_archived,issues_feature_enabled,
     github_issue_write_permission_not_yet_proven:true,
     requires_new_execution_confirmation:true,
     requires_fresh_action_approval:true,
