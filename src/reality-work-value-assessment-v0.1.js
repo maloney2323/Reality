@@ -48,7 +48,7 @@ export function assessEvidenceBackedWork(finding){
   version:VALUE_ASSESSMENT_VERSION,
   triage_score:score,
   triage_band:priority,
-  score_definition:'HEURISTIC_REVIEW_ORDER_ONLY_NOT_BUSINESS_IMPACT',
+  score_definition:'HEURISTIC_TRIAGE_REVIEW_ORDER_ONLY_NOT_BUSINESS_IMPACT',
   score_basis:Object.freeze({
    source_type:finding.finding_type,
    distinct_valid_source_refs:refs.length,
