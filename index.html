@@ -37,7 +37,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .work-steps li[data-state="required"]{border-color:#a87c51;color:#f7dfb3}
 .work-steps li[data-state="blocked"]{border-color:#975b59;color:#f0b0aa}
 .work-review{border:1px solid #4a617a;border-radius:12px;padding:12px;margin-top:12px;background:#101b2a;font-size:12px;line-height:1.6}
-.work-review p{white-space:pre-wrap;overflow-wrap:anywhere}
+.work-review p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
 .work-review label{display:flex;align-items:flex-start;gap:9px;margin:14px 0;cursor:pointer}
 .work-review input[type=checkbox]{margin-top:4px;flex:none;min-width:18px;min-height:18px;accent-color:#b7d4d0}
 .work-review button{width:100%;white-space:normal}
@@ -513,14 +513,14 @@ function renderWork(source){
       heading.textContent='Step 3 · Review what you would approve';
       const desc=document.createElement('p');
       desc.textContent='Original goal: '+current.active_goal.title+
-        '\\nWork ID: '+w.work_id+
-        '\\nProposed action: '+exact.action+
-        '\\nProvider: '+exact.connector+' · '+exact.operation+
-        '\\nRepository: '+exact.inputs?.repository+
-        '\\nIssue title: '+exact.inputs?.title+
-        '\\nIssue body: '+exact.inputs?.body+
-        '\\nEvidence references: '+prepared.evidence_refs.length+
-        '\\nThis step only records exact-work approval. It does NOT create the issue.';
+        '\nWork ID: '+w.work_id+
+        '\nProposed action: '+exact.action+
+        '\nProvider: '+exact.connector+' · '+exact.operation+
+        '\nRepository: '+exact.inputs?.repository+
+        '\nIssue title: '+exact.inputs?.title+
+        '\nIssue body: '+exact.inputs?.body+
+        '\nEvidence references: '+prepared.evidence_refs.length+
+        '\nThis step only records exact-work approval. It does NOT create the issue.';
       const label=document.createElement('label');
       const checkbox=document.createElement('input');
       checkbox.type='checkbox';checkbox.required=true;
