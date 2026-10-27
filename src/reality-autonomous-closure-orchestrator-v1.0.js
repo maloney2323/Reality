@@ -17,7 +17,8 @@ export async function runAutonomousClosurePass({
   universe, reasoner = null, workItem, capabilities = [], capabilityGap = null,
   historicalFailureRefs = [], verificationSuiteRef = null, inputSchema = null,
   outputSchema = null, synthesis, sandboxVerifier, mergeVerifier,
-  capabilityRegistry, authorization = null, attempt = 1, attemptLimit = 3,
+  capabilityRegistry, authorization = null, promotionAuthorization = null,
+  attempt = 1, attemptLimit = 3,
   existingWork = [], minimumRecurrences = 2, minRevenue = 0,
 } = {}) {
   const cognition = await runUniverseCognitionPass({ universe, reasoner });
@@ -53,42 +54,113 @@ export async function runAutonomousClosurePass({
     },
   });
 
-  const confirmedGap = confirmCapabilityGap(gap, { historicalFailureRefs, inputSchema, outputSchema, verificationSuiteRef });
-  const experiment = createSandboxExperiment({ confirmedGap, attempt, attemptLimit, primaryWorldlineId: universe.worldline_id });
-
-  if (!authorization) return Object.freeze({ state: 'AWAITING_AUTHORIZATION', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment });
-
-  if (!mergeVerifier || typeof mergeVerifier.verify !== 'function' || typeof mergeVerifier.merge !== 'function') {
-    throw new Error('WORLDLINE_MERGE_VERIFIER_CONTRACT_REQUIRED');
+  // A gap cannot borrow the identity or authority of another work/worldline.
+  if (!workItem?.id || !workItem?.continuity_root_id || !workItem?.worldline_id ||
+      workItem.worldline_id !== cognition.state?.worldline_id ||
+      workItem.continuity_root_id !== cognition.state?.continuity_root_id) {
+    throw new Error('ORIGINAL_WORK_UNIVERSE_SCOPE_MISMATCH');
   }
+  const confirmedGap = confirmCapabilityGap(gap, { historicalFailureRefs, inputSchema, outputSchema, verificationSuiteRef });
+  const experiment = createSandboxExperiment({
+    confirmedGap, attempt, attemptLimit,
+    primaryWorldlineId: cognition.state.worldline_id,
+  });
+  const partial = {
+    cognition, work_discovery: workDiscovery, gap: confirmedGap,
+    capability_gap_projection: capabilityGapProjection,
+    original_work_item_id: workItem.id,
+    original_work_executed: false, job_completed: false,
+    external_effects_executed: false,
+  };
+
+  if (!authorization) return Object.freeze({
+    ...partial, state: 'AWAITING_AUTHORIZATION', experiment,
+  });
 
   const authorizedExperiment = authorizeSandboxExperiment(experiment, authorization);
-
+  let verifiedExperiment;
   try {
-    if (!synthesis || typeof synthesis.run !== 'function') throw new Error('SANDBOX_SYNTHESIS_ADAPTER_REQUIRED');
-    if (!sandboxVerifier || typeof sandboxVerifier.verify !== 'function') throw new Error('SANDBOX_VERIFIER_REQUIRED');
+    if (typeof synthesis?.run !== 'function') throw new Error('SANDBOX_SYNTHESIS_ADAPTER_REQUIRED');
+    if (typeof sandboxVerifier?.verify !== 'function') throw new Error('SANDBOX_VERIFIER_REQUIRED');
 
     const synthesizedCapability = await synthesis.run({
-      gap: confirmedGap, experiment: authorizedExperiment, production_graph_write_permitted: false,
+      gap: confirmedGap, experiment: authorizedExperiment,
+      production_graph_write_permitted: false,
     });
     const verification = await sandboxVerifier.verify({
       capability: synthesizedCapability, experiment: authorizedExperiment,
       frozen_historical_failure_refs: confirmedGap.frozen_historical_failure_refs,
     });
-    const verifiedExperiment = validateSandboxResult(authorizedExperiment, {
-      synthesizedCapability, frozenRegression: verification?.frozen_regression,
+    verifiedExperiment = validateSandboxResult(authorizedExperiment, {
+      synthesizedCapability,
+      frozenRegression: verification?.frozen_regression,
       isolatedVerification: verification?.isolated_verification,
       capabilitySignature: verification?.capability_signature,
     });
-    const mergeApproval = await mergeVerifier.verify(verifiedExperiment);
-    const mergedExperiment = authorizeWorldlineMerge(verifiedExperiment, { mergeVerifier: () => mergeApproval });
-    const mergeResult = await mergeVerifier.merge(mergedExperiment);
-    const registration = registerVerifiedCapability(mergedExperiment, { capabilityRegistry, mergeResult });
-    const reactivation = reactivationPlan(confirmedGap, { registration, originalWorkItem: workItem });
-
-    return Object.freeze({ state: 'REACTIVATED', cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: mergedExperiment, registration, reactivation });
   } catch (error) {
-    const failure = handleSynthesisFailure(authorizedExperiment, { nextAttempt: attempt + 1, attemptLimit });
-    return Object.freeze({ state: failure.state, cognition, gap: confirmedGap, capability_gap_projection: capabilityGapProjection, experiment: authorizedExperiment, failure, error: error.message });
+    const failure = handleSynthesisFailure(authorizedExperiment, {
+      nextAttempt: attempt + 1, attemptLimit,
+    });
+    return Object.freeze({...partial, state:failure.state,
+      experiment:authorizedExperiment,failure,error:error.message,
+    });
+  }
+
+  // This state must be visible and persistable before obtaining independent,
+  // authenticated promotion authorization from a trusted owner service.
+  if (!promotionAuthorization) return Object.freeze({
+    ...partial, state:'AWAITING_PROMOTION_AUTHORIZATION',
+    experiment:verifiedExperiment,upgrade_verified_in_sandbox:true,
+    promotion_authorized:false,
+  });
+  if (!mergeVerifier || typeof mergeVerifier.verify!=='function' ||
+      typeof mergeVerifier.merge!=='function') {
+    throw Error('WORLDLINE_MERGE_VERIFIER_CONTRACT_REQUIRED');
+  }
+  // Check exact owner-supplied scope BEFORE invoking the merge adapter.
+  // This pure control plane does not authenticate the owner; a future live
+  // entry point MUST supply trusted, server-verified promotionAuthorization.
+  if (promotionAuthorization.approved!==true ||
+      promotionAuthorization.original_work_item_id!==workItem.id ||
+      promotionAuthorization.verification_hash!==verifiedExperiment.verification_hash ||
+      promotionAuthorization.target_worldline_id!==cognition.state.worldline_id ||
+      !promotionAuthorization.authorization_ref ||
+      !promotionAuthorization.authorized_by)
+    throw Error('EXACT_SEPARATE_PROMOTION_AUTHORIZATION_REQUIRED');
+
+  let mergedExperiment;
+  try {
+    const mergeApproval = await mergeVerifier.verify(verifiedExperiment);
+    mergedExperiment = authorizeWorldlineMerge(verifiedExperiment,{
+      mergeVerifier:()=>mergeApproval,promotionAuthorization,originalWorkItem:workItem,
+    });
+  } catch (error) {
+    return Object.freeze({...partial,state:'PROMOTION_REJECTED',
+      experiment:verifiedExperiment,error:error.message,
+      promotion_authorized:false,
+    });
+  }
+  // Any exception from here is an UNCERTAIN MERGE, not a new synthesis retry.
+  // An external write may already have happened, so do not re-dispatch.
+  try {
+    const mergeResult = await mergeVerifier.merge(mergedExperiment);
+    const registration = registerVerifiedCapability(mergedExperiment,{
+      capabilityRegistry,mergeResult,
+    });
+    const reactivation = reactivationPlan(confirmedGap,{
+      registration,originalWorkItem:workItem,
+    });
+    return Object.freeze({...partial,state:'REACTIVATION_READY',
+      experiment:mergedExperiment,registration,reactivation,
+      upgrade_verified_in_sandbox:true,
+      upgrade_promoted_by_adapter:true,
+      original_work_executed:false,job_completed:false,
+      continuation_requires_fresh_work_authorization:true,
+    });
+  } catch (error) {
+    return Object.freeze({...partial,state:'MERGE_OR_REGISTRATION_OUTCOME_UNCERTAIN',
+      experiment:mergedExperiment,error:error.message,
+      retry_allowed:false,read_only_reconciliation_required:true,
+    });
   }
 }
