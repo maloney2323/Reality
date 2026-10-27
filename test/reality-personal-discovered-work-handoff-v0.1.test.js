@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {preparePersonalDiscoveredWorkHandoff}
+import {preparePersonalDiscoveredWorkHandoff,listPersonalDiscoveredWorkHandoffs}
  from '../src/reality-personal-discovered-work-handoff-v0.1.js';
 import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
 import {verifyPersonalWorkGroundingProof}
@@ -207,4 +207,50 @@ test('Home uses only canonical discovery ID, approval confirmation, freshness ch
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script),'Home JavaScript must parse');
+});
+
+test('authenticated Continuity receipt is discoverable after a new request without minting action authority',async()=>{
+ const s=setup();
+ const prepared=await preparePersonalDiscoveredWorkHandoff(args(s));
+ const prior=await listPersonalDiscoveredWorkHandoffs({
+  session,conversationId,env,readGoal:s.readGoal,
+  createPersistence:s.createPersistence,
+ });
+ assert.equal(prior.status,'READ_ONLY_DISCOVERED_WORK_CONTINUITY');
+ assert.equal(prior.items.length,1);
+ assert.equal(prior.items[0].work_id,workId);
+ assert.equal(prior.items[0].continuity_receipt_id,prepared.continuity_receipt_id);
+ assert.equal(prior.items[0].goal_still_current,true);
+ assert.equal(prior.items[0].action_approved_by_handoff,false);
+ assert.equal(prior.external_action_performed,false);
+});
+test('changed goal does not re-authorize a previously recorded work receipt',async()=>{
+ const s=setup();await preparePersonalDiscoveredWorkHandoff(args(s));
+ const old=s.readGoal;
+ const prior=await listPersonalDiscoveredWorkHandoffs({
+  session,conversationId,env,createPersistence:s.createPersistence,
+  readGoal:async()=>({...await old(),state:{...state,
+   active_goal:{...state.active_goal,goal_id:'changed'}}}),
+ });
+ assert.equal(prior.items[0].goal_still_current,false);
+ assert.equal(prior.items[0].action_approved_by_handoff,false);
+});
+test('readback enforces original signed-in person and private conversation',async()=>{
+ const s=setup();await preparePersonalDiscoveredWorkHandoff(args(s));
+ await assert.rejects(listPersonalDiscoveredWorkHandoffs({
+  session:{...session,user_id:randomUUID()},conversationId,env,
+  createPersistence:s.createPersistence,readGoal:s.readGoal,
+ }),/DISCOVERED_WORK_CONTINUITY_SCOPE_NOT_VERIFIED/);
+ await assert.rejects(listPersonalDiscoveredWorkHandoffs({
+  session,conversationId:randomUUID(),env,
+  createPersistence:s.createPersistence,readGoal:s.readGoal,
+ }),/DISCOVERED_WORK_CONTINUITY_SCOPE_NOT_VERIFIED/);
+});
+test('read-only GET does not expose personal work receipts without verified session',async()=>{
+ const {res,record}=mockResponse();
+ await endpoint({method:'GET',headers:{cookie:'reality_principal=not-supabase'},
+  query:{conversation_id:conversationId}},res);
+ assert.equal(record.status,401);
+ assert.equal(record.body.error,'CHAT_SIGN_IN_REQUIRED');
+ assert.equal(record.body.external_action_performed,false);
 });
