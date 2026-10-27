@@ -110,6 +110,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-staffing{border:1px solid #41536d;border-radius:12px;padding:13px;margin-top:15px;background:#0c1825}
 .wc-staffing summary{font-size:13px;font-weight:700;color:#e7f1fc;cursor:pointer}
 .wc-staffing .wc-plan-button{margin-top:14px}
+.wc-diagnostic{display:flex;align-items:center;flex-wrap:wrap;gap:11px;background:#172437;border:1px solid #344b67;border-radius:11px;padding:10px 12px;margin:14px 0}
+.wc-diagnostic button{flex:none;padding:9px 13px;margin:0;font-size:12px;background:#d7e8f9;color:#122131}
+.wc-diagnostic span{color:#b8cadd;font-size:12px;line-height:1.5;flex:1;min-width:180px}
 </style>
 </head>
 <body>
@@ -199,6 +202,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
    <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
   <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small><button type="button" id="wcDiscover">Find work</button></div>
+ </div>
+ <div class="wc-diagnostic">
+  <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
+  <span id="wcCredentialResult" role="status" aria-live="polite">GitHub Issue write access has not been proven by read-only checks. Earlier attempts stay locked.</span>
  </div>
  <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
   <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
@@ -656,6 +663,40 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
 }
 
 
+
+// Owner-only read-only Preview token diagnostic. A credential probe is NOT
+// permission to POST a real issue or retry any previous reservation.
+$('wcCredentialCheck').onclick=async()=>{
+ const button=$('wcCredentialCheck'),out=$('wcCredentialResult');
+ button.disabled=true;
+ out.textContent='Checking GitHub owner, repository and Issues settings using the configured Preview token. No write…';
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store',
+  });
+  const p=await response.json();
+  if(!response.ok||!p.ok){
+   out.textContent='Sign in to your private Reality account to verify the Preview token. No GitHub write attempted.';
+   return;
+  }
+  if(p.status==='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED'){
+   out.textContent='Owner verified: '+String(p.token_identity_verified)+
+    ' · Repository metadata verified: '+String(p.repository_metadata_verified)+
+    ' · GitHub Issues enabled: '+String(p.issues_feature_enabled)+
+    ' · Issues GET verified: '+String(p.repository_issue_read_verified)+
+    ' · Issues WRITE still unproven. Do not retry previous attempts.';
+  }else{
+   out.textContent='Read-only GitHub credential readiness: '+String(p.status||'NOT_VERIFIED')+
+    ' · Owner: '+String(p.token_identity_verified)+
+    ' · Repo: '+String(p.repository_metadata_verified)+
+    ' · Issues enabled: '+String(p.issues_feature_enabled)+
+    ' · Issues read: '+String(p.repository_issue_read_verified)+
+    '. No action performed.';
+  }
+ }catch{
+  out.textContent='Credential check unavailable. No GitHub write attempted. Previous reservations remain locked.';
+ }finally{button.disabled=false}
+};
 
 /* Read-only Work Center. Does NOT dispatch, schedule or charge. */
 const workCategories=[
