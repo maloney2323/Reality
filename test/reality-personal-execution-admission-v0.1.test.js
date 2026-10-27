@@ -77,6 +77,48 @@ function args(x){
   groundingProof:x.groundingProof,env,
   readGoal:async()=>({state:x.latest}),loadPolicy:async()=>x.policy};
 }
+test('two saved approvals coexist; preflight selects exact work even when a later different approval exists',async()=>{
+ const x=setup(),other={...workItem,work_item_id:'wi:another',
+  workflow_id:'wf:another',inputs:{...workItem.inputs,title:'Different work'}};
+ const wrong={...x.policy,policy_id:randomUUID(),
+  scopes:[{connector:'github',operation:'create_issue',resource:'maloney2323/Reality',
+   work_item_id:other.work_item_id,work_item_fingerprint:fingerprintApprovedWorkItem(other)}],
+  goal_binding:{...x.policy.goal_binding,
+   work_item_fingerprint:fingerprintApprovedWorkItem(other)}};
+ const store={reconstruct:async()=>[
+  {event_id:randomUUID(),entity_type:'customer_authority_policy',
+   entity_id:x.policy.policy_id,assertion_time:'2026-10-27T10:00:00.000Z',payload:x.policy},
+  {event_id:randomUUID(),entity_type:'customer_authority_policy',
+   entity_id:wrong.policy_id,assertion_time:'2026-10-27T10:01:00.000Z',payload:wrong},
+ ]};
+ const r=await prepareAuthenticatedPersonalExecution({
+  ...args(x),loadPolicy:null,createPersistence:()=>store,
+ });
+ assert.equal(r.action_policy_id,x.policy.policy_id);
+ assert.equal(r.work_item_fingerprint,fingerprintApprovedWorkItem(workItem));
+ assert.equal(r.external_action_performed,false);
+ const expires={...x.policy,expires_at:'2000-01-01T00:00:00Z'};
+ await assert.rejects(prepareAuthenticatedPersonalExecution({
+  ...args(x),loadPolicy:null,
+  createPersistence:()=>({reconstruct:async()=>[
+   {entity_type:'customer_authority_policy',entity_id:expires.policy_id,
+    assertion_time:'2026-10-27T10:00:00Z',payload:expires},
+   {entity_type:'customer_authority_policy',entity_id:wrong.policy_id,
+    assertion_time:'2026-10-27T10:01:00Z',payload:wrong},
+  ]}),
+ }),/PERSONAL_EXECUTION_PERSISTED_GOAL_BOUND_APPROVAL_REQUIRED/);
+});
+test('policy from other conversation never becomes a matching saved approval',async()=>{
+ const x=setup(),alien={...x.policy,policy_id:randomUUID(),
+  goal_binding:{...x.policy.goal_binding,conversation_id:randomUUID()}};
+ await assert.rejects(prepareAuthenticatedPersonalExecution({
+  ...args(x),loadPolicy:null,
+  createPersistence:()=>({reconstruct:async()=>[{
+   entity_type:'customer_authority_policy',entity_id:alien.policy_id,
+   assertion_time:new Date().toISOString(),payload:alien,
+  }]}),
+ }),/PERSONAL_EXECUTION_PERSISTED_GOAL_BOUND_APPROVAL_REQUIRED/);
+});
 test('authenticated current goal + separate exact approval produce admission but never execute',async()=>{
  const x=setup();
  const r=await prepareAuthenticatedPersonalExecution(args(x));
