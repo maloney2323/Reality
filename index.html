@@ -276,21 +276,93 @@ function renderWork(source){
   }).join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
   const pending=items.filter(w=>w.consequential||w.authority_required?.length||w.authorization_required||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
   $('attentionCount').textContent=String(pending.length);
-  $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>'<div class="attention-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||'Governed work')+'</strong><div class="muted">External effect requires your authorization.</div><button type="button" data-auth="'+i+'">Authorize this work</button></div>').join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
+  $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>{
+    const prepared=w.kind==='SYSTEM_MAINTENANCE'&&w.state==='QUALIFIED'&&
+      w.authorization_required===true&&
+      /^work:[0-9a-f]{32}$/.test(String(w.work_id||''))&&
+      w.execution_work_item?.connector==='github'&&
+      w.execution_work_item?.operation==='create_issue';
+    return '<div class="attention-item"><strong>'+esc(w.title||w.objective||w.work_key||'Governed work')+
+      '</strong><div class="muted">Source evidence: '+esc((w.evidence_refs||[]).length)+
+      ' · '+esc(prepared?'Prepare from verified GitHub records and confirmed user goal. No external action will occur.':'Not ready for authenticated approval; more evidence or capability required.')+
+      '</div><button type="button" data-auth="'+i+'" '+(prepared?'':'disabled')+'>'+
+      (prepared?'Prepare exact work':'Not ready for approval')+'</button><div class="work-meta" data-work-receipt="'+i+'"></div></div>';
+  }).join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
   $('attentionQueue').querySelectorAll('[data-auth]').forEach(btn=>btn.onclick=async()=>{
     const w=pending[Number(btn.dataset.auth)];
-    btn.disabled=true;btn.textContent='Authorizing…';
+    const receipt=$('attentionQueue').querySelector('[data-work-receipt="'+btn.dataset.auth+'"]');
+    btn.disabled=true;btn.textContent='Rechecking source & goal…';
     try{
-      const workItem=w.execution_work_item||w;
-      const scope=(w.authorization_scope||w.scope||w.allowed_operations||workItem.authority_required||[])[0];
-      if(!scope?.connector||!scope?.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
-      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:workItem,enabled:true})});
-      const rb=await rr.json();if(!rr.ok||!rb.ok)throw new Error(rb.error||'Authorization failed');
-      const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem,workflowId:workItem.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded recurring maintenance explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
-      const eb=await er.json();if(!er.ok||!eb.ok)throw new Error(eb.error||eb.result?.blocked_reason||'Execution failed');
-      if(eb.result?.status!=='VERIFIED')throw new Error(eb.result?.blocked_reason||eb.result?.outcome?.outcome_state||'Execution was not independently verified');
-      btn.textContent='Authorized & verified ✓';
-    }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
+      // The browser selects ONLY a source work ID. The server re-discovers
+      // actual GitHub evidence and constructs the exact work item itself.
+      // No generic-cookie identity, client JSON work object, or model text
+      // may mint approval or execute a provider action.
+      const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+      if(!conv||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv))
+        throw Error('Sign in to your private Reality conversation and confirm your active goal first.');
+      if($('privateReady').style.display!=='block')
+        throw Error('Sign in to Reality private chat before preparing a business action.');
+      async function post(path,payload){
+        const response=await fetch(path,{method:'POST',credentials:'same-origin',
+         headers:{'content-type':'application/json'},
+         body:JSON.stringify(payload)});
+        const body=await response.json();
+        if(!response.ok||!body.ok)
+          throw Error(body.error||body.reason||'Reality refused the requested operation');
+        return body;
+      }
+      const prepared=await post('/api/reality/personal-discovered-work',{
+        intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id,
+      });
+      if(prepared.status!=='DISCOVERED_WORK_GOAL_GROUNDED_PENDING_APPROVAL'||
+         prepared.discovered_work_id!==w.work_id||
+         !prepared.work_item?.work_item_id||
+         prepared.work_item.work_item_id!==w.work_id||
+         !prepared.continuity_receipt_id||
+         prepared.external_action_performed!==false)
+        throw Error('Reality did not return a verified, durable, non-executing work handoff.');
+      receipt.textContent='Continuity work receipt '+prepared.continuity_receipt_id+
+        ' · Goal '+prepared.goal_id+' · Evidence '+prepared.evidence_refs.length;
+      btn.textContent='Source & goal verified · Review approval';
+      const exact=prepared.work_item;
+      if(!confirm('Reality grounded this discovered work in your confirmed objective.\n\n'+
+        'Work: '+w.objective+'\n'+
+        'Exact action: '+exact.action+'\n'+
+        'Repository: '+exact.inputs?.repository+'\n'+
+        'Evidence references: '+prepared.evidence_refs.length+'\n\n'+
+        'Approve THIS exact work item only? This does NOT execute or reserve any external action.')){
+        btn.textContent='Grounded · Approval declined';
+        receipt.textContent+=' · Awaiting your decision';
+        return;
+      }
+      btn.textContent='Recording your exact approval…';
+      const approved=await post('/api/reality/personal-action-authority',{
+        conversation_id:conv,work_item:exact,
+        grounding_proof:prepared.grounding_proof,
+        confirmation:'APPROVE_THIS_EXACT_WORK_ITEM',
+      });
+      if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+         !approved.policy_id||
+         approved.external_action_performed!==false)
+        throw Error('Exact-work approval was not durably confirmed.');
+      const admitted=await post('/api/reality/personal-execution-admission',{
+        intent:'CHECK',conversation_id:conv,work_item:exact,
+        grounding_proof:prepared.grounding_proof,
+      });
+      if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
+         admitted.action_policy_id!==approved.policy_id||
+         admitted.work_item_fingerprint!==prepared.work_fingerprint||
+         admitted.external_action_performed!==false)
+        throw Error('Approved work failed the fresh-goal execution readiness check.');
+      btn.textContent='Approved · Dispatch not enabled';
+      receipt.textContent='Work '+w.work_id+' · Goal '+admitted.goal_id+
+        ' · Receipt '+prepared.continuity_receipt_id+
+        ' · Approval '+approved.policy_id+
+        ' · No external action performed. Execution must separately consume its single-use DB reservation.';
+    }catch(e){
+      btn.disabled=false;btn.textContent='Prepare exact work';
+      receipt.textContent='Reality blocked the handoff: '+e.message;
+    }
   });
 }
 async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
