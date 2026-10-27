@@ -2,7 +2,7 @@ import { executeAuthorizedWork } from '../../src/reality-governed-execution-engi
 import { evaluateGoalExecutionBoundary } from '../../src/reality-goal-execution-boundary-v0.1.js';
 import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
-import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
+import { getAuthorityPolicy, autoAuthorize, issueBoundExecutionApproval } from '../../src/reality-authority-v1.0.js';
 import { createEvidenceWarrant, attachLearningProposalToWarrant, verifyWarrantChain } from '../../src/reality-evidence-warrant-v1.0.js';
 import { learnFromVerifiedExecution } from '../../src/reality-constitutional-learning-bridge-v1.0.js';
 
@@ -72,8 +72,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, result: { status: 'BLOCKED', blocked_reason: error.message, execution: null, verification: null, outcome: null } });
     }
 
+    const serverApprovalProof=issueBoundExecutionApproval({
+      policy,workItem:body.workItem,authorization,
+      principalId:principal.principal_id,
+    });
     const result = await executeAuthorizedWork({
       workItem: body.workItem,
+      serverApprovalProof,
       workflowId: body.workflowId || body.workItem.workflow_id,
       authorization,
       connector: bridges,
