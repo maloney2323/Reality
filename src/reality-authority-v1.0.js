@@ -18,12 +18,42 @@ function uuid(prefix, value) {
 function id(prefix, value) { return uuid(prefix, value); }
 function list(v) { return Array.isArray(v) ? v : []; }
 
+// Exact work-item approval is an immutable fingerprint of the server's
+// intended target, operation and inputs. A model must not reuse an approved
+// work_item_id to execute changed instructions or a different destination.
+function canonical(value){
+  if(value===null||typeof value!=='object')return value;
+  if(Array.isArray(value))return value.map(canonical);
+  return Object.fromEntries(Object.keys(value).sort()
+    .map(key=>[key,canonical(value[key])]));
+}
+export function fingerprintApprovedWorkItem(item){
+  if(!item||typeof item!=='object'||Array.isArray(item)||
+     typeof item.work_item_id!=='string'||!item.work_item_id||
+     typeof item.workflow_id!=='string'||!item.workflow_id||
+     typeof item.connector!=='string'||!item.connector||
+     typeof item.operation!=='string'||!item.operation)
+    throw Error('ACTION_APPROVAL_EXACT_WORK_ITEM_REQUIRED');
+  const bound={
+    work_item_id:item.work_item_id,workflow_id:item.workflow_id,
+    connector:item.connector,operation:item.operation,
+    action:item.action??null,inputs:item.inputs??null,
+    resource:item.resource??null,
+    consequential:item.consequential===true,
+  };
+  return 'sha256:'+crypto.createHash('sha256')
+    .update(JSON.stringify(canonical(bound))).digest('hex');
+}
+
 export function createAuthorityPolicy({
   principalId, mode = 'manual', scopes = [], expiresAt = null, enabled = true, approvedBy = null
 } = {}) {
   if (!principalId) throw new Error('AUTHORITY_PRINCIPAL_REQUIRED');
   if (!['manual','auto'].includes(mode)) throw new Error('AUTHORITY_MODE_INVALID');
-  if (mode === 'auto' && !list(scopes).length) throw new Error('AUTO_AUTHORITY_SCOPE_REQUIRED');
+  if (mode === 'auto' && (!list(scopes).length||
+    scopes.some(s=>!s?.work_item_id||
+      !/^sha256:[0-9a-f]{64}$/.test(s.work_item_fingerprint||''))))
+    throw new Error('AUTO_AUTHORITY_EXACT_WORK_ITEM_AND_FINGERPRINT_REQUIRED');
   return Object.freeze({
     authority_version: REALITY_AUTHORITY_VERSION,
     policy_id: id('authority_policy', [principalId, mode, scopes, expiresAt]),
@@ -35,6 +65,7 @@ export function createAuthorityPolicy({
       operation: s.operation,
       resource: s.resource || null,
       work_item_id: s.work_item_id || null,
+      work_item_fingerprint:s.work_item_fingerprint||null,
     })),
     expires_at: expiresAt,
     approved_by: approvedBy || principalId,
@@ -48,7 +79,8 @@ export function scopeMatches(policy, workItem) {
   return policy.scopes.some(s =>
     s.connector === workItem.connector &&
     s.operation === workItem.operation &&
-    (!s.work_item_id || s.work_item_id === workItem.work_item_id) &&
+    s.work_item_id === workItem.work_item_id &&
+    s.work_item_fingerprint === fingerprintApprovedWorkItem(workItem) &&
     (!s.resource || s.resource === workItem.resource || s.resource === workItem.inputs?.resource || s.resource === workItem.inputs?.repository)
   );
 }
