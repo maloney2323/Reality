@@ -1083,14 +1083,15 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
      p.execution_authorized!==false||
      !['LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED',
        'NO_LATER_VERIFIED_SUCCESS_IN_BOUNDED_PROVIDER_WINDOW'].includes(p.status))
-   throw Error('Fresh original-work verification unavailable');
+   throw Error(/^RECOVERY_[A-Z0-9_]{4,100}$/.test(String(p.error_code||''))?
+    p.error_code:'RECOVERY_READBACK_UNAVAILABLE');
   const passed=p.later_success&&
    /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(
     String(p.later_success.run_url||''))?
    p.later_success.run_url:null;
   if(feedback){
    feedback.textContent=p.status==='LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED'?
-    'Verified: a later run of the same GitHub workflow passed. This does NOT yet prove the repair root cause or job completion.':
+    'Verified: a later run of the same GitHub workflow passed on the preview branch. This does NOT yet prove the root cause or original job completion.':
     'No matching later CI success verified. The repair remains unfinished.';
    if(passed){
     feedback.appendChild(document.createTextNode(' '));
@@ -1100,8 +1101,11 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
     feedback.appendChild(link);
    }
   }
- }catch{
-  if(feedback)feedback.textContent='Could not independently verify the repair. No upgrade or external action was executed.';
+ }catch(error){
+  if(feedback)feedback.textContent='Could not verify the saved repair evidence ('+
+   (/^RECOVERY_[A-Z0-9_]{4,100}$/.test(String(error?.message||''))?
+    error.message:'RECOVERY_READBACK_UNAVAILABLE')+
+   '). No upgrade or external action was executed.';
  }finally{button.disabled=false}
 });
 
