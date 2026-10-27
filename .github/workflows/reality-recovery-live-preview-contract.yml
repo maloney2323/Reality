@@ -6,6 +6,8 @@ on:
     paths:
       - 'src/reality-personal-recovery-checkpoint-v0.1.js'
       - 'api/reality/personal-recovery.js'
+      - 'api/reality/personal-completion-reports.js'
+      - 'test/reality-completion-report-v0.1.test.js'
       - 'test/reality-personal-recovery-checkpoint-v0.1.test.js'
       - 'index.html'
       - '.github/workflows/reality-recovery-live-preview-contract.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'src/reality-personal-recovery-checkpoint-v0.1.js'
       - 'api/reality/personal-recovery.js'
+      - 'api/reality/personal-completion-reports.js'
+      - 'test/reality-completion-report-v0.1.test.js'
       - 'test/reality-personal-recovery-checkpoint-v0.1.test.js'
       - 'index.html'
       - '.github/workflows/reality-recovery-live-preview-contract.yml'
@@ -28,4 +32,4 @@ jobs:
         with:
           node-version: '22'
       - name: Non-authorizing recovery checkpoint, route and UI tests
-        run: node --test test/reality-personal-recovery-checkpoint-v0.1.test.js
+        run: node --test test/reality-personal-recovery-checkpoint-v0.1.test.js test/reality-completion-report-v0.1.test.js
