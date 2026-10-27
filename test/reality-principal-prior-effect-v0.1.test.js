@@ -30,7 +30,7 @@ const previousOutcome={entity_type:'personal_issue_execution_outcome',
   work_id:previousWork,outcome_state:'UNRESOLVED',
   reservation_state:'UNCERTAIN',
  }};
-const newSource={entity_type:'personal_discovered_work_handoff',
+const newSource={event_id:randomUUID(),entity_type:'personal_discovered_work_handoff',
  provenance:{principal_id:user},payload:{
   work_id:currentWork,work_key:key,authority:'NOT_GRANTED',
  }};
