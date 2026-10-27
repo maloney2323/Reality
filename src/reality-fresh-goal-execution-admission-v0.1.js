@@ -10,6 +10,8 @@ import { compareFreshAuthenticatedGoalForWork }
  from './reality-execution-goal-grounding-v0.1.js';
 import { verifyPersonalWorkGroundingProof }
  from './reality-personal-work-grounding-proof-v0.1.js';
+import { policyMatchesGoalBoundWork }
+ from './reality-personal-action-authority-v0.1.js';
 
 export const FRESH_GOAL_EXECUTION_ADMISSION_VERSION='reality-fresh-goal-execution-admission-v0.1';
 const nonempty=x=>typeof x==='string'&&x.length>0;
@@ -51,6 +53,12 @@ export function issueFreshGoalExecutionAdmission({
  });
  if(goal.status!=='FRESH_GOAL_BINDING_MATCHED')
   throw Error(goal.reason||'EXECUTION_GOAL_NOT_CURRENT');
+ // A previous generic or different-goal action policy MUST NOT be
+ // promoted into a new goal's execution authority.
+ if(!policyMatchesGoalBoundWork({
+  policy,workItem,binding:signedGoal.binding,principalId,
+  conversationId,
+ }))throw Error('EXECUTION_GOAL_BOUND_ACTION_POLICY_REQUIRED');
  const approval=verifyBoundExecutionApproval({
   proof:serverApprovalProof,workItem,authorization,
  });
