@@ -25,6 +25,7 @@ export async function prepareAuthenticatedPersonalExecution({
  session,conversationId,workItem,groundingProof,env=process.env,
  readGoal=readFreshPersonalGoalState,
  loadPolicy=null,
+ createPersistence=createUniversePostgresPersistence,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
     env.VERCEL_ENV!=='preview')
@@ -49,7 +50,7 @@ export async function prepareAuthenticatedPersonalExecution({
  });
  const policy=loadPolicy?await loadPolicy(session.user_id):
   await getAuthorityPolicy(session.user_id,
-   createUniversePostgresPersistence({...isolated}),
+   createPersistence({...isolated}),
    {matches:isExactPolicy});
  if(!policyMatchesGoalBoundWork({
   policy,workItem,binding:verified.binding,
