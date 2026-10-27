@@ -126,6 +126,12 @@ export function projectAutonomousShiftHome({events=[],config,principalId,scope}=
     shifts[0].payload.evidence_summary.discovered_work.length:0,
    recent_observation_count:Number.isSafeInteger(shifts[0].payload?.evidence_summary?.recent_observation_count)?
     shifts[0].payload.evidence_summary.recent_observation_count:null,
+   discovered_items:(Array.isArray(shifts[0].payload?.evidence_summary?.discovered_work)?
+    shifts[0].payload.evidence_summary.discovered_work:[]).slice(0,20).map(w=>({
+     title:String(w?.objective||w?.title||w?.work_key||'Untitled discovery').slice(0,180),
+     evidence_count:Array.isArray(w?.evidence_refs)?w.evidence_refs.length:0,
+     status:'DISCOVERED_NOT_EXECUTED'
+    })),
    full_shift_closed:false,verified_execution_count:0
   }:null,
   recent_shifts:shifts.length,work:rows,attention,
