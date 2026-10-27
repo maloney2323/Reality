@@ -246,23 +246,19 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const principal = getOrCreateSessionPrincipal(req, res);
 
-    // Legacy automatic self-build is not authorized by natural-language verbs,
-    // a generic session cookie, or a supplied authorization_id.
-    // Block BEFORE model generation, repository reads or external writes.
-    if (typeof body.message === 'string' &&
-        /^(build|create|implement|add|make|fix|modify|change)\\b/i.test(body.message.trim())) {
+    // Legacy natural-language self-build is NOT an action approval. Stop
+    // before any OpenAI build-generation call or GitHub provider write.
+    if (isChatBuildRequest(body.message)) {
       return res.status(403).json({
-        ok: false, status: 'BLOCKED',
-        error: 'CHAT_BUILD_DIRECT_EXECUTION_DISABLED',
-        blocked_reason: 'AUTHENTICATED_GOAL_BOUND_SINGLE_USE_EXECUTION_REQUIRED',
-        external_action_performed: false,
-        paid_model_call_performed: false,
-        branch_created: false,
-        pull_request_opened: false,
+        ok:false,status:'BLOCKED',
+        error:'CHAT_BUILD_DIRECT_EXECUTION_DISABLED',
+        blocked_reason:'AUTHENTICATED_GOAL_BOUND_SINGLE_USE_EXECUTION_REQUIRED',
+        external_action_performed:false,
+        paid_model_call_performed:false,
+        branch_created:false,pull_request_opened:false,
       });
     }
 
-    // Never silently proceed as if no conversation existed after provider failure.
     const realityContext = await loadRealityContext(req, body);
 
     const worldObservations = await observeConnectedWorld();
