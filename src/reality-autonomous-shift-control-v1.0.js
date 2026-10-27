@@ -117,6 +117,17 @@ export function projectAutonomousShiftHome({events=[],config,principalId,scope}=
  return {status:shifts.length?'RECORDED':'NO_RECORDED_SHIFT',
   latest_shift_at:shifts[0]?.assertion_time||null,
   latest_tick_id:shifts[0]?.payload?.tick_id||null,
+  latest_cycle:shifts[0]?{
+   tick_id:shifts[0].payload.tick_id,
+   source_event_id:shifts[0].event_id,
+   observed_at:shifts[0].assertion_time,
+   phase:shifts[0].payload?.phase||null,
+   discovered_work_count:Array.isArray(shifts[0].payload?.evidence_summary?.discovered_work)?
+    shifts[0].payload.evidence_summary.discovered_work.length:0,
+   recent_observation_count:Number.isSafeInteger(shifts[0].payload?.evidence_summary?.recent_observation_count)?
+    shifts[0].payload.evidence_summary.recent_observation_count:null,
+   full_shift_closed:false,verified_execution_count:0
+  }:null,
   recent_shifts:shifts.length,work:rows,attention,
   verified_execution_count:0,
   verification_note:'Saved autonomous discovery is not proof of completed work or authorization',
