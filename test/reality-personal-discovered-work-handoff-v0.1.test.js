@@ -272,3 +272,38 @@ test('Home explains missing owner goal and gives a direct navigation action',()=
  assert.ok(html.includes("No work was authorized or executed"));
  assert.ok(html.includes('DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION'));
 });
+
+test('Home guides account, active goal, source review and one explicit required checkbox',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes('Approval setup · required steps'));
+ for(const name of ['Private sign-in · Required',
+  'Confirmed active goal · Required','Source and exact action review · Required',
+  'Explicit approval · Required'])
+   assert.ok(html.includes(name),name);
+ assert.ok(html.includes('id="privateGoalText" required minlength="12" maxlength="700"'));
+ assert.ok(html.includes('id="privateEmail" type="email" required'));
+ assert.ok(html.includes('id="privatePassword" type="password" required'));
+ assert.ok(html.includes("goalField.reportValidity()"));
+ assert.ok(html.includes("checkbox.type='checkbox';checkbox.required=true"));
+ assert.ok(html.includes("approve.disabled=true"));
+ assert.ok(html.includes("checkbox.onchange=()=>{approve.disabled=!checkbox.checked;}"));
+ assert.ok(html.includes("if(!checkbox.checked||!checkbox.checkValidity())return"));
+ assert.ok(html.includes("cancel.onclick=()=>"));
+ assert.ok(html.includes("Go to confirmed objective"));
+ assert.ok(html.includes("Approved · Dispatch not enabled"));
+});
+test('Home checks signed-in goal before preparing source work and never silently executes',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const sign=html.indexOf("if($('privateReady')?.style.display!=='block'");
+ const goal=html.indexOf("const goalR=await fetch('/api/reality/personal-goals?");
+ const prepare=html.indexOf("const prepared=await post('/api/reality/personal-discovered-work'");
+ const approval=html.indexOf("const approved=await post('/api/reality/personal-action-authority'");
+ const consent=html.indexOf("approve.onclick=async()=>");
+ assert.ok(sign>=0&&sign<goal&&goal<prepare&&prepare<consent&&consent<approval);
+ assert.equal(html.includes("post('/api/reality/personal-execution-admission',{\n        intent:'RESERVE'"),false);
+ assert.equal(html.includes("post('/api/reality/execute'"),false);
+ assert.ok(html.includes('No external action performed'));
+ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script));
+});
