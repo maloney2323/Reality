@@ -113,6 +113,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-diagnostic{display:flex;align-items:center;flex-wrap:wrap;gap:11px;background:#172437;border:1px solid #344b67;border-radius:11px;padding:10px 12px;margin:14px 0}
 .wc-diagnostic button{flex:none;padding:9px 13px;margin:0;font-size:12px;background:#d7e8f9;color:#122131}
 .wc-diagnostic span{color:#b8cadd;font-size:12px;line-height:1.5;flex:1;min-width:180px}
+.wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
+.wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
+.wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -713,6 +716,156 @@ const workCategories=[
 ];
 let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
 let wcSort='triage';
+let wcJobStarting=false;
+const wcJobAttemptLocked=new Set();
+let wcJobProgress={workId:null,message:'',verifiedIssueUrl:null};
+function wcEligibleForDirectStart(w){
+ return w?.kind==='SYSTEM_MAINTENANCE' &&
+  /^work:[0-9a-f]{32}$/.test(String(w.work_id||'')) &&
+  w.authorization_required===true &&
+  w.execution_work_item?.connector==='github' &&
+  w.execution_work_item?.operation==='create_issue';
+}
+function wcJobStatus(workId,message,verifiedIssueUrl=null){
+ wcJobProgress={workId,message,verifiedIssueUrl};
+ wcRender();
+}
+// This is a compact interface to EXISTING goal, source, policy, admission,
+// and single-use execution contracts. Selection alone never conveys authority.
+// Only known, exact GitHub tracking-issue actions can be dispatched here.
+async function wcAuthorizeAndStart(workId){
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ const w=selected.length===1?selected[0]:null;
+ if(wcJobStarting||!w||wcKey(w)!==workId||
+    !wcEligibleForDirectStart(w)||
+    wcStatuses.get(w.work_id)==='PRIOR'||
+    wcStatuses.get(w.work_id)==='ERROR'||
+    wcJobAttemptLocked.has(workId))return;
+ wcJobStarting=true;
+ let providerDispatchRequested=false;
+ const post=async(path,payload)=>{
+  const response=await fetch(path,{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},body:JSON.stringify(payload)
+  });
+  const result=await response.json();
+  if(!response.ok||!result.ok)
+   throw Error(String(result.error||'AUTHORIZATION_OR_EXECUTION_BLOCKED'));
+  return result;
+ };
+ try{
+  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+  if($('privateReady')?.style.display!=='block'||
+     !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))
+   throw Error('Sign in to your private Reality conversation first.');
+  wcJobStatus(workId,'Checking live authorization, current goal and previous attempts. No action yet.');
+  const configResponse=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const config=await configResponse.json();
+  if(!configResponse.ok||!config.ok||
+     config.status!=='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED')
+   throw Error('GitHub execution adapter is not verified in this preview. No action performed.');
+  const goalResponse=await fetch('/api/reality/personal-goals?conversation_id='+
+   encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+  const goal=await goalResponse.json();
+  const active=goal?.goal_state;
+  if(!goalResponse.ok||!goal.ok||!active?.active_goal_id||
+     active.active_goal?.goal_id!==active.active_goal_id||
+     active.active_goal?.status!=='ACTIVE'||active.active_goal?.user_confirmed!==true)
+   throw Error('A confirmed active goal is required before starting a job.');
+  const prior=await post('/api/reality/personal-issue-dispatch',{
+   intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  if(prior.previously_attempted===true){
+   wcStatuses.set(w.work_id,'PRIOR');
+   throw Error('Earlier provider attempt is locked. Use read-only Execution recovery; do not retry.');
+  }
+  if(prior.status!=='NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED'||
+     prior.can_request_new_approval!==true)
+   throw Error('Could not verify safe execution history. No action authorized.');
+  const prepared=await post('/api/reality/personal-discovered-work',{
+   intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  const exact=prepared.work_item;
+  if(prepared.status!=='DISCOVERED_WORK_GOAL_GROUNDED_PENDING_APPROVAL'||
+     prepared.discovered_work_id!==w.work_id||
+     exact?.work_item_id!==w.work_id||
+     exact?.connector!=='github'||exact?.operation!=='create_issue'||
+     exact.inputs?.repository!=='maloney2323/Reality'||
+     typeof exact.inputs?.title!=='string'||
+     typeof exact.inputs?.body!=='string'||
+     !prepared.grounding_proof||!prepared.work_fingerprint||
+     !prepared.continuity_receipt_id||prepared.external_action_performed!==false)
+   throw Error('The server did not establish one exact, verified, source-backed GitHub action.');
+  // Confirm AFTER authenticated source/goal reobservation, with the full
+  // server-prepared action visible. This confirmation is for a GitHub issue,
+  // not an assertion that Reality repaired the underlying defect.
+  const consent='Authorize and START this EXACT action now?\n\n'+
+   'Create ONE GitHub tracking issue (not a code fix).\n'+
+   'Repository: '+exact.inputs.repository+'\n'+
+   'Title: '+exact.inputs.title+'\n\n'+
+   'Complete issue body:\n'+exact.inputs.body+'\n\n'+
+   'An unresolved provider attempt must not be retried. Press OK to authorize and dispatch once, or Cancel to leave unapproved.';
+  wcJobStatus(workId,'Exact job prepared. Your final approval is required; no GitHub action yet.');
+  if(!window.confirm(consent)){
+   wcJobStatus(workId,'Cancelled. No approval recorded and no external action performed.');
+   return;
+  }
+  const approved=await post('/api/reality/personal-action-authority',{
+   conversation_id:conv,work_item:exact,
+   grounding_proof:prepared.grounding_proof,
+   confirmation:'APPROVE_THIS_EXACT_WORK_ITEM'
+  });
+  if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+     !approved.policy_id||approved.external_action_performed!==false)
+   throw Error('Exact goal-bound approval could not be verified. No dispatch.');
+  const admitted=await post('/api/reality/personal-execution-admission',{
+   intent:'CHECK',conversation_id:conv,work_item:exact,
+   grounding_proof:prepared.grounding_proof
+  });
+  if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
+     admitted.action_policy_id!==approved.policy_id||
+     admitted.work_item_fingerprint!==prepared.work_fingerprint||
+     admitted.external_action_performed!==false)
+   throw Error('Authorization changed or admission failed. No dispatch.');
+  const ready=await post('/api/reality/personal-issue-dispatch',{
+   intent:'CHECK',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  if(ready.status!=='EXACT_SOURCE_AND_USER_APPROVAL_ADMITTED'||
+     ready.work_fingerprint!==prepared.work_fingerprint)
+   throw Error('Live execution preflight rejected the approved work. No dispatch.');
+  wcJobStatus(workId,'Authorized. Dispatching ONE exact GitHub issue; verifying provider and Continuity readback…');
+  // From here an HTTP error can mean GitHub ran. Never automatically retry.
+  providerDispatchRequested=true;
+  wcJobAttemptLocked.add(workId);
+  const result=await post('/api/reality/personal-issue-dispatch',{
+   intent:'RUN',conversation_id:conv,discovered_work_id:w.work_id,
+   confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE'
+  });
+  if(result.status==='VERIFIED'&&result.verified===true&&
+     /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(result.provider_issue_url||''))&&
+     result.outcome_receipt_id&&result.reservation_id){
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Verified: one GitHub tracking issue created and outcome saved in Continuity. The underlying repair is NOT completed. Receipt: '+result.outcome_receipt_id,
+    result.provider_issue_url);
+  }else{
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Execution outcome '+String(result.status||'UNVERIFIED')+
+    '. Do not retry. Review read-only Execution recovery and the reservation receipt.');
+  }
+ }catch(e){
+  if(providerDispatchRequested){
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Outcome not verified; provider dispatch may have happened. Do NOT retry. Use Execution recovery · Read only. '+String(e.message||'Dispatch unknown'));
+  }else{
+   wcJobStatus(workId,'Not started: '+String(e.message||'Preflight failed')+
+    '. No provider dispatch requested. Correct the requirement before trying again.');
+  }
+ }finally{
+  wcJobStarting=false;
+  wcRender();
+ }
+}
 let wcCoverage={},wcCatalogStatus='NOT_CHECKED';
 const wcKey=w=>String(w.finding_id||w.work_id||'');
 const wcNeedsSource=id=>({customer:'customer_feedback',operations:'business_operations',research:'external_research'}[id]||null);
@@ -964,7 +1117,23 @@ function wcRender(){
    ' · Priority and time returned: unverified.</p>'+
    src.map((u,j)=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+
      '">Evidence '+(j+1)+'</a></div>').join('')+
-   '<p>'+esc(history)+'. A selection is only a plan draft.</p></details></div>';
+   '<p>'+esc(history)+'. A selection is only a plan draft.</p></details>'+
+   (wcPicked.size===1&&wcPicked.has(wcKey(w))?
+    '<div class="wc-direct-action">'+
+    '<button type="button" class="wc-plan-button" data-wc-start="'+esc(wcKey(w))+'" '+
+     (wcJobStarting||wcJobAttemptLocked.has(wcKey(w))||
+      status==='PRIOR'||status==='ERROR'||!wcEligibleForDirectStart(w)?'disabled':'')+'>'+
+     esc(wcJobStarting&&wcJobProgress.workId===wcKey(w)?'Checking / running job…':
+      wcJobAttemptLocked.has(wcKey(w))||status==='PRIOR'?'Attempt locked · Reconcile':
+      wcEligibleForDirectStart(w)?'Authorize & Start Job':'Executable job plan required')+'</button>'+
+    '<p class="wc-note">'+esc(wcEligibleForDirectStart(w)?
+      'Current supported action: create one source-backed GitHub tracking issue. This does not repair the defect.':
+      'This is a finding, not a runnable job yet. No external action is defined or authorized.')+'</p>'+
+    (wcJobProgress.workId===wcKey(w)?
+      '<p class="wc-feedback" role="status" aria-live="polite">'+esc(wcJobProgress.message)+'</p>'+
+      (wcJobProgress.verifiedIssueUrl?
+       '<a target="_blank" rel="noopener noreferrer" href="'+esc(wcJobProgress.verifiedIssueUrl)+'">View verified GitHub issue</a>':''):
+      '')+'</div>':'')+'</div>';
  }).join(''):'<div class="attention-empty">'+
   esc(unconnected?'This business data source is not connected. Zero is NOT a no-opportunity conclusion.':
   wcCatalogStatus==='PARTIAL'?'Discovery was partial; no findings in this category from successfully checked sources.':
@@ -973,7 +1142,10 @@ function wcRender(){
   const w=shown[Number(c.dataset.wcTask)];
   if(!w)return;
   if(c.checked)wcPicked.add(wcKey(w));else wcPicked.delete(wcKey(w));
-  wcPaintSummary();
+  wcRender();
+ });
+ $('wcTaskList').querySelectorAll('[data-wc-start]').forEach(b=>b.onclick=()=>{
+  void wcAuthorizeAndStart(b.dataset.wcStart);
  });
  wcPaintSummary();
 }
