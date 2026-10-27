@@ -6,7 +6,8 @@ import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
 import {validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {verifyPersonalGithubIssueToken}
  from '../../src/reality-personal-github-execution-bridge-v0.1.js';
-import {preparePersonalIssueDispatch,runPersonalIssueDispatch}
+import {preparePersonalIssueDispatch,runPersonalIssueDispatch,
+ inspectPersonalIssueAttemptsReadOnly}
  from '../../src/reality-personal-issue-dispatch-v0.1.js';
 export const maxDuration=60;
 export default async function handler(req,res){
@@ -67,6 +68,15 @@ export default async function handler(req,res){
     approval_policy_id:p.action_policy_id,
     credential_configured:Boolean(process.env.REALITY_GITHUB_TOKEN),
     external_action_performed:false});
+  }
+  if(b.intent==='RECONCILE'){
+   if(b.confirmation!==undefined)
+    return res.status(400).json({ok:false,error:'RECONCILIATION_IS_READ_ONLY'});
+   const inspected=await inspectPersonalIssueAttemptsReadOnly({
+    session,conversationId:b.conversation_id,
+    discoveredWorkId:b.discovered_work_id,
+   });
+   return res.status(200).json({ok:true,...inspected});
   }
   if(b.intent!=='RUN'||b.confirmation!=='EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE')
    return res.status(400).json({ok:false,error:'DISPATCH_NEW_EXPLICIT_USER_CONFIRMATION_REQUIRED'});
