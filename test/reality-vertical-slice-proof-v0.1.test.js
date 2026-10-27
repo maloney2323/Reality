@@ -19,6 +19,8 @@ import {createPersonalGithubIssueBridge,checkForExistingMaintainerIssue}
  from '../src/reality-personal-github-execution-bridge-v0.1.js';
 import {fingerprintApprovedWorkItem}
  from '../src/reality-authority-v1.0.js';
+import {deriveNextEvidenceBoundImprovement,recordNextEvidenceBoundImprovement}
+ from '../src/reality-verified-improvement-handoff-v0.1.js';
 
 const project='hvkfreoagbrphwghjajw',url='https://'+project+'.supabase.co';
 const env={
@@ -239,8 +241,54 @@ test('SINGLE CONTIGUOUS vertical slice: source discovery → confirmed goal → 
  assert.equal(outcome.payload.independently_verified,true);
  assert.equal(outcome.payload.reservation_state,'VERIFIED');
  assert.equal(outcome.payload.source_receipt_id,handoff.continuity_receipt_id);
+ const next=deriveNextEvidenceBoundImprovement({
+  history:reconstructed,workId,
+ });
+ assert.equal(next.verified_outcome_receipt_id,result.outcome_receipt_id);
+ assert.equal(next.status,'PROPOSED_REQUIRES_INDEPENDENT_TEST_AND_USER_APPROVAL');
+ assert.equal(next.underlying_failure_repaired,false);
+ assert.equal(next.improvement_applied,false);
+ assert.equal(next.customer_business_value_verified,false);
+ assert.equal(next.authority,'NOT_GRANTED');
+ const persistedLearning=await recordNextEvidenceBoundImprovement({
+  session,conversationId,workId,env,
+  persistenceFactory:()=>s.continuityStore,
+ });
+ assert.equal(persistedLearning.receipt_id,next.proposal_id);
+ assert.equal(persistedLearning.already_recorded,false);
+ const idempotentLearning=await recordNextEvidenceBoundImprovement({
+  session,conversationId,workId,env,
+  persistenceFactory:()=>s.continuityStore,
+ });
+ assert.equal(idempotentLearning.receipt_id,next.proposal_id);
+ assert.equal(idempotentLearning.already_recorded,true);
+ const finalHistory=orderContinuityHistory(await s.continuityStore.reconstruct());
+ const learning=finalHistory.find(x=>x.event_id===next.proposal_id);
+ assert.equal(learning.event_kind,'LEARNING');
+ assert.equal(learning.payload.authority,'NOT_GRANTED');
+ assert.equal(learning.payload.improvement_tested,false);
+ assert.equal(learning.payload.improvement_applied,false);
+ assert.equal(learning.payload.customer_business_value_verified,false);
  await assert.rejects(prepare({
   session,conversationId,discoveredWorkId:workId,env,
  }),/PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY/);
  assert.equal(s.stats().providerWrites,1);
+});
+
+test('unverified or absent provider outcome cannot generate an improvement claim',async()=>{
+ const s=storeFixture();
+ assert.throws(()=>deriveNextEvidenceBoundImprovement({
+  history:await s.continuityStore.reconstruct(),workId,
+ }),/IMPROVEMENT_ONE_VERIFIED_OUTCOME_REQUIRED/);
+ const tainted=[...(await s.continuityStore.reconstruct()),{
+  entity_type:'personal_issue_execution_outcome',event_kind:'OUTCOME',
+  epistemic_status:'UNKNOWN',event_id:randomUUID(),payload:{
+   work_id:workId,outcome_state:'UNRESOLVED',
+   independently_verified:false,reservation_state:'UNCERTAIN',
+   provider_issue_url:null,
+  },
+ }];
+ assert.throws(()=>deriveNextEvidenceBoundImprovement({
+  history:tainted,workId,
+ }),/IMPROVEMENT_INDEPENDENTLY_VERIFIED_EXECUTION_REQUIRED|RELIABILITY_/);
 });
