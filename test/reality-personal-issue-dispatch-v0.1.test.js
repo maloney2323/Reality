@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue,verifyPersonalGithubIssueToken}
+import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue,verifyPersonalGithubIssueToken,inspectMatchingGithubIssueReadOnly}
  from '../src/reality-personal-github-execution-bridge-v0.1.js';
 import {runPersonalIssueDispatch,assertPersonalDispatchEnvironment,assertNoPriorPersonalIssueAttempt}
  from '../src/reality-personal-issue-dispatch-v0.1.js';
@@ -280,4 +280,84 @@ test('previous unresolved work cannot expose another live Run control in UI',()=
  const preflight=html.indexOf("intent:'CHECK',conversation_id:conversationId,discovered_work_id:workId");
  const checkbox=html.indexOf("checked.type='checkbox';checked.required=true");
  assert.ok(preflight>=0&&preflight<checkbox);
+});
+
+test('historical GitHub reconciliation reads closed and open issues without ANY writes',async()=>{
+ const calls=[];const repository='https://github.com/maloney2323/Reality/issues/163';
+ const get=async path=>{
+  calls.push(path);
+  if(path==='/repos/maloney2323/Reality/issues?state=all&per_page=100&page=1')
+   return [{number:163,id:333,title:item.inputs.title,body:item.inputs.body,state:'closed'}];
+  if(path==='/repos/maloney2323/Reality/issues/163')
+   return {number:163,id:333,title:item.inputs.title,body:item.inputs.body,
+    state:'closed',html_url:repository,created_at:'2026-10-27T17:00:00Z'};
+  throw Error('UNEXPECTED_PROVIDER_QUERY');
+ };
+ const r=await inspectMatchingGithubIssueReadOnly({workItem:item,get});
+ assert.deepEqual(calls,[
+  '/repos/maloney2323/Reality/issues?state=all&per_page=100&page=1',
+  '/repos/maloney2323/Reality/issues/163',
+ ]);
+ assert.equal(r.status,'EXACT_MATCH_OBSERVED_ATTRIBUTION_UNPROVEN');
+ assert.equal(r.matching_issues[0].url,repository);
+ assert.equal(r.verified_provider_effect,false);
+ assert.equal(r.causal_attribution_proven,false);
+ assert.equal(r.external_action_performed,false);
+ assert.equal(r.no_automatic_retry,true);
+});
+test('zero GitHub matches is ONLY absence observed, never proof of no prior effect',async()=>{
+ let calls=0;
+ const r=await inspectMatchingGithubIssueReadOnly({
+  workItem:item,get:async()=>{calls++;return []},
+ });
+ assert.equal(calls,1);
+ assert.equal(r.status,'NO_EXACT_MATCH_OBSERVED');
+ assert.equal(r.verified_provider_effect,false);
+ assert.equal(r.no_automatic_retry,true);
+});
+test('GitHub reconciliation fails closed on a potentially truncated 500-issue history',async()=>{
+ let count=0;
+ const r=await inspectMatchingGithubIssueReadOnly({
+  workItem:item,get:async()=>{count++;return Array.from({length:100},
+   (_,i)=>({number:(count-1)*100+i+1,title:'other issue'}));},
+ });
+ assert.equal(count,5);
+ assert.equal(r.status,'INCOMPLETE_PROVIDER_ISSUE_HISTORY');
+ assert.equal(r.verified_provider_effect,false);
+ assert.deepEqual(r.matching_issues,[]);
+});
+test('matching issue list but changed independent issue detail is not verified',async()=>{
+ const r=await inspectMatchingGithubIssueReadOnly({
+  workItem:item,
+  get:async p=>p.includes('/issues?')?[{id:5,number:15,
+   title:item.inputs.title,body:item.inputs.body}]:
+   {id:5,number:15,title:item.inputs.title,body:'provider changed body',
+    state:'open',html_url:'https://github.com/maloney2323/Reality/issues/15'},
+ });
+ assert.equal(r.status,'NO_EXACT_MATCH_OBSERVED');
+ assert.equal(r.verified_provider_effect,false);
+});
+test('read-only recovery endpoint cannot mint reservation, approval or perform GitHub write',()=>{
+ const source=readFileSync(new URL('../api/reality/personal-issue-dispatch.js',import.meta.url),'utf8');
+ const recover=source.indexOf("if(b.intent==='RECONCILE')");
+ const run=source.indexOf("if(b.intent!=='RUN'");
+ assert.ok(recover>0&&recover<run);
+ assert.ok(source.slice(recover,run).includes('inspectPersonalIssueAttemptsReadOnly'));
+ assert.ok(source.slice(recover,run).includes('RECONCILIATION_IS_READ_ONLY'));
+ assert.ok(!source.slice(recover,run).includes('runPersonalIssueDispatch('));
+ const service=readFileSync(new URL('../src/reality-personal-issue-dispatch-v0.1.js',import.meta.url),'utf8');
+ const section=service.slice(service.indexOf('export async function inspectPersonalIssueAttemptsReadOnly('),
+  service.indexOf('export async function preparePersonalIssueDispatch('));
+ assert.ok(section.includes('orderContinuityHistory('));
+ assert.ok(section.includes("e.entity_type==='personal_issue_execution_outcome'"));
+ assert.ok(section.includes('inspectGithub({workItem:exact})'));
+ assert.ok(!section.includes('reserveAuthenticatedPersonalExecution('));
+ assert.ok(!section.includes('executeAuthorizedWork('));
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes('id="reconcileHistory"'));
+ assert.ok(html.includes("intent:'RECONCILE',conversation_id:conv"));
+ assert.ok(html.includes('Historical reservations remain locked'));
+ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script));
 });
