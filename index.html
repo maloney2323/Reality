@@ -626,6 +626,23 @@ function renderWork(source){
           throw Error(data.error||data.reason||'Reality refused the requested operation');
         return data;
       }
+      // Review historical effects BEFORE saving another work handoff or
+      // inviting another approval. A changed discovery ID or conversation
+      // cannot re-arm earlier UNCERTAIN work.
+      const prior=await post('/api/reality/personal-issue-dispatch',{
+        intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id,
+      });
+      if(prior.status==='PREVIOUS_PROVIDER_ATTEMPT_REQUIRES_RECONCILIATION'&&
+         prior.previously_attempted===true){
+        setWorkStep(card,3,'blocked','Prior provider attempt · Reconciliation required');
+        setWorkStep(card,4,'blocked','Approval unavailable · Previous attempt locked');
+        receipt.textContent='Reality found a previous provider attempt for this same recurring workflow. It cannot be safely retried under a new work ID or conversation. Use Execution recovery · Read only. No external action performed.';
+        btn.textContent='Previously attempted · Do not retry';
+        return;
+      }
+      if(prior.status!=='NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED'||
+         prior.can_request_new_approval!==true)
+        throw Error('Reality cannot establish a safe new work candidate from its prior execution history.');
       const prepared=await post('/api/reality/personal-discovered-work',{
         intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id,
       });
