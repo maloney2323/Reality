@@ -463,3 +463,118 @@ export function withheldAssistantDirectionAnswer({canonicalFrame}={}){
   'Please confirm how you want to proceed if the direction is different.',
  ].join(' ');
 }
+
+
+/**
+ * Three-contract Integrity linkage at the FINAL conversational publication seam.
+ *
+ * A generated proposal, provisional transition, and reviewer can never
+ * authorize a goal change. The only authenticated goal state is the
+ * independently projected, source-attested user-command ledger captured in
+ * the canonical frame. This contract binds it to the exact original and
+ * released text and the fresh user-goal readback.
+ *
+ * Deterministic agreement of references is not independent semantic proof.
+ * A withheld answer is deliberately represented as a safe REPLACEMENT notice.
+ */
+export function compileGoalPublicationIntegrityProof({
+ canonicalFrame,goalState,goalTransition,assistantProposal,
+ assistantDecision,finalDirectionRelease,publicationGoalFreshness=null,
+ originalAnswer,releasedAnswer,
+}={}){
+ const frame=canonicalFrame;
+ required(valid(frame?.frame_hash)&&valid(frame?.continuity_root_id)&&
+   valid(frame?.current_user_packet_id)&&valid(goalState?.goal_id)&&
+   valid(goalState?.provenance?.origin_turn_id),
+   'GOAL_PUBLICATION_PROOF_CANONICAL_STATE_REQUIRED');
+ required(goalState?.world_id===frame.world_id&&
+   goalState?.permits_external_execution===false&&
+   frame.controlling_user_goal_state_contract?.goal_id===goalState.goal_id&&
+   frame.controlling_user_goal_state_contract?.provenance?.origin_turn_id===
+     goalState.provenance.origin_turn_id,
+   'GOAL_PUBLICATION_PROOF_CONTROLLING_GOAL_MISMATCH');
+ required(goalTransition?.goal_id===goalState.goal_id&&
+   goalTransition?.turn_id===frame.current_user_packet_id&&
+   goalTransition?.authorization_state!=='GRANTED'&&
+   goalTransition?.grants_goal_mutation===false&&
+   goalTransition?.grants_external_execution===false,
+   'GOAL_PUBLICATION_PROOF_TRANSITION_AUTHORITY_ESCALATION');
+ required(assistantProposal?.target_goal_id===goalState.goal_id&&
+   assistantProposal?.target_turn_id===frame.current_user_packet_id&&
+   assistantProposal?.goal_mutation_authorized===false&&
+   assistantProposal?.action_execution_authorized===false&&
+   assistantDecision?.proposal_id===assistantProposal.proposal_id&&
+   assistantDecision?.goal_id===goalState.goal_id&&
+   assistantDecision?.authorized_goal_mutations===0&&
+   assistantDecision?.external_actions_authorized===false,
+   'GOAL_PUBLICATION_PROOF_ASSISTANT_AUTHORITY_ESCALATION');
+ required(typeof originalAnswer==='string'&&valid(originalAnswer)&&
+   typeof releasedAnswer==='string'&&valid(releasedAnswer)&&
+   finalDirectionRelease?.canonical_frame_hash===frame.frame_hash&&
+   finalDirectionRelease?.current_user_packet_id===frame.current_user_packet_id&&
+   finalDirectionRelease?.original_answer_hash===digest(originalAnswer),
+   'GOAL_PUBLICATION_PROOF_ORIGINAL_OR_SCOPE_INVALID');
+ // If the first/final candidate was rejected, ONLY the exact deterministic
+ // source-linked safe notice may enter the ledger. A different AI-generated
+ // text cannot masquerade as the withheld answer.
+ const refused=finalDirectionRelease.candidate_answer_release_allowed===false;
+ if(refused)required(
+   releasedAnswer===withheldAssistantDirectionAnswer({canonicalFrame:frame}),
+   'GOAL_PUBLICATION_PROOF_BLOCKED_TEXT_NOT_WITHHELD');
+ const fresh=publicationGoalFreshness;
+ if(fresh)required(
+   fresh.continuity_root_id===frame.continuity_root_id&&
+   fresh.world_id===frame.world_id&&
+   fresh.generated_answer_may_rely_on_stale_goal===
+     (fresh.status!=='USER_GOAL_SNAPSHOT_CURRENT')&&
+   fresh.goal_state_mutated_by_assistant===false&&
+   fresh.external_execution_authorized===false,
+   'GOAL_PUBLICATION_PROOF_FRESHNESS_MISMATCH');
+ // An explicit signed goal command recorded mid-generation outranks the old
+ // frame. Its stale-context hold text must not be silently replaced with a
+ // suggestion. If a subsequent Integrity refusal has already taken priority,
+ // accept only that exact deterministic withholding notice.
+ const stale=Boolean(fresh?.generated_answer_may_rely_on_stale_goal);
+ if(stale&&!refused)required(
+   releasedAnswer.startsWith(
+     'Reality held this response because your confirmed objective changed'),
+   'GOAL_PUBLICATION_PROOF_STALE_GOAL_CONTENT_RELEASE');
+ const auth=frame.authoritative_user_goals||null;
+ const controllingUserReceipt=auth?.active_goal?.last_transition_receipt_id||
+   (auth?.transition_count>0?auth?.recent_transition_receipts?.at(-1)?.event_id:null);
+ const untrustedChanges=assistantProposal.intended_state_mutations?.goal_mutations||[];
+ required(Array.isArray(untrustedChanges)&&
+   untrustedChanges.every(x=>x.authorized_by==='ASSISTANT_PROPOSAL'&&
+     x.authorization_state==='UNAUTHORIZED'&&x.target_goal_id===goalState.goal_id),
+   'GOAL_PUBLICATION_PROOF_PROPOSAL_ORIGIN_INVALID');
+ const proof={
+   version:GOAL_GOVERNANCE_CONTRACT_VERSION,
+   kind:'INTEGRITY_THREE_CONTRACT_PUBLICATION_PROOF',
+   continuity_root_id:frame.continuity_root_id,world_id:frame.world_id,
+   source_canonical_frame_hash:frame.frame_hash,
+   source_current_user_turn_id:frame.current_user_packet_id,
+   controlling_goal_id:goalState.goal_id,
+   controlling_user_source_ref:goalState.provenance.origin_turn_id,
+   authenticated_goal_authority_receipt_id:controllingUserReceipt||null,
+   authenticated_goal_state_present:Boolean(auth?.transition_count),
+   authoritative_transition_count:auth?.transition_count||0,
+   proposed_goal_transition_id:goalTransition.transition_id,
+   proposed_transition_authorization:goalTransition.authorization_state,
+   assistant_proposal_id:assistantProposal.proposal_id,
+   assistant_goal_mutations_blocked:untrustedChanges.length,
+   assistant_goal_boundary_status:assistantDecision.status,
+   final_direction_decision_hash:finalDirectionRelease.decision_hash,
+   direction_review_independently_verified:false,
+   canonical_publication_status:refused?
+     'BLOCKED_ASSISTANT_DIRECTION_REPLACED_WITH_USER_SOURCE_NOTICE':
+     stale?'STALE_USER_GOAL_REPLACED_WITH_NOTICE':
+     'CANDIDATE_REPLY_ADMITTED_NOT_INDEPENDENTLY_VERIFIED',
+   original_model_answer_hash:digest(originalAnswer),
+   exact_released_answer_hash:digest(releasedAnswer),
+   execution_authorized:false,
+   goal_state_mutations_authorized_by_model:0,
+   user_goal_mutation_executed:false,
+   independently_verified_goal_alignment:false,
+ };
+ return freeze({...proof,proof_hash:digest(proof)});
+}
