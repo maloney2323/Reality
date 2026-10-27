@@ -113,6 +113,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-diagnostic{display:flex;align-items:center;flex-wrap:wrap;gap:11px;background:#172437;border:1px solid #344b67;border-radius:11px;padding:10px 12px;margin:14px 0}
 .wc-diagnostic button{flex:none;padding:9px 13px;margin:0;font-size:12px;background:#d7e8f9;color:#122131}
 .wc-diagnostic span{color:#b8cadd;font-size:12px;line-height:1.5;flex:1;min-width:180px}
+.account-shortcut{display:inline-block;text-decoration:none;white-space:nowrap;font-weight:700;border-color:#5b7189;color:#eef5ff}
+#privateChat{scroll-margin-top:16px}
+#privateAccountState{font-size:14px;line-height:1.55;margin:8px 0 10px}
 .wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
 .wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
 .wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -120,7 +123,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 </head>
 <body>
 <main>
-  <div class="top"><div class="brand">REALITY</div><div class="state">GOVERNED CHAT · v0.1</div></div>
+  <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
   <h1>Reality · Let's get started</h1>
   <p class="sub">Follow these three steps. You do <strong>not</strong> need to type a Request for this test. Reality will find the work.</p>
   <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
@@ -149,9 +152,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
  <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
  <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
 </section>
-<section id="privateChat" style="display:none" class="console-card" aria-label="Persistent private Reality conversation">
- <div class="label">REALITY · PERSISTENT PERSONAL CONVERSATION (PREVIEW)</div>
- <h3>Continue the conversation</h3>
+<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation">
+ <div class="label">REALITY · ACCOUNT & PERSISTENT CONVERSATION (PREVIEW)</div>
+ <h3>Account · Sign in or continue</h3>
+ <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
+ <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
  <div id="privateLogin" style="display:none">
   <label for="privateEmail">Account email</label>
@@ -1536,6 +1541,11 @@ setInterval(refreshSavedShiftHome,300000);
   return id;
  }
  function showSignedIn(yes){
+  el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
+  el('privateAccountState').textContent=yes?
+   '✓ Signed in. Your conversation and goal controls are available below.':
+   'Sign in below using your existing Reality account.';
+  el('privateRetrySession').hidden=true;
   el('privateLogin').style.display=yes?'none':'block';
   el('privateReady').style.display=yes?'block':'none';
   guidedSetup.authenticated=yes;
@@ -1706,27 +1716,37 @@ setInterval(refreshSavedShiftHome,300000);
   await loadGoals();
  }
  async function init(){
+  // Never hide the account section when a preview auth check is slow,
+  // blocked or unavailable. No sign-in form is enabled until session
+  // endpoint availability has been confirmed.
+  el('privateAccountState').textContent='Checking secure account session…';
+  el('privateRetrySession').hidden=true;
+  el('privateLogin').style.display='none';
+  el('privateReady').style.display='none';
   try{
-   const r=await fetch(endpoint,{cache:'no-store'});
-   if(r.status===404){
-    guidedSetup.authenticated=false;
-    guidedSetup.accountError='Private sign-in is unavailable on this deployment.';
-    paintGuidedSetup();
-    return; // Preview-only feature; production remains unchanged.
-   }
-   el('privateChat').style.display='block';
-   if(!r.ok)throw Error('Private conversation service is unavailable.');
+   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)throw Error(r.status===404?
+    'Sign-in service is not installed on this preview (HTTP 404).':
+    'Sign-in service returned HTTP '+r.status+'.');
    const data=await r.json();
+   if(typeof data.authenticated!=='boolean')
+    throw Error('Sign-in service returned an unrecognized session response.');
    showSignedIn(data.authenticated===true);
    if(data.authenticated){await loadSaved();await loadConversations();}
-   else status('Sign in with your existing Supabase account to resume your conversation.');
+   else status('Sign in below with your existing account to resume your conversation.');
   }catch(e){
    guidedSetup.authenticated=false;
-   guidedSetup.accountError='Sign-in status unavailable: '+e.message;
+   guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
    paintGuidedSetup();
-   if(el('privateChat').style.display==='block')status(e.message);
+   el('accountShortcut').textContent='Account · Unavailable';
+   el('privateAccountState').textContent='Account connection unavailable: '+
+    String(e.message||'Please retry')+
+    ' The sign-in form stays disabled until the secure session can be checked. No job has started.';
+   el('privateRetrySession').hidden=false;
+   status('Sign-in unavailable. Check the message above or retry the connection.');
   }
  }
+ el('privateRetrySession').onclick=()=>{void init()};
  el('privateSignIn').onclick=async()=>{
   for(const id of ['privateEmail','privatePassword']){
     if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
