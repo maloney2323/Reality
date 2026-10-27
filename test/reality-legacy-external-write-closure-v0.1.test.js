@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {buildFromChat,isChatBuildRequest} from '../src/reality-chat-build-v1.0.js';
 import selfBuildRoute from '../api/reality/self-build.js';
 import githubWriteRoute from '../api/reality/connectors/github.js';
 
@@ -74,3 +76,21 @@ for(const [name,handler] of [
   assert.equal(r.headers.allow,'POST');
  });
 }
+
+test('chat auto-build cannot infer GitHub authority from requested action or forged authorization ref',async()=>{
+ for(const message of ['Build a feature','fix the failing workflow','create a pull request','Please build this']){
+  assert.equal(isChatBuildRequest(message),true);
+  await assert.rejects(
+   buildFromChat({message,requestedBy:'signed-cookie-only',authorizationRef:'forged:approval'}),
+   {message:'CHAT_BUILD_DIRECT_EXECUTION_DISABLED',status:403},
+  );
+ }
+});
+
+test('chat intelligence HTTP handler blocks direct self-build before any model or Github work',()=>{
+ const source=readFileSync(new URL('../api/reality/intelligence.js',import.meta.url),'utf8');
+ assert.ok(source.includes('if (isChatBuildRequest(body.message))'));
+ assert.ok(source.includes("error:'CHAT_BUILD_DIRECT_EXECUTION_DISABLED'"));
+ assert.ok(source.includes('paid_model_call_performed:false'));
+ assert.equal(source.includes('const build = await buildFromChat('),false);
+});
