@@ -10,6 +10,7 @@ const RUN_LINK=/^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/([1
 const ISSUE_LINK=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/;
 const WORK_ID=/^work:[a-f0-9]{32}$/;
 const ACCEPTED_NAME='Reality Governed Execution Engine v0.1';
+const PROOF_BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const fail=code=>{throw Error(code)};
 function getRunIdentity(data,id){
  if(!data||data.id!==id||data.repository?.full_name!==REPO||
@@ -56,26 +57,32 @@ export async function inspectOriginalWorkRepairEvidence({
   if(!r?.ok)fail('RECOVERY_GITHUB_READBACK_UNAVAILABLE');
   return r.json();
  };
- const observed=await Promise.all(ids.map(id=>get(ROOT+'/actions/runs/'+id)));
+ // Keep provider reads bounded and sequential: eight concurrent anonymous
+ // GitHub GETs can exceed public API secondary rate limits.
+ const observed=[];
+ for(const id of ids)observed.push(await get(ROOT+'/actions/runs/'+id));
  const failed=observed.map((d,i)=>getRunIdentity(d,ids[i]));
  const anchor=failed[0];
  if(failed.some(x=>x.workflow_id!==anchor.workflow_id||
-    x.head_branch!==anchor.head_branch||x.conclusion!=='failure'||
+    x.name!==anchor.name||x.conclusion!=='failure'||
     x.status!=='completed'))
   fail('RECOVERY_SOURCE_FAILURES_NOT_EQUIVALENT');
  const mostRecentFailure=Math.max(...failed.map(x=>Date.parse(x.created_at)));
+ // GitHub source failures may come from PR merge refs, a preview push,
+ // and feature branches. They are NOT necessarily one branch. Check the
+ // workflow's later success on the configured preview branch separately.
  const passList=await get(ROOT+'/actions/workflows/'+anchor.workflow_id+
-    '/runs?status=success&per_page=30&branch='+anchor.head_branch);
+    '/runs?status=success&per_page=30&branch='+PROOF_BRANCH);
  if(!Array.isArray(passList?.workflow_runs))
   fail('RECOVERY_SUCCESS_DISCOVERY_INVALID');
  const candidates=passList.workflow_runs.filter(x=>
   x?.workflow_id===anchor.workflow_id&&
   x?.repository?.full_name===REPO&&
-  x?.name===anchor.name&&x?.head_branch===anchor.head_branch&&
+  x?.name===anchor.name&&x?.head_branch===PROOF_BRANCH&&
   x?.status==='completed'&&x?.conclusion==='success'&&
   Number.isSafeInteger(x?.id)&&x.id>0&&
   Date.parse(x?.created_at)>mostRecentFailure&&
-  x?.head_sha!==anchor.head_sha&&
+  !failed.some(f=>f.head_sha===x.head_sha)&&
   x?.html_url==='https://github.com/'+REPO+'/actions/runs/'+x.id);
  candidates.sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
  let latestSuccess=null;
@@ -84,9 +91,9 @@ export async function inspectOriginalWorkRepairEvidence({
   const readback=getRunIdentity(await get(ROOT+'/actions/runs/'+candidate.id),
    candidate.id);
   if(readback.workflow_id!==anchor.workflow_id||
-     readback.head_branch!==anchor.head_branch||
+     readback.head_branch!==PROOF_BRANCH||
      readback.status!=='completed'||readback.conclusion!=='success'||
-     readback.head_sha===anchor.head_sha||
+     failed.some(f=>f.head_sha===readback.head_sha)||
      Date.parse(readback.created_at)<=mostRecentFailure)
    fail('RECOVERY_LATER_SUCCESS_PROVIDER_RECHECK_FAILED');
   latestSuccess=Object.freeze({
@@ -103,6 +110,8 @@ export async function inspectOriginalWorkRepairEvidence({
    'LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED':
    'NO_LATER_VERIFIED_SUCCESS_IN_BOUNDED_PROVIDER_WINDOW',
   failure_workflow_name:anchor.name,
+  checked_proof_branch:PROOF_BRANCH,
+  historical_failure_branches:Object.freeze([...new Set(failed.map(f=>f.head_branch))].sort()),
   verified_historical_failure_count:failed.length,
   historical_run_urls:Object.freeze(failed.map(x=>x.html_url)),
   later_success:latestSuccess,
@@ -115,7 +124,7 @@ export async function inspectOriginalWorkRepairEvidence({
   external_action_performed:false,
   no_retry_original_issue:true,
   next_step:latestSuccess?
-   'The same workflow has passed a later run. Review the code-change cause and acceptance criteria before closing the original repair. Do not propose a new upgrade without a proven gap.':
+   'The same workflow has passed a later run on the verified preview branch. Historical failure runs include other branches; a passing run is not a proven root-cause fix. Examine the code change before marking the original job complete.':
    'No matching later success was verified. Inspect the failure and evaluate a bounded repair under fresh authorization.',
  });
 }
