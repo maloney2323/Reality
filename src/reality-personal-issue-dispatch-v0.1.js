@@ -154,6 +154,44 @@ export async function inspectPersonalIssueAttemptsReadOnly({
   outcome_records_modified:false,can_retry:false,
  });
 }
+// Non-authorizing work-queue preflight. Server re-observes the exact source
+// and checks any recorded provider effect by stable workflow key across all
+// of this owner's conversations. Does not write, reserve or mint an approval.
+export async function inspectPersonalIssueWorkHistoryReadOnly({
+ session,conversationId,discoveredWorkId,env=process.env,
+ discover=runRealityStewardshipPass,
+ principalHistoryReader=readPriorIssueEffectsForPrincipal,
+}={}){
+ assertPersonalDispatchEnvironment({session,conversationId,env});
+ if(!/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||'')))
+  fail('PERSONAL_WORK_HISTORY_ID_INVALID');
+ const observed=await discover({owner:'maloney2323',repo:'Reality'});
+ const source=observed?.work?.find(w=>w.work_id===discoveredWorkId);
+ if(!source)fail('PERSONAL_WORK_HISTORY_SOURCE_CHANGED');
+ assertExactMaintainerIssue(trustedDiscovery(source));
+ const history=await principalHistoryReader({session,env,workKey:source.work_key});
+ if(!Array.isArray(history))
+  fail('PERSONAL_WORK_HISTORY_UNAVAILABLE_CLOSED');
+ let previousAttempt=false;
+ try{
+  assertNoPriorPersonalIssueAttempt({
+   history,discoveredWorkId,workKey:source.work_key,
+  });
+ }catch(error){
+  if(error?.message!=='PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY')
+   throw error;
+  previousAttempt=true;
+ }
+ return Object.freeze({
+  status:previousAttempt?'PREVIOUS_PROVIDER_ATTEMPT_REQUIRES_RECONCILIATION':
+   'NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED',
+  work_id:discoveredWorkId,external_action_performed:false,
+  no_prior_effect_proven:false,execution_authorized:false,
+  previously_attempted:previousAttempt,
+  can_request_new_approval:!previousAttempt,
+  no_automatic_retry:true,
+ });
+}
 export async function preparePersonalIssueDispatch({
  session,conversationId,discoveredWorkId,env=process.env,
  discover=runRealityStewardshipPass,
