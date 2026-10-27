@@ -257,8 +257,8 @@ test('read-only GET does not expose personal work receipts without verified sess
 
 test('every Home selector has a real element including live health labels',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const ids=new Set([...html.matchAll(/\\bid=["']([^"']+)["']/g)].map(x=>x[1]));
- const selectors=new Set([...html.matchAll(/\\$\\('([^']+)'\\)/g)].map(x=>x[1]));
+ const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
+ const selectors=new Set([...html.matchAll(/\$\('([^']+)'\)/g)].map(x=>x[1]));
  const missing=[...selectors].filter(x=>!ids.has(x));
  assert.deepEqual(missing,[],'script must not write textContent into missing nodes');
  for(const id of ['productState','liveHeadline','liveDetail','privateGoalStatus',
