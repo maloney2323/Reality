@@ -128,7 +128,8 @@ export async function recordPersonalIssueExecutionOutcome({
   execution_id:executionResult?.execution?.execution_id||null,
   provider_issue_number:executionResult?.verification?.observedState?.issue_number||null,
   provider_issue_url:executionResult?.verification?.observedState?.issue_url||null,
-  external_action_attempted:executionResult?.execution?.execution_state!=='AUTHORIZED',
+  external_action_attempted:['EXECUTED','OUTCOME_UNCERTAIN'].includes(
+   executionResult?.execution?.execution_state),
   outcome_state:verified?'VERIFIED_OUTCOME':'UNRESOLVED',
   independently_verified:verified,
   reservation_state:executionResult?.reservation_settlement?.status||
@@ -187,17 +188,27 @@ export async function runPersonalIssueDispatch({
   !granted.internal?.reservation)
   fail('PERSONAL_DISPATCH_ATOMIC_LEASE_NOT_VERIFIED');
  const bridges=bridgeFactory();
- const result=await execute({
-  workItem:ready.work_item,workflowId:ready.work_item.workflow_id,
-  authorization:granted.internal.authorization,
-  serverApprovalProof:granted.internal.serverApprovalProof,
-  serverFreshGoalAdmission:granted.internal.serverFreshGoalAdmission,
-  serverSingleUseReservation:granted.internal.reservation,
-  reservationStore:granted.internal.store,
-  connector:bridges.connector,independentVerifier:bridges.independentVerifier,
-  requestSummary:'One explicitly authorized source-backed Reality tracking issue',
-  requestFingerprint:ready.work_fingerprint,
- });
+ let result;
+ try{
+  result=await execute({
+   workItem:ready.work_item,workflowId:ready.work_item.workflow_id,
+   authorization:granted.internal.authorization,
+   serverApprovalProof:granted.internal.serverApprovalProof,
+   serverFreshGoalAdmission:granted.internal.serverFreshGoalAdmission,
+   serverSingleUseReservation:granted.internal.reservation,
+   reservationStore:granted.internal.store,
+   connector:bridges.connector,independentVerifier:bridges.independentVerifier,
+   requestSummary:'One explicitly authorized source-backed Reality tracking issue',
+   requestFingerprint:ready.work_fingerprint,
+  });
+ }catch{
+  // After obtaining a one-time reservation, a broken adapter may leave the
+  // provider result unknown. Stop, reconcile and never auto-retry.
+  return Object.freeze({status:'UNRESOLVED',
+   reason:'PERSONAL_DISPATCH_PROVIDER_EFFECT_UNCERTAIN_NO_RETRY',
+   reservation_id:granted.reservation_id,verified:false,
+   external_action_may_have_occurred:true,no_automatic_retry:true});
+ }
  if(result.status==='BLOCKED')
   return Object.freeze({status:'BLOCKED',reason:result.blocked_reason,
    reservation_id:granted.reservation_id,no_automatic_retry:true,
@@ -217,7 +228,9 @@ export async function runPersonalIssueDispatch({
    outcome_receipt_id:outcome.receipt_id,
    verified:outcome.independently_verified,
    provider_issue_url:outcome.provider_issue_url,
-   external_action_performed:true,no_automatic_retry:true,
+   external_action_performed:outcome.independently_verified?true:null,
+   external_action_may_have_occurred:!outcome.independently_verified,
+   no_automatic_retry:true,
   });
  }catch{
   // The action may already exist. Never auto-repeat to repair bookkeeping.
