@@ -170,3 +170,67 @@ export async function preparePersonalDiscoveredWorkHandoff({
   external_action_performed:false,
  });
 }
+
+export async function listPersonalDiscoveredWorkHandoffs({
+ session,conversationId,env=process.env,
+ readGoal=readFreshPersonalGoalState,
+ createPersistence=createUniversePostgresPersistence,
+}={}){
+ if(!validUuid(session?.user_id)||!validUuid(conversationId))
+  fail('DISCOVERED_WORK_AUTHENTICATED_SCOPE_REQUIRED');
+ if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+  fail('DISCOVERED_WORK_DURABLE_PREVIEW_REQUIRED');
+ const db=resolveReliabilityBenchmarkDb(env);
+ if(db?.url!==session?.config?.url||
+    db?.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db?.strictSecrets!==true||!db?.secretKey)
+  fail('DISCOVERED_WORK_ISOLATED_PROJECT_REQUIRED');
+ const latest=await readGoal({session,conversationId,env});
+ if(latest.principal_id!==session.user_id||
+    latest.conversation_id!==conversationId||
+    !latest.scope?.root||!latest.scope?.worldline)
+  fail('DISCOVERED_WORK_CONTINUITY_SCOPE_NOT_VERIFIED');
+ const history=await createPersistence({...db}).reconstruct({
+  continuityRootId:latest.scope.root,worldlineId:latest.scope.worldline,
+ });
+ const current=latest.state?.active_goal;
+ const all=history.filter(e=>
+  e.entity_type==='personal_discovered_work_handoff'&&
+  e.continuity_root_id===latest.scope.root&&
+  e.worldline_id===latest.scope.worldline&&
+  e.provenance?.principal_id===session.user_id&&
+  e.provenance?.conversation_id===conversationId&&
+  e.payload?.version===PERSONAL_DISCOVERED_WORK_HANDOFF_VERSION&&
+  e.payload?.authority==='NOT_GRANTED'&&
+  e.payload?.external_action_performed===false&&
+  e.payload?.work_id===e.entity_id&&
+  e.payload?.work_item?.discovered_work_id===e.entity_id&&
+  e.payload?.work_item?.work_item_id===e.entity_id&&
+  e.payload?.work_fingerprint===fingerprintApprovedWorkItem(e.payload.work_item)
+ ).sort((a,b)=>String(b.assertion_time).localeCompare(String(a.assertion_time)));
+ const seen=new Set();
+ return Object.freeze({
+  status:'READ_ONLY_DISCOVERED_WORK_CONTINUITY',
+  conversation_id:conversationId,
+  items:all.filter(e=>{
+   if(seen.has(e.entity_id))return false;
+   seen.add(e.entity_id);return true;
+  }).slice(0,20).map(e=>Object.freeze({
+   work_id:e.entity_id,
+   continuity_receipt_id:e.event_id,
+   goal_id:e.payload.goal_id,
+   work_fingerprint:e.payload.work_fingerprint,
+   source_observation_ids:e.payload.source_observation_ids||[],
+   evidence_refs:e.payload.evidence_refs||[],
+   goal_still_current:Boolean(
+    current?.goal_id===e.payload.goal_id&&
+    current?.status==='ACTIVE'&&
+    current?.last_transition_receipt_id===e.payload.goal_transition_receipt_id
+   ),
+   action_approved_by_handoff:false,
+   external_action_performed:false,
+  })),
+  execution_authorized:false,
+  external_action_performed:false,
+ });
+}
