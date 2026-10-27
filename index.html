@@ -951,6 +951,12 @@ function wcReceiptHTML(report){
   '<strong>Automation cost:</strong> not metered · <strong>Realized cash savings:</strong> not verified.</p>'+
   '<p><strong>Next step:</strong> '+esc(String(report.next_step||'Review source evidence before any next action.'))+'</p>'+
   (validURL?'<p><a href="'+esc(validURL)+'" target="_blank" rel="noopener noreferrer">View verified GitHub issue</a></p>':'')+
+  (verified&&/^work:[a-f0-9]{32}$/.test(String(report.work_id||''))?
+   '<div class="wc-direct-action" data-recovery-card="'+esc(report.work_id)+'">'+
+    '<p><strong>Original repair job is still unfinished.</strong> Save its blocked state in Continuity so Recovery can pick up this exact work later. This does not retry the GitHub action or install an upgrade.</p>'+
+    '<button type="button" data-recovery-checkpoint="'+esc(report.work_id)+'">Record original job for recovery</button>'+
+    '<p class="wc-note" role="status" data-recovery-state="'+esc(report.work_id)+'">Not yet checked. No repair attempted.</p>'+
+   '</div>':'')+
   '</article>';
 }
 async function wcLoadCompletionReports({focus=false}={}){
@@ -983,6 +989,48 @@ async function wcLoadCompletionReports({focus=false}={}){
  }
 }
 $('wcRefreshCompletion').onclick=()=>{void wcLoadCompletionReports()};
+$('wcCompletionList').onclick=async event=>{
+ const button=event.target.closest('button[data-recovery-checkpoint]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.recoveryCheckpoint;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||'')))return;
+ const card=button.closest('[data-recovery-card]');
+ const status=card?.querySelector('[data-recovery-state]');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!conv){
+  if(status)status.textContent='Sign in before saving a recovery checkpoint.';
+  return;
+ }
+ button.disabled=true;
+ if(status)status.textContent='Checking existing verified outcome and goal before saving · No external action…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'CHECKPOINT',conversation_id:conv,work_id:workId}),
+  });
+  const data=await response.json();
+  if(!response.ok||!data.ok||
+     data.original_work_id!==workId||
+     data.state!=='RECOVERY_BLOCKED_DURABLY_RECORDED'||
+     data.checkpoint_persisted!==true||
+     !data.checkpoint_receipt_id||
+     data.job_completed!==false||
+     data.external_action_performed!==false)
+   throw Error('Recovery checkpoint not independently confirmed; no work was resumed.');
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  button.textContent='Recovery checkpoint saved · Original job pending';
+  status.textContent='Saved to Continuity · Receipt '+data.checkpoint_receipt_id+
+   ' · Original work '+workId+
+   ' · No new execution authorization · Missing capability not yet proven · Repair unfinished.';
+ }catch(e){
+  if(status)status.textContent='Recovery checkpoint unavailable: '+
+   String(e.message||'readback failed')+
+   '. No external work was started. Use read-only inspection before retrying a failed storage request.';
+  button.disabled=false;
+ }
+};
+
 function wcRenderShiftEndingReceipt(report){
  const el=$('shiftEndingReceipt');
  const overview=$('wcShiftReceipt');
