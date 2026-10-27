@@ -168,7 +168,7 @@ function response(){
  json(value){result.payload=value;return res}};
  return {res,result};
 }
-test('public reservation API requires explicit RESERVE confirmation',async()=>{
+test('public reservation API requires authenticated user before evaluating RESERVE confirmation',async()=>{
  process.env.VERCEL_ENV='preview';
  process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF=project;
  process.env.REALITY_PERSONAL_CHAT_SUPABASE_URL='https://'+project+'.supabase.co';
@@ -179,7 +179,7 @@ test('public reservation API requires explicit RESERVE confirmation',async()=>{
   host:'example.test','content-type':'application/json'},
   body:{conversation_id:conversation,work_item:workItem,intent:'RESERVE',
    confirmation:'assistant-auto-approved'}},res);
- assert.equal(result.status,400);
- assert.equal(result.payload.error,'EXECUTION_RESERVATION_EXPLICIT_CONFIRMATION_REQUIRED');
+ assert.equal(result.status,401);
+ assert.equal(result.payload.error,'CHAT_SIGN_IN_REQUIRED');
  assert.equal(result.payload.external_action_performed,false);
 });
