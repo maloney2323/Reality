@@ -4,6 +4,8 @@ import {readPrivateChat,recordPrivateMessage,publishPrivateAssistantAtomically,l
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createHash} from 'node:crypto';
+import {assertFinalChatPublicationProof}
+ from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
 import {appendAuthenticatedUserGoalCommand,projectAuthoritativeUserGoals,
@@ -36,6 +38,10 @@ export default async function handler(req,res){
      coverage:history.history_status,older_messages_may_be_missing:history.older_missing,
     }});
   }
+  // The isolated preview has the database's shared goal/user publication
+  // lock installed. Never permit the older non-atomic assistant insert path.
+  if(process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED!=='true')
+   fail('CHAT_ATOMIC_GOAL_PUBLICATION_REQUIRED',503);
   // Use the SAME canonical Continuity + Reliability pipeline as benchmarks,
   // but only on a configuration independently restricted to this signed-in
   // user's isolated preview project. Never silently fall back to unmonitored chat.
@@ -132,8 +138,15 @@ export default async function handler(req,res){
    },
    verifiedConversationTurns:history.messages,
   });
-  const answer=String(result?.intelligence?.answer||'').trim();
-  if(!answer)fail('CHAT_MODEL_ANSWER_UNAVAILABLE',503);
+  // Preserve EXACT checked bytes, including any harmless trailing spaces.
+  // Trimming after final-direction verification would change the answer
+  // without another source-linked verification receipt.
+  const answer=String(result?.intelligence?.answer||'');
+  if(!answer.trim())fail('CHAT_MODEL_ANSWER_UNAVAILABLE',503);
+  const finalPublicationProof=assertFinalChatPublicationProof({
+   answer,reliability:result?.reliability,
+   atomicGoalPublicationEnabled:true,
+  });
   if(result?.reliability?.canonical_epistemic_state?.status!=='PERSISTED_AND_READBACK_VERIFIED'||
      result?.reliability?.readback_verified!==true)
    fail('CHAT_UNIFIED_RELIABILITY_READBACK_NOT_VERIFIED',503);
@@ -166,16 +179,13 @@ export default async function handler(req,res){
   });
   if(publicationGoal.status!=='USER_GOAL_SNAPSHOT_CURRENT')
    fail('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN',409);
-  const atomicPublicationEnabled=
-    process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED==='true';
-  const publication=atomicPublicationEnabled?
-    await publishPrivateAssistantAtomically(session,{
-      conversationId,requestId,text:answer,isolatedDb:isolated,
-      expectedRevision:goalAtGeneration.transition_count,
-      expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
-    }):
-    // Legacy preview remains explicit about the unresolved two-request race.
-    await recordPrivateMessage(session,{conversationId,requestId,role:'assistant',text:answer});
+  // This atomic RPC reads the same conversation/goal revision while inserting
+  // the EXACT answer checked by the final Integrity publication decision.
+  const publication=await publishPrivateAssistantAtomically(session,{
+    conversationId,requestId,text:answer,isolatedDb:isolated,
+    expectedRevision:goalAtGeneration.transition_count,
+    expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
+  });
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
    fail('CHAT_ASSISTANT_DURABILITY_NOT_VERIFIED',503);
@@ -184,10 +194,9 @@ export default async function handler(req,res){
     recovered_messages:check.messages.length,coverage:check.history_status,
     older_messages_may_be_missing:check.older_missing,
     current_answer_persisted:true,
-    goal_publication_atomicity:atomicPublicationEnabled&&
-      publication?.atomic_goal_revision_checked===true?
+    goal_publication_atomicity:publication?.atomic_goal_revision_checked===true?
       'ATOMIC_DATABASE_GOAL_REVISION_AND_ASSISTANT_INSERT':
-      'LEGACY_FRESHNESS_CHECK_RACE_NOT_ELIMINATED'},
+      'ATOMIC_GOAL_PUBLICATION_NOT_CONFIRMED'},
    goal_command_receipt:goalCommandReceipt?{
     status:'COMMITTED_TO_EXISTING_CONTINUITY',
     event_id:goalCommandReceipt.event_id,
@@ -197,6 +206,7 @@ export default async function handler(req,res){
    reliability:{canonical_epistemic_state:result.reliability.canonical_epistemic_state,
      user_goal_continuity:result.reliability.user_goal_continuity||null,
      assistant_goal_governance:result.reliability.goal_governance||null,
+     final_answer_publication_proof:finalPublicationProof,
      final_answer_direction_release:result.reliability.final_direction_release||{
        status:'NOT_ASSESSED_IN_THIS_RUNTIME',release_allowed:null,
        semantic_accuracy_independently_verified:false},
