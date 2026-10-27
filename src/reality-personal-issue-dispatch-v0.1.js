@@ -86,7 +86,8 @@ export async function inspectPersonalIssueAttemptsReadOnly({
  inspectGithub=inspectMatchingGithubIssueReadOnly,
 }={}){
  const db=assertPersonalDispatchEnvironment({session,conversationId,env});
- if(!/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||'')))
+ if(discoveredWorkId!==undefined&&
+    !/^work:[a-f0-9]{32}$/.test(String(discoveredWorkId||'')))
   fail('PERSONAL_RECONCILIATION_WORK_ID_INVALID');
  const {personalGoalScope}=await import('./reality-personal-goal-readback-v0.1.js');
  const scope=personalGoalScope({userId:session.user_id,conversationId});
@@ -101,9 +102,12 @@ export async function inspectPersonalIssueAttemptsReadOnly({
  const handoffs=history.filter(e=>e.entity_type==='personal_discovered_work_handoff'&&
   /^work:[a-f0-9]{32}$/.test(String(e.payload?.work_id||''))&&
   typeof e.payload?.work_key==='string');
- const chosen=handoffs.find(e=>e.payload.work_id===discoveredWorkId);
- if(!chosen)fail('PERSONAL_RECONCILIATION_SOURCE_NOT_IN_USER_WORLDLINE');
- const matching=handoffs.filter(e=>e.payload.work_key===chosen.payload.work_key);
+ const chosen=discoveredWorkId===undefined?null:
+  handoffs.find(e=>e.payload.work_id===discoveredWorkId);
+ if(discoveredWorkId!==undefined&&!chosen)
+  fail('PERSONAL_RECONCILIATION_SOURCE_NOT_IN_USER_WORLDLINE');
+ const matching=chosen?
+  handoffs.filter(e=>e.payload.work_key===chosen.payload.work_key):handoffs;
  const permitted=new Set(matching.map(e=>e.payload.work_id));
  const oldOutcomes=history.filter(e=>
   e.entity_type==='personal_issue_execution_outcome'&&
