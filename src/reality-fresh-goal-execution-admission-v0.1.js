@@ -58,6 +58,7 @@ export function issueFreshGoalExecutionAdmission({
  const data={
   version:FRESH_GOAL_EXECUTION_ADMISSION_VERSION,
   principal_id:principalId,conversation_id:conversationId,
+  isolated_project_ref:env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||null,
   continuity_root_id:signedGoal.binding.continuity_root_id,
   world_id:signedGoal.binding.world_id,
   goal_id:goal.goal_id,
@@ -79,6 +80,7 @@ export function verifyFreshGoalExecutionAdmission({
  admission,workItem,authorization,serverApprovalProof,
  env=process.env,now=Date.now(),
 }={}){
+ if(env.VERCEL_ENV!=='preview')return blocked('EXECUTION_GOAL_ADMISSION_PREVIEW_ONLY');
  if(!admission||admission.version!==FRESH_GOAL_EXECUTION_ADMISSION_VERSION||
     typeof admission.signature!=='string'||!/^[a-f0-9]{64}$/.test(admission.signature))
   return blocked('EXECUTION_FRESH_GOAL_ADMISSION_REQUIRED');
@@ -98,6 +100,8 @@ export function verifyFreshGoalExecutionAdmission({
  if(!nonempty(data.principal_id)||!nonempty(data.conversation_id)||
     !nonempty(data.goal_id)||!nonempty(data.continuity_root_id)||
     !nonempty(data.goal_transition_receipt_id)||
+    !nonempty(data.isolated_project_ref)||
+    data.isolated_project_ref!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
     data.principal_id!==authorization?.principal||
     data.authorization_id!==authorization.authorization_id||
     data.action_approval_signature!==serverApprovalProof?.server_signature||
