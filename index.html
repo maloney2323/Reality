@@ -116,6 +116,18 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .account-shortcut{display:inline-block;text-decoration:none;white-space:nowrap;font-weight:700;border-color:#5b7189;color:#eef5ff}
 #privateChat{scroll-margin-top:16px}
 #privateAccountState{font-size:14px;line-height:1.55;margin:8px 0 10px}
+.wc-unfinished{margin:16px 0;border:1px solid #71815b;background:#191e19;border-radius:16px;padding:16px}
+.wc-unfinished h3{margin:0;font-size:20px}
+.wc-unfinished-count{font-size:12px;color:#d5dcba}
+.wc-unfinished-card{border:1px solid #566a58;background:#121e1c;border-radius:14px;padding:15px;margin-top:12px;overflow-wrap:anywhere}
+.wc-unfinished-card h4{font-size:16px;margin:6px 0 8px}
+.wc-unfinished-card p{font-size:13px;line-height:1.5;margin:6px 0}
+.wc-unfinished-state{color:#eddaaf;font-size:12px;font-weight:700}
+.wc-unfinished-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:10px}
+.wc-unfinished-actions button{margin:0}
+.wc-unfinished-actions a{font-size:13px;color:#b1dbff}
+.wc-unfinished-card[data-status="RECOVERY_CHECKPOINT_SAVED"]{border-color:#4d806f}
+.wc-unfinished-card[data-status="PRIOR_ACTION_UNRESOLVED"]{border-color:#94735a}
 .wc-completion{margin:16px 0 20px;border:1px solid #466275;background:#101b29;border-radius:16px;padding:16px}
 .wc-completion-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .wc-completion-head h3{margin:0}.wc-completion-head button{margin-top:0}
@@ -219,6 +231,15 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
    <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
   <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small><button type="button" id="wcDiscover">Find work</button></div>
+ </div>
+ <div class="wc-unfinished" id="wcUnfinishedCenter" role="region" aria-label="Reality unfinished work">
+  <div class="wc-completion-head">
+   <div><h3>Unfinished Work <span class="wc-unfinished-count" id="wcUnfinishedCount"></span></h3>
+    <p class="wc-note">Jobs that still need attention, across your saved conversations. A finished tracking action is not a finished repair.</p></div>
+   <button type="button" id="wcRefreshUnfinished">Refresh unfinished work</button>
+  </div>
+  <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
+  <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
  </div>
  <div class="wc-diagnostic">
   <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
@@ -909,6 +930,133 @@ async function wcAuthorizeAndStart(workId){
  }
 }
 
+
+const wcUnfinishedIssueUrl=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
+function wcUnfinishedHTML(job){
+ const state=job.state==='RECOVERY_CHECKPOINT_SAVED'?
+  'Recovery saved · Original repair unfinished':
+  job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
+   'Tracking action finished · Repair unfinished':
+   'Previous attempt unresolved · Do not retry';
+ const link=wcUnfinishedIssueUrl.test(String(job.issue_url||''))?
+  '<a href="'+esc(job.issue_url)+'" target="_blank" rel="noopener noreferrer">View tracked GitHub issue</a>':'';
+ const canSave=job.can_save_recovery===true&&
+  job.action_completed===true&&job.job_completed===false&&
+  job.goal_still_current===true&&
+  job.state==='TRACKING_DONE_REPAIR_UNFINISHED';
+ const action=canSave?
+  '<button type="button" data-unfinished-save="'+esc(job.work_id)+
+   '" data-unfinished-conversation="'+esc(job.conversation_id)+'">Save for recovery</button>':'';
+ return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
+  '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
+  '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
+  '<p><strong>What's done:</strong> '+(job.action_completed===true?
+    'The GitHub tracking issue was independently verified.':
+    'The previous action is not independently verified.')+'</p>'+
+  '<p><strong>What's left:</strong> Diagnose, repair and independently verify the original job.</p>'+
+  '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
+  '<div class="wc-unfinished-actions">'+action+link+'</div>'+
+  (job.recovery_receipt_id?
+   '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
+  '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
+  '</article>';
+}
+let wcUnfinishedReadSerial=0;
+async function wcLoadUnfinishedWork(){
+ const panel=$('wcUnfinishedList'),status=$('wcUnfinishedStatus');
+ const serial=++wcUnfinishedReadSerial;
+ if($('privateReady')?.style.display!=='block'){
+  $('wcUnfinishedCount').textContent='';
+  status.textContent='Sign in to see unfinished jobs from your saved conversations.';
+  panel.replaceChildren();return;
+ }
+ status.textContent='Checking your saved jobs across conversations · Read only…';
+ panel.textContent='Reading Continuity. No jobs are being started.';
+ try{
+  const response=await fetch('/api/reality/personal-unfinished-work',{
+   credentials:'same-origin',cache:'no-store',
+  });
+  const data=await response.json();
+  if(serial!==wcUnfinishedReadSerial)return;
+  if(!response.ok||data.ok!==true||!Array.isArray(data.jobs)||
+     !['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(data.status)||
+     data.execution_authorized!==false||
+     data.external_action_performed!==false)
+   throw Error('The verified unfinished-work list is unavailable.');
+  const safe=data.jobs.filter(job=>
+   /^work:[a-f0-9]{32}$/.test(String(job.work_id||''))&&
+   /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(job.conversation_id||''))&&
+   job.job_completed===false);
+  const partial=data.unreadable_conversations>0||data.coverage_limited===true||
+   data.result_truncated===true;
+  $('wcUnfinishedCount').textContent=safe.length?'· '+safe.length+' shown':'';
+  status.textContent=(safe.length?
+   'Found '+safe.length+' unfinished job(s) in saved Continuity.':
+   'No tracked unfinished jobs were verified in the scanned conversations.')+
+   (partial?' Some conversations were not fully checked; this list may be incomplete.':'')+
+   ' No job is being executed.';
+  panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
+   '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
+ }catch{
+  if(serial!==wcUnfinishedReadSerial)return;
+  $('wcUnfinishedCount').textContent='';
+  status.textContent='Could not verify unfinished work. This does not mean all jobs are done.';
+  panel.textContent='Reconnect and refresh this section. No actions were performed.';
+ }
+}
+$('wcRefreshUnfinished').onclick=()=>{void wcLoadUnfinishedWork()};
+$('wcUnfinishedList').onclick=async event=>{
+ const button=event.target.closest('button[data-unfinished-save]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.unfinishedSave;
+ const conversationId=button.dataset.unfinishedConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))
+  return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Checking original goal and saved outcome · Read only…';
+ try{
+  // A fresh read proves the specific original work remains eligible. Never
+  // infer authority from the overview card, a model, or an old browser state.
+  const check=await fetch('/api/reality/personal-recovery?conversation_id='+
+   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+   {credentials:'same-origin',cache:'no-store'});
+  const examined=await check.json();
+  if(!check.ok||examined.ok!==true||
+     examined.original_work_id!==workId||
+     examined.job_completed!==false||
+     examined.external_action_performed!==false)
+   throw Error('Current goal or original-work readback not verified.');
+  if(examined.checkpoint_persisted===true){
+   if(feedback)feedback.textContent='Already saved for recovery. Original repair is still open.';
+   await wcLoadUnfinishedWork();return;
+  }
+  if(examined.state!=='RECOVERY_BLOCKED_NOT_YET_CHECKPOINTED')
+   throw Error('Recovery state requires a fresh read-only review.');
+  if(feedback)feedback.textContent='Saving original blocked work to Continuity · No GitHub write…';
+  const response=await fetch('/api/reality/personal-recovery',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'CHECKPOINT',conversation_id:conversationId,work_id:workId}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+     result.original_work_id!==workId||
+     result.state!=='RECOVERY_BLOCKED_DURABLY_RECORDED'||
+     result.checkpoint_persisted!==true||
+     !result.checkpoint_receipt_id||
+     result.job_completed!==false||
+     result.external_action_performed!==false)
+   throw Error('Recovery was not independently verified.');
+  if(feedback)feedback.textContent='Recovery saved. The original repair is still unfinished.';
+  await wcLoadUnfinishedWork();
+ }catch{
+  if(feedback)feedback.textContent='Recovery could not be verified. No repair was started. Refresh the read-only list before trying again.';
+  button.disabled=true;
+ }
+};
+
 // Deterministic display ONLY: reports arrive from authenticated, saved
 // Continuity outcomes or independently read-back shift discovery ticks.
 const wcReceiptLink=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
@@ -1004,6 +1152,7 @@ async function wcHydrateRecoveryCheckpoints(conv){
 }
 
 async function wcLoadCompletionReports({focus=false}={}){
+ void wcLoadUnfinishedWork();
  const out=$('wcCompletionList'),status=$('wcCompletionStatus');
  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
  if($('privateReady')?.style.display!=='block'||
