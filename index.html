@@ -30,6 +30,20 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .trust-digest summary{cursor:pointer;font-weight:700;color:#eef1f7}
 .trust-digest .trust-unknown{color:#f5d6a4}
 @media(max-width:600px){main{padding:20px 12px}.row{display:block}.row span{display:block;margin-top:4px}}
+.work-guidance{background:#131b27;border:1px solid #35445b;border-radius:12px;padding:12px;margin:12px 0;color:#d7e1f0;font-size:12px;line-height:1.55}
+.work-steps{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:1fr;gap:7px}
+.work-steps li{border:1px solid #334052;background:#141b27;border-radius:9px;padding:9px 11px;font-size:12px;color:#dce6f4}
+.work-steps li[data-state="complete"]{border-color:#487a6f;color:#b9e4ce}
+.work-steps li[data-state="required"]{border-color:#a87c51;color:#f7dfb3}
+.work-steps li[data-state="blocked"]{border-color:#975b59;color:#f0b0aa}
+.work-review{border:1px solid #4a617a;border-radius:12px;padding:12px;margin-top:12px;background:#101b2a;font-size:12px;line-height:1.6}
+.work-review p{white-space:pre-wrap;overflow-wrap:anywhere}
+.work-review label{display:flex;align-items:flex-start;gap:9px;margin:14px 0;cursor:pointer}
+.work-review input[type=checkbox]{margin-top:4px;flex:none;min-width:18px;min-height:18px;accent-color:#b7d4d0}
+.work-review button{width:100%;white-space:normal}
+.work-review .work-cancel{background:#283242;color:#f0f2f7}
+.work-result{white-space:pre-wrap;overflow-wrap:anywhere}
+
 .shift-settings{margin:0 0 28px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.shift-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.shift-head strong{font-size:18px}.switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#cbd3e0;font-size:12px}.switch input{accent-color:#eef1f7}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.shift-grid label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8792a6}.shift-grid input,.shift-grid select{display:block;width:100%;margin-top:7px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:10px;padding:10px;font:inherit}.shift-work{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 12px;border:1px solid #202938;border-radius:12px;color:#aeb8c9;font-size:12px}.shift-work span:first-child{color:#eef1f7;font-weight:700}.shift-scope{margin-top:12px;border-top:1px solid #202938;padding-top:12px}.shift-scope summary{cursor:pointer;color:#cbd3e0;font-size:12px}.shift-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.shift-columns div{border:1px solid #202938;border-radius:12px;padding:11px}.shift-columns strong{display:block;color:#eef1f7;font-size:12px;margin-bottom:7px}.shift-columns ul{margin:0;padding-left:17px;color:#98a3b5;font-size:11px;line-height:1.6}.saved{font-size:12px;color:#a9d7b5;margin-left:8px}@media(max-width:600px){.shift-head{display:block}.switch{margin-top:12px}.shift-grid,.shift-columns{grid-template-columns:1fr}} .shift-banner{margin:0 0 22px;padding:18px 20px;border:1px solid #52627d;border-radius:18px;background:linear-gradient(135deg,#151d2b,#0d121b);display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(0,0,0,.22)}.shift-banner strong{display:block;font-size:18px;line-height:1.4}.shift-banner p{margin:7px 0 0;color:#aeb8c9;font-size:12px}.shift-banner button{margin:0;white-space:nowrap}@media(max-width:600px){.shift-banner{display:block}.shift-banner button{margin-top:12px;width:100%}} .reality-console{margin:0 0 28px;display:grid;grid-template-columns:1.35fr .85fr;gap:14px}.console-card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.console-card h3{margin:4px 0 5px}.console-card .count{font-size:28px;font-weight:800}.work-item{border:1px solid #283242;border-radius:13px;padding:12px;margin-top:10px}.work-item strong{display:block}.work-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.attention-item{border:1px solid #5b4a2f;border-radius:13px;padding:12px;margin-top:10px;background:#17130c}.attention-item button{margin-top:10px;width:100%}.attention-empty{color:#8f9aac;font-size:12px;padding-top:10px}@media(max-width:760px){.reality-console{grid-template-columns:1fr}} .reality-matrix{margin:0 0 22px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.matrix-head{display:flex;justify-content:space-between;gap:12px;align-items:end}.matrix-head h2{margin:4px 0 0;font-size:20px}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:92px}.matrix-card strong{display:block;margin-bottom:6px}.matrix-card p{margin:0;color:#98a3b5;font-size:12px;line-height:1.5}.matrix-card .matrix-count{font-size:24px;font-weight:800;color:#eef1f7}@media(max-width:700px){.matrix-grid{grid-template-columns:1fr}}</style>
 </head>
 <body>
@@ -67,15 +81,20 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
 </section>
 
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><section id="privateChat" style="display:none" class="console-card" aria-label="Persistent private Reality conversation">
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div class="work-guidance"><strong>Approval setup · required steps</strong>
+<div>1. Sign in to your private Reality account.</div>
+<div>2. Confirm or resume your own active business goal.</div>
+<div>3. Verify the discovered work and exact proposed action.</div>
+<div>4. Check the approval box and explicitly approve that one action.</div>
+<div><strong>Approval is not execution:</strong> no external actions are enabled in this preview.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><section id="privateChat" style="display:none" class="console-card" aria-label="Persistent private Reality conversation">
  <div class="label">REALITY · PERSISTENT PERSONAL CONVERSATION (PREVIEW)</div>
  <h3>Continue the conversation</h3>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
  <div id="privateLogin" style="display:none">
   <label for="privateEmail">Account email</label>
-  <input id="privateEmail" type="email" autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <input id="privateEmail" type="email" required autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
   <label for="privatePassword">Password</label>
-  <input id="privatePassword" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <input id="privatePassword" type="password" required autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
@@ -88,8 +107,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
    <strong>Confirmed user objective</strong>
    <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
-   <label for="privateGoalText">Set your current goal (explicit confirmation)</label>
-   <textarea id="privateGoalText" maxlength="700" placeholder="Example: My active goal is to prepare a supervised construction pilot for the owner."></textarea>
+   <label for="privateGoalText">Required for business work: your confirmed active goal</label>
+   <p class="muted" style="font-size:12px">Enter your objective in your own words, or resume an existing confirmed goal. Reality will not choose or change your goal for you.</p>
+   <textarea id="privateGoalText" required minlength="12" maxlength="700" placeholder="Example: My active goal is to prepare a supervised construction pilot for the owner."></textarea>
    <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button id="privateSetGoal" type="button">Confirm this goal</button>
    </div>
@@ -260,6 +280,34 @@ $('plan').onclick=async()=>{
   }catch(e){$('error').textContent=e.message;renderTrustPulse(null)}finally{$('plan').disabled=false}
 };
 const realityWork=$('findWork');const workResult=$('workResult');
+let guidedWorkPending=false;
+function jumpToWorkSetup(kind){
+ guidedWorkPending=true;
+ const chat=$('privateChat');
+ if(chat?.style.display==='none'){
+  workResult.textContent='Private goal/approval setup is not available in this deployment. Work remains blocked.';
+  return;
+ }
+ chat?.scrollIntoView({behavior:'smooth',block:'start'});
+ const input=kind==='account'?'privateEmail':'privateGoalText';
+ $(input)?.focus({preventScroll:true});
+}
+function setWorkStep(card,step,value,description){
+ const el=card?.querySelector('[data-work-step="'+step+'"]');
+ if(!el)return;
+ el.dataset.state=value;
+ el.textContent=step+'. '+description;
+}
+function showWorkSetupAction(target,message,kind){
+ target.replaceChildren();
+ const info=document.createElement('p');info.textContent=message;
+ const button=document.createElement('button');
+ button.type='button';
+ button.textContent=kind==='account'?'Go to sign in':'Go to confirmed objective';
+ button.onclick=()=>jumpToWorkSetup(kind);
+ target.append(info,button);
+}
+
 function renderWork(source){
   const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
   const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
@@ -289,27 +337,38 @@ function renderWork(source){
       w.execution_work_item?.operation==='create_issue';
     return '<div class="attention-item"><strong>'+esc(w.title||w.objective||w.work_key||'Governed work')+
       '</strong><div class="muted">Source evidence: '+esc((w.evidence_refs||[]).length)+
-      ' · '+esc(prepared?'Prepare from verified GitHub records and confirmed user goal. No external action will occur.':'Not ready for authenticated approval; more evidence or capability required.')+
-      '</div><button type="button" data-auth="'+i+'" '+(prepared?'':'disabled')+'>'+
-      (prepared?'Prepare exact work':'Not ready for approval')+'</button><div class="work-meta" data-work-receipt="'+i+'"></div></div>';
+      ' · '+esc(prepared?'Source-backed maintenance opportunity. Complete the required setup steps below.':'Not ready for authenticated approval; more evidence or capability required.')+
+      '</div><ol class="work-steps" aria-label="Required approval steps">'+
+      '<li data-work-step="1" data-state="required">1. Private sign-in · Required</li>'+
+      '<li data-work-step="2" data-state="required">2. Confirmed active goal · Required</li>'+
+      '<li data-work-step="3" data-state="required">3. Source and exact action review · Required</li>'+
+      '<li data-work-step="4" data-state="required">4. Explicit approval · Required</li></ol>'+
+      '<button type="button" data-auth="'+i+'" '+(prepared?'':'disabled')+'>'+
+      (prepared?'Continue guided setup':'Not ready for approval')+'</button>'+
+      '<div class="work-meta" data-work-receipt="'+i+'" role="status" aria-live="polite"></div>'+
+      '<div class="work-review" data-work-review="'+i+'" hidden></div></div>';
   }).join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
   $('attentionQueue').querySelectorAll('[data-auth]').forEach(btn=>btn.onclick=async()=>{
-    const w=pending[Number(btn.dataset.auth)];
-    const receipt=$('attentionQueue').querySelector('[data-work-receipt="'+btn.dataset.auth+'"]');
-    btn.disabled=true;btn.textContent='Rechecking source & goal…';
+    const i=Number(btn.dataset.auth),w=pending[i];
+    const card=btn.closest('.attention-item');
+    const receipt=card.querySelector('[data-work-receipt]');
+    const review=card.querySelector('[data-work-review]');
+    btn.disabled=true;btn.textContent='Checking requirements…';
     let confirmedGoalReadback=false;
     try{
-      // The browser selects ONLY a source work ID. The server re-discovers
-      // actual GitHub evidence and constructs the exact work item itself.
-      // No generic-cookie identity, client JSON work object, or model text
-      // may mint approval or execute a provider action.
+      // User identity and controlling objective must be separately verified
+      // before any source-linked PREPARE. A missing field never becomes AI
+      // permission; the exact action is re-derived by the server, not browser.
       const conv=localStorage.getItem('reality.private.chat.conversation.v1');
-      if(!conv||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv))
-        throw Error('Sign in to your private Reality conversation and confirm your active goal first.');
-      if($('privateReady').style.display!=='block')
-        throw Error('Sign in to Reality private chat before preparing a business action.');
-      // Read-only preflight explains why PREPARE would fail. A browser
-      // readback never creates an active goal or grants execution authority.
+      if($('privateReady')?.style.display!=='block'||!conv||
+         !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv)){
+        setWorkStep(card,1,'blocked','Private sign-in · Required');
+        setWorkStep(card,2,'required','Confirmed active goal · Not checked');
+        showWorkSetupAction(receipt,'Sign in to your private Reality account to continue. No work has been approved or executed.','account');
+        btn.disabled=false;btn.textContent='Continue guided setup';
+        return;
+      }
+      setWorkStep(card,1,'complete','Private sign-in · Verified');
       const goalR=await fetch('/api/reality/personal-goals?conversation_id='+
         encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
       const goalData=await goalR.json();
@@ -317,88 +376,129 @@ function renderWork(source){
         throw Error(goalData.error||'Reality could not verify your goal ledger.');
       const current=goalData.goal_state;
       if(!current?.active_goal_id||current.active_goal?.goal_id!==current.active_goal_id||
-         current.active_goal?.status!=='ACTIVE'||current.active_goal?.user_confirmed!==true)
-        throw Error('DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION');
+         current.active_goal?.status!=='ACTIVE'||current.active_goal?.user_confirmed!==true){
+        setWorkStep(card,2,'blocked','Confirmed active goal · Required');
+        showWorkSetupAction(receipt,'An active goal is required. Scroll to your private conversation, enter your business objective in your own words, and press Confirm this goal (or resume an existing goal). Then return here. No work was approved.','goal');
+        btn.disabled=false;btn.textContent='Continue guided setup';
+        return;
+      }
       confirmedGoalReadback=true;
+      setWorkStep(card,2,'complete','Confirmed active goal · '+String(current.active_goal.title||'Verified').slice(0,70));
       async function post(path,payload){
         const response=await fetch(path,{method:'POST',credentials:'same-origin',
-         headers:{'content-type':'application/json'},
-         body:JSON.stringify(payload)});
-        const body=await response.json();
-        if(!response.ok||!body.ok)
-          throw Error(body.error||body.reason||'Reality refused the requested operation');
-        return body;
+          headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+        const data=await response.json();
+        if(!response.ok||!data.ok)
+          throw Error(data.error||data.reason||'Reality refused the requested operation');
+        return data;
       }
       const prepared=await post('/api/reality/personal-discovered-work',{
         intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id,
       });
       if(prepared.status!=='DISCOVERED_WORK_GOAL_GROUNDED_PENDING_APPROVAL'||
          prepared.discovered_work_id!==w.work_id||
-         !prepared.work_item?.work_item_id||
-         prepared.work_item.work_item_id!==w.work_id||
-         !prepared.continuity_receipt_id||
+         prepared.work_item?.work_item_id!==w.work_id||
+         !prepared.continuity_receipt_id||!prepared.grounding_proof||
          prepared.external_action_performed!==false)
         throw Error('Reality did not return a verified, durable, non-executing work handoff.');
-      receipt.textContent='Continuity work receipt '+prepared.continuity_receipt_id+
-        ' · Goal '+prepared.goal_id+' · Evidence '+prepared.evidence_refs.length;
-      btn.textContent='Source & goal verified · Review approval';
+      setWorkStep(card,3,'complete','Source and exact action · Verified, review below');
+      setWorkStep(card,4,'required','Explicit approval · Checkbox required');
       const exact=prepared.work_item;
-      if(!confirm('Reality grounded this discovered work in your confirmed objective.\n\n'+
-        'Work: '+w.objective+'\n'+
-        'Exact action: '+exact.action+'\n'+
-        'Repository: '+exact.inputs?.repository+'\n'+
-        'Evidence references: '+prepared.evidence_refs.length+'\n\n'+
-        'Approve THIS exact work item only? This does NOT execute or reserve any external action.')){
-        btn.textContent='Grounded · Approval declined';
-        receipt.textContent+=' · Awaiting your decision';
-        return;
-      }
-      btn.textContent='Recording your exact approval…';
-      const approved=await post('/api/reality/personal-action-authority',{
-        conversation_id:conv,work_item:exact,
-        grounding_proof:prepared.grounding_proof,
-        confirmation:'APPROVE_THIS_EXACT_WORK_ITEM',
-      });
-      if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
-         !approved.policy_id||
-         approved.external_action_performed!==false)
-        throw Error('Exact-work approval was not durably confirmed.');
-      const admitted=await post('/api/reality/personal-execution-admission',{
-        intent:'CHECK',conversation_id:conv,work_item:exact,
-        grounding_proof:prepared.grounding_proof,
-      });
-      if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
-         admitted.action_policy_id!==approved.policy_id||
-         admitted.work_item_fingerprint!==prepared.work_fingerprint||
-         admitted.external_action_performed!==false)
-        throw Error('Approved work failed the fresh-goal execution readiness check.');
-      btn.textContent='Approved · Dispatch not enabled';
-      receipt.textContent='Work '+w.work_id+' · Goal '+admitted.goal_id+
-        ' · Receipt '+prepared.continuity_receipt_id+
-        ' · Approval '+approved.policy_id+
-        ' · No external action performed. Execution must separately consume its single-use DB reservation.';
+      receipt.textContent='Prepared from '+prepared.evidence_refs.length+
+        ' source records. Continuity receipt '+prepared.continuity_receipt_id+
+        '. No external action performed.';
+      review.hidden=false;
+      review.replaceChildren();
+      const heading=document.createElement('strong');
+      heading.textContent='Step 3 · Review what you would approve';
+      const desc=document.createElement('p');
+      desc.textContent='Original goal: '+current.active_goal.title+
+        '\\nWork ID: '+w.work_id+
+        '\\nProposed action: '+exact.action+
+        '\\nProvider: '+exact.connector+' · '+exact.operation+
+        '\\nRepository: '+exact.inputs?.repository+
+        '\\nIssue title: '+exact.inputs?.title+
+        '\\nIssue body: '+exact.inputs?.body+
+        '\\nEvidence references: '+prepared.evidence_refs.length+
+        '\\nThis step only records exact-work approval. It does NOT create the issue.';
+      const label=document.createElement('label');
+      const checkbox=document.createElement('input');
+      checkbox.type='checkbox';checkbox.required=true;
+      const consent=document.createElement('span');
+      consent.textContent='Required: I approve recording permission for exactly the action and target shown above. I understand it will not be executed now.';
+      label.append(checkbox,consent);
+      const approve=document.createElement('button');approve.type='button';
+      approve.textContent='Approve this exact action';approve.disabled=true;
+      checkbox.onchange=()=>{approve.disabled=!checkbox.checked;};
+      const cancel=document.createElement('button');cancel.type='button';
+      cancel.className='work-cancel';cancel.textContent='Cancel and keep work unapproved';
+      cancel.onclick=()=>{
+        checkbox.checked=false;review.hidden=true;review.replaceChildren();
+        setWorkStep(card,4,'required','Explicit approval · Not granted');
+        receipt.textContent='Review cancelled. Work remains discovered, not executed.';
+        btn.disabled=false;btn.textContent='Continue guided setup';
+      };
+      approve.onclick=async()=>{
+        if(!checkbox.checked||!checkbox.checkValidity())return;
+        approve.disabled=true;cancel.disabled=true;
+        approve.textContent='Recording exact approval…';
+        try{
+          const approved=await post('/api/reality/personal-action-authority',{
+            conversation_id:conv,work_item:exact,
+            grounding_proof:prepared.grounding_proof,
+            confirmation:'APPROVE_THIS_EXACT_WORK_ITEM',
+          });
+          if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+             !approved.policy_id||approved.external_action_performed!==false)
+            throw Error('Exact work approval could not be verified.');
+          const admitted=await post('/api/reality/personal-execution-admission',{
+            intent:'CHECK',conversation_id:conv,work_item:exact,
+            grounding_proof:prepared.grounding_proof,
+          });
+          if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
+             admitted.action_policy_id!==approved.policy_id||
+             admitted.work_item_fingerprint!==prepared.work_fingerprint||
+             admitted.external_action_performed!==false)
+            throw Error('Approved work did not pass the latest goal/readiness check.');
+          setWorkStep(card,4,'complete','Exact action · Approved, dispatch still disabled');
+          receipt.textContent='Approved · Dispatch not enabled. Work '+w.work_id+
+            ' · Continuity '+prepared.continuity_receipt_id+
+            ' · Approval '+approved.policy_id+
+            '. No external action has been performed.';
+          review.replaceChildren();
+          const success=document.createElement('p');
+          success.textContent='Approval recorded and current goal rechecked. The actual provider action has NOT run. A separate single-use dispatch is needed in the next development stage.';
+          review.append(success);
+          btn.textContent='Approved · Dispatch not enabled';
+        }catch(e){
+          setWorkStep(card,4,'blocked','Approval or admission · Needs review');
+          receipt.textContent='Reality could not finish approval/readiness: '+e.message+
+            '. No external work has been executed.';
+          review.replaceChildren();
+          const failure=document.createElement('p');
+          failure.textContent='Approval status may need fresh readback. Restart the guided setup to verify before taking any action.';
+          review.append(failure);
+          btn.disabled=false;btn.textContent='Restart guided setup';
+        }
+      };
+      review.append(heading,desc,label,approve,cancel);
+      btn.textContent='Review the required approval below';
     }catch(e){
-      btn.disabled=false;btn.textContent='Prepare exact work';
+      btn.disabled=false;btn.textContent='Continue guided setup';
       const code=String(e.message||'Reality could not verify the work.');
-      const needsGoal=code==='GOAL_GROUNDING_AUTHENTICATED_SOURCE_REQUIRED'||
-        code==='DISCOVERED_WORK_CONFIRMED_GOAL_REQUIRED'||
-        code==='DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION';
-      if(needsGoal){
-        receipt.replaceChildren();
-        const detail=document.createElement('div');
-        detail.textContent=confirmedGoalReadback
-          ?'A goal appears active, but Reality could not authenticate its source receipt for this action. Do not recreate or overwrite the goal automatically. No work was authorized or executed.'
-          :'No active, user-confirmed objective was found for this private conversation. Scroll below, confirm a goal, then return to Prepare exact work. No work was authorized or executed.';
-        const guide=document.createElement('button');
-        guide.type='button';
-        guide.textContent='Go to confirmed objective';
-        guide.onclick=()=>{
-          $('privateChat')?.scrollIntoView({behavior:'smooth',block:'start'});
-          $('privateGoalText')?.focus({preventScroll:true});
-        };
-        receipt.append(detail,guide);
+      if(['GOAL_GROUNDING_AUTHENTICATED_SOURCE_REQUIRED',
+           'DISCOVERED_WORK_CONFIRMED_GOAL_REQUIRED',
+           'DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION'].includes(code)){
+        setWorkStep(card,2,'blocked','Goal/source verification · Needs review');
+        showWorkSetupAction(receipt,
+          confirmedGoalReadback
+          ?'An active goal exists, but its source receipt could not be verified. Do not recreate your goal automatically. No work was authorized or executed.'
+          :'A user-confirmed goal is required before Reality can prepare this work. No action was authorized or executed.',
+          'goal');
       }else{
-        receipt.textContent='Reality blocked the handoff: '+code+'. No external work was executed.';
+        setWorkStep(card,3,'blocked','Source and exact action · Not verified');
+        receipt.textContent='Reality blocked the handoff: '+code+
+          '. No external work was executed.';
       }
     }
   });
@@ -591,15 +691,19 @@ setInterval(refreshSavedShiftHome,300000);
   return data;
  }
  el('privateSetGoal').onclick=async()=>{
-  const message=el('privateGoalText').value.trim();
-  if(!message)return status('Enter the objective you are explicitly authorizing.');
+  const goalField=el('privateGoalText');
+  if(!goalField.checkValidity()){goalField.reportValidity();return status('A goal in your own words is required before business work can be prepared.');}
+  const message=goalField.value.trim();
+  if(message.length<12)return status('Enter a meaningful goal of at least 12 characters.');
   if(!confirm('Confirm that this is your new active conversational objective? This does not authorize any external actions.'))return;
   el('privateSetGoal').disabled=true;
   try{
    await saveGoalCommand('SET_ACTIVE',message);
    el('privateGoalText').value='';
    await loadGoals();await loadSaved();await loadConversations();
-   status('User-authorized goal recorded and verified in Continuity.');
+   status('User-authorized goal recorded and verified in Continuity. Return to the work card to continue approval.');
+   if(guidedWorkPending){guidedWorkPending=false;
+     $('attentionQueue')?.scrollIntoView({behavior:'smooth',block:'start'});}
   }catch(e){status('Goal was not confirmed: '+e.message)}
   finally{el('privateSetGoal').disabled=false}
  };
@@ -678,6 +782,9 @@ setInterval(refreshSavedShiftHome,300000);
   }catch(e){if(el('privateChat').style.display==='block')status(e.message)}
  }
  el('privateSignIn').onclick=async()=>{
+  for(const id of ['privateEmail','privatePassword']){
+    if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
+  }
   el('privateSignIn').disabled=true;status('Checking account…');
   try{
    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
