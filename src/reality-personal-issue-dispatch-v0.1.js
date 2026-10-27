@@ -23,6 +23,8 @@ import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
+import {recordNextEvidenceBoundImprovement}
+ from './reality-verified-improvement-handoff-v0.1.js';
 
 export const PERSONAL_ISSUE_DISPATCH_VERSION='reality-personal-issue-dispatch-v0.1';
 const fail=code=>{throw Error(code)};
@@ -288,6 +290,7 @@ export async function runPersonalIssueDispatch({
  bridgeFactory=createPersonalGithubIssueBridge,
  checkDuplicate=checkForExistingMaintainerIssue,
  recordOutcome=recordPersonalIssueExecutionOutcome,
+ recordLearning=recordNextEvidenceBoundImprovement,
 }={}){
  assertPersonalDispatchEnvironment({session,conversationId,env});
  if(confirmation!=='EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE')
@@ -343,10 +346,33 @@ export async function runPersonalIssueDispatch({
    goalId:ready.goal_id,reservationId:granted.reservation_id,
    executionResult:result,
   });
+  // Learning is an evidence-bound PROPOSAL, never self-deployed code.
+  // Once GitHub has been touched, a failure saving this extra receipt
+  // must not trigger any retry or re-run of the external operation.
+  let learningReceiptId=null;
+  let learningStatus='NOT_ELIGIBLE_WITHOUT_VERIFIED_EXECUTION';
+  if(outcome.independently_verified){
+   try{
+    const next=await recordLearning({
+     session,conversationId,workId:discoveredWorkId,env,
+    });
+    if(next?.receipt_id&&next.authority==='NOT_GRANTED'&&
+       next.improvement_applied===false&&next.improvement_tested===false){
+     learningReceiptId=next.receipt_id;
+     learningStatus='EVIDENCE_BOUND_PROPOSAL_SAVED_NOT_AUTHORIZED';
+    }else{
+     learningStatus='LEARNING_READBACK_UNCONFIRMED_NO_PROVIDER_RETRY';
+    }
+   }catch{
+    learningStatus='LEARNING_READBACK_UNCONFIRMED_NO_PROVIDER_RETRY';
+   }
+  }
   return Object.freeze({
    status:outcome.independently_verified?'VERIFIED':'UNRESOLVED',
    work_id:discoveredWorkId,reservation_id:granted.reservation_id,
    outcome_receipt_id:outcome.receipt_id,
+   learning_receipt_id:learningReceiptId,learning_status:learningStatus,
+   improvement_applied:false,
    verified:outcome.independently_verified,
    provider_issue_url:outcome.provider_issue_url,
    provider_failure_stage:outcome.failure_stage||null,
