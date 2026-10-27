@@ -277,10 +277,11 @@ test('SINGLE CONTIGUOUS vertical slice: source discovery → confirmed goal → 
 
 test('unverified or absent provider outcome cannot generate an improvement claim',async()=>{
  const s=storeFixture();
+ const observedHistory=await s.continuityStore.reconstruct();
  assert.throws(()=>deriveNextEvidenceBoundImprovement({
-  history:await s.continuityStore.reconstruct(),workId,
+  history:observedHistory,workId,
  }),/IMPROVEMENT_ONE_VERIFIED_OUTCOME_REQUIRED/);
- const tainted=[...(await s.continuityStore.reconstruct()),{
+ const tainted=[...observedHistory,{
   entity_type:'personal_issue_execution_outcome',event_kind:'OUTCOME',
   epistemic_status:'UNKNOWN',event_id:randomUUID(),payload:{
    work_id:workId,outcome_state:'UNRESOLVED',
