@@ -1,4 +1,5 @@
-import { createExecutionReceipt, canExecute } from './reality-governed-work-runtime-v0.1.js';
+import { createExecutionReceipt, canExecute, classifyWorkItemExecutionEffect } from './reality-governed-work-runtime-v0.1.js';
+import { verifyBoundExecutionApproval } from './reality-authority-v1.0.js';
 import { evaluateGoalExecutionBoundary } from './reality-goal-execution-boundary-v0.1.js';
 
 export const GOVERNED_EXECUTION_ENGINE_VERSION = 'reality-governed-execution-engine-v0.1';
@@ -11,6 +12,7 @@ export async function executeAuthorizedWork({
   workItem,
   workflowId,
   authorization,
+  serverApprovalProof=null,
   connector,
   independentVerifier,
   requestSummary = null,
@@ -26,6 +28,20 @@ export async function executeAuthorizedWork({
     return Object.freeze({
       engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
       status:'BLOCKED',blocked_reason:goalBoundary.reason,
+      goal_authority_boundary:goalBoundary,
+      execution:null,verification:null,outcome:null,
+    });
+  }
+  const effect=classifyWorkItemExecutionEffect(workItem);
+  // This second guard applies even when an internal caller bypasses the HTTP
+  // endpoint. Untrusted model/client authorizations cannot mint server proof.
+  if(workItem.connector&&effect.consequential){
+    const verified=verifyBoundExecutionApproval({
+      proof:serverApprovalProof,workItem,authorization,
+    });
+    if(!verified.valid)return Object.freeze({
+      engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+      status:'BLOCKED',blocked_reason:verified.reason,
       goal_authority_boundary:goalBoundary,
       execution:null,verification:null,outcome:null,
     });
