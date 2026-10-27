@@ -950,10 +950,10 @@ function wcUnfinishedHTML(job){
  return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
   '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
   '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
-  '<p><strong>What's done:</strong> '+(job.action_completed===true?
+  '<p><strong>Completed action:</strong> '+(job.action_completed===true?
     'The GitHub tracking issue was independently verified.':
     'The previous action is not independently verified.')+'</p>'+
-  '<p><strong>What's left:</strong> Diagnose, repair and independently verify the original job.</p>'+
+  '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
   '<div class="wc-unfinished-actions">'+action+link+'</div>'+
   (job.recovery_receipt_id?
