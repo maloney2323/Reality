@@ -645,6 +645,10 @@ setInterval(refreshSavedShiftHome,300000);
     :finalGate.status==='NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE'
      ?'FINAL ANSWER: no recognized unauthorized shift; not independently certified'
      :'FINAL ANSWER: direction review unavailable or incomplete';
+   const integrity=reliability.three_contract_integrity||{};
+   const integrityText=integrity.canonical_user_goal_state_bound&&integrity.proof_hash?
+    'Goal-state / transition / assistant proposal bound to released answer (semantics unverified)':
+    'Three-contract final-answer Integrity proof not established';
    const goalGovernance=reliability.assistant_goal_governance||{};
    const goalGovernanceText=goalGovernance.status==='ASSISTANT_GOAL_MUTATION_BLOCKED'
     ? 'Assistant-proposed goal change BLOCKED; user has not authorized it'
@@ -672,6 +676,7 @@ setInterval(refreshSavedShiftHome,300000);
     ' · '+streakText+
     ' · '+ambiguityText+
     ' · Goal transition: '+goalGovernanceText+
+    ' · '+integrityText+
     ' · '+finalGateText+
     ' · Goal tracking: '+driftText+
     ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
