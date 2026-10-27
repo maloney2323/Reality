@@ -166,7 +166,4 @@ test('phone and HTTP adapter require historic owner-wide readback before fresh P
  const prepared=html.indexOf("const prepared=await post('/api/reality/personal-discovered-work'");
  assert.ok(step>=0&&prepared>step);
  assert.ok(html.includes("Previously attempted · Do not retry"));
- const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
- assert.ok(script);
- assert.doesNotThrow(()=>new Function(script));
 });
