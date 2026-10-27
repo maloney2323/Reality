@@ -1,3 +1,4 @@
+import {classifyWorkItemExecutionEffect} from './reality-governed-work-runtime-v0.1.js';
 // Foundational server-side execution boundary for Reality's user-owned goals.
 // A chat model, its reviewer, browser JSON, or customer auto-authority policy
 // cannot rewrite the existing Continuity/Universe goal state. This check
@@ -75,8 +76,12 @@ export function evaluateGoalExecutionBoundary({workItem,authorization=null}={}){
   });
  // Scan the work item and even a user-supplied authorization artifact. Its
  // presence NEVER independently proves a user authorized a goal mutation.
+ const effect=classifyWorkItemExecutionEffect(workItem);
  const structural=recursiveMutationField({workItem,authorization});
- const reason=structural||supabaseResource(workItem);
+ const reason=structural||
+  (effect.status==='UNRECOGNIZED_CONNECTOR_OPERATION'?
+   'GOAL_BOUNDARY_UNRECOGNIZED_CONNECTOR_OPERATION':null)||
+  supabaseResource(workItem);
  return Object.freeze({
   version:GOAL_EXECUTION_BOUNDARY_VERSION,
   status:reason?'BLOCKED':'NO_GOAL_STATE_MUTATION_REQUESTED',
@@ -84,6 +89,8 @@ export function evaluateGoalExecutionBoundary({workItem,authorization=null}={}){
   goal_mutation_authorized:false,
   external_execution_authorized_by_this_boundary:false,
   user_goal_authorization_independently_verified:false,
+  derived_external_effect:effect.status,
+  derived_consequential:effect.consequential,
   requires_separate_action_authorization:true,
  });
 }
