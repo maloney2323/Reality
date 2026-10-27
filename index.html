@@ -153,7 +153,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <div>2. Confirm or resume your own active business goal.</div>
 <div>3. Verify the discovered work and exact proposed action.</div>
 <div>4. Check the approval box and explicitly approve that one action.</div>
-<div><strong>Approval is not execution:</strong> no external actions are enabled in this preview.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section>
+<div><strong>Approval is not execution:</strong> no external actions are enabled in this preview.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div><div class="work-guidance" id="realityRecoveryPanel"><strong>Execution recovery · Read only</strong><p>Earlier uncertain attempts remain locked. Review GitHub evidence without re-executing or changing their reservations.</p><button type="button" id="reconcileHistory">Inspect previous execution attempts · No writes</button><div id="reconcileResult" role="status" aria-live="polite"></div></div></div></section>
 <details class="advanced-option" id="advancedShift"><summary>Optional · Advanced shift schedule and settings</summary>
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
 
@@ -376,6 +376,42 @@ $('startAction3').onclick=()=>{
  realityWork.click();
 };
 paintGuidedSetup();
+// Historical recovery is a different lane from approval and execution.
+$('reconcileHistory').onclick=async()=>{
+ const button=$('reconcileHistory'),out=$('reconcileResult');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!conv||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv)){
+  out.textContent='Sign in and open the conversation containing the original attempts first.';
+  return;
+ }
+ button.disabled=true;out.textContent='Reading your existing Continuity and GitHub issues. No writes…';
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RECONCILE',conversation_id:conv}),
+  });
+  const result=await response.json();
+  if(!response.ok||!result.ok)throw Error(result.error||'Read-only reconciliation unavailable');
+  if(!result.attempts?.length){
+   out.textContent='No uncertain issue attempts in this conversation. No action performed.';
+   return;
+  }
+  const lines=['Found '+result.attempts.length+' historic uncertain attempt(s). No retries or changes.'];
+  for(const prior of result.attempts){
+   const observed=prior.provider_observation||{};
+   lines.push(prior.original_title+': '+String(observed.status||'UNKNOWN')+
+    ' · reservation remains locked · causal attribution unproven');
+   for(const issue of observed.matching_issues||[])
+    if(/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(issue.url||'')))
+     lines.push('Observed issue: '+issue.url);
+  }
+  out.textContent=lines.join('\n');
+ }catch(e){
+  out.textContent='Recovery readback unavailable: '+e.message+
+   '. Historical reservations remain locked. No retry.';
+ }finally{button.disabled=false;}
+};
 const realityWork=$('findWork');const workResult=$('workResult');
 let guidedWorkPending=false;
 function jumpToWorkSetup(kind){
