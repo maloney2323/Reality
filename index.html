@@ -33,6 +33,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <section class="shift-settings" aria-label="Reality daily shift settings">
 <div class="shift-head"><div><div class="label">REALITY OPERATING SHIFT</div><strong>Daily autonomous shift</strong><p class="muted">Reality starts by itself, discovers its own work, and works the governed queue.</p></div><label class="switch"><input id="shiftEnabled" type="checkbox" checked><span>Enabled</span></label></div>
 <div class="shift-grid"><label>Engineering readiness<input id="readinessTime" type="time" value="20:00"></label><label>Shift start<input id="shiftStart" type="time" value="21:00"></label><label>Shift length<select id="shiftLength"><option value="8">8 hours</option><option value="12">12 hours</option></select></label></div>
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 0">
+<button id="runShiftNow" type="button">Run one supervised shift now</button>
+<span class="muted" id="runShiftProof" role="status">Owner-only discovery test. Scheduled shifts remain unchanged; no external work is authorized.</span>
+</div>
 <div class="shift-work"><span>Shift work</span><span>Find bugs · recover unfinished work · discover recurring work · research upgrades · watch competition · execute governed work · verify results</span></div>
 <details class="shift-scope"><summary>Show full shift mission</summary>
 <div class="shift-columns">
@@ -197,6 +201,32 @@ async function refreshSavedShiftHome(){
     if(!manualWorkActive)workResult.textContent='Saved autonomous shift results could not be verified: '+err.message;
   }
 }
+// Explicit one-time owner action starts investigation. Cron still runs independently.
+$('runShiftNow').onclick=async()=>{
+  const button=$('runShiftNow'), proof=$('runShiftProof');
+  button.disabled=true;
+  proof.textContent='Running one owner-authorized discovery cycle and checking the saved receipt…';
+  try{
+    const response=await fetch('/api/reality/shift',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'RUN_ONCE_NOW'}),
+    });
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.error||result.status||'SHIFT_RUN_FAILED');
+    const receipt=await fetch('/api/reality/shift',{cache:'no-store'});
+    if(!receipt.ok)throw new Error('SHIFT_READ_BACK_FAILED');
+    const saved=await receipt.json();
+    if(saved.home?.status!=='RECORDED' ||
+       saved.home.latest_tick_id!==result.result?.tick_id)
+      throw new Error('SHIFT_RESULT_NOT_YET_READ_BACK_VERIFIED');
+    proof.textContent='Persisted receipt confirmed: '+saved.home.latest_tick_id+
+      '. '+(saved.home.work||[]).length+' discovered work items. No work execution verified.';
+    await refreshSavedShiftHome();
+  }catch(error){
+    proof.textContent='Reality stopped without claiming success: '+error.message+
+      '. Use the same original signed browser session that saved the shift.';
+  }finally{button.disabled=false;}
+};
 // Loading saved discoveries is automatic; it never starts a new LLM call,
 // authorizes a tool, or runs the cron handler.
 refreshSavedShiftHome();

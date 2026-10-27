@@ -154,49 +154,14 @@ export function isChatBuildRequest(message) {
     || /\b(build|implement|add|create)\s+(this|that|it|a|an|the)\b/i.test(text(message));
 }
 
-export async function buildFromChat({ message, requestedBy = 'chat_user', authorizationRef = null } = {}) {
-  if (!isChatBuildRequest(message)) return null;
-
-  const repositoryContext = await loadRepositoryContext(message);
-  const plan = await generateBuild({ message, repositoryContext });
-
-  const authorization = authorizationRef || `chat-build:${requestId(text(message))}`;
-  const proposal = createSelfBuildProposal({
-    requestedBy,
-    objective: plan.objective,
-    rationale: plan.rationale,
-    files: plan.files,
-    tests: Array.isArray(plan.tests) ? plan.tests : [],
-    baseRef: 'main',
-    riskLevel: 'low',
-    verificationPlan: Array.isArray(plan.verificationPlan) ? plan.verificationPlan : [],
-  });
-
-  // The user's explicit "build/create/implement..." message is authorization
-  // for this bounded self-build operation only: create an isolated branch and
-  // PR. It never grants production merge or deployment authority.
-  const authorized = authorizeSelfBuild(proposal, {
-    authorizationRef: authorization,
-    authorizedBy: requestedBy,
-    allowedOperation: 'github:write_isolated_build_branch',
-  });
-
-  const result = await executeSelfBuild(authorized, {
-    provider: createGitHubSelfBuildProvider(),
-  });
-
-  return {
-    version: CHAT_BUILD_VERSION,
-    status: result.state,
-    build_id: result.build_id,
-    objective: result.objective,
-    branch: result.branch,
-    commit_sha: result.commit_sha,
-    pull_request: result.pull_request,
-    authorization: {
-      ref: result.authorization_ref,
-      scope: result.allowed_operation,
-      production_merge_permitted: false,
-    },
-  };
+// Legacy chat auto-build must NOT infer action authority from verbs such as
+// "fix" or "build", a generic cookie, or a client authorization_id.
+// The existing planner and GitHub self-build modules remain reusable, but
+// this old path cannot read private code, call a paid model, or write to GitHub
+// before authenticated owner goal + exact-work approval + single-use dispatch.
+export async function buildFromChat({message}={}){
+ if(!isChatBuildRequest(message))return null;
+ const error=new Error('CHAT_BUILD_DIRECT_EXECUTION_DISABLED');
+ error.status=403;
+ throw error;
 }

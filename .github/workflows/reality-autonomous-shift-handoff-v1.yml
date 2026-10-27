@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/reality-autonomous-shift-handoff-v1-20261024
+      - feature/reality-manual-shift-proof-20261024
     paths:
       - '.github/workflows/reality-autonomous-shift-handoff-v1.yml'
       - 'src/reality-autonomous-shift-control-v1.0.js'

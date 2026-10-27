@@ -1,0 +1,32 @@
+name: Reality Legacy Direct Write Hotfix
+on:
+  push:
+    paths:
+      - 'api/reality/authority.js'
+      - 'api/reality/execute.js'
+      - 'api/reality/self-build.js'
+      - 'api/reality/intelligence.js'
+      - 'src/reality-chat-build-v1.0.js'
+      - 'api/reality/connectors/github.js'
+      - 'test/reality-legacy-external-write-closure-v0.1.test.js'
+      - '.github/workflows/reality-legacy-direct-writes-hotfix.yml'
+  pull_request:
+    paths:
+      - 'api/reality/authority.js'
+      - 'api/reality/execute.js'
+      - 'api/reality/self-build.js'
+      - 'api/reality/intelligence.js'
+      - 'src/reality-chat-build-v1.0.js'
+      - 'api/reality/connectors/github.js'
+      - 'test/reality-legacy-external-write-closure-v0.1.test.js'
+      - '.github/workflows/reality-legacy-direct-writes-hotfix.yml'
+jobs:
+  deny-direct-provider-writes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: node --test test/reality-legacy-external-write-closure-v0.1.test.js
