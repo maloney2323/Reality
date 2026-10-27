@@ -410,3 +410,29 @@ test('readback fails closed if stored UUID entity disagrees with immutable work 
   createPersistence:s.createPersistence,
  }),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
 });
+
+test('new chat observations after the owner goal cannot force a stale-tail false rejection',async()=>{
+ const s=setup();
+ const at='2026-10-27T12:06:00.000Z';
+ const newer=appendContinuityNode({
+  spine:canonicalSpine,stage:'OBSERVATION',
+  entityId:'later-user-chat-observation',
+  eventId:'later-user-chat-observation-event',
+  parentEventId:s.events.at(-1).event_id,
+  priorLineageHash:s.events.at(-1).lineage_hash,
+  effectiveTime:at,assertionTime:at,
+  payload:{kind:'intervening-observation'},
+  provenance:{source:'test-non-goal-chat-observation'},
+ });
+ s.events.push(persistable(newer));
+ const result=await preparePersonalDiscoveredWorkHandoff(args(s));
+ assert.equal(result.action_approved,false);
+ assert.equal(s.events.at(-1).parent_event_id,newer.event_id);
+ assert.equal(s.events.at(-1).payload.goal_transition_receipt_id,goalReceipt);
+});
+test('browser handoff masks raw database JSON error details to avoid exposing conversation scope',()=>{
+ const source=readFileSync(new URL('../api/reality/personal-discovered-work.js',import.meta.url),'utf8');
+ assert.ok(source.includes('DISCOVERED_WORK_CONTINUITY_STORAGE_UNAVAILABLE'));
+ assert.ok(source.includes("dbFailure?'DISCOVERED_WORK_CONTINUITY_STORAGE_UNAVAILABLE'"));
+ assert.ok(!source.includes("error:e.message||'DISCOVERED_WORK_HANDOFF_UNAVAILABLE'"));
+});
