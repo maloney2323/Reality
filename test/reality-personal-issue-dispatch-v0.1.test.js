@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {createPersonalGithubIssueBridge,assertExactMaintainerIssue,checkForExistingMaintainerIssue,verifyPersonalGithubIssueToken}
  from '../src/reality-personal-github-execution-bridge-v0.1.js';
-import {runPersonalIssueDispatch,assertPersonalDispatchEnvironment}
+import {runPersonalIssueDispatch,assertPersonalDispatchEnvironment,assertNoPriorPersonalIssueAttempt}
  from '../src/reality-personal-issue-dispatch-v0.1.js';
 import dispatchApi from '../api/reality/personal-issue-dispatch.js';
 const project='hvkfreoagbrphwghjajw',url='https://'+project+'.supabase.co';
@@ -241,4 +241,43 @@ test('readiness endpoint checks real credential and never equates token presence
  assert.ok(source.includes("status='PREVIEW_GITHUB_CREDENTIAL_NOT_VERIFIED'"));
  assert.ok(source.includes("github_issue_write_permission_not_yet_proven:true"));
  assert.ok(!source.includes("Boolean(process.env.REALITY_GITHUB_TOKEN)?"));
+});
+
+test('prior UNCERTAIN real issue attempt cannot be approved again under new policy or changed work ID',()=>{
+ const oldWork='work:'+'b'.repeat(32),newWork='work:'+'c'.repeat(32);
+ const workflowKey='workflow-failure:Reality Durable Adversarial Business Workday';
+ const history=[
+  {entity_type:'personal_discovered_work_handoff',payload:{work_id:oldWork,work_key:workflowKey}},
+  {entity_type:'personal_issue_execution_outcome',payload:{
+   work_id:oldWork,outcome_state:'UNRESOLVED',reservation_state:'UNCERTAIN',
+   no_automatic_retry:true}},
+  {entity_type:'personal_discovered_work_handoff',payload:{work_id:newWork,work_key:workflowKey}},
+ ];
+ for(const tested of [oldWork,newWork]){
+  assert.throws(()=>assertNoPriorPersonalIssueAttempt({
+   history,discoveredWorkId:tested,workKey:workflowKey,
+  }),/PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY/);
+ }
+ assert.equal(assertNoPriorPersonalIssueAttempt({
+  history,discoveredWorkId:'work:'+'d'.repeat(32),
+  workKey:'workflow-failure:Unrelated work',
+ }),true);
+});
+test('server checks prior Continuity outcome before minting any new dispatch authorization',()=>{
+ const src=readFileSync(new URL('../src/reality-personal-issue-dispatch-v0.1.js',import.meta.url),'utf8');
+ const check=src.indexOf(' await ensureNoPrior({');
+ const proof=src.indexOf(' const groundingProof=issueProof(');
+ const grant=src.indexOf(' const admitted=await prepare(');
+ assert.ok(check>0&&check<proof&&proof<grant);
+ assert.ok(src.includes("event.entity_type==='personal_issue_execution_outcome'"));
+ assert.ok(src.includes('related.has(event.payload?.work_id)'));
+});
+test('previous unresolved work cannot expose another live Run control in UI',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes("intent:'CHECK',conversation_id:conversationId,discovered_work_id:workId"));
+ assert.ok(html.includes("check.status!=='EXACT_SOURCE_AND_USER_APPROVAL_ADMITTED'"));
+ assert.ok(html.includes('PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY'));
+ const preflight=html.indexOf("intent:'CHECK',conversation_id:conversationId,discovered_work_id:workId");
+ const checkbox=html.indexOf("checked.type='checkbox';checked.required=true");
+ assert.ok(preflight>=0&&preflight<checkbox);
 });
