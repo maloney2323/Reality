@@ -18,6 +18,23 @@ export function assertExactMaintainerIssue(item){
   throw Error('PERSONAL_GITHUB_DISPATCH_NOT_EXACT_SCOPED_ISSUE');
  return item;
 }
+// Read-only credential probe. Confirms the PAT is authenticated as the
+// intended repository owner and can read GitHub issues. GitHub write
+// permission is proven only by a separately authorized actual POST.
+export async function verifyPersonalGithubIssueToken({get=githubGet}={}){
+ const owner=await get('/user');
+ if(owner?.login!=='maloney2323')
+  throw Error('PERSONAL_GITHUB_CREDENTIAL_OWNER_UNVERIFIED');
+ const issues=await get(ROOT+'/issues?state=open&per_page=1');
+ if(!Array.isArray(issues))
+  throw Error('PERSONAL_GITHUB_CREDENTIAL_ISSUES_READ_UNVERIFIED');
+ return Object.freeze({
+  credential_identity_verified:true,
+  repository_issues_read_verified:true,
+  github_issue_write_permission_not_yet_proven:true,
+  external_action_performed:false,
+ });
+}
 export async function checkForExistingMaintainerIssue(item,{get=githubGet}={}){
  assertExactMaintainerIssue(item);
  // Do not add a duplicate tracking issue when one with the same exact
