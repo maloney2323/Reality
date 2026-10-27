@@ -123,3 +123,88 @@ export function projectHypotheticalWorkValue({
   cannot_infer_job_reduction:true,
  });
 }
+
+
+// Staffing-capacity projection is a hypothetical role-level economics model.
+// Crucial distinction: 2.4 FTE-equivalent hours released does NOT establish
+// that any 2 or 3 actual positions can be eliminated. It may be fragmented
+// over many employees, and the remaining work/coverage may require them.
+export function projectHypotheticalWorkforceImpact({
+ manual_minutes_per_occurrence,
+ occurrences_per_month,
+ automatable_fraction,
+ loaded_hourly_labor_cost_usd,
+ productive_hours_per_fte_month,
+ human_review_minutes_per_automated_occurrence,
+ exception_fraction_of_automated_occurrences,
+ human_minutes_per_exception,
+ team_headcount=null,
+ estimated_automation_cost_usd_per_month=null,
+ estimated_monthly_implementation_amortization_usd=null,
+}={}){
+ const positive=(n,max)=>typeof n==='number'&&Number.isFinite(n)&&n>0&&n<=max;
+ const nonnegative=(n,max)=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=max;
+ if(!positive(manual_minutes_per_occurrence,60000)||
+  !positive(occurrences_per_month,100000)||
+  !positive(loaded_hourly_labor_cost_usd,100000)||
+  !positive(productive_hours_per_fte_month,744)||
+  !nonnegative(human_review_minutes_per_automated_occurrence,60000)||
+  !nonnegative(human_minutes_per_exception,60000)||
+  !nonnegative(automatable_fraction,1)||
+  !nonnegative(exception_fraction_of_automated_occurrences,1))
+  throw Error('WORKFORCE_IMPACT_MISSING_OR_INVALID_CUSTOMER_ASSUMPTIONS');
+ if(team_headcount!==null&&(!Number.isSafeInteger(team_headcount)||
+  team_headcount<1||team_headcount>1_000_000))
+  throw Error('WORKFORCE_IMPACT_HEADCOUNT_INVALID');
+ for(const n of [estimated_automation_cost_usd_per_month,
+  estimated_monthly_implementation_amortization_usd]){
+  if(n!==null&&!nonnegative(n,1e9))
+   throw Error('WORKFORCE_IMPACT_OPERATING_COST_INVALID');
+ }
+ const covered=occurrences_per_month*automatable_fraction;
+ const baseline=manual_minutes_per_occurrence*occurrences_per_month/60;
+ const grossReleased=covered*manual_minutes_per_occurrence/60;
+ const review=covered*human_review_minutes_per_automated_occurrence/60;
+ const exception=covered*exception_fraction_of_automated_occurrences*
+  human_minutes_per_exception/60;
+ const netHours=Math.max(0,grossReleased-review-exception);
+ const fte=netHours/productive_hours_per_fte_month;
+ const laborCapacityValue=netHours*loaded_hourly_labor_cost_usd;
+ const costsKnown=estimated_automation_cost_usd_per_month!==null&&
+  estimated_monthly_implementation_amortization_usd!==null;
+ const netValue=costsKnown?laborCapacityValue-
+  estimated_automation_cost_usd_per_month-
+  estimated_monthly_implementation_amortization_usd:null;
+ const round=n=>Number(n.toFixed(2));
+ const theoreticalWholePositions=Math.floor(fte+1e-9);
+ return Object.freeze({
+  version:'reality-hypothetical-workforce-impact-v0.1',
+  label:'HYPOTHETICAL_CUSTOMER_ENTERED_STAFFING_CAPACITY_SCENARIO',
+  unit:'MONTH',
+  assumptions_provided_by:'CUSTOMER_NOT_VERIFIED',
+  monthly_manual_baseline_hours:round(baseline),
+  monthly_covered_occurrences:round(covered),
+  monthly_gross_task_hours_released:round(grossReleased),
+  monthly_human_review_hours:round(review),
+  monthly_exception_handling_hours:round(exception),
+  monthly_net_capacity_hours:round(netHours),
+  workforce_capacity_fte_equivalent:round(fte),
+  theoretical_whole_position_capacity_upper_bound:team_headcount===null?
+   null:Math.min(theoreticalWholePositions,team_headcount),
+  total_current_team_headcount:team_headcount,
+  actual_eliminable_positions:null,
+  actual_layoffs_recommended:false,
+  verified_positions_removed:null,
+  gross_monthly_labor_capacity_value_usd:round(laborCapacityValue),
+  hypothetical_net_economic_value_usd_month:netValue===null?null:round(netValue),
+  verified_monthly_payroll_reduction_usd:null,
+  verified_company_cash_savings_usd:null,
+  realized_value_verified:false,
+  full_job_automation_verified:false,
+  schedule_coverage_verified:false,
+  remaining_role_duties_verified:false,
+  role_consolidation_verified:false,
+  staffing_action_authorized:false,
+  proof_required:'Validate full job cycle, distinct job/role distribution, remaining duties, minimum coverage, supervision and exceptions, actual loaded cost, measured execution and cash conversion before estimating eliminable positions or payroll reduction.',
+ });
+}
