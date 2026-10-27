@@ -115,7 +115,13 @@ export async function recordAuthenticatedPersonalActionApproval({
   principalId:session.user_id,conversationId,
  }))throw Error('PERSONAL_ACTION_GOAL_APPROVAL_BINDING_INVALID');
  await saveAuthorityPolicy(policy,store);
- const persisted=await getAuthorityPolicy(session.user_id,store);
+ const persisted=await getAuthorityPolicy(session.user_id,store,{
+  matches:saved=>saved.policy_id===policy.policy_id&&
+   policyMatchesGoalBoundWork({
+    policy:saved,workItem,binding:signed.binding,
+    principalId:session.user_id,conversationId,
+   }),
+ });
  if(persisted?.policy_id!==policy.policy_id||
     !policyMatchesGoalBoundWork({
       policy:persisted,workItem,binding:signed.binding,
