@@ -725,6 +725,84 @@ function wcScenarioNumber(id,allowZero=false){
  const number=Number(str);
  return Number.isFinite(number)&&(allowZero?number>=0:number>0)?number:NaN;
 }
+let wcStaffingRequestId=0;
+function wcResetStaffing(){
+ wcStaffingRequestId++;
+ $('wcStaffingResult').textContent='Scenario inputs changed. Calculate again. No actual jobs or payroll savings have been verified.';
+}
+async function wcCalculateStaffing(){
+ const token=++wcStaffingRequestId;
+ const out=$('wcStaffingResult');
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ if(selected.length!==1){
+  out.textContent='Select exactly ONE workflow. Different roles/tasks require separate baselines.';
+  return;
+ }
+ const id=wcKey(selected[0]);
+ const values={
+  manual_minutes_per_occurrence:wcScenarioNumber('wcManualMinutes'),
+  occurrences_per_month:wcScenarioNumber('wcFrequency'),
+  automatable_fraction:null,
+  loaded_hourly_labor_cost_usd:wcScenarioNumber('wcLaborRate'),
+  productive_hours_per_fte_month:wcScenarioNumber('wcFteHours'),
+  human_review_minutes_per_automated_occurrence:wcScenarioNumber('wcReviewMinutes',true),
+  exception_fraction_of_automated_occurrences:null,
+  human_minutes_per_exception:wcScenarioNumber('wcExceptionMinutes',true),
+  team_headcount:wcScenarioNumber('wcTeamHeadcount'),
+  estimated_automation_cost_usd_per_month:wcScenarioNumber('wcMonthlyCost',true),
+  estimated_monthly_implementation_amortization_usd:wcScenarioNumber('wcSetupCost',true),
+ };
+ const coverage=wcScenarioNumber('wcCoverage',true);
+ const exception=wcScenarioNumber('wcExceptionRate',true);
+ if(coverage!==null)values.automatable_fraction=coverage/100;
+ if(exception!==null)values.exception_fraction_of_automated_occurrences=exception/100;
+ if(values.team_headcount===null)values.team_headcount=null;
+ const required=[
+  'manual_minutes_per_occurrence','occurrences_per_month','automatable_fraction',
+  'loaded_hourly_labor_cost_usd','productive_hours_per_fte_month',
+  'human_review_minutes_per_automated_occurrence',
+  'exception_fraction_of_automated_occurrences','human_minutes_per_exception'
+ ];
+ if(required.some(key=>values[key]===null)){
+  out.textContent='Need task duration, monthly frequency, automation %, loaded hourly cost, hours/FTE, review minutes, exception %, and exception minutes. Enter zero explicitly where justified.';
+  return;
+ }
+ if(Object.values(values).some(v=>typeof v==='number'&&!Number.isFinite(v))){
+  out.textContent='An input is invalid. No staffing projection calculated.';return;
+ }
+ out.textContent='Calculating a hypothetical staffing scenario. No action is being performed…';
+ try{
+  const res=await fetch('/api/reality/workforce-impact',{
+   method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+   body:JSON.stringify(values),
+  });
+  const result=await res.json();
+  if(token!==wcStaffingRequestId||!wcWork.some(w=>wcKey(w)===id)||!wcPicked.has(id))return;
+  if(!res.ok||!result.ok||!result.projection)throw Error('Assumptions were rejected.');
+  const p=result.projection;
+  const money=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+  out.textContent='HYPOTHETICAL workforce scenario for '+String(selected[0].title||selected[0].objective||'selected work')+
+   '\nManual baseline: '+p.monthly_manual_baseline_hours.toFixed(2)+' hours/month'+
+   '\nGross automation-covered work: '+p.monthly_gross_task_hours_released.toFixed(2)+' hours/month'+
+   '\nHuman review and exceptions: '+(p.monthly_human_review_hours+p.monthly_exception_handling_hours).toFixed(2)+' hours/month'+
+   '\nNET CAPACITY RETURNED: '+p.monthly_net_capacity_hours.toFixed(2)+' hours/month'+
+   '\nFULL-TIME-EQUIVALENT CAPACITY: '+p.workforce_capacity_fte_equivalent.toFixed(2)+' FTE'+
+   '\nTheoretical whole-position capacity ceiling: '+
+    (p.theoretical_whole_position_capacity_upper_bound===null?'UNKNOWN — enter actual team headcount':
+     String(p.theoretical_whole_position_capacity_upper_bound)+' positions at most, ONLY if remaining duties and staffing coverage permit consolidation')+
+   '\nActual eliminable positions: UNKNOWN (NOT VERIFIED)'+
+   '\nGross labor capacity value/month: '+money(p.gross_monthly_labor_capacity_value_usd)+
+   '\nHypothetical net economic capacity/month: '+
+    (p.hypothetical_net_economic_value_usd_month===null?'UNKNOWN — operating and implementation costs both required':
+     money(p.hypothetical_net_economic_value_usd_month))+
+   '\nVERIFIED PAYROLL SAVINGS: NONE. VERIFIED ROLE REDUCTION: NONE.'+
+   '\nThis is potential capacity, NOT a layoff prediction. Proving actual savings requires role mapping, tested end-to-end automation, measured oversight, shift coverage, and payroll evidence.';
+ }catch{
+  if(token!==wcStaffingRequestId)return;
+  out.textContent='Workforce projection could not be completed from these assumptions. No workforce or payment action occurred.';
+ }
+}
+
 function wcRenderValueScenario(){
  const el=$('wcValueOutput');
  const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
@@ -775,6 +853,7 @@ function wcPaintSummary(){
  $('wcPreview').textContent=shift?'Review draft shift':'Review selected tasks';
  $('wcSummary').textContent=wcSummary();
  wcRenderValueScenario();
+ wcResetStaffing();
  document.querySelectorAll('[data-wc-mode]').forEach(b=>
   b.setAttribute('aria-selected',String(b.dataset.wcMode===wcMode)));
 }
@@ -887,7 +966,13 @@ $('wcHours').onchange=wcPaintSummary;
 $('wcMetering').onchange=wcPaintSummary;
 $('wcRate').oninput=wcPaintSummary;
 $('wcSort').onchange=()=>{wcSort=$('wcSort').value;wcRender()};
-for(const id of ['wcManualMinutes','wcFrequency','wcCoverage','wcLaborRate','wcMonthlyCost'])$(id).oninput=wcRenderValueScenario;
+for(const id of ['wcManualMinutes','wcFrequency','wcCoverage','wcLaborRate','wcMonthlyCost']){
+ $(id).oninput=()=>{wcRenderValueScenario();wcResetStaffing()};
+}
+for(const id of ['wcFteHours','wcReviewMinutes','wcExceptionRate','wcExceptionMinutes','wcTeamHeadcount','wcSetupCost']){
+ $(id).oninput=wcResetStaffing;
+}
+$('wcCalculateStaffing').onclick=wcCalculateStaffing;
 $('wcPreview').onclick=()=>{$('wcSummary').textContent=wcSummary(true)};
 wcRender();
 
