@@ -31,8 +31,12 @@ export default async function handler(req,res){
    original_job_completed:false,execution_authorized:false,
    external_action_performed:false,
   });
- }catch{
+ }catch(error){
+  const message=String(error?.message||'');
+  const safe=/^RECOVERY_[A-Z0-9_]{4,100}$/.test(message)?
+   message:'RECOVERY_PROVIDER_OR_LEDGER_EVIDENCE_UNAVAILABLE';
   return res.status(503).json({
+   error_code:safe,
    ok:false,error:'RECOVERY_PROVIDER_OR_LEDGER_EVIDENCE_UNAVAILABLE',
    original_job_completed:false,external_action_performed:false,
   });
