@@ -216,14 +216,20 @@ test('SINGLE CONTIGUOUS vertical slice: source discovery → confirmed goal → 
  const bridgeFactory=()=>createPersonalGithubIssueBridge({
   get:s.readGithub,write:s.writeGithub,
  });
+ const recordLearning=opts=>recordNextEvidenceBoundImprovement({
+  ...opts,persistenceFactory:()=>s.continuityStore,
+ });
  const result=await runPersonalIssueDispatch({
   session,conversationId,discoveredWorkId:workId,env,
   confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE',
-  prepare,reserve,recordOutcome,bridgeFactory,
+  prepare,reserve,recordOutcome,recordLearning,bridgeFactory,
   checkDuplicate:item=>checkForExistingMaintainerIssue(item,{get:s.readGithub}),
  });
  assert.equal(result.status,'VERIFIED',JSON.stringify(result));
  assert.equal(result.verified,true);
+ assert.equal(result.learning_status,'EVIDENCE_BOUND_PROPOSAL_SAVED_NOT_AUTHORIZED');
+ assert.ok(result.learning_receipt_id);
+ assert.equal(result.improvement_applied,false);
  assert.equal(result.provider_issue_url,'https://github.com/maloney2323/Reality/issues/8401');
  assert.ok(result.outcome_receipt_id);
  const stats=s.stats();
@@ -255,7 +261,7 @@ test('SINGLE CONTIGUOUS vertical slice: source discovery → confirmed goal → 
   persistenceFactory:()=>s.continuityStore,
  });
  assert.equal(persistedLearning.receipt_id,next.proposal_id);
- assert.equal(persistedLearning.already_recorded,false);
+ assert.equal(persistedLearning.already_recorded,true);
  const idempotentLearning=await recordNextEvidenceBoundImprovement({
   session,conversationId,workId,env,
   persistenceFactory:()=>s.continuityStore,
