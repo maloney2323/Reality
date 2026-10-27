@@ -100,7 +100,7 @@ export async function recordNextEvidenceBoundImprovement({
   reject('IMPROVEMENT_CONTINUITY_TAIL_REQUIRED');
  const at=new Date().toISOString();
  const node=appendContinuityNode({
-  spine,stage:'EVALUATION',entityId:proposal.proposal_id,
+  spine,stage:'LEARNING',entityId:proposal.proposal_id,
   eventId:proposal.proposal_id,parentEventId:tail.event_id,
   priorLineageHash:tail.lineage_hash,effectiveTime:at,assertionTime:at,
   epistemicStatus:'CLAIMED',
