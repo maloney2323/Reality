@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readPriorIssueEffectsForPrincipal}
  from '../src/reality-principal-prior-effect-v0.1.js';
-import {assertNoPriorPersonalIssueAttempt,ensureNoPriorPersonalIssueAttempt}
+import {assertNoPriorPersonalIssueAttempt,ensureNoPriorPersonalIssueAttempt,
+ inspectPersonalIssueWorkHistoryReadOnly}
  from '../src/reality-personal-issue-dispatch-v0.1.js';
 
 const project='hvkfreoagbrphwghjajw',url='https://'+project+'.supabase.co';
@@ -114,4 +115,58 @@ test('pre-dispatch gate rejects another conversation even when current worldline
   persistenceFactory:()=>({reconstruct:async()=>[]}),
   principalHistoryReader:async()=>[previousSource,previousOutcome],
  }),/PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY/);
+});
+
+test('authenticated read-only source preflight blocks stale work BEFORE approval or reservation',async()=>{
+ let discoveries=0,histories=0;
+ const candidate={
+  kind:'SYSTEM_MAINTENANCE',work_id:currentWork,work_key:key,
+  state:'QUALIFIED',recurring:true,recurrence_count:2,authorization_required:true,
+  evidence_refs:[
+   'https://github.com/maloney2323/Reality/actions/runs/100',
+   'https://github.com/maloney2323/Reality/actions/runs/101',
+  ],
+  source_observation_ids:['github:100','github:101'],
+  execution_work_item:{
+   work_item_id:currentWork,workflow_id:'workflow:'+currentWork,
+   connector:'github',operation:'create_issue',consequential:true,
+   status:'AWAITING_AUTHORIZATION',
+   action:'Create one maintenance tracking issue',
+   inputs:{repository:'maloney2323/Reality',
+    title:'Reality recurring work: repair repeated Safe Preflight failures',
+    body:'<!-- Reality recurring work -->\n### Evidence\nReal source refs\n### Required work\nReview failures',
+   },
+  },
+ };
+ const run=hist=>inspectPersonalIssueWorkHistoryReadOnly({
+  session,conversationId:randomUUID(),env,discoveredWorkId:currentWork,
+  discover:async()=>{discoveries++;return {work:[candidate]}},
+  principalHistoryReader:async()=>{histories++;return hist},
+ });
+ const old=await run([previousSource,previousOutcome,newSource]);
+ assert.equal(old.status,'PREVIOUS_PROVIDER_ATTEMPT_REQUIRES_RECONCILIATION');
+ assert.equal(old.can_request_new_approval,false);
+ assert.equal(old.execution_authorized,false);
+ assert.equal(old.external_action_performed,false);
+ const fresh=await run([]);
+ assert.equal(fresh.status,'NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED');
+ assert.equal(fresh.can_request_new_approval,true);
+ assert.equal(fresh.execution_authorized,false);
+ assert.equal(discoveries,2);
+ assert.equal(histories,2);
+});
+test('phone and HTTP adapter require historic owner-wide readback before fresh PREPARE',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/reality/personal-issue-dispatch.js',import.meta.url),'utf8');
+ assert.ok(api.includes("b.intent==='HISTORY_CHECK'"));
+ assert.ok(api.includes('inspectPersonalIssueWorkHistoryReadOnly('));
+ assert.ok(api.includes('WORK_HISTORY_CHECK_READ_ONLY'));
+ const step=html.indexOf("intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id");
+ const prepared=html.indexOf("const prepared=await post('/api/reality/personal-discovered-work'");
+ assert.ok(step>=0&&prepared>step);
+ assert.ok(html.includes("Previously attempted · Do not retry"));
+ const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script));
 });
