@@ -613,6 +613,7 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
   const consent=document.createElement('label');
   const checked=document.createElement('input');checked.type='checkbox';checked.required=true;
   const terms=document.createElement('span');
+  terms.dataset.runConsentText='true';
   terms.textContent='Required: I separately authorize creating this one exact GitHub issue now. I understand it cannot be blindly retried if the outcome is uncertain.';
   consent.append(checked,terms);
   const run=document.createElement('button');run.type='button';run.disabled=true;
@@ -623,6 +624,7 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
    if(!confirm('Create ONE real GitHub issue in maloney2323/Reality named: '+workItem.inputs.title+'?'))return;
    checked.disabled=true;run.disabled=true;
    run.textContent='Executing once · Verifying GitHub…';
+   let verifiedIssue=false;
    try{
     const response=await fetch('/api/reality/personal-issue-dispatch',{
      method:'POST',credentials:'same-origin',
@@ -644,13 +646,27 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
      throw Error(out.error||'Execution was not admitted. Review before any retry.');
     }
     if(out.status==='VERIFIED'&&out.verified===true&&
+       out.outcome_receipt_id&&out.reservation_id&&
        /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(out.provider_issue_url||''))){
+     verifiedIssue=true;
      const link=document.createElement('a');
      link.textContent='View independently verified GitHub issue';
      link.href=out.provider_issue_url;link.target='_blank';link.rel='noopener noreferrer';
-     info.textContent='Gap 3 · Verified outcome persisted to Continuity. GitHub readback passed.';
-     receipt.textContent='Verified GitHub issue · Work '+workId+
-      ' · Outcome receipt '+out.outcome_receipt_id+' · Single-use reservation '+out.reservation_id;
+     info.textContent='GitHub tracking issue created and independently read back. Outcome saved to Continuity. The underlying investigation and repair are still pending.';
+     receipt.textContent='GitHub ISSUE CREATED AND VERIFIED · Work '+workId+
+      ' · Outcome receipt '+out.outcome_receipt_id+' · Single-use reservation '+out.reservation_id+
+      ' · Repair not performed.';
+     const approvalOnly=review.querySelector('[data-approval-only-note]');
+     if(approvalOnly)approvalOnly.textContent='GitHub action completed and verified. This created a tracking issue only; the underlying failure is not repaired. No replay of this reservation.';
+     const card=review.closest('.attention-item');
+     setWorkStep(card,4,'complete','GitHub issue created · Verified; repair pending');
+     const setupButton=card?.querySelector('[data-auth]');
+     if(setupButton){
+      setupButton.disabled=true;
+      setupButton.textContent='GitHub issue verified · Repair pending';
+     }
+     const consentText=review.querySelector('[data-run-consent-text]');
+     if(consentText)consentText.textContent='Your one-time authorization has been consumed. Do not create another issue for this same attempted work.';
      review.append(link);
     }else{
      info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
@@ -666,7 +682,9 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
     info.textContent='Gap 3 could not complete: '+e.message+
      '. Status may be uncertain. Do not retry automatically.';
    }
-   run.textContent='Execution attempt finished · Do not retry';
+   run.textContent=verifiedIssue?
+    'GitHub issue verified · Repair pending · Do not retry':
+    'Execution attempt finished · Do not retry';
   };
   review.append(scope,consent,run);
  }catch{
@@ -1393,6 +1411,7 @@ function renderWork(source){
             '. No external action has been performed.';
           review.replaceChildren();
           const success=document.createElement('p');
+          success.dataset.approvalOnlyNote='true';
           success.textContent='Approval recorded and current goal rechecked. No provider action has run. Any live execution needs a new, separate confirmation and a single-use reservation.';
           review.append(success);
           btn.textContent='Approved · Dispatch not enabled';
