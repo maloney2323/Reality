@@ -198,10 +198,22 @@ export async function saveAuthorityPolicy(policy, persistence = createUniversePo
   return policy;
 }
 
-export async function getAuthorityPolicy(principalId, persistence = createUniversePostgresPersistence()) {
+export async function getAuthorityPolicy(
+ principalId,persistence=createUniversePostgresPersistence(),
+ {matches=null}={}
+) {
+  // Exact-work callers must select the persisted policy matching the CURRENT
+  // authenticated goal, conversation, work ID and fingerprint. Returning only
+  // the latest policy for a principal silently loses earlier simultaneous
+  // approvals, while choosing all past policies without matching widens scope.
+  if(matches!==null&&typeof matches!=='function')
+   throw Error('AUTHORITY_POLICY_SELECTOR_INVALID');
   const events = await persistence.reconstruct({ continuityRootId: ROOT, worldlineId: WORLDLINE });
   const rows = events
-    .filter(e => e.entity_type === 'customer_authority_policy' && e.payload?.principal_id === principalId)
+    .filter(e => e.entity_type === 'customer_authority_policy' &&
+      e.payload?.principal_id === principalId &&
+      e.entity_id===e.payload?.policy_id &&
+      (matches===null||matches(e.payload)===true))
     .sort((a,b) => String(a.assertion_time).localeCompare(String(b.assertion_time)));
   return rows.at(-1)?.payload || null;
 }
