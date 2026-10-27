@@ -195,4 +195,10 @@ test('the Work Center recovery button labels the original job unfinished and doe
  assert.match(js,/data-recovery-checkpoint/);
  assert.match(js,/data\.job_completed!==false/);
  assert.match(js,/data\.external_action_performed!==false/);
+ assert.match(js,/async function wcHydrateRecoveryCheckpoints/);
+ assert.match(js,/method:'POST'/);
+ assert.match(js,/if\(data\.reports\.length\)await wcHydrateRecoveryCheckpoints\(conv\)/);
+ assert.match(js,/data\.checkpoint_persisted===true/);
+ assert.match(js,/data\.checkpoint_persisted===false/);
+ assert.match(js,/Recovery checkpoint could not be checked/);
 });
