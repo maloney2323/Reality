@@ -106,6 +106,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-sort-label select{display:block;width:100%;font:inherit;color:#eef3fc;background:#152030;border:1px solid #425871;border-radius:9px;padding:10px;margin-top:6px}
 .wc-impact{border-top:1px solid #3b4c64;margin-top:18px;padding-top:16px}
 .wc-impact h3{margin:0;font-size:16px}
+
+.wc-staffing{border:1px solid #41536d;border-radius:12px;padding:13px;margin-top:15px;background:#0c1825}
+.wc-staffing summary{font-size:13px;font-weight:700;color:#e7f1fc;cursor:pointer}
+.wc-staffing .wc-plan-button{margin-top:14px}
 </style>
 </head>
 <body>
@@ -235,7 +239,28 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <label>Potential automation coverage (%)<input id="wcCoverage" type="number" min="0" max="100" step="1" placeholder="Assumed, 0–100"></label>
 <label>Hourly labor value (USD)<input id="wcLaborRate" type="number" min="0.01" max="100000" step="0.01" placeholder="Enter your labor cost/value"></label>
 <label>Monthly automation operating cost (USD, optional)<input id="wcMonthlyCost" type="number" min="0" max="1000000000" step="0.01" placeholder="Unknown unless measured"></label>
-</div><div class="wc-feedback" id="wcValueOutput" role="status" aria-live="polite">No verified labor baseline. Select one workflow and enter assumptions to model a hypothetical opportunity.</div></div>
+</div><div class="wc-feedback" id="wcValueOutput" role="status" aria-live="polite">No verified labor baseline. Select one workflow and enter assumptions to model a hypothetical opportunity.</div>
+<details class="wc-staffing" id="wcStaffing">
+<summary>Workforce impact · employees & FTE capacity</summary>
+<p class="wc-plan-desc">Estimate the maximum staffing capacity potentially freed, AFTER manual reviews and exceptions. This is a hypothetical planning model, not a recommendation to eliminate employees.</p>
+<div class="wc-inputs">
+<label>Productive paid hours per employee per month
+<input id="wcFteHours" type="number" min="1" max="744" step="1" placeholder="Enter company-specific hours"></label>
+<label>Human review minutes per automated occurrence
+<input id="wcReviewMinutes" type="number" min="0" max="60000" step="0.1" placeholder="Enter 0 only if none expected"></label>
+<label>Automated occurrences requiring an exception (%)
+<input id="wcExceptionRate" type="number" min="0" max="100" step="1" placeholder="Enter 0 only if none expected"></label>
+<label>Human minutes per exception
+<input id="wcExceptionMinutes" type="number" min="0" max="60000" step="0.1" placeholder="Enter 0 only if none expected"></label>
+<label>Current employees in this role/team (optional)
+<input id="wcTeamHeadcount" type="number" min="1" max="1000000" step="1" placeholder="Needed for theoretical whole-position ceiling"></label>
+<label>Monthly share of one-time implementation costs (USD, optional)
+<input id="wcSetupCost" type="number" min="0" max="1000000000" step="0.01" placeholder="Amortized setup costs, if known"></label>
+</div>
+<button type="button" class="wc-plan-button" id="wcCalculateStaffing">Calculate staffing-capacity scenario</button>
+<div class="wc-feedback" id="wcStaffingResult" role="status" aria-live="polite">No headcount or payroll reduction has been established. Complete the inputs above to model the equivalent labor capacity.</div>
+<p class="wc-note">To establish eliminable positions, Reality would need a complete job-cycle proof, role-by-role duties, shift coverage, service levels and measured operating costs. Freed capacity may instead support redeployment, reduced overtime or additional output.</p>
+</details></div>
    <p class="wc-note">Planning does not start a shift, spend credits, create an issue, or approve any external operation. Full-job estimates and real token costs need measured execution receipts. The optional credit rate is your assumption, not an invoice or verified subscription entitlement.</p>
   </div>
  </div>
