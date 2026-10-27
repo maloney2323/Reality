@@ -146,7 +146,7 @@ test('no goal, altered principal, wrong environment or conversation fails closed
  }
  const s=setup({authState:{...state,active_goal:null}});
  await assert.rejects(preparePersonalDiscoveredWorkHandoff(args(s)),
-  /GOAL_GROUNDING_AUTHENTICATED_SOURCE_REQUIRED/);
+  /DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION/);
  assert.equal(s.calls.append,0);
 });
 function mockResponse(){
@@ -253,4 +253,22 @@ test('read-only GET does not expose personal work receipts without verified sess
  assert.equal(record.status,401);
  assert.equal(record.body.error,'CHAT_SIGN_IN_REQUIRED');
  assert.equal(record.body.external_action_performed,false);
+});
+
+test('every Home selector has a real element including live health labels',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const ids=new Set([...html.matchAll(/\\bid=["']([^"']+)["']/g)].map(x=>x[1]));
+ const selectors=new Set([...html.matchAll(/\\$\\('([^']+)'\\)/g)].map(x=>x[1]));
+ const missing=[...selectors].filter(x=>!ids.has(x));
+ assert.deepEqual(missing,[],'script must not write textContent into missing nodes');
+ for(const id of ['productState','liveHeadline','liveDetail','privateGoalStatus',
+  'privateGoalText','privateChat','attentionQueue','workResult'])
+  assert.ok(ids.has(id),'missing '+id);
+});
+test('Home explains missing owner goal and gives a direct navigation action',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes('Go to confirmed objective'));
+ assert.ok(html.includes("scrollIntoView({behavior:'smooth'"));
+ assert.ok(html.includes("No work was authorized or executed"));
+ assert.ok(html.includes('DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION'));
 });
