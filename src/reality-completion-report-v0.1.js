@@ -88,6 +88,10 @@ export function projectShiftCycleCompletion({home}={}){
   tick_id:c.tick_id,source_receipt_id:c.source_event_id,
   phase:c.phase||'UNKNOWN',
   discovered_work_count:c.discovered_work_count,
+  discovered_items:Array.isArray(c.discovered_items)?c.discovered_items.filter(x=>
+   x&&typeof x.title==='string'&&x.status==='DISCOVERED_NOT_EXECUTED'
+  ).slice(0,20).map(x=>({title:x.title,evidence_count:x.evidence_count,
+   status:'DISCOVERED_NOT_EXECUTED'})):[],
   evidence_observation_count:Number.isSafeInteger(c.recent_observation_count)?
    c.recent_observation_count:null,
   verified_execution_count:0,
