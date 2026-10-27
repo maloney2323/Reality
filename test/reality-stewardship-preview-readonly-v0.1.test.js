@@ -95,3 +95,39 @@ test('Issues-only write token does NOT replace public Actions read in preview',a
  assert.equal(mock.calls[0].headers.Authorization,undefined);
  assert.equal(mock.calls[0].method,'GET');
 });
+
+test('new successful CI run supersedes older repeated failures, so no stale work is proposed',async()=>{
+ const mk=(id,conclusion,updated_at)=>({
+  id,name:'CI now repaired',conclusion,updated_at,created_at:updated_at,
+  html_url:'https://github.com/maloney2323/Reality/actions/runs/'+id,
+ });
+ const f1=mk(3001,'failure','2026-10-27T17:10:00Z');
+ const f2=mk(3002,'failure','2026-10-27T17:20:00Z');
+ const success=mk(3003,'success','2026-10-27T17:30:00Z');
+ const readGithub=async p=>p.includes('/actions/runs?')?
+  {workflow_runs:[success,f2,f1]}:[];
+ const r=await runRealityStewardshipPass({readGithub});
+ assert.deepEqual(r.work.filter(w=>w.kind==='SYSTEM_MAINTENANCE'),[]);
+ assert.deepEqual(r.execution,[]);
+});
+test('one failure after recovery does not count as recurring; two new failures do',async()=>{
+ const mk=(id,conclusion,time)=>({
+  id,name:'CI subsequently regressed',conclusion,created_at:time,updated_at:time,
+  html_url:'https://github.com/maloney2323/Reality/actions/runs/'+id,
+ });
+ const old=mk(3101,'failure','2026-10-27T17:00:00Z');
+ const green=mk(3102,'success','2026-10-27T17:10:00Z');
+ const recent=mk(3103,'failure','2026-10-27T17:20:00Z');
+ const recent2=mk(3104,'failure','2026-10-27T17:30:00Z');
+ const doRun=async items=>runRealityStewardshipPass({
+  readGithub:async path=>path.includes('/actions/runs?')?
+   {workflow_runs:items}:[],
+ });
+ const one=await doRun([recent,green,old]);
+ assert.equal(one.work.filter(w=>w.kind==='SYSTEM_MAINTENANCE').length,0);
+ const two=await doRun([recent2,recent,green,old]);
+ const recurring=two.work.filter(w=>w.kind==='SYSTEM_MAINTENANCE');
+ assert.equal(recurring.length,1);
+ assert.equal(recurring[0].evidence_refs.length,2);
+ assert.ok(!recurring[0].evidence_refs.some(s=>s.includes('3101')));
+});
