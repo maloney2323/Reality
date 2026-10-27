@@ -94,10 +94,20 @@ export default async function handler(req,res){
   // Database errors, nested adapter response bodies and secret scopes never
   // enter the phone UI. The error remains explicitly non-success.
   const unavailable=/UNIVERSE_POSTGRES_HTTP_|CONTINUITY_PERSISTENCE_REQUIRED|CONTINUITY_REHYDRATION_FAILED/.test(raw);
-  return res.status(error?.status||503).json({ok:false,
+  // These named failures only arise in signed-in goal/work admission,
+  // before atomic reservation and provider execution. Never describe them
+  // as a GitHub write of uncertain outcome.
+  const knownBeforeDispatch=new Set([
+   'PERSONAL_EXECUTION_PERSISTED_GOAL_BOUND_APPROVAL_REQUIRED',
+   'PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY',
+   'PERSONAL_DISPATCH_SOURCE_CHANGED_REPREPARE',
+   'PERSONAL_DISPATCH_DURABLE_SOURCE_AND_GOAL_RECEIPT_REQUIRED',
+  ]).has(raw);
+  return res.status(error?.status||(knownBeforeDispatch?409:503)).json({ok:false,
    error:unavailable?'DISPATCH_CONTINUITY_STORAGE_UNAVAILABLE':
     /^([A-Z][A-Z0-9_]{2,120})$/.test(raw)?raw:'DISPATCH_PRECHECK_OR_OUTCOME_UNAVAILABLE',
-   verified:false,external_action_performed:false,
+   failure_phase:knownBeforeDispatch?'BEFORE_PROVIDER_DISPATCH':'NOT_ESTABLISHED',
+   verified:false,external_action_performed:knownBeforeDispatch?false:null,
    no_automatic_retry:true});
  }
 }
