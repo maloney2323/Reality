@@ -83,3 +83,15 @@ test('real stewardship contract produces exact selectable ID from two distinct o
  assert.equal(candidate.evidence_refs.length,2);
  assert.deepEqual(result.execution,[]);
 });
+
+test('Issues-only write token does NOT replace public Actions read in preview',async()=>{
+ const mock=fakeFetch({workflow_runs:[]});
+ const result=await readStewardshipGitHub(
+  '/repos/maloney2323/Reality/actions/runs?per_page=30',
+  {env:{VERCEL_ENV:'preview',REALITY_GITHUB_TOKEN:'fake-issues-only-preview-token'},
+   fetchImpl:mock.fetchImpl});
+ assert.deepEqual(result.workflow_runs,[]);
+ assert.equal(mock.calls.length,1);
+ assert.equal(mock.calls[0].headers.Authorization,undefined);
+ assert.equal(mock.calls[0].method,'GET');
+});
