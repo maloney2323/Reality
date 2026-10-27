@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executeAuthorizedWork } from '../src/reality-governed-execution-engine-v0.1.js';
+import { bindWorkToAuthenticatedGoal } from '../src/reality-execution-goal-grounding-v0.1.js';
+import { issuePersonalWorkGroundingProof } from '../src/reality-personal-work-grounding-proof-v0.1.js';
+import { issueFreshGoalExecutionAdmission } from '../src/reality-fresh-goal-execution-admission-v0.1.js';
 import {
   createAuthorityPolicy, fingerprintApprovedWorkItem,
   autoAuthorize, issueBoundExecutionApproval,
@@ -9,6 +12,8 @@ import {
 // Test-only signing key; never a production credential. Every consequential
 // connector invocation must carry server-minted, exact-work authorization.
 process.env.REALITY_CHAT_RECEIPT_HMAC_KEY = 'test-only-execution-proof-signing-key-000000000000000000';
+process.env.VERCEL_ENV='preview';
+process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF='hvkfreoagbrphwghjajw';
 
 const workItem={
   work_item_id:'work_item:test-1',
@@ -35,7 +40,34 @@ function approved(item=workItem){
   const serverApprovalProof=issueBoundExecutionApproval({
     policy,workItem:item,authorization,principalId:'test-user',
   });
-  return {authorization,serverApprovalProof};
+  const state={
+    principal_id:'test-user',continuity_root_id:'test:authenticated-root',
+    world_id:'test:world',
+    authority_source:'AUTHENTICATED_RLS_USER_GOAL_COMMAND_AND_LEDGER_READBACK',
+    transition_count:1,assistant_can_mutate_goals:false,
+    semantic_reviewer_can_mutate_goals:false,external_execution_authorized:false,
+    active_goal_id:'goal:test',active_goal:{
+      goal_id:'goal:test',status:'ACTIVE',user_confirmed:true,
+      external_execution_authorized:false,
+      source_user_message_ref:'supabase:reality_chat_messages:source-test',
+      last_transition_receipt_id:'goal-receipt:test',
+    },recent_transition_receipts:[{
+      event_id:'goal-receipt:test',confirmed_by_user:true,principal_id:'test-user',
+    }],
+  };
+  const binding=bindWorkToAuthenticatedGoal({
+    workItem:item,authoritativeState:state,serverVerifiedPrincipalId:'test-user',
+  });
+  assert.equal(binding.status,'BOUND_FOR_FRESHNESS_CHECK');
+  const groundingProof=issuePersonalWorkGroundingProof({
+    binding,conversationId:'test-conversation',principalId:'test-user',
+  });
+  const serverFreshGoalAdmission=issueFreshGoalExecutionAdmission({
+    workItem:item,groundingProof,latestAuthoritativeState:state,
+    principalId:'test-user',conversationId:'test-conversation',
+    policy,authorization,serverApprovalProof,
+  });
+  return {authorization,serverApprovalProof,serverFreshGoalAdmission};
 }
 
 test('recognized connector write fails closed without server approval proof',async()=>{
@@ -156,4 +188,54 @@ test('unknown connector operations remain forbidden rather than passing as safe 
   assert.equal(r.status,'BLOCKED');
   assert.equal(r.blocked_reason,'GOAL_BOUNDARY_UNRECOGNIZED_CONNECTOR_OPERATION');
   assert.equal(invoked,false);
+});
+
+test('a valid action signature alone cannot execute without fresh goal grounding',async()=>{
+ let executed=false;
+ const {authorization,serverApprovalProof}=approved();
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,authorization,serverApprovalProof,
+  connector:{execute:async()=>{executed=true}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})},
+ });
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.blocked_reason,'EXECUTION_FRESH_GOAL_ADMISSION_REQUIRED');
+ assert.equal(executed,false);
+});
+
+test('changed, forged or expired goal admission cannot invoke connector writes',async()=>{
+ const grant=approved();
+ for(const admission of [
+  {...grant.serverFreshGoalAdmission,goal_id:'attacker-goal'},
+  {...grant.serverFreshGoalAdmission,expires_at:'2000-01-01T00:00:00.000Z'},
+ ]){
+  let executed=false;
+  const r=await executeAuthorizedWork({
+   workItem,workflowId:workItem.workflow_id,
+   authorization:grant.authorization,serverApprovalProof:grant.serverApprovalProof,
+   serverFreshGoalAdmission:admission,
+   connector:{execute:async()=>{executed=true}},
+   independentVerifier:{verify:async()=>({verified:true,independent:true})},
+  });
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.blocked_reason,'EXECUTION_FRESH_GOAL_ADMISSION_SIGNATURE_INVALID');
+  assert.equal(executed,false);
+ }
+});
+
+test('non-preview connector execution fails closed even with an old signed admission',async()=>{
+ const grant=approved();
+ const previous=process.env.VERCEL_ENV;
+ try{
+  process.env.VERCEL_ENV='production';
+  let executed=false;
+  const r=await executeAuthorizedWork({
+   workItem,workflowId:workItem.workflow_id,...grant,
+   connector:{execute:async()=>{executed=true}},
+   independentVerifier:{verify:async()=>({verified:true,independent:true})},
+  });
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.blocked_reason,'EXECUTION_GOAL_ADMISSION_PREVIEW_ONLY');
+  assert.equal(executed,false);
+ }finally{process.env.VERCEL_ENV=previous}
 });
