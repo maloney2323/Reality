@@ -30,6 +30,30 @@ const SENSITIVE_OPERATIONS = new Set([
   'external_send','purchase','publication','record_write','schedule_write','data_share'
 ]);
 
+// Derive consequentiality from the SERVER'S actual supported connector
+// operation, never from the caller/LLM's 'consequential:false' assertion.
+// A provider write remains consequential even if the work item calls it read.
+const SERVER_WRITE_OPERATIONS = Object.freeze({
+  github: new Set(['create_issue']),
+  vercel: new Set(['create_deployment']),
+  supabase: new Set(['insert','update','delete']),
+});
+export function classifyWorkItemExecutionEffect(workItem){
+  if(!workItem||typeof workItem!=='object'||Array.isArray(workItem))
+    return Object.freeze({consequential:true,status:'INVALID_WORK_ITEM'});
+  const connector=workItem.connector;
+  const operation=workItem.operation;
+  if(connector){
+    const allow=SERVER_WRITE_OPERATIONS[connector];
+    if(!allow||!allow.has(operation))
+      return Object.freeze({consequential:true,status:'UNRECOGNIZED_CONNECTOR_OPERATION'});
+    return Object.freeze({consequential:true,status:'EXTERNAL_CONNECTOR_WRITE'});
+  }
+  const consequential=workItem.consequential===true||SENSITIVE_OPERATIONS.has(operation);
+  return Object.freeze({consequential,status:consequential?
+    'SENSITIVE_INTERNAL_OPERATION':'PURE_INTERNAL_CANDIDATE'});
+}
+
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function list(value) { return Array.isArray(value) ? value.map((v) => typeof v === 'string' ? v.trim() : v).filter(Boolean) : []; }
 function id(prefix, seed) { return prefix + ':' + createHash('sha256').update(seed).digest('hex').slice(0, 32); }
@@ -77,7 +101,7 @@ export function createWorkItem({ workflowId, workItemId = null, action, connecto
   if (!workflowId) throw new Error('WORKFLOW_ID_REQUIRED');
   if (!text(action)) throw new Error('WORK_ITEM_ACTION_REQUIRED');
   const wi = workItemId || id('work_item', JSON.stringify([workflowId, action, connector, inputs]));
-  const sensitive = consequential || SENSITIVE_OPERATIONS.has(operation);
+  const sensitive = classifyWorkItemExecutionEffect({connector,operation,consequential}).consequential;
   return freeze({
     work_item_id: wi, workflow_id: workflowId, action, connector, inputs,
     authority_required: list(authorityRequired), preconditions: list(preconditions),
@@ -126,9 +150,14 @@ export function authorize({ request, approvedBy, scope }) {
 
 export function canExecute({ workItem, authorization }) {
   if (!workItem?.work_item_id) return { allowed:false, reason:'WORK_ITEM_REQUIRED' };
-  if (!workItem.consequential && !SENSITIVE_OPERATIONS.has(workItem.operation))
-    return { allowed:true, reason:'NON_CONSEQUENTIAL_WORK_ITEM' };
-  if (!authorization?.authorized) return { allowed:false, reason:'EXPLICIT_AUTHORIZATION_REQUIRED' };
+  const effect=classifyWorkItemExecutionEffect(workItem);
+  if(effect.status==='UNRECOGNIZED_CONNECTOR_OPERATION'||
+     effect.status==='INVALID_WORK_ITEM')
+    return {allowed:false,reason:'CONNECTOR_OPERATION_UNRECOGNIZED'};
+  if(!effect.consequential)
+    return {allowed:true,reason:'PURE_INTERNAL_NON_CONSEQUENTIAL'};
+  if (!authorization?.authorized)
+    return { allowed:false, reason:'SERVER_VERIFIED_ACTION_AUTHORIZATION_REQUIRED' };
   if (authorization.workflow_id !== workItem.workflow_id) return { allowed:false, reason:'AUTHORIZATION_WORKFLOW_MISMATCH' };
   const allowed = (authorization.allowed_operations || []).some((x) =>
     x.connector === workItem.connector && x.operation === workItem.operation &&
