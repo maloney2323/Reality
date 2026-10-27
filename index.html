@@ -693,6 +693,52 @@ function wcSummary(full=false){
  if(full&&prior)lines.push('Previously attempted work stays locked until reconciliation; do not re-run it.');
  return lines.join('\n');
 }
+
+function wcScenarioNumber(id,allowZero=false){
+ const str=String($(id).value||'').trim();
+ if(!str)return null;
+ const number=Number(str);
+ return Number.isFinite(number)&&(allowZero?number>=0:number>0)?number:NaN;
+}
+function wcRenderValueScenario(){
+ const el=$('wcValueOutput');
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ if(selected.length!==1){
+  el.textContent=selected.length===0?
+   'Select one workflow. Customer impact and real savings remain unknown.':
+   'Select ONE workflow: different tasks cannot share a labor baseline.';
+  return;
+ }
+ const minutes=wcScenarioNumber('wcManualMinutes');
+ const frequency=wcScenarioNumber('wcFrequency');
+ const coverage=wcScenarioNumber('wcCoverage',true);
+ const rate=wcScenarioNumber('wcLaborRate');
+ const monthlyCost=wcScenarioNumber('wcMonthlyCost',true);
+ if([minutes,frequency,coverage,rate].some(v=>v===null)){
+  el.textContent='Incomplete scenario: enter manual minutes, monthly occurrences, potential automation % and hourly labor value. No defaults invented.';
+  return;
+ }
+ if(!Number.isFinite(minutes)||minutes>60000||!Number.isFinite(frequency)||frequency>100000||
+    !Number.isFinite(coverage)||coverage>100||!Number.isFinite(rate)||rate>100000||
+    (monthlyCost!==null&&(!Number.isFinite(monthlyCost)||monthlyCost>1e9))){
+  el.textContent='Invalid scenario assumptions. No calculation performed.';
+  return;
+ }
+ const hours=minutes*frequency*(coverage/100)/60;
+ const gross=hours*rate;
+ const net=monthlyCost===null?null:gross-monthlyCost;
+ const dollars=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+ const work=selected[0];
+ el.textContent='HYPOTHETICAL scenario for '+String(work.title||work.objective||work.work_key||'selected work')+
+  '\nPotential monthly labor hours equivalent: '+hours.toFixed(2)+
+  '\nGross labor-value equivalent/month: '+dollars(gross)+
+  '\nHypothetical net/month: '+(net===null?'UNKNOWN (automation operating cost not provided)':dollars(net))+
+  '\nActual measured time saved: NOT VERIFIED. Real cash savings: NOT VERIFIED.'+
+  '\nAutomation readiness: '+String(work.value_assessment?.automation?.level||'NOT PROVEN')+
+  '. Even a high assumed coverage does not prove full task automation.'+
+  '\nNext: measure the baseline, cost, independent completion, and observed time returned. No workforce reduction can be inferred.';
+}
+
 function wcPaintSummary(){
  const shift=wcMode==='shift';
  $('wcPlanTitle').textContent=shift?'Your planned shift':'Your task batch';
@@ -703,6 +749,7 @@ function wcPaintSummary(){
  $('wcRateRow').hidden=$('wcMetering').value!=='metered';
  $('wcPreview').textContent=shift?'Review draft shift':'Review selected tasks';
  $('wcSummary').textContent=wcSummary();
+ wcRenderValueScenario();
  document.querySelectorAll('[data-wc-mode]').forEach(b=>
   b.setAttribute('aria-selected',String(b.dataset.wcMode===wcMode)));
 }
@@ -815,6 +862,7 @@ $('wcHours').onchange=wcPaintSummary;
 $('wcMetering').onchange=wcPaintSummary;
 $('wcRate').oninput=wcPaintSummary;
 $('wcSort').onchange=()=>{wcSort=$('wcSort').value;wcRender()};
+for(const id of ['wcManualMinutes','wcFrequency','wcCoverage','wcLaborRate','wcMonthlyCost'])$(id).oninput=wcRenderValueScenario;
 $('wcPreview').onclick=()=>{$('wcSummary').textContent=wcSummary(true)};
 wcRender();
 
