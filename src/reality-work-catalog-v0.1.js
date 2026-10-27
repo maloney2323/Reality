@@ -8,6 +8,7 @@ const BASE='https://github.com/maloney2323/Reality';
 const paths=Object.freeze({
  issues:'/repos/maloney2323/Reality/issues?state=open&per_page=30',
  commits:'/repos/maloney2323/Reality/commits?per_page=30',
+ pulls:'/repos/maloney2323/Reality/pulls?state=open&per_page=30',
 });
 const safeString=(v,max=220)=>String(v||'').slice(0,max);
 const id=(type,v)=>'catalog:'+crypto.createHash('sha256').update(type+':'+v).digest('hex').slice(0,32);
@@ -64,7 +65,7 @@ export async function buildRealityWorkCatalog({
     x.startsWith(BASE+'/'));
    if(!urls.length)continue;
    findings.push({
-    finding_id:id('steward',w.work_key),
+    finding_id:id('steward',w.work_key),kind:'SYSTEM_MAINTENANCE',
     work_id:w.work_id,work_key:w.work_key,
     title:safeString(w.objective||w.work_key),
     category:category(w.objective,'reliability'),
@@ -76,8 +77,8 @@ export async function buildRealityWorkCatalog({
   });
   }
  }catch{failures.push('Actions or pull-request discovery unavailable');}
- const results=await Promise.allSettled([readCatalog('issues'),readCatalog('commits')]);
- const [issues,commits]=results.map(x=>x.status==='fulfilled'?x.value:null);
+ const results=await Promise.allSettled([readCatalog('issues'),readCatalog('commits'),readCatalog('pulls')]);
+ const [issues,commits,pulls]=results.map(x=>x.status==='fulfilled'?x.value:null);
  if(issues){
   coverage.issues='checked';
   for(const issue of issues){
@@ -94,6 +95,22 @@ export async function buildRealityWorkCatalog({
   });
   }
  }else failures.push('GitHub issues unavailable');
+ if(pulls){
+  coverage.pull_requests='checked';
+  for(const pr of pulls){
+   const url=ghURL(pr.html_url,'pr');
+   if(!url||!Number.isSafeInteger(pr.number))continue;
+   findings.push({
+    finding_id:id('pr',pr.number),
+    title:'Review '+(pr.draft?'draft ':'')+'PR #'+pr.number+': '+safeString(pr.title),
+    category:category(pr.title,'upgrades'),
+    finding_type:'OPEN_PULL_REQUEST',state:pr.draft?'DRAFT_AWAITING_REVIEW':'OPEN_AWAITING_REVIEW',
+    reason:'GitHub pull request is open. Code review, testing and merge authority remain separate. This is tracked work, not evidence of a deployed improvement.',
+    source:'github_pull_requests',evidence_refs:[url],execution_work_item:null,
+    authorization_required:false,
+   });
+  }
+ }else failures.push('GitHub open pull requests unavailable');
  if(commits){
   coverage.commits='checked';
   let added=0;
