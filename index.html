@@ -647,8 +647,12 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
     }else{
      info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
       '. Do not retry automatically; reconcile the provider and reservation receipts.';
-     receipt.textContent='Execution outcome not verified · '+String(out.reason||'Manual review required')+
-      ' · No automatic retry.';
+     const category=/^(SSO_AUTHORIZATION_REQUIRED|SECONDARY_RATE_LIMIT|PRIMARY_RATE_LIMIT|TOKEN_REPOSITORY_OR_ISSUES_SCOPE_DENIED|NETWORK_ACCESS_POLICY|REPOSITORY_WRITE_UNAVAILABLE|GITHUB_WRITE_POLICY_RESTRICTED|FORBIDDEN_REASON_NOT_DISCLOSED)$/.test(String(out.provider_failure_detail||''))?
+      out.provider_failure_detail:'UNKNOWN';
+     receipt.textContent='Execution outcome not verified · Stage '+String(out.provider_failure_stage||'UNKNOWN')+
+      ' · HTTP category '+String(out.provider_failure_code||'UNKNOWN')+
+      ' · Safe provider reason '+category+
+      ' · Earlier reservations remain locked · No automatic retry.';
     }
    }catch(e){
     info.textContent='Gap 3 could not complete: '+e.message+
