@@ -642,6 +642,7 @@ const workCategories=[
  ['automation','Automation & time returned','Repeatable work']
 ];
 let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
+let wcSort='triage';
 let wcCoverage={},wcCatalogStatus='NOT_CHECKED';
 const wcKey=w=>String(w.finding_id||w.work_id||'');
 const wcNeedsSource=id=>({customer:'customer_feedback',operations:'business_operations',research:'external_research'}[id]||null);
@@ -718,12 +719,29 @@ function wcRender(){
   wcCurrent=b.dataset.wcCat;wcRender()
  });
  const category=workCategories.find(x=>x[0]===wcCurrent);
- const shown=wcCurrent==='all'?wcWork:wcWork.filter(w=>wcClass(w)===wcCurrent);
+ const shown=(wcCurrent==='all'?wcWork:wcWork.filter(w=>wcClass(w)===wcCurrent)).slice().sort((a,b)=>{
+ const av=a.value_assessment||{},bv=b.value_assessment||{};
+ if(wcSort==='automation'){
+  const supported=w=>w.value_assessment?.automation?.known_operation==='github.create_issue'?1:0;
+  return supported(b)-supported(a)||(bv.triage_score||0)-(av.triage_score||0);
+ }
+ if(wcSort==='risk'){
+  const risk=w=>({HIGH:3,ELEVATED:2,REVIEW_REQUIRED:1})[w.value_assessment?.risk?.level]||0;
+  return risk(b)-risk(a)||(bv.triage_score||0)-(av.triage_score||0);
+ }
+ return (bv.triage_score||0)-(av.triage_score||0);
+});
  const unconnected=wcNeedsSource(wcCurrent)&&wcCoverage[wcNeedsSource(wcCurrent)]==='not_connected';
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
  $('wcSelectedCount').textContent=shown.length+' found';
  $('wcTaskList').innerHTML=shown.length?shown.map((w,i)=>{
   const time=wcTime(w),status=wcStatuses.get(wcKey(w));
+  const assessment=w.value_assessment||{};
+  const priority=String(assessment.triage_band||'NOT_ASSESSED').replace(/_/g,' ');
+  const riskLabel=String(assessment.risk?.level||'UNKNOWN').replace(/_/g,' ');
+  const readiness=assessment.automation?.known_operation==='github.create_issue'?
+   'Tracking issue after separate approval only · Full repair not automated':
+   'Full work automation unverified';
   const src=(w.evidence_refs||[]).filter(u=>
    /^https:\/\/github\.com\/maloney2323\/Reality\/(?:actions\/runs\/\d+|issues\/\d+|pull\/\d+|commit\/[a-f0-9]{40})$/.test(String(u)));
   const history=status==='PRIOR'?'PRIOR ATTEMPT · RECONCILE':
@@ -735,12 +753,17 @@ function wcRender(){
    '<span class="wc-small" style="display:block">'+esc(category?.[0]==='all'?
     (workCategories.find(x=>x[0]===wcClass(w))?.[1]||'Unclassified'):category[1])+'</span></span></label></div>'+
    '<span class="wc-tag">'+esc(w.state||'DISCOVERED')+'</span>'+
+   '<span class="wc-tag">Review '+esc(priority)+' ('+esc(String(assessment.triage_score??'N/A'))+'/100 heuristic)</span>'+
+   '<span class="wc-tag">Risk '+esc(riskLabel)+'</span>'+
    '<span class="wc-tag">'+src.length+' sources</span>'+
    '<span class="wc-tag" data-risk="'+(status==='PRIOR')+'">'+esc(history)+'</span>'+
    '<p>Estimated tracking operation: '+(time?time[0]+'–'+time[1]+' min (illustrative)':'Not calibrated')+
    ' · Full work: not yet estimated.</p>'+
    '<details><summary>View evidence, scope and next step</summary>'+
    '<p>'+esc(w.description||w.reason||'Source-backed observation; business value not yet verified.')+'</p>'+
+   '<p>Business impact: UNMEASURED · Full-task labor: UNKNOWN · Verified savings: NONE RECORDED.</p>'+
+   '<p>Automation: '+esc(readiness)+'</p>'+
+   '<p>Next evidence: '+esc(assessment.next_validation_step||'Establish actual cost, effect and scope')+'</p>'+
    '<p>Provider operation: '+esc(w.execution_work_item?.operation||'Not determined')+
    ' · Priority and time returned: unverified.</p>'+
    src.map((u,j)=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+
@@ -791,6 +814,7 @@ document.querySelectorAll('[data-wc-mode]').forEach(b=>b.onclick=()=>{
 $('wcHours').onchange=wcPaintSummary;
 $('wcMetering').onchange=wcPaintSummary;
 $('wcRate').oninput=wcPaintSummary;
+$('wcSort').onchange=()=>{wcSort=$('wcSort').value;wcRender()};
 $('wcPreview').onclick=()=>{$('wcSummary').textContent=wcSummary(true)};
 wcRender();
 
