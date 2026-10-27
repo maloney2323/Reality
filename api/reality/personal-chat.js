@@ -210,6 +210,17 @@ export default async function handler(req,res){
      final_answer_direction_release:result.reliability.final_direction_release||{
        status:'NOT_ASSESSED_IN_THIS_RUNTIME',release_allowed:null,
        semantic_accuracy_independently_verified:false},
+     three_contract_integrity:{
+       proof_hash:result.reliability.final_direction_release?.three_contract_integrity_proof_hash||null,
+       original_proposal_id:result.reliability.final_direction_release?.goal_proposal_id||null,
+       provisional_goal_transition_authorization:
+         result.reliability.final_direction_release?.goal_transition_authorization||'NOT_ASSESSED',
+       canonical_user_goal_state_bound:
+         result.reliability.final_direction_release?.exact_goal_state_bound===true,
+       independent_goal_semantics_proven:false,
+       assistant_state_mutation_authorized:false,
+       external_execution_authorized:false,
+     },
      goal_authority:result.reliability.goal_authority||null,
      authoritative_user_goal_state:result.reliability.goal_authority_contracts?.authorized_user_goal_state||null,
      semantic_review_status:result.reliability.semantic_review?.status||'NOT_ASSESSED',
