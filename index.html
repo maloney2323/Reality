@@ -38,6 +38,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
   <h1>Reality finds work. Ask when you want.</h1>
   <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
+  <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
+    <strong id="productState">CHECKING REALITY</strong>
+    <span><strong id="liveHeadline">Verifying connected services…</strong>
+    <span id="liveDetail">No real-world outcome has been claimed.</span></span>
+  </div>
 
   <section class="shift-settings" aria-label="Reality daily shift settings">
 <div class="shift-head"><div><div class="label">REALITY OPERATING SHIFT</div><strong>Daily autonomous shift</strong><p class="muted">Reality starts by itself, discovers its own work, and works the governed queue.</p></div><label class="switch"><input id="shiftEnabled" type="checkbox" checked><span>Enabled</span></label></div>
@@ -361,7 +366,25 @@ function renderWork(source){
         ' · No external action performed. Execution must separately consume its single-use DB reservation.';
     }catch(e){
       btn.disabled=false;btn.textContent='Prepare exact work';
-      receipt.textContent='Reality blocked the handoff: '+e.message;
+      const code=String(e.message||'Reality could not verify the work.');
+      const needsGoal=code==='GOAL_GROUNDING_AUTHENTICATED_SOURCE_REQUIRED'||
+        code==='DISCOVERED_WORK_CONFIRMED_GOAL_REQUIRED'||
+        code==='DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION';
+      if(needsGoal){
+        receipt.replaceChildren();
+        const detail=document.createElement('div');
+        detail.textContent='The private Continuity ledger could not verify an active, user-confirmed objective for this conversation. No work was authorized or executed.';
+        const guide=document.createElement('button');
+        guide.type='button';
+        guide.textContent='Go to confirmed objective';
+        guide.onclick=()=>{
+          $('privateChat')?.scrollIntoView({behavior:'smooth',block:'start'});
+          $('privateGoalText')?.focus({preventScroll:true});
+        };
+        receipt.append(detail,guide);
+      }else{
+        receipt.textContent='Reality blocked the handoff: '+code+'. No external work was executed.';
+      }
     }
   });
   // Read-only durable recovery. Source-only handoff never implies that a
