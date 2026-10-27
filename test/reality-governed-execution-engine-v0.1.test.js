@@ -62,10 +62,21 @@ function approved(item=workItem){
   const groundingProof=issuePersonalWorkGroundingProof({
     binding,conversationId:'test-conversation',principalId:'test-user',
   });
+  const goalBoundPolicy={...policy,goal_binding:{
+    version:'reality-personal-action-authority-v0.1',
+    user_confirmation:'APPROVE_THIS_EXACT_WORK_ITEM',
+    principal_id:'test-user',conversation_id:'test-conversation',
+    goal_id:binding.goal_id,goal_revision:binding.goal_revision,
+    goal_transition_receipt_id:binding.goal_transition_receipt_id,
+    continuity_root_id:binding.continuity_root_id,
+    world_id:binding.world_id,
+    goal_source_user_message_ref:binding.goal_source_user_message_ref,
+    work_item_fingerprint:binding.work_item_fingerprint,
+  }};
   const serverFreshGoalAdmission=issueFreshGoalExecutionAdmission({
     workItem:item,groundingProof,latestAuthoritativeState:state,
     principalId:'test-user',conversationId:'test-conversation',
-    policy,authorization,serverApprovalProof,
+    policy:goalBoundPolicy,authorization,serverApprovalProof,
   });
   return {authorization,serverApprovalProof,serverFreshGoalAdmission};
 }
