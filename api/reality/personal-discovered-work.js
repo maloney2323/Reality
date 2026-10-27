@@ -53,8 +53,13 @@ export default async function handler(req,res){
    external_action_performed:false,
   });
  }catch(e){
+  // Do not send PostgREST's raw error JSON (which can include user/conversation
+  // scoped IDs and SQL details) to the mobile UI.
+  const raw=String(e?.message||'');
+  const dbFailure=/UNIVERSE_POSTGRES_HTTP_|EXECUTION_RESERVATION_DATABASE_|CONTINUITY_PERSISTENCE_REQUIRED/.test(raw);
   return res.status(e.status||503).json({
-   ok:false,error:e.message||'DISCOVERED_WORK_HANDOFF_UNAVAILABLE',
+   ok:false,error:dbFailure?'DISCOVERED_WORK_CONTINUITY_STORAGE_UNAVAILABLE':
+    raw||'DISCOVERED_WORK_HANDOFF_UNAVAILABLE',
    external_action_performed:false,
   });
  }
