@@ -100,7 +100,7 @@ test('different user and another work key never inherit this principal history',
   history:[previousSource,previousOutcome],discoveredWorkId:currentWork,workKey:otherKey,
  }),true);
 });
-test('pre-dispatch gate combines current worldline plus separate user-wide history',async()=>{
+test('pre-dispatch gate rejects another conversation even when current worldline has no attempt',async()=>{
  const oldScope=randomUUID(),newConversation=randomUUID();
  const scope=(await import('../src/reality-personal-goal-readback-v0.1.js'))
   .personalGoalScope({userId:user,conversationId:newConversation});
@@ -111,7 +111,7 @@ test('pre-dispatch gate combines current worldline plus separate user-wide histo
  await assert.rejects(ensureNoPriorPersonalIssueAttempt({
   session,conversationId:newConversation,env,
   discoveredWorkId:currentWork,workKey:key,
-  persistenceFactory:()=>({reconstruct:async()=>[newSource]}),
+  persistenceFactory:()=>({reconstruct:async()=>[]}),
   principalHistoryReader:async()=>[previousSource,previousOutcome],
  }),/PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY/);
 });
