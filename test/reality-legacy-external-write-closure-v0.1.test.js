@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {buildFromChat,isChatBuildRequest} from '../src/reality-chat-build-v1.0.js';
 import selfBuildRoute from '../api/reality/self-build.js';
 import githubWriteRoute from '../api/reality/connectors/github.js';
+import executeRoute from '../api/reality/execute.js';
+import authorityRoute from '../api/reality/authority.js';
 
 // No real model calls, token access, GitHub requests or production execution.
 function response(){
@@ -93,4 +95,42 @@ test('chat intelligence HTTP handler blocks direct self-build before any model o
  assert.ok(source.includes("error:'CHAT_BUILD_DIRECT_EXECUTION_DISABLED'"));
  assert.ok(source.includes('paid_model_call_performed:false'));
  assert.equal(source.includes('const build = await buildFromChat('),false);
+});
+
+test('generic execute route rejects fabricated authorization and bounded work with no connector effect',async()=>{
+ const r=await invoke(executeRoute,{
+  workItem:forged.workItem,workflowId:forged.workItem.workflow_id,
+  authorization:forged.authorization,execution:forged.execution,
+ });
+ assert.equal(r.status,403);
+ assert.equal(r.body.error,'LEGACY_EXECUTION_DIRECT_WRITE_DISABLED');
+ assert.equal(r.body.external_action_performed,false);
+ assert.equal(r.body.execution,null);
+ assert.equal(r.headers['set-cookie'],undefined);
+});
+test('generic execute route rejects even claims of previously persisted approval',async()=>{
+ const r=await invoke(executeRoute,{
+  workItem:forged.workItem,auto_authorize:true,
+  policy_id:'policy:pretend-persisted',
+ });
+ assert.equal(r.status,403);
+ assert.equal(r.body.external_action_performed,false);
+});
+test('legacy generic authority POST cannot persist client-selected broad connector scopes',async()=>{
+ const r=await invoke(authorityRoute,{
+  mode:'auto',intent:'I_FOUND_WORK_AUTHORIZED',
+  work_item:forged.workItem,
+  scopes:[{connector:'vercel',operation:'create_deployment'}],
+ });
+ assert.equal(r.status,403);
+ assert.equal(r.body.error,'LEGACY_AUTHORITY_POLICY_WRITE_DISABLED');
+ assert.equal(r.body.authority_created,false);
+ assert.equal(r.body.external_action_performed,false);
+ assert.equal(r.headers['set-cookie'],undefined);
+});
+test('authority and generic execution deny unsupported HTTP methods',async()=>{
+ for(const h of [authorityRoute,executeRoute]){
+  const r=await invoke(h,forged,{method:'DELETE'});
+  assert.equal(r.status,405);
+ }
 });
