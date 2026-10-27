@@ -4,6 +4,8 @@
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {verifyPersonalGithubIssueToken}
+ from '../../src/reality-personal-github-execution-bridge-v0.1.js';
 import {preparePersonalIssueDispatch,runPersonalIssueDispatch}
  from '../../src/reality-personal-issue-dispatch-v0.1.js';
 export const maxDuration=60;
@@ -18,10 +20,28 @@ export default async function handler(req,res){
   if(!session)
    return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
   if(req.method==='GET'){
-   return res.status(200).json({ok:true,
-    status:process.env.VERCEL_ENV==='preview'&&
-     Boolean(process.env.REALITY_GITHUB_TOKEN)?
-     'PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED':'PREVIEW_GITHUB_WRITE_ADAPTER_NOT_CONFIGURED',
+   let status='PREVIEW_GITHUB_WRITE_ADAPTER_NOT_CONFIGURED';
+   let token_identity_verified=false;
+   let repository_issue_read_verified=false;
+   // Token presence is NOT proof that the credential was generated correctly.
+   // A protected read-only GitHub /user + repository issues probe checks the
+   // actual preview credential before the UI offers any RUN button.
+   if(process.env.VERCEL_ENV==='preview'&&process.env.REALITY_GITHUB_TOKEN){
+    try{
+     const verified=await verifyPersonalGithubIssueToken();
+     if(verified.credential_identity_verified&&
+        verified.repository_issues_read_verified){
+      status='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED';
+      token_identity_verified=true;
+      repository_issue_read_verified=true;
+     }
+    }catch{
+     status='PREVIEW_GITHUB_CREDENTIAL_NOT_VERIFIED';
+    }
+   }
+   return res.status(200).json({ok:true,status,
+    token_identity_verified,repository_issue_read_verified,
+    github_issue_write_permission_not_yet_proven:true,
     requires_new_execution_confirmation:true,
     requires_fresh_action_approval:true,
     external_action_performed:false});
