@@ -150,11 +150,15 @@ export async function preparePersonalDiscoveredWorkHandoff({
  }else{
   // A live owner-confirmed goal must have an existing, independently hashed
   // goal receipt in this exact user's Continuity. Never create a second root.
+  const goalReceiptExists=past.some(e=>
+   e.event_id===binding.goal_transition_receipt_id);
   const tail=past.at(-1);
-  if(!tail||tail.event_id!==binding.goal_transition_receipt_id||
-     !tail.lineage_hash||tail.continuity_root_id!==spine.continuity_root_id||
+  if(!goalReceiptExists||!tail||!tail.lineage_hash||
+     tail.continuity_root_id!==spine.continuity_root_id||
      tail.worldline_id!==spine.worldline_id)
-   fail('DISCOVERED_WORK_GOAL_RECEIPT_NOT_CURRENT_CONTINUITY_TAIL');
+   fail('DISCOVERED_WORK_GOAL_RECEIPT_MISSING_FROM_CONTINUITY');
+  // Other legitimate messages may follow the controlling goal transition.
+  // Append at the latest tail; do NOT re-parent to an old goal receipt.
   const at=new Date().toISOString();
   // The normal Spine path maps source strings to UUID columns and computes
   // the canonical append-only lineage hash. Never write personal:chat:...
