@@ -418,6 +418,26 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
    info.textContent='Gap 3 · GitHub write is not configured on this protected preview. No issue can be created here yet. Your Step 3 approval was recorded; do not attempt automatic retries.';
    return;
   }
+  // An existing UNRESOLVED issue attempt remains non-retryable even if the
+  // owner reconfirms the goal or creates another short-lived approval.
+  // CHECK only verifies stored evidence; it never consumes a reservation.
+  const checkResponse=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'CHECK',conversation_id:conversationId,discovered_work_id:workId,
+   }),
+  });
+  const check=await checkResponse.json();
+  if(!checkResponse.ok||!check.ok||
+     check.status!=='EXACT_SOURCE_AND_USER_APPROVAL_ADMITTED'){
+   const noRetry=check.error==='PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY';
+   info.textContent=noRetry?
+    'Gap 3 · Previous execution attempt is UNRESOLVED. Do not run again. The provider and consumed reservation require read-only reconciliation.':
+    'Gap 3 · Fresh execution preflight is blocked: '+String(check.error||'Approval or work no longer current')+
+    '. No action has been performed by this check.';
+   return;
+  }
   info.textContent='Gap 3 · Separate live action. This creates ONE GitHub issue only after a new explicit confirmation. This is not automatic.';
   const scope=document.createElement('p');
   scope.textContent='Exact operation: Create one issue in maloney2323/Reality. Title: '+workItem.inputs.title+
