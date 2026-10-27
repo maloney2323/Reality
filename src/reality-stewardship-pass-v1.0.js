@@ -4,6 +4,34 @@ import { githubGet, githubWrite } from './reality-connector-github-v1.0.js';
 const OWNER = 'maloney2323';
 const REPO = 'Reality';
 
+// Public provider read is permitted ONLY for this published repository, ONLY
+// in isolated preview, and ONLY for the two stewarded discovery GET queries.
+// It cannot be used to write GitHub data or substitute for owner approval.
+export async function readStewardshipGitHub(path,{
+ env=process.env,fetchImpl=fetch,
+}={}){
+ if(!/^\/repos\/maloney2323\/Reality\/(?:actions\/runs\?per_page=\d{1,3}|pulls\?state=open&per_page=\d{1,3})$/.test(path))
+  throw Error('DISCOVERY_PUBLIC_GITHUB_SOURCE_OUT_OF_SCOPE');
+ if(env.REALITY_GITHUB_TOKEN)return githubGet(path);
+ if(env.VERCEL_ENV!=='preview')
+  throw Error('DISCOVERY_AUTHENTICATED_GITHUB_CONNECTOR_REQUIRED');
+ const response=await fetchImpl('https://api.github.com'+path,{
+  method:'GET',
+  headers:{Accept:'application/vnd.github+json',
+   'X-GitHub-Api-Version':'2022-11-28',
+   'User-Agent':'Reality-ReadOnly-Public-Stewardship'},
+ });
+ if(!response.ok)throw Error('DISCOVERY_PUBLIC_GITHUB_HTTP_'+response.status);
+ const body=await response.json();
+ if(path.includes('/actions/runs?')){
+  if(!Array.isArray(body?.workflow_runs))
+   throw Error('DISCOVERY_PUBLIC_GITHUB_RUNS_INVALID');
+ }else if(!Array.isArray(body))
+  throw Error('DISCOVERY_PUBLIC_GITHUB_PULLS_INVALID');
+ return body;
+}
+
+
 async function executeRecurringMaintenance({ owner, repo, workflow, failedRuns }) {
   const marker = `reality-recurring-work:${workflow}`;
   const issues = await githubGet(
@@ -82,9 +110,10 @@ export async function runRealityStewardshipPass({
   repo = REPO,
   perPage = 30,
   stalePrDays = 7,
+  readGithub = readStewardshipGitHub,
 } = {}) {
-  const runs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
-  const prs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
+  const runs = await readGithub(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
+  const prs = await readGithub(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
 
   const workflowFailures = new Map();
   for (const run of runs.workflow_runs || []) {
