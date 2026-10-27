@@ -2,6 +2,8 @@ import { createExecutionReceipt, canExecute, classifyWorkItemExecutionEffect } f
 import { verifyBoundExecutionApproval } from './reality-authority-v1.0.js';
 import { evaluateGoalExecutionBoundary } from './reality-goal-execution-boundary-v0.1.js';
 import { verifyFreshGoalExecutionAdmission } from './reality-fresh-goal-execution-admission-v0.1.js';
+import { fingerprintApprovedWorkItem } from './reality-authority-v1.0.js';
+import { validUuid } from './reality-private-chat-store-v0.1.js';
 
 export const GOVERNED_EXECUTION_ENGINE_VERSION = 'reality-governed-execution-engine-v0.1';
 
@@ -15,6 +17,8 @@ export async function executeAuthorizedWork({
   authorization,
   serverApprovalProof=null,
   serverFreshGoalAdmission=null,
+  serverSingleUseReservation=null,
+  reservationStore=null,
   connector,
   independentVerifier,
   requestSummary = null,
@@ -79,26 +83,78 @@ export async function executeAuthorizedWork({
   const execution = createExecutionReceipt({workItem, authorization, requestSummary, requestFingerprint});
   if (execution.execution_state !== 'AUTHORIZED') throw new Error('EXECUTION_RECEIPT_NOT_AUTHORIZED');
 
-  const providerResult = await connector.execute({
-    workItem,
-    authorization,
-    execution,
-  });
+  // The database owns one-time admission. An HMAC alone is replayable.
+  // The older generic /execute endpoint has no scoped DB reservation and
+  // therefore cannot reach a consequential provider call.
+  const requiresReservation=Boolean(workItem.connector&&effect.consequential);
+  if(requiresReservation){
+    const r=serverSingleUseReservation;
+    const valid=Boolean(r?.status==='RESERVED_NOT_DISPATCHED'&&
+      validUuid(r.reservation_id)&&
+      r.principal_id===authorization?.principal&&
+      r.principal_id===serverFreshGoalAdmission?.principal_id&&
+      r.conversation_id===serverFreshGoalAdmission?.conversation_id&&
+      r.policy_id===serverFreshGoalAdmission?.action_policy_id&&
+      r.work_fingerprint===fingerprintApprovedWorkItem(workItem)&&
+      typeof reservationStore?.begin==='function'&&
+      typeof reservationStore?.settle==='function');
+    if(!valid)return Object.freeze({
+      engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+      status:'BLOCKED',blocked_reason:'EXECUTION_DURABLE_SINGLE_USE_RESERVATION_REQUIRED',
+      execution:null,verification:null,outcome:null,
+    });
+    try{
+      const consumed=await reservationStore.begin({reservationId:r.reservation_id});
+      if(consumed?.status!=='DISPATCHING'||consumed.reservation_id!==r.reservation_id||
+         consumed.single_use_claim_consumed!==true)
+        throw Error('EXECUTION_RESERVATION_DISPATCH_READBACK_MISSING');
+    }catch(error){
+      return Object.freeze({
+        engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+        status:'BLOCKED',blocked_reason:
+          error?.message||'EXECUTION_RESERVATION_DISPATCH_UNAVAILABLE',
+        execution:null,verification:null,outcome:null,
+      });
+    }
+  }
 
-  const executed = Object.freeze({
-    ...execution,
-    execution_state:'EXECUTED',
-    response_observation:providerResult?.observation ?? null,
-    provider_execution_id:providerResult?.providerExecutionId ?? null,
-    completed_at:new Date().toISOString(),
-  });
-
-  const verification = await independentVerifier.verify({
-    workItem,
-    authorization,
-    execution:executed,
-    providerResult,
-  });
+  let providerResult,executed,verification;
+  try{
+    providerResult=await connector.execute({workItem,authorization,execution});
+    executed=Object.freeze({
+      ...execution,execution_state:'EXECUTED',
+      response_observation:providerResult?.observation??null,
+      provider_execution_id:providerResult?.providerExecutionId??null,
+      completed_at:new Date().toISOString(),
+    });
+    verification=await independentVerifier.verify({
+      workItem,authorization,execution:executed,providerResult,
+    });
+  }catch(error){
+    // Once DISPATCHING was committed, a network failure cannot be retried
+    // blindly. The provider may have performed the effect despite a timeout.
+    let settlement='UNCERTAIN_OUTCOME_NOT_DURABLY_SETTLED';
+    if(requiresReservation){
+      try{
+        const receipt=await reservationStore.settle({
+          reservationId:serverSingleUseReservation.reservation_id,
+          outcome:'UNCERTAIN',
+          verificationReceiptRef:'reality:execution:'+execution.execution_id,
+        });
+        settlement=receipt?.status==='UNCERTAIN'?'UNCERTAIN':settlement;
+      }catch{ /* still consumed; never auto-retry */ }
+    }
+    return Object.freeze({
+      engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+      status:'UNRESOLVED',blocked_reason:'PROVIDER_EFFECT_OR_READBACK_UNCERTAIN_NO_RETRY',
+      reservation_state:settlement,
+      execution:Object.freeze({...execution,execution_state:'OUTCOME_UNCERTAIN'}),
+      verification:null,
+      outcome:Object.freeze({outcome_state:'UNRESOLVED',verified:false,
+        independent:false,provider_effect_may_have_occurred:true,
+        no_automatic_retry:true}),
+    });
+  }
 
   // A successful self-report or same-adapter check is not independent verification.
   // Never elevate external execution to a verified outcome without an explicit
@@ -113,11 +169,38 @@ export async function executeAuthorizedWork({
     mismatch:verification?.mismatch ?? null,
   });
 
+  let reservationSettlement=null;
+  if(requiresReservation){
+    const settledOutcome=verified?'VERIFIED':'UNRESOLVED';
+    try{
+      reservationSettlement=await reservationStore.settle({
+        reservationId:serverSingleUseReservation.reservation_id,
+        outcome:settledOutcome,
+        verificationReceiptRef:String(verification?.verification_id||
+          'reality:execution:'+execution.execution_id).slice(0,240),
+      });
+      if(reservationSettlement?.status!==settledOutcome)
+        throw Error('EXECUTION_RESERVATION_SETTLEMENT_READBACK_MISSING');
+    }catch{
+      // Cannot claim a durable verified result if the ledger settlement
+      // failed after the provider was invoked. Reconcile, never auto-retry.
+      return Object.freeze({
+        engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
+        status:'UNRESOLVED',
+        blocked_reason:'EXECUTION_SETTLEMENT_UNCONFIRMED_NO_RETRY',
+        execution:executed,verification,
+        outcome:Object.freeze({...outcome,verified:false,
+          outcome_state:'UNRESOLVED',
+          no_automatic_retry:true}),
+      });
+    }
+  }
   return Object.freeze({
     engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
     status:verified?'VERIFIED':'UNRESOLVED',
     execution:executed,
     verification,
     outcome,
+    reservation_settlement:reservationSettlement,
   });
 }
