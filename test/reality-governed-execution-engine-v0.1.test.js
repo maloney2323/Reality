@@ -78,7 +78,29 @@ function approved(item=workItem){
     principalId:'test-user',conversationId:'test-conversation',
     policy:goalBoundPolicy,authorization,serverApprovalProof,
   });
-  return {authorization,serverApprovalProof,serverFreshGoalAdmission};
+  // A simulated DB adapter for these pure unit tests. Real execution uses
+  // reality_begin_reserved_execution RPC under the existing goal epoch lock.
+  const reservationId='00000000-0000-4000-8000-000000000201';
+  let consumed=false;
+  const reservationStore={
+    async begin({reservationId:id}){
+      if(id!==reservationId||consumed)throw Error('EXECUTION_RESERVATION_ALREADY_CONSUMED');
+      consumed=true;
+      return {status:'DISPATCHING',reservation_id:id,single_use_claim_consumed:true};
+    },
+    async settle({reservationId:id,outcome}){
+      if(id!==reservationId||!consumed)throw Error('EXECUTION_RESERVATION_NOT_DISPATCHED');
+      return {status:outcome,reservation_id:id};
+    },
+  };
+  const serverSingleUseReservation={
+    status:'RESERVED_NOT_DISPATCHED',reservation_id:reservationId,
+    principal_id:'test-user',conversation_id:'test-conversation',
+    policy_id:goalBoundPolicy.policy_id,
+    work_fingerprint:binding.work_item_fingerprint,
+  };
+  return {authorization,serverApprovalProof,serverFreshGoalAdmission,
+    serverSingleUseReservation,reservationStore};
 }
 
 test('recognized connector write fails closed without server approval proof',async()=>{
@@ -249,4 +271,66 @@ test('non-preview connector execution fails closed even with an old signed admis
   assert.equal(r.blocked_reason,'EXECUTION_GOAL_ADMISSION_PREVIEW_ONLY');
   assert.equal(executed,false);
  }finally{process.env.VERCEL_ENV=previous}
+});
+
+test('even fresh goal plus signed approval is blocked without durable single-use reservation',async()=>{
+ const grant=approved();
+ delete grant.reservationStore;
+ delete grant.serverSingleUseReservation;
+ let invoked=false;
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{invoked=true}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})},
+ });
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.blocked_reason,'EXECUTION_DURABLE_SINGLE_USE_RESERVATION_REQUIRED');
+ assert.equal(invoked,false);
+});
+
+test('duplicate dispatch of one reservation cannot execute a second provider effect',async()=>{
+ const grant=approved();let count=0;
+ const params={workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{count++;return {observation:{state:'written'}}}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})},
+ };
+ const first=await executeAuthorizedWork(params);
+ const second=await executeAuthorizedWork(params);
+ assert.equal(first.status,'VERIFIED');
+ assert.equal(second.status,'BLOCKED');
+ assert.equal(second.blocked_reason,'EXECUTION_RESERVATION_ALREADY_CONSUMED');
+ assert.equal(count,1);
+});
+
+test('racing dispatch attempts on same reservation are serialized by trusted DB begin',async()=>{
+ const grant=approved();let count=0;
+ const params={workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{count++;return {observation:{state:'written'}}}},
+  independentVerifier:{verify:async()=>({verified:true,independent:true})},
+ };
+ const results=await Promise.all([executeAuthorizedWork(params),executeAuthorizedWork(params)]);
+ assert.equal(results.filter(x=>x.status==='VERIFIED').length,1);
+ assert.equal(results.filter(x=>x.status==='BLOCKED').length,1);
+ assert.equal(count,1);
+});
+
+test('connector timeout consumes reservation, records UNCERTAIN and never auto retries',async()=>{
+ const grant=approved();let count=0,uncertain=false;
+ const settle=grant.reservationStore.settle;
+ grant.reservationStore.settle=async args=>{
+  uncertain=args.outcome==='UNCERTAIN';
+  return settle(args);
+ };
+ const params={workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{count++;throw Error('NETWORK_TIMEOUT')}},
+  independentVerifier:{verify:async()=>{throw Error('SHOULD_NOT_VERIFY')}},
+ };
+ const first=await executeAuthorizedWork(params);
+ const second=await executeAuthorizedWork(params);
+ assert.equal(first.status,'UNRESOLVED');
+ assert.equal(first.outcome.no_automatic_retry,true);
+ assert.equal(first.reservation_state,'UNCERTAIN');
+ assert.equal(uncertain,true);
+ assert.equal(second.status,'BLOCKED');
+ assert.equal(count,1);
 });
