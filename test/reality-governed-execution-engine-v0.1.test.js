@@ -364,3 +364,39 @@ test('lost settlement readback never turns a provider result into verified durab
  assert.equal(r.outcome.verified,false);
  assert.equal(r.outcome.no_automatic_retry,true);
 });
+
+test('GitHub failure after reservation preserves safe HTTP diagnosis without leaking raw provider data',async()=>{
+ const grant=approved();
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>{
+   const err=new Error('GITHUB_CONNECTOR_403');
+   err.body={message:'secret: never print this',authorization:'Bearer do-not-print'};
+   throw err;
+  }},
+  independentVerifier:{verify:async()=>{throw Error('SHOULD_NOT_RUN')}},
+ });
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.provider_failure_stage,'PROVIDER_WRITE');
+ assert.equal(r.provider_failure_code,'GITHUB_HTTP_403');
+ assert.equal(r.reservation_state,'UNCERTAIN');
+ assert.equal(r.outcome.no_automatic_retry,true);
+ assert.ok(!JSON.stringify(r).includes('Bearer'));
+ assert.ok(!JSON.stringify(r).includes('secret:'));
+});
+test('post-creation readback exception stores only unverified provider claim and stage',async()=>{
+ const grant=approved();
+ const r=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,...grant,
+  connector:{execute:async()=>({
+   providerExecutionId:'123456',observation:{number:152,claimed_url:'https://github.com/example/repository/issues/152'},
+  })},
+  independentVerifier:{verify:async()=>{throw Error('NETWORK_TIMEOUT_INTERNAL_CREDENTIAL')}},
+ });
+ assert.equal(r.status,'UNRESOLVED');
+ assert.equal(r.provider_failure_stage,'INDEPENDENT_PROVIDER_READBACK');
+ assert.equal(r.provider_failure_code,'PROVIDER_OR_NETWORK_ERROR');
+ assert.deepEqual(r.unverified_provider_claim,{issue_number:152});
+ assert.equal(r.outcome.verified,false);
+ assert.ok(!JSON.stringify(r).includes('INTERNAL_CREDENTIAL'));
+});
