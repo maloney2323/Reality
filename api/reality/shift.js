@@ -8,6 +8,7 @@ import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../s
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
 import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome, authorizeShiftConfigWrite, authorizeManualShiftRun } from '../../src/reality-autonomous-shift-control-v1.0.js';
+import {projectShiftCycleCompletion} from '../../src/reality-completion-report-v0.1.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -342,7 +343,8 @@ export default async function handler(req, res) {
       });
       return json(res, 200, {
         ok: true, config: owned ? config : null,
-        home, runtime: 'server_backed', execution_invoked: false,
+        home,completion_report:projectShiftCycleCompletion({home}),
+        runtime: 'server_backed', execution_invoked: false,
       });
     }
 
