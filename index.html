@@ -938,6 +938,10 @@ function wcReceiptHTML(report){
   '<p>'+esc(String(report.title||report.headline||'Reality work result'))+'</p>'+
   '<strong>What I actually did</strong>'+list(completed.length?completed:
     ['No completed action could be independently established from this receipt.'])+
+  (cycle&&Array.isArray(report.discovered_items)&&report.discovered_items.length?
+    '<strong>Discoveries from this cycle — not completed jobs</strong>'+
+     list(report.discovered_items.map(x=>String(x.title||'Unnamed work')+
+      ' · Source evidence '+String(x.evidence_count??'unknown'))):'')+
   '<strong>What remains unfinished</strong>'+list(remaining)+
   '<p class="wc-receipt-proof"><strong>Verification:</strong> '+evidence+
   ' · Saved receipt: '+esc(String(receipt))+
@@ -996,6 +1000,7 @@ function wcRenderShiftEndingReceipt(home){
   observed_at:cycle.observed_at||home.latest_shift_at,
   source_receipt_id:cycle.source_event_id,tick_id:cycle.tick_id,
   discovered_work_count:cycle.discovered_work_count,
+  discovered_items:cycle.discovered_items||[],
   evidence_observation_count:cycle.recent_observation_count,
   completed_actions:['Observed source activity and persisted this one discovery-cycle result'],
   pending_work:['Discovered jobs still require separate authorized execution and verification',
