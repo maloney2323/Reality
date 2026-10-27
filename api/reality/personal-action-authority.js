@@ -36,8 +36,13 @@ export default async function handler(req,res){
   return res.status(200).json({ok:true,status:'EXACT_GOAL_BOUND_ACTION_APPROVED',
    ...saved,execution_authorized_by_approval_alone:false});
  }catch(error){
+  // Database driver errors may contain private Continuity IDs and SQL.
+  // Surface a stable, non-secret failure while remaining fail-closed.
+  const raw=String(error?.message||'');
+  const database=/UNIVERSE_POSTGRES_HTTP_|CONTINUITY_PERSISTENCE_REQUIRED|CONTINUITY_REHYDRATION_FAILED/.test(raw);
   return res.status(error.status||503).json({ok:false,
-   error:error.message||'ACTION_APPROVAL_UNAVAILABLE',
+   error:database?'ACTION_APPROVAL_CONTINUITY_STORAGE_UNAVAILABLE':
+    raw||'ACTION_APPROVAL_UNAVAILABLE',
    external_action_performed:false});
  }
 }
