@@ -242,7 +242,7 @@ test('GitHub preview credential must authenticate owner AND read target issues b
 });
 test('readiness endpoint checks real credential and never equates token presence with permission',()=>{
  const source=readFileSync(new URL('../api/reality/personal-issue-dispatch.js',import.meta.url),'utf8');
- assert.ok(source.includes('verifyPersonalGithubIssueToken()'));
+ assert.ok(source.includes('inspectPreviewGithubRepositoryAccessReadOnly()'));
  assert.ok(source.includes("status='PREVIEW_GITHUB_CREDENTIAL_NOT_VERIFIED'"));
  assert.ok(source.includes("github_issue_write_permission_not_yet_proven:true"));
  assert.ok(!source.includes("Boolean(process.env.REALITY_GITHUB_TOKEN)?"));
