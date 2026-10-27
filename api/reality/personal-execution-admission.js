@@ -4,6 +4,8 @@ import { authenticatedChatSession,privateChatConfig,assertSameOrigin }
  from '../../src/reality-private-chat-auth-v0.1.js';
 import { prepareAuthenticatedPersonalExecution }
  from '../../src/reality-personal-execution-admission-service-v0.1.js';
+import { reserveAuthenticatedPersonalExecution }
+ from '../../src/reality-personal-execution-reservation-service-v0.1.js';
 import { validUuid } from '../../src/reality-private-chat-store-v0.1.js';
 
 export const maxDuration=60;
@@ -29,6 +31,24 @@ export default async function handler(req,res){
    throw Object.assign(Error('PERSONAL_EXECUTION_CLIENT_AUTHORITY_REJECTED'),{status:400});
   const session=await authenticatedChatSession(req,res);
   if(!session)throw Object.assign(Error('CHAT_SIGN_IN_REQUIRED'),{status:401});
+  if(body.intent!==undefined&&!['CHECK','RESERVE'].includes(body.intent))
+   throw Object.assign(Error('PERSONAL_EXECUTION_INTENT_INVALID'),{status:400});
+  if(body.intent==='RESERVE'){
+   if(body.confirmation!=='RESERVE_THIS_APPROVED_ACTION')
+    throw Object.assign(Error('EXECUTION_RESERVATION_EXPLICIT_CONFIRMATION_REQUIRED'),{status:400});
+   const reserved=await reserveAuthenticatedPersonalExecution({
+    session,conversationId:body.conversation_id,
+    workItem:body.work_item,groundingProof:body.grounding_proof,
+   });
+   return res.status(200).json({ok:true,status:reserved.status,
+    reservation_id:reserved.reservation_id,
+    goal_id:reserved.goal_id,action_policy_id:reserved.action_policy_id,
+    work_item_fingerprint:reserved.work_item_fingerprint,
+    execution_authorized:false,external_action_performed:false,
+    durable_execution_reservation_claimed:true,
+    no_automatic_retry:true,
+   });
+  }
   const prepared=await prepareAuthenticatedPersonalExecution({
     session,conversationId:body.conversation_id,
     workItem:body.work_item,groundingProof:body.grounding_proof,
