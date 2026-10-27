@@ -364,6 +364,35 @@ function renderWork(source){
       receipt.textContent='Reality blocked the handoff: '+e.message;
     }
   });
+  // Read-only durable recovery. Source-only handoff never implies that a
+  // separate action approval was granted or that the work was executed.
+  void refreshPreparedHomeWork(pending);
+}
+async function refreshPreparedHomeWork(pending){
+  if($('privateReady')?.style.display!=='block')return;
+  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+  if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))return;
+  try{
+    const r=await fetch('/api/reality/personal-discovered-work?conversation_id='+
+      encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    if(data.status!=='READ_ONLY_DISCOVERED_WORK_CONTINUITY')return;
+    const remembered=new Map((data.items||[]).map(x=>[x.work_id,x]));
+    for(let i=0;i<pending.length;i++){
+      const w=pending[i],prior=remembered.get(w.work_id);
+      if(!prior||!prior.continuity_receipt_id)continue;
+      const card=$('attentionQueue').querySelector('[data-work-receipt="'+i+'"]');
+      if(!card||card.textContent.includes('Approval '))continue;
+      card.textContent='Continuity restored · '+prior.continuity_receipt_id+
+       ' · '+(prior.goal_still_current
+        ?'Original goal remains active; fresh approval is still required'
+        :'Prior goal changed; prepare this work again before any approval')+
+       ' · No external action performed';
+    }
+  }catch{
+    // UI readback failure never creates authority or implies completion.
+  }
 }
 async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
 realityWork.onclick=async()=>{
