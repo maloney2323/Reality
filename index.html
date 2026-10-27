@@ -229,6 +229,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <button type="button" id="wcRefreshCompletion">Refresh saved receipts · Read only</button></div>
   <p id="wcCompletionStatus" class="wc-note" role="status" aria-live="polite">Sign in to view saved, source-backed job outcomes. Discovery is not completion.</p>
   <div id="wcCompletionList"><p class="muted">No completed-job claim has been established in this view.</p></div>
+  <div id="wcShiftReceipt" hidden></div>
  </div>
  <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
   <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
@@ -684,7 +685,7 @@ async function revealGap3Action(review,receipt,workItem,conversationId,workId){
      const consentText=review.querySelector('[data-run-consent-text]');
      if(consentText)consentText.textContent='Your one-time authorization has been consumed. Do not create another issue for this same attempted work.';
      review.append(link);
-     void wcLoadCompletionReports();
+     void wcLoadCompletionReports({focus:true});
     }else{
      info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
       '. Do not retry automatically; reconcile the provider and reservation receipts.';
@@ -904,7 +905,7 @@ async function wcAuthorizeAndStart(workId){
  }finally{
   wcJobStarting=false;
   wcRender();
-  if(providerDispatchRequested)void wcLoadCompletionReports();
+  if(providerDispatchRequested)void wcLoadCompletionReports({focus:Boolean(wcJobProgress.verifiedIssueUrl)});
  }
 }
 
@@ -948,7 +949,7 @@ function wcReceiptHTML(report){
   (validURL?'<p><a href="'+esc(validURL)+'" target="_blank" rel="noopener noreferrer">View verified GitHub issue</a></p>':'')+
   '</article>';
 }
-async function wcLoadCompletionReports(){
+async function wcLoadCompletionReports({focus=false}={}){
  const out=$('wcCompletionList'),status=$('wcCompletionStatus');
  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
  if($('privateReady')?.style.display!=='block'||
@@ -970,6 +971,8 @@ async function wcLoadCompletionReports(){
    'No persisted execution outcomes found for this conversation. Discoveries and approvals are not completed jobs.';
   out.innerHTML=data.reports.length?data.reports.map(wcReceiptHTML).join(''):
    '<p class="muted">No verified work results yet for this conversation.</p>';
+  if(focus&&data.reports.length&&data.reports[0].action_completed===true)
+   $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
  }catch{
   status.textContent='Completion receipts could not be restored. No completion claim is being made.';
   out.textContent='Reconnect and refresh the saved receipts. Do not retry any previously dispatched task.';
@@ -978,12 +981,15 @@ async function wcLoadCompletionReports(){
 $('wcRefreshCompletion').onclick=()=>{void wcLoadCompletionReports()};
 function wcRenderShiftEndingReceipt(home){
  const el=$('shiftEndingReceipt');
+ const overview=$('wcShiftReceipt');
  const cycle=home?.latest_cycle;
  if(home?.status!=='RECORDED'||!cycle||cycle.tick_id!==home.latest_tick_id||
     !cycle.source_event_id||!Number.isSafeInteger(cycle.discovered_work_count)){
-  el.hidden=true;el.replaceChildren();return;
+  el.hidden=true;el.replaceChildren();
+  overview.hidden=true;overview.replaceChildren();return;
  }
  el.hidden=false;
+ overview.hidden=false;
  el.innerHTML=wcReceiptHTML({
   type:'SHIFT_DISCOVERY_CYCLE',status:'DISCOVERY_CYCLE_RECORDED_SHIFT_NOT_VERIFIED_COMPLETE',
   headline:'Reality recorded this discovery cycle',
@@ -996,6 +1002,7 @@ function wcRenderShiftEndingReceipt(home){
    'Full-shift closure and complete verified job inventory have not been established'],
   next_step:'Review discoveries and authorize eligible jobs. This is not evidence that a 1–8 hour automation shift finished.'
  });
+ overview.innerHTML=el.innerHTML;
 }
 
 let wcCoverage={},wcCatalogStatus='NOT_CHECKED';
