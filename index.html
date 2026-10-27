@@ -297,6 +297,7 @@ function renderWork(source){
     const w=pending[Number(btn.dataset.auth)];
     const receipt=$('attentionQueue').querySelector('[data-work-receipt="'+btn.dataset.auth+'"]');
     btn.disabled=true;btn.textContent='Rechecking source & goal…';
+    let confirmedGoalReadback=false;
     try{
       // The browser selects ONLY a source work ID. The server re-discovers
       // actual GitHub evidence and constructs the exact work item itself.
@@ -307,6 +308,18 @@ function renderWork(source){
         throw Error('Sign in to your private Reality conversation and confirm your active goal first.');
       if($('privateReady').style.display!=='block')
         throw Error('Sign in to Reality private chat before preparing a business action.');
+      // Read-only preflight explains why PREPARE would fail. A browser
+      // readback never creates an active goal or grants execution authority.
+      const goalR=await fetch('/api/reality/personal-goals?conversation_id='+
+        encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+      const goalData=await goalR.json();
+      if(!goalR.ok||!goalData.ok)
+        throw Error(goalData.error||'Reality could not verify your goal ledger.');
+      const current=goalData.goal_state;
+      if(!current?.active_goal_id||current.active_goal?.goal_id!==current.active_goal_id||
+         current.active_goal?.status!=='ACTIVE'||current.active_goal?.user_confirmed!==true)
+        throw Error('DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION');
+      confirmedGoalReadback=true;
       async function post(path,payload){
         const response=await fetch(path,{method:'POST',credentials:'same-origin',
          headers:{'content-type':'application/json'},
@@ -373,7 +386,9 @@ function renderWork(source){
       if(needsGoal){
         receipt.replaceChildren();
         const detail=document.createElement('div');
-        detail.textContent='The private Continuity ledger could not verify an active, user-confirmed objective for this conversation. No work was authorized or executed.';
+        detail.textContent=confirmedGoalReadback
+          ?'A goal appears active, but Reality could not authenticate its source receipt for this action. Do not recreate or overwrite the goal automatically. No work was authorized or executed.'
+          :'No active, user-confirmed objective was found for this private conversation. Scroll below, confirm a goal, then return to Prepare exact work. No work was authorized or executed.';
         const guide=document.createElement('button');
         guide.type='button';
         guide.textContent='Go to confirmed objective';
