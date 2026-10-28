@@ -10,6 +10,8 @@ import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
 import {createContinuitySpine}
  from './reality-continuity-spine-v2.0.js';
+import {projectRealityUpgradeDiscovery}
+ from './reality-upgrade-discovery-v0.1.js';
 import {validUuid}
  from './reality-private-chat-store-v0.1.js';
 
@@ -39,6 +41,9 @@ export function projectOriginalJobRecoveryLoop({
    'https://github.com/maloney2323/Reality/actions/runs/'),
   'LIVE_LOOP_PROVIDER_SUCCESS_REF_MISSING'
  );
+ const upgradeDiscovery=projectRealityUpgradeDiscovery({
+  originalWorkId,providerEvidence:evidence,cognitionState,
+ });
  const timeline=Object.freeze([
   {step:'ORIGINAL_JOB_RECOVERED',state:'VERIFIED',evidence_ref:evidence.recovery_receipt_id,
    description:'Restored original job and incomplete status from the owner-scoped Continuity checkpoint.'},
@@ -73,6 +78,7 @@ export function projectOriginalJobRecoveryLoop({
   provider_passing_run:evidence.later_success?.run_url||null,
   provider_passing_sha:evidence.later_success?.head_sha||null,
   capability_engine_state:cognitionState.state,
+  upgrade_discovery:upgradeDiscovery,
   current_decision:later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
    'BLOCKED_REQUIRES_ROOT_CAUSE_DIAGNOSIS',
   timeline,
