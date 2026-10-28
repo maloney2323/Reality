@@ -1,0 +1,89 @@
+name: Reality Original Model Executor Evidence-Only Snapshot v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-executor-evidence-snapshot-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-pinned-verified-evidence-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40762950798
+          name: reality-original-executor-corrected-independent-holdout-proof
+          github-token: ${{ github.token }}
+          path: frozen-reality-artifact
+      - name: Independently confirm immutable model package and 10/10 plus 4/4 before evidence-only Git commit
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const src='frozen-reality-artifact/';
+          const sha=x=>createHash('sha256').update(x).digest('hex');
+          const m=JSON.parse(fs.readFileSync(src+'manifest.json','utf8'));
+          const p=JSON.parse(fs.readFileSync(src+'package.json','utf8'));
+          const a=fs.readFileSync(src+'reality-original-maintenance-repair-proposal.mjs','utf8');
+          const b=fs.readFileSync(src+'reality-original-maintenance-executor.mjs','utf8');
+          const frozen=fs.readFileSync(src+'independent-frozen-verification.txt','utf8');
+          const holdout=fs.readFileSync(src+'independent-security-verification.txt','utf8');
+          const canonical=JSON.stringify(p.files.map(f=>({path:f.path,content:f.content,mode:f.mode||'100644'})));
+          if(m.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             m.original_model_response_id!=='resp_00cb45cc49d5ca0a006ae25989e71887d294c2bf5992ff3829'||
+             m.governed_install_candidate_sha256!=='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2'||
+             sha(canonical)!==m.governed_install_candidate_sha256||
+             sha(a)!=='6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16'||
+             sha(b)!=='61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17'||
+             p.files?.length!==2||p.files[0].content!==a||p.files[1].content!==b||
+             !frozen.includes('# pass 10')||!frozen.includes('# fail 0')||
+             !holdout.includes('# pass 4')||!holdout.includes('# fail 0')||
+             m.owner_warrant_issued!==false||m.installed!==false||m.original_job_completed!==false)
+            throw Error('ORIGINAL_EXECUTOR_SNAPSHOT_UNVERIFIED');
+          const target='evidence/reality-original-executor-model-20261028/';
+          const allow=['manifest.json','package.json','independent-frozen-verification.txt','independent-security-verification.txt'];
+          fs.mkdirSync(target,{recursive:true});
+          for(const f of allow){
+           if(fs.existsSync(target+f))throw Error('ORIGINAL_EXECUTOR_EVIDENCE_ALREADY_EXISTS_NO_OVERWRITE');
+           fs.copyFileSync(src+f,target+f);
+          }
+          console.log(JSON.stringify({status:'FROZEN_REAL_MODEL_SOURCE_EVIDENCE_ONLY',
+           files:allow.map(x=>target+x),
+           source_hash:sha(b),candidate_hash:m.governed_install_candidate_sha256,
+           production_change:false,installed:false,owner_authority:false}));
+          JS
+      - name: Commit ONLY evidence snapshots on isolated feature branch, NEVER install paths
+        run: |
+          set -euo pipefail
+          git config user.name "Reality Evidence Bot"
+          git config user.email "reality-evidence-bot@users.noreply.github.com"
+          git add -- evidence/reality-original-executor-model-20261028/
+          node --input-type=module <<'JS'
+          import {execFileSync} from 'node:child_process';
+          const paths=execFileSync('git',['diff','--cached','--name-only'],{encoding:'utf8'}).trim().split('\n');
+          const allow=[
+           'evidence/reality-original-executor-model-20261028/manifest.json',
+           'evidence/reality-original-executor-model-20261028/package.json',
+           'evidence/reality-original-executor-model-20261028/independent-frozen-verification.txt',
+           'evidence/reality-original-executor-model-20261028/independent-security-verification.txt'
+          ];
+          if(paths.length!==4||paths.some(p=>!allow.includes(p)))throw Error('EVIDENCE_ONLY_STAGED_PATHS_REQUIRED');
+          console.log('EXACT_FOUR_FROZEN_EVIDENCE_PATHS_ONLY');
+          JS
+          git commit -m "Record Reality model-generated original-job frozen evidence only (no upgrade installed)"
+          git push origin HEAD:refs/heads/feature/governed-autonomous-self-upgrading-v01-20261027
+      - name: Exact evidence-only GitHub write does not authorize an install or a settlement
+        run: |
+          echo 'GITHUB_WRITE_SCOPE=verified-model-evidence-only'
+          echo 'EXECUTOR_INSTALLED=false'
+          echo 'OWNER_INSTALL_APPROVAL=false'
+          echo 'ORIGINAL_JOB_SETTLED=false'
