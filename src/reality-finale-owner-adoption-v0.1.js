@@ -40,7 +40,7 @@ export async function adoptControlledFinaleIntoOwnerContinuity({
     !validUuid(active.last_transition_receipt_id))
   fail('FINALE_OWNER_FRESH_CONFIRMED_GOAL_REQUIRED');
  const objective=String(active.title||'').toLowerCase();
- if(!/\\breality\\b/.test(objective)||
+ if(!objective.includes('reality')||
     !/(?:finale|full[ -]?loop|self[ -]?repair|self[ -]?upgrade)/.test(objective)||
     !/(?:controlled|construction|estimate)/.test(objective))
   fail('FINALE_OWNER_EXPLICIT_SCOPE_GOAL_REQUIRED');
