@@ -35,7 +35,7 @@ const env={
  REALITY_UNIVERSE_PERSISTENCE_KEY:'mock-persistence-key-local-test-only',
  REALITY_CHAT_RECEIPT_HMAC_KEY:'local-test-secret-never-used-by-reality-123456789',
 };
-function fixture(){
+function fixture({gapCheckpoint=false}={}){
  const scope=personalGoalScope({userId:owner,conversationId});
  const spine=createContinuitySpine({
   continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:owner,
@@ -89,7 +89,17 @@ function fixture(){
   parentEventId:root.event_id,priorLineageHash:root.lineage_hash,
   effectiveTime:at(1),assertionTime:at(1),epistemicStatus:'OBSERVED',
   payload:{original_work_id:originalWorkId,original_goal_id:goalId,
-   job_completed:false,new_external_action_authorized:false},
+   job_completed:false,new_external_action_authorized:false,
+   ...(gapCheckpoint?{
+    blocker_classification:'MISSING_CAPABILITY_INDEPENDENTLY_VERIFIED',
+    frozen_failure_refs:['github:actions:failed-original-invoice-work'],
+    verification_suite_ref:'test:extension.invoice-parser:frozen',
+   }:{})},
+  epistemicStatus:gapCheckpoint?'VERIFIED':'OBSERVED',
+  provenance:gapCheckpoint?{
+   source:'reality-capability-gap-detector-v1.0',
+   principal_id:owner,conversation_id:conversationId,
+  }:{},
  });
  const warrant=issueUpgradeEvidenceWarrant({
   experiment:verifiedExperiment,originalWorkItem,
@@ -123,7 +133,7 @@ function fixture(){
    transformation_receipt_id:e.transformation_receipt_id,
   }}});
 
- const history=[mark(root,'raw_signal'),mark(checkpoint,'personal_recovery_checkpoint'),
+ const history=[mark(root,'raw_signal'),mark(checkpoint,gapCheckpoint?'personal_capability_gap_checkpoint':'personal_recovery_checkpoint'),
   mark(sandbox,'personal_upgrade_sandbox_verified'),
   mark(warrantEvent,'personal_upgrade_evidence_warrant')];
  const inputs={experiment:verifiedExperiment,originalWorkItem,
@@ -256,4 +266,18 @@ test('no source event means no warrant and never a default upgrade candidate',as
      last_transition_receipt_id:goalRevision}}}),
   createPersistence:()=>({reconstruct:async()=>f.history.slice(0,2)}),
  }),/UPGRADE_LOADER_VERIFIED_SANDBOX_AND_WARRANT_NOT_PERSISTED/);
+});
+
+test('new genuine capability-gap checkpoint can enter the same signed warrant loader contract',()=>{
+ const f=fixture({gapCheckpoint:true});
+ const result=projectAuthenticatedWarrantedUpgrade(f.projectArgs);
+ assert.equal(result.original_work_id,originalWorkId);
+ assert.equal(result.verified_not_authorized,true);
+ assert.equal(result.candidate_hash,f.warrant.candidate_sha256);
+ const changed=f.history.map((event,i)=>i===1?{
+  ...event,provenance:{...event.provenance,source:'model-guessed-capability-gap'},
+ }:event);
+ assert.throws(()=>projectAuthenticatedWarrantedUpgrade({
+  ...f.projectArgs,history:changed,
+ }),/(?:RELIABILITY_HISTORY_|UPGRADE_LOADER_NEW_GAP_CHECKPOINT)/);
 });
