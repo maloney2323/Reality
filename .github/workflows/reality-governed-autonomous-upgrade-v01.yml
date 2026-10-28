@@ -5,6 +5,9 @@ on:
       - feature/governed-autonomous-self-upgrading-v01-20261027
     paths:
       - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'src/reality-upgrade-evidence-warrant-v0.1.js'
+      - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
+      - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
       - 'src/reality-upgrade-discovery-v0.1.js'
       - 'src/reality-real-recovery-coordinator-v0.1.js'
       - 'test/reality-upgrade-discovery-v0.1.test.js'
@@ -20,6 +23,9 @@ on:
   pull_request:
     paths:
       - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'src/reality-upgrade-evidence-warrant-v0.1.js'
+      - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
+      - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
       - 'src/reality-upgrade-discovery-v0.1.js'
       - 'src/reality-real-recovery-coordinator-v0.1.js'
       - 'test/reality-upgrade-discovery-v0.1.test.js'
@@ -46,4 +52,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify exact owner-authorized bounded upgrade candidate and independent GitHub readback
-        run: node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js
+        run: node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js
