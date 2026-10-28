@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {projectOriginalExecutorRun,projectAcceptedOriginalExecutorRun} from '../src/reality-original-executor-run-monitor-v0.1.js';
+import {projectOriginalExecutorRun,projectAcceptedOriginalExecutorRun,projectLiveOriginalExecutorRun} from '../src/reality-original-executor-run-monitor-v0.1.js';
 const work='work:24cda9611404e9bcb47909976067605c';
 const run=()=>({
  id:40755665295,name:'Reality ORIGINAL Autonomous Executor Synthesis v0.1',
@@ -69,4 +69,27 @@ test('Reality frozen ten-case model executor evidence requires actual exact gree
  assert.throws(()=>projectAcceptedOriginalExecutorRun({run:{...r,conclusion:'failure'},jobs:[j]}));
  assert.throws(()=>projectAcceptedOriginalExecutorRun({run:r,jobs:[{...j,conclusion:'failure'}]}));
  assert.throws(()=>projectAcceptedOriginalExecutorRun({run:{...r,head_sha:'f'.repeat(40)},jobs:[j]}));
+});
+
+test('real model generated executor on original GitHub current source is read-only, with NO upgrade install or job completion',()=>{
+ const r=run();
+ r.id=40760732281;
+ r.name='Reality ORIGINAL Live GitHub Read-Only Execution Proof v0.1';
+ r.head_sha='3f49896c8d31925a8294e320a3b821923db3e758';
+ r.html_url='https://github.com/maloney2323/Reality/actions/runs/40760732281';
+ r.path='.github/workflows/reality-original-live-github-readonly-v0.1.yml';
+ r.conclusion='success';
+ const j={name:'actual-original-github-readonly',status:'completed',conclusion:'success'};
+ const v=projectLiveOriginalExecutorRun({run:r,jobs:[j]});
+ assert.equal(v.original_work_id,work);
+ assert.equal(v.live_github_read_only_execution_verified,true);
+ assert.equal(v.original_source_already_fixed_before_model_install,true);
+ assert.equal(v.original_repair_performed_by_reality,false);
+ assert.equal(v.owner_warrant_issued,false);
+ assert.equal(v.installed_capability,false);
+ assert.equal(v.original_job_completed,false);
+ assert.throws(()=>projectLiveOriginalExecutorRun({run:{...r,conclusion:'failure'},jobs:[j]}));
+ assert.throws(()=>projectLiveOriginalExecutorRun({run:r,jobs:[{...j,conclusion:'failure'}]}));
+ assert.throws(()=>projectLiveOriginalExecutorRun({run:{...r,head_sha:'f'.repeat(40)},jobs:[j]}));
+ assert.throws(()=>projectLiveOriginalExecutorRun({run:{...r,repository:{full_name:'someone/Reality'}},jobs:[j]}));
 });
