@@ -111,7 +111,7 @@ export function projectAuthenticatedWarrantedUpgrade({
   owner_id:ownerId,conversation_id:conversationId,
   original_work_id:originalWorkId,
   original_goal_id:activeGoalId,goal_revision:goalRevision,
-  originalWorkItem,verifiedExperiment,
+  originalWorkItem,verifiedExperiment,verifierReceipt,
   evidence_warrant:warrant,
   evidence_warrant_id:verified.warrant_id,
   candidate_hash:verified.candidate_sha256,
