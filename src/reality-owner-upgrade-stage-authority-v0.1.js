@@ -112,6 +112,9 @@ export async function prepareOwnerUpgradeStageApproval({
 }
 async function consume({stage,session,scope,plan,installed,env,
  prepare=prepareOwnerUpgradeStageApproval,reserve=reserveAuthenticatedPersonalExecution}){
+ // Validate the immutable owner/goal/candidate scope before reading any
+ // optional injected trusted service or attempting atomic reservation.
+ assertScope({session,conversationId:scope?.conversationId,scope,plan,stage,installed,env});
  // Preparer reconstructs the current signed-in owner's goal and issues a
  // NON-authorizing work binding. Reserved execution separately reloads a
  // previously recorded explicit action approval for this exact fingerprint.
