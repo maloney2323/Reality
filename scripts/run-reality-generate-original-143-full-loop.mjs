@@ -104,24 +104,50 @@ async function main(){
   exact_output_paths:FILES,
   actual_current_source_context:context,
  };
- const response=await fetch('https://api.openai.com/v1/responses',{
-  method:'POST',headers:{authorization:'Bearer '+key,'content-type':'application/json'},
-  body:JSON.stringify({
-   model,max_output_tokens:11500,
-   input:[
-    {role:'system',content:[{type:'input_text',text:'You are Reality, an evidence-governed autonomous code-generating operating intelligence. Generate implementation code rather than a discussion. You can propose files, but have no right to authorize installation, execute, or settle customer jobs.'}]},
-    {role:'user',content:[{type:'input_text',text:JSON.stringify(prompt)}]},
-   ],
-   text:{format:{type:'json_object'}},
-  }),
- });
- const body=await response.json();
- assert(response.ok,'REALITY_PROVIDER_HTTP_'+response.status);
- const raw=extractedText(body).trim();
- assert(raw.length>500,'REALITY_MODEL_EMPTY_OR_TRUNCATED_OUTPUT');
- let candidate;
- try{candidate=JSON.parse(raw)}catch{throw Error('REALITY_MODEL_NOT_VALID_JSON_'+String(body.status))}
- validate(candidate);
- save(candidate,body.id||null,model);
+
+ let lastCandidate=null,lastFailure=null;
+ const attempts=[];
+ for(let attempt=1;attempt<=3;attempt++){
+  // Feedback comes from Reality's deterministic candidate-contract verifier.
+  // Rejected code is never executed, installed, or moved into the PR.
+  const task=attempt===1?prompt:{
+   ...prompt,
+   correction_round:attempt,
+   previous_failure:lastFailure,
+   previous_candidate:lastCandidate,
+   correction_instruction:'Correct the failed contract precisely, preserve the three exact paths, all original user/goal/owner boundaries, and return the entire corrected JSON candidate. The HTTP route must explicitly compare the owner confirmation with ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY. Do not report success from unexecuted test code.',
+  };
+  const response=await fetch('https://api.openai.com/v1/responses',{
+   method:'POST',headers:{authorization:'Bearer '+key,'content-type':'application/json'},
+   body:JSON.stringify({
+    model,max_output_tokens:11500,
+    input:[
+     {role:'system',content:[{type:'input_text',text:'You are Reality, an evidence-governed autonomous code-generating operating intelligence. You may revise rejected code using deterministic verifier feedback, but cannot grant authority, install capabilities, or claim a completed customer job.'}]},
+     {role:'user',content:[{type:'input_text',text:JSON.stringify(task)}]},
+    ],
+    text:{format:{type:'json_object'}},
+   }),
+  });
+  const body=await response.json();
+  assert(response.ok,'REALITY_PROVIDER_HTTP_'+response.status);
+  const raw=extractedText(body).trim();
+  let candidate=null;
+  try{
+   assert(raw.length>500,'REALITY_MODEL_EMPTY_OR_TRUNCATED_OUTPUT');
+   candidate=JSON.parse(raw);
+   validate(candidate);
+  }catch(error){
+   lastFailure=String(error.message||'UNKNOWN_CANDIDATE_ERROR').slice(0,150);
+   lastCandidate=candidate;
+   attempts.push({attempt,model_response_id:body.id||null,status:'REJECTED',reason:lastFailure});
+   console.error('REALITY_SELF_CORRECTION_REQUIRED '+JSON.stringify(attempts.at(-1)));
+   continue;
+  }
+  attempts.push({attempt,model_response_id:body.id||null,status:'CANDIDATE_CONTRACT_ACCEPTED'});
+  save(candidate,body.id||null,model);
+  writeFileSync('reality-generated-original-143/self-correction-trace.json',JSON.stringify(attempts,null,2)+'\\n');
+  return;
+ }
+ throw Error('REALITY_BOUNDED_SELF_CORRECTION_EXHAUSTED_'+lastFailure);
 }
 main().catch(error=>{console.error('REALITY_GENERATION_FAILED '+error.message);process.exitCode=1});
