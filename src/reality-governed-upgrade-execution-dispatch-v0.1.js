@@ -18,6 +18,10 @@ import {githubGet,githubWrite}
  from './reality-connector-github-v1.0.js';
 import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
+import {loadAuthenticatedWarrantedUpgrade}
+ from './reality-warranted-upgrade-candidate-loader-v0.1.js';
+import {verifyUpgradeEvidenceWarrant}
+ from './reality-upgrade-evidence-warrant-v0.1.js';
 
 export const GOVERNED_UPGRADE_DISPATCH_VERSION='reality-governed-upgrade-dispatch-v0.1';
 const REPO='maloney2323/Reality',ROOT='/repos/'+REPO;
@@ -26,7 +30,7 @@ const WORK=/^work:[a-f0-9]{32}$/,SHA=/^[a-f0-9]{40}$/;
 const fail=code=>{throw Error(code)};
 const sha=value=>createHash('sha256').update(value).digest('hex');
 
-export function exactGovernedUpgradeWorkItem(plan){
+export function exactGovernedUpgradeWorkItem(plan,{warrant}={}){
  if(plan?.state!=='AWAITING_EXACT_DRAFT_PR_AUTHORIZATION'||
     !WORK.test(String(plan.original_work_id||''))||
     !/^build:[a-f0-9]{32}$/.test(String(plan.proposal?.build_id||''))||
@@ -46,6 +50,9 @@ export function exactGovernedUpgradeWorkItem(plan){
    build_id:plan.proposal.build_id,
    candidate_hash:plan.verified_candidate_hash,
    verification_hash:plan.verified_experiment_hash,
+   evidence_warrant_id:warrant?.warrant_id||null,
+   evidence_warrant_sha256:warrant?.warrant_id?.startsWith('warrant:')?
+    warrant.warrant_id.slice('warrant:'.length):null,
    original_continuity_root_id:plan.continuity_root_id,
    original_worldline_id:plan.worldline_id,
    candidate_paths:plan.proposal.files.map(x=>x.path),
@@ -61,7 +68,7 @@ export function exactGovernedUpgradeWorkItem(plan){
 export async function dispatchAuthenticatedGovernedUpgradeDraft({
  session,conversationId,originalWorkId,expectedCandidateHash,
  groundingProof,executionConfirmation,env=process.env,
- loadTrustedUpgrade,
+ loadTrustedUpgrade=loadAuthenticatedWarrantedUpgrade,
  reserve=reserveAuthenticatedPersonalExecution,
  execute=executeAuthorizedWork,
  providerGet=githubGet,providerWrite=githubWrite,
@@ -89,20 +96,39 @@ export async function dispatchAuthenticatedGovernedUpgradeDraft({
  if(originalWorkItem?.id!==originalWorkId||
     verified?.owner_id!==session.user_id||
     verified?.conversation_id!==conversationId||
-    verified?.persisted_and_reobserved!==true)
+    verified?.persisted_and_reobserved!==true||
+    verified?.verified_not_authorized!==true||
+    verified?.external_action_authorized!==false||
+    verified?.original_job_completed!==false)
   fail('UPGRADE_OWNER_SCOPED_DURABLE_SOURCE_MISSING');
+ // The key and verifier receipt are read from owner-scoped durable
+ // Continuity, not from user-submitted JSON. Reverify immediately before
+ // building a single-use execution policy.
+ const warrant=verified.evidence_warrant;
+ const attested=verifyUpgradeEvidenceWarrant({
+  warrant,experiment:verifiedExperiment,
+  verifierReceipt:verified.verifierReceipt,
+  originalWorkItem,blockedCheckpointId:verified.blocked_checkpoint_receipt_id,
+  goalRevision:verified.goal_revision,ownerId:session.user_id,
+  conversationId,baseCommitSha:warrant?.pinned_base_commit_sha,env,
+ });
+ if(!attested.valid||attested.execution_authorized!==false||
+    attested.candidate_sha256!==expectedCandidateHash||
+    verified.evidence_warrant_id!==attested.warrant_id)
+  fail('UPGRADE_PAYLOAD_TIED_WARRANT_INVALID_OR_EXPIRED');
  const plan=prepareGovernedAutonomousUpgrade({originalWorkItem,verifiedExperiment});
  if(plan.original_work_id!==originalWorkId||
     plan.verified_candidate_hash!==expectedCandidateHash)
   fail('UPGRADE_BROWSER_CONFIRMED_CANDIDATE_CHANGED');
- const workItem=exactGovernedUpgradeWorkItem(plan);
+ const workItem=exactGovernedUpgradeWorkItem(plan,{warrant});
  // Every consequential effect must be bound to this work-item fingerprint;
  // source evidence and candidate bytes were re-observed on the server.
  const fp=fingerprintApprovedWorkItem(workItem);
  // Check target branch before reserving the one-time execution claim.
  const branch=await providerGet(ROOT+'/git/ref/heads/'+BASE);
  const pinned=branch?.object?.sha;
- if(branch?.ref!=='refs/heads/'+BASE||!SHA.test(String(pinned||'')))
+ if(branch?.ref!=='refs/heads/'+BASE||!SHA.test(String(pinned||''))||
+    pinned!==warrant.pinned_base_commit_sha)
   fail('UPGRADE_GITHUB_BASE_READBACK_REQUIRED');
  const reserved=await reserve({
   session,conversationId,workItem,groundingProof,env,
