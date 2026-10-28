@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import {issueUpgradeEvidenceWarrant,hashUpgradeEvidence}
+ from '../src/reality-upgrade-evidence-warrant-v0.1.js';
+import {fingerprintGovernedUpgradeCandidate}
+ from '../src/reality-governed-github-upgrade-provider-v0.1.js';
 import {prepareGovernedAutonomousUpgrade}
  from '../src/reality-governed-autonomous-upgrade-orchestrator-v0.1.js';
 import {exactGovernedUpgradeWorkItem,dispatchAuthenticatedGovernedUpgradeDraft}
@@ -56,9 +60,30 @@ function fixture(){
    }]},
   },
  };
+ verifiedExperiment.experiment_hash='e'.repeat(64);
+ verifiedExperiment.verification_bundle.experiment_hash=verifiedExperiment.experiment_hash;
+ verifiedExperiment.synthesized_capability=
+  verifiedExperiment.verification_bundle.synthesized_capability;
+ verifiedExperiment.verification_hash=hashUpgradeEvidence(verifiedExperiment.verification_bundle);
+ const verifierReceipt={status:'INDEPENDENT_SANDBOX_VERIFIED',work_item_id:work,
+  experiment_hash:verifiedExperiment.experiment_hash,
+  verification_hash:verifiedExperiment.verification_hash,
+  candidate_sha256:fingerprintGovernedUpgradeCandidate(verifiedExperiment.synthesized_capability.files),
+  frozen_regression_sha256:hashUpgradeEvidence(verifiedExperiment.verification_bundle.frozen_regression),
+  holdout:{passed:true,case_count:2,result_sha256:'9'.repeat(64)},
+  isolation:{production_write_permitted:false,secrets_accessible:false},
+  verifier_run_ref:'github:reality-upgrade-test:synthetic'};
+ const checkpointId='00000000-0000-4000-8000-000000000333';
+ const goalRevision='goal-receipt:test';
+ const warrant=issueUpgradeEvidenceWarrant({
+  experiment:verifiedExperiment,originalWorkItem,
+  ownerId:user,conversationId,blockedCheckpointId:checkpointId,
+  goalRevision,baseCommitSha:shaA,verifierReceipt,env,
+ });
  const plan=prepareGovernedAutonomousUpgrade({originalWorkItem,verifiedExperiment});
- const workItem=exactGovernedUpgradeWorkItem(plan);
- return {originalWorkItem,verifiedExperiment,plan,workItem};
+ const workItem=exactGovernedUpgradeWorkItem(plan,{warrant});
+ return {originalWorkItem,verifiedExperiment,plan,workItem,warrant,
+  verifierReceipt,checkpointId,goalRevision};
 }
 function fakeGitHub({tamperPr=false,failWrite=false}={}){
  const state={branch:null,head:shaA,files:new Map(),pr:null,writes:[],gets:0};
@@ -179,6 +204,10 @@ function args({mock=fakeGitHub(),source=fixture(),reservation=admittedReservatio
   env,loadTrustedUpgrade:async()=>({
    ...source,owner_id:user,conversation_id:conversationId,
    persisted_and_reobserved:true,
+   verified_not_authorized:true,external_action_authorized:false,
+   original_job_completed:false,goal_revision:source.goalRevision,
+   blocked_checkpoint_receipt_id:source.checkpointId,
+   evidence_warrant:source.warrant,evidence_warrant_id:source.warrant.warrant_id,
   }),
   reserve:reservation.reserve,execute:executeAuthorizedWork,
   providerGet:mock.get,providerWrite:mock.write,
@@ -225,9 +254,9 @@ test('changed candidate hash, wrong work ID or missing durable source fail close
  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(a),
   /UPGRADE_BROWSER_CONFIRMED_CANDIDATE_CHANGED/);
  assert.equal(a.reservation.results().claimed,0);
- const b=args();b.loadTrustedUpgrade=undefined;
+ const b=args();b.loadTrustedUpgrade=async()=>null;
  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(b),
-  /UPGRADE_SIGNED_IN_EXACT_CONFIRMATION_AND_SOURCE_REQUIRED/);
+  /UPGRADE_OWNER_SCOPED_DURABLE_SOURCE_MISSING/);
  const c=args();c.originalWorkId='work:'+'f'.repeat(32);
  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(c),
   /UPGRADE_OWNER_SCOPED_DURABLE_SOURCE_MISSING/);
@@ -255,4 +284,28 @@ test('exact upgrade operation remains consequential and legacy broad route is di
  assert.equal(classifyWorkItemExecutionEffect(a.workItem).status,'EXTERNAL_CONNECTOR_WRITE');
  const code=readFileSync(new URL('../api/reality/self-build.js',import.meta.url),'utf8');
  assert.match(code,/LEGACY_SELF_BUILD_DIRECT_WRITE_DISABLED/);
+});
+
+test('signed evidence warrant substitution is rejected before a reservation or provider write',async()=>{
+ for(const mutate of [
+  x=>({...x,evidence_warrant:{...x.evidence_warrant,signature:'0'.repeat(64)}}),
+  x=>({...x,verifierReceipt:{...x.verifierReceipt,holdout:{
+   ...x.verifierReceipt.holdout,result_sha256:'f'.repeat(64)}}}),
+  x=>({...x,evidence_warrant:{...x.evidence_warrant,pinned_base_commit_sha:'f'.repeat(40)}}),
+ ]){
+  const a=args();
+  const source=a.loadTrustedUpgrade;
+  a.loadTrustedUpgrade=async()=>mutate(await source());
+  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(a),
+   /UPGRADE_PAYLOAD_TIED_WARRANT_INVALID_OR_EXPIRED/);
+  assert.equal(a.reservation.results().claimed,0);
+  assert.equal(a.mock.state.writes.length,0);
+ }
+});
+test('changed goal revision invalidates a previously signed warrant',async()=>{
+ const a=args();const source=a.loadTrustedUpgrade;
+ a.loadTrustedUpgrade=async()=>({...await source(),goal_revision:'other-goal-revision'});
+ await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(a),
+  /UPGRADE_PAYLOAD_TIED_WARRANT_INVALID_OR_EXPIRED/);
+ assert.equal(a.reservation.results().claimed,0);
 });
