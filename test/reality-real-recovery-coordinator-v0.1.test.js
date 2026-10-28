@@ -122,3 +122,9 @@ test('user interface runs same original job without approval inference or false 
  assert.match(script,/Original job remains unfinished/);
  assert.match(script,/current_decision/);
 });
+
+test('original repair acceptance module exposes evidence classifier',async()=>{
+ const module=await import('../src/reality-original-job-acceptance-v0.1.js');
+ assert.equal(typeof module.classifyOriginalRepairAcceptance,'function');
+ assert.equal(typeof module.saveAuthenticatedOriginalRepairAssessment,'function');
+});
