@@ -47,12 +47,12 @@ export async function assertUpgradeBaseReady({
      item.content.length>200000||item.sha!==expectedBlobSha||
      !Number.isSafeInteger(item.size)||item.size<100||item.size>120000)
    fail('UPGRADE_BASE_CI_WORKFLOW_SOURCE_UNVERIFIED');
-  const encoded=item.content.replace(/\\s+/g,'');
+  const encoded=item.content.replace(/\s+/g,'');
   const bytes=Buffer.from(encoded,'base64');
   if(bytes.length!==item.size||bytes.toString('base64')!==encoded)
    fail('UPGRADE_BASE_CI_WORKFLOW_BYTES_INVALID');
   const gitBlobHash=createHash('sha1')
-   .update('blob '+bytes.length+'\\0').update(bytes).digest('hex');
+   .update('blob '+bytes.length+'\0').update(bytes).digest('hex');
   if(gitBlobHash!==expectedBlobSha)
    fail('UPGRADE_BASE_CI_WORKFLOW_BLOB_HASH_MISMATCH');
   const yaml=bytes.toString('utf8');
