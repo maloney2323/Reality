@@ -1,0 +1,106 @@
+name: Reality Original Model Executor Installable Package Verification v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-executor-installable-package-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  issues: read
+jobs:
+  frozen-original-executor-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40758956208
+          name: reality-original-feedback-model-candidate
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          path: original-model-artifact
+      - name: Reobserve frozen ten-case and live original GitHub execution independently
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          const h={accept:'application/vnd.github+json',authorization:'Bearer '+process.env.GH_TOKEN};
+          for(const expected of [
+           {id:40759263421,name:'verify-model-corrected-original-executor',sha:'b9949f726d2d2cebee80bdf654767a7d0e0ba038'},
+           {id:40760732281,name:'actual-original-github-readonly',sha:'3f49896c8d31925a8294e320a3b821923db3e758'}
+          ]){
+           const base='https://api.github.com/repos/maloney2323/Reality/actions/runs/'+expected.id;
+           const r=await fetch(base,{headers:h});if(!r.ok)throw Error('VERIFIER_RUN_FETCH_UNAVAILABLE');
+           const run=await r.json();
+           if(run.id!==expected.id||run.head_sha!==expected.sha||run.status!=='completed'||
+              run.conclusion!=='success'||run.repository?.full_name!=='maloney2323/Reality'||
+              run.head_repository?.full_name!=='maloney2323/Reality')
+            throw Error('VERIFIER_RUN_MISMATCH');
+           const j=await fetch(base+'/jobs?per_page=50',{headers:h});if(!j.ok)throw Error('VERIFIER_JOBS_UNAVAILABLE');
+           const jobs=await j.json();
+           if(jobs.total_count!==1||jobs.jobs?.length!==1||jobs.jobs[0].name!==expected.name||
+              jobs.jobs[0].conclusion!=='success')throw Error('VERIFIER_JOB_NOT_GREEN');
+          }
+          console.log('EXACT_FROZEN_AND_LIVE_CI_PASSED');
+          JS
+      - name: Confirm new extension files do not already exist on exact isolated target branch
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          const h={accept:'application/vnd.github+json',authorization:'Bearer '+process.env.GH_TOKEN};
+          const root='https://api.github.com/repos/maloney2323/Reality/contents/src/reality-extensions/';
+          const ref=encodeURIComponent('experiment/reality-live-durable-adversarial-20261025');
+          for(const name of ['reality-original-maintenance-executor.mjs','reality-original-maintenance-repair-proposal.mjs']){
+           const r=await fetch(root+name+'?ref='+ref,{headers:h});
+           if(r.status!==404)throw Error('ISOLATED_TARGET_NOT_NEW_OR_UNVERIFIED_'+r.status);
+          }
+          JS
+      - name: Freeze exact model generated source plus independently verified proposal
+        run: |
+          node --check scripts/reality-original-executor-frozen-package-v0.1.mjs
+          node scripts/reality-original-executor-frozen-package-v0.1.mjs
+          mkdir -p owner-original-repair-executor
+          cp original-executor-installable-package/reality-original-maintenance-executor.mjs owner-original-repair-executor/candidate.mjs
+          cp original-executor-installable-package/reality-original-maintenance-repair-proposal.mjs owner-original-repair-executor/
+      - name: Confirm frozen ten-case acceptance using unchanged installable package, secretless Docker
+        run: |
+          set +e
+          timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "\${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
+            > original-executor-installable-package/frozen-recheck.txt 2>&1
+          state=$?
+          set -e
+          tail -n 28 original-executor-installable-package/frozen-recheck.txt
+          exit "$state"
+      - name: Independent security holdout (not part of frozen acceptance suite)
+        run: |
+          set +e
+          timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "\${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-security-holdout-v0.1.test.mjs \
+            > original-executor-installable-package/independent-security-holdout.txt 2>&1
+          state=$?
+          set -e
+          grep -E '(# Subtest:|not ok |ok [0-9]+ -|# (tests|pass|fail)|  error:)' original-executor-installable-package/independent-security-holdout.txt || true
+          exit "$state"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-model-executor-frozen-installable-package
+          path: original-executor-installable-package/
+          retention-days: 14
