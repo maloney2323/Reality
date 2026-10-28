@@ -1,5 +1,12 @@
 name: Reality ORIGINAL Autonomous Executor Synthesis v0.1
 on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-autonomous-executor-v0.1.yml'
+      - 'scripts/reality-original-executor-autonomous-generate-v0.1.mjs'
+      - 'test/reality-original-executor-autonomous-grader-v0.1.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
