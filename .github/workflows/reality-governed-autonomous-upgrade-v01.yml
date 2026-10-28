@@ -15,6 +15,10 @@ on:
       - 'src/reality-upgrade-evidence-warrant-v0.1.js'
       - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
       - 'src/reality-historical-upgrade-proof-intake-v0.1.js'
+      - 'src/reality-independent-upgrade-ci-readback-v0.1.js'
+      - 'test/reality-independent-upgrade-ci-readback-v0.1.test.js'
+      - 'src/reality-extensions/**'
+      - 'test/reality-extensions/**'
       - 'api/reality/personal-upgrade-proof-import.js'
       - 'test/reality-historical-upgrade-proof-intake-v0.1.test.js'
       - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
@@ -41,6 +45,10 @@ on:
       - 'src/reality-upgrade-evidence-warrant-v0.1.js'
       - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
       - 'src/reality-historical-upgrade-proof-intake-v0.1.js'
+      - 'src/reality-independent-upgrade-ci-readback-v0.1.js'
+      - 'test/reality-independent-upgrade-ci-readback-v0.1.test.js'
+      - 'src/reality-extensions/**'
+      - 'test/reality-extensions/**'
       - 'api/reality/personal-upgrade-proof-import.js'
       - 'test/reality-historical-upgrade-proof-intake-v0.1.test.js'
       - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
@@ -74,8 +82,9 @@ jobs:
         run: |
           node --check scripts/reality-live-upgrade-autorepair-v0.1.mjs
           node --check src/reality-historical-upgrade-proof-intake-v0.1.js
+          node --check src/reality-independent-upgrade-ci-readback-v0.1.js
           node --check api/reality/personal-upgrade-proof-import.js
-          node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js test/reality-historical-upgrade-proof-intake-v0.1.test.js
+          node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js test/reality-historical-upgrade-proof-intake-v0.1.test.js test/reality-independent-upgrade-ci-readback-v0.1.test.js
 
       - name: Independently re-read pinned real GitHub self-correction artifact (read only)
         env:
