@@ -108,10 +108,75 @@ export function verifyOriginalExecutorPackageBytes(bytes){
   independent_holdout:{passed:true,case_count:4,result_sha256:digest(holdout)},
   signed_warrant_issued:false,installation_authorized:false,original_job_completed:false});
 }
+// Read immutable evidence-only paths committed by Reality's narrowly scoped
+// GitHub Actions transfer. This is NOT an installed extension or GitHub write.
+const EVIDENCE_COMMIT='a39af4e355655ca0a0575303ac2c64353aa8eab2';
+const TRANSFER_RUN=40766361286;
+const TRANSFER_HEAD='af324b6805b2af24af037d5d562565939d1e7835';
+const EVIDENCE_PREFIX='/contents/evidence/reality-original-executor-model-20261028/';
+const EVIDENCE_FILES=[
+ 'manifest.json','package.json','independent-frozen-verification.txt',
+ 'independent-security-verification.txt'
+];
+export async function loadOriginalExecutorPinnedEvidenceSnapshot({env=process.env,fetchImpl=fetch}={}){
+ if(env.VERCEL_ENV!=='preview')
+  fail('ORIGINAL_VERIFIER_PREVIEW_ONLY');
+ const headers={accept:'application/vnd.github+json',
+  'User-Agent':'Reality-Original-Immutable-Evidence-Reader',
+  'X-GitHub-Api-Version':'2022-11-28'};
+ const key=env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN;
+ if(key)headers.authorization='Bearer '+key;
+ const api=async path=>{
+  const r=await fetchImpl(ROOT+path,{headers,redirect:'error',
+   signal:AbortSignal.timeout(15000)});
+  if(r.status!==200)fail('ORIGINAL_VERIFIER_PUBLIC_EVIDENCE_READBACK_UNAVAILABLE');
+  return r.json();
+ };
+ const [run,jobs,transferRun,...raw]=await Promise.all([
+  api('/actions/runs/'+RUN),api('/actions/runs/'+RUN+'/jobs?per_page=50'),
+  api('/actions/runs/'+TRANSFER_RUN),
+  ...EVIDENCE_FILES.map(name=>api(EVIDENCE_PREFIX+name+'?ref='+EVIDENCE_COMMIT))
+ ]);
+ if(run.id!==RUN||
+    run.name!=='Reality Corrected Original Executor Frozen and Holdout Verification v0.3'||
+    run.status!=='completed'||run.conclusion!=='success'||run.head_sha!==RUN_SHA||
+    run.repository?.full_name!=='maloney2323/Reality'||
+    jobs.total_count!==1||jobs.jobs?.length!==1||
+    jobs.jobs[0].name!=='verify-original-model-executor'||jobs.jobs[0].conclusion!=='success'||
+    transferRun.id!==TRANSFER_RUN||transferRun.status!=='completed'||
+    transferRun.conclusion!=='success'||transferRun.head_sha!==TRANSFER_HEAD||
+    transferRun.repository?.full_name!=='maloney2323/Reality')
+  fail('ORIGINAL_VERIFIER_PACKAGE_AND_TRANSFER_CI_NOT_GREEN');
+ const source={};
+ for(let i=0;i<EVIDENCE_FILES.length;i++){
+  const data=raw[i],name=EVIDENCE_FILES[i];
+  if(data?.type!=='file'||data.path!=='evidence/reality-original-executor-model-20261028/'+name||
+     data.encoding!=='base64'||typeof data.content!=='string'||data.size>55000||
+     data.size<10)
+   fail('ORIGINAL_VERIFIER_PINNED_EVIDENCE_FILE_INVALID');
+  const bytes=Buffer.from(data.content.replace(/\s+/g,''),'base64');
+  const blobHash=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
+  if(blobHash!==data.sha||bytes.length!==data.size)
+   fail('ORIGINAL_VERIFIER_PINNED_EVIDENCE_BLOB_HASH_INVALID');
+  source[name]=bytes.toString('utf8');
+ }
+ const packageFiles=JSON.parse(source['package.json']).files;
+ if(!Array.isArray(packageFiles)||packageFiles.length!==2)
+  fail('ORIGINAL_VERIFIER_PINNED_PACKAGE_FILE_COUNT_INVALID');
+ source['reality-original-maintenance-repair-proposal.mjs']=packageFiles[0].content;
+ source['reality-original-maintenance-executor.mjs']=packageFiles[1].content;
+ const proof=verifyOriginalExecutorPackageBytes(source);
+ return Object.freeze({...proof,ci_run_url:run.html_url,
+  artifact_immutable_verified:true,source_provenance:'PINNED_VERIFIED_GITHUB_EVIDENCE_ONLY_SNAPSHOT',
+  evidence_commit_sha:EVIDENCE_COMMIT,transfer_run_id:TRANSFER_RUN});
+}
+
 export async function loadTrustedOriginalExecutorPackage({env=process.env,fetchImpl=fetch}={}){
  const token=env.REALITY_GITHUB_TOKEN;
- if(env.VERCEL_ENV!=='preview'||typeof token!=='string'||!token)
-  fail('ORIGINAL_VERIFIER_PRIVATE_PREVIEW_GITHUB_ACCESS_REQUIRED');
+ if(env.VERCEL_ENV!=='preview')
+  fail('ORIGINAL_VERIFIER_PREVIEW_ONLY');
+ if(typeof token!=='string'||!token)
+  return loadOriginalExecutorPinnedEvidenceSnapshot({env,fetchImpl});
  const h={authorization:'Bearer '+token,accept:'application/vnd.github+json',
   'x-github-api-version':'2022-11-28'};
  const api=async path=>{
