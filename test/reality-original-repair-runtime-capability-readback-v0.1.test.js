@@ -141,7 +141,13 @@ test('signed-in 3/7 recovery reuses genuine runtime readback rather than an empt
   readGoal:h.args.readGoal,
   inspectRuntime:async p=>inspectAuthenticatedOriginalRepairRuntime(h.args),
  });
- assert.equal(report.completed_stages,3);
+ assert.equal(report.completed_stages,4);
+ assert.equal(report.timeline[3].step,'CAPABILITY_GAP_DIAGNOSIS');
+ assert.equal(report.timeline[3].state,'VERIFIED');
+ assert.equal(report.timeline[4].state,'SANDBOX_PROPOSED');
+ assert.equal(report.timeline[5].state,'WAITING_FOR_VERIFIED_EXECUTOR');
+ assert.equal(report.current_decision,'ORIGINAL_REPAIR_EXECUTOR_GAP_VERIFIED_SANDBOX_PROPOSED');
+ assert.equal(report.continuation_probe.previously_verified_stages,3);
  assert.equal(report.continuation_probe.state,
   'CAPABILITY_GAP_CANDIDATE_NEEDS_SANDBOX_VERIFICATION');
  assert.equal(report.continuation_probe.original_work_id,workId);
