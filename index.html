@@ -1218,6 +1218,13 @@ $('wcTaskList').addEventListener('click',async event=>{
      info.upgrade_discovery?.original_job_completed!==false||
      info.upgrade_discovery?.authorization_granted!==false||
      !['NO_NEW_UPGRADE_NEEDED','DIAGNOSIS_REQUIRED','CAPABILITY_GAP_CANDIDATE'].includes(info.upgrade_discovery?.status)||
+     (info.continuation_experiment&&(
+      info.continuation_experiment.original_work_id!==workId||
+      info.continuation_experiment.state!=='SANDBOX_PROPOSED_AWAITING_AUTHORIZATION'||
+      info.continuation_experiment.model_generation_performed!==false||
+      info.continuation_experiment.upgrade_installed!==false||
+      info.capability_candidate_saved!==true||
+      !/^[a-f0-9-]{36}$/i.test(String(info.capability_candidate_receipt_id||''))))||
      info.continuation_probe?.original_work_id!==workId||
      info.continuation_probe?.original_job_completed!==false||
      info.continuation_probe?.authorization_granted!==false||
@@ -1262,6 +1269,15 @@ $('wcTaskList').addEventListener('click',async event=>{
    (continuation.missing_capability_independently_established?'Yes':'Not yet')+
    '. Original work remains open; no upgrade or external write authorized.';
   place.appendChild(continuationNext);
+  if(info.continuation_experiment){
+   const experiment=document.createElement('p');
+   experiment.textContent='Reality identified a potential missing original-job execution capability and prepared a bounded sandbox experiment for the same job: '+
+    info.continuation_experiment.capability_id+
+    '. Experiment: '+info.continuation_experiment.experiment_hash+
+    '. Candidate saved in original Continuity: '+info.capability_candidate_receipt_id+
+    '. Code generation, sandbox execution, and installation have not occurred.';
+   place.appendChild(experiment);
+  }
   for(const item of info.timeline){
    const p=document.createElement('p');
    p.textContent=(item.state==='VERIFIED'?'✓ ':'○ ')+
