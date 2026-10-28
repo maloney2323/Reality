@@ -1,0 +1,48 @@
+name: Governed Autonomous Self-Upgrading Provider v0.1
+# Minimal independent extension safety gate on the original isolated preview base.
+# Runs only when an extension is proposed. No OpenAI calls, write credentials,
+# deployments, promotions, owner impersonation, or production mutations.
+on:
+  push:
+    paths:
+      - 'src/reality-extensions/**'
+      - 'test/reality-extensions/**'
+  pull_request:
+    paths:
+      - 'src/reality-extensions/**'
+      - 'test/reality-extensions/**'
+permissions:
+  contents: read
+jobs:
+  isolated-extension-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Require at least one extension and one test, then run in no-network no-secret Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d src/reality-extensions
+          test -d test/reality-extensions
+          test "$(find src/reality-extensions -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | wc -l)" -ge 1
+          test "$(find test/reality-extensions -maxdepth 1 -type f -name '*.test.js' | wc -l)" -ge 1
+          timeout 120s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/src:/work/src:ro" \
+            -v "${{ github.workspace }}/test:/work/test:ro" \
+            -w /work node:22-alpine sh -c '
+              set -eu
+              for file in src/reality-extensions/*.js src/reality-extensions/*.mjs; do
+                [ -f "$file" ] || continue
+                node --check "$file"
+              done
+              for file in test/reality-extensions/*.test.js; do
+                [ -f "$file" ] || exit 12
+                node --check "$file"
+              done
+              node --test test/reality-extensions/*.test.js
+            '
