@@ -67,7 +67,7 @@ export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goa
   actual_experimental_executor_bytes_verified:github.current_executor_sha256===MODEL_SHA,
   model_source_sha256_expected:MODEL_SHA,
   independent_live_reconciliation_verified:github.successful_live_run===true,
-  historical_source_fix_already_present:true,
+  historical_source_fix_already_present:githubReady,
   preexisting_owner_evidence_acceptance_verified:!!accepted,
   prior_warrant_does_not_authorize_installation:!!warrant,
   owner_capability_registry_registered:!!registered&&githubReady,
@@ -84,7 +84,7 @@ function decodeSource(response){
     response?.encoding!=='base64'||typeof response?.content!=='string'||
     response.content.length>230000)
   fail('ORIGINAL_UPGRADE_GITHUB_MODEL_READBACK_INVALID');
- const raw=Buffer.from(response.content.replace(/\\s+/g,''),'base64');
+ const raw=Buffer.from(response.content.replace(/\s+/g,''),'base64');
  if(raw.length<1000||raw.length>160000)fail('ORIGINAL_UPGRADE_MODEL_BYTES_BOUNDS');
  return sha256(raw);
 }
