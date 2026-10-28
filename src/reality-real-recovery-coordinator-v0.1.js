@@ -8,6 +8,8 @@ import {runAutonomousClosurePass}
  from './reality-autonomous-closure-orchestrator-v1.0.js';
 import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
+import {createContinuitySpine}
+ from './reality-continuity-spine-v2.0.js';
 import {validUuid}
  from './reality-private-chat-store-v0.1.js';
 
@@ -105,7 +107,15 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
   grounded?.state?.continuity_root_id&&
   grounded?.scope?.worldline&&grounded?.scope?.world,
   'LIVE_LOOP_ORIGINAL_USER_GOAL_UNVERIFIED');
- const worldline=grounded.state.worldline_id||null;
+ const canonical=createContinuitySpine({
+  continuityRootId:grounded.scope.root,
+  worldlineId:grounded.scope.worldline,
+  subjectId:session.user_id,
+ });
+ requireScope(canonical.continuity_root_id===
+  grounded.state.continuity_root_id,
+  'LIVE_LOOP_CANONICAL_CONTINUITY_SCOPE_CHANGED');
+ const worldline=canonical.worldline_id;
  // Cognition examines observed evidence without asserting a missing
  // capability, inventing a new job, or installing an upgrade.
  const original={
