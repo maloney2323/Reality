@@ -243,7 +243,7 @@ export async function executeOwnerBoundUpgradeClosure({
    fail('UPGRADE_CLOSURE_ORIGINAL_JOB_OBSERVATION_NOT_VERIFIED');
   phase='RESUME_GRANT_SETTLEMENT';
   const originalLease=await ports.settleResumeGrant({
-   session,scope,plan,resumeGrant,outcome,outcomeState:'VERIFIED',env,
+   session,scope,plan,resumeGrant,installed,outcome,outcomeState:'VERIFIED',env,
   });
   if(originalLease?.status!=='VERIFIED'||
      originalLease?.reservation_id!==resumeGrant.grant_id||
