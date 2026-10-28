@@ -35,6 +35,18 @@ export default async function handler(req,res){
   if(verified.source_sha256!==CONTROLLED_FINALE_SOURCE_SHA256||
      verified.original_work_id!==CONTROLLED_FINALE_WORK)
    throw Error('FINALE_SOURCE_CHANGED');
+  if(verified.state==='REVALIDATION_REQUIRED_BASE_MOVED')
+   return res.status(200).json({
+    ok:true,state:'REVALIDATION_REQUIRED_BASE_MOVED',
+    original_work_id:CONTROLLED_FINALE_WORK,
+    source_sha256:verified.source_sha256,
+    previously_tested_pr_base_sha:verified.review_pr_base_sha,
+    current_target_base_sha:verified.observed_base_sha,
+    exact_model_source_unchanged:true,
+    owner_admission_verified:false,owner_install_authorized:false,
+    original_job_completed:false,
+    explanation:'Target base changed since reviewed PR; a fresh exact-base verification is required before approval.',
+   });
   const goal=await readFreshPersonalGoalState({
    session,conversationId:b.conversation_id,
   });
