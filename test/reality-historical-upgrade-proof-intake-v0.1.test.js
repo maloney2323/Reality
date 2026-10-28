@@ -106,6 +106,19 @@ test('model text cannot relabel historical pilot as owner job or claim authority
  }),/UPGRADE_IMPORT_PILOT_PROOF_MUST_REMAIN_NON_AUTHORIZING/);
  assert.equal(f.writes,0);
 });
+test('JSONB object key reordering does not trigger a false duplicate collision',async()=>{
+ const f=fixture();
+ const first=await persistAuthenticatedHistoricalPilotProof(f.args);
+ const event=f.records.at(-1);
+ const reversed=v=>Array.isArray(v)?v.map(reversed):v&&typeof v==='object'?
+  Object.fromEntries(Object.keys(v).reverse().map(k=>[k,reversed(v[k])])):v;
+ event.payload=reversed(event.payload);
+ // Simulates PostgreSQL jsonb returning object keys in its own ordering.
+ const second=await persistAuthenticatedHistoricalPilotProof(f.args);
+ assert.equal(first.receipt_id,second.receipt_id);
+ assert.equal(second.already_recorded,true);
+ assert.equal(f.writes,1);
+});
 test('an existing conflicting immutable event blocks an overwrite',async()=>{
  const f=fixture();
  await persistAuthenticatedHistoricalPilotProof(f.args);
