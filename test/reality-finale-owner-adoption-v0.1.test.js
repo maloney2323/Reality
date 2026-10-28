@@ -35,7 +35,7 @@ function fixture(){
   scope:{root:spine.continuity_root_source,worldline:spine.worldline_source,
    world:'world:owner-test'},
   state:{continuity_root_id:spine.continuity_root_id,world_id:'world:owner-test',
-   active_goal_id:goalId,active_goal:{goal_id:goalId,user_confirmed:true,
+   active_goal_id:goalId,active_goal:{goal_id:goalId,title:'Complete Reality controlled construction estimate self-repair finale',user_confirmed:true,
     status:'ACTIVE',last_transition_receipt_id:revision}},
  });
  const verifyEvidence=async()=>({
@@ -121,4 +121,14 @@ test('no sandbox receipt or warrant is invented even for valid evidence',async()
   'personal_upgrade_sandbox_verified','personal_upgrade_evidence_warrant',
   'personal_original_job_settlement'].includes(e.entity_type));
  assert.equal(forbidden.length,0);
+});
+
+test('unrelated existing owner goal cannot silently be replaced by pilot',async()=>{
+ const x=fixture();
+ const goal=await x.args.readGoal();
+ goal.state.active_goal.title='Send weekly marketing updates';
+ await assert.rejects(adoptControlledFinaleIntoOwnerContinuity({
+  ...x.args,readGoal:async()=>goal,
+ }),/FINALE_OWNER_EXPLICIT_SCOPE_GOAL_REQUIRED/);
+ assert.equal(x.stored.length,0);
 });
