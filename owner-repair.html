@@ -148,7 +148,7 @@ function render(s){
   'Exact owner-warranted plan independently verified.';
  status(s.job_settlement_verified?'Verified settled':s.warranted_upgrade_ready?'Owner approval available':'Evidence / owner gate pending');
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
- $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||!packageVerified||s.owner_warrant_events>0;
+ $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||s.original_source_verified!==true||s.owner_warrant_events>0;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
  $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
  $('verifyFinal').disabled=busy;
@@ -171,7 +171,7 @@ async function loadRealityAutonomousActivity(){
      d.original_job_completed!==false||d.installed_capability!==false)
    throw Error('ORIGINAL_RUN_SCOPE_OR_AUTHORITY_CHANGED');
   packageVerified=d.installation_package_verified===true&&d.installable_candidate_sha256==='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2'&&d.independent_behavioral_cases_passed===10&&d.independent_security_holdout_passed===4;
-  $('verifyWarrant').disabled=busy||locked||!packageVerified||snapshot?.original_goal_active!==true||(snapshot?.owner_warrant_events||0)>0;
+  $('verifyWarrant').disabled=busy||locked||snapshot?.original_goal_active!==true||snapshot?.original_source_verified!==true||(snapshot?.owner_warrant_events||0)>0;
   $('realityActivityStatus').textContent='Reality: '+String(d.status)+
    ' · model generated: '+String(d.real_model_generation_verified_by_ci===true)+
    ' · independent first pass: '+String(d.first_independent_sandbox_passed===true)+
@@ -188,7 +188,7 @@ async function loadRealityAutonomousActivity(){
  }finally{$('realityActivity').disabled=false;}
 }
 async function verifyOriginalExecutorWarrant(){
- if(busy||locked||!conv||!packageVerified||snapshot?.original_goal_active!==true)return;
+ if(busy||locked||!conv||snapshot?.original_goal_active!==true||snapshot?.original_source_verified!==true)return;
  busy=true;disabledAll(true);
  $('warrantResult').textContent='Reality is re-observing the authentic model package, independent tests, original goal and immutable Continuity lineage. No installation authority is being granted…';
  try{
