@@ -1,0 +1,29 @@
+name: Reality #143 Rejected Candidate Read-Only Recovery
+on:
+  push:
+    branches:
+      - reality/orchestrate/original-143-model-full-loop-20261028
+    paths:
+      - '.github/workflows/reality-original-143-rejected-candidate-review.yml'
+      - 'scripts/reality-inspect-generated-original-143-response.mjs'
+permissions:
+  contents: read
+jobs:
+  recover-model-code-for-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: node scripts/reality-inspect-generated-original-143-response.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-rejected-full-loop-candidate-review-only
+          path: reality-recovered-model-candidate/
+          retention-days: 7
