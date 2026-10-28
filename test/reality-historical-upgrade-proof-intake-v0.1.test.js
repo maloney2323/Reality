@@ -172,14 +172,14 @@ test('owner UI keeps pilot import inside Upgrades & improvements, never generic 
  const {readFileSync}=await import('node:fs');
  const {default:vm}=await import('node:vm');
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const script=html.match(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/i)?.[1];
+ const script=html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
  assert.match(script,/data-historical-upgrade-import/);
- assert.match(script,/\\/api\\/reality\\/personal-upgrade-proof-import/);
+ assert.match(script,/\/api\/reality\/personal-upgrade-proof-import/);
  assert.match(script,/IMPORT_VERIFIED_HISTORICAL_PILOT_PROOF/);
- assert.match(script,/p\\.original_customer_work_id!==null/);
- assert.match(script,/p\\.github_write_authorized!==false/);
+ assert.match(script,/p\.original_customer_work_id!==null/);
+ assert.match(script,/p\.github_write_authorized!==false/);
  const start=script.indexOf('function wcUpgradeReviewHTML(){');
  const end=script.indexOf('function wcRender(){',start);
  const state={wcUpgradeReviews:[],
@@ -189,9 +189,9 @@ test('owner UI keeps pilot import inside Upgrades & improvements, never generic 
  assert.match(output,/developer-scoped pilot evidence/);
  assert.match(output,/No upgrade or GitHub action will be authorized/);
  const handler=readFileSync(new URL('../api/reality/personal-upgrade-proof-import.js',import.meta.url),'utf8');
- assert.match(handler,/assertSameOrigin\\(req\\)/);
- assert.match(handler,/authenticatedChatSession\\(req,res\\)/);
+ assert.match(handler,/assertSameOrigin\(req\)/);
+ assert.match(handler,/authenticatedChatSession\(req,res\)/);
  assert.match(handler,/persistAuthenticatedHistoricalPilotProof/);
- assert.match(handler,/body\\.intent!=='IMPORT_VERIFIED_HISTORICAL_PILOT_PROOF'/);
- assert.doesNotMatch(handler,/create_isolated_upgrade_pr|githubWrite\\(/);
+ assert.match(handler,/body\.intent!=='IMPORT_VERIFIED_HISTORICAL_PILOT_PROOF'/);
+ assert.doesNotMatch(handler,/create_isolated_upgrade_pr|githubWrite\(/);
 });
