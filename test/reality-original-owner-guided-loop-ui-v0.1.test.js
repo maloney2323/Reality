@@ -136,7 +136,9 @@ test('uncertain GitHub effect locks one-time dispatch and only allows evidence i
 test('independent install readback advances to separate resumption, not a second installation',async()=>{
  const h=createHarness();await h.settle();
  h.setInstalled();
+ vm.runInContext('locked=true',h.context);
  await vm.runInContext('refresh()',h.context);
+ assert.equal(vm.runInContext('locked',h.context),false);
  assert.equal(vm.runInContext('guidedChoice().type',h.context),'resume-prepare');
  assert.equal(h.nodes.nextAction.disabled,false);
 });
