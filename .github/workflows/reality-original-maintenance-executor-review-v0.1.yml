@@ -1,0 +1,38 @@
+name: Reality ORIGINAL Maintenance Executor — Isolated Owner-Grant Proof
+on:
+  push:
+    branches:
+      - review/reality-original-executor-capability-v01-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-executor-independent-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify source syntax, fixed work scope and exact original model candidate hash
+        run: |
+          node --check src/reality-extensions/reality-original-maintenance-executor.mjs
+          node --check test/reality-original-maintenance-executor.test.mjs
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-repair-proposal.mjs | cut -d' ' -f1)" = "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+      - name: Run original-job executor proof with network, capabilities and secrets unavailable
+        run: |
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/repo:ro" -w /repo node:22-alpine \
+            node --test test/reality-original-maintenance-executor.test.mjs
+      - name: Confirm independently tested code cannot silently settle same job
+        run: |
+          ! grep -q "original_job_completed:true" src/reality-extensions/reality-original-maintenance-executor.mjs
+          echo "AUTHORIZED_ORIGINAL_REPAIR_EXECUTOR_MODEL_PROOF_ONLY"
+          echo "ORIGINAL_JOB_COMPLETED=false"
+          echo "OWNER_INSTALL_GRANT_CONSUMED=false"
