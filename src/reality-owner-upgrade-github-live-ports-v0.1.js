@@ -7,7 +7,8 @@ import {observeOwnerGithubUpgradeInstall}
  from './reality-owner-upgrade-github-install-readback-v0.1.js';
 import {appendVerifiedOwnerUpgradeJobSettlement,readVerifiedOwnerUpgradeJobSettlement}
  from './reality-owner-upgrade-original-job-settlement-v0.1.js';
-import {consumeOwnerUpgradeInstallGrant,consumeOwnerUpgradeResumeGrant}
+import {consumeOwnerUpgradeInstallGrant,consumeOwnerUpgradeResumeGrant,
+ settleOwnerUpgradeStageGrant}
  from './reality-owner-upgrade-stage-authority-v0.1.js';
 import {registerOwnerIsolatedUpgradeCapability,readOwnerIsolatedUpgradeCapability}
  from './reality-owner-upgrade-runtime-registry-v0.1.js';
@@ -22,6 +23,7 @@ export function connectOwnerGithubUpgradeToClosure({
  register=registerOwnerIsolatedUpgradeCapability,
  readRegistry=readOwnerIsolatedUpgradeCapability,
  readFreshGoal=readOwnerOriginalWorkGoalBeforeResume,
+ settleStageGrant=settleOwnerUpgradeStageGrant,
  install=installExactOwnerAuthorizedGithubUpgrade,
  observe=observeOwnerGithubUpgradeInstall,
  appendSettlement=appendVerifiedOwnerUpgradeJobSettlement,
@@ -34,7 +36,7 @@ export function connectOwnerGithubUpgradeToClosure({
  }
  if(typeof consumeInstallGrant!=='function'||typeof consumeResumeGrant!=='function'||
     typeof register!=='function'||typeof readRegistry!=='function'||
-    typeof readFreshGoal!=='function'||
+    typeof readFreshGoal!=='function'||typeof settleStageGrant!=='function'||
     typeof install!=='function'||typeof observe!=='function'||
     typeof appendSettlement!=='function'||typeof readSettlement!=='function')
   missing('GITHUB_VERIFIED_INSTALL');
@@ -52,6 +54,11 @@ export function connectOwnerGithubUpgradeToClosure({
    readRegistry({session,scope,plan,installed,env}),
   readFreshGoal:async({session,conversationId,scope,plan,env})=>
    readFreshGoal({session,conversationId,scope,plan,env}),
+  settleInstallGrant:async({session,scope,plan,grant,installed,env})=>
+   settleStageGrant({stage:'INSTALL',session,scope,plan,grant,installed,env}),
+  settleResumeGrant:async({session,scope,plan,resumeGrant,installed,outcome,env})=>
+   settleStageGrant({stage:'RESUME',session,scope,plan,
+    grant:resumeGrant,installed,outcome,env}),
   install:async({session,scope,plan,grant,env})=>
    install({session,scope,plan,grant,env}),
   observeInstall:async({session,scope,plan,grant,issued,env})=>
