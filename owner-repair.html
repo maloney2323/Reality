@@ -161,13 +161,16 @@ function render(s){
  status(s.job_settlement_verified?'Verified settled':s.verified_draft_ready?'Owner install approval available':s.warranted_upgrade_ready?'Signed warrant verified · Governed draft pending':'Evidence / owner gate pending');
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
  $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||s.original_source_verified!==true||s.owner_warrant_events>0;
- $('prepareDraft').disabled=busy||locked||draftLocked||s.warranted_upgrade_ready!==true||s.verified_draft_ready===true;
+ $('prepareDraft').disabled=busy||locked||draftLocked||s.original_goal_active!==true||s.original_source_verified!==true||s.owner_warrant_events!==1||s.sandbox_receipts!==1||s.verified_draft_ready===true;
  $('approveDraft').disabled=busy||locked||draftLocked||!draftPrepared||draftApproval||draftPrepared.github_draft_dispatch_configured!==true;
  $('runDraft').disabled=busy||locked||draftLocked||!draftApproval;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
  $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
  $('verifyFinal').disabled=busy;
  $('refresh').disabled=busy;
+ $('draftState').textContent=(!draftPrepared&&s.original_goal_active===true&&s.original_source_verified===true&&s.owner_warrant_events===1&&s.sandbox_receipts===1)?
+  'Signed warrant and sandbox receipts found. Prepare will independently check the owner, signature, goal, and exact source without writing GitHub.':
+  (!draftPrepared?'Sign in and read the original job. Exactly one sandbox and signed warrant receipt are required for preparation.':$('draftState').textContent);
 }
 async function json(url,options={}){
  const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
@@ -233,8 +236,9 @@ async function verifyOriginalExecutorWarrant(){
   $('verifyWarrant').disabled=true;void refresh();}
 }
 async function prepareGovernedDraft(){
- if(busy||locked||draftLocked||!conv||snapshot?.warranted_upgrade_ready!==true||
-    snapshot?.verified_draft_ready===true)return;
+ if(busy||locked||draftLocked||!conv||snapshot?.original_goal_active!==true||
+    snapshot?.original_source_verified!==true||snapshot?.owner_warrant_events!==1||
+    snapshot?.sandbox_receipts!==1||snapshot?.verified_draft_ready===true)return;
  busy=true;disabledAll(true);
  draftPrepared=null;draftApproval=false;
  $('draftDetail').hidden=true;
@@ -273,8 +277,9 @@ async function prepareGovernedDraft(){
  }catch(e){
   $('draftState').textContent='Draft preparation stopped: '+String(e.message)+'. No GitHub write or installation occurred.';
  }finally{busy=false;$('refresh').disabled=false;
-  $('prepareDraft').disabled=locked||draftLocked||snapshot?.warranted_upgrade_ready!==true||
-   snapshot?.verified_draft_ready===true;
+  $('prepareDraft').disabled=locked||draftLocked||snapshot?.original_goal_active!==true||
+   snapshot?.original_source_verified!==true||snapshot?.owner_warrant_events!==1||
+   snapshot?.sandbox_receipts!==1||snapshot?.verified_draft_ready===true;
   $('approveDraft').disabled=!draftPrepared||draftLocked||draftPrepared.github_draft_dispatch_configured!==true;
  }
 }
