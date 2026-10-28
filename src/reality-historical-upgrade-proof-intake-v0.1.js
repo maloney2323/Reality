@@ -23,6 +23,8 @@ const FIRST_RESPONSE='resp_0caa066cec78119d006ae15446059887d2a3be76a30ee344cd';
 const SECOND_RESPONSE='resp_0708a3a4eca57fef006ae1551afd4487d090ffdcedce9b4cce';
 const fail=code=>{throw Error(code)};
 const sha=data=>createHash('sha256').update(data).digest('hex');
+const stableJson=x=>JSON.stringify(x,(key,value)=>value&&typeof value==='object'&&
+ !Array.isArray(value)?Object.fromEntries(Object.keys(value).sort().map(k=>[k,value[k]])):value);
 const url='https://api.github.com/repos/'+REPO;
 const MAX_ZIP=4000000, MAX_CONTENT=600000, MAX_ENTRIES=40;
 
@@ -249,7 +251,7 @@ export async function persistAuthenticatedHistoricalPilotProof({
  if(existing){
   if(existing.entity_type!=='personal_historical_upgrade_pilot_proof'||
      existing.epistemic_status!=='VERIFIED'||
-     JSON.stringify(existing.payload)!==JSON.stringify(state))
+     stableJson(existing.payload)!==stableJson(state))
    fail('UPGRADE_IMPORT_EXISTING_EVENT_CONFLICT');
  }else{
   const tail=history.at(-1);
