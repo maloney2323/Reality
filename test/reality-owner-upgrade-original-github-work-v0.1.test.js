@@ -48,7 +48,7 @@ function sourceHarness(){
   const e=appendContinuityNode({spine,stage,entityId:workId,eventId:randomUUID(),
    parentEventId:last?.event_id||null,
    priorLineageHash:last?.lineage_hash||null,
-   assertionTime:at,effectiveTime:at,epistemicStatus:epistem,
+   assertionTime:at,effectiveTime:at,epistemicStatus:epistemic,
    payload,evidenceRefs:[],provenance});
   history.push({...e,entity_type:type,
    provenance:{...e.provenance,continuity_spine:{
