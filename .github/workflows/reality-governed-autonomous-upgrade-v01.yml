@@ -143,6 +143,7 @@ jobs:
               reason:error.message,pinned_base_sha:ref.object.sha,
               upgrade_dispatch_allowed:false,owner_reservation_consumed:false,
               github_write_performed:false,capability_installed:false}));
+            throw Error('LIVE_UPGRADE_BASE_NOT_READY');
           }
           JS
 
