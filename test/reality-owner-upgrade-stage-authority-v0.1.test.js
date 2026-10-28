@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {exactOwnerUpgradeStageWorkItem,prepareOwnerUpgradeStageApproval,
- consumeOwnerUpgradeInstallGrant,consumeOwnerUpgradeResumeGrant}
+ consumeOwnerUpgradeInstallGrant,consumeOwnerUpgradeResumeGrant,
+ settleOwnerUpgradeStageGrant}
  from '../src/reality-owner-upgrade-stage-authority-v0.1.js';
 import {fingerprintApprovedWorkItem}
  from '../src/reality-authority-v1.0.js';
@@ -158,4 +159,43 @@ test('invalid signed-in owner, changed branch and absent stage approval stop bef
    /UPGRADE_STAGE_AUTHORITY_/);
  }
  assert.equal(x.calls.length,0);
+});
+
+test('real stage settlement forwards exact consumed DB reservation and independent installation proof',async()=>{
+ const x=setup('INSTALL');
+ const grant=await consumeOwnerUpgradeInstallGrant({...args,
+  prepare:x.prepare,reserve:x.reserve});
+ const calls=[];
+ const storeFactory=()=>({settle:async a=>{calls.push(a);
+  return {status:'VERIFIED',reservation_id:a.reservationId,
+   verification_receipt_ref:a.verificationReceiptRef}}});
+ const r=await settleOwnerUpgradeStageGrant({
+  ...args,stage:'INSTALL',grant,installed,storeFactory});
+ assert.equal(r.durably_settled,true);
+ assert.equal(r.reservation_id,grant.grant_id);
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].reservationId,grant.grant_id);
+ assert.equal(calls[0].outcome,'VERIFIED');
+ assert.equal(calls[0].verificationReceiptRef,
+  'github-preview-merge:'+installed.merge_commit_sha);
+});
+test('original-work reservation settlement requires independent verified same-job outcome',async()=>{
+ const x=setup('RESUME');
+ const grant=await consumeOwnerUpgradeResumeGrant({
+  ...args,installed,prepare:x.prepare,reserve:x.reserve});
+ const outcome={independent:true,original_job_completed:true,
+  original_work_id:workId,work_id:workId,
+  owner_id:owner,conversation_id:conversationId,goal_revision:plan.goal_revision,
+  capability_sha256:plan.candidate_sha256,
+  execution_receipt_id:'execution:resumed-original-job'};
+ const storeFactory=()=>({settle:async a=>({
+  status:'VERIFIED',reservation_id:a.reservationId,
+  verification_receipt_ref:a.verificationReceiptRef})});
+ const r=await settleOwnerUpgradeStageGrant({
+  ...args,stage:'RESUME',grant,installed,outcome,storeFactory});
+ assert.equal(r.status,'VERIFIED');
+ await assert.rejects(settleOwnerUpgradeStageGrant({
+  ...args,stage:'RESUME',grant,installed,
+  outcome:{...outcome,independent:false},storeFactory,
+ }),/UPGRADE_STAGE_SETTLEMENT_ORIGINAL_JOB_NOT_INDEPENDENT/);
 });
