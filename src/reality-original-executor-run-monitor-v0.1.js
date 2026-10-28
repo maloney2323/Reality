@@ -189,52 +189,9 @@ export async function inspectOriginalExecutorRun({
  if(owner?.original_work_id!==ORIGINAL_OWNER_WORK_ID||
     owner?.owner_id!==session?.user_id||owner?.owner_goal_confirmed!==true)
   fail('ORIGINAL_EXECUTOR_ORIGINAL_SIGNED_IN_OWNER_REQUIRED');
- const list=await get(ROOT+'/actions/runs?branch='+encodeURIComponent(BRANCH)+'&per_page=30');
- if(!Array.isArray(list?.workflow_runs)||list.workflow_runs.length>30)
-  fail('ORIGINAL_EXECUTOR_PROVIDER_RUN_LIST_UNVERIFIED');
- const verified=list.workflow_runs.filter(x=>x.id===PACKAGE_RUN&&
-  x.name===PACKAGE_CI_NAME&&x.head_sha===PACKAGE_CI_SHA&&
-  x.repository?.full_name==='maloney2323/Reality'&&
-  x.head_repository?.full_name==='maloney2323/Reality');
- if(verified.length===1){
-  const observed=await get(ROOT+'/actions/runs/'+PACKAGE_RUN+'/jobs?per_page=50');
-  if(!Array.isArray(observed?.jobs)||observed.jobs.length!==1||observed.total_count!==1)
-   fail('ORIGINAL_EXECUTOR_PACKAGE_JOB_REOBSERVATION_REQUIRED');
-  return projectVerifiedOriginalExecutorPackage({run:verified[0],jobs:observed.jobs});
- }
- const live=list.workflow_runs.filter(x=>x.id===LIVE_RUN&&x.name===LIVE_NAME&&
-  x.head_sha===LIVE_SHA&&x.repository?.full_name==='maloney2323/Reality'&&
-  x.head_repository?.full_name==='maloney2323/Reality');
- if(live.length===1){
-  const checked=await get(ROOT+'/actions/runs/'+LIVE_RUN+'/jobs?per_page=50');
-  if(!Array.isArray(checked?.jobs)||checked.total_count!==1||checked.jobs.length!==1)
-   fail('ORIGINAL_EXECUTOR_LIVE_RUN_JOB_READBACK_REQUIRED');
-  return projectLiveOriginalExecutorRun({run:live[0],jobs:checked.jobs});
- }
- const accepted=list.workflow_runs.filter(x=>
-  x.id===ACCEPTED_RUN&&x.name===ACCEPTED_NAME&&
-  x.head_sha===ACCEPTED_COMMIT&&
-  x.repository?.full_name==='maloney2323/Reality'&&
-  x.head_repository?.full_name==='maloney2323/Reality');
- if(accepted.length===1){
-  const exact=accepted[0];
-  const checked=await get(ROOT+'/actions/runs/'+ACCEPTED_RUN+'/jobs?per_page=50');
-  if(!Array.isArray(checked?.jobs)||checked.jobs.length!==1||checked.total_count!==1)
-   fail('ORIGINAL_EXECUTOR_ACCEPTED_RUN_JOB_READBACK_REQUIRED');
-  return projectAcceptedOriginalExecutorRun({run:exact,jobs:checked.jobs});
- }
- const candidates=list.workflow_runs.filter(x=>x.name===NAME&&
-  typeof x.path==='string'&&x.path.endsWith('.github/workflows/'+WORKFLOW)&&
-  x.repository?.full_name==='maloney2323/Reality'&&
-  x.head_repository?.full_name==='maloney2323/Reality');
- if(!candidates.length)
-  return Object.freeze({status:'REALITY_AUTONOMOUS_EXECUTOR_NOT_STARTED',
-   original_work_id:ORIGINAL_OWNER_WORK_ID,owner_warrant_issued:false,
-   original_job_completed:false,installed_capability:false});
- candidates.sort((a,b)=>b.id-a.id);
- const run=candidates[0];
- const listed=await get(ROOT+'/actions/runs/'+run.id+'/jobs?per_page=50');
- if(!Array.isArray(listed?.jobs)||listed.jobs.length>8||listed.total_count>50)
-  fail('ORIGINAL_EXECUTOR_PROVIDER_JOBS_UNVERIFIED');
- return projectOriginalExecutorRun({run,jobs:listed.jobs});
+ const run=await get(ROOT+'/actions/runs/'+PACKAGE_RUN);
+ const listing=await get(ROOT+'/actions/runs/'+PACKAGE_RUN+'/jobs?per_page=50');
+ if(!Array.isArray(listing?.jobs)||listing.jobs.length!==1||listing.total_count!==1)
+  fail('ORIGINAL_EXECUTOR_MONITOR_EXACT_RUN_JOBS_UNAVAILABLE');
+ return projectVerifiedOriginalExecutorPackage({run,jobs:listing.jobs});
 }
