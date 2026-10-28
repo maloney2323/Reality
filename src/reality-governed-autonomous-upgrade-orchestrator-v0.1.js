@@ -13,6 +13,7 @@ export const GOVERNED_AUTONOMOUS_UPGRADE_VERSION='reality-governed-autonomous-up
 const BASE='experiment/reality-live-durable-adversarial-20261025';
 const WORK=/^work:[0-9a-f]{32}$/;
 const SHA=/^[0-9a-f]{40}$/;
+const SHA256=/^[0-9a-f]{64}$/;
 const fail=code=>{throw Error(code)};
 export function prepareGovernedAutonomousUpgrade({
  verifiedExperiment,originalWorkItem,
@@ -77,7 +78,7 @@ export async function executeGovernedAutonomousUpgradeDraft({
  if(plan?.state!=='AWAITING_EXACT_DRAFT_PR_AUTHORIZATION'||
     plan.original_work_id!==originalWorkItem?.id||
     !WORK.test(String(plan.original_work_id||''))||
-    !SHA.test(String(ownerApproval?.policy_sha||''))||
+    !SHA256.test(String(ownerApproval?.policy_sha||''))||
     ownerApproval?.verified_by_server!==true||
     ownerApproval?.original_work_id!==plan.original_work_id||
     ownerApproval?.approved_build_id!==plan.proposal?.build_id||
