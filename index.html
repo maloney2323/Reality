@@ -1218,6 +1218,10 @@ $('wcTaskList').addEventListener('click',async event=>{
      info.upgrade_discovery?.original_job_completed!==false||
      info.upgrade_discovery?.authorization_granted!==false||
      !['NO_NEW_UPGRADE_NEEDED','DIAGNOSIS_REQUIRED','CAPABILITY_GAP_CANDIDATE'].includes(info.upgrade_discovery?.status)||
+     info.continuation_probe?.original_work_id!==workId||
+     info.continuation_probe?.original_job_completed!==false||
+     info.continuation_probe?.authorization_granted!==false||
+     !['EXECUTION_CAPABILITY_REQUIRES_INDEPENDENT_INVESTIGATION','CAPABILITY_GAP_CANDIDATE_NEEDS_SANDBOX_VERIFICATION','ORIGINAL_REPAIR_EXECUTOR_AVAILABLE'].includes(info.continuation_probe?.state)||
      !Array.isArray(info.timeline)||info.timeline.length!==7)
    throw Error(info.error_code||'RECOVERY_LOOP_NOT_VERIFIED');
   place.replaceChildren();
@@ -1241,6 +1245,23 @@ $('wcTaskList').addEventListener('click',async event=>{
   upgradeNext.textContent='Next: '+upgrade.next_action+
    ' No upgrade, GitHub write, or promotion has been authorized.';
   place.appendChild(upgradeNext);
+  // The historical CI repair and Reality's own ability to FINISH the
+  // original job are separate. Display the stalled automation diagnosis.
+  const continuation=info.continuation_probe;
+  const continuationHeading=document.createElement('h4');
+  continuationHeading.textContent='Original job automation · '+
+   continuation.state.replaceAll('_',' ');
+  place.appendChild(continuationHeading);
+  const continuationWhy=document.createElement('p');
+  continuationWhy.textContent='Reality stopped at '+
+   continuation.previously_verified_stages+' of 7. Historical CI success does not prove the original repair can execute or settle.';
+  place.appendChild(continuationWhy);
+  const continuationNext=document.createElement('p');
+  continuationNext.textContent='Capability investigation: '+continuation.next_action+
+   ' Missing capability verified: '+
+   (continuation.missing_capability_independently_established?'Yes':'Not yet')+
+   '. Original work remains open; no upgrade or external write authorized.';
+  place.appendChild(continuationNext);
   for(const item of info.timeline){
    const p=document.createElement('p');
    p.textContent=(item.state==='VERIFIED'?'✓ ':'○ ')+
@@ -1256,7 +1277,7 @@ $('wcTaskList').addEventListener('click',async event=>{
   const closing=document.createElement('p');
   closing.textContent='Original job remains unfinished. Next required stage: '+
    (info.current_decision==='RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED'?
-    'Verify root cause and original job acceptance; no new upgrade required.':
+    'Historical workflow corrected. Investigate how Reality executes and verifies the original repair before deciding whether an upgrade is needed.':
     'Verify a genuine missing capability and request fresh authorization.');
   place.appendChild(closing);
   const receipt=document.createElement('p');
