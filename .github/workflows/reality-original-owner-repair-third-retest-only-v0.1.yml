@@ -1,0 +1,95 @@
+name: Reality Original Owner Repair - Independent Frozen Third Candidate Retest Only
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-owner-repair-third-retest-only-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-correction-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40707748185
+          name: original-owner-model-generated-final-correction
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: owner-original-repair-final-correction
+      - name: Independently attest exact owner frozen Git source bytes
+        run: |
+          set -euo pipefail
+          mkdir -p owner-original-fixtures
+          cp test/fixtures/original-repair-historical-source.snapshot.txt owner-original-fixtures/historical.js
+          cp test/fixtures/original-repair-corrected-source.snapshot.txt owner-original-fixtures/corrected.js
+          test "$(git hash-object owner-original-fixtures/historical.js)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
+          test "$(git hash-object owner-original-fixtures/corrected.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
+      - name: Real model-corrected source tested in a separate secretless, network-disabled, read-only Docker sandbox
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/owner-original-repair-final-correction:/work:ro" \
+            -v "${{ github.workspace }}/owner-original-fixtures:/fixtures:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-original-repair-capability-grade-v0.1.mjs \
+            /work/candidate.mjs /fixtures/historical.js /fixtures/corrected.js \
+            > owner-original-repair-final-correction/independent-retest.json
+          sandbox_exit=$?
+          set -e
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('owner-original-repair-final-correction/correction-evidence.json','utf8'));
+          const v=JSON.parse(fs.readFileSync('owner-original-repair-final-correction/independent-retest.json','utf8'));
+          const digest=x=>createHash('sha256').update(x).digest('hex');
+          const verified=p.correction_model_generated===true&&
+            p.failed_candidate_sha256==='4744589d50b0873ea006ae432c077429c50793a5eb758027f4140a6ec1ba37b2'&&
+            p.corrected_candidate_sha256==='6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16'&&
+            p.corrected_model_response_id==='resp_0af032dc727a5eb5006ae208a7b01487d0985336024bf98f2c'&&
+            p.original_work_id===v.original_work_id&&
+            p.corrected_candidate_sha256===v.candidate_sha256&&
+            v.state==='ORIGINAL_REPAIR_CAPABILITY_SANDBOX_VERIFIED'&&
+            v.passed===8&&v.total===8&&v.failed===0&&
+            v.frozen_verified===true&&v.hidden_holdout_verified===true&&
+            v.isolation.network_permitted===false&&
+            v.isolation.secrets_accessible===false&&
+            v.original_repair_executed===false&&v.original_job_completed===false;
+          const evidence={
+           version:'reality-original-owner-correction-independent-retest-v0.1',
+           status:verified?'REAL_MODEL_SELF_CORRECTION_SANDBOX_VERIFIED_NOT_INSTALLED':'REAL_MODEL_SELF_CORRECTION_SANDBOX_REJECTED',
+           original_work_id:p.original_work_id,
+           original_capability_candidate_receipt_id:p.original_capability_candidate_receipt_id,
+           experiment_hash:p.experiment_hash,
+           failed_model_response_id:p.failed_model_response_id,
+           corrected_model_response_id:p.corrected_model_response_id,
+           failed_source_sha256:p.failed_candidate_sha256,
+           corrected_source_sha256:p.corrected_candidate_sha256,
+           independent_result_sha256:digest(fs.readFileSync('owner-original-repair-final-correction/independent-retest.json')),
+           cases_passed:v.passed,cases_total:v.total,
+           independent_sandbox_verified:verified,
+           capability_installed:false,owner_install_authorization:false,
+           original_job_resumed:false,original_job_completed:false,
+           github_write_performed:false,
+          };
+          fs.writeFileSync('owner-original-repair-final-correction/retest-proof.json',
+            JSON.stringify(evidence,null,2)+'\n');
+          console.log(JSON.stringify(evidence));
+          if(!verified)process.exit(8);
+          JS
+          if [ "$sandbox_exit" -ne 0 ]; then exit "$sandbox_exit"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-model-final-correction-independent-retest
+          path: owner-original-repair-final-correction/
+          retention-days: 14
