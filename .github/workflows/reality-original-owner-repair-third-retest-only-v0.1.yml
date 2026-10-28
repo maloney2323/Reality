@@ -31,6 +31,37 @@ jobs:
           cp test/fixtures/original-repair-corrected-source.snapshot.txt owner-original-fixtures/corrected.js
           test "$(git hash-object owner-original-fixtures/historical.js)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
           test "$(git hash-object owner-original-fixtures/corrected.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
+      - name: Read-only sandbox diagnosis of candidate patch delta versus independently fixed Git source
+        run: |
+          set -euo pipefail
+          docker run --rm -i --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/owner-original-repair-final-correction:/work:ro" \
+            -v "${{ github.workspace }}/owner-original-fixtures:/fixtures:ro" \
+            node:22-alpine node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          const mod=await import('file:///work/candidate.mjs');
+          const original='work:24cda9611404e9bcb47909976067605c';
+          const source=fs.readFileSync('/fixtures/historical.js','utf8');
+          const fixed=fs.readFileSync('/fixtures/corrected.js','utf8');
+          const output=mod.proposeOriginalRepair({workId:original,source});
+          const expected=fixed;
+          const actual=output.patchedSource;
+          let start=0;
+          while(start<Math.min(expected.length,actual.length)&&expected[start]===actual[start])start++;
+          let end=0;
+          while(end<Math.min(expected.length-start,actual.length-start)&&
+            expected[expected.length-end-1]===actual[actual.length-end-1])end++;
+          console.log(JSON.stringify({
+            state:'UNTRUSTED_MODEL_PATCH_DELTA_DIAGNOSTIC',
+            original_work_id:original,decision:output.status,
+            first_divergence:start,expected_length:expected.length,actual_length:actual.length,
+            expected_differing_span:expected.slice(start,expected.length-end).slice(0,1800),
+            actual_differing_span:actual.slice(start,actual.length-end).slice(0,1800),
+            candidate_installed:false,original_job_completed:false,
+          }));
+          JS
       - name: Real model-corrected source tested in a separate secretless, network-disabled, read-only Docker sandbox
         run: |
           set -euo pipefail
