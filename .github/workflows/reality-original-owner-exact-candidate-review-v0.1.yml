@@ -21,7 +21,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           run-id: 40708956478
-          name: reality-original-owner-third-candidate-independent-retest-evidence
+          name: original-owner-model-final-correction-independent-retest
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: original-model
       - name: Exact same original owner LLM source, not manually rewritten
