@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import './reality-original-job-recovery-diagnosis-v0.1.test.js';
 import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
 import {createContinuitySpine} from '../src/reality-continuity-spine-v2.0.js';
 import {
