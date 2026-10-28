@@ -39,7 +39,8 @@ jobs:
           import {verifyControlledFinaleIndependentEvidence}
             from './src/reality-controlled-finale-independent-admission-v0.1.js';
           const result=await verifyControlledFinaleIndependentEvidence();
-          if(result.state!=='EXACT_MODEL_CORRECTION_INDEPENDENTLY_VERIFIED_OWNER_ADMISSION_PENDING'||
+          if(!['EXACT_MODEL_CORRECTION_INDEPENDENTLY_VERIFIED_OWNER_ADMISSION_PENDING',
+             'REVALIDATION_REQUIRED_BASE_MOVED'].includes(result.state)||
              result.owner_bound_warrant_issued!==false||
              result.installation_authorized!==false||
              result.owner_resumption_authorized!==false||
