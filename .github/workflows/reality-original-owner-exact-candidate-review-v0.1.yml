@@ -1,0 +1,67 @@
+name: Reality ORIGINAL Owner Repair - Exact LLM Capability Installation Review
+on:
+  push:
+    branches:
+      - review/reality-original-owner-repair-capability-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-verified-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40708956478
+          name: reality-original-owner-third-candidate-independent-retest-evidence
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-model
+      - name: Exact same original owner LLM source, not manually rewritten
+        run: |
+          set -euo pipefail
+          test -s original-model/candidate.mjs
+          cmp original-model/candidate.mjs src/reality-extensions/reality-original-maintenance-repair-proposal.mjs
+          echo "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16  src/reality-extensions/reality-original-maintenance-repair-proposal.mjs" | sha256sum -c -
+          node --check src/reality-extensions/reality-original-maintenance-repair-proposal.mjs
+      - name: Independently re-execute original repair on historical and current source, with NO network or secrets
+        run: |
+          set -euo pipefail
+          mkdir -p original-fixtures
+          cp test/fixtures/original-repair-historical-source.snapshot.txt original-fixtures/historical.js
+          cp test/fixtures/original-repair-corrected-source.snapshot.txt original-fixtures/corrected.js
+          timeout 90s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 40 --memory 256m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,noexec,nosuid,size=8m \
+            -v "${{ github.workspace }}:/repo:ro" -w /repo node:22-alpine \
+            node --input-type=module -e '
+              import assert from "node:assert/strict";
+              import {readFileSync} from "node:fs";
+              import {proposeOriginalRepair} from "./src/reality-extensions/reality-original-maintenance-repair-proposal.mjs";
+              const id="work:24cda9611404e9bcb47909976067605c";
+              const old=readFileSync("original-fixtures/historical.js","utf8");
+              const current=readFileSync("original-fixtures/corrected.js","utf8");
+              const before=proposeOriginalRepair({workId:id,source:old});
+              const after=proposeOriginalRepair({workId:id,source:current});
+              assert.equal(before.status,"PATCH_PROPOSED");
+              assert.equal(after.status,"ALREADY_FIXED");
+              assert.equal(after.patchedSource,current);
+              assert.throws(()=>proposeOriginalRepair({workId:"work:00000000000000000000000000000000",source:old}));
+              console.log(JSON.stringify({
+                original_work_id:id,
+                same_llm_source_sha256:"6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16",
+                historical_source:"PATCH_PROPOSED",
+                currently_fixed_source:"ALREADY_FIXED",
+                changed_source:false,
+                capability_installed:false,
+                owner_install_grant:false,
+                original_job_completed:false
+              }));
+            '
