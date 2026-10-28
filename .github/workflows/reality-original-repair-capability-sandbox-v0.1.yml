@@ -1,0 +1,136 @@
+name: Reality Original 4-of-7 Repair Capability - Real Model and Independent Sandbox
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'scripts/reality-original-repair-capability-generate-v0.1.mjs'
+      - 'scripts/reality-original-repair-capability-grade-v0.1.mjs'
+      - '.github/workflows/reality-original-repair-capability-sandbox-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-model-synthesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Static check real original-work generation and immutable owner receipts
+        run: |
+          node --check scripts/reality-original-repair-capability-generate-v0.1.mjs
+          node --check scripts/reality-original-repair-capability-grade-v0.1.mjs
+          git cat-file -e c8f0b861e1fac6cda7826aed9f36a2666d124eda^{commit}
+          git cat-file -e 4e88594a43ca546a1861d3c5f5812f20234bb3e3^{commit}
+      - name: Reality synthesizes code for exact owner missing repair execution capability
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_ORIGINAL_REPAIR_OUTPUT: owner-original-repair
+        run: node scripts/reality-original-repair-capability-generate-v0.1.mjs
+      - name: Verify provenance without running or importing model source
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('owner-original-repair/generation-evidence.json','utf8'));
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             p.original_capability_candidate_receipt_id!=='544eebaa-c9e6-5ad6-8d3e-6e6820343b2a'||
+             p.experiment_hash!=='e2c36fe43a3331fdcd8f66635f905a55304584804fd48a4af99e87d99c82e60f'||
+             p.model_generated!==true||!p.model_response_id||
+             p.status!=='MODEL_ORIGINAL_REPAIR_GENERATED_UNTRUSTED_AWAITING_ISOLATED_VERIFICATION'||
+             p.github_provider_write_performed!==false||p.original_job_completed!==false||
+             !fs.existsSync('owner-original-repair/candidate.mjs')||
+             p.candidate_sha256!==createHash('sha256')
+                .update(fs.readFileSync('owner-original-repair/candidate.mjs')).digest('hex'))
+             throw Error('ORIGINAL_REPAIR_REAL_MODEL_GENERATION_NOT_ATTESTED:'+p.status);
+          console.log(JSON.stringify({state:p.status,original_work_id:p.original_work_id,
+            model_response_id:p.model_response_id,model:p.model,
+            candidate_sha256:p.candidate_sha256,original_job_completed:false,
+            github_write_performed:false}));
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-model-repair-candidate
+          path: owner-original-repair/
+          retention-days: 14
+  independent-no-network-sandbox:
+    needs: actual-model-synthesis
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: original-owner-model-repair-candidate
+          path: owner-original-repair
+      - name: Independently derive actual historical bad and corrected Git source snapshots
+        run: |
+          set -euo pipefail
+          mkdir -p owner-original-fixtures
+          git show c8f0b861e1fac6cda7826aed9f36a2666d124eda:test/reality-personal-discovered-work-handoff-v0.1.test.js > owner-original-fixtures/historical.js
+          git show 4e88594a43ca546a1861d3c5f5812f20234bb3e3:test/reality-personal-discovered-work-handoff-v0.1.test.js > owner-original-fixtures/corrected.js
+          test -s owner-original-fixtures/historical.js
+          test -s owner-original-fixtures/corrected.js
+      - name: Isolate untrusted model code with no network, secrets, writable root or elevated privileges
+        run: |
+          set -euo pipefail
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/owner-original-repair:/work:ro" \
+            -v "${{ github.workspace }}/owner-original-fixtures:/fixtures:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-original-repair-capability-grade-v0.1.mjs \
+              /work/candidate.mjs /fixtures/historical.js /fixtures/corrected.js \
+              > owner-original-repair/independent-verification.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const g=JSON.parse(fs.readFileSync('owner-original-repair/generation-evidence.json','utf8'));
+          const v=JSON.parse(fs.readFileSync('owner-original-repair/independent-verification.json','utf8'));
+          const digest=x=>createHash('sha256').update(x).digest('hex');
+          if(g.model_generated!==true||
+             digest(fs.readFileSync('owner-original-repair/candidate.mjs'))!==g.candidate_sha256||
+             v.original_work_id!==g.original_work_id||
+             v.candidate_sha256!==g.candidate_sha256||
+             v.state!=='ORIGINAL_REPAIR_CAPABILITY_SANDBOX_VERIFIED'||
+             v.failed!==0||v.total!==8||v.passed!==8||
+             v.frozen_verified!==true||v.hidden_holdout_verified!==true||
+             v.isolation.network_permitted!==false||
+             v.isolation.secrets_accessible!==false||
+             v.original_repair_executed!==false||v.original_job_completed!==false)
+            throw Error('EXACT_OWNER_REPAIR_NOT_INDEPENDENTLY_SANDBOX_VERIFIED');
+          const proof={version:'reality-original-owner-sandbox-proof-v0.1',
+            status:'REAL_MODEL_GENERATED_ORIGINAL_REPAIR_CAPABILITY_INDEPENDENT_SANDBOX_PASS',
+            original_work_id:g.original_work_id,
+            original_capability_candidate_receipt_id:g.original_capability_candidate_receipt_id,
+            experiment_hash:g.experiment_hash,
+            model_response_id:g.model_response_id,
+            candidate_sha256:g.candidate_sha256,
+            independent_result_sha256:digest(fs.readFileSync('owner-original-repair/independent-verification.json')),
+            frozen_verified:true,hidden_holdout_verified:true,
+            sandbox_isolated:true,owner_approval_for_install:false,
+            code_installed:false,original_job_resumed:false,
+            original_job_completed:false,github_write_performed:false};
+          fs.writeFileSync('owner-original-repair/verified-proof.json',JSON.stringify(proof,null,2)+'\n');
+          console.log(JSON.stringify(proof));
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-independent-repair-sandbox-proof
+          path: owner-original-repair/
+          retention-days: 14
