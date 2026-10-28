@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {connectOwnerGithubUpgradeToClosure}
  from '../src/reality-owner-upgrade-github-live-ports-v0.1.js';
-const methods=['readFreshGoal','resumeOriginal','observeOriginal'];
+const methods=['resumeOriginal','observeOriginal'];
 function portGroup(){
  const result={};for(const m of methods)result[m]=async()=>({name:m});
  return result;
@@ -14,12 +14,13 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
  const ports=connectOwnerGithubUpgradeToClosure({
   authorityPorts:{},
   runtimePorts:{resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal},
-  continuityPorts:{readFreshGoal:prior.readFreshGoal},
+  continuityPorts:{},
   install,observe,
   consumeInstallGrant:async a=>{calls.push(['grantInstall',a]);return {status:'CONSUMED_ONCE'}},
   consumeResumeGrant:async a=>{calls.push(['grantResume',a]);return {status:'CONSUMED_ONCE'}},
   register:async a=>{calls.push(['register',a]);return {registered:true}},
   readRegistry:async a=>{calls.push(['readRegistry',a]);return {registered:true}},
+  readFreshGoal:async a=>{calls.push(['readFreshGoal',a]);return {active:true}},
   appendSettlement:async a=>{calls.push(['settle',a]);return {receipt_id:'receipt:123'}},
   readSettlement:async a=>{calls.push(['readSettlement',a]);return {
    settlement_receipt_id:'receipt:123',independently_reobserved:true}},
@@ -36,10 +37,12 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
  const gr=await ports.consumeResumeGrant({session,scope,plan,installed,env});
  const reg=await ports.register({session,scope,plan,installed,env});
  const regObserved=await ports.readRegistry({session,scope,plan,installed,env});
+ const fresh=await ports.readFreshGoal({session,conversationId:scope.conversationId,scope,plan,env});
+ assert.equal(fresh.active,true);
  assert.equal(reg.registered,true);assert.equal(regObserved.registered,true);
  assert.equal(gi.status,'CONSUMED_ONCE');
  assert.equal(gr.status,'CONSUMED_ONCE');
- assert.deepEqual(calls.map(x=>x[0]),['install','observe','grantInstall','grantResume','register','readRegistry']);
+ assert.deepEqual(calls.map(x=>x[0]),['install','observe','grantInstall','grantResume','register','readRegistry','readFreshGoal']);
  assert.equal(calls[0][1].scope.workId,scope.workId);
  assert.equal(calls[1][1].originalWorkId,scope.workId);
  assert.equal(calls[1][1].conversationId,scope.conversationId);
@@ -48,7 +51,7 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
   active:{},outcome:{},env});
  const saved=await ports.readSettlement({session,scope,plan,receipt,outcome:{},env});
  assert.equal(saved.independently_reobserved,true);
- assert.deepEqual(calls.map(x=>x[0]),['install','observe','grantInstall','grantResume','register','readRegistry','settle','readSettlement']);
+ assert.deepEqual(calls.map(x=>x[0]),['install','observe','grantInstall','grantResume','register','readRegistry','readFreshGoal','settle','readSettlement']);
  await assert.rejects(ports.readSettlement({
   session,scope,plan,receipt:{receipt_id:'wrong'},env,
  }),/UPGRADE_LIVE_SETTLEMENT_READBACK_RECEIPT_MISMATCH/);
