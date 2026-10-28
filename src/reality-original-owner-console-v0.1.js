@@ -41,13 +41,14 @@ const cleanError=e=>String(e?.message||'').match(/^(?:UPGRADE_|AUTONOMOUS_LOOP_)
 
 export function originalOwnerConsoleFlags({
  goalConfirmed=false,evidence={},github={},warrantVerified=false,
- installationVerified=false,settlementVerified=false,
+ draftVerified=false,installationVerified=false,settlementVerified=false,
 }={}){
  const source=github.exact_llm_source_verified===true&&github.sandbox_success===true;
  const alreadyFixed=github.historical_fixed_source_verified===true;
  const ownerEvidence=evidence.owner_evidence_acknowledged===true;
  const warrant=Boolean(goalConfirmed&&source&&warrantVerified);
- const install=Boolean(warrant&&installationVerified);
+ const draft=Boolean(warrant&&draftVerified);
+ const install=Boolean(draft&&installationVerified);
  const settled=Boolean(install&&settlementVerified);
  return Object.freeze({
   correct_original_work_id:ORIGINAL_OWNER_WORK_ID,
@@ -56,12 +57,14 @@ export function originalOwnerConsoleFlags({
   original_source_already_fixed:alreadyFixed,
   owner_historical_evidence_acknowledged:ownerEvidence,
   warranted_upgrade_ready:warrant,
+  verified_draft_ready:draft,
   installation_verified:install,
   job_settlement_verified:settled,
   original_job_completed:settled,
   next_required_step:!goalConfirmed?'OPEN_OR_CONFIRM_ORIGINAL_OWNER_GOAL':
    !source?'INDEPENDENT_GITHUB_MODEL_SOURCE_REVALIDATION':
    !warrant?'ISSUE_FRESH_OWNER_SCOPED_SANDBOX_AND_WARRANT':
+   !draft?'PREPARE_GOVERNED_DRAFT_PR_AUTHORIZATION':
    !install?'PREPARE_EXACT_OWNER_INSTALL_APPROVAL':
    !settled?'PREPARE_SEPARATE_RESUMPTION_AND_VERIFY_SETTLEMENT':
    'VERIFIED_SETTLED',
