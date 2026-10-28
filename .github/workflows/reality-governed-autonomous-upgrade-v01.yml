@@ -37,6 +37,9 @@ on:
       - 'src/reality-owner-upgrade-github-live-ports-v0.1.js'
       - 'src/reality-owner-upgrade-original-github-work-v0.1.js'
       - 'src/reality-owner-upgrade-install-continuation-v0.1.js'
+      - 'src/reality-owner-autonomous-upgrade-loop-v0.1.js'
+      - 'api/reality/personal-autonomous-upgrade-loop.js'
+      - 'test/reality-owner-autonomous-upgrade-loop-v0.1.test.js'
       - 'test/reality-owner-upgrade-install-continuation-v0.1.test.js'
       - 'sql/reality-owner-upgrade-read-verified-install-v0.1.sql'
       - 'test/reality-owner-upgrade-original-github-work-v0.1.test.js'
@@ -103,6 +106,9 @@ on:
       - 'src/reality-owner-upgrade-github-live-ports-v0.1.js'
       - 'src/reality-owner-upgrade-original-github-work-v0.1.js'
       - 'src/reality-owner-upgrade-install-continuation-v0.1.js'
+      - 'src/reality-owner-autonomous-upgrade-loop-v0.1.js'
+      - 'api/reality/personal-autonomous-upgrade-loop.js'
+      - 'test/reality-owner-autonomous-upgrade-loop-v0.1.test.js'
       - 'test/reality-owner-upgrade-install-continuation-v0.1.test.js'
       - 'sql/reality-owner-upgrade-read-verified-install-v0.1.sql'
       - 'test/reality-owner-upgrade-original-github-work-v0.1.test.js'
@@ -164,6 +170,8 @@ jobs:
           node --check src/reality-owner-upgrade-github-live-ports-v0.1.js
           node --check src/reality-owner-upgrade-original-github-work-v0.1.js
           node --check src/reality-owner-upgrade-install-continuation-v0.1.js
+          node --check src/reality-owner-autonomous-upgrade-loop-v0.1.js
+          node --check api/reality/personal-autonomous-upgrade-loop.js
           node --check src/reality-owner-upgrade-original-job-settlement-v0.1.js
           node --check src/reality-original-job-acceptance-v0.1.js
           node --check src/reality-personal-unfinished-work-v0.1.js
@@ -174,7 +182,7 @@ jobs:
           node --check src/reality-owner-upgrade-runtime-registry-v0.1.js
           node --check src/reality-owner-upgrade-fresh-goal-v0.1.js
           node --check api/reality/personal-upgrade-proof-import.js
-          node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js test/reality-historical-upgrade-proof-intake-v0.1.test.js test/reality-independent-upgrade-ci-readback-v0.1.test.js test/reality-owner-bound-upgrade-closure-v0.1.test.js test/reality-owner-upgrade-draft-continuity-v0.1.test.js test/reality-owner-upgrade-github-install-readback-v0.1.test.js test/reality-owner-upgrade-github-install-v0.1.test.js test/reality-owner-upgrade-github-live-ports-v0.1.test.js test/reality-owner-upgrade-original-job-settlement-v0.1.test.js test/reality-owner-upgrade-stage-authority-v0.1.test.js test/reality-owner-upgrade-isolated-runtime-readback-v0.1.test.js test/reality-owner-upgrade-runtime-registry-v0.1.test.js test/reality-owner-upgrade-fresh-goal-v0.1.test.js test/reality-original-job-acceptance-v0.1.test.js test/reality-personal-unfinished-work-v0.1.test.js test/reality-owner-repair-acceptance-v0.1.test.js test/reality-owner-upgrade-original-github-work-v0.1.test.js test/reality-owner-upgrade-install-continuation-v0.1.test.js
+          node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js test/reality-historical-upgrade-proof-intake-v0.1.test.js test/reality-independent-upgrade-ci-readback-v0.1.test.js test/reality-owner-bound-upgrade-closure-v0.1.test.js test/reality-owner-upgrade-draft-continuity-v0.1.test.js test/reality-owner-upgrade-github-install-readback-v0.1.test.js test/reality-owner-upgrade-github-install-v0.1.test.js test/reality-owner-upgrade-github-live-ports-v0.1.test.js test/reality-owner-upgrade-original-job-settlement-v0.1.test.js test/reality-owner-upgrade-stage-authority-v0.1.test.js test/reality-owner-upgrade-isolated-runtime-readback-v0.1.test.js test/reality-owner-upgrade-runtime-registry-v0.1.test.js test/reality-owner-upgrade-fresh-goal-v0.1.test.js test/reality-original-job-acceptance-v0.1.test.js test/reality-personal-unfinished-work-v0.1.test.js test/reality-owner-repair-acceptance-v0.1.test.js test/reality-owner-upgrade-original-github-work-v0.1.test.js test/reality-owner-upgrade-install-continuation-v0.1.test.js test/reality-owner-autonomous-upgrade-loop-v0.1.test.js
 
       - name: Independently re-read pinned real GitHub self-correction artifact (read only)
         env:
