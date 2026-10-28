@@ -22,6 +22,8 @@ import {loadAuthenticatedWarrantedUpgrade}
  from './reality-warranted-upgrade-candidate-loader-v0.1.js';
 import {verifyUpgradeEvidenceWarrant}
  from './reality-upgrade-evidence-warrant-v0.1.js';
+import {assertUpgradeBaseReady}
+ from './reality-upgrade-base-readiness-v0.1.js';
 
 export const GOVERNED_UPGRADE_DISPATCH_VERSION='reality-governed-upgrade-dispatch-v0.1';
 const REPO='maloney2323/Reality',ROOT='/repos/'+REPO;
@@ -130,6 +132,9 @@ export async function dispatchAuthenticatedGovernedUpgradeDraft({
  if(branch?.ref!=='refs/heads/'+BASE||!SHA.test(String(pinned||''))||
     pinned!==warrant.pinned_base_commit_sha)
   fail('UPGRADE_GITHUB_BASE_READBACK_REQUIRED');
+ // Independent source preflight: never consume authorization if the pinned
+ // base cannot run BOTH CI suites for the generated extension files.
+ await assertUpgradeBaseReady({providerGet,baseCommitSha:pinned});
  const reserved=await reserve({
   session,conversationId,workItem,groundingProof,env,
  });
