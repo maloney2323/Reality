@@ -1,0 +1,110 @@
+name: Reality Finale - Real Model Self-Correction and Independent Retest
+on:
+  push:
+    branches:
+      - experiment/reality-full-loop-finale-20261028
+    paths:
+      - 'scripts/reality-finale-model-self-correct-v0.1.mjs'
+      - '.github/workflows/reality-finale-self-correction-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-failed-model-self-correction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independently verify previous model attempt was truly rejected
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const runId=40715822942;
+          const r=await fetch('https://api.github.com/repos/maloney2323/Reality/actions/runs/'+runId,{
+            headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json',
+              'User-Agent':'Reality-Finale-Failed-Run-Readback'}});
+          assert.equal(r.status,200);
+          const j=await r.json();
+          assert.equal(j.status,'completed');
+          assert.equal(j.conclusion,'failure');
+          assert.equal(j.head_sha,'4f1a3a23fe28d738ccf863754c76234c4d1b1929');
+          console.log(JSON.stringify({previous_run_id:runId,previous_conclusion:'failure',
+            previous_candidate_status:'REJECTED_INDEPENDENT_VERIFICATION',
+            installation_authorized:false}));
+          JS
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40715822942
+          name: reality-finale-untrusted-model-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: first-candidate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40715822942
+          name: reality-finale-real-red-gap
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: finale-evidence
+      - name: Real model corrects its exact failed source using independent public regression feedback
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-finale-model-self-correct-v0.1.mjs
+          node scripts/reality-finale-model-self-correct-v0.1.mjs
+          test -s finale-candidate/candidate.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-finale-second-real-model-correction
+          path: finale-candidate/
+          retention-days: 14
+  independent-correction-retest:
+    needs: actual-failed-model-self-correction
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40715822942
+          name: reality-finale-real-red-gap
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: finale-evidence
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-finale-second-real-model-correction
+          path: finale-candidate
+      - name: Independently rerun all frozen and hidden tests in no-network Docker
+        run: |
+          set -euo pipefail
+          mkdir -p src/reality-extensions
+          touch src/reality-extensions/construction-estimate-approval-gate.mjs
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -v "${{ github.workspace }}/finale-evidence:/evidence:ro" \
+            -v "${{ github.workspace }}/finale-candidate:/work:ro" \
+            -v "${{ github.workspace }}/finale-candidate/candidate.mjs:/repo/src/reality-extensions/construction-estimate-approval-gate.mjs:ro" \
+            -w /repo node:22-alpine \
+            sh -c 'node --test test/reality-finale-estimate-approval-gate.test.mjs && node scripts/reality-finale-independent-holdout-v0.1.mjs' \
+            > finale-second-independent-retest.log
+          cat finale-second-independent-retest.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-finale-second-independent-sandbox
+          path: finale-second-independent-retest.log
+          if-no-files-found: warn
+          retention-days: 14
