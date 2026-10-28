@@ -84,6 +84,17 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p id="warrantResult" class="note" role="status" aria-live="polite">Sign in and open your original Reality job. This button independently validates the exact pinned model package and records a non-authorizing Continuity warrant; it is not installation approval.</p>
 </div>
 <div class="shell">
+<h2>Next: Reality creates its exact governed draft PR</h2>
+<p>Reality's original work already has an independently verified 14/14 model-generated capability and a signed evidence warrant. Prepare a <strong>draft pull request only</strong> for the two verified extension files. This does not install, merge or complete the job.</p>
+<div class="actions">
+ <button type="button" id="prepareDraft" disabled>Prepare governed draft PR</button>
+ <button type="button" id="approveDraft" disabled>Approve exact draft action</button>
+ <button type="button" id="runDraft" disabled>Run approved draft once</button>
+</div>
+<div id="draftDetail" class="note" hidden></div>
+<p id="draftState" class="note" role="status" aria-live="polite">Signed warrant is required. No draft has been approved or dispatched.</p>
+</div>
+<div class="shell">
 <h2>Owner-controlled execution</h2>
 <p class="note">Every stage is tied to the same original work ID. Installation and resumption require independent, separate approvals. Reality will not use a GitHub merge as proof of final job completion.</p>
 <div class="step">
@@ -129,8 +140,9 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 'use strict';
 const WORK='work:24cda9611404e9bcb47909976067605c';
 const $=id=>document.getElementById(id);
-const buttons=['refresh','verifyExecutor','verifyWarrant','prepareInstall','approve','execute','prepareResume','verifyFinal'];
+const buttons=['refresh','verifyExecutor','verifyWarrant','prepareDraft','approveDraft','runDraft','prepareInstall','approve','execute','prepareResume','verifyFinal'];
 let conv=null,snapshot=null,prepared=null,approvedStage=null,locked=false,busy=false,packageVerified=false;
+let draftPrepared=null,draftApproval=false,draftLocked=false;
 function output(message){$('log').textContent=String(message);}
 function status(message){$('globalState').textContent=String(message);}
 function disabledAll(value){for(const id of buttons)$(id).disabled=value;}
@@ -149,6 +161,9 @@ function render(s){
  status(s.job_settlement_verified?'Verified settled':s.verified_draft_ready?'Owner install approval available':s.warranted_upgrade_ready?'Signed warrant verified · Governed draft pending':'Evidence / owner gate pending');
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
  $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||s.original_source_verified!==true||s.owner_warrant_events>0;
+ $('prepareDraft').disabled=busy||locked||draftLocked||s.warranted_upgrade_ready!==true||s.verified_draft_ready===true;
+ $('approveDraft').disabled=busy||locked||draftLocked||!draftPrepared||draftApproval;
+ $('runDraft').disabled=busy||locked||draftLocked||!draftApproval;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
  $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
  $('verifyFinal').disabled=busy;
@@ -216,6 +231,114 @@ async function verifyOriginalExecutorWarrant(){
    '. No installation, GitHub write, or job settlement was authorized.';
  }finally{busy=false;$('refresh').disabled=false;
   $('verifyWarrant').disabled=true;void refresh();}
+}
+async function prepareGovernedDraft(){
+ if(busy||locked||draftLocked||!conv||snapshot?.warranted_upgrade_ready!==true||
+    snapshot?.verified_draft_ready===true)return;
+ busy=true;disabledAll(true);
+ draftPrepared=null;draftApproval=false;
+ $('draftDetail').hidden=true;
+ $('draftState').textContent='Reality is checking the exact signed owner warrant, current goal, and pinned GitHub base without making an external change…';
+ try{
+  const d=await json('/api/reality/personal-original-governed-draft',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'PREPARE_EXACT_GOVERNED_DRAFT',
+    conversation_id:conv,original_work_id:WORK})
+  });
+  const expected='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2';
+  if(d.status!=='AWAITING_EXACT_GOVERNED_DRAFT_OWNER_APPROVAL'||
+     d.stage!=='DRAFT'||d.original_work_id!==WORK||
+     d.expected_candidate_hash!==expected||
+     d.work_item?.connector!=='github'||
+     d.work_item?.operation!=='create_isolated_upgrade_pr'||
+     d.work_item?.inputs?.candidate_hash!==expected||
+     d.work_item?.inputs?.draft!==true||
+     d.work_item?.inputs?.production_merge_permitted!==false||
+     d.approval_recorded!==false||d.draft_pr_created!==false||
+     d.installation_authorized!==false||d.external_action_performed!==false||
+     d.original_job_completed!==false||!d.grounding_proof)
+   throw Error('EXACT_ORIGINAL_DRAFT_APPROVAL_SCOPE_INVALID');
+  draftPrepared=d;
+  $('draftDetail').hidden=false;
+  $('draftDetail').textContent='Action: Create a reviewed DRAFT PR only' +
+   ' · Original job: '+WORK+
+   ' · Repository: '+String(d.target_repository)+
+   ' · Base: '+String(d.target_base)+
+   ' · Exact candidate SHA-256: '+expected+
+   ' · Warrant: '+String(d.warrant_id)+
+   ' · Installation approved: NO';
+  $('draftState').textContent='Exact draft action prepared. Review the scope, then approve separately. No GitHub write performed.';
+ }catch(e){
+  $('draftState').textContent='Draft preparation stopped: '+String(e.message)+'. No GitHub write or installation occurred.';
+ }finally{busy=false;$('refresh').disabled=false;
+  $('prepareDraft').disabled=locked||draftLocked||snapshot?.warranted_upgrade_ready!==true||
+   snapshot?.verified_draft_ready===true;
+  $('approveDraft').disabled=!draftPrepared||draftLocked;
+ }
+}
+async function approveGovernedDraft(){
+ if(busy||locked||draftLocked||!draftPrepared||draftApproval)return;
+ if(!window.confirm('Approve Reality to CREATE ONE DRAFT PR for ORIGINAL job #143 using candidate SHA-256 '+
+   draftPrepared.expected_candidate_hash+'?\n\nThis records approval only. No GitHub write, merge, installation, or settlement occurs until you separately select Run.'))return;
+ busy=true;disabledAll(true);
+ $('draftState').textContent='Recording signed-in, goal-bound approval for this exact draft action only…';
+ try{
+  const d=await json('/api/reality/personal-action-authority',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    conversation_id:conv,work_item:draftPrepared.work_item,
+    grounding_proof:draftPrepared.grounding_proof,
+    confirmation:'APPROVE_THIS_EXACT_WORK_ITEM'})
+  });
+  if(d.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+     d.action_approved_for_this_exact_goal!==true||
+     d.external_action_performed!==false||
+     d.execution_authorized_by_approval_alone!==false)
+   throw Error('EXACT_DRAFT_OWNER_APPROVAL_UNVERIFIED');
+  draftApproval=true;
+  $('draftState').textContent='Exact draft action approved. No GitHub write yet. Run once separately to create the draft PR.';
+ }catch(e){
+  $('draftState').textContent='Draft approval unresolved: '+String(e.message)+'. Refresh before proceeding.';
+  draftLocked=true;
+ }finally{busy=false;$('refresh').disabled=false;
+  $('runDraft').disabled=!draftApproval||draftLocked;
+ }
+}
+async function executeGovernedDraft(){
+ if(busy||locked||draftLocked||!draftApproval||!draftPrepared)return;
+ if(!window.confirm('Run ONE previously approved Reality draft PR creation on GitHub for the original job?\n\nThis may create a branch, commit two extension files, and open a DRAFT PR. It does NOT merge, install, or complete the job. Do not retry if the result is uncertain.'))return;
+ draftLocked=true;busy=true;disabledAll(true);
+ $('draftState').textContent='Reality is consuming its single-use owner authorization for the exact draft action. No automatic retry…';
+ try{
+  const d=await json('/api/reality/personal-original-governed-draft',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'DISPATCH_ONE_OWNER_APPROVED_GOVERNED_DRAFT',
+    original_work_id:WORK,conversation_id:conv,
+    expected_candidate_hash:draftPrepared.expected_candidate_hash,
+    grounding_proof:draftPrepared.grounding_proof,
+    execution_confirmation:'EXECUTE_ONE_EXACT_VERIFIED_UPGRADE_DRAFT_PR'
+   })
+  });
+  if(d.original_work_id!==WORK||d.original_job_completed!==false)
+   throw Error('DRAFT_DISPATCH_ORIGINAL_WORK_NOT_VERIFIED');
+  if(d.status==='DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED'&&
+     d.draft_durably_recorded===true&&
+     d.independently_reobserved===true&&
+     d.candidate_hash===draftPrepared.expected_candidate_hash){
+   $('draftState').textContent='Reality created and independently verified draft PR #'+String(d.github_pr_number)+
+    ', then recorded the original-job receipt. Installation still requires a separate approval.';
+  }else{
+   $('draftState').textContent='Draft dispatch not verified: '+String(d.status)+
+    '. Do NOT retry. Independently inspect GitHub and Continuity first.';
+  }
+ }catch(e){
+  $('draftState').textContent='Draft creation or readback unresolved: '+String(e.message)+
+   '. Do NOT retry automatically; an external GitHub effect may have occurred.';
+ }finally{
+  busy=false;$('refresh').disabled=false;
+  $('verifyFinal').disabled=false;$('runDraft').disabled=true;
+ }
 }
 async function findOriginalConversation(){
  const d=await json('/api/reality/personal-unfinished-work');
@@ -370,6 +493,9 @@ async function execute(){
 $('refresh').addEventListener('click',refresh);
 $('realityActivity').addEventListener('click',loadRealityAutonomousActivity);
 $('verifyWarrant').addEventListener('click',verifyOriginalExecutorWarrant);
+$('prepareDraft').addEventListener('click',prepareGovernedDraft);
+$('approveDraft').addEventListener('click',approveGovernedDraft);
+$('runDraft').addEventListener('click',executeGovernedDraft);
 $('verifyExecutor').addEventListener('click',verifyOriginalExecutor);
 $('verifyFinal').addEventListener('click',refresh);
 $('prepareInstall').addEventListener('click',()=>prepare('INSTALL'));
