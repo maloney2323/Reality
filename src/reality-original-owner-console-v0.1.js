@@ -76,9 +76,6 @@ async function githubJson(path,fetchImpl=fetch){
  const res=await fetchImpl(ROOT+path,{
   method:'GET',redirect:'error',
   headers,
-  /*
-   'User-Agent':'Reality-Original-Owner-Repair-Console',
-   'X-GitHub-Api-Version':'2022-11-28'}, */
   signal:AbortSignal.timeout(12000),
  });
  if(!res?.ok)fail('OWNER_GITHUB_READBACK_FAILED');
