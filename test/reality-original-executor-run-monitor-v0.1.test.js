@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {projectOriginalExecutorRun,projectAcceptedOriginalExecutorRun,projectLiveOriginalExecutorRun} from '../src/reality-original-executor-run-monitor-v0.1.js';
+import {projectOriginalExecutorRun,projectAcceptedOriginalExecutorRun,projectLiveOriginalExecutorRun,projectVerifiedOriginalExecutorPackage} from '../src/reality-original-executor-run-monitor-v0.1.js';
 const work='work:24cda9611404e9bcb47909976067605c';
 const run=()=>({
  id:40755665295,name:'Reality ORIGINAL Autonomous Executor Synthesis v0.1',
@@ -92,4 +92,29 @@ test('real model generated executor on original GitHub current source is read-on
  assert.throws(()=>projectLiveOriginalExecutorRun({run:r,jobs:[{...j,conclusion:'failure'}]}));
  assert.throws(()=>projectLiveOriginalExecutorRun({run:{...r,head_sha:'f'.repeat(40)},jobs:[j]}));
  assert.throws(()=>projectLiveOriginalExecutorRun({run:{...r,repository:{full_name:'someone/Reality'}},jobs:[j]}));
+});
+
+test('verified model-generated two-file package is pinned to independent green 14-case CI, without warrant or installation',()=>{
+ const r=run();
+ r.id=40762950798;
+ r.name='Reality Corrected Original Executor Frozen and Holdout Verification v0.3';
+ r.head_sha='52de4566fd1317e53c62615b69fc847803512e92';
+ r.html_url='https://github.com/maloney2323/Reality/actions/runs/40762950798';
+ r.path='.github/workflows/reality-original-executor-corrected-holdout-recheck-v0.3.yml';
+ r.conclusion='success';
+ const job={name:'verify-original-model-executor',status:'completed',conclusion:'success'};
+ const result=projectVerifiedOriginalExecutorPackage({run:r,jobs:[job]});
+ assert.equal(result.original_work_id,work);
+ assert.equal(result.installation_package_verified,true);
+ assert.equal(result.independent_behavioral_cases_passed,10);
+ assert.equal(result.independent_security_holdout_passed,4);
+ assert.equal(result.installable_candidate_sha256,'88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2');
+ assert.equal(result.owner_warrant_issued,false);
+ assert.equal(result.owner_install_authorized,false);
+ assert.equal(result.installed_capability,false);
+ assert.equal(result.original_job_completed,false);
+ assert.throws(()=>projectVerifiedOriginalExecutorPackage({run:{...r,conclusion:'failure'},jobs:[job]}));
+ assert.throws(()=>projectVerifiedOriginalExecutorPackage({run:r,jobs:[{...job,conclusion:'failure'}]}));
+ assert.throws(()=>projectVerifiedOriginalExecutorPackage({run:{...r,head_sha:'f'.repeat(40)},jobs:[job]}));
+ assert.throws(()=>projectVerifiedOriginalExecutorPackage({run:{...r,repository:{full_name:'untrusted/repo'}},jobs:[job]}));
 });
