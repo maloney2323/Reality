@@ -318,22 +318,34 @@ export async function inspectOriginalOwnerConsole({
 }={}){
  const ctx=await context({session,conversationId,env});
  const github=await observe();
- let verifiedWarrant=false,readyBlocker='OWNER_SCOPED_WARRANT_AND_GOVERNED_DRAFT_MISSING';
+ let verifiedWarrant=false,verifiedDraft=false,readyBlocker='OWNER_SCOPED_WARRANT_AND_GOVERNED_DRAFT_MISSING';
  let verifiedInstall=false,verifiedSettlement=false,settlementReceiptId=null;
- // Historical completion must remain verifiable even after the preparer
- // correctly refuses further upgrade issuance for already-completed work.
  const priorSettlement=await reobserveOriginalOwnerSettlement(ctx);
  if(priorSettlement){
-  verifiedWarrant=true;verifiedInstall=true;verifiedSettlement=true;
+  verifiedWarrant=true;verifiedDraft=true;verifiedInstall=true;verifiedSettlement=true;
   settlementReceiptId=priorSettlement.settlement_receipt_id;
   readyBlocker=null;
  }else if(ctx.owner_goal_confirmed){
-  try {
-   const p=await readyPlan({session,conversationId,env});
-   if(p?.state==='AWAITING_SEPARATE_INSTALLATION_AUTHORIZATION'){
-    verifiedWarrant=true;readyBlocker=null;
-   }
+  try{
+   const warrant=await loadAuthenticatedWarrantedUpgrade({
+    session,conversationId,originalWorkId:ORIGINAL_OWNER_WORK_ID,env,
+   });
+   if(warrant?.persisted_and_reobserved!==true||
+      warrant?.verified_not_authorized!==true||
+      warrant?.external_action_authorized!==false||
+      warrant?.original_job_completed!==false)
+    fail('OWNER_CONSOLE_WARRANT_REOBSERVATION_INVALID');
+   verifiedWarrant=true;
+   readyBlocker='UPGRADE_DRAFT_RECEIPT_OWNER_DURABLE_SOURCE_MISSING';
   }catch(e){readyBlocker=cleanError(e)}
+  if(verifiedWarrant){
+   try{
+    const p=await readyPlan({session,conversationId,env});
+    if(p?.state==='AWAITING_SEPARATE_INSTALLATION_AUTHORIZATION'){
+     verifiedDraft=true;readyBlocker=null;
+    }
+   }catch(e){readyBlocker=cleanError(e)}
+  }
  }
  if(verifiedWarrant&&!verifiedSettlement){
   // Neither a GitHub merge nor a ledger row proves installed runtime.
