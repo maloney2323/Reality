@@ -300,5 +300,7 @@ test('auto-discovery is a bounded same-origin authenticated internal diagnosis, 
  assert.match(script,/RUN_AND_RECORD_RECOVERY_DIAGNOSIS/);
  assert.match(script,/capability_candidate_saved===true/);
  assert.match(script,/Reality discovered an original-job capability upgrade candidate/);
+ assert.match(script,/Recovery · 4 of 7 stages verified/);
+ assert.match(script,/Stage 5: sandbox experiment proposed, not executed/);
  assert.match(script,/void wcAutoInvestigateOriginalRepair\(safe,serial\)/);
 });
