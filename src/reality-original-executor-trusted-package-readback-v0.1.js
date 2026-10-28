@@ -18,7 +18,7 @@ const FILES=[
 ];
 const REQUIRED=['manifest.json','package.json','reality-original-maintenance-repair-proposal.mjs',
  'reality-original-maintenance-executor.mjs','independent-frozen-verification.txt',
- 'independent-security-verification.txt'];
+ 'independent-security-verification.txt','frozen-regression.txt','independent-security-holdout.txt'];
 const fail=x=>{throw Error(x)};
 const digest=x=>createHash('sha256').update(x).digest('hex');
 const exact=()=>({work_id:WORK,executor_sha256:EXECUTOR_SHA,proposal_sha256:PROPOSAL_SHA,
