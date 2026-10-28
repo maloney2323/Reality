@@ -1,0 +1,50 @@
+name: Reality Original Executor Trusted Warrant Input Readback v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-executor-trusted-readback-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reobserve-pinned-model-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Source must be parseable
+        run: node --check src/reality-original-executor-trusted-package-readback-v0.1.js
+      - name: Independently read real GitHub Actions artifact, checked against exact candidate source, both CI suites and package hash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {loadTrustedOriginalExecutorPackage,verifyOriginalExecutorPackageBytes}
+           from './src/reality-original-executor-trusted-package-readback-v0.1.js';
+          const p=await loadTrustedOriginalExecutorPackage({
+           env:{VERCEL_ENV:'preview',REALITY_GITHUB_TOKEN:process.env.GITHUB_TOKEN}
+          });
+          assert.equal(p.artifact_immutable_verified,true);
+          assert.equal(p.work_id,'work:24cda9611404e9bcb47909976067605c');
+          assert.equal(p.ci_run_id,40762950798);
+          assert.equal(p.frozen_tests.case_count,10);
+          assert.equal(p.independent_holdout.case_count,4);
+          assert.equal(p.installable_candidate_sha256,'88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2');
+          assert.equal(p.signed_warrant_issued,false);
+          assert.equal(p.installation_authorized,false);
+          assert.equal(p.original_job_completed,false);
+          console.log(JSON.stringify({status:'VERIFIED_TRUSTED_ORIGINAL_EXECUTOR_WARRANT_INPUT_ONLY',
+           original_work_id:p.work_id,run:p.ci_run_id,
+           installable_candidate_sha256:p.installable_candidate_sha256,
+           frozen_cases:p.frozen_tests.case_count,holdout_cases:p.independent_holdout.case_count,
+           signature_issued:false,installed:false,original_job_completed:false}));
+          JS
