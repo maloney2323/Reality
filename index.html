@@ -246,6 +246,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
   <div class="wc-diagnostic">
    <button type="button" id="wcFinaleReadinessCheck">Verify self-correction finale · Read only</button>
+   <button type="button" id="wcFinaleOwnerAdopt">Adopt verified finale as my owner-controlled test job</button>
    <span id="wcFinaleReadinessResult" role="status" aria-live="polite">Exact model repair is independently sandbox-verified. Owner admission, install, resumption and settlement remain separate.</span>
   </div>
  </div>
@@ -1128,6 +1129,38 @@ async function wcLoadUnfinishedWork(){
  }
 }
 $('wcRefreshUnfinished').onclick=()=>{void wcLoadUnfinishedWork()};
+$('wcFinaleOwnerAdopt').onclick=async()=>{
+ const button=$('wcFinaleOwnerAdopt'),out=$('wcFinaleReadinessResult');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||''))){
+  out.textContent='Sign in and open an existing confirmed-goal conversation before adopting this controlled test.';
+  return;
+ }
+ button.disabled=true;
+ out.textContent='Recording only historical self-correction proof in your current confirmed goal. No installation, action approval or settlement…';
+ try{
+  const response=await fetch('/api/reality/personal-controlled-finale-adopt',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conv,
+    confirmation:'ADOPT_THIS_CONTROLLED_FINALE_IN_MY_ACTIVE_GOAL'}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+     result.status!=='HISTORICAL_CONTROLLED_FINALE_OWNER_ADOPTED'||
+     result.independently_reobserved!==true||
+     result.warrant_issued!==false||
+     result.installation_authorized!==false||
+     result.original_job_completed!==false)
+   throw Error(String(result.error||'OWNER_ADOPTION_UNVERIFIED'));
+  out.textContent='Historical controlled finale evidence saved to your authenticated Continuity (receipt: '+
+   String(result.receipt_id)+'). Fresh owner-scoped sandbox re-verification and a signed warrant are still required. No installation authorized.';
+ }catch(error){
+  out.textContent='Adoption not verified: '+String(error.message||'unavailable')+
+   '. No installation or work completion occurred.';
+ }finally{button.disabled=false}
+};
 $('wcFinaleReadinessCheck').onclick=async()=>{
  const button=$('wcFinaleReadinessCheck'),out=$('wcFinaleReadinessResult');
  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
