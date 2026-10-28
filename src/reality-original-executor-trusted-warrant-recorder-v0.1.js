@@ -110,11 +110,25 @@ export function buildExactOriginalExecutorWarrantEvidence({owner,proof,baseSha}=
  });
 }
 
+// Owner evidence signing may read the pinned original GitHub base publicly.
+// This adapter is strictly GET-only, branch-pinned and never carries a write token.
+export async function readOriginalExecutorPinnedBase(path){
+ if(path!==REPO+'/git/ref/heads/'+BRANCH)
+  fail('ORIGINAL_EXECUTOR_WARRANT_UNEXPECTED_GITHUB_PATH');
+ const r=await fetch('https://api.github.com'+path,{
+  headers:{accept:'application/vnd.github+json',
+   'User-Agent':'Reality-Original-Warrant-ReadOnly'},
+  redirect:'error',signal:AbortSignal.timeout(12000),
+ });
+ if(r.status!==200)fail('ORIGINAL_EXECUTOR_WARRANT_PUBLIC_GITHUB_BASE_UNAVAILABLE');
+ return r.json();
+}
+
 export async function recordOriginalExecutorTrustedWarrant({
  session,conversationId,env=process.env,
  loadOwner=originalOwnerContext,
  loadProof=loadTrustedOriginalExecutorPackage,
- get=githubGet,
+ get=readOriginalExecutorPinnedBase,
  createPersistence=createUniversePostgresPersistence,
  resolveDb=resolveReliabilityBenchmarkDb,
 }={}){
