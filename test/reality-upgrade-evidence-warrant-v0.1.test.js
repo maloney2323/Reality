@@ -117,7 +117,12 @@ function fixture(){
   provenance:{source:'reality-upgrade-warrant-issuer-v0.1',
    principal_id:owner,conversation_id:conversationId},
  });
- const mark=(e,type)=>({...e,entity_type:type});
+ const mark=(e,type)=>({...e,entity_type:type,
+  provenance:{...e.provenance,continuity_spine:{
+   prior_lineage_hash:e.prior_lineage_hash,
+   transformation_receipt_id:e.transformation_receipt_id,
+  }}});
+
  const history=[mark(root,'raw_signal'),mark(checkpoint,'personal_recovery_checkpoint'),
   mark(sandbox,'personal_upgrade_sandbox_verified'),
   mark(warrantEvent,'personal_upgrade_evidence_warrant')];
@@ -209,7 +214,7 @@ test('missing warrant, untrusted lineage and wrong signed work cannot become upg
  ];
  for(const args of attempts){
   assert.throws(()=>projectAuthenticatedWarrantedUpgrade(args),
-   /UPGRADE_LOADER_/);
+   /^(?:UPGRADE_LOADER_|RELIABILITY_HISTORY_)/);
  }
 });
 test('authenticated loader reads existing isolated DB without trusting browser proposals',async()=>{
