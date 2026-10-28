@@ -30,7 +30,7 @@ function setup(){
   approved_candidate_hash:fingerprintGovernedUpgradeCandidate(build.files),
   operation:'github:create_isolated_upgrade_pr',
   repository:REPO,base_ref:BASE,pinned_base_sha:baseSha,
-  authorization_policy_sha:'f'.repeat(40),
+  authorization_policy_sha:'f'.repeat(64),
   production_merge_authorized:false};
  const verifiedExperiment={
   state:'SANDBOX_VERIFIED',work_item_id:work,
