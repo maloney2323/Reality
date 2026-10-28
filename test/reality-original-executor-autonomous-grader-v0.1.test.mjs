@@ -18,12 +18,12 @@ function fakeFile(text){return {type:'file',path:PATH,sha:sha(text),encoding:'ba
  content:Buffer.from(text).toString('base64')};}
 const historical=readFileSync('test/fixtures/original-repair-historical-source.snapshot.txt','utf8');
 const corrected=readFileSync('test/fixtures/original-repair-corrected-source.snapshot.txt','utf8');
-function provider(source,{moving=false,issueOpen=true}={}){
- let writes=0;let reads=0;let current=source;
+function provider(source,{moving=false,movingEarly=false,issueOpen=true}={}){
+ let writes=0;let reads=0;let current=source;let grantConsumed=false;
  const get=async path=>{
   reads++;
   if(path===REPO+'/git/ref/heads/'+REF)
-   return {ref:'refs/heads/'+REF,object:{sha:moving&&reads>3?'f'.repeat(40):SHA}};
+   return {ref:'refs/heads/'+REF,object:{sha:((moving&&grantConsumed)||(movingEarly&&reads>3))?'f'.repeat(40):SHA}};
   if(path===REPO+'/issues/143')
    return {number:143,state:issueOpen?'open':'closed',
     title:'Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures',
@@ -41,7 +41,7 @@ function provider(source,{moving=false,issueOpen=true}={}){
   current=Buffer.from(body.content,'base64').toString('utf8');
   return {commit:{sha:RESULT}};
  };
- return {get,write,get writes(){return writes},get reads(){return reads}};
+ return {get,write,markGrantConsumed(){grantConsumed=true},get writes(){return writes},get reads(){return reads}};
 }
 const session={user_id:OWNER};
 const conversationId=CONV;
@@ -132,16 +132,24 @@ test('unexpected issue state prevents any grant consumption',async()=>{
 });
 test('moving target after grant -> no write or silent retry',async()=>{
  const v=provider(historical,{moving:true}),c=consumer();
+ const afterGrant=async input=>{const consumed=await c.fn(input);v.markGrantConsumed();return consumed};
  await assert.rejects(executeOriginalMaintenanceRepair({
-  session,conversationId,get:v.get,write:v.write,consumeVerifiedGrant:c.fn}),
+  session,conversationId,get:v.get,write:v.write,consumeVerifiedGrant:afterGrant}),
  /ORIGINAL_EXECUTOR_SOURCE_MOVED_AFTER_GRANT_NO_RETRY/);
  assert.equal(v.writes,0);assert.equal(c.count,1);
 });
+test('branch moving before a one-time grant is safely rejected without consuming authority',async()=>{
+ const v=provider(historical,{movingEarly:true}),c=consumer();
+ await assert.rejects(executeOriginalMaintenanceRepair({
+  session,conversationId,get:v.get,write:v.write,consumeVerifiedGrant:c.fn}),
+ /ORIGINAL_EXECUTOR_SOURCE_MOVED_AFTER_GRANT_NO_RETRY/);
+ assert.equal(v.writes,0);assert.equal(c.count,0);
+});
 test('executor does not authorize or declare completed work on GH write response alone',()=>{
  const source=readFileSync(candidate,'utf8');
- assert.doesNotMatch(source,/original_job_completed:true/);
+ assert.doesNotMatch(source,/original_job_completed\s*:\s*true/);
  assert.match(source,/consumeVerifiedGrant/);
- assert.match(source,/source_readback_independent:true/);
- assert.match(source,/original_job_settlement_saved:false/);
+ assert.match(source,/source_readback_independent\s*:\s*true/);
+ assert.match(source,/original_job_settlement_saved\s*:\s*false/);
  assert.doesNotMatch(source,/githubWrite\(.*issues/);
 });
