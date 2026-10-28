@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-const path='/work/original-executor-installable-package/reality-original-maintenance-executor.mjs';
+const parent=process.env.REALITY_EXECUTOR_HOLDOUT_PACKAGE;
+if(!['original-executor-installable-package','original-executor-security-corrected-package'].includes(parent))
+ throw Error('ORIGINAL_EXECUTOR_HOLDOUT_EXACT_PACKAGE_NAME_REQUIRED');
+const path='/work/'+parent+'/reality-original-maintenance-executor.mjs';
 const {prepareOriginalMaintenanceRepair,executeOriginalMaintenanceRepair}
  =await import(pathToFileURL(path).href);
 const WORK='work:24cda9611404e9bcb47909976067605c';
