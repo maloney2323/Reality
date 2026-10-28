@@ -25,7 +25,7 @@ const scope=personalGoalScope({userId:user_id,conversationId});
 const spine=createContinuitySpine({
  continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:user_id,
 });
-function history({checkpoint=false,verified=true,accepted=false,ownerConfirmed=false}={}){
+function history({checkpoint=false,verified=true,accepted=false,ownerConfirmed=false,trustedHandoff=false}={}){
  const entries=[];
  const add=(stage,entity_type,payload,epistemicStatus='OBSERVED',provenance=null)=>{
   const prior=entries.at(-1);
@@ -53,7 +53,10 @@ function history({checkpoint=false,verified=true,accepted=false,ownerConfirmed=f
    inputs:{repository:'maloney2323/Reality',title:'Repair failing CI workflows'}},
   evidence_refs:['run-1','run-2'],
   authority:'NOT_GRANTED',external_action_performed:false,
- });
+ },'OBSERVED',trustedHandoff?{
+  source:'reality-personal-discovered-work-handoff-v0.1',
+  principal_id:user_id,conversation_id:conversationId,
+ }:null);
  const outcome=add('OUTCOME','personal_issue_execution_outcome',{
   work_id:work,goal_id:goalId,
   source_receipt_id:discovery.event_id,reservation_id:randomUUID(),
@@ -254,7 +257,7 @@ test('read-only list endpoint has authenticated session and cannot create work',
 });
 
 test('original-worldline capability investigation receipt survives reload without declaring repair completed',()=>{
- const events=history({checkpoint:true});
+ const events=history({checkpoint:true,trustedHandoff:true});
  const source=events.find(x=>x.entity_type==='personal_discovered_work_handoff');
  const checkpoint=events.find(x=>x.entity_type==='personal_recovery_checkpoint');
  const tail=events.at(-1),at='2026-10-28T14:12:00.000Z';
