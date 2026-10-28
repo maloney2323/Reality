@@ -119,7 +119,11 @@ jobs:
             Authorization:'Bearer '+process.env.GH_READ_ONLY_TOKEN,
           };
           const get=async path=>{
-            const response=await fetch(root+path,{method:'GET',headers,redirect:'error'});
+            const prefix='/repos/maloney2323/Reality';
+            const relative=path.startsWith(prefix+'/')?path.slice(prefix.length):path;
+            if(!relative.startsWith('/')||relative.includes('..'))
+              throw Error('UNTRUSTED_GITHUB_READ_PATH');
+            const response=await fetch(root+relative,{method:'GET',headers,redirect:'error'});
             if(!response.ok){
               console.error('PINNED_BASE_READ_HTTP_STATUS='+response.status+' SOURCE='+path.split('?')[0].replace(/[^a-zA-Z0-9\/._-]/g,'').slice(0,160));
               throw Error('GITHUB_READ_'+response.status);
