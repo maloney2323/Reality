@@ -1,0 +1,28 @@
+name: Reality Original #143 Activation Readback Contract
+on:
+  push:
+    branches:
+      - reality/integration/original-143-activation-readback-20261028
+    paths:
+      - src/reality-original-upgrade-readback-v0.1.js
+      - api/reality/personal-original-upgrade-status.js
+      - test/reality-original-upgrade-readback-v0.1.test.js
+      - .github/workflows/reality-original-activation-readback-v0.1.yml
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+permissions:
+  contents: read
+jobs:
+  original-activation-readback-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test owner-bound activation/settlement projection (no GitHub or database writes)
+        run: node --test test/reality-original-upgrade-readback-v0.1.test.js
