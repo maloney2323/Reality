@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {projectOriginalExecutorRun} from '../src/reality-original-executor-run-monitor-v0.1.js';
+import {projectOriginalExecutorRun,projectAcceptedOriginalExecutorRun} from '../src/reality-original-executor-run-monitor-v0.1.js';
 const work='work:24cda9611404e9bcb47909976067605c';
 const run=()=>({
  id:40755665295,name:'Reality ORIGINAL Autonomous Executor Synthesis v0.1',
@@ -48,4 +48,25 @@ test('wrong repository, job, event or SHA cannot impersonate Reality run',()=>{
  const y=run();y.head_sha='INVALID';
  assert.throws(()=>projectOriginalExecutorRun({run:y,jobs:[job(generate,'success'),job(sandbox,'success')]}));
  assert.throws(()=>projectOriginalExecutorRun({run:run(),jobs:[job(generate,'success'),job('fake-finish','success')]}));
+});
+
+test('Reality frozen ten-case model executor evidence requires actual exact green run and cannot imply owner installation',()=>{
+ const r=run();
+ r.id=40759263421;
+ r.name='Reality ORIGINAL Model Executor Independently Verified Behavioral Recheck v0.4';
+ r.head_sha='b9949f726d2d2cebee80bdf654767a7d0e0ba038';
+ r.html_url='https://github.com/maloney2323/Reality/actions/runs/40759263421';
+ r.path='maloney2323/Reality/.github/workflows/reality-original-model-executor-behavioral-recheck-v0.4.yml@refs/heads/feature/governed-autonomous-self-upgrading-v01-20261027';
+ r.conclusion='success';
+ const j={name:'verify-model-corrected-original-executor',status:'completed',conclusion:'success'};
+ const x=projectAcceptedOriginalExecutorRun({run:r,jobs:[j]});
+ assert.equal(x.original_work_id,work);
+ assert.equal(x.candidate_sha256,'d06ed111a121a4e1a93fb8bcfd47623e2cb60ba6a22e940ec31e0ac5b568d31d');
+ assert.equal(x.independent_behavioral_cases_passed,10);
+ assert.equal(x.owner_warrant_issued,false);
+ assert.equal(x.original_job_completed,false);
+ assert.equal(x.installed_capability,false);
+ assert.throws(()=>projectAcceptedOriginalExecutorRun({run:{...r,conclusion:'failure'},jobs:[j]}));
+ assert.throws(()=>projectAcceptedOriginalExecutorRun({run:r,jobs:[{...j,conclusion:'failure'}]}));
+ assert.throws(()=>projectAcceptedOriginalExecutorRun({run:{...r,head_sha:'f'.repeat(40)},jobs:[j]}));
 });
