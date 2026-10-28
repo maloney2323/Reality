@@ -6,7 +6,7 @@
 export const INDEPENDENT_UPGRADE_CI_GATE_VERSION='reality-independent-upgrade-ci-readback-v0.1';
 const REPO='maloney2323/Reality',ROOT='https://api.github.com/repos/'+REPO;
 const BASE='experiment/reality-live-durable-adversarial-20261025';
-const BRANCH=/^reality\\/build\\/build-[a-f0-9]{32}$/;
+const BRANCH=/^reality\/build\/build-[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const REQUIRED=Object.freeze([
