@@ -194,14 +194,20 @@ function stagePosition(s){
 }
 function guidedChoice(){
  const s=snapshot;
- if(locked||draftLocked){
-  return {label:'Read current Reality receipts · No retry',type:'review',
-   reason:'A consequential action was attempted. Reality will only inspect results; it must not automatically repeat a GitHub or installation action.'};
- }
  if(!s||!conv)return {label:'Check Reality and continue',type:'refresh',
   reason:'Sign in to Reality on this preview to load the original job and its Continuity receipts.'};
  if(s.job_settlement_verified===true)return {label:'Read verified final settlement',type:'refresh',
   reason:'Reality has independently verified the original job settlement. Read the durable receipt.'};
+ // A confirmed *new* independent stage readback supersedes the prior stage
+ // no-retry lock, but a stale snapshot can never make us dispatch again.
+ if(s.installation_verified===true)return {label:'Prepare separately authorized original-job resumption',type:'resume-prepare',
+  reason:'The installed capability has been independently verified. Reality now needs a DIFFERENT owner approval to resume original job #143.'};
+ if(s.verified_draft_ready===true)return {label:'Prepare exact installation approval',type:'install-prepare',
+  reason:'The governed draft PR has been independently verified. Installation remains a separate owner-authorized action.'};
+ if(locked||draftLocked){
+  return {label:'Read current Reality receipts · No retry',type:'review',
+   reason:'A consequential action was attempted. Reality will only inspect results; it must not automatically repeat a GitHub or installation action.'};
+ }
  if(draftApproval&&draftPrepared)return {label:'Run owner-approved draft PR once',type:'draft-run',
   reason:'Your exact draft action is approved. This will write two verified extension files to an isolated GitHub draft PR, not merge or install them.'};
  if(draftPrepared)return {label:'Review and approve exact draft PR',type:'draft-approve',
@@ -210,10 +216,7 @@ function guidedChoice(){
   reason:'One exact owner-approved action is pending. This operation may produce a consequential provider effect and will not retry automatically.'};
  if(prepared)return {label:'Approve exact '+prepared.stage.toLowerCase()+' action',type:'stage-approve',
   reason:'Review the original job, target PR and candidate hash before approving. Approval alone performs no external action.'};
- if(s.installation_verified===true)return {label:'Prepare separate original-job resumption',type:'resume-prepare',
-  reason:'Installation is recorded as verified. Reality must request a distinct approval before resuming the same original job.'};
- if(s.verified_draft_ready===true)return {label:'Prepare exact installation approval',type:'install-prepare',
-  reason:'The governed draft PR was independently reobserved. Reality must prepare a different owner-bound installation grant.'};
+
  if(s.original_goal_active===true&&s.owner_warrant_events===1&&s.sandbox_receipts===1)
   return {label:'Prepare governed draft PR',type:'draft-prepare',
    reason:'Signed evidence and sandbox receipts are saved. Reality will independently check the signature, goal and exact candidate without writing GitHub.'};
