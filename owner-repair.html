@@ -77,6 +77,13 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p class="note" role="status" aria-live="polite" id="realityActivityStatus">Owner sign-in required for source-backed Reality run status.</p>
 </div>
 <div class="shell">
+<h2>Record Reality's verified upgrade evidence</h2>
+<p>The REAL model-generated two-file original repair executor passed 10/10 frozen regression checks and 4/4 independent security holdouts. Reality independently rechecks the exact GitHub artifact, original owner goal, and Continuity lineage before recording a cryptographically signed <strong>non-authorizing</strong> evidence warrant. This is not approval to install or write GitHub.</p>
+<p class="note">Exact installable package SHA-256: <code>88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2</code>. <a href="https://github.com/maloney2323/Reality/actions/runs/40762950798" rel="noopener noreferrer" target="_blank">Independent 14/14 proof</a>.</p>
+<button id="verifyWarrant" type="button" disabled>Verify package and record signed evidence warrant</button>
+<p id="warrantResult" class="note" role="status" aria-live="polite">Sign in and let Reality verify the exact original package first. No installation authority granted.</p>
+</div>
+<div class="shell">
 <h2>Owner-controlled execution</h2>
 <p class="note">Every stage is tied to the same original work ID. Installation and resumption require independent, separate approvals. Reality will not use a GitHub merge as proof of final job completion.</p>
 <div class="step">
@@ -122,8 +129,8 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 'use strict';
 const WORK='work:24cda9611404e9bcb47909976067605c';
 const $=id=>document.getElementById(id);
-const buttons=['refresh','verifyExecutor','prepareInstall','approve','execute','prepareResume','verifyFinal'];
-let conv=null,snapshot=null,prepared=null,approvedStage=null,locked=false,busy=false;
+const buttons=['refresh','verifyExecutor','verifyWarrant','prepareInstall','approve','execute','prepareResume','verifyFinal'];
+let conv=null,snapshot=null,prepared=null,approvedStage=null,locked=false,busy=false,packageVerified=false;
 function output(message){$('log').textContent=String(message);}
 function status(message){$('globalState').textContent=String(message);}
 function disabledAll(value){for(const id of buttons)$(id).disabled=value;}
@@ -141,6 +148,7 @@ function render(s){
   'Exact owner-warranted plan independently verified.';
  status(s.job_settlement_verified?'Verified settled':s.warranted_upgrade_ready?'Owner approval available':'Evidence / owner gate pending');
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
+ $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||!packageVerified||s.owner_warrant_events>0;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
  $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
  $('verifyFinal').disabled=busy;
@@ -162,6 +170,8 @@ async function loadRealityAutonomousActivity(){
   if(d.original_work_id!==WORK||d.owner_warrant_issued!==false||
      d.original_job_completed!==false||d.installed_capability!==false)
    throw Error('ORIGINAL_RUN_SCOPE_OR_AUTHORITY_CHANGED');
+  packageVerified=d.installation_package_verified===true&&d.installable_candidate_sha256==='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2'&&d.independent_behavioral_cases_passed===10&&d.independent_security_holdout_passed===4;
+  $('verifyWarrant').disabled=busy||locked||!packageVerified||snapshot?.original_goal_active!==true||(snapshot?.owner_warrant_events||0)>0;
   $('realityActivityStatus').textContent='Reality: '+String(d.status)+
    ' · model generated: '+String(d.real_model_generation_verified_by_ci===true)+
    ' · independent first pass: '+String(d.first_independent_sandbox_passed===true)+
@@ -177,6 +187,36 @@ async function loadRealityAutonomousActivity(){
    '. No installation or completion is implied.';
  }finally{$('realityActivity').disabled=false;}
 }
+async function verifyOriginalExecutorWarrant(){
+ if(busy||locked||!conv||!packageVerified||snapshot?.original_goal_active!==true)return;
+ busy=true;disabledAll(true);
+ $('warrantResult').textContent='Reality is re-observing the authentic model package, independent tests, original goal and immutable Continuity lineage. No installation authority is being granted…';
+ try{
+  const result=await json('/api/reality/personal-original-executor-trusted-verification',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conv,original_work_id:WORK,
+    intent:'VERIFY_FROZEN_MODEL_PACKAGE_AND_RECORD_NON_AUTHORIZING_WARRANT'})
+  });
+  if(result.original_work_id!==WORK||
+     result.status!=='ORIGINAL_EXECUTOR_NON_AUTHORIZING_WARRANT_DURABLY_VERIFIED'||
+     result.candidate_sha256!=='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2'||
+     result.github_write_authorized!==false||
+     result.installation_authorized!==false||result.original_job_completed!==false||
+     !/^warrant:[a-f0-9]{64}$/.test(String(result.warrant_id||'')))
+    throw Error('ORIGINAL_EXECUTOR_SIGNED_RECEIPT_READBACK_INVALID');
+  $('warrantResult').textContent='Verified signed evidence warrant saved in original owner Continuity: '+
+   result.warrant_id+'. Installation and external execution remain separately gated.';
+  output('Original model-generated installation package verified and cryptographically signed.'+
+   '\nOriginal work: '+WORK+'\nCandidate: '+result.candidate_sha256+
+   '\nEvidence warrant: '+result.warrant_id+
+   '\nSandbox receipt: '+result.sandbox_receipt_id+
+   '\nInstallation approved: NO\nGitHub write performed: NO\nOriginal job settled: NO');
+ }catch(e){
+  $('warrantResult').textContent='Warrant verification stopped: '+String(e.message)+
+   '. No installation, GitHub write, or job settlement was authorized.';
+ }finally{busy=false;$('refresh').disabled=false;
+  $('verifyWarrant').disabled=true;void refresh();}
+}
 async function findOriginalConversation(){
  const d=await json('/api/reality/personal-unfinished-work');
  if(!Array.isArray(d.jobs)||!['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(d.status))
@@ -190,6 +230,7 @@ async function refresh(){
  if(busy)return;
  busy=true;disabledAll(true);stageReset();output('Reading authenticated owner Continuity and independently checking the original GitHub repair…');
  try{
+  packageVerified=false;
   conv=await findOriginalConversation();
   const url='/api/reality/personal-original-repair-owner-console?conversation_id='+
    encodeURIComponent(conv)+'&original_work_id='+encodeURIComponent(WORK);
@@ -328,6 +369,7 @@ async function execute(){
 }
 $('refresh').addEventListener('click',refresh);
 $('realityActivity').addEventListener('click',loadRealityAutonomousActivity);
+$('verifyWarrant').addEventListener('click',verifyOriginalExecutorWarrant);
 $('verifyExecutor').addEventListener('click',verifyOriginalExecutor);
 $('verifyFinal').addEventListener('click',refresh);
 $('prepareInstall').addEventListener('click',()=>prepare('INSTALL'));
