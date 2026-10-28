@@ -169,9 +169,19 @@ export function projectVerifiedOriginalExecutorPackage({run,jobs}={}){
  });
 }
 
+export async function originalExecutorReadOnlyGet(path){
+ const prefix='/repos/maloney2323/Reality/actions/';
+ if(!path.startsWith(prefix))throw Error('ORIGINAL_EXECUTOR_MONITOR_PATH_DENIED');
+ const r=await fetch('https://api.github.com'+path,{
+  headers:{accept:'application/vnd.github+json','User-Agent':'Reality-Original-Monitor'},
+  redirect:'error',signal:AbortSignal.timeout(12000),
+ });
+ if(!r.ok)throw Error('ORIGINAL_EXECUTOR_MONITOR_READ_UNAVAILABLE');
+ return r.json();
+}
 export async function inspectOriginalExecutorRun({
  session,conversationId,env=process.env,
- context=originalOwnerContext,get=githubGet
+ context=originalOwnerContext,get=originalExecutorReadOnlyGet
 }={}){
  if(env?.VERCEL_ENV!=='preview')
   fail('ORIGINAL_EXECUTOR_PREVIEW_ONLY');
