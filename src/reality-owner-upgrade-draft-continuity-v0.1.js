@@ -19,6 +19,9 @@ import {loadAuthenticatedWarrantedUpgrade}
 export const OWNER_UPGRADE_DRAFT_RECEIPT_VERSION='reality-owner-upgrade-draft-receipt-v0.1';
 const WORK=/^work:[a-f0-9]{32}$/,SHA=/^[a-f0-9]{40}$/,HASH=/^[a-f0-9]{64}$/;
 const fail=x=>{throw Error(x)};
+const stable=o=>o===null||typeof o!=='object'?o:
+ Array.isArray(o)?o.map(stable):Object.fromEntries(Object.keys(o).sort().map(k=>[k,stable(o[k])]));
+const canonical=o=>JSON.stringify(stable(o));
 async function context({
  session,conversationId,originalWorkId,env,readGoal,createPersistence,
 }){
@@ -144,7 +147,7 @@ export async function saveOwnerUpgradeDraftReceipt({
  if(exists.length>1)fail('UPGRADE_DRAFT_RECEIPT_DUPLICATE');
  if(exists.length){
   if(!validateEvent(exists[0],scope,originalWorkId,session,conversationId)||
-     JSON.stringify(exists[0].payload)!==JSON.stringify(payload))
+     canonical(exists[0].payload)!==canonical(payload))
    fail('UPGRADE_DRAFT_RECEIPT_CONFLICT');
   return Object.freeze({...payload,receipt_id:id,durably_recorded:true,
    independently_reobserved:true,already_recorded:true});
@@ -170,7 +173,7 @@ export async function saveOwnerUpgradeDraftReceipt({
  const saved=confirmed.find(e=>e.event_id===id);
  if(!validateEvent(saved,scope,originalWorkId,session,conversationId)||
     saved.parent_event_id!==last.event_id||
-    JSON.stringify(saved.payload)!==JSON.stringify(payload))
+    canonical(saved.payload)!==canonical(payload))
   fail('UPGRADE_DRAFT_RECEIPT_PROVIDER_READBACK_FAILED');
  return Object.freeze({...payload,receipt_id:id,durably_recorded:true,
   independently_reobserved:true,already_recorded:false});
