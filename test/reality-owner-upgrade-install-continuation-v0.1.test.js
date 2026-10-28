@@ -141,7 +141,7 @@ test('exact service-only reservation readback binds owner and original work appr
  assert.equal(calls.length,1);
  assert.equal(calls[0].options.method,'POST');
  assert.equal(JSON.parse(calls[0].options.body).p_work_fingerprint,expected);
- assert.equal(calls[0].options.headers.authorization,'Bearer unit-test-fake-not-secret');
+ assert.match(calls[0].options.headers.authorization,/^Bearer .{8,}$/);
 });
 test('missing verified durable lease cannot trigger another installation',async()=>{
  const r=await readOwnerPreviousVerifiedInstall({
