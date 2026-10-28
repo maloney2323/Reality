@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import {connectOwnerGithubUpgradeToClosure}
  from '../src/reality-owner-upgrade-github-live-ports-v0.1.js';
 const methods=['consumeInstallGrant','register','readRegistry','readFreshGoal',
- 'consumeResumeGrant','resumeOriginal','observeOriginal','appendSettlement',
- 'readSettlement'];
+ 'consumeResumeGrant','resumeOriginal','observeOriginal'];
 function portGroup(){
  const result={};for(const m of methods)result[m]=async()=>({name:m});
  return result;
@@ -18,9 +17,12 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
    consumeResumeGrant:prior.consumeResumeGrant},
   runtimePorts:{register:prior.register,readRegistry:prior.readRegistry,
    resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal},
-  continuityPorts:{readFreshGoal:prior.readFreshGoal,appendSettlement:prior.appendSettlement,
-   readSettlement:prior.readSettlement},
+  continuityPorts:{readFreshGoal:prior.readFreshGoal},
   install,observe,
+  appendSettlement:async a=>{calls.push(['settle',a]);return {receipt_id:'receipt:123'}},
+  readSettlement:async a=>{calls.push(['readSettlement',a]);return {
+   settlement_receipt_id:'receipt:123',independently_reobserved:true}},
+
  });
  assert.equal(Object.isFrozen(ports),true);
  for(const m of methods)assert.equal(ports[m],prior[m]);
@@ -34,6 +36,14 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
  assert.equal(calls[1][1].originalWorkId,scope.workId);
  assert.equal(calls[1][1].conversationId,scope.conversationId);
  assert.deepEqual(calls[1][1].issued,installed);
+ const receipt=await ports.appendSettlement({session,scope,plan,installed,
+  active:{},outcome:{},env});
+ const saved=await ports.readSettlement({session,scope,plan,receipt,outcome:{},env});
+ assert.equal(saved.independently_reobserved,true);
+ assert.deepEqual(calls.map(x=>x[0]),['install','observe','settle','readSettlement']);
+ await assert.rejects(ports.readSettlement({
+  session,scope,plan,receipt:{receipt_id:'wrong'},env,
+ }),/UPGRADE_LIVE_SETTLEMENT_READBACK_RECEIPT_MISMATCH/);
 });
 test('missing a real authority, registry or original job adapter fails before any write',()=>{
  const ports=portGroup();
