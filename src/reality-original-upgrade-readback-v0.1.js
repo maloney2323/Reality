@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {readFreshPersonalGoalState} from './reality-personal-goal-readback-v0.1.js';
 import {createUniversePostgresPersistence} from './reality-universe-postgres-persistence-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
-import {createContinuitySpine} from './reality-continuity-spine-v2.0.js';
+import {createContinuitySpine,continuityUuidFromSource} from './reality-continuity-spine-v2.0.js';
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {githubGet} from './reality-connector-github-v1.0.js';
@@ -15,6 +15,9 @@ const BRANCH='experiment/reality-live-durable-adversarial-20261025';
 const REPO='/repos/maloney2323/Reality';
 const MODEL_SHA='7ba3cc3273c2301c6902b6b3b3d6d0247e8b6abe0398467656e5e2ca93648128';
 const MODEL_PATH='src/reality-extensions/reality-original-maintenance-executor.mjs';
+export const ORIGINAL_CAPABILITY_ID=continuityUuidFromSource('reality.original-repair-execution');
+export const ORIGINAL_CAPABILITY_VERSION='original-repair-executor-1';
+const LIVE_RUN='https://github.com/maloney2323/Reality/actions/runs/40777160879';
 const ISSUE_TITLE='Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures';
 function fail(code){throw Error(code)}
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -24,7 +27,7 @@ function matchingEvent(event,type,ownerId,goalId){
   event.payload?.owner_id===ownerId &&
   event.payload?.original_goal_id===goalId;
 }
-export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goalId}={}){
+export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goalId,registryRecord=null}={}){
  if(!validUuid(ownerId)||!goalId||!Array.isArray(events)||!github)
   fail('ORIGINAL_UPGRADE_PROJECTION_INPUT_INVALID');
  const accepted=events.find(e=>matchingEvent(e,'personal_original_repair_owner_acceptance',ownerId,goalId) &&
@@ -42,7 +45,21 @@ export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goa
   e.payload?.target_branch===BRANCH &&
   e.payload?.runtime_activation_verified===true &&
   e.payload?.registration_readback_verified===true);
- const settled=registered&&events.find(e=>matchingEvent(e,'personal_original_job_final_settlement',ownerId,goalId) &&
+ // The source-attested Continuity registration receipt is necessary but not
+ // sufficient: independently retrieve the owner registry's exact active row.
+ const registryRowVerified=!!registered&&
+  registryRecord?.capability_id===ORIGINAL_CAPABILITY_ID&&
+  registryRecord?.capability_version===ORIGINAL_CAPABILITY_VERSION&&
+  registryRecord?.status==='ACTIVE'&&
+  registryRecord?.admitted_event_id===registered.event_id&&
+  registryRecord?.verification_basis?.owner_id===ownerId&&
+  registryRecord?.verification_basis?.original_goal_id===goalId&&
+  registryRecord?.verification_basis?.original_work_id===ORIGINAL_WORK&&
+  registryRecord?.verification_basis?.source_sha256===MODEL_SHA&&
+  registryRecord?.verification_basis?.target_branch===BRANCH&&
+  registryRecord?.verification_basis?.independent_live_run_ref===LIVE_RUN&&
+  registryRecord?.procedure?.runtime_import_verified===true;
+ const settled=registryRowVerified&&registered&&events.find(e=>matchingEvent(e,'personal_original_job_final_settlement',ownerId,goalId) &&
   e.payload?.registration_receipt_id===registered.event_id &&
   e.payload?.outcome==='HISTORICAL_SOURCE_ALREADY_FIXED_INDEPENDENTLY_RECONCILED' &&
   e.payload?.original_job_completed===true &&
@@ -58,7 +75,7 @@ export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goa
   github.issue_state==='open';
  let nextAction='RECHECK_LIVE_GITHUB_AND_INSTALLED_BYTES';
  if(githubReady) nextAction=!accepted?'SOURCE_ACCEPTANCE_REQUIRED':
-  !registered?'AWAIT_EXPLICIT_OWNER_ACTIVATION_AND_DURABLE_REGISTRATION':
+  !registryRowVerified?'AWAIT_EXPLICIT_OWNER_ACTIVATION_AND_DURABLE_REGISTRATION':
   !settled?'RESUME_AND_DURABLY_SETTLE_ORIGINAL_JOB':'FINISHED_VERIFIED';
  return Object.freeze({
   version:ORIGINAL_UPGRADE_STATUS_VERSION, original_work_id:ORIGINAL_WORK,
@@ -70,7 +87,9 @@ export function projectOriginalCapabilityReadiness({events=[],github,ownerId,goa
   historical_source_fix_already_present:githubReady,
   preexisting_owner_evidence_acceptance_verified:!!accepted,
   prior_warrant_does_not_authorize_installation:!!warrant,
-  owner_capability_registry_registered:!!registered&&githubReady,
+  owner_capability_registry_registered:registryRowVerified&&githubReady,
+  owner_capability_registry_record_verified:registryRowVerified&&githubReady,
+  owner_capability_registry_version:ORIGINAL_CAPABILITY_VERSION,
   original_job_final_settlement_persisted:!!settled&&githubReady,
   full_original_job_completed:!!settled&&githubReady,
   owner_activation_receipt_id:registered?.event_id||null,
@@ -111,10 +130,12 @@ export async function inspectAuthenticatedOriginalCapabilityReadiness({
  });
  if(spine.continuity_root_id!==goal.state.continuity_root_id)
   fail('ORIGINAL_UPGRADE_CONTINUITY_SCOPE_CHANGED');
- const [history,ref,pr156,pr157,issue,run]=await Promise.all([
-  createPersistence({...db}).reconstruct({
+ const store=createPersistence({...db});
+ const [history,registryRecord,ref,pr156,pr157,issue,run]=await Promise.all([
+  store.reconstruct({
    continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id,
   }),
+  store.getCapability(ORIGINAL_CAPABILITY_ID,ORIGINAL_CAPABILITY_VERSION),
   get(REPO+'/git/ref/heads/'+BRANCH),
   get(REPO+'/pulls/156'),
   get(REPO+'/pulls/157'),
@@ -137,7 +158,7 @@ export async function inspectAuthenticatedOriginalCapabilityReadiness({
  return Object.freeze({
   ...projectOriginalCapabilityReadiness({
    events:orderContinuityHistory(history),github,
-   ownerId:session.user_id,goalId:goal.state.active_goal_id,
+   ownerId:session.user_id,goalId:goal.state.active_goal_id,registryRecord,
   }),
   github_branch_head_sha:head,provider_checked_at:new Date().toISOString(),
  });
