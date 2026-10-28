@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {issueUpgradeEvidenceWarrant,hashUpgradeEvidence}
  from '../src/reality-upgrade-evidence-warrant-v0.1.js';
@@ -102,6 +102,15 @@ function fakeGitHub({tamperPr=false,failWrite=false,missingWorkflow=false,badWor
   '    steps:',
   '      - run: echo verified',
  ].join('\n')+'\n';
+ const workflow=badWorkflow?
+  ciYaml.replaceAll("'src/reality-extensions/**'","'src/other/**'"):ciYaml;
+ const workflowBytes=Buffer.from(workflow);
+ const workflowBlobSha=createHash('sha1')
+  .update('blob '+workflowBytes.length+'\0').update(workflowBytes).digest('hex');
+ const ciPaths=[
+  '.github/workflows/reality-governed-autonomous-upgrade-v01.yml',
+  '.github/workflows/reality-governed-execution-engine-v0.1.yml',
+ ];
  const state={branch:null,head:shaA,files:new Map(),pr:null,writes:[],gets:0};
  const get=async path=>{
   state.gets++;
@@ -109,13 +118,13 @@ function fakeGitHub({tamperPr=false,failWrite=false,missingWorkflow=false,badWor
    return {ref:'refs/heads/'+BASE,object:{sha:shaA}};
   if(path===ROOT+'/git/ref/heads/'+state.branch)
    return {ref:'refs/heads/'+state.branch,object:{sha:state.head}};
-  if(path.startsWith(ROOT+'/contents/.github/workflows/')){
-   if(missingWorkflow)throw Object.assign(Error('NO_CI_WORKFLOW'),{status:404});
-   const workflow=badWorkflow?ciYaml.replaceAll("'src/reality-extensions/**'","'src/other/**'"):ciYaml;
-   const filePath=path.slice((ROOT+'/contents/').length).split('?')[0];
-   return {type:'file',path:filePath,encoding:'base64',sha:shaA,
-     content:Buffer.from(workflow).toString('base64')};
-  }
+  if(path===ROOT+'/git/trees/'+shaA+'?recursive=1')
+   return {truncated:false,tree:missingWorkflow?[
+    {path:ciPaths[1],type:'blob',mode:'100644',sha:workflowBlobSha}
+   ]:ciPaths.map(path=>({path,type:'blob',mode:'100644',sha:workflowBlobSha}))};
+  if(path===ROOT+'/git/blobs/'+workflowBlobSha)
+   return {sha:workflowBlobSha,encoding:'base64',size:workflowBytes.length,
+    content:workflowBytes.toString('base64')};
   if(path.startsWith(ROOT+'/contents/')){
    const p=path.slice((ROOT+'/contents/').length).split('?')[0];
    if(!state.files.has(p)){const e=Error('GITHUB_CONNECTOR_404');e.status=404;throw e;}
