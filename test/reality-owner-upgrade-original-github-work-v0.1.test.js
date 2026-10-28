@@ -126,7 +126,9 @@ test('real original action uses existing GitHub connector and separate independe
  assert.equal(h.effects[0].path,ROOT+'/issues');
  const r=await observeOriginalOwnerGithubWork({...h.args,resumed:issued});
  assert.equal(r.independent,true);
- assert.equal(r.original_job_completed,true);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.original_tracking_action_completed,true);
+ assert.equal(r.underlying_maintenance_repair_completed,false);
  assert.equal(r.original_work_id,workId);
  assert.equal(r.evidence_ref,issue.html_url);
  assert.equal(r.original_action_operation,'github:create_issue');
@@ -186,5 +188,6 @@ test('the underlying repair described IN the issue is not claimed complete by is
  assert.equal(r.original_action_operation,'github:create_issue');
  assert.equal(r.original_action_verified,true);
  assert.equal(r.evidence_ref,'https://github.com/'+REPO+'/issues/333');
- assert.equal(r.maintenance_repair_completed,undefined);
+ assert.equal(r.underlying_maintenance_repair_completed,false);
+ assert.equal(r.original_job_completed,false);
 });
