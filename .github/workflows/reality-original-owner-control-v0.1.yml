@@ -5,6 +5,9 @@ on:
       - feature/governed-autonomous-self-upgrading-v01-20261027
     paths:
       - 'src/reality-original-owner-console-v0.1.js'
+      - 'src/reality-original-governed-draft-prepare-v0.1.js'
+      - 'api/reality/personal-original-governed-draft.js'
+      - 'test/reality-original-governed-draft-prepare-v0.1.test.js'
       - 'src/reality-original-executor-trusted-package-readback-v0.1.js'
       - 'src/reality-original-executor-trusted-warrant-recorder-v0.1.js'
       - 'api/reality/personal-original-executor-trusted-verification.js'
@@ -67,6 +70,11 @@ jobs:
         run: node --test test/reality-original-owner-verifier-v0.1.test.js
       - name: Verify source-backed model-run status never claims owner authorization or completion
         run: node --test test/reality-original-executor-run-monitor-v0.1.test.js
+      - name: Independently test original governed draft preparation requires signed owner warrant and causes NO GitHub writes
+        run: |
+          node --check api/reality/personal-original-governed-draft.js
+          node --check src/reality-original-governed-draft-prepare-v0.1.js
+          node --test test/reality-original-governed-draft-prepare-v0.1.test.js
       - name: Independently test non-authorizing evidence HMAC warrant on original goal and separate holdout
         run: node --test test/reality-original-executor-trusted-warrant-recorder-v0.1.test.mjs
       - name: Independently verify the real original model source and historical fix from GitHub
