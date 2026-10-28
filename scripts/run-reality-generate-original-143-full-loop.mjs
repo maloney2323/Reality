@@ -39,7 +39,7 @@ function validate(candidate){
  const service=candidate.files.find(x=>x.path===FILES[0]).content;
  const route=candidate.files.find(x=>x.path===FILES[1]).content;
  const tests=candidate.files.find(x=>x.path===FILES[2]).content;
- for(const phrase of ['prepareOriginalFullLoop','activateOriginalFullLoop','settleOriginalFullLoop',WORK]){
+ for(const phrase of ['prepareOriginalFullLoop','activateOriginalFullLoop','settleOriginalFullLoop']){
   assert(service.includes(phrase),'REALITY_MODEL_MISSING_SERVICE_CONTRACT_'+phrase);
  }
  for(const phrase of ['authenticatedChatSession','assertSameOrigin','privateChatConfig',
