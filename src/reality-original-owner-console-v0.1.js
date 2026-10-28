@@ -254,6 +254,60 @@ export async function prepareOriginalOwnerStage({
  });
 }
 
+
+// A completed upgrade cannot be re-read via the *preinstallation* loader
+// (which correctly refuses work already settled). Verify a final result from
+// the full ordered owner Continuity, the original warrant/draft lineage, and
+// the actual independently observable GitHub merge instead.
+async function reobserveOriginalOwnerSettlement(ctx){
+ const events=ctx.relevant.filter(e=>
+  e.entity_type==='personal_original_job_settlement'&&
+  e.payload?.original_work_id===ORIGINAL_OWNER_WORK_ID);
+ if(events.length===0)return null;
+ if(events.length!==1)fail('OWNER_CONSOLE_CONFLICTING_SETTLEMENT_EVENTS');
+ const e=events[0],p=e.payload;
+ if(e.event_kind!=='OUTCOME'||e.epistemic_status!=='VERIFIED'||
+  e.provenance?.source!=='reality-owner-upgrade-original-job-settlement-v0.1'||
+  e.provenance?.principal_id!==ctx.owner_id||
+  e.provenance?.conversation_id!==ctx.conversation_id||
+  p?.owner_id!==ctx.owner_id||p.conversation_id!==ctx.conversation_id||
+  p.original_job_completed!==true||p.independent!==true||
+  p.production_deployment_performed!==false||
+  !/^[a-f0-9]{64}$/.test(String(p.candidate_sha256||''))||
+  !/^[a-f0-9]{40}$/.test(String(p.head_sha||''))||
+  !/^[a-f0-9]{40}$/.test(String(p.merge_commit_sha||''))||
+  typeof p.execution_receipt_id!=='string'||!p.execution_receipt_id||
+  typeof p.evidence_ref!=='string'||!p.evidence_ref||
+  !e.evidence_refs?.includes(p.evidence_ref))
+  fail('OWNER_CONSOLE_COMPLETION_EVIDENCE_INVALID');
+ const drafts=ctx.relevant.filter(x=>
+  x.entity_type==='personal_upgrade_draft_pr_verified'&&
+  x.payload?.original_work_id===ORIGINAL_OWNER_WORK_ID&&
+  x.payload?.candidate_sha256===p.candidate_sha256&&
+  x.payload?.github_commit_sha===p.head_sha);
+ const warrants=ctx.relevant.filter(x=>
+  x.entity_type==='personal_upgrade_evidence_warrant'&&
+  x.payload?.original_work_id===ORIGINAL_OWNER_WORK_ID);
+ if(drafts.length!==1||warrants.length!==1||
+    !Number.isSafeInteger(drafts[0].payload.github_pr_number))
+  fail('OWNER_CONSOLE_SAVED_WARRANT_OR_DRAFT_MISSING');
+ const actual=await githubJson('/pulls/'+drafts[0].payload.github_pr_number);
+ if(actual?.number!==drafts[0].payload.github_pr_number||
+    actual?.state!=='closed'||actual?.merged!==true||
+    actual?.head?.sha!==p.head_sha||
+    actual?.merge_commit_sha!==p.merge_commit_sha||
+    actual?.base?.repo?.full_name!==REPO||
+    actual?.base?.ref!=='experiment/reality-live-durable-adversarial-20261025')
+  fail('OWNER_CONSOLE_EXTERNAL_INSTALL_NOT_REOBSERVED');
+ return Object.freeze({
+  settlement_receipt_id:e.event_id,
+  independently_reobserved:true,
+  original_job_completed:true,
+  installed_commit_sha:p.merge_commit_sha,
+  original_execution_receipt_id:p.execution_receipt_id,
+ });
+}
+
 export async function inspectOriginalOwnerConsole({
  session,conversationId,env=process.env,
  context=originalOwnerContext,observe=observeGithub,
@@ -261,7 +315,15 @@ export async function inspectOriginalOwnerConsole({
  const ctx=await context({session,conversationId,env});
  const github=await observe();
  let verifiedWarrant=false,readyBlocker='OWNER_SCOPED_WARRANT_AND_GOVERNED_DRAFT_MISSING';
- if(ctx.owner_goal_confirmed){
+ let verifiedInstall=false,verifiedSettlement=false,settlementReceiptId=null;
+ // Historical completion must remain verifiable even after the preparer
+ // correctly refuses further upgrade issuance for already-completed work.
+ const priorSettlement=await reobserveOriginalOwnerSettlement(ctx);
+ if(priorSettlement){
+  verifiedWarrant=true;verifiedInstall=true;verifiedSettlement=true;
+  settlementReceiptId=priorSettlement.settlement_receipt_id;
+  readyBlocker=null;
+ }else if(ctx.owner_goal_confirmed){
   try {
    const p=await readyPlan({session,conversationId,env});
    if(p?.state==='AWAITING_SEPARATE_INSTALLATION_AUTHORIZATION'){
@@ -269,8 +331,7 @@ export async function inspectOriginalOwnerConsole({
    }
   }catch(e){readyBlocker=cleanError(e)}
  }
- let verifiedInstall=false,verifiedSettlement=false;
- if(verifiedWarrant){
+ if(verifiedWarrant&&!verifiedSettlement){
   // Neither a GitHub merge nor a ledger row proves installed runtime.
   // Only a governed, independently reconciled installation does.
   try {
@@ -309,9 +370,11 @@ export async function inspectOriginalOwnerConsole({
   sandbox_receipts:ctx.sandbox_receipts,
   owner_warrant_events:ctx.owner_warrant_events,
   saved_settlement_receipts:ctx.saved_settlement_receipts,
-  install_approval_can_prepare:flags.warranted_upgrade_ready,
+  verified_settlement_receipt_id:settlementReceiptId,
+  install_approval_can_prepare:flags.warranted_upgrade_ready&&!flags.installation_verified,
   resume_approval_can_prepare:flags.installation_verified,
-  execute_enabled:flags.warranted_upgrade_ready||flags.installation_verified,
+  execute_enabled:!flags.job_settlement_verified&&
+   (flags.warranted_upgrade_ready||flags.installation_verified),
   verified_settlement_receipt_required:true,
   no_implicit_approval:true,
  });
