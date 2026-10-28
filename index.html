@@ -128,6 +128,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-unfinished-actions a{font-size:13px;color:#b1dbff}
 .wc-unfinished-card[data-status="RECOVERY_CHECKPOINT_SAVED"]{border-color:#4d806f}
 .wc-unfinished-card[data-status="PRIOR_ACTION_UNRESOLVED"]{border-color:#94735a}
+.wc-recovery-timeline{margin-top:12px;border-top:1px solid #536b5b;padding-top:10px}
+.wc-recovery-timeline h4{font-size:15px;margin:0 0 8px}
+.wc-recovery-timeline p{font-size:12px;line-height:1.5;margin:7px 0}
+.wc-recovery-timeline a{font-size:12px;color:#b1dbff}
 .wc-completion{margin:16px 0 20px;border:1px solid #466275;background:#101b29;border-radius:16px;padding:16px}
 .wc-completion-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .wc-completion-head h3{margin:0}.wc-completion-head button{margin-top:0}
@@ -951,6 +955,10 @@ function wcUnfinishedHTML(job){
   /Reality Governed Execution Engine v0\.1/.test(String(job.title||''))?
   '<button type="button" data-repair-check="'+esc(job.work_id)+
    '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
+ const runLoop=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+  job.goal_still_current===true&&job.action_completed===true?
+  '<button type="button" data-recovery-run="'+esc(job.work_id)+
+   '" data-recovery-conversation="'+esc(job.conversation_id)+'">Run recovery loop · Review</button>':'';
  return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
   '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
   '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
@@ -959,10 +967,11 @@ function wcUnfinishedHTML(job){
     'The previous action is not independently verified.')+'</p>'+
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
-  '<div class="wc-unfinished-actions">'+action+checkRepair+link+'</div>'+
+  '<div class="wc-unfinished-actions">'+runLoop+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
+  '<div class="wc-recovery-timeline" data-recovery-timeline="'+esc(job.work_id)+'" aria-live="polite"></div>'+
   '</article>';
 }
 let wcUnfinishedReadSerial=0;
@@ -1106,6 +1115,60 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
    (/^RECOVERY_[A-Z0-9_]{4,100}$/.test(String(error?.message||''))?
     error.message:'RECOVERY_READBACK_UNAVAILABLE')+
    '). No upgrade or external action was executed.';
+ }finally{button.disabled=false}
+});
+
+
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-recovery-run]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.recoveryRun;
+ const conversationId=button.dataset.recoveryConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const card=button.closest('article');
+ const place=card?.querySelector('[data-recovery-timeline]');
+ if(!place)return;
+ button.disabled=true;
+ place.textContent='Restoring original job → checking GitHub → running capability diagnosis · No provider writes…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery-loop?conversation_id='+
+   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+   {credentials:'same-origin',cache:'no-store'});
+  const info=await response.json();
+  if(!response.ok||info.ok!==true||info.original_work_id!==workId||
+     info.original_job_completed!==false||
+     info.external_action_performed!==false||
+     info.action_authorized!==false||
+     !Array.isArray(info.timeline)||info.timeline.length!==7)
+   throw Error(info.error_code||'RECOVERY_LOOP_NOT_VERIFIED');
+  place.replaceChildren();
+  const h=document.createElement('h4');
+  h.textContent='Recovery Loop · '+info.completed_stages+' of '+info.total_stages+' stages verified';
+  place.appendChild(h);
+  for(const item of info.timeline){
+   const p=document.createElement('p');
+   p.textContent=(item.state==='VERIFIED'?'✓ ':'○ ')+
+    item.step.replaceAll('_',' ')+' · '+item.state+' — '+item.description;
+   place.appendChild(p);
+   if(item.evidence_ref&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[0-9]+$/.test(item.evidence_ref)){
+    const a=document.createElement('a');a.href=item.evidence_ref;
+    a.textContent='GitHub verification';a.rel='noopener noreferrer';a.target='_blank';
+    place.appendChild(a);
+   }
+  }
+  const closing=document.createElement('p');
+  closing.textContent='Original job remains unfinished. Next required stage: '+
+   (info.current_decision==='RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED'?
+    'Verify root cause and original job acceptance; no new upgrade required.':
+    'Verify a genuine missing capability and request fresh authorization.');
+  place.appendChild(closing);
+ }catch(e){
+  place.textContent='Unable to verify the full recovery decision ('+
+   (/^(?:LIVE_LOOP|RECOVERY)_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+    e.message:'RECOVERY_LOOP_READBACK_UNAVAILABLE')+
+   '). Original job remains unfinished. No upgrade or external action was performed.';
  }finally{button.disabled=false}
 });
 
