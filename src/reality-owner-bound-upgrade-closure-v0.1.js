@@ -6,6 +6,8 @@
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {loadAuthenticatedWarrantedUpgrade}
  from './reality-warranted-upgrade-candidate-loader-v0.1.js';
+import {loadAuthenticatedVerifiedUpgradeDraftReceipt}
+ from './reality-owner-upgrade-draft-continuity-v0.1.js';
 import {verifyUpgradeEvidenceWarrant}
  from './reality-upgrade-evidence-warrant-v0.1.js';
 import {verifyIndependentUpgradeDraftCI}
@@ -32,7 +34,8 @@ const mandatoryPort=(ports,name)=>{
 export async function prepareOwnerBoundUpgradeClosure({
  session,conversationId,originalWorkId,env=process.env,
  loadTrustedUpgrade=loadAuthenticatedWarrantedUpgrade,
- loadVerifiedDraft,ciRunIds,fetchImpl=fetch,
+ loadVerifiedDraft=loadAuthenticatedVerifiedUpgradeDraftReceipt,
+ ciRunIds,fetchImpl=fetch,
 }={}){
  if(env?.VERCEL_ENV!=='preview'||!validUuid(session?.user_id)||
     !validUuid(conversationId)||!WORK.test(String(originalWorkId||''))||
