@@ -131,6 +131,44 @@ export function projectLiveOriginalExecutorRun({run,jobs}={}){
  });
 }
 
+const PACKAGE_RUN=40762950798;
+const PACKAGE_CI_NAME='Reality Corrected Original Executor Frozen and Holdout Verification v0.3';
+const PACKAGE_CI_SHA='52de4566fd1317e53c62615b69fc847803512e92';
+const PACKAGE_CI_FILE='reality-original-executor-corrected-holdout-recheck-v0.3.yml';
+const PACKAGE_CANDIDATE='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2';
+const PACKAGE_SOURCE='61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17';
+export function projectVerifiedOriginalExecutorPackage({run,jobs}={}){
+ if(run?.id!==PACKAGE_RUN||run.name!==PACKAGE_CI_NAME||
+    run.head_sha!==PACKAGE_CI_SHA||run.head_branch!==BRANCH||
+    run.status!=='completed'||run.conclusion!=='success'||run.event!=='push'||
+    run.repository?.full_name!=='maloney2323/Reality'||
+    run.head_repository?.full_name!=='maloney2323/Reality'||
+    !String(run.path||'').endsWith('.github/workflows/'+PACKAGE_CI_FILE)||
+    run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+PACKAGE_RUN||
+    !Array.isArray(jobs)||jobs.length!==1||
+    jobs[0]?.name!=='verify-original-model-executor'||
+    jobs[0]?.status!=='completed'||jobs[0]?.conclusion!=='success')
+   fail('ORIGINAL_EXECUTOR_PACKAGE_CI_NOT_INDEPENDENTLY_VERIFIED');
+ return Object.freeze({
+  version:ORIGINAL_EXECUTOR_RUN_MONITOR_VERSION,
+  original_work_id:ORIGINAL_OWNER_WORK_ID,
+  status:'REALITY_MODEL_EXECUTOR_INSTALLABLE_PACKAGE_14_OF_14_VERIFIED',
+  run_id:PACKAGE_RUN,run_url:run.html_url,head_sha:PACKAGE_CI_SHA,
+  model_generated_executor_sha256:PACKAGE_SOURCE,
+  installable_candidate_sha256:PACKAGE_CANDIDATE,
+  package_file_count:2,
+  independent_behavioral_cases_passed:10,independent_behavioral_cases_total:10,
+  independent_security_holdout_passed:4,independent_security_holdout_total:4,
+  actual_github_read_only_execution_run:40760732281,
+  live_github_read_only_execution_verified:true,
+  model_self_correction_completed:true,corrected_independent_sandbox_passed:true,
+  installation_package_verified:true,original_source_already_fixed_before_model_install:true,
+  evidence_type:'EXTERNAL_PINNED_GITHUB_PACKAGE_PROOF_REQUIRES_SIGNED_OWNER_WARRANT',
+  owner_warrant_issued:false,owner_install_authorized:false,
+  installed_capability:false,original_job_completed:false,
+ });
+}
+
 export async function inspectOriginalExecutorRun({
  session,conversationId,env=process.env,
  context=originalOwnerContext,get=githubGet
@@ -144,6 +182,16 @@ export async function inspectOriginalExecutorRun({
  const list=await get(ROOT+'/actions/runs?branch='+encodeURIComponent(BRANCH)+'&per_page=30');
  if(!Array.isArray(list?.workflow_runs)||list.workflow_runs.length>30)
   fail('ORIGINAL_EXECUTOR_PROVIDER_RUN_LIST_UNVERIFIED');
+ const verified=list.workflow_runs.filter(x=>x.id===PACKAGE_RUN&&
+  x.name===PACKAGE_CI_NAME&&x.head_sha===PACKAGE_CI_SHA&&
+  x.repository?.full_name==='maloney2323/Reality'&&
+  x.head_repository?.full_name==='maloney2323/Reality');
+ if(verified.length===1){
+  const observed=await get(ROOT+'/actions/runs/'+PACKAGE_RUN+'/jobs?per_page=50');
+  if(!Array.isArray(observed?.jobs)||observed.jobs.length!==1||observed.total_count!==1)
+   fail('ORIGINAL_EXECUTOR_PACKAGE_JOB_REOBSERVATION_REQUIRED');
+  return projectVerifiedOriginalExecutorPackage({run:verified[0],jobs:observed.jobs});
+ }
  const live=list.workflow_runs.filter(x=>x.id===LIVE_RUN&&x.name===LIVE_NAME&&
   x.head_sha===LIVE_SHA&&x.repository?.full_name==='maloney2323/Reality'&&
   x.head_repository?.full_name==='maloney2323/Reality');
