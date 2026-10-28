@@ -1,7 +1,7 @@
 // Independent construction-update capability acceptance evaluator.
 // Runs in a credential-free, network-disabled, read-only Linux container.
 // NEVER import this candidate outside the restricted verification process.
-import {pathToFileURL} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const file=process.argv[2];
 if(!file||!file.startsWith('/work/')||!file.endsWith('/candidate.mjs'))
@@ -46,37 +46,30 @@ const cases=[
  input:'JOB = c-608;STATUS=BLOCKED;BLOCKER= permit #A-42 waiting ;OWNER=  Site Lead ',
  expected:{job_id:'C-608',phase:null,status:'BLOCKED',blocker:'permit #A-42 waiting',owner:'Site Lead'}},
 ];
-let fn;
-let importFailure=null;
-try{
- const mod=await import(pathToFileURL(file).href);
- fn=mod.parseConstructionUpdate;
- if(typeof fn!=='function'||Object.keys(mod).sort().join(',')!=='parseConstructionUpdate')
-  throw Error('CANDIDATE_EXPORT_CONTRACT_VIOLATION');
-}catch(e){importFailure=String(e?.message||e).slice(0,180)}
 const outcomes=[];
 for(const c of cases){
+ const attempt=spawnSync(process.execPath,
+  ['/tools/reality-live-upgrade-evaluate-one-v0.1.mjs',file],
+  {input:JSON.stringify({input:c.input}),encoding:'utf8',
+   timeout:2000,maxBuffer:4096,env:{PATH:process.env.PATH||'/usr/bin:/bin'}});
  let valid=false,reason=null;
  try{
-  if(importFailure)throw Error('IMPORT_OR_EXPORT_INVALID');
-  const value=fn(c.input);
-  if(value&&typeof value.then==='function')throw Error('ASYNC_NOT_PERMITTED');
-  if(c.throws){reason='EXPECTED_THROW_NOT_OBSERVED';}
-  else if(!value||typeof value!=='object'||Array.isArray(value)){
-   reason='NOT_A_PLAIN_RESULT';
+  if(attempt.error||attempt.status!==0)throw Error('CANDIDATE_EXECUTION_FAILED');
+  const output=JSON.parse(String(attempt.stdout||'').trim().split('\n').at(-1));
+  if(output?.evaluated!==true)throw Error('CANDIDATE_EVALUATION_MISSING');
+  if(c.throws){
+   valid=output.failed===true;
+   if(!valid)reason='EXPECTED_THROW_NOT_OBSERVED';
+  }else if(output.failed||!output.value||typeof output.value!=='object'||
+    Array.isArray(output.value)){
+   reason='CANDIDATE_OUTPUT_MISSING_OR_THROW';
   }else{
-   const sorted=Object.keys(value).sort().join(',');
-   valid=sorted==='blocker,job_id,owner,phase,status'&&
-    JSON.stringify(value)===JSON.stringify(c.expected);
-   if(!valid&&sorted==='blocker,job_id,owner,phase,status'){
-    valid=Object.keys(c.expected).every(k=>Object.is(value[k],c.expected[k]));
-   }
+   const v=output.value;
+   valid=Object.keys(v).sort().join(',')==='blocker,job_id,owner,phase,status'&&
+    Object.keys(c.expected).every(k=>Object.is(v[k],c.expected[k]));
    if(!valid)reason='OUTPUT_CONTRACT_OR_CONTENT_MISMATCH';
   }
- }catch(e){
-  valid=c.throws===true&&!importFailure;
-  if(!valid)reason='THREW_UNEXPECTEDLY';
- }
+ }catch(error){reason=String(error?.message||error).slice(0,75);}
  outcomes.push({case_id:c.name,passed:valid,reason:valid?null:reason});
 }
 const passed=outcomes.filter(x=>x.passed).length;
