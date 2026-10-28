@@ -146,6 +146,39 @@ test('signed-in 3/7 recovery reuses genuine runtime readback rather than an empt
   'CAPABILITY_GAP_CANDIDATE_NEEDS_SANDBOX_VERIFICATION');
  assert.equal(report.continuation_probe.original_work_id,workId);
  assert.equal(report.continuation_probe.authorization_granted,false);
+ assert.equal(report.continuation_experiment.state,'SANDBOX_PROPOSED_AWAITING_AUTHORIZATION');
+ assert.equal(report.continuation_experiment.original_work_id,workId);
+ assert.equal(report.continuation_experiment.capability_id,'reality.original-repair-execution');
+ assert.ok(report.continuation_experiment.gap_id.startsWith('capability_gap:'));
+ assert.ok(report.continuation_experiment.ephemeral_worldline_id.startsWith('worldline:ephemeral:'));
+ assert.equal(report.continuation_experiment.model_generation_performed,false);
+ assert.equal(report.continuation_experiment.upgrade_installed,false);
  assert.equal(report.original_job_completed,false);
  assert.equal(h.requests.length,1);
+});
+
+test('missing original repair executor cannot be silently promoted to an installed capability or completed work',async()=>{
+ const {projectOriginalJobRecoveryLoop}=
+  await import('../src/reality-real-recovery-coordinator-v0.1.js');
+ const history={original_work_id:workId,
+  recovery_receipt_id:randomUUID(),original_job_completed:false,
+  external_action_performed:false,execution_authorized:false,
+  status:'LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED',
+  later_success:{run_url:'https://github.com/maloney2323/Reality/actions/runs/40605639502'},
+  historical_run_urls:['https://github.com/maloney2323/Reality/actions/runs/40591283500']};
+ const forged={state:'REACTIVATION_READY',
+  gap:{state:'GAP_CONFIRMED',work_item_id:workId,
+   capability_id:'reality.original-repair-execution'},
+  experiment:{state:'SANDBOX_VERIFIED',work_item_id:workId},
+  original_work_executed:false,job_completed:false};
+ assert.throws(()=>projectOriginalJobRecoveryLoop({
+  originalWorkId:workId,conversationId,evidence:history,
+  cognitionState:{state:'NO_CAPABILITY_GAP'},goalId,
+  runtimeProof:{original_work_id:workId,independently_reobserved:true,
+   executor_status:'MISSING',evidence_ref:'owner-continuity:'+randomUUID(),
+   missing_scope:'EXISTING_OWNER_GITHUB_REPAIR_DISPATCH_PATH',
+   bridge_admission_failure:'PERSONAL_GITHUB_DISPATCH_NOT_EXACT_SCOPED_ISSUE',
+   current_registered_capabilities:0},
+  continuationEngine:forged,
+ }),/LIVE_LOOP_CONTINUATION_CAPABILITY_INDEPENDENTLY_UNVERIFIED/);
 });
