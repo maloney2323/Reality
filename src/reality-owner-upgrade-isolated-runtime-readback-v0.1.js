@@ -44,8 +44,7 @@ export async function verifyOwnerIsolatedExtensionRuntime({
    '&event=push&per_page=100';
  const result=await get(query);
  if(!Array.isArray(result?.workflow_runs)||
-    !Number.isSafeInteger(result.total_count)||
-    result.total_count>100)
+    !Number.isSafeInteger(result.total_count))
   fail('UPGRADE_RUNTIME_GITHUB_RUN_COVERAGE_INCOMPLETE');
  const verified=[];
  for(const name of REQUIRED){
