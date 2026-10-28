@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {prepareOwnerBoundUpgradeClosure,executeOwnerBoundUpgradeClosure}
  from '../src/reality-owner-bound-upgrade-closure-v0.1.js';
-import {issueUpgradeEvidenceWarrant,hashUpgradeEvidence}
+import {issueUpgradeEvidenceWarrant,verifyUpgradeEvidenceWarrant,hashUpgradeEvidence}
  from '../src/reality-upgrade-evidence-warrant-v0.1.js';
 import {fingerprintGovernedUpgradeCandidate}
  from '../src/reality-governed-github-upgrade-provider-v0.1.js';
@@ -297,6 +297,13 @@ function draftAndCI(){
 }
 test('fresh signed warrant + durable PR + two exact green GitHub readbacks prepares only approval request',async()=>{
  const x=draftAndCI();
+ const check=verifyUpgradeEvidenceWarrant({
+  warrant:x.s.evidence_warrant,experiment:x.s.verifiedExperiment,
+  verifierReceipt:x.s.verifierReceipt,originalWorkItem:x.s.originalWorkItem,
+  blockedCheckpointId:x.s.blocked_checkpoint_receipt_id,goalRevision,
+  ownerId:owner,conversationId,baseCommitSha:baseSha,env,
+ });
+ assert.equal(check.valid,true,check.reason);
  const r=await prepareOwnerBoundUpgradeClosure({
   session,conversationId,originalWorkId:workId,env,
   loadTrustedUpgrade:async()=>x.s,
