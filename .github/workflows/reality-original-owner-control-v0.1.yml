@@ -8,6 +8,7 @@ on:
       - 'src/reality-original-governed-draft-prepare-v0.1.js'
       - 'api/reality/personal-original-governed-draft.js'
       - 'test/reality-original-governed-draft-prepare-v0.1.test.js'
+      - 'test/reality-original-owner-guided-loop-ui-v0.1.test.js'
       - 'src/reality-original-executor-trusted-package-readback-v0.1.js'
       - 'src/reality-original-executor-trusted-warrant-recorder-v0.1.js'
       - 'api/reality/personal-original-executor-trusted-verification.js'
@@ -70,6 +71,8 @@ jobs:
         run: node --test test/reality-original-owner-verifier-v0.1.test.js
       - name: Verify source-backed model-run status never claims owner authorization or completion
         run: node --test test/reality-original-executor-run-monitor-v0.1.test.js
+      - name: Simulate original customer one-control mobile workflow, exact approval, run-once and fail-closed no retry
+        run: node --test test/reality-original-owner-guided-loop-ui-v0.1.test.js
       - name: Independently test original governed draft preparation requires signed owner warrant and causes NO GitHub writes
         run: |
           node --check api/reality/personal-original-governed-draft.js
