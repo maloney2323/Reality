@@ -153,3 +153,19 @@ test('actual historical Git source and current source classify corrected asserti
   report,oldSource:current,newSource:current,issue,
  }),/ACCEPTANCE_HISTORICAL_TEST_CAUSE_OR_FIX_NOT_CONFIRMED/);
 });
+
+test('owner repair-source verification is same-work and never closes the issue',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-repair-acceptance.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const script=html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+ assert.ok(script);assert.doesNotThrow(()=>new Function(script));
+ assert.match(api,/authenticatedChatSession/);
+ assert.match(api,/assertSameOrigin/);
+ assert.match(api,/saveAuthenticatedOriginalRepairAssessment/);
+ assert.match(api,/VERIFY_ORIGINAL_REPAIR_CAUSE/);
+ assert.match(html,/Verify original repair · Save evidence/);
+ assert.match(script,/p\.assessment_saved!==true/);
+ assert.match(script,/p\.full_original_job_completed!==false/);
+ assert.match(script,/p\.original_issue_closed!==false/);
+ assert.doesNotMatch(api,/githubWrite|close_issue|executeSelfBuild|method:'PATCH'/);
+});
