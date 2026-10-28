@@ -24,6 +24,8 @@ import {verifyUpgradeEvidenceWarrant}
  from './reality-upgrade-evidence-warrant-v0.1.js';
 import {assertUpgradeBaseReady}
  from './reality-upgrade-base-readiness-v0.1.js';
+import {saveOwnerUpgradeDraftReceipt}
+ from './reality-owner-upgrade-draft-continuity-v0.1.js';
 
 export const GOVERNED_UPGRADE_DISPATCH_VERSION='reality-governed-upgrade-dispatch-v0.1';
 const REPO='maloney2323/Reality',ROOT='/repos/'+REPO;
@@ -74,6 +76,7 @@ export async function dispatchAuthenticatedGovernedUpgradeDraft({
  reserve=reserveAuthenticatedPersonalExecution,
  execute=executeAuthorizedWork,
  providerGet=githubGet,providerWrite=githubWrite,
+ recordDraft=saveOwnerUpgradeDraftReceipt,
 }={}){
  if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
     !validUuid(session?.user_id)||!validUuid(conversationId)||
@@ -254,7 +257,7 @@ export async function dispatchAuthenticatedGovernedUpgradeDraft({
    external_action_may_have_occurred:dispatchAttempted,
    original_job_completed:false,no_automatic_retry:true,
    blocked_reason:result?.blocked_reason||'UPGRADE_DURABLE_VERIFICATION_UNRESOLVED'});
- return Object.freeze({
+ const dispatchProof=Object.freeze({
   status:'DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED',
   original_work_id:originalWorkId,
   original_continuity_root_id:plan.continuity_root_id,
@@ -273,5 +276,36 @@ export async function dispatchAuthenticatedGovernedUpgradeDraft({
   original_job_resumed:false,
   original_job_completed:false,
   further_promotion_requires_new_authority:true,
+  goal_revision:verified.goal_revision,
+  warrant_id:verified.evidence_warrant_id,
+  pinned_base_sha:pinned,
+  github_branch:observedDraft.github_branch,
  });
+ try{
+  const saved=await recordDraft({
+   session,conversationId,originalWorkId,dispatch:dispatchProof,env,
+  });
+  if(saved?.durably_recorded!==true||saved?.independently_reobserved!==true||
+     typeof saved.receipt_id!=='string'||!validUuid(saved.receipt_id)||
+     saved.original_work_id!==originalWorkId||
+     saved.github_commit_sha!==observedDraft.github_commit_sha||
+     saved.candidate_sha256!==plan.verified_candidate_hash)
+   fail('UPGRADE_DRAFT_DURABLE_CONTINUITY_READBACK_REQUIRED');
+  return Object.freeze({...dispatchProof,
+   owner_continuity_draft_receipt_id:saved.receipt_id,
+   draft_durably_recorded:true,
+   independently_reobserved:true,
+  });
+ }catch{
+  // The GitHub PR and one-time reservation ALREADY exist. No retry.
+  return Object.freeze({
+   status:'UNRESOLVED_NO_RETRY',original_work_id:originalWorkId,
+   github_pr_number:observedDraft.github_pr_number,
+   github_pr_url:observedDraft.github_pr_url,
+   reservation_id:reserved.reservation_id,
+   blocked_reason:'UPGRADE_DRAFT_OWNER_CONTINUITY_NOT_VERIFIED',
+   external_action_may_have_occurred:true,
+   original_job_completed:false,no_automatic_retry:true,
+  });
+ }
 }
