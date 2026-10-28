@@ -1,0 +1,31 @@
+name: Reality Live Original-Job Recovery Loop v0.1
+on:
+  push:
+    branches:
+      - feature/reality-real-recovery-loop-20261027
+    paths:
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'api/reality/personal-recovery-loop.js'
+      - 'test/reality-real-recovery-coordinator-v0.1.test.js'
+      - 'index.html'
+      - '.github/workflows/reality-real-recovery-loop-v0.1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'api/reality/personal-recovery-loop.js'
+      - 'test/reality-real-recovery-coordinator-v0.1.test.js'
+      - 'index.html'
+      - '.github/workflows/reality-real-recovery-loop-v0.1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-original-job-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify authenticated original-job coordinator and independent evidence
+        run: node --test test/reality-real-recovery-coordinator-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-personal-recovery-checkpoint-v0.1.test.js test/reality-recovery-evidence-gate-v0.1.test.js
