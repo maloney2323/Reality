@@ -126,6 +126,8 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-unfinished-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:10px}
 .wc-unfinished-actions button{margin:0}
 .wc-unfinished-actions a{font-size:13px;color:#b1dbff}
+.wc-unfinished-actions a.wc-owner-repair-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 16px;border-radius:12px;border:1px solid #bbd1ff;background:#e8eefb;color:#101a30;font-size:14px;font-weight:700;text-decoration:none;text-align:center}
+.wc-unfinished-actions a.wc-owner-repair-link:focus-visible{outline:3px solid #9dc6ff;outline-offset:3px}
 .wc-unfinished-card[data-status="RECOVERY_CHECKPOINT_SAVED"]{border-color:#4d806f}
 .wc-unfinished-card[data-status="PRIOR_ACTION_UNRESOLVED"]{border-color:#94735a}
 .wc-recovery-timeline{margin-top:12px;border-top:1px solid #536b5b;padding-top:10px}
@@ -966,6 +968,9 @@ function wcUnfinishedHTML(job){
   /Reality Governed Execution Engine v0\.1/.test(String(job.title||''))?
   '<button type="button" data-repair-check="'+esc(job.work_id)+
    '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
+ const ownerControl=job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+  job.state==='RECOVERY_CHECKPOINT_SAVED'&&job.job_completed===false?
+  '<a class="wc-owner-repair-link" href="/owner-repair.html">Open Owner Repair Control · Verify next step</a>':'';
  const upgradeJump='<button type="button" data-wc-upgrade-jump="'+esc(job.work_id)+
   '">Review upgrade discovery in categories</button>';
  const evidenceSaved=job.repair_evidence_saved===true&&
@@ -1015,7 +1020,7 @@ function wcUnfinishedHTML(job){
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
   '<p class="wc-note">Upgrade diagnosis and capability recommendations are in <strong>Upgrades & improvements</strong>. The original job stays open.</p>'+
   evidenceNotice+capabilityCandidateNotice+
-  '<div class="wc-unfinished-actions">'+upgradeJump+verifyFix+acceptCorrection+action+checkRepair+link+'</div>'+
+  '<div class="wc-unfinished-actions">'+ownerControl+upgradeJump+verifyFix+acceptCorrection+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
