@@ -4,7 +4,8 @@
 // This does not authorize or invoke a new GitHub write or deploy.
 import {inspectAuthenticatedOriginalJobRecoveryLoop}
  from './reality-real-recovery-coordinator-v0.1.js';
-import {githubGet} from './reality-connector-github-v1.0.js';
+// Source verification for public GitHub evidence must not depend on the
+// separate write-capable REALITY_GITHUB_TOKEN used for issue/PR actions.
 import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
 import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
@@ -23,6 +24,34 @@ const ORIGINAL_FAIL_MERGE='c8f0b861e1fac6cda7826aed9f36a2666d124eda';
 const TEST_PATH='test/reality-personal-discovered-work-handoff-v0.1.test.js';
 const TITLE='Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures';
 const fail=c=>{throw Error(c)};
+const PUBLIC_GITHUB_API='https://api.github.com';
+const ROOT='/repos/'+REPO;
+// The acceptance operation is a strictly read-only, bounded public-source
+// verifier; it cannot browse arbitrary GitHub repositories or touch issue/PR
+// writes. Historical/current source refs are exact SHA-40, never branch labels.
+export async function getPublicOriginalRepairEvidence(path,{fetchImpl=fetch}={}){
+ const sourcePrefix=ROOT+'/contents/'+TEST_PATH+'?ref=';
+ const allowed=path===ROOT+'/issues/143'||
+   (typeof path==='string'&&path.startsWith(sourcePrefix)&&
+    /^[a-f0-9]{40}$/.test(path.slice(sourcePrefix.length)));
+ if(!allowed)fail('ACCEPTANCE_PUBLIC_READ_PATH_OUT_OF_SCOPE');
+ const response=await fetchImpl(PUBLIC_GITHUB_API+path,{
+  method:'GET',
+  headers:{
+   Accept:'application/vnd.github+json',
+   'X-GitHub-Api-Version':'2022-11-28',
+   'User-Agent':'Reality-Original-Repair-Acceptance-ReadOnly',
+  },
+ });
+ if(!response?.ok)fail('ACCEPTANCE_GITHUB_PUBLIC_READBACK_UNAVAILABLE');
+ let data;
+ try{data=await response.json()}
+ catch{fail('ACCEPTANCE_GITHUB_PUBLIC_JSON_INVALID')}
+ if(!data||typeof data!=='object'||Array.isArray(data))
+  fail('ACCEPTANCE_GITHUB_PUBLIC_EVIDENCE_INVALID');
+ return data;
+}
+
 function trustedSource(response){
  if(response?.type!=='file'||response.encoding!=='base64'||
     typeof response.content!=='string'||response.content.length>180000)
@@ -91,7 +120,7 @@ export function classifyOriginalRepairAcceptance({
 export async function assessAuthenticatedOriginalRepair({
  session,conversationId,workId,env=process.env,
  inspect=inspectAuthenticatedOriginalJobRecoveryLoop,
- get=githubGet,
+ get=getPublicOriginalRepairEvidence,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
     workId!==ORIGINAL_WORK||env.VERCEL_ENV!=='preview')
