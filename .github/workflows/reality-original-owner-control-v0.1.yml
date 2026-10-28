@@ -5,6 +5,9 @@ on:
       - feature/governed-autonomous-self-upgrading-v01-20261027
     paths:
       - 'src/reality-original-owner-console-v0.1.js'
+      - 'src/reality-original-executor-trusted-package-readback-v0.1.js'
+      - 'src/reality-original-executor-trusted-warrant-recorder-v0.1.js'
+      - 'test/reality-original-executor-trusted-warrant-recorder-v0.1.test.mjs'
       - 'src/reality-original-executor-run-monitor-v0.1.js'
       - 'api/reality/personal-original-executor-run-status.js'
       - 'test/reality-original-executor-run-monitor-v0.1.test.js'
@@ -47,6 +50,8 @@ jobs:
         run: node --test test/reality-original-owner-verifier-v0.1.test.js
       - name: Verify source-backed model-run status never claims owner authorization or completion
         run: node --test test/reality-original-executor-run-monitor-v0.1.test.js
+      - name: Independently test non-authorizing evidence HMAC warrant on original goal and separate holdout
+        run: node --test test/reality-original-executor-trusted-warrant-recorder-v0.1.test.mjs
       - name: Independently verify the real original model source and historical fix from GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
