@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import './reality-original-job-recovery-diagnosis-v0.1.test.js';
 import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
 import {createContinuitySpine} from '../src/reality-continuity-spine-v2.0.js';
 import {
@@ -101,7 +102,9 @@ test('verified later run cannot be substituted from another repository or trust 
 });
 test('live endpoint permits only exact authenticated read-only request',()=>{
  const api=readFileSync(new URL('../api/reality/personal-recovery-loop.js',import.meta.url),'utf8');
- assert.match(api,/req\.method!=='GET'/);
+ assert.match(api,/!\['GET','POST'\]\.includes\(req\.method\)/);
+ assert.match(api,/assertSameOrigin/);
+ assert.match(api,/recordAuthenticatedRecoveryDiagnosis/);
  assert.match(api,/authenticatedChatSession/);
  assert.match(api,/inspectAuthenticatedOriginalJobRecoveryLoop/);
  assert.doesNotMatch(api,/method:'POST'|githubWrite|executeSelfBuild|issueBoundExecutionApproval/);
@@ -110,7 +113,9 @@ test('user interface runs same original job without approval inference or false 
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const script=html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)?.[1];
  assert.ok(script);assert.doesNotThrow(()=>new Function(script));
- assert.match(script,/Run recovery loop · Review/);
+ assert.match(script,/Run recovery loop · Save findings/);
+ assert.match(script,/RUN_AND_RECORD_RECOVERY_DIAGNOSIS/);
+ assert.match(script,/info\.diagnosis_saved!==true/);
  assert.match(script,/\/api\/reality\/personal-recovery-loop/);
  assert.match(script,/original_job_completed!==false/);
  assert.match(script,/external_action_performed!==false/);
