@@ -26,6 +26,7 @@ const CONTEXT=[
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const validRound=x=>Number.isInteger(x)&&x>=1&&x<=3;
 const readJSON=path=>existsSync(path)?JSON.parse(readFileSync(path,'utf8')):null;
+const readText=path=>existsSync(path)?readFileSync(path,'utf8'):null;
 function outputDir(round){return 'reality-generated-original-143/round-'+round}
 function failCode(candidate){
  if(!candidate||typeof candidate!=='object'||Array.isArray(candidate))return 'CANDIDATE_NOT_OBJECT';
@@ -51,7 +52,9 @@ function boundedFeedback(previous){
  const actual=String(previous.test_output||'').slice(-6500);
  return {status:String(previous.status||'UNKNOWN').slice(0,100),
   reason:String(previous.reason||'').slice(0,350),
-  test_output:actual,exit_code:previous.exit_code};
+  test_output:actual,exit_code:previous.exit_code,
+  failure_titles:Array.isArray(previous.failure_titles)?previous.failure_titles.slice(0,12):[],
+  failure_class:previous.failure_class||'UNKNOWN'};
 }
 function save(round,raw,candidate,responseId,model,validation){
  const dir=outputDir(round);mkdirSync(dir,{recursive:true});
@@ -79,9 +82,10 @@ async function generate(round){
  if(typeof key!=='string'||key.length<10)throw Error('OPENAI_API_KEY_REQUIRED');
  const model=process.env.REALITY_OPENAI_MODEL||'gpt-5.6-luna';
  const previousCandidate=round>1?readJSON('reality-previous/candidate.json'):null;
+ const previousRaw=round>1?readText('reality-previous/candidate-response.txt'):null;
  const previousFeedback=round>1?readJSON('reality-previous/feedback.json'):null;
- if(round>1&&(!previousFeedback||!previousCandidate))
-  throw Error('RETRY_REQUIRES_SAVED_CANDIDATE_AND_SANDBOX_FEEDBACK');
+ if(round>1&&(!previousFeedback||(!previousCandidate&&!previousRaw)))
+  throw Error('RETRY_REQUIRES_PRIOR_MODEL_OUTPUT_AND_SANDBOX_FEEDBACK');
  const prompt={
   task:'Reality itself must design a working, evidence-bound missing activation and settlement bridge for the ORIGINAL #143 customer job. Produce runnable source rather than general advice.',
   original_work_id:WORK,target_branch:BRANCH,
@@ -102,7 +106,9 @@ async function generate(round){
   reference_source:CONTEXT.map(path=>({path,content:readFileSync(path,'utf8')})),
   prior_attempt:round===1?null:{
    source:'UNTRUSTED_REJECTED_MODEL_CANDIDATE_FOR_CORRECTION_ONLY',
-   candidate:previousCandidate,independent_sandbox_feedback:boundedFeedback(previousFeedback),
+   candidate:previousCandidate,
+   rejected_raw_model_output_excerpt:previousCandidate?null:String(previousRaw||'').slice(0,9000),
+   independent_sandbox_feedback:boundedFeedback(previousFeedback),
    instruction:'Study exact failure diagnostics, correct cause instead of repeating source, then return all files. Do not make fabricated passes. Preserve independent owner approval.'
   }
  };
@@ -130,9 +136,24 @@ async function generate(round){
 }
 function feedback(round,exitCode){
  const out=outputDir(round);
- const contents=existsSync('reality-test-output.txt')?
-  readFileSync('reality-test-output.txt','utf8').slice(-6500):
-  'No sandbox output recorded';
+ const whole=readText('reality-test-output.txt')||'No sandbox output recorded';
+ const lines=whole.split(/\r?\n/);
+ const failing=[];
+ const excerpts=[];
+ for(let i=0;i<lines.length;i++){
+  if(/^\s*not ok\s+\d+\s*-/.test(lines[i])){
+   failing.push(lines[i].trim().slice(0,220));
+   // Preserve the failure name, assertion and code; never simply take the
+   // tail of verbose TAP output, which previously lost root-cause details.
+   excerpts.push(lines.slice(i,Math.min(lines.length,i+16)).join('\n').slice(0,1900));
+  }
+ }
+ const final=lines.filter(s=>/^\s*# (tests|pass|fail)|SyntaxError:|Error:|ERR_ASSERTION|REALITY_REJECTED_CANDIDATE/.test(s)).slice(-24);
+ const contents=([...(failing.length?excerpts:[whole.slice(0,4500)]),...final]).join('\n').slice(0,10000);
+ const failureClass=exitCode===0?'NONE':
+  /SyntaxError:|Unexpected token|ERR_MODULE_NOT_FOUND/.test(whole)?'SYNTAX_OR_IMPORT_DEFECT':
+  /REALITY_REJECTED_CANDIDATE/.test(whole)?'CANDIDATE_SHAPE_DEFECT':
+  failing.length?'INDEPENDENT_TEST_REGRESSION':'SANDBOX_EXECUTION_ERROR';
  const prior=readJSON(join(out,'generation-receipt.json'));
  const report={
   original_work_id:WORK,round,model_response_id:prior?.model_response_id||null,
@@ -140,6 +161,7 @@ function feedback(round,exitCode){
   reason:prior?.candidate_contract!=='SCHEMA_VALID'?prior?.candidate_contract:
    exitCode===0?'ALL_TESTS_PASSED':'INDEPENDENT_SANDBOX_FAILED',
   exit_code:exitCode,test_output:contents,
+  failure_class:failureClass,failure_titles:failing,
   verified_without_model_secrets:true,external_action_performed:false,
   installation_authorized:false,job_settled:false
  };

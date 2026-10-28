@@ -45,3 +45,12 @@ test('generated service does not embed production branch as target',()=>{
 test('source does not mark API authentication optional',()=>{
  assert.doesNotMatch(route,/authenticatedChatSession\s*=\s*async\s*\(\s*\)\s*=>\s*\{/);
 });
+
+test('activation route cannot substitute a permanent not-implemented placeholder for the full loop',()=>{
+ assert.doesNotMatch(route,/return\s+(?:json|reply)\(\s*res,\s*501\b/);
+});
+test('provider observation is obtained through a server connector, not an injected client request property',()=>{
+ assert.doesNotMatch(route,/req\.(?:realityGithubReadback|githubReadback|providerReadback)/);
+ assert.ok(route.includes('githubGet')||service.includes('githubGet'),
+   'missing server-side authenticated provider readback');
+});

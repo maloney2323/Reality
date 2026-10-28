@@ -310,3 +310,33 @@ jobs:
           git -c user.name='Reality Model Candidate Bot' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Reality verified full-loop candidate for original #143 (no installation)"
           git push origin "HEAD:refs/heads/$branch"
           echo "Source staged only; owner approval and production deployment remain disabled."
+
+  final-reliability-verdict:
+    needs: [verify-1, verify-2, verify-3, stage-verified-reality-candidate]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Distinguish a completed model workflow from an independently verified candidate
+        shell: bash
+        env:
+          VERIFY_1: ${{ needs.verify-1.outputs.passed }}
+          VERIFY_2: ${{ needs.verify-2.outputs.passed }}
+          VERIFY_3: ${{ needs.verify-3.outputs.passed }}
+          STAGING_RESULT: ${{ needs.stage-verified-reality-candidate.result }}
+        run: |
+          set -euo pipefail
+          echo "Reality sandbox results: round1=$VERIFY_1 round2=$VERIFY_2 round3=$VERIFY_3"
+          if [[ "$VERIFY_1" != "true" && "$VERIFY_2" != "true" && "$VERIFY_3" != "true" ]]; then
+            echo "::error::REALITY_NO_VERIFIED_CANDIDATE_AFTER_THREE_ROUNDS"
+            echo "Original customer job not complete; zero capability installations and zero settlements authorized."
+            exit 1
+          fi
+          if [[ "$STAGING_RESULT" != "success" ]]; then
+            echo "::error::REALITY_VERIFIED_CANDIDATE_NOT_STAGED"
+            exit 1
+          fi
+          echo "Reality model candidate sandbox verified and staged in isolated branch only."
+          echo "Owner activation and original-job final settlement remain separate unproven steps."
