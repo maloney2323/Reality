@@ -52,6 +52,7 @@ export async function prepareOwnerBoundUpgradeClosure({
  const actual=verifyUpgradeEvidenceWarrant({
   warrant:verified.evidence_warrant,
   experiment:verified.verifiedExperiment,
+  verifierReceipt:verified.verifierReceipt,
   originalWorkItem:verified.originalWorkItem,
   blockedCheckpointId:verified.blocked_checkpoint_receipt_id,
   goalRevision:verified.goal_revision,
