@@ -167,7 +167,8 @@ export async function recordOriginalExecutorTrustedWarrant({
  if(checked.valid!==true||checked.execution_authorized!==false||
     checked.candidate_sha256!==e.candidateHash)
   fail('ORIGINAL_EXECUTOR_WARRANT_SIGNATURE_VERIFICATION_FAILED');
- const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ const stable=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(stable):Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]));
+ const same=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
  const append=async({eventId,parent,priorHash,source,payload})=>{
   const now=new Date().toISOString();
   const node=appendContinuityNode({
