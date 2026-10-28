@@ -118,8 +118,10 @@ function fakeGitHub({tamperPr=false,failWrite=false,missingWorkflow=false,badWor
    return {ref:'refs/heads/'+BASE,object:{sha:shaA}};
   if(path===ROOT+'/git/ref/heads/'+state.branch)
    return {ref:'refs/heads/'+state.branch,object:{sha:state.head}};
-  if(path===ROOT+'/git/trees/'+shaA+'?recursive=1')
-   return {truncated:false,tree:missingWorkflow?[
+  if(path===ROOT+'/git/commits/'+shaA)
+   return {sha:shaA,tree:{sha:'e'.repeat(40)}};
+  if(path===ROOT+'/git/trees/'+'e'.repeat(40)+'?recursive=1')
+   return {sha:'e'.repeat(40),truncated:false,tree:missingWorkflow?[
     {path:ciPaths[1],type:'blob',mode:'100644',sha:workflowBlobSha}
    ]:ciPaths.map(path=>({path,type:'blob',mode:'100644',sha:workflowBlobSha}))};
   if(path===ROOT+'/git/blobs/'+workflowBlobSha)
