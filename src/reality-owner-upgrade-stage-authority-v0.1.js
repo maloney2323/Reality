@@ -11,6 +11,8 @@ import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
 import {reserveAuthenticatedPersonalExecution}
  from './reality-personal-execution-reservation-service-v0.1.js';
+import {createSingleUseExecutionReservationStore}
+ from './reality-single-use-execution-reservation-v0.1.js';
 import {fingerprintApprovedWorkItem}
  from './reality-authority-v1.0.js';
 import {evaluateGoalExecutionBoundary}
@@ -168,4 +170,62 @@ export async function consumeOwnerUpgradeInstallGrant(args={}){
 }
 export async function consumeOwnerUpgradeResumeGrant(args={}){
  return consume({...args,stage:'RESUME'});
+}
+
+export async function settleOwnerUpgradeStageGrant({
+ stage,session,scope,plan,grant,installed,outcome,env=process.env,
+ storeFactory=createSingleUseExecutionReservationStore,
+}={}){
+ assertScope({session,conversationId:scope?.conversationId,scope,plan,stage,installed,env});
+ if(grant?.status!=='CONSUMED_ONCE'||!validUuid(grant.grant_id)||
+    grant.owner_id!==session.user_id||
+    grant.conversation_id!==scope.conversationId||
+    grant.original_work_id!==scope.workId||
+    grant.goal_revision!==scope.goalRevision||
+    grant.candidate_sha256!==scope.candidateSha||
+    grant.head_sha!==scope.headSha||
+    grant.github_pr_number!==scope.githubPrNumber||
+    grant.authorized_by!==session.user_id||
+    grant.operation!==(stage==='INSTALL'?
+     'github:install_exact_verified_upgrade':'resume_original_work'))
+  fail('UPGRADE_STAGE_SETTLEMENT_CONSUMED_EXACT_GRANT_REQUIRED');
+ let evidenceRef;
+ if(stage==='INSTALL'){
+  if(installed?.independent!==true||
+     installed.installed!==true||
+     installed.exact_candidate_files_verified!==true||
+     installed.production_deployment_performed!==false||
+     installed.original_work_id!==scope.workId||
+     installed.candidate_sha256!==scope.candidateSha||
+     !SHA.test(String(installed.merge_commit_sha||'')))
+   fail('UPGRADE_STAGE_SETTLEMENT_INDEPENDENT_INSTALL_MISSING');
+  evidenceRef='github-preview-merge:'+installed.merge_commit_sha;
+ }else{
+  if(outcome?.independent!==true||
+     outcome.original_job_completed!==true||
+     outcome.original_work_id!==scope.workId||
+     outcome.work_id!==scope.workId||
+     outcome.owner_id!==session.user_id||
+     outcome.conversation_id!==scope.conversationId||
+     outcome.goal_revision!==scope.goalRevision||
+     outcome.capability_sha256!==scope.candidateSha||
+     typeof outcome.execution_receipt_id!=='string'||
+     !outcome.execution_receipt_id||outcome.execution_receipt_id.length>170)
+   fail('UPGRADE_STAGE_SETTLEMENT_ORIGINAL_JOB_NOT_INDEPENDENT');
+  evidenceRef='original-work-verified:'+outcome.execution_receipt_id;
+ }
+ const store=storeFactory({session,conversationId:scope.conversationId,env});
+ if(typeof store?.settle!=='function')
+  fail('UPGRADE_STAGE_SETTLEMENT_ATOMIC_STORE_REQUIRED');
+ const result=await store.settle({
+  reservationId:grant.grant_id,outcome:'VERIFIED',
+  verificationReceiptRef:evidenceRef,
+ });
+ if(result?.reservation_id!==grant.grant_id||result?.status!=='VERIFIED'||
+    result.verification_receipt_ref!==evidenceRef)
+  fail('UPGRADE_STAGE_SETTLEMENT_DURABLE_PROVIDER_READBACK_REQUIRED');
+ return Object.freeze({status:'VERIFIED',
+  reservation_id:grant.grant_id,verification_receipt_ref:evidenceRef,
+  durably_settled:true,external_action_authority_expended:true,
+ });
 }
