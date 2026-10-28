@@ -1,0 +1,119 @@
+name: Reality ORIGINAL Live GitHub Read-Only Execution Proof v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-live-github-readonly-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+  actions: read
+jobs:
+  actual-original-github-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Fetch the exact previously model-generated executor, not a manually written substitute
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40758956208
+          name: reality-original-feedback-model-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: owner-original-repair-executor
+      - name: Attest exact model artifact and independently green acceptance run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const model=JSON.parse(readFileSync('owner-original-repair-executor/generation-evidence.json','utf8'));
+          const candidate=readFileSync('owner-original-repair-executor/candidate.mjs');
+          const sha=createHash('sha256').update(candidate).digest('hex');
+          if(model.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             model.model_generated!==true||
+             typeof model.model_response_id!=='string'||!model.model_response_id.startsWith('resp_')||
+             model.candidate_sha256!==sha||
+             sha!=='d06ed111a121a4e1a93fb8bcfd47623e2cb60ba6a22e940ec31e0ac5b568d31d'||
+             model.original_job_completed!==false||model.github_provider_write_performed!==false)
+             throw Error('ORIGINAL_MODEL_CANDIDATE_NOT_EXACT_AND_UNTRUSTED');
+          const url='https://api.github.com/repos/maloney2323/Reality/actions/runs/40759263421/jobs?per_page=25';
+          const headers={accept:'application/vnd.github+json',
+            authorization:'Bearer '+process.env.GITHUB_TOKEN,'x-github-api-version':'2022-11-28'};
+          const res=await fetch(url,{headers});
+          if(!res.ok)throw Error('INDEPENDENT_RUN_UNAVAILABLE');
+          const data=await res.json();
+          if(data.total_count!==1||data.jobs?.length!==1||
+             data.jobs[0].name!=='verify-model-corrected-original-executor'||
+             data.jobs[0].conclusion!=='success')
+             throw Error('MODEL_EXECUTOR_10_CASE_VERIFICATION_NOT_REOBSERVED');
+          console.log(JSON.stringify({real_model_response:model.model_response_id,source_sha256:sha,
+            frozen_independent_run:40759263421,verified:true,writes_permitted:false}));
+          JS
+      - name: Collect REAL current GitHub branch, issue and file read observations, separate from model code
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import {writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const root='https://api.github.com/repos/maloney2323/Reality';
+          const headers={accept:'application/vnd.github+json',
+            authorization:'Bearer '+process.env.GITHUB_TOKEN,'x-github-api-version':'2022-11-28'};
+          async function get(path){
+           const r=await fetch(root+path,{headers,redirect:'error'});
+           if(r.status!==200)throw Error('REAL_GITHUB_SOURCE_UNAVAILABLE_'+r.status);
+           return r.json();
+          }
+          const branch='experiment/reality-live-durable-adversarial-20261025';
+          const ref=await get('/git/ref/heads/'+branch);
+          if(ref?.ref!=='refs/heads/'+branch||!/^[a-f0-9]{40}$/.test(ref?.object?.sha||''))
+           throw Error('REAL_GITHUB_ORIGINAL_BRANCH_INVALID');
+          const issue=await get('/issues/143');
+          if(issue?.number!==143||issue.state!=='open'||
+            issue.html_url!=='https://github.com/maloney2323/Reality/issues/143'||
+            issue.title!=='Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures')
+           throw Error('REAL_GITHUB_ORIGINAL_ISSUE_INVALID');
+          const path='test/reality-personal-discovered-work-handoff-v0.1.test.js';
+          const file=await get('/contents/'+path+'?ref='+ref.object.sha);
+          if(file?.type!=='file'||file.path!==path||file.encoding!=='base64'||
+             typeof file.content!=='string')throw Error('REAL_GITHUB_SOURCE_FILE_INVALID');
+          const bytes=Buffer.from(file.content.replace(/\s/g,''),'base64');
+          const sha=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
+          if(file.sha!==sha)throw Error('REAL_GITHUB_SOURCE_BLOB_MISMATCH');
+          const snapshot={original_work_id:'work:24cda9611404e9bcb47909976067605c',
+            source_provider:'GITHUB_API_READ_ONLY',ref,issue:{
+              number:issue.number,state:issue.state,title:issue.title,html_url:issue.html_url
+            },file:{type:file.type,path:file.path,sha:file.sha,encoding:file.encoding,content:file.content}};
+          writeFileSync('original-live-github-snapshot.json',JSON.stringify(snapshot));
+          console.log(JSON.stringify({observed_actual_github_branch_head:ref.object.sha,
+             actual_issue_state:issue.state,verified_git_blob_sha:file.sha,
+             snapshot_from_real_github:true,model_executor_not_executed_yet:true}));
+          JS
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-repair-proposal.mjs | cut -d' ' -f1)" = "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+          cp src/reality-extensions/reality-original-maintenance-repair-proposal.mjs owner-original-repair-executor/
+      - name: Execute the REAL model generated executor only in secretless offline Docker against fresh actual GitHub observations
+        run: |
+          set -euo pipefail
+          timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node scripts/reality-original-executor-live-readback-v0.1.mjs \
+            | tee actual-original-read-only-execution-proof.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-real-github-read-only-execution
+          path: |
+            actual-original-read-only-execution-proof.json
+            owner-original-repair-executor/generation-evidence.json
+          retention-days: 14
