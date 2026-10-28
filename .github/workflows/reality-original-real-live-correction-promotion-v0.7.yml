@@ -35,7 +35,7 @@ jobs:
           node --input-type=module <<'JS'
           import {createHash} from 'node:crypto';
           import {readFileSync} from 'node:fs';
-          const root='frozen-model-proof/original-live-model-corrected/';
+          const root='frozen-model-proof/';
           const proof=JSON.parse(readFileSync(root+'generation-evidence.json','utf8'));
           const source=readFileSync(root+'candidate.mjs');
           const digest=createHash('sha256').update(source).digest('hex');
@@ -86,7 +86,7 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "0e83d0388e92220d2cf08f277e2a44e0c877367c"
           git checkout -b "$branch" FETCH_HEAD
           test "$(sha256sum src/reality-extensions/reality-original-maintenance-executor.mjs | cut -d' ' -f1)" = "61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17"
-          cp frozen-model-proof/original-live-model-corrected/candidate.mjs src/reality-extensions/reality-original-maintenance-executor.mjs
+          cp frozen-model-proof/candidate.mjs src/reality-extensions/reality-original-maintenance-executor.mjs
           chmod 644 src/reality-extensions/reality-original-maintenance-executor.mjs
           test "$(sha256sum src/reality-extensions/reality-original-maintenance-executor.mjs | cut -d' ' -f1)" = "7ba3cc3273c2301c6902b6b3b3d6d0247e8b6abe0398467656e5e2ca93648128"
           node --check src/reality-extensions/reality-original-maintenance-executor.mjs
