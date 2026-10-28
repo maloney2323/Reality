@@ -245,6 +245,12 @@ function args({mock=fakeGitHub(),source=fixture(),reservation=admittedReservatio
   }),
   reserve:reservation.reserve,execute:executeAuthorizedWork,
   providerGet:mock.get,providerWrite:mock.write,
+  recordDraft:async({dispatch,originalWorkId})=>({
+   durably_recorded:true,independently_reobserved:true,
+   receipt_id:'00000000-0000-4000-8000-000000000555',
+   original_work_id:originalWorkId,github_commit_sha:dispatch.github_commit_sha,
+   candidate_sha256:dispatch.candidate_hash,
+  }),
   mock,reservation};
 }
 test('real governed execution engine consumes DB-style reservation, writes verified draft PR, settles once',async()=>{
@@ -262,6 +268,8 @@ test('real governed execution engine consumes DB-style reservation, writes verif
  assert.equal(result.status,'DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED',JSON.stringify(result));
  assert.equal(result.original_work_id,work);
  assert.equal(result.draft_pr_verified,true);
+ assert.equal(result.draft_durably_recorded,true);
+ assert.equal(result.owner_continuity_draft_receipt_id,'00000000-0000-4000-8000-000000000555');
  assert.equal(result.github_pr_number,1501);
  assert.equal(result.capability_promoted,false);
  assert.equal(result.original_job_completed,false);
@@ -280,6 +288,16 @@ test('missing required pinned-base CI prevents reservation and all GitHub writes
   assert.equal(a.reservation.results().claimed,0);
   assert.equal(a.mock.state.writes.length,0);
  }
+});
+test('verified GitHub draft without durable original-worldline readback never claims success or retries',async()=>{
+ const a=args();a.recordDraft=async()=>{throw Error('DATABASE_INSERT_UNCERTAIN')};
+ const r=await dispatchAuthenticatedGovernedUpgradeDraft(a);
+ assert.equal(r.status,'UNRESOLVED_NO_RETRY');
+ assert.equal(r.blocked_reason,'UPGRADE_DRAFT_OWNER_CONTINUITY_NOT_VERIFIED');
+ assert.equal(r.no_automatic_retry,true);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(a.reservation.results().settled,'VERIFIED');
+ assert.equal(a.mock.state.writes.length,3);
 });
 test('missing explicit new execution confirmation and foreign signed-in identity fail before reservation',async()=>{
  const a=args();a.executionConfirmation='APPROVE_THIS_EXACT_WORK_ITEM';
