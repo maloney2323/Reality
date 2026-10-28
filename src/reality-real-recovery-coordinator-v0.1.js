@@ -24,7 +24,7 @@ const requireScope=(ok,code)=>{if(!ok)throw Error(code)};
 const SAME_WORK=/^work:[a-f0-9]{32}$/;
 export function projectOriginalJobRecoveryLoop({
  originalWorkId,conversationId,evidence,cognitionState,goalId,
- runtimeProof=null,
+ runtimeProof=null,continuationEngine=null,
 }={}){
  requireScope(SAME_WORK.test(String(originalWorkId||''))&&
   validUuid(conversationId)&&
@@ -49,6 +49,21 @@ export function projectOriginalJobRecoveryLoop({
  const upgradeDiscovery=projectRealityUpgradeDiscovery({
   originalWorkId,providerEvidence:evidence,cognitionState,
  });
+ if(continuationEngine!==null){
+  if(runtimeProof?.executor_status!=='MISSING'||
+     runtimeProof?.missing_scope!=='EXISTING_OWNER_GITHUB_REPAIR_DISPATCH_PATH'||
+     runtimeProof?.bridge_admission_failure!=='PERSONAL_GITHUB_DISPATCH_NOT_EXACT_SCOPED_ISSUE'||
+     runtimeProof?.current_registered_capabilities!==0||
+     continuationEngine?.state!=='AWAITING_AUTHORIZATION'||
+     continuationEngine?.gap?.state!=='GAP_CONFIRMED'||
+     continuationEngine.gap.work_item_id!==originalWorkId||
+     continuationEngine.gap.capability_id!=='reality.original-repair-execution'||
+     continuationEngine.experiment?.state!=='SANDBOX_PROPOSED'||
+     continuationEngine.experiment.work_item_id!==originalWorkId||
+     continuationEngine.original_work_executed!==false||
+     continuationEngine.job_completed!==false)
+   throw Error('LIVE_LOOP_CONTINUATION_CAPABILITY_INDEPENDENTLY_UNVERIFIED');
+ }
  const timeline=Object.freeze([
   {step:'ORIGINAL_JOB_RECOVERED',state:'VERIFIED',evidence_ref:evidence.recovery_receipt_id,
    description:'Restored original job and incomplete status from the owner-scoped Continuity checkpoint.'},
@@ -91,6 +106,21 @@ export function projectOriginalJobRecoveryLoop({
    originalWorkId,evidence,completedStages:timeline.filter(s=>s.state==='VERIFIED').length,
    runtimeProof,
   }),
+  // The EXISTING v1 capability engine now receives independently reproduced
+  // original-work execution failures instead of empty, invented gaps.
+  continuation_experiment:continuationEngine?Object.freeze({
+   state:'SANDBOX_PROPOSED_AWAITING_AUTHORIZATION',
+   original_work_id:originalWorkId,
+   gap_id:continuationEngine.gap.gap_id,
+   capability_id:continuationEngine.gap.capability_id,
+   experiment_hash:continuationEngine.experiment.experiment_hash,
+   ephemeral_worldline_id:continuationEngine.experiment.ephemeral_worldline_id,
+   historical_failure_refs:[...continuationEngine.gap.frozen_historical_failure_refs],
+   verification_suite_ref:continuationEngine.gap.capability_contract.verification_suite_ref,
+   external_action_performed:false,
+   model_generation_performed:false,
+   upgrade_installed:false,original_job_completed:false,
+  }):null,
   current_decision:later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
    'BLOCKED_REQUIRES_ROOT_CAUSE_DIAGNOSIS',
   timeline,
@@ -172,9 +202,44 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
  }
  if(verifiedRuntime?.executor_status==='INVESTIGATION_REQUIRED')
   verifiedRuntime=null;
+ let continuationEngine=null;
+ if(verifiedRuntime?.executor_status==='MISSING'&&
+    verifiedRuntime.missing_scope==='EXISTING_OWNER_GITHUB_REPAIR_DISPATCH_PATH'&&
+    verifiedRuntime.bridge_admission_failure==='PERSONAL_GITHUB_DISPATCH_NOT_EXACT_SCOPED_ISSUE'&&
+    verifiedRuntime.current_registered_capabilities===0){
+  continuationEngine=await cognition({
+   universe,workItem:original,
+   capabilityGap:{
+    gap:'MISSING_CAPABILITY',
+    subject:'reality.original-repair-execution',
+   },
+   capabilities:[],
+   historicalFailureRefs:[
+    verifiedRuntime.evidence_ref,
+    ...(Array.isArray(evidence.historical_run_urls)?
+      evidence.historical_run_urls:[]),
+   ],
+   verificationSuiteRef:
+    'test/reality-original-repair-runtime-capability-readback-v0.1.test.js',
+   inputSchema:{
+    original_work_id:'work-id',
+    authorized_repair_intent:'owner-signed-goal',
+    provider_failure_refs:'frozen-independent-provider-failures',
+   },
+   outputSchema:{
+    original_work_id:'same-work-id',
+    actual_repair_execution_receipt:'independent-provider-result',
+    original_outcome_verified:'boolean',
+   },
+   // IMPORTANT: sandbox synthesis requires a separate authorization,
+   // which can never be fabricated from recovery or this diagnosis.
+   authorization:null,promotionAuthorization:null,
+  });
+ }
  return projectOriginalJobRecoveryLoop({
   originalWorkId:workId,conversationId,evidence,
   cognitionState:result,goalId:grounded.state.active_goal_id,
   runtimeProof:verifiedRuntime,
+  continuationEngine,
  });
 }
