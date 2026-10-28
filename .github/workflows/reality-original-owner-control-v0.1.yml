@@ -5,6 +5,9 @@ on:
       - feature/governed-autonomous-self-upgrading-v01-20261027
     paths:
       - 'src/reality-original-owner-console-v0.1.js'
+      - 'src/reality-original-executor-run-monitor-v0.1.js'
+      - 'api/reality/personal-original-executor-run-status.js'
+      - 'test/reality-original-executor-run-monitor-v0.1.test.js'
       - 'src/reality-original-owner-verifier-v0.1.js'
       - 'api/reality/personal-original-repair-verifier.js'
       - 'test/reality-original-owner-verifier-v0.1.test.js'
@@ -36,10 +39,14 @@ jobs:
           node --check api/reality/personal-original-repair-owner-console.js
           node --check src/reality-original-owner-verifier-v0.1.js
           node --check api/reality/personal-original-repair-verifier.js
+          node --check src/reality-original-executor-run-monitor-v0.1.js
+          node --check api/reality/personal-original-executor-run-status.js
       - name: Assert owner stages cannot silently promote source tests to completed work
         run: node --test test/reality-original-owner-console-v0.1.test.js
       - name: Assert original executor warrant is refused for proposal-only candidate
         run: node --test test/reality-original-owner-verifier-v0.1.test.js
+      - name: Verify source-backed model-run status never claims owner authorization or completion
+        run: node --test test/reality-original-executor-run-monitor-v0.1.test.js
       - name: Independently verify the real original model source and historical fix from GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
