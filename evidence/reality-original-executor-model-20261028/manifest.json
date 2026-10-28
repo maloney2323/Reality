@@ -1,0 +1,31 @@
+{
+  "schema": "reality.original-owner-model-executor-package.security-corrected.v0.2",
+  "original_work_id": "work:24cda9611404e9bcb47909976067605c",
+  "original_issue_number": 143,
+  "original_model_response_id": "resp_00cb45cc49d5ca0a006ae25989e71887d294c2bf5992ff3829",
+  "executor_source_sha256": "61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17",
+  "original_proposal_source_sha256": "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16",
+  "governed_install_candidate_sha256": "88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2",
+  "files": [
+    {
+      "path": "src/reality-extensions/reality-original-maintenance-repair-proposal.mjs",
+      "mode": "100644",
+      "bytes": 6300,
+      "sha256": "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+    },
+    {
+      "path": "src/reality-extensions/reality-original-maintenance-executor.mjs",
+      "mode": "100644",
+      "bytes": 9651,
+      "sha256": "61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17"
+    }
+  ],
+  "predecessor_frozen_case_ci_run": 40759263421,
+  "newly_verified_frozen_and_holdout_tests": false,
+  "independent_actual_github_readonly_ci_run": 40760732281,
+  "owner_warrant_issued": false,
+  "owner_install_approval_granted": false,
+  "original_job_completed": false,
+  "installed": false,
+  "production_modified": false
+}

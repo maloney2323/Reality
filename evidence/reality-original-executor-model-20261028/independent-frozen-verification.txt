@@ -1,0 +1,89 @@
+Unable to find image 'node:22-alpine' locally
+22-alpine: Pulling from library/node
+7b229517ed22: Pulling fs layer
+8776aa3d2ba7: Pulling fs layer
+7246d4c6a55d: Pulling fs layer
+304511616d6a: Pulling fs layer
+7b229517ed22: Verifying Checksum
+7b229517ed22: Download complete
+7246d4c6a55d: Verifying Checksum
+7246d4c6a55d: Download complete
+7b229517ed22: Pull complete
+8776aa3d2ba7: Download complete
+304511616d6a: Verifying Checksum
+304511616d6a: Download complete
+8776aa3d2ba7: Pull complete
+7246d4c6a55d: Pull complete
+304511616d6a: Pull complete
+Digest: sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
+Status: Downloaded newer image for node:22-alpine
+TAP version 13
+# Subtest: real current original source -> ALREADY_FIXED, never write, never self-credit
+ok 1 - real current original source -> ALREADY_FIXED, never write, never self-credit
+  ---
+  duration_ms: 5.825829
+  type: 'test'
+  ...
+# Subtest: frozen actual original failure -> exact model PATCH_PROPOSED, no approval implied
+ok 2 - frozen actual original failure -> exact model PATCH_PROPOSED, no approval implied
+  ---
+  duration_ms: 2.356425
+  type: 'test'
+  ...
+# Subtest: original repair candidate with separately consumed owner grant can update exact source only
+ok 3 - original repair candidate with separately consumed owner grant can update exact source only
+  ---
+  duration_ms: 9.648111
+  type: 'test'
+  ...
+# Subtest: no owner grant service -> never write
+ok 4 - no owner grant service -> never write
+  ---
+  duration_ms: 2.192912
+  type: 'test'
+  ...
+# Subtest: wrong original work or unknown owner is never accepted
+ok 5 - wrong original work or unknown owner is never accepted
+  ---
+  duration_ms: 1.333687
+  type: 'test'
+  ...
+# Subtest: wrong grant base sha after consume -> fail closed without write
+ok 6 - wrong grant base sha after consume -> fail closed without write
+  ---
+  duration_ms: 1.401739
+  type: 'test'
+  ...
+# Subtest: unexpected issue state prevents any grant consumption
+ok 7 - unexpected issue state prevents any grant consumption
+  ---
+  duration_ms: 0.275569
+  type: 'test'
+  ...
+# Subtest: moving target after grant -> no write or silent retry
+ok 8 - moving target after grant -> no write or silent retry
+  ---
+  duration_ms: 2.54929
+  type: 'test'
+  ...
+# Subtest: branch moving before a one-time grant is safely rejected without consuming authority
+ok 9 - branch moving before a one-time grant is safely rejected without consuming authority
+  ---
+  duration_ms: 1.86775
+  type: 'test'
+  ...
+# Subtest: executor does not authorize or declare completed work on GH write response alone
+ok 10 - executor does not authorize or declare completed work on GH write response alone
+  ---
+  duration_ms: 0.999943
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132.117967
