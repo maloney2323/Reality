@@ -5,16 +5,13 @@ on:
       - feature/governed-autonomous-self-upgrading-v01-20261027
     paths:
       - '.github/workflows/reality-original-autonomous-executor-v0.1.yml'
-      - 'scripts/reality-original-executor-autonomous-generate-v0.1.mjs'
-      - 'scripts/reality-original-executor-autonomous-correct-v0.1.mjs'
-      - 'test/reality-original-executor-autonomous-grader-v0.1.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 concurrency:
   group: reality-original-autonomous-executor-v01
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   reality-model-generates-original-executor:
     runs-on: ubuntu-latest
