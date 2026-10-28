@@ -1,0 +1,150 @@
+name: Reality Original Repair Capability - Real Model Self-Correction and Independent Retest
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'scripts/reality-original-repair-capability-correct-v0.1.mjs'
+      - 'scripts/reality-original-repair-capability-grade-v0.1.mjs'
+      - '.github/workflows/reality-original-owner-repair-self-correction-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  correct-real-failed-original-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Retrieve EXACT independently failed original-owner model candidate, never create a substitute job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40706174135
+          name: original-owner-independent-repair-sandbox-proof
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: failed-original-owner
+      - name: Reality model analyzes prior original-job source and independent failures, produces correction
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PREVIOUS_REPAIR_DIR: failed-original-owner
+          REALITY_ORIGINAL_REPAIR_OUTPUT: owner-original-repair-correction
+        run: |
+          node --check scripts/reality-original-repair-capability-correct-v0.1.mjs
+          node scripts/reality-original-repair-capability-correct-v0.1.mjs
+      - name: Validate corrected real model provenance without executing untrusted source
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(readFileSync('owner-original-repair-correction/correction-evidence.json','utf8'));
+          const source=readFileSync('owner-original-repair-correction/candidate.mjs');
+          const sha=createHash('sha256').update(source).digest('hex');
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             p.original_capability_candidate_receipt_id!=='544eebaa-c9e6-5ad6-8d3e-6e6820343b2a'||
+             p.experiment_hash!=='e2c36fe43a3331fdcd8f66635f905a55304584804fd48a4af99e87d99c82e60f'||
+             p.failed_candidate_sha256!=='682790ec1ac98567f55d457cec48457e5a22eeae1b693872497c2b6f0ca5aa6a'||
+             p.correction_model_generated!==true||!p.corrected_model_response_id||
+             p.status!=='REAL_MODEL_GENERATED_CORRECTION_AWAITING_INDEPENDENT_RETEST'||
+             p.corrected_candidate_sha256!==sha||
+             p.corrected_candidate_sha256===p.failed_candidate_sha256||
+             p.github_write_performed!==false||p.original_job_completed!==false)
+            throw Error('ORIGINAL_OWNER_FAILED_MODEL_CORRECTION_NOT_AUTHENTIC');
+          console.log(JSON.stringify({
+           state:p.status,original_work_id:p.original_work_id,
+           failed_sha:p.failed_candidate_sha256,corrected_sha:sha,
+           correction_response:p.corrected_model_response_id,
+           original_job_completed:false,github_write_performed:false,
+          }));
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-model-generated-correction
+          path: owner-original-repair-correction/
+          retention-days: 14
+  independent-correction-retest:
+    needs: correct-real-failed-original-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: original-owner-model-generated-correction
+          path: owner-original-repair-correction
+      - name: Independently attest exact owner frozen Git source bytes
+        run: |
+          set -euo pipefail
+          mkdir -p owner-original-fixtures
+          cp test/fixtures/original-repair-historical-source.snapshot.txt owner-original-fixtures/historical.js
+          cp test/fixtures/original-repair-corrected-source.snapshot.txt owner-original-fixtures/corrected.js
+          test "$(git hash-object owner-original-fixtures/historical.js)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
+          test "$(git hash-object owner-original-fixtures/corrected.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
+      - name: Real model-corrected source tested in a separate secretless, network-disabled, read-only Docker sandbox
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/owner-original-repair-correction:/work:ro" \
+            -v "${{ github.workspace }}/owner-original-fixtures:/fixtures:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-original-repair-capability-grade-v0.1.mjs \
+            /work/candidate.mjs /fixtures/historical.js /fixtures/corrected.js \
+            > owner-original-repair-correction/independent-retest.json
+          sandbox_exit=$?
+          set -e
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('owner-original-repair-correction/correction-evidence.json','utf8'));
+          const v=JSON.parse(fs.readFileSync('owner-original-repair-correction/independent-retest.json','utf8'));
+          const digest=x=>createHash('sha256').update(x).digest('hex');
+          const verified=p.correction_model_generated===true&&
+            p.original_work_id===v.original_work_id&&
+            p.corrected_candidate_sha256===v.candidate_sha256&&
+            v.state==='ORIGINAL_REPAIR_CAPABILITY_SANDBOX_VERIFIED'&&
+            v.passed===8&&v.total===8&&v.failed===0&&
+            v.frozen_verified===true&&v.hidden_holdout_verified===true&&
+            v.isolation.network_permitted===false&&
+            v.isolation.secrets_accessible===false&&
+            v.original_repair_executed===false&&v.original_job_completed===false;
+          const evidence={
+           version:'reality-original-owner-correction-independent-retest-v0.1',
+           status:verified?'REAL_MODEL_SELF_CORRECTION_SANDBOX_VERIFIED_NOT_INSTALLED':'REAL_MODEL_SELF_CORRECTION_SANDBOX_REJECTED',
+           original_work_id:p.original_work_id,
+           original_capability_candidate_receipt_id:p.original_capability_candidate_receipt_id,
+           experiment_hash:p.experiment_hash,
+           failed_model_response_id:p.failed_model_response_id,
+           corrected_model_response_id:p.corrected_model_response_id,
+           failed_source_sha256:p.failed_candidate_sha256,
+           corrected_source_sha256:p.corrected_candidate_sha256,
+           independent_result_sha256:digest(fs.readFileSync('owner-original-repair-correction/independent-retest.json')),
+           cases_passed:v.passed,cases_total:v.total,
+           independent_sandbox_verified:verified,
+           capability_installed:false,owner_install_authorization:false,
+           original_job_resumed:false,original_job_completed:false,
+           github_write_performed:false,
+          };
+          fs.writeFileSync('owner-original-repair-correction/retest-proof.json',
+            JSON.stringify(evidence,null,2)+'\n');
+          console.log(JSON.stringify(evidence));
+          if(!verified)process.exit(8);
+          JS
+          if [ "$sandbox_exit" -ne 0 ]; then exit "$sandbox_exit"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-model-self-correction-independent-retest
+          path: owner-original-repair-correction/
+          retention-days: 14
