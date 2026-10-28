@@ -67,6 +67,7 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <h2>Independent capability verification</h2>
 <p>Verify the original blocked Reality maintenance job against its current execution adapter, actual model-generated repair source and independent GitHub tests. This records a scoped finding in Continuity. It <strong>cannot</strong> issue an execution warrant if the verified candidate is only a patch proposal.</p>
 <div class="actions"><button id="verifyExecutor" type="button" disabled>Verify missing capability · Record evidence</button></div>
+<p class="note"><strong>Executor capability candidate:</strong> <a href="https://github.com/maloney2323/Reality/pull/155" target="_blank" rel="noopener noreferrer">review PR #155</a>. Its original-job repair adapter passed <a href="https://github.com/maloney2323/Reality/actions/runs/40751609936" target="_blank" rel="noopener noreferrer">9/9 isolated checks</a>. This is engineering evidence, <strong>not</strong> a Reality-issued owner warrant, installed capability, or finished job. Once the above evidence is recorded, no repeated verification click is needed.</p>
 <p class="note" id="verifierResult" role="status" aria-live="polite">Sign in and load the original job to verify the current execution gap.</p>
 </div>
 <div class="shell">
@@ -200,7 +201,7 @@ async function verifyOriginalExecutor(){
    !/^[a-f0-9-]{36}$/i.test(String(d.receipt_id||'')))
    throw Error('ORIGINAL_EXECUTOR_ELIGIBILITY_NOT_DURABLY_VERIFIED');
   $('verifierResult').textContent='Recorded in owner Continuity: '+d.receipt_id+
-   '. Actual execution gap verified; previous AI-generated patch proposal does NOT implement the missing executor. No warrant or installation authority issued.';
+   '. Actual execution gap verified; previous AI-generated patch proposal does NOT implement the missing executor. No warrant or installation authority issued. The execution adapter candidate is in review PR #155; independent owner-warranted installation is still required.';
   output('Original job re-verified. Receipt: '+d.receipt_id+
    '\nObserved missing capability: '+d.capability_gap_id+
    '\nPrevious generated patch proposal verified: yes'+
