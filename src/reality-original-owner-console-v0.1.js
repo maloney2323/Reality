@@ -9,6 +9,7 @@ import {createContinuitySpine} from './reality-continuity-spine-v2.0.js';
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {createUniversePostgresPersistence} from './reality-universe-postgres-persistence-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
+import {loadAuthenticatedWarrantedUpgrade} from './reality-warranted-upgrade-candidate-loader-v0.1.js';
 import {loadAuthenticatedVerifiedUpgradeDraftReceipt}
  from './reality-owner-upgrade-draft-continuity-v0.1.js';
 import {discoverExactOriginalUpgradeCI}
