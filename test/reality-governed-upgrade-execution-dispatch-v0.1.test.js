@@ -101,7 +101,7 @@ function fakeGitHub({tamperPr=false,failWrite=false,missingWorkflow=false,badWor
   '    runs-on: ubuntu-latest',
   '    steps:',
   '      - run: echo verified',
- ].join('\\n')+'\\n';
+ ].join('\n')+'\n';
  const state={branch:null,head:shaA,files:new Map(),pr:null,writes:[],gets:0};
  const get=async path=>{
   state.gets++;
