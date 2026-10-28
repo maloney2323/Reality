@@ -39,6 +39,11 @@ export async function adoptControlledFinaleIntoOwnerContinuity({
     active.goal_id!==goal.state?.active_goal_id||
     !validUuid(active.last_transition_receipt_id))
   fail('FINALE_OWNER_FRESH_CONFIRMED_GOAL_REQUIRED');
+ const objective=String(active.title||'').toLowerCase();
+ if(!/\\breality\\b/.test(objective)||
+    !/(?:finale|full[ -]?loop|self[ -]?repair|self[ -]?upgrade)/.test(objective)||
+    !/(?:controlled|construction|estimate)/.test(objective))
+  fail('FINALE_OWNER_EXPLICIT_SCOPE_GOAL_REQUIRED');
  const spine=createContinuitySpine({continuityRootId:goal.scope.root,
   worldlineId:goal.scope.worldline,subjectId:session.user_id});
  if(spine.continuity_root_id!==goal.state.continuity_root_id||
