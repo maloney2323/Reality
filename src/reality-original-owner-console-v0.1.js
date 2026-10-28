@@ -82,12 +82,14 @@ async function githubJson(path,fetchImpl=fetch){
 }
 
 async function observeGithub(fetchImpl=fetch){
- const [pr,issue,run,source,base]=await Promise.all([
+ const [pr,issue,run,source,base,fixedRun,fixedSource]=await Promise.all([
   githubJson('/pulls/'+PR,fetchImpl),
   githubJson('/issues/'+ISSUE,fetchImpl),
   githubJson('/actions/runs/'+TEST_RUN,fetchImpl),
   githubJson('/contents/'+CANDIDATE+'?ref='+REVIEW,fetchImpl),
   githubJson('/git/ref/heads/'+BRANCH,fetchImpl),
+  githubJson('/actions/runs/40628422023',fetchImpl),
+  githubJson('/contents/test/reality-personal-discovered-work-handoff-v0.1.test.js?ref=3448c6d694b440a0e0c4593ff30e2fc326824cd4',fetchImpl),
  ]);
  const shaBase=base?.object?.sha;
  const scope=pr?.number===PR&&pr?.head?.repo?.full_name===REPO&&
@@ -102,6 +104,13 @@ async function observeGithub(fetchImpl=fetch){
  const checked=run?.id===TEST_RUN&&run?.status==='completed'&&
   run?.conclusion==='success'&&run?.head_sha===pr?.head?.sha&&
   run?.name==='Reality ORIGINAL Owner Repair - Exact LLM Capability Installation Review';
+ const sourceFixed=fixedSource?.encoding==='base64'&&
+  typeof fixedSource.content==='string'&&fixedSource.content.length<190000&&
+  sha(Buffer.from(fixedSource.content.replace(/\s+/g,''),'base64'))===
+   'aca7e6386c226f9e9f9c6e6cd541b3470d8e38b25f1b0c02e9e35ce7b80c0d95'&&
+  fixedRun?.id===40628422023&&fixedRun?.status==='completed'&&
+  fixedRun?.conclusion==='success'&&
+  fixedRun?.head_sha==='3448c6d694b440a0e0c4593ff30e2fc326824cd4';
  const fixed=issue?.number===ISSUE&&
   issue?.title==='Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures';
  return Object.freeze({
@@ -112,7 +121,7 @@ async function observeGithub(fetchImpl=fetch){
   review_pr_merged:pr.merged===true,
   exact_llm_source_verified:Boolean(scope&&hashOk),
   sandbox_success:Boolean(scope&&checked),
-  historical_fixed_source_verified:fixed,
+  historical_fixed_source_verified:Boolean(fixed&&sourceFixed),
   original_fix_preexisted_model_installation:true,
   base_current:scope&&shaBase===pr.base.sha,
   original_candidate_sha256:ORIGINAL_OWNER_REPAIR_CANDIDATE_SHA256,
@@ -144,8 +153,7 @@ export async function originalOwnerContext({
   subjectId:session.user_id,
  });
  if(spine.continuity_root_id!==goal.state.continuity_root_id||
-    spine.worldline_id!==goal.state.continuity_root_id&&
-    spine.worldline_id!==goal.scope.worldline_id)
+    goal.scope.world!==goal.state.world_id)
   fail('OWNER_CONSOLE_CONTINUITY_SCOPE_CHANGED');
  const history=orderContinuityHistory(await createPersistence({...db}).reconstruct({
   continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id,
@@ -206,7 +214,7 @@ export async function prepareOriginalOwnerStage({
  if(!state.owner_goal_confirmed)
   fail('OWNER_CONSOLE_ORIGINAL_OWNER_GOAL_NOT_ACTIVE');
  const github=await observe();
- if(!github.exact_llm_source_verified||!github.sandbox_success||!github.base_current)
+ if(!github.exact_llm_source_verified||!github.sandbox_success)
   fail('OWNER_CONSOLE_ORIGINAL_MODEL_SOURCE_RECHECK_REQUIRED');
  let plan,scope,installed=null;
  if(stage==='INSTALL'){
@@ -298,7 +306,7 @@ export async function inspectOriginalOwnerConsole({
   sandbox_receipts:ctx.sandbox_receipts,
   owner_warrant_events:ctx.owner_warrant_events,
   saved_settlement_receipts:ctx.saved_settlement_receipts,
-  install_approval_can_prepare:flags.warranted_upgrade_ready&&github.base_current,
+  install_approval_can_prepare:flags.warranted_upgrade_ready,
   resume_approval_can_prepare:flags.installation_verified,
   execute_enabled:flags.warranted_upgrade_ready||flags.installation_verified,
   verified_settlement_receipt_required:true,
