@@ -88,7 +88,7 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p class="note">Every stage is tied to the same original work ID. Installation and resumption require independent, separate approvals. Reality will not use a GitHub merge as proof of final job completion.</p>
 <div class="step">
 <div class="num">1</div><div>
-<h3>Prepare exact installation</h3>
+<h3>Prepare exact installation · Requires verified governed draft PR</h3>
 <p>Reality must first have an owner-scoped sandbox-verification receipt, signed evidence warrant and governed draft PR. The original model-generated repair has passed independent tests, but those receipts are a separate requirement.</p>
 <button id="prepareInstall" type="button" disabled>Prepare installation approval</button>
 </div></div>
@@ -138,15 +138,15 @@ function stageReset(){prepared=null;approvedStage=null;$('stageDetail').hidden=t
 function render(s){
  snapshot=s;
  $('sourceState').textContent=s.original_source_verified?'Exact model source verified':'Source evidence unavailable';
- $('installState').textContent=s.installation_verified?'Verified installed':s.warranted_upgrade_ready?'Warrant verified · Awaiting approval':'Warrant / install pending';
+ $('installState').textContent=s.installation_verified?'Verified installed':s.verified_draft_ready?'Draft verified · Awaiting install approval':s.warranted_upgrade_ready?'Signed warrant verified · Draft PR pending':'Warrant / install pending';
  $('settlementState').textContent=s.job_settlement_verified?'Durably verified':'Not verified';
  $('summary').textContent=s.job_settlement_verified?'Original work settlement independently verified.':
   s.original_goal_active?'Original work restored. Next: '+String(s.next_required_step||'verification')+'.':
   'Open the original signed-in conversation and confirm the original goal before authorizing work.';
  $('blocker').textContent=s.warrant_and_draft_blocker?
-  'Installation boundary: '+String(s.warrant_and_draft_blocker)+'. The original repair PR #154 is review-only and is not itself a signed warrant.':
+  'Installation boundary: '+String(s.warrant_and_draft_blocker)+'. Verified signed evidence warrant is separate from a governed draft PR and installation approval.':
   'Exact owner-warranted plan independently verified.';
- status(s.job_settlement_verified?'Verified settled':s.warranted_upgrade_ready?'Owner approval available':'Evidence / owner gate pending');
+ status(s.job_settlement_verified?'Verified settled':s.verified_draft_ready?'Owner install approval available':s.warranted_upgrade_ready?'Signed warrant verified · Governed draft pending':'Evidence / owner gate pending');
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
  $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||s.original_source_verified!==true||s.owner_warrant_events>0;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
