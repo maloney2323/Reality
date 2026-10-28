@@ -244,6 +244,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
+  <div class="wc-diagnostic">
+   <button type="button" id="wcFinaleReadinessCheck">Verify self-correction finale · Read only</button>
+   <span id="wcFinaleReadinessResult" role="status" aria-live="polite">Exact model repair is independently sandbox-verified. Owner admission, install, resumption and settlement remain separate.</span>
+  </div>
  </div>
  <div class="wc-diagnostic">
   <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
@@ -1124,6 +1128,39 @@ async function wcLoadUnfinishedWork(){
  }
 }
 $('wcRefreshUnfinished').onclick=()=>{void wcLoadUnfinishedWork()};
+$('wcFinaleReadinessCheck').onclick=async()=>{
+ const button=$('wcFinaleReadinessCheck'),out=$('wcFinaleReadinessResult');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||''))){
+  out.textContent='Sign in and open an owner conversation first. No authorization has been issued.';
+  return;
+ }
+ button.disabled=true;
+ out.textContent='Independently checking exact model source, GitHub proof, current base and owner Continuity. Read only…';
+ try{
+  const response=await fetch('/api/reality/personal-controlled-finale-readiness',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conv,intent:'VERIFY_CONTROLLED_FINALE_READINESS'}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true){
+   out.textContent='Readiness blocked: '+String(result.error||'not independently verified')+'. No installation, external action or settlement occurred.';
+   return;
+  }
+  const state=String(result.state||'UNVERIFIED');
+  const descriptions={
+   REVALIDATION_REQUIRED_BASE_MOVED:'The reviewed target branch moved. Reality rejected the stale install scope. Exact correction remains verified; revalidation is required before approval.',
+   AWAITING_SIGNED_IN_ACTIVE_OWNER_GOAL:'A confirmed active owner goal is required before this controlled job can enter Continuity.',
+   AWAITING_AUTHENTICATED_OWNER_CONTINUITY_ADMISSION:'Verified GitHub correction exists, but no owner-bound sandbox receipt and signed evidence warrant have been re-observed.',
+   OWNER_WARRANT_VERIFIED_AWAITING_SEPARATE_EXACT_APPROVAL:'Owner-bound warrant verified. Installation and original-work execution each require separate explicit approvals.',
+  };
+  out.textContent=(descriptions[state]||state)+' No install or completed job is claimed.';
+ }catch{
+  out.textContent='Readback unavailable. No change to installed code, owner authority or the original job.';
+ }finally{button.disabled=false}
+};
 $('wcUnfinishedList').onclick=async event=>{
  const button=event.target.closest('button[data-unfinished-save]');
  if(!button||button.disabled)return;
