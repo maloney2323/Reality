@@ -75,7 +75,7 @@ export async function inspectOriginalExecutorRun({
  if(!Array.isArray(list?.workflow_runs)||list.workflow_runs.length>30)
   fail('ORIGINAL_EXECUTOR_PROVIDER_RUN_LIST_UNVERIFIED');
  const candidates=list.workflow_runs.filter(x=>x.name===NAME&&
-  x.path?.endsWith('/'+WORKFLOW)&&
+  typeof x.path==='string'&&x.path.includes('/.github/workflows/'+WORKFLOW)&&
   x.repository?.full_name==='maloney2323/Reality'&&
   x.head_repository?.full_name==='maloney2323/Reality');
  if(!candidates.length)
