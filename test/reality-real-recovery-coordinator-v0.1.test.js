@@ -115,5 +115,5 @@ test('user interface runs same original job without approval inference or false 
  assert.match(script,/original_job_completed!==false/);
  assert.match(script,/external_action_performed!==false/);
  assert.match(script,/Original job remains unfinished/);
- assert.match(script,/capability_gap/);
+ assert.match(script,/current_decision/);
 });
