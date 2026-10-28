@@ -5,6 +5,7 @@ on:
       - experiment/reality-live-durable-adversarial-20261025
     paths:
       - '.github/workflows/reality-original-installed-executor-live-reconcile-v0.1.yml'
+      - 'src/reality-extensions/reality-original-maintenance-executor.mjs'
   workflow_dispatch:
 permissions:
   contents: read
