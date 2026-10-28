@@ -134,9 +134,10 @@ export async function executeOwnerBoundUpgradeClosure({
     !WORK.test(String(originalWorkId||''))||
     env?.VERCEL_ENV!=='preview'||typeof prepare!=='function')
   fail('UPGRADE_CLOSURE_TRUSTED_PREVIEW_CONTEXT_REQUIRED');
- const names=['consumeInstallGrant','install','observeInstall','register',
-  'readRegistry','readFreshGoal','consumeResumeGrant','resumeOriginal',
-  'observeOriginal','appendSettlement','readSettlement'];
+ const names=['consumeInstallGrant','install','observeInstall',
+  'settleInstallGrant','register','readRegistry','readFreshGoal',
+  'consumeResumeGrant','resumeOriginal','observeOriginal',
+  'settleResumeGrant','appendSettlement','readSettlement'];
  for(const name of names)mandatoryPort(ports,name);
  // Never derive a trusted ready plan from caller JSON. The trusted preparer
  // must re-load owner Continuity and provider evidence immediately.
@@ -185,6 +186,14 @@ export async function executeOwnerBoundUpgradeClosure({
      !SHA.test(String(installed?.merge_commit_sha||''))||
      installed?.production_deployment_performed!==false)
    fail('UPGRADE_CLOSURE_INDEPENDENT_INSTALL_READBACK_REQUIRED');
+  phase='INSTALL_GRANT_SETTLEMENT';
+  const installationLease=await ports.settleInstallGrant({
+   session,scope,plan,grant,installed,outcome:'VERIFIED',env,
+  });
+  if(installationLease?.status!=='VERIFIED'||
+     installationLease?.reservation_id!==grant.grant_id||
+     installationLease?.durably_settled!==true)
+   fail('UPGRADE_CLOSURE_INSTALL_RESERVATION_NOT_DURABLY_SETTLED');
   phase='REGISTRATION';
   await ports.register({session,scope,plan,installed,env});
   phase='REGISTRY_READBACK';
@@ -232,6 +241,14 @@ export async function executeOwnerBoundUpgradeClosure({
      !outcome.execution_receipt_id||
      typeof outcome?.evidence_ref!=='string'||!outcome.evidence_ref)
    fail('UPGRADE_CLOSURE_ORIGINAL_JOB_OBSERVATION_NOT_VERIFIED');
+  phase='RESUME_GRANT_SETTLEMENT';
+  const originalLease=await ports.settleResumeGrant({
+   session,scope,plan,resumeGrant,outcome,outcomeState:'VERIFIED',env,
+  });
+  if(originalLease?.status!=='VERIFIED'||
+     originalLease?.reservation_id!==resumeGrant.grant_id||
+     originalLease?.durably_settled!==true)
+   fail('UPGRADE_CLOSURE_ORIGINAL_RESERVATION_NOT_DURABLY_SETTLED');
   phase='SETTLEMENT';
   const receipt=await ports.appendSettlement({
    session,scope,plan,installed,active,outcome,env,
@@ -261,6 +278,8 @@ export async function executeOwnerBoundUpgradeClosure({
    original_job_completed:true,
    independent_install_readback:true,independent_job_readback:true,
    durable_settlement_readback:true,
+   installation_reservation_settled:true,
+   original_work_reservation_settled:true,
    production_deployment_performed:false,
   });
  }catch(error){
