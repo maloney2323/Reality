@@ -21,13 +21,14 @@ export async function adoptControlledFinaleIntoOwnerContinuity({
  session,conversationId,confirmation,env=process.env,
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
+ resolveDb=resolveReliabilityBenchmarkDb,
  verifyEvidence=verifyControlledFinaleIndependentEvidence,
 }={}){
  if(confirmation!==FINALE_OWNER_ADOPTION_INTENT)fail('FINALE_OWNER_EXACT_ADOPTION_REQUIRED');
  if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
     !validUuid(session?.user_id)||!validUuid(conversationId))
   fail('FINALE_OWNER_SIGNED_IN_PREVIEW_REQUIRED');
- const db=resolveReliabilityBenchmarkDb(env);
+ const db=resolveDb(env);
  if(!db?.strictSecrets||!db.secretKey||db.url!==session?.config?.url||
     db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail('FINALE_OWNER_EXACT_DATABASE_REQUIRED');
