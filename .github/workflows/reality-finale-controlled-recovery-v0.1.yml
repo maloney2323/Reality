@@ -1,0 +1,108 @@
+name: Reality Finale - Controlled Live Model Recovery (Noncustomer)
+on:
+  push:
+    branches:
+      - experiment/reality-full-loop-finale-20261028
+    paths:
+      - 'scripts/reality-finale-controlled-gap-v0.1.mjs'
+      - 'scripts/reality-finale-controlled-model-v0.1.mjs'
+      - 'scripts/reality-finale-independent-holdout-v0.1.mjs'
+      - 'test/reality-finale-estimate-approval-gate.test.mjs'
+      - '.github/workflows/reality-finale-controlled-recovery-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-real-red-and-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Ground new controlled job in actual failed test and Reality gap engine
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-finale-controlled-gap-v0.1.mjs
+          node scripts/reality-finale-controlled-gap-v0.1.mjs
+          test -s finale-evidence/baseline.json
+          test -s finale-evidence/experiment.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-finale-real-red-gap
+          path: finale-evidence/
+          retention-days: 14
+  real-model-synthesis:
+    needs: actual-real-red-and-continuity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-finale-real-red-gap
+          path: finale-evidence
+      - name: Call real OpenAI model for bounded missing capability only
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-finale-controlled-model-v0.1.mjs
+          node scripts/reality-finale-controlled-model-v0.1.mjs
+          test -s finale-candidate/candidate.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-finale-untrusted-model-candidate
+          path: finale-candidate/
+          retention-days: 14
+  independent-red-green-and-hidden:
+    needs: real-model-synthesis
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-finale-real-red-gap
+          path: finale-evidence
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-finale-untrusted-model-candidate
+          path: finale-candidate
+      - name: Execute only model candidate in no-network read-only Docker against frozen test and hidden holdouts
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-finale-independent-holdout-v0.1.mjs
+          mkdir -p src/reality-extensions
+          touch src/reality-extensions/construction-estimate-approval-gate.mjs
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -v "${{ github.workspace }}/finale-evidence:/evidence:ro" \
+            -v "${{ github.workspace }}/finale-candidate:/work:ro" \
+            -v "${{ github.workspace }}/finale-candidate/candidate.mjs:/repo/src/reality-extensions/construction-estimate-approval-gate.mjs:ro" \
+            -w /repo node:22-alpine \
+            sh -c 'node --test test/reality-finale-estimate-approval-gate.test.mjs && node scripts/reality-finale-independent-holdout-v0.1.mjs' \
+            > finale-independent-sandbox-result.log
+          cat finale-independent-sandbox-result.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-finale-independent-sandbox-result
+          path: finale-independent-sandbox-result.log
+          if-no-files-found: warn
+          retention-days: 14
