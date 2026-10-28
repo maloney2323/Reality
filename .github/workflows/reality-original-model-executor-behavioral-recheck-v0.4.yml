@@ -1,0 +1,66 @@
+name: Reality ORIGINAL Model Executor Independently Verified Behavioral Recheck v0.4
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-model-executor-behavioral-recheck-v0.4.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-model-corrected-original-executor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40758956208
+          name: reality-original-feedback-model-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-corrected-artifact
+      - name: Independently attest real model correction for the same original work
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('original-corrected-artifact/generation-evidence.json','utf8'));
+          const bytes=fs.readFileSync('original-corrected-artifact/candidate.mjs');
+          const hash=createHash('sha256').update(bytes).digest('hex');
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             p.model_generated!==true||typeof p.model_response_id!=='string'||!p.model_response_id||
+             p.candidate_sha256!==hash||
+             p.status!=='MODEL_ORIGINAL_EXECUTOR_CORRECTED_AWAITING_INDEPENDENT_RETEST'||
+             p.original_job_completed!==false||p.github_provider_write_performed!==false)
+           throw Error('ORIGINAL_EXECUTOR_CORRECTED_ARTIFACT_PROVENANCE_INVALID');
+          console.log(JSON.stringify({original_work_id:p.original_work_id,
+           corrected_model_response_id:p.model_response_id,source_sha256:hash,
+           owner_warrant_issued:false,original_job_completed:false}));
+          JS
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-repair-proposal.mjs | cut -d' ' -f1)" = "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+          mkdir -p owner-original-repair-executor
+          cp original-corrected-artifact/candidate.mjs owner-original-repair-executor/
+          cp src/reality-extensions/reality-original-maintenance-repair-proposal.mjs owner-original-repair-executor/
+      - name: Run independent frozen owner-work acceptance in read-only secretless Docker
+        run: |
+          set +e
+          timeout 130s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
+            > original-corrected-artifact/independent-frozen-results.txt 2>&1
+          status=$?
+          set -e
+          tail -n 120 original-corrected-artifact/independent-frozen-results.txt
+          exit "$status"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-model-behavioral-recheck-results
+          path: original-corrected-artifact/
+          retention-days: 14
