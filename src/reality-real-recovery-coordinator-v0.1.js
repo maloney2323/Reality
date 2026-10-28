@@ -12,6 +12,8 @@ import {createContinuitySpine}
  from './reality-continuity-spine-v2.0.js';
 import {projectRealityUpgradeDiscovery}
  from './reality-upgrade-discovery-v0.1.js';
+import {probeStalledOriginalRepair}
+ from './reality-recovery-continuation-probe-v0.1.js';
 import {validUuid}
  from './reality-private-chat-store-v0.1.js';
 
@@ -20,6 +22,7 @@ const requireScope=(ok,code)=>{if(!ok)throw Error(code)};
 const SAME_WORK=/^work:[a-f0-9]{32}$/;
 export function projectOriginalJobRecoveryLoop({
  originalWorkId,conversationId,evidence,cognitionState,goalId,
+ runtimeProof=null,
 }={}){
  requireScope(SAME_WORK.test(String(originalWorkId||''))&&
   validUuid(conversationId)&&
@@ -79,6 +82,13 @@ export function projectOriginalJobRecoveryLoop({
   provider_passing_sha:evidence.later_success?.head_sha||null,
   capability_engine_state:cognitionState.state,
   upgrade_discovery:upgradeDiscovery,
+  // The historical workflow fix and the ability to finish the owner's
+  // original work are separate questions. Do not let "NO_CAPABILITY_GAP"
+  // from a synthetic empty list silently close the latter.
+  continuation_probe:probeStalledOriginalRepair({
+   originalWorkId,evidence,completedStages:timeline.filter(s=>s.state==='VERIFIED').length,
+   runtimeProof,
+  }),
   current_decision:later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
    'BLOCKED_REQUIRES_ROOT_CAUSE_DIAGNOSIS',
   timeline,
@@ -100,6 +110,7 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
  inspectEvidence=inspectAuthenticatedOriginalWorkRepairEvidence,
  readGoal=readFreshPersonalGoalState,
  cognition=runAutonomousClosurePass,
+ runtimeProof=null,
 }={}){
  requireScope(validUuid(session?.user_id)&&validUuid(conversationId)&&
   SAME_WORK.test(String(workId||''))&&env.VERCEL_ENV==='preview',
@@ -123,8 +134,11 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
   grounded.state.continuity_root_id,
   'LIVE_LOOP_CANONICAL_CONTINUITY_SCOPE_CHANGED');
  const worldline=canonical.worldline_id;
- // Cognition examines observed evidence without asserting a missing
- // capability, inventing a new job, or installing an upgrade.
+ // Historical workflow cognition currently has no verified missing
+ // capability observations. This must NOT be read as proof the original
+ // REPAIR EXECUTOR is available. The separate continuation probe makes
+ // that unresolved original-work capability explicit and discoverable.
+ // No gap is upgraded without independent runtime/contract evidence.
  const original={
   id:workId,continuity_root_id:grounded.state.continuity_root_id,
   worldline_id:worldline,
@@ -143,5 +157,6 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
  return projectOriginalJobRecoveryLoop({
   originalWorkId:workId,conversationId,evidence,
   cognitionState:result,goalId:grounded.state.active_goal_id,
+  runtimeProof,
  });
 }
