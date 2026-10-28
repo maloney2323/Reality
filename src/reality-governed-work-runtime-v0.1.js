@@ -34,7 +34,8 @@ const SENSITIVE_OPERATIONS = new Set([
 // operation, never from the caller/LLM's 'consequential:false' assertion.
 // A provider write remains consequential even if the work item calls it read.
 const SERVER_WRITE_OPERATIONS = Object.freeze({
-  github: new Set(['create_issue','create_isolated_upgrade_pr']),
+  github: new Set(['create_issue','create_isolated_upgrade_pr',
+    'install_exact_verified_upgrade','resume_original_work']),
   vercel: new Set(['create_deployment']),
   supabase: new Set(['insert','update','delete']),
 });
