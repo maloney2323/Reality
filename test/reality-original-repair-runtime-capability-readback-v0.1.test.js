@@ -46,7 +46,7 @@ function harness(capabilities=[]){
  }
  add('original_goal',{goal_id:goalId},'RAW_SIGNAL');
  add('personal_discovered_work_handoff',{
-  work_id:workId,goal_id:goalId,work_item:item,
+  work_id:workId,goal_id:goalId,work_item:structuredClone(item),
  },'OBSERVATION','OBSERVED',{
   source:'reality-personal-discovered-work-handoff-v0.1',
   principal_id:user,conversation_id:conversationId});
