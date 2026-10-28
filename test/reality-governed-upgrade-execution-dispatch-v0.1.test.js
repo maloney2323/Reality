@@ -85,7 +85,23 @@ function fixture(){
  return {originalWorkItem,verifiedExperiment,plan,workItem,warrant,
   verifierReceipt,checkpointId,goalRevision};
 }
-function fakeGitHub({tamperPr=false,failWrite=false}={}){
+function fakeGitHub({tamperPr=false,failWrite=false,missingWorkflow=false,badWorkflow=false}={}){
+ const ciYaml=['name: Governed',
+  'on:',
+  '  push:',
+  '    paths:',
+  "      - 'src/reality-extensions/**'",
+  "      - 'test/reality-extensions/**'",
+  '  pull_request:',
+  '    paths:',
+  "      - 'src/reality-extensions/**'",
+  "      - 'test/reality-extensions/**'",
+  'jobs:',
+  '  verify:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - run: echo verified',
+ ].join('\\n')+'\\n';
  const state={branch:null,head:shaA,files:new Map(),pr:null,writes:[],gets:0};
  const get=async path=>{
   state.gets++;
@@ -93,6 +109,13 @@ function fakeGitHub({tamperPr=false,failWrite=false}={}){
    return {ref:'refs/heads/'+BASE,object:{sha:shaA}};
   if(path===ROOT+'/git/ref/heads/'+state.branch)
    return {ref:'refs/heads/'+state.branch,object:{sha:state.head}};
+  if(path.startsWith(ROOT+'/contents/.github/workflows/')){
+   if(missingWorkflow)throw Object.assign(Error('NO_CI_WORKFLOW'),{status:404});
+   const workflow=badWorkflow?ciYaml.replaceAll("'src/reality-extensions/**'","'src/other/**'"):ciYaml;
+   const filePath=path.slice((ROOT+'/contents/').length).split('?')[0];
+   return {type:'file',path:filePath,encoding:'base64',sha:shaA,
+     content:Buffer.from(workflow).toString('base64')};
+  }
   if(path.startsWith(ROOT+'/contents/')){
    const p=path.slice((ROOT+'/contents/').length).split('?')[0];
    if(!state.files.has(p)){const e=Error('GITHUB_CONNECTOR_404');e.status=404;throw e;}
@@ -237,6 +260,15 @@ test('real governed execution engine consumes DB-style reservation, writes verif
  assert.equal(a.reservation.results().settled,'VERIFIED');
  assert.deepEqual(a.mock.state.writes.map(x=>x.method),['POST','PUT','POST']);
  assert.ok(a.mock.state.gets>=8);
+});
+test('missing required pinned-base CI prevents reservation and all GitHub writes',async()=>{
+ for(const mock of [fakeGitHub({missingWorkflow:true}),fakeGitHub({badWorkflow:true})]){
+  const a=args({mock});
+  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(a),
+   /UPGRADE_BASE_REQUIRED_CI_(WORKFLOW_UNAVAILABLE|TRIGGER_MISSING)/);
+  assert.equal(a.reservation.results().claimed,0);
+  assert.equal(a.mock.state.writes.length,0);
+ }
 });
 test('missing explicit new execution confirmation and foreign signed-in identity fail before reservation',async()=>{
  const a=args();a.executionConfirmation='APPROVE_THIS_EXACT_WORK_ITEM';
