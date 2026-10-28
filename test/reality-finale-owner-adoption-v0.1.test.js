@@ -23,7 +23,12 @@ function fixture(){
   eventId:'55555555-5555-4555-8555-555555555555',
   effectiveTime:'2026-10-27T00:00:00.000Z',assertionTime:'2026-10-27T00:00:00.000Z',
   payload:{goal:'test'},epistemicStatus:'OBSERVED'});
- const history=[start];
+ const storedRepresentation=e=>({...e,provenance:{...e.provenance,
+  continuity_spine:{version:'reality-continuity-spine-v2.1',
+   prior_lineage_hash:e.prior_lineage_hash||null,
+   transformation_receipt_id:e.transformation_receipt_id||null}},
+ });
+ const history=[storedRepresentation(start)];
  const stored=[];
  const readGoal=async()=>({
   principal_id:owner,conversation_id:conversation,
@@ -48,7 +53,8 @@ function fixture(){
  });
  const createPersistence=()=>({
   reconstruct:async()=>history,
-  appendEvent:async e=>{history.push(e);stored.push(e);},
+  appendEvent:async e=>{const copy=storedRepresentation(e);
+   history.push(copy);stored.push(copy);},
  });
  const args={session,conversationId:conversation,confirmation:FINALE_OWNER_ADOPTION_INTENT,
   env,readGoal,createPersistence,verifyEvidence,
