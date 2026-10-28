@@ -252,7 +252,7 @@ test('changed candidate hash, wrong work ID or missing durable source fail close
  const a=args();
  a.expectedCandidateHash='f'.repeat(64);
  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(a),
-  /UPGRADE_BROWSER_CONFIRMED_CANDIDATE_CHANGED/);
+  /UPGRADE_PAYLOAD_TIED_WARRANT_INVALID_OR_EXPIRED/);
  assert.equal(a.reservation.results().claimed,0);
  const b=args();b.loadTrustedUpgrade=async()=>null;
  await assert.rejects(dispatchAuthenticatedGovernedUpgradeDraft(b),
