@@ -31,7 +31,7 @@ test('27 historical tests and user acceptance do not install or settle an upgrad
 });
 test('unconfirmed or changed owner objective blocks execution',()=>{
  const flags=originalOwnerConsoleFlags({goalConfirmed:false,evidence,github:proven,
-  warrantVerified:true,installationVerified:true,settlementVerified:true});
+  warrantVerified:true,draftVerified:true,installationVerified:true,settlementVerified:true});
  assert.equal(flags.original_job_completed,false);
  assert.equal(flags.warranted_upgrade_ready,false);
  assert.equal(flags.next_required_step,'OPEN_OR_CONFIRM_ORIGINAL_OWNER_GOAL');
@@ -40,26 +40,37 @@ test('verified warrant alone is not installation or original job settlement',()=
  const flags=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:proven,
   warrantVerified:true});
  assert.equal(flags.warranted_upgrade_ready,true);
+ assert.equal(flags.verified_draft_ready,false);
+ assert.equal(flags.next_required_step,'PREPARE_GOVERNED_DRAFT_PR_AUTHORIZATION');
  assert.equal(flags.installation_verified,false);
  assert.equal(flags.job_settlement_verified,false);
 });
+test('even a valid signed owner warrant does not enable installation before durable governed PR',()=>{
+ const result=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:proven,
+  warrantVerified:true,installationVerified:true,settlementVerified:true});
+ assert.equal(result.warranted_upgrade_ready,true);
+ assert.equal(result.verified_draft_ready,false);
+ assert.equal(result.installation_verified,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.next_required_step,'PREPARE_GOVERNED_DRAFT_PR_AUTHORIZATION');
+});
 test('installed module is not the original job outcome',()=>{
  const flags=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:proven,
-  warrantVerified:true,installationVerified:true});
+  warrantVerified:true,draftVerified:true,installationVerified:true});
  assert.equal(flags.installation_verified,true);
  assert.equal(flags.job_settlement_verified,false);
  assert.equal(flags.original_job_completed,false);
 });
 test('full verified evidence is the ONLY state that may claim original-job settlement',()=>{
  const flags=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:proven,
-  warrantVerified:true,installationVerified:true,settlementVerified:true});
+  warrantVerified:true,draftVerified:true,installationVerified:true,settlementVerified:true});
  assert.equal(flags.original_job_completed,true);
  assert.equal(flags.next_required_step,'VERIFIED_SETTLED');
 });
 test('a source mismatch blocks warrant promotion even with alleged installs and settlements',()=>{
  const flags=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,
   github:{...proven,exact_llm_source_verified:false},
-  warrantVerified:true,installationVerified:true,settlementVerified:true});
+  warrantVerified:true,draftVerified:true,installationVerified:true,settlementVerified:true});
  assert.equal(flags.original_source_verified,false);
  assert.equal(flags.original_job_completed,false);
  assert.equal(flags.next_required_step,'INDEPENDENT_GITHUB_MODEL_SOURCE_REVALIDATION');
