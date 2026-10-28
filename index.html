@@ -972,6 +972,11 @@ function wcUnfinishedHTML(job){
     'The previous action is not independently verified.')+'</p>'+
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
+  '<p class="wc-note"><strong>Reality Upgrade Discovery:</strong> '+
+   (job.state==='RECOVERY_CHECKPOINT_SAVED'?
+    'Run recovery to determine if a capability upgrade is actually needed.':
+    'Diagnosis pending · reconcile the prior action before proposing any upgrade.')+
+   '</p>'+
   '<div class="wc-unfinished-actions">'+runLoop+verifyFix+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
@@ -1149,12 +1154,32 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
      info.external_action_performed!==false||
      info.action_authorized!==false||
      info.diagnosis_saved!==true||!info.diagnosis_receipt_id||
+     info.upgrade_discovery?.original_job_completed!==false||
+     info.upgrade_discovery?.authorization_granted!==false||
+     !['NO_NEW_UPGRADE_NEEDED','DIAGNOSIS_REQUIRED','CAPABILITY_GAP_CANDIDATE'].includes(info.upgrade_discovery?.status)||
      !Array.isArray(info.timeline)||info.timeline.length!==7)
    throw Error(info.error_code||'RECOVERY_LOOP_NOT_VERIFIED');
   place.replaceChildren();
   const h=document.createElement('h4');
   h.textContent='Recovery Loop · '+info.completed_stages+' of '+info.total_stages+' stages verified';
   place.appendChild(h);
+  const upgrade=info.upgrade_discovery;
+  const upgradeHeader=document.createElement('h4');
+  upgradeHeader.textContent='Reality Upgrade Discovery · '+
+   upgrade.status.replaceAll('_',' ');
+  place.appendChild(upgradeHeader);
+  const upgradeReason=document.createElement('p');
+  upgradeReason.textContent='Diagnosis: '+upgrade.reason;
+  place.appendChild(upgradeReason);
+  if(upgrade.needed_upgrade){
+   const instrument=document.createElement('p');
+   instrument.textContent='Proposed instrument: '+upgrade.needed_upgrade;
+   place.appendChild(instrument);
+  }
+  const upgradeNext=document.createElement('p');
+  upgradeNext.textContent='Next: '+upgrade.next_action+
+   ' No upgrade, GitHub write, or promotion has been authorized.';
+  place.appendChild(upgradeNext);
   for(const item of info.timeline){
    const p=document.createElement('p');
    p.textContent=(item.state==='VERIFIED'?'✓ ':'○ ')+
