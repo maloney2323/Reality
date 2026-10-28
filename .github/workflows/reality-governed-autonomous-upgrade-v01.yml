@@ -124,12 +124,12 @@ jobs:
           test ! -f src/reality-extensions/construction-update-parser.mjs
           test -s verified-developer-pilot/candidate.mjs
           test -s verified-developer-pilot/independent-proof.json
-          timeout 75s docker run --rm --network none --read-only --cap-drop ALL \\
-            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \\
-            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \\
-            -v "${{ github.workspace }}/verified-developer-pilot:/work:ro" \\
-            -v "${{ github.workspace }}/scripts:/tools:ro" \\
-            node:22-alpine node /tools/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs \\
+          timeout 75s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/verified-developer-pilot:/work:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs \
             > verified-developer-pilot/developer-job-reactivation-proof.json
           node --input-type=module - <<'JS'
           import fs from 'node:fs';
