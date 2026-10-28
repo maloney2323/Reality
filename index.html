@@ -958,7 +958,7 @@ function wcUnfinishedHTML(job){
  const runLoop=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
   job.goal_still_current===true&&job.action_completed===true?
   '<button type="button" data-recovery-run="'+esc(job.work_id)+
-   '" data-recovery-conversation="'+esc(job.conversation_id)+'">Run recovery loop · Review</button>':'';
+   '" data-recovery-conversation="'+esc(job.conversation_id)+'">Run recovery loop · Save findings</button>':'';
  return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
   '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
   '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
@@ -1132,14 +1132,18 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
  button.disabled=true;
  place.textContent='Restoring original job → checking GitHub → running capability diagnosis · No provider writes…';
  try{
-  const response=await fetch('/api/reality/personal-recovery-loop?conversation_id='+
-   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
-   {credentials:'same-origin',cache:'no-store'});
+  const response=await fetch('/api/reality/personal-recovery-loop',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RUN_AND_RECORD_RECOVERY_DIAGNOSIS',
+    conversation_id:conversationId,work_id:workId}),
+  });
   const info=await response.json();
   if(!response.ok||info.ok!==true||info.original_work_id!==workId||
      info.original_job_completed!==false||
      info.external_action_performed!==false||
      info.action_authorized!==false||
+     info.diagnosis_saved!==true||!info.diagnosis_receipt_id||
      !Array.isArray(info.timeline)||info.timeline.length!==7)
    throw Error(info.error_code||'RECOVERY_LOOP_NOT_VERIFIED');
   place.replaceChildren();
@@ -1164,6 +1168,10 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
     'Verify root cause and original job acceptance; no new upgrade required.':
     'Verify a genuine missing capability and request fresh authorization.');
   place.appendChild(closing);
+  const receipt=document.createElement('p');
+  receipt.textContent='Saved in original Continuity: '+info.diagnosis_receipt_id+
+   ' · Original repair still OPEN.';
+  place.appendChild(receipt);
  }catch(e){
   place.textContent='Unable to verify the full recovery decision ('+
    (/^(?:LIVE_LOOP|RECOVERY)_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
