@@ -25,11 +25,11 @@ jobs:
         with:
           run-id: 40758956208
           name: reality-original-feedback-model-candidate
-          github-token: \${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: original-model-artifact
       - name: Reobserve frozen ten-case and live original GitHub execution independently
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node --input-type=module <<'JS'
           const h={accept:'application/vnd.github+json',authorization:'Bearer '+process.env.GH_TOKEN};
@@ -53,7 +53,7 @@ jobs:
           JS
       - name: Confirm new extension files do not already exist on exact isolated target branch
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node --input-type=module <<'JS'
           const h={accept:'application/vnd.github+json',authorization:'Bearer '+process.env.GH_TOKEN};
@@ -78,7 +78,7 @@ jobs:
             --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
             --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
             -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
-            -v "\${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
             node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
             > original-executor-installable-package/frozen-recheck.txt 2>&1
           state=$?
@@ -91,7 +91,7 @@ jobs:
           timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
             --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
             --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
-            -v "\${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
             node --test test/reality-original-executor-security-holdout-v0.1.test.mjs \
             > original-executor-installable-package/independent-security-holdout.txt 2>&1
           state=$?
