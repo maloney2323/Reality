@@ -28,7 +28,7 @@ function setup(){
  const history=[],at='2026-10-28T12:00:00.000Z';
  const add=(entityType,payload)=>{
   const prev=history.at(-1);
-  const node=appendContinuityNode({spine,stage:'VERIFICATION',
+  const node=appendContinuityNode({spine,stage:history.length?'VERIFICATION':'RAW_SIGNAL',
    entityId:workId,eventId:randomUUID(),
    parentEventId:prev?.event_id||null,
    priorLineageHash:prev?.lineage_hash||null,
@@ -39,6 +39,7 @@ function setup(){
     prior_lineage_hash:node.prior_lineage_hash,
     transformation_receipt_id:node.transformation_receipt_id}}});
  };
+ add('initial_user_goal',{goal_id:goalId});
  add('personal_upgrade_runtime_verified',{
   original_work_id:workId,candidate_sha256:candidate});
  const readGoal=async()=>({
@@ -76,7 +77,7 @@ test('previous durable original-job settlement refuses another dispatch',async()
   /UPGRADE_FRESH_GOAL_ALREADY_SETTLED_NO_RETRY/);
 });
 test('runtime not registered in same original worldline means no resumption',async()=>{
- const x=setup();x.history.splice(0,1);
+ const x=setup();x.history.splice(1,1);
  await assert.rejects(readOwnerOriginalWorkGoalBeforeResume(x.args),
   /UPGRADE_FRESH_GOAL_ACTIVATION_NOT_IN_ORIGINAL_CONTINUITY/);
 });
