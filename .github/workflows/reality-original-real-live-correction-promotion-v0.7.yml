@@ -1,0 +1,110 @@
+name: Reality Original Live Model Correction Autonomous Isolated Promotion v0.7
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-real-live-correction-promotion-v0.7.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+concurrency:
+  group: reality-original-143-exact-model-correction-promotion-v07
+  cancel-in-progress: false
+jobs:
+  promote-only-exact-green-model-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40776569560
+          name: reality-original-real-live-model-corrected-independent-18-case-proof
+          github-token: ${{ github.token }}
+          path: frozen-model-proof
+      - name: Independently attest the exact already-successful model correction and all 18 tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {readFileSync} from 'node:fs';
+          const root='frozen-model-proof/original-live-model-corrected/';
+          const proof=JSON.parse(readFileSync(root+'generation-evidence.json','utf8'));
+          const source=readFileSync(root+'candidate.mjs');
+          const digest=createHash('sha256').update(source).digest('hex');
+          const runUrl='https://api.github.com/repos/maloney2323/Reality/actions/runs/40776569560';
+          const headers={accept:'application/vnd.github+json',
+           authorization:'Bearer '+process.env.GH_TOKEN,'x-github-api-version':'2022-11-28'};
+          const req=async suffix=>{const r=await fetch(runUrl+suffix,{headers});
+           if(r.status!==200)throw Error('REAL_MODEL_CORRECTION_VERIFIED_RUN_UNAVAILABLE');
+           return r.json()};
+          const run=await req(''),jobs=await req('/jobs?per_page=50');
+          if(run.id!==40776569560||run.status!=='completed'||run.conclusion!=='success'||
+             run.head_sha!=='ffacfe65cc4dd7e601d42d9e92c8238a6478d334'||
+             run.repository?.full_name!=='maloney2323/Reality'||
+             jobs.total_count!==1||jobs.jobs?.length!==1||
+             jobs.jobs[0].name!=='independent-original-model-sandbox-verifier'||
+             jobs.jobs[0].conclusion!=='success'||
+             proof.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             proof.model_generated!==true||
+             proof.model_response_id!=='resp_035645a615e57f6b006ae2702baa6887d0865bb1af5c6e501b'||
+             digest!=='7ba3cc3273c2301c6902b6b3b3d6d0247e8b6abe0398467656e5e2ca93648128'||
+             proof.candidate_sha256!==digest||
+             proof.original_job_completed!==false||proof.github_provider_write_performed!==false)
+           throw Error('REAL_MODEL_CORRECTION_SOURCE_OR_VERIFIED_RUN_MISMATCH');
+          for(const [file,total] of [
+           ['independent-frozen-results.txt',10],
+           ['independent-security-results.txt',4],
+           ['independent-real-github-body-results.txt',4]
+          ]){
+           const text=readFileSync(root+file,'utf8');
+           if(!text.includes('# tests '+total)||!text.includes('# pass '+total)||
+              !text.includes('# fail 0'))throw Error('REAL_MODEL_CORRECTION_INDEPENDENT_HOLDOUT_NOT_GREEN_'+file);
+          }
+          console.log(JSON.stringify({status:'REALITY_MODEL_CORRECTED_EXACT_BYTES_READY_FOR_ISOLATED_PR',
+           source_sha256:digest,original_work_id:proof.original_work_id,
+           verified_case_count:18,model_response_id:proof.model_response_id,
+           production_changes:false,original_job_completed:false}));
+          JS
+      - name: Reality stages the exact real-model correction in a new isolated branch
+        run: |
+          set -euo pipefail
+          base=experiment/reality-live-durable-adversarial-20261025
+          branch=reality/self-correction/original-143-real-issue-body-20261028
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null 2>&1; then
+            echo 'ORIGINAL_REAL_MODEL_CORRECTION_BRANCH_ALREADY_EXISTS_NO_RETRY'
+            exit 30
+          fi
+          git fetch --no-tags origin "refs/heads/$base"
+          test "$(git rev-parse FETCH_HEAD)" = "0e83d0388e92220d2cf08f277e2a44e0c877367c"
+          git checkout -b "$branch" FETCH_HEAD
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-executor.mjs | cut -d' ' -f1)" = "61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17"
+          cp frozen-model-proof/original-live-model-corrected/candidate.mjs src/reality-extensions/reality-original-maintenance-executor.mjs
+          chmod 644 src/reality-extensions/reality-original-maintenance-executor.mjs
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-executor.mjs | cut -d' ' -f1)" = "7ba3cc3273c2301c6902b6b3b3d6d0247e8b6abe0398467656e5e2ca93648128"
+          node --check src/reality-extensions/reality-original-maintenance-executor.mjs
+          git add -- src/reality-extensions/reality-original-maintenance-executor.mjs
+          test "$(git diff --cached --name-only)" = "src/reality-extensions/reality-original-maintenance-executor.mjs"
+          git config user.name "Reality Model Correction Bot"
+          git config user.email "reality-model-correction@users.noreply.github.com"
+          git commit -m "Reality self-correction: real GitHub issue body envelope bug (18/18 verified)"
+          git push origin "HEAD:refs/heads/$branch"
+          echo 'ISOLATED_CORRECTED_SOURCE_BRANCH_PUSHED=true'
+      - name: Reality opens a draft PR ONLY; never merge or change production
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --repo maloney2323/Reality \
+            --head reality/self-correction/original-143-real-issue-body-20261028 \
+            --base experiment/reality-live-durable-adversarial-20261025 \
+            --draft \
+            --title "Reality original #143: model self-corrects real GitHub issue-body failure (18/18)" \
+            --body "Original work: work:24cda9611404e9bcb47909976067605c. REAL model-generated source response resp_035645a615e57f6b006ae2702baa6887d0865bb1af5c6e501b; frozen exact SHA-256 7ba3cc3273c2301c6902b6b3b3d6d0247e8b6abe0398467656e5e2ca93648128. Live installed CI failure 40776036280 exposed a GitHub issue.body API-envelope bug. Independent correction proof: 10/10 regression + 4/4 security + 4/4 new GitHub-response holdout, run https://github.com/maloney2323/Reality/actions/runs/40776569560. Only the model-generated executor file changes. No production merge, owner-registry activation, new source repair, or customer settlement is implied."
