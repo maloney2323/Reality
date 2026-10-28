@@ -105,6 +105,35 @@ export function projectUnfinishedFromConversation({
       ownerAccepted.payload?.external_action_performed!==false)
     throw Error('UNFINISHED_OWNER_ACCEPTANCE_PROVENANCE_INVALID');
   }
+  // Same original-worldline evidence of Reality independently recognizing
+  // its own missing repair execution path. NOT a verified build warrant or
+  // an authorization to write code / conclude the underlying business job.
+  const candidates=history.filter(e=>
+   e.entity_type==='personal_original_repair_capability_candidate'&&
+   e.payload?.original_work_id===report.work_id);
+  if(candidates.length>1)
+   throw Error('UNFINISHED_ORIGINAL_CAPABILITY_CANDIDATE_DUPLICATE');
+  const candidate=candidates[0]||null;
+  if(candidate){
+   if(!checkpointSaved||!goalCurrent||
+      candidate.event_kind!=='WORK'||
+      candidate.epistemic_status!=='CORROBORATED'||
+      candidate.provenance?.source!=='reality-original-repair-capability-candidate-v0.1'||
+      candidate.provenance?.conversation_id!==conversationId||
+      candidate.provenance?.principal_id!==handoff.provenance?.principal_id||
+      candidate.payload?.original_goal_id!==handoff.payload?.goal_id||
+      candidate.payload?.recovery_receipt_id!==checkpoint.event_id||
+      candidate.payload?.candidate_capability_id!=='reality.original-repair-execution'||
+      candidate.payload?.missing_scope!=='EXISTING_OWNER_GITHUB_REPAIR_DISPATCH_PATH'||
+      candidate.payload?.proof_ref!=='owner-continuity:'+handoff.event_id||
+      candidate.payload?.candidate_state!=='SANDBOX_PROPOSED_AWAITING_AUTHORIZATION'||
+      candidate.payload?.code_generated!==false||
+      candidate.payload?.verified_upgrade_installed!==false||
+      candidate.payload?.installation_authorized!==false||
+      candidate.payload?.external_action_performed!==false||
+      candidate.payload?.original_job_completed!==false)
+    throw Error('UNFINISHED_ORIGINAL_CAPABILITY_CANDIDATE_SCOPE_INVALID');
+  }
   out.push(Object.freeze({
    work_id:report.work_id,conversation_id:conversationId,
    title:String(report.title||'Unfinished job').slice(0,200),
@@ -117,6 +146,11 @@ export function projectUnfinishedFromConversation({
    observed_at:report.observed_at||null,
    source_receipt_id:report.receipt_id,
    recovery_receipt_id:checkpointSaved?checkpoint.event_id:null,
+   capability_candidate_saved:Boolean(candidate),
+   capability_candidate_receipt_id:candidate?.event_id||null,
+   capability_candidate_id:candidate?.payload?.candidate_capability_id||null,
+   can_auto_investigate_original_repair:checkpointSaved&&goalCurrent&&!candidate&&
+    report.work_id==='work:24cda9611404e9bcb47909976067605c',
    repair_evidence_saved:Boolean(savedEvidence),
    repair_evidence_receipt_id:savedEvidence?.event_id||null,
    repair_evidence_status:savedEvidence?
