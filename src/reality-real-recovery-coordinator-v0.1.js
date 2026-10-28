@@ -14,6 +14,8 @@ import {projectRealityUpgradeDiscovery}
  from './reality-upgrade-discovery-v0.1.js';
 import {probeStalledOriginalRepair}
  from './reality-recovery-continuation-probe-v0.1.js';
+import {inspectAuthenticatedOriginalRepairRuntime}
+ from './reality-original-repair-runtime-capability-readback-v0.1.js';
 import {validUuid}
  from './reality-private-chat-store-v0.1.js';
 
@@ -111,6 +113,7 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
  readGoal=readFreshPersonalGoalState,
  cognition=runAutonomousClosurePass,
  runtimeProof=null,
+ inspectRuntime=inspectAuthenticatedOriginalRepairRuntime,
 }={}){
  requireScope(validUuid(session?.user_id)&&validUuid(conversationId)&&
   SAME_WORK.test(String(workId||''))&&env.VERCEL_ENV==='preview',
@@ -154,9 +157,24 @@ export async function inspectAuthenticatedOriginalJobRecoveryLoop({
  requireScope(typeof original.worldline_id==='string'&&
   original.worldline_id.length>0,'LIVE_LOOP_ORIGINAL_WORLDLINE_REQUIRED');
  const result=await cognition({universe,workItem:original});
+ // A scoped recovery checkpoint now probes the actual currently installed
+ // execution bridge and the existing Universe registry, not a synthetic
+ // empty missing_capabilities[] assumption. Never trust the browser.
+ // Legacy/no-persistence test readers remain read-only and unclassified.
+ let verifiedRuntime=runtimeProof;
+ if(env.REALITY_UNIVERSE_PERSISTENCE_ENABLED==='true'){
+  verifiedRuntime=await inspectRuntime({session,conversationId,workId,env});
+  if(verifiedRuntime?.original_work_id!==workId||
+     verifiedRuntime?.independently_reobserved!==true||
+     verifiedRuntime?.original_job_completed!==false||
+     verifiedRuntime?.external_action_performed!==false)
+   throw Error('LIVE_LOOP_ORIGINAL_RUNTIME_INDEPENDENT_READBACK_REQUIRED');
+ }
+ if(verifiedRuntime?.executor_status==='INVESTIGATION_REQUIRED')
+  verifiedRuntime=null;
  return projectOriginalJobRecoveryLoop({
   originalWorkId:workId,conversationId,evidence,
   cognitionState:result,goalId:grounded.state.active_goal_id,
-  runtimeProof,
+  runtimeProof:verifiedRuntime,
  });
 }
