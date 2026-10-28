@@ -975,7 +975,9 @@ function wcUnfinishedHTML(job){
  const capabilityCandidateSaved=job.capability_candidate_saved===true&&
   job.capability_candidate_id==='reality.original-repair-execution'&&
   /^[a-f0-9-]{36}$/i.test(String(job.capability_candidate_receipt_id||''));
- const capabilityCandidateNotice=capabilityCandidateSaved?
+ const capabilityCandidateNotice=capabilityCandidateSaved&&job.state==='RECOVERY_CHECKPOINT_SAVED'?
+  '<p class="wc-note"><strong>Recovery · 4 of 7 stages verified</strong></p>'+
+  '<p class="wc-note">Stage 4: original repair execution capability gap diagnosed and preserved in Continuity. Stage 5: sandbox experiment proposed, not executed.</p>'+
   '<p class="wc-note"><strong>Reality discovered an original-job capability upgrade candidate</strong></p>'+
   '<p class="wc-note">Same original work · Saved investigation receipt: '+
   esc(job.capability_candidate_receipt_id)+
