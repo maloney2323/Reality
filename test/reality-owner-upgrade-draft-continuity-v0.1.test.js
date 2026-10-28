@@ -172,5 +172,5 @@ test('any cross-owner draft event or source-lineage tampering is rejected',async
  await assert.rejects(loadAuthenticatedVerifiedUpgradeDraftReceipt({
   session,conversationId,originalWorkId:workId,env,
   readGoal:h.readGoal,createPersistence:h.createPersistence,
- }),/UPGRADE_DRAFT_RECEIPT_OWNER_DURABLE_SOURCE_MISSING|UPGRADE_DRAFT_RECEIPT_CONTINUITY_CHAIN_INVALID/);
+ }),/UPGRADE_DRAFT_RECEIPT_OWNER_DURABLE_SOURCE_MISSING|UPGRADE_DRAFT_RECEIPT_CONTINUITY_CHAIN_INVALID|RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
 });
