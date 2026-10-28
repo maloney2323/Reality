@@ -14,9 +14,10 @@ const out='finale-evidence';
 mkdirSync(out,{recursive:true});
 if(existsSync(target))throw Error('CONTROLLED_FINALE_NOT_A_REAL_MISSING_CAPABILITY');
 const res=spawnSync(process.execPath,['--test',test],{encoding:'utf8',timeout:30000});
+const diagnostic=String(res.stdout||'')+'\n'+String(res.stderr||'');
 if(res.error||res.status===0||
- !String(res.stderr||'').includes('ERR_MODULE_NOT_FOUND')||
- !String(res.stderr||'').includes('construction-estimate-approval-gate.mjs'))
+ !diagnostic.includes('ERR_MODULE_NOT_FOUND')||
+ !diagnostic.includes('construction-estimate-approval-gate.mjs'))
  throw Error('CONTROLLED_BASELINE_FAILURE_NOT_VERIFIED');
 const workItem={
  id:workId,continuity_root_id:'root:'+sha(workId).slice(0,32),
@@ -30,7 +31,7 @@ const detected=detectCapabilityGap({consequence:{
 if(!detected||detected.work_item_id!==workId||detected.state!=='GAP_DETECTED')
  throw Error('REALITY_GAP_DETECTION_FAILED');
 const confirmed=confirmCapabilityGap(detected,{
- historicalFailureRefs:['controlled:git:test:ERR_MODULE_NOT_FOUND:'+sha(res.stderr)],
+ historicalFailureRefs:['controlled:git:test:ERR_MODULE_NOT_FOUND:'+sha(diagnostic)],
  verificationSuiteRef:test,
  inputSchema:'typed estimate id, homeowner approval, approval evidence and owner review',
  outputSchema:'HOLD/READY_FOR_AUTHORIZATION with no send authority',
