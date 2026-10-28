@@ -7,6 +7,10 @@ on:
       - 'src/reality-controlled-finale-independent-admission-v0.1.js'
       - 'api/reality/personal-controlled-finale-readiness.js'
       - 'test/reality-controlled-finale-independent-admission-v0.1.test.js'
+      - 'src/reality-finale-owner-adoption-v0.1.js'
+      - 'test/reality-finale-owner-adoption-v0.1.test.js'
+      - 'api/reality/personal-controlled-finale-adopt.js'
+      - 'index.html'
       - '.github/workflows/reality-controlled-finale-live-admission-v0.1.yml'
   workflow_dispatch:
 permissions:
@@ -28,6 +32,8 @@ jobs:
         run: |
           node --check src/reality-controlled-finale-independent-admission-v0.1.js
           node --check api/reality/personal-controlled-finale-readiness.js
+          node --check api/reality/personal-controlled-finale-adopt.js
+          node --check src/reality-finale-owner-adoption-v0.1.js
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           run-id: 40716279333
@@ -39,6 +45,8 @@ jobs:
           test "$(sha256sum finale-candidate/candidate.mjs | cut -d' ' -f1)" = c0f0fc86cd2ed11fe7e8c01484ebaf1b698143028c9c81ff323c6b7f8cd857ae
       - name: Adversarial fail-closed admission regression tests
         run: node --test test/reality-controlled-finale-independent-admission-v0.1.test.js
+      - name: Explicit owner adoption, lineage and anti-warrant forgery tests
+        run: node --test test/reality-finale-owner-adoption-v0.1.test.js
       - name: Independently verify actual pinned GitHub candidate and stage boundaries
         env:
           REALITY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
