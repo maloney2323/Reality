@@ -959,6 +959,11 @@ function wcUnfinishedHTML(job){
   job.goal_still_current===true&&job.action_completed===true?
   '<button type="button" data-recovery-run="'+esc(job.work_id)+
    '" data-recovery-conversation="'+esc(job.conversation_id)+'">Run recovery loop · Save findings</button>':'';
+ const verifyFix=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+  job.goal_still_current===true&&
+  job.work_id==='work:24cda9611404e9bcb47909976067605c'?
+  '<button type="button" data-acceptance-check="'+esc(job.work_id)+
+   '" data-acceptance-conversation="'+esc(job.conversation_id)+'">Verify original repair · Save evidence</button>':'';
  return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
   '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
   '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
@@ -967,7 +972,7 @@ function wcUnfinishedHTML(job){
     'The previous action is not independently verified.')+'</p>'+
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
-  '<div class="wc-unfinished-actions">'+runLoop+action+checkRepair+link+'</div>'+
+  '<div class="wc-unfinished-actions">'+runLoop+verifyFix+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
@@ -1177,6 +1182,46 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
    (/^(?:LIVE_LOOP|RECOVERY)_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
     e.message:'RECOVERY_LOOP_READBACK_UNAVAILABLE')+
    '). Original job remains unfinished. No upgrade or external action was performed.';
+ }finally{button.disabled=false}
+});
+
+
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-acceptance-check]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.acceptanceCheck;
+ const conversationId=button.dataset.acceptanceConversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Checking the old failing test against the exact later passing source and saving acceptance evidence…';
+ try{
+  const response=await fetch('/api/reality/personal-repair-acceptance',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'VERIFY_ORIGINAL_REPAIR_CAUSE',conversation_id:conversationId,work_id:workId}),
+  });
+  const p=await response.json();
+  if(!response.ok||p.ok!==true||
+     p.original_work_id!==workId||
+     p.assessment_saved!==true||
+     p.source_correction_verified!==true||
+     p.provider_current_success_verified!==true||
+     p.full_original_job_completed!==false||
+     p.original_issue_closed!==false||
+     p.external_action_performed!==false||
+     !p.acceptance_receipt_id)
+   throw Error(/^ACCEPTANCE_[A-Z0-9_]{4,100}$/.test(String(p.error_code||''))?
+    p.error_code:'ACCEPTANCE_SOURCE_READBACK_UNAVAILABLE');
+  if(feedback)feedback.textContent='Source correction verified and saved in original Continuity. Receipt '+
+   p.acceptance_receipt_id+
+   '. The underlying issue remains OPEN; no code was modified or merged. Review original-job acceptance separately.';
+ }catch(e){
+  if(feedback)feedback.textContent='Root-cause acceptance could not be independently verified ('+
+   (/^ACCEPTANCE_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+    e.message:'ACCEPTANCE_SOURCE_READBACK_UNAVAILABLE')+
+   '). No issue was closed or upgrade executed.';
  }finally{button.disabled=false}
 });
 
