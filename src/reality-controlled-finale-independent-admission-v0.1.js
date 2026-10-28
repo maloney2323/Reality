@@ -12,7 +12,6 @@ const API='https://api.github.com/repos/'+REPO;
 const BASE='experiment/reality-full-loop-finale-20261028';
 const HEAD='review/reality-finale-exact-model-candidate-20261028';
 const PINNED_HEAD='757404f5891a0fa73258833ea4a477cb01ae8862';
-const PINNED_BASE='acbc3160ced0525ea73ef4d0184da5fdae50337c';
 const SHA=x=>createHash('sha256').update(x).digest('hex');
 const fail=c=>{throw Error(c)};
 const RUNS=Object.freeze([
@@ -49,11 +48,12 @@ export async function verifyControlledFinaleIndependentEvidence({
   if(raw.length>260000)fail('FINALE_GITHUB_RESPONSE_TOO_LARGE');
   try{return JSON.parse(raw)}catch{fail('FINALE_GITHUB_RESPONSE_INVALID')}
  };
- const [old,corrected,review,pr,artifacts,content]=await Promise.all([
+ const [old,corrected,review,pr,artifacts,content,baseRef]=await Promise.all([
   ...RUNS.map(r=>get('/actions/runs/'+r.id)),
   get('/pulls/'+CONTROLLED_FINALE_PR),
   get('/actions/runs/40716279333/artifacts?per_page=100'),
   get('/contents/'+CONTROLLED_FINALE_PATH+'?ref='+PINNED_HEAD),
+  get('/git/ref/heads/'+BASE),
  ]);
  for(let i=0;i<RUNS.length;i++){
   const r=RUNS[i],actual=[old,corrected,review][i];
@@ -67,7 +67,10 @@ export async function verifyControlledFinaleIndependentEvidence({
     pr.draft!==true||pr.merged!==false||
     pr.head?.repo?.full_name!==REPO||pr.base?.repo?.full_name!==REPO||
     pr.head?.ref!==HEAD||pr.head?.sha!==PINNED_HEAD||
-    pr.base?.ref!==BASE||pr.base?.sha!==PINNED_BASE||
+    pr.base?.ref!==BASE||
+    baseRef?.ref!=='refs/heads/'+BASE||
+    !/^[a-f0-9]{40}$/.test(String(baseRef?.object?.sha||''))||
+    pr.base?.sha!==baseRef.object.sha||
     pr.html_url!=='https://github.com/'+REPO+'/pull/'+CONTROLLED_FINALE_PR)
   fail('FINALE_DRAFT_SCOPE_OR_BASE_MOVED');
  if(!Array.isArray(artifacts.artifacts)||artifacts.total_count>100)
@@ -102,7 +105,7 @@ export async function verifyControlledFinaleIndependentEvidence({
   source_sha256:CONTROLLED_FINALE_SOURCE_SHA256,
   actual_model_source_bytes:source,
   approved_destination_base:BASE,
-  pinned_base_sha:PINNED_BASE,
+  observed_base_sha:baseRef.object.sha,
   github_pr_number:CONTROLLED_FINALE_PR,
   pinned_review_head_sha:PINNED_HEAD,
   independent_run_ids:RUNS.map(r=>r.id),
