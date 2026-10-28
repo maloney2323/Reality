@@ -1137,6 +1137,37 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 
 
 $('wcTaskList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-historical-upgrade-import]');
+ if(!button||button.disabled)return;
+ const feedback=button.closest('.wc-upgrade-pilot')?.querySelector('[data-historical-upgrade-result]');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||''))){
+  if(feedback)feedback.textContent='Sign in, open a saved conversation, and explicitly confirm its active goal first.';
+  return;
+ }
+ button.disabled=true;
+ if(feedback)feedback.textContent='Rechecking immutable GitHub model proof and owner Continuity · No code installation…';
+ try{
+  const response=await fetch('/api/reality/personal-upgrade-proof-import',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'IMPORT_VERIFIED_HISTORICAL_PILOT_PROOF',conversation_id:conv}),
+  });
+  const p=await response.json();
+  if(!response.ok||p.ok!==true||
+     p.status!=='HISTORICAL_PILOT_PROOF_PERSISTED_JOB_BINDING_REQUIRED'||
+     !p.receipt_id||p.original_customer_work_id!==null||
+     p.github_write_authorized!==false||p.original_job_completed!==false)
+   throw Error('HISTORICAL_PROOF_NOT_VERIFIED');
+  if(feedback)feedback.textContent='Verified historical pilot proof saved to Continuity receipt '+
+   p.receipt_id+'. No original customer job has been verified, no warrant issued, and no upgrade installed.';
+ }catch{
+  if(feedback)feedback.textContent='Historical proof could not be persisted and read back. No upgrade or external action was authorized.';
+  button.disabled=false;
+ }
+});
+
+$('wcTaskList').addEventListener('click',async event=>{
  const button=event.target.closest('button[data-recovery-run]');
  if(!button||button.disabled)return;
  const workId=button.dataset.recoveryRun;
@@ -1633,7 +1664,11 @@ function wcUpgradeReviewHTML(){
  const jobs=wcUpgradeReviews.slice(0,30);
  const heading='<section class="wc-upgrade-review" aria-label="Reality Upgrade Discovery">'+
   '<h4>Reality Upgrade Discovery · Original-job capability reviews</h4>'+
-  '<p class="wc-note">These are owner-scoped unfinished jobs for diagnosis, NOT confirmed missing capabilities or new discovery-feed findings. A verified diagnosis never grants execution or promotion authority.</p>';
+  '<p class="wc-note">These are owner-scoped unfinished jobs for diagnosis, NOT confirmed missing capabilities or new discovery-feed findings. A verified diagnosis never grants execution or promotion authority.</p>'+
+  '<div class="wc-upgrade-pilot"><h4>Real model correction · Historical proof</h4>'+
+  '<p class="wc-note">Independent GitHub test: 15/15 after correcting a failed 10/15 candidate. This is developer-scoped pilot evidence, NOT proof of completing an original customer job. Save the evidence to the active signed-in Continuity goal before starting a genuine customer-bound sandbox.</p>'+
+  '<button type="button" data-historical-upgrade-import>Save verified pilot evidence to Continuity</button>'+
+  '<p class="wc-note" data-historical-upgrade-result aria-live="polite">No upgrade or GitHub action will be authorized.</p></div>';
  if(!jobs.length)return heading+
   '<p class="wc-note">'+
   ($('privateReady')?.style.display==='block'?
