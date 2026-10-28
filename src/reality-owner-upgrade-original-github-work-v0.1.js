@@ -217,7 +217,13 @@ export async function observeOriginalOwnerGithubWork({
   goal_revision:scope.goalRevision,
   candidate_sha256:scope.candidateSha,capability_sha256:scope.candidateSha,
   head_sha:scope.headSha,independent:true,
-  original_job_completed:true,
+  // A GitHub tracking issue is an action outcome, never proof that the
+  // underlying maintenance repair or business objective was completed.
+  // The full-loop settlement gate must therefore reject this as a finished
+  // original repair. A genuine repair-executor needs its own proof contract.
+  original_job_completed:false,
+  original_tracking_action_completed:true,
+  underlying_maintenance_repair_completed:false,
   execution_receipt_id:resumed.execution_id,
   evidence_ref:verification.observedState.issue_url,
   original_action_operation:'github:create_issue',
