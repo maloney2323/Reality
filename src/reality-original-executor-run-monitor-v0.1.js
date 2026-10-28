@@ -73,7 +73,7 @@ export function projectAcceptedOriginalExecutorRun({run,jobs}={}){
     run.status!=='completed'||run.conclusion!=='success'||run.event!=='push'||
     run.repository?.full_name!=='maloney2323/Reality'||
     run.head_repository?.full_name!=='maloney2323/Reality'||
-    !String(run.path||'').includes('/.github/workflows/'+ACCEPTED_WORKFLOW)||
+    !String(run.path||'').endsWith('.github/workflows/'+ACCEPTED_WORKFLOW)||
     run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+ACCEPTED_RUN||
     !Array.isArray(jobs)||jobs.length!==1||
     jobs[0]?.name!=='verify-model-corrected-original-executor'||
@@ -97,6 +97,40 @@ export function projectAcceptedOriginalExecutorRun({run,jobs}={}){
  });
 }
 
+const LIVE_RUN=40760732281;
+const LIVE_SHA='3f49896c8d31925a8294e320a3b821923db3e758';
+const LIVE_NAME='Reality ORIGINAL Live GitHub Read-Only Execution Proof v0.1';
+const LIVE_WORKFLOW='reality-original-live-github-readonly-v0.1.yml';
+export function projectLiveOriginalExecutorRun({run,jobs}={}){
+ if(run?.id!==LIVE_RUN||run.name!==LIVE_NAME||
+    run.head_branch!==BRANCH||run.head_sha!==LIVE_SHA||
+    run.status!=='completed'||run.conclusion!=='success'||run.event!=='push'||
+    run.repository?.full_name!=='maloney2323/Reality'||
+    run.head_repository?.full_name!=='maloney2323/Reality'||
+    !String(run.path||'').endsWith('.github/workflows/'+LIVE_WORKFLOW)||
+    run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+LIVE_RUN||
+    !Array.isArray(jobs)||jobs.length!==1||
+    jobs[0]?.name!=='actual-original-github-readonly'||
+    jobs[0].status!=='completed'||jobs[0].conclusion!=='success')
+   fail('ORIGINAL_EXECUTOR_LIVE_GITHUB_EXECUTION_NOT_INDEPENDENTLY_VERIFIED');
+ return Object.freeze({
+  version:ORIGINAL_EXECUTOR_RUN_MONITOR_VERSION,
+  original_work_id:ORIGINAL_OWNER_WORK_ID,
+  status:'REALITY_MODEL_EXECUTOR_LIVE_GITHUB_READ_ONLY_VERIFIED',
+  run_id:LIVE_RUN,run_url:run.html_url,
+  model_generated_executor_sha256:ACCEPTED_MODEL_SHA256,
+  model_generated:true,independent_behavioral_cases_passed:10,
+  independent_behavioral_cases_total:10,
+  live_github_read_only_execution_verified:true,
+  original_source_already_fixed_before_model_install:true,
+  original_repair_performed_by_reality:false,
+  external_github_write_performed:false,
+  evidence_type:'EXTERNAL_PINNED_GITHUB_ACTIONS_EVIDENCE_NOT_YET_OWNER_WARRANTED',
+  owner_warrant_issued:false,owner_install_authorized:false,
+  installed_capability:false,original_job_completed:false,
+ });
+}
+
 export async function inspectOriginalExecutorRun({
  session,conversationId,env=process.env,
  context=originalOwnerContext,get=githubGet
@@ -110,6 +144,15 @@ export async function inspectOriginalExecutorRun({
  const list=await get(ROOT+'/actions/runs?branch='+encodeURIComponent(BRANCH)+'&per_page=30');
  if(!Array.isArray(list?.workflow_runs)||list.workflow_runs.length>30)
   fail('ORIGINAL_EXECUTOR_PROVIDER_RUN_LIST_UNVERIFIED');
+ const live=list.workflow_runs.filter(x=>x.id===LIVE_RUN&&x.name===LIVE_NAME&&
+  x.head_sha===LIVE_SHA&&x.repository?.full_name==='maloney2323/Reality'&&
+  x.head_repository?.full_name==='maloney2323/Reality');
+ if(live.length===1){
+  const checked=await get(ROOT+'/actions/runs/'+LIVE_RUN+'/jobs?per_page=50');
+  if(!Array.isArray(checked?.jobs)||checked.total_count!==1||checked.jobs.length!==1)
+   fail('ORIGINAL_EXECUTOR_LIVE_RUN_JOB_READBACK_REQUIRED');
+  return projectLiveOriginalExecutorRun({run:live[0],jobs:checked.jobs});
+ }
  const accepted=list.workflow_runs.filter(x=>
   x.id===ACCEPTED_RUN&&x.name===ACCEPTED_NAME&&
   x.head_sha===ACCEPTED_COMMIT&&
@@ -123,7 +166,7 @@ export async function inspectOriginalExecutorRun({
   return projectAcceptedOriginalExecutorRun({run:exact,jobs:checked.jobs});
  }
  const candidates=list.workflow_runs.filter(x=>x.name===NAME&&
-  typeof x.path==='string'&&x.path.includes('/.github/workflows/'+WORKFLOW)&&
+  typeof x.path==='string'&&x.path.endsWith('.github/workflows/'+WORKFLOW)&&
   x.repository?.full_name==='maloney2323/Reality'&&
   x.head_repository?.full_name==='maloney2323/Reality');
  if(!candidates.length)
