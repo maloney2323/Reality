@@ -1,4 +1,5 @@
 name: Reality Original Executor Feedback Self-Correction v0.2
+# Replay the same independently verified failure; no new original work is created.
 on:
   push:
     branches:
