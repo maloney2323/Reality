@@ -99,7 +99,8 @@ export async function executeGovernedAutonomousUpgradeDraft({
   verifiedExperiment,originalWorkItem,
  });
  if(recomputed.proposal.build_id!==plan.proposal.build_id||
-    recomputed.verified_candidate_hash!==plan.verified_candidate_hash)
+    recomputed.verified_candidate_hash!==plan.verified_candidate_hash||
+    JSON.stringify(recomputed.proposal)!==JSON.stringify(plan.proposal))
   fail('AUTONOMOUS_UPGRADE_CANDIDATE_CHANGED');
  const authorized=authorizeSelfBuild(recomputed.proposal,{
   authorizationRef:ownerApproval.authorization_ref,
