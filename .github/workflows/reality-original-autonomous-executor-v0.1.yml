@@ -131,6 +131,7 @@ jobs:
           retention-days: 14
   independent-secretless-correction-retest:
     needs: reality-model-corrects-failed-original-executor
+    if: ${{ always() && needs.reality-model-corrects-failed-original-executor.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
