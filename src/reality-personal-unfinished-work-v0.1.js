@@ -80,6 +80,31 @@ export function projectUnfinishedFromConversation({
       !/^[a-f0-9-]{36}$/i.test(String(savedEvidence.event_id||'')))
     throw Error('UNFINISHED_REPAIR_ACCEPTANCE_PROVENANCE_INVALID');
   }
+  const ownerAcceptance=history.filter(e=>
+   e.entity_type==='personal_original_repair_owner_acceptance'&&
+   e.payload?.original_work_id===report.work_id);
+  if(ownerAcceptance.length>1)throw Error('UNFINISHED_OWNER_ACCEPTANCE_DUPLICATE');
+  const ownerAccepted=ownerAcceptance[0]||null;
+  if(ownerAccepted){
+   if(!savedEvidence||!goalCurrent||
+      ownerAccepted.event_kind!=='AUTHORITY'||
+      ownerAccepted.epistemic_status!=='VERIFIED'||
+      ownerAccepted.provenance?.source!=='reality-owner-repair-acceptance-v0.1'||
+      ownerAccepted.provenance?.conversation_id!==conversationId||
+      ownerAccepted.provenance?.principal_id!==savedEvidence.provenance?.principal_id||
+      ownerAccepted.payload?.owner_id!==savedEvidence.provenance?.principal_id||
+      ownerAccepted.payload?.conversation_id!==conversationId||
+      ownerAccepted.payload?.source_evidence_receipt_id!==savedEvidence.event_id||
+      ownerAccepted.payload?.original_recovery_receipt_id!==checkpoint.event_id||
+      ownerAccepted.payload?.original_goal_id!==handoff.payload?.goal_id||
+      ownerAccepted.payload?.owner_confirmation!=='ACCEPT_VERIFIED_CORRECTION_EVIDENCE_ONLY'||
+      ownerAccepted.payload?.owner_accepted_source_correction!==true||
+      ownerAccepted.payload?.original_repair_job_completed!==false||
+      ownerAccepted.payload?.original_issue_closed!==false||
+      ownerAccepted.payload?.github_write_authorized!==false||
+      ownerAccepted.payload?.external_action_performed!==false)
+    throw Error('UNFINISHED_OWNER_ACCEPTANCE_PROVENANCE_INVALID');
+  }
   out.push(Object.freeze({
    work_id:report.work_id,conversation_id:conversationId,
    title:String(report.title||'Unfinished job').slice(0,200),
@@ -96,13 +121,18 @@ export function projectUnfinishedFromConversation({
    repair_evidence_receipt_id:savedEvidence?.event_id||null,
    repair_evidence_status:savedEvidence?
     'SOURCE_CORRECTION_VERIFIED_AWAITING_OWNER_ACCEPTANCE':'NOT_YET_VERIFIED',
-   owner_repair_accepted:false,
+   owner_repair_accepted:Boolean(ownerAccepted),
+   owner_repair_acceptance_receipt_id:ownerAccepted?.event_id||null,
+   can_accept_source_correction:goalCurrent&&Boolean(savedEvidence)&&!ownerAccepted&&
+    report.work_id==='work:24cda9611404e9bcb47909976067605c',
    goal_still_current:goalCurrent,
    can_save_recovery:actionVerified&&!checkpointSaved&&goalCurrent,
    can_resume_execution:false,
    external_action_performed:false,
    next_step:!actionVerified?
     'Prior provider attempt unresolved. Read-only reconciliation required; do not retry.':
+    ownerAccepted?
+    'Owner accepted the verified source correction. Original repair acceptance and final settlement remain separate; GitHub issue still OPEN.':
     savedEvidence?
     'Source correction evidence verified and saved. Owner acceptance and final repair settlement remain pending; no issue was closed.':
     checkpointSaved?
