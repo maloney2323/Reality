@@ -64,6 +64,7 @@ export function projectOriginalJobRecoveryLoop({
      continuationEngine.job_completed!==false)
    throw Error('LIVE_LOOP_CONTINUATION_CAPABILITY_INDEPENDENTLY_UNVERIFIED');
  }
+ const repairGapVerified=continuationEngine!==null;
  const timeline=Object.freeze([
   {step:'ORIGINAL_JOB_RECOVERED',state:'VERIFIED',evidence_ref:evidence.recovery_receipt_id,
    description:'Restored original job and incomplete status from the owner-scoped Continuity checkpoint.'},
@@ -74,17 +75,26 @@ export function projectOriginalJobRecoveryLoop({
    evidence_ref:later?evidence.later_success.run_url:null,
    description:later?'Independently verified a later passing run of the same workflow.':
     'A later passing run could not be established in the bounded GitHub provider window.'},
-  {step:'CAPABILITY_GAP_DIAGNOSIS',state:later?'NOT_REQUIRED':'NOT_PROVEN',
-   evidence_ref:null,
-   description:later?'Do not invent a missing capability when later CI is passing.':
+  {step:'CAPABILITY_GAP_DIAGNOSIS',
+   state:repairGapVerified?'VERIFIED':later?'NOT_REQUIRED':'NOT_PROVEN',
+   evidence_ref:repairGapVerified?runtimeProof.evidence_ref:null,
+   description:repairGapVerified?
+    'The current original-job repair execution bridge rejected the underlying repair operation; the existing capability inventory was independently rechecked. This identifies a scoped execution gap, not proof that new generated code will succeed.':
+    later?'Historical workflow CI passed, but a separate original repair execution gap has not been independently established.':
     'Historical failures alone do not prove a missing code capability.'},
-  {step:'UPGRADE_EXECUTION',state:later?'SKIPPED_NOT_NEEDED':'BLOCKED_UNPROVEN_GAP',
+  {step:'UPGRADE_EXECUTION',
+   state:repairGapVerified?'SANDBOX_PROPOSED':later?'SKIPPED_NOT_NEEDED':'BLOCKED_UNPROVEN_GAP',
    evidence_ref:null,
-   description:later?'A new self-upgrade is not justified for this already-passing workflow.':
+   description:repairGapVerified?
+    'Reality proposed a bounded sandbox experiment for the original repair-execution gap; no code generated, tested, installed or promoted.':
+    later?'Historical CI correction requires no repeat upgrade; any independent original-execution gap is assessed separately.':
     'Isolated upgrade requires a verified gap and separate exact owner authorization.'},
-  {step:'ORIGINAL_JOB_RESUMPTION',state:'WAITING_FOR_ACCEPTANCE',
+  {step:'ORIGINAL_JOB_RESUMPTION',
+   state:repairGapVerified?'WAITING_FOR_VERIFIED_EXECUTOR':'WAITING_FOR_ACCEPTANCE',
    evidence_ref:null,
-   description:'A passing workflow does not establish root cause or settle the original repair job.'},
+   description:repairGapVerified?
+    'The same original repair cannot resume until a real capability passes sandbox verification, installation and independent execution readback.':
+    'A passing workflow does not establish root cause or settle the original repair job.'},
   {step:'FINAL_SETTLEMENT',state:'NOT_COMPLETED',evidence_ref:null,
    description:'No final repair outcome has been independently accepted and recorded in Continuity.'},
  ]);
@@ -103,7 +113,7 @@ export function projectOriginalJobRecoveryLoop({
   // original work are separate questions. Do not let "NO_CAPABILITY_GAP"
   // from a synthetic empty list silently close the latter.
   continuation_probe:probeStalledOriginalRepair({
-   originalWorkId,evidence,completedStages:timeline.filter(s=>s.state==='VERIFIED').length,
+   originalWorkId,evidence,completedStages:timeline.slice(0,3).filter(s=>s.state==='VERIFIED').length,
    runtimeProof,
   }),
   // The EXISTING v1 capability engine now receives independently reproduced
@@ -121,7 +131,9 @@ export function projectOriginalJobRecoveryLoop({
    model_generation_performed:false,
    upgrade_installed:false,original_job_completed:false,
   }):null,
-  current_decision:later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
+  current_decision:repairGapVerified?
+   'ORIGINAL_REPAIR_EXECUTOR_GAP_VERIFIED_SANDBOX_PROPOSED':
+   later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
    'BLOCKED_REQUIRES_ROOT_CAUSE_DIAGNOSIS',
   timeline,
   completed_stages:timeline.filter(s=>s.state==='VERIFIED').length,
