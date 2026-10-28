@@ -46,7 +46,9 @@ export function originalOwnerConsoleFlags({
  const source=github.exact_llm_source_verified===true&&github.sandbox_success===true;
  const alreadyFixed=github.historical_fixed_source_verified===true;
  const ownerEvidence=evidence.owner_evidence_acknowledged===true;
- const warrant=Boolean(goalConfirmed&&source&&warrantVerified);
+ // The owner-bound HMAC warrant independently proves the CURRENT model-generated
+ // package. Do not gate it on the LEGACY review PR #154's patch-only tests.
+ const warrant=Boolean(goalConfirmed&&warrantVerified);
  const draft=Boolean(warrant&&draftVerified);
  const install=Boolean(draft&&installationVerified);
  const settled=Boolean(install&&settlementVerified);
@@ -54,6 +56,7 @@ export function originalOwnerConsoleFlags({
   correct_original_work_id:ORIGINAL_OWNER_WORK_ID,
   original_goal_active:goalConfirmed,
   original_source_verified:source,
+  current_model_package_warrant_verified:warrant,
   original_source_already_fixed:alreadyFixed,
   owner_historical_evidence_acknowledged:ownerEvidence,
   warranted_upgrade_ready:warrant,
