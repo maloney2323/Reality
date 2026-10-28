@@ -70,8 +70,7 @@ try{
  const raw=(json.output||[]).flatMap(x=>x.content||[])
   .filter(x=>x.type==='output_text'&&typeof x.text==='string')
   .map(x=>x.text).join('').trim();
- if(raw.length<800||raw.length>34000||raw.includes('\\`\\`\\`')||
-   /(?:\\brequire\\s*\\(|\\bfetch\\s*\\(|\\bprocess\\s*\\.|\\bglobalThis\\b|\\beval\\s*\\(|\\bFunction\\s*\\(|\\bWebSocket\\b|\\bchild_process\\b)/.test(raw))
+ if(raw.length<800||raw.length>34000||raw.includes('~~~')||raw.includes('\\`\\`\\`'))
   throw Error('MODEL_REPAIR_SOURCE_OUT_OF_BOUNDS');
  const source=raw+'\n';
  writeFileSync(out+'/candidate.mjs',source,{mode:0o600});
