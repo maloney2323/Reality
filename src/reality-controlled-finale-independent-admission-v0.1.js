@@ -71,7 +71,7 @@ export async function verifyControlledFinaleIndependentEvidence({
     pr.base?.ref!==BASE||
     baseRef?.ref!=='refs/heads/'+BASE||
     !/^[a-f0-9]{40}$/.test(String(baseRef?.object?.sha||''))||
-    pr.base?.sha!==baseRef.object.sha||
+    !/^[a-f0-9]{40}$/.test(String(pr.base?.sha||''))||
     pr.html_url!=='https://github.com/'+REPO+'/pull/'+CONTROLLED_FINALE_PR)
   fail('FINALE_DRAFT_SCOPE_OR_BASE_MOVED');
  if(!Array.isArray(artifacts.artifacts)||artifacts.total_count>100)
@@ -98,7 +98,9 @@ export async function verifyControlledFinaleIndependentEvidence({
   fail('FINALE_SOURCE_SCOPE_MISMATCH');
  return Object.freeze({
   version:CONTROLLED_FINALE_VERIFIER_VERSION,
-  state:'EXACT_MODEL_CORRECTION_INDEPENDENTLY_VERIFIED_OWNER_ADMISSION_PENDING',
+  state:pr.base.sha===baseRef.object.sha?
+   'EXACT_MODEL_CORRECTION_INDEPENDENTLY_VERIFIED_OWNER_ADMISSION_PENDING':
+   'REVALIDATION_REQUIRED_BASE_MOVED',
   test_kind:'CONTROLLED_NONCUSTOMER',
   original_work_id:CONTROLLED_FINALE_WORK,
   original_customer_work_id:'work:24cda9611404e9bcb47909976067605c',
@@ -107,6 +109,8 @@ export async function verifyControlledFinaleIndependentEvidence({
   actual_model_source_bytes:source,
   approved_destination_base:BASE,
   observed_base_sha:baseRef.object.sha,
+  review_pr_base_sha:pr.base.sha,
+  target_base_moved_since_review:pr.base.sha!==baseRef.object.sha,
   github_pr_number:CONTROLLED_FINALE_PR,
   pinned_review_head_sha:PINNED_HEAD,
   independent_run_ids:RUNS.map(r=>r.id),
