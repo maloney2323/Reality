@@ -1,0 +1,95 @@
+name: Reality Original Owner Repair - Live Source Preinstall Acceptance
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'scripts/reality-original-owner-preinstall-source-adjudication-v0.1.mjs'
+      - '.github/workflows/reality-original-owner-preinstall-source-adjudication-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-decide-if-original-repair-still-needed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify original immutable model generation run and exact sandbox artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base='https://api.github.com/repos/maloney2323/Reality';
+          const get=async path=>{
+            const r=await fetch(base+path,{headers:{
+              Authorization:'Bearer '+process.env.GH_TOKEN,
+              Accept:'application/vnd.github+json',
+              'X-GitHub-Api-Version':'2022-11-28',
+              'User-Agent':'Reality-Original-Owner-Preinstall-Check'
+            }});
+            assert.equal(r.status,200,'GitHub immutable proof unavailable');
+            return r.json();
+          };
+          const [run,artifact]=await Promise.all([
+            get('/actions/runs/40708956478'),
+            get('/actions/artifacts/12825870486'),
+          ]);
+          assert.equal(run.id,40708956478);
+          assert.equal(run.head_sha,'f98c8b2fbf940173c762f27b3d94f846cce2cca9');
+          assert.equal(run.status,'completed');
+          assert.equal(run.conclusion,'success');
+          assert.equal(run.repository?.full_name,'maloney2323/Reality');
+          assert.equal(artifact.id,12825870486);
+          assert.equal(artifact.name,'original-owner-model-final-correction-independent-retest');
+          assert.equal(artifact.expired,false);
+          assert.equal(artifact.workflow_run?.id,40708956478);
+          assert.equal(artifact.workflow_run?.head_sha,run.head_sha);
+          assert.equal(artifact.digest,
+            'sha256:ead1a2a56799682f61ddf6770adfc68deb647040aed0c20da6ce0018899d975f');
+          console.log(JSON.stringify({status:'EXACT_GITHUB_ARTIFACT_AND_RUN_READBACK_VERIFIED',
+            artifact_id:artifact.id,run_id:run.id,original_job_completed:false}));
+          JS
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40708956478
+          name: original-owner-model-final-correction-independent-retest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: owner-original-repair-evidence
+      - name: Check exact independent GitHub source blobs and script syntax
+        run: |
+          set -euo pipefail
+          mkdir -p original-owner-source
+          cp test/fixtures/original-repair-historical-source.snapshot.txt original-owner-source/historical.js
+          cp test/fixtures/original-repair-corrected-source.snapshot.txt original-owner-source/corrected.js
+          test "$(git hash-object original-owner-source/historical.js)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
+          test "$(git hash-object original-owner-source/corrected.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
+          test "$(git hash-object test/reality-personal-discovered-work-handoff-v0.1.test.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
+          node --check scripts/reality-original-owner-preinstall-source-adjudication-v0.1.mjs
+      - name: Independently run actual model candidate against current source without network or secrets
+        run: |
+          set -euo pipefail
+          timeout 120s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/owner-original-repair-evidence:/work:ro" \
+            -v "${{ github.workspace }}/original-owner-source:/fixtures:ro" \
+            -v "${{ github.workspace }}/test:/current/test:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-original-owner-preinstall-source-adjudication-v0.1.mjs \
+              > original-owner-current-source-acceptance.json
+          cat original-owner-current-source-acceptance.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: original-owner-current-source-noop-acceptance
+          path: original-owner-current-source-acceptance.json
+          if-no-files-found: warn
+          retention-days: 14
