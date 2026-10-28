@@ -30,7 +30,23 @@ const requireValue = (value, message) => {
   if (!value) fail(message);
 };
 
-const unwrap = (value) => value?.data ?? value?.body ?? value;
+const unwrap = (value) => {
+  if (!value || typeof value !== "object") return value;
+
+  if (Object.prototype.hasOwnProperty.call(value, "data")) {
+    return value.data;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(value, "body") &&
+    value.body !== null &&
+    typeof value.body === "object"
+  ) {
+    return value.body;
+  }
+
+  return value;
+};
 
 const sha256 = (value) =>
   createHash("sha256").update(value, "utf8").digest("hex");
