@@ -136,6 +136,7 @@ jobs:
               base_sha:ref.object.sha,required_checks:observed.workflows.length,
               github_write_performed:false,capability_installed:false}));
           }catch(error){
+            console.error('LIVE_BASE_READ_DIAGNOSIS='+String(error?.message||error).slice(0,110));
             if(!['UPGRADE_BASE_REQUIRED_CI_WORKFLOW_UNAVAILABLE',
                'UPGRADE_BASE_REQUIRED_CI_TRIGGER_MISSING'].includes(error.message))
               throw error;
