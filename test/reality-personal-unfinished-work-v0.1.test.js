@@ -25,7 +25,7 @@ const scope=personalGoalScope({userId:user_id,conversationId});
 const spine=createContinuitySpine({
  continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:user_id,
 });
-function history({checkpoint=false,verified=true,accepted=false}={}){
+function history({checkpoint=false,verified=true,accepted=false,ownerConfirmed=false}={}){
  const entries=[];
  const add=(stage,entity_type,payload,epistemicStatus='OBSERVED',provenance=null)=>{
   const prior=entries.at(-1);
@@ -68,6 +68,7 @@ function history({checkpoint=false,verified=true,accepted=false}={}){
   new_external_action_authorized:false,job_completed:false,
   retry_original_issue_creation:false,
  });
+ if(ownerConfirmed&&!accepted)throw Error('owner acceptance needs prior source evidence');
  if(accepted){
   const receipt=entries.find(e=>e.entity_type==='personal_recovery_checkpoint');
   if(!receipt)throw Error('test fixture needs saved recovery checkpoint');
@@ -82,6 +83,21 @@ function history({checkpoint=false,verified=true,accepted=false}={}){
    source:'reality-personal-repair-acceptance-v0.1',
    principal_id:user_id,conversation_id:conversationId,
   });
+ }
+ if(ownerConfirmed){
+  const evidence=entries.find(e=>e.entity_type==='personal_recovery_acceptance_evidence');
+  const checkpoint=entries.find(e=>e.entity_type==='personal_recovery_checkpoint');
+  add('AUTHORITY','personal_original_repair_owner_acceptance',{
+   owner_id:user_id,conversation_id:conversationId,
+   original_work_id:work,original_goal_id:goalId,
+   source_evidence_receipt_id:evidence.event_id,
+   original_recovery_receipt_id:checkpoint.event_id,
+   owner_confirmation:'ACCEPT_VERIFIED_CORRECTION_EVIDENCE_ONLY',
+   owner_accepted_source_correction:true,
+   original_repair_job_completed:false,original_issue_closed:false,
+   github_write_authorized:false,external_action_performed:false,
+  },'VERIFIED',{source:'reality-owner-repair-acceptance-v0.1',
+   principal_id:user_id,conversation_id:conversationId});
  }
  return entries;
 }
@@ -136,6 +152,26 @@ test('an acceptance receipt from another conversation is rejected, never silentl
  assert.throws(()=>projectUnfinishedFromConversation({
   conversationId,events:rows,goal,
  }),/RELIABILITY_HISTORY_|UNFINISHED_REPAIR_ACCEPTANCE_PROVENANCE_INVALID/);
+});
+test('separate authenticated owner correction acceptance survives refresh without closing original repair',()=>{
+ const rows=projectUnfinishedFromConversation({conversationId,
+  events:history({checkpoint:true,accepted:true,ownerConfirmed:true}),goal});
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].owner_repair_accepted,true);
+ assert.ok(rows[0].owner_repair_acceptance_receipt_id);
+ assert.equal(rows[0].can_accept_source_correction,false);
+ assert.equal(rows[0].job_completed,false);
+ assert.equal(rows[0].can_resume_execution,false);
+ assert.match(rows[0].next_step,/Original repair acceptance and final settlement remain separate/);
+});
+test('owner acceptance from a different principal is rejected, never converted into completed work',()=>{
+ const entries=history({checkpoint:true,accepted:true,ownerConfirmed:true});
+ const ev=entries.at(-1);
+ entries[entries.length-1]={...ev,provenance:{
+  ...ev.provenance,principal_id:randomUUID()}};
+ assert.throws(()=>projectUnfinishedFromConversation({
+  conversationId,events:entries,goal}),
+ /RELIABILITY_HISTORY_|UNFINISHED_OWNER_ACCEPTANCE_PROVENANCE_INVALID/);
 });
 test('changed goal and unresolved provider attempt never allow recovery save',()=>{
  const changed=projectUnfinishedFromConversation({conversationId,events:history(),
@@ -198,6 +234,8 @@ test('UI places unfinished work above ending receipts and requires GET before an
  assert.ok(html.indexOf('id="wcUnfinishedCenter"')<html.indexOf('id="wcCompletionCenter"'));
  assert.match(script,/\/api\/reality\/personal-unfinished-work/);
  assert.match(script,/Source correction verified · Owner acceptance pending/);
+ assert.match(script,/Owner accepted verified source correction · Original repair still open/);
+ assert.match(script,/data-repair-source-accept/);
  assert.match(script,/job\.repair_evidence_saved===true/);
  assert.match(script,/await wcLoadUnfinishedWork\(\)/);
  assert.match(script,/wcLoadUnfinishedWork\(\)/);
