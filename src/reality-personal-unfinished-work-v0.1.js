@@ -55,6 +55,31 @@ export function projectUnfinishedFromConversation({
    report.status==='ACTION_VERIFIED_JOB_OPEN'&&
    ISSUE.test(String(report.issue_url||''));
   const checkpointSaved=Boolean(checkpoint)&&actionVerified;
+  // Acceptance evidence is a separate CORROBORATED original-work stage.
+  // It is not approval to close an issue, restart work or mark completion.
+  const acceptance=history.filter(e=>
+   e.entity_type==='personal_recovery_acceptance_evidence'&&
+   e.payload?.original_work_id===report.work_id);
+  if(acceptance.length>1)throw Error('UNFINISHED_REPAIR_ACCEPTANCE_DUPLICATE');
+  const savedEvidence=acceptance[0]||null;
+  if(savedEvidence){
+   if(!checkpointSaved||
+      savedEvidence.event_kind!=='WORK'||
+      savedEvidence.epistemic_status!=='CORROBORATED'||
+      savedEvidence.provenance?.source!=='reality-personal-repair-acceptance-v0.1'||
+      savedEvidence.provenance?.conversation_id!==conversationId||
+      savedEvidence.payload?.recovery_receipt_id!==checkpoint.event_id||
+      savedEvidence.payload?.original_goal_id!==handoff.payload?.goal_id||
+      savedEvidence.payload?.source_correction_verified!==true||
+      savedEvidence.payload?.provider_current_success_verified!==true||
+      savedEvidence.payload?.assessment!=='EVIDENCE_SUPPORTS_CORRECTION_AWAITING_OWNER_ACCEPTANCE'||
+      savedEvidence.payload?.owner_accepted!==false||
+      savedEvidence.payload?.full_original_job_completed!==false||
+      savedEvidence.payload?.original_issue_closed!==false||
+      savedEvidence.payload?.external_action_performed!==false||
+      !/^[a-f0-9-]{36}$/i.test(String(savedEvidence.event_id||'')))
+    throw Error('UNFINISHED_REPAIR_ACCEPTANCE_PROVENANCE_INVALID');
+  }
   out.push(Object.freeze({
    work_id:report.work_id,conversation_id:conversationId,
    title:String(report.title||'Unfinished job').slice(0,200),
@@ -67,12 +92,19 @@ export function projectUnfinishedFromConversation({
    observed_at:report.observed_at||null,
    source_receipt_id:report.receipt_id,
    recovery_receipt_id:checkpointSaved?checkpoint.event_id:null,
+   repair_evidence_saved:Boolean(savedEvidence),
+   repair_evidence_receipt_id:savedEvidence?.event_id||null,
+   repair_evidence_status:savedEvidence?
+    'SOURCE_CORRECTION_VERIFIED_AWAITING_OWNER_ACCEPTANCE':'NOT_YET_VERIFIED',
+   owner_repair_accepted:false,
    goal_still_current:goalCurrent,
    can_save_recovery:actionVerified&&!checkpointSaved&&goalCurrent,
    can_resume_execution:false,
    external_action_performed:false,
    next_step:!actionVerified?
     'Prior provider attempt unresolved. Read-only reconciliation required; do not retry.':
+    savedEvidence?
+    'Source correction evidence verified and saved. Owner acceptance and final repair settlement remain pending; no issue was closed.':
     checkpointSaved?
     'Recovery checkpoint saved. The actual repair is still unfinished.':
     goalCurrent?
