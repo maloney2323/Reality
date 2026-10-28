@@ -162,7 +162,7 @@ function render(s){
  $('verifyExecutor').disabled=busy||locked||!s.original_goal_active||!s.original_source_verified;
  $('verifyWarrant').disabled=busy||locked||!s.original_goal_active||s.original_source_verified!==true||s.owner_warrant_events>0;
  $('prepareDraft').disabled=busy||locked||draftLocked||s.warranted_upgrade_ready!==true||s.verified_draft_ready===true;
- $('approveDraft').disabled=busy||locked||draftLocked||!draftPrepared||draftApproval;
+ $('approveDraft').disabled=busy||locked||draftLocked||!draftPrepared||draftApproval||draftPrepared.github_draft_dispatch_configured!==true;
  $('runDraft').disabled=busy||locked||draftLocked||!draftApproval;
  $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
  $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
@@ -267,17 +267,19 @@ async function prepareGovernedDraft(){
    ' · Exact candidate SHA-256: '+expected+
    ' · Warrant: '+String(d.warrant_id)+
    ' · Installation approved: NO';
-  $('draftState').textContent='Exact draft action prepared. Review the scope, then approve separately. No GitHub write performed.';
+  $('draftState').textContent=d.github_draft_dispatch_configured===true?
+   'Exact draft action prepared. Review and approve separately. No GitHub write performed.':
+   'Exact draft action is prepared, but Reality’s GitHub write credential is NOT assigned to this isolated preview. Approval and Run are disabled until that connection is authorized. No GitHub write performed.';
  }catch(e){
   $('draftState').textContent='Draft preparation stopped: '+String(e.message)+'. No GitHub write or installation occurred.';
  }finally{busy=false;$('refresh').disabled=false;
   $('prepareDraft').disabled=locked||draftLocked||snapshot?.warranted_upgrade_ready!==true||
    snapshot?.verified_draft_ready===true;
-  $('approveDraft').disabled=!draftPrepared||draftLocked;
+  $('approveDraft').disabled=!draftPrepared||draftLocked||draftPrepared.github_draft_dispatch_configured!==true;
  }
 }
 async function approveGovernedDraft(){
- if(busy||locked||draftLocked||!draftPrepared||draftApproval)return;
+ if(busy||locked||draftLocked||!draftPrepared||draftApproval||draftPrepared.github_draft_dispatch_configured!==true)return;
  if(!window.confirm('Approve Reality to CREATE ONE DRAFT PR for ORIGINAL job #143 using candidate SHA-256 '+
    draftPrepared.expected_candidate_hash+'?\n\nThis records approval only. No GitHub write, merge, installation, or settlement occurs until you separately select Run.'))return;
  busy=true;disabledAll(true);
