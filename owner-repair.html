@@ -64,10 +64,10 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p id="blocker" class="note" aria-live="polite">No installation or completion is assumed.</p>
 </div>
 <div class="shell">
-<h2>Independent capability verification</h2>
-<p>Verify the original blocked Reality maintenance job against its current execution adapter, actual model-generated repair source and independent GitHub tests. This records a scoped finding in Continuity. It <strong>cannot</strong> issue an execution warrant if the verified candidate is only a patch proposal.</p>
+<h2>Historical execution-gap diagnosis</h2>
+<p>This older diagnostic verified why the original job stopped, but predates Reality's independently verified executor. You do <strong>not</strong> need to repeat it to verify the new 14/14 model-generated package.</p>
 <div class="actions"><button id="verifyExecutor" type="button" disabled>Verify missing capability · Record evidence</button></div>
-<p class="note"><strong>Executor capability candidate:</strong> <a href="https://github.com/maloney2323/Reality/pull/155" target="_blank" rel="noopener noreferrer">review PR #155</a>. Its original-job repair adapter passed <a href="https://github.com/maloney2323/Reality/actions/runs/40751609936" target="_blank" rel="noopener noreferrer">9/9 isolated checks</a>. This is engineering evidence, <strong>not</strong> a Reality-issued owner warrant, installed capability, or finished job. Once the above evidence is recorded, no repeated verification click is needed.</p>
+<p class="note"><strong>Current model-generated executor:</strong> <a href="https://github.com/maloney2323/Reality/actions/runs/40762950798" target="_blank" rel="noopener noreferrer">10/10 regression plus 4/4 independent security holdouts</a>. Verified two-file package fingerprint: <code>88d4bba7…7c97bceb9b2</code>. The older manual review PR #155 is <strong>not</strong> Reality’s generated executor and is not proof of installation. Use the signed-evidence verification below.</p>
 <p class="note" id="verifierResult" role="status" aria-live="polite">Sign in and load the original job to verify the current execution gap.</p>
 </div>
 <div class="shell">
@@ -81,7 +81,7 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p>The REAL model-generated two-file original repair executor passed 10/10 frozen regression checks and 4/4 independent security holdouts. Reality independently rechecks the exact GitHub artifact, original owner goal, and Continuity lineage before recording a cryptographically signed <strong>non-authorizing</strong> evidence warrant. This is not approval to install or write GitHub.</p>
 <p class="note">Exact installable package SHA-256: <code>88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2</code>. <a href="https://github.com/maloney2323/Reality/actions/runs/40762950798" rel="noopener noreferrer" target="_blank">Independent 14/14 proof</a>.</p>
 <button id="verifyWarrant" type="button" disabled>Verify package and record signed evidence warrant</button>
-<p id="warrantResult" class="note" role="status" aria-live="polite">Sign in and let Reality verify the exact original package first. No installation authority granted.</p>
+<p id="warrantResult" class="note" role="status" aria-live="polite">Sign in and open your original Reality job. This button independently validates the exact pinned model package and records a non-authorizing Continuity warrant; it is not installation approval.</p>
 </div>
 <div class="shell">
 <h2>Owner-controlled execution</h2>
@@ -173,11 +173,11 @@ async function loadRealityAutonomousActivity(){
   packageVerified=d.installation_package_verified===true&&d.installable_candidate_sha256==='88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2'&&d.independent_behavioral_cases_passed===10&&d.independent_security_holdout_passed===4;
   $('verifyWarrant').disabled=busy||locked||snapshot?.original_goal_active!==true||snapshot?.original_source_verified!==true||(snapshot?.owner_warrant_events||0)>0;
   $('realityActivityStatus').textContent='Reality: '+String(d.status)+
-   ' · model generated: '+String(d.real_model_generation_verified_by_ci===true)+
-   ' · independent first pass: '+String(d.first_independent_sandbox_passed===true)+
-   ' · self-correction: '+String(d.model_self_correction_completed===true)+
-   ' · corrected pass: '+String(d.corrected_independent_sandbox_passed===true)+
-   '. No installation authority or completion is implied.';
+   ' · actual model-generated installable package verified: '+String(d.installation_package_verified===true)+
+   ' · frozen regression: '+String(d.independent_behavioral_cases_passed||0)+'/10'+
+   ' · independent security holdout: '+String(d.independent_security_holdout_passed||0)+'/4'+
+   ' · warrant: separate Continuity verification required.'+
+   ' No GitHub installation, job resumption or completion is implied.';
   const link=$('realityRunLink');
   if(d.run_url==='https://github.com/maloney2323/Reality/actions/runs/'+d.run_id){
    link.href=d.run_url;link.hidden=false;
