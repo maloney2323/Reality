@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {verifyControlledFinaleIndependentEvidence,
  CONTROLLED_FINALE_WORK,CONTROLLED_FINALE_SOURCE_SHA256}
  from '../src/reality-controlled-finale-independent-admission-v0.1.js';
@@ -7,7 +8,7 @@ import {verifyControlledFinaleIndependentEvidence,
 const HEAD='757404f5891a0fa73258833ea4a477cb01ae8862';
 const BASE='acbc3160ced0525ea73ef4d0184da5fdae50337c';
 const API='https://api.github.com/repos/maloney2323/Reality';
-const MODULE='export function evaluateEstimateRelease(input) { return {external_action_authorized: false}; }\n';
+const MODULE=readFileSync('finale-candidate/candidate.mjs','utf8');
 // Negative tests must never bless fabricated success or a moving branch.
 // Success case uses the real SHA-tested module dynamically supplied by CI.
 function fixtures(content,sourceSha){
@@ -62,6 +63,8 @@ const ask=({fetchImpl})=>verifyControlledFinaleIndependentEvidence({
 });
 test('pinned verifier refuses any non-authentic substituted candidate',async()=>{
  const v=fixtures(MODULE);
+ const file=v.map.get('/contents/src/reality-extensions/construction-estimate-approval-gate.mjs?ref='+HEAD);
+ file.content=Buffer.from('export function evaluateEstimateRelease(input){return null;}\n').toString('base64');
  await assert.rejects(ask(v),/FINALE_MODEL_GENERATED_SOURCE_CHANGED/);
 });
 test('PR must remain an unmerged draft with exact tested head',async()=>{
@@ -72,7 +75,10 @@ test('PR must remain an unmerged draft with exact tested head',async()=>{
 test('moving PR base is refused',async()=>{
  const v=fixtures(MODULE);
  v.map.get('/git/ref/heads/experiment/reality-full-loop-finale-20261028').object.sha='a'.repeat(40);
- await assert.rejects(ask(v),/FINALE_DRAFT_SCOPE_OR_BASE_MOVED/);
+ const result=await ask(v);
+ assert.equal(result.state,'REVALIDATION_REQUIRED_BASE_MOVED');
+ assert.equal(result.target_base_moved_since_review,true);
+ assert.equal(result.installation_authorized,false);
 });
 test('a forged successful predecessor is refused',async()=>{
  const v=fixtures(MODULE);
