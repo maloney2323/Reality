@@ -1,0 +1,121 @@
+name: Reality Original Executor Feedback Self-Correction v0.2
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-executor-feedback-self-correction-v0.2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: reality-original-executor-feedback-v02
+  cancel-in-progress: false
+jobs:
+  reality-repairs-from-actual-independent-feedback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Retrieve authentic Reality model correction and its complete independent failing results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40756883559
+          name: reality-original-executor-corrected-artifact-independent-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous-reality-executor-failure
+      - name: Recheck original immutable model source and authenticate previous failure
+        run: |
+          node --check scripts/reality-original-executor-autonomous-correct-v0.1.mjs
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-repair-proposal.mjs | cut -d' ' -f1)" = "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(readFileSync('previous-reality-executor-failure/generation-evidence.json','utf8'));
+          const candidate=readFileSync('previous-reality-executor-failure/candidate.mjs');
+          const failed=readFileSync('previous-reality-executor-failure/independent-frozen-results.txt','utf8');
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             p.model_generated!==true||!p.model_response_id||
+             p.status!=='MODEL_ORIGINAL_EXECUTOR_CORRECTED_AWAITING_INDEPENDENT_RETEST'||
+             p.candidate_sha256!==createHash('sha256').update(candidate).digest('hex')||
+             !failed.includes('# tests 9')||!failed.includes('# fail 9')||
+             p.original_job_completed!==false||p.github_provider_write_performed!==false)
+             throw Error('REALITY_ORIGINAL_FAILED_PROVENANCE_NOT_VERIFIED');
+          console.log(JSON.stringify({original_work_id:p.original_work_id,
+           previous_model_response_id:p.model_response_id,
+           previous_candidate_sha256:p.candidate_sha256,independent_test_failures:9,
+           original_job_completed:false,installation_authorized:false}));
+          JS
+      - name: Reality reads the full failure evidence and synthesizes corrected executor without manual patch
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PREVIOUS_EXECUTOR_SOURCE: previous-reality-executor-failure/candidate.mjs
+          REALITY_PREVIOUS_EXECUTOR_FEEDBACK: previous-reality-executor-failure/independent-frozen-results.txt
+          REALITY_ORIGINAL_REPAIR_OUTPUT: reality-original-feedback-corrected
+        run: |
+          node scripts/reality-original-executor-autonomous-correct-v0.1.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-feedback-model-candidate
+          path: reality-original-feedback-corrected/
+          retention-days: 14
+  independent-model-correction-acceptance:
+    needs: reality-repairs-from-actual-independent-feedback
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-original-feedback-model-candidate
+          path: reality-original-feedback-corrected
+      - name: Independently confirm exact original source, actual model response and frozen SHA
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(readFileSync('reality-original-feedback-corrected/generation-evidence.json','utf8'));
+          const bytes=readFileSync('reality-original-feedback-corrected/candidate.mjs');
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+            p.model_generated!==true||!p.model_response_id||
+            p.status!=='MODEL_ORIGINAL_EXECUTOR_CORRECTED_AWAITING_INDEPENDENT_RETEST'||
+            p.candidate_sha256!==createHash('sha256').update(bytes).digest('hex')||
+            p.original_job_completed!==false||p.github_provider_write_performed!==false)
+            throw Error('REALITY_MODEL_CORRECTION_PROVENANCE_MISMATCH');
+          console.log(JSON.stringify({model_response_id:p.model_response_id,
+            original_work_id:p.original_work_id,source_sha256:p.candidate_sha256,
+            signed_warrant_issued:false,original_job_completed:false}));
+          JS
+          test "$(sha256sum src/reality-extensions/reality-original-maintenance-repair-proposal.mjs | cut -d' ' -f1)" = "6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16"
+          cp src/reality-extensions/reality-original-maintenance-repair-proposal.mjs reality-original-feedback-corrected/
+      - name: Independent actual 9-case acceptance inside secretless read-only networkless Docker
+        run: |
+          set +e
+          timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}/reality-original-feedback-corrected:/work/owner-original-repair-executor:ro" \
+            -v "${{ github.workspace }}/test:/work/test:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
+            > reality-original-feedback-corrected/independent-acceptance.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(# Subtest:|not ok |ok [0-9]+ -|# (tests|pass|fail)|  error:)' reality-original-feedback-corrected/independent-acceptance.txt | tail -n 52 || true
+          exit "$status"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-feedback-independent-acceptance
+          path: reality-original-feedback-corrected/
+          retention-days: 14
