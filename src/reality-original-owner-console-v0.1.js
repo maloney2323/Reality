@@ -68,11 +68,17 @@ export function originalOwnerConsoleFlags({
 }
 
 async function githubJson(path,fetchImpl=fetch){
+ const headers={accept:'application/vnd.github+json',
+   'User-Agent':'Reality-Original-Owner-Repair-Console',
+   'X-GitHub-Api-Version':'2022-11-28'};
+ const key=process.env.REALITY_GITHUB_TOKEN||process.env.GITHUB_TOKEN;
+ if(typeof key==='string'&&key.trim())headers.authorization='Bearer '+key.trim();
  const res=await fetchImpl(ROOT+path,{
   method:'GET',redirect:'error',
-  headers:{accept:'application/vnd.github+json',
+  headers,
+  /*
    'User-Agent':'Reality-Original-Owner-Repair-Console',
-   'X-GitHub-Api-Version':'2022-11-28'},
+   'X-GitHub-Api-Version':'2022-11-28'}, */
   signal:AbortSignal.timeout(12000),
  });
  if(!res?.ok)fail('OWNER_GITHUB_READBACK_FAILED');
@@ -81,7 +87,7 @@ async function githubJson(path,fetchImpl=fetch){
  try{return JSON.parse(raw)}catch{fail('OWNER_GITHUB_RESPONSE_INVALID')}
 }
 
-async function observeGithub(fetchImpl=fetch){
+export async function observeGithub(fetchImpl=fetch){
  const [pr,issue,run,source,base,fixedRun,fixedSource]=await Promise.all([
   githubJson('/pulls/'+PR,fetchImpl),
   githubJson('/issues/'+ISSUE,fetchImpl),
