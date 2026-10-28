@@ -32,7 +32,19 @@ function setup(){
   repository:REPO,base_ref:BASE,pinned_base_sha:baseSha,
   authorization_policy_sha:'f'.repeat(40),
   production_merge_authorized:false};
- return {build,lease};
+ const verifiedExperiment={
+  state:'SANDBOX_VERIFIED',work_item_id:work,
+  production_graph_write_permitted:false,
+  ephemeral_worldline_id:'worldline:ephemeral:'+'c'.repeat(32),
+  verification_hash:'d'.repeat(64),capability_signature:'verified-extension-bundle',
+  verification_bundle:{
+   frozen_regression:{passed:true},
+   isolated_verification:{verified:true},
+   capability_signature:'verified-extension-bundle',
+   synthesized_capability:{files:build.files},
+  },
+ };
+ return {build,lease,verifiedExperiment};
 }
 function fakeGitHub({badCommittedContent=false,badPr=false,failBranchPost=false}={}){
  const state={sha:baseSha,branch:null,files:new Map(),pr:null,requests:[]};
@@ -81,9 +93,9 @@ function fakeGitHub({badCommittedContent=false,badPr=false,failBranchPost=false}
  return {state,get,write};
 }
 test('existing self-build controller creates only bounded draft PR after consumed exact single-use lease',async()=>{
- const {build,lease}=setup();const mock=fakeGitHub();
+ const {build,lease,verifiedExperiment}=setup();const mock=fakeGitHub();
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:lease,get:mock.get,write:mock.write});
+  authorizedBuild:build,consumedReservation:lease,verifiedExperiment,get:mock.get,write:mock.write});
  const out=await executeSelfBuild(build,{provider});
  assert.equal(out.state,'PR_OPENED');
  assert.equal(out.commit_sha,nextSha);
@@ -98,7 +110,7 @@ test('existing self-build controller creates only bounded draft PR after consume
  assert.ok(mock.state.requests.every(x=>x[1].startsWith(ROOT+'/')));
 });
 test('no owner goal-bound consumed lease, no provider creation',()=>{
- const {build,lease}=setup();
+ const {build,lease,verifiedExperiment}=setup();
  for(const bad of [
   {...lease,status:'RESERVED_NOT_DISPATCHED'},
   {...lease,single_use_claim_consumed:false},
@@ -111,12 +123,12 @@ test('no owner goal-bound consumed lease, no provider creation',()=>{
   {...lease,authorization_policy_sha:undefined},
  ]){
   assert.throws(()=>createGovernedGithubUpgradeProvider({
-   authorizedBuild:build,consumedReservation:bad,
+   authorizedBuild:build,consumedReservation:bad,verifiedExperiment,
   }),/UPGRADE_DURABLE_SINGLE_USE_CANDIDATE_AUTHORIZATION_REQUIRED/);
  }
 });
 test('path escapes, governance rewrites and broad code edits are rejected before GitHub writes',()=>{
- const {build,lease}=setup();
+ const {build,lease,verifiedExperiment}=setup();
  for(const path of [
   '../package.json','/etc/hosts','src/reality-authority-v1.0.js',
   'api/reality/self-build.js','.github/workflows/ci.yml',
@@ -125,47 +137,47 @@ test('path escapes, governance rewrites and broad code edits are rejected before
   const changed={...build,files:[{path,content:'x',mode:'100644'}]};
   const authority={...lease,approved_candidate_hash:fingerprintGovernedUpgradeCandidate(changed.files)};
   assert.throws(()=>createGovernedGithubUpgradeProvider({
-   authorizedBuild:changed,consumedReservation:authority,
+   authorizedBuild:changed,consumedReservation:authority,verifiedExperiment,
   }),/UPGRADE_EXACT_EXTENSION_PATH_OR_CONTENT_INVALID/);
  }
 });
 test('pinned branch SHA mismatch prevents any provider POST',async()=>{
- const {build,lease}=setup();
+ const {build,lease,verifiedExperiment}=setup();
  const mock=fakeGitHub();
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:{...lease,pinned_base_sha:'e'.repeat(40)},
+  authorizedBuild:build,consumedReservation:{...lease,pinned_base_sha:'e'.repeat(40)},verifiedExperiment,
   get:mock.get,write:mock.write});
  await assert.rejects(executeSelfBuild(build,{provider}),/UPGRADE_PINNED_BASE_CHANGED/);
  assert.equal(mock.state.requests.filter(x=>x[0]!=='GET').length,0);
 });
 test('uncertain branch POST cannot be retried or create duplicate branch',async()=>{
- const {build,lease}=setup();const mock=fakeGitHub({failBranchPost:true});
+ const {build,lease,verifiedExperiment}=setup();const mock=fakeGitHub({failBranchPost:true});
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:lease,get:mock.get,write:mock.write});
+  authorizedBuild:build,consumedReservation:lease,verifiedExperiment,get:mock.get,write:mock.write});
  await assert.rejects(executeSelfBuild(build,{provider}),/NETWORK_OUTCOME_UNKNOWN/);
  await assert.rejects(executeSelfBuild(build,{provider}),/UPGRADE_BRANCH_ALREADY_ATTEMPTED_NO_RETRY/);
  assert.equal(mock.state.requests.filter(x=>x[0]==='POST').length,1);
 });
 test('committed bytes mismatch blocks PR creation and refuses retry',async()=>{
- const {build,lease}=setup();const mock=fakeGitHub({badCommittedContent:true});
+ const {build,lease,verifiedExperiment}=setup();const mock=fakeGitHub({badCommittedContent:true});
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:lease,get:mock.get,write:mock.write});
+  authorizedBuild:build,consumedReservation:lease,verifiedExperiment,get:mock.get,write:mock.write});
  await assert.rejects(executeSelfBuild(build,{provider}),/UPGRADE_COMMITTED_BYTES_MISMATCH/);
  assert.equal(mock.state.pr,null);
  await assert.rejects(executeSelfBuild(build,{provider}),/UPGRADE_BRANCH_ALREADY_ATTEMPTED_NO_RETRY/);
 });
 test('independent GitHub readback rejecting incorrect PR status blocks success claim',async()=>{
- const {build,lease}=setup();const mock=fakeGitHub({badPr:true});
+ const {build,lease,verifiedExperiment}=setup();const mock=fakeGitHub({badPr:true});
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:lease,get:mock.get,write:mock.write});
+  authorizedBuild:build,consumedReservation:lease,verifiedExperiment,get:mock.get,write:mock.write});
  await assert.rejects(executeSelfBuild(build,{provider}),/UPGRADE_PR_INDEPENDENT_READBACK_MISMATCH/);
  assert.equal(mock.state.pr.number,479);
  assert.equal(provider.getLocalStatus().pull_request,null);
 });
 test('candidate tampering is detected after initial approval and before code write',async()=>{
- const {build,lease}=setup();const mock=fakeGitHub();
+ const {build,lease,verifiedExperiment}=setup();const mock=fakeGitHub();
  const provider=createGovernedGithubUpgradeProvider({
-  authorizedBuild:build,consumedReservation:lease,get:mock.get,write:mock.write});
+  authorizedBuild:build,consumedReservation:lease,verifiedExperiment,get:mock.get,write:mock.write});
  const b=await provider.createBranch({baseRef:BASE,branch:'reality/build/'+build.build_id.replace(':','-')});
  await assert.rejects(provider.writeFiles({
   branch:'reality/build/'+build.build_id.replace(':','-'),
@@ -182,4 +194,27 @@ test('the old direct self-build API remains disabled and the adapter never merge
  assert.doesNotMatch(adapter,/['"]PUT['"],\s*\{[^}]*\/merges/);
  assert.doesNotMatch(adapter,/githubWrite\(.*merge/i);
  assert.match(adapter,/production_merge_authorized!==false/);
+});
+
+test('missing, failed or work-swapped sandbox is rejected before any GitHub provider access',()=>{
+ const {build,lease,verifiedExperiment}=setup();
+ for(const invalid of [
+  undefined,
+  {...verifiedExperiment,state:'SANDBOX_PROPOSED'},
+  {...verifiedExperiment,work_item_id:'work:'+'f'.repeat(32)},
+  {...verifiedExperiment,production_graph_write_permitted:true},
+  {...verifiedExperiment,verification_bundle:{
+   ...verifiedExperiment.verification_bundle,frozen_regression:{passed:false}}},
+  {...verifiedExperiment,verification_bundle:{
+   ...verifiedExperiment.verification_bundle,isolated_verification:{verified:false}}},
+  {...verifiedExperiment,verification_bundle:{
+   ...verifiedExperiment.verification_bundle,synthesized_capability:{
+    files:[{...build.files[0],content:'altered by another agent'}]}}},
+ ]){
+  assert.throws(()=>createGovernedGithubUpgradeProvider({
+   authorizedBuild:build,consumedReservation:lease,
+   verifiedExperiment:invalid,get:async()=>{throw Error('UNEXPECTED_GET')},
+   write:async()=>{throw Error('UNEXPECTED_WRITE')},
+  }),/UPGRADE_INDEPENDENT_SANDBOX_VERIFICATION_REQUIRED/);
+ }
 });
