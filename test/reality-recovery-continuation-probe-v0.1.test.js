@@ -99,3 +99,13 @@ test('real authenticated recovery coordinator now exposes the same original-work
  assert.equal(r.current_decision,'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED');
  assert.equal(r.original_job_resumed,false);
 });
+
+test('recovery UI shows the original-work automation gap investigation, not just historical workflow pass',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const page=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(page,/Original job automation · /);
+ assert.match(page,/Capability investigation: /);
+ assert.match(page,/Missing capability verified: /);
+ assert.match(page,/Historical workflow corrected\. Investigate how Reality executes and verifies the original repair/);
+ assert.doesNotMatch(page,/Verify root cause and original job acceptance; no new upgrade required\./);
+});
