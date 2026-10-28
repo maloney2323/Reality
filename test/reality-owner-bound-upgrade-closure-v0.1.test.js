@@ -56,6 +56,9 @@ function fakePorts(){
   })),
   install:wrap('install',()=>({requested:true,ref:'provider:issued'})),
   observeInstall:wrap('observeInstall',()=>installed),
+  settleInstallGrant:wrap('settleInstallGrant',()=>({
+   status:'VERIFIED',reservation_id:installGrantId,durably_settled:true,
+  })),
   register:wrap('register',()=>({requested:true})),
   readRegistry:wrap('readRegistry',()=>({
    ...scope,registered:true,runtime_active:true,
@@ -74,6 +77,9 @@ function fakePorts(){
   })),
   resumeOriginal:wrap('resumeOriginal',()=>({execution_id:'execution:original:123'})),
   observeOriginal:wrap('observeOriginal',()=>outcome),
+  settleResumeGrant:wrap('settleResumeGrant',()=>({
+   status:'VERIFIED',reservation_id:resumeGrantId,durably_settled:true,
+  })),
   appendSettlement:wrap('appendSettlement',()=>({event_id:'receipt:original:123'})),
   readSettlement:wrap('readSettlement',()=>({
    ...scope,original_goal_id:originalGoalId,continuity_root_id:root,
@@ -94,10 +100,32 @@ test('complete original owner-bound loop requires two grants and 3 independent r
  assert.equal(r.independent_install_readback,true);
  assert.equal(r.independent_job_readback,true);
  assert.equal(r.durable_settlement_readback,true);
+ assert.equal(r.installation_reservation_settled,true);
+ assert.equal(r.original_work_reservation_settled,true);
  assert.equal(r.production_deployment_performed,false);
- assert.deepEqual(calls,['consumeInstallGrant','install','observeInstall','register',
-  'readRegistry','readFreshGoal','consumeResumeGrant','resumeOriginal','observeOriginal',
-  'appendSettlement','readSettlement']);
+ assert.deepEqual(calls,['consumeInstallGrant','install','observeInstall',
+  'settleInstallGrant','register','readRegistry','readFreshGoal',
+  'consumeResumeGrant','resumeOriginal','observeOriginal',
+  'settleResumeGrant','appendSettlement','readSettlement']);
+});
+test('no owner job can resume after an unverified install reservation settlement',async()=>{
+ const {ports,calls}=fakePorts();
+ ports.settleInstallGrant=async()=>({
+  status:'UNCERTAIN',reservation_id:installGrantId,durably_settled:false});
+ const r=await executeOwnerBoundUpgradeClosure({...args,ports});
+ assert.equal(r.status,'UNRESOLVED_NO_AUTOMATIC_RETRY');
+ assert.equal(r.blocked_at,'INSTALL_GRANT_SETTLEMENT');
+ assert.equal(calls.includes('resumeOriginal'),false);
+});
+test('independent original success without durable original reservation settlement never becomes a completed job',async()=>{
+ const {ports,calls}=fakePorts();
+ ports.settleResumeGrant=async()=>({
+  status:'UNCERTAIN',reservation_id:resumeGrantId,durably_settled:false});
+ const r=await executeOwnerBoundUpgradeClosure({...args,ports});
+ assert.equal(r.status,'UNRESOLVED_NO_AUTOMATIC_RETRY');
+ assert.equal(r.blocked_at,'RESUME_GRANT_SETTLEMENT');
+ assert.equal(r.original_job_completed,false);
+ assert.equal(calls.includes('appendSettlement'),false);
 });
 test('no effect adapters or browser-shaped plan can begin the loop',async()=>{
  const {ports,calls}=fakePorts();delete ports.observeInstall;
