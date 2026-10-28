@@ -38,7 +38,7 @@ const cases=[
  ['missing review',{homeowner_approved:true,approval_evidence_id:'approval:abcdefgh'},'HOLD','OWNER_REVIEW_REQUIRED'],
  ['string review',{homeowner_approved:true,owner_reviewed:'true',approval_evidence_id:'approval:abcdefgh'},'HOLD','OWNER_REVIEW_REQUIRED'],
  ['ready',{homeowner_approved:true,owner_reviewed:true,approval_evidence_id:'approval:abcdefgh'},'READY_FOR_AUTHORIZATION','SEPARATE_SEND_AUTHORIZATION_REQUIRED'],
- ['alternate estimate',{estimate_id:'C-9.a:12',homeowner_approved:true,owner_reviewed:true,approval_evidence_id:'approval:ab-cd_ef'},'READY_FOR_AUTHORIZATION','SEPARATE_SEND_AUTHORIZATION_REQUIRED'],
+ ['alternate estimate',{estimate_id:'C-9.a:12',homeowner_approved:true,owner_reviewed:true,approval_evidence_id:'approval:ab-cd-ef'},'READY_FOR_AUTHORIZATION','SEPARATE_SEND_AUTHORIZATION_REQUIRED'],
 ];
 let passed=0;
 for(const [name,changes,status,reason] of cases){
