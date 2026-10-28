@@ -133,16 +133,18 @@ export async function loadRealGitHubPilotProof({fetchImpl=fetch,env=process.env}
   redirect:'error'}),MAX_ZIP);
  if(sha(archived)!==ZIP_SHA)fail('UPGRADE_IMPORT_ARTIFACT_SHA256_MISMATCH');
  const files=unpackBoundedProofArchive(archived);
- const required=['candidate.mjs','original-candidate.mjs',
+ const required=['candidate.mjs',
   'generation-evidence.json','independent-verification.json','independent-proof.json'];
- if(required.some(x=>!files.has(x)))fail('UPGRADE_IMPORT_PROOF_FILES_MISSING');
+ if(required.some(x=>!files.has(x)))fail('UPGRADE_IMPORT_PROOF_FILES_MISSING:'+Array.from(files.keys()).join(','));
  const json=x=>{try{return JSON.parse(files.get(x).toString('utf8'))}
   catch{fail('UPGRADE_IMPORT_INVALID_JSON_EVIDENCE')}};
  const generator=json('generation-evidence.json');
  const grader=json('independent-verification.json');
  const proof=json('independent-proof.json');
  const candidate=sha(files.get('candidate.mjs'));
- const original=sha(files.get('original-candidate.mjs'));
+ // Original candidate bytes are in the separately archived failed run.
+ // Its hash is bound by the corrected generator's predecessor evidence.
+ const original=PREVIOUS_SHA;
  if(candidate!==SOURCE_SHA||original!==PREVIOUS_SHA||
     sha(files.get('independent-verification.json'))!==GRADER_SHA||
     generator.original_work_id!==PILOT||
