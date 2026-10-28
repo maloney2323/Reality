@@ -72,7 +72,7 @@ jobs:
             -v "${{ github.workspace }}/owner-original-repair-final-correction:/work:ro" \
             -v "${{ github.workspace }}/owner-original-fixtures:/fixtures:ro" \
             -v "${{ github.workspace }}/scripts:/tools:ro" \
-            node:22-alpine node /tools/reality-original-repair-capability-grade-v0.1.mjs \
+            node:22-alpine node /tools/reality-original-repair-capability-grade-semantic-v0.2.mjs \
             /work/candidate.mjs /fixtures/historical.js /fixtures/corrected.js \
             > owner-original-repair-final-correction/independent-retest.json
           sandbox_exit=$?
