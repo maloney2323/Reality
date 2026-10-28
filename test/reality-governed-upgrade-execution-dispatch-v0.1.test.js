@@ -187,7 +187,7 @@ function args({mock=fakeGitHub(),source=fixture(),reservation=admittedReservatio
 test('real governed execution engine consumes DB-style reservation, writes verified draft PR, settles once',async()=>{
  const a=args();
  const result=await dispatchAuthenticatedGovernedUpgradeDraft(a);
- assert.equal(result.status,'DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED');
+ assert.equal(result.status,'DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED',JSON.stringify(result));
  assert.equal(result.original_work_id,work);
  assert.equal(result.draft_pr_verified,true);
  assert.equal(result.github_pr_number,1501);
