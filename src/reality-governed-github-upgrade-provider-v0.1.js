@@ -17,6 +17,7 @@ const BASE='experiment/reality-live-durable-adversarial-20261025';
 const WORK=/^work:[0-9a-f]{32}$/;
 const BRANCH=/^reality\/build\/build-[0-9a-f]{32}$/;
 const SHA=/^[0-9a-f]{40}$/;
+const SHA256=/^[0-9a-f]{64}$/;
 const PATH=/^(?:src|test)\/reality-extensions\/[a-z0-9][a-z0-9-]{0,55}\.(?:js|mjs)$/;
 const fail=code=>{throw Error(code)};
 const hex=text=>createHash('sha256').update(text).digest('hex');
@@ -52,7 +53,7 @@ function trust({build,lease,verifiedExperiment}){
     lease.operation!=='github:create_isolated_upgrade_pr'||
     lease.repository!==REPO||lease.base_ref!==BASE||
     !SHA.test(String(lease.pinned_base_sha||''))||
-    !SHA.test(String(lease.authorization_policy_sha||''))||
+    !SHA256.test(String(lease.authorization_policy_sha||''))||
     lease.production_merge_authorized!==false)
   fail('UPGRADE_DURABLE_SINGLE_USE_CANDIDATE_AUTHORIZATION_REQUIRED');
  if(!build.authorization_ref||!build.authorized_by)
