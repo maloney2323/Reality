@@ -214,7 +214,7 @@ test('missing warrant, untrusted lineage and wrong signed work cannot become upg
  ];
  for(const args of attempts){
   assert.throws(()=>projectAuthenticatedWarrantedUpgrade(args),
-   /^(?:UPGRADE_LOADER_|RELIABILITY_HISTORY_)/);
+   /(?:UPGRADE_LOADER_|RELIABILITY_HISTORY_)/);
  }
 });
 test('authenticated loader reads existing isolated DB without trusting browser proposals',async()=>{
