@@ -1,0 +1,78 @@
+name: Reality Finale - Live Owner Admission Readback (No Authorization)
+on:
+  push:
+    branches:
+      - experiment/reality-full-loop-finale-20261028
+    paths:
+      - 'src/reality-controlled-finale-independent-admission-v0.1.js'
+      - 'api/reality/personal-controlled-finale-readiness.js'
+      - 'test/reality-controlled-finale-independent-admission-v0.1.test.js'
+      - 'src/reality-finale-owner-adoption-v0.1.js'
+      - 'test/reality-finale-owner-adoption-v0.1.test.js'
+      - 'api/reality/personal-controlled-finale-adopt.js'
+      - 'index.html'
+      - '.github/workflows/reality-controlled-finale-live-admission-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  independent-admission-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax-check signed-in read-only owner admission endpoint
+        run: |
+          node --check src/reality-controlled-finale-independent-admission-v0.1.js
+          node --check api/reality/personal-controlled-finale-readiness.js
+          node --check api/reality/personal-controlled-finale-adopt.js
+          node --check src/reality-finale-owner-adoption-v0.1.js
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40716279333
+          name: reality-finale-second-real-model-correction
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: finale-candidate
+      - name: Pin exact model correction before regression tests
+        run: |
+          test "$(sha256sum finale-candidate/candidate.mjs | cut -d' ' -f1)" = c0f0fc86cd2ed11fe7e8c01484ebaf1b698143028c9c81ff323c6b7f8cd857ae
+      - name: Adversarial fail-closed admission regression tests
+        run: node --test test/reality-controlled-finale-independent-admission-v0.1.test.js
+      - name: Explicit owner adoption, lineage and anti-warrant forgery tests
+        run: node --test test/reality-finale-owner-adoption-v0.1.test.js
+      - name: Independently verify actual pinned GitHub candidate and stage boundaries
+        env:
+          REALITY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' > reality-controlled-finale-live-admission.json
+          import {verifyControlledFinaleIndependentEvidence}
+            from './src/reality-controlled-finale-independent-admission-v0.1.js';
+          const result=await verifyControlledFinaleIndependentEvidence();
+          if(!['EXACT_MODEL_CORRECTION_INDEPENDENTLY_VERIFIED_OWNER_ADMISSION_PENDING',
+             'REVALIDATION_REQUIRED_BASE_MOVED'].includes(result.state)||
+             result.owner_bound_warrant_issued!==false||
+             result.installation_authorized!==false||
+             result.owner_resumption_authorized!==false||
+             result.durable_job_settlement!==false||
+             result.controlled_job_completed!==false||
+             result.customer_job_completed!==false)
+             throw Error('FINALE_ADMISSION_IMPROPERLY_PROMOTED_AUTHORITY_OR_JOB_COMPLETION');
+          const {actual_model_source_bytes,...safe}=result;
+          console.log(JSON.stringify(safe,null,2));
+          JS
+          cat reality-controlled-finale-live-admission.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-controlled-finale-owner-admission-readonly
+          path: reality-controlled-finale-live-admission.json
+          if-no-files-found: warn
+          retention-days: 14
