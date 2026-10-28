@@ -1,0 +1,174 @@
+name: Reality Original Live CI Red-to-Green Self Correction v0.5
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-live-issue-body-correction-v0.5.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+  actions: read
+jobs:
+  original-real-live-self-correction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 0e83d0388e92220d2cf08f277e2a44e0c877367c
+          path: installed-original
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Attest exact previous model-generated installed source and independently observed REAL GitHub failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-original-executor-real-live-self-correct-v0.5.mjs
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const installed=readFileSync('installed-original/src/reality-extensions/reality-original-maintenance-executor.mjs','utf8');
+          const digest=x=>createHash('sha256').update(x).digest('hex');
+          if(digest(installed)!=='61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17')
+           throw Error('REAL_LIVE_FAILURE_PREDECESSOR_MODEL_SOURCE_NOT_EXACT');
+          const originalProposal=readFileSync('src/reality-extensions/reality-original-maintenance-repair-proposal.mjs','utf8');
+          if(digest(originalProposal)!=='6b82acd60baa9055bfc57a70f551bac44f783fc431814ad2555927eb50f5ca16')
+           throw Error('REAL_LIVE_FAILURE_PROPOSAL_DEPENDENCY_CHANGED');
+          const headers={accept:'application/vnd.github+json',
+           authorization:'Bearer '+process.env.GH_TOKEN,'x-github-api-version':'2022-11-28'};
+          const get=async url=>{const r=await fetch(url,{headers,redirect:'error'});
+           if(r.status!==200)throw Error('REAL_LIVE_FAILURE_GITHUB_EVIDENCE_FETCH_'+r.status);
+           return r.json()};
+          const root='https://api.github.com/repos/maloney2323/Reality';
+          const run=await get(root+'/actions/runs/40776036280');
+          const jobs=await get(root+'/actions/runs/40776036280/jobs?per_page=50');
+          const issue=await get(root+'/issues/143');
+          if(run.status!=='completed'||run.conclusion!=='failure'||
+             run.head_sha!=='0e83d0388e92220d2cf08f277e2a44e0c877367c'||
+             jobs.total_count!==1||jobs.jobs[0].name!=='actual-installed-original-job-readonly'||
+             jobs.jobs[0].conclusion!=='failure'||
+             issue.number!==143||issue.state!=='open'||
+             issue.html_url!=='https://github.com/maloney2323/Reality/issues/143'||
+             issue.title!=='Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures'||
+             typeof issue.body!=='string')
+           throw Error('REAL_LIVE_ORIGINAL_ISSUE_BODY_FAILURE_NOT_INDEPENDENTLY_GROUNDED');
+          const evidence=[
+           'REAL installed original model executor CI run 40776036280 FAILED.',
+           'Source head SHA 0e83d0388e92220d2cf08f277e2a44e0c877367c, original issue #143.',
+           'Real CI stack reports ORIGINAL_EXECUTOR_PINNED_BRANCH_OR_ISSUE_MISMATCH at validateIssue(await read(get, ISSUE_PATH)).',
+           'INDEPENDENT GitHub REST response confirms issue number=143, state=open, canonical html_url and exact title are correct.',
+           'GitHub issue response contains body TYPE STRING with text description, not a wrapper.',
+           'Current generated executor uses unwrap = value?.data ?? value?.body ?? value, incorrectly unwrapping issue.body into a string.',
+           'Keep strict issue validation; fix only the incorrect provider envelope detection.',
+           'Original source previously fixed. No owner grant or GitHub write is allowed during correction.',
+          ];
+          writeFileSync('original-live-failure.txt',evidence.join('\n')+'\n');
+          console.log(JSON.stringify({status:'GROUNDED_REAL_LIVE_MODEL_FAILURE',
+           run_id:run.id,real_issue_number:issue.number,
+           real_issue_body_type:typeof issue.body,
+           predecessor_sha256:digest(installed),no_git_writes:true}));
+          JS
+      - name: Prove actual installed model fails the NEW real GitHub-body holdout (red control)
+        run: |
+          mkdir -p owner-original-repair-executor
+          cp installed-original/src/reality-extensions/reality-original-maintenance-executor.mjs owner-original-repair-executor/candidate.mjs
+          cp src/reality-extensions/reality-original-maintenance-repair-proposal.mjs owner-original-repair-executor/
+          set +e
+          timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-real-issue-body-holdout-v0.1.test.mjs \
+            > original-live-red.txt 2>&1
+          result=$?
+          set -e
+          grep -E '(^# (tests|pass|fail)|^not ok )' original-live-red.txt || true
+          test "$result" -ne 0
+          grep -q '# fail ' original-live-red.txt
+          grep -q 'ORIGINAL_EXECUTOR_PINNED_BRANCH_OR_ISSUE_MISMATCH' original-live-red.txt
+      - name: REALITY MODEL corrects its own installed source after authentic live GitHub failure (not assistant-generated code)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PREVIOUS_EXECUTOR_SOURCE: installed-original/src/reality-extensions/reality-original-maintenance-executor.mjs
+          REALITY_PREVIOUS_EXECUTOR_FEEDBACK: original-live-failure.txt
+          REALITY_ORIGINAL_REPAIR_OUTPUT: original-live-model-corrected
+        run: node scripts/reality-original-executor-real-live-self-correct-v0.5.mjs
+      - name: Stage only REAL model corrected output and independently verify provenance
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,copyFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const info=JSON.parse(readFileSync('original-live-model-corrected/generation-evidence.json','utf8'));
+          const candidate=readFileSync('original-live-model-corrected/candidate.mjs');
+          if(info.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+            info.model_generated!==true||!String(info.model_response_id).startsWith('resp_')||
+            info.candidate_sha256!==createHash('sha256').update(candidate).digest('hex')||
+            info.original_job_completed!==false||info.github_provider_write_performed!==false)
+           throw Error('REAL_LIVE_MODEL_CANDIDATE_PROVENANCE_UNTRUSTED');
+          copyFileSync('original-live-model-corrected/candidate.mjs','owner-original-repair-executor/candidate.mjs');
+          console.log(JSON.stringify({model_response_id:info.model_response_id,
+           source_sha256:info.candidate_sha256,original_job_completed:false}));
+          JS
+          mkdir -p original-executor-security-corrected-package
+          cp owner-original-repair-executor/candidate.mjs original-executor-security-corrected-package/reality-original-maintenance-executor.mjs
+          cp owner-original-repair-executor/reality-original-maintenance-repair-proposal.mjs original-executor-security-corrected-package/
+      - name: Independent frozen original ten-case acceptance in no-network, no-secret read-only Docker
+        run: |
+          set +e
+          timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
+            > original-live-model-corrected/frozen-results.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(^# (tests|pass|fail)|^not ok )' original-live-model-corrected/frozen-results.txt || true
+          exit "$status"
+      - name: Independently recheck all four prior issue-scope security holdouts
+        run: |
+          set +e
+          timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_EXECUTOR_HOLDOUT_PACKAGE=original-executor-security-corrected-package \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-security-holdout-v0.1.test.mjs \
+            > original-live-model-corrected/security-results.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(^# (tests|pass|fail)|^not ok )' original-live-model-corrected/security-results.txt || true
+          exit "$status"
+      - name: Independent NEW real GitHub API body-envelope regression must pass 4/4
+        run: |
+          set +e
+          timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-real-issue-body-holdout-v0.1.test.mjs \
+            > original-live-model-corrected/real-github-body-results.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(^# (tests|pass|fail)|^not ok )' original-live-model-corrected/real-github-body-results.txt || true
+          exit "$status"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-real-live-model-self-correction-verified
+          path: |
+            original-live-failure.txt
+            original-live-red.txt
+            original-live-model-corrected/
+          retention-days: 30
