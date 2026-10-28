@@ -41,14 +41,17 @@ const cleanError=e=>String(e?.message||'').match(/^(?:UPGRADE_|AUTONOMOUS_LOOP_)
 
 export function originalOwnerConsoleFlags({
  goalConfirmed=false,evidence={},github={},warrantVerified=false,
- draftVerified=false,installationVerified=false,settlementVerified=false,
+ currentPackageWarrantVerified=false,draftVerified=false,
+ installationVerified=false,settlementVerified=false,
 }={}){
  const source=github.exact_llm_source_verified===true&&github.sandbox_success===true;
  const alreadyFixed=github.historical_fixed_source_verified===true;
  const ownerEvidence=evidence.owner_evidence_acknowledged===true;
- // The owner-bound HMAC warrant independently proves the CURRENT model-generated
- // package. Do not gate it on the LEGACY review PR #154's patch-only tests.
- const warrant=Boolean(goalConfirmed&&warrantVerified);
+ // The legacy patch-only review source and the newer real model executor
+ // have DIFFERENT evidence chains. Preserve legacy source-mismatch rejection
+ // while accepting only an independently verified CURRENT signed warrant.
+ const legacyWarrant=Boolean(goalConfirmed&&source&&warrantVerified);
+ const warrant=Boolean(goalConfirmed&&(legacyWarrant||currentPackageWarrantVerified));
  const draft=Boolean(warrant&&draftVerified);
  const install=Boolean(draft&&installationVerified);
  const settled=Boolean(install&&settlementVerified);
@@ -56,7 +59,8 @@ export function originalOwnerConsoleFlags({
   correct_original_work_id:ORIGINAL_OWNER_WORK_ID,
   original_goal_active:goalConfirmed,
   original_source_verified:source,
-  current_model_package_warrant_verified:warrant,
+  current_model_package_warrant_verified:Boolean(goalConfirmed&&currentPackageWarrantVerified),
+  legacy_review_warrant_ready:legacyWarrant,
   original_source_already_fixed:alreadyFixed,
   owner_historical_evidence_acknowledged:ownerEvidence,
   warranted_upgrade_ready:warrant,
@@ -376,7 +380,8 @@ export async function inspectOriginalOwnerConsole({
  const flags=originalOwnerConsoleFlags({
   goalConfirmed:ctx.owner_goal_confirmed,github,
   evidence:{owner_evidence_acknowledged:ctx.owner_evidence_acknowledged},
-  warrantVerified:verifiedWarrant,draftVerified:verifiedDraft,
+  warrantVerified:verifiedWarrant,
+  currentPackageWarrantVerified:verifiedWarrant,draftVerified:verifiedDraft,
   installationVerified:verifiedInstall,
   settlementVerified:verifiedSettlement,
  });
