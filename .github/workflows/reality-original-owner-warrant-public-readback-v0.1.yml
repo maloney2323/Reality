@@ -1,0 +1,51 @@
+name: Reality Original Owner Warrant Public Evidence Readback Proof v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-owner-warrant-public-readback-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-warrant-package-public-reconstruction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax-check actual trusted signer input and HMAC scope verifier
+        run: |
+          node --check src/reality-original-executor-trusted-package-readback-v0.1.js
+          node --check src/reality-original-executor-trusted-warrant-recorder-v0.1.js
+          node --check api/reality/personal-original-executor-trusted-verification.js
+      - name: Read immutable public verified snapshot WITHOUT GITHUB API TOKEN OR WRITE CREDENTIALS
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {loadTrustedOriginalExecutorPackage}
+           from './src/reality-original-executor-trusted-package-readback-v0.1.js';
+          const x=await loadTrustedOriginalExecutorPackage({env:{VERCEL_ENV:'preview'}});
+          assert.equal(x.work_id,'work:24cda9611404e9bcb47909976067605c');
+          assert.equal(x.artifact_immutable_verified,true);
+          assert.equal(x.installable_candidate_sha256,'88d4bba7f2ddf0c7331ddfcc0621b4a13739326451cb53d41ad807c97bceb9b2');
+          assert.equal(x.executor_sha256,'61df9fc02b2cc342b19fb61a82b961d773499628caf47b9b1647ea3675299d17');
+          assert.equal(x.frozen_tests.case_count,10);
+          assert.equal(x.independent_holdout.case_count,4);
+          assert.equal(x.signed_warrant_issued,false);
+          assert.equal(x.installation_authorized,false);
+          assert.equal(x.original_job_completed,false);
+          assert.equal(x.evidence_commit_sha,'a39af4e355655ca0a0575303ac2c64353aa8eab2');
+          console.log(JSON.stringify({status:'PUBLIC_READONLY_VERIFIED_PACKAGE_BOUND_TO_ORIGINAL',
+           original_work_id:x.work_id,candidate_sha256:x.installable_candidate_sha256,
+           exact_model_executor_sha256:x.executor_sha256,
+           frozen_tests:x.frozen_tests.case_count,holdout:x.independent_holdout.case_count,
+           warrant_issued:false,installation_authorized:false,job_completed:false}));
+          JS
+      - name: Owner warrant remains a separate independently signed continuity service
+        run: node --test test/reality-original-executor-trusted-warrant-recorder-v0.1.test.mjs
