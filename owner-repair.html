@@ -71,6 +71,12 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <p class="note" id="verifierResult" role="status" aria-live="polite">Sign in and load the original job to verify the current execution gap.</p>
 </div>
 <div class="shell">
+<h2>Reality's autonomous execution evidence</h2>
+<p class="note">Independent GitHub runs show what Reality's model actually generated, whether its isolated verifier rejected it, and whether Reality self-corrected. These runs are engineering evidence, not signed owner installation warrants.</p>
+<div class="actions"><button class="secondary" id="realityActivity" type="button">Read Reality's latest autonomous run</button><a id="realityRunLink" target="_blank" rel="noopener noreferrer" hidden>Open independent GitHub run</a></div>
+<p class="note" role="status" aria-live="polite" id="realityActivityStatus">Owner sign-in required for source-backed Reality run status.</p>
+</div>
+<div class="shell">
 <h2>Owner-controlled execution</h2>
 <p class="note">Every stage is tied to the same original work ID. Installation and resumption require independent, separate approvals. Reality will not use a GitHub merge as proof of final job completion.</p>
 <div class="step">
@@ -146,6 +152,31 @@ async function json(url,options={}){
  if(!response.ok||data?.ok!==true)throw Error(String(data?.error||'REQUEST_OR_READBACK_NOT_VERIFIED'));
  return data;
 }
+async function loadRealityAutonomousActivity(){
+ if(!conv){$('realityActivityStatus').textContent='Original job scope not yet authenticated.';return;}
+ $('realityActivity').disabled=true;
+ $('realityActivityStatus').textContent='Reading Reality model generation and independent sandbox results…';
+ try{
+  const d=await json('/api/reality/personal-original-executor-run-status?conversation_id='+
+   encodeURIComponent(conv)+'&original_work_id='+encodeURIComponent(WORK));
+  if(d.original_work_id!==WORK||d.owner_warrant_issued!==false||
+     d.original_job_completed!==false||d.installed_capability!==false)
+   throw Error('ORIGINAL_RUN_SCOPE_OR_AUTHORITY_CHANGED');
+  $('realityActivityStatus').textContent='Reality: '+String(d.status)+
+   ' · model generated: '+String(d.real_model_generation_verified_by_ci===true)+
+   ' · independent first pass: '+String(d.first_independent_sandbox_passed===true)+
+   ' · self-correction: '+String(d.model_self_correction_completed===true)+
+   ' · corrected pass: '+String(d.corrected_independent_sandbox_passed===true)+
+   '. No installation authority or completion is implied.';
+  const link=$('realityRunLink');
+  if(d.run_url==='https://github.com/maloney2323/Reality/actions/runs/'+d.run_id){
+   link.href=d.run_url;link.hidden=false;
+  }else{link.hidden=true;}
+ }catch(e){
+  $('realityActivityStatus').textContent='Autonomous run evidence unavailable: '+String(e.message)+
+   '. No installation or completion is implied.';
+ }finally{$('realityActivity').disabled=false;}
+}
 async function findOriginalConversation(){
  const d=await json('/api/reality/personal-unfinished-work');
  if(!Array.isArray(d.jobs)||!['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(d.status))
@@ -176,6 +207,7 @@ async function refresh(){
    '\nFinal independently verified settlement: '+String(d.job_settlement_verified===true)+
    '\nNext: '+String(d.next_required_step));
   busy=false;render(d);
+  void loadRealityAutonomousActivity();
  }catch(err){
   busy=false;disabledAll(true);$('refresh').disabled=false;$('verifyFinal').disabled=false;
   $('summary').textContent='Original owner readback unavailable.';
@@ -295,6 +327,7 @@ async function execute(){
   $('approve').disabled=true;$('execute').disabled=true;}
 }
 $('refresh').addEventListener('click',refresh);
+$('realityActivity').addEventListener('click',loadRealityAutonomousActivity);
 $('verifyExecutor').addEventListener('click',verifyOriginalExecutor);
 $('verifyFinal').addEventListener('click',refresh);
 $('prepareInstall').addEventListener('click',()=>prepare('INSTALL'));
