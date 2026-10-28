@@ -73,6 +73,7 @@ test('verified owner warrant can PREPARE exact two-file draft but never approves
  assert.equal(d.external_action_performed,false);
  assert.equal(d.approval_recorded,false);
  assert.equal(d.draft_pr_created,false);
+ assert.equal(d.github_draft_dispatch_configured,false);
  assert.equal(d.installation_authorized,false);
  const proof=verifyPersonalWorkGroundingProof({proof:d.grounding_proof,
   conversationId:x.conversationId,principalId:x.session.user_id,env:x.env});
