@@ -7,28 +7,37 @@ import {observeOwnerGithubUpgradeInstall}
  from './reality-owner-upgrade-github-install-readback-v0.1.js';
 import {appendVerifiedOwnerUpgradeJobSettlement,readVerifiedOwnerUpgradeJobSettlement}
  from './reality-owner-upgrade-original-job-settlement-v0.1.js';
+import {consumeOwnerUpgradeInstallGrant,consumeOwnerUpgradeResumeGrant}
+ from './reality-owner-upgrade-stage-authority-v0.1.js';
 export const OWNER_UPGRADE_GITHUB_LIVE_PORTS_VERSION='reality-owner-upgrade-github-live-ports-v0.1';
 const missing=(name)=>{throw Error('UPGRADE_LIVE_PORT_REQUIRED_'+name)};
 export function connectOwnerGithubUpgradeToClosure({
  authorityPorts,runtimePorts,continuityPorts,
+ consumeInstallGrant=consumeOwnerUpgradeInstallGrant,
+ consumeResumeGrant=consumeOwnerUpgradeResumeGrant,
  install=installExactOwnerAuthorizedGithubUpgrade,
  observe=observeOwnerGithubUpgradeInstall,
  appendSettlement=appendVerifiedOwnerUpgradeJobSettlement,
  readSettlement=readVerifiedOwnerUpgradeJobSettlement,
 }={}){
  const external={...authorityPorts,...runtimePorts,...continuityPorts};
- const required=['consumeInstallGrant','register','readRegistry','readFreshGoal',
-  'consumeResumeGrant','resumeOriginal','observeOriginal'];
+ const required=['register','readRegistry','readFreshGoal',
+  'resumeOriginal','observeOriginal'];
  for(const key of required){
   if(typeof external[key]!=='function')missing(key);
  }
- if(typeof install!=='function'||typeof observe!=='function'||
+ if(typeof consumeInstallGrant!=='function'||typeof consumeResumeGrant!=='function'||
+    typeof install!=='function'||typeof observe!=='function'||
     typeof appendSettlement!=='function'||typeof readSettlement!=='function')
   missing('GITHUB_VERIFIED_INSTALL');
  // Always override any caller-defined install/observe hooks with the
  // independent real provider pair. Do not expose a bypass injection route.
  return Object.freeze({
   ...external,
+  consumeInstallGrant:async({session,conversationId,scope,plan,env})=>
+   consumeInstallGrant({session,scope,plan,env}),
+  consumeResumeGrant:async({session,scope,plan,goal,installed,env})=>
+   consumeResumeGrant({session,scope,plan,installed,env}),
   install:async({session,scope,plan,grant,env})=>
    install({session,scope,plan,grant,env}),
   observeInstall:async({session,scope,plan,grant,issued,env})=>
