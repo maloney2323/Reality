@@ -105,6 +105,47 @@ jobs:
             github_write_authorized:false,original_job_completed:false}));
           JS
 
+      - name: Independently observe live preview-base workflow readiness without mutation
+        env:
+          GH_READ_ONLY_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module - <<'JS'
+          import {assertUpgradeBaseReady} from './src/reality-upgrade-base-readiness-v0.1.js';
+          const root='https://api.github.com/repos/maloney2323/Reality';
+          const headers={
+            Accept:'application/vnd.github+json',
+            'X-GitHub-Api-Version':'2022-11-28',
+            'User-Agent':'Reality-Upgrader-Base-Readiness-Proof',
+            Authorization:'Bearer '+process.env.GH_READ_ONLY_TOKEN,
+          };
+          const get=async path=>{
+            const response=await fetch(root+path,{method:'GET',headers,redirect:'error'});
+            if(!response.ok)throw Error('GITHUB_READ_'+response.status);
+            return response.json();
+          };
+          const base='experiment/reality-live-durable-adversarial-20261025';
+          const ref=await get('/git/ref/heads/'+base);
+          if(ref.ref!=='refs/heads/'+base||
+             !/^[a-f0-9]{40}$/.test(String(ref.object?.sha||'')))
+            throw Error('UNVERIFIED_GITHUB_PREVIEW_BASE');
+          try{
+            const observed=await assertUpgradeBaseReady({
+              providerGet:get,baseCommitSha:ref.object.sha,
+            });
+            console.log(JSON.stringify({state:'REAL_PREVIEW_BASE_CI_READY',
+              base_sha:ref.object.sha,required_checks:observed.workflows.length,
+              github_write_performed:false,capability_installed:false}));
+          }catch(error){
+            if(!['UPGRADE_BASE_REQUIRED_CI_WORKFLOW_UNAVAILABLE',
+               'UPGRADE_BASE_REQUIRED_CI_TRIGGER_MISSING'].includes(error.message))
+              throw error;
+            console.log(JSON.stringify({state:'REAL_PREVIEW_BASE_CI_BLOCKED',
+              reason:error.message,pinned_base_sha:ref.object.sha,
+              upgrade_dispatch_allowed:false,owner_reservation_consumed:false,
+              github_write_performed:false,capability_installed:false}));
+          }
+          JS
+
   real-model-pilot-synthesis:
     if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-model-pilot]')
     needs: governed-upgrade
