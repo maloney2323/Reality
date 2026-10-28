@@ -56,7 +56,7 @@ test('Reality frozen ten-case model executor evidence requires actual exact gree
  r.name='Reality ORIGINAL Model Executor Independently Verified Behavioral Recheck v0.4';
  r.head_sha='b9949f726d2d2cebee80bdf654767a7d0e0ba038';
  r.html_url='https://github.com/maloney2323/Reality/actions/runs/40759263421';
- r.path='maloney2323/Reality/.github/workflows/reality-original-model-executor-behavioral-recheck-v0.4.yml@refs/heads/feature/governed-autonomous-self-upgrading-v01-20261027';
+ r.path='.github/workflows/reality-original-model-executor-behavioral-recheck-v0.4.yml';
  r.conclusion='success';
  const j={name:'verify-model-corrected-original-executor',status:'completed',conclusion:'success'};
  const x=projectAcceptedOriginalExecutorRun({run:r,jobs:[j]});
