@@ -25,9 +25,9 @@ const scope=personalGoalScope({userId:user_id,conversationId});
 const spine=createContinuitySpine({
  continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:user_id,
 });
-function history({checkpoint=false,verified=true}={}){
+function history({checkpoint=false,verified=true,accepted=false}={}){
  const entries=[];
- const add=(stage,entity_type,payload,epistemicStatus='OBSERVED')=>{
+ const add=(stage,entity_type,payload,epistemicStatus='OBSERVED',provenance=null)=>{
   const prior=entries.at(-1);
   const receipt=appendContinuityNode({
    spine,stage,entityId:work,
@@ -35,6 +35,7 @@ function history({checkpoint=false,verified=true}={}){
    parentEventId:prior?.event_id||null,
    priorLineageHash:prior?.lineage_hash||null,
    effectiveTime:at,assertionTime:at,epistemicStatus,payload,
+   provenance:provenance||{source:'unit-test-original-job'},
   });
   const saved={...receipt,entity_type,provenance:{
    ...receipt.provenance,continuity_spine:{
@@ -67,6 +68,21 @@ function history({checkpoint=false,verified=true}={}){
   new_external_action_authorized:false,job_completed:false,
   retry_original_issue_creation:false,
  });
+ if(accepted){
+  const receipt=entries.find(e=>e.entity_type==='personal_recovery_checkpoint');
+  if(!receipt)throw Error('test fixture needs saved recovery checkpoint');
+  add('WORK','personal_recovery_acceptance_evidence',{
+   original_work_id:work,original_goal_id:goalId,
+   recovery_receipt_id:receipt.event_id,
+   source_correction_verified:true,provider_current_success_verified:true,
+   assessment:'EVIDENCE_SUPPORTS_CORRECTION_AWAITING_OWNER_ACCEPTANCE',
+   owner_accepted:false,full_original_job_completed:false,
+   original_issue_closed:false,external_action_performed:false,
+  },'CORROBORATED',{
+   source:'reality-personal-repair-acceptance-v0.1',
+   principal_id:user_id,conversation_id:conversationId,
+  });
+ }
  return entries;
 }
 const goal={active_goal_id:goalId,
@@ -96,6 +112,30 @@ test('saved checkpoint is restored and disables duplicate save',()=>{
  assert.equal(rows[0].can_save_recovery,false);
  assert.ok(rows[0].recovery_receipt_id);
  assert.equal(rows[0].job_completed,false);
+});
+test('verified source correction is restored from original Continuity and never treated as repair completion',()=>{
+ const rows=projectUnfinishedFromConversation({
+  conversationId,events:history({checkpoint:true,accepted:true}),goal,
+ });
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].state,'RECOVERY_CHECKPOINT_SAVED');
+ assert.equal(rows[0].repair_evidence_saved,true);
+ assert.equal(rows[0].repair_evidence_status,'SOURCE_CORRECTION_VERIFIED_AWAITING_OWNER_ACCEPTANCE');
+ assert.ok(rows[0].repair_evidence_receipt_id);
+ assert.equal(rows[0].owner_repair_accepted,false);
+ assert.equal(rows[0].job_completed,false);
+ assert.equal(rows[0].can_resume_execution,false);
+ assert.match(rows[0].next_step,/Owner acceptance and final repair settlement remain pending/);
+});
+test('an acceptance receipt from another conversation is rejected, never silently promoted',()=>{
+ const rows=history({checkpoint:true,accepted:true});
+ const receipt=rows.at(-1);
+ rows[rows.length-1]={...receipt,provenance:{
+  ...receipt.provenance,conversation_id:otherConversation,
+ }};
+ assert.throws(()=>projectUnfinishedFromConversation({
+  conversationId,events:rows,goal,
+ }),/RELIABILITY_HISTORY_|UNFINISHED_REPAIR_ACCEPTANCE_PROVENANCE_INVALID/);
 });
 test('changed goal and unresolved provider attempt never allow recovery save',()=>{
  const changed=projectUnfinishedFromConversation({conversationId,events:history(),
@@ -157,6 +197,9 @@ test('UI places unfinished work above ending receipts and requires GET before an
  assert.ok(html.indexOf('id="wcUnfinishedCenter"')>0);
  assert.ok(html.indexOf('id="wcUnfinishedCenter"')<html.indexOf('id="wcCompletionCenter"'));
  assert.match(script,/\/api\/reality\/personal-unfinished-work/);
+ assert.match(script,/Source correction verified · Owner acceptance pending/);
+ assert.match(script,/job\.repair_evidence_saved===true/);
+ assert.match(script,/await wcLoadUnfinishedWork\(\)/);
  assert.match(script,/wcLoadUnfinishedWork\(\)/);
  assert.match(script,/Save for recovery/);
  assert.match(script,/examined\.checkpoint_persisted===true/);
