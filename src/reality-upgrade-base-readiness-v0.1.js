@@ -25,12 +25,18 @@ export async function assertUpgradeBaseReady({
 }={}){
  if(typeof providerGet!=='function'||!SHA.test(String(baseCommitSha||'')))
   fail('UPGRADE_BASE_READINESS_TRUSTED_SCOPE_REQUIRED');
- let tree;
+ let commit,tree;
  try{
-  tree=await providerGet(ROOT+'/git/trees/'+baseCommitSha+'?recursive=1');
- }catch{fail('UPGRADE_BASE_PINNED_GIT_TREE_UNAVAILABLE')}
- if(tree?.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length<1||
-    tree.tree.length>15000)
+  commit=await providerGet(ROOT+'/git/commits/'+baseCommitSha);
+  if(commit?.sha!==baseCommitSha||!SHA.test(String(commit.tree?.sha||'')))
+   fail('UPGRADE_BASE_PINNED_COMMIT_TREE_UNVERIFIED');
+  tree=await providerGet(ROOT+'/git/trees/'+commit.tree.sha+'?recursive=1');
+ }catch(error){
+  if(error?.message==='UPGRADE_BASE_PINNED_COMMIT_TREE_UNVERIFIED')throw error;
+  fail('UPGRADE_BASE_PINNED_GIT_TREE_UNAVAILABLE');
+ }
+ if(tree?.sha!==commit.tree.sha||tree?.truncated!==false||
+    !Array.isArray(tree.tree)||tree.tree.length<1||tree.tree.length>15000)
   fail('UPGRADE_BASE_PINNED_GIT_TREE_UNVERIFIED');
  const observed=[];
  for(const path of REQUIRED_UPGRADE_CI_FILES){
