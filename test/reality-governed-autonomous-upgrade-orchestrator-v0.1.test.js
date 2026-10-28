@@ -7,7 +7,7 @@ import {
 const REPO='maloney2323/Reality',ROOT='/repos/'+REPO,
  BASE='experiment/reality-live-durable-adversarial-20261025';
 const WORK='work:24cda9611404e9bcb47909976067605c';
-const SHA_A='a'.repeat(40),SHA_B='b'.repeat(40),POLICY='c'.repeat(40);
+const SHA_A='a'.repeat(40),SHA_B='b'.repeat(40),POLICY='c'.repeat(64);
 function fixture(){
  const originalWorkItem={id:WORK,continuity_root_id:'root:original',
   worldline_id:'worldline:original',status:'BLOCKED'};
