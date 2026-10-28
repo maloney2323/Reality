@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 // Fail closed before consuming the owner's single-use execution reservation.
 // GitHub installs extension modules from the pinned preview base. The base
 // must ALREADY contain both required exact-commit safety workflows: a passing
@@ -24,23 +25,39 @@ export async function assertUpgradeBaseReady({
 }={}){
  if(typeof providerGet!=='function'||!SHA.test(String(baseCommitSha||'')))
   fail('UPGRADE_BASE_READINESS_TRUSTED_SCOPE_REQUIRED');
+ let tree;
+ try{
+  tree=await providerGet(ROOT+'/git/trees/'+baseCommitSha+'?recursive=1');
+ }catch{fail('UPGRADE_BASE_PINNED_GIT_TREE_UNAVAILABLE')}
+ if(tree?.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length<2||
+    tree.tree.length>15000)
+  fail('UPGRADE_BASE_PINNED_GIT_TREE_UNVERIFIED');
  const observed=[];
  for(const path of REQUIRED_UPGRADE_CI_FILES){
+  const matches=tree.tree.filter(x=>x?.path===path);
+  if(matches.length!==1||matches[0].mode!=='100644'||
+     matches[0].type!=='blob'||!SHA.test(String(matches[0].sha||'')))
+   fail('UPGRADE_BASE_REQUIRED_CI_WORKFLOW_UNAVAILABLE');
+  const expectedBlobSha=matches[0].sha;
   let item;
   try{
-   item=await providerGet(ROOT+'/contents/'+path+'?ref='+baseCommitSha);
+   item=await providerGet(ROOT+'/git/blobs/'+expectedBlobSha);
   }catch{fail('UPGRADE_BASE_REQUIRED_CI_WORKFLOW_UNAVAILABLE')}
-  if(item?.type!=='file'||item.path!==path||
-    item.encoding!=='base64'||typeof item.content!=='string'||
-    item.content.length>200000||!SHA.test(String(item.sha||'')))
+  if(item?.encoding!=='base64'||typeof item.content!=='string'||
+     item.content.length>200000||item.sha!==expectedBlobSha||
+     !Number.isSafeInteger(item.size)||item.size<100||item.size>120000)
    fail('UPGRADE_BASE_CI_WORKFLOW_SOURCE_UNVERIFIED');
-  const bytes=Buffer.from(item.content.replace(/\s+/g,''),'base64');
-  if(bytes.length<100||bytes.length>120000||bytes.toString('base64')!==
-     item.content.replace(/\s+/g,''))
+  const encoded=item.content.replace(/\\s+/g,'');
+  const bytes=Buffer.from(encoded,'base64');
+  if(bytes.length!==item.size||bytes.toString('base64')!==encoded)
    fail('UPGRADE_BASE_CI_WORKFLOW_BYTES_INVALID');
+  const gitBlobHash=createHash('sha1')
+   .update('blob '+bytes.length+'\\0').update(bytes).digest('hex');
+  if(gitBlobHash!==expectedBlobSha)
+   fail('UPGRADE_BASE_CI_WORKFLOW_BLOB_HASH_MISMATCH');
   const yaml=bytes.toString('utf8');
   if(!acceptable(yaml))fail('UPGRADE_BASE_REQUIRED_CI_TRIGGER_MISSING');
-  observed.push(Object.freeze({path,blob_sha:item.sha}));
+  observed.push(Object.freeze({path,blob_sha:expectedBlobSha}));
  }
  return Object.freeze({ready:true,version:UPGRADE_BASE_READINESS_VERSION,
   pinned_base_sha:baseCommitSha,workflows:observed,
