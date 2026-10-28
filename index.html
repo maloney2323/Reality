@@ -1629,6 +1629,39 @@ function wcPaintSummary(){
  document.querySelectorAll('[data-wc-mode]').forEach(b=>
   b.setAttribute('aria-selected',String(b.dataset.wcMode===wcMode)));
 }
+function wcUpgradeReviewHTML(){
+ const jobs=wcUpgradeReviews.slice(0,30);
+ const heading='<section class="wc-upgrade-review" aria-label="Reality Upgrade Discovery">'+
+  '<h4>Reality Upgrade Discovery · Original-job capability reviews</h4>'+
+  '<p class="wc-note">These are owner-scoped unfinished jobs for diagnosis, NOT confirmed missing capabilities or new discovery-feed findings. A verified diagnosis never grants execution or promotion authority.</p>';
+ if(!jobs.length)return heading+
+  '<p class="wc-note">'+
+  ($('privateReady')?.style.display==='block'?
+   'No unfinished jobs with saved Continuity were found in the checked conversations. New discovery findings appear separately below.':
+   'Sign in to review upgrade needs linked to your saved jobs.')+'</p></section>';
+ return heading+jobs.map(job=>{
+  const ready=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+   job.goal_still_current===true&&job.action_completed===true&&job.job_completed===false;
+  const label=ready?'Recovery saved · Ready for evidence recheck':
+   job.state==='PRIOR_ACTION_UNRESOLVED'?'Provider attempt unresolved · No retry':
+   job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
+   'Recovery checkpoint required':'Original goal or evidence must be verified';
+  return '<article class="wc-task wc-upgrade-job" data-upgrade-work="'+esc(job.work_id)+'">'+
+   '<h4>'+esc(job.title||'Original unfinished job')+'</h4>'+
+   '<span class="wc-tag">'+esc(label)+'</span>'+
+   '<p class="wc-note">Original work: '+esc(job.work_id)+
+   ' · Job not completed · No code upgrade authorized.</p>'+
+   (ready?
+    '<button type="button" data-recovery-run="'+esc(job.work_id)+
+    '" data-recovery-conversation="'+esc(job.conversation_id)+
+    '">Run recovery loop · Save findings</button>':
+    '<p class="wc-note">Next: '+esc(job.state==='PRIOR_ACTION_UNRESOLVED'?
+     'Reconcile the earlier external action before diagnosing a missing capability.':
+     'Restore the original confirmed goal and recovery checkpoint before reassessment.')+'</p>')+
+   '<div class="wc-recovery-timeline" data-recovery-timeline="'+esc(job.work_id)+
+   '" aria-live="polite"></div></article>';
+ }).join('')+'</section>';
+}
 function wcRender(){
  $('wcDiscovered').textContent=String(wcWork.length);
  $('wcCategories').innerHTML=workCategories.map(([id,label,desc])=>{
@@ -1636,7 +1669,10 @@ function wcRender(){
   const unavailable=wcNeedsSource(id)&&wcCoverage[wcNeedsSource(id)]==='not_connected';
   return '<button class="wc-category" type="button" data-wc-cat="'+id+
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
-    '<strong>'+esc(label)+'</strong><span class="wc-num">'+n+'</span><small>'+esc(unavailable?'Additional business source not connected':desc)+'</small></button>';
+    '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
+     n+' found · '+wcUpgradeReviews.length+' review':String(n))+
+    '</span><small>'+esc(unavailable?'Additional business source not connected':
+     id==='upgrades'?'Upgrade findings + original-job reviews':desc)+'</small></button>';
  }).join('');
  $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
   wcCurrent=b.dataset.wcCat;wcRender()
@@ -1656,8 +1692,11 @@ function wcRender(){
 });
  const unconnected=wcNeedsSource(wcCurrent)&&wcCoverage[wcNeedsSource(wcCurrent)]==='not_connected';
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
- $('wcSelectedCount').textContent=shown.length+' found';
- $('wcTaskList').innerHTML=shown.length?shown.map((w,i)=>{
+ $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
+  shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
+  shown.length+' found';
+ $('wcTaskList').innerHTML=(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
+  (shown.length?shown.map((w,i)=>{
   const time=wcTime(w),status=wcStatuses.get(wcKey(w));
   const assessment=w.value_assessment||{};
   const priority=String(assessment.triage_band||'NOT_ASSESSED').replace(/_/g,' ');
@@ -1711,7 +1750,7 @@ function wcRender(){
  }).join(''):'<div class="attention-empty">'+
   esc(unconnected?'This business data source is not connected. Zero is NOT a no-opportunity conclusion.':
   wcCatalogStatus==='PARTIAL'?'Discovery was partial; no findings in this category from successfully checked sources.':
-  'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>';
+  'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>');
  $('wcTaskList').querySelectorAll('[data-wc-task]').forEach(c=>c.onchange=()=>{
   const w=shown[Number(c.dataset.wcTask)];
   if(!w)return;
