@@ -122,3 +122,34 @@ test('user interface runs same original job without approval inference or false 
  assert.match(script,/Original job remains unfinished/);
  assert.match(script,/current_decision/);
 });
+
+test('original repair acceptance module exposes evidence classifier',async()=>{
+ const module=await import('../src/reality-original-job-acceptance-v0.1.js');
+ assert.equal(typeof module.classifyOriginalRepairAcceptance,'function');
+ assert.equal(typeof module.saveAuthenticatedOriginalRepairAssessment,'function');
+});
+
+test('actual historical Git source and current source classify corrected assertion without claiming job closure',async()=>{
+ const {execFileSync}=await import('node:child_process');
+ const {classifyOriginalRepairAcceptance}=await import('../src/reality-original-job-acceptance-v0.1.js');
+ const sourcePath='test/reality-personal-discovered-work-handoff-v0.1.test.js';
+ const historical=execFileSync('git',['show','c8f0b861e1fac6cda7826aed9f36a2666d124eda:'+sourcePath],{encoding:'utf8'});
+ const current=readFileSync(new URL('../'+sourcePath,import.meta.url),'utf8');
+ const report={
+  original_work_id:'work:24cda9611404e9bcb47909976067605c',
+  original_job_completed:false,action_authorized:false,
+  external_action_performed:false,current_decision:'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED',
+  provider_status:'LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED',
+  provider_passing_run:'https://github.com/maloney2323/Reality/actions/runs/40605639502',
+ };
+ const issue={number:143,state:'open',title:'Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures'};
+ const accepted=classifyOriginalRepairAcceptance({
+  report,oldSource:historical,newSource:current,issue,
+ });
+ assert.equal(accepted.source_correction_verified,true);
+ assert.equal(accepted.full_original_job_completed,false);
+ assert.equal(accepted.owner_authorized_issue_closure,false);
+ assert.throws(()=>classifyOriginalRepairAcceptance({
+  report,oldSource:current,newSource:current,issue,
+ }),/ACCEPTANCE_HISTORICAL_TEST_CAUSE_OR_FIX_NOT_CONFIRMED/);
+});

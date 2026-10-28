@@ -71,6 +71,7 @@ export function projectOriginalJobRecoveryLoop({
   recovery_receipt_id:evidence.recovery_receipt_id,
   provider_status:evidence.status,
   provider_passing_run:evidence.later_success?.run_url||null,
+  provider_passing_sha:evidence.later_success?.head_sha||null,
   capability_engine_state:cognitionState.state,
   current_decision:later?'RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED':
    'BLOCKED_REQUIRES_ROOT_CAUSE_DIAGNOSIS',
