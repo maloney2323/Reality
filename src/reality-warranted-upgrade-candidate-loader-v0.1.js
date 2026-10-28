@@ -41,7 +41,8 @@ export function projectAuthenticatedWarrantedUpgrade({
    e.worldline_id!==worldlineId))
   fail('UPGRADE_LOADER_CROSS_WORLDLINE_EVENT');
  const checkpoints=ordered.filter(e=>
-  e.entity_type==='personal_recovery_checkpoint'&&
+  ['personal_recovery_checkpoint','personal_capability_gap_checkpoint']
+   .includes(e.entity_type)&&
   e.payload?.original_work_id===originalWorkId&&
   e.payload?.original_goal_id===activeGoalId&&
   e.payload?.job_completed===false);
@@ -51,6 +52,17 @@ export function projectAuthenticatedWarrantedUpgrade({
     checkpoint.event_kind!=='WORK'||
     checkpoint.payload?.new_external_action_authorized!==false)
   fail('UPGRADE_LOADER_UNTRUSTED_BLOCKED_CHECKPOINT');
+ if(checkpoint.entity_type==='personal_capability_gap_checkpoint'&&
+    (checkpoint.epistemic_status!=='VERIFIED'||
+     checkpoint.provenance?.source!=='reality-capability-gap-detector-v1.0'||
+     checkpoint.provenance?.principal_id!==ownerId||
+     checkpoint.provenance?.conversation_id!==conversationId||
+     checkpoint.payload?.blocker_classification!=='MISSING_CAPABILITY_INDEPENDENTLY_VERIFIED'||
+     !Array.isArray(checkpoint.payload?.frozen_failure_refs)||
+     checkpoint.payload.frozen_failure_refs.length===0||
+     typeof checkpoint.payload?.verification_suite_ref!=='string'||
+     checkpoint.payload.verification_suite_ref.length<8))
+  fail('UPGRADE_LOADER_NEW_GAP_CHECKPOINT_NOT_INDEPENDENTLY_VERIFIED');
  // Only the trusted independent sandbox-verifier service may append
  // these VERIFICATION events. No HTTP issuance endpoint is exposed.
  const sandboxEvents=ordered.filter(e=>
