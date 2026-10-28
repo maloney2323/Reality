@@ -1,0 +1,461 @@
+name: Governed Autonomous Self-Upgrading Provider v0.1
+# One-shot repair run for real failure in GitHub Actions 40617140163.
+# Live model pilot trigger: bounded single attempt; separate no-secret holdout.
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'scripts/reality-live-upgrade-autorepair-v0.1.mjs'
+      - 'scripts/reality-live-self-upgrade-pilot-v0.1.mjs'
+      - 'scripts/reality-live-self-upgrade-repair-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-independent-grader-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-evaluate-one-v0.1.mjs'
+      - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'src/reality-upgrade-evidence-warrant-v0.1.js'
+      - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
+      - 'src/reality-historical-upgrade-proof-intake-v0.1.js'
+      - 'test/reality-historical-upgrade-proof-intake-v0.1.test.js'
+      - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
+      - 'src/reality-upgrade-discovery-v0.1.js'
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'test/reality-upgrade-discovery-v0.1.test.js'
+      - 'test/reality-upgrade-discovery-category-v0.1.test.js'
+      - 'index.html'
+      - 'src/reality-governed-upgrade-execution-dispatch-v0.1.js'
+      - 'test/reality-governed-upgrade-execution-dispatch-v0.1.test.js'
+      - 'src/reality-governed-work-runtime-v0.1.js'
+      - 'src/reality-governed-autonomous-upgrade-orchestrator-v0.1.js'
+      - 'test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js'
+      - 'test/reality-governed-github-upgrade-provider-v0.1.test.js'
+      - '.github/workflows/reality-governed-autonomous-upgrade-v01.yml'
+  pull_request:
+    paths:
+      - 'scripts/reality-live-upgrade-autorepair-v0.1.mjs'
+      - 'scripts/reality-live-self-upgrade-pilot-v0.1.mjs'
+      - 'scripts/reality-live-self-upgrade-repair-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-independent-grader-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-evaluate-one-v0.1.mjs'
+      - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'src/reality-upgrade-evidence-warrant-v0.1.js'
+      - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
+      - 'src/reality-historical-upgrade-proof-intake-v0.1.js'
+      - 'test/reality-historical-upgrade-proof-intake-v0.1.test.js'
+      - 'test/reality-upgrade-evidence-warrant-v0.1.test.js'
+      - 'src/reality-upgrade-discovery-v0.1.js'
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'test/reality-upgrade-discovery-v0.1.test.js'
+      - 'test/reality-upgrade-discovery-category-v0.1.test.js'
+      - 'index.html'
+      - 'src/reality-governed-upgrade-execution-dispatch-v0.1.js'
+      - 'test/reality-governed-upgrade-execution-dispatch-v0.1.test.js'
+      - 'src/reality-governed-work-runtime-v0.1.js'
+      - 'src/reality-governed-autonomous-upgrade-orchestrator-v0.1.js'
+      - 'test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js'
+      - 'test/reality-governed-github-upgrade-provider-v0.1.test.js'
+      - '.github/workflows/reality-governed-autonomous-upgrade-v01.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  governed-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact owner-authorized bounded upgrade candidate and independent GitHub readback
+        run: |
+          node --check scripts/reality-live-upgrade-autorepair-v0.1.mjs
+          node --check src/reality-historical-upgrade-proof-intake-v0.1.js
+          node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-governed-autonomous-upgrade-orchestrator-v0.1.test.js test/reality-governed-upgrade-execution-dispatch-v0.1.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js test/reality-upgrade-evidence-warrant-v0.1.test.js test/reality-historical-upgrade-proof-intake-v0.1.test.js
+
+      - name: Independently re-read pinned real GitHub self-correction artifact (read only)
+        env:
+          REALITY_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module - <<'JS'
+          import {loadRealGitHubPilotProof} from './src/reality-historical-upgrade-proof-intake-v0.1.js';
+          const proof=await loadRealGitHubPilotProof();
+          if(proof.total_passed!==15||proof.customer_original_work_id!==null||
+             proof.github_execution_authorized!==false||proof.original_job_completed!==false)
+            throw Error('LIVE_UPGRADE_PROOF_RECHECK_NOT_SAFE');
+          console.log(JSON.stringify({state:'PINNED_REAL_PROOF_INDEPENDENTLY_REOBSERVED',
+            run_url:proof.run_url,candidate_sha256:proof.corrected_source_sha256,
+            historical_pilot_only:true,owner_warrant_signed:false,
+            github_write_authorized:false,original_job_completed:false}));
+          JS
+
+  real-model-pilot-synthesis:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-model-pilot]')
+    needs: governed-upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ask configured OpenAI model to GENERATE a missing capability, no fallback
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PILOT_OUTPUT: pilot
+        run: node scripts/reality-live-self-upgrade-pilot-v0.1.mjs
+      - name: Require actual source from real model and exact SHA
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('pilot/generation-evidence.json','utf8'));
+          if(!p.model_generated||!p.model_response_id||!fs.existsSync('pilot/candidate.mjs')){
+            console.error('REAL_MODEL_NOT_GENERATED: '+p.status+' '+(p.blocker||''));
+            process.exit(13);
+          }
+          const sha=createHash('sha256').update(fs.readFileSync('pilot/candidate.mjs')).digest('hex');
+          if(p.source_sha256!==sha)throw Error('GENERATION_SOURCE_HASH_CHANGED');
+          console.log('REAL_MODEL_CANDIDATE_SHA256='+sha);
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-real-model-candidate-provenance
+          path: pilot/
+          retention-days: 14
+
+  real-model-pilot-independent-sandbox:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-model-pilot]')
+    needs: real-model-pilot-synthesis
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-real-model-candidate-provenance
+          path: pilot
+      - name: Check model candidate matches its recorded hash
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('pilot/generation-evidence.json','utf8'));
+          const sha=createHash('sha256').update(fs.readFileSync('pilot/candidate.mjs')).digest('hex');
+          if(p.model_generated!==true||p.source_sha256!==sha)
+            throw Error('GENERATION_ARTIFACT_NOT_AUTHENTICATED');
+          JS
+      - name: Isolated container tests with zero network or secrets
+        run: |
+          set -euo pipefail
+          timeout 70s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/pilot:/work:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-live-upgrade-independent-grader-v0.1.mjs \
+            /work/candidate.mjs > pilot/independent-verification.json
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const gen=JSON.parse(fs.readFileSync('pilot/generation-evidence.json','utf8'));
+          const v=JSON.parse(fs.readFileSync('pilot/independent-verification.json','utf8'));
+          if(v.status!=='INDEPENDENT_SANDBOX_VERIFIED'||
+             v.frozen?.passed!==true||v.holdout?.passed!==true||
+             v.passed!==v.total||v.isolation?.network_permitted!==false)
+            throw Error('REAL_CANDIDATE_DID_NOT_PASS_INDEPENDENT_SANDBOX');
+          const evidence={version:'reality-isolated-upgrade-proof-v0.1',
+           original_work_id:gen.original_work_id,
+           model_response_id:gen.model_response_id,
+           candidate_sha256:gen.source_sha256,
+           holdout_result_sha256:v.holdout.result_sha256,
+           total:v.total,passed:v.passed,
+           independent_verifier_output_sha256:createHash('sha256')
+             .update(fs.readFileSync('pilot/independent-verification.json')).digest('hex'),
+           state:'REAL_MODEL_CANDIDATE_INDEPENDENTLY_VERIFIED_NOT_INSTALLED',
+           github_write_authorized:false,
+           original_job_completed:false};
+          fs.writeFileSync('pilot/independent-proof.json',JSON.stringify(evidence,null,2)+'\n');
+          console.log(JSON.stringify(evidence));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-independent-model-upgrade-proof
+          path: pilot/
+          retention-days: 14
+
+  real-model-repair-synthesis:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-model-repair]')
+    needs: governed-upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-model-upgrade-proof
+          repository: maloney2323/Reality
+          run-id: 40617140163
+          github-token: ${{ github.token }}
+          path: failed-pilot
+      - name: Model repairs its earlier REAL failed source using only verifier failures
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PRIOR_CANDIDATE_DIR: failed-pilot
+          REALITY_PILOT_OUTPUT: pilot-repair
+        run: node scripts/reality-live-self-upgrade-repair-v0.1.mjs
+      - name: Require real changed model output, not manual patch or template
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('pilot-repair/generation-evidence.json','utf8'));
+          if(!p.model_generated_correction||!p.new_response_id||!fs.existsSync('pilot-repair/candidate.mjs')){
+            console.error('REAL_MODEL_CORRECTION_NOT_GENERATED: '+p.status+' '+(p.blocker||''));
+            process.exit(13);
+          }
+          const sha=createHash('sha256').update(fs.readFileSync('pilot-repair/candidate.mjs')).digest('hex');
+          if(p.corrected_source_sha256!==sha||p.predecessor_candidate_sha256===sha)
+            throw Error('REPAIR_CANDIDATE_HASH_OR_CHANGE_INVALID');
+          console.log('REAL_MODEL_CORRECTED_CANDIDATE_SHA256='+sha);
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-model-generated-correction
+          path: pilot-repair/
+          retention-days: 14
+
+  real-model-repair-independent-sandbox:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-model-repair]')
+    needs: real-model-repair-synthesis
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-model-generated-correction
+          path: pilot-repair
+      - name: Confirm model correction SHA matches downloaded bytes
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(fs.readFileSync('pilot-repair/generation-evidence.json','utf8'));
+          if(!p.model_generated_correction||p.corrected_source_sha256!==
+             createHash('sha256').update(fs.readFileSync('pilot-repair/candidate.mjs')).digest('hex'))
+            throw Error('REPAIRED_MODEL_SOURCE_DIGEST_INVALID');
+          JS
+      - name: Credentialless network-disabled correction retest
+        run: |
+          set -euo pipefail
+          timeout 70s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/pilot-repair:/work:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-live-upgrade-independent-grader-v0.1.mjs \
+            /work/candidate.mjs > pilot-repair/independent-verification.json
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const gen=JSON.parse(fs.readFileSync('pilot-repair/generation-evidence.json','utf8'));
+          const v=JSON.parse(fs.readFileSync('pilot-repair/independent-verification.json','utf8'));
+          if(v.status!=='INDEPENDENT_SANDBOX_VERIFIED'||
+             v.frozen?.passed!==true||v.holdout?.passed!==true||
+             v.passed!==v.total||v.isolation?.network_permitted!==false)
+            throw Error('CORRECTED_MODEL_FAILED_INDEPENDENT_SANDBOX');
+          const evidence={
+            version:'reality-real-model-self-correction-proof-v0.1',
+            original_work_id:gen.original_work_id,
+            first_model_response_id:gen.predecessor_response_id,
+            second_model_response_id:gen.new_response_id,
+            first_candidate_sha256:gen.predecessor_candidate_sha256,
+            second_candidate_sha256:gen.corrected_source_sha256,
+            total:v.total,passed:v.passed,
+            heldout_result_sha256:v.holdout.result_sha256,
+            independent_grader_sha256:createHash('sha256')
+              .update(fs.readFileSync('pilot-repair/independent-verification.json')).digest('hex'),
+            state:'REAL_MODEL_CORRECTED_AND_INDEPENDENTLY_VERIFIED_NOT_PROMOTED',
+            github_write_authorized:false,capability_installed:false,
+            original_job_completed:false,
+          };
+          fs.writeFileSync('pilot-repair/independent-proof.json',JSON.stringify(evidence,null,2));
+          console.log(JSON.stringify(evidence));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-model-self-correction-independent-proof
+          path: pilot-repair/
+          retention-days: 14
+
+  real-model-pilot-autonomous-repair:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-repair-pilot]')
+    needs: governed-upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrieve EXACT actual FAILED model candidate and independent sandbox evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-model-upgrade-proof
+          run-id: 40617140163
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: failed
+      - name: Reality model autonomously CORRECTS failed source with public regressions only
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_UPGRADE_FAILED_CANDIDATE: failed
+          REALITY_PILOT_OUTPUT: repaired
+        run: node scripts/reality-live-upgrade-autorepair-v0.1.mjs
+      - name: Verify real correction provenance and source-byte hash
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const a=JSON.parse(fs.readFileSync('repaired/repair-evidence.json','utf8'));
+          const digest=b=>createHash('sha256').update(b).digest('hex');
+          if(a.status!=='REAL_MODEL_REPAIRED_CANDIDATE_PENDING_INDEPENDENT_SANDBOX'||
+             a.correction_model_generated!==true||!a.correction_response_id||
+             !fs.existsSync('repaired/candidate.mjs')||
+             !fs.existsSync('repaired/original-candidate.mjs'))
+            throw Error('REAL_AUTONOMOUS_REPAIR_MISSING_OR_BLOCKED:'+a.status);
+          if(digest(fs.readFileSync('repaired/candidate.mjs'))!==a.corrected_candidate_sha256||
+             digest(fs.readFileSync('repaired/original-candidate.mjs'))!==a.previous_candidate_sha256||
+             a.previous_candidate_sha256===a.corrected_candidate_sha256)
+            throw Error('AUTONOMOUS_REPAIR_CANDIDATE_BYTES_NOT_ATTESTED');
+          console.log(JSON.stringify({original_work_id:a.original_work_id,
+            model_response_id:a.correction_response_id,
+            corrected_candidate_sha256:a.corrected_candidate_sha256,
+            state:'REAL_REPAIR_PROPOSED_NOT_AUTHORIZED'}));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-real-model-autonomous-repair
+          path: repaired/
+          retention-days: 14
+
+  real-model-pilot-autonomous-repair-verification:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[run-repair-pilot]')
+    needs: real-model-pilot-autonomous-repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-real-model-autonomous-repair
+          path: repaired
+      - name: Verify correction bytes are from actual model repair response
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const r=JSON.parse(fs.readFileSync('repaired/repair-evidence.json','utf8'));
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          if(!r.correction_model_generated||!r.correction_response_id||
+             sha(fs.readFileSync('repaired/candidate.mjs'))!==r.corrected_candidate_sha256)
+            throw Error('UNVERIFIED_REPAIRED_MODEL_SOURCE');
+          JS
+      - name: Independently retest REAL model correction in credential-free no-network sandbox
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 70s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/repaired:/work:ro" \
+            -v "${{ github.workspace }}/scripts:/tools:ro" \
+            node:22-alpine node /tools/reality-live-upgrade-independent-grader-v0.1.mjs \
+            /work/candidate.mjs > repaired/reverification.json
+          sandbox_exit=$?
+          set -e
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const proof=JSON.parse(fs.readFileSync('repaired/repair-evidence.json','utf8'));
+          const result=JSON.parse(fs.readFileSync('repaired/reverification.json','utf8'));
+          const valid=result.status==='INDEPENDENT_SANDBOX_VERIFIED'&&
+            result.total===15&&result.passed===15&&result.failed===0&&
+            result.frozen?.passed===true&&result.holdout?.passed===true&&
+            result.isolation?.secrets_accessible===false&&
+            result.isolation?.network_permitted===false;
+          const receipt={
+           original_work_id:proof.original_work_id,
+           failed_candidate_sha256:proof.previous_candidate_sha256,
+           corrected_candidate_sha256:proof.corrected_candidate_sha256,
+           original_model_response_id:'resp_0caa066cec78119d006ae15446059887d2a3be76a30ee344cd',
+           correction_model_response_id:proof.correction_response_id,
+           source_verified:proof.correction_model_generated===true,
+           frozen_passed:result.frozen?.passed,
+           holdout_passed:result.holdout?.passed,
+           cases_passed:result.passed,cases_total:result.total,
+           independent_sandbox_verified:valid,
+           result_sha256:createHash('sha256').update(fs.readFileSync('repaired/reverification.json')).digest('hex'),
+           state:valid?'REAL_MODEL_CORRECTION_SANDBOX_VERIFIED_AWAITING_WARRANT':'REAL_MODEL_CORRECTION_REJECTED',
+           github_write_authorized:false,
+           capability_installed:false,
+           original_job_completed:false,
+          };
+          fs.writeFileSync('repaired/independent-repair-proof.json',JSON.stringify(receipt,null,2)+'\n');
+          console.log(JSON.stringify(receipt));
+          if(!valid)process.exit(8);
+          JS
+          if [ "$sandbox_exit" -ne 0 ]; then exit "$sandbox_exit"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-autonomous-repair-independent-verification
+          path: repaired/
+          retention-days: 14
