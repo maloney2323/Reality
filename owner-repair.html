@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Reality · Owner Repair Control</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf3ff;background:#070c18}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse 80% 48% at 80% -10%,#273860 0%,transparent 75%),#070c18}
+main{width:min(1050px,calc(100% - 32px));margin:auto;padding:35px 0 75px}
+a{color:#b9cdf9;text-underline-offset:3px}a:hover{color:white}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}
+.eyebrow{color:#a9badb;font-size:.73rem;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+h1{font-size:clamp(2rem,4.5vw,3.3rem);line-height:1.05;letter-spacing:-.035em;margin:11px 0}
+h2{font-size:1.1rem;margin:0 0 9px}h3{font-size:1rem;margin:0 0 8px}
+p{line-height:1.55;color:#b3c0d5} .lead{max-width:680px;font-size:1.06rem}
+.shell{background:rgba(16,25,46,.85);border:1px solid #35415b;border-radius:18px;padding:24px;margin-top:17px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media(max-width:780px){.grid{grid-template-columns:1fr}.shell{padding:18px}}
+.stat{padding:17px;border:1px solid #2e3a53;border-radius:13px;background:#10192a;min-height:120px}
+.stat span{color:#aebed6;font-size:.79rem;display:block;margin:0 0 12px}
+.stat strong{font-size:1.05rem;display:block;word-break:break-word}
+.status{font-size:.84rem;padding:8px 12px;border:1px solid #53637b;border-radius:999px;background:#19263d;color:#cce0ff;display:inline-flex;align-items:center;gap:7px}
+.status::before{content:"";width:7px;height:7px;background:#f0c47a;border-radius:50%}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 0}
+button,.button-link{border:1px solid #6479ae;background:#304b88;color:white;border-radius:10px;padding:12px 16px;font:inherit;font-weight:650;cursor:pointer;display:inline-block;text-decoration:none}
+button.secondary,.button-link.secondary{background:#182740;border-color:#3c527c}
+button:disabled{opacity:.44;cursor:not-allowed}
+button:focus-visible,a:focus-visible{outline:3px solid #aed3ff;outline-offset:3px}
+.step{border-top:1px solid #35415b;padding:22px 0;display:grid;grid-template-columns:38px minmax(0,1fr);gap:15px}
+.step:last-child{padding-bottom:0}
+.num{width:35px;height:35px;background:#233759;border:1px solid #4d6994;color:#d5e5ff;border-radius:50%;display:grid;place-items:center;font-weight:700}
+.step p{margin:0 0 9px}
+.note{font-size:.86rem;color:#a7b5cf}
+#log{white-space:pre-wrap;overflow-wrap:anywhere;font: .84rem/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:#091323;border:1px solid #33415b;padding:16px;border-radius:10px;min-height:80px}
+#summary{font-weight:650;color:#e0edff}
+#stageDetail{font-size:.88rem;border-left:3px solid #98b8f3;padding:9px 12px;color:#d5e1fa;margin:14px 0}
+#stageDetail[hidden]{display:none}
+.safe{color:#a2e5ce}.warn{color:#ffd394}
+.kv{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;color:#b3c1d9;font-size:.85rem}
+footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
+</style>
+</head>
+<body>
+<main>
+<header><a href="/" class="eyebrow">✦ Reality · Work Center</a><span class="status" id="globalState">Owner verification required</span></header>
+<div class="eyebrow">Original Reality maintenance work · Issue #143</div>
+<h1>Owner Repair Control</h1>
+<p class="lead">Review the exact self-repair evidence, approve installation under your own Reality account, authorize resumption separately, and verify the final Continuity receipt. This is the <strong>original Reality job</strong>, not a replacement test.</p>
+<div class="shell">
+<h2>Verified job state</h2>
+<p id="summary" role="status" aria-live="polite">Sign in to Reality, then check the original work.</p>
+<div class="grid">
+<div class="stat"><span>Model-generated repair</span><strong id="sourceState">Not independently rechecked</strong></div>
+<div class="stat"><span>Owner-warranted install</span><strong id="installState">Not authorized</strong></div>
+<div class="stat"><span>Original job settlement</span><strong id="settlementState">Not verified</strong></div>
+</div>
+<div class="actions">
+<button id="refresh" class="secondary" type="button">Verify original work · Read only</button>
+<a id="prLink" class="button-link secondary" target="_blank" rel="noopener noreferrer" href="https://github.com/maloney2323/Reality/pull/154">Review exact repair PR #154</a>
+<a class="button-link secondary" target="_blank" rel="noopener noreferrer" href="https://github.com/maloney2323/Reality/issues/143">Open original issue #143</a>
+</div>
+<p id="blocker" class="note" aria-live="polite">No installation or completion is assumed.</p>
+</div>
+<div class="shell">
+<h2>Owner-controlled execution</h2>
+<p class="note">Every stage is tied to the same original work ID. Installation and resumption require independent, separate approvals. Reality will not use a GitHub merge as proof of final job completion.</p>
+<div class="step">
+<div class="num">1</div><div>
+<h3>Prepare exact installation</h3>
+<p>Reality must first have an owner-scoped sandbox-verification receipt, signed evidence warrant and governed draft PR. The original model-generated repair has passed independent tests, but those receipts are a separate requirement.</p>
+<button id="prepareInstall" type="button" disabled>Prepare installation approval</button>
+</div></div>
+<div class="step">
+<div class="num">2</div><div>
+<h3>Approve the exact action</h3>
+<p>You will see the operation, repository, candidate hash, and target PR before approving. Approval alone never merges code.</p>
+<div id="stageDetail" hidden></div>
+<button id="approve" type="button" disabled>Approve exact prepared stage</button>
+</div></div>
+<div class="step">
+<div class="num">3</div><div>
+<h3>Execute and reconcile</h3>
+<p>Use a one-time owner-bound execution grant. Reality independently checks installation and records the result. If an effect is uncertain, this control locks instead of automatically retrying.</p>
+<button id="execute" type="button" disabled>Run the approved stage once</button>
+</div></div>
+<div class="step">
+<div class="num">4</div><div>
+<h3>Approve resumption of the original work</h3>
+<p>After verified installation, authorize original-job resumption as a <em>different</em> action. Reality must independently observe the result and persist a final Continuity settlement.</p>
+<button id="prepareResume" type="button" disabled>Prepare separate resumption approval</button>
+</div></div>
+<div class="step">
+<div class="num">5</div><div>
+<h3>Verify the end receipt</h3>
+<p>Only a validated Continuity settlement, linked to this same original job, is completion. The GitHub issue can then be closed separately as a bookkeeping action.</p>
+<button id="verifyFinal" class="secondary" type="button">Read settlement · No writes</button>
+</div></div>
+</div>
+<div class="shell">
+<h2>Live evidence and responses</h2>
+<div id="log" role="status" aria-live="polite">No actions taken. Waiting for an authenticated owner readback.</div>
+<div class="kv"><span>Original work: <code>work:24cda961…67605c</code></span><span>Source: <code>6b82acd6…5ca16</code></span><span>Production changes: <strong>No</strong></span></div>
+</div>
+<footer>Reality separates independent evidence, owner authority, execution, and settlement. An unresolved stage remains unresolved; it never silently becomes complete.</footer>
+</main>
+<script>
+'use strict';
+const WORK='work:24cda9611404e9bcb47909976067605c';
+const $=id=>document.getElementById(id);
+const buttons=['refresh','prepareInstall','approve','execute','prepareResume','verifyFinal'];
+let conv=null,snapshot=null,prepared=null,approvedStage=null,locked=false,busy=false;
+function output(message){$('log').textContent=String(message);}
+function status(message){$('globalState').textContent=String(message);}
+function disabledAll(value){for(const id of buttons)$(id).disabled=value;}
+function stageReset(){prepared=null;approvedStage=null;$('stageDetail').hidden=true;$('stageDetail').textContent='';$('approve').disabled=true;$('execute').disabled=true;}
+function render(s){
+ snapshot=s;
+ $('sourceState').textContent=s.original_source_verified?'Exact model source verified':'Source evidence unavailable';
+ $('installState').textContent=s.installation_verified?'Verified installed':s.warranted_upgrade_ready?'Warrant verified · Awaiting approval':'Warrant / install pending';
+ $('settlementState').textContent=s.job_settlement_verified?'Durably verified':'Not verified';
+ $('summary').textContent=s.job_settlement_verified?'Original work settlement independently verified.':
+  s.original_goal_active?'Original work restored. Next: '+String(s.next_required_step||'verification')+'.':
+  'Open the original signed-in conversation and confirm the original goal before authorizing work.';
+ $('blocker').textContent=s.warrant_and_draft_blocker?
+  'Installation boundary: '+String(s.warrant_and_draft_blocker)+'. The original repair PR #154 is review-only and is not itself a signed warrant.':
+  'Exact owner-warranted plan independently verified.';
+ status(s.job_settlement_verified?'Verified settled':s.warranted_upgrade_ready?'Owner approval available':'Evidence / owner gate pending');
+ $('prepareInstall').disabled=busy||locked||s.install_approval_can_prepare!==true;
+ $('prepareResume').disabled=busy||locked||s.resume_approval_can_prepare!==true;
+ $('verifyFinal').disabled=busy;
+ $('refresh').disabled=busy;
+}
+async function json(url,options={}){
+ const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
+ const data=await response.json();
+ if(!response.ok||data?.ok!==true)throw Error(String(data?.error||'REQUEST_OR_READBACK_NOT_VERIFIED'));
+ return data;
+}
+async function findOriginalConversation(){
+ const d=await json('/api/reality/personal-unfinished-work');
+ if(!Array.isArray(d.jobs)||!['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(d.status))
+  throw Error('UNFINISHED_WORK_COVERAGE_NOT_VERIFIED');
+ const matches=d.jobs.filter(x=>x.work_id===WORK&&x.job_completed===false&&
+  /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(String(x.conversation_id||'')));
+ if(matches.length!==1)throw Error('ORIGINAL_WORK_CONVERSATION_NOT_UNIQUELY_VERIFIED');
+ return matches[0].conversation_id;
+}
+async function refresh(){
+ if(busy)return;
+ busy=true;disabledAll(true);stageReset();output('Reading authenticated owner Continuity and independently checking the original GitHub repair…');
+ try{
+  conv=await findOriginalConversation();
+  const url='/api/reality/personal-original-repair-owner-console?conversation_id='+
+   encodeURIComponent(conv)+'&original_work_id='+encodeURIComponent(WORK);
+  const d=await json(url);
+  if(d.original_work_id!==WORK||d.conversation_id!==conv||
+   d.no_implicit_approval!==true||d.verified_settlement_receipt_required!==true)
+   throw Error('OWNER_CONSOLE_ORIGINAL_WORK_MISMATCH');
+  output('Verified owner readback.\nWork: '+WORK+'\nSource SHA-256: '+
+   String(d.source_review?.original_candidate_sha256||'unknown')+
+   '\nOriginal issue open: '+String(d.source_review?.issue_open===true)+
+   '\nOriginal source was already fixed before model installation: '+
+   String(d.original_source_already_fixed===true)+
+   '\nOwner warrant receipts: '+String(d.owner_warrant_events)+
+   '\nSandbox receipts in original Continuity: '+String(d.sandbox_receipts)+
+   '\nFinal independently verified settlement: '+String(d.job_settlement_verified===true)+
+   '\nNext: '+String(d.next_required_step));
+  busy=false;render(d);
+ }catch(err){
+  busy=false;disabledAll(true);$('refresh').disabled=false;$('verifyFinal').disabled=false;
+  $('summary').textContent='Original owner readback unavailable.';
+  status('Not authorized');
+  output('Stopped safely: '+String(err.message)+
+   '\nSign in to Reality on this preview and open the original conversation. No action was taken.');
+ }
+}
+async function prepare(stage){
+ if(busy||locked||!snapshot||!conv)return;
+ const enabled=stage==='INSTALL'?snapshot.install_approval_can_prepare:snapshot.resume_approval_can_prepare;
+ if(enabled!==true)return;
+ busy=true;disabledAll(true);stageReset();
+ output('Preparing an exact owner-scoped '+stage.toLowerCase()+' request. No action is authorized yet…');
+ try{
+  const data=await json('/api/reality/personal-original-repair-owner-console',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:stage==='INSTALL'?'PREPARE_INSTALL_APPROVAL':'PREPARE_RESUME_APPROVAL',
+    conversation_id:conv,original_work_id:WORK,
+   }),
+  });
+  if(data.stage!==stage||data.original_work_id!==WORK||
+   data.state!=='AWAITING_EXPLICIT_OWNER_APPROVAL'||
+   data.authorization_persisted!==false||data.external_action_performed!==false||
+   data.original_job_completed!==false||!data.work_item||!data.grounding_proof)
+   throw Error('EXACT_STAGE_GROUNDING_NOT_VERIFIED');
+  prepared=data;
+  $('stageDetail').hidden=false;
+  $('stageDetail').textContent='Stage: '+stage+
+   ' · Exact action: '+String(data.work_item.action||data.work_item.operation)+
+   ' · Repository: maloney2323/Reality · Governed PR #'+String(data.approved_pr_number)+
+   ' · Candidate SHA-256: '+String(data.candidate_sha256)+
+   ' · Owner approval has not yet been given.';
+  output('Exact stage prepared from current owner evidence. Review the action above, then explicitly approve it.');
+ }catch(err){output('Preparation blocked: '+String(err.message)+'. No installation or original-job action occurred.');}
+ finally{busy=false;$('refresh').disabled=false;$('verifyFinal').disabled=false;
+  $('prepareInstall').disabled=locked||snapshot.install_approval_can_prepare!==true;
+  $('prepareResume').disabled=locked||snapshot.resume_approval_can_prepare!==true;
+  $('approve').disabled=prepared===null;}
+}
+async function approve(){
+ if(busy||locked||!prepared||!conv)return;
+ const stage=prepared.stage;
+ const phrase='Approve '+stage+' for the ORIGINAL Reality job #143, scoped to governed PR #'+
+  String(prepared.approved_pr_number)+' and exact SHA-256 '+String(prepared.candidate_sha256)+
+  '?\n\nThis records approval only. It does not merge or resume the job.';
+ if(!window.confirm(phrase)){output('Owner declined the exact approval. No action taken.');return;}
+ busy=true;disabledAll(true);output('Recording your exact owner-bound action approval in Continuity. No provider write…');
+ try{
+  const d=await json('/api/reality/personal-action-authority',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conv,work_item:prepared.work_item,
+    grounding_proof:prepared.grounding_proof,confirmation:'APPROVE_THIS_EXACT_WORK_ITEM'}),
+  });
+  if(d.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||d.execution_authorized_by_approval_alone!==false)
+   throw Error('OWNER_EXACT_APPROVAL_NOT_CONFIRMED');
+  approvedStage=stage;
+  output('Owner approval recorded for '+stage+'. No external action yet. You must separately choose Run once.');
+ }catch(err){output('Owner approval not verified: '+String(err.message)+'. Refresh before another attempt.');locked=true;}
+ finally{busy=false;$('refresh').disabled=false;$('verifyFinal').disabled=false;
+  $('execute').disabled=!approvedStage||locked;}
+}
+async function execute(){
+ if(busy||locked||!approvedStage||!conv)return;
+ const stage=approvedStage;
+ if(!window.confirm('Execute the one-time, already owner-approved '+stage+
+  ' stage of the ORIGINAL Reality job? Consequential GitHub effects may occur. If the response is uncertain, do not retry.'))return;
+ locked=true;busy=true;disabledAll(true);
+ output('Executing exact owner-approved Reality loop once and verifying provider/Continuity receipts…');
+ try{
+  const d=await json('/api/reality/personal-autonomous-upgrade-loop',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conv,original_work_id:WORK}),
+  });
+  if(d.original_work_id!==WORK)throw Error('WRONG_ORIGINAL_WORK_RETURNED');
+  output('Execution response: '+String(d.status)+
+   '\nOriginal-job-completed claim: '+String(d.original_job_completed===true)+
+   '\nReceipt: '+String(d.settlement_receipt_id||'none yet')+
+   '\nThis is not 7/7 until fresh owner Continuity readback confirms settlement.'+
+   '\nDo not automatically retry this operation.');
+ }catch(err){output('Execution or readback unresolved: '+String(err.message)+
+  '\nA provider effect may have occurred. DO NOT RETRY. Reopen this console and inspect independent evidence.');}
+ finally{busy=false;$('refresh').disabled=false;$('verifyFinal').disabled=false;
+  $('approve').disabled=true;$('execute').disabled=true;}
+}
+$('refresh').addEventListener('click',refresh);
+$('verifyFinal').addEventListener('click',refresh);
+$('prepareInstall').addEventListener('click',()=>prepare('INSTALL'));
+$('prepareResume').addEventListener('click',()=>prepare('RESUME'));
+$('approve').addEventListener('click',approve);
+$('execute').addEventListener('click',execute);
+refresh();
+</script>
+</body>
+</html>
