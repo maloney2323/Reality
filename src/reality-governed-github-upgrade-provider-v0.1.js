@@ -38,7 +38,7 @@ function asserted(files){
   fail('UPGRADE_SOURCE_EXTENSION_REQUIRED');
  return files;
 }
-function trust({build,lease}){
+function trust({build,lease,verifiedExperiment}){
  if(build?.state!=='AUTHORIZED'||build?.production_merge_permitted!==false||
     build?.base_ref!==BASE||!/^build:[0-9a-f]{32}$/.test(String(build.build_id||''))||
     !Array.isArray(build.files))
@@ -57,7 +57,19 @@ function trust({build,lease}){
   fail('UPGRADE_DURABLE_SINGLE_USE_CANDIDATE_AUTHORIZATION_REQUIRED');
  if(!build.authorization_ref||!build.authorized_by)
   fail('UPGRADE_TRUSTED_OWNER_APPROVAL_REQUIRED');
- return Object.freeze({build,lease});
+ // Existing Recovery v1 SANDBOX_VERIFIED is the only candidate source.
+ // A model suggestion or a PR-ready file list cannot pass this boundary.
+ if(verifiedExperiment?.state!=='SANDBOX_VERIFIED'||
+    verifiedExperiment?.work_item_id!==lease.original_work_id||
+    verifiedExperiment?.production_graph_write_permitted!==false||
+    !/^worldline:ephemeral:[0-9a-f]{32}$/.test(String(verifiedExperiment.ephemeral_worldline_id||''))||
+    !/^[0-9a-f]{64}$/.test(String(verifiedExperiment.verification_hash||''))||
+    verifiedExperiment?.verification_bundle?.frozen_regression?.passed!==true||
+    verifiedExperiment?.verification_bundle?.isolated_verification?.verified!==true||
+    verifiedExperiment?.verification_bundle?.capability_signature!==verifiedExperiment.capability_signature||
+    candidateHash(verifiedExperiment?.verification_bundle?.synthesized_capability?.files||[])!==lease.approved_candidate_hash)
+  fail('UPGRADE_INDEPENDENT_SANDBOX_VERIFICATION_REQUIRED');
+ return Object.freeze({build,lease,verifiedExperiment});
 }
 function branchPath(branch){
  if(!BRANCH.test(String(branch||'')))fail('UPGRADE_BRANCH_SCOPE_INVALID');
@@ -73,9 +85,9 @@ function responseContent(value,path,branch){
  return text;
 }
 export function createGovernedGithubUpgradeProvider({
- authorizedBuild,consumedReservation,get=githubGet,write=githubWrite,
+ authorizedBuild,consumedReservation,verifiedExperiment,get=githubGet,write=githubWrite,
 }={}){
- const {build,lease}=trust({build:authorizedBuild,lease:consumedReservation});
+ const {build,lease}=trust({build:authorizedBuild,lease:consumedReservation,verifiedExperiment});
  let createdBranch=null,commit=null,openedPr=null;
  async function verifyRef(branch,sha){
   const result=await get(ROOT+'/git/ref/heads/'+branch);
