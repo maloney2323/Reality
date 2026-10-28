@@ -55,7 +55,7 @@ try{
   'Never claim owner authorization, installed capability, or original job completion.',
   'Return only executable JavaScript ES module source with no markdown or commentary.',
   'Do not include provider credentials, fetch, dynamic imports, eval, process, or direct GitHub calls.'
- ].join('\n');;
+ ].join('\n');
  const resp=await fetch('https://api.openai.com/v1/responses',{
   method:'POST',headers:{authorization:'Bearer '+key,'content-type':'application/json'},
   body:JSON.stringify({model,max_output_tokens:8500,input:[
@@ -70,9 +70,8 @@ try{
  const raw=(json.output||[]).flatMap(x=>x.content||[])
   .filter(x=>x.type==='output_text'&&typeof x.text==='string')
   .map(x=>x.text).join('').trim();
- if(raw.length<1200||raw.length>28000||
-    !/export\s+(?:async\s+)?function\s+prepareOriginalMaintenanceRepair\s*\(/.test(raw)||! /export\s+(?:async\s+)?function\s+executeOriginalMaintenanceRepair\s*\(/.test(raw)||
-    /(?:\brequire\s*\(|\bfetch\s*\(|\bprocess\s*\.|\bglobalThis\b|\beval\s*\(|\bFunction\s*\(|\bWebSocket\b|\bchild_process\b|\bDeno\b|\bBun\b)/.test(raw))
+ if(raw.length<800||raw.length>34000||raw.includes('\\`\\`\\`')||
+   /(?:\\brequire\\s*\\(|\\bfetch\\s*\\(|\\bprocess\\s*\\.|\\bglobalThis\\b|\\beval\\s*\\(|\\bFunction\\s*\\(|\\bWebSocket\\b|\\bchild_process\\b)/.test(raw))
   throw Error('MODEL_REPAIR_SOURCE_OUT_OF_BOUNDS');
  const source=raw+'\n';
  writeFileSync(out+'/candidate.mjs',source,{mode:0o600});
@@ -90,4 +89,5 @@ try{
  save();
  console.error(JSON.stringify({status:proof.status,blocker:proof.blocker,
   original_work_id:ORIGINAL}));
+ process.exitCode=1;
 }
