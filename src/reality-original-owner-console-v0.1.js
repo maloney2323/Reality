@@ -373,7 +373,8 @@ export async function inspectOriginalOwnerConsole({
  const flags=originalOwnerConsoleFlags({
   goalConfirmed:ctx.owner_goal_confirmed,github,
   evidence:{owner_evidence_acknowledged:ctx.owner_evidence_acknowledged},
-  warrantVerified:verifiedWarrant,installationVerified:verifiedInstall,
+  warrantVerified:verifiedWarrant,draftVerified:verifiedDraft,
+  installationVerified:verifiedInstall,
   settlementVerified:verifiedSettlement,
  });
  return Object.freeze({
@@ -387,10 +388,10 @@ export async function inspectOriginalOwnerConsole({
   owner_warrant_events:ctx.owner_warrant_events,
   saved_settlement_receipts:ctx.saved_settlement_receipts,
   verified_settlement_receipt_id:settlementReceiptId,
-  install_approval_can_prepare:flags.warranted_upgrade_ready&&!flags.installation_verified,
+  install_approval_can_prepare:flags.verified_draft_ready&&!flags.installation_verified,
   resume_approval_can_prepare:flags.installation_verified,
   execute_enabled:!flags.job_settlement_verified&&
-   (flags.warranted_upgrade_ready||flags.installation_verified),
+   (flags.verified_draft_ready||flags.installation_verified),
   verified_settlement_receipt_required:true,
   no_implicit_approval:true,
  });
