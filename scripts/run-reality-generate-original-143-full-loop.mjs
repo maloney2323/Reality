@@ -34,7 +34,7 @@ function validate(candidate){
   assert(file&&FILES.includes(file.path)&&!got.has(file.path),'REALITY_MODEL_UNAUTHORIZED_FILE_PATH');
   got.add(file.path);
   assert(typeof file.content==='string'&&file.content.length>400&&file.content.length<80000,'REALITY_MODEL_FILE_INVALID_LENGTH');
-  assert(!/process\\.env\\.OPENAI_API_KEY|process\\.env\\.REALITY_GITHUB_TOKEN/.test(file.content),'REALITY_MODEL_SECRET_ACCESS_FORBIDDEN');
+  assert(!/process\.env\.OPENAI_API_KEY|process\.env\.REALITY_GITHUB_TOKEN/.test(file.content),'REALITY_MODEL_SECRET_ACCESS_FORBIDDEN');
  }
  const service=candidate.files.find(x=>x.path===FILES[0]).content;
  const route=candidate.files.find(x=>x.path===FILES[1]).content;
@@ -46,7 +46,7 @@ function validate(candidate){
   'ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY']){
   assert(route.includes(phrase),'REALITY_MODEL_MISSING_AUTH_ROUTE_CONTRACT_'+phrase);
  }
- assert((tests.match(/test\\(/g)||[]).length>=8,'REALITY_MODEL_INSUFFICIENT_TEST_CASES');
+ assert((tests.match(/test\(/g)||[]).length>=8,'REALITY_MODEL_INSUFFICIENT_TEST_CASES');
  return candidate;
 }
 function save(candidate,responseId,model){
@@ -65,7 +65,7 @@ function save(candidate,responseId,model){
   original_job_settled:false,production_changed:false,
  };
  writeFileSync('reality-generated-original-143/generation-receipt.json',
-  JSON.stringify(proof,null,2)+'\\n','utf8');
+  JSON.stringify(proof,null,2)+'\n','utf8');
  console.log('REALITY_GENERATION_RECEIPT '+JSON.stringify(proof));
 }
 function extractedText(body){
