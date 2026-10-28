@@ -75,6 +75,22 @@ test('a source mismatch blocks warrant promotion even with alleged installs and 
  assert.equal(flags.original_job_completed,false);
  assert.equal(flags.next_required_step,'INDEPENDENT_GITHUB_MODEL_SOURCE_REVALIDATION');
 });
+test('a distinct independently owner-signed current model package is not invalidated by historical patch-only source tests',()=>{
+ const g={...proven,exact_llm_source_verified:false,sandbox_success:false};
+ const without=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:g,
+  warrantVerified:true,installationVerified:true,settlementVerified:true});
+ assert.equal(without.warranted_upgrade_ready,false);
+ assert.equal(without.original_job_completed,false);
+ const current=originalOwnerConsoleFlags({goalConfirmed:goal,evidence,github:g,
+  currentPackageWarrantVerified:true, draftVerified:false,
+  installationVerified:true,settlementVerified:true});
+ assert.equal(current.current_model_package_warrant_verified,true);
+ assert.equal(current.legacy_review_warrant_ready,false);
+ assert.equal(current.warranted_upgrade_ready,true);
+ assert.equal(current.verified_draft_ready,false);
+ assert.equal(current.installation_verified,false);
+ assert.equal(current.original_job_completed,false);
+});
 test('the owner page exists, has original-work bound controls, and does not auto-approve or auto-run',()=>{
  const page=readFileSync('owner-repair.html','utf8');
  assert.match(page,/Owner Repair Control/);
