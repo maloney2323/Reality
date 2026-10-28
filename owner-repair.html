@@ -40,6 +40,25 @@ button:focus-visible,a:focus-visible{outline:3px solid #aed3ff;outline-offset:3p
 .safe{color:#a2e5ce}.warn{color:#ffd394}
 .kv{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;color:#b3c1d9;font-size:.85rem}
 footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
+
+/* Guided customer workflow: the evidence console is optional, not a prerequisite. */
+.quick{background:linear-gradient(160deg,#18294a,#10182a);border-color:#6a89bb;padding:24px}
+.quick h2{font-size:1.45rem;margin-bottom:7px}
+.quick .eyebrow{font-size:.7rem;letter-spacing:.08em}
+#nextAction{font-size:1.08rem;min-height:60px;width:100%;background:#4069bb;border-color:#769bdc;padding:16px;white-space:normal}
+#nextAction:disabled{opacity:.72}
+#nextReason{color:#b6c7e5;font-size:.93rem;line-height:1.55}
+#nextFeedback{font-size:.92rem;overflow-wrap:anywhere;padding:13px;background:#0a1426;border:1px solid #3b4d70;border-radius:11px;white-space:pre-wrap;line-height:1.5}
+#nextFeedback:empty{display:none}
+.track{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:18px 0}
+.track-item{font-size:.75rem;text-align:center;padding:10px 3px;border:1px solid #304362;border-radius:8px;color:#9caecb;background:#0a1426}
+.track-item[data-state="done"]{border-color:#3d8d81;color:#b8ebdf;background:#15312f}
+.track-item[data-state="current"]{border-color:#84a8e8;color:#e5efff;background:#203966}
+.advanced{margin-top:16px;padding:0;border:1px solid #35415b;border-radius:16px;background:#0f192b}
+.advanced summary{cursor:pointer;padding:16px 18px;font-weight:700;color:#c5d7f5}
+.advanced .advanced-body{padding:0 14px 16px}
+.advanced .shell{margin-top:12px}
+@media(max-width:780px){.quick{padding:18px}.track{gap:4px}.track-item{font-size:.65rem;padding:9px 2px}#nextAction{font-size:1rem}}
 </style>
 </head>
 <body>
@@ -48,6 +67,23 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <div class="eyebrow">Original Reality maintenance work · Issue #143</div>
 <h1>Owner Repair Control</h1>
 <p class="lead">Review the exact self-repair evidence, approve installation under your own Reality account, authorize resumption separately, and verify the final Continuity receipt. This is the <strong>original Reality job</strong>, not a replacement test.</p>
+<section class="shell quick" id="guidedLoop">
+ <div class="eyebrow">Reality · Original customer job #143</div>
+ <h2>Run the governed upgrade loop</h2>
+ <p class="note">One step at a time. Reality prepares the work; you separately approve draft creation, installation and resumption. It never claims completion without the original Continuity receipt.</p>
+ <div class="track" aria-label="Original job stage">
+  <div class="track-item" id="trackEvidence">Evidence</div>
+  <div class="track-item" id="trackDraft">Draft PR</div>
+  <div class="track-item" id="trackInstall">Install</div>
+  <div class="track-item" id="trackResume">Resume</div>
+  <div class="track-item" id="trackSettle">Settle</div>
+ </div>
+ <p id="nextReason" role="status" aria-live="polite">Reading your original signed-in Reality job…</p>
+ <button type="button" id="nextAction">Check Reality and continue</button>
+ <p id="nextFeedback" role="status" aria-live="polite"></p>
+ <p class="note">The same original work ID and the verified model-generated package are preserved. Production execution is not authorized by these steps.</p>
+</section>
+<details id="advanced" class="advanced"><summary>Technical evidence and individual controls</summary><div class="advanced-body">
 <div class="shell">
 <h2>Verified job state</h2>
 <p id="summary" role="status" aria-live="polite">Sign in to Reality, then check the original work.</p>
@@ -129,6 +165,7 @@ footer{margin-top:28px;color:#8f9db5;font-size:.8rem}
 <button id="verifyFinal" class="secondary" type="button">Read settlement · No writes</button>
 </div></div>
 </div>
+</div></details>
 <div class="shell">
 <h2>Live evidence and responses</h2>
 <div id="log" role="status" aria-live="polite">No actions taken. Waiting for an authenticated owner readback.</div>
@@ -143,12 +180,106 @@ const $=id=>document.getElementById(id);
 const buttons=['refresh','verifyExecutor','verifyWarrant','prepareDraft','approveDraft','runDraft','prepareInstall','approve','execute','prepareResume','verifyFinal'];
 let conv=null,snapshot=null,prepared=null,approvedStage=null,locked=false,busy=false,packageVerified=false;
 let draftPrepared=null,draftApproval=false,draftLocked=false;
+let guidedBusy=false,guidedLastOutcome=null;
 function output(message){$('log').textContent=String(message);}
 function status(message){$('globalState').textContent=String(message);}
 function disabledAll(value){for(const id of buttons)$(id).disabled=value;}
+
+function stagePosition(s){
+ if(s?.job_settlement_verified===true)return 5;
+ if(s?.installation_verified===true)return 3;
+ if(s?.verified_draft_ready===true)return 2;
+ if(s?.owner_warrant_events===1&&s?.sandbox_receipts===1)return 1;
+ return 0;
+}
+function guidedChoice(){
+ const s=snapshot;
+ if(locked||draftLocked){
+  return {label:'Read current Reality receipts · No retry',type:'review',
+   reason:'A consequential action was attempted. Reality will only inspect results; it must not automatically repeat a GitHub or installation action.'};
+ }
+ if(!s||!conv)return {label:'Check Reality and continue',type:'refresh',
+  reason:'Sign in to Reality on this preview to load the original job and its Continuity receipts.'};
+ if(s.job_settlement_verified===true)return {label:'Read verified final settlement',type:'refresh',
+  reason:'Reality has independently verified the original job settlement. Read the durable receipt.'};
+ if(draftApproval&&draftPrepared)return {label:'Run owner-approved draft PR once',type:'draft-run',
+  reason:'Your exact draft action is approved. This will write two verified extension files to an isolated GitHub draft PR, not merge or install them.'};
+ if(draftPrepared)return {label:'Review and approve exact draft PR',type:'draft-approve',
+  reason:'Reality prepared the original-job draft scope. Confirm the exact candidate and repository before any GitHub effect.'};
+ if(approvedStage)return {label:'Run approved '+approvedStage.toLowerCase()+' once',type:'stage-run',
+  reason:'One exact owner-approved action is pending. This operation may produce a consequential provider effect and will not retry automatically.'};
+ if(prepared)return {label:'Approve exact '+prepared.stage.toLowerCase()+' action',type:'stage-approve',
+  reason:'Review the original job, target PR and candidate hash before approving. Approval alone performs no external action.'};
+ if(s.installation_verified===true)return {label:'Prepare separate original-job resumption',type:'resume-prepare',
+  reason:'Installation is recorded as verified. Reality must request a distinct approval before resuming the same original job.'};
+ if(s.verified_draft_ready===true)return {label:'Prepare exact installation approval',type:'install-prepare',
+  reason:'The governed draft PR was independently reobserved. Reality must prepare a different owner-bound installation grant.'};
+ if(s.original_goal_active===true&&s.owner_warrant_events===1&&s.sandbox_receipts===1)
+  return {label:'Prepare governed draft PR',type:'draft-prepare',
+   reason:'Signed evidence and sandbox receipts are saved. Reality will independently check the signature, goal and exact candidate without writing GitHub.'};
+ return {label:'Check original job and evidence',type:'refresh',
+  reason:'A required original-job condition is missing or unverified. The detailed status will show the exact reason. No provider action is allowed.'};
+}
+function renderGuided(){
+ const c=guidedChoice(),pos=stagePosition(snapshot);
+ for(const [i,id] of ['trackEvidence','trackDraft','trackInstall','trackResume','trackSettle'].entries()){
+  $(id).dataset.state=i<pos?'done':i===pos?'current':'pending';
+ }
+ $('nextAction').textContent=c.label;
+ // Never disable the customer entrypoint because an unrelated historical
+ // status probe failed. The server independently validates every action.
+ $('nextAction').disabled=busy||guidedBusy;
+ $('nextReason').textContent=c.reason;
+}
+function guidedMessage(value){
+ guidedLastOutcome=String(value||'');
+ $('nextFeedback').textContent=guidedLastOutcome;
+}
+async function continueReality(){
+ if(busy||guidedBusy)return;
+ guidedBusy=true;
+ $('nextAction').disabled=true;
+ let action=guidedChoice();
+ try{
+  if(action.type==='refresh'||action.type==='review'){
+   await refresh();
+   const detail=$('log').textContent;
+   guidedMessage(snapshot?('Original work refreshed. '+String(snapshot.next_required_step||'Next stage pending')+'.'):
+    'Original signed-in job could not be loaded. '+detail);
+  }else if(action.type==='draft-prepare'){
+   await prepareGovernedDraft();
+   guidedMessage($('draftState').textContent);
+  }else if(action.type==='draft-approve'){
+   // Confirmations are kept separate from preparation and execution.
+   await approveGovernedDraft();
+   guidedMessage($('draftState').textContent);
+  }else if(action.type==='draft-run'){
+   await executeGovernedDraft();
+   guidedMessage($('draftState').textContent);
+  }else if(action.type==='install-prepare'||action.type==='resume-prepare'){
+   await prepare(action.type==='install-prepare'?'INSTALL':'RESUME');
+   guidedMessage($('log').textContent);
+  }else if(action.type==='stage-approve'){
+   await approve();
+   guidedMessage($('log').textContent);
+  }else if(action.type==='stage-run'){
+   await execute();
+   guidedMessage($('log').textContent);
+  }else{
+   guidedMessage('Reality has no verified action for this stage. Refresh the original-job readback.');
+  }
+ }catch(error){
+  guidedMessage('Reality stopped: '+String(error?.message||error)+
+   '. No automatic retry. Check the original-job evidence.');
+ }finally{
+  guidedBusy=false;renderGuided();
+ }
+}
+
 function stageReset(){prepared=null;approvedStage=null;$('stageDetail').hidden=true;$('stageDetail').textContent='';$('approve').disabled=true;$('execute').disabled=true;}
 function render(s){
  snapshot=s;
+ renderGuided();
  $('sourceState').textContent=s.original_source_verified?'Exact model source verified':'Source evidence unavailable';
  $('installState').textContent=s.installation_verified?'Verified installed':s.verified_draft_ready?'Draft verified · Awaiting install approval':s.warranted_upgrade_ready?'Signed warrant verified · Draft PR pending':'Warrant / install pending';
  $('settlementState').textContent=s.job_settlement_verified?'Durably verified':'Not verified';
@@ -383,6 +514,7 @@ async function refresh(){
   busy=false;disabledAll(true);$('refresh').disabled=false;$('verifyFinal').disabled=false;
   $('summary').textContent='Original owner readback unavailable.';
   status('Not authorized');
+  renderGuided();
   output('Stopped safely: '+String(err.message)+
    '\nSign in to Reality on this preview and open the original conversation. No action was taken.');
  }
@@ -497,6 +629,7 @@ async function execute(){
  finally{busy=false;$('refresh').disabled=false;$('verifyFinal').disabled=false;
   $('approve').disabled=true;$('execute').disabled=true;}
 }
+$('nextAction').addEventListener('click',continueReality);
 $('refresh').addEventListener('click',refresh);
 $('realityActivity').addEventListener('click',loadRealityAutonomousActivity);
 $('verifyWarrant').addEventListener('click',verifyOriginalExecutorWarrant);
