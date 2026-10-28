@@ -972,6 +972,14 @@ function wcUnfinishedHTML(job){
   /^[a-f0-9-]{36}$/i.test(String(job.repair_evidence_receipt_id||''));
  const ownerAccepted=job.owner_repair_accepted===true&&
   /^[a-f0-9-]{36}$/i.test(String(job.owner_repair_acceptance_receipt_id||''));
+ const capabilityCandidateSaved=job.capability_candidate_saved===true&&
+  job.capability_candidate_id==='reality.original-repair-execution'&&
+  /^[a-f0-9-]{36}$/i.test(String(job.capability_candidate_receipt_id||''));
+ const capabilityCandidateNotice=capabilityCandidateSaved?
+  '<p class="wc-note"><strong>Reality discovered an original-job capability upgrade candidate</strong></p>'+
+  '<p class="wc-note">Same original work · Saved investigation receipt: '+
+  esc(job.capability_candidate_receipt_id)+
+  '. Sandbox experiment proposed, not executed. No code installed and original repair remains open.</p>':'';
  const evidenceNotice=evidenceSaved?
   '<p class="wc-note"><strong>'+(ownerAccepted?
    'Owner accepted verified source correction · Original repair still open':
@@ -1003,13 +1011,66 @@ function wcUnfinishedHTML(job){
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
   '<p class="wc-note">Upgrade diagnosis and capability recommendations are in <strong>Upgrades & improvements</strong>. The original job stays open.</p>'+
-  evidenceNotice+
+  evidenceNotice+capabilityCandidateNotice+
   '<div class="wc-unfinished-actions">'+upgradeJump+verifyFix+acceptCorrection+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
   '<div class="wc-note" data-recovery-status="'+esc(job.work_id)+'" aria-live="polite"></div>'+
   '</article>';
+}
+const wcAutoInvestigatedOriginalWork=new Set();
+// No owner approval screen is required merely to read evidence, diagnose
+// Reality's own missing executor, or append a non-authorizing finding.
+// Consequential code/issue writes still require their separate signed grants.
+async function wcAutoInvestigateOriginalRepair(jobs,readSerial){
+ const eligible=jobs.filter(j=>
+  j.can_auto_investigate_original_repair===true&&
+  j.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+  j.job_completed===false&&j.goal_still_current===true&&
+  /^[a-f0-9-]{36}$/i.test(String(j.conversation_id||''))&&
+  !wcAutoInvestigatedOriginalWork.has(j.work_id+':'+j.conversation_id));
+ for(const job of eligible.slice(0,1)){
+  const key=job.work_id+':'+job.conversation_id;
+  wcAutoInvestigatedOriginalWork.add(key);
+  const feedback=$('wcUnfinishedList')?.querySelector(
+   '[data-unfinished-feedback="'+job.work_id+'"]');
+  if(feedback)feedback.textContent='Reality autonomously investigating unfinished original-job execution capability…';
+  try{
+   const res=await fetch('/api/reality/personal-recovery-loop',{
+    method:'POST',credentials:'same-origin',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+     intent:'RUN_AND_RECORD_RECOVERY_DIAGNOSIS',
+     conversation_id:job.conversation_id,work_id:job.work_id,
+    }),
+   });
+   const result=await res.json();
+   if(!res.ok||result.ok!==true||
+      result.original_work_id!==job.work_id||
+      result.diagnosis_saved!==true||
+      result.original_job_completed!==false||
+      result.external_action_performed!==false||
+      result.action_authorized!==false)
+    throw Error('ORIGINAL_CAPABILITY_DISCOVERY_NOT_VERIFIED');
+   if(result.capability_candidate_saved===true){
+    if(result.continuation_experiment?.state!=='SANDBOX_PROPOSED_AWAITING_AUTHORIZATION'||
+       result.continuation_experiment.original_work_id!==job.work_id||
+       result.continuation_experiment.upgrade_installed!==false||
+       !/^[a-f0-9-]{36}$/i.test(String(result.capability_candidate_receipt_id||'')))
+     throw Error('ORIGINAL_CAPABILITY_DISCOVERY_SAVED_CANDIDATE_MISMATCH');
+    // Read back from the persistent owner Continuity before displaying
+    // discovery as achieved. Never trust the POST response alone.
+    if(readSerial===wcUnfinishedReadSerial)
+     await wcLoadUnfinishedWork();
+   }else if(feedback&&readSerial===wcUnfinishedReadSerial){
+    feedback.textContent='Reality checked the original execution path; no independently verified new capability candidate was recorded. Original repair still open.';
+   }
+  }catch{
+   if(feedback&&readSerial===wcUnfinishedReadSerial)
+    feedback.textContent='Autonomous original-job capability investigation was not verified. No original job or GitHub action was executed.';
+  }
+ }
 }
 let wcUnfinishedReadSerial=0;
 async function wcLoadUnfinishedWork(){
@@ -1049,6 +1110,9 @@ async function wcLoadUnfinishedWork(){
    ' No job is being executed.';
   panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
    '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
+  // Bound to the already verified signed-in original job, once per view.
+  // There are no GitHub writes, no model generation and no approvals here.
+  void wcAutoInvestigateOriginalRepair(safe,serial);
  }catch{
   if(serial!==wcUnfinishedReadSerial)return;
   $('wcUnfinishedCount').textContent='';
