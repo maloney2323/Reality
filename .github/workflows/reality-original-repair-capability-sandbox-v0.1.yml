@@ -26,8 +26,8 @@ jobs:
         run: |
           node --check scripts/reality-original-repair-capability-generate-v0.1.mjs
           node --check scripts/reality-original-repair-capability-grade-v0.1.mjs
-          git cat-file -e c8f0b861e1fac6cda7826aed9f36a2666d124eda^{commit}
-          git cat-file -e 4e88594a43ca546a1861d3c5f5812f20234bb3e3^{commit}
+          test "$(git hash-object test/fixtures/original-repair-historical-source.snapshot.txt)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
+          test "$(git hash-object test/fixtures/original-repair-corrected-source.snapshot.txt)" = 1e5362df93da404723c82ffe4941144bc4c33d44
       - name: Reality synthesizes code for exact owner missing repair execution capability
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -81,8 +81,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p owner-original-fixtures
-          git show c8f0b861e1fac6cda7826aed9f36a2666d124eda:test/reality-personal-discovered-work-handoff-v0.1.test.js > owner-original-fixtures/historical.js
-          git show 4e88594a43ca546a1861d3c5f5812f20234bb3e3:test/reality-personal-discovered-work-handoff-v0.1.test.js > owner-original-fixtures/corrected.js
+          cp test/fixtures/original-repair-historical-source.snapshot.txt owner-original-fixtures/historical.js
+          cp test/fixtures/original-repair-corrected-source.snapshot.txt owner-original-fixtures/corrected.js
+          test "$(git hash-object owner-original-fixtures/historical.js)" = aa5255dc668d3f5c739c85820703b0eeefb315aa
+          test "$(git hash-object owner-original-fixtures/corrected.js)" = 1e5362df93da404723c82ffe4941144bc4c33d44
           test -s owner-original-fixtures/historical.js
           test -s owner-original-fixtures/corrected.js
       - name: Isolate untrusted model code with no network, secrets, writable root or elevated privileges
