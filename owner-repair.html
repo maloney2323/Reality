@@ -511,9 +511,15 @@ async function refresh(){
    '\nSandbox receipts in original Continuity: '+String(d.sandbox_receipts)+
    '\nFinal independently verified settlement: '+String(d.job_settlement_verified===true)+
    '\nNext: '+String(d.next_required_step));
+  // A NEW independently verified install receipt may release the prior
+  // stage's no-retry lock for a DIFFERENT owner-approved resumption stage.
+  if(d.installation_verified===true&&d.job_settlement_verified!==true)locked=false;
   busy=false;render(d);
   void loadRealityAutonomousActivity();
  }catch(err){
+  // Do not allow a stale successful snapshot to drive actions after a failed
+  // authentication or Continuity reload.
+  snapshot=null;conv=null;draftPrepared=null;draftApproval=false;
   busy=false;disabledAll(true);$('refresh').disabled=false;$('verifyFinal').disabled=false;
   $('summary').textContent='Original owner readback unavailable.';
   status('Not authorized');
