@@ -11,6 +11,7 @@ on:
       - 'scripts/reality-live-self-upgrade-repair-v0.1.mjs'
       - 'scripts/reality-live-upgrade-independent-grader-v0.1.mjs'
       - 'scripts/reality-live-upgrade-evaluate-one-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs'
       - 'src/reality-governed-github-upgrade-provider-v0.1.js'
       - 'src/reality-upgrade-evidence-warrant-v0.1.js'
       - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
@@ -42,6 +43,7 @@ on:
       - 'scripts/reality-live-self-upgrade-repair-v0.1.mjs'
       - 'scripts/reality-live-upgrade-independent-grader-v0.1.mjs'
       - 'scripts/reality-live-upgrade-evaluate-one-v0.1.mjs'
+      - 'scripts/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs'
       - 'src/reality-governed-github-upgrade-provider-v0.1.js'
       - 'src/reality-upgrade-evidence-warrant-v0.1.js'
       - 'src/reality-warranted-upgrade-candidate-loader-v0.1.js'
@@ -83,6 +85,7 @@ jobs:
       - name: Verify exact owner-authorized bounded upgrade candidate and independent GitHub readback
         run: |
           node --check scripts/reality-live-upgrade-autorepair-v0.1.mjs
+          node --check scripts/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs
           node --check src/reality-historical-upgrade-proof-intake-v0.1.js
           node --check src/reality-independent-upgrade-ci-readback-v0.1.js
           node --check src/reality-upgrade-base-readiness-v0.1.js
@@ -104,6 +107,50 @@ jobs:
             historical_pilot_only:true,owner_warrant_signed:false,
             github_write_authorized:false,original_job_completed:false}));
           JS
+
+      - name: Obtain exact independently proven model correction (developer only)
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-model-self-correction-independent-proof
+          repository: maloney2323/Reality
+          run-id: 40617479444
+          github-token: ${{ github.token }}
+          path: verified-developer-pilot
+
+      - name: Run original developer construction work with corrected model tool in isolated runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f src/reality-extensions/construction-update-parser.mjs
+          test -s verified-developer-pilot/candidate.mjs
+          test -s verified-developer-pilot/independent-proof.json
+          timeout 75s docker run --rm --network none --read-only --cap-drop ALL \\
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \\
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \\
+            -v "${{ github.workspace }}/verified-developer-pilot:/work:ro" \\
+            -v "${{ github.workspace }}/scripts:/tools:ro" \\
+            node:22-alpine node /tools/reality-live-upgrade-original-pilot-reactivation-v0.1.mjs \\
+            > verified-developer-pilot/developer-job-reactivation-proof.json
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          const x=JSON.parse(fs.readFileSync('verified-developer-pilot/developer-job-reactivation-proof.json','utf8'));
+          if(x.state!=='MODEL_CORRECTED_CAPABILITY_REACTIVATED_IN_ISOLATED_DEVELOPER_SANDBOX'||
+             x.isolated_original_job_cases?.length!==2||
+             x.developer_original_job_reexecuted_and_verified!==true||
+             x.original_customer_work_id!==null||
+             x.customer_capability_installed!==false||
+             x.original_customer_job_completed!==false||
+             x.github_write_authorized!==false)
+           throw Error('DEVELOPER_REACTIVATION_EVIDENCE_INVALID');
+          console.log(JSON.stringify(x));
+          JS
+
+      - name: Preserve independently executed developer original-job evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-developer-job-reactivation-evidence
+          path: verified-developer-pilot/developer-job-reactivation-proof.json
+          retention-days: 14
 
       - name: Independently observe live preview-base workflow readiness without mutation
         env:
