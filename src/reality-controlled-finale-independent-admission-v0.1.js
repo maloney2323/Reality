@@ -12,12 +12,13 @@ const API='https://api.github.com/repos/'+REPO;
 const BASE='experiment/reality-full-loop-finale-20261028';
 const HEAD='review/reality-finale-exact-model-candidate-20261028';
 const PINNED_HEAD='757404f5891a0fa73258833ea4a477cb01ae8862';
+const CORRECTION_HEAD='acbc3160ced0525ea73ef4d0184da5fdae50337c';
 const SHA=x=>createHash('sha256').update(x).digest('hex');
 const fail=c=>{throw Error(c)};
 const RUNS=Object.freeze([
  {id:40715822942,head:'4f1a3a23fe28d738ccf863754c76234c4d1b1929',
   conclusion:'failure',name:'Reality Finale - Controlled Live Model Recovery (Noncustomer)'},
- {id:40716279333,head:PINNED_BASE,conclusion:'success',
+ {id:40716279333,head:CORRECTION_HEAD,conclusion:'success',
   name:'Reality Finale - Real Model Self-Correction and Independent Retest'},
  {id:40717353722,head:PINNED_HEAD,conclusion:'success',
   name:'Reality Finale - Exact Model Candidate Review Installation Readback'},
@@ -80,7 +81,7 @@ export async function verifyControlledFinaleIndependentEvidence({
   if(matches.length!==1||matches[0].name!==expected.name||
      matches[0].digest!==expected.digest||matches[0].expired!==false||
      matches[0].workflow_run?.id!==expected.run||
-     matches[0].workflow_run?.head_sha!==PINNED_BASE)
+     matches[0].workflow_run?.head_sha!==CORRECTION_HEAD)
    fail('FINALE_ACTUAL_MODEL_PROOF_ARTIFACT_MISMATCH');
  }
  if(content?.type!=='file'||content.path!==CONTROLLED_FINALE_PATH||
