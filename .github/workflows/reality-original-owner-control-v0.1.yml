@@ -1,0 +1,64 @@
+name: Reality ORIGINAL Owner Repair Control v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'src/reality-original-owner-console-v0.1.js'
+      - 'api/reality/personal-original-repair-owner-console.js'
+      - 'owner-repair.html'
+      - 'index.html'
+      - 'test/reality-original-owner-console-v0.1.test.js'
+      - '.github/workflows/reality-original-owner-control-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  issues: read
+jobs:
+  owner-console-verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax-check exact signed-in owner route and read-only state module
+        run: |
+          node --check src/reality-original-owner-console-v0.1.js
+          node --check api/reality/personal-original-repair-owner-console.js
+      - name: Assert owner stages cannot silently promote source tests to completed work
+        run: node --test test/reality-original-owner-console-v0.1.test.js
+      - name: Independently verify the real original model source and historical fix from GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {observeGithub,originalOwnerConsoleFlags}
+            from './src/reality-original-owner-console-v0.1.js';
+          const github=await observeGithub();
+          assert.equal(github.exact_llm_source_verified,true);
+          assert.equal(github.sandbox_success,true);
+          assert.equal(github.historical_fixed_source_verified,true);
+          assert.equal(github.issue_open,true);
+          assert.equal(github.review_pr_merged,false);
+          const r=originalOwnerConsoleFlags({
+           goalConfirmed:true,github,evidence:{owner_evidence_acknowledged:true},
+           warrantVerified:false,installationVerified:false,settlementVerified:false,
+          });
+          assert.equal(r.original_job_completed,false);
+          assert.equal(r.next_required_step,'ISSUE_FRESH_OWNER_SCOPED_SANDBOX_AND_WARRANT');
+          console.log(JSON.stringify({
+           result:'ORIGINAL_OWNER_CONSOLE_LIVE_EVIDENCE_VERIFIED',
+           issue_url:github.issue_url,review_pr_url:github.review_pr_url,
+           exact_model_source_sha256:github.original_candidate_sha256,
+           original_source_already_fixed:github.historical_fixed_source_verified,
+           live_warrant_or_install_claimed:false,
+           original_job_completed:false
+          },null,2));
+          JS
