@@ -14,6 +14,8 @@ import {registerOwnerIsolatedUpgradeCapability,readOwnerIsolatedUpgradeCapabilit
  from './reality-owner-upgrade-runtime-registry-v0.1.js';
 import {readOwnerOriginalWorkGoalBeforeResume}
  from './reality-owner-upgrade-fresh-goal-v0.1.js';
+import {resumeOriginalOwnerGithubWork,observeOriginalOwnerGithubWork}
+ from './reality-owner-upgrade-original-github-work-v0.1.js';
 export const OWNER_UPGRADE_GITHUB_LIVE_PORTS_VERSION='reality-owner-upgrade-github-live-ports-v0.1';
 const missing=(name)=>{throw Error('UPGRADE_LIVE_PORT_REQUIRED_'+name)};
 export function connectOwnerGithubUpgradeToClosure({
@@ -28,13 +30,12 @@ export function connectOwnerGithubUpgradeToClosure({
  observe=observeOwnerGithubUpgradeInstall,
  appendSettlement=appendVerifiedOwnerUpgradeJobSettlement,
  readSettlement=readVerifiedOwnerUpgradeJobSettlement,
+ resumeOriginal=resumeOriginalOwnerGithubWork,
+ observeOriginal=observeOriginalOwnerGithubWork,
 }={}){
  const external={...authorityPorts,...runtimePorts,...continuityPorts};
- const required=['resumeOriginal','observeOriginal'];
- for(const key of required){
-  if(typeof external[key]!=='function')missing(key);
- }
- if(typeof consumeInstallGrant!=='function'||typeof consumeResumeGrant!=='function'||
+ if(typeof resumeOriginal!=='function'||typeof observeOriginal!=='function'||
+    typeof consumeInstallGrant!=='function'||typeof consumeResumeGrant!=='function'||
     typeof register!=='function'||typeof readRegistry!=='function'||
     typeof readFreshGoal!=='function'||typeof settleStageGrant!=='function'||
     typeof install!=='function'||typeof observe!=='function'||
@@ -54,6 +55,12 @@ export function connectOwnerGithubUpgradeToClosure({
    readRegistry({session,scope,plan,installed,env}),
   readFreshGoal:async({session,conversationId,scope,plan,env})=>
    readFreshGoal({session,conversationId,scope,plan,env}),
+  // Original-work dispatch is now a real bounded provider operation, NOT a
+  // caller supplied stub. New job types require their own trusted adapter.
+  resumeOriginal:async({session,scope,plan,active,goal,resumeGrant,env})=>
+   resumeOriginal({session,scope,plan,active,goal,resumeGrant,env}),
+  observeOriginal:async({session,scope,plan,resumed,resumeGrant,env})=>
+   observeOriginal({session,scope,plan,resumed,resumeGrant,env}),
   settleInstallGrant:async({session,scope,plan,grant,installed,env})=>
    settleStageGrant({stage:'INSTALL',session,scope,plan,grant,installed,env}),
   settleResumeGrant:async({session,scope,plan,resumeGrant,installed,outcome,env})=>
