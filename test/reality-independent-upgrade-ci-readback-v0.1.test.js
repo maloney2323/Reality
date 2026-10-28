@@ -101,3 +101,20 @@ test('reject copied single workflow identity and provider read failures',async()
  await assert.rejects(verifyIndependentUpgradeDraftCI({...opts,fetchImpl:f.fetchImpl}),
   /UPGRADE_CI_PROVIDER_READBACK_UNAVAILABLE/);
 });
+
+test('both independent CI workflows must actually be scheduled for extension PR changes',async()=>{
+ const {readFileSync}=await import('node:fs');
+ for(const path of [
+  '../.github/workflows/reality-governed-execution-engine-v0.1.yml',
+  '../.github/workflows/reality-governed-autonomous-upgrade-v01.yml',
+ ]){
+  const yaml=readFileSync(new URL(path,import.meta.url),'utf8');
+  const sections=yaml.split('  pull_request:');
+  assert.ok(sections.length===2,'must declare pull_request trigger: '+path);
+  for(const glob of ["'src/reality-extensions/**'","'test/reality-extensions/**'"]){
+   assert.ok(sections[0].includes(glob),'missing push path '+glob+' in '+path);
+   assert.ok(sections[1].split('jobs:')[0].includes(glob),
+    'missing PR path '+glob+' in '+path);
+  }
+ }
+});
