@@ -1,0 +1,104 @@
+name: Reality Original #143 — Model Generates Full Loop
+on:
+  push:
+    branches:
+      - reality/orchestrate/original-143-model-full-loop-20261028
+    paths:
+      - '.github/workflows/reality-original-143-model-full-loop.yml'
+      - 'scripts/run-reality-generate-original-143-full-loop.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reality-model-generation:
+    name: Reality generates exact original-job activation and settlement code
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REALITY_OPENAI_MODEL: gpt-5.6-luna
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Reality creates original full loop candidate using real model
+        run: node scripts/run-reality-generate-original-143-full-loop.mjs
+      - name: Save model source, source hashes and independent response ID
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-generated-original-143-candidate
+          path: reality-generated-original-143/
+          retention-days: 21
+          if-no-files-found: error
+  reality-independent-sandbox:
+    needs: reality-model-generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-generated-original-143-candidate
+          path: reality-generated-original-143
+      - name: Check Reality generated source syntax with no secrets
+        run: |
+          set -euo pipefail
+          node --check reality-generated-original-143/src/reality-extensions/reality-original-full-loop-integration.mjs
+          node --check reality-generated-original-143/api/reality/personal-original-full-loop.js
+          node --check reality-generated-original-143/test/reality-extensions/reality-original-full-loop-integration.test.js
+      - name: Isolated model-generated code tests (no network, secrets or host writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/reality-extensions test/reality-extensions api/reality
+          cp reality-generated-original-143/src/reality-extensions/reality-original-full-loop-integration.mjs src/reality-extensions/
+          cp reality-generated-original-143/test/reality-extensions/reality-original-full-loop-integration.test.js test/reality-extensions/
+          cp reality-generated-original-143/api/reality/personal-original-full-loop.js api/reality/
+          timeout 180s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 80 --memory 512m --cpus 2 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/src:/work/src:ro" \
+            -v "${{ github.workspace }}/api:/work/api:ro" \
+            -v "${{ github.workspace }}/test:/work/test:ro" \
+            -v "${{ github.workspace }}/package.json:/work/package.json:ro" \
+            -w /work node:22-alpine \
+            node --test test/reality-extensions/reality-original-full-loop-integration.test.js
+  stage-reality-generated-source:
+    needs: reality-independent-sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-generated-original-143-candidate
+          path: reality-generated-original-143
+      - name: Stage Reality's verified source in a separate non-production branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.ref_name }}" = "reality/orchestrate/original-143-model-full-loop-20261028"
+          branch="reality/model-generated/original-143-full-loop-20261028"
+          git switch -c "$branch"
+          cp reality-generated-original-143/src/reality-extensions/reality-original-full-loop-integration.mjs src/reality-extensions/
+          cp reality-generated-original-143/test/reality-extensions/reality-original-full-loop-integration.test.js test/reality-extensions/
+          cp reality-generated-original-143/api/reality/personal-original-full-loop.js api/reality/
+          git add src/reality-extensions/reality-original-full-loop-integration.mjs \
+            test/reality-extensions/reality-original-full-loop-integration.test.js \
+            api/reality/personal-original-full-loop.js
+          git -c user.name='Reality Model Candidate Bot' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Reality model-generated original #143 activation / resume / settlement candidate (isolated)"
+          git push origin "HEAD:refs/heads/$branch"
+          echo "Reality-generated candidate staged in branch $branch; NO promotion, installation, or job settlement."
