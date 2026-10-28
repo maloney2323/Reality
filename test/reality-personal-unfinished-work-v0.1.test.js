@@ -252,3 +252,50 @@ test('read-only list endpoint has authenticated session and cannot create work',
  assert.match(api,/listAuthenticatedUnfinishedWork/);
  assert.doesNotMatch(api,/runPersonalIssueDispatch|create_issue|executeAuthorizedWork|method:'POST'/);
 });
+
+test('original-worldline capability investigation receipt survives reload without declaring repair completed',()=>{
+ const events=history({checkpoint:true});
+ const source=events.find(x=>x.entity_type==='personal_discovered_work_handoff');
+ const checkpoint=events.find(x=>x.entity_type==='personal_recovery_checkpoint');
+ const tail=events.at(-1),at='2026-10-28T14:12:00.000Z';
+ const candidate=appendContinuityNode({
+  spine,stage:'WORK',entityId:work,eventId:randomUUID(),
+  parentEventId:tail.event_id,priorLineageHash:tail.lineage_hash,
+  assertionTime:at,effectiveTime:at,epistemicStatus:'CORROBORATED',
+  payload:{
+   original_work_id:work,original_goal_id:goalId,
+   recovery_receipt_id:checkpoint.event_id,
+   candidate_capability_id:'reality.original-repair-execution',
+   missing_scope:'EXISTING_OWNER_GITHUB_REPAIR_DISPATCH_PATH',
+   proof_ref:'owner-continuity:'+source.event_id,
+   candidate_state:'SANDBOX_PROPOSED_AWAITING_AUTHORIZATION',
+   code_generated:false,verified_upgrade_installed:false,
+   installation_authorized:false,external_action_performed:false,
+   original_job_completed:false,
+  },
+  provenance:{source:'reality-original-repair-capability-candidate-v0.1',
+   principal_id:user_id,conversation_id:conversationId},
+ });
+ events.push({...candidate,entity_type:'personal_original_repair_capability_candidate',
+  provenance:{...candidate.provenance,continuity_spine:{
+   prior_lineage_hash:candidate.prior_lineage_hash,
+   transformation_receipt_id:candidate.transformation_receipt_id,
+  }}});
+ const rows=projectUnfinishedFromConversation({conversationId,events,goal});
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].capability_candidate_saved,true);
+ assert.equal(rows[0].capability_candidate_receipt_id,candidate.event_id);
+ assert.equal(rows[0].capability_candidate_id,'reality.original-repair-execution');
+ assert.equal(rows[0].job_completed,false);
+ assert.equal(rows[0].can_resume_execution,false);
+ assert.equal(rows[0].external_action_performed,false);
+});
+test('auto-discovery is a bounded same-origin authenticated internal diagnosis, not external repair execution',()=>{
+ const script=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(script,/wcAutoInvestigateOriginalRepair/);
+ assert.match(script,/can_auto_investigate_original_repair===true/);
+ assert.match(script,/RUN_AND_RECORD_RECOVERY_DIAGNOSIS/);
+ assert.match(script,/capability_candidate_saved===true/);
+ assert.match(script,/Reality discovered an original-job capability upgrade candidate/);
+ assert.match(script,/void wcAutoInvestigateOriginalRepair\(safe,serial\)/);
+});
