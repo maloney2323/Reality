@@ -21,6 +21,8 @@ const CONTEXT=[
  'api/reality/personal-original-upgrade-status.js',
  'src/reality-reliability-db-boundary-v0.1.js',
  'src/reality-single-use-execution-reservation-v0.1.js',
+ 'src/reality-authoritative-user-goal-ledger-v0.1.js',
+ 'src/reality-personal-discovered-work-handoff-v0.1.js',
 ];
 const assert=(condition,reason)=>{if(!condition)throw Error(reason)};
 const hash=v=>createHash('sha256').update(v).digest('hex');
@@ -106,6 +108,7 @@ async function main(){
    'No production changes; no GitHub writes; no new secrets or models in action endpoints; no installation during GET; no fake placeholder receipts or hardcoded success.',
    'API must expose explicit authenticated PREPARE and ACTIVATE_AND_COMPLETE steps; activation may only execute on an actual owner click and fresh exact authorization.',
    'Use dependency injection for provider, persistence and auth in tests; include wrong-owner, wrong-goal, missing approval, bad source hash, stale grant, registry readback mismatch, already-fixed reconciliation and partial-write failures.',
+   'Actual test failures must be corrected without weakening security controls. The goal projection from real source is active_goal.title, not active_goal.text; it has a last_transition_receipt_id but no active_goal.version. Verify original owner from persisted Continuity work linkage, not from a caller-chosen field.',
    'The output is a candidate. It will be independently tested in a no-network no-secret sandbox before proposed PR; never mark it complete because you generated it.'
   ],
   exact_output_paths:FILES,
@@ -115,8 +118,8 @@ async function main(){
  // Preserve Reality's earlier rejected source as the correction parent.
  // Fetch it directly from the user's OpenAI account. Never execute it here.
  let lastCandidate=null;
- let lastFailure='Earlier Reality model source failed independent Node tests: its test imports ORIGINAL_WORK but its service did not export ORIGINAL_WORK. The proposed persistence adapter also called non-existent methods consumeSingleUseAuthorization, registerCapabilityAndEventAtomic and appendSettlementAtomic. Correct real database integration rather than faking readiness.';
- const parentResponseId='resp_025d6e517afe1959006ae282505a7087d0a67fe2de6aad4966';
+ let lastFailure='Original Reality model revision v4 passed static contract but FAILED 3 of 12 actual isolated Node tests. (1) wrong owner test did not reject because mocked goal owner was replaced too; bind original job owner to independent authenticated Continuity evidence rather than relying only on caller session; (2) bad source SHA 'bad' did not reject in PREPARE because injected observe result was not independently checked against the pinned executor digest; (3) registry mismatch test failed earlier with CONTINUITY_PARENT_REQUIRED because test mocked an empty worldline, which is an invalid precondition: use a valid parent event and lineage hash in the test rather than weakening Continuity invariants. Also real goal active_goal uses title and last_transition_receipt_id, not active.version or active.text. Keep exact consent and owner registration readback. Real DB RPC functions still need isolated SQL implementation; do not mark live installation ready.';
+ const parentResponseId='resp_0654777304e58e93006ae2835eb55887d1809338981d0ec0bb';
  const parentRes=await fetch('https://api.openai.com/v1/responses/'+parentResponseId,{
   headers:{authorization:'Bearer '+key},redirect:'error'});
  assert(parentRes.ok,'REALITY_CORRECTION_PARENT_UNAVAILABLE_'+parentRes.status);
