@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {connectOwnerGithubUpgradeToClosure}
+ from '../src/reality-owner-upgrade-github-live-ports-v0.1.js';
+const methods=['consumeInstallGrant','register','readRegistry','readFreshGoal',
+ 'consumeResumeGrant','resumeOriginal','observeOriginal','appendSettlement',
+ 'readSettlement'];
+function portGroup(){
+ const result={};for(const m of methods)result[m]=async()=>({name:m});
+ return result;
+}
+test('live GitHub adapter wires exact original ID and separate readback, reuses all required legacy services',async()=>{
+ const prior=portGroup(),calls=[];
+ const install=async a=>{calls.push(['install',a]);return {github_pr_number:92}};
+ const observe=async a=>{calls.push(['observe',a]);return {independent:true}};
+ const ports=connectOwnerGithubUpgradeToClosure({
+  authorityPorts:{consumeInstallGrant:prior.consumeInstallGrant,
+   consumeResumeGrant:prior.consumeResumeGrant},
+  runtimePorts:{register:prior.register,readRegistry:prior.readRegistry,
+   resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal},
+  continuityPorts:{readFreshGoal:prior.readFreshGoal,appendSettlement:prior.appendSettlement,
+   readSettlement:prior.readSettlement},
+  install,observe,
+ });
+ assert.equal(Object.isFrozen(ports),true);
+ for(const m of methods)assert.equal(ports[m],prior[m]);
+ const session={user_id:'owner'},scope={workId:'work:123',conversationId:'conv'};
+ const plan={github_pr_number:92},grant={grant_id:'grant'},env={VERCEL_ENV:'preview'};
+ const installed=await ports.install({session,scope,plan,grant,env});
+ const verified=await ports.observeInstall({session,scope,plan,grant,issued:installed,env});
+ assert.equal(verified.independent,true);
+ assert.deepEqual(calls.map(x=>x[0]),['install','observe']);
+ assert.equal(calls[0][1].scope.workId,scope.workId);
+ assert.equal(calls[1][1].originalWorkId,scope.workId);
+ assert.equal(calls[1][1].conversationId,scope.conversationId);
+ assert.deepEqual(calls[1][1].issued,installed);
+});
+test('missing a real authority, registry or original job adapter fails before any write',()=>{
+ const ports=portGroup();
+ for(const m of methods){
+  const supplied={...ports};delete supplied[m];
+  assert.throws(()=>connectOwnerGithubUpgradeToClosure({
+   authorityPorts:supplied,install:async()=>{},observe:async()=>{},
+  }),new RegExp('UPGRADE_LIVE_PORT_REQUIRED_'+m));
+ }
+});
