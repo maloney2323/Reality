@@ -29,7 +29,7 @@ export async function assertUpgradeBaseReady({
  try{
   tree=await providerGet(ROOT+'/git/trees/'+baseCommitSha+'?recursive=1');
  }catch{fail('UPGRADE_BASE_PINNED_GIT_TREE_UNAVAILABLE')}
- if(tree?.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length<2||
+ if(tree?.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length<1||
     tree.tree.length>15000)
   fail('UPGRADE_BASE_PINNED_GIT_TREE_UNVERIFIED');
  const observed=[];
