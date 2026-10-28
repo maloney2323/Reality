@@ -42,10 +42,17 @@ function validate(candidate){
  for(const phrase of ['prepareOriginalFullLoop','activateOriginalFullLoop','settleOriginalFullLoop']){
   assert(service.includes(phrase),'REALITY_MODEL_MISSING_SERVICE_CONTRACT_'+phrase);
  }
- for(const phrase of ['authenticatedChatSession','assertSameOrigin','privateChatConfig',
-  'ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY']){
+ for(const phrase of ['authenticatedChatSession','assertSameOrigin','privateChatConfig']){
   assert(route.includes(phrase),'REALITY_MODEL_MISSING_AUTH_ROUTE_CONTRACT_'+phrase);
  }
+ // Importing the exact service-side confirmation constant is equivalent to
+ // repeating the exact literal. The HTTP handler must still check it.
+ const exact='ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY';
+ const imported=route.includes('CONFIRMATION') &&
+  service.includes("export const CONFIRMATION = '"+exact+"'");
+ assert(route.includes(exact)||imported,'REALITY_MODEL_MISSING_AUTH_ROUTE_CONTRACT_'+exact);
+ assert(!/consumeSingleUseAuthorization|registerCapabilityAndEventAtomic|appendSettlementAtomic/.test(service),
+  'REALITY_MODEL_UNIMPLEMENTED_ATOMIC_PERSISTENCE_METHOD');
  assert((tests.match(/test\(/g)||[]).length>=8,'REALITY_MODEL_INSUFFICIENT_TEST_CASES');
  return candidate;
 }
@@ -105,17 +112,29 @@ async function main(){
   actual_current_source_context:context,
  };
 
- let lastCandidate=null,lastFailure=null;
- const attempts=[];
+ // Preserve Reality's earlier rejected source as the correction parent.
+ // Fetch it directly from the user's OpenAI account. Never execute it here.
+ let lastCandidate=null;
+ let lastFailure='Earlier Reality model source failed independent Node tests: its test imports ORIGINAL_WORK but its service did not export ORIGINAL_WORK. The proposed persistence adapter also called non-existent methods consumeSingleUseAuthorization, registerCapabilityAndEventAtomic and appendSettlementAtomic. Correct real database integration rather than faking readiness.';
+ const parentResponseId='resp_025d6e517afe1959006ae282505a7087d0a67fe2de6aad4966';
+ const parentRes=await fetch('https://api.openai.com/v1/responses/'+parentResponseId,{
+  headers:{authorization:'Bearer '+key},redirect:'error'});
+ assert(parentRes.ok,'REALITY_CORRECTION_PARENT_UNAVAILABLE_'+parentRes.status);
+ const parentResponse=await parentRes.json();
+ lastCandidate=JSON.parse(extractedText(parentResponse));
+ assert(lastCandidate.original_work_id===WORK && lastCandidate.target_branch===BRANCH,
+  'REALITY_CORRECTION_PARENT_WORK_SCOPE_CHANGED');
+ const attempts=[{attempt:0,model_response_id:parentResponseId,
+  status:'REJECTED_BY_INDEPENDENT_SANDBOX',reason:lastFailure}];
  for(let attempt=1;attempt<=3;attempt++){
   // Feedback comes from Reality's deterministic candidate-contract verifier.
   // Rejected code is never executed, installed, or moved into the PR.
-  const task=attempt===1?prompt:{
+  const task= {
    ...prompt,
    correction_round:attempt,
    previous_failure:lastFailure,
    previous_candidate:lastCandidate,
-   correction_instruction:'Correct the failed contract precisely, preserve the three exact paths, all original user/goal/owner boundaries, and return the entire corrected JSON candidate. The HTTP route must explicitly compare the owner confirmation with ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY. Do not report success from unexecuted test code.',
+   correction_instruction:'Correct the actual failing Node test import and atomic persistence gap. Preserve all original owner/goal/work boundaries. A route may import CONFIRMATION from the service (do not need to duplicate string) but must explicitly compare request body confirmation. The service must define or use VERIFIED REAL database adapter methods; createUniversePostgresPersistence only has appendEvent, reconstruct, getCapability. Do not invent consumeSingleUseAuthorization/registerCapabilityAndEventAtomic/appendSettlementAtomic. If database activation requires new SQL RPC, implement real RPC transport and fail closed until provisioned. Tests must exercise actual exported symbols. Return all three complete source files. No fake success.',
   };
   const response=await fetch('https://api.openai.com/v1/responses',{
    method:'POST',headers:{authorization:'Bearer '+key,'content-type':'application/json'},
