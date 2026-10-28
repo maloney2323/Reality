@@ -155,6 +155,7 @@ export async function executeOwnerBoundUpgradeClosure({
   ownerId:session.user_id,conversationId,workId:originalWorkId,
   goalRevision:plan.goal_revision,candidateSha:plan.candidate_sha256,
   headSha:plan.github_head_sha,
+  pinnedBaseSha:plan.pinned_base_sha,
   githubPrNumber:plan.github_pr_number,base:BASE,
   continuityRootId:plan.continuity_root_id,worldlineId:plan.worldline_id,
  });
