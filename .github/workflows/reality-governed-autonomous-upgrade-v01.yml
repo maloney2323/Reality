@@ -1,0 +1,29 @@
+name: Governed Autonomous Self-Upgrading Provider v0.1
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'test/reality-governed-github-upgrade-provider-v0.1.test.js'
+      - '.github/workflows/reality-governed-autonomous-upgrade-v01.yml'
+  pull_request:
+    paths:
+      - 'src/reality-governed-github-upgrade-provider-v0.1.js'
+      - 'test/reality-governed-github-upgrade-provider-v0.1.test.js'
+      - '.github/workflows/reality-governed-autonomous-upgrade-v01.yml'
+permissions:
+  contents: read
+jobs:
+  governed-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact owner-authorized bounded upgrade candidate and independent GitHub readback
+        run: node --test test/reality-governed-github-upgrade-provider-v0.1.test.js test/reality-recovery-v1-linkage.test.js
