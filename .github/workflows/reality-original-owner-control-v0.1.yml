@@ -7,6 +7,7 @@ on:
       - 'src/reality-original-owner-console-v0.1.js'
       - 'src/reality-original-executor-trusted-package-readback-v0.1.js'
       - 'src/reality-original-executor-trusted-warrant-recorder-v0.1.js'
+      - 'api/reality/personal-original-executor-trusted-verification.js'
       - 'test/reality-original-executor-trusted-warrant-recorder-v0.1.test.mjs'
       - 'src/reality-original-executor-run-monitor-v0.1.js'
       - 'api/reality/personal-original-executor-run-status.js'
@@ -42,8 +43,22 @@ jobs:
           node --check api/reality/personal-original-repair-owner-console.js
           node --check src/reality-original-owner-verifier-v0.1.js
           node --check api/reality/personal-original-repair-verifier.js
+          node --check api/reality/personal-original-executor-trusted-verification.js
+          node --check src/reality-original-executor-trusted-warrant-recorder-v0.1.js
           node --check src/reality-original-executor-run-monitor-v0.1.js
           node --check api/reality/personal-original-executor-run-status.js
+      - name: Parse exact owner screen's inline controller script before deploying preview
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {Script} from 'node:vm';
+          const html=readFileSync('owner-repair.html','utf8');
+          const match=html.match(/<script>([\\s\\S]*?)<\\/script>/);
+          if(!match||!match[1].includes('verifyOriginalExecutorWarrant'))
+           throw Error('OWNER_WARRANT_BUTTON_CONTROLLER_MISSING');
+          new Script(match[1]);
+          console.log('OWNER_WARRANT_CONTROLLER_SCRIPT_SYNTAX_VALID');
+          JS
       - name: Assert owner stages cannot silently promote source tests to completed work
         run: node --test test/reality-original-owner-console-v0.1.test.js
       - name: Assert original executor warrant is refused for proposal-only candidate
