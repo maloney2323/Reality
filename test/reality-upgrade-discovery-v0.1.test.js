@@ -153,6 +153,6 @@ test('Work Center displays the classification sourced from actual Recovery Loop 
  assert.match(script,/upgrade\.needed_upgrade/);
  assert.match(script,/upgrade\.next_action/);
  assert.match(script,/upgrade\.status\.replaceAll/);
- assert.match(script,/upgrade\.authorization_granted/);
+ assert.match(script,/info\.upgrade_discovery\?\.authorization_granted!==false/);
  assert.match(script,/original_job_completed!==false/);
 });
