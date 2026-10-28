@@ -186,7 +186,16 @@ function args({mock=fakeGitHub(),source=fixture(),reservation=admittedReservatio
 }
 test('real governed execution engine consumes DB-style reservation, writes verified draft PR, settles once',async()=>{
  const a=args();
+ let errorReason=null;
+ a.execute=async options=>{
+  const original=options.connector.execute;
+  options.connector.execute=async(...args)=>{
+   try{return await original(...args)}catch(error){errorReason=error?.message;throw error}
+  };
+  return executeAuthorizedWork(options);
+ };
  const result=await dispatchAuthenticatedGovernedUpgradeDraft(a);
+ assert.equal(errorReason,null,'Underlying test-provider failure: '+errorReason);
  assert.equal(result.status,'DRAFT_PR_VERIFIED_AND_RESERVATION_SETTLED',JSON.stringify(result));
  assert.equal(result.original_work_id,work);
  assert.equal(result.draft_pr_verified,true);
