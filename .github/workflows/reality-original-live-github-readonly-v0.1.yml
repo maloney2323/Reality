@@ -105,7 +105,7 @@ jobs:
           set -euo pipefail
           timeout 140s docker run --rm --network none --read-only --cap-drop ALL \
             --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
-            --user 65534:65534 --tmpfs /tmp:rw:rw,nosuid,noexec,size=8m \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
             -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
             node scripts/reality-original-executor-live-readback-v0.1.mjs \
             | tee actual-original-read-only-execution-proof.json
