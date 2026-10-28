@@ -13,7 +13,8 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
  const observe=async a=>{calls.push(['observe',a]);return {independent:true}};
  const ports=connectOwnerGithubUpgradeToClosure({
   authorityPorts:{},
-  runtimePorts:{resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal},
+  runtimePorts:{},
+  resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal,
   continuityPorts:{},
   install,observe,
   consumeInstallGrant:async a=>{calls.push(['grantInstall',a]);return {status:'CONSUMED_ONCE'}},
@@ -32,7 +33,12 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
 
  });
  assert.equal(Object.isFrozen(ports),true);
- for(const m of methods)assert.equal(ports[m],prior[m]);
+ const initial=await ports.resumeOriginal({session:{user_id:'owner'},scope:{workId:'work:123'}});
+ assert.equal(initial.name,'resumeOriginal');
+ const checked=await ports.observeOriginal({session:{user_id:'owner'},scope:{workId:'work:123'}});
+ assert.equal(checked.name,'observeOriginal');
+ assert.notEqual(ports.resumeOriginal,prior.resumeOriginal);
+ assert.notEqual(ports.observeOriginal,prior.observeOriginal);
  const session={user_id:'owner'},scope={workId:'work:123',conversationId:'conv'};
  const plan={github_pr_number:92},grant={grant_id:'grant'},env={VERCEL_ENV:'preview'};
  const installed=await ports.install({session,scope,plan,grant,env});
@@ -68,12 +74,20 @@ test('live GitHub adapter wires exact original ID and separate readback, reuses 
   session,scope,plan,receipt:{receipt_id:'wrong'},env,
  }),/UPGRADE_LIVE_SETTLEMENT_READBACK_RECEIPT_MISMATCH/);
 });
-test('missing a real authority, registry or original job adapter fails before any write',()=>{
- const ports=portGroup();
+test('runtime caller cannot override the exact original-work provider ports',async()=>{
+ const prior=portGroup();
+ const supplied=connectOwnerGithubUpgradeToClosure({
+  runtimePorts:{resumeOriginal:async()=>{throw Error('injected-bypass')},
+   observeOriginal:async()=>{throw Error('injected-bypass')}},
+  resumeOriginal:prior.resumeOriginal,observeOriginal:prior.observeOriginal,
+ });
+ assert.equal((await supplied.resumeOriginal({})).name,'resumeOriginal');
+ assert.equal((await supplied.observeOriginal({})).name,'observeOriginal');
+});
+test('original work adapter is mandatory; cannot silently report completion',()=>{
  for(const m of methods){
-  const supplied={...ports};delete supplied[m];
   assert.throws(()=>connectOwnerGithubUpgradeToClosure({
-   runtimePorts:supplied,install:async()=>{},observe:async()=>{},
-  }),new RegExp('UPGRADE_LIVE_PORT_REQUIRED_'+m));
+   [m]:null,
+  }),/UPGRADE_LIVE_PORT_REQUIRED_GITHUB_VERIFIED_INSTALL/);
  }
 });
