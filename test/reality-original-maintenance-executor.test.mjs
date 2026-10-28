@@ -29,7 +29,8 @@ function provider(source,{moving=false,issueOpen=true}={}){
     title:'Reality recurring work: repair repeated Reality Governed Execution Engine v0.1 failures',
     html_url:'https://github.com/maloney2323/Reality/issues/143'};
   if(path===REPO+'/contents/'+PATH+'?ref='+SHA)return fakeFile(current);
-  if(path===REPO+'/contents/'+PATH+'?ref='+RESULT)return fakeFile(current);
+  if(path===REPO+'/contents/'+PATH+'?ref='+RESULT ||
+     path===REPO+'/contents/'+PATH+'?ref='+('f'.repeat(40)))return fakeFile(current);
   throw Error('UNEXPECTED_GET_'+path);
  };
  const write=async(path,method,body)=>{
@@ -142,5 +143,5 @@ test('executor does not authorize or declare completed work on GH write response
  assert.match(source,/consumeVerifiedGrant/);
  assert.match(source,/source_readback_independent:true/);
  assert.match(source,/original_job_settlement_saved:false/);
- assert.doesNotMatch(source,/\/issues\/143','PATCH'/);
+ assert.doesNotMatch(source,/githubWrite\(.*issues/);
 });
