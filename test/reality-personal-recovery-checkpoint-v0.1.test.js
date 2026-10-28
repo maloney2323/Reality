@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import './reality-original-job-recovery-diagnosis-v0.1.test.js';
 import {readFileSync} from 'node:fs';
 import {createContinuitySpine,appendContinuityNode}
  from '../src/reality-continuity-spine-v2.0.js';
