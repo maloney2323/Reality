@@ -1,4 +1,5 @@
 name: Governed Autonomous Self-Upgrading Provider v0.1
+# Live model pilot trigger: bounded single attempt; separate no-secret holdout.
 on:
   push:
     branches:
