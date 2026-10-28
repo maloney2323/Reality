@@ -1,0 +1,105 @@
+name: Reality Original Executor Security Self Correction and Installer Proof v0.2
+on:
+  push:
+    branches:
+      - feature/governed-autonomous-self-upgrading-v01-20261027
+    paths:
+      - '.github/workflows/reality-original-executor-security-correction-v0.2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  issues: read
+jobs:
+  reality-self-correction-and-verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40762409056
+          name: reality-original-model-executor-frozen-installable-package
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior-holdout-failure
+      - name: Validate exact predecessor model, real 10/10 and independent 3/4 holdout failure
+        run: |
+          node --check scripts/reality-original-executor-security-self-correct-v0.4.mjs
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p=JSON.parse(readFileSync('prior-holdout-failure/manifest.json','utf8'));
+          const source=readFileSync('prior-holdout-failure/reality-original-maintenance-executor.mjs');
+          const results=readFileSync('prior-holdout-failure/independent-security-holdout.txt','utf8');
+          const regression=readFileSync('prior-holdout-failure/frozen-recheck.txt','utf8');
+          if(p.original_work_id!=='work:24cda9611404e9bcb47909976067605c'||
+             p.executor_source_sha256!=='d06ed111a121a4e1a93fb8bcfd47623e2cb60ba6a22e940ec31e0ac5b568d31d'||
+             createHash('sha256').update(source).digest('hex')!==p.executor_source_sha256||
+             !results.includes('# pass 3')||!results.includes('# fail 1')||
+             !results.includes('falsified canonical issue URL')||
+             !regression.includes('# pass 10')||!regression.includes('# fail 0'))
+             throw Error('MODEL_SECURITY_CORRECTION_NOT_BOUND_TO_REAL_FAILED_HOLDOUT');
+          console.log('EXACT_10_GREEN_1_SECURITY_HOLDOUT_REJECTED_MODEL_SOURCE_VERIFIED');
+          JS
+      - name: Reality autonomously corrects its OWN code from exact held-out security finding
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_OPENAI_MODEL: ${{ vars.REALITY_OPENAI_MODEL }}
+          REALITY_PREVIOUS_EXECUTOR_SOURCE: prior-holdout-failure/reality-original-maintenance-executor.mjs
+          REALITY_PREVIOUS_EXECUTOR_FEEDBACK: prior-holdout-failure/independent-security-holdout.txt
+          REALITY_ORIGINAL_REPAIR_OUTPUT: model-security-corrected
+        run: node scripts/reality-original-executor-security-self-correct-v0.4.mjs
+      - name: Package exact new REAL model source and independently verified original proposal
+        env:
+          REALITY_VERIFIED_MODEL_ARTIFACT_DIR: model-security-corrected
+        run: |
+          node --check scripts/reality-original-executor-security-corrected-package-v0.2.mjs
+          node scripts/reality-original-executor-security-corrected-package-v0.2.mjs
+          mkdir -p owner-original-repair-executor
+          cp original-executor-security-corrected-package/reality-original-maintenance-executor.mjs owner-original-repair-executor/candidate.mjs
+          cp original-executor-security-corrected-package/reality-original-maintenance-repair-proposal.mjs owner-original-repair-executor/
+      - name: Independent original frozen ten-case regression (no model key, network or filesystem writes)
+        run: |
+          set +e
+          timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -e REALITY_ORIGINAL_EXECUTOR_CANDIDATE=/work/owner-original-repair-executor/candidate.mjs \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-autonomous-grader-v0.1.test.mjs \
+            > original-executor-security-corrected-package/frozen-regression.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(^# (pass|fail|tests)|^not ok )' original-executor-security-corrected-package/frozen-regression.txt || true
+          exit "$status"
+      - name: Independent security holdout is mandatory, no weakening
+        run: |
+          set +e
+          timeout 150s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/work:ro" -w /work node:22-alpine \
+            node --test test/reality-original-executor-security-holdout-v0.1.test.mjs \
+            > original-executor-security-corrected-package/independent-security-holdout.txt 2>&1
+          status=$?
+          set -e
+          grep -E '(^# (pass|fail|tests)|^not ok )' original-executor-security-corrected-package/independent-security-holdout.txt || true
+          exit "$status"
+      - name: Final explicitly non-authorizing independent package verification result
+        run: |
+          echo 'REALITY_MODEL_PACKAGE_FROZEN_AND_INDEPENDENT_HOLDOUT_PASSED'
+          echo 'OWNER_SIGNED_EVIDENCE_WARRANT_NOT_YET_ISSUED'
+          echo 'GITHUB_INSTALLATION_AND_ORIGINAL_JOB_SETTLEMENT_NOT_AUTHORIZED'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-original-executor-security-corrected-frozen-package
+          path: |
+            model-security-corrected/
+            original-executor-security-corrected-package/
+          retention-days: 14
