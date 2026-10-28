@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {personalGoalScope} from '../src/reality-personal-goal-readback-v0.1.js';
-import {createContinuitySpine}
+import {createContinuitySpine,appendContinuityNode}
  from '../src/reality-continuity-spine-v2.0.js';
 import {readOwnerOriginalWorkGoalBeforeResume}
  from '../src/reality-owner-upgrade-fresh-goal-v0.1.js';
@@ -25,8 +25,22 @@ const plan={owner_id:owner,conversation_id:conversationId,
  original_work_id:workId,original_goal_id:goalId,goal_revision:goalRev,
  continuity_root_id:spine.continuity_root_id,worldline_id:spine.worldline_id};
 function setup(){
- const history=[{entity_type:'personal_upgrade_runtime_verified',
-  payload:{original_work_id:workId,candidate_sha256:candidate}}];
+ const history=[],at='2026-10-28T12:00:00.000Z';
+ const add=(entityType,payload)=>{
+  const prev=history.at(-1);
+  const node=appendContinuityNode({spine,stage:'VERIFICATION',
+   entityId:workId,eventId:randomUUID(),
+   parentEventId:prev?.event_id||null,
+   priorLineageHash:prev?.lineage_hash||null,
+   effectiveTime:at,assertionTime:at,
+   epistemicStatus:'VERIFIED',payload,evidenceRefs:[]});
+  history.push({...node,entity_type:entityType,
+   provenance:{...node.provenance,continuity_spine:{
+    prior_lineage_hash:node.prior_lineage_hash,
+    transformation_receipt_id:node.transformation_receipt_id}}});
+ };
+ add('personal_upgrade_runtime_verified',{
+  original_work_id:workId,candidate_sha256:candidate});
  const readGoal=async()=>({
   principal_id:owner,conversation_id:conversationId,scope:home,
   state:{active_goal_id:goalId,active_goal:{
@@ -34,7 +48,7 @@ function setup(){
    last_transition_receipt_id:goalRev}},
  });
  const createPersistence=()=>({reconstruct:async()=>history});
- return {history,readGoal,createPersistence,
+ return {history,add,readGoal,createPersistence,
   args:{session,conversationId,scope,plan,env,readGoal,createPersistence}};
 }
 test('fresh original authenticated goal and verified original capability allow a new separately authorized resume',async()=>{
@@ -56,8 +70,8 @@ test('a changed owner goal blocks execution, not silently accepted',async()=>{
 });
 test('previous durable original-job settlement refuses another dispatch',async()=>{
  const x=setup();
- x.history.push({entity_type:'personal_original_job_settlement',
-  payload:{original_work_id:workId,original_job_completed:true}});
+ x.add('personal_original_job_settlement',{
+  original_work_id:workId,original_job_completed:true});
  await assert.rejects(readOwnerOriginalWorkGoalBeforeResume(x.args),
   /UPGRADE_FRESH_GOAL_ALREADY_SETTLED_NO_RETRY/);
 });
