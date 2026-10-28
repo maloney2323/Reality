@@ -27,3 +27,40 @@ jobs:
           name: reality-rejected-full-loop-candidate-review-only
           path: reality-recovered-model-candidate/
           retention-days: 7
+
+  independently-check-reality-candidate:
+    needs: recover-model-code-for-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reality-rejected-full-loop-candidate-review-only
+          path: reality-recovered-model-candidate
+      - name: Verify untouched model source syntax
+        run: |
+          set -euo pipefail
+          node --check reality-recovered-model-candidate/reality-original-full-loop-integration.mjs
+          node --check reality-recovered-model-candidate/personal-original-full-loop.js
+          node --check reality-recovered-model-candidate/reality-original-full-loop-integration.test.js
+      - name: Run Reality-authored tests in isolated networkless sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp reality-recovered-model-candidate/reality-original-full-loop-integration.mjs src/reality-extensions/
+          cp reality-recovered-model-candidate/personal-original-full-loop.js api/reality/
+          cp reality-recovered-model-candidate/reality-original-full-loop-integration.test.js test/reality-extensions/
+          timeout 180s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 80 --memory 512m --cpus 2 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}/src:/work/src:ro" \
+            -v "${{ github.workspace }}/api:/work/api:ro" \
+            -v "${{ github.workspace }}/test:/work/test:ro" \
+            -v "${{ github.workspace }}/package.json:/work/package.json:ro" \
+            -w /work node:22-alpine \
+            node --test test/reality-extensions/reality-original-full-loop-integration.test.js
