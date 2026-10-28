@@ -95,6 +95,8 @@ export async function prepareOriginalGovernedDraft({
   target_repository:REPO,target_base:BASE,
   expected_extension_paths:workItem.inputs.candidate_paths,
   work_item:workItem,grounding_proof:proof,
+  github_draft_dispatch_configured:typeof env.REALITY_GITHUB_TOKEN==='string'&&
+   env.REALITY_GITHUB_TOKEN.trim().length>0,
   approval_recorded:false,draft_pr_created:false,
   installation_authorized:false,
   external_action_performed:false,original_job_completed:false,
