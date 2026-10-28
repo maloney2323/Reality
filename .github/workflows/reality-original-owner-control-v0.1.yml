@@ -53,10 +53,12 @@ jobs:
           import {readFileSync} from 'node:fs';
           import {Script} from 'node:vm';
           const html=readFileSync('owner-repair.html','utf8');
-          const match=html.match(/<script>([\\s\\S]*?)<\\/script>/);
-          if(!match||!match[1].includes('verifyOriginalExecutorWarrant'))
-           throw Error('OWNER_WARRANT_BUTTON_CONTROLLER_MISSING');
-          new Script(match[1]);
+          const first=html.indexOf('<script>');
+          const end=html.lastIndexOf('</script>');
+          if(first<0||end<=first)throw Error('OWNER_WARRANT_BUTTON_CONTROLLER_MISSING');
+          const code=html.slice(first+8,end);
+          if(!code.includes('verifyOriginalExecutorWarrant'))throw Error('OWNER_WARRANT_BUTTON_CONTROLLER_MISSING');
+          new Script(code);
           console.log('OWNER_WARRANT_CONTROLLER_SCRIPT_SYNTAX_VALID');
           JS
       - name: Assert owner stages cannot silently promote source tests to completed work
