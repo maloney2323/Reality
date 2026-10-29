@@ -9,21 +9,35 @@ import {ORIGINAL_WORK}
 import {inspectOriginal143OwnerAction,completeOriginal143OwnerAction,
  ORIGINAL_143_CONFIRMATION}
  from '../../src/reality-original-143-real-activation-v0.1.js';
+// Failure codes are server-generated from trusted modules. Only stable,
+// allowlisted error identifiers are exposed; never return provider payloads,
+// request cookies, tokens, stack traces, database SQL, or user records.
+export function classifyOriginal143Error(error){
+ const raw=String(error?.message||'');
+ const recognized=/^(?:ORIGINAL_143_|ORIGINAL_UPGRADE_|PERSONAL_GOAL_|RELIABILITY_|USER_GOAL_AUTHORITY_|CONTINUITY_|UNIVERSE_|CHAT_|PRIVATE_CHAT_|GITHUB_CONNECTOR_)[A-Z0-9_]{3,100}$/;
+ if(recognized.test(raw))return raw;
+ if(raw==='CONNECTOR_CREDENTIAL_MISSING:github')return 'ORIGINAL_143_GITHUB_CREDENTIAL_MISSING';
+ return 'ORIGINAL_143_ACTION_UNAVAILABLE';
+}
 export const maxDuration=60;
 export default async function handler(req,res){
+ let phase='CONFIG';
  res.setHeader('Cache-Control','private, no-store');
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method))
    return res.status(405).json({ok:false,error:'METHOD_NOT_ALLOWED'});
+  phase='OWNER_SESSION';
   const session=await authenticatedChatSession(req,res);
   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
+  phase='OWNER_SCOPE';
   const body=req.body&&typeof req.body==='object'&&!Array.isArray(req.body)?req.body:{};
   const conversationId=req.method==='GET'?req.query?.conversation_id:body.conversation_id;
   const workId=req.method==='GET'?req.query?.work_id:body.work_id;
   if(!validUuid(conversationId)||workId!==ORIGINAL_WORK)
    return res.status(400).json({ok:false,error:'ORIGINAL_143_EXACT_SCOPE_REQUIRED'});
   if(req.method==='GET'){
+   phase='READINESS';
    const result=await inspectOriginal143OwnerAction({session,conversationId});
    return res.status(200).json({ok:true,...result});
   }
@@ -37,15 +51,17 @@ export default async function handler(req,res){
    body.authorization!==undefined||body.owner_id!==undefined||
    body.goal_id!==undefined||body.registryRecord!==undefined)
    return res.status(403).json({ok:false,error:'EXPLICIT_OWNER_ACTIVATION_CONFIRMATION_REQUIRED'});
+  phase='AUTHORIZED_ACTIVATION';
   const output=await completeOriginal143OwnerAction({
    session,conversationId,confirmation:body.confirmation
   });
   return res.status(200).json({ok:true,...output});
  }catch(e){
-  const raw=String(e?.message||'');
-  const safe=/^ORIGINAL_143_[A-Z0-9_]+$/.test(raw)?raw:'ORIGINAL_143_ACTION_UNAVAILABLE';
+  const safe=classifyOriginal143Error(e);
+  // No sensitive error payloads are written to logs; code+stage only.
+  console.warn('REALITY_ORIGINAL_143_FAILED',phase,safe);
   return res.status(e?.status||503).json({
-   ok:false,error:safe,job_completion_not_proven:true,
+   ok:false,error:safe,failed_stage:phase,job_completion_not_proven:true,
   });
  }
 }
