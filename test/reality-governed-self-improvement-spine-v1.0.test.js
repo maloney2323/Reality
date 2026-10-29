@@ -231,7 +231,7 @@ test('owner approval must be fresh, single-use, exact-artifact and source-linked
    consumed_once:true,reservation_ref:'reservation:one-time',
    ...override});
   await assert.rejects(acceptGovernedObservation(s,proof,{
-   verifyProvider:h.verifyProvider}),override.artifact_hash ? /SELF_IMPROVEMENT_CANDIDATE_BYTES_CHANGED/ : /SELF_IMPROVEMENT_EXACT_OWNER_PROMOTION_NOT_AUTHORIZED/);
+   verifyProvider:h.verifyProvider}),override.artifact_hash ? /SELF_IMPROVEMENT_CANDIDATE_BYTES_CHANGED/ : override.owner_id ? /SELF_IMPROVEMENT_ORIGINAL_SCOPE_CHANGED/ : /SELF_IMPROVEMENT_EXACT_OWNER_PROMOTION_NOT_AUTHORIZED/);
  }
 });
 test('registration must match exact approved artifact and original worldline',async()=>{
