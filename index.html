@@ -260,6 +260,15 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    </div>
    <p class="wc-note" id="wcGovernedBuildStatus" role="status" aria-live="polite">No upgrade run has been started by this screen. Read-only check required.</p>
    <p class="wc-note" id="wcGovernedBuildProof" role="status" aria-live="polite">Generation · Sandbox · Approval · Registration · Original-job resumption · Settlement: not verified.</p>
+   <div id="wcFirstUpgrade178" style="border-top:1px solid #45516a;margin-top:14px;padding-top:14px">
+    <strong>First customer self-upgrade · Original job #178</strong>
+    <p class="wc-note">Real missing capability: GitHub Actions failure-to-upgrade evidence. Frozen red run #40962921090. Only this job is eligible here; settled #143 cannot be selected.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <button id="wcInspectFirstGap178" type="button">Verify job #178 readiness · Read only</button>
+     <button id="wcStartFirstGap178" type="button" disabled>Authorize one #178 investigation · No install</button>
+    </div>
+    <p id="wcFirstGap178Status" role="status" aria-live="polite" class="wc-note">Sign in and check the current owner goal. No #178 work has been queued from this screen.</p>
+   </div>
   </section>
  </div>
  <div class="wc-diagnostic">
@@ -1148,6 +1157,78 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // upgrade loop. GET never starts work; POST is a separate, confirmed action.
 // The current isolated worker is read-only discovery. No stage is described as
 // model-generated or installed unless the durable provider state proves it.
+let wcFirstGap178Ready=false;
+let wcFirstGap178Busy=false;
+function wcFirstGap178Conversation(){
+ // Use Reality's existing signed-in conversation selector only. The server
+ // rechecks the owner and the goal; browser strings are never authority.
+ const selected=$('privateConversations')?.value;
+ const saved=localStorage.getItem('reality.private.chat.conversation.v1');
+ return /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(String(selected||saved||''))?
+  String(selected||saved):null;
+}
+async function wcInspectFirstGap178(){
+ const inspect=$('wcInspectFirstGap178'),start=$('wcStartFirstGap178');
+ const status=$('wcFirstGap178Status');
+ if(wcFirstGap178Busy)return;
+ wcFirstGap178Busy=true;wcFirstGap178Ready=false;start.disabled=true;
+ inspect.disabled=true;status.textContent='Verifying your current goal and exact #178 queue…';
+ try{
+  if($('privateReady')?.style.display!=='block')throw Error('SIGN_IN_REQUIRED');
+  const conv=wcFirstGap178Conversation();if(!conv)throw Error('CHOOSE_SAVED_CONVERSATION');
+  const response=await fetch('/api/reality/personal-first-upgrade-178?conversation_id='+
+   encodeURIComponent(conv),{method:'GET',credentials:'same-origin',cache:'no-store'});
+  const d=await response.json();
+  if(!response.ok||d.ok!==true||d.issue_number!==178||
+    d.installation_authorized!==false||d.model_generated!==false)
+   throw Error(String(d.error||'PROOF_READBACK_INVALID'));
+  if(d.status==='READY_FOR_EXACT_OWNER_CONFIRMATION'&&
+    /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))){
+   wcFirstGap178Ready=true;start.disabled=false;
+   status.textContent='Verified current owner goal. Original #178 work ID: '+
+    d.original_work_id+'. Ready for ONE investigation request. No model output or install yet.';
+  }else if(d.status==='ALREADY_QUEUED'){
+   status.textContent='Original #178 queue already exists ('+
+    String(d.queue_phase||'UNVERIFIED')+'). Do not repeat; review existing worker receipts.';
+  }else{
+   status.textContent='Safely blocked: '+String(d.status||'UNVERIFIED')+
+     '. No operation performed or installation authorized.';
+  }
+ }catch(error){
+  status.textContent='First proof readiness could not be verified: '+
+    String(error?.message||'UNAVAILABLE')+'. No retry or execution authorized.';
+ }finally{wcFirstGap178Busy=false;inspect.disabled=false;}
+}
+$('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
+$('wcStartFirstGap178').onclick=async()=>{
+ if(!wcFirstGap178Ready||wcFirstGap178Busy||$('wcStartFirstGap178').disabled)return;
+ if($('privateReady')?.style.display!=='block')return;
+ const conv=wcFirstGap178Conversation();if(!conv)return;
+ if(!window.confirm('Authorize Reality to investigate real job #178 using this confirmed goal? It may submit ONE isolated GitHub worker request. This does NOT authorize new code installation, production changes, or completion.'))return;
+ wcFirstGap178Busy=true;wcFirstGap178Ready=false;
+ $('wcStartFirstGap178').disabled=true;$('wcInspectFirstGap178').disabled=true;
+ const status=$('wcFirstGap178Status');
+ status.textContent='Sending exact original #178 investigation request…';
+ try{
+  const r=await fetch('/api/reality/personal-first-upgrade-178',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'INVESTIGATE_VERIFIED_FIRST_CAPABILITY_GAP_178',
+    conversation_id:conv})});
+  const d=await r.json();
+  if(!r.ok||d.ok!==true||d.issue_number!==178||
+    d.installation_authorized!==false||d.model_generated!==false)
+    throw Error(String(d.error||'PROOF_REQUEST_UNVERIFIED'));
+  status.textContent='Reality #178: '+String(d.status||'UNVERIFIED')+
+    '; durable queue '+String(d.queue_id||'unverified')+
+    '. Candidate generation, sandbox, installation and settlement remain unproven.';
+ }catch(error){
+  status.textContent='Outcome unresolved: '+String(error?.message||'REQUEST_FAILED')+
+   '. Do not press Start again; use read-only readiness check.';
+ }finally{
+  wcFirstGap178Busy=false;$('wcInspectFirstGap178').disabled=false;
+ }
+};
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
