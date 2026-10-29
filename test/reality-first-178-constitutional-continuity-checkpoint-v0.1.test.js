@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createContinuitySpine} from '../src/reality-continuity-spine-v2.0.js';
+import {createContinuitySpine,appendContinuityNode}
+ from '../src/reality-continuity-spine-v2.0.js';
 import {
  createGovernedSelfImprovement,acceptGovernedObservation,proposeGovernedCandidate
 } from '../src/reality-governed-self-improvement-spine-v1.0.js';
@@ -37,16 +38,38 @@ const goalState={
 const session={user_id:owner,config:{url:'https://hvkfreoagbrphwghjajw.supabase.co'}};
 const db={url:session.config.url,strictSecrets:true,secretKey:'test-isolated-server-secret'};
 const env={VERCEL_ENV:'preview',REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true'};
-const sourceEvent={
- event_id:originalReceipt,entity_type:'personal_first_self_upgrade_customer_work',
- event_kind:'WORK',lineage_hash:'a'.repeat(64),
- continuity_root_id:spine.continuity_root_id,
- worldline_id:spine.worldline_id,assertion_time:'2026-10-29T20:00:00Z',
- payload:{original_work_id:work,original_goal_id:goalId,
-  goal_transition_receipt_ref:goalReceipt,issue_number:178,
-  pinned_red_run:'https://github.com/maloney2323/Reality/actions/runs/40962921090',
-  installation_authorized:false},
+const sourcePayload={
+ original_work_id:work,original_goal_id:goalId,
+ goal_transition_receipt_ref:goalReceipt,issue_number:178,
+ pinned_red_run:'https://github.com/maloney2323/Reality/actions/runs/40962921090',
+ installation_authorized:false,
 };
+const at='2026-10-29T20:00:00.000Z';
+const seed=appendContinuityNode({
+ spine,stage:'RAW_SIGNAL',entityId:'customer:confirmed-goal',
+ eventId:goalReceipt,effectiveTime:at,assertionTime:at,
+ provenance:{source:'test:verified-owner-goal'},
+ payload:{event_type:'AUTHORITATIVE_USER_GOAL_TRANSITION',goal_id:goalId},
+});
+const sourceEvent={
+ ...appendContinuityNode({
+  spine,stage:'WORK',entityId:work,eventId:originalReceipt,
+  parentEventId:seed.event_id,priorLineageHash:seed.lineage_hash,
+  effectiveTime:'2026-10-29T20:00:01.000Z',
+  assertionTime:'2026-10-29T20:00:01.000Z',
+  provenance:{source:'test:first-178-work'},
+  payload:sourcePayload,
+ }),
+ entity_type:'personal_first_self_upgrade_customer_work',
+};
+function persisted(node){
+ return {...structuredClone(node),provenance:{
+  ...node.provenance,continuity_spine:{
+   prior_lineage_hash:node.prior_lineage_hash||null,
+   transformation_receipt_id:node.transformation_receipt_id||null,
+  },
+ }};
+}
 async function gap(){
  const start=createGovernedSelfImprovement({scope});
  const receipt={kind:'GAP_CONFIRMED',owner_id:owner,
@@ -67,11 +90,11 @@ async function gap(){
  })});
 }
 function harness({includeOriginal=true,goal=goalState}={}){
- const rows=includeOriginal?[sourceEvent]:[];
+ const rows=includeOriginal?[persisted(seed),persisted(sourceEvent)]:[persisted(seed)];
  let writes=0;
  const createPersistence=()=>({
   reconstruct:async()=>rows.map(x=>structuredClone(x)),
-  appendEvent:async e=>{writes++;rows.push(structuredClone(e));return e},
+  appendEvent:async e=>{writes++;rows.push(persisted(e));return e},
  });
  const adapter=createFirst178ConstitutionalCheckpointService({
   session,conversationId,originalWorkId:work,db,env,
@@ -115,7 +138,7 @@ test('persisting a generated proposal extends the exact prior hash journal',asyn
  assert.equal(result.persisted,true);
  assert.equal(h.getWrites(),2);
  assert.equal(h.rows.at(-1).payload.driver_state.phase,'CANDIDATE_READY');
- assert.equal(h.rows.at(-1).parent_event_id,h.rows[1].event_id);
+ assert.equal(h.rows.at(-1).parent_event_id,h.rows[2].event_id);
 });
 test('no original issue #178 work receipt cannot create a checkpoint',async()=>{
  const h=harness({includeOriginal:false});
