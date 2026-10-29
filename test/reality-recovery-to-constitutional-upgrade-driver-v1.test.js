@@ -25,6 +25,20 @@ test('existing #143 already fixed: recovery POST never fabricates a new upgrade'
  assert.equal(report.self_upgrade_installed,false);
  assert.equal(report.original_job_completed,false);
 });
+test('missing independent gap classification is UNKNOWN, never a model generation trigger',async()=>{
+ let loaded=false;
+ const report=await continueVerifiedRecoveryDiagnosis({
+  report:{...base,upgrade_discovery:undefined},
+  session,goal,spine,
+  loadSelfImprovementState:async()=>{loaded=true;return state},
+  trustedSelfImprovementAdapters:{trusted:true}
+ });
+ assert.equal(loaded,false);
+ assert.equal(report.self_upgrade_execution_status,'INDEPENDENT_GAP_DIAGNOSIS_UNAVAILABLE');
+ assert.equal(report.original_job_completed,false);
+ assert.equal(report.self_upgrade_model_executed,false);
+ assert.equal(report.self_upgrade_installed,false);
+});
 test('candidate gap with no trusted runner safely blocks, without new credential request',async()=>{
  const report=await continueVerifiedRecoveryDiagnosis({report:base});
  assert.equal(report.self_upgrade_execution_status,'TRUSTED_ISOLATED_RUNNER_NOT_CONNECTED');
