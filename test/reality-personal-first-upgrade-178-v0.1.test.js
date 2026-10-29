@@ -26,6 +26,7 @@ const env={
  REALITY_UNIVERSE_PERSISTENCE_KEY:'isolated-test-secret-key',
  REALITY_STANDALONE_OPENAI_API_KEY:'isolated-test-model-secret-not-real',
  REALITY_SEMANTIC_REVIEW_MODEL:'gpt-6',
+ REALITY_FIRST178_GITHUB_READ_TOKEN:'mock-read-only-github-token-not-real',
 };
 const session={user_id:owner,config:{url,key:env.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY}};
 const scope=personalGoalScope({userId:owner,conversationId});
@@ -68,6 +69,10 @@ test('model provider must be configured, GitHub write token is unnecessary',asyn
   session,conversationId,env:missing,readGoal,
   call:()=>{throw Error('UNEXPECTED_DB_CALL');},
  }),/FIRST_PROOF_MODEL_PROVIDER_NOT_CONFIGURED/);
+ const missingRead=await inspectFirstUpgrade178({
+  session,conversationId,env:{...env,REALITY_FIRST178_GITHUB_READ_TOKEN:''},
+  readGoal,call:queueEmpty});
+ assert.equal(missingRead.status,'BLOCKED_GITHUB_READ_ONLY_CREDENTIAL');
  const withoutGitHubWriteToken=await inspectFirstUpgrade178({
   session,conversationId,env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:''},
   readGoal,call:queueEmpty});
@@ -110,7 +115,8 @@ test('original #178 source-linked once-only queue has no GitHub write or install
   throw Error('UNEXPECTED_RPC_'+name);
  };
  const observe=async({scope,apiToken})=>{
-  assert.equal(apiToken,null,'public source must not require GitHub write credential');
+  assert.equal(apiToken,env.REALITY_FIRST178_GITHUB_READ_TOKEN,
+   'independent GitHub evidence read credential only');
   return {status:'INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED',
    original_work_id:scope.original_work_id,goal_id:scope.goal_id,owner_id:scope.owner_id,
    provider_receipt_ref:'github:actions:run:40962921090:job:123760052647'};
