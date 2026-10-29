@@ -1,11 +1,15 @@
 // Foundational services plug into the ONE constitutional self-improvement
 // driver. This adapter grants no lifecycle authority; only existing
 // Governed Self-Improvement Spine admits independently attested transitions.
+import {createHash} from 'node:crypto';
 import {
  validateFoundationalCandidate,createSandboxEvidenceCandidate,
  independentlyVerifySandbox
 } from './reality-foundational-build-loop-v1.0.js';
 const enforce=(value,code)=>{if(!value)throw Error(code)};
+const canonical=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(canonical):
+ Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])]));
+const digest=x=>createHash('sha256').update(JSON.stringify(canonical(x))).digest('hex');
 export const FOUNDATION_CONSTITUTIONAL_ADAPTER_VERSION=
  'reality-foundational-constitutional-adapter-v1.0';
 export function createConstitutionalGenerationSandboxAdapters({
@@ -62,7 +66,10 @@ export function createConstitutionalGenerationSandboxAdapters({
     files:ctx.candidate?.files,rationale:ctx.candidate?.rationale,
     model_response_id:ctx.candidate?.model_response_ref,
    });
-   enforce(candidate.artifact_sha256===ctx.candidate.foundational_artifact_sha256,
+   // Compare exact bytes to the hash already committed by the constitutional
+   // spine. It strips unrecognized model metadata, so never trust a field in
+   // the model response to tell us the source fingerprint.
+   enforce(digest(ctx.candidate.files.map(f=>({path:f.path,content:f.content})))===ctx.artifact_hash,
     'FOUNDATION_CONSTITUTIONAL_MODEL_SOURCE_CHANGED');
    const report=await isolatedSandbox(Object.freeze({
     ticket,candidate,attempt:ctx.attempt,
