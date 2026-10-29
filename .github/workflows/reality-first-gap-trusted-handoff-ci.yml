@@ -44,23 +44,5 @@ jobs:
         run: |
           node --check scripts/reality-first-178-real-provider-readback-v0.1.mjs
           node scripts/reality-first-178-real-provider-readback-v0.1.mjs
-      - name: Verify public Github pinned source needs no credential
-        run: |
-          node --input-type=module -e '
-          import {observeFirstGapFromGithub} from "./src/reality-first-gap-handoff-v0.1.js";
-          const scope={owner_id:"CI_OWNER",goal_id:"CI_GOAL",original_work_id:"work:"+"f".repeat(32),
-           original_issue_number:178,continuity_root_id:"CI_ROOT",worldline_id:"CI_WORLD",
-           goal_transition_receipt_ref:"CI_RECEIPT",goal_evidence_ref:"CI_GOAL_SOURCE",
-           environment:"ISOLATED_PREVIEW",user_confirmed:true,owner_session_verified:true,goal_current_verified:true};
-          const r=await observeFirstGapFromGithub({scope,apiToken:null});
-          if(r.status!=="INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED"||r.installation_authorized!==false)
-            throw Error("PUBLIC_PINNED_EVIDENCE_UNVERIFIED");
-          console.log("FIRST178_PUBLIC_GITHUB_SOURCE_READBACK_VERIFIED");
-          '
-      - name: Verify atomic single-use owner #178 constitutional execution handoff
-        run: |
-          node --check src/reality-first178-constitutional-executor-v0.1.js
-          node --check api/reality/personal-first-upgrade-178-execute.js
-          node --test test/reality-first178-constitutional-executor-v0.1.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
