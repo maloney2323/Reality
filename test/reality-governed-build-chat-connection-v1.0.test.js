@@ -26,6 +26,7 @@ const observed={
  status:'ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION',
  original_conversation_id:conversation,original_work_id:work,
  original_job_tracking_receipt_ref:'universe:tracking-verified',
+ issue_url:'https://github.com/maloney2323/Reality/issues/143',
  goal_id:goalId,goal_transition_receipt_ref:transition,
 };
 const goal={principal_id:user,
@@ -37,9 +38,14 @@ function mock(extra={}){
  const calls=[];
  return {calls,params:{session,env,
   inspect:async()=>observed,readGoal:async()=>goal,
+  dispatch:async()=>({dispatched:true,worker_sha:'d'.repeat(40),
+   request_path:'reality-requests/00000000-0000-4000-8000-000000000001.json',
+   workflow_runs_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-governed-build-worker-v1.yml'}),
   call:async(db,name,input)=>{
    calls.push({db:{url:db.url,strictSecrets:db.strictSecrets},
     name,input});
+   if(name==='reality_mark_governed_build_dispatched_v1')
+    return {queue_id:input.p_queue_id,dispatched:true};
    if(name==='reality_enqueue_governed_build_v1')
     return {queue_id:randomUUID(),original_work_id:work,goal_id:goalId,
      phase:'QUEUED_DISCOVERY',installation_authorized:false,job_completed:false};
@@ -51,7 +57,7 @@ function mock(extra={}){
 test('authenticated owner goal and canonical unfinished work enqueue through SERVICE ONLY',async()=>{
  const m=mock();
  const result=await queueOwnerGovernedBuild(m.params);
- assert.equal(result.phase,'QUEUED_DISCOVERY');
+ assert.equal(result.phase,'DISPATCHED_TO_ISOLATED_WORKER');
  assert.equal(result.model_generated,false);
  assert.equal(result.sandbox_executed,false);
  assert.equal(result.capability_installed,false);
@@ -123,4 +129,21 @@ test('actual chat JavaScript parses and clearly says queuing does not yet run a 
  assert.match(html,/id="privateGovernedBuildQueue"/);
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
  assert.match(html,/not yet triggered/);
+});
+
+test('missing worker credential is recorded as an explicit non-executed blocker',async()=>{
+ const m=mock({dispatch:async()=>{throw Error('GOVERNED_BUILD_DISPATCH_CREDENTIAL_UNAVAILABLE')}});
+ const r=await queueOwnerGovernedBuild(m.params);
+ assert.equal(r.phase,'QUEUED_DISPATCH_BLOCKED');
+ assert.equal(r.dispatch_error,'GOVERNED_BUILD_DISPATCH_CREDENTIAL_UNAVAILABLE');
+ assert.equal(r.model_generated,false);
+ assert.equal(r.capability_installed,false);
+});
+test('the client cannot choose an arbitrary repository, branch or work ID',()=>{
+ const code=readFileSync('src/reality-governed-build-github-dispatch-v1.0.js','utf8');
+ assert.match(code,/const WORKER='reality\/worker\/foundational-build-queue-v1'/);
+ assert.match(code,/const REPO='maloney2323\/Reality'/);
+ assert.match(code,/REALITY_BUILDER_DISPATCH_GITHUB_TOKEN/);
+ assert.match(code,/force:false/);
+ assert.match(code,/request_path:file/);
 });
