@@ -112,9 +112,42 @@ async function rpc(db,name,args,fetchImpl=fetch){
   body:JSON.stringify(args),
  });
  const body=await response.json().catch(()=>null);
- if(!response.ok)fail('ORIGINAL_143_ATOMIC_DATABASE_OPERATION_REJECTED',503);
+ if(!response.ok){
+  // Allowlisted server-only error diagnosis; never emit SQL, JWTs or raw provider data.
+  const safe=/^ORIGINAL_143_[A-Z0-9_]{4,100}$/.test(String(body?.message||''))?
+   body.message:'ORIGINAL_143_ATOMIC_DATABASE_OPERATION_REJECTED';
+  fail(safe,503);
+ }
  return body;
 }
+// Identity of the SAME previously owner-approved original #143 action.
+// Resumption never claims a second reservation or broadens its authorization.
+function exactOriginal143ActionIdentity(session,conversationId,goalId){
+ const policyId=continuityUuidFromSource('original143-owner-click:'+
+  session.user_id+':'+conversationId+':'+ORIGINAL_WORK+':'+SOURCE_SHA);
+ const fingerprint='sha256:'+digest({
+  owner_id:session.user_id,conversation_id:conversationId,
+  original_work_id:ORIGINAL_WORK,goal_id:goalId,
+  source_sha256:SOURCE_SHA,target_branch:BRANCH,
+  owner_confirmation:ORIGINAL_143_CONFIRMATION,
+ });
+ return {policyId,fingerprint};
+}
+async function readExistingOriginal143Reservation({
+ db,session,conversationId,goalId,rpcCall=rpc,
+}={}){
+ const {policyId,fingerprint}=exactOriginal143ActionIdentity(session,conversationId,goalId);
+ const result=await rpcCall(db,'reality_read_original_143_reservation',{
+  p_owner_id:session.user_id,p_conversation_id:conversationId,
+  p_action_policy_id:policyId,p_work_fingerprint:fingerprint,
+ });
+ if(!result||!['NOT_FOUND','RESERVED_UNDISPATCHED','NOT_RESUMABLE'].includes(result.status))
+  fail('ORIGINAL_143_RESERVATION_READBACK_INVALID',503);
+ if(result.status==='RESERVED_UNDISPATCHED'&&!validUuid(result.reservation_id))
+  fail('ORIGINAL_143_RESERVATION_READBACK_INVALID',503);
+ return result;
+}
+
 function matchStoredEvent(stored,event){
  return stored?.event_id===event.event_id&&
   stored?.lineage_hash===event.lineage_hash&&
@@ -125,11 +158,27 @@ function matchStoredEvent(stored,event){
 export async function inspectOriginal143OwnerAction({
  session,conversationId,env=process.env,
  inspect=inspectAuthenticatedOriginalCapabilityReadiness,
+ readGoal=readFreshPersonalGoalState,
+ readReservation=readExistingOriginal143Reservation,
 }={}){
  authScope(session,conversationId,env);
  const r=await inspect({session,conversationId,workId:ORIGINAL_WORK,env});
+ let existing='NOT_CHECKED',resume=false;
+ if(readyToActivate(r)){
+  const goal=await readGoal({session,conversationId,env});
+  scopeOfGoal(goal,session,conversationId);
+  if(r.original_goal_id!==undefined&&goal.state.active_goal_id!==r.original_goal_id)
+   fail('ORIGINAL_143_OWNER_GOAL_CHANGED');
+  const result=await readReservation({db:authScope(session,conversationId,env),
+   session,conversationId,goalId:goal.state.active_goal_id});
+  existing=result.status;
+  resume=existing==='RESERVED_UNDISPATCHED';
+ }
  return Object.freeze({
-  ...r,exact_owner_action_available:readyToActivate(r),
+  ...r,exact_owner_action_available:readyToActivate(r)&&
+   ['NOT_FOUND','RESERVED_UNDISPATCHED'].includes(existing),
+  existing_approved_reservation_status:existing,
+  existing_approved_reservation_verified:resume,
   user_action_confirmation:ORIGINAL_143_CONFIRMATION,
   automatic_installation:false,production_unchanged:true,
  });
@@ -141,7 +190,7 @@ export async function completeOriginal143OwnerAction({
  createPersistence=createUniversePostgresPersistence,
  createReservation=createSingleUseExecutionReservationStore,
  get=readPublicOriginal143GitHubEvidence,originalExecutor=executeOriginalMaintenanceRepair,
- rpcCall=rpc,
+ rpcCall=rpc,readReservation=readExistingOriginal143Reservation,
 }={}){
  // This method must be called only by an authenticated same-origin POST,
  // and may not be called from a model, a cron job, or GET request.
@@ -173,21 +222,23 @@ export async function completeOriginal143OwnerAction({
  const epoch=await lease.readEpoch();
  if(epoch.goal_transition_event_id!==goal.state.active_goal.last_transition_receipt_id)
   fail('ORIGINAL_143_AUTHORITY_GOAL_EPOCH_CHANGED');
- const policyId=continuityUuidFromSource('original143-owner-click:'+
-  session.user_id+':'+conversationId+':'+ORIGINAL_WORK+':'+SOURCE_SHA);
- const fingerprint='sha256:'+digest({
-  owner_id:session.user_id,conversation_id:conversationId,
-  original_work_id:ORIGINAL_WORK,goal_id:goal.state.active_goal_id,
-  source_sha256:SOURCE_SHA,target_branch:BRANCH,
-  owner_confirmation:confirmation,
- });
- const reservation=await lease.claim({
-  policyId,workFingerprint:fingerprint,goalId:goal.state.active_goal_id,
-  expectedGoalRevision:epoch.goal_revision,
-  expectedGoalEventId:epoch.goal_transition_event_id,
-  expectedUserMessageRevision:epoch.user_message_revision,
-  expectedLatestUserRequestId:epoch.latest_user_request_id,
- });
+ const {policyId,fingerprint}=exactOriginal143ActionIdentity(
+  session,conversationId,goal.state.active_goal_id);
+ const prior=await readReservation({db,session,conversationId,
+  goalId:goal.state.active_goal_id,rpcCall});
+ if(prior.status==='NOT_RESUMABLE')
+  fail('ORIGINAL_143_EXISTING_RESERVATION_NOT_RESUMABLE',409);
+ // Exactly one source-bound, previously owner-authorized reservation can be
+ // recovered. It has not been dispatched and is still bound to a fresh epoch.
+ const reservation=prior.status==='RESERVED_UNDISPATCHED'?
+  {reservation_id:prior.reservation_id,existing_owner_approval_reused:true}:
+  await lease.claim({
+   policyId,workFingerprint:fingerprint,goalId:goal.state.active_goal_id,
+   expectedGoalRevision:epoch.goal_revision,
+   expectedGoalEventId:epoch.goal_transition_event_id,
+   expectedUserMessageRevision:epoch.user_message_revision,
+   expectedLatestUserRequestId:epoch.latest_user_request_id,
+  });
  const payload={
   original_work_id:ORIGINAL_WORK,owner_id:session.user_id,
   conversation_id:conversationId,original_goal_id:goal.state.active_goal_id,
