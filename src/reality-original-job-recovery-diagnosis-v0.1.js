@@ -13,6 +13,59 @@ import {createUniversePostgresPersistence}
 import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
+import {continueVerifiedRealityUpgrade}
+ from './reality-upgrade-discovery-v0.1.js';
+// Existing Upgrades & improvements POST -> existing constitutional driver.
+// No hidden model action: only an independently verified gap AND trusted
+// durable runner adapters can advance. No new queue, route or authority system.
+export async function continueVerifiedRecoveryDiagnosis({
+ report,session,goal,spine,loadSelfImprovementState,
+ trustedSelfImprovementAdapters,continueUpgrade=continueVerifiedRealityUpgrade,
+}={}){
+ const gap=report?.upgrade_discovery;
+ const work=report?.original_work_id;
+ if(!/^work:[a-f0-9]{32}$/.test(String(work||''))||
+    report.original_job_completed!==false||
+    report.external_action_performed!==false||
+    report.action_authorized!==false||
+    gap?.original_job_completed!==false)
+  throw Error('RECOVERY_DIAGNOSIS_UPGRADE_HANDOFF_SOURCE_INVALID');
+ if(gap.status!=='CAPABILITY_GAP_CANDIDATE')
+  return Object.freeze({...report,
+   self_upgrade_execution_status:'NO_INDEPENDENT_MISSING_CAPABILITY_VERIFIED',
+   self_upgrade_model_executed:false,self_upgrade_installed:false});
+ if(typeof loadSelfImprovementState!=='function'||
+    !trustedSelfImprovementAdapters)
+  return Object.freeze({...report,
+   self_upgrade_execution_status:'TRUSTED_ISOLATED_RUNNER_NOT_CONNECTED',
+   self_upgrade_model_executed:false,self_upgrade_installed:false});
+ const state=await loadSelfImprovementState({session,goal,spine,originalWorkId:work});
+ if(!state||state.scope?.owner_id!==session?.user_id||
+    state.scope?.goal_id!==goal?.state?.active_goal_id||
+    state.scope?.original_work_id!==work||
+    state.scope?.continuity_root_id!==spine?.continuity_root_id||
+    state.scope?.worldline_id!==spine?.worldline_id)
+  throw Error('RECOVERY_DIAGNOSIS_UPGRADE_GOAL_OR_WORK_DRIFT');
+ const result=await continueUpgrade({
+  originalWorkId:work,discovery:gap,state,
+  adapters:trustedSelfImprovementAdapters,
+ });
+ if(result?.original_work_id!==work||
+    result.original_job_completed!==false||
+    !result.checkpoint_hash)
+  throw Error('RECOVERY_DIAGNOSIS_UPGRADE_CHECKPOINT_UNVERIFIED');
+ return Object.freeze({...report,
+  self_upgrade_execution_status:result.status,
+  self_upgrade_checkpoint_hash:result.checkpoint_hash,
+  self_upgrade_attempt_count:result.correction_attempts,
+  self_upgrade_owner_action_required:result.owner_action_required===true,
+  self_upgrade_model_executed:result.correction_attempts>0,
+  self_upgrade_installed:false,
+  // The original job is STILL unfinished. Registration, resumption and
+  // settlement have separate independently checked authority transitions.
+ });
+}
+
 export const RECOVERY_DIAGNOSIS_RECEIPT_VERSION='reality-saved-original-job-diagnosis-v0.1';
 const fail=code=>{throw Error(code)};
 export async function recordAuthenticatedRecoveryDiagnosis({
@@ -20,6 +73,7 @@ export async function recordAuthenticatedRecoveryDiagnosis({
  inspect=inspectAuthenticatedOriginalJobRecoveryLoop,
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
+ loadSelfImprovementState=null,trustedSelfImprovementAdapters=null,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
     !/^work:[a-f0-9]{32}$/.test(String(workId||''))||
@@ -75,8 +129,9 @@ export async function recordAuthenticatedRecoveryDiagnosis({
      e.payload?.provider_status!==verified.provider_status||
      e.payload?.recovery_receipt_id!==verified.recovery_receipt_id)
    fail('RECOVERY_DIAGNOSIS_EXISTING_CONFLICT');
-  return Object.freeze({...verified,diagnosis_receipt_id:uid,
-   diagnosis_saved:true,already_recorded:true});
+  return continueVerifiedRecoveryDiagnosis({report:{
+   ...verified,diagnosis_receipt_id:uid,diagnosis_saved:true,already_recorded:true},
+   session,goal,spine,loadSelfImprovementState,trustedSelfImprovementAdapters});
  }
  const tail=history.at(-1);
  if(!tail?.event_id||!tail?.lineage_hash)
@@ -117,6 +172,7 @@ export async function recordAuthenticatedRecoveryDiagnosis({
     confirmed.payload?.original_job_completed!==false||
     confirmed.parent_event_id!==tail.event_id)
   fail('RECOVERY_DIAGNOSIS_DURABLE_READBACK_MISSING');
- return Object.freeze({...verified,diagnosis_receipt_id:uid,
-  diagnosis_saved:true,already_recorded:false});
+ return continueVerifiedRecoveryDiagnosis({report:{
+  ...verified,diagnosis_receipt_id:uid,diagnosis_saved:true,already_recorded:false},
+  session,goal,spine,loadSelfImprovementState,trustedSelfImprovementAdapters});
 }
