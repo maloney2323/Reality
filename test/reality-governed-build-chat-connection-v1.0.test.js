@@ -1,0 +1,126 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+import {queueOwnerGovernedBuild,readOwnerGovernedBuild}
+ from '../src/reality-governed-build-chat-connection-v1.0.js';
+const project='hvkfreoagbrphwghjajw';
+const env={
+ VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_SHA:'a'.repeat(40),
+ REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+ REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
+ REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:project,
+ REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:project,
+ REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://'+project+'.supabase.co',
+ REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
+ REALITY_PERSONAL_CHAT_SUPABASE_URL:'https://'+project+'.supabase.co',
+ REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY:'sb_publishable_test',
+ REALITY_CHAT_RECEIPT_HMAC_KEY:'test-secret-26-characters-long',
+ SUPABASE_SECRET_KEY:'test-server-role-not-real',
+};
+const user=randomUUID(),conversation=randomUUID(),transition=randomUUID();
+const work='work:'+'b'.repeat(32),goalId='user-goal:'+'c'.repeat(32);
+const session={user_id:user};
+const observed={
+ status:'ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION',
+ original_conversation_id:conversation,original_work_id:work,
+ original_job_tracking_receipt_ref:'universe:tracking-verified',
+ goal_id:goalId,goal_transition_receipt_ref:transition,
+};
+const goal={principal_id:user,
+ state:{active_goal_id:goalId,active_goal:{goal_id:goalId,status:'ACTIVE',
+  user_confirmed:true,last_transition_receipt_id:transition,
+  source_user_message_ref:'supabase:reality_chat_messages:'+randomUUID()}},
+ scope:{root:randomUUID(),worldline:randomUUID()}};
+function mock(extra={}){
+ const calls=[];
+ return {calls,params:{session,env,
+  inspect:async()=>observed,readGoal:async()=>goal,
+  call:async(db,name,input)=>{
+   calls.push({db:{url:db.url,strictSecrets:db.strictSecrets},
+    name,input});
+   if(name==='reality_enqueue_governed_build_v1')
+    return {queue_id:randomUUID(),original_work_id:work,goal_id:goalId,
+     phase:'QUEUED_DISCOVERY',installation_authorized:false,job_completed:false};
+   return {queue_id:randomUUID(),original_work_id:work,goal_id:goalId,
+    phase:'QUEUED_DISCOVERY',installation_authorized:false,job_completed:false};
+  },...extra
+ }};
+}
+test('authenticated owner goal and canonical unfinished work enqueue through SERVICE ONLY',async()=>{
+ const m=mock();
+ const result=await queueOwnerGovernedBuild(m.params);
+ assert.equal(result.phase,'QUEUED_DISCOVERY');
+ assert.equal(result.model_generated,false);
+ assert.equal(result.sandbox_executed,false);
+ assert.equal(result.capability_installed,false);
+ assert.equal(m.calls[0].name,'reality_enqueue_governed_build_v1');
+ assert.equal(m.calls[0].input.p_original_work_id,work);
+ assert.equal(m.calls[0].input.p_owner_id,user);
+ assert.equal(m.calls[0].input.p_goal_transition_event_id,transition);
+ assert.equal(m.calls[0].db.url,'https://'+project+'.supabase.co');
+});
+test('queue cannot run in production or without signed-in owner',async()=>{
+ const m=mock();
+ await assert.rejects(queueOwnerGovernedBuild({...m.params,
+  session:{},}),/GOVERNED_BUILD_AUTHENTICATED_PREVIEW_ONLY/);
+ await assert.rejects(queueOwnerGovernedBuild({...m.params,
+  env:{...env,VERCEL_ENV:'production'}}),/GOVERNED_BUILD_AUTHENTICATED_PREVIEW_ONLY/);
+});
+test('trusted owner database must match authenticated chat project',async()=>{
+ const m=mock();
+ await assert.rejects(queueOwnerGovernedBuild({...m.params,
+  env:{...env,REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'anotherprojectref123'}}),
+ /CHAT_DATABASE_PROJECT_MISMATCH|GOVERNED_BUILD_OWNER_DB_BOUNDARY_CHANGED/);
+});
+test('assistant-proposed or paused goals cannot enqueue builds',async()=>{
+ for(const patch of [{user_confirmed:false},{status:'PAUSED'},
+  {last_transition_receipt_id:randomUUID()}]){
+  const m=mock({readGoal:async()=>({...goal,state:{...goal.state,
+   active_goal:{...goal.state.active_goal,...patch}}})});
+  await assert.rejects(queueOwnerGovernedBuild(m.params),
+   /GOVERNED_BUILD_FRESH_CONFIRMED_GOAL_REQUIRED/);
+ }
+});
+test('user cannot switch the original conversation through a forged discovery result',async()=>{
+ const m=mock({inspect:async()=>({...observed,original_conversation_id:'claimed'})});
+ await assert.rejects(queueOwnerGovernedBuild(m.params),
+  /GOVERNED_BUILD_VERIFIED_UNFINISHED_WORK_REQUIRED/);
+});
+test('empty or ineligible work never queues a fabricated developer task',async()=>{
+ const m=mock({inspect:async()=>({status:'NO_VERIFIED_ELIGIBLE_WORK'})});
+ await assert.rejects(queueOwnerGovernedBuild(m.params),
+  /GOVERNED_BUILD_VERIFIED_UNFINISHED_WORK_REQUIRED/);
+});
+test('server must reject fabricated or missing atomic database receipt',async()=>{
+ const m=mock({call:async()=>({queue_id:randomUUID(),original_work_id:work,
+  job_completed:true,goal_id:goalId})});
+ await assert.rejects(queueOwnerGovernedBuild(m.params),
+  /GOVERNED_BUILD_QUEUE_READBACK_NOT_CONFIRMED/);
+});
+test('READ status never grants execution authority or implies settled job',async()=>{
+ const m=mock();
+ const result=await readOwnerGovernedBuild(m.params);
+ assert.equal(result.queued,true);
+ assert.equal(result.completed,false);
+ assert.equal(result.external_execution_authorized,false);
+ assert.equal(result.capability_installed,false);
+});
+test('API request scope, origin and intent remain server-owned',()=>{
+ const source=readFileSync('api/reality/personal-governed-build.js','utf8');
+ assert.match(source,/authenticatedChatSession/);
+ assert.match(source,/assertSameOrigin\(req\)/);
+ assert.match(source,/body.intent!=='QUEUE_SAFE_AUTONOMOUS_DISCOVERY'/);
+ assert.match(source,/Object.keys\(body\).length!==1/);
+ assert.match(source,/Object.keys\(req.query\|\|\{\}\).length/);
+ assert.doesNotMatch(source,/completeOriginal143OwnerAction|githubPost|githubPut|promoteVerifiedUpgrade/);
+});
+test('actual chat JavaScript parses and clearly says queuing does not yet run a worker',()=>{
+ const html=readFileSync('index.html','utf8');
+ for(const [,script]of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
+  new vm.Script(script);
+ assert.match(html,/id="privateGovernedBuildQueue"/);
+ assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
+ assert.match(html,/not yet triggered/);
+});
