@@ -6,13 +6,16 @@ import {createFoundationalModelGenerator}
  from './reality-foundational-model-provider-v1.0.js';
 import {createIsolatedVercelSandbox}
  from './reality-foundational-vercel-sandbox-adapter-v1.0.js';
+import {createVerifiedFrozenRegressionReader}
+ from './reality-foundational-verified-regression-context-v1.0.js';
 export function createRealityVercelGenerationAdapters({
  ticket,model,apiKey,SandboxClient,modelFetch=fetch,
+ readFrozenRegression=null,
 }={}){
  if(ticket?.environment!=='ISOLATED_PREVIEW'||!ticket?.ticket_hash)
   throw Error('FOUNDATION_TRUSTED_PINNED_BUILD_TICKET_REQUIRED');
  const modelGenerate=createFoundationalModelGenerator({
-  model,apiKey,fetchImpl:modelFetch,
+  model,apiKey,fetchImpl:modelFetch,readFrozenRegression,
  });
  const {isolatedSandbox,independentReadback}=createIsolatedVercelSandbox({
   SandboxClient,
@@ -30,8 +33,12 @@ export function createRealityVercelGenerationAdapters({
 export async function createRealityLiveVercelUpgradeAdapters({
  ticket,env=process.env,modelFetch=fetch,
 }={}){
- if(env.VERCEL_ENV!=='preview'||
-    env.VERCEL_GIT_COMMIT_REF!=='experiment/reality-live-durable-adversarial-20261025')
+ const exactBranches=new Set([
+  'experiment/reality-live-durable-adversarial-20261025',
+  'feature/first-real-gap-to-generation-handoff-20261029',
+ ]);
+ if(env.VERCEL_ENV!=='preview'||!exactBranches.has(env.VERCEL_GIT_COMMIT_REF)||
+   !/^[a-f0-9]{40}$/.test(String(env.VERCEL_GIT_COMMIT_SHA||'')))
   throw Error('FOUNDATION_LIVE_ISOLATED_PREVIEW_REQUIRED');
  if(ticket?.environment!=='ISOLATED_PREVIEW')
   throw Error('FOUNDATION_LIVE_TICKET_PREVIEW_REQUIRED');
@@ -40,5 +47,9 @@ export async function createRealityLiveVercelUpgradeAdapters({
   ticket,SandboxClient:Sandbox,modelFetch,
   apiKey:env.REALITY_STANDALONE_OPENAI_API_KEY,
   model:env.REALITY_SEMANTIC_REVIEW_MODEL,
+  readFrozenRegression:createVerifiedFrozenRegressionReader({
+   fetchImpl:modelFetch,
+   token:env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null,
+  }),
  });
 }
