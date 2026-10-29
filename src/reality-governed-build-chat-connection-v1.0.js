@@ -9,6 +9,8 @@ import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
+import {dispatchGovernedBuildToIsolatedWorker}
+ from './reality-governed-build-github-dispatch-v1.0.js';
 export const GOVERNED_BUILD_CHAT_CONNECTION_VERSION=
  'reality-governed-build-chat-connection-v1.0';
 const fail=(code,status=409)=>{throw Object.assign(Error(code),{status})};
@@ -40,7 +42,7 @@ async function rpc(db,name,input,fetchImpl=fetch){
 export async function queueOwnerGovernedBuild({
  session,env=process.env,
  inspect=inspectAuthenticatedSelfImprovement,readGoal=readFreshPersonalGoalState,
- call=rpc,
+ call=rpc,dispatch=dispatchGovernedBuildToIsolatedWorker,
 }={}){
  const db=trust(session,env);
  const next=await inspect({session,env});
@@ -75,10 +77,41 @@ export async function queueOwnerGovernedBuild({
   result?.goal_id!==next.goal_id||result?.job_completed!==false||
   result?.installation_authorized!==false)
   fail('GOVERNED_BUILD_QUEUE_READBACK_NOT_CONFIRMED',503);
+ // The authenticated owner action permits only a scoped request commit on
+ // the isolated worker branch; it does NOT permit model code installation.
+ // Failed dispatch preserves the queue so the owner sees an exact blocker.
+ let worker=null;
+ try{
+  worker=await dispatch({
+   queue_id:result.queue_id,original_work_id:next.original_work_id,
+   issue_url:next.issue_url,env,
+  });
+  const pinned=await call(db,'reality_mark_governed_build_dispatched_v1',{
+   p_owner_id:session.user_id,p_conversation_id:next.original_conversation_id,
+   p_queue_id:result.queue_id,p_commit_sha:worker.worker_sha,
+   p_request_path:worker.request_path,
+  });
+  if(pinned?.queue_id!==result.queue_id||pinned?.dispatched!==true)
+   fail('GOVERNED_BUILD_DISPATCH_DURABLE_READBACK_FAILED',503);
+ }catch(error){
+  const safe=String(error?.message||'');
+  return Object.freeze({
+   ...result,phase:'QUEUED_DISPATCH_BLOCKED',
+   dispatch_error:/^GOVERNED_BUILD_[A-Z0-9_]+$/.test(safe)?safe:
+    'GOVERNED_BUILD_WORKER_DISPATCH_UNAVAILABLE',
+   owner_approved_investigation_only:true,
+   model_generated:false,sandbox_executed:false,
+   continuous_worker_connected:false,
+   external_execution_authorized:false,capability_installed:false,
+  });
+ }
  return Object.freeze({
-  ...result,owner_approved_investigation_only:true,
+  ...result,phase:'DISPATCHED_TO_ISOLATED_WORKER',
+  worker_dispatch_started:true,worker_commit_sha:worker.worker_sha,
+  worker_workflow_url:worker.workflow_runs_url,
+  owner_approved_investigation_only:true,
   model_generated:false,sandbox_executed:false,
-  continuous_worker_connected:false,
+  continuous_worker_connected:true,
   external_execution_authorized:false,capability_installed:false,
  });
 }
