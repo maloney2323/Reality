@@ -24,6 +24,10 @@ jobs:
         run: node --check src/reality-first-gap-handoff-v0.1.js
       - name: Verify first real gap, integrity, and fail-closed owner scope
         run: node --test test/reality-first-gap-handoff-v0.1.test.js
+      - name: Verify immutable test source is included in model task data
+        run: |
+          node --check src/reality-foundational-verified-regression-context-v1.0.js
+          node --test test/reality-foundational-verified-regression-context-v1.0.test.js
       - name: Verify exact owner job #178 admission and approval boundaries
         run: |
           node --check src/reality-personal-first-upgrade-178-v0.1.js
