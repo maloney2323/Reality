@@ -28,9 +28,12 @@ if(Object.keys(request).sort().join(',')!==
  !Number.isInteger(request.issue_number)||request.issue_number<=0||
  request.issue_number>100000)
  fail('REALITY_WORKER_UNTRUSTED_QUEUE_REQUEST');
-const issue=await readPublicOriginal143GitHubEvidence(
- ROOT+'issues/'+request.issue_number,
- {env:{VERCEL_ENV:'preview'}});
+const issueResponse=await fetch('https://api.github.com'+ROOT+'issues/'+request.issue_number,{
+ method:'GET',redirect:'error',cache:'no-store',headers:{
+  accept:'application/vnd.github+json','x-github-api-version':'2022-11-28',
+  'user-agent':'Reality-isolated-build-worker-read-only'}});
+if(!issueResponse.ok)fail('REALITY_WORKER_ISSUE_PROVIDER_UNAVAILABLE');
+const issue=await issueResponse.json();
 if(issue.number!==request.issue_number||issue.state!=='open'||
  issue.repository_url!=='https://api.github.com/repos/maloney2323/Reality')
  fail('REALITY_WORKER_PROVIDER_ISSUE_READBACK_INVALID');
