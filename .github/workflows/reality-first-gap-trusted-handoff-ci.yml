@@ -23,5 +23,10 @@ jobs:
         run: node --check src/reality-first-gap-handoff-v0.1.js
       - name: Verify first real gap, integrity, and fail-closed owner scope
         run: node --test test/reality-first-gap-handoff-v0.1.test.js
+      - name: Verify exact owner job #178 admission and approval boundaries
+        run: |
+          node --check src/reality-personal-first-upgrade-178-v0.1.js
+          node --check api/reality/personal-first-upgrade-178.js
+          node --test test/reality-personal-first-upgrade-178-v0.1.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
