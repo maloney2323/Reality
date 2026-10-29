@@ -5,7 +5,8 @@ import { discoverAutonomousWork, CAPABILITY_GAP_DETECTOR_VERSION } from '../src/
 import { AUTONOMOUS_CLOSURE_VERSION } from '../src/reality-autonomous-closure-orchestrator-v1.0.js';
 
 test('v1.0 capability loop preserves governance', () => {
-  assert.equal(AUTONOMOUS_CAPABILITY_LOOP_VERSION, '1.0.0');
+  // This module is v0.2.0 despite its historical -v1.0 path; assert its real contract.
+  assert.equal(AUTONOMOUS_CAPABILITY_LOOP_VERSION, '0.2.0');
   const gap = detectCapabilityGap({ consequence: { gap: 'MISSING_CAPABILITY', subject: 'customer_follow_up' }, workItem: { id: 'work-1', work_key: 'follow-up' } });
   const confirmed = confirmCapabilityGap(gap, { historicalFailureRefs: ['failure-1'], verificationSuiteRef: 'suite-1' });
   const experiment = createSandboxExperiment({ confirmedGap: confirmed, primaryWorldlineId: 'worldline-1' });
