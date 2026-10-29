@@ -18,6 +18,7 @@ import {projectPersonalCompletionReports}
 export const PERSONAL_UNFINISHED_WORK_VERSION='reality-personal-unfinished-work-v0.1';
 const WORK=/^work:[a-f0-9]{32}$/;
 const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
+const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 
 export function projectUnfinishedFromConversation({
  conversationId,events=[],goal=null,
@@ -33,6 +34,36 @@ export function projectUnfinishedFromConversation({
    e.payload?.work_id===report.work_id);
   if(related.length!==1)continue;
   const handoff=related[0];
+  // A verified tracking-issue outcome is not a completed job. Conversely, an
+  // independently settled original #143 must not be offered for new discovery
+  // or a second owner reservation. Require BOTH linked Continuity events.
+  const settledOriginal143=report.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+   history.some(settlement=>{
+    const p=settlement.payload||{};
+    if(settlement.entity_type!=='personal_original_job_final_settlement'||
+       settlement.event_kind!=='OUTCOME'||
+       settlement.epistemic_status!=='VERIFIED'||
+       p.original_work_id!==report.work_id||
+       p.original_goal_id!==handoff.payload?.goal_id||
+       p.original_job_completed!==true||
+       p.independently_verified!==true||
+       p.outcome!=='HISTORICAL_SOURCE_ALREADY_FIXED_INDEPENDENTLY_RECONCILED'||
+       p.original_issue_number!==143||
+       !UUID.test(String(p.registration_receipt_id||'')))return false;
+    return history.some(reg=>{
+     const b=reg.payload||{};
+     return reg.event_id===p.registration_receipt_id&&
+      reg.entity_type==='personal_original_executor_capability_registered'&&
+      reg.event_kind==='CAPABILITY'&&reg.epistemic_status==='VERIFIED'&&
+      b.original_work_id===report.work_id&&
+      b.original_goal_id===handoff.payload?.goal_id&&
+      b.owner_id===p.owner_id&&b.conversation_id===p.conversation_id&&
+      b.owner_confirmation==='ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY'&&
+      b.runtime_activation_verified===true&&
+      b.registration_readback_verified===true;
+    });
+   });
+  if(settledOriginal143)continue;
   const relevant=history.filter(e=>e.entity_type==='personal_recovery_checkpoint'&&
    e.payload?.original_work_id===report.work_id);
   if(relevant.length>1)throw Error('UNFINISHED_CHECKPOINT_DUPLICATE_REVIEW');
