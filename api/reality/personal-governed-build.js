@@ -33,7 +33,7 @@ export default async function handler(req,res){
    return res.status(403).json({ok:false,error:'GOVERNED_BUILD_EXPLICIT_INVESTIGATION_REQUIRED'});
   const job=await queueOwnerGovernedBuild({session});
   return res.status(202).json({ok:true,...job,
-   message:'Safe discovery queued. Model generation and sandbox execution are not automatically started by this endpoint.',
+   message:job.worker_dispatch_started?'Isolated discovery worker dispatched. Model generation, installation and job settlement remain unproven.':'Durable discovery queued, but worker dispatch is blocked. No model generation or installation occurred.',
    external_execution_authorized:false,production_changed:false});
  }catch(e){
   const message=String(e?.message||'');
