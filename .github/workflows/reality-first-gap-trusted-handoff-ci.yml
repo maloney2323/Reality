@@ -57,5 +57,10 @@ jobs:
             throw Error("PUBLIC_PINNED_EVIDENCE_UNVERIFIED");
           console.log("FIRST178_PUBLIC_GITHUB_SOURCE_READBACK_VERIFIED");
           '
+      - name: Verify atomic single-use owner #178 constitutional execution handoff
+        run: |
+          node --check src/reality-first178-constitutional-executor-v0.1.js
+          node --check api/reality/personal-first-upgrade-178-execute.js
+          node --test test/reality-first178-constitutional-executor-v0.1.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
