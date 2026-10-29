@@ -56,6 +56,102 @@ export function createFirst178ConstitutionalCheckpointService({
   continuityRootId:spine.continuity_root_id,
   worldlineId:spine.worldline_id,
  });
+ const gapReceiptId=continuityUuidFromSource(
+  'first178:provider-gap:'+session.user_id+':'+conversationId+':'+originalWorkId);
+ const exactOriginal=history=>history.filter(e=>
+  e.entity_type==='personal_first_self_upgrade_customer_work'&&
+  e.payload?.original_work_id===originalWorkId&&
+  e.payload?.issue_number===178&&
+  e.payload?.installation_authorized===false);
+ const persistGap=async input=>{
+  const {g,spine}=await verifyGoal();
+  if(input?.owner_id!==session.user_id||
+     input?.goal_id!==g.state.active_goal_id||
+     input?.original_work_id!==originalWorkId||
+     input?.worldline_id!==spine.worldline_id||
+     !/^[a-f0-9]{64}$/.test(String(input.evidence_hash||''))||
+     input.provider_receipt_ref!==
+      'github:actions:run:40962921090:job:123760052647')
+   fail('PINNED_OWNER_GAP_INVALID');
+  const history=orderContinuityHistory(await read(spine));
+  const workSources=exactOriginal(history).filter(e=>
+    e.payload?.original_goal_id===g.state.active_goal_id&&
+    e.payload?.goal_transition_receipt_ref===
+     g.state.active_goal.last_transition_receipt_id);
+  if(workSources.length!==1)
+   fail('FIRST_178_SOURCE_WORK_RECEIPT_REQUIRED');
+  const payload={
+   version:REALITY_FIRST_178_CONTINUITY_CHECKPOINT_VERSION,
+   owner_id:session.user_id,goal_id:g.state.active_goal_id,
+   original_work_id:originalWorkId,worldline_id:spine.worldline_id,
+   original_source_receipt_ref:workSources[0].event_id,
+   evidence_hash:input.evidence_hash,
+   provider_receipt_ref:input.provider_receipt_ref,
+   installed:false,authorization_granted:false,
+   original_job_completed:false,
+  };
+  const existing=history.find(e=>e.event_id===gapReceiptId);
+  if(existing){
+   if(existing.entity_type!=='personal_first_178_confirmed_gap'||
+      !jsonEqual(existing.payload,payload))
+    fail('GAP_RECEIPT_CONFLICT');
+  }else{
+   const tail=history.at(-1);
+   if(!tail?.event_id||!tail?.lineage_hash)
+    fail('GAP_CONTINUITY_TAIL_REQUIRED');
+   const at=new Date().toISOString();
+   const node=appendContinuityNode({
+    spine,stage:'OBSERVATION',entityId:originalWorkId,
+    eventId:gapReceiptId,parentEventId:tail.event_id,
+    priorLineageHash:tail.lineage_hash,effectiveTime:at,assertionTime:at,
+    epistemicStatus:'VERIFIED',payload,
+    evidenceRefs:[workSources[0].payload.pinned_red_run],
+    provenance:{source:REALITY_FIRST_178_CONTINUITY_CHECKPOINT_VERSION,
+     principal_id:session.user_id,conversation_id:conversationId},
+   });
+   await store.appendEvent({...node,
+    entity_type:'personal_first_178_confirmed_gap'});
+  }
+  const result=await readBackGap({
+   owner_id:session.user_id,goal_id:g.state.active_goal_id,
+   original_work_id:originalWorkId,receipt_id:gapReceiptId,
+  });
+  if(result?.verified!==true||result.evidence_hash!==input.evidence_hash)
+   fail('GAP_POST_WRITE_READBACK_UNVERIFIED');
+  return Object.freeze({committed:true,receipt_id:gapReceiptId});
+ };
+ const readBackGap=async input=>{
+  const {g,spine}=await verifyGoal();
+  if(input?.receipt_id!==gapReceiptId||
+     input.owner_id!==session.user_id||
+     input.goal_id!==g.state.active_goal_id||
+     input.original_work_id!==originalWorkId)
+   fail('GAP_READBACK_OWNER_SCOPE_INVALID');
+  const events=orderContinuityHistory(await read(spine));
+  const gap=events.find(e=>e.event_id===gapReceiptId);
+  const sources=exactOriginal(events);
+  if(!gap||gap.event_kind!=='OBSERVATION'||
+     gap.epistemic_status!=='VERIFIED'||
+     gap.entity_type!=='personal_first_178_confirmed_gap'||
+     sources.length!==1||
+     gap.payload?.original_source_receipt_ref!==sources[0].event_id||
+     gap.payload?.goal_id!==g.state.active_goal_id||
+     gap.payload?.original_work_id!==originalWorkId||
+     gap.payload?.owner_id!==session.user_id||
+     gap.payload?.worldline_id!==spine.worldline_id||
+     !/^[a-f0-9]{64}$/.test(gap.payload?.evidence_hash||'')||
+     gap.payload?.provider_receipt_ref!==
+      'github:actions:run:40962921090:job:123760052647'||
+     gap.payload?.installed!==false||
+     gap.payload?.authorization_granted!==false)
+   fail('GAP_NOT_INDEPENDENTLY_RECONSTRUCTED');
+  return Object.freeze({receipt_id:gapReceiptId,verified:true,
+   source:'INDEPENDENT_PROVIDER_READBACK',
+   owner_id:session.user_id,goal_id:g.state.active_goal_id,
+   original_work_id:originalWorkId,worldline_id:spine.worldline_id,
+   evidence_hash:gap.payload.evidence_hash,
+   provider_receipt_ref:gap.payload.provider_receipt_ref});
+ };
  const persistCheckpoint=async state=>{
   verifySelfImprovementJournal(state);
   if(state.scope.owner_id!==session.user_id||
@@ -166,5 +262,5 @@ export function createFirst178ConstitutionalCheckpointService({
    continuity_receipt_id:id,
   });
  };
- return Object.freeze({persistCheckpoint});
+ return Object.freeze({persistCheckpoint,persistGap,readBackGap});
 }
