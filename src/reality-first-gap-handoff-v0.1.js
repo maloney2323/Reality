@@ -119,14 +119,18 @@ export async function observeFirstGapFromGithub({
  scope,apiToken,fetchImpl=fetch,
 }={}){
  strictScope(scope);
- if(typeof apiToken!=='string'||apiToken.length<20)
-  fail('PROVIDER_READ_CREDENTIAL_REQUIRED');
+ // The pinned #178 source and Actions run are public. No GitHub write or
+ // dispatch credential is needed to independently READ a public job. A
+ // provider 401/403 still fails closed, never downgrades to model assertions.
+ if(apiToken!=null&&apiToken!==''&&
+    (typeof apiToken!=='string'||apiToken.length<20))
+  fail('PROVIDER_READ_CREDENTIAL_INVALID');
  const p=FIRST_GAP_PROOF;
  const root='https://api.github.com/repos/'+p.repository;
  const headers={accept:'application/vnd.github+json',
-  authorization:'Bearer '+apiToken,
   'x-github-api-version':'2022-11-28',
   'user-agent':'Reality-pinned-CI-gap-readback'};
+ if(apiToken)headers.authorization='Bearer '+apiToken;
  async function get(path,{text=false}={}){
   const url=root+path;
   const response=await fetchImpl(url,{method:'GET',cache:'no-store',
