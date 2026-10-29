@@ -6,8 +6,6 @@
 import {createHash} from 'node:crypto';
 import {createFoundationalBuildTicket}
  from './reality-foundational-build-loop-v1.0.js';
-import {createConstitutionalGenerationSandboxAdapters}
- from './reality-foundational-constitutional-adapters-v1.0.js';
 import {createGovernedSelfImprovement}
  from './reality-governed-self-improvement-spine-v1.0.js';
 import {continueGovernedSelfImprovement}
@@ -264,18 +262,16 @@ export async function generateAfterTrustedGap({
     !SHA40.test(verifiedGovernanceReleaseSha||''))
   fail('NO_TRUSTED_TICKET');
  for(const name of [
-  'modelGenerate','isolatedSandbox','independentReadback',
   'observeMissingCapability','verifyIndependentReceipt','persistCheckpoint',
  ]){
   if(typeof adapters?.[name]!=='function')fail('MISSING_TRUSTED_'+name.toUpperCase());
  }
- // A provider-attested receipt is supplied by a trusted adapter, never by
- // the LLM. It must still be re-read inside the constitutional driver.
- const foundation=createConstitutionalGenerationSandboxAdapters({
-  ticket,modelGenerate:adapters.modelGenerate,
-  isolatedSandbox:adapters.isolatedSandbox,
-  independentReadback:adapters.independentReadback,
- });
+ // The existing constitutional generation adapter supplies exactly TWO
+ // services. It never becomes a lifecycle authority or trusted state writer.
+ const foundation=adapters?.generation;
+ if(typeof foundation?.generateCandidate!=='function'||
+    typeof foundation?.runIsolatedSandbox!=='function')
+  fail('MISSING_TRUSTED_CONSTITUTIONAL_GENERATION_ADAPTER');
  const scope={
   owner_id:ticket.owner_id,goal_id:ticket.goal_id,
   original_work_id:ticket.original_work_id,
