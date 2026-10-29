@@ -145,6 +145,10 @@ export async function readOwnerGovernedBuild({
  if(!validUuid(result.queue_id)||result.original_work_id!==discovered.original_work_id)
   fail('GOVERNED_BUILD_READBACK_OWNER_SCOPE_MISMATCH');
  return Object.freeze({...result,queued:true,
-  completed:false,external_execution_authorized:false,
-  capability_installed:false});
+  // A durable queue or worker commit is not a generated, tested or installed
+  // upgrade. Future stages need independent receipts, not status guesses.
+  completed:false,model_generated:false,sandbox_executed:false,
+  installation_authorized:false,job_completed:false,
+  external_execution_authorized:false,
+  capability_installed:false,production_changed:false});
 }
