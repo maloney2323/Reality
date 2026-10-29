@@ -29,8 +29,15 @@ export function createConstitutionalGenerationSandboxAdapters({
    scope(ctx);
    enforce(ctx.no_execution_authority===true,
     'FOUNDATION_MODEL_NO_EXECUTION_AUTHORITY_REQUIRED');
+   enforce(Number.isInteger(ctx.current_attempt)&&ctx.current_attempt>=1&&
+    ctx.current_attempt<=ticket.max_attempts,
+    'FOUNDATION_CONSTITUTIONAL_ATTEMPT_INVALID');
    const previous=ctx.previous_candidate;
    const failure=ctx.previous_independent_failure;
+   if(ctx.current_attempt>1)
+    enforce(previous?.artifact_hash&&failure?.evidence_ref&&
+     failure?.classification?.class&&failure?.diagnostics,
+     'FOUNDATION_REPAIR_REQUIRES_INDEPENDENT_FAILURE');
    const verifiedFeedback=ctx.current_attempt===1?null:{
     kind:'INDEPENDENT_SANDBOX_FAILURE',
     attestation_ref:failure?.evidence_ref||null,
