@@ -14,6 +14,10 @@ on:
       - 'test/reality-upgrade-discovery-driver-continuation-v1.test.js'
       - 'src/reality-original-job-recovery-diagnosis-v0.1.js'
       - 'test/reality-recovery-to-constitutional-upgrade-driver-v1.test.js'
+      - 'src/reality-foundational-vercel-sandbox-adapter-v1.0.js'
+      - 'src/reality-foundational-vercel-generation-adapters-v1.0.js'
+      - 'test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js'
+      - 'package.json'
       - 'index.html'
       - 'test/reality-foundational-build-loop-v1.0.test.js'
       - 'docs/reality-foundational-generation-sandbox-v1.md'
@@ -45,6 +49,9 @@ jobs:
           node --test test/reality-foundational-constitutional-adapters-v1.0.test.js
           node --test test/reality-upgrade-discovery-driver-continuation-v1.test.js
           node --test test/reality-recovery-to-constitutional-upgrade-driver-v1.test.js
+          node --check src/reality-foundational-vercel-sandbox-adapter-v1.0.js
+          node --check src/reality-foundational-vercel-generation-adapters-v1.0.js
+          node --test test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
       - name: Existing constitutional spine and authenticated chat discovery
         run: |
           set -euo pipefail
