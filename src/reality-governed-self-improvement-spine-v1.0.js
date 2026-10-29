@@ -103,6 +103,27 @@ export function verifySelfImprovementJournal(state){
   prior=event_hash;
  }
  if(prior!==state.head_hash)throw Error('SELF_IMPROVEMENT_CHECKPOINT_HASH_MISMATCH');
+ // The journal is the single constitutional source of truth. A caller may
+ // not relabel a legitimate GAP_CONFIRMED or SANDBOX_VERIFIED checkpoint
+ // as SETTLED while leaving its hash chain intact. Every phase must be
+ // justified by its final authenticated event, never by a status flag.
+ const last=state.journal.at(-1)?.kind||null;
+ const phases={
+  DISCOVERING:[null],
+  GAP_CONFIRMED:['GAP_CONFIRMED'],
+  CANDIDATE_READY:['MODEL_CANDIDATE_PROPOSED'],
+  REPAIR_REQUIRED:['SANDBOX_FAILED'],
+  ESCALATED:['SANDBOX_FAILED'],
+  AWAITING_OWNER_APPROVAL:['SANDBOX_VERIFIED'],
+  PROMOTION_AUTHORIZED:['PROMOTION_AUTHORIZED'],
+  CAPABILITY_REGISTERED:['CAPABILITY_REGISTERED'],
+  ORIGINAL_JOB_RESUMED:['ORIGINAL_JOB_RESUMED'],
+  SETTLED:['ORIGINAL_JOB_SETTLED'],
+ };
+ if(!phases[state.phase]?.includes(last)||
+    state.attempt_count!==state.journal.filter(
+     e=>e.kind==='MODEL_CANDIDATE_PROPOSED').length)
+  throw Error('SELF_IMPROVEMENT_JOURNAL_PHASE_INVARIANT_VIOLATED');
  return true;
 }
 export function createGovernedSelfImprovement({scope,attemptLimit=3}={}){

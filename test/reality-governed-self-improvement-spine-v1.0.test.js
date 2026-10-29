@@ -389,3 +389,15 @@ test('normal model upgrade cannot rewrite HTTP routes, auth, persistence or arbi
   }),/SELF_IMPROVEMENT_NON_EXTENSION_CHANGE_REQUIRES_SEPARATE_GOVERNANCE_RELEASE/);
  }
 });
+
+test('constitutional journal refuses false settlement or lost attempt count even with intact hash chain',async()=>{
+ const h=harness();
+ const discovered=await gap(createGovernedSelfImprovement({scope}),h);
+ const forgedPhase={...structuredClone(discovered),phase:'SETTLED'};
+ assert.throws(()=>verifySelfImprovementJournal(forgedPhase),
+  /SELF_IMPROVEMENT_JOURNAL_PHASE_INVARIANT_VIOLATED/);
+ const forgedCount={...structuredClone(discovered),attempt_count:1};
+ assert.throws(()=>verifySelfImprovementJournal(forgedCount),
+  /SELF_IMPROVEMENT_JOURNAL_PHASE_INVARIANT_VIOLATED/);
+ assert.equal(verifySelfImprovementJournal(discovered),true);
+});
