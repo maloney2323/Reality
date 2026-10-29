@@ -2319,7 +2319,7 @@ setInterval(refreshSavedShiftHome,300000);
  el('privateGovernedBuildQueue').onclick=async()=>{
   const button=el('privateGovernedBuildQueue');
   if(!realityBuildEligible||button.disabled)return;
-  if(!window.confirm('Queue the verified original unfinished work for Reality to investigate under its confirmed goal? This only queues safe discovery. It does not start a model, execute code, approve installation, or change production.'))return;
+  if(!window.confirm('Queue the verified original unfinished work for Reality to investigate under its confirmed goal? This can dispatch a GitHub read-only discovery worker on a separate experimental branch. It may inspect existing source and run the original read-only verifier. It does not approve installation, issue closure, or any production change.'))return;
   button.disabled=true;
   try{
    const r=await fetch('/api/reality/personal-governed-build',{
