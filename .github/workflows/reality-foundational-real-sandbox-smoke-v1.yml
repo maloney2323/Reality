@@ -1,0 +1,32 @@
+name: Reality — Real Foundational Docker Sandbox Smoke
+on:
+  push:
+    branches:
+      - reality/proof/foundational-sandbox-real-run-20261029
+    paths:
+      - 'scripts/reality-foundational-real-sandbox-smoke-v1.mjs'
+      - 'test/reality-frozen-regressions/ci-constitutional-v1.json'
+      - '.github/workflows/reality-foundational-real-sandbox-smoke-v1.yml'
+permissions:
+  contents: read
+jobs:
+  real-no-secret-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Execute frozen constitutional suite and harmless fixture in real no-secret Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull node:22-alpine
+          raw="$(docker image inspect --format '{{index .RepoDigests 0}}' node:22-alpine)"
+          digest="$(printf '%s' "$raw" | sed -E 's/^.*@sha256:/node@sha256:/')"
+          [[ "$digest" =~ ^node@sha256:[a-f0-9]{64}$ ]] || exit 1
+          node --check scripts/reality-foundational-real-sandbox-smoke-v1.mjs
+          node scripts/reality-foundational-real-sandbox-smoke-v1.mjs "$digest"

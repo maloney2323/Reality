@@ -1,0 +1,36 @@
+name: Reality Recovery Real Source Upgrade Proof v0.1
+on:
+  push:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+    paths:
+      - 'scripts/reality-recovery-real-source-proof-v0.1.mjs'
+      - 'src/reality-autonomous-capability-loop-v1.0.js'
+      - 'src/reality-autonomous-closure-orchestrator-v1.0.js'
+      - '.github/workflows/reality-recovery-real-source-proof-v0.1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-source-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prove actual historical import gap versus repaired source and same-work recovery
+        run: node scripts/reality-recovery-real-source-proof-v0.1.mjs
+      - name: Verify live module contracts and regression tests
+        run: node --test test/reality-recovery-v1-linkage.test.js
+      - name: Publish source-backed no-cost proof receipt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-real-source-v0.1
+          path: reality-recovery-real-source-proof.json
+          retention-days: 14

@@ -1,0 +1,26 @@
+name: Reality — Isolated Worker Dispatch Contract
+on:
+  push:
+    branches:
+      - reality/test/governed-worker-dispatch-readback-20261029
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+permissions:
+  contents: read
+jobs:
+  test-dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test no-secret branch dispatch and fail-closed transport
+        run: |
+          node --check src/reality-governed-build-github-dispatch-v1.0.js
+          node --test test/reality-governed-build-github-dispatch-v1.0.test.js
+          node --test test/reality-governed-build-chat-connection-v1.0.test.js

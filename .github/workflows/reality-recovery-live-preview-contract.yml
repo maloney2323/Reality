@@ -1,0 +1,86 @@
+name: Reality Recovery Live Preview Contract
+on:
+  push:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+    paths:
+      - 'src/reality-personal-recovery-checkpoint-v0.1.js'
+      - 'src/reality-upgrade-discovery-v0.1.js'
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'test/reality-upgrade-discovery-v0.1.test.js'
+      - 'test/reality-upgrade-discovery-category-v0.1.test.js'
+      - 'scripts/reality-recovery-real-source-proof-v0.1.mjs'
+      - 'scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs'
+      - 'src/reality-autonomous-capability-loop-v1.0.js'
+      - 'src/reality-autonomous-closure-orchestrator-v1.0.js'
+      - 'test/reality-recovery-v1-linkage.test.js'
+      - 'src/reality-recovery-evidence-gate-v0.1.js'
+      - 'api/reality/personal-recovery-evidence.js'
+      - 'test/reality-recovery-evidence-gate-v0.1.test.js'
+      - 'src/reality-personal-unfinished-work-v0.1.js'
+      - 'api/reality/personal-unfinished-work.js'
+      - 'test/reality-personal-unfinished-work-v0.1.test.js'
+      - 'api/reality/personal-recovery.js'
+      - 'api/reality/personal-completion-reports.js'
+      - 'test/reality-completion-report-v0.1.test.js'
+      - 'test/reality-personal-recovery-checkpoint-v0.1.test.js'
+      - 'index.html'
+      - '.github/workflows/reality-recovery-live-preview-contract.yml'
+  pull_request:
+    paths:
+      - 'src/reality-personal-recovery-checkpoint-v0.1.js'
+      - 'src/reality-upgrade-discovery-v0.1.js'
+      - 'src/reality-real-recovery-coordinator-v0.1.js'
+      - 'test/reality-upgrade-discovery-v0.1.test.js'
+      - 'test/reality-upgrade-discovery-category-v0.1.test.js'
+      - 'scripts/reality-recovery-real-source-proof-v0.1.mjs'
+      - 'scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs'
+      - 'src/reality-autonomous-capability-loop-v1.0.js'
+      - 'src/reality-autonomous-closure-orchestrator-v1.0.js'
+      - 'test/reality-recovery-v1-linkage.test.js'
+      - 'src/reality-recovery-evidence-gate-v0.1.js'
+      - 'api/reality/personal-recovery-evidence.js'
+      - 'test/reality-recovery-evidence-gate-v0.1.test.js'
+      - 'src/reality-personal-unfinished-work-v0.1.js'
+      - 'api/reality/personal-unfinished-work.js'
+      - 'test/reality-personal-unfinished-work-v0.1.test.js'
+      - 'api/reality/personal-recovery.js'
+      - 'api/reality/personal-completion-reports.js'
+      - 'test/reality-completion-report-v0.1.test.js'
+      - 'test/reality-personal-recovery-checkpoint-v0.1.test.js'
+      - 'index.html'
+      - '.github/workflows/reality-recovery-live-preview-contract.yml'
+permissions:
+  contents: read
+jobs:
+  recovery-checkpoint-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Non-authorizing recovery checkpoint, route and UI tests
+        run: node --test test/reality-personal-recovery-checkpoint-v0.1.test.js test/reality-completion-report-v0.1.test.js test/reality-personal-unfinished-work-v0.1.test.js test/reality-recovery-evidence-gate-v0.1.test.js test/reality-recovery-v1-linkage.test.js test/reality-upgrade-discovery-v0.1.test.js test/reality-upgrade-discovery-category-v0.1.test.js
+      - name: Prove actual Git history gap and repaired original-work runtime
+        run: node scripts/reality-recovery-real-source-proof-v0.1.mjs
+      - name: Reproduce real old failure and verify isolated repair on historical checkout
+        run: node scripts/reality-recovery-real-sandbox-red-green-v0.1.mjs
+      - name: Archive isolated red/green recovery proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-sandbox-red-green
+          path: reality-recovery-real-sandbox-proof.json
+          retention-days: 14
+      - name: Archive independently CI-validated source recovery receipt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-source-proof
+          path: reality-recovery-real-source-proof.json
+          retention-days: 14

@@ -14,6 +14,29 @@ function headers() {
   };
 }
 
+// Diagnostics use ONLY an allowlisted classification of GitHub's error.
+// No raw HTTP error message, token, rate-limit identity or header is exposed.
+export function classifyGitHub403(body,headers=null){
+ const message=typeof body?.message==='string'?body.message.toLowerCase().slice(0,640):'';
+ const sso=headers&&typeof headers.get==='function'?
+  String(headers.get('x-github-sso')||'').toLowerCase():'';
+ if(sso.startsWith('required')||/saml|single sign.on|sso authorization/.test(message))
+  return 'SSO_AUTHORIZATION_REQUIRED';
+ if(/secondary rate limit|abuse detection|abuse rate limit/.test(message))
+  return 'SECONDARY_RATE_LIMIT';
+ if(/rate limit exceeded|api rate limit/.test(message))
+  return 'PRIMARY_RATE_LIMIT';
+ if(/resource not accessible by personal access token|resource not accessible by integration|integration.*not.*accessible/.test(message))
+  return 'TOKEN_REPOSITORY_OR_ISSUES_SCOPE_DENIED';
+ if(/ip address|ip allow list|ip allowlist|network restriction/.test(message))
+  return 'NETWORK_ACCESS_POLICY';
+ if(/repository is archived|repository.*archived|issues are disabled/.test(message))
+  return 'REPOSITORY_WRITE_UNAVAILABLE';
+ if(/personal access token.*not permitted|personal access token.*restricted|permission.*denied|operation is not permitted|access denied/.test(message))
+  return 'GITHUB_WRITE_POLICY_RESTRICTED';
+ return 'FORBIDDEN_REASON_NOT_DISCLOSED';
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${API}${path}`, {
     ...options,
@@ -25,6 +48,10 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const error = new Error(`GITHUB_CONNECTOR_${response.status}`);
     error.status = response.status;
+    // Sanitized, bounded for downstream immutable receipts; never propagate
+    // an arbitrary provider message or headers to client-facing code.
+    error.safeGitHubDenial = response.status===403?
+      classifyGitHub403(body,response.headers):null;
     error.body = body;
     throw error;
   }

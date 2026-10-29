@@ -83,7 +83,7 @@ function restoreSemantic(){
  if(priorSemantic===undefined)delete process.env.REALITY_SEMANTIC_REVIEW_ENABLED;
  else process.env.REALITY_SEMANTIC_REVIEW_ENABLED=priorSemantic;
 }
-function semanticCallStub(f,{draft,first,repair,second}={}){
+function semanticCallStub(f,{draft,first,repair,second,completeProvenance=false}={}){
  const calls=[];
  const fetchImpl=async(url,options={})=>{
   if(!String(url).includes('api.openai.com/v1/responses'))return f.fetch(url,options);
@@ -92,9 +92,51 @@ function semanticCallStub(f,{draft,first,repair,second}={}){
     throw Error('OLD_EXTRACTOR_SHOULD_NOT_RUN_WHEN_SEMANTIC_ENABLED');
   const isReview=req.text?.format?.name==='reality_semantic_review';
   const mode=isReview?'REVIEW':'MODEL';
-  calls.push({mode});
-  const text=isReview?
-    JSON.stringify(calls.filter(x=>x.mode==='REVIEW').length===1?first:second):
+  calls.push({mode,request:req});
+  const reviewPass=calls.filter(x=>x.mode==='REVIEW').length;
+  const selected=isReview?(reviewPass===1?first:second):null;
+  const comparison=isReview?JSON.parse(req.input[1].content[0].text):null;
+  // The current real reviewer uses a typed goal trajectory, lifecycle and
+  // proposal contract. Keep old regression cases semantically unchanged while
+  // providing a VALID modern model response to exercise their intended path.
+  // Do not weaken production validation or suppress the negative test quotes.
+  const currentUserRef=comparison?.user_goal_trajectory?.current_user_direction?.source_ref;
+  const goalReview=selected?.goal_trajectory_review||{};
+  const reviewerFields=isReview?{
+    goal_trajectory_review:{
+      goal_source_ref:currentUserRef||'UNKNOWN_CURRENT_USER_SOURCE',
+      user_direction:'CONTINUING_USER_OBJECTIVE',
+      answer_alignment:'ON_USER_DIRECTED_OBJECTIVE',
+      answer_quote:'',
+      reason:'The model candidate is compared with the current user objective.',
+      return_intent:'NOT_RETURN_REQUEST',return_request_quote:'',
+      ...goalReview,
+      // Fields newly mandatory for the actual provider schema; explicit
+      // case values (including false provenance) remain under test.
+      return_intent:goalReview.return_intent||'NOT_RETURN_REQUEST',
+      return_request_quote:goalReview.return_request_quote||'',
+    },
+    goal_lifecycle_review:{
+      relation:'NO_LIFECYCLE_CHANGE',speaker:'NONE',
+      target_goal_source_ref:'',source_quote:'',
+      reason:'No goal lifecycle change in this reviewer fixture.',
+      ...(selected?.goal_lifecycle_review||{}),
+    },
+    future_goal_proposals:selected?.future_goal_proposals||[],
+  }:{};
+  const covered={
+    ...selected,...reviewerFields,
+    ...(completeProvenance?{
+      provenance_checks:(comparison?.conversation_evidence?.candidates||[]).map(c=>({
+        source_ref:c.source_ref,clause_id:c.clause_id,
+        relation:reviewPass===1?'ASSERTED_AS_FACT':'REPORTED_WITH_UNCERTAINTY',
+        answer_quote:reviewPass===1?'NOT DELIVERED':'delivery remains unconfirmed',
+        verified_source_ref:'',
+        reason:'Compare the exact prior reported-delivery status with this answer.',
+      })),
+    }:{provenance_checks:selected?.provenance_checks||[]}),
+  };
+  const text=isReview?JSON.stringify(covered):
     calls.filter(x=>x.mode==='MODEL').length===1?draft:repair;
   return new Response(JSON.stringify({id:'fake-'+calls.length,
    status:'completed',output_text:text}),{status:200});
@@ -456,6 +498,212 @@ test('a false-positive reviewer warning about literally verified CI conclusion i
    assert.equal(got.reliability.semantic_repair,undefined);
    assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
    assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
+
+
+test('turn 4 active semantic path retains the internal draft and persists coverage gap',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const original='Internal release draft. No attempt to publish or externally announce this summary has been made.';
+   const quote='No attempt to publish or externally announce this summary has been made.';
+   const stub=semanticCallStub(f,{draft:original,first:review({actions:[{
+    action_type:'publish',target:'release summary',status:'COMPLETED',quote,
+   }]})});
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Prepare an internal release summary without publishing it.',
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',apiKey:'test-only',
+    systemContext:context(),verifiedConversationTurns:[],fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.reliability.model_output_quarantined,false);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_review.unassessed_claims[0].reason,
+    'EXPLICIT_DENIAL_NOT_ACTION_COMPLETION');
+   const receipt=f.events.find(e=>e.event_id===got.reliability.receipt_id);
+   assert.equal(receipt.payload.conversational_drift.coverage.status,'INSUFFICIENT_ANCHOR_COVERAGE');
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+  }finally{restoreSemantic()}
+ });
+});
+
+test('Cleaner scope clauses reach both reviews and a forgotten-obligation finding triggers bounded repair',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const message="We are NOT cancelling the construction project; we're cancelling ONLY the draft announcement.";
+   const original='The cancellation of the draft announcement is on hold.';
+   const corrected='Your requested scope cancels only the draft announcement. Construction is not cancelled. No external change has been executed.';
+   const stub=semanticCallStub(f,{draft:original,repair:corrected,
+    first:review({addressed:true,issues:[{kind:'FORGOTTEN_OBLIGATION',quote:original,
+     reason:'The requested cancellation is reversed into holding the cancellation.'}]}),second:review({})});
+   const got=await runLiveIntelligenceOrchestration({message,
+    observedAt:'2026-10-24T15:01:00.000Z',model:'test-model',apiKey:'test-only',
+    systemContext:context(),verifiedConversationTurns:[],fetchImpl:stub.fetchImpl});
+   assert.equal(got.intelligence.answer,corrected);
+   assert.deepEqual(stub.calls.map(c=>c.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   for(const call of stub.calls.filter(c=>c.mode==='REVIEW')){
+    const input=JSON.parse(call.request.input[1].content[0].text);
+    const typed=input.cleaner_conversation_context;
+    assert.equal(typed.current.clauses.length,2);
+    assert.match(typed.current.clauses[0].exact_source_text,/NOT cancelling/);
+    assert.match(typed.current.clauses[1].exact_source_text,/ONLY the draft/);
+    assert.equal(typed.execution_authorized,false);
+   }
+   const receipt=f.events.find(e=>e.event_id===got.reliability.receipt_id);
+   assert.equal(receipt.payload.conversational_drift.coverage.interpretation_source,'SIGNAL_CLEANER_TYPED_INTAKE');
+   assert.equal(receipt.payload.conversational_drift.coverage.typed_clause_count,2);
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   assert.equal(got.reliability.readback_verified,true);
+   assert.equal(got.authority.granted,false);
+  }finally{restoreSemantic()}
+ });
+});
+
+
+test('conversation comparison: revise an unknown-vs-false answer using authenticated user source, then re-review',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const turns=[
+    {role:'user',source_ref:'user:receipt:01',
+     text:"Carrier said the CX-204 delivery probably happened, but we have no signed proof of delivery. Delivery is unconfirmed."},
+    {role:'assistant',source_ref:'model:receipt:02',
+     text:'We should keep the delivery status unconfirmed until verified.'},
+    {role:'user',source_ref:'user:receipt:03',
+     text:'We are only preparing a draft update. Do not send it.'},
+   ];
+   const original='Keep the CX-204 order marked NOT DELIVERED.';
+   const corrected='CX-204 delivery remains unconfirmed. Prepare an internal status draft, but do not send it.';
+   const stub=semanticCallStub(f,{
+    draft:original,repair:corrected,
+    first:review({issues:[{
+      kind:'FACT_CONTRADICTION',quote:'NOT DELIVERED',
+      reason:'user:receipt:01 says delivery unconfirmed, not proven not delivered.'}]}),
+    second:review(),completeProvenance:true,
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'What should our status say? Keep this as a draft only.',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:turns,fetchImpl:stub.fetchImpl,
+   });
+   const reviewRequest=JSON.parse(stub.calls.find(x=>x.mode==='REVIEW')
+     .request.input[1].content[0].text);
+   assert.equal(reviewRequest.conversation_source_history.user_statements.length,2);
+   assert.equal(reviewRequest.conversation_source_history.user_statements[0].source_ref,
+     'user:receipt:01');
+   assert.match(reviewRequest.conversation_source_history.user_statements[0].text,/unconfirmed/);
+   assert.equal(reviewRequest.conversation_source_history.prior_assistant_messages_are_not_evidence,true);
+   assert.equal(got.intelligence.answer,corrected);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,1);
+   assert.equal(got.reliability.conversational_drift.findings.some(x=>
+     x.classification==='CONVERSATION_FACT_CONTRADICTION_CANDIDATE'&&
+     x.reason.includes('user:receipt:01')&&
+     x.detector_channel==='EXISTING_SEMANTIC_CONVERSATION_REVIEW'),true);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   assert.equal(got.execution.status,'NOT_EXECUTED');
+   const receipt=f.events.find(e=>e.event_id===got.reliability.semantic_repair.receipt_id);
+   assert.equal(receipt.payload.initial_issues[0].kind,'FACT_CONTRADICTION');
+   assert.equal(receipt.payload.post_repair_issues.length,0);
+  }finally{restoreSemantic()}
+ });
+});
+test('conversation comparison: do not modify a correct answer and do not promote prior assistant text to fact',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const turns=[
+    {role:'user',source_ref:'user:first',
+     text:'The carrier says delivery may have happened; no independent proof is available.'},
+    {role:'assistant',source_ref:'assistant:previous',
+     text:'Delivery is confirmed and completed.'},
+   ];
+   const original='The carrier reported possible delivery; the actual status remains unconfirmed.';
+   const stub=semanticCallStub(f,{draft:original,first:review()});
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Summarize delivery without inventing verification.',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:turns,fetchImpl:stub.fetchImpl,
+   });
+   const comparison=JSON.parse(stub.calls.find(x=>x.mode==='REVIEW')
+     .request.input[1].content[0].text).conversation_source_history;
+   assert.deepEqual(comparison.user_statements.map(x=>x.source_ref),['user:first']);
+   assert.equal(comparison.prior_assistant_messages_are_not_evidence,true);
+   assert.equal(got.intelligence.answer,original);
+   assert.equal(got.intelligence.reliability_intervention,undefined);
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,0);
+   assert.equal(got.reliability.conversational_drift.findings.length,0);
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW']);
+  }finally{restoreSemantic()}
+ });
+});
+
+
+test('user-goal trajectory drift enters existing repair and Continuity receipt; authorized user goal remains governing',async()=>{
+ await environment(async()=>{
+  previewSemantic();try{
+   const f=fixture();await bootstrap(f);
+   const firstUserRef='customer:user:intent-1';
+   const older=[
+    {role:'user',source_ref:firstUserRef,
+      text:'We need to finish the estimate for the homeowner this afternoon. Keep that the objective.'},
+    {role:'assistant',source_ref:'assistant:old-2',
+      text:'I will focus on the homeowner estimate.'},
+    {role:'user',source_ref:'customer:user:detour-3',
+      text:'Quick detour to inventory, then return to the estimate.'},
+    {role:'assistant',source_ref:'assistant:old-4',
+      text:'I can review the stock first; the estimate is still the requested outcome.'},
+   ];
+   const incorrect='Instead, let us launch a social-media campaign this afternoon.';
+   const correct='The homeowner estimate remains the goal. Check pricing and prepare the internal draft.';
+   const stub=semanticCallStub(f,{
+    draft:incorrect,repair:correct,
+    first:{...review(),goal_trajectory_review:{
+      goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      return_intent:'EXPLICIT_TARGET_RETURN',
+      return_request_quote:'Back to the homeowner estimate now',
+      answer_alignment:'ASSISTANT_DRIFTED_OFF_OBJECTIVE',
+      answer_quote:'launch a social-media campaign',
+      reason:'The user asked to return to the estimate, not launch an unsolicited campaign.',
+    }},
+    second:{...review(),goal_trajectory_review:{
+      goal_source_ref:firstUserRef,user_direction:'USER_RETURNED_TO_OBJECTIVE',
+      return_intent:'EXPLICIT_TARGET_RETURN',
+      return_request_quote:'Back to the homeowner estimate now',
+      answer_alignment:'ON_USER_DIRECTED_OBJECTIVE',
+      answer_quote:'',reason:'The answer returns to the requested estimate.',
+    }},
+   });
+   const got=await runLiveIntelligenceOrchestration({
+    message:'Back to the homeowner estimate now. What remains to finish it?',
+    observedAt:'2026-10-24T15:01:00.000Z',
+    model:'test-model',apiKey:'test-only',systemContext:context(),
+    verifiedConversationTurns:older,fetchImpl:stub.fetchImpl,
+   });
+   assert.equal(got.intelligence.answer,correct);
+   assert.equal(got.intelligence.reliability_intervention,'SEMANTIC_REVIEW_CORRECTED');
+   assert.equal(got.reliability.conversational_assessment.semantic_conversation_candidates,1);
+   assert.ok(got.reliability.conversational_drift.findings.some(x=>
+    x.classification==='CONVERSATION_TOPIC_DRIFT_CANDIDATE'&&
+    x.detector_channel==='EXISTING_SEMANTIC_CONVERSATION_REVIEW'));
+   assert.equal(got.reliability.semantic_repair.independently_verified_correctness,false);
+   const coverage=got.reliability.conversational_assessment.goal_drift_coverage;
+   assert.equal(coverage.status,'DRIFT_CANDIDATES_REQUIRE_ADJUDICATION');
+   assert.equal(coverage.independently_verified_drift_rate,null);
+   assert.equal(coverage.candidate_count_zero_means_drift_free,false);
+   const durable=f.events.find(e=>e.payload?.event_type==='MODEL_OUTPUT_ASSESSMENT');
+   assert.equal(durable.payload.conversational_drift.coverage.goal_drift_coverage.status,
+     'DRIFT_CANDIDATES_REQUIRE_ADJUDICATION');
+   const modelReq=stub.calls.find(x=>x.mode==='MODEL');
+   assert.ok(JSON.stringify(modelReq.request).includes('user_goal_trajectory'));
+   assert.deepEqual(stub.calls.map(x=>x.mode),['MODEL','REVIEW','MODEL','REVIEW']);
   }finally{restoreSemantic()}
  });
 });

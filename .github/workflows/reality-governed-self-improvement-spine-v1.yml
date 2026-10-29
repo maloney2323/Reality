@@ -1,0 +1,39 @@
+name: Reality — Foundational Governed Self-Improvement Spine
+on:
+  push:
+    branches:
+      - reality/architecture/governed-self-improvement-spine-v1-20261029
+    paths:
+      - 'src/reality-governed-self-improvement-spine-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'test/reality-governed-self-improvement-spine-v1.0.test.js'
+      - 'test/reality-autonomous-v1.0.test.js'
+      - 'docs/reality-foundational-governed-self-improvement-architecture-v1.md'
+      - '.github/workflows/reality-governed-self-improvement-spine-v1.yml'
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+permissions:
+  contents: read
+jobs:
+  immutable-constitutional-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Static syntax and independent adversarial state-machine tests
+        run: |
+          set -euo pipefail
+          node --check src/reality-governed-self-improvement-spine-v1.0.js
+          node --check src/reality-governed-self-improvement-driver-v1.0.js
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+      - name: Verify existing constitutional and capability contracts still pass
+        run: |
+          node --test test/reality-constitutional-learning-v1.0.test.js
+          node --test test/reality-constitutional-learning-bridge-v1.0.test.js
+          node --test test/reality-autonomous-v1.0.test.js

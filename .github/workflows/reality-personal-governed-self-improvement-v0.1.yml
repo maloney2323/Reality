@@ -1,0 +1,40 @@
+name: Reality Authenticated Chat -> Governed Self-Improvement
+on:
+  push:
+    branches:
+      - reality/integration/governed-self-improvement-chat-20261029
+    paths:
+      - 'src/reality-personal-governed-self-improvement-v0.1.js'
+      - 'api/reality/personal-self-improvement.js'
+      - 'index.html'
+      - 'test/reality-personal-governed-self-improvement-v0.1.test.js'
+      - '.github/workflows/reality-personal-governed-self-improvement-v0.1.yml'
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+permissions:
+  contents: read
+jobs:
+  authenticated-readonly-owner-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax and independently owner-bound self-improvement tests
+        run: |
+          set -euo pipefail
+          node --check src/reality-personal-governed-self-improvement-v0.1.js
+          node --check api/reality/personal-self-improvement.js
+          node --test test/reality-personal-governed-self-improvement-v0.1.test.js
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+      - name: Verify existing authenticated work discovery remains safe
+        run: |
+          node --test test/reality-personal-unfinished-work-v0.1.test.js
+      - name: Parse actual chatbot inline JavaScript and confirm truthful read-only state
+        run: |
+          node --input-type=module -e "import {readFileSync} from 'node:fs';import vm from 'node:vm';const h=readFileSync('index.html','utf8');for(const [,s] of h.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g))new vm.Script(s);if(!h.includes('id=\"privateSelfImprovementRefresh\"')||!h.includes('SELF_IMPROVEMENT_READBACK_UNAVAILABLE')){if(!h.includes('/api/reality/personal-self-improvement'))process.exit(1);}console.log('Reality chatbot has read-only self-improvement observation; no builder activated.')"

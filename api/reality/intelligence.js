@@ -2,7 +2,7 @@ export const maxDuration = 60;
 
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal-v0.1.js';
-import { buildFromChat } from '../../src/reality-chat-build-v1.0.js';
+import { loadAuthenticatedConversationHistory } from '../../src/reality-authenticated-conversation-history-v0.1.js';
 
 const BASE44_API = 'https://base44.app/api';
 const BASE44_APP_ID = '6a7bd610756b32bc21c39ad0';
@@ -138,18 +138,11 @@ async function loadRealityContext(req, body) {
   const conversationId = String(body?.conversation_id || '').trim();
   if (!thoughtId || !conversationId) throw new Error('REALITY_CHAT_TRACE_REQUIRED');
 
-  const q = encodeURIComponent(JSON.stringify({
-    user_id: user.id,
-    thought_id: thoughtId,
-    conversation_id: conversationId,
-  }));
-  const historyPayload = await base44Get(
-    `/apps/${BASE44_APP_ID}/entities/PersonalMessage?q=${q}&sort=-created_date&limit=80`,
-    authorization,
-  );
-  const historyRows = rows(historyPayload)
-    .filter((item) => item?.role === 'user' || item?.role === 'assistant')
-    .slice(0, 60);
+  const historyReadback=await loadAuthenticatedConversationHistory({
+    userId:user.id,thoughtId,conversationId,appId:BASE44_APP_ID,
+    getPage:path=>base44Get(path,authorization),
+  });
+  const historyRows=historyReadback.turns;
 
   const profileQuery = encodeURIComponent(JSON.stringify({ user_id: user.id }));
   let profile = null;
@@ -185,9 +178,10 @@ async function loadRealityContext(req, body) {
     goals: Array.isArray(profile.goals) ? profile.goals.slice(0, 20) : [],
   } : null;
 
-  const historyText = historyRows
-    .reverse()
-    .map((item) => `${String(item.role).toUpperCase()}: ${String(item.text || '').slice(0, 12000)}`)
+  // Avoid stuffing an entire multi-hundred-turn transcript into Universe.
+  // The cognition handoff supplies recent and source-linked older context.
+  const historyText=historyRows.slice(-12)
+    .map(item=>String(item.role).toUpperCase()+' ('+item.source_ref+'): '+item.text.slice(0,1200))
     .join('\\n');
 
   const crossText = crossThought
@@ -225,12 +219,10 @@ async function loadRealityContext(req, body) {
     // Only server-fetched, account-scoped Base44 user/assistant turns may be
     // examined as history evidence. Client-supplied conversation text is NOT
     // eligible to establish the user's earlier restrictions.
-    authenticated_conversation_turns: historyRows
-      .filter(item=>typeof item?.id==='string' && item.id.trim() &&
-        typeof item?.text==='string' && ['user','assistant'].includes(item.role))
-      .map(item=>({role:item.role,text:item.text.slice(0,12000),
-        source_ref:'base44:PersonalMessage:'+item.id,
-        created_at:item.created_date||null})),
+    authenticated_conversation_turns: historyRows,
+    conversation_history_coverage:historyReadback.coverage,
+    conversation_history_retrieved_count:historyReadback.source_message_count,
+    conversation_history_older_messages_may_be_missing:historyReadback.older_messages_may_be_missing,
     conversation_history_source:'AUTHENTICATED_CONVERSATION_MESSAGES',
     verified_conversation_context: historyText || '(No earlier conversation context is available.)',
     prior_user_context: crossText || '(No prior cross-thought user context selected.)',
@@ -254,34 +246,20 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const principal = getOrCreateSessionPrincipal(req, res);
 
-    // Explicit build language in chat enters Reality's governed self-build path.
-    // The resulting authority is bounded to an isolated branch + PR; production
-    // merge/deploy authority remains separate.
-    if (typeof body.message === 'string' && /^(build|create|implement|add|make|fix|modify|change)\\b/i.test(body.message.trim())) {
-      const build = await buildFromChat({
-        message: body.message,
-        requestedBy: principal.principal_id,
-        authorizationRef: body.authorization_id || null,
+    // Legacy natural-language self-build is NOT an action approval. Stop
+    // before any OpenAI build-generation call or GitHub provider write.
+    if (isChatBuildRequest(body.message)) {
+      return res.status(403).json({
+        ok:false,status:'BLOCKED',
+        error:'CHAT_BUILD_DIRECT_EXECUTION_DISABLED',
+        blocked_reason:'AUTHENTICATED_GOAL_BOUND_SINGLE_USE_EXECUTION_REQUIRED',
+        external_action_performed:false,
+        paid_model_call_performed:false,
+        branch_created:false,pull_request_opened:false,
       });
-      if (build) {
-        return res.status(200).json({
-          ok: true,
-          result: {
-            mode: 'SELF_BUILD',
-            answer: `Reality built the requested change and opened an isolated build for review.\\n\\nBuild: ${build.objective}\\nBranch: ${build.branch}\\nPull request: ${build.pull_request?.url || 'opened'}`,
-            build,
-            authority: { granted: true, scope: build.authorization.scope, production_merge_permitted: false },
-            execution: { status: 'PR_OPENED', production_deploy: false },
-          },
-        });
-      }
     }
 
-    const realityContext = await loadRealityContext(req, body).catch((error) => {
-      if (error?.message === 'REALITY_SESSION_REQUIRED') throw error;
-      if (error?.message === 'REALITY_CHAT_TRACE_REQUIRED') throw error;
-      return null;
-    });
+    const realityContext = await loadRealityContext(req, body);
 
     const worldObservations = await observeConnectedWorld();
     const operationalContext = {
@@ -308,6 +286,9 @@ export default async function handler(req, res) {
         context_loaded: Boolean(realityContext),
         authenticated_user_context: Boolean(realityContext?.authenticated_user_id),
         durable_context_source: realityContext ? 'BASE44_PERSONAL_REALITY' : 'NONE',
+        conversation_history_coverage:realityContext?.conversation_history_coverage||'NO_AUTHENTICATED_HISTORY',
+        conversation_history_retrieved_count:realityContext?.conversation_history_retrieved_count||0,
+        older_history_may_be_missing:realityContext?.conversation_history_older_messages_may_be_missing??true,
       },
     });
   } catch (error) {

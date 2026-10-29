@@ -106,13 +106,15 @@ test('20-turn digest retains previously detected open incidents from turns 1-10'
  assert.equal(p.digest.all_clear,false);
 });
 
-test('complete independent adjudication can say checked clear only about the current turn',()=>{
+test('source fact review alone cannot produce green all-clear when goal drift is ungraded',()=>{
  const p=buildConversationTrustPulse({history:history(1,n=>assessment(n,{
   evaluation_status:'EVALUATED_AGAINST_SOURCE_ATTESTATION',
   extraction_completeness_verified:true,independent_truth_adjudication:true,
  })),turn:1});
- assert.equal(p.status,'CHECKED_NO_FINDINGS_FULLY_ADJUDICATED');
- assert.equal(p.whole_response_verified,true);
+ assert.equal(p.status,'NO_FINDINGS_IN_LIMITED_CHECK');
+ assert.equal(p.whole_response_verified,false);
+ assert.equal(p.goal_drift_review_status,'NOT_SEMANTICALLY_ASSESSED');
+ assert.equal(p.goal_drift_independently_adjudicated,false);
  assert.equal(p.drift_free_claim_allowed,false);
 });
 
@@ -134,4 +136,28 @@ test('chat UI consumes receipt pulse after server response and surfaces the ten-
  const script=html.match(/<script>([\s\S]*?)<\/script>/);
  assert.ok(script);
  assert.doesNotThrow(()=>new vm.Script(script[1]));
+});
+
+
+test('10-turn trust digest counts missing, partial and flagged goal drift separately',()=>{
+ const data=history(10,n=>assessment(n,{
+  conversational_drift:{history_scope:'AUTHENTICATED_PRIOR_TURNS_PLUS_CURRENT',
+   findings:[],coverage:{goal_drift_coverage:{
+    status:n<=3?'NOT_SEMANTICALLY_ASSESSED':
+      n<=7?'LIMITED_REVIEW_NO_CANDIDATES':
+      n===8?'DRIFT_CANDIDATES_REQUIRE_ADJUDICATION':
+      'REVIEWED_NO_CANDIDATES_NOT_VALIDATED',
+    coverage_limitations:[],
+   }},
+  },
+ }));
+ const p=buildConversationTrustPulse({history:data,turn:10});
+ assert.equal(p.goal_drift_review_status,'REVIEWED_NO_CANDIDATES_NOT_VALIDATED');
+ assert.equal(p.zero_alerts_proves_no_drift,false);
+ assert.equal(p.digest.goal_drift_unassessed_turns,3);
+ assert.equal(p.digest.goal_drift_limited_or_unresolved_turns,4);
+ assert.equal(p.digest.goal_drift_candidate_turns,1);
+ assert.equal(p.digest.goal_drift_independently_graded_turns,0);
+ assert.equal(p.digest.drift_rate_pct,null);
+ assert.equal(p.digest.all_clear,false);
 });

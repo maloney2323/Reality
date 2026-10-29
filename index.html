@@ -30,14 +30,312 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .trust-digest summary{cursor:pointer;font-weight:700;color:#eef1f7}
 .trust-digest .trust-unknown{color:#f5d6a4}
 @media(max-width:600px){main{padding:20px 12px}.row{display:block}.row span{display:block;margin-top:4px}}
-.shift-settings{margin:0 0 28px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.shift-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.shift-head strong{font-size:18px}.switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#cbd3e0;font-size:12px}.switch input{accent-color:#eef1f7}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.shift-grid label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8792a6}.shift-grid input,.shift-grid select{display:block;width:100%;margin-top:7px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:10px;padding:10px;font:inherit}.shift-work{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 12px;border:1px solid #202938;border-radius:12px;color:#aeb8c9;font-size:12px}.shift-work span:first-child{color:#eef1f7;font-weight:700}.shift-scope{margin-top:12px;border-top:1px solid #202938;padding-top:12px}.shift-scope summary{cursor:pointer;color:#cbd3e0;font-size:12px}.shift-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.shift-columns div{border:1px solid #202938;border-radius:12px;padding:11px}.shift-columns strong{display:block;color:#eef1f7;font-size:12px;margin-bottom:7px}.shift-columns ul{margin:0;padding-left:17px;color:#98a3b5;font-size:11px;line-height:1.6}.saved{font-size:12px;color:#a9d7b5;margin-left:8px}@media(max-width:600px){.shift-head{display:block}.switch{margin-top:12px}.shift-grid,.shift-columns{grid-template-columns:1fr}} .shift-banner{margin:0 0 22px;padding:18px 20px;border:1px solid #52627d;border-radius:18px;background:linear-gradient(135deg,#151d2b,#0d121b);display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(0,0,0,.22)}.shift-banner strong{display:block;font-size:18px;line-height:1.4}.shift-banner p{margin:7px 0 0;color:#aeb8c9;font-size:12px}.shift-banner button{margin:0;white-space:nowrap}@media(max-width:600px){.shift-banner{display:block}.shift-banner button{margin-top:12px;width:100%}} .reality-console{margin:0 0 28px;display:grid;grid-template-columns:1.35fr .85fr;gap:14px}.console-card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.console-card h3{margin:4px 0 5px}.console-card .count{font-size:28px;font-weight:800}.work-item{border:1px solid #283242;border-radius:13px;padding:12px;margin-top:10px}.work-item strong{display:block}.work-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.attention-item{border:1px solid #5b4a2f;border-radius:13px;padding:12px;margin-top:10px;background:#17130c}.attention-item button{margin-top:10px;width:100%}.attention-empty{color:#8f9aac;font-size:12px;padding-top:10px}@media(max-width:760px){.reality-console{grid-template-columns:1fr}} .reality-matrix{margin:0 0 22px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.matrix-head{display:flex;justify-content:space-between;gap:12px;align-items:end}.matrix-head h2{margin:4px 0 0;font-size:20px}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:92px}.matrix-card strong{display:block;margin-bottom:6px}.matrix-card p{margin:0;color:#98a3b5;font-size:12px;line-height:1.5}.matrix-card .matrix-count{font-size:24px;font-weight:800;color:#eef1f7}@media(max-width:700px){.matrix-grid{grid-template-columns:1fr}}</style>
+.work-guidance{background:#131b27;border:1px solid #35445b;border-radius:12px;padding:12px;margin:12px 0;color:#d7e1f0;font-size:12px;line-height:1.55}
+.work-steps{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:1fr;gap:7px}
+.work-steps li{border:1px solid #334052;background:#141b27;border-radius:9px;padding:9px 11px;font-size:12px;color:#dce6f4}
+.work-steps li[data-state="complete"]{border-color:#487a6f;color:#b9e4ce}
+.work-steps li[data-state="required"]{border-color:#a87c51;color:#f7dfb3}
+.work-steps li[data-state="blocked"]{border-color:#975b59;color:#f0b0aa}
+.work-review{border:1px solid #4a617a;border-radius:12px;padding:12px;margin-top:12px;background:#101b2a;font-size:12px;line-height:1.6}
+.work-review p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+.work-review label{display:flex;align-items:flex-start;gap:9px;margin:14px 0;cursor:pointer}
+.work-review input[type=checkbox]{margin-top:4px;flex:none;min-width:18px;min-height:18px;accent-color:#b7d4d0}
+.work-review button{width:100%;white-space:normal}
+.work-review .work-cancel{background:#283242;color:#f0f2f7}
+.work-result{white-space:pre-wrap;overflow-wrap:anywhere}
+
+.shift-settings{margin:0 0 28px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.shift-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.shift-head strong{font-size:18px}.switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#cbd3e0;font-size:12px}.switch input{accent-color:#eef1f7}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.shift-grid label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8792a6}.shift-grid input,.shift-grid select{display:block;width:100%;margin-top:7px;background:#0b0e14;color:#f5f7fb;border:1px solid #303847;border-radius:10px;padding:10px;font:inherit}.shift-work{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 12px;border:1px solid #202938;border-radius:12px;color:#aeb8c9;font-size:12px}.shift-work span:first-child{color:#eef1f7;font-weight:700}.shift-scope{margin-top:12px;border-top:1px solid #202938;padding-top:12px}.shift-scope summary{cursor:pointer;color:#cbd3e0;font-size:12px}.shift-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.shift-columns div{border:1px solid #202938;border-radius:12px;padding:11px}.shift-columns strong{display:block;color:#eef1f7;font-size:12px;margin-bottom:7px}.shift-columns ul{margin:0;padding-left:17px;color:#98a3b5;font-size:11px;line-height:1.6}.saved{font-size:12px;color:#a9d7b5;margin-left:8px}@media(max-width:600px){.shift-head{display:block}.switch{margin-top:12px}.shift-grid,.shift-columns{grid-template-columns:1fr}} .shift-banner{margin:0 0 22px;padding:18px 20px;border:1px solid #52627d;border-radius:18px;background:linear-gradient(135deg,#151d2b,#0d121b);display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(0,0,0,.22)}.shift-banner strong{display:block;font-size:18px;line-height:1.4}.shift-banner p{margin:7px 0 0;color:#aeb8c9;font-size:12px}.shift-banner button{margin:0;white-space:nowrap}@media(max-width:600px){.shift-banner{display:block}.shift-banner button{margin-top:12px;width:100%}} .reality-console{margin:0 0 28px;display:grid;grid-template-columns:1.35fr .85fr;gap:14px}.console-card{background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.console-card h3{margin:4px 0 5px}.console-card .count{font-size:28px;font-weight:800}.work-item{border:1px solid #283242;border-radius:13px;padding:12px;margin-top:10px}.work-item strong{display:block}.work-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.attention-item{border:1px solid #5b4a2f;border-radius:13px;padding:12px;margin-top:10px;background:#17130c}.attention-item button{margin-top:10px;width:100%}.attention-empty{color:#8f9aac;font-size:12px;padding-top:10px}@media(max-width:760px){.reality-console{grid-template-columns:1fr}} .reality-matrix{margin:0 0 22px;background:#0e121a;border:1px solid #293140;border-radius:18px;padding:18px}.matrix-head{display:flex;justify-content:space-between;gap:12px;align-items:end}.matrix-head h2{margin:4px 0 0;font-size:20px}.matrix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.matrix-card{border:1px solid #283242;border-radius:13px;padding:13px;min-height:92px}.matrix-card strong{display:block;margin-bottom:6px}.matrix-card p{margin:0;color:#98a3b5;font-size:12px;line-height:1.5}.matrix-card .matrix-count{font-size:24px;font-weight:800;color:#eef1f7}@media(max-width:700px){.matrix-grid{grid-template-columns:1fr}}
+.start-flow{margin:18px 0 24px;padding:16px;border:1px solid #516886;border-radius:18px;background:#111928}
+.start-flow-head h2{font-size:24px;margin:4px 0 7px}.start-flow-head p{color:#b5c4d7;font-size:13px;margin:0 0 15px}
+.start-step{border:1px solid #344356;border-radius:15px;padding:16px;margin:10px 0;background:#101722}
+.start-step[data-state="active"]{border-color:#c09961;background:#1b202b}
+.start-step[data-state="complete"]{border-color:#4d8d76}
+.start-step[data-state="blocked"]{border-color:#975b59}
+.start-step-heading{display:flex;align-items:flex-start;gap:12px}
+.start-number{display:inline-grid;flex:none;place-items:center;border:2px solid #c9d6ea;color:#fff;border-radius:50%;width:36px;height:36px;font-size:19px;font-weight:700}
+.start-step[data-state="complete"] .start-number{border-color:#6cb697;color:#b4e7c9}
+.start-step h3{font-size:17px;margin:0 0 5px}.start-step-heading p{margin:0;color:#b6c2d2;font-size:12px;line-height:1.45}
+.start-status{font-size:13px;color:#dde7f4;margin:12px 0 6px}
+.start-step button{display:block;width:100%;min-height:45px;margin-top:10px;white-space:normal}
+.start-step button:disabled{opacity:.7;cursor:default}
+.start-next{border:1px solid #627a98;border-radius:12px;padding:12px;font-weight:700;font-size:13px}
+.start-limit{font-size:12px;color:#b6c6d8;margin-bottom:0}
+.advanced-option{border:1px solid #303e52;border-radius:12px;padding:12px;margin:12px 0}
+.advanced-option>summary{font-size:13px;font-weight:700;cursor:pointer;color:#d5e2f0}
+#privateChat{scroll-margin-top:18px}#privateLogin,#privateReady{scroll-margin-top:16px}
+#privateGoalText,#attentionQueue{scroll-margin-top:18px}
+@media(max-width:600px){.start-flow{padding:12px}.start-step{padding:14px}.start-flow-head h2{font-size:22px}}
+
+/* Work Center: discovered evidence, solo task plans, and bounded shift planning. */
+.work-center{margin:0 0 24px;padding:20px;background:linear-gradient(150deg,#131d2a,#0d121b 76%);border:1px solid #3e5369;border-radius:18px}
+.wc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.wc-head h2{margin:3px 0 7px;font-size:23px;line-height:1.2}.wc-head p{color:#adbcd0;font-size:13px;line-height:1.55;margin:0;max-width:640px}
+.wc-total{border:1px solid #3a4d63;border-radius:13px;padding:10px 14px;text-align:center;min-width:96px}
+.wc-total strong{font-size:27px;display:block}.wc-total button{font-size:12px;padding:8px 11px;width:100%;background:#dfeaf5;margin-top:8px}.wc-total small{display:block;color:#a5b8cf}
+.wc-tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+.wc-tabs button{background:#202b3b;color:#d4e0ef;margin:0;border:1px solid #40516a}
+.wc-tabs button[aria-selected="true"]{background:#e3ecf7;color:#0c1420;border-color:#dceaf5}
+.wc-section-title{font-size:14px;margin:20px 0 11px;color:#e5edf9}
+.wc-categories{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.wc-category{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:8px;min-height:104px;background:#121c29;border:1px solid #314257;color:#d7e2f0;border-radius:12px;padding:11px;margin:0}
+.wc-category[data-active="true"]{border-color:#bed0ea;background:#1c2e40}.wc-category strong{font-size:12px;line-height:1.4}.wc-category small{color:#96aabe;font-weight:500;line-height:1.35}.wc-category .wc-num{font-size:21px;color:#eef4ff}
+.wc-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(255px,.85fr);gap:12px;margin-top:18px;align-items:start}
+.wc-panel{border:1px solid #334256;border-radius:14px;padding:14px;background:#0b131d;min-width:0}
+.wc-panel-head{display:flex;justify-content:space-between;align-items:center;gap:9px}.wc-panel h3{font-size:16px;margin:0}
+.wc-task{padding:13px 0;border-bottom:1px solid #29394c}.wc-task:last-child{border-bottom:none}
+.wc-task-top{display:flex;align-items:flex-start;gap:9px}.wc-task-top label{display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1}
+.wc-task-top input{width:19px;height:19px;flex:none;accent-color:#c9e5d7;margin-top:2px}
+.wc-task strong{font-size:13px;line-height:1.45}.wc-task p,.wc-task .wc-small{font-size:12px;color:#a4b6cc;line-height:1.55;margin:7px 0}
+.wc-tag{display:inline-block;padding:4px 7px;border:1px solid #405169;border-radius:99px;font-size:10px;margin:5px 5px 0 0;color:#ccd9e8}
+.wc-tag[data-risk="true"]{border-color:#ab7454;color:#f4cc9b}
+.wc-task details{margin-top:9px;padding:8px 10px;border:1px solid #334457;border-radius:9px}
+.wc-task details summary{font-size:12px;color:#cfe0f4;cursor:pointer}
+.wc-task a{color:#b9d7fb;overflow-wrap:anywhere}
+.wc-plan-desc{font-size:12px;color:#abbfd3;margin:10px 0;line-height:1.55}
+.wc-inputs{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.wc-inputs label{font-size:12px;color:#bdcee1;display:block}
+.wc-inputs [hidden]{display:none!important}
+.wc-inputs select,.wc-inputs input{font:inherit;color:#eef3fc;background:#131f2d;border:1px solid #465a6f;border-radius:9px;padding:10px;margin-top:6px;width:100%}
+.wc-feedback{font-size:12px;line-height:1.65;padding:12px;background:#152334;border:1px solid #3c526a;border-radius:12px;margin:14px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.wc-plan-button{width:100%;margin-top:0;background:#e1effb;color:#132031}
+.wc-note{font-size:11px;color:#a3b4c8;line-height:1.65;margin-top:11px}
+@media(max-width:800px){.wc-categories{grid-template-columns:repeat(3,minmax(0,1fr))}.wc-layout{grid-template-columns:1fr}}
+@media(max-width:430px){.work-center{padding:14px}.wc-categories{grid-template-columns:repeat(2,minmax(0,1fr))}.wc-category{min-height:93px}.wc-head h2{font-size:21px}}
+
+.wc-sort-label{display:block;font-size:12px;color:#b9cee0;margin-top:12px}
+.wc-sort-label select{display:block;width:100%;font:inherit;color:#eef3fc;background:#152030;border:1px solid #425871;border-radius:9px;padding:10px;margin-top:6px}
+.wc-impact{border-top:1px solid #3b4c64;margin-top:18px;padding-top:16px}
+.wc-impact h3{margin:0;font-size:16px}
+
+.wc-staffing{border:1px solid #41536d;border-radius:12px;padding:13px;margin-top:15px;background:#0c1825}
+.wc-staffing summary{font-size:13px;font-weight:700;color:#e7f1fc;cursor:pointer}
+.wc-staffing .wc-plan-button{margin-top:14px}
+.wc-diagnostic{display:flex;align-items:center;flex-wrap:wrap;gap:11px;background:#172437;border:1px solid #344b67;border-radius:11px;padding:10px 12px;margin:14px 0}
+.wc-diagnostic button{flex:none;padding:9px 13px;margin:0;font-size:12px;background:#d7e8f9;color:#122131}
+.wc-diagnostic span{color:#b8cadd;font-size:12px;line-height:1.5;flex:1;min-width:180px}
+.account-shortcut{display:inline-block;text-decoration:none;white-space:nowrap;font-weight:700;border-color:#5b7189;color:#eef5ff}
+#privateChat{scroll-margin-top:16px}
+#privateAccountState{font-size:14px;line-height:1.55;margin:8px 0 10px}
+.wc-unfinished{margin:16px 0;border:1px solid #71815b;background:#191e19;border-radius:16px;padding:16px}
+.wc-unfinished h3{margin:0;font-size:20px}
+.wc-unfinished-count{font-size:12px;color:#d5dcba}
+.wc-unfinished-card{border:1px solid #566a58;background:#121e1c;border-radius:14px;padding:15px;margin-top:12px;overflow-wrap:anywhere}
+.wc-unfinished-card h4{font-size:16px;margin:6px 0 8px}
+.wc-unfinished-card p{font-size:13px;line-height:1.5;margin:6px 0}
+.wc-unfinished-state{color:#eddaaf;font-size:12px;font-weight:700}
+.wc-unfinished-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:10px}
+.wc-unfinished-actions button{margin:0}
+.wc-unfinished-actions a{font-size:13px;color:#b1dbff}
+.wc-unfinished-card[data-status="RECOVERY_CHECKPOINT_SAVED"]{border-color:#4d806f}
+.wc-unfinished-card[data-status="PRIOR_ACTION_UNRESOLVED"]{border-color:#94735a}
+.wc-recovery-timeline{margin-top:12px;border-top:1px solid #536b5b;padding-top:10px}
+.wc-recovery-timeline h4{font-size:15px;margin:0 0 8px}
+.wc-recovery-timeline p{font-size:12px;line-height:1.5;margin:7px 0}
+.wc-recovery-timeline a{font-size:12px;color:#b1dbff}
+.wc-completion{margin:16px 0 20px;border:1px solid #466275;background:#101b29;border-radius:16px;padding:16px}
+.wc-completion-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.wc-completion-head h3{margin:0}.wc-completion-head button{margin-top:0}
+.wc-ending-receipt{background:#101d2a;border:1px solid #496579;border-radius:14px;padding:15px;margin:12px 0;overflow-wrap:anywhere}
+.wc-ending-receipt[data-outcome="verified"]{border-color:#4d806f}
+.wc-ending-receipt[data-outcome="unknown"]{border-color:#94735a}
+.wc-ending-receipt h3{margin:0 0 6px}.wc-ending-receipt .wc-receipt-kicker{font-size:12px;font-weight:700;color:#aac6db}
+.wc-ending-receipt ul{padding-left:20px;margin:6px 0 12px}.wc-ending-receipt li{margin:5px 0}
+.wc-ending-receipt a{overflow-wrap:anywhere}.wc-ending-receipt .wc-receipt-proof{font-size:12px;color:#b4c2d2;overflow-wrap:anywhere}
+.wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
+.wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
+.wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
 </head>
 <body>
 <main>
-  <div class="top"><div class="brand">REALITY</div><div class="state">GOVERNED CHAT · v0.1</div></div>
+  <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
+  <h1>Reality · Let's get started</h1>
+  <p class="sub">Follow these three steps. You do <strong>not</strong> need to type a Request for this test. Reality will find the work.</p>
+  <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
+    <strong id="productState">CHECKING REALITY</strong>
+    <span><strong id="liveHeadline">Verifying connected services…</strong>
+    <span id="liveDetail">No real-world outcome has been claimed.</span></span>
+  </div>
+
+<section id="startFlow" class="start-flow" aria-label="Start here: three steps">
+ <div class="start-flow-head"><span class="label">START HERE</span><h2>3 steps. That's it.</h2><p>Reality tells you what to do next.</p></div>
+ <div class="start-step" id="startStep1" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">1</span><div><h3>Step 1 · Sign in</h3><p>Use your existing Reality account.</p></div></div>
+  <p id="startStatus1" class="start-status" role="status">Checking your sign-in…</p>
+  <button id="startAction1" type="button">Step 1 · Sign in</button>
+ </div>
+ <div class="start-step" id="startStep2" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">2</span><div><h3>Step 2 · Confirm your goal</h3><p>Tell Reality what your business is trying to achieve, or resume an existing goal.</p></div></div>
+  <p id="startStatus2" class="start-status" role="status">Complete Step 1 first.</p>
+  <button id="startAction2" type="button">Step 2 · Set my goal</button>
+ </div>
+ <div class="start-step" id="startStep3" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">3</span><div><h3>Step 3 · Find and review work</h3><p>Let Reality find a task, review its evidence, then approve the exact action.</p></div></div>
+  <p id="startStatus3" class="start-status" role="status">Complete Steps 1 and 2 first.</p>
+  <button id="startAction3" type="button">Step 3 · Find work</button>
+ </div>
+ <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
+ <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
+</section>
+<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation">
+ <div class="label">REALITY · ACCOUNT & PERSISTENT CONVERSATION (PREVIEW)</div>
+ <h3>Account · Sign in or continue</h3>
+ <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
+ <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
+ <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
+ <div id="privateLogin" style="display:none">
+  <label for="privateEmail">Account email</label>
+  <input id="privateEmail" type="email" required autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <label for="privatePassword">Password</label>
+  <input id="privatePassword" type="password" required autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <button id="privateSignIn" type="button">Sign in to continuous chat</button>
+ </div>
+ <div id="privateReady" style="display:none">
+  <label for="privateConversations">Saved conversations</label>
+  <select id="privateConversations" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"><option value="">Current conversation</option></select>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+   <button id="privateNew" type="button">New conversation</button>
+   <button id="privateSignOut" type="button">Sign out</button>
+  </div>
+  <section aria-label="Reality self-improvement" style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
+   <strong>Reality · Self-Improvement</strong>
+   <p class="muted" id="privateSelfImprovementStatus" aria-live="polite">Checks signed-in Continuity for unfinished work. The model cannot approve or install upgrades.</p>
+   <button type="button" id="privateSelfImprovementRefresh">Inspect Reality's next work</button>
+   <button type="button" id="privateContinueOriginal143" disabled>Continue original job #143 · Existing verified path</button>
+   <p class="muted" style="font-size:11px">No new queue or dispatch. This opens Reality's existing authenticated original-job review. Reality checks fresh GitHub and Continuity evidence before showing the separate owner approval. No change to production.</p>
+  </section>
+  <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
+   <strong>Confirmed user objective</strong>
+   <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
+   <label for="privateGoalText">Required for business work: your confirmed active goal</label>
+   <p class="muted" style="font-size:12px">Enter your objective in your own words, or resume an existing confirmed goal. Reality will not choose or change your goal for you.</p>
+   <textarea id="privateGoalText" required minlength="12" maxlength="700" placeholder="Example: My active goal is to prepare a supervised construction pilot for the owner."></textarea>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="privateSetGoal" type="button">Confirm this goal</button>
+   </div>
+   <label for="privateSavedGoals">Previously confirmed objectives</label>
+   <select id="privateSavedGoals" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"></select>
+   <button id="privateResumeGoal" type="button">Resume selected goal</button>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button id="privatePauseGoal" type="button" disabled>Pause active goal</button>
+    <button id="privateStopGoal" type="button" disabled>Abandon active goal</button>
+    <button id="privateReportGoal" type="button" disabled>Report goal complete (unverified)</button>
+   </div>
+   <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
+  </div>
+  <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
+  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
+  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
+   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
+   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
+   <option value="START_DETOUR">Temporarily detour from my active objective</option>
+  </select>
+  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
+  <button id="privateSend" type="button">Send to Reality</button>
+ </div>
+ <p id="privateStatus" class="muted" role="status"></p>
+</section>
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
+<section class="work-center" id="workCenter" aria-label="Reality Work Center">
+ <div class="wc-head">
+  <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
+   <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
+  <div class="wc-total"><strong id="wcDiscovered">0</strong><small>source-backed findings</small><button type="button" id="wcDiscover">Find work</button></div>
+ </div>
+ <div class="wc-unfinished" id="wcUnfinishedCenter" role="region" aria-label="Reality unfinished work">
+  <div class="wc-completion-head">
+   <div><h3>Unfinished Work <span class="wc-unfinished-count" id="wcUnfinishedCount"></span></h3>
+    <p class="wc-note">Jobs that still need attention, across your saved conversations. A finished tracking action is not a finished repair.</p></div>
+   <button type="button" id="wcRefreshUnfinished">Refresh unfinished work</button>
+  </div>
+  <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
+  <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
+ </div>
+ <div class="wc-diagnostic">
+  <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
+  <span id="wcCredentialResult" role="status" aria-live="polite">GitHub Issue write access has not been proven by read-only checks. Earlier attempts stay locked.</span>
+ </div>
+ <div class="wc-completion" id="wcCompletionCenter" role="region" aria-label="Reality end-of-work receipts">
+  <div class="wc-completion-head"><h3>Reality · Work results & ending receipts</h3>
+   <button type="button" id="wcRefreshCompletion">Refresh saved receipts · Read only</button></div>
+  <p id="wcCompletionStatus" class="wc-note" role="status" aria-live="polite">Sign in to view saved, source-backed job outcomes. Discovery is not completion.</p>
+  <div id="wcCompletionList"><p class="muted">No completed-job claim has been established in this view.</p></div>
+  <div id="wcShiftReceipt" hidden></div>
+ </div>
+ <div class="wc-tabs" role="tablist" aria-label="Work planning mode">
+  <button type="button" role="tab" data-wc-mode="tasks" aria-selected="true">Individual tasks</button>
+  <button type="button" role="tab" data-wc-mode="shift" aria-selected="false">1–8 hour shift</button>
+ </div>
+ <h3 class="wc-section-title">Discoveries by category <span class="muted" style="font-weight:400">· Tap a category to explore</span></h3>
+ <div class="wc-categories" id="wcCategories" aria-label="Clickable work categories"></div>
+ <div class="wc-layout">
+  <div class="wc-panel">
+   <div class="wc-panel-head"><h3 id="wcSelectedTitle">All findings</h3><span class="badge" id="wcSelectedCount">0 found</span></div>
+<label class="wc-sort-label">Rank work by
+<select id="wcSort"><option value="triage">Review priority · evidence heuristic</option><option value="automation">Supported tracking first</option><option value="risk">Higher review risk first</option></select></label>
+<p class="wc-note">Review scores are not measured business impact. Historical commits do not prove outstanding defects.</p>
+   <p class="wc-plan-desc">Findings and evidence come from Reality's discovery feed. A discovered problem is not automatically a task Reality can execute.</p>
+   <div id="wcTaskList" aria-live="polite">Loading work…</div>
+  </div>
+  <div class="wc-panel" aria-label="Workload and budget planner">
+   <h3 id="wcPlanTitle">Your task batch</h3>
+   <p class="wc-plan-desc" id="wcPlanIntro">Choose one task, or select several to review together.</p>
+   <div class="wc-inputs">
+    <label id="wcHoursRow" hidden>Maximum shift length
+     <select id="wcHours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4" selected>4 hours</option><option value="5">5 hours</option><option value="6">6 hours</option><option value="7">7 hours</option><option value="8">8 hours</option></select>
+    </label>
+    <label>Plan / billing assumption
+     <select id="wcMetering"><option value="unknown">Plan not verified</option><option value="metered">Model a credit allowance</option><option value="unlimited">Unlimited automation — hypothetical plan</option></select>
+    </label>
+    <label id="wcRateRow" hidden>Assumed credits per active hour (planning only)
+     <input id="wcRate" type="number" min="0.01" max="100000" step="0.01" placeholder="Enter your plan's rate">
+    </label>
+   </div>
+   <div class="wc-feedback" id="wcSummary" role="status" aria-live="polite">Select work to see a planning summary. Credit usage is not metered yet.</div>
+   <button type="button" class="wc-plan-button" id="wcPreview">Preview my task batch</button>
+<div class="wc-impact"><h3>Time returned & savings scenario</h3>
+<p class="wc-plan-desc">Select exactly ONE workflow. Enter your own observed or assumed numbers. The scenario cannot prove automation capability or real savings.</p>
+<div class="wc-inputs">
+<label>Manual minutes per occurrence<input id="wcManualMinutes" type="number" min="0.1" max="60000" step="0.1" placeholder="Measured or assumed minutes"></label>
+<label>Occurrences each month<input id="wcFrequency" type="number" min="0.1" max="100000" step="0.1" placeholder="Frequency per month"></label>
+<label>Potential automation coverage (%)<input id="wcCoverage" type="number" min="0" max="100" step="1" placeholder="Assumed, 0–100"></label>
+<label>Hourly labor value (USD)<input id="wcLaborRate" type="number" min="0.01" max="100000" step="0.01" placeholder="Enter your labor cost/value"></label>
+<label>Monthly automation operating cost (USD, optional)<input id="wcMonthlyCost" type="number" min="0" max="1000000000" step="0.01" placeholder="Unknown unless measured"></label>
+</div><div class="wc-feedback" id="wcValueOutput" role="status" aria-live="polite">No verified labor baseline. Select one workflow and enter assumptions to model a hypothetical opportunity.</div>
+<details class="wc-staffing" id="wcStaffing">
+<summary>Workforce impact · employees & FTE capacity</summary>
+<p class="wc-plan-desc">Estimate the maximum staffing capacity potentially freed, AFTER manual reviews and exceptions. This is a hypothetical planning model, not a recommendation to eliminate employees.</p>
+<div class="wc-inputs">
+<label>Productive paid hours per employee per month
+<input id="wcFteHours" type="number" min="1" max="744" step="1" placeholder="Enter company-specific hours"></label>
+<label>Human review minutes per automated occurrence
+<input id="wcReviewMinutes" type="number" min="0" max="60000" step="0.1" placeholder="Enter 0 only if none expected"></label>
+<label>Automated occurrences requiring an exception (%)
+<input id="wcExceptionRate" type="number" min="0" max="100" step="1" placeholder="Enter 0 only if none expected"></label>
+<label>Human minutes per exception
+<input id="wcExceptionMinutes" type="number" min="0" max="60000" step="0.1" placeholder="Enter 0 only if none expected"></label>
+<label>Current employees in this role/team (optional)
+<input id="wcTeamHeadcount" type="number" min="1" max="1000000" step="1" placeholder="Needed for theoretical whole-position ceiling"></label>
+<label>Monthly share of one-time implementation costs (USD, optional)
+<input id="wcSetupCost" type="number" min="0" max="1000000000" step="0.01" placeholder="Amortized setup costs, if known"></label>
+</div>
+<button type="button" class="wc-plan-button" id="wcCalculateStaffing">Calculate staffing-capacity scenario</button>
+<div class="wc-feedback" id="wcStaffingResult" role="status" aria-live="polite">No headcount or payroll reduction has been established. Complete the inputs above to model the equivalent labor capacity.</div>
+<p class="wc-note">To establish eliminable positions, Reality would need a complete job-cycle proof, role-by-role duties, shift coverage, service levels and measured operating costs. Freed capacity may instead support redeployment, reduced overtime or additional output.</p>
+</details></div>
+   <p class="wc-note">Planning does not start a shift, spend credits, create an issue, or approve any external operation. Full-job estimates and real token costs need measured execution receipts. The optional credit rate is your assumption, not an invoice or verified subscription entitlement.</p>
+  </div>
+ </div>
+</section>
+<section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div class="work-guidance"><strong>Approval setup · required steps</strong>
+<div>1. Sign in to your private Reality account.</div>
+<div>2. Confirm or resume your own active business goal.</div>
+<div>3. Verify the discovered work and exact proposed action.</div>
+<div>4. Check the approval box and explicitly approve that one action.</div>
+<div><strong>Approval is not execution:</strong> a separate, fresh confirmation is required before any GitHub issue creation.</div></div><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div><div class="work-guidance" id="realityRecoveryPanel"><strong>Execution recovery · Read only</strong><p>Earlier uncertain attempts remain locked. Review GitHub evidence without re-executing or changing their reservations.</p><button type="button" id="reconcileHistory">Inspect previous execution attempts · No writes</button><div id="reconcileResult" role="status" aria-live="polite"></div></div></div></section>
+<details class="advanced-option" id="advancedShift"><summary>Optional · Advanced shift schedule and settings</summary>
   <div class="shift-banner" role="status"><div><div class="label">TONIGHT'S REALITY SHIFT</div><strong>Engineering readiness <span id="bannerReadiness">8:00 PM</span> → Autonomous shift <span id="bannerStart">9:00 PM</span></strong><p>Reality will wake up, discover useful governed work, and work the queue. <span id="bannerState">Shift enabled</span>.</p></div><button id="bannerSave" type="button">Save 8 PM → 9 PM</button></div>
-  <h1>Reality finds work. Ask when you want.</h1>
-  <p class="sub">Normal conversation stays normal. When a request implies governed work, Reality shows what it understood, what it intends to do, what authority exists, and how the result will be proved.</p>
 
   <section class="shift-settings" aria-label="Reality daily shift settings">
 <div class="shift-head"><div><div class="label">REALITY OPERATING SHIFT</div><strong>Daily autonomous shift</strong><p class="muted">Reality starts by itself, discovers its own work, and works the governed queue.</p></div><label class="switch"><input id="shiftEnabled" type="checkbox" checked><span>Enabled</span></label></div>
@@ -46,6 +344,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="runShiftNow" type="button">Run one supervised shift now</button>
 <span class="muted" id="runShiftProof" role="status">Owner-only discovery test. Scheduled shifts remain unchanged; no external work is authorized.</span>
 </div>
+<div id="shiftEndingReceipt" class="wc-ending-receipt" role="status" aria-live="polite" hidden></div>
 <div class="shift-work"><span>Shift work</span><span>Find bugs · recover unfinished work · discover recurring work · research upgrades · watch competition · execute governed work · verify results</span></div>
 <details class="shift-scope"><summary>Show full shift mission</summary>
 <div class="shift-columns">
@@ -62,7 +361,10 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
 </section>
 
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><div class="chat">
+
+</details>
+<details class="advanced-option" id="optionalPrompt"><summary>Optional · Ask Reality a question (not needed for this test)</summary>
+<div class="chat">
     <div class="bubble user">
       <div class="label">Your request</div>
       <textarea id="request" placeholder="Try: Review unread business emails, identify follow-ups, draft responses, and send them."></textarea>
@@ -102,6 +404,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
       </section>
     </div>
   </div>
+</details>
 </main>
 <script>
 const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
@@ -205,7 +508,1499 @@ $('plan').onclick=async()=>{
     $('verification').textContent='No external outcome claimed';
   }catch(e){$('error').textContent=e.message;renderTrustPulse(null)}finally{$('plan').disabled=false}
 };
+// UI-only progress. Server still re-verifies actual identity, goal, source,
+// policy and exact-work authorization before any consequential operation.
+const guidedSetup={authenticated:null,goal:'checking',goalTitle:'',workFound:false,approved:false,accountError:''};
+function paintGuidedSetup(){
+ const signed=guidedSetup.authenticated===true;
+ const pending=guidedSetup.authenticated===null;
+ const goal=signed&&guidedSetup.goal==='confirmed';
+ const set=(n,state,status,label)=>{
+  $('startStep'+n).dataset.state=state;
+  $('startStatus'+n).textContent=status;
+  $('startAction'+n).textContent=label;
+ };
+ set(1,signed?'complete':pending?'pending':'active',
+  signed?'✓ Signed in to your private Reality account':
+  pending?'Checking sign-in…':guidedSetup.accountError||'Required: sign in below with your existing account.',
+  signed?'✓ Step 1 complete · Account':'Step 1 · Go to sign in');
+ set(2,goal?'complete':signed?'active':'pending',
+  goal?'✓ Confirmed goal: '+guidedSetup.goalTitle.slice(0,140):
+   !signed?'First, finish Step 1.':
+   guidedSetup.goal==='unavailable'?'Goal ledger not verified. Check the message below.':
+   'Required: confirm an active goal or resume a previously confirmed goal.',
+  goal?'✓ Step 2 complete · View goal':'Step 2 · Enter or resume goal');
+ set(3,guidedSetup.approved?'complete':goal?'active':'pending',
+  guidedSetup.approved?'✓ Exact work approved. External execution is still disabled.':
+  !goal?'Finish Steps 1 and 2 first.':
+  guidedSetup.workFound?'Work discovered. Review one candidate below.':
+  'Ready: Reality can find source-backed work without a Request.',
+  guidedSetup.approved?'✓ Step 3 complete · Review result':
+  guidedSetup.workFound?'Step 3 · Review work':'Step 3 · Find work');
+ $('startNext').textContent=guidedSetup.approved
+  ?'Test reached exact approval. Dispatch is not enabled.'
+  :!signed?'NEXT → Step 1: Sign in to Reality.'
+  :!goal?'NEXT → Step 2: Confirm the goal you want Reality to work toward.'
+  :guidedSetup.workFound?'NEXT → Step 3: Select a discovered task and review its exact action.'
+  :'NEXT → Step 3: Press Find work. No Request field is needed.';
+}
+$('startAction1').onclick=()=>jumpToWorkSetup('account');
+$('startAction2').onclick=()=>{
+ if(guidedSetup.authenticated!==true)return jumpToWorkSetup('account');
+ jumpToWorkSetup('goal');
+};
+$('startAction3').onclick=()=>{
+ if(guidedSetup.authenticated!==true)return jumpToWorkSetup('account');
+ if(guidedSetup.goal!=='confirmed')return jumpToWorkSetup('goal');
+ if(guidedSetup.workFound||guidedSetup.approved)
+  return $('attentionQueue').scrollIntoView({behavior:'smooth',block:'start'});
+ realityWork.click();
+};
+paintGuidedSetup();
+// Historical recovery is a different lane from approval and execution.
+$('reconcileHistory').onclick=async()=>{
+ const button=$('reconcileHistory'),out=$('reconcileResult');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!conv||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv)){
+  out.textContent='Sign in and open the conversation containing the original attempts first.';
+  return;
+ }
+ button.disabled=true;out.textContent='Reading your existing Continuity and GitHub issues. No writes…';
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RECONCILE',conversation_id:conv}),
+  });
+  const result=await response.json();
+  if(!response.ok||!result.ok)throw Error(result.error||'Read-only reconciliation unavailable');
+  if(!result.attempts?.length){
+   out.textContent='No uncertain issue attempts in this conversation. No action performed.';
+   return;
+  }
+  const lines=['Found '+result.attempts.length+' historic uncertain attempt(s). No retries or changes.'];
+  for(const prior of result.attempts){
+   const observed=prior.provider_observation||{};
+   lines.push(prior.original_title+': '+String(observed.status||'UNKNOWN')+
+    ' · reservation remains locked · causal attribution unproven');
+   for(const issue of observed.matching_issues||[])
+    if(/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(issue.url||'')))
+     lines.push('Observed issue: '+issue.url);
+  }
+  out.textContent=lines.join('\n');
+ }catch(e){
+  out.textContent='Recovery readback unavailable: '+e.message+
+   '. Historical reservations remain locked. No retry.';
+ }finally{button.disabled=false;}
+};
 const realityWork=$('findWork');const workResult=$('workResult');
+let guidedWorkPending=false;
+function jumpToWorkSetup(kind){
+ guidedWorkPending=true;
+ const chat=$('privateChat');
+ if(chat?.style.display==='none'){
+  workResult.textContent='Private goal/approval setup is not available in this deployment. Work remains blocked.';
+  return;
+ }
+ chat?.scrollIntoView({behavior:'smooth',block:'start'});
+ const input=kind==='account'?'privateEmail':'privateGoalText';
+ $(input)?.focus({preventScroll:true});
+}
+function setWorkStep(card,step,value,description){
+ const el=card?.querySelector('[data-work-step="'+step+'"]');
+ if(!el)return;
+ el.dataset.state=value;
+ el.textContent=step+'. '+description;
+}
+function showWorkSetupAction(target,message,kind){
+ target.replaceChildren();
+ const info=document.createElement('p');info.textContent=message;
+ const button=document.createElement('button');
+ button.type='button';
+ button.textContent=kind==='account'?'Go to sign in':'Go to confirmed objective';
+ button.onclick=()=>jumpToWorkSetup(kind);
+ target.append(info,button);
+}
+// Gap 3 is never auto-dispatched by Step 3 approval. Only an entirely NEW,
+// deliberate user click can request the server's atomic single-use execution.
+async function revealGap3Action(review,receipt,workItem,conversationId,workId){
+ const info=document.createElement('p');
+ info.textContent='Checking live GitHub execution readiness. Approval alone never dispatches.';
+ review.append(info);
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||!data.ok||data.status!=='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED'){
+   info.textContent='Gap 3 · GitHub write is not configured on this protected preview. No issue can be created here yet. Your Step 3 approval was recorded; do not attempt automatic retries.';
+   return;
+  }
+  // An existing UNRESOLVED issue attempt remains non-retryable even if the
+  // owner reconfirms the goal or creates another short-lived approval.
+  // CHECK only verifies stored evidence; it never consumes a reservation.
+  const checkResponse=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'CHECK',conversation_id:conversationId,discovered_work_id:workId,
+   }),
+  });
+  const check=await checkResponse.json();
+  if(!checkResponse.ok||!check.ok||
+     check.status!=='EXACT_SOURCE_AND_USER_APPROVAL_ADMITTED'){
+   const noRetry=check.error==='PERSONAL_DISPATCH_PREVIOUS_ATTEMPT_RECONCILIATION_REQUIRED_NO_RETRY';
+   info.textContent=noRetry?
+    'Gap 3 · Previous execution attempt is UNRESOLVED. Do not run again. The provider and consumed reservation require read-only reconciliation.':
+    'Gap 3 · Fresh execution preflight is blocked: '+String(check.error||'Approval or work no longer current')+
+    '. No action has been performed by this check.';
+   return;
+  }
+  info.textContent='Gap 3 · Separate live action. This creates ONE GitHub issue only after a new explicit confirmation. This is not automatic.';
+  const scope=document.createElement('p');
+  scope.textContent='Exact operation: Create one issue in maloney2323/Reality. Title: '+workItem.inputs.title+
+   '\\nNo code changes, merging, purchases or deployment will occur.';
+  const consent=document.createElement('label');
+  const checked=document.createElement('input');checked.type='checkbox';checked.required=true;
+  const terms=document.createElement('span');
+  terms.dataset.runConsentText='true';
+  terms.textContent='Required: I separately authorize creating this one exact GitHub issue now. I understand it cannot be blindly retried if the outcome is uncertain.';
+  consent.append(checked,terms);
+  const run=document.createElement('button');run.type='button';run.disabled=true;
+  run.textContent='Run this one approved GitHub issue';
+  checked.onchange=()=>{run.disabled=!checked.checked;};
+  run.onclick=async()=>{
+   if(!checked.checked||!checked.checkValidity())return;
+   if(!confirm('Create ONE real GitHub issue in maloney2323/Reality named: '+workItem.inputs.title+'?'))return;
+   checked.disabled=true;run.disabled=true;
+   run.textContent='Executing once · Verifying GitHub…';
+   let verifiedIssue=false;
+   try{
+    const response=await fetch('/api/reality/personal-issue-dispatch',{
+     method:'POST',credentials:'same-origin',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({
+      intent:'RUN',conversation_id:conversationId,discovered_work_id:workId,
+      confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE',
+     }),
+    });
+    const out=await response.json();
+    if(!response.ok||!out.ok){
+     if(out.failure_phase==='BEFORE_PROVIDER_DISPATCH'){
+      info.textContent='Gap 3 · Not executed. Admission blocked before GitHub dispatch. '+String(out.error||'Fresh approval required')+
+       '. Review the exact task and current goal. Do not automatically retry.';
+      receipt.textContent='No GitHub execution for this request · Approval/readiness rejected. Prior uncertain attempts remain locked.';
+      run.textContent='Preflight rejected · Not executed';
+      return;
+     }
+     throw Error(out.error||'Execution was not admitted. Review before any retry.');
+    }
+    if(out.status==='VERIFIED'&&out.verified===true&&
+       out.outcome_receipt_id&&out.reservation_id&&
+       /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(out.provider_issue_url||''))){
+     verifiedIssue=true;
+     const link=document.createElement('a');
+     link.textContent='View independently verified GitHub issue';
+     link.href=out.provider_issue_url;link.target='_blank';link.rel='noopener noreferrer';
+     info.textContent='GitHub tracking issue created and independently read back. Outcome saved to Continuity. The underlying investigation and repair are still pending.';
+     receipt.textContent='GitHub ISSUE CREATED AND VERIFIED · Work '+workId+
+      ' · Outcome receipt '+out.outcome_receipt_id+' · Single-use reservation '+out.reservation_id+
+      ' · Repair not performed.';
+     const approvalOnly=review.querySelector('[data-approval-only-note]');
+     if(approvalOnly)approvalOnly.textContent='GitHub action completed and verified. This created a tracking issue only; the underlying failure is not repaired. No replay of this reservation.';
+     const card=review.closest('.attention-item');
+     setWorkStep(card,4,'complete','GitHub issue created · Verified; repair pending');
+     const setupButton=card?.querySelector('[data-auth]');
+     if(setupButton){
+      setupButton.disabled=true;
+      setupButton.textContent='GitHub issue verified · Repair pending';
+     }
+     const consentText=review.querySelector('[data-run-consent-text]');
+     if(consentText)consentText.textContent='Your one-time authorization has been consumed. Do not create another issue for this same attempted work.';
+     review.append(link);
+     void wcLoadCompletionReports({focus:true});
+    }else{
+     info.textContent='Gap 3 · '+String(out.status||'UNRESOLVED')+
+      '. Do not retry automatically; reconcile the provider and reservation receipts.';
+     const category=/^(SSO_AUTHORIZATION_REQUIRED|SECONDARY_RATE_LIMIT|PRIMARY_RATE_LIMIT|TOKEN_REPOSITORY_OR_ISSUES_SCOPE_DENIED|NETWORK_ACCESS_POLICY|REPOSITORY_WRITE_UNAVAILABLE|GITHUB_WRITE_POLICY_RESTRICTED|FORBIDDEN_REASON_NOT_DISCLOSED)$/.test(String(out.provider_failure_detail||''))?
+      out.provider_failure_detail:'UNKNOWN';
+     receipt.textContent='Execution outcome not verified · Stage '+String(out.provider_failure_stage||'UNKNOWN')+
+      ' · HTTP category '+String(out.provider_failure_code||'UNKNOWN')+
+      ' · Safe provider reason '+category+
+      ' · Earlier reservations remain locked · No automatic retry.';
+    }
+   }catch(e){
+    info.textContent='Gap 3 could not complete: '+e.message+
+     '. Status may be uncertain. Do not retry automatically.';
+   }
+   run.textContent=verifiedIssue?
+    'GitHub issue verified · Repair pending · Do not retry':
+    'Execution attempt finished · Do not retry';
+  };
+  review.append(scope,consent,run);
+ }catch{
+  info.textContent='Gap 3 readiness check unavailable. No external action has been attempted.';
+ }
+}
+
+
+
+// Owner-only read-only Preview token diagnostic. A credential probe is NOT
+// permission to POST a real issue or retry any previous reservation.
+$('wcCredentialCheck').onclick=async()=>{
+ const button=$('wcCredentialCheck'),out=$('wcCredentialResult');
+ button.disabled=true;
+ out.textContent='Checking GitHub owner, repository and Issues settings using the configured Preview token. No write…';
+ try{
+  const response=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store',
+  });
+  const p=await response.json();
+  if(!response.ok||!p.ok){
+   out.textContent='Sign in to your private Reality account to verify the Preview token. No GitHub write attempted.';
+   return;
+  }
+  if(p.status==='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED'){
+   out.textContent='Owner verified: '+String(p.token_identity_verified)+
+    ' · Repository metadata verified: '+String(p.repository_metadata_verified)+
+    ' · GitHub Issues enabled: '+String(p.issues_feature_enabled)+
+    ' · Issues GET verified: '+String(p.repository_issue_read_verified)+
+    ' · Issues WRITE still unproven. Do not retry previous attempts.';
+  }else{
+   out.textContent='Read-only GitHub credential readiness: '+String(p.status||'NOT_VERIFIED')+
+    ' · Owner: '+String(p.token_identity_verified)+
+    ' · Repo: '+String(p.repository_metadata_verified)+
+    ' · Issues enabled: '+String(p.issues_feature_enabled)+
+    ' · Issues read: '+String(p.repository_issue_read_verified)+
+    '. No action performed.';
+  }
+ }catch{
+  out.textContent='Credential check unavailable. No GitHub write attempted. Previous reservations remain locked.';
+ }finally{button.disabled=false}
+};
+
+/* Read-only Work Center. Does NOT dispatch, schedule or charge. */
+const workCategories=[
+ ['all','View all','All findings'],['customer','Customer issues & feedback','Customers and service'],
+ ['bugs','Bug fixes','Confirmed defects'],['upgrades','Upgrades & improvements','Proposed changes'],
+ ['features','New features','Missing capabilities'],['reliability','Performance & reliability','Regressions and failures'],
+ ['integrations','Integrations & deployment','Services and releases'],['security','Security, governance & evidence','Trust and authority'],
+ ['operations','Operations & workflow','Business processes'],['research','Research & opportunities','Work to evaluate'],
+ ['automation','Automation & time returned','Repeatable work']
+];
+let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
+let wcUpgradeReviews=[]; // Owner-authenticated unfinished jobs, not discovered new defects.
+let wcSort='triage';
+let wcJobStarting=false;
+const wcJobAttemptLocked=new Set();
+let wcJobProgress={workId:null,message:'',verifiedIssueUrl:null};
+function wcEligibleForDirectStart(w){
+ return w?.kind==='SYSTEM_MAINTENANCE' &&
+  /^work:[0-9a-f]{32}$/.test(String(w.work_id||'')) &&
+  w.authorization_required===true &&
+  w.execution_work_item?.connector==='github' &&
+  w.execution_work_item?.operation==='create_issue';
+}
+function wcJobStatus(workId,message,verifiedIssueUrl=null){
+ wcJobProgress={workId,message,verifiedIssueUrl};
+ wcRender();
+}
+// This is a compact interface to EXISTING goal, source, policy, admission,
+// and single-use execution contracts. Selection alone never conveys authority.
+// Only known, exact GitHub tracking-issue actions can be dispatched here.
+async function wcAuthorizeAndStart(workId){
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ const w=selected.length===1?selected[0]:null;
+ if(wcJobStarting||!w||wcKey(w)!==workId||
+    !wcEligibleForDirectStart(w)||
+    wcStatuses.get(w.work_id)==='PRIOR'||
+    wcStatuses.get(w.work_id)==='ERROR'||
+    wcJobAttemptLocked.has(workId))return;
+ wcJobStarting=true;
+ let providerDispatchRequested=false;
+ const post=async(path,payload)=>{
+  const response=await fetch(path,{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},body:JSON.stringify(payload)
+  });
+  const result=await response.json();
+  if(!response.ok||!result.ok)
+   throw Error(String(result.error||'AUTHORIZATION_OR_EXECUTION_BLOCKED'));
+  return result;
+ };
+ try{
+  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+  if($('privateReady')?.style.display!=='block'||
+     !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))
+   throw Error('Sign in to your private Reality conversation first.');
+  wcJobStatus(workId,'Checking live authorization, current goal and previous attempts. No action yet.');
+  const configResponse=await fetch('/api/reality/personal-issue-dispatch',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const config=await configResponse.json();
+  if(!configResponse.ok||!config.ok||
+     config.status!=='PREVIEW_GITHUB_WRITE_ADAPTER_CONFIGURED')
+   throw Error('GitHub execution adapter is not verified in this preview. No action performed.');
+  const goalResponse=await fetch('/api/reality/personal-goals?conversation_id='+
+   encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+  const goal=await goalResponse.json();
+  const active=goal?.goal_state;
+  if(!goalResponse.ok||!goal.ok||!active?.active_goal_id||
+     active.active_goal?.goal_id!==active.active_goal_id||
+     active.active_goal?.status!=='ACTIVE'||active.active_goal?.user_confirmed!==true)
+   throw Error('A confirmed active goal is required before starting a job.');
+  const prior=await post('/api/reality/personal-issue-dispatch',{
+   intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  if(prior.previously_attempted===true){
+   wcStatuses.set(w.work_id,'PRIOR');
+   throw Error('Earlier provider attempt is locked. Use read-only Execution recovery; do not retry.');
+  }
+  if(prior.status!=='NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED'||
+     prior.can_request_new_approval!==true)
+   throw Error('Could not verify safe execution history. No action authorized.');
+  const prepared=await post('/api/reality/personal-discovered-work',{
+   intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  const exact=prepared.work_item;
+  if(prepared.status!=='DISCOVERED_WORK_GOAL_GROUNDED_PENDING_APPROVAL'||
+     prepared.discovered_work_id!==w.work_id||
+     exact?.work_item_id!==w.work_id||
+     exact?.connector!=='github'||exact?.operation!=='create_issue'||
+     exact.inputs?.repository!=='maloney2323/Reality'||
+     typeof exact.inputs?.title!=='string'||
+     typeof exact.inputs?.body!=='string'||
+     !prepared.grounding_proof||!prepared.work_fingerprint||
+     !prepared.continuity_receipt_id||prepared.external_action_performed!==false)
+   throw Error('The server did not establish one exact, verified, source-backed GitHub action.');
+  // Confirm AFTER authenticated source/goal reobservation, with the full
+  // server-prepared action visible. This confirmation is for a GitHub issue,
+  // not an assertion that Reality repaired the underlying defect.
+  const consent='Authorize and START this EXACT action now?\n\n'+
+   'Create ONE GitHub tracking issue (not a code fix).\n'+
+   'Repository: '+exact.inputs.repository+'\n'+
+   'Title: '+exact.inputs.title+'\n\n'+
+   'Complete issue body:\n'+exact.inputs.body+'\n\n'+
+   'An unresolved provider attempt must not be retried. Press OK to authorize and dispatch once, or Cancel to leave unapproved.';
+  wcJobStatus(workId,'Exact job prepared. Your final approval is required; no GitHub action yet.');
+  if(!window.confirm(consent)){
+   wcJobStatus(workId,'Cancelled. No approval recorded and no external action performed.');
+   return;
+  }
+  const approved=await post('/api/reality/personal-action-authority',{
+   conversation_id:conv,work_item:exact,
+   grounding_proof:prepared.grounding_proof,
+   confirmation:'APPROVE_THIS_EXACT_WORK_ITEM'
+  });
+  if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+     !approved.policy_id||approved.external_action_performed!==false)
+   throw Error('Exact goal-bound approval could not be verified. No dispatch.');
+  const admitted=await post('/api/reality/personal-execution-admission',{
+   intent:'CHECK',conversation_id:conv,work_item:exact,
+   grounding_proof:prepared.grounding_proof
+  });
+  if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
+     admitted.action_policy_id!==approved.policy_id||
+     admitted.work_item_fingerprint!==prepared.work_fingerprint||
+     admitted.external_action_performed!==false)
+   throw Error('Authorization changed or admission failed. No dispatch.');
+  const ready=await post('/api/reality/personal-issue-dispatch',{
+   intent:'CHECK',conversation_id:conv,discovered_work_id:w.work_id
+  });
+  if(ready.status!=='EXACT_SOURCE_AND_USER_APPROVAL_ADMITTED'||
+     ready.work_fingerprint!==prepared.work_fingerprint)
+   throw Error('Live execution preflight rejected the approved work. No dispatch.');
+  wcJobStatus(workId,'Authorized. Dispatching ONE exact GitHub issue; verifying provider and Continuity readback…');
+  // From here an HTTP error can mean GitHub ran. Never automatically retry.
+  providerDispatchRequested=true;
+  wcJobAttemptLocked.add(workId);
+  const result=await post('/api/reality/personal-issue-dispatch',{
+   intent:'RUN',conversation_id:conv,discovered_work_id:w.work_id,
+   confirmation:'EXECUTE_THIS_ONE_EXACT_APPROVED_GITHUB_ISSUE'
+  });
+  if(result.status==='VERIFIED'&&result.verified===true&&
+     /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/.test(String(result.provider_issue_url||''))&&
+     result.outcome_receipt_id&&result.reservation_id){
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Verified: one GitHub tracking issue created and outcome saved in Continuity. The underlying repair is NOT completed. Receipt: '+result.outcome_receipt_id,
+    result.provider_issue_url);
+  }else{
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Execution outcome '+String(result.status||'UNVERIFIED')+
+    '. Do not retry. Review read-only Execution recovery and the reservation receipt.');
+  }
+ }catch(e){
+  if(providerDispatchRequested){
+   wcStatuses.set(w.work_id,'PRIOR');
+   wcJobStatus(workId,'Outcome not verified; provider dispatch may have happened. Do NOT retry. Use Execution recovery · Read only. '+String(e.message||'Dispatch unknown'));
+  }else{
+   wcJobStatus(workId,'Not started: '+String(e.message||'Preflight failed')+
+    '. No provider dispatch requested. Correct the requirement before trying again.');
+  }
+ }finally{
+  wcJobStarting=false;
+  wcRender();
+  if(providerDispatchRequested)void wcLoadCompletionReports({focus:Boolean(wcJobProgress.verifiedIssueUrl)});
+ }
+}
+
+
+const wcUnfinishedIssueUrl=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
+function wcOpenUpgradeCategory(){
+ wcCurrent='upgrades';wcRender();
+ $('wcCategories')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+}
+$('wcUnfinishedList').addEventListener('click',event=>{
+ const button=event.target.closest('button[data-wc-upgrade-jump]');
+ if(!button)return;
+ wcOpenUpgradeCategory();
+});
+function wcUnfinishedHTML(job){
+ const state=job.state==='RECOVERY_CHECKPOINT_SAVED'?
+  'Recovery saved · Original repair unfinished':
+  job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
+   'Tracking action finished · Repair unfinished':
+   'Previous attempt unresolved · Do not retry';
+ const link=wcUnfinishedIssueUrl.test(String(job.issue_url||''))?
+  '<a href="'+esc(job.issue_url)+'" target="_blank" rel="noopener noreferrer">View tracked GitHub issue</a>':'';
+ const canSave=job.can_save_recovery===true&&
+  job.action_completed===true&&job.job_completed===false&&
+  job.goal_still_current===true&&
+  job.state==='TRACKING_DONE_REPAIR_UNFINISHED';
+ const action=canSave?
+  '<button type="button" data-unfinished-save="'+esc(job.work_id)+
+   '" data-unfinished-conversation="'+esc(job.conversation_id)+'">Save for recovery</button>':'';
+ const checkRepair=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+  /Reality Governed Execution Engine v0\.1/.test(String(job.title||''))?
+  '<button type="button" data-repair-check="'+esc(job.work_id)+
+   '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
+ const upgradeJump='<button type="button" data-wc-upgrade-jump="'+esc(job.work_id)+
+  '">Review upgrade discovery in categories</button>';
+ const original143Activation=job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+   job.job_completed===false?
+  '<button type="button" data-original143-prepare="'+esc(job.work_id)+
+   '" data-original143-conversation="'+esc(job.conversation_id)+
+   '">Review Reality original job activation · Read only</button>':'';
+ const verifyFix=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+  job.goal_still_current===true&&
+  job.work_id==='work:24cda9611404e9bcb47909976067605c'?
+  '<button type="button" data-acceptance-check="'+esc(job.work_id)+
+   '" data-acceptance-conversation="'+esc(job.conversation_id)+'">Verify original repair · Save evidence</button>':'';
+ return '<article class="wc-unfinished-card" data-status="'+esc(job.state||'UNKNOWN')+'">'+
+  '<span class="wc-unfinished-state">'+esc(state)+'</span>'+
+  '<h4>'+esc(job.title||'Unfinished job')+'</h4>'+
+  '<p><strong>Completed action:</strong> '+(job.action_completed===true?
+    'The GitHub tracking issue was independently verified.':
+    'The previous action is not independently verified.')+'</p>'+
+  '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
+  '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
+  '<p class="wc-note">Upgrade diagnosis and capability recommendations are in <strong>Upgrades & improvements</strong>. The original job stays open.</p>'+
+  '<div class="wc-unfinished-actions">'+upgradeJump+verifyFix+original143Activation+action+checkRepair+link+'</div>'+
+  (job.recovery_receipt_id?
+   '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
+  '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
+  '<div class="wc-note" data-recovery-status="'+esc(job.work_id)+'" aria-live="polite"></div>'+
+  '</article>';
+}
+// Original Reality customer job #143: review, then owner-only activation.
+// No model or background task can invoke this action. Nothing is installed by
+// opening the Unfinished Work card or by refreshing discovery.
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-original143-prepare]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.original143Prepare;
+ const conversationId=button.dataset.original143Conversation;
+ const status=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+  !/^[0-9a-f-]{36}$/i.test(conversationId))return;
+ button.disabled=true;
+ if(status)status.textContent='Checking original goal, verified GitHub source and owner registry…';
+ try{
+  const url='/api/reality/personal-original-full-loop?conversation_id='+
+   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId);
+  const response=await fetch(url,{cache:'no-store',credentials:'same-origin'});
+  const report=await response.json();
+  if(!response.ok||report.ok!==true)
+   throw Error(String(report.error||'ACTIVATION_READBACK_UNAVAILABLE'));
+  if(report.full_original_job_completed===true){
+   if(status)status.textContent='Original job already has verified settlement. Refresh ending receipts.';
+   return;
+  }
+  if(report.exact_owner_action_available!==true||
+     report.github_verified!==true||
+     report.preexisting_owner_evidence_acceptance_verified!==true){
+   if(status)status.textContent='Original job is still blocked: '+
+    String(report.next_action||'Missing verified prerequisite')+
+    '. No installation has been authorized.';
+   return;
+  }
+  const resume=report.existing_approved_reservation_verified===true&&
+   report.existing_approved_reservation_status==='RESERVED_UNDISPATCHED';
+  button.textContent=resume?
+   'Resume already-approved isolated activation · Finish original #143':
+   'Approve isolated activation and finish original #143';
+  button.disabled=false;
+  button.removeAttribute('data-original143-prepare');
+  button.dataset.original143Activate=workId;
+  button.dataset.original143Conversation=conversationId;
+  button.dataset.original143Resume=String(resume);
+  if(status)status.textContent=resume?
+   'Prior approval and an unexecuted reservation independently verified. '+
+   'Resume this exact original #143 action without creating another reservation. '+
+   'No production change or GitHub write.':
+   'Ready for YOUR explicit approval. Reality will register its verified executor, '+
+   'reconcile the historical fix without GitHub writes, and record a final receipt. '+
+   'The historical source was fixed earlier; Reality must not claim that repair.';
+ }catch(e){
+  if(status)status.textContent='Activation readiness not proven: '+String(e.message||e);
+  button.disabled=false;
+ }
+});
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-original143-activate]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.original143Activate;
+ const conversationId=button.dataset.original143Conversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c')return;
+ // This explicit human click, following server-side independent readback, is
+ // the only place a new exact owner activation request can originate.
+ const resuming=button.dataset.original143Resume==='true';
+ const consent=window.confirm(
+  (resuming?
+    'Resume the EXACT prior owner-approved reservation for original job #143? '+
+    'Reality will not claim a second reservation. ':
+    'Authorize Reality to activate the exact verified executor for original job #143 '+
+    'and claim one single-use goal-bound reservation? ')+
+  'In the isolated preview only, run read-only historical reconciliation and '+
+  'save the final independently verified Continuity receipt.\n\n'+
+  'No production changes, GitHub writes, or original-issue closure. '+
+  'The historical source fix predates this activation.'
+ );
+ if(!consent)return;
+ const status=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(status)status.textContent='Owner-approved isolated activation requested. Verifying receipt…';
+ try{
+  const response=await fetch('/api/reality/personal-original-full-loop',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conversationId,work_id:workId,
+    intent:'ACTIVATE_RESUME_SETTLE_ORIGINAL_143',
+    confirmation:'ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY'}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+   result.full_original_job_completed!==true||
+   !result.settlement_receipt_id)
+   throw Error(String(result.error||'SETTLEMENT_NOT_INDEPENDENTLY_VERIFIED'));
+  if(status)status.textContent='Original job settled with verified receipt '+
+   result.settlement_receipt_id+
+   '. Historical fix was preexisting; no GitHub write or production change.';
+  button.textContent='Original job settled · Read-only receipt';
+  void wcLoadCompletionReports();
+  void wcLoadUnfinishedWork();
+ }catch(e){
+  button.disabled=true;
+  if(status)status.textContent='Activation outcome uncertain ('+
+   String(e.message||e)+'). Checking exact owner reservation and settlement · Read only…';
+  // Never replay a failed POST automatically. A verified, un-dispatched owner
+  // reservation may be resumed only after a new deliberate owner click.
+  try{
+   const check=await fetch('/api/reality/personal-original-full-loop?conversation_id='+
+    encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+   const current=await check.json();
+   if(!check.ok||current.ok!==true||current.original_work_id!==workId)
+    throw Error('READBACK_UNAVAILABLE');
+   if(current.full_original_job_completed===true&&current.final_settlement_receipt_id){
+    if(status)status.textContent='Original #143 has verified final settlement receipt '+
+     current.final_settlement_receipt_id+'. No second action needed.';
+    button.textContent='Original job settled · Verified receipt';
+   }else if(current.exact_owner_action_available===true&&
+     current.existing_approved_reservation_verified===true&&
+     current.existing_approved_reservation_status==='RESERVED_UNDISPATCHED'){
+    button.dataset.original143Resume='true';
+    button.textContent='Resume already-approved isolated activation · Finish original #143';
+    button.disabled=false;
+    if(status)status.textContent='Registration did not settle. Existing owner approval and '+
+     'an unexecuted reservation were independently verified. You may choose Resume '+
+     'once; Reality will not create another reservation. Earlier error: '+
+     String(e.message||e);
+   }else if(status)status.textContent='Activation outcome not verified. '+String(e.message||e)+
+    '. Current state: '+String(current.existing_approved_reservation_status||current.next_action||'UNKNOWN')+
+    '. Do not retry until a fresh read-only review verifies a safe action.';
+  }catch{
+   if(status)status.textContent='Activation outcome cannot be independently read back ('+
+    String(e.message||e)+'). No automatic retry. Refresh the original job to recheck.';
+  }
+ }
+});
+
+let wcUnfinishedReadSerial=0;
+async function wcLoadUnfinishedWork(){
+ const panel=$('wcUnfinishedList'),status=$('wcUnfinishedStatus');
+ const serial=++wcUnfinishedReadSerial;
+ if($('privateReady')?.style.display!=='block'){
+  $('wcUnfinishedCount').textContent='';
+  status.textContent='Sign in to see unfinished jobs from your saved conversations.';
+  panel.replaceChildren();wcUpgradeReviews=[];wcRender();return;
+ }
+ status.textContent='Checking your saved jobs across conversations · Read only…';
+ panel.textContent='Reading Continuity. No jobs are being started.';
+ try{
+  const response=await fetch('/api/reality/personal-unfinished-work',{
+   credentials:'same-origin',cache:'no-store',
+  });
+  const data=await response.json();
+  if(serial!==wcUnfinishedReadSerial)return;
+  if(!response.ok||data.ok!==true||!Array.isArray(data.jobs)||
+     !['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(data.status)||
+     data.execution_authorized!==false||
+     data.external_action_performed!==false)
+   throw Error('The verified unfinished-work list is unavailable.');
+  const safe=data.jobs.filter(job=>
+   /^work:[a-f0-9]{32}$/.test(String(job.work_id||''))&&
+   /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(job.conversation_id||''))&&
+   job.job_completed===false);
+  wcUpgradeReviews=safe; // Link upgrade assessments to original saved jobs across conversations.
+  wcRender();
+  const partial=data.unreadable_conversations>0||data.coverage_limited===true||
+   data.result_truncated===true;
+  $('wcUnfinishedCount').textContent=safe.length?'· '+safe.length+' shown':'';
+  status.textContent=(safe.length?
+   'Found '+safe.length+' unfinished job(s) in saved Continuity.':
+   'No tracked unfinished jobs were verified in the scanned conversations.')+
+   (partial?' Some conversations were not fully checked; this list may be incomplete.':'')+
+   ' No job is being executed.';
+  panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
+   '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
+ }catch{
+  if(serial!==wcUnfinishedReadSerial)return;
+  $('wcUnfinishedCount').textContent='';
+  wcUpgradeReviews=[];wcRender();
+  status.textContent='Could not verify unfinished work. This does not mean all jobs are done.';
+  panel.textContent='Reconnect and refresh this section. No actions were performed.';
+ }
+}
+$('wcRefreshUnfinished').onclick=()=>{void wcLoadUnfinishedWork()};
+$('wcUnfinishedList').onclick=async event=>{
+ const button=event.target.closest('button[data-unfinished-save]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.unfinishedSave;
+ const conversationId=button.dataset.unfinishedConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))
+  return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Checking original goal and saved outcome · Read only…';
+ try{
+  // A fresh read proves the specific original work remains eligible. Never
+  // infer authority from the overview card, a model, or an old browser state.
+  const check=await fetch('/api/reality/personal-recovery?conversation_id='+
+   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+   {credentials:'same-origin',cache:'no-store'});
+  const examined=await check.json();
+  if(!check.ok||examined.ok!==true||
+     examined.original_work_id!==workId||
+     examined.job_completed!==false||
+     examined.external_action_performed!==false)
+   throw Error('Current goal or original-work readback not verified.');
+  if(examined.checkpoint_persisted===true){
+   if(feedback)feedback.textContent='Already saved for recovery. Original repair is still open.';
+   await wcLoadUnfinishedWork();return;
+  }
+  if(examined.state!=='RECOVERY_BLOCKED_NOT_YET_CHECKPOINTED')
+   throw Error('Recovery state requires a fresh read-only review.');
+  if(feedback)feedback.textContent='Saving original blocked work to Continuity · No GitHub write…';
+  const response=await fetch('/api/reality/personal-recovery',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'CHECKPOINT',conversation_id:conversationId,work_id:workId}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+     result.original_work_id!==workId||
+     result.state!=='RECOVERY_BLOCKED_DURABLY_RECORDED'||
+     result.checkpoint_persisted!==true||
+     !result.checkpoint_receipt_id||
+     result.job_completed!==false||
+     result.external_action_performed!==false)
+   throw Error('Recovery was not independently verified.');
+  if(feedback)feedback.textContent='Recovery saved. The original repair is still unfinished.';
+  await wcLoadUnfinishedWork();
+ }catch{
+  if(feedback)feedback.textContent='Recovery could not be verified. No repair was started. Refresh the read-only list before trying again.';
+  button.disabled=true;
+ }
+};
+
+
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-repair-check]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.repairCheck;
+ const conversationId=button.dataset.repairConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Verifying historical failures and later GitHub runs · Read only…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery-evidence?conversation_id='+
+    encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+  const p=await response.json();
+  if(!response.ok||p.ok!==true||p.original_work_id!==workId||
+     p.original_job_completed!==false||
+     p.external_action_performed!==false||
+     p.execution_authorized!==false||
+     !['LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED',
+       'NO_LATER_VERIFIED_SUCCESS_IN_BOUNDED_PROVIDER_WINDOW'].includes(p.status))
+   throw Error(/^RECOVERY_[A-Z0-9_]{4,100}$/.test(String(p.error_code||''))?
+    p.error_code:'RECOVERY_READBACK_UNAVAILABLE');
+  const passed=p.later_success&&
+   /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(
+    String(p.later_success.run_url||''))?
+   p.later_success.run_url:null;
+  if(feedback){
+   feedback.textContent=p.status==='LATER_SUCCESSFUL_CI_RUN_INDEPENDENTLY_OBSERVED'?
+    'Verified: a later run of the same GitHub workflow passed on the preview branch. This does NOT yet prove the root cause or original job completion.':
+    'No matching later CI success verified. The repair remains unfinished.';
+   if(passed){
+    feedback.appendChild(document.createTextNode(' '));
+    const link=document.createElement('a');
+    link.href=passed;link.rel='noopener noreferrer';link.target='_blank';
+    link.textContent='View verified passing workflow';
+    feedback.appendChild(link);
+   }
+  }
+ }catch(error){
+  if(feedback)feedback.textContent='Could not verify the saved repair evidence ('+
+   (/^RECOVERY_[A-Z0-9_]{4,100}$/.test(String(error?.message||''))?
+    error.message:'RECOVERY_READBACK_UNAVAILABLE')+
+   '). No upgrade or external action was executed.';
+ }finally{button.disabled=false}
+});
+
+
+$('wcTaskList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-recovery-run]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.recoveryRun;
+ const conversationId=button.dataset.recoveryConversation;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const card=button.closest('article');
+ const place=card?.querySelector('[data-recovery-timeline]');
+ if(!place)return;
+ button.disabled=true;
+ place.textContent='Restoring original job → checking GitHub → running capability diagnosis · No provider writes…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery-loop',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RUN_AND_RECORD_RECOVERY_DIAGNOSIS',
+    conversation_id:conversationId,work_id:workId}),
+  });
+  const info=await response.json();
+  if(!response.ok||info.ok!==true||info.original_work_id!==workId||
+     info.original_job_completed!==false||
+     info.external_action_performed!==false||
+     info.action_authorized!==false||
+     info.diagnosis_saved!==true||!info.diagnosis_receipt_id||
+     info.upgrade_discovery?.original_job_completed!==false||
+     info.upgrade_discovery?.authorization_granted!==false||
+     !['NO_NEW_UPGRADE_NEEDED','DIAGNOSIS_REQUIRED','CAPABILITY_GAP_CANDIDATE'].includes(info.upgrade_discovery?.status)||
+     !Array.isArray(info.timeline)||info.timeline.length!==7)
+   throw Error(info.error_code||'RECOVERY_LOOP_NOT_VERIFIED');
+  place.replaceChildren();
+  const h=document.createElement('h4');
+  h.textContent='Recovery Loop · '+info.completed_stages+' of '+info.total_stages+' stages verified';
+  place.appendChild(h);
+  const upgrade=info.upgrade_discovery;
+  const upgradeHeader=document.createElement('h4');
+  upgradeHeader.textContent='Reality Upgrade Discovery · '+
+   upgrade.status.replaceAll('_',' ');
+  place.appendChild(upgradeHeader);
+  const upgradeReason=document.createElement('p');
+  upgradeReason.textContent='Diagnosis: '+upgrade.reason;
+  place.appendChild(upgradeReason);
+  if(upgrade.needed_upgrade){
+   const instrument=document.createElement('p');
+   instrument.textContent='Proposed instrument: '+upgrade.needed_upgrade;
+   place.appendChild(instrument);
+  }
+  const upgradeNext=document.createElement('p');
+  upgradeNext.textContent='Next: '+upgrade.next_action+
+   ' No upgrade, GitHub write, or promotion has been authorized.';
+  place.appendChild(upgradeNext);
+  for(const item of info.timeline){
+   const p=document.createElement('p');
+   p.textContent=(item.state==='VERIFIED'?'✓ ':'○ ')+
+    item.step.replaceAll('_',' ')+' · '+item.state+' — '+item.description;
+   place.appendChild(p);
+   if(item.evidence_ref&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[0-9]+$/.test(item.evidence_ref)){
+    const a=document.createElement('a');a.href=item.evidence_ref;
+    a.textContent='GitHub verification';a.rel='noopener noreferrer';a.target='_blank';
+    place.appendChild(a);
+   }
+  }
+  const closing=document.createElement('p');
+  closing.textContent='Original job remains unfinished. Next required stage: '+
+   (info.current_decision==='RECHECK_ACCEPTANCE_NO_UPGRADE_NEEDED'?
+    'Verify root cause and original job acceptance; no new upgrade required.':
+    'Verify a genuine missing capability and request fresh authorization.');
+  place.appendChild(closing);
+  const receipt=document.createElement('p');
+  receipt.textContent='Saved in original Continuity: '+info.diagnosis_receipt_id+
+   ' · Original repair still OPEN.';
+  place.appendChild(receipt);
+ }catch(e){
+  place.textContent='Unable to verify the full recovery decision ('+
+   (/^(?:LIVE_LOOP|RECOVERY)_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+    e.message:'RECOVERY_LOOP_READBACK_UNAVAILABLE')+
+   '). Original job remains unfinished. No upgrade or external action was performed.';
+ }finally{button.disabled=false}
+});
+
+
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-acceptance-check]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.acceptanceCheck;
+ const conversationId=button.dataset.acceptanceConversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversationId||'')))return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(feedback)feedback.textContent='Checking the old failing test against the exact later passing source and saving acceptance evidence…';
+ try{
+  const response=await fetch('/api/reality/personal-repair-acceptance',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'VERIFY_ORIGINAL_REPAIR_CAUSE',conversation_id:conversationId,work_id:workId}),
+  });
+  const p=await response.json();
+  if(!response.ok||p.ok!==true||
+     p.original_work_id!==workId||
+     p.assessment_saved!==true||
+     p.source_correction_verified!==true||
+     p.provider_current_success_verified!==true||
+     p.full_original_job_completed!==false||
+     p.original_issue_closed!==false||
+     p.external_action_performed!==false||
+     !p.acceptance_receipt_id)
+   throw Error(/^ACCEPTANCE_[A-Z0-9_]{4,100}$/.test(String(p.error_code||''))?
+    p.error_code:'ACCEPTANCE_SOURCE_READBACK_UNAVAILABLE');
+  if(feedback)feedback.textContent='Source correction verified and saved in original Continuity. Receipt '+
+   p.acceptance_receipt_id+
+   '. The underlying issue remains OPEN; no code was modified or merged. Review original-job acceptance separately.';
+ }catch(e){
+  if(feedback)feedback.textContent='Root-cause acceptance could not be independently verified ('+
+   (/^ACCEPTANCE_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+    e.message:'ACCEPTANCE_SOURCE_READBACK_UNAVAILABLE')+
+   '). No issue was closed or upgrade executed.';
+ }finally{button.disabled=false}
+});
+
+// Deterministic display ONLY: reports arrive from authenticated, saved
+// Continuity outcomes or independently read-back shift discovery ticks.
+const wcReceiptLink=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/\d+$/;
+function wcReceiptHTML(report){
+ const verified=report?.status==='ACTION_VERIFIED_JOB_OPEN';
+ const cycle=report?.type==='SHIFT_DISCOVERY_CYCLE';
+ const title=verified?'I finished this action — the full job is still open':
+  cycle?'I recorded this discovery cycle — the full shift is NOT proven finished':
+  'I cannot verify this action finished';
+ const list=values=>'<ul>'+values.map(x=>'<li>'+esc(String(x))+'</li>').join('')+'</ul>';
+ const completed=Array.isArray(report?.completed_actions)?report.completed_actions:[];
+ const remaining=Array.isArray(report?.pending_work)?report.pending_work:[];
+ const receipt=report.receipt_id||report.source_receipt_id||'Not available';
+ const validURL=verified&&wcReceiptLink.test(String(report.issue_url||''))?report.issue_url:null;
+ const evidence=cycle?
+  'Discovery observations: '+esc(String(report.evidence_observation_count??'Not measured'))+
+   ' · Findings discovered: '+esc(String(report.discovered_work_count??'Not measured'))+
+   ' · Verified executions: 0':
+  'Source evidence references: '+esc(String(report.source_evidence_count??'Unknown'))+
+   ' · Outcome: '+(verified?'Independent GitHub and Continuity readback':'Unverified; do not retry');
+ const date=report.observed_at&&Number.isFinite(Date.parse(report.observed_at))?
+  new Date(report.observed_at).toLocaleString():'Time unavailable';
+ return '<article class="wc-ending-receipt" data-outcome="'+(verified?'verified':'unknown')+'">'+
+  '<div class="wc-receipt-kicker">'+esc(cycle?'SHIFT DISCOVERY RECEIPT':'INDIVIDUAL ACTION RECEIPT')+
+  ' · '+esc(date)+'</div>'+
+  '<h3>'+esc(title)+'</h3>'+
+  '<p>'+esc(String(report.title||report.headline||'Reality work result'))+'</p>'+
+  '<strong>What I actually did</strong>'+list(completed.length?completed:
+    ['No completed action could be independently established from this receipt.'])+
+  (cycle&&Array.isArray(report.discovered_items)&&report.discovered_items.length?
+    '<strong>Discoveries from this cycle — not completed jobs</strong>'+
+     list(report.discovered_items.map(x=>String(x.title||'Unnamed work')+
+      ' · Source evidence '+String(x.evidence_count??'unknown'))):'')+
+  '<strong>What remains unfinished</strong>'+list(remaining)+
+  '<p class="wc-receipt-proof"><strong>Verification:</strong> '+evidence+
+  ' · Saved receipt: '+esc(String(receipt))+
+  (report.reservation_id?' · One-time reservation: '+esc(String(report.reservation_id)):'')+
+  (cycle?' · Tick: '+esc(String(report.tick_id||'')):'')+'</p>'+
+  '<p class="wc-receipt-proof"><strong>Time spent:</strong> not measured · <strong>Time returned:</strong> not measured · '+
+  '<strong>Automation cost:</strong> not metered · <strong>Realized cash savings:</strong> not verified.</p>'+
+  '<p><strong>Next step:</strong> '+esc(String(report.next_step||'Review source evidence before any next action.'))+'</p>'+
+  (validURL?'<p><a href="'+esc(validURL)+'" target="_blank" rel="noopener noreferrer">View verified GitHub issue</a></p>':'')+
+  (verified&&/^work:[a-f0-9]{32}$/.test(String(report.work_id||''))?
+   '<div class="wc-direct-action" data-recovery-card="'+esc(report.work_id)+'">'+
+    '<p><strong>Original repair job is still unfinished.</strong> Save its blocked state in Continuity so Recovery can pick up this exact work later. This does not retry the GitHub action or install an upgrade.</p>'+
+    '<button type="button" data-recovery-checkpoint="'+esc(report.work_id)+'">Record original job for recovery</button>'+
+    '<p class="wc-note" role="status" data-recovery-state="'+esc(report.work_id)+'">Not yet checked. No repair attempted.</p>'+
+   '</div>':'')+
+  '</article>';
+}
+
+async function wcHydrateRecoveryCheckpoints(conv){
+ const buttons=[...$('wcCompletionList').querySelectorAll('button[data-recovery-checkpoint]')];
+ for(const button of buttons){
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  const workId=button.dataset.recoveryCheckpoint;
+  const card=button.closest('[data-recovery-card]');
+  const status=card?.querySelector('[data-recovery-state]');
+  if(!/^work:[a-f0-9]{32}$/.test(String(workId||''))||!status)continue;
+  button.disabled=true;
+  status.textContent='Checking saved original-job recovery status · Read only…';
+  try{
+   const response=await fetch('/api/reality/personal-recovery?conversation_id='+
+    encodeURIComponent(conv)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+   const data=await response.json();
+   if(!response.ok||data.ok!==true||data.original_work_id!==workId||
+      data.job_completed!==false||data.external_action_performed!==false)
+    throw Error('Verified recovery readback unavailable');
+   if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+   if(data.checkpoint_persisted===true&&
+      data.state==='RECOVERY_BLOCKED_DURABLY_RECORDED'&&data.checkpoint_receipt_id){
+    button.textContent='Saved recovery · Original job still pending';
+    status.textContent='Restored from Continuity · Receipt '+
+     data.checkpoint_receipt_id+' · Same work '+workId+
+     ' · Repair still unfinished · No re-execution authorized.';
+    button.disabled=true;
+   }else if(data.checkpoint_persisted===false&&
+      data.state==='RECOVERY_BLOCKED_NOT_YET_CHECKPOINTED'){
+    status.textContent='Verified tracking issue found. Original repair remains unfinished. '+
+     'Save this original work once to make its recovery checkpoint durable.';
+    button.disabled=false;
+   }else{
+    throw Error('Recovery projection status unverified');
+   }
+  }catch{
+   // Never allow a blind POST when fresh scoped readback fails.
+   status.textContent='Recovery checkpoint could not be checked. No repair is proven or started. '+
+    'Reconnect, confirm the original conversation goal and refresh receipts.';
+   button.disabled=true;
+  }
+ }
+}
+
+async function wcLoadCompletionReports({focus=false}={}){
+ void wcLoadUnfinishedWork();
+ const out=$('wcCompletionList'),status=$('wcCompletionStatus');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||''))){
+  status.textContent='Sign in to see saved completion receipts. No finished work is assumed.';
+  out.replaceChildren();return;
+ }
+ status.textContent='Reading saved action outcomes · No external writes or model calls…';
+ try{
+  const r=await fetch('/api/reality/personal-completion-reports?conversation_id='+
+   encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+  const data=await r.json();
+  if(!r.ok||!data.ok||data.status!=='PERSISTED_READ_ONLY'||!Array.isArray(data.reports))
+   throw Error('Authenticated Continuity readback unavailable');
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  status.textContent=data.reports.length?
+   'Saved Continuity outcomes · '+data.reports.filter(x=>x.action_completed===true).length+
+    ' verified external action(s). This does not establish completed repairs.':
+   'No persisted execution outcomes found for this conversation. Discoveries and approvals are not completed jobs.';
+  out.innerHTML=data.reports.length?data.reports.map(wcReceiptHTML).join(''):
+   '<p class="muted">No verified work results yet for this conversation.</p>';
+  if(data.reports.length)await wcHydrateRecoveryCheckpoints(conv);
+  if(focus&&data.reports.length&&data.reports[0].action_completed===true)
+   $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch{
+  status.textContent='Completion receipts could not be restored. No completion claim is being made.';
+  out.textContent='Reconnect and refresh the saved receipts. Do not retry any previously dispatched task.';
+ }
+}
+$('wcRefreshCompletion').onclick=()=>{void wcLoadCompletionReports()};
+$('wcCompletionList').onclick=async event=>{
+ const button=event.target.closest('button[data-recovery-checkpoint]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.recoveryCheckpoint;
+ if(!/^work:[a-f0-9]{32}$/.test(String(workId||'')))return;
+ const card=button.closest('[data-recovery-card]');
+ const status=card?.querySelector('[data-recovery-state]');
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!conv){
+  if(status)status.textContent='Sign in before saving a recovery checkpoint.';
+  return;
+ }
+ button.disabled=true;
+ if(status)status.textContent='Checking existing verified outcome and goal before saving · No external action…';
+ try{
+  const response=await fetch('/api/reality/personal-recovery',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'CHECKPOINT',conversation_id:conv,work_id:workId}),
+  });
+  const data=await response.json();
+  if(!response.ok||!data.ok||
+     data.original_work_id!==workId||
+     data.state!=='RECOVERY_BLOCKED_DURABLY_RECORDED'||
+     data.checkpoint_persisted!==true||
+     !data.checkpoint_receipt_id||
+     data.job_completed!==false||
+     data.external_action_performed!==false)
+   throw Error('Recovery checkpoint not independently confirmed; no work was resumed.');
+  if(localStorage.getItem('reality.private.chat.conversation.v1')!==conv)return;
+  button.textContent='Recovery checkpoint saved · Original job pending';
+  status.textContent='Saved to Continuity · Receipt '+data.checkpoint_receipt_id+
+   ' · Original work '+workId+
+   ' · No new execution authorization · Missing capability not yet proven · Repair unfinished.';
+ }catch(e){
+  if(status)status.textContent='Recovery checkpoint unavailable: '+
+   String(e.message||'readback failed')+
+   '. No external work was started. Use read-only inspection before retrying a failed storage request.';
+  button.disabled=false;
+ }
+};
+
+function wcRenderShiftEndingReceipt(report){
+ const el=$('shiftEndingReceipt');
+ const overview=$('wcShiftReceipt');
+ if(report?.type!=='SHIFT_DISCOVERY_CYCLE'||
+    report?.verification!=='SHIFT_TICK_PERSISTED_READBACK_DISCOVERY_ONLY'||
+    report?.status!=='DISCOVERY_CYCLE_RECORDED_SHIFT_NOT_VERIFIED_COMPLETE'||
+    report?.shift_completed!==false||!report?.source_receipt_id){
+  el.hidden=true;el.replaceChildren();
+  overview.hidden=true;overview.replaceChildren();return;
+ }
+ el.hidden=false;overview.hidden=false;
+ el.innerHTML=wcReceiptHTML(report);
+ overview.innerHTML=el.innerHTML;
+}
+
+let wcCoverage={},wcCatalogStatus='NOT_CHECKED';
+const wcKey=w=>String(w.finding_id||w.work_id||'');
+const wcNeedsSource=id=>({customer:'customer_feedback',operations:'business_operations',research:'external_research'}[id]||null);
+function wcClass(w){
+ if(typeof w.category==='string'&&workCategories.some(x=>x[0]===w.category))return w.category;
+ const s=String((w.work_key||'')+' '+(w.objective||'')).toLowerCase();
+ if(/customer|feedback|support|client/.test(s))return 'customer';
+ if(/security|authority|governance|evidence/.test(s))return 'security';
+ if(/integration|connector|deploy/.test(s))return 'integrations';
+ if(/workflow-failure:|ci |regression|reliabil|performance|latency/.test(s))return 'reliability';
+ if(/bug|defect|broken/.test(s))return 'bugs';
+ if(/upgrade|improv/.test(s))return 'upgrades';
+ if(/feature|capability/.test(s))return 'features';
+ if(/automati|time return/.test(s))return 'automation';
+ if(/research|opportunit/.test(s))return 'research';
+ if(/operations|process|schedule|workday/.test(s))return 'operations';
+ return '';
+}
+function wcTime(w){
+ return w.execution_work_item?.connector==='github'&&
+  w.execution_work_item?.operation==='create_issue'?[1,5]:null;
+}
+function wcSummary(full=false){
+ const tasks=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ const estimates=tasks.map(wcTime).filter(Boolean);
+ const sum=i=>estimates.reduce((n,x)=>n+x[i],0);
+ const hours=wcMode==='shift'?Number($('wcHours').value):null;
+ const prior=tasks.filter(w=>wcStatuses.get(wcKey(w))==='PRIOR').length;
+ const mode=$('wcMetering').value,rate=Number($('wcRate').value);
+ const credits=mode==='unlimited'?'Unlimited plan is hypothetical; actual entitlement unverified.':
+  mode==='unknown'?'Credits unknown: billing and token metering are not connected.':
+  !(rate>0&&Number.isFinite(rate))?'Enter an assumed credits/hour rate (not a real billing rate).':
+  hours!==null?'Illustrative allowance: '+(hours*rate).toFixed(2)+' credits for '+hours+' hours. This is NOT predicted usage.':
+  estimates.length!==tasks.length?'Credits cannot be estimated for unscoped tasks.':
+  'Illustrative tracking-only credits: '+(sum(0)*rate/60).toFixed(2)+'–'+(sum(1)*rate/60).toFixed(2)+
+  ' using your assumption. Not actual credits.';
+ const lines=[
+  hours!==null?'Shift planning window: '+hours+' hour(s); a CAP, not expected task duration.':
+   'Individual task batch: '+tasks.length+' selected.',
+  tasks.length+' selected · '+prior+' previously attempted · '+(tasks.length-prior)+' others (approval/history still required).',
+  estimates.length?'Tracking operation (uncalibrated): '+sum(0)+'–'+sum(1)+' minutes for '+estimates.length+' issue(s).':
+   'Tracking-operation duration: unknown.',
+  'Full investigation, repair and completed-job duration: UNKNOWN (no measured baseline).',
+  credits,
+  'No credit charge · No shift started · No authority granted.'
+ ];
+ if(full)lines.push('A real run requires fresh exact approval per consequential action and verified evidence of completion.');
+ if(full&&prior)lines.push('Previously attempted work stays locked until reconciliation; do not re-run it.');
+ return lines.join('\n');
+}
+
+function wcScenarioNumber(id,allowZero=false){
+ const str=String($(id).value||'').trim();
+ if(!str)return null;
+ const number=Number(str);
+ return Number.isFinite(number)&&(allowZero?number>=0:number>0)?number:NaN;
+}
+let wcStaffingRequestId=0;
+function wcResetStaffing(){
+ wcStaffingRequestId++;
+ $('wcStaffingResult').textContent='Scenario inputs changed. Calculate again. No actual jobs or payroll savings have been verified.';
+}
+async function wcCalculateStaffing(){
+ const token=++wcStaffingRequestId;
+ const out=$('wcStaffingResult');
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ if(selected.length!==1){
+  out.textContent='Select exactly ONE workflow. Different roles/tasks require separate baselines.';
+  return;
+ }
+ const id=wcKey(selected[0]);
+ const values={
+  manual_minutes_per_occurrence:wcScenarioNumber('wcManualMinutes'),
+  occurrences_per_month:wcScenarioNumber('wcFrequency'),
+  automatable_fraction:null,
+  loaded_hourly_labor_cost_usd:wcScenarioNumber('wcLaborRate'),
+  productive_hours_per_fte_month:wcScenarioNumber('wcFteHours'),
+  human_review_minutes_per_automated_occurrence:wcScenarioNumber('wcReviewMinutes',true),
+  exception_fraction_of_automated_occurrences:null,
+  human_minutes_per_exception:wcScenarioNumber('wcExceptionMinutes',true),
+  team_headcount:wcScenarioNumber('wcTeamHeadcount'),
+  estimated_automation_cost_usd_per_month:wcScenarioNumber('wcMonthlyCost',true),
+  estimated_monthly_implementation_amortization_usd:wcScenarioNumber('wcSetupCost',true),
+ };
+ const coverage=wcScenarioNumber('wcCoverage',true);
+ const exception=wcScenarioNumber('wcExceptionRate',true);
+ if(coverage!==null)values.automatable_fraction=coverage/100;
+ if(exception!==null)values.exception_fraction_of_automated_occurrences=exception/100;
+ if(values.team_headcount===null)values.team_headcount=null;
+ const required=[
+  'manual_minutes_per_occurrence','occurrences_per_month','automatable_fraction',
+  'loaded_hourly_labor_cost_usd','productive_hours_per_fte_month',
+  'human_review_minutes_per_automated_occurrence',
+  'exception_fraction_of_automated_occurrences','human_minutes_per_exception'
+ ];
+ if(required.some(key=>values[key]===null)){
+  out.textContent='Need task duration, monthly frequency, automation %, loaded hourly cost, hours/FTE, review minutes, exception %, and exception minutes. Enter zero explicitly where justified.';
+  return;
+ }
+ if(Object.values(values).some(v=>typeof v==='number'&&!Number.isFinite(v))){
+  out.textContent='An input is invalid. No staffing projection calculated.';return;
+ }
+ out.textContent='Calculating a hypothetical staffing scenario. No action is being performed…';
+ try{
+  const res=await fetch('/api/reality/workforce-impact',{
+   method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+   body:JSON.stringify(values),
+  });
+  const result=await res.json();
+  if(token!==wcStaffingRequestId||!wcWork.some(w=>wcKey(w)===id)||!wcPicked.has(id))return;
+  if(!res.ok||!result.ok||!result.projection)throw Error('Assumptions were rejected.');
+  const p=result.projection;
+  const money=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+  out.textContent='HYPOTHETICAL workforce scenario for '+String(selected[0].title||selected[0].objective||'selected work')+
+   '\nManual baseline: '+p.monthly_manual_baseline_hours.toFixed(2)+' hours/month'+
+   '\nGross automation-covered work: '+p.monthly_gross_task_hours_released.toFixed(2)+' hours/month'+
+   '\nHuman review and exceptions: '+(p.monthly_human_review_hours+p.monthly_exception_handling_hours).toFixed(2)+' hours/month'+
+   '\nNET CAPACITY RETURNED: '+p.monthly_net_capacity_hours.toFixed(2)+' hours/month'+
+   '\nFULL-TIME-EQUIVALENT CAPACITY: '+p.workforce_capacity_fte_equivalent.toFixed(2)+' FTE'+
+   '\nTheoretical whole-position capacity ceiling: '+
+    (p.theoretical_whole_position_capacity_upper_bound===null?'UNKNOWN — enter actual team headcount':
+     String(p.theoretical_whole_position_capacity_upper_bound)+' positions at most, ONLY if remaining duties and staffing coverage permit consolidation')+
+   '\nActual eliminable positions: UNKNOWN (NOT VERIFIED)'+
+   '\nGross labor capacity value/month: '+money(p.gross_monthly_labor_capacity_value_usd)+
+   '\nHypothetical net economic capacity/month: '+
+    (p.hypothetical_net_economic_value_usd_month===null?'UNKNOWN — operating and implementation costs both required':
+     money(p.hypothetical_net_economic_value_usd_month))+
+   '\nVERIFIED PAYROLL SAVINGS: NONE. VERIFIED ROLE REDUCTION: NONE.'+
+   '\nThis is potential capacity, NOT a layoff prediction. Proving actual savings requires role mapping, tested end-to-end automation, measured oversight, shift coverage, and payroll evidence.';
+ }catch{
+  if(token!==wcStaffingRequestId)return;
+  out.textContent='Workforce projection could not be completed from these assumptions. No workforce or payment action occurred.';
+ }
+}
+
+function wcRenderValueScenario(){
+ const el=$('wcValueOutput');
+ const selected=wcWork.filter(w=>wcPicked.has(wcKey(w)));
+ if(selected.length!==1){
+  el.textContent=selected.length===0?
+   'Select one workflow. Customer impact and real savings remain unknown.':
+   'Select ONE workflow: different tasks cannot share a labor baseline.';
+  return;
+ }
+ const minutes=wcScenarioNumber('wcManualMinutes');
+ const frequency=wcScenarioNumber('wcFrequency');
+ const coverage=wcScenarioNumber('wcCoverage',true);
+ const rate=wcScenarioNumber('wcLaborRate');
+ const monthlyCost=wcScenarioNumber('wcMonthlyCost',true);
+ if([minutes,frequency,coverage,rate].some(v=>v===null)){
+  el.textContent='Incomplete scenario: enter manual minutes, monthly occurrences, potential automation % and hourly labor value. No defaults invented.';
+  return;
+ }
+ if(!Number.isFinite(minutes)||minutes>60000||!Number.isFinite(frequency)||frequency>100000||
+    !Number.isFinite(coverage)||coverage>100||!Number.isFinite(rate)||rate>100000||
+    (monthlyCost!==null&&(!Number.isFinite(monthlyCost)||monthlyCost>1e9))){
+  el.textContent='Invalid scenario assumptions. No calculation performed.';
+  return;
+ }
+ const hours=minutes*frequency*(coverage/100)/60;
+ const gross=hours*rate;
+ const net=monthlyCost===null?null:gross-monthlyCost;
+ const dollars=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+ const work=selected[0];
+ el.textContent='HYPOTHETICAL scenario for '+String(work.title||work.objective||work.work_key||'selected work')+
+  '\nPotential monthly labor hours equivalent: '+hours.toFixed(2)+
+  '\nGross labor-value equivalent/month: '+dollars(gross)+
+  '\nHypothetical net/month: '+(net===null?'UNKNOWN (automation operating cost not provided)':dollars(net))+
+  '\nActual measured time saved: NOT VERIFIED. Real cash savings: NOT VERIFIED.'+
+  '\nAutomation readiness: '+String(work.value_assessment?.automation?.level||'NOT PROVEN')+
+  '. Even a high assumed coverage does not prove full task automation.'+
+  '\nNext: measure the baseline, cost, independent completion, and observed time returned. No workforce reduction can be inferred.';
+}
+
+function wcPaintSummary(){
+ const shift=wcMode==='shift';
+ $('wcPlanTitle').textContent=shift?'Your planned shift':'Your task batch';
+ $('wcPlanIntro').textContent=shift?
+  'Choose 1–8 hours and a proposed queue. This does not schedule or run a shift.':
+  'Choose one task, two, three, or more to review as a batch.';
+ $('wcHoursRow').hidden=!shift;
+ $('wcRateRow').hidden=$('wcMetering').value!=='metered';
+ $('wcPreview').textContent=shift?'Review draft shift':'Review selected tasks';
+ $('wcSummary').textContent=wcSummary();
+ wcRenderValueScenario();
+ wcResetStaffing();
+ document.querySelectorAll('[data-wc-mode]').forEach(b=>
+  b.setAttribute('aria-selected',String(b.dataset.wcMode===wcMode)));
+}
+// Upgrades & improvements uses the SAME authenticated original-job endpoint
+// as Unfinished Work. Navigation performs only the established read-only GET;
+// exact owner approval remains a second, direct click in the existing card.
+$('wcTaskList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-upgrade-original143-continue]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.upgradeOriginal143Continue;
+ const conversationId=button.dataset.upgradeOriginal143Conversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+  !/^[0-9a-f-]{36}$/i.test(String(conversationId||''))||
+  $('privateReady')?.style.display!=='block')return;
+ button.disabled=true;
+ try{
+  await wcLoadUnfinishedWork();
+  const same=[...$('wcUnfinishedList').querySelectorAll('button[data-original143-prepare]')]
+   .find(node=>node.dataset.original143Prepare===workId&&
+    node.dataset.original143Conversation===conversationId);
+  if(!same)throw Error('ORIGINAL_143_UNFINISHED_WORK_VERIFICATION_REQUIRED');
+  same.scrollIntoView({behavior:'smooth',block:'center'});
+  same.focus();
+  same.click(); // existing read-only readiness handler; NOT owner approval
+ }catch(e){
+  const place=button.closest('article')?.querySelector('[data-recovery-timeline]');
+  if(place)place.textContent='Could not reverify original job: '+String(e.message||e)+
+   '. No upgrade, approval or settlement was attempted.';
+ }finally{button.disabled=false}
+});
+
+
+function wcUpgradeReviewHTML(){
+ const jobs=wcUpgradeReviews.slice(0,30);
+ const heading='<section class="wc-upgrade-review" aria-label="Reality Upgrade Discovery">'+
+  '<h4>Reality Upgrade Discovery · Original-job capability reviews</h4>'+
+  '<p class="wc-note">These are owner-scoped unfinished jobs for diagnosis, NOT confirmed missing capabilities or new discovery-feed findings. A verified diagnosis never grants execution or promotion authority.</p>';
+ if(!jobs.length)return heading+
+  '<p class="wc-note">'+
+  ($('privateReady')?.style.display==='block'?
+   'No unfinished jobs with saved Continuity were found in the checked conversations. New discovery findings appear separately below.':
+   'Sign in to review upgrade needs linked to your saved jobs.')+'</p></section>';
+ return heading+jobs.map(job=>{
+  const ready=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
+   job.goal_still_current===true&&job.action_completed===true&&job.job_completed===false;
+  const label=ready?'Recovery saved · Ready for evidence recheck':
+   job.state==='PRIOR_ACTION_UNRESOLVED'?'Provider attempt unresolved · No retry':
+   job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
+   'Recovery checkpoint required':'Original goal or evidence must be verified';
+  return '<article class="wc-task wc-upgrade-job" data-upgrade-work="'+esc(job.work_id)+'">'+
+   '<h4>'+esc(job.title||'Original unfinished job')+'</h4>'+
+   '<span class="wc-tag">'+esc(label)+'</span>'+
+   '<p class="wc-note">Original work: '+esc(job.work_id)+
+   ' · Job not completed · No code upgrade authorized.</p>'+
+   (ready?
+    '<button type="button" data-recovery-run="'+esc(job.work_id)+
+    '" data-recovery-conversation="'+esc(job.conversation_id)+
+    '">Run recovery loop · Save findings</button>':
+    '<p class="wc-note">Next: '+esc(job.state==='PRIOR_ACTION_UNRESOLVED'?
+     'Reconcile the earlier external action before diagnosing a missing capability.':
+     'Restore the original confirmed goal and recovery checkpoint before reassessment.')+'</p>')+
+   (job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+    job.goal_still_current===true&&job.job_completed===false?
+    '<button type="button" data-upgrade-original143-continue="'+esc(job.work_id)+
+    '" data-upgrade-original143-conversation="'+esc(job.conversation_id)+
+    '">Continue verified original job · existing approval path</button>':'')+
+   '<div class="wc-recovery-timeline" data-recovery-timeline="'+esc(job.work_id)+
+   '" aria-live="polite"></div></article>';
+ }).join('')+'</section>';
+}
+
+function wcRender(){
+ $('wcDiscovered').textContent=String(wcWork.length);
+ $('wcCategories').innerHTML=workCategories.map(([id,label,desc])=>{
+  const n=id==='all'?wcWork.length:wcWork.filter(w=>wcClass(w)===id).length;
+  const unavailable=wcNeedsSource(id)&&wcCoverage[wcNeedsSource(id)]==='not_connected';
+  return '<button class="wc-category" type="button" data-wc-cat="'+id+
+    '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
+    '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
+     n+' found · '+wcUpgradeReviews.length+' review':String(n))+
+    '</span><small>'+esc(unavailable?'Additional business source not connected':
+     id==='upgrades'?'Upgrade findings + original-job reviews':desc)+'</small></button>';
+ }).join('');
+ $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
+  wcCurrent=b.dataset.wcCat;wcRender()
+ });
+ const category=workCategories.find(x=>x[0]===wcCurrent);
+ const shown=(wcCurrent==='all'?wcWork:wcWork.filter(w=>wcClass(w)===wcCurrent)).slice().sort((a,b)=>{
+ const av=a.value_assessment||{},bv=b.value_assessment||{};
+ if(wcSort==='automation'){
+  const supported=w=>w.value_assessment?.automation?.known_operation==='github.create_issue'?1:0;
+  return supported(b)-supported(a)||(bv.triage_score||0)-(av.triage_score||0);
+ }
+ if(wcSort==='risk'){
+  const risk=w=>({HIGH:3,ELEVATED:2,REVIEW_REQUIRED:1})[w.value_assessment?.risk?.level]||0;
+  return risk(b)-risk(a)||(bv.triage_score||0)-(av.triage_score||0);
+ }
+ return (bv.triage_score||0)-(av.triage_score||0);
+});
+ const unconnected=wcNeedsSource(wcCurrent)&&wcCoverage[wcNeedsSource(wcCurrent)]==='not_connected';
+ $('wcSelectedTitle').textContent=category?.[1]||'View all';
+ $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
+  shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
+  shown.length+' found';
+ $('wcTaskList').innerHTML=(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
+  (shown.length?shown.map((w,i)=>{
+  const time=wcTime(w),status=wcStatuses.get(wcKey(w));
+  const assessment=w.value_assessment||{};
+  const priority=String(assessment.triage_band||'NOT_ASSESSED').replace(/_/g,' ');
+  const riskLabel=String(assessment.risk?.level||'UNKNOWN').replace(/_/g,' ');
+  const readiness=assessment.automation?.known_operation==='github.create_issue'?
+   'Tracking issue after separate approval only · Full repair not automated':
+   'Full work automation unverified';
+  const src=(w.evidence_refs||[]).filter(u=>
+   /^https:\/\/github\.com\/maloney2323\/Reality\/(?:actions\/runs\/\d+|issues\/\d+|pull\/\d+|commit\/[a-f0-9]{40})$/.test(String(u)));
+  const history=status==='PRIOR'?'PRIOR ATTEMPT · RECONCILE':
+   status==='CLEAR'?'No prior attempt seen · Not authorized':
+   status==='ERROR'?'History unknown · Block execution':'History not checked';
+  return '<div class="wc-task"><div class="wc-task-top"><label>'+
+   '<input type="checkbox" data-wc-task="'+i+'" '+(wcPicked.has(wcKey(w))?'checked':'')+'>'+
+   '<span><strong>'+esc(w.objective||w.title||w.work_key||'Finding')+'</strong>'+
+   '<span class="wc-small" style="display:block">'+esc(category?.[0]==='all'?
+    (workCategories.find(x=>x[0]===wcClass(w))?.[1]||'Unclassified'):category[1])+'</span></span></label></div>'+
+   '<span class="wc-tag">'+esc(w.state||'DISCOVERED')+'</span>'+
+   '<span class="wc-tag">Review '+esc(priority)+' ('+esc(String(assessment.triage_score??'N/A'))+'/100 heuristic)</span>'+
+   '<span class="wc-tag">Risk '+esc(riskLabel)+'</span>'+
+   '<span class="wc-tag">'+src.length+' sources</span>'+
+   '<span class="wc-tag" data-risk="'+(status==='PRIOR')+'">'+esc(history)+'</span>'+
+   '<p>Estimated tracking operation: '+(time?time[0]+'–'+time[1]+' min (illustrative)':'Not calibrated')+
+   ' · Full work: not yet estimated.</p>'+
+   '<details><summary>View evidence, scope and next step</summary>'+
+   '<p>'+esc(w.description||w.reason||'Source-backed observation; business value not yet verified.')+'</p>'+
+   '<p>Business impact: UNMEASURED · Full-task labor: UNKNOWN · Verified savings: NONE RECORDED.</p>'+
+   '<p>Automation: '+esc(readiness)+'</p>'+
+   '<p>Next evidence: '+esc(assessment.next_validation_step||'Establish actual cost, effect and scope')+'</p>'+
+   '<p>Provider operation: '+esc(w.execution_work_item?.operation||'Not determined')+
+   ' · Priority and time returned: unverified.</p>'+
+   src.map((u,j)=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+
+     '">Evidence '+(j+1)+'</a></div>').join('')+
+   '<p>'+esc(history)+'. A selection is only a plan draft.</p></details>'+
+   (wcPicked.size===1&&wcPicked.has(wcKey(w))?
+    '<div class="wc-direct-action">'+
+    '<button type="button" class="wc-plan-button" data-wc-start="'+esc(wcKey(w))+'" '+
+     (wcJobStarting||wcJobAttemptLocked.has(wcKey(w))||
+      status==='PRIOR'||status==='ERROR'||!wcEligibleForDirectStart(w)?'disabled':'')+'>'+
+     esc(wcJobStarting&&wcJobProgress.workId===wcKey(w)?'Checking / running job…':
+      wcJobAttemptLocked.has(wcKey(w))||status==='PRIOR'?'Attempt locked · Reconcile':
+      wcEligibleForDirectStart(w)?'Authorize & Start Job':'Executable job plan required')+'</button>'+
+    '<p class="wc-note">'+esc(wcEligibleForDirectStart(w)?
+      'Current supported action: create one source-backed GitHub tracking issue. This does not repair the defect.':
+      'This is a finding, not a runnable job yet. No external action is defined or authorized.')+'</p>'+
+    (wcJobProgress.workId===wcKey(w)?
+      '<p class="wc-feedback" role="status" aria-live="polite">'+esc(wcJobProgress.message)+'</p>'+
+      (wcJobProgress.verifiedIssueUrl?
+       '<a target="_blank" rel="noopener noreferrer" href="'+esc(wcJobProgress.verifiedIssueUrl)+'">View verified GitHub issue</a>':''):
+      '')+'</div>':'')+'</div>';
+ }).join(''):'<div class="attention-empty">'+
+  esc(unconnected?'This business data source is not connected. Zero is NOT a no-opportunity conclusion.':
+  wcCatalogStatus==='PARTIAL'?'Discovery was partial; no findings in this category from successfully checked sources.':
+  'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>');
+ $('wcTaskList').querySelectorAll('[data-wc-task]').forEach(c=>c.onchange=()=>{
+  const w=shown[Number(c.dataset.wcTask)];
+  if(!w)return;
+  if(c.checked)wcPicked.add(wcKey(w));else wcPicked.delete(wcKey(w));
+  wcRender();
+ });
+ $('wcTaskList').querySelectorAll('[data-wc-start]').forEach(b=>b.onclick=()=>{
+  void wcAuthorizeAndStart(b.dataset.wcStart);
+ });
+ wcPaintSummary();
+}
+async function wcCheckPrior(items,epoch){
+ const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+ if($('privateReady')?.style.display!=='block'||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))return;
+ for(const w of items.slice(0,15)){
+  if(!/^work:[0-9a-f]{32}$/.test(String(w.work_id||''))||w.kind!=='SYSTEM_MAINTENANCE')continue;
+  try{
+   const r=await fetch('/api/reality/personal-issue-dispatch',{
+    method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id}),
+   });
+   const x=await r.json();
+   if(epoch!==wcEpoch)return;
+   wcStatuses.set(w.work_id,!r.ok||!x.ok?'ERROR':
+    x.previously_attempted===true?'PRIOR':x.can_request_new_approval===true?'CLEAR':'ERROR');
+  }catch{if(epoch!==wcEpoch)return;wcStatuses.set(w.work_id,'ERROR')}
+  wcRender();
+ }
+}
+$('wcDiscover').onclick=()=>{$('findWork').click()};
+function wcLoad(items,{coverage={},status='OBSERVED'}={}){
+ wcWork=Array.isArray(items)?items.filter(w=>w&&wcKey(w)&&Array.isArray(w.evidence_refs)&&w.evidence_refs.length>0):[];
+ wcCoverage=coverage;wcCatalogStatus=status;
+ wcPicked=new Set([...wcPicked].filter(id=>wcWork.some(w=>wcKey(w)===id)));
+ wcStatuses=new Map();wcEpoch++;
+ wcRender();
+ void wcCheckPrior(wcWork,wcEpoch);
+}
+document.querySelectorAll('[data-wc-mode]').forEach(b=>b.onclick=()=>{
+ wcMode=b.dataset.wcMode;wcPaintSummary();
+});
+$('wcHours').onchange=wcPaintSummary;
+$('wcMetering').onchange=wcPaintSummary;
+$('wcRate').oninput=wcPaintSummary;
+$('wcSort').onchange=()=>{wcSort=$('wcSort').value;wcRender()};
+for(const id of ['wcManualMinutes','wcFrequency','wcCoverage','wcLaborRate','wcMonthlyCost']){
+ $(id).oninput=()=>{wcRenderValueScenario();wcResetStaffing()};
+}
+for(const id of ['wcFteHours','wcReviewMinutes','wcExceptionRate','wcExceptionMinutes','wcTeamHeadcount','wcSetupCost']){
+ $(id).oninput=wcResetStaffing;
+}
+$('wcCalculateStaffing').onclick=wcCalculateStaffing;
+$('wcPreview').onclick=()=>{$('wcSummary').textContent=wcSummary(true)};
+wcRender();
+
+async function wcDiscoverCatalog(){
+ const epoch=++wcEpoch;
+ try{
+  const r=await fetch('/api/reality/work-catalog',{credentials:'same-origin',cache:'no-store'});
+  const data=await r.json();
+  if(epoch!==wcEpoch)return;
+  if(!r.ok||!data.ok||!Array.isArray(data.items))throw Error('catalog unavailable');
+  wcLoad(data.items,{coverage:data.source_coverage||{},status:data.status||'PARTIAL'});
+ }catch{
+  if(epoch!==wcEpoch)return;
+  wcLoad([],{status:'PARTIAL'});
+  $('wcTaskList').textContent='Work catalog could not read its sources. No conclusions about available work can be drawn.';
+ }
+}
 function renderWork(source){
   const items=Array.isArray(source)?source:(source?.work||source?.work_items||source?.items||[]);
   const state=w=>String(w.status||w.state||'DISCOVERED').toUpperCase();
@@ -221,28 +2016,238 @@ function renderWork(source){
   $('matrixPresentCount').textContent=String(counts.present);
   $('matrixFutureCount').textContent=String(counts.future);
   $('workCount').textContent=String(items.length);
+   void wcDiscoverCatalog();
   $('workQueue').innerHTML=items.length?items.map((w,i)=>{
     const evidence=Array.isArray(w.evidence_refs)?w.evidence_refs.length:0;
     return '<div class="work-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||w.kind||('Work '+(i+1)))+'</strong><div class="muted">'+esc(w.reason||w.expected_effect||w.description||'Reality identified governed work.')+'</div><div class="work-meta"><span class="pill">'+esc(state(w))+'</span><span class="pill">'+esc(w.expected_revenue!=null?'Value $'+w.expected_revenue:'Value not established')+'</span><span class="pill">'+esc(w.recurring?'RECURRING':'GOVERNED')+'</span><span class="pill">'+esc('Evidence '+evidence)+'</span></div></div>';
   }).join(''):'<div class="attention-empty">Reality has not established a work candidate yet.</div>';
   const pending=items.filter(w=>w.consequential||w.authority_required?.length||w.authorization_required||w.authority==='NONE_UNLESS_EXPLICITLY_ESTABLISHED');
+  guidedSetup.workFound=pending.some(w=>w.authorization_required===true&&
+    w.execution_work_item?.connector==='github'&&w.execution_work_item?.operation==='create_issue');
+  paintGuidedSetup();
   $('attentionCount').textContent=String(pending.length);
-  $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>'<div class="attention-item"><strong>'+esc(w.title||w.action||w.objective||w.work_key||'Governed work')+'</strong><div class="muted">External effect requires your authorization.</div><button type="button" data-auth="'+i+'">Authorize this work</button></div>').join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
+  $('attentionQueue').innerHTML=pending.length?pending.map((w,i)=>{
+    const prepared=w.kind==='SYSTEM_MAINTENANCE'&&w.state==='QUALIFIED'&&
+      w.authorization_required===true&&
+      /^work:[0-9a-f]{32}$/.test(String(w.work_id||''))&&
+      w.execution_work_item?.connector==='github'&&
+      w.execution_work_item?.operation==='create_issue';
+    return '<div class="attention-item"><strong>'+esc(w.title||w.objective||w.work_key||'Governed work')+
+      '</strong><div class="muted">Source evidence: '+esc((w.evidence_refs||[]).length)+
+      ' · '+esc(prepared?'Source-backed maintenance opportunity. Complete the required setup steps below.':'Not ready for authenticated approval; more evidence or capability required.')+
+      '</div><ol class="work-steps" aria-label="Required approval steps">'+
+      '<li data-work-step="1" data-state="required">1. Private sign-in · Required</li>'+
+      '<li data-work-step="2" data-state="required">2. Confirmed active goal · Required</li>'+
+      '<li data-work-step="3" data-state="required">3. Source and exact action review · Required</li>'+
+      '<li data-work-step="4" data-state="required">4. Explicit approval · Required</li></ol>'+
+      '<button type="button" data-auth="'+i+'" '+(prepared?'':'disabled')+'>'+
+      (prepared?'Continue guided setup':'Not ready for approval')+'</button>'+
+      '<div class="work-meta" data-work-receipt="'+i+'" role="status" aria-live="polite"></div>'+
+      '<div class="work-review" data-work-review="'+i+'" hidden></div></div>';
+  }).join(''):'<div class="attention-empty">Nothing is awaiting authorization.</div>';
   $('attentionQueue').querySelectorAll('[data-auth]').forEach(btn=>btn.onclick=async()=>{
-    const w=pending[Number(btn.dataset.auth)];
-    btn.disabled=true;btn.textContent='Authorizing…';
+    const i=Number(btn.dataset.auth),w=pending[i];
+    const card=btn.closest('.attention-item');
+    const receipt=card.querySelector('[data-work-receipt]');
+    const review=card.querySelector('[data-work-review]');
+    btn.disabled=true;btn.textContent='Checking requirements…';
+    let confirmedGoalReadback=false;
     try{
-      const workItem=w.execution_work_item||w;
-      const scope=(w.authorization_scope||w.scope||w.allowed_operations||workItem.authority_required||[])[0];
-      if(!scope?.connector||!scope?.operation)throw new Error('Reality has not established an exact authorization scope for this work.');
-      const rr=await fetch('/api/reality/authority',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({intent:'I_FOUND_WORK_AUTHORIZED',work_item:workItem,enabled:true})});
-      const rb=await rr.json();if(!rr.ok||!rb.ok)throw new Error(rb.error||'Authorization failed');
-      const er=await fetch('/api/reality/execute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workItem,workflowId:workItem.workflow_id,requestSummary:w.objective,warrantContext:{evidenceRefs:w.evidence_refs||[],observationRefs:w.source_observation_ids||[],epistemicAssessment:{status:'SUPPORTED',basis:'QUALIFIED_RECURRING_WORK'},frictionDecision:{level:'STANDARD',reason:'Bounded recurring maintenance explicitly authorized'},attentionDecision:{status:'PROPOSE_GOVERNED_WORK'},workProposal:w,policyVersion:'reality-authority-v1.0'}})});
-      const eb=await er.json();if(!er.ok||!eb.ok)throw new Error(eb.error||eb.result?.blocked_reason||'Execution failed');
-      if(eb.result?.status!=='VERIFIED')throw new Error(eb.result?.blocked_reason||eb.result?.outcome?.outcome_state||'Execution was not independently verified');
-      btn.textContent='Authorized & verified ✓';
-    }catch(e){btn.disabled=false;btn.textContent='Authorize this work';alert(e.message)}
+      // User identity and controlling objective must be separately verified
+      // before any source-linked PREPARE. A missing field never becomes AI
+      // permission; the exact action is re-derived by the server, not browser.
+      const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+      if($('privateReady')?.style.display!=='block'||!conv||
+         !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(conv)){
+        setWorkStep(card,1,'blocked','Private sign-in · Required');
+        setWorkStep(card,2,'required','Confirmed active goal · Not checked');
+        showWorkSetupAction(receipt,'Sign in to your private Reality account to continue. No work has been approved or executed.','account');
+        btn.disabled=false;btn.textContent='Continue guided setup';
+        return;
+      }
+      setWorkStep(card,1,'complete','Private sign-in · Verified');
+      const goalR=await fetch('/api/reality/personal-goals?conversation_id='+
+        encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+      const goalData=await goalR.json();
+      if(!goalR.ok||!goalData.ok)
+        throw Error(goalData.error||'Reality could not verify your goal ledger.');
+      const current=goalData.goal_state;
+      if(!current?.active_goal_id||current.active_goal?.goal_id!==current.active_goal_id||
+         current.active_goal?.status!=='ACTIVE'||current.active_goal?.user_confirmed!==true){
+        setWorkStep(card,2,'blocked','Confirmed active goal · Required');
+        showWorkSetupAction(receipt,'An active goal is required. Scroll to your private conversation, enter your business objective in your own words, and press Confirm this goal (or resume an existing goal). Then return here. No work was approved.','goal');
+        btn.disabled=false;btn.textContent='Continue guided setup';
+        return;
+      }
+      confirmedGoalReadback=true;
+      setWorkStep(card,2,'complete','Confirmed active goal · '+String(current.active_goal.title||'Verified').slice(0,70));
+      async function post(path,payload){
+        const response=await fetch(path,{method:'POST',credentials:'same-origin',
+          headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+        const data=await response.json();
+        if(!response.ok||!data.ok)
+          throw Error(data.error||data.reason||'Reality refused the requested operation');
+        return data;
+      }
+      // Review historical effects BEFORE saving another work handoff or
+      // inviting another approval. A changed discovery ID or conversation
+      // cannot re-arm earlier UNCERTAIN work.
+      const prior=await post('/api/reality/personal-issue-dispatch',{
+        intent:'HISTORY_CHECK',conversation_id:conv,discovered_work_id:w.work_id,
+      });
+      if(prior.status==='PREVIOUS_PROVIDER_ATTEMPT_REQUIRES_RECONCILIATION'&&
+         prior.previously_attempted===true){
+        setWorkStep(card,3,'blocked','Prior provider attempt · Reconciliation required');
+        setWorkStep(card,4,'blocked','Approval unavailable · Previous attempt locked');
+        receipt.textContent='Reality found a previous provider attempt for this same recurring workflow. It cannot be safely retried under a new work ID or conversation. Use Execution recovery · Read only. No external action performed.';
+        btn.textContent='Previously attempted · Do not retry';
+        return;
+      }
+      if(prior.status!=='NO_PREVIOUS_PROVIDER_ATTEMPT_OBSERVED'||
+         prior.can_request_new_approval!==true)
+        throw Error('Reality cannot establish a safe new work candidate from its prior execution history.');
+      const prepared=await post('/api/reality/personal-discovered-work',{
+        intent:'PREPARE',conversation_id:conv,discovered_work_id:w.work_id,
+      });
+      if(prepared.status!=='DISCOVERED_WORK_GOAL_GROUNDED_PENDING_APPROVAL'||
+         prepared.discovered_work_id!==w.work_id||
+         prepared.work_item?.work_item_id!==w.work_id||
+         !prepared.continuity_receipt_id||!prepared.grounding_proof||
+         prepared.external_action_performed!==false)
+        throw Error('Reality did not return a verified, durable, non-executing work handoff.');
+      setWorkStep(card,3,'complete','Source and exact action · Verified, review below');
+      setWorkStep(card,4,'required','Explicit approval · Checkbox required');
+      const exact=prepared.work_item;
+      receipt.textContent='Prepared from '+prepared.evidence_refs.length+
+        ' source records. Continuity receipt '+prepared.continuity_receipt_id+
+        '. No external action performed.';
+      review.hidden=false;
+      review.replaceChildren();
+      const heading=document.createElement('strong');
+      heading.textContent='Step 3 · Review what you would approve';
+      const desc=document.createElement('p');
+      desc.textContent='Original goal: '+current.active_goal.title+
+        '\nWork ID: '+w.work_id+
+        '\nProposed action: '+exact.action+
+        '\nProvider: '+exact.connector+' · '+exact.operation+
+        '\nRepository: '+exact.inputs?.repository+
+        '\nIssue title: '+exact.inputs?.title+
+        '\nIssue body: '+exact.inputs?.body+
+        '\nEvidence references: '+prepared.evidence_refs.length+
+        '\nThis step only records exact-work approval. It does NOT create the issue.';
+      const label=document.createElement('label');
+      const checkbox=document.createElement('input');
+      checkbox.type='checkbox';checkbox.required=true;
+      const consent=document.createElement('span');
+      consent.textContent='Required: I approve recording permission for exactly the action and target shown above. I understand it will not be executed now.';
+      label.append(checkbox,consent);
+      const approve=document.createElement('button');approve.type='button';
+      approve.textContent='Approve this exact action';approve.disabled=true;
+      checkbox.onchange=()=>{approve.disabled=!checkbox.checked;};
+      const cancel=document.createElement('button');cancel.type='button';
+      cancel.className='work-cancel';cancel.textContent='Cancel and keep work unapproved';
+      cancel.onclick=()=>{
+        checkbox.checked=false;review.hidden=true;review.replaceChildren();
+        setWorkStep(card,4,'required','Explicit approval · Not granted');
+        receipt.textContent='Review cancelled. Work remains discovered, not executed.';
+        btn.disabled=false;btn.textContent='Continue guided setup';
+      };
+      approve.onclick=async()=>{
+        if(!checkbox.checked||!checkbox.checkValidity())return;
+        approve.disabled=true;cancel.disabled=true;
+        approve.textContent='Recording exact approval…';
+        try{
+          const approved=await post('/api/reality/personal-action-authority',{
+            conversation_id:conv,work_item:exact,
+            grounding_proof:prepared.grounding_proof,
+            confirmation:'APPROVE_THIS_EXACT_WORK_ITEM',
+          });
+          if(approved.status!=='EXACT_GOAL_BOUND_ACTION_APPROVED'||
+             !approved.policy_id||approved.external_action_performed!==false)
+            throw Error('Exact work approval could not be verified.');
+          const admitted=await post('/api/reality/personal-execution-admission',{
+            intent:'CHECK',conversation_id:conv,work_item:exact,
+            grounding_proof:prepared.grounding_proof,
+          });
+          if(admitted.status!=='GOAL_AND_ACTION_ADMITTED_PENDING_EXECUTION_LEASE'||
+             admitted.action_policy_id!==approved.policy_id||
+             admitted.work_item_fingerprint!==prepared.work_fingerprint||
+             admitted.external_action_performed!==false)
+            throw Error('Approved work did not pass the latest goal/readiness check.');
+          setWorkStep(card,4,'complete','Exact action · Approved, dispatch still disabled');
+          guidedSetup.approved=true;paintGuidedSetup();
+          receipt.textContent='Approved · Dispatch not enabled. Work '+w.work_id+
+            ' · Continuity '+prepared.continuity_receipt_id+
+            ' · Approval '+approved.policy_id+
+            '. No external action has been performed.';
+          review.replaceChildren();
+          const success=document.createElement('p');
+          success.dataset.approvalOnlyNote='true';
+          success.textContent='Approval recorded and current goal rechecked. No provider action has run. Any live execution needs a new, separate confirmation and a single-use reservation.';
+          review.append(success);
+          btn.textContent='Approved · Dispatch not enabled';
+          await revealGap3Action(review,receipt,exact,conv,w.work_id);
+        }catch(e){
+          setWorkStep(card,4,'blocked','Approval or admission · Needs review');
+          receipt.textContent='Reality could not finish approval/readiness: '+e.message+
+            '. No external work has been executed.';
+          review.replaceChildren();
+          const failure=document.createElement('p');
+          failure.textContent='Approval status may need fresh readback. Restart the guided setup to verify before taking any action.';
+          review.append(failure);
+          btn.disabled=false;btn.textContent='Restart guided setup';
+        }
+      };
+      review.append(heading,desc,label,approve,cancel);
+      btn.textContent='Review the required approval below';
+    }catch(e){
+      btn.disabled=false;btn.textContent='Continue guided setup';
+      const code=String(e.message||'Reality could not verify the work.');
+      if(['GOAL_GROUNDING_AUTHENTICATED_SOURCE_REQUIRED',
+           'DISCOVERED_WORK_CONFIRMED_GOAL_REQUIRED',
+           'DISCOVERED_WORK_CONFIRM_ACTIVE_GOAL_IN_PRIVATE_CONVERSATION'].includes(code)){
+        setWorkStep(card,2,'blocked','Goal/source verification · Needs review');
+        showWorkSetupAction(receipt,
+          confirmedGoalReadback
+          ?'An active goal exists, but its source receipt could not be verified. Do not recreate your goal automatically. No work was authorized or executed.'
+          :'A user-confirmed goal is required before Reality can prepare this work. No action was authorized or executed.',
+          'goal');
+      }else{
+        setWorkStep(card,3,'blocked','Source and exact action · Not verified');
+        receipt.textContent='Reality blocked the handoff: '+code+
+          '. No external work was executed.';
+      }
+    }
   });
+  // Read-only durable recovery. Source-only handoff never implies that a
+  // separate action approval was granted or that the work was executed.
+  void refreshPreparedHomeWork(pending);
+}
+async function refreshPreparedHomeWork(pending){
+  if($('privateReady')?.style.display!=='block')return;
+  const conv=localStorage.getItem('reality.private.chat.conversation.v1');
+  if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conv||'')))return;
+  try{
+    const r=await fetch('/api/reality/personal-discovered-work?conversation_id='+
+      encodeURIComponent(conv),{credentials:'same-origin',cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    if(data.status!=='READ_ONLY_DISCOVERED_WORK_CONTINUITY')return;
+    const remembered=new Map((data.items||[]).map(x=>[x.work_id,x]));
+    for(let i=0;i<pending.length;i++){
+      const w=pending[i],prior=remembered.get(w.work_id);
+      if(!prior||!prior.continuity_receipt_id)continue;
+      const card=$('attentionQueue').querySelector('[data-work-receipt="'+i+'"]');
+      if(!card||card.textContent.includes('Approval '))continue;
+      card.textContent='Continuity restored · '+prior.continuity_receipt_id+
+       ' · '+(prior.goal_still_current
+        ?'Original goal remains active; fresh approval is still required'
+        :'Prior goal changed; prepare this work again before any approval')+
+       ' · No external action performed';
+    }
+  }catch{
+    // UI readback failure never creates authority or implies completion.
+  }
 }
 async function checkReality(){try{const r=await fetch('/api/health');const b=await r.json();if(!r.ok)throw new Error(b.error||'health check failed');$('productState').textContent='LIVE · '+(b.status||'HEALTHY').toUpperCase();$('liveHeadline').textContent='Reality is live and ready to work.';$('liveDetail').textContent='The operating system is reachable. When work is authorized, Reality can move it through governed execution and verification.'}catch(e){$('productState').textContent='LIVE STATE UNKNOWN';$('liveHeadline').textContent='Reality could not establish live health.';$('liveDetail').textContent=e.message}}checkReality();
 realityWork.onclick=async()=>{
@@ -250,6 +2255,7 @@ realityWork.onclick=async()=>{
   try{
     const r=await fetch('/api/reality/stewardship');const b=await r.json();if(!r.ok)throw new Error(b.error||'stewardship discovery failed');
     renderWork(b.work||[]);
+    if(guidedSetup.workFound)$('attentionQueue').scrollIntoView({behavior:'smooth',block:'start'});
     workResult.textContent='Discovery completed. Work appears above; attention shows what still requires authorization. No external work was executed.';
     $('liveHeadline').textContent='Reality has started looking for work.';$('liveDetail').textContent='Discovery is observation. Authorization remains explicit.';
   }catch(e){workResult.textContent='Reality stopped honestly: '+e.message}
@@ -268,6 +2274,7 @@ async function refreshSavedShiftHome(){
       if([8,12].includes(Number(b.config.shiftLength)))$('shiftLength').value=String(b.config.shiftLength);
       updateShiftBanner();
     }
+    wcRenderShiftEndingReceipt(b.completion_report);
     if(manualWorkActive)return;
     if(b.home?.status==='RECORDED'){
       renderWork(b.home.work||[]);
@@ -312,6 +2319,482 @@ $('runShiftNow').onclick=async()=>{
 // authorizes a tool, or runs the cron handler.
 refreshSavedShiftHome();
 setInterval(refreshSavedShiftHome,300000);
+
+(function(){
+ const el=id=>document.getElementById(id);
+ const status=s=>el('privateStatus').textContent=s;
+ const endpoint='/api/reality/personal-session';
+ function conversationId(){
+  let id=localStorage.getItem('reality.private.chat.conversation.v1');
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id)){
+   id=crypto.randomUUID();localStorage.setItem('reality.private.chat.conversation.v1',id);
+  }
+  return id;
+ }
+ let realitySelfImprovementLoading=false;
+ let realityOriginal143Eligible=false;
+ const original143WorkId='work:24cda9611404e9bcb47909976067605c';
+ async function refreshRealitySelfImprovement(){
+  if(realitySelfImprovementLoading||el('privateReady').style.display==='none')return;
+  realitySelfImprovementLoading=true;
+  const refresh=el('privateSelfImprovementRefresh');
+  const continueButton=el('privateContinueOriginal143');
+  const line=el('privateSelfImprovementStatus');
+  refresh.disabled=true;
+  continueButton.disabled=true;
+  realityOriginal143Eligible=false;
+  line.textContent='Checking your original goal and unfinished work in Continuity…';
+  try{
+   const response=await fetch('/api/reality/personal-self-improvement',{
+    method:'GET',credentials:'same-origin',cache:'no-store'
+   });
+   const observed=await response.json();
+   if(!response.ok||observed.ok!==true)
+    throw Error(String(observed.error||'ORIGINAL_JOB_READBACK_UNAVAILABLE'));
+   // This generic discovery view selects ONE unfinished item. The original
+   // job may exist elsewhere in verified Work Center results; don't block
+   // read-only navigation based on the discovery list's first item.
+   realityOriginal143Eligible=true;
+   continueButton.disabled=false;
+   if(observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
+    observed.original_work_id===original143WorkId){
+    line.textContent='Original job #143 is unfinished and owner-goal scoped. '+
+     'Existing repair evidence is recorded, but activation, registration, and '+
+     'final settlement still require fresh independent readback. '+
+     'Continue this SAME job below; no new work queue or credential is needed.';
+   }else{
+    line.textContent=observed.status==='NO_VERIFIED_ELIGIBLE_WORK'?
+     'No eligible unfinished work was verified in the inspected conversations. '+
+      'This does not prove that all work is finished.':
+     'Current readback did not identify original #143 as an eligible unfinished job. '+
+     'Status: '+String(observed.status||'UNKNOWN')+
+     '. Use Continue to independently check the exact original #143 in '+ 
+     'Unfinished Work; no capability has been activated.';
+   }
+  }catch(error){
+   continueButton.disabled=true;
+   line.textContent='Could not independently identify original #143: '+
+    String(error?.message||'READBACK_FAILED')+
+    '. No authorization or execution was attempted.';
+  }finally{
+   refresh.disabled=false;
+   realitySelfImprovementLoading=false;
+  }
+ }
+ el('privateSelfImprovementRefresh').onclick=refreshRealitySelfImprovement;
+ el('privateContinueOriginal143').onclick=async()=>{
+  const button=el('privateContinueOriginal143');
+  if(!realityOriginal143Eligible||button.disabled||
+   el('privateReady').style.display==='none')return;
+  button.disabled=true;
+  const line=el('privateSelfImprovementStatus');
+  line.textContent='Recovering original #143 from the existing Unfinished Work view…';
+  try{
+   // Reuse the already tested Work Center: no new route, model authority,
+   // GitHub token, queue, or completion mechanism.
+   await wcLoadUnfinishedWork();
+   const target=[...document.querySelectorAll(
+    '#wcUnfinishedList button[data-original143-prepare],'+
+    '#wcUnfinishedList button[data-original143-activate]'
+   )].find(node=>
+    (node.dataset.original143Prepare||node.dataset.original143Activate)===
+      original143WorkId);
+   if(!target)
+    throw Error('ORIGINAL_143_NOT_IN_VERIFIED_UNFINISHED_WORK');
+   target.scrollIntoView({behavior:'smooth',block:'center'});
+   target.focus();
+   // Only the existing READ-ONLY prepare handler is invoked. Owner
+   // authorization remains a later direct human click after GET readback.
+   if(target.dataset.original143Prepare)target.click();
+   line.textContent='Reality opened the existing job #143 review. '+
+    'The Work Center is checking current evidence. '+
+    'The separate approval button will appear there ONLY if ready. '+
+    'No approval was given by this navigation.';
+  }catch(error){
+   line.textContent='Cannot continue #143 until its original work is verified: '+
+    String(error?.message||'UNFINISHED_WORK_UNAVAILABLE')+
+    '. No new job or upgrade was created.';
+  }finally{
+   button.disabled=!realityOriginal143Eligible;
+  }
+ };
+
+ function showSignedIn(yes){
+  el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
+  el('privateAccountState').textContent=yes?
+   '✓ Signed in. Your conversation and goal controls are available below.':
+   'Sign in below using your existing Reality account.';
+  el('privateRetrySession').hidden=true;
+  el('privateLogin').style.display=yes?'none':'block';
+  el('privateReady').style.display=yes?'block':'none';
+  guidedSetup.authenticated=yes;
+  guidedSetup.accountError='';
+  if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
+   guidedSetup.workFound=false;guidedSetup.approved=false;}
+  paintGuidedSetup();
+  if(yes)void refreshRealitySelfImprovement();
+  else{
+   realityOriginal143Eligible=false;
+   el('privateContinueOriginal143').disabled=true;
+   el('privateSelfImprovementStatus').textContent=
+    'Sign in to inspect original verified work. No model action is authorized.';
+  }
+ }
+ function bubble(role,text){
+  const node=document.createElement('div');
+  node.className='bubble '+(role==='user'?'user':'');
+  const head=document.createElement('div');head.className='label';
+  head.textContent=role==='user'?'YOU':'REALITY';
+  const body=document.createElement('div');body.style.whiteSpace='pre-wrap';
+  body.textContent=String(text||'');
+  node.append(head,body);el('privateTranscript').append(node);
+ }
+ async function loadConversations(){
+  const r=await fetch('/api/reality/personal-chat?list=1',{cache:'no-store'});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Unable to list saved conversations');
+  const select=el('privateConversations');select.replaceChildren();
+  const active=conversationId(),existing=(data.conversations||[]);
+  const start=document.createElement('option');start.value=active;
+  start.textContent='Current conversation'+(existing.some(x=>x.conversation_id===active)?' · saved':' · new');
+  select.append(start);
+  for(const item of existing){
+   if(item.conversation_id===active)continue;
+   const option=document.createElement('option');option.value=item.conversation_id;
+   option.textContent=(item.last_message||'Previous chat').slice(0,68);
+   select.append(option);
+  }
+  select.value=active;
+ }
+ el('privateConversations').onchange=async()=>{
+  const id=el('privateConversations').value;
+  if(!id)return;
+  localStorage.setItem('reality.private.chat.conversation.v1',id);
+  try{await loadSaved();await loadConversations();void wcLoadCompletionReports()}catch(e){status(e.message)}
+ };
+ let confirmedActiveGoal=null;
+ async function loadGoals(){
+  const label=el('privateGoalStatus');
+  try{
+   const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Goal ledger unavailable');
+   const state=data.goal_state||{};
+   confirmedActiveGoal=state.active_goal?.goal_id&&state.active_goal_id===state.active_goal.goal_id&&
+     state.active_goal.status==='ACTIVE'&&state.active_goal.user_confirmed===true?
+    {goal_id:state.active_goal.goal_id,title:String(state.active_goal.title||'').slice(0,300)}:null;
+   guidedSetup.goal=confirmedActiveGoal?'confirmed':'missing';
+   guidedSetup.goalTitle=confirmedActiveGoal?.title||'';
+   guidedSetup.approved=false;
+   paintGuidedSetup();
+   for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
+    el(id).disabled=!confirmedActiveGoal;
+   label.textContent=state.active_goal?
+     ('USER-CONFIRMED active objective: '+String(state.active_goal.title||'').slice(0,250)+
+      ' · Ledger receipt: '+state.active_goal.last_transition_receipt_id):
+     ('No explicitly confirmed active objective in this conversation. Prior suggestions are not authorization.');
+   const select=el('privateSavedGoals');select.replaceChildren();
+   for(const item of state.goals||[]){
+    if(item.goal_id===state.active_goal_id||item.status==='ABANDONED'||
+       item.status==='USER_REPORTED_COMPLETE_UNVERIFIED')continue;
+    const option=document.createElement('option');option.value=item.goal_id;
+    option.textContent=String(item.title||'Prior goal').slice(0,115)+' · '+item.status;
+    select.append(option);
+   }
+   el('privateResumeGoal').disabled=!select.options.length;
+  }catch(e){
+   confirmedActiveGoal=null;
+   guidedSetup.goal='unavailable';guidedSetup.goalTitle='';
+   paintGuidedSetup();
+   for(const id of ['privatePauseGoal','privateStopGoal','privateReportGoal'])
+    el(id).disabled=true;
+   label.textContent='Confirmed goal ledger not available: '+e.message+
+    '. Do not treat suggestions as approved objectives.';
+   el('privateResumeGoal').disabled=true;
+  }
+ }
+ async function saveGoalCommand(operation,message,target_goal_id=null){
+  const r=await fetch('/api/reality/personal-goals',{method:'POST',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conversationId(),
+    request_id:crypto.randomUUID(),operation,message,target_goal_id})});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Goal change not recorded');
+  if(!data.transition_receipt_id||data.goal_state?.external_execution_authorized!==false)
+   throw Error('GOAL_TRANSITION_READBACK_NOT_VERIFIED');
+  return data;
+ }
+ el('privateSetGoal').onclick=async()=>{
+  const goalField=el('privateGoalText');
+  if(!goalField.checkValidity()){goalField.reportValidity();return status('A goal in your own words is required before business work can be prepared.');}
+  const message=goalField.value.trim();
+  if(message.length<12)return status('Enter a meaningful goal of at least 12 characters.');
+  if(!confirm('Confirm that this is your new active conversational objective? This does not authorize any external actions.'))return;
+  el('privateSetGoal').disabled=true;
+  try{
+   await saveGoalCommand('SET_ACTIVE',message);
+   el('privateGoalText').value='';
+   await loadGoals();await loadSaved();await loadConversations();
+   status('Goal confirmed. Continue with Step 3: Find work.');
+   guidedWorkPending=false;
+   $('startStep3').scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){status('Goal was not confirmed: '+e.message)}
+  finally{el('privateSetGoal').disabled=false}
+ };
+ el('privateResumeGoal').onclick=async()=>{
+  const target=el('privateSavedGoals').value;
+  const selected=el('privateSavedGoals').selectedOptions[0]?.textContent||'';
+  if(!target)return;
+  if(!confirm('Resume this earlier objective? '+selected))return;
+  el('privateResumeGoal').disabled=true;
+  try{
+   await saveGoalCommand('RESUME','I explicitly authorize resuming this earlier objective: '+selected.slice(0,450),target);
+   await loadGoals();await loadSaved();await loadConversations();
+   status('Goal resumed. Continue with Step 3: Find work.');
+   $('startStep3').scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){status('Goal was not resumed: '+e.message)}
+  finally{el('privateResumeGoal').disabled=false}
+ };
+ // Explicit, authenticated user lifecycle controls. Never promote
+ // assistant suggestions or review text to an authorized user transition.
+ async function changeActiveGoal(operation,buttonId){
+  const target=confirmedActiveGoal;
+  if(!target?.goal_id)return status('No confirmed active goal is available to change.');
+  const choices={
+   PAUSE:{
+    prompt:'Pause this active objective? It stays recoverable and no older goal is silently reactivated.',
+    message:'I explicitly pause my active conversational goal: ',
+    success:'Goal paused in authenticated Continuity; nothing was executed.',
+   },
+   ABANDON:{
+    prompt:'Abandon this active objective? This is a conversational decision, not proof the business work is completed.',
+    message:'I explicitly abandon my active conversational goal: ',
+    success:'Goal abandoned by explicit user direction; no external outcome was claimed.',
+   },
+   REPORT_COMPLETE:{
+    prompt:'Report this goal complete? Reality will NOT treat your report as independent proof of business completion.',
+    message:'I report the conversational goal complete, without independently verifying an external outcome: ',
+    success:'User-reported completion recorded as UNVERIFIED, not a verified business outcome.',
+   },
+  };
+  const selected=choices[operation];if(!selected)return;
+  if(!confirm(selected.prompt+' '+target.title))return;
+  const button=el(buttonId);button.disabled=true;
+  try{
+   const data=await saveGoalCommand(operation,
+    (selected.message+target.title).slice(0,700),target.goal_id);
+   if(!data.goal_state||data.goal_state.active_goal_id===target.goal_id)
+    throw Error('GOAL_LIFECYCLE_STATE_DID_NOT_CHANGE');
+   await loadGoals();await loadSaved();await loadConversations();
+   status(selected.success);
+  }catch(e){status('Goal lifecycle change not confirmed: '+e.message)}
+  finally{button.disabled=!confirmedActiveGoal}
+ }
+ el('privatePauseGoal').onclick=()=>changeActiveGoal('PAUSE','privatePauseGoal');
+ el('privateStopGoal').onclick=()=>changeActiveGoal('ABANDON','privateStopGoal');
+ el('privateReportGoal').onclick=()=>changeActiveGoal('REPORT_COMPLETE','privateReportGoal');
+
+ async function loadSaved(){
+  const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
+  el('privateTranscript').replaceChildren();
+  for(const message of data.messages||[])bubble(message.role,message.text);
+  status((data.messages?.length||0)+' saved messages restored'+
+   (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
+  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+  await loadGoals();
+ }
+ async function init(){
+  // Never hide the account section when a preview auth check is slow,
+  // blocked or unavailable. No sign-in form is enabled until session
+  // endpoint availability has been confirmed.
+  el('privateAccountState').textContent='Checking secure account session…';
+  el('privateRetrySession').hidden=true;
+  el('privateLogin').style.display='none';
+  el('privateReady').style.display='none';
+  try{
+   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)throw Error(r.status===404?
+    'Sign-in service is not installed on this preview (HTTP 404).':
+    'Sign-in service returned HTTP '+r.status+'.');
+   const data=await r.json();
+   if(typeof data.authenticated!=='boolean')
+    throw Error('Sign-in service returned an unrecognized session response.');
+   showSignedIn(data.authenticated===true);
+   if(data.authenticated){
+    await loadSaved();await loadConversations();
+    void wcLoadCompletionReports();
+   }else status('Sign in below with your existing account to resume your conversation.');
+  }catch(e){
+   guidedSetup.authenticated=false;
+   guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
+   paintGuidedSetup();
+   el('accountShortcut').textContent='Account · Unavailable';
+   el('privateAccountState').textContent='Account connection unavailable: '+
+    String(e.message||'Please retry')+
+    ' The sign-in form stays disabled until the secure session can be checked. No job has started.';
+   el('privateRetrySession').hidden=false;
+   status('Sign-in unavailable. Check the message above or retry the connection.');
+  }
+ }
+ el('privateRetrySession').onclick=()=>{void init()};
+ el('privateSignIn').onclick=async()=>{
+  for(const id of ['privateEmail','privatePassword']){
+    if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
+  }
+  el('privateSignIn').disabled=true;status('Checking account…');
+  try{
+   const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
+   el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
+   void wcLoadCompletionReports();
+   if(!confirmedActiveGoal)jumpToWorkSetup('goal');
+  }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
+ };
+ el('privateSignOut').onclick=async()=>{
+  el('privateSignOut').disabled=true;
+  try{
+   await fetch(endpoint,{method:'DELETE'});
+   el('privateTranscript').replaceChildren();showSignedIn(false);void wcLoadCompletionReports();status('Signed out.');
+  }catch(e){status(e.message)}finally{el('privateSignOut').disabled=false}
+ };
+ el('privateNew').onclick=async()=>{
+  if(!confirm('Start a new conversation? The previous one remains saved under its earlier conversation ID.'))return;
+  localStorage.setItem('reality.private.chat.conversation.v1',crypto.randomUUID());
+  el('privateTranscript').replaceChildren();await loadConversations();void wcLoadCompletionReports();status('New conversation ready.');
+ };
+ el('privateSend').onclick=async()=>{
+  const value=el('privatePrompt').value.trim();if(!value)return;
+  const goalCommand=el('privateGoalCommand').value||null;
+  el('privateSend').disabled=true;status('Reality is working with saved context…');
+  try{
+   const r=await fetch('/api/reality/personal-chat',{method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:conversationId(),request_id:crypto.randomUUID(),
+      message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
+   el('privatePrompt').value='';
+   el('privateGoalCommand').value='';
+   await loadSaved();await loadConversations();
+   // Refresh Reality's independently observed improvement queue after chat.
+   // This request remains GET-only and cannot start a model or authorize work.
+   void refreshRealitySelfImprovement();
+   const reliability=data.reliability||{};
+   const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
+   const issues=reliability.semantic_issue_candidates?.length||0;
+   const assessed=reliability.semantic_review_provenance_status||'NOT_ASSESSED';
+   const trajectory=reliability.goal_drift_coverage||{};
+   const goalContext=reliability.user_goal_continuity||{};
+   const authority=reliability.goal_authority||{};
+   const ambiguous=authority.ambiguous_goal_return||{};
+   const ambiguityText=ambiguous.user_selection_required
+    ?'Earlier work is ambiguous: please choose the source-linked goal shown in Reality’s response'
+    :ambiguous.status==='UNANCHORED_REVIEWER_RETURN_CANDIDATE'
+      ?'Return intent uncertain; no goal was changed'
+      :'No unresolved multi-goal return decision recorded';
+   const streakText=authority.direction_fault
+    ?'Repeated assistant-origin direction fault; proposal withheld'
+    :authority.trajectory_reanchor_suggested
+      ?'Repeated blocked assistant suggestions; next answer re-anchored to user goal'
+      :'Assistant-goal proposal streak: '+(authority.assistant_direction_streak||0)+
+       ' (reviewer candidates, not verified drift)';
+   const goalAuthorityText=authority.boundary_status==='UNVERIFIED_ASSISTANT_COMPLETION_BLOCKED'
+    ? 'Assistant business-completion claim BLOCKED; independent outcome proof required'
+    :authority.boundary_status==='UNAUTHORIZED_ASSISTANT_GOAL_SHIFT_BLOCKED'
+    ? 'Assistant-proposed change BLOCKED; original user goal preserved'
+    :authority.boundary_status==='UNAUTHORIZED_ASSISTANT_FUTURE_WORK_BLOCKED'
+    ? 'Unauthorized proposed future work BLOCKED; no task scheduled'
+    :authority.boundary_status==='NOT_SEMANTICALLY_ASSESSED'
+     ? 'Goal-shift authority: not semantically assessed'
+     :authority.boundary_status==='NO_ASSISTANT_GOAL_MUTATION_ESTABLISHED'
+      ? 'No assistant goal mutation established (not independent proof)'
+      : 'Goal authority not yet available';
+   const lifecycle=authority.current_user_lifecycle_candidate||{};
+   const lifecycleText=lifecycle.relation==='CONVERSATIONAL_EXIT'
+    ? 'Conversation topic finished; business task NOT marked complete'
+    :lifecycle.relation==='USER_REPORTED_BUSINESS_COMPLETION'
+     ? 'User reports completion; external outcome NOT VERIFIED'
+     :lifecycle.relation==='USER_REQUESTED_ABANDONMENT'
+      ? 'Stop requested; target and scope pending reconciliation'
+      :lifecycle.relation==='ASSISTANT_PROPOSED_COMPLETION'
+       ? 'Assistant completion claim is NOT outcome proof'
+       : 'Business completion not independently verified';
+   const pinnedGoalText=goalContext.authoritative_active_goal_text;
+   const pinnedGoalStatus=pinnedGoalText?
+    ('You explicitly set this ongoing goal: '+String(pinnedGoalText).slice(0,150)+
+     ' · Only your user-goal controls can replace it') :
+    goalContext.authenticated_no_active_goal===true?
+     'You explicitly paused or ended the active goal. No older inferred objective can restart automatically.' :
+     'No user-pinned ongoing objective; current conversation directions are provisional';
+   const currentMeaning=goalContext.current_turn_meaning_reconciliation||{};
+   const currentMeaningStatus=currentMeaning.relation==='RETURN_TARGET_UNRESOLVED'||
+     currentMeaning.relation==='PIVOT_SOURCE_UNRESOLVED'
+     ?' · Goal change ambiguous; earlier objective preserved'
+     :currentMeaning.status==='SOURCE_BOUND_SEMANTIC_CANDIDATE_NOT_USER_AUTHORIZED'
+      ?' · Goal direction source-linked, still provisional'
+      :' · Current goal transition not independently reconciled';
+   const parentGoalStatus=goalContext.authoritative_graph_status==='PARTIAL_AUTHORITATIVE_GOAL_GRAPH'
+    ?'Authenticated goal hierarchy incomplete; verify parent source'
+    :goalContext.authoritative_graph_status==='AUTHENTICATED_ACTIVE_GOAL_GRAPH'
+     ?'Source-linked parent goals: '+(goalContext.authenticated_parent_goal_ids||[]).length+
+      ' · Paused/dormant recoverable: '+(goalContext.recoverable_authenticated_goal_count||0)
+     :'No authenticated active-goal hierarchy available';
+   const goalContextStatus=goalContext.provisional_working_goal_source_ref?
+    ('Working objective (provisional, from user text): '+
+     String(goalContext.provisional_working_goal_text||'').slice(0,110)+
+     ' · Temporary detours: '+(goalContext.paused_goal_candidate_count||0)+
+     ' · Dormant goals saved: '+(goalContext.dormant_goal_candidate_count||0)+
+     ' · Older goals do not override your current request'+currentMeaningStatus):
+    'User-goal continuity not yet recovered';
+   const finalGate=reliability.final_answer_direction_release||{};
+   const finalGateText=finalGate.known_off_goal_text_withheld
+    ?'FINAL ANSWER: assistant-origin change withheld before publication'
+    :finalGate.status==='NO_KNOWN_UNAUTHORIZED_DIRECTION_IN_RELEASE'
+     ?'FINAL ANSWER: no recognized unauthorized shift; not independently certified'
+     :'FINAL ANSWER: direction review unavailable or incomplete';
+   const integrity=reliability.three_contract_integrity||{};
+   const integrityText=integrity.canonical_user_goal_state_bound&&integrity.proof_hash?
+    'Goal-state / transition / assistant proposal bound to released answer (semantics unverified)':
+    'Three-contract final-answer Integrity proof not established';
+   const goalGovernance=reliability.assistant_goal_governance||{};
+   const goalGovernanceText=goalGovernance.status==='ASSISTANT_GOAL_MUTATION_BLOCKED'
+    ? 'Assistant-proposed goal change BLOCKED; user has not authorized it'
+    :goalGovernance.status==='NO_GOAL_MUTATION_PROPOSAL'
+     ? 'No goal-state change proposed; not proof of zero drift'
+     : 'Goal proposal review not available';
+   const driftStatus=trajectory.status||'NOT_SEMANTICALLY_ASSESSED';
+   const driftText=driftStatus==='DRIFT_CANDIDATES_REQUIRE_ADJUDICATION'
+    ? 'Potential goal drift detected; needs verification'
+    :driftStatus==='REVIEWED_NO_CANDIDATES_NOT_VALIDATED'
+     ? 'Goal checked; no candidates, not independently verified'
+     :driftStatus==='LIMITED_REVIEW_NO_CANDIDATES'
+      ? 'Goal drift review limited; unknown if drift missed'
+      :driftStatus==='GOAL_ALIGNMENT_UNRESOLVED'
+       ? 'Goal alignment unresolved'
+       : 'Goal drift NOT fully assessed';
+   status((data.continuity?.recovered_messages||0)+' source-linked messages · '+
+    (verifiedFrame?'Canonical state recorded and verified':'Canonical state not verified')+
+    ' · Semantic review: '+assessed+
+    ' · '+pinnedGoalStatus+
+    ' · '+goalContextStatus+
+    ' · '+parentGoalStatus+
+    ' · Completion: '+lifecycleText+
+    ' · Goal authority: '+goalAuthorityText+
+    ' · '+streakText+
+    ' · '+ambiguityText+
+    ' · Goal transition: '+goalGovernanceText+
+    ' · '+integrityText+
+    ' · '+finalGateText+
+    ' · Goal tracking: '+driftText+
+    ' · Drift candidates: '+(reliability.conversational_drift_findings_count||0)+
+    ' · Review candidates: '+issues+
+    ' · Corrections: '+(reliability.intervention||'none')+
+    (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':'')+
+    ' · External truth not independently verified');
+  }catch(e){status(e.message+' · Saved user messages may still be recoverable.');}
+  finally{el('privateSend').disabled=false}
+ };
+ init();
+})();
+
 </script>
 </body>
 </html>

@@ -1,0 +1,24 @@
+# Reality — authenticated goal-bound execution admission checkpoint
+Date: 2026-10-27. Experimental PR #140 only. NO production deployment,
+NO merge, NO paid benchmark/model calls, NO provider write, NO schema change.
+
+## What actually changed
+
+The existing `GoalState / GoalTransition / AssistantProposal` system and append-only Continuity ledger remain the ONLY source of goal authority. This work adds neither a second goal DB nor a separate LLM "drift judge".
+
+1. `src/reality-governed-execution-engine-v0.1.js`: the exported engine now refuses a consequential connector call unless BOTH the separately signed exact-work approval and the new signed, fresh-goal admission verify. The legacy generic `/api/reality/execute` route, which identifies an unrelated `reality_principal` cookie, cannot mint a Supabase-authenticated goal admission and therefore cannot execute these connector writes.
+2. `src/reality-personal-action-authority-v0.1.js` + `api/reality/personal-action-authority.js`: require the server-verified private Supabase user, same-origin explicit work confirmation, signed goal/work PREPARE proof, and a NEW readback from the same isolated scoped Continuity. Persist the *exact* work approval in the EXISTING `customer_authority_policy` ledger, binding work-item fingerprint, goal ID, goal revision, transition receipt, source user-message ref, principal, conversation/root/world. Read the stored policy back. The approval action itself never invokes an external connector.
+3. `src/reality-fresh-goal-execution-admission-v0.1.js`: mint an HMAC-scoped, 15-second server admission only when the earlier signed goal binding, fresh Continuity goal projection and separately persisted exact-goal action policy agree. The engine checks the same HMAC and exact approval before connector invocation; raw client JSON cannot impersonate the admission.
+4. `src/reality-personal-execution-admission-service-v0.1.js` + `api/reality/personal-execution-admission.js`: the authenticated preview path combines fresh isolated Continuity readback and separately persisted user approval. It internally constructs both signed proofs but returns **PENDING EXECUTION LEASE** instead of making a provider call or exposing the server signer capability. Production and all external providers remain untouched.
+5. Offline regression cases cover: old generic permission cannot become new-goal permission; forged signature, altered work target and cross-user/world boundaries; stale revision and different conversations; missing source ledger, missing consent and unverified provider result.
+
+## Critical limits (cannot claim solved)
+
+- The *new authenticated handoff* is assembled, but live external execution is intentionally withheld. The current 15-second execution admission is **replayable**, so merely possessing it is not an exactly-once grant. A crash or concurrent retry could otherwise dispatch an external effect twice.
+- The existing isolated DB already holds `reality_internal.goal_publication_epochs` and the shared per-user/conversation advisory-lock convention from `sql/reality-atomic-goal-publication-v0.1.sql`. The next change should add a PRIVATE, single-use execution reservation keyed by the exact persisted action-approval ID + immutable work fingerprint, using that SAME advisory lock. The reservation function must compare current goal revision and last authenticated transition event while holding the lock. It must be service-role-only, search-path pinned, and guarded by a unique constraint.
+- Consume the reservation **inside the server execution boundary** before provider dispatch. Never auto-retry a claimed request after timeout: reconcile an uncertain outcome with provider readback first. Return `BLOCKED` on an unavailable reservation RPC, stale goal, duplicate claim or unsupported provider.
+- A database lease cannot atomically encompass a GitHub/Vercel/provider network effect. At-most-once *dispatch by Reality* needs a stored uncertainty state and provider idempotency when available. Do not call this exactly-once real-world execution.
+- The goal revision clock captures explicit user-goal transitions, but an intervening ordinary user message can matter even before its goal intent is semantically reconciled. Couple the reservation with the `user_message_revision` / `latest_user_request_id` clock before enabling external actions; preserve the legitimate distinction between independent task updates and authorized goal pivots.
+- Semantic review can still miss an off-goal task. A signed hash proves integrity and provenance, NOT correct interpretation. The paused 21/50 founder benchmark and independent drift/hallucination grading are still required.
+
+**No migration or service-role RPC was installed in this pass.** The new preview routes may be exercised only in nonexecuting form. Do not promote PR #140 on offline checks alone.

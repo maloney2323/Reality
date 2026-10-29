@@ -4,6 +4,40 @@ import { githubGet, githubWrite } from './reality-connector-github-v1.0.js';
 const OWNER = 'maloney2323';
 const REPO = 'Reality';
 
+// Public provider read is permitted ONLY for this published repository, ONLY
+// in isolated preview, and ONLY for the two stewarded discovery GET queries.
+// It cannot be used to write GitHub data or substitute for owner approval.
+export async function readStewardshipGitHub(path,{
+ env=process.env,fetchImpl=fetch,
+}={}){
+ if(!/^\/repos\/maloney2323\/Reality\/(?:actions\/runs\?per_page=\d{1,3}|pulls\?state=open&per_page=\d{1,3})$/.test(path))
+  throw Error('DISCOVERY_PUBLIC_GITHUB_SOURCE_OUT_OF_SCOPE');
+ // Preview discovery reads this PUBLIC repo's Actions/PR evidence without
+ // credentials even if an Issues-only write credential is configured.
+ // Fine-grained Issues tokens need not have Actions read permission;
+ // discovery must not silently expand the token's scope.
+ if(env.VERCEL_ENV!=='preview'){
+  if(!env.REALITY_GITHUB_TOKEN)
+   throw Error('DISCOVERY_AUTHENTICATED_GITHUB_CONNECTOR_REQUIRED');
+  return githubGet(path);
+ }
+ const response=await fetchImpl('https://api.github.com'+path,{
+  method:'GET',
+  headers:{Accept:'application/vnd.github+json',
+   'X-GitHub-Api-Version':'2022-11-28',
+   'User-Agent':'Reality-ReadOnly-Public-Stewardship'},
+ });
+ if(!response.ok)throw Error('DISCOVERY_PUBLIC_GITHUB_HTTP_'+response.status);
+ const body=await response.json();
+ if(path.includes('/actions/runs?')){
+  if(!Array.isArray(body?.workflow_runs))
+   throw Error('DISCOVERY_PUBLIC_GITHUB_RUNS_INVALID');
+ }else if(!Array.isArray(body))
+  throw Error('DISCOVERY_PUBLIC_GITHUB_PULLS_INVALID');
+ return body;
+}
+
+
 async function executeRecurringMaintenance({ owner, repo, workflow, failedRuns }) {
   const marker = `reality-recurring-work:${workflow}`;
   const issues = await githubGet(
@@ -82,29 +116,44 @@ export async function runRealityStewardshipPass({
   repo = REPO,
   perPage = 30,
   stalePrDays = 7,
+  readGithub = readStewardshipGitHub,
 } = {}) {
-  const runs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
-  const prs = await githubGet(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
+  const runs = await readGithub(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=${perPage}`);
+  const prs = await readGithub(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${perPage}`);
 
-  const workflowFailures = new Map();
+  const workflowFailures = new Map(),latestSuccessfulRun=new Map();
+  const runTime=run=>Date.parse(run.updated_at||run.created_at||'');
   for (const run of runs.workflow_runs || []) {
-    if (!['failure', 'timed_out', 'action_required'].includes(run.conclusion)) continue;
-    const key = run.name || run.workflow_id || 'unknown-workflow';
-    const arr = workflowFailures.get(key) || [];
-    arr.push(run);
-    workflowFailures.set(key, arr);
+    const key=run.name||run.workflow_id||'unknown-workflow';
+    const at=runTime(run);
+    if(run.conclusion==='success'&&Number.isFinite(at)){
+      const prior=latestSuccessfulRun.get(key);
+      if(prior===undefined||at>prior)latestSuccessfulRun.set(key,at);
+    }
+    if(!['failure','timed_out','action_required'].includes(run.conclusion))continue;
+    const arr=workflowFailures.get(key)||[];
+    arr.push(run);workflowFailures.set(key,arr);
   }
 
   const observations = [];
 
   for (const [workflow, failedRuns] of workflowFailures) {
-    if (failedRuns.length < 2) continue;
+    // A fresh successful workflow run is evidence the preceding failures
+    // may already be resolved. Repeated failures must be AFTER that success
+    // to qualify as work needing renewed investigation.
+    const successAt=latestSuccessfulRun.get(workflow);
+    const actionableFailures=failedRuns.filter(run=>{
+      if(successAt===undefined)return true;
+      const at=runTime(run);
+      return Number.isFinite(at)&&at>successAt;
+    });
+    if (actionableFailures.length < 2) continue;
 
     // Preserve each observed failure as a distinct observation. The work
     // discovery foundation establishes recurrence by counting observations
     // with the same work_key; collapsing the runs into one observation would
     // make recurrence_count look high while incorrectly leaving recurring=false.
-    for (const run of failedRuns) {
+    for (const run of actionableFailures) {
       observations.push({
         observation_id: `github-workflow-failure:${workflow}:${run.id || run.run_number || run.updated_at || run.created_at}`,
         work_key: `workflow-failure:${workflow}`,
