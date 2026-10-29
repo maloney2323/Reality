@@ -18,11 +18,12 @@ test('Real original work has one direct path from Reality chat to verified Unfin
  assert.doesNotMatch(ui,/id="privateGovernedBuildQueue"/);
  assert.doesNotMatch(ui,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
 });
-test('Navigation requires owner-scoped unfinished-work readback before enabling',()=>{
+test('Navigation is signed-in and exact job selection is verified by Work Center, not first-item discovery',()=>{
  assert.match(ui,/observed\.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'/);
  assert.match(ui,/observed\.original_work_id===original143WorkId/);
  assert.match(ui,/el\('privateReady'\)\.style\.display==='none'/);
- assert.match(ui,/continueButton\.disabled=!realityOriginal143Eligible/);
+ assert.match(ui,/realityOriginal143Eligible=true;\s+continueButton\.disabled=false/);
+ assert.match(ui,/ORIGINAL_143_NOT_IN_VERIFIED_UNFINISHED_WORK/);
  assert.match(ui,/realityOriginal143Eligible=false;\s+el\('privateContinueOriginal143'\)\.disabled=true;/);
 });
 test('Navigation cannot make a direct activation request or fake an owner receipt',()=>{
