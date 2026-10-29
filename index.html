@@ -1186,15 +1186,27 @@ async function wcReadGovernedBuild(){
   }else if(phase==='NO_VERIFIED_ELIGIBLE_WORK'){
     status.textContent='No eligible verified unfinished job. Settled #143 cannot be queued again. Reality must find and verify a new genuine gap.';
   }else if(data.queued===true){
+    const observed=data.worker_observation;
+    const workerState=typeof observed?.state==='string'&&
+      /^[A-Z_]{6,70}$/.test(observed.state)?observed.state:'NOT_INDEPENDENTLY_OBSERVED';
     status.textContent='Existing owner-scoped queue: '+phase+
       (data.original_work_id?' · '+data.original_work_id:'')+
-      '. Do not enqueue a duplicate; read the worker result first.';
+      ' · Isolated GitHub worker: '+workerState+
+      '. Do not enqueue a duplicate. A passing discovery run does NOT prove a missing capability or installed upgrade.';
   }else{
     status.textContent='Upgrade discovery cannot be started safely: '+phase+
       '. No action or installation authorized.';
   }
   proof.textContent='Current independently checked phase: '+phase+
    '. Generation, sandbox acceptance, owner installation approval, capability registration and original-job settlement remain unproven.';
+  const workerRef=String(data.worker_observation?.worker_run_ref||'');
+  if(data.queued===true&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(workerRef)){
+   const link=document.createElement('a');link.href=workerRef;
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent=' Independently checked worker run';
+   proof.appendChild(link);
+  }
  }catch(error){
   status.textContent='Cannot verify upgrade readiness: '+
    String(error?.message||'READBACK_FAILED')+'. No automatic retry or installation.';
