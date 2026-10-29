@@ -23,7 +23,7 @@ const candidate=(content='export const fixed=true;')=>({
  rationale:'Repair the verified original #143 capability gap',
  verification_plan_ref:'suite:independent-original143',
  model_response_ref:'response:reality-model',
- files:[{path:'src/reality-original-143-repair-capability.js',content}],
+ files:[{path:'src/reality-extensions/reality-original-143-repair-capability.js',content}],
 });
 function harness(){
  const known=new Map();let n=0;
@@ -127,9 +127,9 @@ test('cannot propose editing the constitution, owner auth, or governance kernel'
 test('rejects path escapes, duplicate files, empty content or missing verification plan',async()=>{
  const h=harness();const s=await gap(createGovernedSelfImprovement({scope}),h);
  for(const files of [[{path:'src/../package.json',content:'x'}],
-  [{path:'src/x.js',content:'x'},{path:'src/x.js',content:'y'}],
+  [{path:'src/reality-extensions/x.js',content:'x'},{path:'src/reality-extensions/x.js',content:'y'}],
   [{path:'/tmp/test.js',content:'test'}],
-  [{path:'src/x.js',content:''}]]){
+  [{path:'src/reality-extensions/x.js',content:''}]]){
   assert.throws(()=>proposeGovernedCandidate(s,{...candidate(),files}),/SELF_IMPROVEMENT_CANDIDATE_/);
  }
  assert.throws(()=>proposeGovernedCandidate(s,{...candidate(),verification_plan_ref:''}),
@@ -371,4 +371,21 @@ test('full receipt chain requires approval, registry readback, original executio
  assert.equal(s.phase,'SETTLED');
  assert.equal(nextGovernedSelfImprovementAction(s).original_job_completed,true);
  assert.equal(verifySelfImprovementJournal(s),true);
+});
+
+test('normal model upgrade cannot rewrite HTTP routes, auth, persistence or arbitrary source files',async()=>{
+ const h=harness();const s=await gap(createGovernedSelfImprovement({scope}),h);
+ for(const path of [
+  'api/reality/personal-chat.js',
+  'api/reality/self-build.js',
+  'src/reality-private-chat-store-v0.1.js',
+  'src/reality-github-self-build-provider-v1.0.js',
+  'src/reality-universe-postgres-persistence-v0.1.js',
+  'src/novel-agent-core.js'
+ ]){
+  assert.throws(()=>proposeGovernedCandidate(s,{
+   ...candidate(),
+   files:[{path,content:'export const unsafe=true;'}],
+  }),/SELF_IMPROVEMENT_NON_EXTENSION_CHANGE_REQUIRES_SEPARATE_GOVERNANCE_RELEASE/);
+ }
 });
