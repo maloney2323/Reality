@@ -5,7 +5,7 @@ import {mkdtempSync,cpSync,existsSync,readFileSync,writeFileSync,mkdirSync,rmSyn
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
-import {spawnSync} from 'node:child_process';
+import {spawnSync,execFileSync} from 'node:child_process';
 import {validateFoundationalCandidate}
  from './reality-foundational-build-loop-v1.0.js';
 const sha=s=>createHash('sha256').update(s).digest('hex');
@@ -33,7 +33,8 @@ export function validateTrustedFrozenSuite(ticket,raw,root){
    deny('FOUNDATION_FROZEN_TEST_NOT_IN_BASE');
  return manifest;
 }
-export function createIsolatedDockerSandbox({workspace,image,spawn=spawnSync}={}){
+export function createIsolatedDockerSandbox({workspace,image,spawn=spawnSync,
+ readBaseSha=root=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()}={}){
  if(!pinned(image))deny('FOUNDATION_SANDBOX_DIGEST_PIN_REQUIRED');
  if(typeof workspace!=='string'||!existsSync(join(workspace,'src'))||
   !existsSync(join(workspace,'test'))||
@@ -45,6 +46,8 @@ export function createIsolatedDockerSandbox({workspace,image,spawn=spawnSync}={}
    frozen_suite_ref!==ticket.frozen_regression_manifest_ref||
    !Number.isInteger(attempt)||attempt<1||attempt>ticket.max_attempts)
    deny('FOUNDATION_SANDBOX_UNTRUSTED_EXECUTION_SCOPE');
+  if(readBaseSha(workspace)!==ticket.repository_base_sha)
+   deny('FOUNDATION_SANDBOX_BASE_COMMIT_CHANGED');
   const verified=validateFoundationalCandidate(ticket,candidate);
   if(verified.artifact_sha256!==candidate.artifact_sha256)
    deny('FOUNDATION_SANDBOX_CANDIDATE_HASH_CHANGED');
