@@ -50,7 +50,7 @@ export async function createRealityLiveVercelUpgradeAdapters({
   model:env.REALITY_SEMANTIC_REVIEW_MODEL,
   readFrozenRegression:createVerifiedFrozenRegressionReader({
    fetchImpl:modelFetch,
-   token:env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null,
+   token:env.REALITY_FIRST178_GITHUB_READ_TOKEN||null,
   }),
  });
 }
