@@ -1,0 +1,35 @@
+name: Reality #143 — Verified Public Evidence Provider
+on:
+  push:
+    branches:
+      - reality/fix/original-143-read-only-public-evidence-20261028
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+    paths:
+      - 'src/reality-original-143-public-evidence-v0.1.js'
+      - 'src/reality-original-upgrade-readback-v0.1.js'
+      - 'src/reality-original-143-real-activation-v0.1.js'
+      - 'test/reality-original-143-public-evidence-v0.1.test.js'
+      - 'test/reality-original-143-real-activation-v0.1.test.js'
+      - '.github/workflows/reality-original-143-public-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  real-public-source-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      REALITY_PUBLIC_GITHUB_LIVE: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify real original #143 public GitHub evidence, no GitHub token
+        run: |
+          node --check src/reality-original-143-public-evidence-v0.1.js
+          node --test test/reality-original-143-public-evidence-v0.1.test.js
+          node --test test/reality-original-143-real-activation-v0.1.test.js test/reality-original-upgrade-readback-v0.1.test.js
