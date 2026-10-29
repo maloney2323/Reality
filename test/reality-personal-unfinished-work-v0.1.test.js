@@ -25,7 +25,7 @@ const scope=personalGoalScope({userId:user_id,conversationId});
 const spine=createContinuitySpine({
  continuityRootId:scope.root,worldlineId:scope.worldline,subjectId:user_id,
 });
-function history({checkpoint=false,verified=true}={}){
+function history({checkpoint=false,verified=true,settled=false,invalidSettlementLink=false}={}){
  const entries=[];
  const add=(stage,entity_type,payload,epistemicStatus='OBSERVED')=>{
   const prior=entries.at(-1);
@@ -67,6 +67,22 @@ function history({checkpoint=false,verified=true}={}){
   new_external_action_authorized:false,job_completed:false,
   retry_original_issue_creation:false,
  });
+ if(settled){
+  const registration=add('CAPABILITY','personal_original_executor_capability_registered',{
+   original_work_id:work,original_goal_id:goalId,owner_id:user_id,
+   conversation_id:conversationId,
+   owner_confirmation:'ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY',
+   runtime_activation_verified:true,registration_readback_verified:true,
+  },'VERIFIED');
+  add('OUTCOME','personal_original_job_final_settlement',{
+   original_work_id:work,original_goal_id:goalId,owner_id:user_id,
+   conversation_id:conversationId,
+   registration_receipt_id:invalidSettlementLink?randomUUID():registration.event_id,
+   original_issue_number:143,original_job_completed:true,
+   independently_verified:true,
+   outcome:'HISTORICAL_SOURCE_ALREADY_FIXED_INDEPENDENTLY_RECONCILED',
+  },'VERIFIED');
+ }
  return entries;
 }
 const goal={active_goal_id:goalId,
@@ -95,6 +111,17 @@ test('saved checkpoint is restored and disables duplicate save',()=>{
  assert.equal(rows[0].state,'RECOVERY_CHECKPOINT_SAVED');
  assert.equal(rows[0].can_save_recovery,false);
  assert.ok(rows[0].recovery_receipt_id);
+ assert.equal(rows[0].job_completed,false);
+});
+test('independently linked registration and settlement exclude original #143 from unfinished work',()=>{
+ const entries=history({checkpoint:true,settled:true});
+ const rows=projectUnfinishedFromConversation({conversationId,events:entries,goal});
+ assert.equal(rows.length,0,'settled job must not be rediscovered for a second reservation');
+});
+test('unlinked purported settlement cannot silently hide incomplete work',()=>{
+ const entries=history({checkpoint:true,settled:true,invalidSettlementLink:true});
+ const rows=projectUnfinishedFromConversation({conversationId,events:entries,goal});
+ assert.equal(rows.length,1);
  assert.equal(rows[0].job_completed,false);
 });
 test('changed goal and unresolved provider attempt never allow recovery save',()=>{
