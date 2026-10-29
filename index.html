@@ -2308,7 +2308,8 @@ setInterval(refreshSavedShiftHome,300000);
     const line=el('privateSelfImprovementStatus');
     line.textContent+=' Queued build '+String(status.queue_id||'').slice(0,14)+
      ', phase '+String(status.phase||'UNKNOWN')+
-     '. Independent worker has not been proven to run.';
+     (status.dispatch_commit_sha?' — worker request commit recorded; inspect GitHub run evidence.':
+      ' — worker dispatch not yet confirmed.');
    }else{
     button.disabled=!realityBuildEligible;
    }
