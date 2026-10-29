@@ -92,7 +92,8 @@ export function createSandboxEvidenceCandidate(ticket,candidate,report){
  assert(report.frozen_suite_sha256===ticket.frozen_regression_sha256&&
   report.frozen_test_manifest_ref===ticket.frozen_regression_manifest_ref,
   'FOUNDATION_FROZEN_REGRESSION_PROOF_REQUIRED');
- const passed=report.exit_code===0&&report.test_results.every(x=>x.passed===true)&&
+ const passed=report.exit_code===0&&report.governance_tests_passed===true&&
+  report.test_results.every(x=>x.passed===true)&&
   report.frozen_test_pass_count===report.frozen_test_count;
  const result={version:FOUNDATIONAL_BUILD_LOOP_VERSION,ticket_hash:ticket.ticket_hash,
   artifact_sha256:candidate.artifact_sha256,passed,report_hash:digest(report),
