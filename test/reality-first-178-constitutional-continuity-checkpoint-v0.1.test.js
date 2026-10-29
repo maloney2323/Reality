@@ -167,3 +167,47 @@ test('wrong owner, previous job #143 and unauthorized terminal stages cannot per
  }),/FIRST_178_CONTINUITY_OWNER_DURABLE_PREVIEW_REQUIRED/);
  assert.equal(other.getWrites(),0);
 });
+
+test('independently verified #178 gap is admitted in the same source-linked worldline',async()=>{
+ const h=harness();
+ const source={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const written=await h.adapter.persistGap(source);
+ assert.equal(written.committed,true);
+ assert.equal(h.getWrites(),1);
+ const row=h.rows.at(-1);
+ assert.equal(row.entity_type,'personal_first_178_confirmed_gap');
+ assert.equal(row.parent_event_id,originalReceipt);
+ assert.equal(row.payload.original_work_id,work);
+ assert.equal(row.payload.authorization_granted,false);
+ const read=await h.adapter.readBackGap({
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  receipt_id:written.receipt_id,
+ });
+ assert.equal(read.verified,true);
+ assert.equal(read.evidence_hash,source.evidence_hash);
+ assert.equal(read.provider_receipt_ref,source.provider_receipt_ref);
+ await h.adapter.persistGap(source);
+ assert.equal(h.getWrites(),1,'same signed evidence must not create duplicate gaps');
+});
+test('model-asserted gap and foreign goal never get a durable source receipt',async()=>{
+ const h=harness();
+ for(const changes of [
+  {provider_receipt_ref:'MODEL_SAYS_GAP_EXISTS'},
+  {goal_id:'user-goal:foreign'},
+  {original_work_id:'work:'+'e'.repeat(32)},
+  {evidence_hash:'not-a-cryptographic-digest'},
+ ]){
+  await assert.rejects(h.adapter.persistGap({
+   owner_id:owner,goal_id:goalId,original_work_id:work,
+   worldline_id:spine.worldline_id,
+   provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+   evidence_hash:'d'.repeat(64),...changes,
+  }),/FIRST_178_CONTINUITY_PINNED_OWNER_GAP_INVALID/);
+ }
+ assert.equal(h.getWrites(),0);
+});
