@@ -7,6 +7,7 @@ on:
       - 'reality-requests/*.json'
 permissions:
   contents: read
+  actions: read
 jobs:
   independently-discover-gap:
     runs-on: ubuntu-latest
@@ -19,7 +20,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Reobserve actual public GitHub issue and original executor, no writes
+      - name: Reobserve pinned actual GitHub issue and failure logs, no writes
+        env:
+          GH_PROVIDER_READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node --check scripts/reality-governed-build-queue-worker-v1.mjs
