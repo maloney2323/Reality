@@ -113,6 +113,8 @@ export async function inspectFirstUpgrade178({
  if(!String(env.REALITY_STANDALONE_OPENAI_API_KEY||'').trim()||
     !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim())
   return publicShape(scope,'BLOCKED_MODEL_PROVIDER_NOT_CONFIGURED');
+ if(String(env.REALITY_FIRST178_GITHUB_READ_TOKEN||'').length<20)
+  return publicShape(scope,'BLOCKED_GITHUB_READ_ONLY_CREDENTIAL');
  return publicShape(scope,'READY_FOR_EXACT_OWNER_CONFIRMATION');
 }
 // The queue reservation is not itself an event in the owner's Continuity.
@@ -196,6 +198,8 @@ export async function startFirstUpgrade178({
  if(!String(env.REALITY_STANDALONE_OPENAI_API_KEY||'').trim()||
     !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim())
   fail('MODEL_PROVIDER_NOT_CONFIGURED',503);
+ if(String(env.REALITY_FIRST178_GITHUB_READ_TOKEN||'').length<20)
+  fail('GITHUB_READ_ONLY_CREDENTIAL_REQUIRED',503);
  const initial=await verifiedOwnerScope({session,conversationId,env,readGoal});
  const existing=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
@@ -207,7 +211,7 @@ export async function startFirstUpgrade178({
    queue_id:existing.queue_id,queue_phase:existing.phase,
    external_execution_authorized:false});
  // Real provider logs are fetched by the trusted server, never the browser.
- const observed=await observe({scope:initial,apiToken:null});
+ const observed=await observe({scope:initial,apiToken:env.REALITY_FIRST178_GITHUB_READ_TOKEN});
  if(observed?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
     observed.original_work_id!==initial.original_work_id||
     observed.goal_id!==initial.goal_id||
