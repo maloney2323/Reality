@@ -17,7 +17,8 @@ const env={VERCEL_ENV:'preview',
  VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029',
  VERCEL_GIT_COMMIT_SHA:sha,
  REALITY_STANDALONE_OPENAI_API_KEY:'fake-test-provider-secret-not-real',
- REALITY_SEMANTIC_REVIEW_MODEL:'gpt-6'};
+ REALITY_SEMANTIC_REVIEW_MODEL:'gpt-6',
+ REALITY_FIRST178_GITHUB_READ_TOKEN:'mock-only-github-read-token-not-real'};
 const session={user_id:owner};
 const queue={queue_id:queueId,phase:'QUEUED_DISCOVERY',
  original_work_id:work,goal_id:scope.goal_id,preview_release_sha:sha,
@@ -65,7 +66,7 @@ function kit(overrides={}){
  });
  const observer=async({scope:argScope,apiToken})=>{
   assert.equal(argScope.original_work_id,work);
-  assert.equal(apiToken,null);
+  assert.equal(apiToken,env.REALITY_FIRST178_GITHUB_READ_TOKEN);
   return provider;
  };
  const admitted={proof:'OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK',
