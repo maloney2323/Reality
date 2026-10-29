@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- FIRST_GAP_PROOF,attestFirstGapProviderSnapshot,
+ FIRST_GAP_PROOF,attestFirstGapProviderSnapshot,observeFirstGapFromGithub,
  admitFirstGapBuildTicket,generateAfterTrustedGap,
 } from '../src/reality-first-gap-handoff-v0.1.js';
 const p=FIRST_GAP_PROOF;
@@ -94,7 +94,8 @@ test('only durable EXACT source, owner, goal and worldline readback admits model
   evidence_hash:e.evidence_hash,provider_receipt_ref:e.provider_receipt_ref
  };
  const a=await admitFirstGapBuildTicket({scope,providerEvidence:e,
-  persistGap:persist,readBackGap:async()=>verified});
+  persistGap:persist,readBackGap:async()=>verified,
+  reobserveProviderEvidence:async()=>read()});
  assert.equal(a.proof,'OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK');
  assert.equal(a.ticket.original_work_id,scope.original_work_id);
  assert.equal(a.ticket.frozen_regression_sha256,p.manifest_sha256);
@@ -104,7 +105,8 @@ test('only durable EXACT source, owner, goal and worldline readback admits model
   {verified:false},{original_work_id:'work:'+'4'.repeat(32)}]){
   await assert.rejects(
    ()=>admitFirstGapBuildTicket({scope,providerEvidence:e,
-    persistGap:persist,readBackGap:async()=>({...verified,...bad})}),
+    persistGap:persist,readBackGap:async()=>({...verified,...bad}),
+    reobserveProviderEvidence:async()=>read()}),
    /FIRST_GAP_CONTINUITY_READBACK_MISMATCH/);
  }
 });
@@ -116,6 +118,50 @@ test('model invocation cannot begin on fabricated or non-durable gap',async()=>{
  const e=read();
  await assert.rejects(()=>admitFirstGapBuildTicket({
   scope,providerEvidence:e,persistGap:async()=>({committed:false}),
-  readBackGap:async()=>({verified:true})}),/FIRST_GAP_GAP_NOT_COMMITTED/);
+  readBackGap:async()=>({verified:true}),
+  reobserveProviderEvidence:async()=>read()}),/FIRST_GAP_GAP_NOT_COMMITTED/);
  assert.equal(called,0);
+});
+
+test('trusted runner fetches only pinned read-only GitHub URLs, then attaches exact evidence',async()=>{
+ const calls=[];
+ const base='https://api.github.com/repos/maloney2323/Reality';
+ const responder=async(url,opts)=>{
+  calls.push({url,method:opts.method,body:opts.body||null});
+  assert.equal(opts.method,'GET');
+  let payload,raw=false;
+  if(url===base+'/actions/runs/'+p.run_id)payload=run;
+  else if(url===base+'/actions/runs/'+p.run_id+'/jobs?per_page=100')
+   payload={jobs:[job],total_count:1};
+  else if(url===base+'/actions/jobs/'+job.id+'/logs'){payload=log;raw=true}
+  else if(url===base+'/contents/'+p.manifest_path+'?ref='+p.run_head_sha)
+   payload={encoding:'base64',content:Buffer.from(manifest).toString('base64'),
+    path:p.manifest_path,size:manifest.length};
+  else throw Error('UNEXPECTED_NETWORK_TARGET');
+  return {ok:true,headers:{get:()=>null},
+   json:async()=>{if(raw)throw Error('WRONG_FORMAT');return payload},
+   text:async()=>{if(!raw)throw Error('WRONG_FORMAT');return payload}};
+ };
+ const result=await observeFirstGapFromGithub({
+  scope,apiToken:'read-only-test-credential-12345678',fetchImpl:responder
+ });
+ assert.equal(result.evidence_hash,read().evidence_hash);
+ assert.equal(calls.length,4);
+ for(const call of calls){assert.match(call.url,/^https:\/\/api\.github\.com\/repos\/maloney2323\/Reality\//);
+  assert.equal(call.body,null)}
+});
+test('provider reobservation required after initial evidence before any continuity write',async()=>{
+ const e=read();
+ let persisted=0;
+ await assert.rejects(()=>admitFirstGapBuildTicket({
+  scope,providerEvidence:e,persistGap:async()=>{persisted++;return {committed:true}},
+  readBackGap:async()=>({verified:true}),
+  reobserveProviderEvidence:async()=>({...e,evidence_hash:'f'.repeat(64)})
+ }),/FIRST_GAP_FRESH_PROVIDER_GAP_REOBSERVATION_MISMATCH/);
+ assert.equal(persisted,0);
+ await assert.rejects(()=>admitFirstGapBuildTicket({
+  scope,providerEvidence:e,persistGap:async()=>{persisted++;return {committed:true}},
+  readBackGap:async()=>({verified:true}),
+ }),/FIRST_GAP_INDEPENDENT_REOBSERVATION_REQUIRED/);
+ assert.equal(persisted,0);
 });
