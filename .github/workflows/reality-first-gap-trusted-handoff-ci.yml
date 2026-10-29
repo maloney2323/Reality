@@ -8,6 +8,7 @@ on:
       - experiment/reality-live-durable-adversarial-20261025
 permissions:
   contents: read
+  actions: read
 jobs:
   trusted-gap-handoff:
     runs-on: ubuntu-latest
@@ -28,5 +29,11 @@ jobs:
           node --check src/reality-personal-first-upgrade-178-v0.1.js
           node --check api/reality/personal-first-upgrade-178.js
           node --test test/reality-personal-first-upgrade-178-v0.1.test.js
+      - name: Verify the actual pinned #178 failure from live GitHub Actions
+        env:
+          GH_PROVIDER_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-first-178-real-provider-readback-v0.1.mjs
+          node scripts/reality-first-178-real-provider-readback-v0.1.mjs
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
