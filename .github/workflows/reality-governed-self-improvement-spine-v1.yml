@@ -7,6 +7,7 @@ on:
       - 'src/reality-governed-self-improvement-spine-v1.0.js'
       - 'src/reality-governed-self-improvement-driver-v1.0.js'
       - 'test/reality-governed-self-improvement-spine-v1.0.test.js'
+      - 'test/reality-autonomous-v1.0.test.js'
       - 'docs/reality-foundational-governed-self-improvement-architecture-v1.md'
       - '.github/workflows/reality-governed-self-improvement-spine-v1.yml'
   pull_request:
