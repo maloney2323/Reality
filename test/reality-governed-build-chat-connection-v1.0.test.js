@@ -122,16 +122,47 @@ test('API request scope, origin and intent remain server-owned',()=>{
  assert.match(source,/Object.keys\(req.query\|\|\{\}\).length/);
  assert.doesNotMatch(source,/completeOriginal143OwnerAction|githubPost|githubPut|promoteVerifiedUpgrade/);
 });
-test('previous dispatch backend remains safe, but chat uses one existing original-job path',()=>{
+test('Work Center connects live queue inspection and one consented discovery action',()=>{
  const html=readFileSync('index.html','utf8');
  for(const [,script]of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
   new vm.Script(script);
  assert.match(html,/id="privateContinueOriginal143"/);
  assert.match(html,/wcLoadUnfinishedWork\(\)/);
- assert.doesNotMatch(html,/id="privateGovernedBuildQueue"/);
- assert.doesNotMatch(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
+ assert.match(html,/id="wcInspectGovernedBuild"/);
+ assert.match(html,/id="wcStartGovernedBuild" disabled/);
+ assert.match(html,/\/api\/reality\/personal-governed-build/);
+ assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
+ assert.match(html,/window\.confirm\(/);
+ assert.match(html,/data\.eligible_for_investigation===true/);
+ assert.match(html,/String\(data\.original_work_id\)!=='work:24cda9611404e9bcb47909976067605c'/);
+ assert.match(html,/No eligible verified unfinished job/);
+ assert.doesNotMatch(html,/setInterval\(.*wcReadGovernedBuild/);
 });
 
+test('read-only GET returns exact scoped eligibility without any installation authority',async()=>{
+ const m=mock({call:async(_db,name)=>name==='reality_read_governed_build_v1'?
+  {queue_id:null}:{}});
+ const r=await readOwnerGovernedBuild(m.params);
+ assert.equal(r.phase,'NOT_QUEUED');
+ assert.equal(r.original_work_id,work);
+ assert.equal(r.eligible_for_investigation,true);
+ assert.equal(r.completed,false);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.capability_installed,false);
+});
+test('empty eligibility never fabricates a queue and a prior queue cannot claim model generation',async()=>{
+ const m=mock({inspect:async()=>({status:'NO_VERIFIED_ELIGIBLE_WORK'})});
+ const empty=await readOwnerGovernedBuild(m.params);
+ assert.equal(empty.queued,false);
+ assert.equal(empty.phase,'NO_VERIFIED_ELIGIBLE_WORK');
+ assert.equal(empty.completed,false);
+ const prior=await readOwnerGovernedBuild(mock().params);
+ assert.equal(prior.queued,true);
+ assert.equal(prior.model_generated,false);
+ assert.equal(prior.sandbox_executed,false);
+ assert.equal(prior.installation_authorized,false);
+ assert.equal(prior.capability_installed,false);
+});
 test('missing worker credential is recorded as an explicit non-executed blocker',async()=>{
  const m=mock({dispatch:async()=>{throw Error('GOVERNED_BUILD_DISPATCH_CREDENTIAL_UNAVAILABLE')}});
  const r=await queueOwnerGovernedBuild(m.params);

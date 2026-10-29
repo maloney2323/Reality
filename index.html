@@ -251,6 +251,16 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
+  <section id="wcGovernedBuild" aria-label="Reality governed upgrade pipeline" style="border-top:1px solid #45516a;padding:14px 0;margin-top:14px">
+   <strong>Reality · Governed Self-Upgrade</strong>
+   <p class="wc-note">Discover an actual missing capability, generate and independently sandbox-test a correction, then request a separate owner approval before installation. Each stage needs a durable receipt.</p>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" id="wcInspectGovernedBuild">Check verified upgrade readiness · Read only</button>
+    <button type="button" id="wcStartGovernedBuild" disabled>Start owner-scoped investigation · No install</button>
+   </div>
+   <p class="wc-note" id="wcGovernedBuildStatus" role="status" aria-live="polite">No upgrade run has been started by this screen. Read-only check required.</p>
+   <p class="wc-note" id="wcGovernedBuildProof" role="status" aria-live="polite">Generation · Sandbox · Approval · Registration · Original-job resumption · Settlement: not verified.</p>
+  </section>
  </div>
  <div class="wc-diagnostic">
   <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
@@ -1133,6 +1143,107 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
   }
  }
 });
+
+// Owner-scoped discovery is the first actual connector in Reality's
+// upgrade loop. GET never starts work; POST is a separate, confirmed action.
+// The current isolated worker is read-only discovery. No stage is described as
+// model-generated or installed unless the durable provider state proves it.
+let wcGovernedBuildEligible=false;
+let wcGovernedBuildBusy=false;
+const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
+function wcGovernedBuildSafePhase(data){
+ const allowed=new Set(['NOT_QUEUED','NO_VERIFIED_ELIGIBLE_WORK',
+  'QUEUED_DISCOVERY','QUEUED_DISPATCH_BLOCKED','DISPATCHED_TO_ISOLATED_WORKER',
+  'DISCOVERY_QUEUED','DISCOVERY_RUNNING','DISCOVERY_COMPLETE','GAP_UNCONFIRMED',
+  'GAP_CONFIRMED']);
+ return allowed.has(String(data?.phase||''))?data.phase:'UNVERIFIED_PHASE';
+}
+async function wcReadGovernedBuild(){
+ const btn=$('wcInspectGovernedBuild'),start=$('wcStartGovernedBuild');
+ const status=$('wcGovernedBuildStatus'),proof=$('wcGovernedBuildProof');
+ if(wcGovernedBuildBusy)return;
+ wcGovernedBuildBusy=true;btn.disabled=true;start.disabled=true;
+ wcGovernedBuildEligible=false;
+ status.textContent='Reading owner-goal-scoped worker queue · No execution…';
+ try{
+  if($('privateReady')?.style.display!=='block')
+   throw Error('SIGN_IN_REQUIRED');
+  const response=await fetch('/api/reality/personal-governed-build',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||data.completed!==false||
+    data.model_generated!==false||data.sandbox_executed!==false)
+   throw Error(String(data.error||'QUEUE_READBACK_UNVERIFIED'));
+  const phase=wcGovernedBuildSafePhase(data);
+  if(data.queued===false&&phase==='NOT_QUEUED'&&
+    data.eligible_for_investigation===true&&
+    wcGovernedBuildWork.test(String(data.original_work_id||''))&&
+    String(data.original_work_id)!=='work:24cda9611404e9bcb47909976067605c'&&
+    typeof data.goal_id==='string'&&data.goal_id.length>0){
+    wcGovernedBuildEligible=true;start.disabled=false;
+    status.textContent='Verified candidate '+data.original_work_id+
+     ' matches an active, owner-confirmed goal. Investigation is available. No upgrade has been generated or installed.';
+  }else if(phase==='NO_VERIFIED_ELIGIBLE_WORK'){
+    status.textContent='No eligible verified unfinished job. Settled #143 cannot be queued again. Reality must find and verify a new genuine gap.';
+  }else if(data.queued===true){
+    const observed=data.worker_observation;
+    const workerState=typeof observed?.state==='string'&&
+      /^[A-Z_]{6,70}$/.test(observed.state)?observed.state:'NOT_INDEPENDENTLY_OBSERVED';
+    status.textContent='Existing owner-scoped queue: '+phase+
+      (data.original_work_id?' · '+data.original_work_id:'')+
+      ' · Isolated GitHub worker: '+workerState+
+      '. Do not enqueue a duplicate. A passing discovery run does NOT prove a missing capability or installed upgrade.';
+  }else{
+    status.textContent='Upgrade discovery cannot be started safely: '+phase+
+      '. No action or installation authorized.';
+  }
+  proof.textContent='Current independently checked phase: '+phase+
+   '. Generation, sandbox acceptance, owner installation approval, capability registration and original-job settlement remain unproven.';
+  const workerRef=String(data.worker_observation?.worker_run_ref||'');
+  if(data.queued===true&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(workerRef)){
+   const link=document.createElement('a');link.href=workerRef;
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent=' Independently checked worker run';
+   proof.appendChild(link);
+  }
+ }catch(error){
+  status.textContent='Cannot verify upgrade readiness: '+
+   String(error?.message||'READBACK_FAILED')+'. No automatic retry or installation.';
+  proof.textContent='No new upgrade completion can be claimed without durable provider receipts.';
+ }finally{wcGovernedBuildBusy=false;btn.disabled=false;}
+}
+$('wcInspectGovernedBuild').onclick=()=>{void wcReadGovernedBuild();};
+$('wcStartGovernedBuild').onclick=async()=>{
+ const btn=$('wcStartGovernedBuild'),status=$('wcGovernedBuildStatus');
+ if(!wcGovernedBuildEligible||wcGovernedBuildBusy||btn.disabled||
+    $('privateReady')?.style.display!=='block')return;
+ if(!window.confirm('Authorize ONE isolated owner-scoped discovery request? This may create a GitHub worker-branch request. It does NOT authorize model code installation, promotion, production changes, or job settlement.'))return;
+ wcGovernedBuildEligible=false;wcGovernedBuildBusy=true;
+ btn.disabled=true;$('wcInspectGovernedBuild').disabled=true;
+ status.textContent='Submitting one governed investigation; no install authority…';
+ try{
+  const response=await fetch('/api/reality/personal-governed-build',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'})});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||data.original_job_completed!==undefined&&data.original_job_completed!==false||
+     data.installation_authorized!==false)
+   throw Error(String(data.error||'QUEUE_SUBMISSION_UNVERIFIED'));
+  status.textContent='Queue result: '+wcGovernedBuildSafePhase(data)+
+   '. Worker discovery is not model generation or capability installation.';
+  $('wcGovernedBuildProof').textContent=
+   'Durable investigation queue ID: '+String(data.queue_id||'unverified')+
+   '. Owner installation approval, sandbox verification and final settlement not established.';
+ }catch(error){
+  status.textContent='Queue outcome unresolved: '+String(error?.message||'REQUEST_FAILED')+
+   '. Do not resubmit. Use the read-only check to determine prior effects.';
+ }finally{
+  wcGovernedBuildBusy=false;
+  $('wcInspectGovernedBuild').disabled=false;
+ }
+};
 
 let wcUnfinishedReadSerial=0;
 async function wcLoadUnfinishedWork(){

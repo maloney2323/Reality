@@ -11,6 +11,8 @@ import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {dispatchGovernedBuildToIsolatedWorker}
  from './reality-governed-build-github-dispatch-v1.0.js';
+import {observeGovernedBuildWorker}
+ from './reality-governed-build-worker-readback-v1.0.js';
 export const GOVERNED_BUILD_CHAT_CONNECTION_VERSION=
  'reality-governed-build-chat-connection-v1.0';
 const fail=(code,status=409)=>{throw Object.assign(Error(code),{status})};
@@ -117,20 +119,45 @@ export async function queueOwnerGovernedBuild({
 }
 export async function readOwnerGovernedBuild({
  session,env=process.env,inspect=inspectAuthenticatedSelfImprovement,call=rpc,
+ observeWorker=observeGovernedBuildWorker,
 }={}){
  const db=trust(session,env);
  const discovered=await inspect({session,env});
  if(!validUuid(discovered?.original_conversation_id))
   return Object.freeze({phase:'NO_VERIFIED_ELIGIBLE_WORK',queued:false,
-   completed:false,model_generated:false,sandbox_executed:false});
+   completed:false,model_generated:false,sandbox_executed:false,
+   capability_installed:false,installation_authorized:false,
+   external_execution_authorized:false,
+   production_changed:false});
+ const eligible=discovered.status===
+  'ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
+  /^work:[a-f0-9]{32}$/.test(String(discovered.original_work_id||''))&&
+  typeof discovered.original_job_tracking_receipt_ref==='string'&&
+  discovered.original_job_tracking_receipt_ref.length>0;
+ if(!eligible)fail('GOVERNED_BUILD_FRESH_ELIGIBILITY_REQUIRED');
  const result=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:discovered.original_conversation_id});
  if(!result?.queue_id)
   return Object.freeze({phase:'NOT_QUEUED',queued:false,
-   completed:false,model_generated:false,sandbox_executed:false});
+   original_work_id:discovered.original_work_id,
+   goal_id:discovered.goal_id,
+   original_conversation_id:discovered.original_conversation_id,
+   eligible_for_investigation:true,
+   completed:false,model_generated:false,sandbox_executed:false,
+   capability_installed:false,installation_authorized:false,
+   external_execution_authorized:false,
+   production_changed:false});
  if(!validUuid(result.queue_id)||result.original_work_id!==discovered.original_work_id)
   fail('GOVERNED_BUILD_READBACK_OWNER_SCOPE_MISMATCH');
- return Object.freeze({...result,queued:true,
-  completed:false,external_execution_authorized:false,
-  capability_installed:false});
+ // A run observed at the exact dispatch SHA is evidence that the isolated
+ // discovery worker ran. It is NOT a missing-capability attestation.
+ const workerObservation=result.dispatch_commit_sha&&result.request_path?
+  await observeWorker({queue:result,env}):null;
+ return Object.freeze({...result,queued:true,worker_observation:workerObservation,
+  // A durable queue or worker commit is not a generated, tested or installed
+  // upgrade. Future stages need independent receipts, not status guesses.
+  completed:false,model_generated:false,sandbox_executed:false,
+  installation_authorized:false,job_completed:false,
+  external_execution_authorized:false,
+  capability_installed:false,production_changed:false});
 }
