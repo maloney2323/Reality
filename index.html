@@ -1181,7 +1181,11 @@ async function wcInspectFirstGap178(){
    encodeURIComponent(conv),{method:'GET',credentials:'same-origin',cache:'no-store'});
   const d=await response.json();
   if(!response.ok||d.ok!==true||d.issue_number!==178||
-    d.installation_authorized!==false||d.model_generated!==false)
+    d.installation_authorized!==false||
+    (d.model_generated===true&&
+     !(d.queue_phase==='AWAITING_OWNER_APPROVAL'&&
+       d.owner_approval_required===true&&
+       d.sandbox_verified===true&&d.checkpoint_receipt_id&&d.checkpoint_hash)))
    throw Error(String(d.error||'PROOF_READBACK_INVALID'));
   if(d.status==='READY_FOR_EXACT_OWNER_CONFIRMATION'&&
     /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))){
@@ -1189,10 +1193,18 @@ async function wcInspectFirstGap178(){
    status.textContent='Verified current owner goal. Original #178 work ID: '+
     d.original_work_id+'. Ready for ONE investigation request. No model output or install yet.';
   }else if(d.status==='ALREADY_QUEUED'){
-   status.textContent='Original #178 queue already exists ('+
-    String(d.queue_phase||'UNVERIFIED')+'). Do not repeat; review existing worker receipts.';
+   if(d.owner_approval_required===true&&
+      d.queue_phase==='AWAITING_OWNER_APPROVAL'){
+    status.textContent='Reality #178 is AWAITING OWNER INSTALLATION APPROVAL. Provider-verified candidate checkpoint '+
+     String(d.checkpoint_receipt_id)+
+     '. Source generation and sandbox verification are recorded. No installation or original-job completion has occurred.';
+   }else status.textContent='Original #178 queue already exists ('+
+    String(d.queue_phase||'UNVERIFIED')+
+    '). Do not repeat the request; review the existing durable receipt before recovery.';
   }else{
-   status.textContent='Safely blocked: '+String(d.status||'UNVERIFIED')+
+   status.textContent=d.status==='BLOCKED_GITHUB_READ_ONLY_CREDENTIAL'?
+    'Missing isolated GitHub Actions read-only credential: REALITY_FIRST178_GITHUB_READ_TOKEN. Set it for the exact proof preview branch in Vercel, redeploy this branch, then check readiness. No work or installation started.':
+    'Safely blocked: '+String(d.status||'UNVERIFIED')+
      '. No operation performed or installation authorized.';
   }
  }catch(error){
