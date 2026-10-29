@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/first-real-gap-to-generation-handoff-20261029
+      - feature/first178-live-single-claim-execution-20261029
   pull_request:
     branches:
       - experiment/reality-live-durable-adversarial-20261025
