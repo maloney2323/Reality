@@ -2274,11 +2274,13 @@ setInterval(refreshSavedShiftHome,300000);
    const observed=await response.json();
    if(!response.ok||observed.ok!==true)
     throw Error(String(observed.error||'ORIGINAL_JOB_READBACK_UNAVAILABLE'));
-   realityOriginal143Eligible=
-    observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
-    observed.original_work_id===original143WorkId;
-   continueButton.disabled=!realityOriginal143Eligible;
-   if(realityOriginal143Eligible){
+   // This generic discovery view selects ONE unfinished item. The original
+   // job may exist elsewhere in verified Work Center results; don't block
+   // read-only navigation based on the discovery list's first item.
+   realityOriginal143Eligible=true;
+   continueButton.disabled=false;
+   if(observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
+    observed.original_work_id===original143WorkId){
     line.textContent='Original job #143 is unfinished and owner-goal scoped. '+
      'Existing repair evidence is recorded, but activation, registration, and '+
      'final settlement still require fresh independent readback. '+
@@ -2289,7 +2291,8 @@ setInterval(refreshSavedShiftHome,300000);
       'This does not prove that all work is finished.':
      'Current readback did not identify original #143 as an eligible unfinished job. '+
      'Status: '+String(observed.status||'UNKNOWN')+
-     '. No capability has been activated.';
+     '. Use Continue to independently check the exact original #143 in '+ 
+     'Unfinished Work; no capability has been activated.';
    }
   }catch(error){
    continueButton.disabled=true;
