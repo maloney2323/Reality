@@ -122,13 +122,14 @@ test('API request scope, origin and intent remain server-owned',()=>{
  assert.match(source,/Object.keys\(req.query\|\|\{\}\).length/);
  assert.doesNotMatch(source,/completeOriginal143OwnerAction|githubPost|githubPut|promoteVerifiedUpgrade/);
 });
-test('actual chat JavaScript parses and clearly says queuing does not yet run a worker',()=>{
+test('previous dispatch backend remains safe, but chat uses one existing original-job path',()=>{
  const html=readFileSync('index.html','utf8');
  for(const [,script]of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
   new vm.Script(script);
- assert.match(html,/id="privateGovernedBuildQueue"/);
- assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
- assert.match(html,/Isolated GitHub discovery worker was dispatched/);
+ assert.match(html,/id="privateContinueOriginal143"/);
+ assert.match(html,/wcLoadUnfinishedWork\(\)/);
+ assert.doesNotMatch(html,/id="privateGovernedBuildQueue"/);
+ assert.doesNotMatch(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
 });
 
 test('missing worker credential is recorded as an explicit non-executed blocker',async()=>{
