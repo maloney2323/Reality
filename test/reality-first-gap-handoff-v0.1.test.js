@@ -58,7 +58,7 @@ test('wrong run SHA, branch, repo, conclusion and workflow fail closed',()=>{
   {head_sha:'f'.repeat(40)}, {head_branch:'main'},
   {repository:{full_name:'adversary/Reality'}},
   {conclusion:'success'},{event:'workflow_dispatch'},
-  {path:'other.yml'},{run_id:0},{id:0},
+  {path:'other.yml'},{id:0},
  ])assert.throws(()=>read({run:{...run,...wrong}}),/FIRST_GAP_PINNED_RUN_NOT_VERIFIED/);
 });
 test('job mismatch or unresolved independent constitutional run is rejected',()=>{
@@ -107,7 +107,7 @@ test('only durable EXACT source, owner, goal and worldline readback admits model
    ()=>admitFirstGapBuildTicket({scope,providerEvidence:e,
     persistGap:persist,readBackGap:async()=>({...verified,...bad}),
     reobserveProviderEvidence:async()=>read()}),
-   /FIRST_GAP_CONTINUITY_READBACK_MISMATCH/);
+   /FIRST_GAP_GAP_CONTINUITY_READBACK_MISMATCH/);
  }
 });
 test('model invocation cannot begin on fabricated or non-durable gap',async()=>{
