@@ -128,7 +128,7 @@ test('actual chat JavaScript parses and clearly says queuing does not yet run a 
   new vm.Script(script);
  assert.match(html,/id="privateGovernedBuildQueue"/);
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
- assert.match(html,/not yet triggered/);
+ assert.match(html,/Isolated GitHub discovery worker was dispatched/);
 });
 
 test('missing worker credential is recorded as an explicit non-executed blocker',async()=>{
