@@ -2331,7 +2331,10 @@ setInterval(refreshSavedShiftHome,300000);
     throw Error(String(report.error||'QUEUE_NOT_CONFIRMED'));
    el('privateSelfImprovementStatus').textContent=
     'Reality recorded discovery queue '+report.queue_id+
-    ', phase '+report.phase+'. The autonomous sandbox runner is not yet triggered; no code was installed or job completed.';
+    ', phase '+report.phase+'. '+(report.worker_dispatch_started?
+     'Isolated GitHub discovery worker was dispatched. Readiness and final results must still be independently verified.':
+     'Worker dispatch blocked: '+String(report.dispatch_error||'NOT_AVAILABLE')+'.')+
+    ' No capability was installed and no original job was settled.';
   }catch(e){
    el('privateSelfImprovementStatus').textContent=
     'Reality could not durably queue discovery: '+String(e.message||e)+
