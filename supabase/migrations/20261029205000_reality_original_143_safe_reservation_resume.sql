@@ -254,8 +254,7 @@ begin
   return pg_catalog.jsonb_build_object('status','NOT_RESUMABLE','reason','FINGERPRINT_CHANGED'); end if;
  select * into ep from reality_internal.goal_publication_epochs
  where user_id=p_owner_id and conversation_id=p_conversation_id;
- if not found or r.goal_id is distinct from ep.goal_id or
-    r.goal_revision is distinct from ep.revision or
+ if not found or r.goal_revision is distinct from ep.revision or
     r.goal_transition_event_id is distinct from ep.last_transition_event_id or
     r.user_message_revision is distinct from ep.user_message_revision or
     r.latest_user_request_id is distinct from ep.latest_user_request_id
