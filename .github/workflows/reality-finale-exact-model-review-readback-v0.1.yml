@@ -1,0 +1,137 @@
+name: Reality Finale - Exact Model Candidate Review Installation Readback
+on:
+  push:
+    branches:
+      - review/reality-finale-exact-model-candidate-20261028
+    paths:
+      - 'src/reality-extensions/construction-estimate-approval-gate.mjs'
+      - '.github/workflows/reality-finale-exact-model-review-readback-v0.1.yml'
+      - 'test/reality-finale-estimate-approval-gate.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-source-review-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify prior genuine model correction and independent 27-check approval
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          for (const [id,conclusion,head_sha] of [
+            [40715822942,'failure','4f1a3a23fe28d738ccf863754c76234c4d1b1929'],
+            [40716279333,'success','acbc3160ced0525ea73ef4d0184da5fdae50337c']]) {
+            const response=await fetch('https://api.github.com/repos/maloney2323/Reality/actions/runs/'+id,{
+              headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json','User-Agent':'Reality-Finale-Exact-Review-Readback'}});
+            assert.equal(response.status,200);
+            const item=await response.json();
+            assert.equal(item.id,id);
+            assert.equal(item.status,'completed');
+            assert.equal(item.conclusion,conclusion);
+            assert.equal(item.head_sha,head_sha);
+          }
+          console.log(JSON.stringify({prior_real_model_correction_success:true,
+            owner_install_authorized:false,controlled_job_completed:false}));
+          JS
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40716279333
+          name: reality-finale-second-real-model-correction
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-model-candidate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 40715822942
+          name: reality-finale-real-red-gap
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: finale-evidence
+      - name: Byte-compare installed review source to actual model artifact
+        run: |
+          set -euo pipefail
+          test "$(sha256sum src/reality-extensions/construction-estimate-approval-gate.mjs | cut -d' ' -f1)" = c0f0fc86cd2ed11fe7e8c01484ebaf1b698143028c9c81ff323c6b7f8cd857ae
+          cmp src/reality-extensions/construction-estimate-approval-gate.mjs original-model-candidate/candidate.mjs
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const p=JSON.parse(fs.readFileSync('original-model-candidate/generation.json','utf8'));
+          const f=JSON.parse(fs.readFileSync('finale-evidence/baseline.json','utf8'));
+          assert.equal(p.original_work_id,'work:8f71513a2c1955569e84c0e9af0962ec');
+          assert.equal(p.original_work_id,f.original_work_id);
+          assert.equal(p.candidate_sha256,'c0f0fc86cd2ed11fe7e8c01484ebaf1b698143028c9c81ff323c6b7f8cd857ae');
+          assert.equal(p.model_generated,true);
+          assert.equal(p.first_verified_failure,'FROZEN_INVALID_ESTIMATE_MUST_THROW_NOT_RETURN_OBJECT');
+          assert.equal(p.owner_authorized_install,false);
+          console.log(JSON.stringify({state:'EXACT_MODEL_BYTES_ON_UNMERGED_REVIEW_BRANCH',sha256:p.candidate_sha256}));
+          JS
+      - name: Independently verify staged source with zero network and zero secrets
+        run: |
+          set -euo pipefail
+          timeout 110s docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 48 --memory 384m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,nosuid,noexec,size=8m \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -v "${{ github.workspace }}/finale-evidence:/evidence:ro" \
+            -v "${{ github.workspace }}/original-model-candidate:/work:ro" \
+            -w /repo node:22-alpine \
+            sh -c 'node --test test/reality-finale-estimate-approval-gate.test.mjs && node scripts/reality-finale-independent-holdout-v0.1.mjs' \
+            > finale-review-acceptance.log
+          cat finale-review-acceptance.log
+      - name: Independently assert controlled job functionality but no owner install authority
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' > finale-review-result.json
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import fs from 'node:fs';
+          import {evaluateEstimateRelease} from './src/reality-extensions/construction-estimate-approval-gate.mjs';
+          const sha=x=>createHash('sha256').update(x).digest('hex');
+          const cases=[
+            {estimate_id:'EST-401',homeowner_approved:false,approval_evidence_id:null,owner_reviewed:false},
+            {estimate_id:'EST-401',homeowner_approved:true,approval_evidence_id:'approval:abcd1234',owner_reviewed:true}
+          ];
+          const [blocked,ready]=cases.map(evaluateEstimateRelease);
+          assert.equal(blocked.status,'HOLD');
+          assert.equal(blocked.external_action_authorized,false);
+          assert.equal(ready.status,'READY_FOR_AUTHORIZATION');
+          assert.equal(ready.external_action_authorized,false);
+          const bytes=fs.readFileSync('src/reality-extensions/construction-estimate-approval-gate.mjs');
+          assert.equal(sha(bytes),'c0f0fc86cd2ed11fe7e8c01484ebaf1b698143028c9c81ff323c6b7f8cd857ae');
+          console.log(JSON.stringify({
+           version:'reality-finale-preview-review-installed-source-v0.1',
+           original_work_id:'work:8f71513a2c1955569e84c0e9af0962ec',
+           original_customer_work_id:'work:24cda9611404e9bcb47909976067605c',
+           candidate_sha256:sha(bytes),frozen_cases_passed:6,holdout_cases_passed:21,
+           module_works_on_isolated_review_branch:true,
+           gate_denies_unapproved_estimate:true,
+           gate_allows_authorization_preparation_only:true,
+           original_customer_job_completed:false,
+           owner_scoped_warrant_issued:false,
+           owner_install_grant_consumed:false,
+           authorized_installation_completed:false,
+           job_settlement_durable:false,
+           controlled_original_job_completed:false,
+           full_loop_7_of_7:false,
+           branch_review_only:true,
+          },null,2));
+          JS
+          cat finale-review-result.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reality-finale-review-only-exact-model-check
+          path: |
+            finale-review-acceptance.log
+            finale-review-result.json
+          if-no-files-found: warn
+          retention-days: 14
