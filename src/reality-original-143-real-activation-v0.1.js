@@ -148,6 +148,29 @@ async function readExistingOriginal143Reservation({
  return result;
 }
 
+// Single-use selector: a prior checked RESERVATION is reused exactly once,
+// never claimed again. A stale/ambiguous/consumed result fails closed.
+export async function claimOrResumeOriginal143Reservation({
+ prior,lease,policyId,fingerprint,goalId,epoch,
+}={}){
+ if(prior?.status==='RESERVED_UNDISPATCHED'){
+  if(!validUuid(prior.reservation_id))fail('ORIGINAL_143_RESERVATION_READBACK_INVALID');
+  return Object.freeze({reservation_id:prior.reservation_id,
+   existing_owner_approval_reused:true});
+ }
+ if(prior?.status!=='NOT_FOUND')
+  fail('ORIGINAL_143_EXISTING_RESERVATION_NOT_RESUMABLE',409);
+ if(!lease||typeof lease.claim!=='function')
+  fail('ORIGINAL_143_RESERVATION_CLAIM_UNAVAILABLE');
+ return lease.claim({
+  policyId,workFingerprint:fingerprint,goalId,
+  expectedGoalRevision:epoch.goal_revision,
+  expectedGoalEventId:epoch.goal_transition_event_id,
+  expectedUserMessageRevision:epoch.user_message_revision,
+  expectedLatestUserRequestId:epoch.latest_user_request_id,
+ });
+}
+
 function matchStoredEvent(stored,event){
  return stored?.event_id===event.event_id&&
   stored?.lineage_hash===event.lineage_hash&&
@@ -226,19 +249,11 @@ export async function completeOriginal143OwnerAction({
   session,conversationId,goal.state.active_goal_id);
  const prior=await readReservation({db,session,conversationId,
   goalId:goal.state.active_goal_id,rpcCall});
- if(prior.status==='NOT_RESUMABLE')
-  fail('ORIGINAL_143_EXISTING_RESERVATION_NOT_RESUMABLE',409);
  // Exactly one source-bound, previously owner-authorized reservation can be
  // recovered. It has not been dispatched and is still bound to a fresh epoch.
- const reservation=prior.status==='RESERVED_UNDISPATCHED'?
-  {reservation_id:prior.reservation_id,existing_owner_approval_reused:true}:
-  await lease.claim({
-   policyId,workFingerprint:fingerprint,goalId:goal.state.active_goal_id,
-   expectedGoalRevision:epoch.goal_revision,
-   expectedGoalEventId:epoch.goal_transition_event_id,
-   expectedUserMessageRevision:epoch.user_message_revision,
-   expectedLatestUserRequestId:epoch.latest_user_request_id,
-  });
+ const reservation=await claimOrResumeOriginal143Reservation({
+  prior,lease,policyId,fingerprint,goalId:goal.state.active_goal_id,epoch,
+ });
  const payload={
   original_work_id:ORIGINAL_WORK,owner_id:session.user_id,
   conversation_id:conversationId,original_goal_id:goal.state.active_goal_id,
