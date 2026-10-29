@@ -123,6 +123,11 @@ export function createGovernedSelfImprovement({scope,attemptLimit=3}={}){
  return state;
 }
 const PROTECTED_PATH=/(^|\/)(?:reality-governed-self-improvement|reality-constitution|reality-private-chat-auth|reality-goal-authority|reality-single-use-execution-reservation|reality-constitutional-learning|reality-cognition-execution-bridge)(?:[^/]*)(?:\.js|\.mjs)$/i;
+const NORMAL_UPGRADE_PATH=/^(?:src\/reality-extensions\/|test\/reality-extensions\/|docs\/)[a-zA-Z0-9._\/-]+$/;
+// Normal model-generated candidate source cannot directly touch public API,
+// owner authentication, policy/constitution, database adapters or framework
+// files. Cross-boundary rewrites require a distinct human governance release.
+
 function validateCandidate(candidate){
  enforce(candidate&&typeof candidate==='object'&&
   Array.isArray(candidate.files)&&candidate.files.length>0&&
@@ -134,6 +139,7 @@ function validateCandidate(candidate){
    !f.path.split('/').includes('..')&&!paths.has(f.path),
    'SELF_IMPROVEMENT_CANDIDATE_PATH_INVALID');
   enforce(!PROTECTED_PATH.test(f.path),'SELF_IMPROVEMENT_CONSTITUTIONAL_KERNEL_IMMUTABLE');
+  enforce(NORMAL_UPGRADE_PATH.test(f.path),'SELF_IMPROVEMENT_NON_EXTENSION_CHANGE_REQUIRES_SEPARATE_GOVERNANCE_RELEASE');
   enforce(typeof f.content==='string'&&f.content.length>0&&f.content.length<=100000,
    'SELF_IMPROVEMENT_CANDIDATE_CONTENT_INVALID');
   paths.add(f.path);
