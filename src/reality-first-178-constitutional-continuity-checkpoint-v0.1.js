@@ -60,9 +60,7 @@ export function createFirst178ConstitutionalCheckpointService({
   verifySelfImprovementJournal(state);
   if(state.scope.owner_id!==session.user_id||
     state.scope.original_work_id!==originalWorkId||
-    state.scope.target_environment!=='ISOLATED_PREVIEW'||
-    ['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
-     'ORIGINAL_JOB_RESUMED','SETTLED'].includes(state.phase))
+    state.scope.target_environment!=='ISOLATED_PREVIEW')
    fail('OWNER_WORK_OR_AUTHORITY_SCOPE_CHANGED');
   const {g,spine}=await verifyGoal();
   if(state.scope.goal_id!==g.state.active_goal_id||
@@ -120,8 +118,14 @@ export function createFirst178ConstitutionalCheckpointService({
     constitutional_head_hash:state.head_hash,
     constitutional_phase:state.phase,
     driver_state:state,
-    installation_authorized:false,
-    original_job_completed:false,production_changed:false,
+    // The same journal records the entire lifecycle, including *later*
+    // owner-approved registration and settlement. Its phase/receipt invariants
+    // are verified in the constitutional core, not reimplemented here.
+    installation_authorized:Boolean(state.promotion_authorization?.consumed_once),
+    original_job_completed:state.phase==='SETTLED'&&
+     state.settlement?.durable_settlement_readback===true&&
+     state.settlement?.independent_outcome_verified===true,
+    production_changed:false,
    };
    const node=appendContinuityNode({
     spine,stage:'WORK',entityId:originalWorkId,eventId:id,
@@ -148,7 +152,12 @@ export function createFirst178ConstitutionalCheckpointService({
      recorded?.payload?.constitutional_head_hash!==state.head_hash||
      recorded.payload?.original_source_receipt_ref!==original[0].event_id||
      !jsonEqual(recorded.payload?.driver_state,state)||
-     recorded.payload?.installation_authorized!==false)
+     recorded.payload?.installation_authorized!==
+      Boolean(state.promotion_authorization?.consumed_once)||
+     recorded.payload?.original_job_completed!==Boolean(
+      state.phase==='SETTLED'&&
+      state.settlement?.durable_settlement_readback===true&&
+      state.settlement?.independent_outcome_verified===true))
    fail('CHECKPOINT_INDEPENDENT_RECONSTRUCTION_FAILED');
   return Object.freeze({
    persisted:true,independent_readback_verified:true,
