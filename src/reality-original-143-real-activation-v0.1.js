@@ -18,7 +18,7 @@ import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {executeOriginalMaintenanceRepair}
  from './reality-extensions/reality-original-maintenance-executor.mjs';
-import {githubGet} from './reality-connector-github-v1.0.js';
+import {readPublicOriginal143GitHubEvidence} from './reality-original-143-public-evidence-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 
 export const ORIGINAL_143_CONFIRMATION='ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY';
@@ -140,7 +140,7 @@ export async function completeOriginal143OwnerAction({
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
  createReservation=createSingleUseExecutionReservationStore,
- get=githubGet,originalExecutor=executeOriginalMaintenanceRepair,
+ get=readPublicOriginal143GitHubEvidence,originalExecutor=executeOriginalMaintenanceRepair,
  rpcCall=rpc,
 }={}){
  // This method must be called only by an authenticated same-origin POST,
