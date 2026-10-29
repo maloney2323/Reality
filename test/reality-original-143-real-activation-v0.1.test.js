@@ -76,3 +76,19 @@ test('final receipt explicitly distinguishes preexisting fix from Reality-author
  assert.match(source,/external_repair_performed_by_reality:false/);
  assert.match(source,/original_issue_closed:false/);
 });
+
+test('original job approval appears only from Unfinished Work and requires owner click',()=>{
+ const html=readFileSync('index.html','utf8');
+ assert.match(html,/data-original143-prepare/);
+ assert.match(html,/data-original143-activate/);
+ assert.match(html,/window\.confirm\(/);
+ assert.match(html,/ACTIVATE_RESUME_SETTLE_ORIGINAL_143/);
+ assert.match(html,/ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
+});
+test('the updated original job UI JavaScript is syntactically valid',async()=>{
+ const vm=await import('node:vm');
+ const html=readFileSync('index.html','utf8');
+ const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=1);
+ for(const [,script] of scripts)new vm.Script(script);
+});
