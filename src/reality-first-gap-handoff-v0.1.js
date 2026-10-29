@@ -4,8 +4,14 @@
 // Trusted callers must obtain the owner's current goal and durable checkpoint
 // from the authenticated server; never forward caller-provided evidence as truth.
 import {createHash} from 'node:crypto';
-import {createFoundationalBuildTicket,runFoundationalGenerationSandboxLoop}
+import {createFoundationalBuildTicket}
  from './reality-foundational-build-loop-v1.0.js';
+import {createConstitutionalGenerationSandboxAdapters}
+ from './reality-foundational-constitutional-adapters-v1.0.js';
+import {createGovernedSelfImprovement}
+ from './reality-governed-self-improvement-spine-v1.0.js';
+import {continueGovernedSelfImprovement}
+ from './reality-governed-self-improvement-driver-v1.0.js';
 
 export const REALITY_FIRST_GAP_HANDOFF_VERSION='reality-first-gap-handoff-v0.1';
 export const FIRST_GAP_PROOF=Object.freeze({
@@ -230,26 +236,82 @@ export async function admitFirstGapBuildTicket({
  });
  return Object.freeze({ticket,
   proof:'OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK',
+  gap_continuity_receipt_id:write.receipt_id,
+  provider_receipt_ref:providerEvidence.provider_receipt_ref,
+  provider_evidence_hash:providerEvidence.evidence_hash,
   model_generated:false,installation_authorized:false,
   original_job_completed:false});
 }
 
-// The trusted runner supplies REAL model, independently isolated sandbox,
-// attestation and persisted-checkpoint adapters. Never accept from the browser.
+// One constitutional driver, one authority for transitions. The foundational
+// generator and sandbox are services, not a parallel owner of lifecycle state.
+// GAP_CONFIRMED and sandbox observations must be independently checked by
+// trusted provider adapters, and every transition durably read back in the
+// SAME original owner's Continuity Ledger. Never call this from a browser.
 export async function generateAfterTrustedGap({
- admitted,adapters,
+ admitted,adapters,verifiedGovernanceReleaseSha,
 }={}){
+ const ticket=admitted?.ticket;
  if(admitted?.proof!=='OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK'||
-  admitted?.ticket?.version!=='reality-foundational-build-loop-v1.0'||
-  admitted?.ticket?.original_work_id==null)
+    ticket?.version!=='reality-foundational-build-loop-v1.0'||
+    ticket?.environment!=='ISOLATED_PREVIEW'||
+    !WORK.test(ticket?.original_work_id||'')||
+    ticket.confirmed_gap_receipt_ref!==admitted.gap_continuity_receipt_id||
+    ticket.confirmed_gap_evidence_hash!==admitted.provider_evidence_hash||
+    admitted.model_generated!==false||
+    admitted.installation_authorized!==false||
+    admitted.original_job_completed!==false||
+    !SHA40.test(verifiedGovernanceReleaseSha||''))
   fail('NO_TRUSTED_TICKET');
- const result=await runFoundationalGenerationSandboxLoop({
-  ticket:admitted.ticket,adapters,
+ for(const name of [
+  'modelGenerate','isolatedSandbox','independentReadback',
+  'observeMissingCapability','verifyIndependentReceipt','persistCheckpoint',
+ ]){
+  if(typeof adapters?.[name]!=='function')fail('MISSING_TRUSTED_'+name.toUpperCase());
+ }
+ // A provider-attested receipt is supplied by a trusted adapter, never by
+ // the LLM. It must still be re-read inside the constitutional driver.
+ const foundation=createConstitutionalGenerationSandboxAdapters({
+  ticket,modelGenerate:adapters.modelGenerate,
+  isolatedSandbox:adapters.isolatedSandbox,
+  independentReadback:adapters.independentReadback,
  });
- if(result?.status!=='AWAITING_EXACT_OWNER_APPROVAL')
-  return Object.freeze({...result,installation_authorized:false,
-   original_job_completed:false});
- return Object.freeze({...result,installation_authorized:false,
-  capability_installed:false,original_job_completed:false,
-  production_changed:false});
+ const scope={
+  owner_id:ticket.owner_id,goal_id:ticket.goal_id,
+  original_work_id:ticket.original_work_id,
+  continuity_root_id:ticket.continuity_root_id,
+  worldline_id:ticket.worldline_id,
+  goal_transition_receipt_ref:ticket.goal_transition_receipt_ref,
+  goal_evidence_ref:ticket.goal_evidence_ref,
+  target_environment:'ISOLATED_PREVIEW',
+  governance_kernel_hash:'sha256:'+hex(
+   'reality-constitutional-driver-release:'+verifiedGovernanceReleaseSha),
+ };
+ const initial=createGovernedSelfImprovement({
+  scope,attemptLimit:ticket.max_attempts,
+ });
+ const driven=await continueGovernedSelfImprovement({
+  state:initial,maxTransitions:12,
+  adapters:{
+   ...foundation,
+   observeMissingCapability:adapters.observeMissingCapability,
+   verifyIndependentReceipt:adapters.verifyIndependentReceipt,
+   persistCheckpoint:adapters.persistCheckpoint,
+  },
+ });
+ // This entry point ALWAYS stops at the owner gate (or a justified
+ // escalation). No approval, registration, resumption or settlement adapters
+ // are ever made available to this generation invocation.
+ if(!['OWNER_APPROVAL_REQUIRED','ESCALATED_WITH_FROZEN_EVIDENCE',
+       'WORK_BUDGET_EXHAUSTED_CHECKPOINT_PRESERVED'].includes(driven.status))
+  fail('UNEXPECTED_GENERATION_AUTHORITY_TRANSITION');
+ if(driven.state.scope.original_work_id!==ticket.original_work_id||
+    driven.state.scope.goal_id!==ticket.goal_id)
+  fail('CONSTITUTIONAL_SCOPE_CHANGED');
+ return Object.freeze({
+  ...driven,original_work_id:ticket.original_work_id,
+  owner_approval_required:driven.status==='OWNER_APPROVAL_REQUIRED',
+  installation_authorized:false,capability_installed:false,
+  original_job_completed:false,production_changed:false,
+ });
 }
