@@ -2543,6 +2543,9 @@ setInterval(refreshSavedShiftHome,300000);
    el('privatePrompt').value='';
    el('privateGoalCommand').value='';
    await loadSaved();await loadConversations();
+   // Refresh Reality's independently observed improvement queue after chat.
+   // This request remains GET-only and cannot start a model or authorize work.
+   void refreshRealitySelfImprovement();
    const reliability=data.reliability||{};
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
    const issues=reliability.semantic_issue_candidates?.length||0;
