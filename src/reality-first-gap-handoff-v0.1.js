@@ -108,13 +108,77 @@ export function attestFirstGapProviderSnapshot({
  });
 }
 
+// Fetch the exact GitHub provider records through the trusted runner itself.
+// This is read-only. The URL set is pinned and no model or browser input can
+// choose a different workflow, source, run, commit, job or repository.
+export async function observeFirstGapFromGithub({
+ scope,apiToken,fetchImpl=fetch,
+}={}){
+ strictScope(scope);
+ if(typeof apiToken!=='string'||apiToken.length<20)
+  fail('PROVIDER_READ_CREDENTIAL_REQUIRED');
+ const p=FIRST_GAP_PROOF;
+ const root='https://api.github.com/repos/'+p.repository;
+ const headers={accept:'application/vnd.github+json',
+  authorization:'Bearer '+apiToken,
+  'x-github-api-version':'2022-11-28',
+  'user-agent':'Reality-pinned-CI-gap-readback'};
+ async function get(path,{text=false}={}){
+  const url=root+path;
+  const response=await fetchImpl(url,{method:'GET',cache:'no-store',
+   redirect:'follow',headers});
+  if(!response?.ok)fail('PROVIDER_READBACK_UNAVAILABLE');
+  const size=Number(response.headers?.get?.('content-length')||0);
+  if(!Number.isFinite(size)||size>800000)
+   fail('PROVIDER_RESULT_OVERSIZE');
+  if(text){
+   const raw=await response.text();
+   if(raw.length>800000)fail('PROVIDER_RESULT_OVERSIZE');
+   return raw;
+  }
+  return response.json();
+ }
+ const run=await get('/actions/runs/'+p.run_id);
+ // Reject the wrong run before looking up any job/log URL.
+ if(run?.id!==p.run_id||run?.head_sha!==p.run_head_sha||
+    run?.head_branch!==p.head_branch||
+    run?.repository?.full_name!==p.repository)
+  fail('PINNED_RUN_NOT_VERIFIED');
+ const jobPage=await get('/actions/runs/'+p.run_id+'/jobs?per_page=100');
+ if(!Array.isArray(jobPage?.jobs)||jobPage?.total_count!==jobPage.jobs.length)
+  fail('PROVIDER_JOB_LIST_INCOMPLETE');
+ const matches=jobPage.jobs.filter(j=>j.name===p.job_name&&
+   j.run_id===p.run_id&&j.head_sha===p.run_head_sha);
+ if(matches.length!==1||!Number.isSafeInteger(matches[0]?.id))
+  fail('UNIQUE_FAILED_JOB_REQUIRED');
+ const log=await get('/actions/jobs/'+matches[0].id+'/logs',{text:true});
+ const source=await get('/contents/'+p.manifest_path+'?ref='+p.run_head_sha);
+ if(source?.encoding!=='base64'||typeof source.content!=='string'||
+    source.path!==p.manifest_path||source.size>10000)
+  fail('FROZEN_PROVIDER_MANIFEST_INVALID');
+ const manifest=Buffer.from(source.content.replace(/\\s/g,''),'base64').toString('utf8');
+ return attestFirstGapProviderSnapshot({
+  scope,run,jobs:jobPage.jobs,log,manifest,
+ });
+}
+
 // No model is invoked before a *separate, durable* Continuity receipt links
 // the provider observation to the current original owner/goal/worldline.
 // This requires a real authenticated Reality work ID, NOT the fixture 'work:e...'.
 export async function admitFirstGapBuildTicket({
  scope,providerEvidence,persistGap,readBackGap,
+ reobserveProviderEvidence,
 }={}){
  strictScope(scope);
+ if(typeof reobserveProviderEvidence!=='function')
+  fail('INDEPENDENT_REOBSERVATION_REQUIRED');
+ const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
+ if(fresh?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
+    fresh?.evidence_hash!==providerEvidence?.evidence_hash||
+    fresh?.provider_receipt_ref!==providerEvidence?.provider_receipt_ref||
+    fresh?.original_work_id!==scope.original_work_id||
+    fresh?.goal_id!==scope.goal_id||fresh?.owner_id!==scope.owner_id)
+  fail('FRESH_PROVIDER_GAP_REOBSERVATION_MISMATCH');
  if(providerEvidence?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
   providerEvidence.original_work_id!==scope.original_work_id||
   providerEvidence.goal_id!==scope.goal_id||
