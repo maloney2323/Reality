@@ -25,6 +25,8 @@ jobs:
           node --check api/reality/personal-governed-build.js
           node --check src/reality-governed-build-chat-connection-v1.0.js
           node --test test/reality-governed-build-chat-connection-v1.0.test.js
+          node --check src/reality-governed-build-worker-readback-v1.0.js
+          node --test test/reality-governed-build-worker-readback-v1.0.test.js
           node --test test/reality-personal-governed-self-improvement-v0.1.test.js
           node --test test/reality-foundational-build-loop-v1.0.test.js
           node --test test/reality-foundational-constitutional-adapters-v1.0.test.js
