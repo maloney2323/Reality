@@ -169,6 +169,8 @@ test('provider reobservation required after initial evidence before any continui
 test('one constitutional driver takes real-gap ticket through model and independent sandbox to owner gate only',async()=>{
  const {createFoundationalBuildTicket}=await import('../src/reality-foundational-build-loop-v1.0.js');
  const {createSandboxEvidenceCandidate}=await import('../src/reality-foundational-build-loop-v1.0.js');
+ const {createConstitutionalGenerationSandboxAdapters}=
+  await import('../src/reality-foundational-constitutional-adapters-v1.0.js');
  const ticket=createFoundationalBuildTicket({
   owner_id:scope.owner_id,goal_id:scope.goal_id,
   original_work_id:scope.original_work_id,
@@ -268,8 +270,14 @@ test('one constitutional driver takes real-gap ticket through model and independ
     original_work_id:ticket.original_work_id};
   },
  };
+ const generation=createConstitutionalGenerationSandboxAdapters({
+  ticket,modelGenerate:adapters.modelGenerate,
+  isolatedSandbox:adapters.isolatedSandbox,
+  independentReadback:adapters.independentReadback,
+ });
  const r=await generateAfterTrustedGap({
-  admitted,adapters,verifiedGovernanceReleaseSha:'b'.repeat(40)});
+  admitted,adapters:{...adapters,generation},
+  verifiedGovernanceReleaseSha:'b'.repeat(40)});
  assert.equal(r.status,'OWNER_APPROVAL_REQUIRED');
  assert.equal(r.state.phase,'AWAITING_OWNER_APPROVAL');
  assert.equal(r.state.scope.original_work_id,ticket.original_work_id);
