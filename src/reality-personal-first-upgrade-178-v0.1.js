@@ -104,9 +104,22 @@ export async function inspectFirstUpgrade178({
   if(existing.original_work_id!==scope.original_work_id||
     existing.goal_id!==scope.goal_id)
    return publicShape(scope,'BLOCKED_BY_DIFFERENT_QUEUED_WORK');
+  const phase=String(existing.phase||'NOT_VERIFIED');
+  const r=existing.report||{};
+  const stageReceipt=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(
+   String(r.checkpoint_receipt_id||''))?r.checkpoint_receipt_id:null;
+  const exactHash=/^[a-f0-9]{64}$/.test(String(r.checkpoint_hash||''))?
+   r.checkpoint_hash:null;
+  const verifiedGate=phase==='AWAITING_OWNER_APPROVAL'&&
+   r.state===phase&&stageReceipt&&exactHash&&
+   r.installation_authorized===false&&r.job_completed===false;
   return Object.freeze({...publicShape(scope,'ALREADY_QUEUED'),
-   queue_id:existing.queue_id,
-   queue_phase:existing.phase||'NOT_VERIFIED'});
+   queue_id:existing.queue_id,queue_phase:phase,
+   checkpoint_receipt_id:stageReceipt,checkpoint_hash:exactHash,
+   owner_approval_required:Boolean(verifiedGate),
+   model_generated:Boolean(verifiedGate),
+   sandbox_verified:Boolean(verifiedGate),
+   installation_authorized:false,job_completed:false});
  }
  // The exact public #178 GitHub failure is verified without a write token.
  // Model and sandbox run on the trusted Vercel host under this same goal.
