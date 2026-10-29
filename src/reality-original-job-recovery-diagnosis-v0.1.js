@@ -28,8 +28,14 @@ export async function continueVerifiedRecoveryDiagnosis({
     report.original_job_completed!==false||
     report.external_action_performed!==false||
     report.action_authorized!==false||
-    gap?.original_job_completed!==false)
+    (gap!==undefined&&gap!==null&&gap.original_job_completed!==false))
   throw Error('RECOVERY_DIAGNOSIS_UPGRADE_HANDOFF_SOURCE_INVALID');
+ // Legacy trusted recovery evidence can lack upgrade classification. It is
+ // missing proof, NOT a confirmed gap and never permission to call a model.
+ if(gap===undefined||gap===null)
+  return Object.freeze({...report,
+   self_upgrade_execution_status:'INDEPENDENT_GAP_DIAGNOSIS_UNAVAILABLE',
+   self_upgrade_model_executed:false,self_upgrade_installed:false});
  if(gap.status!=='CAPABILITY_GAP_CANDIDATE')
   return Object.freeze({...report,
    self_upgrade_execution_status:'NO_INDEPENDENT_MISSING_CAPABILITY_VERIFIED',
