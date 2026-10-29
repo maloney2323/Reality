@@ -7,6 +7,9 @@ on:
       - 'src/reality-foundational-build-loop-v1.0.js'
       - 'src/reality-foundational-model-provider-v1.0.js'
       - 'src/reality-foundational-sandbox-adapter-v1.0.js'
+      - 'src/reality-foundational-constitutional-adapters-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'test/reality-foundational-constitutional-adapters-v1.0.test.js'
       - 'test/reality-foundational-build-loop-v1.0.test.js'
       - 'docs/reality-foundational-generation-sandbox-v1.md'
       - '.github/workflows/reality-foundational-generation-sandbox-v1.yml'
@@ -32,7 +35,9 @@ jobs:
           node --check src/reality-foundational-build-loop-v1.0.js
           node --check src/reality-foundational-model-provider-v1.0.js
           node --check src/reality-foundational-sandbox-adapter-v1.0.js
+          node --check src/reality-foundational-constitutional-adapters-v1.0.js
           node --test test/reality-foundational-build-loop-v1.0.test.js
+          node --test test/reality-foundational-constitutional-adapters-v1.0.test.js
       - name: Existing constitutional spine and authenticated chat discovery
         run: |
           set -euo pipefail
