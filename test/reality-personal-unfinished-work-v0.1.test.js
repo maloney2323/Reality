@@ -18,7 +18,7 @@ const env={
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
 };
 const user_id=randomUUID(),conversationId=randomUUID(),otherConversation=randomUUID();
-const session={user_id,config:{url}},work='work:'+'c'.repeat(32),
+const session={user_id,config:{url}},work='work:24cda9611404e9bcb47909976067605c',
  goalId='user-goal:test-original',at='2026-10-27T22:03:48.291Z';
 const issue='https://github.com/maloney2323/Reality/issues/143';
 const scope=personalGoalScope({userId:user_id,conversationId});
