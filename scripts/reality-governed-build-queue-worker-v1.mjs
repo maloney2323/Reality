@@ -9,6 +9,8 @@ import {executeOriginalMaintenanceRepair}
  from '../src/reality-extensions/reality-original-maintenance-executor.mjs';
 import {readPublicOriginal143GitHubEvidence}
  from '../src/reality-original-143-public-evidence-v0.1.js';
+import {observePinnedReality178Failure}
+ from '../src/reality-first-178-github-gap-reader-v0.1.js';
 
 const ROOT='/repos/maloney2323/Reality/';
 const WORK143='work:24cda9611404e9bcb47909976067605c';
@@ -55,6 +57,26 @@ if(issue.number===143&&request.original_work_id===WORK143){
   verified_source_already_fixed:true,
   real_original_executor_ran:true,
   historical_repair_authored_by_reality:false};
+}else if(issue.number===178){
+ // Provider-only proof. This isolated request contains no owner identity,
+ // so successful discovery NEVER authorizes model generation or installation.
+ // The authenticated Vercel Continuity bridge must re-read and bind the
+ // exact evidence to the owner's current goal and work before continuation.
+ const observed=await observePinnedReality178Failure({
+  token:process.env.GH_PROVIDER_READ_TOKEN,
+ });
+ if(observed.status!=='PINNED_178_MISSING_EXTENSION_INDEPENDENTLY_OBSERVED'||
+    observed.owner_goal_verified!==false||
+    observed.model_generated!==false)
+  fail('REALITY_WORKER_178_PROVIDER_RESULT_INVALID');
+ result={phase:'PINNED_CAPABILITY_GAP_OBSERVED_AWAITING_OWNER_WORK_BINDING',
+  gap_type:'MISSING_EXTENSION_CONFIRMED_AT_PINNED_CI_COMMIT',
+  ...observed,
+  model_code_generation_needed:true,
+  model_code_generation_performed:false,
+  real_original_executor_ran:false,
+  independently_verified_provider_gap:true,
+  owner_goal_bound_by_worker:false};
 }else{
  // A GitHub issue and a job ID alone do NOT prove a missing capability.
  // A real independent failing test or verified provider receipt must be
