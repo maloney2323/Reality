@@ -201,8 +201,8 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <strong>Reality · Self-Improvement</strong>
    <p class="muted" id="privateSelfImprovementStatus" aria-live="polite">Checks signed-in Continuity for unfinished work. The model cannot approve or install upgrades.</p>
    <button type="button" id="privateSelfImprovementRefresh">Inspect Reality's next work</button>
-   <button type="button" id="privateGovernedBuildQueue" disabled>Queue Reality's safe investigation</button>
-   <p class="muted" style="font-size:11px">Reality can now queue independently grounded work in owner-scoped Continuity. An authenticated request can trigger an isolated read-only GitHub discovery worker. The model cannot grant authority, install an upgrade, or finish the original job by itself.</p>
+   <button type="button" id="privateContinueOriginal143" disabled>Continue original job #143 · Existing verified path</button>
+   <p class="muted" style="font-size:11px">No new queue or dispatch. This opens Reality's existing authenticated original-job review. Reality checks fresh GitHub and Continuity evidence before showing the separate owner approval. No change to production.</p>
   </section>
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
    <strong>Confirmed user objective</strong>
@@ -2255,92 +2255,87 @@ setInterval(refreshSavedShiftHome,300000);
   return id;
  }
  let realitySelfImprovementLoading=false;
+ let realityOriginal143Eligible=false;
+ const original143WorkId='work:24cda9611404e9bcb47909976067605c';
  async function refreshRealitySelfImprovement(){
   if(realitySelfImprovementLoading||el('privateReady').style.display==='none')return;
   realitySelfImprovementLoading=true;
-  const button=el('privateSelfImprovementRefresh');
+  const refresh=el('privateSelfImprovementRefresh');
+  const continueButton=el('privateContinueOriginal143');
   const line=el('privateSelfImprovementStatus');
-  button.disabled=true;
-  line.textContent='Reality is checking your actual confirmed goals and unfinished work…';
+  refresh.disabled=true;
+  continueButton.disabled=true;
+  realityOriginal143Eligible=false;
+  line.textContent='Checking your original goal and unfinished work in Continuity…';
   try{
    const response=await fetch('/api/reality/personal-self-improvement',{
     method:'GET',credentials:'same-origin',cache:'no-store'
    });
    const observed=await response.json();
    if(!response.ok||observed.ok!==true)
-    throw Error(String(observed.error||'OWNER_SELF_IMPROVEMENT_READBACK_UNAVAILABLE'));
-   realityBuildEligible=observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION';
-   el('privateGovernedBuildQueue').disabled=!realityBuildEligible;
-   if(observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'){
-    line.textContent='Original unfinished work: '+observed.original_work_id+
-     '. Goal: '+String(observed.goal_title||'').slice(0,190)+
-     '. Reality\'s next required step: independently confirm what capability is missing. '+
-     'No model-generated upgrade, installed capability or final settlement has been proved.';
+    throw Error(String(observed.error||'ORIGINAL_JOB_READBACK_UNAVAILABLE'));
+   realityOriginal143Eligible=
+    observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
+    observed.original_work_id===original143WorkId;
+   continueButton.disabled=!realityOriginal143Eligible;
+   if(realityOriginal143Eligible){
+    line.textContent='Original job #143 is unfinished and owner-goal scoped. '+
+     'Existing repair evidence is recorded, but activation, registration, and '+
+     'final settlement still require fresh independent readback. '+
+     'Continue this SAME job below; no new work queue or credential is needed.';
    }else{
     line.textContent=observed.status==='NO_VERIFIED_ELIGIBLE_WORK'?
-     'No eligible unfinished work verified in the inspected owner conversations. '+
-      'This does not prove there is no other work.':
-     'Unfinished-work discovery is incomplete or no work is eligible. Status: '+
-      String(observed.status||'UNKNOWN')+
-      '. No execution or model upgrade has occurred.';
+     'No eligible unfinished work was verified in the inspected conversations. '+
+      'This does not prove that all work is finished.':
+     'Current readback did not identify original #143 as an eligible unfinished job. '+
+     'Status: '+String(observed.status||'UNKNOWN')+
+     '. No capability has been activated.';
    }
   }catch(error){
-   line.textContent='Could not independently verify self-improvement work: '+
+   continueButton.disabled=true;
+   line.textContent='Could not independently identify original #143: '+
     String(error?.message||'READBACK_FAILED')+
-    '. No generated code, execution, or installation was attempted.';
+    '. No authorization or execution was attempted.';
   }finally{
-   button.disabled=false;
+   refresh.disabled=false;
    realitySelfImprovementLoading=false;
   }
-  if(realityBuildEligible)void refreshGovernedBuildStatus();
  }
  el('privateSelfImprovementRefresh').onclick=refreshRealitySelfImprovement;
- let realityBuildEligible=false;
- async function refreshGovernedBuildStatus(){
-  const button=el('privateGovernedBuildQueue');
-  try{
-   const r=await fetch('/api/reality/personal-governed-build',{
-    method:'GET',credentials:'same-origin',cache:'no-store'
-   });
-   const status=await r.json();
-   if(status.ok===true&&status.queued===true){
-    button.disabled=true;
-    const line=el('privateSelfImprovementStatus');
-    line.textContent+=' Queued build '+String(status.queue_id||'').slice(0,14)+
-     ', phase '+String(status.phase||'UNKNOWN')+
-     (status.dispatch_commit_sha?' — worker request commit recorded; inspect GitHub run evidence.':
-      ' — worker dispatch not yet confirmed.');
-   }else{
-    button.disabled=!realityBuildEligible;
-   }
-  }catch{
-   button.disabled=true;
-  }
- }
- el('privateGovernedBuildQueue').onclick=async()=>{
-  const button=el('privateGovernedBuildQueue');
-  if(!realityBuildEligible||button.disabled)return;
-  if(!window.confirm('Queue the verified original unfinished work for Reality to investigate under its confirmed goal? This can dispatch a GitHub read-only discovery worker on a separate experimental branch. It may inspect existing source and run the original read-only verifier. It does not approve installation, issue closure, or any production change.'))return;
+ el('privateContinueOriginal143').onclick=async()=>{
+  const button=el('privateContinueOriginal143');
+  if(!realityOriginal143Eligible||button.disabled||
+   el('privateReady').style.display==='none')return;
   button.disabled=true;
+  const line=el('privateSelfImprovementStatus');
+  line.textContent='Recovering original #143 from the existing Unfinished Work view…';
   try{
-   const r=await fetch('/api/reality/personal-governed-build',{
-    method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
-    body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'}),
-   });
-   const report=await r.json();
-   if(!r.ok||report.ok!==true||!report.queue_id)
-    throw Error(String(report.error||'QUEUE_NOT_CONFIRMED'));
-   el('privateSelfImprovementStatus').textContent=
-    'Reality recorded discovery queue '+report.queue_id+
-    ', phase '+report.phase+'. '+(report.worker_dispatch_started?
-     'Isolated GitHub discovery worker was dispatched. Readiness and final results must still be independently verified.':
-     'Worker dispatch blocked: '+String(report.dispatch_error||'NOT_AVAILABLE')+'.')+
-    ' No capability was installed and no original job was settled.';
-  }catch(e){
-   el('privateSelfImprovementStatus').textContent=
-    'Reality could not durably queue discovery: '+String(e.message||e)+
-    '. No model generation or installation was attempted.';
-   button.disabled=false;
+   // Reuse the already tested Work Center: no new route, model authority,
+   // GitHub token, queue, or completion mechanism.
+   await wcLoadUnfinishedWork();
+   const target=[...document.querySelectorAll(
+    '#wcUnfinishedList button[data-original143-prepare],'+
+    '#wcUnfinishedList button[data-original143-activate]'
+   )].find(node=>
+    (node.dataset.original143Prepare||node.dataset.original143Activate)===
+      original143WorkId);
+   if(!target)
+    throw Error('ORIGINAL_143_NOT_IN_VERIFIED_UNFINISHED_WORK');
+   target.scrollIntoView({behavior:'smooth',block:'center'});
+   target.focus();
+   // Only the existing READ-ONLY prepare handler is invoked. Owner
+   // authorization remains a later direct human click after GET readback.
+   if(target.dataset.original143Prepare)target.click();
+   line.textContent='Reality opened the existing job #143 review. '+
+    'The Work Center is checking current evidence. '+
+    'The separate approval button will appear there ONLY if ready. '+
+    'No approval was given by this navigation.';
+  }catch(error){
+   line.textContent='Cannot continue #143 until its original work is verified: '+
+    String(error?.message||'UNFINISHED_WORK_UNAVAILABLE')+
+    '. No new job or upgrade was created.';
+  }finally{
+   button.disabled=!realityOriginal143Eligible;
   }
  };
 
@@ -2358,8 +2353,12 @@ setInterval(refreshSavedShiftHome,300000);
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
   if(yes)void refreshRealitySelfImprovement();
-  else el('privateSelfImprovementStatus').textContent=
-   'Sign in to inspect verified owner work. No model action is authorized.';
+  else{
+   realityOriginal143Eligible=false;
+   el('privateContinueOriginal143').disabled=true;
+   el('privateSelfImprovementStatus').textContent=
+    'Sign in to inspect original verified work. No model action is authorized.';
+  }
  }
  function bubble(role,text){
   const node=document.createElement('div');
