@@ -59,7 +59,10 @@ begin
   event_id=p_goal_transition_event_id and
   continuity_root_id=p_continuity_root_id and
   worldline_id=p_worldline_id and
-  payload->>'command'='AUTHORITATIVE_USER_GOAL_TRANSITION')
+  payload->>'event_type'='AUTHORITATIVE_USER_GOAL_TRANSITION' and
+  payload->>'authorized_by'='AUTHENTICATED_USER_EXPLICIT_GOAL_COMMAND' and
+  payload->>'principal_id'=p_owner_id::text and
+  payload->>'goal_id'=p_goal_id)
  then raise exception 'GOVERNED_BUILD_GOAL_TRANSITION_EVIDENCE_MISSING'; end if;
  insert into reality_internal.governed_build_queue_v1
  (owner_id,conversation_id,goal_id,goal_transition_event_id,goal_revision,
