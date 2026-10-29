@@ -1,6 +1,6 @@
 // Trusted no-secret CI sandbox. Candidate bytes are copied as inert data on
 // host, NEVER executed on host. Only no-network Docker evaluates model source.
-import {mkdtempSync,cpSync,existsSync,readFileSync,writeFileSync,mkdirSync,rmSync}
+import {mkdtempSync,cpSync,existsSync,readFileSync,writeFileSync,mkdirSync,rmSync,chmodSync}
  from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
@@ -61,6 +61,9 @@ export function createIsolatedDockerSandbox({workspace,image,spawn=spawnSync,
    if(existsSync(join(workspace,file.path)))
     deny('FOUNDATION_CANNOT_OVERWRITE_BASE_SOURCE');
   const root=mkdtempSync(join(tmpdir(),'reality-isolated-'));
+  // mkdtemp creates a 0700 directory; the container's unprivileged UID
+  // must be able to read the mounted sandbox WITHOUT becoming root.
+  chmodSync(root,0o755);
   try{
    for(const dir of ['src','test'])
     cpSync(join(workspace,dir),join(root,dir),{recursive:true});
