@@ -36,6 +36,7 @@ export async function createRealityLiveVercelUpgradeAdapters({
  const exactBranches=new Set([
   'experiment/reality-live-durable-adversarial-20261025',
   'feature/first-real-gap-to-generation-handoff-20261029',
+  'feature/first178-live-single-claim-execution-20261029',
  ]);
  if(env.VERCEL_ENV!=='preview'||!exactBranches.has(env.VERCEL_GIT_COMMIT_REF)||
    !/^[a-f0-9]{40}$/.test(String(env.VERCEL_GIT_COMMIT_SHA||'')))
