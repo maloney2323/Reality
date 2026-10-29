@@ -1,0 +1,34 @@
+name: Reality — Isolated Governed Build Request Worker
+on:
+  push:
+    branches:
+      - reality/worker/foundational-build-queue-v1
+    paths:
+      - 'reality-requests/*.json'
+permissions:
+  contents: read
+jobs:
+  independently-discover-gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Reobserve actual public GitHub issue and original executor, no writes
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-governed-build-queue-worker-v1.mjs
+          node scripts/reality-governed-build-queue-worker-v1.mjs
+      - name: Preserve independently observed result, no owner authority
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-governed-build-discovery-${{ github.run_id }}
+          path: reality-worker-result/receipt.json
+          if-no-files-found: warn
+          retention-days: 14
