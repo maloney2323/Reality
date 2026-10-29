@@ -1762,10 +1762,44 @@ function wcUpgradeReviewHTML(){
     '<p class="wc-note">Next: '+esc(job.state==='PRIOR_ACTION_UNRESOLVED'?
      'Reconcile the earlier external action before diagnosing a missing capability.':
      'Restore the original confirmed goal and recovery checkpoint before reassessment.')+'</p>')+
+   (job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+    job.goal_still_current===true&&job.job_completed===false?
+    '<button type="button" data-upgrade-original143-continue="'+esc(job.work_id)+
+    '" data-upgrade-original143-conversation="'+esc(job.conversation_id)+
+    '">Continue verified original job · existing approval path</button>':'')+
    '<div class="wc-recovery-timeline" data-recovery-timeline="'+esc(job.work_id)+
    '" aria-live="polite"></div></article>';
  }).join('')+'</section>';
 }
+
+// Upgrades & improvements uses the SAME authenticated original-job endpoint
+// as Unfinished Work. Navigation performs only the established read-only GET;
+// exact owner approval remains a second, direct click in the existing card.
+$('wcTaskList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-upgrade-original143-continue]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.upgradeOriginal143Continue;
+ const conversationId=button.dataset.upgradeOriginal143Conversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+  !/^[0-9a-f-]{36}$/i.test(String(conversationId||''))||
+  $('privateReady')?.style.display!=='block')return;
+ button.disabled=true;
+ try{
+  await wcLoadUnfinishedWork();
+  const same=[...$('wcUnfinishedList').querySelectorAll('button[data-original143-prepare]')]
+   .find(node=>node.dataset.original143Prepare===workId&&
+    node.dataset.original143Conversation===conversationId);
+  if(!same)throw Error('ORIGINAL_143_UNFINISHED_WORK_VERIFICATION_REQUIRED');
+  same.scrollIntoView({behavior:'smooth',block:'center'});
+  same.focus();
+  same.click(); // existing read-only readiness handler; NOT owner approval
+ }catch(e){
+  const place=button.closest('article')?.querySelector('[data-recovery-timeline]');
+  if(place)place.textContent='Could not reverify original job: '+String(e.message||e)+
+   '. No upgrade, approval or settlement was attempted.';
+ }finally{button.disabled=false}
+});
+
 function wcRender(){
  $('wcDiscovered').textContent=String(wcWork.length);
  $('wcCategories').innerHTML=workCategories.map(([id,label,desc])=>{
