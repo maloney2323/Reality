@@ -197,6 +197,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <button id="privateNew" type="button">New conversation</button>
    <button id="privateSignOut" type="button">Sign out</button>
   </div>
+  <section aria-label="Reality self-improvement" style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
+   <strong>Reality · Self-Improvement</strong>
+   <p class="muted" id="privateSelfImprovementStatus" aria-live="polite">Checks signed-in Continuity for unfinished work. The model cannot approve or install upgrades.</p>
+   <button type="button" id="privateSelfImprovementRefresh">Inspect Reality's next work</button>
+   <p class="muted" style="font-size:11px">Read-only observation. Candidate generation, isolated testing, activation, and job settlement are not yet connected to the live self-improvement controller.</p>
+  </section>
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
    <strong>Confirmed user objective</strong>
    <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
@@ -2247,6 +2253,45 @@ setInterval(refreshSavedShiftHome,300000);
   }
   return id;
  }
+ let realitySelfImprovementLoading=false;
+ async function refreshRealitySelfImprovement(){
+  if(realitySelfImprovementLoading||el('privateReady').style.display==='none')return;
+  realitySelfImprovementLoading=true;
+  const button=el('privateSelfImprovementRefresh');
+  const line=el('privateSelfImprovementStatus');
+  button.disabled=true;
+  line.textContent='Reality is checking your actual confirmed goals and unfinished work…';
+  try{
+   const response=await fetch('/api/reality/personal-self-improvement',{
+    method:'GET',credentials:'same-origin',cache:'no-store'
+   });
+   const observed=await response.json();
+   if(!response.ok||observed.ok!==true)
+    throw Error(String(observed.error||'OWNER_SELF_IMPROVEMENT_READBACK_UNAVAILABLE'));
+   if(observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'){
+    line.textContent='Original unfinished work: '+observed.original_work_id+
+     '. Goal: '+String(observed.goal_title||'').slice(0,190)+
+     '. Reality\'s next required step: independently confirm what capability is missing. '+
+     'No model-generated upgrade, installed capability or final settlement has been proved.';
+   }else{
+    line.textContent=observed.status==='NO_VERIFIED_ELIGIBLE_WORK'?
+     'No eligible unfinished work verified in the inspected owner conversations. '+
+      'This does not prove there is no other work.':
+     'Unfinished-work discovery is incomplete or no work is eligible. Status: '+
+      String(observed.status||'UNKNOWN')+
+      '. No execution or model upgrade has occurred.';
+   }
+  }catch(error){
+   line.textContent='Could not independently verify self-improvement work: '+
+    String(error?.message||'READBACK_FAILED')+
+    '. No generated code, execution, or installation was attempted.';
+  }finally{
+   button.disabled=false;
+   realitySelfImprovementLoading=false;
+  }
+ }
+ el('privateSelfImprovementRefresh').onclick=refreshRealitySelfImprovement;
+
  function showSignedIn(yes){
   el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
   el('privateAccountState').textContent=yes?
@@ -2260,6 +2305,9 @@ setInterval(refreshSavedShiftHome,300000);
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
+  if(yes)void refreshRealitySelfImprovement();
+  else el('privateSelfImprovementStatus').textContent=
+   'Sign in to inspect verified owner work. No model action is authorized.';
  }
  function bubble(role,text){
   const node=document.createElement('div');
@@ -2495,6 +2543,9 @@ setInterval(refreshSavedShiftHome,300000);
    el('privatePrompt').value='';
    el('privateGoalCommand').value='';
    await loadSaved();await loadConversations();
+   // Refresh Reality's independently observed improvement queue after chat.
+   // This request remains GET-only and cannot start a model or authorize work.
+   void refreshRealitySelfImprovement();
    const reliability=data.reliability||{};
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
    const issues=reliability.semantic_issue_candidates?.length||0;
