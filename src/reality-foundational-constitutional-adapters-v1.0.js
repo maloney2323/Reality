@@ -102,7 +102,7 @@ export function createConstitutionalGenerationSandboxAdapters({
     foundational_artifact_sha256:candidate.artifact_sha256,
     independent_tests_passed:verified.passed,
     frozen_regression_passed:verified.passed,
-    governance_preserved:true,
+    governance_preserved:verified.passed,
     verifier_run_ref:verified.runner_receipt_ref,
     sandbox_source_hash:verified.report_hash,
     diagnostics:verified.passed?null:{
