@@ -24,7 +24,8 @@ const env={
  REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:'hvkfreoagbrphwghjajw',
  REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:url,
  REALITY_UNIVERSE_PERSISTENCE_KEY:'isolated-test-secret-key',
- REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'isolated-test-github-token-long-enough',
+ REALITY_STANDALONE_OPENAI_API_KEY:'isolated-test-model-secret-not-real',
+ REALITY_SEMANTIC_REVIEW_MODEL:'gpt-6',
 };
 const session={user_id:owner,config:{url,key:env.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY}};
 const scope=personalGoalScope({userId:owner,conversationId});
@@ -58,16 +59,19 @@ test('read-only readiness binds first job 178 to exact owner, not old #143',asyn
  assert.equal(result.installation_authorized,false);
  assert.equal(result.model_generated,false);
 });
-test('missing worker credential fails closed without a queue write',async()=>{
+test('model provider must be configured, GitHub write token is unnecessary',async()=>{
+ const missing={...env,REALITY_STANDALONE_OPENAI_API_KEY:''};
  const result=await inspectFirstUpgrade178({
+  session,conversationId,env:missing,readGoal,call:queueEmpty});
+ assert.equal(result.status,'BLOCKED_MODEL_PROVIDER_NOT_CONFIGURED');
+ await assert.rejects(()=>startFirstUpgrade178({
+  session,conversationId,env:missing,readGoal,
+  call:()=>{throw Error('UNEXPECTED_DB_CALL');},
+ }),/FIRST_PROOF_MODEL_PROVIDER_NOT_CONFIGURED/);
+ const withoutGitHubWriteToken=await inspectFirstUpgrade178({
   session,conversationId,env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:''},
   readGoal,call:queueEmpty});
- assert.equal(result.status,'BLOCKED_MISSING_ISOLATED_GITHUB_CREDENTIAL');
- await assert.rejects(()=>startFirstUpgrade178({
-  session,conversationId,
-  env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:''},readGoal,
-  call:()=>{throw Error('UNEXPECTED_WRITE')}
- }),/FIRST_PROOF_WORKER_PROVIDER_CREDENTIAL_UNAVAILABLE/);
+ assert.equal(withoutGitHubWriteToken.status,'READY_FOR_EXACT_OWNER_CONFIRMATION');
 });
 test('foreign or changed owner goal prevents any provider call',async()=>{
  let called=false;
@@ -90,7 +94,7 @@ test('existing queued different work cannot be silently reassigned to #178',asyn
  assert.equal(result.status,'BLOCKED_BY_DIFFERENT_QUEUED_WORK');
  assert.equal(result.installation_authorized,false);
 });
-test('exact owner action verifies provider, existing atomic queue, Continuity, and dispatch once',async()=>{
+test('original #178 source-linked once-only queue has no GitHub write or installation',async()=>{
  const called=[];let actualWork;
  const call=async(_db,name,args)=>{
   called.push(name);
@@ -103,37 +107,31 @@ test('exact owner action verifies provider, existing atomic queue, Continuity, a
    return {queue_id:queueId,original_work_id:actualWork,
     goal_id:args.p_goal_id,job_completed:false,installation_authorized:false};
   }
-  if(name==='reality_mark_governed_build_dispatched_v1'){
-   assert.equal(args.p_queue_id,queueId);
-   assert.equal(args.p_commit_sha,'b'.repeat(40));
-   return {queue_id:queueId,dispatched:true};
-  }
-  throw Error('UNEXPECTED_RPC');
+  throw Error('UNEXPECTED_RPC_'+name);
  };
- const observe=async({scope})=>({status:'INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED',
-  original_work_id:scope.original_work_id,goal_id:scope.goal_id,owner_id:scope.owner_id,
-  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647'});
+ const observe=async({scope,apiToken})=>{
+  assert.equal(apiToken,null,'public source must not require GitHub write credential');
+  return {status:'INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED',
+   original_work_id:scope.original_work_id,goal_id:scope.goal_id,owner_id:scope.owner_id,
+   provider_receipt_ref:'github:actions:run:40962921090:job:123760052647'};
+ };
  const persistWork=async({scope,providerEvidence})=>{
   assert.equal(scope.original_work_id,actualWork);
   assert.equal(providerEvidence.original_work_id,actualWork);
   return {receipt_id:'55555555-5555-4555-8555-555555555555',
    original_work_id:actualWork,verified_readback:true,installation_authorized:false};
  };
- const dispatch=async args=>{
-  assert.equal(args.original_work_id,actualWork);
-  assert.equal(args.issue_url,'https://github.com/maloney2323/Reality/issues/178');
-  return {worker_sha:'b'.repeat(40),request_path:'reality-requests/'+queueId+'.json'};
- };
  const r=await startFirstUpgrade178({
-  session,conversationId,env,readGoal,call,observe,dispatch,persistWork,
+  session,conversationId,env,readGoal,call,observe,persistWork,
  });
- assert.equal(r.status,'DISCOVERY_WORKER_DISPATCHED');
+ assert.equal(r.status,'QUEUED_DIRECT_CONSTITUTIONAL');
+ assert.equal(r.worker_dispatch_required,false);
  assert.equal(r.continuity_work_receipt_id,'55555555-5555-4555-8555-555555555555');
  assert.equal(r.original_work_id,actualWork);
  assert.equal(r.model_generated,false);
  assert.equal(r.installation_authorized,false);
  assert.deepEqual(called,['reality_read_governed_build_v1',
-  'reality_enqueue_governed_build_v1','reality_mark_governed_build_dispatched_v1']);
+  'reality_enqueue_governed_build_v1']);
 });
 test('unverified provider outcome cannot create work or bypass gate',async()=>{
  let writes=0;
@@ -145,8 +143,7 @@ test('unverified provider outcome cannot create work or bypass gate',async()=>{
  }),/FIRST_PROOF_EXACT_PROVIDER_GAP_NOT_PROVEN/);
  assert.equal(writes,0);
 });
-test('missing Continuity receipt aborts before external GitHub request',async()=>{
- let dispatchCalls=0;
+test('missing Continuity receipt aborts before any execution authority',async()=>{
  const observed=async({scope})=>({
   status:'INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED',
   original_work_id:scope.original_work_id,goal_id:scope.goal_id,owner_id:scope.owner_id,
@@ -160,9 +157,7 @@ test('missing Continuity receipt aborts before external GitHub request',async()=
     goal_id:args.p_goal_id,job_completed:false,installation_authorized:false};
   },
   persistWork:async()=>({verified_readback:false}),
-  dispatch:async()=>{dispatchCalls++;}
  }),/FIRST_PROOF_CONTINUITY_WORK_READBACK_FAILED/);
- assert.equal(dispatchCalls,0);
 });
 test('Work Center script parses and exact first proof has disabled-start + owner confirmation',()=>{
  const html=readFileSync('index.html','utf8');
