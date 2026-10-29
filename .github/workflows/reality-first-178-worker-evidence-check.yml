@@ -1,0 +1,49 @@
+name: Reality — Independent First Customer Missing Capability Discovery
+on:
+  push:
+    branches:
+      - reality/worker/foundational-build-queue-v1
+    paths:
+      - 'src/reality-first-178-github-gap-reader-v0.1.js'
+      - 'scripts/reality-governed-build-queue-worker-v1.mjs'
+      - '.github/workflows/reality-first-178-worker-evidence-check.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-real-provider-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Read actual pinned failed run, failed log, and frozen manifest
+        env:
+          GH_PROVIDER_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node --check src/reality-first-178-github-gap-reader-v0.1.js
+          node --input-type=module -e '
+          import {observePinnedReality178Failure} from "./src/reality-first-178-github-gap-reader-v0.1.js";
+          const evidence=await observePinnedReality178Failure({token:process.env.GH_PROVIDER_READ_TOKEN});
+          if(evidence.status!=="PINNED_178_MISSING_EXTENSION_INDEPENDENTLY_OBSERVED"||
+             evidence.owner_goal_verified!==false||
+             evidence.model_generated!==false||
+             evidence.installation_authorized!==false||
+             evidence.original_job_completed!==false||
+             !/^[a-f0-9]{64}$/.test(evidence.failed_log_sha256))
+           throw Error("REALITY_WORKER_REAL_GAP_EVIDENCE_UNVERIFIED");
+          console.log("REALITY_WORKER_REAL_GAP_EVIDENCE "+JSON.stringify({
+           status:evidence.status,
+           run:evidence.pinned_provider_run,
+           source:evidence.pinned_source_sha,
+           frozen_manifest_sha256:evidence.frozen_manifest_sha256,
+           failed_log_sha256:evidence.failed_log_sha256,
+           owner_goal_verified:false,model_generated:false,
+           installation_authorized:false,original_job_completed:false
+          }));
+          '
