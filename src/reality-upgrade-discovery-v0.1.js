@@ -2,6 +2,74 @@
 // This deterministic projection consumes ONLY server-reobserved evidence
 // and the existing Recovery v1 state. Never accept untrusted browser or LLM
 // text as an independent failure, a verified gap, or approval to mutate code.
+import {verifySelfImprovementJournal}
+ from './reality-governed-self-improvement-spine-v1.0.js';
+import {continueGovernedSelfImprovement}
+ from './reality-governed-self-improvement-driver-v1.0.js';
+
+// This is a connection to the existing constitutional driver, not another
+// self-upgrading state machine. A discovery is a hypothesis, never a warrant.
+// Only trusted adapters with independent provider readback can advance work.
+export async function continueVerifiedRealityUpgrade({
+ originalWorkId,discovery,state,adapters,maxTransitions=12,
+}={}){
+ if(!WORK.test(String(originalWorkId||''))||
+    state?.scope?.original_work_id!==originalWorkId)
+  fail('UPGRADE_CONTINUATION_ORIGINAL_WORK_CHANGED');
+ verifySelfImprovementJournal(state);
+ if(state.scope.target_environment!=='ISOLATED_PREVIEW')
+  fail('UPGRADE_CONTINUATION_PRODUCTION_NOT_ALLOWED');
+ if(discovery?.original_job_completed!==false||
+    discovery?.capability_installed!==false||
+    discovery?.authorization_granted!==false||
+    discovery?.sandbox_executed!==false)
+  fail('UPGRADE_CONTINUATION_UNTRUSTED_DISCOVERY');
+ if(discovery.status==='NO_NEW_UPGRADE_NEEDED')
+  return Object.freeze({status:'NO_UPGRADE_REQUIRED_CONTINUE_ORIGINAL_WORK',
+   original_work_id:originalWorkId,phase:state.phase,
+   original_job_completed:false,installation_authorized:false});
+ if(discovery.status==='DIAGNOSIS_REQUIRED'||
+    discovery.status==='REPAIR_EXISTING_CAPABILITY')
+  return Object.freeze({status:'INDEPENDENT_GAP_CONFIRMATION_REQUIRED',
+   original_work_id:originalWorkId,phase:state.phase,
+   original_job_completed:false,installation_authorized:false});
+ if(discovery.status!=='CAPABILITY_GAP_CANDIDATE'||
+    discovery.kind!=='MISSING_INSTRUMENT_NEEDS_INDEPENDENT_VERIFICATION'||
+    !/^[a-z][a-z0-9._-]{2,90}$/.test(String(discovery.needed_upgrade||''))||
+    !Array.isArray(discovery.evidence_refs)||!discovery.evidence_refs.length)
+  fail('UPGRADE_CONTINUATION_VERIFIED_DISCOVERY_REQUIRED');
+ if(!adapters||typeof adapters.observeMissingCapability!=='function'||
+    typeof adapters.verifyIndependentReceipt!=='function'||
+    typeof adapters.persistCheckpoint!=='function')
+  fail('UPGRADE_CONTINUATION_TRUSTED_ADAPTERS_REQUIRED');
+ if(state.phase==='DISCOVERING'){
+  const observe=adapters.observeMissingCapability;
+  adapters={...adapters,async observeMissingCapability(context){
+   const receipt=await observe(context);
+   if(receipt?.kind!=='GAP_CONFIRMED'||
+      receipt.capability_id!==discovery.needed_upgrade||
+      !Array.isArray(receipt.failure_refs)||!receipt.failure_refs.length||
+      !receipt.verification_suite_ref)
+    fail('UPGRADE_CONTINUATION_PROVIDER_GAP_NOT_CONFIRMED');
+   // The existing constitutional driver independently verifies this receipt,
+   // persists the transition, and reads back its hash before model generation.
+   return receipt;
+  }};
+ }else if(state.confirmed_gap?.capability_id!==discovery.needed_upgrade)
+  fail('UPGRADE_CONTINUATION_CAPABILITY_MISMATCH');
+ const result=await continueGovernedSelfImprovement({state,adapters,maxTransitions});
+ if(result?.state?.scope?.original_work_id!==originalWorkId)
+  fail('UPGRADE_CONTINUATION_DRIVER_SCOPE_CHANGED');
+ return Object.freeze({status:result.status,original_work_id:originalWorkId,
+  phase:result.state.phase,checkpoint_hash:result.state.head_hash,
+  correction_attempts:result.state.attempt_count,
+  owner_action_required:result.owner_action_required===true,
+  original_job_completed:result.original_job_completed===true,
+  // The authoritative state and the persisted, attested journal remain in the
+  // original constitutional driver; this layer never fabricates settlement.
+  driver:result});
+}
+
 export const REALITY_UPGRADE_DISCOVERY_VERSION='reality-upgrade-discovery-v0.1';
 const WORK=/^work:[a-f0-9]{32}$/;
 const CI=/^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/;
