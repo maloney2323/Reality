@@ -328,7 +328,7 @@ export function nextGovernedSelfImprovementAction(state){
 export function readGovernedSelfImprovementOrientation(state,evidence={}){
  verifySelfImprovementJournal(state);
  const agenda=buildRealitySelfQuestionAgenda({
-  evidence,phase:'CONVERSATION',limit:12,
+  evidence,phase:'CONVERSATION',limit:25,
  });
  const next=nextGovernedSelfImprovementAction(state);
  return freeze({
