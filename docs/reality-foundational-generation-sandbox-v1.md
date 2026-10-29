@@ -34,4 +34,4 @@ A real owner goal and actual unfinished job, such as original Reality #143, must
 
 **Status of this PR:** model-neutral core, replaceable provider, Docker adapter, local/CI adversarial tests. **Not yet** a live chat-triggered autonomous engineer, not an installed capability, and not a proven 7/7 original job.
 
-The sandbox refuses mutable checkouts: the independent runner must prove its Git HEAD exactly matches the ticket's verified 40-character base commit before any candidate code enters Docker.
+A model candidate is not considered eligible for owner review unless the independent frozen test suite includes Reality's constitutional spine regressions, and the no-secret runner actually passes them. The verified provider receipt remains separately required.\n\nThe sandbox refuses mutable checkouts: the independent runner must prove its Git HEAD exactly matches the ticket's verified 40-character base commit before any candidate code enters Docker.
