@@ -123,7 +123,8 @@ export async function readOwnerGovernedBuild({
  if(!validUuid(discovered?.original_conversation_id))
   return Object.freeze({phase:'NO_VERIFIED_ELIGIBLE_WORK',queued:false,
    completed:false,model_generated:false,sandbox_executed:false,
-   capability_installed:false,external_execution_authorized:false,
+   capability_installed:false,installation_authorized:false,
+   external_execution_authorized:false,
    production_changed:false});
  const eligible=discovered.status===
   'ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'&&
@@ -140,7 +141,8 @@ export async function readOwnerGovernedBuild({
    original_conversation_id:discovered.original_conversation_id,
    eligible_for_investigation:true,
    completed:false,model_generated:false,sandbox_executed:false,
-   capability_installed:false,external_execution_authorized:false,
+   capability_installed:false,installation_authorized:false,
+   external_execution_authorized:false,
    production_changed:false});
  if(!validUuid(result.queue_id)||result.original_work_id!==discovered.original_work_id)
   fail('GOVERNED_BUILD_READBACK_OWNER_SCOPE_MISMATCH');
