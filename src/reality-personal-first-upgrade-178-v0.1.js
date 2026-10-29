@@ -9,7 +9,12 @@ import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {readFreshPersonalGoalState} from './reality-personal-goal-readback-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
 import {privateChatConfig} from './reality-private-chat-auth-v0.1.js';
-import {createContinuitySpine} from './reality-continuity-spine-v2.0.js';
+import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
+ from './reality-continuity-spine-v2.0.js';
+import {createUniversePostgresPersistence}
+ from './reality-universe-postgres-persistence-v0.1.js';
+import {orderContinuityHistory}
+ from './reality-continuous-reliability-v0.1.js';
 import {observeFirstGapFromGithub,FIRST_GAP_PROOF}
  from './reality-first-gap-handoff-v0.1.js';
 import {dispatchGovernedBuildToIsolatedWorker}
@@ -108,10 +113,80 @@ export async function inspectFirstUpgrade178({
   return publicShape(scope,'BLOCKED_MISSING_ISOLATED_GITHUB_CREDENTIAL');
  return publicShape(scope,'READY_FOR_EXACT_OWNER_CONFIRMATION');
 }
+// The queue reservation is not itself an event in the owner's Continuity.
+// Append a source-linked observation to the SAME authenticated worldline,
+// then independently reconstruct and verify it before dispatch. No model
+// source, installation approval or settlement is represented by this event.
+export async function persistFirstUpgrade178Work({
+ scope,conversationId,providerEvidence,db,
+ createPersistence=createUniversePostgresPersistence,
+}={}){
+ if(!uuid(scope?.owner_id)||!uuid(conversationId)||
+    providerEvidence?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
+    providerEvidence.original_work_id!==scope.original_work_id||
+    providerEvidence.goal_id!==scope.goal_id||
+    providerEvidence.owner_id!==scope.owner_id)
+  fail('CONTINUITY_WORK_SOURCE_INVALID');
+ const store=createPersistence({...db});
+ const read=()=>store.reconstruct({continuityRootId:scope.continuity_root_id,
+  worldlineId:scope.worldline_id});
+ const id=continuityUuidFromSource('personal-first-customer-upgrade-178:'+
+   scope.owner_id+':'+conversationId+':'+scope.original_work_id);
+ const history=orderContinuityHistory(await read());
+ const matching=history.filter(x=>x.event_id===id);
+ const content={
+  version:'reality-personal-first-upgrade-178-v0.1',
+  original_work_id:scope.original_work_id,original_goal_id:scope.goal_id,
+  goal_transition_receipt_ref:scope.goal_transition_receipt_ref,
+  issue_number:178,issue_url:'https://github.com/maloney2323/Reality/issues/178',
+  pinned_red_run:providerEvidence.run_url,
+  gap_provider_receipt_ref:providerEvidence.provider_receipt_ref,
+  gap_evidence_hash:providerEvidence.evidence_hash,
+  status:'INVESTIGATION_APPROVED_GAP_WORK_NOT_COMPLETED',
+  installation_authorized:false,model_generated:false,
+  original_job_completed:false,production_changed:false,
+ };
+ if(matching.length>1)fail('CONTINUITY_WORK_DUPLICATE');
+ if(!matching.length){
+  const tail=history.at(-1);
+  if(!tail?.event_id||!tail?.lineage_hash||
+     !history.some(x=>x.event_id===scope.goal_transition_receipt_ref))
+    fail('CONTINUITY_GOAL_LINEAGE_MISSING');
+  const spine=createContinuitySpine({
+   continuityRootId:scope.continuity_root_id,
+   worldlineId:scope.worldline_id,subjectId:scope.owner_id,
+  });
+  const at=new Date().toISOString();
+  const node=appendContinuityNode({
+   spine,stage:'WORK',entityId:scope.original_work_id,eventId:id,
+   parentEventId:tail.event_id,priorLineageHash:tail.lineage_hash,
+   effectiveTime:at,assertionTime:at,epistemicStatus:'OBSERVED',
+   evidenceRefs:[content.issue_url,content.pinned_red_run],
+   payload:content,
+   provenance:{source:'reality-personal-first-upgrade-178-v0.1',
+    principal_id:scope.owner_id,conversation_id:conversationId},
+  });
+  await store.appendEvent({...node,entity_type:'personal_first_self_upgrade_customer_work'});
+ }
+ const verified=orderContinuityHistory(await read());
+ const event=verified.find(x=>x.event_id===id);
+ if(!event||event.entity_type!=='personal_first_self_upgrade_customer_work'||
+    event.payload?.original_work_id!==scope.original_work_id||
+    event.payload?.original_goal_id!==scope.goal_id||
+    event.payload?.goal_transition_receipt_ref!==scope.goal_transition_receipt_ref||
+    event.payload?.gap_evidence_hash!==providerEvidence.evidence_hash||
+    event.payload?.gap_provider_receipt_ref!==providerEvidence.provider_receipt_ref||
+    event.payload?.installation_authorized!==false||
+    event.payload?.original_job_completed!==false)
+   fail('CONTINUITY_WORK_READBACK_FAILED');
+ return Object.freeze({receipt_id:id,original_work_id:scope.original_work_id,
+  verified_readback:true,installation_authorized:false});
+}
 export async function startFirstUpgrade178({
  session,conversationId,env=process.env,
  readGoal=readFreshPersonalGoalState,call=rpc,
  observe=observeFirstGapFromGithub,dispatch=dispatchGovernedBuildToIsolatedWorker,
+ persistWork=persistFirstUpgrade178Work,
 }={}){
  const db=dbFor(session,env);
  if(!/^[a-f0-9]{40}$/.test(String(env.VERCEL_GIT_COMMIT_SHA||'')))
@@ -155,6 +230,17 @@ export async function startFirstUpgrade178({
     result.goal_id!==initial.goal_id||result.job_completed!==false||
     result.installation_authorized!==false)
   fail('DURABLE_QUEUE_RECEIPT_UNVERIFIED',503);
+ const third=await verifiedOwnerScope({session,conversationId,env,readGoal});
+ if(third.original_work_id!==initial.original_work_id||
+    third.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
+   fail('GOAL_CHANGED_BEFORE_CONTINUITY_WORK');
+ const workReceipt=await persistWork({scope:initial,conversationId,
+   providerEvidence:observed,db});
+ if(workReceipt?.verified_readback!==true||
+    workReceipt.original_work_id!==initial.original_work_id||
+    workReceipt.installation_authorized!==false||
+    !uuid(workReceipt.receipt_id))
+   fail('CONTINUITY_WORK_READBACK_FAILED',503);
  let dispatched=null;
  try{
   dispatched=await dispatch({queue_id:result.queue_id,
@@ -169,11 +255,13 @@ export async function startFirstUpgrade178({
    fail('WORKER_DISPATCH_READBACK_FAILED',503);
  }catch{
   return Object.freeze({...publicShape(initial,'QUEUED_DISPATCH_UNRESOLVED'),
-   queue_id:result.queue_id,provider_receipt_ref:observed.provider_receipt_ref,
+   queue_id:result.queue_id,continuity_work_receipt_id:workReceipt.receipt_id,
+   provider_receipt_ref:observed.provider_receipt_ref,
    do_not_retry:true,external_execution_authorized:false});
  }
  return Object.freeze({...publicShape(initial,'DISCOVERY_WORKER_DISPATCHED'),
-  queue_id:result.queue_id,worker_commit_sha:dispatched.worker_sha,
+  queue_id:result.queue_id,continuity_work_receipt_id:workReceipt.receipt_id,
+  worker_commit_sha:dispatched.worker_sha,
   provider_receipt_ref:observed.provider_receipt_ref,
   external_execution_authorized:false});
 }
