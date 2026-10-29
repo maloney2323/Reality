@@ -13,7 +13,8 @@ import {createFoundationalModelGenerator}
 import {createIsolatedDockerSandbox,validateTrustedFrozenSuite}
  from '../src/reality-foundational-sandbox-adapter-v1.0.js';
 const sha=x=>createHash('sha256').update(x).digest('hex');
-const manifest=JSON.stringify({manifest_ref:'frozen-v1',tests:['test/frozen-baseline.test.js']});
+const manifest=JSON.stringify({manifest_ref:'frozen-v1',tests:[
+ 'test/frozen-baseline.test.js','test/reality-governed-self-improvement-spine-v1.0.test.js']});
 const scope={owner_id:'owner:verified',goal_id:'user-goal:durable',
  goal_transition_receipt_ref:'universe:goal-receipt',
  goal_evidence_ref:'supabase:verified-user-message',
@@ -40,7 +41,7 @@ const report=(c,pass=true,missing_dependency=null)=>({
  frozen_suite_sha256:ticket.frozen_regression_sha256,
  frozen_test_manifest_ref:ticket.frozen_regression_manifest_ref,
  frozen_test_count:2,frozen_test_pass_count:pass?2:1,
- exit_code:pass?0:1,test_results:[{passed:pass}],
+ exit_code:pass?0:1,test_results:[{passed:pass}],governance_tests_passed:pass,
  log_excerpt:pass?'# pass 2':'not ok 2 - authority regression',
  missing_dependency,runner_receipt_ref:'github:run:frozen:1'});
 function harness(sequence){
@@ -168,7 +169,8 @@ test('sandbox only runs candidate code in secret-free, read-only, no-network Doc
  const root=mkdtempSync(join(tmpdir(),'reality-foundation-test-'));
  try{
   for(const path of ['package.json','src/base.mjs','test/frozen-baseline.test.js',
-   'test/reality-frozen-regressions/frozen-v1.json']){
+   'test/reality-frozen-regressions/frozen-v1.json',
+   'test/reality-governed-self-improvement-spine-v1.0.test.js']){
    const file=join(root,path);mkdirSync(dirname(file),{recursive:true});
    writeFileSync(file,path.endsWith('.json')?
     path.includes('frozen-v1')?manifest:'{"type":"module"}':'export const x=true;');
