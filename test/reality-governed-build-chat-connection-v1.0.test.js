@@ -147,7 +147,7 @@ test('read-only GET returns exact scoped eligibility without any installation au
  assert.equal(r.original_work_id,work);
  assert.equal(r.eligible_for_investigation,true);
  assert.equal(r.completed,false);
- assert.equal(r.installation_authorized,undefined);
+ assert.equal(r.installation_authorized,false);
  assert.equal(r.capability_installed,false);
 });
 test('empty eligibility never fabricates a queue and a prior queue cannot claim model generation',async()=>{
