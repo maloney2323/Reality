@@ -28,6 +28,10 @@ jobs:
         run: |
           node --check src/reality-foundational-verified-regression-context-v1.0.js
           node --test test/reality-foundational-verified-regression-context-v1.0.test.js
+      - name: Verify same-ledger constitutional checkpoint and resumption identity
+        run: |
+          node --check src/reality-first-178-constitutional-continuity-checkpoint-v0.1.js
+          node --test test/reality-first-178-constitutional-continuity-checkpoint-v0.1.test.js
       - name: Verify exact owner job #178 admission and approval boundaries
         run: |
           node --check src/reality-personal-first-upgrade-178-v0.1.js
