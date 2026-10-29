@@ -1032,12 +1032,20 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
     '. No installation has been authorized.';
    return;
   }
-  button.textContent='Approve isolated activation and finish original #143';
+  const resume=report.existing_approved_reservation_verified===true&&
+   report.existing_approved_reservation_status==='RESERVED_UNDISPATCHED';
+  button.textContent=resume?
+   'Resume already-approved isolated activation · Finish original #143':
+   'Approve isolated activation and finish original #143';
   button.disabled=false;
   button.removeAttribute('data-original143-prepare');
   button.dataset.original143Activate=workId;
   button.dataset.original143Conversation=conversationId;
-  if(status)status.textContent=
+  button.dataset.original143Resume=String(resume);
+  if(status)status.textContent=resume?
+   'Prior approval and an unexecuted reservation independently verified. '+
+   'Resume this exact original #143 action without creating another reservation. '+
+   'No production change or GitHub write.':
    'Ready for YOUR explicit approval. Reality will register its verified executor, '+
    'reconcile the historical fix without GitHub writes, and record a final receipt. '+
    'The historical source was fixed earlier; Reality must not claim that repair.';
@@ -1054,10 +1062,15 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
  if(workId!=='work:24cda9611404e9bcb47909976067605c')return;
  // This explicit human click, following server-side independent readback, is
  // the only place a new exact owner activation request can originate.
+ const resuming=button.dataset.original143Resume==='true';
  const consent=window.confirm(
-  'Authorize Reality to activate the exact verified executor for original job #143 '+
-  'in the ISOLATED preview, consume one goal-bound reservation, execute read-only '+
-  'historical reconciliation, and save a final Continuity receipt?\n\n'+
+  (resuming?
+    'Resume the EXACT prior owner-approved reservation for original job #143? '+
+    'Reality will not claim a second reservation. ':
+    'Authorize Reality to activate the exact verified executor for original job #143 '+
+    'and claim one single-use goal-bound reservation? ')+
+  'In the isolated preview only, run read-only historical reconciliation and '+
+  'save the final independently verified Continuity receipt.\n\n'+
   'No production changes, GitHub writes, or original-issue closure. '+
   'The historical source fix predates this activation.'
  );
@@ -1085,10 +1098,39 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
   void wcLoadCompletionReports();
   void wcLoadUnfinishedWork();
  }catch(e){
-  if(status)status.textContent=
-   'Activation or settlement not verified. '+String(e.message||e)+
-   '. Do NOT retry without fresh readback; the reservation may have been consumed.';
   button.disabled=true;
+  if(status)status.textContent='Activation outcome uncertain ('+
+   String(e.message||e)+'). Checking exact owner reservation and settlement · Read only…';
+  // Never replay a failed POST automatically. A verified, un-dispatched owner
+  // reservation may be resumed only after a new deliberate owner click.
+  try{
+   const check=await fetch('/api/reality/personal-original-full-loop?conversation_id='+
+    encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId),
+    {credentials:'same-origin',cache:'no-store'});
+   const current=await check.json();
+   if(!check.ok||current.ok!==true||current.original_work_id!==workId)
+    throw Error('READBACK_UNAVAILABLE');
+   if(current.full_original_job_completed===true&&current.final_settlement_receipt_id){
+    if(status)status.textContent='Original #143 has verified final settlement receipt '+
+     current.final_settlement_receipt_id+'. No second action needed.';
+    button.textContent='Original job settled · Verified receipt';
+   }else if(current.exact_owner_action_available===true&&
+     current.existing_approved_reservation_verified===true&&
+     current.existing_approved_reservation_status==='RESERVED_UNDISPATCHED'){
+    button.dataset.original143Resume='true';
+    button.textContent='Resume already-approved isolated activation · Finish original #143';
+    button.disabled=false;
+    if(status)status.textContent='Registration did not settle. Existing owner approval and '+
+     'an unexecuted reservation were independently verified. You may choose Resume '+
+     'once; Reality will not create another reservation. Earlier error: '+
+     String(e.message||e);
+   }else if(status)status.textContent='Activation outcome not verified. '+String(e.message||e)+
+    '. Current state: '+String(current.existing_approved_reservation_status||current.next_action||'UNKNOWN')+
+    '. Do not retry until a fresh read-only review verifies a safe action.';
+  }catch{
+   if(status)status.textContent='Activation outcome cannot be independently read back ('+
+    String(e.message||e)+'). No automatic retry. Refresh the original job to recheck.';
+  }
  }
 });
 
