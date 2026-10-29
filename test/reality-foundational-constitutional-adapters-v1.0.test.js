@@ -35,6 +35,7 @@ function setup(pass=true){
    production_write_permitted:false,frozen_suite_sha256:ticket.frozen_regression_sha256,
    frozen_test_manifest_ref:ticket.frozen_regression_manifest_ref,
    frozen_test_count:3,frozen_test_pass_count:pass?3:2,exit_code:pass?0:1,
+   governance_tests_passed:pass,
    test_results:[{passed:pass}],log_excerpt:pass?'# pass 3':'not ok 2 - missing check',
    runner_receipt_ref:'github:runner:independent'};
   const e=createSandboxEvidenceCandidate(ticket,ctx.candidate,report);
