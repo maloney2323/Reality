@@ -45,7 +45,7 @@ test('owner cannot replace confirmation with model output',async()=>{
 test('no write-capable GitHub connector imported or called',()=>{
  const source=readFileSync('src/reality-original-143-real-activation-v0.1.js','utf8');
  assert.match(source,/executeOriginalMaintenanceRepair/);
- assert.match(source,/get=githubGet/);
+ assert.match(source,/get=readPublicOriginal143GitHubEvidence/);
  assert.doesNotMatch(source,/githubPost|githubPut|githubWrite|githubPatch|gitPush/);
 });
 test('registration and settlement use real separate service-only atomic RPCs',()=>{

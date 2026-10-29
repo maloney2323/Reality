@@ -7,7 +7,7 @@ import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v
 import {createContinuitySpine,continuityUuidFromSource} from './reality-continuity-spine-v2.0.js';
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
-import {githubGet} from './reality-connector-github-v1.0.js';
+import {readPublicOriginal143GitHubEvidence} from './reality-original-143-public-evidence-v0.1.js';
 
 export const ORIGINAL_UPGRADE_STATUS_VERSION='reality-original-upgrade-readback-v0.1';
 export const ORIGINAL_WORK='work:24cda9611404e9bcb47909976067605c';
@@ -110,7 +110,7 @@ function decodeSource(response){
 export async function inspectAuthenticatedOriginalCapabilityReadiness({
  session,conversationId,workId,env=process.env,
  readGoal=readFreshPersonalGoalState,createPersistence=createUniversePostgresPersistence,
- get=githubGet,
+ get=readPublicOriginal143GitHubEvidence,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
     workId!==ORIGINAL_WORK||env.VERCEL_ENV!=='preview')
