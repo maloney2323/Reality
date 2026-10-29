@@ -1,0 +1,32 @@
+name: Reality Original #143 Real Atomic Activation Bridge
+on:
+  push:
+    branches:
+      - reality/fix/original-143-real-atomic-activation-20261028
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+    paths:
+      - 'src/reality-original-143-real-activation-v0.1.js'
+      - 'api/reality/personal-original-full-loop.js'
+      - 'supabase/migrations/20261028235500_reality_original_143_atomic_activation.sql'
+      - 'test/reality-original-143-real-activation-v0.1.test.js'
+      - '.github/workflows/reality-original-143-real-atomic-activation.yml'
+permissions:
+  contents: read
+jobs:
+  validate-actual-activation-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Real module/API syntax and owner-approval, isolation and settlement boundary tests
+        run: |
+          node --check src/reality-original-143-real-activation-v0.1.js
+          node --check api/reality/personal-original-full-loop.js
+          node --test test/reality-original-143-real-activation-v0.1.test.js
