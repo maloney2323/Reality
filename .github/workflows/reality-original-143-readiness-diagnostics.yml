@@ -1,0 +1,28 @@
+name: Reality Original #143 - Error Visibility
+on:
+  push:
+    branches:
+      - reality/fix/original-143-readiness-error-visibility-20261028
+  pull_request:
+    branches:
+      - experiment/reality-live-durable-adversarial-20261025
+    paths:
+      - api/reality/personal-original-full-loop.js
+      - test/reality-original-143-readiness-diagnostics.test.js
+      - .github/workflows/reality-original-143-readiness-diagnostics.yml
+permissions:
+  contents: read
+jobs:
+  test-readonly-readiness-errors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: |
+          node --check api/reality/personal-original-full-loop.js
+          node --test test/reality-original-143-readiness-diagnostics.test.js
+          node --test test/reality-original-143-real-activation-v0.1.test.js
