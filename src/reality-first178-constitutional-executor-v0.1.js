@@ -32,7 +32,8 @@ export async function executeFirst178Constitutional({
      'feature/first178-live-single-claim-execution-20261029'||
     !sha40(env.VERCEL_GIT_COMMIT_SHA)||
     !String(env.REALITY_STANDALONE_OPENAI_API_KEY||'').trim()||
-    !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim())
+    !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim()||
+    String(env.REALITY_FIRST178_GITHUB_READ_TOKEN||'').length<20)
    die('ISOLATED_RUNNER_NOT_CONFIGURED',503);
  const db=dbReader(session,env);
  const scope=await scopeReader({session,conversationId,env});
@@ -48,7 +49,7 @@ export async function executeFirst178Constitutional({
     queue.dispatch_commit_sha!=null||queue.dispatched_at!=null)
   die('OWNER_QUEUED_JOB_NOT_EXACTLY_CLAIMABLE');
  // Read the REAL pinned job again, independent of browser and model text.
- const initialEvidence=await observer({scope,apiToken:null});
+ const initialEvidence=await observer({scope,apiToken:env.REALITY_FIRST178_GITHUB_READ_TOKEN});
  if(initialEvidence?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
     initialEvidence.original_work_id!==scope.original_work_id||
     initialEvidence.goal_id!==scope.goal_id||
@@ -90,7 +91,7 @@ export async function executeFirst178Constitutional({
  const admitted=await claimConfirmedGap({
   scope,providerEvidence:initialEvidence,
   persistGap:checkpoint.persistGap,readBackGap:checkpoint.readBackGap,
-  reobserveProviderEvidence:()=>observer({scope,apiToken:null}),
+  reobserveProviderEvidence:()=>observer({scope,apiToken:env.REALITY_FIRST178_GITHUB_READ_TOKEN}),
  });
  if(admitted?.ticket?.original_work_id!==scope.original_work_id||
     admitted?.ticket?.goal_id!==scope.goal_id||
