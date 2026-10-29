@@ -179,7 +179,8 @@ test('sandbox only runs candidate code in secret-free, read-only, no-network Doc
    return {status:0,stdout:'TAP version 13\n# tests 2\n# pass 2\n# fail 0\n',stderr:''};
   };
   const run=createIsolatedDockerSandbox({workspace:root,
-   image:'node@sha256:'+'a'.repeat(64),spawn});
+   image:'node@sha256:'+'a'.repeat(64),spawn,
+   readBaseSha:()=>ticket.repository_base_sha});
   const result=await run({ticket,candidate:candidate(),attempt:1,
    frozen_suite_ref:'frozen-v1',network_permitted:false,secrets_permitted:false});
   assert.equal(result.exit_code,0);assert.equal(result.frozen_test_count,2);
@@ -190,5 +191,21 @@ test('sandbox only runs candidate code in secret-free, read-only, no-network Doc
    assert.ok(c.args.includes('--read-only'));
    assert.ok(!Object.keys(c.opts.env).some(k=>/TOKEN|SECRET|GITHUB|OPENAI/.test(k)));
   }
+ }finally{rmSync(root,{recursive:true,force:true})}
+});
+test('sandbox refuses even well-tested source if the base repository SHA moves',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'reality-base-sha-'));
+ try{
+  for(const p of ['package.json','src/base.mjs','test/base.test.js']){
+   const target=join(root,p);mkdirSync(dirname(target),{recursive:true});
+   writeFileSync(target,'{}');
+  }
+  const runner=createIsolatedDockerSandbox({workspace:root,
+   image:'node@sha256:'+'f'.repeat(64),
+   readBaseSha:()=> 'c'.repeat(40),
+   spawn:()=>{throw Error('SANDBOX_SHOULD_NOT_EXECUTE')}});
+  await assert.rejects(runner({ticket,candidate:candidate(),attempt:1,
+   frozen_suite_ref:'frozen-v1',network_permitted:false,secrets_permitted:false}),
+   /FOUNDATION_SANDBOX_BASE_COMMIT_CHANGED/);
  }finally{rmSync(root,{recursive:true,force:true})}
 });
