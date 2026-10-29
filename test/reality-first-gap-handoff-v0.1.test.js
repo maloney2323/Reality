@@ -165,3 +165,129 @@ test('provider reobservation required after initial evidence before any continui
  }),/FIRST_GAP_INDEPENDENT_REOBSERVATION_REQUIRED/);
  assert.equal(persisted,0);
 });
+
+test('one constitutional driver takes real-gap ticket through model and independent sandbox to owner gate only',async()=>{
+ const {createFoundationalBuildTicket}=await import('../src/reality-foundational-build-loop-v1.0.js');
+ const {createSandboxEvidenceCandidate}=await import('../src/reality-foundational-build-loop-v1.0.js');
+ const ticket=createFoundationalBuildTicket({
+  owner_id:scope.owner_id,goal_id:scope.goal_id,
+  original_work_id:scope.original_work_id,
+  goal_transition_receipt_ref:scope.goal_transition_receipt_ref,
+  goal_evidence_ref:scope.goal_evidence_ref,
+  continuity_root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
+  confirmed_gap_receipt_ref:'continuity:confirmed:first-178',
+  confirmed_gap_evidence_hash:'d'.repeat(64),
+  confirmed_gap_source:'INDEPENDENT_PROVIDER_READBACK',
+  frozen_regression_manifest_ref:p.manifest_ref,
+  frozen_regression_sha256:p.manifest_sha256,
+  repository_base_sha:p.run_head_sha,
+  allowed_source_roots:['src/reality-extensions/','test/reality-extensions/'],
+  environment:'ISOLATED_PREVIEW',max_attempts:3,
+ });
+ const admitted={proof:'OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK',
+  ticket,gap_continuity_receipt_id:ticket.confirmed_gap_receipt_ref,
+  provider_evidence_hash:ticket.confirmed_gap_evidence_hash,
+  model_generated:false,installation_authorized:false,
+  original_job_completed:false};
+ let generate=0,sandbox=0;
+ const verifiedEvidence=new Map();
+ const gapProof=state=>{
+  const receipt={kind:'GAP_CONFIRMED',
+   owner_id:ticket.owner_id,goal_id:ticket.goal_id,
+   original_work_id:ticket.original_work_id,
+   continuity_root_id:ticket.continuity_root_id,
+   worldline_id:ticket.worldline_id,
+   evidence_ref:ticket.confirmed_gap_receipt_ref,
+   evidence_hash:ticket.confirmed_gap_evidence_hash,
+   capability_id:'reality.ci-failure-evidence-v1',
+   failure_refs:['https://github.com/maloney2323/Reality/actions/runs/'+p.run_id],
+   verification_suite_ref:ticket.frozen_regression_manifest_ref};
+  verifiedEvidence.set(receipt.evidence_ref,{evidence_hash:receipt.evidence_hash,
+   scope_hash:state.checkpoint_hash,
+   // the verifier below establishes state.scope_hash from its own request
+  });
+  return receipt;
+ };
+ const adapters={
+  observeMissingCapability:async ctx=>gapProof(ctx),
+  modelGenerate:async ctx=>{
+   generate++;
+   assert.equal(ctx.execution_authority,false);
+   assert.equal(ctx.ticket.original_work_id,ticket.original_work_id);
+   return {ticket_hash:ticket.ticket_hash,original_work_id:ticket.original_work_id,
+    files:[
+     {path:'src/reality-extensions/reality-ci-failure-evidence.mjs',
+      content:'export function classifyVerifiedCiFailure(){return {decision:"INSUFFICIENT_EVIDENCE"}}'},
+     {path:'test/reality-extensions/ci-evidence.test.js',
+      content:'import test from "node:test";test("foundation",()=>{});'},
+    ],rationale:'Provider-backed first capability candidate',
+    model_response_id:'response:isolated-model-only'};
+  },
+  isolatedSandbox:async ({candidate})=>{
+   sandbox++;
+   const report={ticket_hash:ticket.ticket_hash,
+    artifact_sha256:candidate.artifact_sha256,
+    environment:'ISOLATED_NO_SECRET_CONTAINER',network_disabled:true,
+    secrets_mounted:false,production_write_permitted:false,
+    frozen_suite_sha256:ticket.frozen_regression_sha256,
+    frozen_test_manifest_ref:ticket.frozen_regression_manifest_ref,
+    frozen_test_count:7,frozen_test_pass_count:7,exit_code:0,
+    governance_tests_passed:true,
+    test_results:[{kind:'FROZEN',passed:true},{kind:'MODEL',passed:true}],
+    log_excerpt:'# tests 7\\n# pass 7\\n# fail 0',
+    runner_receipt_ref:'isolated:sandbox:trusted-test'},
+    proof=createSandboxEvidenceCandidate(ticket,candidate,report);
+   verifiedEvidence.set('trusted:actual-sandbox:1',{
+     evidence_hash:proof.report_hash,runner:proof.runner_receipt_ref});
+   return report;
+  },
+  independentReadback:async req=>{
+   assert.equal(req.ticket_hash,ticket.ticket_hash);
+   assert.equal(req.frozen_suite_sha256,ticket.frozen_regression_sha256);
+   return {...req,independent_provider_readback:true,
+    attestation_ref:'trusted:actual-sandbox:1'};
+  },
+  verifyIndependentReceipt:async req=>{
+   const rec=req.receipt;
+   const trust=verifiedEvidence.get(rec.evidence_ref);
+   if(!trust||rec.evidence_hash!==trust.evidence_hash)return {verified:false};
+   if(rec.kind==='SANDBOX_VERIFIED'&&
+      (rec.artifact_hash!==req.candidate_hash||
+       !rec.independent_tests_passed))return {verified:false};
+   return {verified:true,independent_provider_readback:true,
+    evidence_ref:rec.evidence_ref,evidence_hash:rec.evidence_hash,
+    original_work_id:ticket.original_work_id,
+    scope_hash:req.scope_hash,
+    attestation_ref:'trusted:readback:'+rec.evidence_ref};
+  },
+  persistCheckpoint:async state=>{
+   assert.equal(state.scope.original_work_id,ticket.original_work_id);
+   assert.equal(state.scope.goal_id,ticket.goal_id);
+   return {persisted:true,independent_readback_verified:true,
+    checkpoint_hash:state.head_hash,
+    original_work_id:ticket.original_work_id};
+  },
+ };
+ const r=await generateAfterTrustedGap({
+  admitted,adapters,verifiedGovernanceReleaseSha:'b'.repeat(40)});
+ assert.equal(r.status,'OWNER_APPROVAL_REQUIRED');
+ assert.equal(r.state.phase,'AWAITING_OWNER_APPROVAL');
+ assert.equal(r.state.scope.original_work_id,ticket.original_work_id);
+ assert.equal(generate,1);assert.equal(sandbox,1);
+ assert.equal(r.state.registration,null);
+ assert.equal(r.state.resumption,null);
+ assert.equal(r.state.settlement,null);
+ assert.equal(r.owner_approval_required,true);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.capability_installed,false);
+ assert.equal(r.original_job_completed,false);
+});
+test('constitutional generation refuses incomplete admission before calling model',async()=>{
+ let calls=0;
+ await assert.rejects(()=>generateAfterTrustedGap({
+  admitted:{proof:'MODEL_SAYS_GAP_CONFIRMED'},
+  adapters:{modelGenerate:async()=>{calls++}},
+  verifiedGovernanceReleaseSha:'b'.repeat(40),
+ }),/FIRST_GAP_NO_TRUSTED_TICKET/);
+ assert.equal(calls,0);
+});
