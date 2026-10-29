@@ -156,7 +156,7 @@ export async function observeFirstGapFromGithub({
  if(source?.encoding!=='base64'||typeof source.content!=='string'||
     source.path!==p.manifest_path||source.size>10000)
   fail('FROZEN_PROVIDER_MANIFEST_INVALID');
- const manifest=Buffer.from(source.content.replace(/\\s/g,''),'base64').toString('utf8');
+ const manifest=Buffer.from(source.content.replace(/\s/g,''),'base64').toString('utf8');
  return attestFirstGapProviderSnapshot({
   scope,run,jobs:jobPage.jobs,log,manifest,
  });
