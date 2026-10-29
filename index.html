@@ -967,6 +967,11 @@ function wcUnfinishedHTML(job){
    '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
  const upgradeJump='<button type="button" data-wc-upgrade-jump="'+esc(job.work_id)+
   '">Review upgrade discovery in categories</button>';
+ const original143Activation=job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
+   job.job_completed===false?
+  '<button type="button" data-original143-prepare="'+esc(job.work_id)+
+   '" data-original143-conversation="'+esc(job.conversation_id)+
+   '">Review Reality original job activation · Read only</button>':'';
  const verifyFix=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
   job.goal_still_current===true&&
   job.work_id==='work:24cda9611404e9bcb47909976067605c'?
@@ -981,13 +986,105 @@ function wcUnfinishedHTML(job){
   '<p><strong>Remaining work:</strong> Diagnose, repair and independently verify the original job.</p>'+
   '<p class="wc-note">'+esc(job.next_step||'Review the original evidence.')+'</p>'+
   '<p class="wc-note">Upgrade diagnosis and capability recommendations are in <strong>Upgrades & improvements</strong>. The original job stays open.</p>'+
-  '<div class="wc-unfinished-actions">'+upgradeJump+verifyFix+action+checkRepair+link+'</div>'+
+  '<div class="wc-unfinished-actions">'+upgradeJump+verifyFix+original143Activation+action+checkRepair+link+'</div>'+
   (job.recovery_receipt_id?
    '<p class="wc-note">Recovery receipt saved and restored. This has not executed the repair.</p>':'')+
   '<p class="wc-note" role="status" data-unfinished-feedback="'+esc(job.work_id)+'"></p>'+
   '<div class="wc-note" data-recovery-status="'+esc(job.work_id)+'" aria-live="polite"></div>'+
   '</article>';
 }
+// Original Reality customer job #143: review, then owner-only activation.
+// No model or background task can invoke this action. Nothing is installed by
+// opening the Unfinished Work card or by refreshing discovery.
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-original143-prepare]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.original143Prepare;
+ const conversationId=button.dataset.original143Conversation;
+ const status=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ if(workId!=='work:24cda9611404e9bcb47909976067605c'||
+  !/^[0-9a-f-]{36}$/i.test(conversationId))return;
+ button.disabled=true;
+ if(status)status.textContent='Checking original goal, verified GitHub source and owner registry…';
+ try{
+  const url='/api/reality/personal-original-full-loop?conversation_id='+
+   encodeURIComponent(conversationId)+'&work_id='+encodeURIComponent(workId);
+  const response=await fetch(url,{cache:'no-store',credentials:'same-origin'});
+  const report=await response.json();
+  if(!response.ok||report.ok!==true)
+   throw Error(String(report.error||'ACTIVATION_READBACK_UNAVAILABLE'));
+  if(report.full_original_job_completed===true){
+   if(status)status.textContent='Original job already has verified settlement. Refresh ending receipts.';
+   return;
+  }
+  if(report.exact_owner_action_available!==true||
+     report.github_verified!==true||
+     report.preexisting_owner_evidence_acceptance_verified!==true){
+   if(status)status.textContent='Original job is still blocked: '+
+    String(report.next_action||'Missing verified prerequisite')+
+    '. No installation has been authorized.';
+   return;
+  }
+  button.textContent='Approve isolated activation and finish original #143';
+  button.disabled=false;
+  button.removeAttribute('data-original143-prepare');
+  button.dataset.original143Activate=workId;
+  button.dataset.original143Conversation=conversationId;
+  if(status)status.textContent=
+   'Ready for YOUR explicit approval. Reality will register its verified executor, '+
+   'reconcile the historical fix without GitHub writes, and record a final receipt. '+
+   'The historical source was fixed earlier; Reality must not claim that repair.';
+ }catch(e){
+  if(status)status.textContent='Activation readiness not proven: '+String(e.message||e);
+  button.disabled=false;
+ }
+});
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-original143-activate]');
+ if(!button||button.disabled)return;
+ const workId=button.dataset.original143Activate;
+ const conversationId=button.dataset.original143Conversation;
+ if(workId!=='work:24cda9611404e9bcb47909976067605c')return;
+ // This explicit human click, following server-side independent readback, is
+ // the only place a new exact owner activation request can originate.
+ const consent=window.confirm(
+  'Authorize Reality to activate the exact verified executor for original job #143 '+
+  'in the ISOLATED preview, consume one goal-bound reservation, execute read-only '+
+  'historical reconciliation, and save a final Continuity receipt?\n\n'+
+  'No production changes, GitHub writes, or original-issue closure. '+
+  'The historical source fix predates this activation.'
+ );
+ if(!consent)return;
+ const status=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ button.disabled=true;
+ if(status)status.textContent='Owner-approved isolated activation requested. Verifying receipt…';
+ try{
+  const response=await fetch('/api/reality/personal-original-full-loop',{
+   method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({conversation_id:conversationId,work_id:workId,
+    intent:'ACTIVATE_RESUME_SETTLE_ORIGINAL_143',
+    confirmation:'ACTIVATE_EXACT_VERIFIED_ISOLATED_CAPABILITY'}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+   result.full_original_job_completed!==true||
+   !result.settlement_receipt_id)
+   throw Error(String(result.error||'SETTLEMENT_NOT_INDEPENDENTLY_VERIFIED'));
+  if(status)status.textContent='Original job settled with verified receipt '+
+   result.settlement_receipt_id+
+   '. Historical fix was preexisting; no GitHub write or production change.';
+  button.textContent='Original job settled · Read-only receipt';
+  void wcLoadCompletionReports();
+  void wcLoadUnfinishedWork();
+ }catch(e){
+  if(status)status.textContent=
+   'Activation or settlement not verified. '+String(e.message||e)+
+   '. Do NOT retry without fresh readback; the reservation may have been consumed.';
+  button.disabled=true;
+ }
+});
+
 let wcUnfinishedReadSerial=0;
 async function wcLoadUnfinishedWork(){
  const panel=$('wcUnfinishedList'),status=$('wcUnfinishedStatus');
