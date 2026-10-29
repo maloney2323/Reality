@@ -201,7 +201,8 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <strong>Reality · Self-Improvement</strong>
    <p class="muted" id="privateSelfImprovementStatus" aria-live="polite">Checks signed-in Continuity for unfinished work. The model cannot approve or install upgrades.</p>
    <button type="button" id="privateSelfImprovementRefresh">Inspect Reality's next work</button>
-   <p class="muted" style="font-size:11px">Read-only observation. Candidate generation, isolated testing, activation, and job settlement are not yet connected to the live self-improvement controller.</p>
+   <button type="button" id="privateGovernedBuildQueue" disabled>Queue Reality's safe investigation</button>
+   <p class="muted" style="font-size:11px">Reality can now queue independently grounded work in owner-scoped Continuity. An authenticated request can trigger an isolated read-only GitHub discovery worker. The model cannot grant authority, install an upgrade, or finish the original job by itself.</p>
   </section>
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
    <strong>Confirmed user objective</strong>
@@ -2268,6 +2269,8 @@ setInterval(refreshSavedShiftHome,300000);
    const observed=await response.json();
    if(!response.ok||observed.ok!==true)
     throw Error(String(observed.error||'OWNER_SELF_IMPROVEMENT_READBACK_UNAVAILABLE'));
+   realityBuildEligible=observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION';
+   el('privateGovernedBuildQueue').disabled=!realityBuildEligible;
    if(observed.status==='ORIGINAL_JOB_IDENTIFIED_AWAITING_INDEPENDENT_GAP_OBSERVATION'){
     line.textContent='Original unfinished work: '+observed.original_work_id+
      '. Goal: '+String(observed.goal_title||'').slice(0,190)+
@@ -2289,8 +2292,57 @@ setInterval(refreshSavedShiftHome,300000);
    button.disabled=false;
    realitySelfImprovementLoading=false;
   }
+  if(realityBuildEligible)void refreshGovernedBuildStatus();
  }
  el('privateSelfImprovementRefresh').onclick=refreshRealitySelfImprovement;
+ let realityBuildEligible=false;
+ async function refreshGovernedBuildStatus(){
+  const button=el('privateGovernedBuildQueue');
+  try{
+   const r=await fetch('/api/reality/personal-governed-build',{
+    method:'GET',credentials:'same-origin',cache:'no-store'
+   });
+   const status=await r.json();
+   if(status.ok===true&&status.queued===true){
+    button.disabled=true;
+    const line=el('privateSelfImprovementStatus');
+    line.textContent+=' Queued build '+String(status.queue_id||'').slice(0,14)+
+     ', phase '+String(status.phase||'UNKNOWN')+
+     (status.dispatch_commit_sha?' — worker request commit recorded; inspect GitHub run evidence.':
+      ' — worker dispatch not yet confirmed.');
+   }else{
+    button.disabled=!realityBuildEligible;
+   }
+  }catch{
+   button.disabled=true;
+  }
+ }
+ el('privateGovernedBuildQueue').onclick=async()=>{
+  const button=el('privateGovernedBuildQueue');
+  if(!realityBuildEligible||button.disabled)return;
+  if(!window.confirm('Queue the verified original unfinished work for Reality to investigate under its confirmed goal? This can dispatch a GitHub read-only discovery worker on a separate experimental branch. It may inspect existing source and run the original read-only verifier. It does not approve installation, issue closure, or any production change.'))return;
+  button.disabled=true;
+  try{
+   const r=await fetch('/api/reality/personal-governed-build',{
+    method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'}),
+   });
+   const report=await r.json();
+   if(!r.ok||report.ok!==true||!report.queue_id)
+    throw Error(String(report.error||'QUEUE_NOT_CONFIRMED'));
+   el('privateSelfImprovementStatus').textContent=
+    'Reality recorded discovery queue '+report.queue_id+
+    ', phase '+report.phase+'. '+(report.worker_dispatch_started?
+     'Isolated GitHub discovery worker was dispatched. Readiness and final results must still be independently verified.':
+     'Worker dispatch blocked: '+String(report.dispatch_error||'NOT_AVAILABLE')+'.')+
+    ' No capability was installed and no original job was settled.';
+  }catch(e){
+   el('privateSelfImprovementStatus').textContent=
+    'Reality could not durably queue discovery: '+String(e.message||e)+
+    '. No model generation or installation was attempted.';
+   button.disabled=false;
+  }
+ };
 
  function showSignedIn(yes){
   el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
