@@ -11,6 +11,8 @@ import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {dispatchGovernedBuildToIsolatedWorker}
  from './reality-governed-build-github-dispatch-v1.0.js';
+import {observeGovernedBuildWorker}
+ from './reality-governed-build-worker-readback-v1.0.js';
 export const GOVERNED_BUILD_CHAT_CONNECTION_VERSION=
  'reality-governed-build-chat-connection-v1.0';
 const fail=(code,status=409)=>{throw Object.assign(Error(code),{status})};
@@ -117,6 +119,7 @@ export async function queueOwnerGovernedBuild({
 }
 export async function readOwnerGovernedBuild({
  session,env=process.env,inspect=inspectAuthenticatedSelfImprovement,call=rpc,
+ observeWorker=observeGovernedBuildWorker,
 }={}){
  const db=trust(session,env);
  const discovered=await inspect({session,env});
@@ -146,7 +149,11 @@ export async function readOwnerGovernedBuild({
    production_changed:false});
  if(!validUuid(result.queue_id)||result.original_work_id!==discovered.original_work_id)
   fail('GOVERNED_BUILD_READBACK_OWNER_SCOPE_MISMATCH');
- return Object.freeze({...result,queued:true,
+ // A run observed at the exact dispatch SHA is evidence that the isolated
+ // discovery worker ran. It is NOT a missing-capability attestation.
+ const workerObservation=result.dispatch_commit_sha&&result.request_path?
+  await observeWorker({queue:result,env}):null;
+ return Object.freeze({...result,queued:true,worker_observation:workerObservation,
   // A durable queue or worker commit is not a generated, tested or installed
   // upgrade. Future stages need independent receipts, not status guesses.
   completed:false,model_generated:false,sandbox_executed:false,
