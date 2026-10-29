@@ -51,3 +51,6 @@ The kernel is not yet connected as the live scheduler or personal chat execution
 10. No ChatGPT-written source repair during this trial. No production installation without separate authorization.
 
 **No 7/7 claim without all linked live receipts.**
+
+## Normal extension-only safety boundary
+The standard self-improvement candidate may change only src/reality-extensions/, test/reality-extensions/, and docs/. Core/API/security/authorization modifications require a distinct governed release outside the ordinary self-promotion flow.
