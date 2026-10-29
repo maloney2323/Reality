@@ -11,6 +11,9 @@ on:
       - 'api/reality/personal-original-full-loop.js'
       - 'supabase/migrations/20261028235500_reality_original_143_atomic_activation.sql'
       - 'test/reality-original-143-real-activation-v0.1.test.js'
+      - 'supabase/migrations/20261029205000_reality_original_143_safe_reservation_resume.sql'
+      - 'test/reality-original143-owner-approved-safe-resume-v1.test.js'
+      - 'index.html'
       - '.github/workflows/reality-original-143-real-atomic-activation.yml'
 permissions:
   contents: read
@@ -30,3 +33,4 @@ jobs:
           node --check src/reality-original-143-real-activation-v0.1.js
           node --check api/reality/personal-original-full-loop.js
           node --test test/reality-original-143-real-activation-v0.1.test.js
+          node --test test/reality-original143-owner-approved-safe-resume-v1.test.js
