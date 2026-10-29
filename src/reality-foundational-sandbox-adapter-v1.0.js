@@ -31,6 +31,8 @@ export function validateTrustedFrozenSuite(ticket,raw,root){
  for(const p of manifest.tests)
   if(!testPath(p)||!existsSync(join(root,p)))
    deny('FOUNDATION_FROZEN_TEST_NOT_IN_BASE');
+ if(!manifest.tests.includes('test/reality-governed-self-improvement-spine-v1.0.test.js'))
+  deny('FOUNDATION_CONSTITUTIONAL_FROZEN_REGRESSION_MISSING');
  return manifest;
 }
 export function createIsolatedDockerSandbox({workspace,image,spawn=spawnSync,
