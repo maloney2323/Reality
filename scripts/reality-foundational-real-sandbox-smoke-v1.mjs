@@ -41,6 +41,14 @@ const sandbox=createIsolatedDockerSandbox({workspace:process.cwd(),image});
 const report=await sandbox({ticket,candidate,attempt:1,
  frozen_suite_ref:ticket.frozen_regression_manifest_ref,
  network_permitted:false,secrets_permitted:false});
+if(!report.frozen_test_count||!report.governance_tests_passed){
+ console.error('REAL_NO_SECRET_CONTAINER_TEST_DIAGNOSTICS '+JSON.stringify({
+  exit_code:report.exit_code,frozen_tests:report.frozen_test_count,
+  frozen_pass:report.frozen_test_pass_count,
+  output:report.log_excerpt.slice(-5000),
+ }));
+ throw Error('FOUNDATION_REAL_CONTAINER_UNVERIFIED');
+}
 const evidence=createSandboxEvidenceCandidate(ticket,candidate,report);
 console.log(JSON.stringify({type:'REAL_CONTAINER_SANDBOX_INFRASTRUCTURE_ONLY',
  source_commit:commit,runner_receipt_ref:report.runner_receipt_ref,
