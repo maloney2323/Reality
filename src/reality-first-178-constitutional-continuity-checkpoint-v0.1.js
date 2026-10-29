@@ -17,7 +17,9 @@ import {orderContinuityHistory}
 export const REALITY_FIRST_178_CONTINUITY_CHECKPOINT_VERSION=
  'reality-first-178-constitutional-continuity-checkpoint-v0.1';
 const fail=(why)=>{throw Error('FIRST_178_CONTINUITY_'+why)};
-const jsonEqual=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const canon=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?
+ x.map(canon):Object.fromEntries(Object.keys(x).sort().map(k=>[k,canon(x[k])]));
+const jsonEqual=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
 const work=/^work:[a-f0-9]{32}$/;
 export function createFirst178ConstitutionalCheckpointService({
  session,conversationId,originalWorkId,db,env=process.env,
