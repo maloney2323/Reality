@@ -74,6 +74,9 @@ export async function continueGovernedSelfImprovement({
      remaining_attempts:current.attempt_limit-current.attempt_count,
      frozen_gap:current.confirmed_gap,
      previous_independent_failure:current.independent_failure,
+     // Original prior model candidate is untrusted. Its exact source stays
+     // paired with the independently verified failure for model correction.
+     previous_candidate:current.phase==='REPAIR_REQUIRED'?current.candidate:null,
      no_execution_authority:true,
     }));
     current=await committed(proposeGovernedCandidate(current,candidate),adapters);
