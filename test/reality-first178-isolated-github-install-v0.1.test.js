@@ -40,7 +40,7 @@ function fakeProvider(){
   if(method==='GET'&&p.includes('/git/trees/'))
    return respond({tree:[]});
   if(method==='POST'&&p.endsWith('/git/blobs')){
-   const sha=String.fromCharCode(102+blobs.size).repeat(40);
+   const sha='0123456789abcdef'[6+blobs.size].repeat(40);
    blobs.set(sha,options.body?JSON.parse(options.body).content:'');
    return respond({sha});
   }
