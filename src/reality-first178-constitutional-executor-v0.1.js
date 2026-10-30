@@ -98,13 +98,17 @@ export async function executeFirst178Constitutional({
   const secondRecovery=restored.state.phase==='ESCALATED'&&
    restored.state.attempt_count===5&&restored.state.attempt_limit===5&&
    restored.state.recovery_authorization?.verified===true;
-  const exhaustionRecovery=firstRecovery||secondRecovery;
+  const finalRecovery=restored.state.phase==='ESCALATED'&&
+   restored.state.attempt_count===7&&restored.state.attempt_limit===7&&
+   restored.state.recovery_continuation_authorization?.verified===true;
+  const exhaustionRecovery=firstRecovery||secondRecovery||finalRecovery;
   if(exhausted&&!exhaustionRecovery)die('NOT_REPAIRABLE_ORIGINAL_EXHAUSTION');
   const sandboxRecovery=restored.state.phase==='CANDIDATE_READY'&&
    restored.state.attempt_count===1;
   const laterCorrection=restored.state.phase==='REPAIR_REQUIRED'||
    (restored.state.phase==='CANDIDATE_READY'&&restored.state.attempt_count>1);
-  const rpcName=secondRecovery?'reality_reserve_first178_second_exhaustion_recovery_v1':
+  const rpcName=finalRecovery?'reality_reserve_first178_final_verified_draft_recovery_v1':
+   secondRecovery?'reality_reserve_first178_second_exhaustion_recovery_v1':
    firstRecovery?'reality_reserve_first178_exhaustion_recovery_v1':
    laterCorrection?'reality_reserve_first178_continuation_step_v1':
    sandboxRecovery?'reality_reserve_first178_candidate_sandbox_v1':
@@ -139,7 +143,7 @@ export async function executeFirst178Constitutional({
      (sandboxRecovery&&reserved.candidate_hash!==restored.state.candidate.artifact_hash)||
      (exhaustionRecovery&&(reserved.failure_evidence_ref!==
        restored.state.independent_failure.evidence_ref||
-       reserved.recovery_attempt_limit!==(secondRecovery?7:5)))||
+       reserved.recovery_attempt_limit!==(finalRecovery?8:secondRecovery?7:5)))||
      (laterCorrection&&(reserved.phase!==restored.state.phase||
        reserved.attempt_count!==restored.state.attempt_count))||
      reserved.installation_authorized!==false)
