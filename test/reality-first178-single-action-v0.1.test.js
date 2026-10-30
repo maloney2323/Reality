@@ -96,8 +96,21 @@ test('previous queued exact #178 continues without re-creating source work',asyn
  assert.equal(startCalls,0);
  assert.equal(executeCalls,1);
 });
+test('previously claimed GAP may continue once only through server recovery reservation',async()=>{
+ let execution=0;
+ const r=await runFirst178SingleAction({
+  session,conversationId,env,resolveOriginal:async()=>null,
+  inspect:async()=>({...scope,status:'ALREADY_QUEUED',
+   queue_id:queueId,queue_phase:'RUNNING_CONSTITUTIONAL'}),
+  start:async()=>{throw Error('MUST_NOT_CREATE_THIRD_JOB')},
+  execute:async()=>{execution++;return validated},
+ });
+ assert.equal(execution,1);
+ assert.equal(r.status,'AWAITING_OWNER_APPROVAL');
+ assert.equal(r.installation_authorized,false);
+});
 test('already claimed or awaiting approval never replays execution',async()=>{
- for(const phase of ['RUNNING_CONSTITUTIONAL','AWAITING_OWNER_APPROVAL',
+ for(const phase of ['AWAITING_OWNER_APPROVAL',
   'EXECUTION_UNRESOLVED','ESCALATED']){
   const result=await runFirst178SingleAction({
    session,conversationId,env,resolveOriginal:async()=>null,
@@ -144,7 +157,7 @@ test('one-click UI and single authenticated POST handler have working syntax',()
  assert.ok(html.includes('RUN_SAME_FIRST178_JOB_UNTIL_EXACT_INSTALL_APPROVAL'));
  assert.ok(!html.includes('wcFirstGap178ReadyConversation'));
  assert.match(html,/wcFirstGap178AutoResumeAttempted=true/);
- assert.match(html,/d\.queue_phase==='QUEUED_DISCOVERY'/);
+ assert.match(html,/\['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'\]/);
  assert.match(html,/Promise\.resolve\(\)\.then\(\(\)=>\{void wcFirstGap178Run\(\);\}\)/);
  assert.match(html,/async function wcFirstGap178Run\(\)/);
  const endpoint=readFileSync('api/reality/personal-first-upgrade-178-run.js','utf8');
