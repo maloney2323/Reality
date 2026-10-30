@@ -25,7 +25,7 @@ export function createFoundationalBuildTicket(input){
  assert(/^[a-f0-9]{64}$/.test(t.frozen_regression_sha256),'FOUNDATION_FROZEN_SUITE_HASH_INVALID');
  assert(/^[a-zA-Z0-9_-]{1,80}$/.test(t.frozen_regression_manifest_ref),'FOUNDATION_FROZEN_MANIFEST_REF_INVALID');
  assert(t.environment==='ISOLATED_PREVIEW','FOUNDATION_PRODUCTION_NOT_PERMITTED');
- assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&t.max_attempts<=5,
+ assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&t.max_attempts<=7,
   'FOUNDATION_FINITE_RETRY_BUDGET_REQUIRED');
  assert(t.confirmed_gap_source==='INDEPENDENT_PROVIDER_READBACK',
   'FOUNDATION_CONFIRMED_GAP_SOURCE_REQUIRED');
