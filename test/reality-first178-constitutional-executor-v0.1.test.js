@@ -211,6 +211,71 @@ test('claimed original job resumes the only verified gap under exactly one recov
   'reality_record_governed_build_178_v1']);
  assert.equal(h.calls.some(x=>x.name==='reality_claim_governed_build_178_v1'),false);
 });
+test('already claimed original #178 verifies existing generated candidate in sandbox only, never reclaims',async()=>{
+ const proposal={
+  phase:'CANDIDATE_READY',attempt_count:1,head_hash:'c'.repeat(64),
+  journal:[{kind:'GAP_CONFIRMED'},{kind:'MODEL_CANDIDATE_PROPOSED'}],
+  candidate:{artifact_hash:'d'.repeat(64)},scope:{original_work_id:work,goal_id:scope.goal_id}
+ };
+ let driveResumed=false;
+ const h=kit({
+  queue:{...queue,phase:'RUNNING_CONSTITUTIONAL'},
+  checkpointFactory:()=>({
+   readLatestCheckpoint:async()=>({verified:true,
+    original_work_id:work,checkpoint_hash:proposal.head_hash,
+    continuity_receipt_id:'99999999-9999-4999-8999-999999999999',
+    state:proposal}),
+   persistGap:async()=>({committed:true,receipt_id:'88888888-8888-4888-8888-888888888888'}),
+   readBackGap:async()=>({verified:true,evidence_hash:provider.evidence_hash,
+    provider_receipt_ref:provider.provider_receipt_ref}),
+   persistCheckpoint:async()=>({persisted:true,
+    independent_readback_verified:true,checkpoint_hash:hash,
+    original_work_id:work,
+    continuity_receipt_id:'99999999-9999-4999-8999-999999999999'}),
+  }),
+  call:async(_db,name,args)=>{
+   h.calls.push({name,args});
+   if(name==='reality_read_governed_build_v1')
+    return {...queue,phase:'RUNNING_CONSTITUTIONAL'};
+   if(name==='reality_reserve_first178_candidate_sandbox_v1'){
+    assert.equal(args.p_candidate_hash,proposal.candidate.artifact_hash);
+    assert.equal(args.p_checkpoint_hash,proposal.head_hash);
+    return {recovery_reserved:true,
+     sandbox_reservation_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+     claim_id:claimId,original_work_id:work,queue_id:queueId,
+     continuity_receipt_id:'99999999-9999-4999-8999-999999999999',
+     checkpoint_hash:proposal.head_hash,
+     candidate_hash:proposal.candidate.artifact_hash,
+     installation_authorized:false};
+   }
+   if(name==='reality_record_governed_build_178_v1')return {
+    recorded:true,phase:'AWAITING_OWNER_APPROVAL',queue_id:queueId,
+    checkpoint_hash:hash,
+    checkpoint_receipt_id:'99999999-9999-4999-8999-999999999999'};
+   throw Error('UNEXPECTED_CANDIDATE_RPC_'+name);
+  },
+  drive:async({resumeState,adapters})=>{
+   assert.equal(resumeState,proposal);
+   driveResumed=true;
+   const p=await adapters.persistCheckpoint({
+    scope:{original_work_id:work},head_hash:hash});
+   assert.equal(p.persisted,true);
+   return {status:'OWNER_APPROVAL_REQUIRED',
+    state:{head_hash:hash,scope:{original_work_id:work},
+     attempt_count:1,candidate:{artifact_hash:'d'.repeat(64)}},
+    installation_authorized:false,capability_installed:false,
+    original_job_completed:false};
+  },
+ });
+ const result=await executeFirst178Constitutional(h.options);
+ assert.equal(driveResumed,true);
+ assert.equal(result.status,'AWAITING_OWNER_APPROVAL');
+ assert.equal(result.installation_authorized,false);
+ assert.deepEqual(h.calls.map(x=>x.name),[
+  'reality_read_governed_build_v1',
+  'reality_reserve_first178_candidate_sandbox_v1',
+  'reality_record_governed_build_178_v1']);
+});
 test('claimed original job without independent checkpoint cannot reserve or rerun',async()=>{
  const h=kit({queue:{...queue,phase:'RUNNING_CONSTITUTIONAL'}});
  await assert.rejects(executeFirst178Constitutional(h.options),
