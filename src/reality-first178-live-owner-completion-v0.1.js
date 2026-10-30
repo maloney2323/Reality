@@ -17,6 +17,10 @@ import {createFirst178GithubInstallationProvider,verifyFirst178ScopedGithubWrite
  from './reality-first178-isolated-github-install-v0.1.js';
 import {describeOriginal178OwnerApproval,finishOriginal178AfterExactApproval}
  from './reality-first178-approved-completion-v0.1.js';
+import {createOriginal178CapabilityRegistry}
+ from './reality-first178-real-capability-registry-v0.1.js';
+import {createOriginal178VerifiedSettlement}
+ from './reality-first178-real-outcome-settlement-v0.1.js';
 const fail=x=>{throw Error('FIRST178_LIVE_OWNER_COMPLETION_'+x)};
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(x);
@@ -200,6 +204,8 @@ export async function runOriginal178OneApproval({
  checkpointFactory=createFirst178ConstitutionalCheckpointService,
  scopeReader=verifiedOwnerScope,dbReader=dbFor,
  githubFactory=createFirst178GithubInstallationProvider,
+ registryFactory=createOriginal178CapabilityRegistry,
+ settlementFactory=createOriginal178VerifiedSettlement,
  completion=finishOriginal178AfterExactApproval,
 }={}){
  if(env.VERCEL_ENV!=='preview'||env.VERCEL_GIT_COMMIT_REF!==
@@ -293,7 +299,8 @@ export async function runOriginal178OneApproval({
   });
  };
  let current=state;
- let github=null,installed=null,ci=null;
+ let github=null,installed=null,ci=null,registered=null,executed=null;
+ let registry=null,settlement=null;
  const provision=()=>{
   const approval=current.promotion_authorization;
   if(!approval||approval.consumed_once!==true)
