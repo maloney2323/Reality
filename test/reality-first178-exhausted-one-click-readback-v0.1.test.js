@@ -9,7 +9,7 @@ const work='work:9b9578b3c65427589c4c6da68fe0fc87';
 const goal='original:first178';
 const receipt='e12b7582-d148-5b64-98ff-bc18f8990054';
 const hash='e224238d7460ee04851b4884d965025e25ce4ec0bb75cf9cc77da5d865daf9d5';
-test('original #178 exhausted one-click job shows honest verified failure, does NOT call fresh GAP restore',async()=>{
+test('original #178 exhausted one-click job proves immutable repairable journal without reopening original claim',async()=>{
  let restored=0;let writings=0;
  const scope={owner_id:owner,original_work_id:work,goal_id:goal};
  const queue={queue_id:queueId,phase:'ESCALATED',
@@ -25,16 +25,24 @@ test('original #178 exhausted one-click job shows honest verified failure, does 
   scopeReader:async()=>scope,
   dbReader:()=>({}),
   call:async(_db,func)=>{assert.equal(func,'reality_read_governed_build_v1');writings++;return queue},
-  checkpointFactory:()=>{restored++;throw Error('MUST_NOT_RESTORE_ESCALATED_AS_GAP')},
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>{
+   restored++;
+   return {verified:true,original_work_id:work,checkpoint_hash:hash,
+    continuity_receipt_id:receipt,
+    state:{phase:'ESCALATED',attempt_count:3,attempt_limit:3,
+     independent_failure:{classification:{retry_source_without_dependency:true}}}};
+  }}),
  });
- assert.equal(restored,0);
+ assert.equal(restored,1);
  assert.equal(writings,1);
- assert.equal(view.status,'EXHAUSTED_CORRECTION_ATTEMPTS');
+ assert.equal(view.status,'GOVERNED_RECOVERY_READY');
+ assert.equal(view.additional_attempts,2);
  assert.equal(view.attempts_used,3);
  assert.equal(view.checkpoint_receipt_id,receipt);
  assert.equal(view.original_job_completed,false);
  assert.equal(view.installation_authorized,false);
- assert.equal(view.cannot_auto_retry_consumed_claim,true);
+ assert.equal(view.original_claim_preserved,true);
+ assert.equal(view.autonomous_recovery_eligible,true);
 });
 test('unverified exhausted database report fails closed rather than offering another run',async()=>{
  const scope={owner_id:owner,original_work_id:work,goal_id:goal};
