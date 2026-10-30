@@ -90,7 +90,8 @@ function kit(overrides={}){
   assert.equal(adapters.settleAndReobserve,undefined);
   assert.equal(typeof adapters.generation.generateCandidate,'function');
   assert.equal(typeof adapters.verifyIndependentReceipt,'function');
-  await adapters.persistCheckpoint({scope:{original_work_id:work}});
+  await adapters.persistCheckpoint({scope:{original_work_id:work},
+   head_hash:hash});
   return {status:'OWNER_APPROVAL_REQUIRED',
    state:{head_hash:hash,scope:{original_work_id:work},
     attempt_count:1,candidate:{artifact_hash:'d'.repeat(64)}},
