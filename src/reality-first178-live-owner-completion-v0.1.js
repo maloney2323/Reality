@@ -110,7 +110,7 @@ export async function original178OwnerApprovalView({
    last_failure_test_names:
     result.state.independent_failure?.attempt===result.state.attempt_count?
      [...String(result.state.independent_failure?.diagnostics?.output||'')
-      .slice(0,12000).matchAll(/^not ok [0-9]+ - ([^\\r\\n]{1,150})/gm)]
+      .slice(0,12000).matchAll(/^not ok [0-9]+ - (.{1,150})$/gm)]
       .slice(0,6).map(m=>m[1]):[],
    one_click_job_attempted:true,owner_approval_required:false,
    cannot_auto_retry_consumed_claim:true,
