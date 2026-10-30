@@ -268,7 +268,9 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button id="wcInspectFirstGap178" type="button">Refresh #178 status · Read only</button>
      <button id="wcStartFirstGap178" type="button">Run original #178 · One click</button>
+     <button id="wcApproveFirst178" type="button" style="display:none" disabled>Approve exact verified upgrade · Finish original #178</button>
     </div>
+    <p id="wcFirst178ApprovalStatus" role="status" aria-live="polite" class="wc-note">Reality will present one installation approval ONLY after the exact original candidate passes independent tests. No production installation.</p>
     <p id="wcFirstGap178Status" role="status" aria-live="polite" class="wc-note">One owner click starts the exact original #178 investigation, AI generation, and independent sandbox testing. This may consume model/sandbox credits. No capability installation, production change, or settlement is authorized.</p>
    </div>
   </section>
@@ -1162,6 +1164,95 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // One signed-in owner action for the SAME original #178 work.
 let wcFirstGap178Busy=false;
 let wcFirstGap178AutoResumeAttempted=false;
+let wcFirst178ApprovalReady=null;
+let wcFirst178CompletionBusy=false;
+let wcFirst178CompletionAutoStarted=false;
+async function wcReadOwnerApproval178(){
+ const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
+ if(!button||!status||$('privateReady')?.style.display!=='block')return;
+ button.disabled=true;button.style.display='none';
+ try{
+  const response=await fetch('/api/reality/personal-first-upgrade-178-approve',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const d=await response.json();
+  if(!response.ok||d.ok!==true)throw Error(String(d.error||'NOT_YET_VERIFIED'));
+  if(d.status==='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'&&
+     d.original_job_completed===true){
+   status.textContent='FINISHED original #178 · Settlement '+String(d.final_settlement_receipt_ref||'UNVERIFIED')+
+    ' · Original work '+String(d.original_work_id)+'.';
+   $('wcStartFirstGap178').style.display='none';return;
+  }
+  if(d.status==='AWAITING_EXACT_OWNER_APPROVAL'){
+   wcFirst178ApprovalReady=d;
+   $('wcStartFirstGap178').style.display='none';
+   if(d.install_connection_ready!==true){
+    status.textContent='Original #178 independently verified candidate '+String(d.candidate_artifact_hash)+
+     '. Installation is BLOCKED because the isolated GitHub installer connection is not configured. No approval consumed.';
+    return;
+   }
+   button.style.display='inline-block';button.disabled=false;
+   status.textContent='One approval is now available for verified candidate '+d.candidate_artifact_hash+
+    '. Approve to install to the ISOLATED preview, run the original frozen GitHub tests, and independently settle the same original #178 job. Production will not change.';
+   return;
+  }
+  if(d.status==='AUTOMATIC_COMPLETION_IN_PROGRESS'){
+   $('wcStartFirstGap178').style.display='none';
+   status.textContent='Original #178 owner approval already recorded. Reality is continuing the SAME installation, verification, and settlement. No new approval required.';
+   if(d.install_connection_ready&& !wcFirst178CompletionAutoStarted){
+    wcFirst178CompletionAutoStarted=true;
+    void wcCompleteFirst178({intent:'CONTINUE_SAME_ALREADY_APPROVED_178'},true);
+   }
+   return;
+  }
+  status.textContent='Original #178 phase: '+String(d.status||'UNVERIFIED')+'. No installation approved.';
+ }catch(error){
+  status.textContent='Verified owner completion not yet available: '+String(error?.message||'NO_RESULT')+
+   '. The saved original work and prior approvals are not changed.';
+ }
+}
+async function wcCompleteFirst178(payload,auto=false){
+ if(wcFirst178CompletionBusy)return;
+ const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
+ wcFirst178CompletionBusy=true;button.disabled=true;
+ status.textContent='Reality is executing the original #178 completion loop: provider installation → frozen test verification → original job → Continuity settlement. No further stage buttons required…';
+ try{
+  const r=await fetch('/api/reality/personal-first-upgrade-178-approve',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json();
+  if(!r.ok||d.ok!==true||d.status!=='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'||
+     d.original_job_completed!==true||d.independently_verified!==true)
+   throw Error(String(d.error||'EXTERNAL_EXECUTION_NOT_YET_RECONCILED'));
+  button.style.display='none';
+  status.textContent='VERIFIED COMPLETE · Original #178 '+d.original_work_id+
+   ' · GitHub execution '+String(d.executor_run_ref)+
+   ' · Continuity settlement '+String(d.settlement_receipt_ref)+
+   ' · Production unchanged.';
+ }catch(error){
+  status.textContent='Original #178 outcome still unverified: '+String(error?.message||'PROVIDER_UNRESOLVED')+
+   '. Do not create another job or approve again; prior authorization, if any, remains durable.';
+ }finally{
+  wcFirst178CompletionBusy=false;
+  if(!auto&&button.style.display!=='none')button.disabled=false;
+ }
+}
+$('wcApproveFirst178').onclick=()=>{
+ const d=wcFirst178ApprovalReady;
+ if(!d||d.status!=='AWAITING_EXACT_OWNER_APPROVAL'||
+    d.install_connection_ready!==true||!d.candidate_artifact_hash||
+    !d.checkpoint_receipt_id)return;
+ // This button itself is the explicit owner approval: no second confirmation
+ // dialog, no model-generated authority, no early approval.
+ void wcCompleteFirst178({
+  intent:'APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH',
+  owner_confirms_installation:true,
+  original_work_id:d.original_work_id,
+  candidate_artifact_hash:d.candidate_artifact_hash,
+  checkpoint_hash:d.checkpoint_hash,
+  checkpoint_receipt_id:d.checkpoint_receipt_id,
+ });
+};
+
 function wcFirstGap178Conversation(){
  const selected=$('privateConversations')?.value;
  const saved=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -1211,7 +1302,7 @@ async function wcInspectFirstGap178(){
  }catch(error){
   status.textContent='Cannot verify original #178: '+String(error?.message||'UNAVAILABLE')+
    '. No execution or installation performed.';
- }finally{button.disabled=false;}
+ }finally{button.disabled=false;void wcReadOwnerApproval178();}
 }
 $('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
 async function wcFirstGap178Run(){
@@ -1260,6 +1351,7 @@ async function wcFirstGap178Run(){
   wcFirstGap178Busy=false;
   $('wcStartFirstGap178').disabled=false;
   $('wcInspectFirstGap178').disabled=false;
+  void wcReadOwnerApproval178();
  }
 }
 $('wcStartFirstGap178').onclick=()=>{void wcFirstGap178Run();};
