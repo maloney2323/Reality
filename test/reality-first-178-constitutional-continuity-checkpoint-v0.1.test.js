@@ -70,7 +70,8 @@ function persisted(node){
   },
  }};
 }
-async function gap(){
+async function gap({evidenceRef='provider:trusted-gap:178',
+ evidenceHash='b'.repeat(64)}={}){
  const start=createGovernedSelfImprovement({scope});
  const receipt={kind:'GAP_CONFIRMED',owner_id:owner,
   goal_id:goalId,original_work_id:work,
@@ -79,8 +80,8 @@ async function gap(){
   capability_id:'reality.ci-failure-evidence-v1',
   failure_refs:[sourceEvent.payload.pinned_red_run],
   verification_suite_ref:'first-ci-evidence-gap-v1',
-  evidence_ref:'provider:trusted-gap:178',
-  evidence_hash:'b'.repeat(64),
+  evidence_ref:evidenceRef,
+  evidence_hash:evidenceHash,
  };
  return acceptGovernedObservation(start,receipt,{verifyProvider:async ctx=>({
   verified:true,independent_provider_readback:true,
@@ -210,4 +211,53 @@ test('model-asserted gap and foreign goal never get a durable source receipt',as
   }),/FIRST_178_CONTINUITY_PINNED_OWNER_GAP_INVALID/);
  }
  assert.equal(h.getWrites(),0);
+});
+
+test('one verified original GAP checkpoint restores with same hash and no new work',async()=>{
+ const h=harness();
+ const source={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(source);
+ const checkpoint=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:source.evidence_hash});
+ const recorded=await h.adapter.persistCheckpoint(checkpoint);
+ const writes=h.getWrites();
+ const restored=await h.adapter.readLatestCheckpoint();
+ assert.equal(restored.verified,true);
+ assert.equal(restored.original_work_id,work);
+ assert.equal(restored.checkpoint_hash,checkpoint.head_hash);
+ assert.equal(restored.continuity_receipt_id,recorded.continuity_receipt_id);
+ assert.equal(restored.state.phase,'GAP_CONFIRMED');
+ assert.equal(restored.state.attempt_count,0);
+ assert.equal(h.getWrites(),writes,'readback cannot write or claim');
+});
+test('already generated candidate cannot be restored as unaccepted GAP',async()=>{
+ const h=harness();
+ const src={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(src);
+ const checkpoint=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:src.evidence_hash});
+ await h.adapter.persistCheckpoint(checkpoint);
+ const candidate=proposeGovernedCandidate(checkpoint,{
+  rationale:'Generate model-authored candidate',
+  verification_plan_ref:'first-ci-evidence-gap-v1',
+  files:[
+   {path:'src/reality-extensions/reality-ci-failure-evidence.mjs',
+    content:'export const valid=()=>true'},
+   {path:'test/reality-extensions/valid.test.js',
+    content:'import test from "node:test";test("original",()=>{});'},
+  ],
+ });
+ await h.adapter.persistCheckpoint(candidate);
+ await assert.rejects(h.adapter.readLatestCheckpoint(),
+  /FIRST_178_CONTINUITY_RESTORE_EXACT_UNCONSUMED_GAP_REQUIRED/);
 });
