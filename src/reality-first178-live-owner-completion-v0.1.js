@@ -135,7 +135,7 @@ export async function original178OwnerApprovalView({
    cannot_auto_retry_consumed_claim:true,
    installation_authorized:false,original_job_completed:false,
    production_changed:false,
-   reason:'All three model candidates failed independent sandbox tests. '+
+   reason:'All '+String(result.state.attempt_count)+' recorded model candidates failed independent sandbox tests. '+
     'The original job is preserved but NOT completed.',
   });
  }
