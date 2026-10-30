@@ -1167,7 +1167,7 @@ let wcFirstGap178AutoResumeAttempted=false;
 let wcFirst178ApprovalReady=null;
 let wcFirst178CompletionBusy=false;
 let wcFirst178CompletionAutoStarted=false;
-let wcFirst178RecoveryAutoStarted=false;
+// Owner GET/Refresh is read-only; only the trusted dispatcher resumes #178.
 async function wcReadOwnerApproval178(){
  const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
  if(!button||!status||$('privateReady')?.style.display!=='block')return;
@@ -1188,10 +1188,8 @@ async function wcReadOwnerApproval178(){
    wcFirst178ApprovalReady=null;
    $('wcStartFirstGap178').style.display='none';
    status.textContent='Original #178: '+String(d.attempts_used)+' candidates failed. Reality independently verified this repairable failure and can continue the SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
-   if(!wcFirst178RecoveryAutoStarted){
-    wcFirst178RecoveryAutoStarted=true;
-    void wcFirstGap178Run();
-   }
+   // The server dispatcher runs the existing approved job. This observer
+   // MUST NOT turn a GET/Refresh into an executing POST.
    return;
   }
   if(d.status==='EXHAUSTED_CORRECTION_ATTEMPTS'&&
@@ -1221,10 +1219,8 @@ async function wcReadOwnerApproval178(){
   if(d.status==='AUTOMATIC_COMPLETION_IN_PROGRESS'){
    $('wcStartFirstGap178').style.display='none';
    status.textContent='Original #178 owner approval already recorded. Reality is continuing the SAME installation, verification, and settlement. No new approval required.';
-   if(d.install_connection_ready&& !wcFirst178CompletionAutoStarted){
-    wcFirst178CompletionAutoStarted=true;
-    void wcCompleteFirst178({intent:'CONTINUE_SAME_ALREADY_APPROVED_178'},true);
-   }
+   // Read-only status inspection never resumes installation or settlement.
+   // Phase 3 will connect previously approved work to a trusted server worker.
    return;
   }
   status.textContent='Original #178 phase: '+String(d.status||'UNVERIFIED')+'. No installation approved.';
@@ -1303,12 +1299,10 @@ async function wcInspectFirstGap178(){
    // #178 was explicitly authorized earlier and its original source-linked
    // work is already durable. The server re-verifies that original receipt and
    // atomically claims it. No model starts before the trusted single-use claim.
-   if(['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(d.queue_phase)&&
-      /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))&&
-      d.queue_id&&!wcFirstGap178AutoResumeAttempted){
-    wcFirstGap178AutoResumeAttempted=true;
-    status.textContent='Recovering the same verified original #178 checkpoint. Reality will not claim a second job or install without separate approval…';
-    Promise.resolve().then(()=>{void wcFirstGap178Run();});
+   if(['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL','ESCALATED'].includes(d.queue_phase)&&
+      /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))&&d.queue_id){
+    status.textContent='Original #178 remains in '+String(d.queue_phase)+
+      '. Trusted server-side dispatch owns execution; opening this view never launches a job.';
    }else{
     status.textContent=d.owner_approval_required===true&&d.queue_phase==='AWAITING_OWNER_APPROVAL'?
      'Original #178 has a verified candidate awaiting your SEPARATE installation approval. Checkpoint receipt: '+
