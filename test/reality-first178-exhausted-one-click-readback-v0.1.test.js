@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {original178OwnerApprovalView}
+ from '../src/reality-first178-live-owner-completion-v0.1.js';
+const owner='11111111-1111-4111-8111-111111111111';
+const cid='22222222-2222-4222-8222-222222222222';
+const queueId='33333333-3333-4333-8333-333333333333';
+const work='work:9b9578b3c65427589c4c6da68fe0fc87';
+const goal='original:first178';
+const receipt='e12b7582-d148-5b64-98ff-bc18f8990054';
+const hash='e224238d7460ee04851b4884d965025e25ce4ec0bb75cf9cc77da5d865daf9d5';
+test('original #178 exhausted one-click job shows honest verified failure, does NOT call fresh GAP restore',async()=>{
+ let restored=0;let writings=0;
+ const scope={owner_id:owner,original_work_id:work,goal_id:goal};
+ const queue={queue_id:queueId,phase:'ESCALATED',
+  original_work_id:work,goal_id:goal,
+  report:{state:'ESCALATED',checkpoint_receipt_id:receipt,
+   checkpoint_hash:hash,original_work_id:work,
+   installation_authorized:false,job_completed:false}};
+ const view=await original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>scope,
+  dbReader:()=>({}),
+  call:async(_db,func)=>{assert.equal(func,'reality_read_governed_build_v1');writings++;return queue},
+  checkpointFactory:()=>{restored++;throw Error('MUST_NOT_RESTORE_ESCALATED_AS_GAP')},
+ });
+ assert.equal(restored,0);
+ assert.equal(writings,1);
+ assert.equal(view.status,'EXHAUSTED_CORRECTION_ATTEMPTS');
+ assert.equal(view.attempts_used,3);
+ assert.equal(view.checkpoint_receipt_id,receipt);
+ assert.equal(view.original_job_completed,false);
+ assert.equal(view.installation_authorized,false);
+ assert.equal(view.cannot_auto_retry_consumed_claim,true);
+});
+test('unverified exhausted database report fails closed rather than offering another run',async()=>{
+ const scope={owner_id:owner,original_work_id:work,goal_id:goal};
+ await assert.rejects(original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>scope,dbReader:()=>({}),
+  call:async()=>({queue_id:queueId,original_work_id:work,goal_id:goal,
+   phase:'ESCALATED',report:{state:'ESCALATED',
+   checkpoint_receipt_id:receipt,checkpoint_hash:'f'.repeat(64),
+   original_work_id:work,installation_authorized:true,job_completed:false}}),
+ }),/FIRST178_LIVE_OWNER_COMPLETION_ESCALATED_QUEUE_DURABLE_RECEIPT_UNVERIFIED/);
+});
