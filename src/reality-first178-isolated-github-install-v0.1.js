@@ -96,9 +96,28 @@ export function createFirst178GithubInstallationProvider({
   if(!SHA40.test(baseCommit?.tree?.sha))fail('BASE_TREE_UNVERIFIED');
   // No source silently overwritten after someone else installed the job.
   const tree=await api('GET','/repos/'+REPO+'/git/trees/'+baseCommit.tree.sha+'?recursive=1',null,true);
-  for(const item of all)
-   if((tree?.tree||[]).some(e=>e.path===item.path))
-    fail('SOURCE_EXISTS_IN_ISOLATED_BRANCH_RECONCILE_FIRST');
+  const exists=all.filter(item=>(tree?.tree||[]).some(e=>e.path===item.path));
+  if(exists.length){
+   // An uncertain prior GitHub commit must be reconciled against ALL exact
+   // approved bytes, never retried as a second commit. No mixed-partial
+   // state can count as installed.
+   if(exists.length!==all.length)
+    fail('PARTIAL_INSTALL_REQUIRES_READ_ONLY_RECONCILIATION');
+   await independentlyReadSource(headSha,all);
+   return Object.freeze({
+    kind:'ISOLATED_GITHUB_SOURCE_INSTALLED',
+    repository:REPO,branch:BASE_BRANCH,
+    installed_commit_sha:headSha,source_base_sha:null,
+    artifact_hash:candidate.artifact_hash,
+    original_work_id:originalWorkId,capability_id:ORIGINAL,
+    frozen_source_sha:SOURCE_SHA,
+    provider_source_files:all.map(x=>x.path),
+    installation_authority_ref:approval.reservation_ref,
+    production_changed:false,
+    independently_verified:false,original_job_completed:false,
+    previously_installed_exact_bytes:true,
+   });
+  }
   const entries=[];
   for(const item of all){
    const blob=await api('POST','/repos/'+REPO+'/git/blobs',{
