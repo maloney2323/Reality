@@ -24,6 +24,18 @@ test('self diagnosis distinguishes failed repair from wrong browser conversation
  assert.equal(r.original_job_completed,false);
  assert.match(r.finding,/browser selected a different conversation/);
 });
+test('source-verified final regression leads to root-cause investigation, not another blind attempt',()=>{
+ const diagnosed=classifyFirst178Diagnosis({original,view:{
+  ...exhausted,last_failure_kind:'REGRESSION',
+  last_failure_next:'REPAIR_CODE_FROM_TEST_FAILURE',
+  last_failure_evidence_ref:'vercel:provider-verified:sbx_abc:cmd_xyz:cmd_end',
+ }});
+ assert.equal(diagnosed.last_failure_kind,'REGRESSION');
+ assert.equal(diagnosed.last_failure_next,'REPAIR_CODE_FROM_TEST_FAILURE');
+ assert.match(diagnosed.proposed_next_step,/why eight corrections failed/);
+ assert.equal(diagnosed.auto_retry_allowed,false);
+ assert.equal(diagnosed.original_job_completed,false);
+});
 test('canonical goal readback failure produces a diagnostic, not a fake missing job',async()=>{
  const r=await diagnoseOriginal178Self({
   resolve:async()=>original,
