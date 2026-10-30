@@ -300,18 +300,29 @@ export async function generateAfterTrustedGap({
      resumeState.journal[0].kind==='GAP_CONFIRMED'&&
      resumeState.candidate===null;
   const unverifiedCandidate=resumeState.phase==='CANDIDATE_READY'&&
-     resumeState.attempt_count===1&&
-     resumeState.journal.length===2&&
-     resumeState.journal[0].kind==='GAP_CONFIRMED'&&
-     resumeState.journal[1].kind==='MODEL_CANDIDATE_PROPOSED'&&
+     resumeState.attempt_count>=1&&
+     resumeState.attempt_count<=ticket.max_attempts&&
+     resumeState.journal.length===2*resumeState.attempt_count&&
+     resumeState.journal.at(-1).kind==='MODEL_CANDIDATE_PROPOSED'&&
      resumeState.candidate?.generated_by_model===true&&
      resumeState.candidate?.verified===false&&
      resumeState.candidate?.installed===false&&
      resumeState.candidate?.authorized===false&&
-     resumeState.sandbox_receipt===null;
-  // Existing constitutional journal, not the model, decides the next action:
-  // CANDIDATE_READY goes straight to isolated sandbox, never regenerates code.
-  if((!unacceptedGap&&!unverifiedCandidate)||
+     resumeState.sandbox_receipt===null&&
+     (resumeState.attempt_count===1||
+      (resumeState.independent_failure?.classification?.retry_source_without_dependency===true&&
+       resumeState.independent_failure.attempt===resumeState.attempt_count-1&&
+       resumeState.journal.at(-2).kind==='SANDBOX_FAILED'));
+  const repairableCheckpoint=resumeState.phase==='REPAIR_REQUIRED'&&
+     resumeState.attempt_count>=1&&
+     resumeState.attempt_count<ticket.max_attempts&&
+     resumeState.journal.length===2*resumeState.attempt_count+1&&
+     resumeState.journal.at(-1).kind==='SANDBOX_FAILED'&&
+     resumeState.journal.at(-1).evidence_ref===resumeState.independent_failure?.evidence_ref&&
+     resumeState.independent_failure?.attempt===resumeState.attempt_count&&
+     resumeState.independent_failure?.classification?.retry_source_without_dependency===true;
+  // All are *continuations*, never new goals, work or authority.
+  if((!unacceptedGap&&!unverifiedCandidate&&!repairableCheckpoint)||
      resumeState.attempt_limit!==ticket.max_attempts||
      !rs?.governance_kernel_hash?.startsWith('sha256:')||
      !Object.entries(scope).every(([key,value])=>
