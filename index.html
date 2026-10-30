@@ -1163,14 +1163,20 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // model-generated or installed unless the durable provider state proves it.
 // One signed-in owner action for the SAME original #178 work.
 let wcFirstGap178Busy=false;
-let wcFirstGap178AutoResumeAttempted=false;
+let wcFirstGap178RecoveryEligible=false;
+let wcFirstGap178RecoveryAttempted=false;
 let wcFirst178ApprovalReady=null;
 let wcFirst178CompletionBusy=false;
 let wcFirst178CompletionAutoStarted=false;
 // Owner GET/Refresh is read-only; only the trusted dispatcher resumes #178.
 async function wcContinueOriginal178Recovery(){
  const status=$('wcFirst178ApprovalStatus');
- if($('privateReady')?.style.display!=='block')return;
+ if($('privateReady')?.style.display!=='block'||
+    !wcFirstGap178RecoveryEligible||wcFirstGap178RecoveryAttempted||
+    wcFirstGap178Busy)return;
+ wcFirstGap178RecoveryAttempted=true;
+ wcFirstGap178Busy=true;
+ $('wcStartFirstGap178').disabled=true;
  status.textContent='Reality is continuing the previously authorized original #178 through its trusted preview worker. No new job, installation approval, or production changes…';
  try{
   const response=await fetch('/api/reality/personal-first-upgrade-178-recovery',{
@@ -1193,6 +1199,9 @@ async function wcContinueOriginal178Recovery(){
   status.textContent='Original #178 could not verify recovered execution: '+
    String(e?.message||'UNRESOLVED')+
    '. No automatic retry. The existing durable checkpoint is authoritative.';
+ }finally{
+  wcFirstGap178Busy=false;
+  $('wcStartFirstGap178').disabled=true;
  }
 }
 async function wcReadOwnerApproval178(){
@@ -1213,16 +1222,14 @@ async function wcReadOwnerApproval178(){
   if(d.status==='GOVERNED_RECOVERY_READY'&&
      d.autonomous_recovery_eligible===true&&d.original_claim_preserved===true){
    wcFirst178ApprovalReady=null;
-   $('wcStartFirstGap178').style.display='none';
-   status.textContent='Original #178: '+String(d.attempts_used)+' candidates failed. Reality independently verified this repairable failure and can continue the SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
-   // An explicit earlier owner grant already authorizes one bounded recovery.
-   // GET itself remains read-only. After this independently verified read,
-   // the signed-in owner's browser requests the separate authenticated POST
-   // exactly once; the DB still enforces the one-use work delegation.
-   if(!wcFirstGap178AutoResumeAttempted){
-    wcFirstGap178AutoResumeAttempted=true;
-    void wcContinueOriginal178Recovery();
-   }
+   wcFirstGap178RecoveryEligible=true;
+   const recovery=$('wcStartFirstGap178');
+   recovery.style.display='inline-block';
+   recovery.textContent='Resume saved #178 recovery · one click';
+   recovery.disabled=wcFirstGap178RecoveryAttempted;
+   status.textContent='Original #178: '+String(d.attempts_used)+' failed candidates, independently verified. The existing authorized job can resume through its one-use Vercel worker. No installation permission granted.';
+   // Read-only status never invokes POST. Actual execution requires this
+   // owner-initiated click, then the server independently rechecks everything.
    return;
   }
   if(d.status==='EXHAUSTED_CORRECTION_ATTEMPTS'&&
@@ -1357,6 +1364,10 @@ async function wcInspectFirstGap178(){
 $('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
 async function wcFirstGap178Run(){
  if(wcFirstGap178Busy)return;
+ if(wcFirstGap178RecoveryEligible){
+  void wcContinueOriginal178Recovery();
+  return;
+ }
  const status=$('wcFirstGap178Status');
  if($('privateReady')?.style.display!=='block'){
   status.textContent='Sign in above, then press Run once. Installation still needs separate approval.';
