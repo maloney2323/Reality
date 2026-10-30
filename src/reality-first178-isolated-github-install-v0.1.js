@@ -12,6 +12,25 @@ const BASE_BRANCH='feature/first178-live-single-claim-execution-20261029';
 const SOURCE_SHA='6e6014f38f9fea382ea93b38418ec77e9158c1ef';
 const FROZEN_PATH='test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js';
 const FROZEN_BLOB_SHA='3371237f8cf56a9f7240ba61bd5cd1b67af266c9';
+// Existing owner-approved PREVIEW GitHub credential may be reused only in
+// this single isolated branch. Runtime MUST independently observe Contents
+// write (push) permission before offering an owner installation button.
+export async function verifyFirst178ScopedGithubWrite({
+ token,fetchImpl=fetch,
+}={}){
+ if(typeof token!=='string'||token.length<25)return false;
+ try{
+  const response=await fetchImpl('https://api.github.com/repos/'+REPO,{
+   method:'GET',headers:{authorization:'Bearer '+token,
+    accept:'application/vnd.github+json',
+    'x-github-api-version':'2022-11-28',
+    'user-agent':'Reality-First178-Scoped-Preview-Readiness'},
+  });
+  if(!response.ok)return false;
+  const data=await response.json();
+  return data?.full_name===REPO&&data?.permissions?.push===true;
+ }catch{return false}
+}
 const allowed=x=>/^src\/reality-extensions\/reality-ci-failure-evidence\.mjs$/.test(x)||
  /^test\/reality-extensions\/[a-z0-9_-]+\.(?:test\.js|test\.mjs)$/.test(x);
 const stable=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(stable):
