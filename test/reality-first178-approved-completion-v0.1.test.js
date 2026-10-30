@@ -135,6 +135,14 @@ test('one owner action executes registration, exact original resumption, settlem
    original_work_id:work,durable_settlement_readback:true,
    independent_outcome_verified:true,
    settlement_receipt_ref:'universe:verified-settlement'}),
+  recordAndReobserveFinalSettlement:async body=>{
+   assert.equal(lastState.phase,'SETTLED');
+   assert.equal(body.original_work_id,work);
+   assert.equal(body.checkpoint_hash,lastState.head_hash);
+   return {settled:true,readback_verified:true,
+    original_work_id:work,queue_id:queueId,
+    checkpoint_hash:lastState.head_hash,original_job_completed:true};
+  },
  };
  const done=await finishOriginal178AfterExactApproval({
   state:h.state,queue:h.queue,session:{user_id:owner},
