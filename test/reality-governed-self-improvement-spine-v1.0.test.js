@@ -460,7 +460,7 @@ test('actual #178 recovery extends same immutable three-failure journal exactly 
  assert.equal(s.promotion_authorization,null);
  assert.equal(nextGovernedSelfImprovementAction(s).installation_authorized,false);
 });
-test('second recovery exhaustion remains terminal and never silently resets original budget',async()=>{
+test('seven failures permit a single verified-draft correction then stop at exact owner approval',async()=>{
  const h=harness();let s=await gap(createGovernedSelfImprovement({scope}),h);
  for(let i=1;i<=3;i++){
   s=proposeGovernedCandidate(s,candidate('export const fail='+i+';'));
@@ -506,9 +506,25 @@ test('second recovery exhaustion remains terminal and never silently resets orig
  assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,7);
  assert.equal(s.journal.length,17);
  assert.equal(verifySelfImprovementJournal(s),true);
- assert.throws(()=>recoverGovernedEscalation(s,{
-  verified:true,independent_provider_readback:true,
- }),/SELF_IMPROVEMENT_EXACT_REPAIRABLE_EXHAUSTION_REQUIRED/);
- assert.throws(()=>proposeGovernedCandidate(s,candidate()),
- /SELF_IMPROVEMENT_GAP_OR_REPAIR_REQUIRED/);
+ // One final bounded continuation follows all seven independently persisted
+ // failures; no rewrite, no new queue and no silent installation permission.
+ const before=structuredClone(s);
+ const receipt='receipt:source-linked-attempt-seven';
+ s=recoverGovernedEscalation(s,{verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:s.head_hash,checkpoint_receipt_id:receipt,
+  reservation_id:'reservation:final-single-use',
+  failure_evidence_ref:s.independent_failure.evidence_ref,installation_authorized:false});
+ assert.equal(s.attempt_count,7);assert.equal(s.attempt_limit,8);
+ assert.equal(s.journal.length,18);
+ assert.deepEqual(s.journal.slice(0,17),before.journal);
+ assert.equal(verifySelfImprovementJournal(s),true);
+ assert.equal(s.promotion_authorization,null);
+ s=proposeGovernedCandidate(s,candidate('export const finalDraft=true;'));
+ assert.equal(s.attempt_count,8);
+ s=await verified(s,h);
+ assert.equal(s.phase,'AWAITING_OWNER_APPROVAL');
+ assert.equal(s.promotion_authorization,null);
+ assert.equal(nextGovernedSelfImprovementAction(s).installation_authorized,false);
+
 });
