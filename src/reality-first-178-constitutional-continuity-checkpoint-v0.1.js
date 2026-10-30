@@ -200,7 +200,16 @@ export function createFirst178ConstitutionalCheckpointService({
    state.sandbox_receipt?.governance_preserved===true&&
    state.promotion_authorization===null&&
    state.registration===null&&state.resumption===null&&state.settlement===null;
-  if(!pendingGap&&!pendingSandbox&&!sandboxApproved||
+  const hasOwnerPromotion=['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
+   'ORIGINAL_JOB_RESUMED','SETTLED'].includes(state?.phase)&&
+   state?.promotion_authorization?.consumed_once===true&&
+   state.promotion_authorization.approval_origin===
+    'AUTHENTICATED_OWNER_EXPLICIT_ACTION'&&
+   state?.candidate?.artifact_hash===state?.sandbox_receipt?.artifact_hash&&
+   state.sandbox_receipt?.independent_tests_passed===true&&
+   state.sandbox_receipt?.frozen_regression_passed===true&&
+   state.sandbox_receipt?.governance_preserved===true;
+  if(!pendingGap&&!pendingSandbox&&!sandboxApproved&&!hasOwnerPromotion||
 
      state.scope?.owner_id!==session.user_id||
      state.scope?.goal_id!==g.state.active_goal_id||
@@ -215,8 +224,12 @@ export function createFirst178ConstitutionalCheckpointService({
      last.payload?.constitutional_phase!==state.phase||
      last.payload?.constitutional_head_hash!==state.head_hash||
      last.payload?.original_source_receipt_ref!==originals[0].event_id||
-     last.payload?.installation_authorized!==false||
-     last.payload?.original_job_completed!==false)
+     last.payload?.installation_authorized!==
+      Boolean(state.promotion_authorization?.consumed_once)||
+     last.payload?.original_job_completed!==
+      Boolean(state.phase==='SETTLED'&&
+       state.settlement?.durable_settlement_readback===true&&
+       state.settlement?.independent_outcome_verified===true))
    fail('RESTORE_EXACT_UNCONSUMED_GAP_REQUIRED');
   // The independent gap evidence must still match this original owner's
   // worldline. This also verifies there was no model-authored approval.
