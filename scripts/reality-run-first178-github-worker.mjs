@@ -11,8 +11,15 @@ const BRANCH='feature/first178-live-single-claim-execution-20261029';
 const PROJECT='hvkfreoagbrphwghjajw';
 const stop=code=>{throw Error('REALITY_FIRST178_GITHUB_WORKER_'+code)};
 export function verifyGitHubFirst178Run(env,actualCheckoutSha){
+ // The already-admitted customer job may also be activated by ONE exact
+ // isolated-branch push. The GitHub workflow grants this identity only for a
+ // single nominated commit message; the database still independently checks
+ // the unspent one-use recovery reservation and immutable failure evidence.
+ const exactPush=env.GITHUB_EVENT_NAME==='push'&&
+   env.REALITY_FIRST178_ACTIVATION_COMMIT===env.GITHUB_SHA&&
+   /^[a-f0-9]{40}$/.test(String(env.GITHUB_SHA||''));
  if(env.GITHUB_ACTIONS!=='true'||
-    env.GITHUB_EVENT_NAME!=='workflow_dispatch'||
+    !(env.GITHUB_EVENT_NAME==='workflow_dispatch'||exactPush)||
     env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
     env.GITHUB_REF!=='refs/heads/'+BRANCH||
     !/^[a-f0-9]{40}$/.test(String(env.GITHUB_SHA||''))||
