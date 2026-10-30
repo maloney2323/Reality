@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyGitHubFirst178Run,runGitHubFirst178Recovery}
+import {verifyGitHubFirst178Run,runGitHubFirst178Recovery,verifyScopedVercelSandboxAccess}
  from '../scripts/reality-run-first178-github-worker.mjs';
 const branch='feature/first178-live-single-claim-execution-20261029';
 const sha='a'.repeat(40);
@@ -57,6 +57,7 @@ test('GitHub-native original worker checks exact branch and HEAD before DB mutat
 test('GitHub invokes existing direct-dispatch+DB-handoff path once; no installation',async()=>{
  let calls=0;
  const r=await runGitHubFirst178Recovery({env,checkoutSha:sha,
+  verifyProvider:async()=>true,
   dispatch:async ({env:observed})=>{
    calls++;assert.equal(observed,env);return valid;
   },
@@ -79,6 +80,7 @@ test('independent sandbox failure cannot become completion or green GitHub actio
   {...valid,production_changed:true},
  ]){
   await assert.rejects(runGitHubFirst178Recovery({env,checkoutSha:sha,
+  verifyProvider:async()=>true,
    dispatch:async()=>outcome}),
   /REALITY_FIRST178_GITHUB_WORKER_/);
  }
@@ -90,8 +92,40 @@ test('wrong branch or missing secrets never calls privileged dispatcher',async()
  ]){
   let calls=0;
   await assert.rejects(runGitHubFirst178Recovery({env:x,checkoutSha:sha,
+   verifyProvider:async()=>true,
    dispatch:async()=>{calls++;return valid;}}),
   /REALITY_FIRST178_GITHUB_WORKER_/);
   assert.equal(calls,0);
  }
+});
+
+test('Vercel Sandbox project credential is checked via read-only management API',async()=>{
+ let calls=0;
+ const ok=await verifyScopedVercelSandboxAccess({env,
+  fetchImpl:async (url,options)=>{
+   calls++;
+   assert.match(url,/^https:\/\/api\.vercel\.com\/v9\/projects\/prj_/);
+   assert.equal(options.method,'GET');
+   assert.equal(options.headers.authorization,'Bearer '+env.VERCEL_TOKEN);
+   return {ok:true,json:async()=>({id:env.VERCEL_PROJECT_ID,name:'reality'})};
+  },
+ });
+ assert.equal(ok,true);
+ assert.equal(calls,1);
+ for(const badResponse of [
+  {ok:false},
+  {ok:true,json:async()=>({id:'prj_foreign',name:'reality'})},
+ ]){
+  await assert.rejects(
+   verifyScopedVercelSandboxAccess({env,fetchImpl:async()=>badResponse}),
+   /REALITY_FIRST178_GITHUB_WORKER_SANDBOX_PROVIDER_/);
+ }
+});
+test('read-only sandbox preflight failure does not consume the original #178 claim',async()=>{
+ let called=0;
+ await assert.rejects(runGitHubFirst178Recovery({env,checkoutSha:sha,
+  verifyProvider:async()=>{throw Error('TOKEN_REJECTED')},
+  dispatch:async()=>{called++;return valid;},
+ }),/TOKEN_REJECTED/);
+ assert.equal(called,0);
 });
