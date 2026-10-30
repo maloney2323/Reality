@@ -23,7 +23,7 @@ const approval={kind:'PROMOTION_AUTHORIZED',owner_id:owner,
  consumed_once:true,reservation_ref:'db:explicit-human-action',
  installation_target:'ISOLATED_PREVIEW'};
 const frozen='import {classifyVerifiedCiFailure} from "../../src/reality-extensions/reality-ci-failure-evidence.mjs";test();';
-function fakeProvider(){
+function fakeProvider({frozenStepConclusion='success'}={}){
  const calls=[];let newHead=false;const blobs=new Map();
  const respond=(body,ok=true,status=200)=>({ok,status,json:async()=>body});
  const fetchImpl=async(url,options)=>{
@@ -70,7 +70,7 @@ function fakeProvider(){
   if(method==='GET'&&p.includes('/actions/runs/9876/jobs?'))
    return respond({jobs:[{id:101,conclusion:'success',steps:[
     {name:'Execute ORIGINAL frozen #178 acceptance against installed model-authored source',
-     conclusion:'success'}]}]});
+     conclusion:frozenStepConclusion}]}]});
   if(method==='GET'&&p.includes('/actions/runs?')){
    assert.ok(p.includes('head_sha='+newCommit));
    return respond({workflow_runs:[{head_sha:newCommit,
@@ -119,4 +119,25 @@ test('one explicit approved candidate creates single fast-forward preview commit
  assert.equal(ci.original_work_id,work);
  assert.equal(ci.original_job_completed,false);
  assert.equal(ci.provider_run_id,9876);
+});
+
+test('green workflow with skipped frozen acceptance never proves installed capability',async()=>{
+ const h=fakeProvider({frozenStepConclusion:'skipped'});
+ const adapter=createFirst178GithubInstallationProvider({
+  ownerId:owner,originalWorkId:work,approval,candidate,
+  writeToken:'fake-isolated-write-token-long-enough',
+  fetchImpl:h.fetchImpl,
+ });
+ await assert.rejects(adapter.observeFrozenAcceptance(newCommit),
+  /FIRST178_GITHUB_INSTALL_FROZEN_TEST_EXECUTION_NOT_INDEPENDENTLY_OBSERVED/);
+});
+test('original #178 frozen acceptance is skipped, NOT green, without installed source',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const file=readFileSync('.github/workflows/reality-first-gap-trusted-handoff-ci.yml','utf8');
+ const step=file.split('      - name: Execute ORIGINAL frozen #178 acceptance against installed model-authored source')[1]
+  ?.split('      - name:')[0];
+ assert.ok(step,'Frozen customer acceptance step must exist');
+ assert.match(step,/if: \$\\{\\{ hashFiles\('src\\/reality-extensions\\/reality-ci-failure-evidence\\.mjs'\) != '' \\}\\}/);
+ assert.ok(!step.includes('echo "Original #178 uninstalled'));
+ assert.match(step,/node --test test\\/reality-frozen-regressions\\/first-reality-ci-evidence-gap\\.test\\.js/);
 });
