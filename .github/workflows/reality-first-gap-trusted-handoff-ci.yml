@@ -44,5 +44,10 @@ jobs:
         run: |
           node --check scripts/reality-first-178-real-provider-readback-v0.1.mjs
           node scripts/reality-first-178-real-provider-readback-v0.1.mjs
+      - name: Verify one-click owner admission and exactly-once constitutional continuation
+        run: |
+          node --check src/reality-first178-single-action-v0.1.js
+          node --check api/reality/personal-first-upgrade-178-run.js
+          node --test test/reality-first178-single-action-v0.1.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
