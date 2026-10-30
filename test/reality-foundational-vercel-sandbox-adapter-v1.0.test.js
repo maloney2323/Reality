@@ -48,8 +48,8 @@ function fake({badSha=false,secret=false,providerLie=false,failed=false}={}){
    const code=isEnv&&secret?45:isTest&&failed?1:0;
    const output=isSha?(badSha?'b'.repeat(40):commit):
     isTest?'# tests 2\n# pass '+(failed?1:2)+'\n# fail '+(failed?1:0):'';
-   const cmd={id,exitCode:code,stdout:async()=>output,stderr:async()=>''};
-   commands.set(id,{id,exitCode:code});
+   const cmd={cmdId:id,exitCode:code,stdout:async()=>output,stderr:async()=>''};
+   commands.set(id,{cmdId:id,exitCode:code});
    return cmd;
   },
   async readFileToBuffer({path}){
@@ -102,6 +102,28 @@ test('real Vercel microVM adapter closes egress BEFORE any model bytes are writt
  assert.equal(h.stopped,true);
  assert.ok(h.calls.indexOf('deny:deny-all')<h.calls.indexOf('write'));
  assert.equal(h.calls.filter(x=>x.startsWith('getCommand:')).length,2);
+});
+test('sandbox v3 command IDs are cmdId, not id; missing provider cmdId fails closed',async()=>{
+ const h=fake();
+ const originalCreate=h.Client.create;
+ h.Client.create=async(...args)=>{
+  const sbx=await originalCreate(...args);
+  const origRun=sbx.runCommand;
+  let index=0;
+  sbx.runCommand=async opts=>{
+   const cmd=await origRun(opts);
+   if(opts.cmd==='node'&&opts.args[0]==='--test'&&++index===2)
+    return {exitCode:cmd.exitCode,stdout:cmd.stdout,stderr:cmd.stderr};
+   return cmd;
+  };
+  return sbx;
+ };
+ const a=createIsolatedVercelSandbox({SandboxClient:h.Client});
+ await assert.rejects(a.isolatedSandbox({ticket,candidate,attempt:1,
+  frozen_suite_ref:ticket.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false}),
+  /FOUNDATION_SANDBOX_PROVIDER_COMMAND_ID_REQUIRED/);
+ assert.equal(h.stopped,true);
 });
 test('preexisting source SHA mismatch is blocked, and sandbox is stopped',async()=>{
  const h=fake({badSha:true});
