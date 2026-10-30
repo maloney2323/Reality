@@ -65,13 +65,18 @@ export function validateFoundationalCandidate(ticket,modelOutput){
 }
 export function classifyFoundationalFailure(report){
  const output=String(report?.log_excerpt||'').slice(0,12000);
- if(report?.missing_dependency||/MISSING_CAPABILITY|UNIMPLEMENTED|NO_SUCH_RPC/.test(output))
-  return 'MISSING_CAPABILITY';
- if(/OWNER_APPROVAL|AUTHORITY_REQUIRED|PERMISSION_DENIED|ONE_TIME_RESERVATION/.test(output))
-  return 'AUTHORITY_REQUIRED';
- if(/SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module/.test(output))return 'SYNTAX';
- if(/not ok \d+|ERR_ASSERTION|AssertionError|TEST_FAILED/.test(output)||report?.exit_code!==0)
-  return 'TEST_REGRESSION';
+ // A frozen test often quotes MISSING_CAPABILITY or APPROVAL as the
+ // observed *wrong answer*. Those strings are untrusted log content, NOT
+ // independent evidence of a new dependency or an authority decision.
+ // Provider-owned exit status/test results and typed missing_dependency
+ // outrank arbitrary stdout. This is critical for #178 self-correction.
+ if(report?.missing_dependency)return 'MISSING_CAPABILITY';
+ if(/SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module/.test(output))
+  return 'SYNTAX';
+ if(/not ok\s+\d+|ERR_ASSERTION|AssertionError|TEST_FAILED|ReferenceError/.test(output)||
+   report?.test_results?.some(x=>x.passed===false)||
+   report?.exit_code!==0)return 'TEST_REGRESSION';
+ if(report?.failure_kind==='AUTHORITY_REQUIRED')return 'AUTHORITY_REQUIRED';
  return 'UNCLASSIFIED';
 }
 export function createSandboxEvidenceCandidate(ticket,candidate,report){
