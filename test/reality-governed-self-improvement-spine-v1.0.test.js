@@ -401,3 +401,21 @@ test('constitutional journal refuses false settlement or lost attempt count even
   /SELF_IMPROVEMENT_JOURNAL_PHASE_INVARIANT_VIOLATED/);
  assert.equal(verifySelfImprovementJournal(discovered),true);
 });
+
+test('Real original #178: typed independent TEST_FAILED corrects model rather than invents authority/dependency',()=>{
+ const log=[
+  'not ok 3 - absent provider provenance or incomplete exact hash',
+  "  + 'MISSING_CAPABILITY'",
+  "  - 'INSUFFICIENT_EVIDENCE'",
+  'AssertionError [ERR_ASSERTION]: Expected values to be strictly equal',
+  'ReferenceError: describe is not defined',
+ ].join('\n');
+ const result=classifyIndependentFailure({output:log,code:'TEST_FAILED'});
+ assert.equal(result.next,'REPAIR_CODE_FROM_TEST_FAILURE');
+ assert.equal(result.retry_source_without_dependency,true);
+ assert.notEqual(result.class,'MISSING_CAPABILITY');
+ assert.notEqual(result.class,'AUTHORITY_REQUIRED');
+ const realMissing=classifyIndependentFailure({
+  output:log,code:'MISSING_CAPABILITY',missingDependency:'provider:missing:required-rpc'});
+ assert.equal(realMissing.class,'MISSING_CAPABILITY');
+});
