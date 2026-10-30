@@ -1187,7 +1187,7 @@ async function wcReadOwnerApproval178(){
      d.autonomous_recovery_eligible===true&&d.original_claim_preserved===true){
    wcFirst178ApprovalReady=null;
    $('wcStartFirstGap178').style.display='none';
-   status.textContent='Original #178: the first three candidates failed. Reality has independently verified this repairable failure and can continue SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
+   status.textContent='Original #178: '+String(d.attempts_used)+' candidates failed. Reality independently verified this repairable failure and can continue the SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
    if(!wcFirst178RecoveryAutoStarted){
     wcFirst178RecoveryAutoStarted=true;
     void wcFirstGap178Run();
