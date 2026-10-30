@@ -70,7 +70,7 @@ test('trusted ticket preserves owner, goal, original work, frozen suite and atte
  assert.equal(ticket.ticket_hash.length,64);
 });
 test('production, model-claimed gap, unbounded retries and path-shaped manifest are rejected',()=>{
- for(const patch of [{environment:'production'},{max_attempts:0},{max_attempts:7},
+ for(const patch of [{environment:'production'},{max_attempts:0},{max_attempts:8},
   {confirmed_gap_source:'MODEL_SAYS_VERIFIED'},
   {frozen_regression_manifest_ref:'../../hidden'}])
   assert.throws(()=>createFoundationalBuildTicket({...scope,...patch}),/FOUNDATION_/);
