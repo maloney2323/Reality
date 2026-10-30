@@ -203,5 +203,64 @@ export function createFirst178GithubInstallationProvider({
    original_job_completed:false,
   });
  }
- return Object.freeze({writeAndReadback,observeFrozenAcceptance});
+ async function observeOriginalExecution(commitSha){
+  if(!SHA40.test(commitSha))fail('ORIGINAL_EXECUTION_SOURCE_SHA_REQUIRED');
+  const r=await api('GET','/repos/'+REPO+'/actions/runs?head_sha='+
+   commitSha+'&per_page=50',null,true);
+  const runs=(r.workflow_runs||[]).filter(x=>
+   x.head_sha===commitSha&&
+   x.name==='Reality — Original 178 Work Replay');
+  const passed=runs.find(x=>x.status==='completed'&&x.conclusion==='success');
+  if(!passed)return Object.freeze({verified:false,
+   status:runs.some(x=>x.status==='completed'&&x.conclusion!=='success')?
+    'ORIGINAL_EXECUTION_FAILED':'ORIGINAL_EXECUTION_PENDING',
+   original_job_completed:false});
+  const jobs=await api('GET','/repos/'+REPO+'/actions/runs/'+passed.id+
+   '/jobs?per_page=100',null,true);
+  const matching=(jobs.jobs||[]).filter(x=>x.conclusion==='success'&&
+   x.name==='replay'&&x.head_sha===commitSha&&
+   x.steps?.some(z=>z.name==='Observe real original 178 provider evidence'&&
+    z.conclusion==='success')&&
+   x.steps?.some(z=>z.name==='Execute original 178 source with observed provider evidence'&&
+    z.conclusion==='success'));
+  if(matching.length!==1)fail('ORIGINAL_EXECUTION_DISTINCT_STEPS_NOT_PROVEN');
+  // Attest separate provider job output; an unrelated green CI run alone
+  // never proves that the actual original failure was processed.
+  const response=await fetchImpl('https://api.github.com/repos/'+REPO+
+   '/actions/jobs/'+matching[0].id+'/logs',{
+    headers:readHead,method:'GET'});
+  if(!response.ok)fail('ORIGINAL_EXECUTION_LOG_PROVIDER_READBACK_UNAVAILABLE');
+  const output=await response.text();
+  if(output.length>500000)fail('ORIGINAL_EXECUTION_LOG_OVERSIZE');
+  const markers=output.split(/\r?\n/).filter(x=>
+   x.includes('REALITY_ORIGINAL178_REPLAY_RESULT='));
+  if(markers.length!==1)fail('ORIGINAL_EXECUTION_UNIQUE_RESULT_REQUIRED');
+  let result;
+  try{result=JSON.parse(markers[0].split(
+   'REALITY_ORIGINAL178_REPLAY_RESULT=')[1])}catch{
+    fail('ORIGINAL_EXECUTION_RESULT_INVALID')}
+  if(result.original_work_id!==originalWorkId||
+     result.provider_run_id!==40962921090||
+     result.provider_job_id!==123760052647||
+     result.pinned_sha!==SOURCE_SHA||
+     result.decision!=='MISSING_CAPABILITY'||
+     result.original_job_completed!==false||
+     result.production_changed!==false||
+     !SHA64.test(result.observed_log_sha256||'')||
+     !SHA64.test(result.evidence_hash||''))
+    fail('ORIGINAL_EXECUTION_PROVIDER_RESULT_MISMATCH');
+  return Object.freeze({verified:true,status:'ORIGINAL_EXECUTION_VERIFIED',
+   installed_commit_sha:commitSha,
+   original_work_id:originalWorkId,
+   provider_run_id:passed.id,
+   provider_job_id:matching[0].id,
+   pinned_failure_run_id:result.provider_run_id,
+   pinned_failure_log_sha256:result.observed_log_sha256,
+   evidence_hash:result.evidence_hash,
+   executor_run_ref:'github:actions:run:'+passed.id+':job:'+matching[0].id,
+   original_job_completed:false,production_changed:false,
+  });
+ }
+ return Object.freeze({writeAndReadback,observeFrozenAcceptance,
+  observeOriginalExecution});
 }
