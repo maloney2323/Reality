@@ -59,8 +59,15 @@ jobs:
 
   recover:
     name: Recover existing #178, stop at verified Approval 1
-    needs: [validate, guard_dispatch_branch]
-    if: github.event_name == 'workflow_dispatch' && inputs.original_job == '178' && github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029' && github.repository == 'maloney2323/Reality'
+    needs: [validate]
+    # One nominated isolated-branch commit may activate the same previously
+    # authorized customer queue. No browser, Vercel preview request, or
+    # unrestricted scheduled retries. DB one-use reservations are authoritative.
+    if: >-
+      github.repository == 'maloney2323/Reality' &&
+      github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.original_job == '178') ||
+       (github.event_name == 'push' && github.event.head_commit.message == 'Reality #178: activate one bounded recovery'))
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
@@ -92,6 +99,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           REALITY_FIRST178_GITHUB_READ_TOKEN: ${{ github.token }}
           REALITY_FIRST178_EXECUTOR: GITHUB_ACTIONS
+          REALITY_FIRST178_ACTIVATION_COMMIT: ${{ github.event_name == 'push' && github.event.head_commit.message == 'Reality #178: activate one bounded recovery' && github.sha || '' }}
           VERCEL_ENV: preview
           VERCEL_GIT_COMMIT_REF: feature/first178-live-single-claim-execution-20261029
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
