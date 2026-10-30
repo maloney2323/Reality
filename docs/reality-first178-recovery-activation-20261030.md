@@ -20,3 +20,5 @@ The activation commit itself is not a success receipt. Independent source,
 provider, database, and sandbox readbacks determine the outcome. If the
 required runtime capability is unavailable, fail closed without retrying
 or fabricating completion.
+
+Activation audit: the prior designated push was rejected by GitHub YAML validation with zero jobs. A subsequent source-only workflow validation at 15b00e0ac6ee7f5861757bbc3f06f8e453da3053 succeeded, with zero database reservations. This commit requests the same once-only original job's bounded recovery under the existing independent authorization checks; no additional constitutional attempt is authorized by this text.
