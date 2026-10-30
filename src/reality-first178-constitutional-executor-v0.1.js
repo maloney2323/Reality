@@ -86,24 +86,33 @@ export async function executeFirst178Constitutional({
   const restored=await checkpoint.readLatestCheckpoint();
   if(restored?.verified!==true||
      restored.original_work_id!==scope.original_work_id||
-     restored.state?.phase!=='GAP_CONFIRMED'||
-     restored.state.attempt_count!==0||
+     !['GAP_CONFIRMED','CANDIDATE_READY'].includes(restored.state?.phase)||
      restored.checkpoint_hash!==restored.state.head_hash||
      !uuid(restored.continuity_receipt_id))
-   die('EXACT_UNACCEPTED_GAP_RESTORE_FAILED',503);
-  const reserved=await call(db,'reality_reserve_first178_gap_recovery_v1',{
+   die('EXACT_UNSETTLED_JOURNAL_RESTORE_FAILED',503);
+  const sandboxRecovery=restored.state.phase==='CANDIDATE_READY';
+  const rpcName=sandboxRecovery?
+   'reality_reserve_first178_candidate_sandbox_v1':
+   'reality_reserve_first178_gap_recovery_v1';
+  const reserved=await call(db,rpcName,{
    p_owner_id:session.user_id,p_conversation_id:conversationId,
    p_queue_id:queue.queue_id,p_original_work_id:scope.original_work_id,
    p_checkpoint_hash:restored.checkpoint_hash,
+   ...(sandboxRecovery?{
+    p_candidate_hash:restored.state.candidate.artifact_hash,
+   }:{}),
    p_continuity_receipt_id:restored.continuity_receipt_id,
   });
   if(reserved?.recovery_reserved!==true||
-     !uuid(reserved.recovery_reservation_id)||
+     !uuid(sandboxRecovery?reserved.sandbox_reservation_id:
+      reserved.recovery_reservation_id)||
      !uuid(reserved.claim_id)||
      reserved.original_work_id!==scope.original_work_id||
      reserved.queue_id!==queue.queue_id||
      reserved.continuity_receipt_id!==restored.continuity_receipt_id||
      reserved.checkpoint_hash!==restored.checkpoint_hash||
+     (sandboxRecovery&&reserved.candidate_hash!==
+      restored.state.candidate.artifact_hash)||
      reserved.installation_authorized!==false)
    die('SINGLE_USE_RECOVERY_RESERVATION_UNVERIFIED',503);
   claim={claimed:true,claim_id:reserved.claim_id,
