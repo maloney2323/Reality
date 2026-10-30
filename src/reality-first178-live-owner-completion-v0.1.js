@@ -65,13 +65,16 @@ export async function original178OwnerApprovalView({
      result.original_work_id!==scope.original_work_id||
      result.state.phase!=='ESCALATED')
    fail('EXHAUSTED_CONTINUITY_NOT_SOURCE_VERIFIED');
-  const recoverable=result.state.attempt_count===3&&
-   result.state.attempt_limit===3&&
+  const recoverable=(
+   (result.state.attempt_count===3&&result.state.attempt_limit===3)||
+   (result.state.attempt_count===5&&result.state.attempt_limit===5&&
+    result.state.recovery_authorization?.verified===true))&&
    result.state.independent_failure?.classification?.retry_source_without_dependency===true;
   if(recoverable)return Object.freeze({
    status:'GOVERNED_RECOVERY_READY',
    original_work_id:scope.original_work_id,queue_id:queue.queue_id,
-   attempt_limit:5,attempts_used:3,additional_attempts:2,
+   attempt_limit:result.state.attempt_limit+2,
+   attempts_used:result.state.attempt_count,additional_attempts:2,
    checkpoint_receipt_id:receipt,checkpoint_hash:digest,
    installation_authorized:false,original_job_completed:false,
    production_changed:false,original_claim_preserved:true,
