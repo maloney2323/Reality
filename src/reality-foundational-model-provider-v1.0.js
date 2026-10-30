@@ -9,6 +9,7 @@ const outputText=b=>typeof b?.output_text==='string'&&b.output_text.trim()?b.out
  .map(x=>x.text||'').join('');
 export function createFoundationalModelGenerator({
  model,apiKey,fetchImpl=fetch,readFrozenRegression=null,
+ verifyDraftCandidate=null,
  endpoint='https://api.openai.com/v1/responses'
 }={}){
  if(typeof model!=='string'||!/^[a-zA-Z0-9._-]{3,100}$/.test(model))
@@ -75,11 +76,15 @@ export function createFoundationalModelGenerator({
   // A model proposal is not a sandbox attempt. Reject known tautological
   // provenance checks and give the model bounded feedback to rewrite them
   // before consuming a trusted independent sandbox attempt.
-  let localRejection=null;
-  for(let proposal=1;proposal<=3;proposal++){
+  let localRejection=null, rejectedDraft=null, lastValidDraft=null;
+  // Four MODEL proposals may be independently sandboxed under the same
+  // constitutional attempt, but only one final candidate is admitted to its
+  // immutable journal. No generated source may execute in the trusted host.
+  for(let proposal=1;proposal<=4;proposal++){
   const currentTask=localRejection?{...task,
    rejected_proposal_reason:localRejection,
-   proposal_number:proposal}:task;
+   proposal_number:proposal,
+   rejected_proposal_files:rejectedDraft?.files||null}:task;
   const response=await fetchImpl(endpoint,{method:'POST',
    headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
    body:JSON.stringify({model,max_output_tokens:11000,
@@ -103,9 +108,38 @@ export function createFoundationalModelGenerator({
   // Self-comparisons can never compare independently observed evidence.
   // Reject model-proposed source, do not modify it or treat it as verified.
   const invalid=/\b(evidence|input|record|source)\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\s*(?:!==|===|!=|==)\s*\1\.\2\b/i.test(code);
-  if(!invalid)return validated;
-  localRejection='Invalid candidate evidence check: the same provenance field is compared with itself. Compare independently sourced fields instead, satisfy frozen negative cases, and return corrected source. The rejected artifact was not installed or tested.';
+  if(invalid){
+   localRejection='Rejected draft: a provenance field was compared with itself. The field must instead be validated against independently supplied expected scope. Correct source; do not change frozen tests.';
+   rejectedDraft=validated;
+   continue;
   }
+  if(typeof verifyDraftCandidate==='function'){
+   const check=await verifyDraftCandidate(Object.freeze({
+    ticket,candidate:validated,attempt,proposal,
+   }));
+   if(check?.independent_provider_readback!==true||
+      check.artifact_sha256!==validated.artifact_sha256||
+      typeof check.attestation_ref!=='string'||
+      check.attestation_ref.length<16||
+      typeof check.passed!=='boolean')
+    fail('FOUNDATION_DRAFT_INDEPENDENT_VERIFICATION_REQUIRED');
+   if(check.passed)return validated;
+   if(!['TEST_REGRESSION','SYNTAX'].includes(check.classification))
+    fail('FOUNDATION_DRAFT_NON_REPAIRABLE_FAILURE');
+   localRejection='Independent isolated sandbox FAILED for this exact draft. '+
+    'Provider receipt: '+check.attestation_ref+'. Failure classification: '+
+    check.classification+'. Frozen and candidate test assertions:\n'+
+    String(check.log_excerpt||'').slice(0,11000)+
+    '\nRevise the rejected source to correct every failing assertion. '+
+    'Do not modify frozen regression tests or invent authority.';
+   rejectedDraft=validated;lastValidDraft=validated;
+   continue;
+  }
+  return validated;
+  }
+  // A failed but source-valid last draft is passed to the constitutional
+  // verifier for an independent, durable failure receipt; never claim success.
+  if(lastValidDraft)return lastValidDraft;
   fail('FOUNDATION_MODEL_UNCORRECTED_SELF_COMPARISON');
  };
 }
