@@ -1,0 +1,113 @@
+name: Trigger Reality Job #178
+on:
+  workflow_dispatch:
+    inputs:
+      original_job:
+        description: "Only the previously authorized original Reality customer job"
+        required: true
+        type: choice
+        options:
+          - '178'
+  push:
+    branches:
+      - feature/first178-live-single-claim-execution-20261029
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: reality-existing-original-job-178
+  cancel-in-progress: false
+
+jobs:
+  guard_dispatch_branch:
+    name: Fail closed on a wrong manual workflow branch
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify isolated original #178 branch only
+        env:
+          ACTUAL_REF: ${{ github.ref }}
+          ACTUAL_REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$ACTUAL_REF" = "refs/heads/feature/first178-live-single-claim-execution-20261029"
+          test "$ACTUAL_REPOSITORY" = "maloney2323/Reality"
+  validate:
+    name: Verify exact job runner, never consume live work
+    if: github.repository == 'maloney2323/Reality' && github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout pinned feature branch (no persisted credentials)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify execution wiring without a live Supabase write
+        run: |
+          node --check scripts/reality-run-first178-github-worker.mjs
+          node --check src/reality-foundational-vercel-generation-adapters-v1.0.js
+          node --check src/reality-foundational-vercel-sandbox-adapter-v1.0.js
+          node --test test/reality-first178-github-actions-native-worker.test.js test/reality-first178-server-dispatch-v0.1.test.js test/reality-first178-one-shot-background-delegation-v0.1.test.js test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
+      - name: Verify exact frozen original, unchanged claim and owner approval gates
+        run: |
+          node --test test/reality-first178-exhausted-one-click-readback-v0.1.test.js test/reality-first178-single-action-v0.1.test.js test/reality-governed-self-improvement-spine-v1.0.test.js
+
+  recover:
+    name: Recover existing #178, stop at verified Approval 1
+    needs: [validate, guard_dispatch_branch]
+    if: github.event_name == 'workflow_dispatch' && inputs.original_job == '178' && github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029' && github.repository == 'maloney2323/Reality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact dispatched source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned Reality sandbox dependency
+        run: npm install --no-fund --no-audit --ignore-scripts --no-save --package-lock=false
+      - name: Check required secrets without showing their values
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
+          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+        run: |
+          for name in SUPABASE_SERVICE_ROLE_KEY OPENAI_API_KEY VERCEL_TOKEN VERCEL_TEAM_ID REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY REALITY_CHAT_RECEIPT_HMAC_KEY; do
+            if [ -z "${!name:-}" ]; then echo "::error::Missing required configured secret or variable: $name"; exit 1; fi
+          done
+      - name: Run Reality original #178 using durable Supabase journal
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REALITY_FIRST178_GITHUB_READ_TOKEN: ${{ github.token }}
+          REALITY_FIRST178_EXECUTOR: GITHUB_ACTIONS
+          VERCEL_ENV: preview
+          VERCEL_GIT_COMMIT_REF: feature/first178-live-single-claim-execution-20261029
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+          REALITY_CONTINUOUS_RELIABILITY_ENABLED: 'true'
+          REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
+          REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF: hvkfreoagbrphwghjajw
+          REALITY_PERSONAL_CHAT_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+          REALITY_RELIABILITY_BENCHMARK_PROJECT_REF: hvkfreoagbrphwghjajw
+          REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF: hvkfreoagbrphwghjajw
+          REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALITY_STANDALONE_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_SEMANTIC_REVIEW_MODEL: ${{ vars.REALITY_SEMANTIC_REVIEW_MODEL }}
+          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
+          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: prj_5A3b0WG9IuvzyEUBw9tD9v8jcha8
+        run: node scripts/reality-run-first178-github-worker.mjs
