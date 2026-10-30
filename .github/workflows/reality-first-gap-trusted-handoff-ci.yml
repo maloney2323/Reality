@@ -61,5 +61,13 @@ jobs:
         run: |
           node --check src/reality-first178-approved-completion-v0.1.js
           node --test test/reality-first178-approved-completion-v0.1.test.js
+      - name: Execute ORIGINAL frozen #178 acceptance against installed model-authored source
+        run: |
+          if [ -f src/reality-extensions/reality-ci-failure-evidence.mjs ]; then
+            test -f test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+            node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          else
+            echo "Original #178 uninstalled; frozen acceptance requires exact owner-authorized source."
+          fi
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
