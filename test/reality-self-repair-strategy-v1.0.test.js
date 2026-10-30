@@ -4,6 +4,8 @@ import {
  createGovernedSelfImprovement,proposeGovernedCandidate,
  acceptGovernedObservation
 } from '../src/reality-governed-self-improvement-spine-v1.0.js';
+import {projectVerifiedSelfRepairOpportunity}
+ from '../src/reality-upgrade-discovery-v0.1.js';
 import {
  strategyFromConstitutionalJournal,
  strategyFromVerifiedFailureSummary,
@@ -83,6 +85,18 @@ test('independent repeated failures change source-level strategy; history stays 
  assert.equal(exhausted.automatic_reexecution_permitted,false);
  assert.equal(exhausted.discovered_work.status,'BLOCKED_REQUIRES_NEW_AUTHORITY');
  assert.equal(exhausted.original_job_completed,false);
+});
+test('repair is visible as an upgrade discovery for the SAME original job, with zero new authority',async()=>{
+ let s=await setup();
+ s=await fail(s,1);
+ const opportunity=projectVerifiedSelfRepairOpportunity({state:s});
+ assert.equal(opportunity.discovery_status,'SOURCE_VERIFIED_REPAIR_DISCOVERY');
+ assert.equal(opportunity.original_work_id,scope.original_work_id);
+ assert.equal(opportunity.discovered_work.original_work_id,scope.original_work_id);
+ assert.equal(opportunity.discovered_work.category,'upgrades_and_improvements');
+ assert.equal(opportunity.discovered_work.execution_authorized,false);
+ assert.equal(opportunity.new_job_created,false);
+ assert.equal(opportunity.installation_authorized,false);
 });
 test('treat regression log as data, never self-approve or treat wrong value as real authority',()=>{
  const parsed=extractVerifiedFailureAssertions(output);
