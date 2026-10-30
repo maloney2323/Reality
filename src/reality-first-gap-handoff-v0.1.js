@@ -175,9 +175,10 @@ export async function observeFirstGapFromGithub({
 // This requires a real authenticated Reality work ID, NOT the fixture 'work:e...'.
 export async function admitFirstGapBuildTicket({
  scope,providerEvidence,persistGap,readBackGap,
- reobserveProviderEvidence,
+ reobserveProviderEvidence,maxAttempts=3,
 }={}){
  strictScope(scope);
+ if(![3,5].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
  if(typeof reobserveProviderEvidence!=='function')
   fail('INDEPENDENT_REOBSERVATION_REQUIRED');
  const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
@@ -233,7 +234,7 @@ export async function admitFirstGapBuildTicket({
   frozen_regression_manifest_ref:FIRST_GAP_PROOF.manifest_ref,
   frozen_regression_sha256:FIRST_GAP_PROOF.manifest_sha256,
   repository_base_sha:FIRST_GAP_PROOF.run_head_sha,
-  environment:'ISOLATED_PREVIEW',max_attempts:3,
+  environment:'ISOLATED_PREVIEW',max_attempts:maxAttempts,
   allowed_source_roots:['src/reality-extensions/','test/reality-extensions/'],
  });
  return Object.freeze({ticket,
@@ -302,7 +303,8 @@ export async function generateAfterTrustedGap({
   const unverifiedCandidate=resumeState.phase==='CANDIDATE_READY'&&
      resumeState.attempt_count>=1&&
      resumeState.attempt_count<=ticket.max_attempts&&
-     resumeState.journal.length===2*resumeState.attempt_count&&
+     resumeState.journal.length===2*resumeState.attempt_count+
+       (resumeState.recovery_authorization?.verified===true?1:0)&&
      resumeState.journal.at(-1).kind==='MODEL_CANDIDATE_PROPOSED'&&
      resumeState.candidate?.generated_by_model===true&&
      resumeState.candidate?.verified===false&&
@@ -312,13 +314,23 @@ export async function generateAfterTrustedGap({
      (resumeState.attempt_count===1||
       (resumeState.independent_failure?.classification?.retry_source_without_dependency===true&&
        resumeState.independent_failure.attempt===resumeState.attempt_count-1&&
-       resumeState.journal.at(-2).kind==='SANDBOX_FAILED'));
+       (resumeState.journal.at(-2).kind==='SANDBOX_FAILED'||
+        (resumeState.attempt_count===4&&recoveryOffset===1&&
+         resumeState.journal.at(-2).kind==='RECOVERY_STARTED'&&
+         resumeState.journal.at(-3).kind==='SANDBOX_FAILED'))));
+  const recoveryOffset=resumeState.recovery_authorization?.verified===true?1:0;
+  const lastEvent=resumeState.journal.at(-1);
+  const recoveryOpening=resumeState.phase==='REPAIR_REQUIRED'&&
+     recoveryOffset===1&&resumeState.attempt_count===3&&
+     lastEvent?.kind==='RECOVERY_STARTED'&&
+     resumeState.journal.length===8;
   const repairableCheckpoint=resumeState.phase==='REPAIR_REQUIRED'&&
      resumeState.attempt_count>=1&&
      resumeState.attempt_count<ticket.max_attempts&&
-     resumeState.journal.length===2*resumeState.attempt_count+1&&
-     resumeState.journal.at(-1).kind==='SANDBOX_FAILED'&&
-     resumeState.journal.at(-1).evidence_ref===resumeState.independent_failure?.evidence_ref&&
+     (recoveryOpening||(
+       resumeState.journal.length===2*resumeState.attempt_count+1+recoveryOffset&&
+       lastEvent?.kind==='SANDBOX_FAILED'&&
+       lastEvent.evidence_ref===resumeState.independent_failure?.evidence_ref))&&
      resumeState.independent_failure?.attempt===resumeState.attempt_count&&
      resumeState.independent_failure?.classification?.retry_source_without_dependency===true;
   // All are *continuations*, never new goals, work or authority.
