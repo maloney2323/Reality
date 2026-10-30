@@ -87,3 +87,36 @@ test('real fifth-attempt failure offers one source-linked second recovery, no in
  assert.equal(d.additional_attempts,2);
  assert.equal(d.installation_authorized,false);
 });
+
+
+test('seven preserved failures trigger one final bounded draft repair on same job',async()=>{
+ const digest='b'.repeat(64),lastReceipt='372ed47b-13b0-567d-b2b8-fbc691208e18';
+ const d=await original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>({owner_id:owner,goal_id:goal,original_work_id:work}),
+  dbReader:()=>({}),
+  call:async()=>({queue_id:queueId,original_work_id:work,goal_id:goal,
+   phase:'ESCALATED',report:{state:'ESCALATED',
+    checkpoint_receipt_id:lastReceipt,checkpoint_hash:digest,
+    original_work_id:work,installation_authorized:false,job_completed:false}}),
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>({
+   verified:true,original_work_id:work,checkpoint_hash:digest,
+   continuity_receipt_id:lastReceipt,state:{phase:'ESCALATED',
+    attempt_count:7,attempt_limit:7,
+    recovery_authorization:{verified:true},
+    recovery_continuation_authorization:{verified:true},
+    independent_failure:{classification:{retry_source_without_dependency:true}}}
+  })}),
+ });
+ assert.equal(d.status,'GOVERNED_RECOVERY_READY');
+ assert.equal(d.attempt_limit,8);
+ assert.equal(d.attempts_used,7);
+ assert.equal(d.additional_attempts,1);
+ assert.equal(d.autonomous_recovery_eligible,true);
+ assert.equal(d.original_claim_preserved,true);
+ assert.equal(d.installation_authorized,false);
+ assert.equal(d.original_job_completed,false);
+});
