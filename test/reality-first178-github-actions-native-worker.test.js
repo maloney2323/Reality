@@ -54,6 +54,20 @@ test('GitHub-native original worker checks exact branch and HEAD before DB mutat
  assert.throws(()=>verifyGitHubFirst178Run(env,'b'.repeat(40)),
   /EXACT_WORKFLOW_REPOSITORY_BRANCH_COMMIT_REQUIRED/);
 });
+test('only a nominated preview push may activate the already-authorized original recovery',()=>{
+ const activated={...env,GITHUB_EVENT_NAME:'push',
+  REALITY_FIRST178_ACTIVATION_COMMIT:sha};
+ assert.equal(verifyGitHubFirst178Run(activated,sha).original_work_id,work);
+ for(const bad of [
+  {...activated,REALITY_FIRST178_ACTIVATION_COMMIT:'b'.repeat(40)},
+  {...activated,REALITY_FIRST178_ACTIVATION_COMMIT:''},
+  {...activated,GITHUB_REF:'refs/heads/main'},
+  {...activated,GITHUB_SHA:'b'.repeat(40)},
+ ]){
+  assert.throws(()=>verifyGitHubFirst178Run(bad,sha),
+   /REALITY_FIRST178_GITHUB_WORKER_/);
+ }
+});
 test('GitHub invokes existing direct-dispatch+DB-handoff path once; no installation',async()=>{
  let calls=0;
  const r=await runGitHubFirst178Recovery({env,checkoutSha:sha,
