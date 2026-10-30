@@ -44,6 +44,30 @@ export async function original178OwnerApprovalView({
     queue.original_work_id!==scope.original_work_id||
     queue.goal_id!==scope.goal_id)
   fail('ORIGINAL_QUEUE_READBACK_MISMATCH');
+ // Read the exact durable outcome of an exhausted original job.
+ // This is NOT an unconsumed GAP and may not be silently re-claimed.
+ if(queue.phase==='ESCALATED'){
+  const receipt=queue.report?.checkpoint_receipt_id;
+  const digest=queue.report?.checkpoint_hash;
+  if(queue.report?.state!=='ESCALATED'||!uuid(receipt)||
+     !/^[a-f0-9]{64}$/.test(String(digest||''))||
+     queue.report?.original_work_id!==scope.original_work_id||
+     queue.report?.installation_authorized!==false||
+     queue.report?.job_completed!==false)
+   fail('ESCALATED_QUEUE_DURABLE_RECEIPT_UNVERIFIED');
+  return Object.freeze({
+   status:'EXHAUSTED_CORRECTION_ATTEMPTS',
+   original_work_id:scope.original_work_id,queue_id:queue.queue_id,
+   attempt_limit:3,attempts_used:3,
+   checkpoint_receipt_id:receipt,checkpoint_hash:digest,
+   one_click_job_attempted:true,owner_approval_required:false,
+   cannot_auto_retry_consumed_claim:true,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,
+   reason:'All three model candidates failed independent sandbox tests. '+
+    'The original job is preserved but NOT completed.',
+  });
+ }
  const checkpoint=checkpointFactory({
   session,conversationId,originalWorkId:scope.original_work_id,db,env,
  });
