@@ -397,6 +397,7 @@ export async function runOriginal178OneApproval({
      (receipt.artifact_hash&&receipt.artifact_hash!==artifact))
    return {verified:false};
   let source=null;
+  try{
   if(receipt.kind==='PROMOTION_AUTHORIZED'){
    const proof=await readExactOwnerApproval();
    if(proof?.verified===true&&
@@ -432,6 +433,8 @@ export async function runOriginal178OneApproval({
       proof.evidence_hash===receipt.evidence_hash)
     source='INDEPENDENT_DURABLE_CONTINUITY_OUTCOME_READBACK';
   }
+  }catch{return {verified:false,
+    reason:'DISTINCT_PROVIDER_READBACK_UNAVAILABLE'}}
   if(!source)return {verified:false,
    reason:'DISTINCT_VERIFIABLE_PROVIDER_OPERATION_REQUIRED'};
   return {verified:true,independent_provider_readback:true,
