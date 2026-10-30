@@ -152,6 +152,62 @@ export function createFirst178ConstitutionalCheckpointService({
    evidence_hash:gap.payload.evidence_hash,
    provider_receipt_ref:gap.payload.provider_receipt_ref});
  };
+ const readLatestCheckpoint=async()=>{
+  const {g,spine}=await verifyGoal();
+  const history=orderContinuityHistory(await read(spine));
+  const originals=exactOriginal(history).filter(x=>
+   x.payload?.original_goal_id===g.state.active_goal_id&&
+   x.payload?.goal_transition_receipt_ref===
+    g.state.active_goal.last_transition_receipt_id);
+  if(originals.length!==1)
+   fail('RESTORE_ORIGINAL_SOURCE_NOT_UNIQUE');
+  const checkpoints=history.filter(e=>
+   e.entity_type==='personal_first_178_constitutional_checkpoint'&&
+   e.payload?.original_work_id===originalWorkId);
+  if(checkpoints.length<1)fail('RESTORE_CHECKPOINT_NOT_FOUND');
+  const last=checkpoints.at(-1);
+  const state=last?.payload?.driver_state;
+  verifySelfImprovementJournal(state);
+  if(state?.phase!=='GAP_CONFIRMED'||
+     state?.attempt_count!==0||state?.candidate!==null||
+     state?.journal?.length!==1||
+     state?.journal?.[0]?.kind!=='GAP_CONFIRMED'||
+     state.scope?.owner_id!==session.user_id||
+     state.scope?.goal_id!==g.state.active_goal_id||
+     state.scope?.original_work_id!==originalWorkId||
+     state.scope?.worldline_id!==spine.worldline_id||
+     state.scope?.continuity_root_id!==spine.continuity_root_id||
+     state.scope?.goal_transition_receipt_ref!==
+      g.state.active_goal.last_transition_receipt_id||
+     state.scope?.goal_evidence_ref!==
+      g.state.active_goal.source_user_message_ref||
+     state.scope?.target_environment!=='ISOLATED_PREVIEW'||
+     last.payload?.constitutional_phase!=='GAP_CONFIRMED'||
+     last.payload?.constitutional_head_hash!==state.head_hash||
+     last.payload?.original_source_receipt_ref!==originals[0].event_id||
+     last.payload?.installation_authorized!==false||
+     last.payload?.original_job_completed!==false)
+   fail('RESTORE_EXACT_UNCONSUMED_GAP_REQUIRED');
+  // The independent gap evidence must still match this original owner's
+  // worldline. This also verifies there was no model-authored approval.
+  const gap=history.filter(e=>
+   e.entity_type==='personal_first_178_confirmed_gap'&&
+   e.payload?.original_work_id===originalWorkId);
+  if(gap.length!==1||gap[0].payload?.original_source_receipt_ref!==
+     originals[0].event_id||gap[0].payload?.authorization_granted!==false)
+   fail('RESTORE_GAP_PROVENANCE_MISSING');
+  const verified=await readBackGap({
+   owner_id:session.user_id,goal_id:g.state.active_goal_id,
+   original_work_id:originalWorkId,receipt_id:gapReceiptId,
+  });
+  if(!verified.verified||verified.evidence_hash!==
+      gap[0].payload.evidence_hash)
+   fail('RESTORE_PROVIDER_GAP_READBACK_FAILED');
+  return Object.freeze({state,
+   continuity_receipt_id:last.event_id,
+   checkpoint_hash:state.head_hash,
+   original_work_id:originalWorkId,verified:true});
+ };
  const persistCheckpoint=async state=>{
   verifySelfImprovementJournal(state);
   if(state.scope.owner_id!==session.user_id||
@@ -262,5 +318,6 @@ export function createFirst178ConstitutionalCheckpointService({
    continuity_receipt_id:id,
   });
  };
- return Object.freeze({persistCheckpoint,persistGap,readBackGap});
+ return Object.freeze({persistCheckpoint,persistGap,readBackGap,
+  readLatestCheckpoint});
 }
