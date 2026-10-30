@@ -26,7 +26,7 @@ const validated={
 test('one owner call admits exact original work once then invokes constitutional executor',async()=>{
  const calls=[];
  const response=await runFirst178SingleAction({
-  session,conversationId,env,
+  session,conversationId,env,resolveOriginal:async()=>null,
   inspect:async args=>{
    assert.equal(args.conversationId,conversationId);
    calls.push('READ');
@@ -45,10 +45,48 @@ test('one owner call admits exact original work once then invokes constitutional
  assert.equal(response.installation_authorized,false);
  assert.equal(response.original_job_completed,false);
 });
+test('canonical owner work from an earlier conversation wins without changing its goal or requeuing',async()=>{
+ const originalConversation='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const calls=[];
+ const result=await runFirst178SingleAction({
+  session,conversationId,env,
+  resolveOriginal:async()=>({
+   verified_owner:session.user_id,issue_number:178,
+   conversation_id:originalConversation,queue_id:queueId,
+   original_work_id:scope.original_work_id,goal_id:scope.goal_id,
+   installation_authorized:false,original_job_completed:false,
+  }),
+  inspect:async req=>{
+   calls.push('READ:'+req.conversationId);
+   return {...scope,status:'ALREADY_QUEUED',queue_id:queueId,
+    queue_phase:'QUEUED_DISCOVERY'};
+  },
+  start:async()=>{throw Error('MUST_NOT_ENQUEUE_ANOTHER_CONVERSATION')},
+  execute:async req=>{calls.push('RUN:'+req.conversationId);return validated},
+ });
+ assert.deepEqual(calls,['READ:'+originalConversation,'RUN:'+originalConversation]);
+ assert.equal(result.existing_work,true);
+ assert.equal(result.original_work_id,scope.original_work_id);
+ assert.equal(result.installation_authorized,false);
+});
+test('canonical owner mismatch fails before execution',async()=>{
+ let called=false;
+ await assert.rejects(runFirst178SingleAction({
+  session,conversationId,env,
+  resolveOriginal:async()=>({
+   conversation_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+   original_work_id:'work:'+'f'.repeat(32),goal_id:scope.goal_id,
+   queue_id:queueId,
+  }),
+  inspect:async()=>{called=true;return {...scope,status:'ALREADY_QUEUED',queue_id:queueId}},
+  execute:async()=>{throw Error('NO_EXECUTION')},
+ }),/FIRST178_SINGLE_ACTION_CANONICAL_ORIGINAL_OWNER_GOAL_CHANGED/);
+ assert.equal(called,true);
+});
 test('previous queued exact #178 continues without re-creating source work',async()=>{
  let startCalls=0,executeCalls=0;
  const result=await runFirst178SingleAction({
-  session,conversationId,env,
+  session,conversationId,env,resolveOriginal:async()=>null,
   inspect:async()=>({...scope,status:'ALREADY_QUEUED',queue_id:queueId,
    queue_phase:'QUEUED_DISCOVERY'}),
   start:async()=>{startCalls++;throw Error('DUPLICATE_JOB')},
@@ -62,7 +100,7 @@ test('already claimed or awaiting approval never replays execution',async()=>{
  for(const phase of ['RUNNING_CONSTITUTIONAL','AWAITING_OWNER_APPROVAL',
   'EXECUTION_UNRESOLVED','ESCALATED']){
   const result=await runFirst178SingleAction({
-   session,conversationId,env,
+   session,conversationId,env,resolveOriginal:async()=>null,
    inspect:async()=>({...scope,status:'ALREADY_QUEUED',
     queue_id:queueId,queue_phase:phase,
     checkpoint_receipt_id:receiptId,checkpoint_hash:'c'.repeat(64),
@@ -78,7 +116,7 @@ test('already claimed or awaiting approval never replays execution',async()=>{
 });
 test('missing prerequisite returns exact blocker without attempting generation',async()=>{
  await assert.rejects(()=>runFirst178SingleAction({
-  session,conversationId,env,
+  session,conversationId,env,resolveOriginal:async()=>null,
   inspect:async()=>({...scope,status:'BLOCKED_GITHUB_READ_ONLY_CREDENTIAL'}),
   start:async()=>{throw Error('SHOULD_NOT_QUEUE')},
   execute:async()=>{throw Error('SHOULD_NOT_GENERATE')},
@@ -86,12 +124,12 @@ test('missing prerequisite returns exact blocker without attempting generation',
 });
 test('foreign original work or forged installed state fails closed',async()=>{
  await assert.rejects(()=>runFirst178SingleAction({
-  session,conversationId,env,
+  session,conversationId,env,resolveOriginal:async()=>null,
   inspect:async()=>({...scope,issue_number:143,status:'READY_FOR_EXACT_OWNER_CONFIRMATION'}),
   start:async()=>{throw Error('MUST_NOT_QUEUE')},
  }),/FIRST178_SINGLE_ACTION_VERIFIED_ORIGINAL_SCOPE_REQUIRED/);
  await assert.rejects(()=>runFirst178SingleAction({
-  session,conversationId,env,
+  session,conversationId,env,resolveOriginal:async()=>null,
   inspect:async()=>({...scope,status:'READY_FOR_EXACT_OWNER_CONFIRMATION'}),
   start:async()=>({...scope,status:'QUEUED_DIRECT_CONSTITUTIONAL',queue_id:queueId,
    continuity_work_receipt_id:receiptId}),
