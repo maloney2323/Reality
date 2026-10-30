@@ -95,7 +95,13 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
    const model=await run(tests);
    const session=sandbox.currentSession?.();
    const sessionId=session?.sessionId||session?.id;
-   if(!sessionId||!frozen.cmd?.id||!model.cmd?.id)
+   // @vercel/sandbox v3 returns CommandFinished.cmdId (not .id).
+   // Do not synthesize IDs from model output or fabricate provider receipts.
+   const frozenId=frozen.cmd?.cmdId,modelId=model.cmd?.cmdId;
+   if(typeof sessionId!=='string'||!sessionId.startsWith('sbx_')||
+      typeof frozenId!=='string'||!frozenId.startsWith('cmd_')||
+      typeof modelId!=='string'||!modelId.startsWith('cmd_')||
+      frozenId===modelId)
     die('FOUNDATION_SANDBOX_PROVIDER_COMMAND_ID_REQUIRED');
    const report={
     ticket_hash:ticket.ticket_hash,artifact_sha256:candidate.artifact_sha256,
@@ -114,11 +120,11 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
        model.counts.tests>0&&model.counts.fail===0},
     ],
     log_excerpt:(frozen.output+'\n'+model.output).slice(-8000),
-    runner_receipt_ref:'vercel-sandbox:'+sessionId+':'+model.cmd.id+':'+attempt,
+    runner_receipt_ref:'vercel-sandbox:'+sessionId+':'+modelId+':'+attempt,
    };
    const reportHash=digest(report);
    pending.set(reportHash,{sandbox,report,sessionId,
-    commands:[frozen.cmd.id,model.cmd.id],artifact_hash:candidate.artifact_sha256});
+    commands:[frozenId,modelId],artifact_hash:candidate.artifact_sha256});
    return report;
   }catch(error){
    if(sandbox)await sandbox.stop().catch(()=>{});
@@ -140,7 +146,7 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
     ref.commands.map(id=>ref.sandbox.getCommand(id)));
    const expected=ref.report.test_results;
    if(!frozen||!model||
-      frozen.id!==ref.commands[0]||model.id!==ref.commands[1]||
+      frozen.cmdId!==ref.commands[0]||model.cmdId!==ref.commands[1]||
       (frozen.exitCode===0)!==expected[0].passed||
       (model.exitCode===0)!==expected[1].passed)
     die('FOUNDATION_SANDBOX_PROVIDER_COMMAND_READBACK_MISMATCH');
