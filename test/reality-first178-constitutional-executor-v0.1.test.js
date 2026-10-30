@@ -118,6 +118,22 @@ test('one owner-scoped claim resumes identical work and stops at installation ap
   'reality_claim_governed_build_178_v1',
   'reality_record_governed_build_178_v1']);
 });
+test('the ONE existing original #178 queue survives worker redeploy without requeue or altering pinned source',async()=>{
+ const originalRelease='f57dc3b253824ad1edf5675cf5e6223097d50ff9';
+ const recorded={...queue,preview_release_sha:originalRelease};
+ const h=kit({queue:recorded});
+ const result=await executeFirst178Constitutional(h.options);
+ assert.equal(result.status,'AWAITING_OWNER_APPROVAL');
+ assert.equal(result.original_work_id,work);
+ const claim=h.calls.find(x=>x.name==='reality_claim_governed_build_178_v1');
+ assert.ok(claim);
+ assert.equal(claim.args.p_preview_release_sha,originalRelease);
+ assert.equal(claim.args.p_original_work_id,work);
+ assert.equal(claim.args.p_owner_id,owner);
+ assert.equal(h.calls.filter(x=>x.name==='reality_claim_governed_build_178_v1').length,1);
+ assert.equal(h.calls.some(x=>x.name==='reality_enqueue_governed_build_v1'),false);
+ assert.equal(result.installation_authorized,false);
+});
 test('queue already running, foreign work or wrong preview can never invoke model',async()=>{
  for(const badQueue of [
   {...queue,phase:'RUNNING_CONSTITUTIONAL'},
