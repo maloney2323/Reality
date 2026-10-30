@@ -267,10 +267,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <p class="wc-note">Real missing capability: GitHub Actions failure-to-upgrade evidence. Frozen red run #40962921090. Only this job is eligible here; settled #143 cannot be selected. Generation and isolated verification may use model credits. Installation always requires separate approval.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button id="wcInspectFirstGap178" type="button">Refresh #178 status · Read only</button>
+     <button id="wcSelfDiagnose178" type="button">Reality · Diagnose its own failure</button>
      <button id="wcStartFirstGap178" type="button">Run original #178 · One click</button>
      <button id="wcApproveFirst178" type="button" style="display:none" disabled>Approve exact verified upgrade · Finish original #178</button>
     </div>
     <p id="wcFirst178ApprovalStatus" role="status" aria-live="polite" class="wc-note">Reality will present one installation approval ONLY after the exact original candidate passes independent tests. No production installation.</p>
+    <p id="wcSelfDiagnose178Status" role="status" aria-live="polite" class="wc-note">Reality's read-only self-diagnosis will compare the canonical saved job, selected conversation, verified failure checkpoint, and authority boundaries. Diagnosis never retries or grants installation.</p>
     <p id="wcFirstGap178Status" role="status" aria-live="polite" class="wc-note">One owner click starts the exact original #178 investigation, AI generation, and independent sandbox testing. This may consume model/sandbox credits. No capability installation, production change, or settlement is authorized.</p>
    </div>
   </section>
@@ -1319,6 +1321,39 @@ function wcFirstGap178Conversation(){
  return /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(candidate)?
   candidate:null;
 }
+let wcFirst178SelfDiagnosisBusy=false;
+async function wcSelfDiagnoseOriginal178(){
+ const status=$('wcSelfDiagnose178Status');
+ const button=$('wcSelfDiagnose178');
+ if(!status||!button||wcFirst178SelfDiagnosisBusy||
+    $('privateReady')?.style.display!=='block')return;
+ wcFirst178SelfDiagnosisBusy=true;
+ button.disabled=true;
+ status.textContent='Reality is independently reading its original saved job and failure checkpoint. No retry or installation…';
+ try{
+  const selected=wcFirstGap178Conversation();
+  const qs=selected?'?conversation_id='+encodeURIComponent(selected):'';
+  const response=await fetch('/api/reality/personal-first-upgrade-178-diagnose'+qs,{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const d=await response.json();
+  if(!response.ok||d.ok!==true||
+     d.read_only!==true||d.auto_retry_allowed!==false||
+     d.installation_authorized!==false||d.original_job_completed!==false)
+   throw Error(String(d.error||'DIAGNOSIS_READBACK_UNVERIFIED'));
+  const selectedNote=d.selected_conversation_matches_original===false?
+   ' Detected: browser-selected conversation is NOT the canonical original job; this is separate from the failed sandbox attempts.':'';
+  status.textContent='Reality diagnosis · '+String(d.status||'UNVERIFIED')+
+   '. '+String(d.finding||'No verified finding.')+selectedNote+
+   ' Next: '+String(d.proposed_next_step||'Read provider evidence.')+
+   (d.checkpoint_receipt_id?' Evidence receipt: '+d.checkpoint_receipt_id+'.':'')+
+   ' No new claim, approval, installation or settlement.';
+ }catch(e){
+  status.textContent='Reality could not verify the full self-diagnosis: '+
+   String(e?.message||'UNAVAILABLE')+
+   '. The original job and authority remain unchanged.';
+ }finally{wcFirst178SelfDiagnosisBusy=false;button.disabled=false}
+}
+$('wcSelfDiagnose178').onclick=()=>{void wcSelfDiagnoseOriginal178();};
 async function wcInspectFirstGap178(){
  const status=$('wcFirstGap178Status'),button=$('wcInspectFirstGap178');
  if(wcFirstGap178Busy)return;
@@ -1359,7 +1394,11 @@ async function wcInspectFirstGap178(){
  }catch(error){
   status.textContent='Cannot verify original #178: '+String(error?.message||'UNAVAILABLE')+
    '. No execution or installation performed.';
- }finally{button.disabled=false;void wcReadOwnerApproval178();}
+ }finally{
+  button.disabled=false;
+  void wcReadOwnerApproval178();
+  void wcSelfDiagnoseOriginal178();
+ }
 }
 $('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
 async function wcFirstGap178Run(){
