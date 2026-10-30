@@ -391,24 +391,53 @@ export async function runOriginal178OneApproval({
  // same CI run; remove that false success path until separate provider
  // operations and their independent readbacks are connected.
  const verifyIndependentReceipt=async({receipt,scope_hash})=>{
-  if(receipt.owner_id!==session.user_id||
-     receipt.goal_id!==scope.goal_id||
-     receipt.original_work_id!==scope.original_work_id||
+  if(receipt?.owner_id!==session.user_id||
+     receipt?.goal_id!==scope.goal_id||
+     receipt?.original_work_id!==scope.original_work_id||
      (receipt.artifact_hash&&receipt.artifact_hash!==artifact))
    return {verified:false};
-  if(receipt.kind!=='PROMOTION_AUTHORIZED')
-   return {verified:false,
-    reason:'DISTINCT_CONSEQUENCE_PROVIDER_READBACK_REQUIRED'};
-  const proof=await readExactOwnerApproval();
-  if(proof?.verified!==true||
-     approvalRef(proof.reservation_id)!==receipt.evidence_ref||
-     approvalEvidence(proof.reservation_id)!==receipt.evidence_hash||
-     receipt.reservation_ref!==receipt.evidence_ref)
-   return {verified:false};
+  let source=null;
+  if(receipt.kind==='PROMOTION_AUTHORIZED'){
+   const proof=await readExactOwnerApproval();
+   if(proof?.verified===true&&
+      approvalRef(proof.reservation_id)===receipt.evidence_ref&&
+      approvalEvidence(proof.reservation_id)===receipt.evidence_hash&&
+      receipt.reservation_ref===receipt.evidence_ref)
+    source='VERIFIED_OWNER_APPROVAL_DATABASE';
+  }else if(receipt.kind==='CAPABILITY_REGISTERED'){
+   const proof=await registrationProvider().verify({
+    evidenceHash:receipt.evidence_hash});
+   if(proof?.verified===true&&
+      proof.registry_receipt_ref===receipt.registry_receipt_ref&&
+      proof.registry_receipt_ref===receipt.evidence_ref&&
+      receipt.status==='ACTIVE')
+    source='INDEPENDENT_CAPABILITY_REGISTRY_DATABASE_READBACK';
+  }else if(receipt.kind==='ORIGINAL_JOB_RESUMED'){
+   const registryProof=await readRegistered();
+   const proof=await provision().observeOriginalExecution(
+    receipt.installed_commit_sha);
+   if(registryProof.verified===true&&proof?.verified===true&&
+      proof.executor_run_ref===receipt.executor_run_ref&&
+      proof.executor_run_ref===receipt.evidence_ref&&
+      proof.evidence_hash===receipt.evidence_hash&&
+      receipt.registration_ref===registryProof.registry_receipt_ref&&
+      proof.provider_run_id!==ci?.provider_run_id)
+    source='INDEPENDENT_DISTINCT_GITHUB_ORIGINAL_WORK_READBACK';
+  }else if(receipt.kind==='ORIGINAL_JOB_SETTLED'){
+   const proof=await outcomeProvider().verify({
+    registration:await readRegistered(),execution:await readExecuted()});
+   if(proof?.verified===true&&
+      proof.settlement_receipt_ref===receipt.settlement_receipt_ref&&
+      proof.settlement_receipt_ref===receipt.evidence_ref&&
+      proof.evidence_hash===receipt.evidence_hash)
+    source='INDEPENDENT_DURABLE_CONTINUITY_OUTCOME_READBACK';
+  }
+  if(!source)return {verified:false,
+   reason:'DISTINCT_VERIFIABLE_PROVIDER_OPERATION_REQUIRED'};
   return {verified:true,independent_provider_readback:true,
    evidence_ref:receipt.evidence_ref,evidence_hash:receipt.evidence_hash,
    original_work_id:scope.original_work_id,scope_hash,
-   attestation_ref:'reality:original178:owner:'+receipt.evidence_ref};
+   attestation_ref:'reality:provider-confirmed:'+source+':'+receipt.evidence_ref};
  };
  const adapter={
   reserveExactOwnerApproval,readExactOwnerApproval,
