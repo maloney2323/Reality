@@ -336,6 +336,55 @@ export async function runOriginal178OneApproval({
   if(ci?.verified===true)return ci;
   return providerCI();
  };
+ const registrationProvider=()=>{
+  if(!current.promotion_authorization?.consumed_once)
+   fail('PRIOR_EXACT_OWNER_APPROVAL_REQUIRED_FOR_REGISTRY');
+  registry ||= registryFactory({db,ownerId:session.user_id,
+   originalWorkId:scope.original_work_id,
+   artifactHash:artifact,verifiedGoalId:scope.goal_id,
+   worldlineId:scope.worldline_id,
+   approvalRef:current.promotion_authorization.reservation_ref});
+  return registry;
+ };
+ const outcomeProvider=()=>{
+  settlement ||= settlementFactory({
+   session,scope:{...scope,target_environment:'ISOLATED_PREVIEW'},
+   db});
+  return settlement;
+ };
+ const readRegistered=async()=>{
+  if(registered)return registered;
+  if(!current.registration||current.registration.status!=='ACTIVE')
+   fail('ACTUAL_REGISTRATION_RECEIPT_REQUIRED');
+  const prior=current.registration;
+  const dbProof=await registrationProvider().verify({
+   evidenceHash:prior.evidence_hash});
+  if(dbProof?.verified!==true||
+     dbProof.registry_receipt_ref!==prior.registry_receipt_ref)
+   fail('RECOVERED_REGISTRATION_NOT_INDEPENDENTLY_VERIFIED');
+  registered=Object.freeze({verified:true,status:'ACTIVE',
+   original_work_id:scope.original_work_id,artifact_hash:artifact,
+   registry_receipt_ref:prior.registry_receipt_ref,
+   evidence_hash:prior.evidence_hash,
+   installed_commit_sha:prior.installed_commit_sha,
+   production_changed:false,original_job_completed:false});
+  return registered;
+ };
+ const readExecuted=async()=>{
+  if(executed)return executed;
+  if(!current.resumption?.executor_run_ref)
+   fail('ACTUAL_ORIGINAL_JOB_EXECUTION_REQUIRED');
+  const prior=current.resumption;
+  const g=provision();
+  const source=prior.installed_commit_sha||(
+   await requireCI()).installed_commit_sha;
+  const proof=await g.observeOriginalExecution(source);
+  if(proof?.verified!==true||
+     proof.executor_run_ref!==prior.executor_run_ref||
+     proof.evidence_hash!==prior.evidence_hash)
+   fail('RECOVERED_ORIGINAL_EXECUTION_NOT_INDEPENDENTLY_VERIFIED');
+  executed=proof;return proof;
+ };
  // The frozen GitHub CI run verifies candidate code only. It cannot attest
  // registration, resumed original customer execution, observation or settlement.
  // The previous adapter constructed three distinct-looking receipts from that
