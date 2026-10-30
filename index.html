@@ -1342,8 +1342,11 @@ async function wcSelfDiagnoseOriginal178(){
    throw Error(String(d.error||'DIAGNOSIS_READBACK_UNVERIFIED'));
   const selectedNote=d.selected_conversation_matches_original===false?
    ' Detected: browser-selected conversation is NOT the canonical original job; this is separate from the failed sandbox attempts.':'';
+  const failed=Array.isArray(d.failing_tests)?
+   d.failing_tests.slice(0,3).map(x=>String(x).slice(0,120)).join('; '):'';
   status.textContent='Reality diagnosis · '+String(d.status||'UNVERIFIED')+
    '. '+String(d.finding||'No verified finding.')+selectedNote+
+   (failed?' Independent tests failing: '+failed+'.':'')+
    ' Next: '+String(d.proposed_next_step||'Read provider evidence.')+
    (d.checkpoint_receipt_id?' Evidence receipt: '+d.checkpoint_receipt_id+'.':'')+
    ' No new claim, approval, installation or settlement.';
