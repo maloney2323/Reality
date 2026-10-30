@@ -433,6 +433,12 @@ test('actual #178 recovery extends same immutable three-failure journal exactly 
  }
  assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,3);
  const old=structuredClone(s);
+ // The real persisted #178 escalation predates recovery_authorization.
+ // Its constitutional hash covers the journal, not newly added fields.
+ const historical=structuredClone(s);
+ delete historical.recovery_authorization;
+ assert.equal(verifySelfImprovementJournal(historical),true);
+ s=historical;
  const proof={verified:true,independent_provider_readback:true,
   owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
   checkpoint_hash:s.head_hash,checkpoint_receipt_id:'continuity:original-e12b',
