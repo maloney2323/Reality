@@ -3,6 +3,7 @@
 // journal. No parallel job status table, no model authority, no installation.
 // Trusted server creates this adapter after authenticated goal/owner readback.
 // It is consumed as 'persistCheckpoint' by the ONE constitutional driver.
+import {createHash} from 'node:crypto';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
@@ -168,10 +169,30 @@ export function createFirst178ConstitutionalCheckpointService({
   const last=checkpoints.at(-1);
   const state=last?.payload?.driver_state;
   verifySelfImprovementJournal(state);
-  if(state?.phase!=='GAP_CONFIRMED'||
-     state?.attempt_count!==0||state?.candidate!==null||
-     state?.journal?.length!==1||
-     state?.journal?.[0]?.kind!=='GAP_CONFIRMED'||
+  const pendingGap=state?.phase==='GAP_CONFIRMED'&&
+   state?.attempt_count===0&&state.candidate===null&&
+   state.journal?.length===1&&state.journal[0]?.kind==='GAP_CONFIRMED';
+  const proposed=state?.candidate;
+  const proposedFiles=proposed?.files;
+  const candidateHash=Array.isArray(proposedFiles)?
+   createHash('sha256').update(JSON.stringify(canon(
+    proposedFiles.map(x=>({path:x.path,content:x.content}))))).digest('hex'):null;
+  const pendingSandbox=state?.phase==='CANDIDATE_READY'&&
+   state?.attempt_count===1&&state?.journal?.length===2&&
+   state.journal[0]?.kind==='GAP_CONFIRMED'&&
+   state.journal[1]?.kind==='MODEL_CANDIDATE_PROPOSED'&&
+   Array.isArray(proposedFiles)&&proposedFiles.length>=2&&
+   proposedFiles.some(x=>x.path?.startsWith('src/'))&&
+   proposedFiles.some(x=>x.path?.startsWith('test/'))&&
+   proposed?.artifact_hash===candidateHash&&
+   state.journal[1].body?.artifact_hash===candidateHash&&
+   state.journal[1].body?.original_work_id===originalWorkId&&
+   proposed.generated_by_model===true&&
+   proposed.verified===false&&proposed.installed===false&&
+   proposed.authorized===false&&state.sandbox_receipt===null&&
+   state.independent_failure===null;
+  if(!pendingGap&&!pendingSandbox||
+
      state.scope?.owner_id!==session.user_id||
      state.scope?.goal_id!==g.state.active_goal_id||
      state.scope?.original_work_id!==originalWorkId||
@@ -182,7 +203,7 @@ export function createFirst178ConstitutionalCheckpointService({
      state.scope?.goal_evidence_ref!==
       g.state.active_goal.source_user_message_ref||
      state.scope?.target_environment!=='ISOLATED_PREVIEW'||
-     last.payload?.constitutional_phase!=='GAP_CONFIRMED'||
+     last.payload?.constitutional_phase!==state.phase||
      last.payload?.constitutional_head_hash!==state.head_hash||
      last.payload?.original_source_receipt_ref!==originals[0].event_id||
      last.payload?.installation_authorized!==false||
