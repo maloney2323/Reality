@@ -67,9 +67,15 @@ const secureManifest=({raw,ticket})=>{
 // published @vercel/sandbox Sandbox client through the existing Vercel OIDC.
 // The VM is created with no environment secrets and network is shut off before
 // model files are uploaded, tests imported, or any model source runs.
-export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
+export function createIsolatedVercelSandbox({SandboxClient,timeout=180000,
+ providerAuth=null}={}){
  if(!SandboxClient||typeof SandboxClient.create!=='function')
   die('FOUNDATION_VERCEL_SANDBOX_CLIENT_REQUIRED');
+ if(providerAuth!==null&&(
+   typeof providerAuth.token!=='string'||providerAuth.token.length<25||
+   !/^[A-Za-z0-9_-]{10,160}$/.test(providerAuth.teamId||'')||
+   !/^prj_[A-Za-z0-9]{10,64}$/.test(providerAuth.projectId||'')))
+  die('FOUNDATION_EXTERNAL_SANDBOX_AUTH_INVALID');
  if(!Number.isInteger(timeout)||timeout<60000||timeout>300000)
   die('FOUNDATION_VERCEL_SANDBOX_TIMEOUT_INVALID');
  const pending=new Map();
@@ -87,6 +93,8 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
   try{
    sandbox=await SandboxClient.create({
     persistent:false,timeout,resources:{vcpus:1},
+    ...(providerAuth?{token:providerAuth.token,
+     teamId:providerAuth.teamId,projectId:providerAuth.projectId}:{}),
     networkPolicy:'allow-all',
     source:{type:'git',url:GITHUB,depth:1,revision:ticket.repository_base_sha},
    });
