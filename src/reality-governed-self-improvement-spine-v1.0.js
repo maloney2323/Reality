@@ -121,15 +121,31 @@ export function verifySelfImprovementJournal(state){
   SETTLED:['ORIGINAL_JOB_SETTLED'],
  };
  const recoveryEvents=state.journal.filter(e=>e.kind==='RECOVERY_STARTED');
- if(recoveryEvents.length>1||
-    (recoveryEvents.length===1&&(
-      state.attempt_limit!==5||state.recovery_authorization?.verified!==true||
+ // The second recovery cannot rewrite or replace the first reservation.
+ // It adds only two more model attempts and retains all failed receipts.
+ if(recoveryEvents.length>2||
+    (recoveryEvents.length>0&&(
+      ![5,7].includes(state.attempt_limit)||
+      state.recovery_authorization?.verified!==true||
       recoveryEvents[0].body?.prior_attempt_limit!==3||
       recoveryEvents[0].body?.prior_checkpoint_hash!==recoveryEvents[0].prior_hash||
       recoveryEvents[0].body?.original_work_id!==state.scope.original_work_id||
       recoveryEvents[0].body?.reservation_id!==state.recovery_authorization?.reservation_id||
       recoveryEvents[0].body?.failed_checkpoint_receipt_id!==state.recovery_authorization?.checkpoint_receipt_id))||
-    (recoveryEvents.length===0&&state.recovery_authorization!=null))
+    (recoveryEvents.length===0&&state.recovery_authorization!=null)||
+    (recoveryEvents.length===1&&
+      (state.attempt_limit!==5||state.recovery_continuation_authorization!=null))||
+    (recoveryEvents.length===2&&(
+      state.attempt_limit!==7||
+      state.recovery_continuation_authorization?.verified!==true||
+      recoveryEvents[1].body?.prior_attempt_limit!==5||
+      recoveryEvents[1].body?.prior_checkpoint_hash!==recoveryEvents[1].prior_hash||
+      recoveryEvents[1].body?.original_work_id!==state.scope.original_work_id||
+      recoveryEvents[1].body?.reservation_id!==
+        state.recovery_continuation_authorization?.reservation_id||
+      recoveryEvents[1].body?.failed_checkpoint_receipt_id!==
+        state.recovery_continuation_authorization?.checkpoint_receipt_id))||
+    (recoveryEvents.length===0&&state.recovery_continuation_authorization!=null))
   throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
  if(!phases[state.phase]?.includes(last)||
     state.attempt_count!==state.journal.filter(
@@ -149,6 +165,7 @@ export function createGovernedSelfImprovement({scope,attemptLimit=3}={}){
   candidate:null,confirmed_gap:null,sandbox_receipt:null,
   independent_failure:null,promotion_authorization:null,
   registration:null,resumption:null,settlement:null,recovery_authorization:null,
+  recovery_continuation_authorization:null,
   journal:[],head_hash:hash({version:GOVERNED_SELF_IMPROVEMENT_VERSION,scope_hash}),
  });
  verifySelfImprovementJournal(state);
@@ -191,11 +208,15 @@ function validateCandidate(candidate){
 // The original 3 failed attempts and hashes remain immutable in the journal.
 export function recoverGovernedEscalation(state,proof){
  verifySelfImprovementJournal(state);
- enforce(state.phase==='ESCALATED'&&state.attempt_count===3&&
-  state.attempt_limit===3&&state.recovery_authorization==null&&
+ enforce(state.phase==='ESCALATED'&&
+  ((state.attempt_count===3&&state.attempt_limit===3&&
+    state.recovery_authorization==null)||
+   (state.attempt_count===5&&state.attempt_limit===5&&
+    state.recovery_authorization?.verified===true&&
+    state.recovery_continuation_authorization==null))&&
   state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
   state.independent_failure?.classification?.retry_source_without_dependency===true&&
-  state.independent_failure?.attempt===3,
+  state.independent_failure?.attempt===state.attempt_count,
   'SELF_IMPROVEMENT_EXACT_REPAIRABLE_EXHAUSTION_REQUIRED');
  enforce(proof?.verified===true&&proof?.independent_provider_readback===true&&
   proof?.owner_id===state.scope.owner_id&&
@@ -212,13 +233,17 @@ export function recoverGovernedEscalation(state,proof){
   checkpoint_receipt_id:proof.checkpoint_receipt_id,
   checkpoint_hash:proof.checkpoint_hash,
   failure_evidence_ref:proof.failure_evidence_ref});
+ const priorLimit=state.attempt_limit;
+ const patch=priorLimit===3?
+  {attempt_limit:5,recovery_authorization:authorization}:
+  {attempt_limit:7,recovery_continuation_authorization:authorization};
  return append(state,{phase:'REPAIR_REQUIRED',kind:'RECOVERY_STARTED',
   body:{original_work_id:state.scope.original_work_id,
-   prior_checkpoint_hash:state.head_hash,prior_attempt_limit:3,
+   prior_checkpoint_hash:state.head_hash,prior_attempt_limit:priorLimit,
    failed_checkpoint_receipt_id:proof.checkpoint_receipt_id,
    failure_evidence_ref:proof.failure_evidence_ref,
    reservation_id:proof.reservation_id,additional_attempts:2},
-  patch:{attempt_limit:5,recovery_authorization:authorization}});
+  patch});
 }
 export function proposeGovernedCandidate(state,candidate){
  verifySelfImprovementJournal(state);
