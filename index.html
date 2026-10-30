@@ -1167,6 +1167,7 @@ let wcFirstGap178AutoResumeAttempted=false;
 let wcFirst178ApprovalReady=null;
 let wcFirst178CompletionBusy=false;
 let wcFirst178CompletionAutoStarted=false;
+let wcFirst178RecoveryAutoStarted=false;
 async function wcReadOwnerApproval178(){
  const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
  if(!button||!status||$('privateReady')?.style.display!=='block')return;
@@ -1182,12 +1183,23 @@ async function wcReadOwnerApproval178(){
     ' · Original work '+String(d.original_work_id)+'.';
    $('wcStartFirstGap178').style.display='none';return;
   }
+  if(d.status==='GOVERNED_RECOVERY_READY'&&
+     d.autonomous_recovery_eligible===true&&d.original_claim_preserved===true){
+   wcFirst178ApprovalReady=null;
+   $('wcStartFirstGap178').style.display='none';
+   status.textContent='Original #178: the first three candidates failed. Reality has independently verified this repairable failure and can continue SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
+   if(!wcFirst178RecoveryAutoStarted){
+    wcFirst178RecoveryAutoStarted=true;
+    void wcFirstGap178Run();
+   }
+   return;
+  }
   if(d.status==='EXHAUSTED_CORRECTION_ATTEMPTS'&&
      d.cannot_auto_retry_consumed_claim===true){
    wcFirst178ApprovalReady=null;
    $('wcStartFirstGap178').style.display='none';
    status.textContent='Original #178 ran all '+String(d.attempts_used)+
-    ' independent sandbox attempts and safely STOPPED without a passing candidate. '+
+    ' independently checked sandbox attempts and safely STOPPED without a passing candidate. '+
     'No installation, resumption, or final settlement occurred. '+
     'Verified escalation checkpoint: '+String(d.checkpoint_receipt_id)+
     '. The original work remains preserved. Further correction requires a separately governed recovery; pressing Run again would not complete it.';
