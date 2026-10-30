@@ -235,6 +235,17 @@ export async function startFirstUpgrade178({
  if(fresh.original_work_id!==initial.original_work_id||
     fresh.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
    fail('GOAL_CHANGED_DURING_PROVIDER_CHECK');
+ const third=await verifiedOwnerScope({session,conversationId,env,readGoal});
+ if(third.original_work_id!==initial.original_work_id||
+    third.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
+   fail('GOAL_CHANGED_BEFORE_CONTINUITY_WORK');
+ const workReceipt=await persistWork({scope:initial,conversationId,
+   providerEvidence:observed,db});
+ if(workReceipt?.verified_readback!==true||
+    workReceipt.original_work_id!==initial.original_work_id||
+    workReceipt.installation_authorized!==false||
+    !uuid(workReceipt.receipt_id))
+   fail('CONTINUITY_WORK_READBACK_FAILED',503);
  const result=await call(db,'reality_enqueue_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
   p_goal_id:initial.goal_id,
@@ -250,17 +261,6 @@ export async function startFirstUpgrade178({
     result.goal_id!==initial.goal_id||result.job_completed!==false||
     result.installation_authorized!==false)
   fail('DURABLE_QUEUE_RECEIPT_UNVERIFIED',503);
- const third=await verifiedOwnerScope({session,conversationId,env,readGoal});
- if(third.original_work_id!==initial.original_work_id||
-    third.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
-   fail('GOAL_CHANGED_BEFORE_CONTINUITY_WORK');
- const workReceipt=await persistWork({scope:initial,conversationId,
-   providerEvidence:observed,db});
- if(workReceipt?.verified_readback!==true||
-    workReceipt.original_work_id!==initial.original_work_id||
-    workReceipt.installation_authorized!==false||
-    !uuid(workReceipt.receipt_id))
-   fail('CONTINUITY_WORK_READBACK_FAILED',503);
  // No GitHub WRITE request here. The existing atomic queue is claimed
  // separately by the trusted constitutional driver in the same preview.
  // This avoids copying a protected GitHub dispatch secret and ensures there
