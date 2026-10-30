@@ -55,7 +55,9 @@ export async function executeFirst178Constitutional({
  const queue=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
  });
- if(!uuid(queue?.queue_id)||queue?.phase!=='QUEUED_DISCOVERY'||
+ const recovering=queue?.phase==='RUNNING_CONSTITUTIONAL';
+ if(!uuid(queue?.queue_id)||
+    !['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(queue?.phase)||
     queue.original_work_id!==scope.original_work_id||
     queue.goal_id!==scope.goal_id||
     !verifiedOriginal178QueuePin(queue,env)||
@@ -70,25 +72,60 @@ export async function executeFirst178Constitutional({
     initialEvidence.run_id!==FIRST_GAP_PROOF.run_id||
     !sha64(initialEvidence.evidence_hash))
   die('PINNED_PROVIDER_GAP_INVALID',503);
- // No external model call or sandbox can occur until this single database
- // transaction succeeds under the SAME authenticated goal epoch.
- const claim=await call(db,'reality_claim_governed_build_178_v1',{
-  p_owner_id:session.user_id,p_conversation_id:conversationId,
-  p_queue_id:queue.queue_id,p_goal_id:scope.goal_id,
-  p_original_work_id:scope.original_work_id,
-  p_goal_transition_event_id:scope.goal_transition_receipt_ref,
-  // Atomic database claim verifies this source pin is still exactly the
-  // immutable pin in the queue, not the freshly deployed worker release.
-  p_preview_release_sha:queue.preview_release_sha,
- });
- if(claim?.claimed!==true||!uuid(claim.claim_id)||
-    claim.queue_id!==queue.queue_id||
-    claim.original_work_id!==scope.original_work_id||
-    claim.installation_authorized!==false)
-  die('ATOMIC_SINGLE_CLAIM_READBACK_INVALID',503);
+ // The exact original #178 claim is never repeated. A prior generation
+ // was rejected before any candidate could enter the constitutional journal.
+ // Recovery requires an independent source readback and an atomic ONE-TIME
+ // reservation against the SAME claimed database row.
  const checkpoint=checkpointFactory({
   session,conversationId,originalWorkId:scope.original_work_id,db,env,
  });
+ let claim,resumeState=null;
+ if(recovering){
+  if(typeof checkpoint.readLatestCheckpoint!=='function')
+   die('DURABLE_RECOVERY_READBACK_UNAVAILABLE',503);
+  const restored=await checkpoint.readLatestCheckpoint();
+  if(restored?.verified!==true||
+     restored.original_work_id!==scope.original_work_id||
+     restored.state?.phase!=='GAP_CONFIRMED'||
+     restored.state.attempt_count!==0||
+     restored.checkpoint_hash!==restored.state.head_hash||
+     !uuid(restored.continuity_receipt_id))
+   die('EXACT_UNACCEPTED_GAP_RESTORE_FAILED',503);
+  const reserved=await call(db,'reality_reserve_first178_gap_recovery_v1',{
+   p_owner_id:session.user_id,p_conversation_id:conversationId,
+   p_queue_id:queue.queue_id,p_original_work_id:scope.original_work_id,
+   p_checkpoint_hash:restored.checkpoint_hash,
+   p_continuity_receipt_id:restored.continuity_receipt_id,
+  });
+  if(reserved?.recovery_reserved!==true||
+     !uuid(reserved.recovery_reservation_id)||
+     !uuid(reserved.claim_id)||
+     reserved.original_work_id!==scope.original_work_id||
+     reserved.queue_id!==queue.queue_id||
+     reserved.continuity_receipt_id!==restored.continuity_receipt_id||
+     reserved.checkpoint_hash!==restored.checkpoint_hash||
+     reserved.installation_authorized!==false)
+   die('SINGLE_USE_RECOVERY_RESERVATION_UNVERIFIED',503);
+  claim={claimed:true,claim_id:reserved.claim_id,
+   queue_id:queue.queue_id,original_work_id:scope.original_work_id,
+   installation_authorized:false};
+  resumeState=restored.state;
+ }else{
+  // The initial database claim is an irreversible single-use reservation.
+  // It cannot be retried merely because a model generates malformed output.
+  claim=await call(db,'reality_claim_governed_build_178_v1',{
+   p_owner_id:session.user_id,p_conversation_id:conversationId,
+   p_queue_id:queue.queue_id,p_goal_id:scope.goal_id,
+   p_original_work_id:scope.original_work_id,
+   p_goal_transition_event_id:scope.goal_transition_receipt_ref,
+   p_preview_release_sha:queue.preview_release_sha,
+  });
+  if(claim?.claimed!==true||!uuid(claim.claim_id)||
+     claim.queue_id!==queue.queue_id||
+     claim.original_work_id!==scope.original_work_id||
+     claim.installation_authorized!==false)
+   die('ATOMIC_SINGLE_CLAIM_READBACK_INVALID',503);
+ }
  // An ambiguous network or provider failure leaves this exact claim
  // RUNNING_CONSTITUTIONAL. Do NOT auto-retry; the owner can inspect history.
  let lastReceipt=null;
@@ -178,7 +215,8 @@ export async function executeFirst178Constitutional({
    attestation_ref:'reality:provider-confirmed:'+receipt.evidence_ref};
  };
  const driven=await drive({
-  admitted,verifiedGovernanceReleaseSha:env.VERCEL_GIT_COMMIT_SHA,
+  admitted,resumeState,
+  verifiedGovernanceReleaseSha:env.VERCEL_GIT_COMMIT_SHA,
   adapters:{generation:validatedGeneration,observeMissingCapability,
    verifyIndependentReceipt,persistCheckpoint},
  });
