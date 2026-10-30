@@ -449,21 +449,96 @@ export async function runOriginal178OneApproval({
    return saved;
   },
   registerAndReobserve:async()=>{
-   // Installation and frozen acceptance are necessary but insufficient.
-   // A separate durable capability-registry mutation/readback is not yet
-   // wired. Never construct a registration receipt from the CI run.
-   await requireCI();
-   fail('DISTINCT_CAPABILITY_REGISTRY_READBACK_REQUIRED');
+   const acceptance=await requireCI();
+   const latest=await checkpoint.readLatestCheckpoint();
+   if(latest?.verified!==true||
+      latest.state?.phase!=='PROMOTION_AUTHORIZED'||
+      latest.checkpoint_hash!==current.head_hash||
+      latest.original_work_id!==scope.original_work_id)
+    fail('PROMOTION_CHECKPOINT_NOT_DURABLY_READ_BACK');
+   const record=await registrationProvider().admitted({
+    installed,acceptance,
+    approvalCheckpointReceiptId:latest.continuity_receipt_id});
+   if(record?.verified!==true||record.status!=='ACTIVE'||
+      record.original_work_id!==scope.original_work_id||
+      record.artifact_hash!==artifact)
+    fail('REAL_CAPABILITY_REGISTRY_READBACK_REQUIRED');
+   registered=record;
+   return Object.freeze({
+    kind:'CAPABILITY_REGISTERED',
+    owner_id:session.user_id,goal_id:scope.goal_id,
+    original_work_id:scope.original_work_id,
+    continuity_root_id:scope.continuity_root_id,
+    worldline_id:scope.worldline_id,
+    artifact_hash:artifact,status:'ACTIVE',
+    authorization_ref:current.promotion_authorization.evidence_ref,
+    target_worldline_id:scope.worldline_id,
+    registry_receipt_ref:record.registry_receipt_ref,
+    installed_commit_sha:record.installed_commit_sha,
+    evidence_ref:record.registry_receipt_ref,
+    evidence_hash:record.evidence_hash,
+   });
   },
   resumeOriginalWork:async()=>{
-   // Requires actual re-execution of the SAME original work, with its own
-   // executor operation ID, observed result and provider readback.
-   fail('DISTINCT_ORIGINAL_JOB_EXECUTION_READBACK_REQUIRED');
+   const cap=await readRegistered();
+   await requireCI();
+   if(cap.installed_commit_sha!==installed?.installed_commit_sha)
+    fail('REPLAY_SOURCE_NOT_SAME_REGISTERED_ARTIFACT');
+   const g=provision();
+   let observed=null;
+   for(let attempt=0;attempt<15;attempt++){
+    const p=await g.observeOriginalExecution(cap.installed_commit_sha);
+    if(p.status==='ORIGINAL_EXECUTION_FAILED')
+     fail('REAL_ORIGINAL_JOB_PROVIDER_REPLAY_FAILED');
+    if(p.verified===true){observed=p;break}
+    if(attempt<14)await new Promise(resolve=>setTimeout(resolve,4000));
+   }
+   if(observed?.verified!==true||
+      observed.original_work_id!==scope.original_work_id||
+      observed.provider_run_id===ci.provider_run_id)
+    fail('DISTINCT_ORIGINAL_JOB_EXECUTION_REQUIRES_RECONCILIATION');
+   executed=observed;
+   return Object.freeze({
+    kind:'ORIGINAL_JOB_RESUMED',
+    owner_id:session.user_id,goal_id:scope.goal_id,
+    original_work_id:scope.original_work_id,
+    continuity_root_id:scope.continuity_root_id,
+    worldline_id:scope.worldline_id,
+    artifact_hash:artifact,
+    registration_ref:cap.registry_receipt_ref,
+    real_execution_observed:true,
+    installed_commit_sha:cap.installed_commit_sha,
+    executor_run_ref:observed.executor_run_ref,
+    evidence_ref:observed.executor_run_ref,
+    evidence_hash:observed.evidence_hash,
+    original_job_completed:false,
+   });
   },
   settleAndReobserve:async()=>{
-   // Requires independently observed original-job outcome, reconciliation,
-   // and separate durable settlement, not a GitHub acceptance step.
-   fail('DISTINCT_OUTCOME_RECONCILIATION_READBACK_REQUIRED');
+   const cap=await readRegistered();
+   const originalExecution=await readExecuted();
+   const receipt=await outcomeProvider().recordAndReadback({
+    registration:cap,execution:originalExecution});
+   if(receipt?.verified!==true||
+      receipt.independent_outcome_verified!==true||
+      receipt.durable_settlement_readback!==true||
+      receipt.original_work_id!==scope.original_work_id)
+    fail('REAL_ORIGINAL_JOB_OUTCOME_NOT_DURABLY_VERIFIED');
+   return Object.freeze({
+    kind:'ORIGINAL_JOB_SETTLED',
+    owner_id:session.user_id,goal_id:scope.goal_id,
+    original_work_id:scope.original_work_id,
+    continuity_root_id:scope.continuity_root_id,
+    worldline_id:scope.worldline_id,
+    artifact_hash:artifact,
+    resumption_ref:originalExecution.executor_run_ref,
+    durable_settlement_readback:true,
+    independent_outcome_verified:true,
+    settlement_receipt_ref:receipt.settlement_receipt_ref,
+    evidence_ref:receipt.settlement_receipt_ref,
+    evidence_hash:receipt.evidence_hash,
+    customer_acceptance_recorded:false,
+   });
   },
   recordAndReobserveFinalSettlement:async result=>{
    const saved=await call(db,'reality_settle_first178_exact_owner_work_v1',{
