@@ -6,7 +6,7 @@
 import {createHash} from 'node:crypto';
 import {createFoundationalBuildTicket}
  from './reality-foundational-build-loop-v1.0.js';
-import {createGovernedSelfImprovement}
+import {createGovernedSelfImprovement,verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
 import {continueGovernedSelfImprovement}
  from './reality-governed-self-improvement-driver-v1.0.js';
@@ -251,7 +251,7 @@ export async function admitFirstGapBuildTicket({
 // trusted provider adapters, and every transition durably read back in the
 // SAME original owner's Continuity Ledger. Never call this from a browser.
 export async function generateAfterTrustedGap({
- admitted,adapters,verifiedGovernanceReleaseSha,
+ admitted,adapters,verifiedGovernanceReleaseSha,resumeState=null,
 }={}){
  const ticket=admitted?.ticket;
  if(admitted?.proof!=='OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK'||
@@ -287,9 +287,29 @@ export async function generateAfterTrustedGap({
   governance_kernel_hash:'sha256:'+hex(
    'reality-constitutional-driver-release:'+verifiedGovernanceReleaseSha),
  };
- const initial=createGovernedSelfImprovement({
-  scope,attemptLimit:ticket.max_attempts,
- });
+ let initial;
+ if(resumeState!==null){
+  verifySelfImprovementJournal(resumeState);
+  const rs=resumeState.scope;
+  // No new model-scope authority on recovery. The original constitutional
+  // release hash is retained in the verified journal. Current owner/goal,
+  // original work, source receipts and immutable gap identity MUST match.
+  if(resumeState.phase!=='GAP_CONFIRMED'||
+     resumeState.attempt_count!==0||
+     resumeState.journal.length!==1||
+     resumeState.journal[0].kind!=='GAP_CONFIRMED'||
+     resumeState.candidate!==null||
+     resumeState.attempt_limit!==ticket.max_attempts||
+     !rs?.governance_kernel_hash?.startsWith('sha256:')||
+     !Object.entries(scope).every(([key,value])=>
+       key==='governance_kernel_hash'||rs[key]===value))
+   fail('RECOVERY_ONLY_EXACT_UNACCEPTED_GAP_ALLOWED');
+  initial=resumeState;
+ }else{
+  initial=createGovernedSelfImprovement({
+   scope,attemptLimit:ticket.max_attempts,
+  });
+ }
  const driven=await continueGovernedSelfImprovement({
   state:initial,maxTransitions:12,
   adapters:{
