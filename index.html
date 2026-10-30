@@ -1168,6 +1168,33 @@ let wcFirst178ApprovalReady=null;
 let wcFirst178CompletionBusy=false;
 let wcFirst178CompletionAutoStarted=false;
 // Owner GET/Refresh is read-only; only the trusted dispatcher resumes #178.
+async function wcContinueOriginal178Recovery(){
+ const status=$('wcFirst178ApprovalStatus');
+ if($('privateReady')?.style.display!=='block')return;
+ status.textContent='Reality is continuing the previously authorized original #178 through its trusted preview worker. No new job, installation approval, or production changes…';
+ try{
+  const response=await fetch('/api/reality/personal-first-upgrade-178-recovery',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RESUME_PREAUTHORIZED_ORIGINAL_178_RECOVERY'}),
+  });
+  const d=await response.json();
+  if(!response.ok||d.ok!==true||
+     d.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'||
+     d.installed!==false||d.original_job_completed!==false||
+     d.production_changed!==false)
+   throw Error(String(d.error||'ORIGINAL_178_PROVIDER_RESULT_UNVERIFIED'));
+  status.textContent=d.status==='AWAITING_OWNER_APPROVAL'?
+   'Original #178: independently verified candidate is ready. Review the separate exact installation approval below. No installation yet.':
+   'Original #178 returned '+String(d.status||'UNVERIFIED')+
+   '. Read durable checkpoint before any further attempt. No installation or settlement claimed.';
+  void wcReadOwnerApproval178();
+ }catch(e){
+  status.textContent='Original #178 could not verify recovered execution: '+
+   String(e?.message||'UNRESOLVED')+
+   '. No automatic retry. The existing durable checkpoint is authoritative.';
+ }
+}
 async function wcReadOwnerApproval178(){
  const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
  if(!button||!status||$('privateReady')?.style.display!=='block')return;
@@ -1188,8 +1215,14 @@ async function wcReadOwnerApproval178(){
    wcFirst178ApprovalReady=null;
    $('wcStartFirstGap178').style.display='none';
    status.textContent='Original #178: '+String(d.attempts_used)+' candidates failed. Reality independently verified this repairable failure and can continue the SAME job with one evidence-backed, two-attempt recovery round. No installation authority granted.';
-   // The server dispatcher runs the existing approved job. This observer
-   // MUST NOT turn a GET/Refresh into an executing POST.
+   // An explicit earlier owner grant already authorizes one bounded recovery.
+   // GET itself remains read-only. After this independently verified read,
+   // the signed-in owner's browser requests the separate authenticated POST
+   // exactly once; the DB still enforces the one-use work delegation.
+   if(!wcFirstGap178AutoResumeAttempted){
+    wcFirstGap178AutoResumeAttempted=true;
+    void wcContinueOriginal178Recovery();
+   }
    return;
   }
   if(d.status==='EXHAUSTED_CORRECTION_ATTEMPTS'&&
