@@ -1189,11 +1189,11 @@ async function wcInspectFirstGap178(){
    // #178 was explicitly authorized earlier and its original source-linked
    // work is already durable. The server re-verifies that original receipt and
    // atomically claims it. No model starts before the trusted single-use claim.
-   if(d.queue_phase==='QUEUED_DISCOVERY'&&
+   if(['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(d.queue_phase)&&
       /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))&&
       d.queue_id&&!wcFirstGap178AutoResumeAttempted){
     wcFirstGap178AutoResumeAttempted=true;
-    status.textContent='Resuming your previously authorized original #178 automatically. No new job, no second approval and no installation…';
+    status.textContent='Recovering the same verified original #178 checkpoint. Reality will not claim a second job or install without separate approval…';
     Promise.resolve().then(()=>{void wcFirstGap178Run();});
    }else{
     status.textContent=d.owner_approval_required===true&&d.queue_phase==='AWAITING_OWNER_APPROVAL'?
