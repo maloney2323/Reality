@@ -104,6 +104,14 @@ export async function original178OwnerApprovalView({
     /^vercel:provider-verified:[a-zA-Z0-9:_-]{25,250}$/.test(
       String(result.state.independent_failure?.evidence_ref||''))?
      result.state.independent_failure.evidence_ref:null,
+   // These failing test names are taken exclusively from the last
+   // verified, checkpoint-bound independent sandbox diagnostics. They are
+   // evidence for diagnosis, never instructions or execution authority.
+   last_failure_test_names:
+    result.state.independent_failure?.attempt===result.state.attempt_count?
+     [...String(result.state.independent_failure?.diagnostics?.output||'')
+      .slice(0,12000).matchAll(/^not ok [0-9]+ - ([^\\r\\n]{1,150})/gm)]
+      .slice(0,6).map(m=>m[1]):[],
    one_click_job_attempted:true,owner_approval_required:false,
    cannot_auto_retry_consumed_claim:true,
    installation_authorized:false,original_job_completed:false,
