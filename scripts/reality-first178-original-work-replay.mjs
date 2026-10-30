@@ -20,7 +20,8 @@ const fixture={owner_id:'CI_REPLAY_NOT_CUSTOMER_OWNER',
  owner_session_verified:true,goal_current_verified:true};
 if(process.argv[2]==='observe'){
  const token=String(process.env.GH_PROVIDER_READ_TOKEN||'');
- if(token.length<20)throw Error('ORIGINAL178_PROVIDER_TOKEN_REQUIRED');
+ // Public provider resources may be readable anonymously. A denied log
+ // read fails closed rather than trusting a fixture or adding a new secret.
  const observed=await observeFirstGapFromGithub({scope:fixture,apiToken:token});
  if(observed?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
   observed.run_id!==RUN||observed.run_sha!==PIN||
