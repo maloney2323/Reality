@@ -182,7 +182,8 @@ export function createFirst178ConstitutionalCheckpointService({
   // A timeout must not reset the attempt count or invent a new job.
   const attempt=state?.attempt_count;
   const recoveryOffset=(state?.recovery_authorization?.verified===true?1:0)+
-   (state?.recovery_continuation_authorization?.verified===true?1:0);
+   (state?.recovery_continuation_authorization?.verified===true?1:0)+
+   (state?.recovery_final_authorization?.verified===true?1:0);
   const remaining=Number.isInteger(attempt)&&
    attempt>=1&&attempt<=state.attempt_limit;
   const baseCandidateValid=Array.isArray(proposedFiles)&&
@@ -199,7 +200,8 @@ export function createFirst178ConstitutionalCheckpointService({
    ((state.journal?.at(-2)?.kind==='SANDBOX_FAILED'&&
      state.journal.at(-2).evidence_ref===state.independent_failure.evidence_ref)||
     (((attempt===4&&recoveryOffset===1)||
-      (attempt===6&&recoveryOffset===2))&&
+      (attempt===6&&recoveryOffset===2)||
+      (attempt===8&&recoveryOffset===3))&&
      state.journal?.at(-2)?.kind==='RECOVERY_STARTED'&&
      state.journal?.at(-3)?.kind==='SANDBOX_FAILED'&&
      state.journal.at(-3).evidence_ref===state.independent_failure.evidence_ref))
@@ -215,7 +217,9 @@ export function createFirst178ConstitutionalCheckpointService({
    ((recoveryOffset===1&&attempt===3&&state.attempt_limit===5&&
      state.journal?.length===8)||
     (recoveryOffset===2&&attempt===5&&state.attempt_limit===7&&
-     state.journal?.length===13))&&
+     state.journal?.length===13)||
+    (recoveryOffset===3&&attempt===7&&state.attempt_limit===8&&
+     state.journal?.length===18))&&
    state.journal.at(-1)?.kind==='RECOVERY_STARTED';
   const pendingRepair=state?.phase==='REPAIR_REQUIRED'&&
    remaining&&attempt<state.attempt_limit&&baseCandidateValid&&
@@ -241,11 +245,19 @@ export function createFirst178ConstitutionalCheckpointService({
    state.independent_failure?.classification?.retry_source_without_dependency===true&&
    state.promotion_authorization===null&&state.registration===null&&
    state.resumption===null&&state.settlement===null;
-  const finalRecoveredExhaustion=state?.phase==='ESCALATED'&&
+  const recoverableFinalEscalation=state?.phase==='ESCALATED'&&
    attempt===7&&state.attempt_limit===7&&recoveryOffset===2&&
    state.journal?.length===17&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
-   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
    state.independent_failure?.attempt===7&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
+  const finalRecoveredExhaustion=state?.phase==='ESCALATED'&&
+   attempt===8&&state.attempt_limit===8&&recoveryOffset===3&&
+   state.journal?.length===20&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.attempt===8&&
    state.promotion_authorization===null&&state.registration===null&&
    state.resumption===null&&state.settlement===null;
   const sandboxApproved=state?.phase==='AWAITING_OWNER_APPROVAL'&&
@@ -268,6 +280,7 @@ export function createFirst178ConstitutionalCheckpointService({
    state.sandbox_receipt?.governance_preserved===true;
   if(!pendingGap&&!pendingSandbox&&!pendingRepair&&
      !recoverableEscalation&&!recoverableSecondEscalation&&
+     !recoverableFinalEscalation&&
      !finalRecoveredExhaustion&&
      !sandboxApproved&&!hasOwnerPromotion||
 
