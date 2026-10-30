@@ -49,18 +49,45 @@ export function describeOriginal178OwnerApproval({state,queue,session}={}){
 export async function finishOriginal178AfterExactApproval({
  state,queue,session,ownerAction,adapters,
 }={}){
- const ready=describeOriginal178OwnerApproval({state,queue,session});
- const action=ownerAction||{};
- if(action.intent!=='APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'||
-    action.owner_confirms_installation!==true||
-    action.original_work_id!==ready.original_work_id||
-    action.candidate_artifact_hash!==ready.candidate_artifact_hash||
-    action.checkpoint_hash!==ready.checkpoint_hash||
-    action.checkpoint_receipt_id!==ready.checkpoint_receipt_id)
-  fail('EXACT_HUMAN_INSTALLATION_CONSENT_REQUIRED');
+ const fresh=state?.phase==='AWAITING_OWNER_APPROVAL';
+ verifySelfImprovementJournal(state);
+ const ready=fresh?describeOriginal178OwnerApproval({state,queue,session}):
+  Object.freeze({
+   original_work_id:state?.scope?.original_work_id,
+   queue_id:queue?.queue_id,goal_id:state?.scope?.goal_id,
+   candidate_artifact_hash:state?.candidate?.artifact_hash,
+   checkpoint_hash:state?.head_hash,
+   checkpoint_receipt_id:queue?.report?.checkpoint_receipt_id,
+  });
+ if(!fresh&&(!['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
+   'ORIGINAL_JOB_RESUMED','SETTLED'].includes(state.phase)||
+    state.scope?.owner_id!==session?.user_id||
+    state.scope?.target_environment!=='ISOLATED_PREVIEW'||
+    queue.original_work_id!==state.scope.original_work_id||
+    queue.goal_id!==state.scope.goal_id||
+    queue.phase!=='AWAITING_OWNER_APPROVAL'&&queue.phase!=='SETTLED'||
+    queue.report?.installation_approval_candidate_hash!==
+     state.candidate.artifact_hash||
+    !queue.report?.installation_approval_reservation_id||
+    state.promotion_authorization?.approval_origin!==
+     'AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+    state.promotion_authorization?.reservation_ref!==
+     'supabase:owner-approval:'+queue.report.installation_approval_reservation_id))
+   fail('PREVIOUS_EXACT_OWNER_APPROVAL_NOT_PROVEN');
+ if(fresh){
+  const action=ownerAction||{};
+  if(action.intent!=='APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'||
+     action.owner_confirms_installation!==true||
+     action.original_work_id!==ready.original_work_id||
+     action.candidate_artifact_hash!==ready.candidate_artifact_hash||
+     action.checkpoint_hash!==ready.checkpoint_hash||
+     action.checkpoint_receipt_id!==ready.checkpoint_receipt_id)
+   fail('EXACT_HUMAN_INSTALLATION_CONSENT_REQUIRED');
+ }
  for(const name of [
-  'reserveExactOwnerApproval','verifyIndependentReceipt',
-  'persistCheckpoint','registerAndReobserve','resumeOriginalWork',
+  'reserveExactOwnerApproval','readExactOwnerApproval',
+  'verifyIndependentReceipt','persistCheckpoint',
+  'registerAndReobserve','resumeOriginalWork',
   'settleAndReobserve','recordAndReobserveFinalSettlement',
  ]){
   if(typeof adapters?.[name]!=='function')
@@ -69,33 +96,46 @@ export async function finishOriginal178AfterExactApproval({
  // Return from this function is NOT itself evidence of installation.
  // In particular, the reservation must be externally checked against
  // the same owner, work, candidate hash and checkpoint.
- const receipt=await adapters.reserveExactOwnerApproval(Object.freeze({
-  owner_id:session.user_id,goal_id:ready.goal_id,
-  original_work_id:ready.original_work_id,queue_id:ready.queue_id,
-  artifact_hash:ready.candidate_artifact_hash,
-  checkpoint_hash:ready.checkpoint_hash,
-  checkpoint_receipt_id:ready.checkpoint_receipt_id,
-  environment:'ISOLATED_PREVIEW',
-  authority:'OWNER_APPROVED_EXACT_INSTALLATION_ONLY',
- }));
- checked(receipt?.kind==='PROMOTION_AUTHORIZED'&&
-  receipt.owner_id===session.user_id&&
-  receipt.original_work_id===ready.original_work_id&&
-  receipt.artifact_hash===ready.candidate_artifact_hash&&
-  receipt.approval_origin==='AUTHENTICATED_OWNER_EXPLICIT_ACTION'&&
-  receipt.consumed_once===true&&
-  typeof receipt.reservation_ref==='string'&&
-  receipt.installation_target==='ISOLATED_PREVIEW',
-  'ATOMIC_OWNER_RESERVATION_READBACK_INVALID');
- const authorized=await acceptGovernedObservation(state,receipt,{
-  verifyProvider:adapters.verifyIndependentReceipt,
- });
- const recorded=await adapters.persistCheckpoint(authorized);
- if(recorded?.persisted!==true||
-    recorded?.independent_readback_verified!==true||
-    recorded?.checkpoint_hash!==authorized.head_hash||
-    recorded.original_work_id!==ready.original_work_id)
-  fail('AUTHORITATIVE_APPROVAL_CONTINUITY_CHECKPOINT_MISSING');
+ let authorized=state;
+ if(fresh){
+  const receipt=await adapters.reserveExactOwnerApproval(Object.freeze({
+   owner_id:session.user_id,goal_id:ready.goal_id,
+   original_work_id:ready.original_work_id,queue_id:ready.queue_id,
+   artifact_hash:ready.candidate_artifact_hash,
+   checkpoint_hash:ready.checkpoint_hash,
+   checkpoint_receipt_id:ready.checkpoint_receipt_id,
+   environment:'ISOLATED_PREVIEW',
+   authority:'OWNER_APPROVED_EXACT_INSTALLATION_ONLY',
+  }));
+  checked(receipt?.kind==='PROMOTION_AUTHORIZED'&&
+   receipt.owner_id===session.user_id&&
+   receipt.original_work_id===ready.original_work_id&&
+   receipt.artifact_hash===ready.candidate_artifact_hash&&
+   receipt.approval_origin==='AUTHENTICATED_OWNER_EXPLICIT_ACTION'&&
+   receipt.consumed_once===true&&
+   typeof receipt.reservation_ref==='string'&&
+   receipt.installation_target==='ISOLATED_PREVIEW',
+   'ATOMIC_OWNER_RESERVATION_READBACK_INVALID');
+  authorized=await acceptGovernedObservation(state,receipt,{
+   verifyProvider:adapters.verifyIndependentReceipt,
+  });
+  const recorded=await adapters.persistCheckpoint(authorized);
+  if(recorded?.persisted!==true||
+     recorded?.independent_readback_verified!==true||
+     recorded?.checkpoint_hash!==authorized.head_hash||
+     recorded.original_work_id!==ready.original_work_id)
+   fail('AUTHORITATIVE_APPROVAL_CONTINUITY_CHECKPOINT_MISSING');
+ }else{
+  // Recover from the SAME previously consumed approval without requiring
+  // another click or issuing another database reservation.
+  const observed=await adapters.readExactOwnerApproval(ready);
+  if(observed?.verified!==true||
+     observed.reservation_id!==
+      queue.report.installation_approval_reservation_id||
+     observed.candidate_hash!==ready.candidate_artifact_hash||
+     observed.owner_id!==session.user_id)
+   fail('ALREADY_APPROVED_PROVIDER_READBACK_MISSING');
+ }
  // This is the SAME existing driver. Its three provider adapters MUST
  // reobserve actual installed code, the original execution, and settlement.
  const result=await continueGovernedSelfImprovement({
