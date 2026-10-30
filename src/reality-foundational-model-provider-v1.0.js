@@ -44,7 +44,16 @@ export function createFoundationalModelGenerator({
    verified_frozen_test_source:contract?.files||null,
    frozen_test_source_status:contract?.source||'NOT_SUPPLIED',
    attempt,previous_candidate:previous_candidate||null,
-   independently_verified_failure:verified_feedback||null};
+   independently_verified_failure:verified_feedback||null,
+   observed_test_failures:verified_feedback?.log_excerpt||null,
+   correction_acceptance_criteria:[
+    'Use each failed frozen assertion and its expected versus actual value',
+    'Reject missing provider attestation and non-provider evidence source',
+    'Require exact repository and matching current run SHAs before generation',
+    'Reject foreign owner, goal, work identifier and superseding green runs',
+    'Never compare the same field to itself as a validation',
+    'Do not weaken or modify frozen tests; retain approval separation'
+   ]};
   // Require the actual source-and-test artifact shape at generation time.
   // JSON-object mode previously allowed valid JSON without a files array;
   // that response was rejected only AFTER the job's single-use claim.
