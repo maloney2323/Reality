@@ -192,7 +192,7 @@ function validateCandidate(candidate){
 export function recoverGovernedEscalation(state,proof){
  verifySelfImprovementJournal(state);
  enforce(state.phase==='ESCALATED'&&state.attempt_count===3&&
-  state.attempt_limit===3&&state.recovery_authorization===null&&
+  state.attempt_limit===3&&state.recovery_authorization==null&&
   state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
   state.independent_failure?.classification?.retry_source_without_dependency===true&&
   state.independent_failure?.attempt===3,
