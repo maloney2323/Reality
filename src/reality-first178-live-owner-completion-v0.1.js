@@ -89,6 +89,21 @@ export async function original178OwnerApprovalView({
    attempt_limit:result.state.attempt_limit,
    attempts_used:result.state.attempt_count,
    checkpoint_receipt_id:receipt,checkpoint_hash:digest,
+   // Source is the independently reconstructed constitutional checkpoint,
+   // not the model or browser. Expose only typed provider failure metadata.
+   last_failure_kind:
+    result.state.independent_failure?.attempt===result.state.attempt_count&&
+    /^[A-Z_]{3,60}$/.test(String(result.state.independent_failure?.classification?.class||''))?
+     result.state.independent_failure.classification.class:null,
+   last_failure_next:
+    result.state.independent_failure?.attempt===result.state.attempt_count&&
+    /^[A-Z_]{3,80}$/.test(String(result.state.independent_failure?.classification?.next||''))?
+     result.state.independent_failure.classification.next:null,
+   last_failure_evidence_ref:
+    result.state.independent_failure?.attempt===result.state.attempt_count&&
+    /^vercel:provider-verified:[a-zA-Z0-9:_-]{25,250}$/.test(
+      String(result.state.independent_failure?.evidence_ref||''))?
+     result.state.independent_failure.evidence_ref:null,
    one_click_job_attempted:true,owner_approval_required:false,
    cannot_auto_retry_consumed_claim:true,
    installation_authorized:false,original_job_completed:false,
