@@ -137,7 +137,7 @@ test('original #178 frozen acceptance is skipped, NOT green, without installed s
  const step=file.split('      - name: Execute ORIGINAL frozen #178 acceptance against installed model-authored source')[1]
   ?.split('      - name:')[0];
  assert.ok(step,'Frozen customer acceptance step must exist');
- assert.match(step,/if: \$\\{\\{ hashFiles\('src\\/reality-extensions\\/reality-ci-failure-evidence\\.mjs'\) != '' \\}\\}/);
+ assert.ok(step.includes("if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}"));
  assert.ok(!step.includes('echo "Original #178 uninstalled'));
- assert.match(step,/node --test test\\/reality-frozen-regressions\\/first-reality-ci-evidence-gap\\.test\\.js/);
+ assert.ok(step.includes('node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js'));
 });
