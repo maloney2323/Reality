@@ -86,13 +86,18 @@ export async function executeFirst178Constitutional({
   const restored=await checkpoint.readLatestCheckpoint();
   if(restored?.verified!==true||
      restored.original_work_id!==scope.original_work_id||
-     !['GAP_CONFIRMED','CANDIDATE_READY'].includes(restored.state?.phase)||
+     !['GAP_CONFIRMED','CANDIDATE_READY','REPAIR_REQUIRED'].includes(
+       restored.state?.phase)||
      restored.checkpoint_hash!==restored.state.head_hash||
      !uuid(restored.continuity_receipt_id))
    die('EXACT_UNSETTLED_JOURNAL_RESTORE_FAILED',503);
-  const sandboxRecovery=restored.state.phase==='CANDIDATE_READY';
-  const rpcName=sandboxRecovery?
-   'reality_reserve_first178_candidate_sandbox_v1':
+  const sandboxRecovery=restored.state.phase==='CANDIDATE_READY'&&
+   restored.state.attempt_count===1;
+  const laterCorrection=restored.state.phase==='REPAIR_REQUIRED'||
+   (restored.state.phase==='CANDIDATE_READY'&&restored.state.attempt_count>1);
+  const rpcName=laterCorrection?
+   'reality_reserve_first178_continuation_step_v1':
+   sandboxRecovery?'reality_reserve_first178_candidate_sandbox_v1':
    'reality_reserve_first178_gap_recovery_v1';
   const reserved=await call(db,rpcName,{
    p_owner_id:session.user_id,p_conversation_id:conversationId,
@@ -101,21 +106,35 @@ export async function executeFirst178Constitutional({
    ...(sandboxRecovery?{
     p_candidate_hash:restored.state.candidate.artifact_hash,
    }:{}),
-   p_continuity_receipt_id:restored.continuity_receipt_id,
+   ...(laterCorrection?{
+    p_phase:restored.state.phase,
+    p_attempt_count:restored.state.attempt_count,
+   }:{}),
+   ...(!laterCorrection?{p_continuity_receipt_id:
+    restored.continuity_receipt_id}:{}),
+   ...(laterCorrection?{
+    p_checkpoint_receipt_id:restored.continuity_receipt_id,
+   }:{}),
   });
-  if(reserved?.recovery_reserved!==true||
-     !uuid(sandboxRecovery?reserved.sandbox_reservation_id:
+  if((laterCorrection?reserved?.reserved_once!==true:
+       reserved?.recovery_reserved!==true)||
+     !uuid(laterCorrection?reserved.reservation_id:
+      sandboxRecovery?reserved.sandbox_reservation_id:
       reserved.recovery_reservation_id)||
-     !uuid(reserved.claim_id)||
+     !uuid(laterCorrection?reserved.existing_claim_id:reserved.claim_id)||
      reserved.original_work_id!==scope.original_work_id||
      reserved.queue_id!==queue.queue_id||
-     reserved.continuity_receipt_id!==restored.continuity_receipt_id||
+     (laterCorrection?reserved.checkpoint_receipt_id:
+       reserved.continuity_receipt_id)!==restored.continuity_receipt_id||
      reserved.checkpoint_hash!==restored.checkpoint_hash||
      (sandboxRecovery&&reserved.candidate_hash!==
       restored.state.candidate.artifact_hash)||
+     (laterCorrection&&(reserved.phase!==restored.state.phase||
+       reserved.attempt_count!==restored.state.attempt_count))||
      reserved.installation_authorized!==false)
    die('SINGLE_USE_RECOVERY_RESERVATION_UNVERIFIED',503);
-  claim={claimed:true,claim_id:reserved.claim_id,
+  claim={claimed:true,claim_id:laterCorrection?
+    reserved.existing_claim_id:reserved.claim_id,
    queue_id:queue.queue_id,original_work_id:scope.original_work_id,
    installation_authorized:false};
   resumeState=restored.state;
