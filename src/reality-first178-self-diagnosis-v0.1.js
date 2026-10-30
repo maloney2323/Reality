@@ -51,10 +51,16 @@ export function classifyFirst178Diagnosis({original,view,viewError,
    last_failure_evidence_ref:view.last_failure_evidence_ref||null,
    failing_tests:Array.isArray(view.last_failure_test_names)?
     view.last_failure_test_names.slice(0,6):[],
+   // Reuse the same normalized, constitutional repair strategy that the model
+   // receives. A UI explanation cannot independently grant another attempt.
+   self_repair_strategy:view.self_repair_strategy||null,
    finding:'The original job exhausted independently checked correction attempts without a verified passing candidate.'+
     (view.last_failure_kind?' Final independent failure: '+view.last_failure_kind+'.':'')+
     (same===false?' The browser selected a different conversation; this is separate from the sandbox failure.':''),
-   proposed_next_step:view.last_failure_kind==='REGRESSION'&&
+   proposed_next_step:view.self_repair_strategy?.root_cause_hypotheses?.length?
+    'Reality identified source-level repair hypotheses from its full Continuity history. '+view.self_repair_strategy.root_cause_hypotheses.slice(0,3).join(' ')+
+    ' Do not consume another attempt until a materially different proposal is independently verified.':
+    view.last_failure_kind==='REGRESSION'&&
     view.last_failure_next==='REPAIR_CODE_FROM_TEST_FAILURE'?
      'Inspect the frozen regression failure and model-authored source, find why eight corrections failed, and design a materially different bounded repair before requesting any new execution authority.':
      'Analyze the last independently observed sandbox failure and the model correction source; propose an evidence-backed capability change before requesting any new bounded recovery authority.'});
