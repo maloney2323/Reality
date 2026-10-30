@@ -28,3 +28,8 @@ jobs:
       - name: Independently regress exact failed assertions, continuity and approval separation
         run: |
           node --test test/reality-foundational-model-strict-candidate-v1.0.test.js test/reality-foundational-build-loop-v1.0.test.js test/reality-first-gap-handoff-v0.1.test.js test/reality-governed-self-improvement-spine-v1.0.test.js test/reality-first-178-constitutional-continuity-checkpoint-v0.1.test.js test/reality-first178-exhausted-one-click-readback-v0.1.test.js test/reality-first178-single-action-v0.1.test.js
+      - name: Prove Phase 1 server-side dispatch, once-only original authorization and observer-only UI
+        run: |
+          node --check api/reality/personal-first-upgrade-178-dispatch.js
+          node --check api/reality/personal-first-upgrade-178-background.js
+          node --test test/reality-first178-server-dispatch-v0.1.test.js test/reality-first178-one-shot-background-delegation-v0.1.test.js
