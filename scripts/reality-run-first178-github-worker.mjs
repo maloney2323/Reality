@@ -3,7 +3,6 @@
 // workflow_dispatch is an operator execution trigger; the persisted original
 // customer authorization is independently re-verified before consuming work.
 import {execFileSync} from 'node:child_process';
-import {randomBytes} from 'node:crypto';
 import {dispatchFirst178ApprovedOriginal}
  from '../api/reality/personal-first-upgrade-178-dispatch.js';
 
@@ -54,10 +53,33 @@ export function verifyGitHubFirst178Run(env,actualCheckoutSha){
  return Object.freeze({validated:true,original_work_id:WORK,
   original_job_preserved:true,installation_authorized:false});
 }
+// A wrong Vercel token must NEVER consume the once-only Supabase delegation.
+// This is a read-only Vercel management API check, NOT protected-preview HTTP.
+export async function verifyScopedVercelSandboxAccess({
+ env=process.env,fetchImpl=fetch,
+}={}){
+ const url='https://api.vercel.com/v9/projects/'+
+  env.VERCEL_PROJECT_ID+'?teamId='+encodeURIComponent(env.VERCEL_TEAM_ID||'');
+ let response;
+ try{
+  response=await fetchImpl(url,{method:'GET',
+   headers:{authorization:'Bearer '+env.VERCEL_TOKEN,
+    accept:'application/json'},redirect:'error',
+   signal:AbortSignal.timeout(12000)});
+ }catch{stop('SANDBOX_PROVIDER_READONLY_PREFLIGHT_UNAVAILABLE');}
+ if(response?.ok!==true)
+  stop('SANDBOX_PROVIDER_CREDENTIAL_OR_PROJECT_ACCESS_REJECTED');
+ const data=await response.json().catch(()=>null);
+ if(data?.id!==env.VERCEL_PROJECT_ID||data?.name!=='reality')
+  stop('SANDBOX_PROVIDER_PROJECT_MISMATCH');
+ return true;
+}
 export async function runGitHubFirst178Recovery({
  env=process.env,checkoutSha,dispatch=dispatchFirst178ApprovedOriginal,
+ verifyProvider=verifyScopedVercelSandboxAccess,
 }={}){
  verifyGitHubFirst178Run(env,checkoutSha);
+ await verifyProvider({env});
  // The privileged DB function mints a single-use delegation for the
  // already-authorized original #178. A failed/uncertain worker run must not
  // mint another delegation or silently reset its exhausted attempt ledger.
