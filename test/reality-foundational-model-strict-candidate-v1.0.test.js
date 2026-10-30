@@ -118,3 +118,44 @@ test('repair generation sends actual frozen failures and provenance conditions, 
   execution_authority:false});
  assert.equal(seen,true);
 });
+
+test('Reality asks the coding model to correct tautological provenance before sandbox attempts',async()=>{
+ let calls=0;
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  fetchImpl:async(_endpoint,options)=>{
+   calls++;
+   const req=JSON.parse(options.body);
+   const task=JSON.parse(req.input[1].content[0].text);
+   if(calls===2)assert.ok(task.rejected_proposal_reason.includes('same provenance'));
+   const files=actualFiles();
+   files[0].content=calls===1?
+    'export function classifyVerifiedCiFailure(evidence){if(evidence.repository !== evidence.repository)return false;return true;}':
+    'export function classifyVerifiedCiFailure(evidence){return evidence.repository === "maloney2323/Reality";}';
+   return {ok:true,json:async()=>({id:'proposal:'+calls,
+    output_text:JSON.stringify({ticket_hash:t.ticket_hash,original_work_id:t.original_work_id,
+     rationale:'Repair evidence comparisons',files})})};
+  }
+ });
+ const output=await gen({ticket:t,attempt:1,execution_authority:false});
+ assert.equal(calls,2);
+ assert.ok(!output.files[0].content.includes('evidence.repository !== evidence.repository'));
+ assert.equal(output.installed,false);
+});
+test('invalid self-comparisons fail closed after three bounded model proposals',async()=>{
+ let calls=0;
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  fetchImpl:async()=>{
+   calls++;
+   const files=actualFiles();
+   files[0].content='export function classifyVerifiedCiFailure(evidence){return evidence.run_head_sha === evidence.run_head_sha;}';
+   return {ok:true,json:async()=>({id:'proposal:bad',output_text:JSON.stringify({
+    ticket_hash:t.ticket_hash,original_work_id:t.original_work_id,
+    rationale:'Still invalid',files})})};
+  },
+ });
+ await assert.rejects(gen({ticket:t,attempt:1,execution_authority:false}),
+  /FOUNDATION_MODEL_UNCORRECTED_SELF_COMPARISON/);
+ assert.equal(calls,3);
+});
