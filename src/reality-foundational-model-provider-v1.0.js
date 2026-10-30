@@ -3,6 +3,8 @@
 // verified by the constitutional build and sandbox layer.
 import {validateFoundationalCandidate}
  from './reality-foundational-build-loop-v1.0.js';
+import {extractVerifiedFailureAssertions}
+ from './reality-self-repair-strategy-v1.0.js';
 const fail=x=>{throw Error(x)};
 const outputText=b=>typeof b?.output_text==='string'&&b.output_text.trim()?b.output_text:
  (b?.output||[]).flatMap(x=>x?.content||[]).filter(x=>x?.type==='output_text')
@@ -18,7 +20,7 @@ export function createFoundationalModelGenerator({
   fail('FOUNDATION_MODEL_KEY_REQUIRED');
  if(endpoint!=='https://api.openai.com/v1/responses')
   fail('FOUNDATION_UNTRUSTED_MODEL_ENDPOINT');
- return async({ticket,attempt,previous_candidate,verified_feedback,execution_authority})=>{
+ return async({ticket,attempt,previous_candidate,verified_feedback,repair_strategy=null,execution_authority})=>{
   if(execution_authority!==false||!Number.isInteger(attempt)||
    attempt<1||attempt>ticket.max_attempts)
    fail('FOUNDATION_MODEL_AUTHORITY_OR_ATTEMPT_INVALID');
@@ -26,6 +28,17 @@ export function createFoundationalModelGenerator({
    verified_feedback?.kind!=='INDEPENDENT_SANDBOX_FAILURE'||
    !verified_feedback.attestation_ref))
    fail('FOUNDATION_REPAIR_REQUIRES_INDEPENDENT_FAILURE');
+  if(repair_strategy&&(
+   repair_strategy.kind!=='VERIFIED_SELF_REPAIR_STRATEGY'||
+   repair_strategy.source!=='CONSTITUTIONAL_INDEPENDENT_PROVIDER_READBACK'||
+   repair_strategy.original_work_id!==ticket.original_work_id||
+   repair_strategy.attempt_count!==attempt-1||
+   repair_strategy.installation_authorized!==false||
+   repair_strategy.external_actions_authorized!==false||
+   repair_strategy.model_may_propose!==true||
+   (attempt>1&&!repair_strategy.evidence_refs?.includes(
+    verified_feedback.attestation_ref))))
+   fail('FOUNDATION_SELF_REPAIR_STRATEGY_AUTHORITY_INVALID');
   // The model needs the exact pinned failure contract. Test source is
   // UNTRUSTED task data, never an instruction or a source of authority.
   const contract=typeof readFrozenRegression==='function'?
@@ -47,13 +60,22 @@ export function createFoundationalModelGenerator({
    attempt,previous_candidate:previous_candidate||null,
    independently_verified_failure:verified_feedback||null,
    observed_test_failures:verified_feedback?.log_excerpt||null,
+   reality_self_repair_strategy:repair_strategy?{
+    version:repair_strategy.version,strategy:repair_strategy.strategy,
+    recurring_failures:repair_strategy.recurring_failures,
+    latest_failing_tests:repair_strategy.latest_failing_tests,
+    root_cause_hypotheses:repair_strategy.root_cause_hypotheses,
+    source:'CONSTITUTIONAL_INDEPENDENT_PROVIDER_READBACK',
+    no_new_execution_authority:true,
+   }:null,
    correction_acceptance_criteria:[
     'Use each failed frozen assertion and its expected versus actual value',
     'Reject missing provider attestation and non-provider evidence source',
     'Require exact repository and matching current run SHAs before generation',
     'Reject foreign owner, goal, work identifier and superseding green runs',
     'Never compare the same field to itself as a validation',
-    'Do not weaken or modify frozen tests; retain approval separation'
+    'Do not weaken or modify frozen tests; retain approval separation',
+    'If the same negative case persists across drafts, redesign the validation order and compare to source-bound expected values, not another one-line patch'
    ]};
   // Require the actual source-and-test artifact shape at generation time.
   // JSON-object mode previously allowed valid JSON without a files array;
@@ -126,10 +148,15 @@ export function createFoundationalModelGenerator({
    if(check.passed)return validated;
    if(!['TEST_REGRESSION','SYNTAX'].includes(check.classification))
     fail('FOUNDATION_DRAFT_NON_REPAIRABLE_FAILURE');
+   const observed=extractVerifiedFailureAssertions(check.log_excerpt);
+   const frozen=observed.failing_tests.slice(0,8).join('; ');
+   const mismatch=observed.expected_values.map((value,i)=>
+    'expected '+value+' but saw '+(observed.actual_values[i]||'UNKNOWN')).join('; ');
    localRejection='Independent isolated sandbox FAILED for this exact draft. '+
     'Provider receipt: '+check.attestation_ref+'. Failure classification: '+
-    check.classification+'. Frozen and candidate test assertions:\n'+
-    String(check.log_excerpt||'').slice(0,11000)+
+    check.classification+'. Failed assertions: '+frozen+'. Value mismatches: '+
+    mismatch+'. Frozen and candidate test assertions:\n'+
+    String(check.log_excerpt||'').slice(0,9500)+
     '\nRevise the rejected source to correct every failing assertion. '+
     'Do not modify frozen regression tests or invent authority.';
    rejectedDraft=validated;lastValidDraft=validated;
