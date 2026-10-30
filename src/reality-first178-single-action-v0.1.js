@@ -69,7 +69,7 @@ export async function runFirst178SingleAction({
      !source.queue_id||!source.continuity_work_receipt_id)
    stop('SOURCE_WORK_ADMISSION_UNVERIFIED',503);
  }else if(current.status==='ALREADY_QUEUED'){
-  if(!['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(
+  if(!['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL','ESCALATED'].includes(
     current.queue_phase)){
    // Never retry a consumed/ambiguous execution claim. Show its recorded
    // state, and leave recovery to the same constitutional journal.
