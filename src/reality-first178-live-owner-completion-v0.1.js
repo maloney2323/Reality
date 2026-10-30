@@ -62,6 +62,19 @@ export async function original178OwnerApprovalView({
   });
  if(queue.phase!=='AWAITING_OWNER_APPROVAL')
   fail('CANDIDATE_NOT_YET_VERIFIED');
+ if(state.phase==='AWAITING_OWNER_APPROVAL'&&
+     queue.report?.installation_approval_reservation_id){
+  return Object.freeze({
+   status:'AUTOMATIC_COMPLETION_IN_PROGRESS',
+   original_work_id:scope.original_work_id,
+   candidate_artifact_hash:state.candidate.artifact_hash,
+   checkpoint_hash:state.head_hash,
+   checkpoint_receipt_id:restored.continuity_receipt_id,
+   install_connection_ready:String(env.REALITY_FIRST178_GITHUB_INSTALL_TOKEN||'').length>=25,
+   recovery_no_new_approval:true,original_job_completed:false,
+   production_changed:false,
+  });
+ }
  if(state.phase==='AWAITING_OWNER_APPROVAL'){
   const ready=describeOriginal178OwnerApproval({state,queue,session});
   return Object.freeze({...ready,
