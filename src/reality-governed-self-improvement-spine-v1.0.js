@@ -196,7 +196,8 @@ export function classifyIndependentFailure({output='',code='',missingDependency=
  // model stdout or a failing test's expected/actual values are NOT.
  if(str(missingDependency)||normalized==='MISSING_CAPABILITY')
   return freeze({class:'MISSING_CAPABILITY',next:'DISCOVER_DEPENDENCY',retry_source_without_dependency:false});
- if(normalized==='AUTHORITY')
+ if(normalized==='AUTHORITY'||(!normalized&&
+    /^(?:OWNER_APPROVAL_REQUIRED|AUTHORITY_REQUIRED|RESERVATION_REQUIRED|OWNER_SIGN_IN|PERMISSION_DENIED|FORBIDDEN)$/.test(fragment.trim())))
   return freeze({class:'AUTHORITY_REQUIRED',next:'REQUEST_OWNER_AUTHORITY',retry_source_without_dependency:false});
  if(normalized==='TEST_FAILED'||normalized==='REGRESSION'||normalized==='SYNTAX'){
   if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module|ReferenceError/.test(fragment))
