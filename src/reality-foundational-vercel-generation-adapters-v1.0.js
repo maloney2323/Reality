@@ -12,12 +12,12 @@ import {createSandboxEvidenceCandidate,independentlyVerifySandbox}
  from './reality-foundational-build-loop-v1.0.js';
 export function createRealityVercelGenerationAdapters({
  ticket,model,apiKey,SandboxClient,modelFetch=fetch,
- readFrozenRegression=null,
+ readFrozenRegression=null,providerAuth=null,
 }={}){
  if(ticket?.environment!=='ISOLATED_PREVIEW'||!ticket?.ticket_hash)
   throw Error('FOUNDATION_TRUSTED_PINNED_BUILD_TICKET_REQUIRED');
  const {isolatedSandbox,independentReadback}=createIsolatedVercelSandbox({
-  SandboxClient,
+  SandboxClient,providerAuth,
  });
  // The model's drafts are independently tested in ephemeral, secret-free
  // Vercel Sandboxes before ONE source candidate enters the constitutional
@@ -65,14 +65,30 @@ export async function createRealityLiveVercelUpgradeAdapters({
   'feature/first-real-gap-to-generation-handoff-20261029',
   'feature/first178-live-single-claim-execution-20261029',
  ]);
+ const githubRunner=env.REALITY_FIRST178_EXECUTOR==='GITHUB_ACTIONS';
+ const exactGitHubBranch='refs/heads/feature/first178-live-single-claim-execution-20261029';
+ if(githubRunner&&(
+  env.GITHUB_ACTIONS!=='true'||
+  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
+  env.GITHUB_REF!==exactGitHubBranch||
+  env.GITHUB_EVENT_NAME!=='workflow_dispatch'||
+  env.GITHUB_SHA!==env.VERCEL_GIT_COMMIT_SHA))
+  throw Error('FOUNDATION_GITHUB_ACTIONS_EXACT_BRANCH_ATTESTATION_REQUIRED');
  if(env.VERCEL_ENV!=='preview'||!exactBranches.has(env.VERCEL_GIT_COMMIT_REF)||
    !/^[a-f0-9]{40}$/.test(String(env.VERCEL_GIT_COMMIT_SHA||'')))
   throw Error('FOUNDATION_LIVE_ISOLATED_PREVIEW_REQUIRED');
+ const providerAuth=githubRunner?{
+  token:env.VERCEL_TOKEN,teamId:env.VERCEL_TEAM_ID,
+  projectId:env.VERCEL_PROJECT_ID,
+ }:null;
+ if(githubRunner&&(!providerAuth.token||
+   !providerAuth.teamId||!providerAuth.projectId))
+  throw Error('FOUNDATION_GITHUB_ACTIONS_SANDBOX_API_AUTH_MISSING');
  if(ticket?.environment!=='ISOLATED_PREVIEW')
   throw Error('FOUNDATION_LIVE_TICKET_PREVIEW_REQUIRED');
  const {Sandbox}=await import('@vercel/sandbox');
  return createRealityVercelGenerationAdapters({
-  ticket,SandboxClient:Sandbox,modelFetch,
+  ticket,SandboxClient:Sandbox,modelFetch,providerAuth,
   apiKey:env.REALITY_STANDALONE_OPENAI_API_KEY,
   model:env.REALITY_SEMANTIC_REVIEW_MODEL,
   readFrozenRegression:createVerifiedFrozenRegressionReader({
