@@ -91,6 +91,12 @@ jobs:
         run: |
           node --check api/reality/personal-first-upgrade-178-recovery.js
           node --test test/reality-first178-owner-recovery-preview.test.js
+      - name: Verify independent real capability registration and durable outcome adapters
+        run: |
+          node --check src/reality-first178-real-capability-registry-v0.1.js
+          node --check src/reality-first178-real-outcome-settlement-v0.1.js
+          node --check scripts/reality-first178-original-work-replay.mjs
+          node --test test/reality-first178-real-capability-registry.test.js
       - name: Check real #178 one-click owner API and complete provider service syntax
         run: |
           node --check api/reality/personal-first-upgrade-178-approve.js
