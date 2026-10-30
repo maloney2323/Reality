@@ -1365,7 +1365,11 @@ async function wcInspectFirstGap178(){
   return;
  }
  const conversation_id=wcFirstGap178Conversation();
- if(!conversation_id){status.textContent='A saved Reality conversation is required.';return;}
+ if(!conversation_id){
+  status.textContent='No conversation is selected. Reality will inspect the saved canonical #178 job without inventing a new goal.';
+  void wcSelfDiagnoseOriginal178();
+  return;
+ }
  button.disabled=true;
  try{
   const r=await fetch('/api/reality/personal-first-upgrade-178?conversation_id='+
@@ -1395,8 +1399,11 @@ async function wcInspectFirstGap178(){
     '. No execution or installation performed.';
   }
  }catch(error){
-  status.textContent='Cannot verify original #178: '+String(error?.message||'UNAVAILABLE')+
-   '. No execution or installation performed.';
+  const code=String(error?.message||'UNAVAILABLE');
+  status.textContent=code==='FIRST_PROOF_OWNER_CONFIRMED_GOAL_REQUIRED'?
+   'Selected-conversation goal readback failed. This does NOT prove the canonical original #178 goal is absent. Reality is independently diagnosing the saved original job below; no retries.':
+   'Cannot verify selected conversation for #178: '+code+
+   '. Reality is separately checking the canonical original job; no execution or installation.';
  }finally{
   button.disabled=false;
   void wcReadOwnerApproval178();
