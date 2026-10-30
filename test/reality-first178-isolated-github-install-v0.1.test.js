@@ -67,6 +67,10 @@ function fakeProvider(){
    const content=path===frozenPath?frozen:files.find(x=>x.path===path)?.content;
    return respond({encoding:'base64',content:Buffer.from(content).toString('base64')});
   }
+  if(method==='GET'&&p.includes('/actions/runs/9876/jobs?'))
+   return respond({jobs:[{id:101,conclusion:'success',steps:[
+    {name:'Execute ORIGINAL frozen #178 acceptance against installed model-authored source',
+     conclusion:'success'}]}]});
   if(method==='GET'&&p.includes('/actions/runs?')){
    assert.ok(p.includes('head_sha='+newCommit));
    return respond({workflow_runs:[{head_sha:newCommit,
