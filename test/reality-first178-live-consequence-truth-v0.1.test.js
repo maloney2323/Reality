@@ -64,11 +64,11 @@ test('frozen CI never attests original-job registration, execution or settlement
      receipt:forged,scope_hash:'source-linked-scope',candidate_hash:artifact});
     assert.equal(check.verified,false);
     await assert.rejects(adapters.registerAndReobserve(),
-     /FIRST178_LIVE_OWNER_COMPLETION_DISTINCT_CAPABILITY_REGISTRY_READBACK_REQUIRED/);
+     /FIRST178_LIVE_OWNER_COMPLETION_PROMOTION_CHECKPOINT_NOT_DURABLY_READ_BACK/);
     await assert.rejects(adapters.resumeOriginalWork(),
-     /FIRST178_LIVE_OWNER_COMPLETION_DISTINCT_ORIGINAL_JOB_EXECUTION_READBACK_REQUIRED/);
+     /FIRST178_LIVE_OWNER_COMPLETION_ACTUAL_REGISTRATION_RECEIPT_REQUIRED/);
     await assert.rejects(adapters.settleAndReobserve(),
-     /FIRST178_LIVE_OWNER_COMPLETION_DISTINCT_OUTCOME_RECONCILIATION_READBACK_REQUIRED/);
+     /FIRST178_LIVE_OWNER_COMPLETION_ACTUAL_REGISTRATION_RECEIPT_REQUIRED/);
     return {status:'INDEPENDENT_CONSEQUENCES_NOT_YET_PROVEN',
      original_job_completed:false};
    },
