@@ -211,3 +211,19 @@ test('sandbox refuses even well-tested source if the base repository SHA moves',
    /FOUNDATION_SANDBOX_BASE_COMMIT_CHANGED/);
  }finally{rmSync(root,{recursive:true,force:true})}
 });
+
+test('Real #178: frozen test quoting missing capability remains a repairable regression',()=>{
+ const actual={...report(candidate(),false),exit_code:1,
+  test_results:[{kind:'FROZEN',passed:false},{kind:'MODEL_CANDIDATE',passed:false}],
+  log_excerpt:[
+   'not ok 3 - absent provider provenance or incomplete exact hash cannot start generation',
+   'AssertionError [ERR_ASSERTION]:',
+   "  + 'MISSING_CAPABILITY'",
+   "  - 'INSUFFICIENT_EVIDENCE'",
+   'ReferenceError: describe is not defined',
+  ].join('\n'),
+ };
+ assert.equal(classifyFoundationalFailure(actual),'TEST_REGRESSION');
+ const explicit={...actual,missing_dependency:'trusted:provider:missing_rpc'};
+ assert.equal(classifyFoundationalFailure(explicit),'MISSING_CAPABILITY');
+});
