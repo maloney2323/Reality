@@ -30,14 +30,20 @@ export default async function handler(req,res){
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    return res.status(415).json({ok:false,error:'FIRST178_OWNER_ACTION_JSON_REQUIRED'});
   const data=req.body;
-  if(!data||typeof data!=='object'||Array.isArray(data)||
-     Object.keys(data).sort().join(',')!==
-      'candidate_artifact_hash,checkpoint_hash,checkpoint_receipt_id,intent,original_work_id,owner_confirms_installation'||
-     data.intent!=='APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'||
-     data.owner_confirms_installation!==true)
+  if(!data||typeof data!=='object'||Array.isArray(data))
    return res.status(403).json({ok:false,error:'FIRST178_EXACT_OWNER_APPROVAL_ACTION_REQUIRED'});
+  const recover=Object.keys(data).join(',')==='intent'&&
+    data.intent==='CONTINUE_SAME_ALREADY_APPROVED_178';
+  const exact=Object.keys(data).sort().join(',')===
+    'candidate_artifact_hash,checkpoint_hash,checkpoint_receipt_id,intent,original_work_id,owner_confirms_installation'&&
+    data.intent==='APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'&&
+    data.owner_confirms_installation===true;
+  if(!exact&&!recover)
+   return res.status(403).json({ok:false,error:'FIRST178_EXACT_OWNER_APPROVAL_ACTION_REQUIRED'});
+  // RECOVER is not an approval. Server requires the prior DB one-time
+  // human grant and original authenticated journal before any continuation.
   const out=await runOriginal178OneApproval({
-   session,ownerAction:data,
+   session,ownerAction:exact?data:null,
   });
   if(out.status!=='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'||
      out.original_job_completed!==true||
