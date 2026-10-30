@@ -75,6 +75,13 @@ jobs:
         run: |
           node --check src/reality-first178-isolated-github-install-v0.1.js
           node --test test/reality-first178-isolated-github-install-v0.1.test.js
+      - name: Prove shared constitutional self-repair planning and source-linked recurrent failures
+        run: |
+          node --check src/reality-self-repair-strategy-v1.0.js
+          node --check src/reality-governed-self-improvement-driver-v1.0.js
+          node --check src/reality-foundational-constitutional-adapters-v1.0.js
+          node --check src/reality-foundational-model-provider-v1.0.js
+          node --test test/reality-self-repair-strategy-v1.0.test.js
       - name: Verify Reality independently diagnoses its own original job and conversation drift
         run: |
           node --check src/reality-first178-self-diagnosis-v0.1.js
