@@ -162,3 +162,35 @@ test('unauthorized network, foreign scope, and stale attempts fail before sandbo
  }
  assert.deepEqual(h.calls,[]);
 });
+
+test('GitHub worker passes scoped external API auth only to Sandbox.create, never VM env',async()=>{
+ const h=fake();
+ const create=h.Client.create;
+ const auth={token:'example-scoped-external-ci-token-123456',
+  teamId:'team_123456789012345',projectId:'prj_5A3b0WG9IuvzyEUBw9tD9v8jcha8'};
+ h.Client.create=async opts=>{
+  assert.equal(opts.token,auth.token);
+  assert.equal(opts.teamId,auth.teamId);
+  assert.equal(opts.projectId,auth.projectId);
+  assert.ok(!('env' in opts));
+  return create(opts);
+ };
+ const adapter=createIsolatedVercelSandbox({SandboxClient:h.Client,providerAuth:auth});
+ const report=await adapter.isolatedSandbox({ticket,candidate,attempt:1,
+  frozen_suite_ref:ticket.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false});
+ const pre=createSandboxEvidenceCandidate(ticket,candidate,report);
+ const verified=await independentlyVerifySandbox(ticket,candidate,pre,
+  {readback:adapter.independentReadback});
+ assert.equal(verified.independently_verified,true);
+ assert.ok(h.calls.includes('deny:deny-all'));
+ assert.equal(h.stopped,true);
+});
+test('invalid external CI auth must fail before creating a sandbox',()=>{
+ const h=fake();
+ assert.throws(()=>createIsolatedVercelSandbox({
+  SandboxClient:h.Client,
+  providerAuth:{token:'short',teamId:'team_fake',projectId:'prj_bad'},
+ }),/FOUNDATION_EXTERNAL_SANDBOX_AUTH_INVALID/);
+ assert.equal(h.calls.length,0);
+});
