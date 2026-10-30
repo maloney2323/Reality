@@ -191,7 +191,16 @@ export function createFirst178ConstitutionalCheckpointService({
    proposed.verified===false&&proposed.installed===false&&
    proposed.authorized===false&&state.sandbox_receipt===null&&
    state.independent_failure===null;
-  if(!pendingGap&&!pendingSandbox||
+  const sandboxApproved=state?.phase==='AWAITING_OWNER_APPROVAL'&&
+   state?.attempt_count>=1&&
+   state.journal?.at(-1)?.kind==='SANDBOX_VERIFIED'&&
+   state.candidate?.artifact_hash===state.sandbox_receipt?.artifact_hash&&
+   state.sandbox_receipt?.independent_tests_passed===true&&
+   state.sandbox_receipt?.frozen_regression_passed===true&&
+   state.sandbox_receipt?.governance_preserved===true&&
+   state.promotion_authorization===null&&
+   state.registration===null&&state.resumption===null&&state.settlement===null;
+  if(!pendingGap&&!pendingSandbox&&!sandboxApproved||
 
      state.scope?.owner_id!==session.user_id||
      state.scope?.goal_id!==g.state.active_goal_id||
