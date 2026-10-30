@@ -75,6 +75,10 @@ jobs:
         run: |
           node --check src/reality-first178-isolated-github-install-v0.1.js
           node --test test/reality-first178-isolated-github-install-v0.1.test.js
+      - name: Verify original #178 existing owner grant resumes in configured preview only
+        run: |
+          node --check api/reality/personal-first-upgrade-178-recovery.js
+          node --test test/reality-first178-owner-recovery-preview.test.js
       - name: Check real #178 one-click owner API and complete provider service syntax
         run: |
           node --check api/reality/personal-first-upgrade-178-approve.js
