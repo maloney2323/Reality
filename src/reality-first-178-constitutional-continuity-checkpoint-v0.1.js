@@ -229,6 +229,13 @@ export function createFirst178ConstitutionalCheckpointService({
    state.independent_failure?.classification?.retry_source_without_dependency===true&&
    state.promotion_authorization===null&&state.registration===null&&
    state.resumption===null&&state.settlement===null;
+  const finalRecoveredExhaustion=state?.phase==='ESCALATED'&&
+   attempt===5&&state.attempt_limit===5&&recoveryOffset===1&&
+   state.journal?.length===12&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.attempt===5&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
   const sandboxApproved=state?.phase==='AWAITING_OWNER_APPROVAL'&&
    state?.attempt_count>=1&&
    state.journal?.at(-1)?.kind==='SANDBOX_VERIFIED'&&
@@ -248,7 +255,8 @@ export function createFirst178ConstitutionalCheckpointService({
    state.sandbox_receipt?.frozen_regression_passed===true&&
    state.sandbox_receipt?.governance_preserved===true;
   if(!pendingGap&&!pendingSandbox&&!pendingRepair&&
-     !recoverableEscalation&&!sandboxApproved&&!hasOwnerPromotion||
+     !recoverableEscalation&&!finalRecoveredExhaustion&&
+     !sandboxApproved&&!hasOwnerPromotion||
 
      state.scope?.owner_id!==session.user_id||
      state.scope?.goal_id!==g.state.active_goal_id||
