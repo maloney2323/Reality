@@ -49,6 +49,8 @@ export function classifyFirst178Diagnosis({original,view,viewError,
    last_failure_kind:view.last_failure_kind||null,
    last_failure_next:view.last_failure_next||null,
    last_failure_evidence_ref:view.last_failure_evidence_ref||null,
+   failing_tests:Array.isArray(view.last_failure_test_names)?
+    view.last_failure_test_names.slice(0,6):[],
    finding:'The original job exhausted independently checked correction attempts without a verified passing candidate.'+
     (view.last_failure_kind?' Final independent failure: '+view.last_failure_kind+'.':'')+
     (same===false?' The browser selected a different conversation; this is separate from the sandbox failure.':''),
