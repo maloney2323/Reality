@@ -5,6 +5,8 @@
 import {createHash} from 'node:crypto';
 import {strategyFromConstitutionalJournal}
  from './reality-self-repair-strategy-v1.0.js';
+import {projectVerifiedSelfRepairOpportunity}
+ from './reality-upgrade-discovery-v0.1.js';
 import {dbFor,rpc,verifiedOwnerScope}
  from './reality-personal-first-upgrade-178-v0.1.js';
 import {resolveOriginalFirst178OwnerQueue}
@@ -88,6 +90,7 @@ export async function original178OwnerApprovalView({
   // Reality itself reads the COMPLETE existing constitutional failure history.
   // The strategy is a diagnosis/proposal, NOT another retry reservation.
   const repair=strategyFromConstitutionalJournal(result.state);
+  const discovered=projectVerifiedSelfRepairOpportunity({state:result.state});
   return Object.freeze({
    status:'EXHAUSTED_CORRECTION_ATTEMPTS',
    self_repair_strategy:{
@@ -96,7 +99,8 @@ export async function original178OwnerApprovalView({
     root_cause_hypotheses:repair.root_cause_hypotheses,
     latest_failing_tests:repair.latest_failing_tests,
     evidence_refs:repair.evidence_refs,
-    discovered_work:repair.discovered_work,
+    discovered_work:discovered.discovered_work,
+    discovery_status:discovered.discovery_status,
     automatic_reexecution_permitted:false,
     execution_authorized:false,
    },
