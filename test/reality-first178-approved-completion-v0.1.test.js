@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createGovernedSelfImprovement,proposeGovernedCandidate,
  acceptGovernedObservation}
  from '../src/reality-governed-self-improvement-spine-v1.0.js';
+import {original178OwnerApprovalView} from '../src/reality-first178-live-owner-completion-v0.1.js';
 import {describeOriginal178OwnerApproval,finishOriginal178AfterExactApproval}
  from '../src/reality-first178-approved-completion-v0.1.js';
 const owner='11111111-1111-4111-8111-111111111111';
@@ -160,4 +161,34 @@ test('one owner action executes registration, exact original resumption, settlem
  assert.equal(done.original_job_completed,true);
  assert.equal(done.production_changed,false);
  assert.equal(done.installed_candidate_sha256,a.candidate_artifact_hash);
+});
+
+
+test('exhausted original #178 permits one verified recovery without exposing installer approval',async()=>{
+ const digest='a'.repeat(64);
+ const checkpoint='44444444-4444-4444-8444-444444444444';
+ let reads=0;let writes=0;
+ const d=await original178OwnerApprovalView({
+  session:{user_id:owner},
+  env:{VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:receiptId,original_work_id:work,goal_id:scope.goal_id,queue_id:queueId}),
+  scopeReader:async()=>({owner_id:owner,original_work_id:work,goal_id:scope.goal_id}),
+  dbReader:()=>({}),
+  call:async(_db,method)=>{reads++;assert.equal(method,'reality_read_governed_build_v1');return {
+   queue_id:queueId,original_work_id:work,goal_id:scope.goal_id,phase:'ESCALATED',
+   report:{state:'ESCALATED',checkpoint_receipt_id:checkpoint,checkpoint_hash:digest,
+    original_work_id:work,installation_authorized:false,job_completed:false},
+  }},
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>{reads++;return{
+   verified:true,continuity_receipt_id:checkpoint,checkpoint_hash:digest,
+   original_work_id:work,state:{phase:'ESCALATED',attempt_count:3,attempt_limit:3,
+    independent_failure:{classification:{retry_source_without_dependency:true}}}
+  }}}),
+ });
+ assert.equal(d.status,'GOVERNED_RECOVERY_READY');
+ assert.equal(d.original_work_id,work);
+ assert.equal(d.additional_attempts,2);
+ assert.equal(d.installation_authorized,false);
+ assert.equal(d.original_job_completed,false);
+ assert.equal(reads,2);assert.equal(writes,0);
 });
