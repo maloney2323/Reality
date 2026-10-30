@@ -69,5 +69,9 @@ jobs:
           else
             echo "Original #178 uninstalled; frozen acceptance requires exact owner-authorized source."
           fi
+      - name: Verify exact owner-approved isolated GitHub install and frozen CI readback
+        run: |
+          node --check src/reality-first178-isolated-github-install-v0.1.js
+          node --test test/reality-first178-isolated-github-install-v0.1.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
