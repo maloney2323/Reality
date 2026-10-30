@@ -163,16 +163,16 @@ test('foreign original work or forged installed state fails closed',async()=>{
   execute:async()=>({...validated,installation_authorized:true}),
  }),/FIRST178_SINGLE_ACTION_CONSTITUTIONAL_EXECUTION_RESULT_UNVERIFIED/);
 });
-test('one-click UI and single authenticated POST handler have working syntax',()=>{
+test('read-only original #178 observer preserves authenticated legacy endpoint boundaries',()=>{
  const html=readFileSync('index.html','utf8');
  for(const [,script] of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
   new vm.Script(script);
  assert.ok(html.includes('id="wcStartFirstGap178" type="button">Run original #178'));
  assert.ok(html.includes('RUN_SAME_FIRST178_JOB_UNTIL_EXACT_INSTALL_APPROVAL'));
  assert.ok(!html.includes('wcFirstGap178ReadyConversation'));
- assert.match(html,/wcFirstGap178AutoResumeAttempted=true/);
- assert.match(html,/\['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'\]/);
- assert.match(html,/Promise\.resolve\(\)\.then\(\(\)=>\{void wcFirstGap178Run\(\);\}\)/);
+ assert.ok(!html.includes('wcFirstGap178AutoResumeAttempted=true'));
+ assert.match(html,/Trusted server-side dispatch owns execution/);
+ assert.ok(!html.includes('Promise.resolve().then(()=>{void wcFirstGap178Run();})'));
  assert.match(html,/async function wcFirstGap178Run\(\)/);
  const endpoint=readFileSync('api/reality/personal-first-upgrade-178-run.js','utf8');
  // Route module syntax is verified separately by node --check in CI.
