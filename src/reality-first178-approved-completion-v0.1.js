@@ -61,7 +61,7 @@ export async function finishOriginal178AfterExactApproval({
  for(const name of [
   'reserveExactOwnerApproval','verifyIndependentReceipt',
   'persistCheckpoint','registerAndReobserve','resumeOriginalWork',
-  'settleAndReobserve',
+  'settleAndReobserve','recordAndReobserveFinalSettlement',
  ]){
   if(typeof adapters?.[name]!=='function')
    fail('TRUSTED_'+name.toUpperCase()+'_NOT_CONNECTED');
@@ -118,6 +118,21 @@ export async function finishOriginal178AfterExactApproval({
     result.state.settlement?.durable_settlement_readback!==true||
     result.original_job_completed!==true)
   fail('UNSETTLED_PROVIDER_OUTCOME_MUST_RECONCILE');
+ const final=await adapters.recordAndReobserveFinalSettlement(Object.freeze({
+  owner_id:session.user_id,queue_id:ready.queue_id,
+  original_work_id:ready.original_work_id,
+  candidate_artifact_hash:ready.candidate_artifact_hash,
+  checkpoint_hash:result.state.head_hash,
+  registered_capability_ref:result.state.registration.registry_receipt_ref,
+  executor_run_ref:result.state.resumption.executor_run_ref,
+  settlement_receipt_ref:result.state.settlement.settlement_receipt_ref,
+ }));
+ if(final?.settled!==true||final?.readback_verified!==true||
+    final.queue_id!==ready.queue_id||
+    final.original_work_id!==ready.original_work_id||
+    final.checkpoint_hash!==result.state.head_hash||
+    final.original_job_completed!==true)
+  fail('FINAL_ORIGINAL_JOB_DATABASE_RECONCILIATION_REQUIRED');
  return Object.freeze({
   status:'ORIGINAL_JOB_INDEPENDENTLY_SETTLED',
   original_work_id:ready.original_work_id,
