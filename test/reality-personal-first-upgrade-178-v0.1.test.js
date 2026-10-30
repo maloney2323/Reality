@@ -122,6 +122,7 @@ test('original #178 source-linked once-only queue has no GitHub write or install
    provider_receipt_ref:'github:actions:run:40962921090:job:123760052647'};
  };
  const persistWork=async({scope,providerEvidence})=>{
+  actualWork=scope.original_work_id;
   assert.equal(scope.original_work_id,actualWork);
   assert.equal(providerEvidence.original_work_id,actualWork);
   return {receipt_id:'55555555-5555-4555-8555-555555555555',
@@ -165,14 +166,14 @@ test('missing Continuity receipt aborts before any execution authority',async()=
   persistWork:async()=>({verified_readback:false}),
  }),/FIRST_PROOF_CONTINUITY_WORK_READBACK_FAILED/);
 });
-test('Work Center script parses and exact first proof has disabled-start + owner confirmation',()=>{
+test('Work Center parses and offers one owner action, without mandatory readiness click',()=>{
  const html=readFileSync('index.html','utf8');
  for(const [,script]of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
   new vm.Script(script);
  for(const id of ['wcFirstUpgrade178','wcInspectFirstGap178','wcStartFirstGap178'])
   assert.ok(html.includes('id="'+id+'"'));
- assert.match(html,/id="wcStartFirstGap178" type="button" disabled/);
- assert.match(html,/INVESTIGATE_VERIFIED_FIRST_CAPABILITY_GAP_178/);
- assert.match(html,/wcFirstGap178ReadyConversation=conv/);
- assert.match(html,/window\.confirm\(/);
+ assert.match(html,/id="wcStartFirstGap178" type="button">Run original #178/);
+ assert.match(html,/RUN_SAME_FIRST178_JOB_UNTIL_EXACT_INSTALL_APPROVAL/);
+ assert.match(html,/personal-first-upgrade-178-run/);
+ assert.doesNotMatch(html,/wcFirstGap178ReadyConversation/);
 });
