@@ -71,6 +71,12 @@ export function classifyFoundationalFailure(report){
  // Provider-owned exit status/test results and typed missing_dependency
  // outrank arbitrary stdout. This is critical for #178 self-correction.
  if(report?.missing_dependency)return 'MISSING_CAPABILITY';
+ // Exact standalone trusted failure codes are supported for historical
+ // provider responses; do not infer them from a test's stdout/stderr.
+ if(report?.failure_kind==='AUTHORITY_REQUIRED'||
+    (report?.exit_code==null&&!Array.isArray(report?.test_results)&&
+     /^(?:OWNER_APPROVAL_REQUIRED|AUTHORITY_REQUIRED|PERMISSION_DENIED|ONE_TIME_RESERVATION)$/.test(output.trim())))
+  return 'AUTHORITY_REQUIRED';
  if(/SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module/.test(output))
   return 'SYNTAX';
  if(/not ok\s+\d+|ERR_ASSERTION|AssertionError|TEST_FAILED|ReferenceError/.test(output)||
