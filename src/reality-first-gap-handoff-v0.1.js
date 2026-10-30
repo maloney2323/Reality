@@ -295,6 +295,7 @@ export async function generateAfterTrustedGap({
   // No new model-scope authority on recovery. The original constitutional
   // release hash is retained in the verified journal. Current owner/goal,
   // original work, source receipts and immutable gap identity MUST match.
+  const recoveryOffset=resumeState.recovery_authorization?.verified===true?1:0;
   const unacceptedGap=resumeState.phase==='GAP_CONFIRMED'&&
      resumeState.attempt_count===0&&
      resumeState.journal.length===1&&
@@ -318,7 +319,6 @@ export async function generateAfterTrustedGap({
         (resumeState.attempt_count===4&&recoveryOffset===1&&
          resumeState.journal.at(-2).kind==='RECOVERY_STARTED'&&
          resumeState.journal.at(-3).kind==='SANDBOX_FAILED'))));
-  const recoveryOffset=resumeState.recovery_authorization?.verified===true?1:0;
   const lastEvent=resumeState.journal.at(-1);
   const recoveryOpening=resumeState.phase==='REPAIR_REQUIRED'&&
      recoveryOffset===1&&resumeState.attempt_count===3&&
