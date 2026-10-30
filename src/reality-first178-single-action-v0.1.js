@@ -69,7 +69,8 @@ export async function runFirst178SingleAction({
      !source.queue_id||!source.continuity_work_receipt_id)
    stop('SOURCE_WORK_ADMISSION_UNVERIFIED',503);
  }else if(current.status==='ALREADY_QUEUED'){
-  if(current.queue_phase!=='QUEUED_DISCOVERY'){
+  if(!['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(
+    current.queue_phase)){
    // Never retry a consumed/ambiguous execution claim. Show its recorded
    // state, and leave recovery to the same constitutional journal.
    return Object.freeze({
@@ -83,6 +84,9 @@ export async function runFirst178SingleAction({
     existing_work:true,do_not_retry:true,
    });
   }
+  // An already running constitutional claim can only proceed through
+  // the exact independent GAP checkpoint + one-time PostgreSQL recovery
+  // reservation. The executor never claims the work a second time.
   if(!current.queue_id)stop('EXISTING_QUEUE_RECEIPT_REQUIRED');
  }else{
   stop('NOT_READY_'+String(current.status||'UNKNOWN').replace(/[^A-Z0-9_]/g,'_'));
