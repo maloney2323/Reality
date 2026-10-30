@@ -267,3 +267,74 @@ test('candidate source checkpoint restores only as unverified sandbox work',asyn
  assert.equal(restored.state.candidate.installed,false);
  assert.equal(restored.state.candidate.authorized,false);
 });
+
+test('real #178 failed sandbox checkpoint restores for bounded model correction and second candidate',async()=>{
+ const h=harness();
+ const source={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(source);
+ let state=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:source.evidence_hash});
+ await h.adapter.persistCheckpoint(state);
+ const proposal={
+  rationale:'Original model proposal, not execution authority',
+  verification_plan_ref:'first-ci-evidence-gap-v1',
+  files:[
+   {path:'src/reality-extensions/reality-ci-failure-evidence.mjs',
+    content:'export const decision=()=>"MISSING_CAPABILITY"'},
+   {path:'test/reality-extensions/failure-evidence.test.js',
+    content:'import test from "node:test";test("original",()=>{});'},
+  ],
+ };
+ state=proposeGovernedCandidate(state,proposal);
+ await h.adapter.persistCheckpoint(state);
+ const failure={
+  kind:'SANDBOX_FAILED',
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  continuity_root_id:scope.continuity_root_id,
+  worldline_id:scope.worldline_id,
+  artifact_hash:state.candidate.artifact_hash,
+  evidence_ref:'vercel:independent-sandbox:failure:1',
+  evidence_hash:'f'.repeat(64),
+  diagnostics:{
+   code:'TEST_FAILED',
+   output:"not ok 3 - frozen CI expected INSUFFICIENT_EVIDENCE; actual MISSING_CAPABILITY",
+  },
+ };
+ state=await acceptGovernedObservation(state,failure,{
+  verifyProvider:async x=>({
+   verified:true,independent_provider_readback:true,
+   evidence_ref:failure.evidence_ref,
+   evidence_hash:failure.evidence_hash,
+   original_work_id:work,scope_hash:x.scope_hash,
+  }),
+ });
+ assert.equal(state.phase,'REPAIR_REQUIRED');
+ await h.adapter.persistCheckpoint(state);
+ const r=await h.adapter.readLatestCheckpoint();
+ assert.equal(r.verified,true);
+ assert.equal(r.state.phase,'REPAIR_REQUIRED');
+ assert.equal(r.state.attempt_count,1);
+ assert.equal(r.state.independent_failure.classification.retry_source_without_dependency,true);
+ assert.equal(r.state.journal.at(-1).kind,'SANDBOX_FAILED');
+ const corrected=proposeGovernedCandidate(r.state,{
+  ...proposal,
+  rationale:'Independent frozen failure correction with same original work',
+  files:[
+   {...proposal.files[0],content:'export const decision=()=>"INSUFFICIENT_EVIDENCE"'},
+   {...proposal.files[1]},
+  ],
+ });
+ await h.adapter.persistCheckpoint(corrected);
+ const next=await h.adapter.readLatestCheckpoint();
+ assert.equal(next.verified,true);
+ assert.equal(next.state.phase,'CANDIDATE_READY');
+ assert.equal(next.state.attempt_count,2);
+ assert.equal(next.state.candidate.artifact_hash,corrected.candidate.artifact_hash);
+ assert.equal(next.state.journal.length,4);
+ assert.equal(next.state.sandbox_receipt,null);
+});
