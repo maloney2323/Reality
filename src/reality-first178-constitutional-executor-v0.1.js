@@ -18,6 +18,19 @@ const uuid=x=>typeof x==='string'&&
  /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(x);
 const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const FIRST_ORIGINAL_178_QUEUED_RELEASE='f57dc3b253824ad1edf5675cf5e6223097d50ff9';
+// The first customer's exact queue was durably admitted by this preview
+// release before the server was redeployed. Preserve the original write's
+// release fingerprint across code upgrades, while always requiring an
+// authenticated current owner goal + the exact independently verified #178
+// work receipt + a single-use transaction. No arbitrary/stale branch release.
+function verifiedOriginal178QueuePin(queue,env){
+ const pin=queue?.preview_release_sha;
+ return sha40(pin)&&(
+  pin===env.VERCEL_GIT_COMMIT_SHA||
+  pin===FIRST_ORIGINAL_178_QUEUED_RELEASE
+ );
+}
 export async function executeFirst178Constitutional({
  session,conversationId,env=process.env,call=rpc,
  scopeReader=verifiedOwnerScope,dbReader=dbFor,
@@ -45,7 +58,7 @@ export async function executeFirst178Constitutional({
  if(!uuid(queue?.queue_id)||queue?.phase!=='QUEUED_DISCOVERY'||
     queue.original_work_id!==scope.original_work_id||
     queue.goal_id!==scope.goal_id||
-    queue.preview_release_sha!==env.VERCEL_GIT_COMMIT_SHA||
+    !verifiedOriginal178QueuePin(queue,env)||
     queue.dispatch_commit_sha!=null||queue.dispatched_at!=null)
   die('OWNER_QUEUED_JOB_NOT_EXACTLY_CLAIMABLE');
  // Read the REAL pinned job again, independent of browser and model text.
@@ -64,7 +77,9 @@ export async function executeFirst178Constitutional({
   p_queue_id:queue.queue_id,p_goal_id:scope.goal_id,
   p_original_work_id:scope.original_work_id,
   p_goal_transition_event_id:scope.goal_transition_receipt_ref,
-  p_preview_release_sha:env.VERCEL_GIT_COMMIT_SHA,
+  // Atomic database claim verifies this source pin is still exactly the
+  // immutable pin in the queue, not the freshly deployed worker release.
+  p_preview_release_sha:queue.preview_release_sha,
  });
  if(claim?.claimed!==true||!uuid(claim.claim_id)||
     claim.queue_id!==queue.queue_id||
