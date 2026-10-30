@@ -12,14 +12,11 @@ export default async function handler(req,res){
   const db=resolveReliabilityBenchmarkDb();
   if(!db?.strictSecrets||!db.secretKey)return res.status(503).json({ok:false,stage:'CONFIG'});
   // Named dummy identity is not a real owner and cannot create or change data.
-  const r=await fetch(db.url+'/rest/v1/rpc/reality_read_governed_build_v1',{
+  const r=await fetch(db.url+'/rest/v1/rpc/reality_first178_service_role_probe_v1',{
    method:'POST',cache:'no-store',redirect:'error',
    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
     accept:'application/json','content-type':'application/json'},
-   body:JSON.stringify({
-    p_owner_id:'00000000-0000-4000-8000-000000000001',
-    p_conversation_id:'00000000-0000-4000-8000-000000000002',
-   }),
+   body:'{}',
   });
   const body=await r.json().catch(()=>null);
   return res.status(200).json({
@@ -28,7 +25,8 @@ export default async function handler(req,res){
    provider_code:typeof body?.code==='string'?body.code.slice(0,64):null,
    provider_message:typeof body?.message==='string'?
     body.message.slice(0,160).replace(/[a-zA-Z0-9_-]{32,}/g,'[redacted]'):null,
-   result_is_empty:r.ok&&body&&!body.queue_id,
+   actual_service_role:body?.actual_service_role===true,
+   claim_service_role:body?.claim_service_role===true,
    writes:0,execution_authorized:false,
   });
  }catch(e){
