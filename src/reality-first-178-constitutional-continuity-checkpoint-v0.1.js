@@ -194,7 +194,10 @@ export function createFirst178ConstitutionalCheckpointService({
    e.entity_type==='personal_first_178_confirmed_gap'&&
    e.payload?.original_work_id===originalWorkId);
   if(gap.length!==1||gap[0].payload?.original_source_receipt_ref!==
-     originals[0].event_id||gap[0].payload?.authorization_granted!==false)
+     originals[0].event_id||gap[0].payload?.authorization_granted!==false||
+     state.journal[0].evidence_ref!==gapReceiptId||
+     state.journal[0].evidence_hash!==gap[0].payload?.evidence_hash||
+     state.journal[0].body?.original_work_id!==originalWorkId)
    fail('RESTORE_GAP_PROVENANCE_MISSING');
   const verified=await readBackGap({
    owner_id:session.user_id,goal_id:g.state.active_goal_id,
