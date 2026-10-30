@@ -311,6 +311,7 @@ test('real #178 failed sandbox checkpoint restores for bounded model correction 
    evidence_ref:failure.evidence_ref,
    evidence_hash:failure.evidence_hash,
    original_work_id:work,scope_hash:x.scope_hash,
+   attestation_ref:'vercel:independent:original178:sandbox-failure-1',
   }),
  });
  assert.equal(state.phase,'REPAIR_REQUIRED');
