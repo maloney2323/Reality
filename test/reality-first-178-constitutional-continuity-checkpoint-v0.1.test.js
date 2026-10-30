@@ -235,7 +235,7 @@ test('one verified original GAP checkpoint restores with same hash and no new wo
  assert.equal(restored.state.attempt_count,0);
  assert.equal(h.getWrites(),writes,'readback cannot write or claim');
 });
-test('already generated candidate cannot be restored as unaccepted GAP',async()=>{
+test('candidate source checkpoint restores only as unverified sandbox work',async()=>{
  const h=harness();
  const src={
   owner_id:owner,goal_id:goalId,original_work_id:work,
@@ -258,6 +258,12 @@ test('already generated candidate cannot be restored as unaccepted GAP',async()=
   ],
  });
  await h.adapter.persistCheckpoint(candidate);
- await assert.rejects(h.adapter.readLatestCheckpoint(),
-  /FIRST_178_CONTINUITY_RESTORE_EXACT_UNCONSUMED_GAP_REQUIRED/);
+ const restored=await h.adapter.readLatestCheckpoint();
+ assert.equal(restored.verified,true);
+ assert.equal(restored.state.phase,'CANDIDATE_READY');
+ assert.equal(restored.state.attempt_count,1);
+ assert.equal(restored.state.sandbox_receipt,null);
+ assert.equal(restored.state.candidate.artifact_hash,candidate.candidate.artifact_hash);
+ assert.equal(restored.state.candidate.installed,false);
+ assert.equal(restored.state.candidate.authorized,false);
 });
