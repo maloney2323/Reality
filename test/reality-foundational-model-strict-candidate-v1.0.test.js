@@ -89,3 +89,32 @@ test('model cannot substitute a different goal or write protected paths',async()
   execution_authority:false}),
   /FOUNDATION_GENERATION_GOAL_DRIFT/);
 });
+
+
+test('repair generation sends actual frozen failures and provenance conditions, not a blind retry',async()=>{
+ let seen=false;
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  fetchImpl:async(_endpoint,options)=>{
+   const request=JSON.parse(options.body);
+   const task=JSON.parse(request.input[1].content[0].text);
+   assert.equal(task.attempt,2);
+   assert.ok(task.independently_verified_failure.log_excerpt.includes('not ok 6'));
+   assert.ok(task.correction_acceptance_criteria.some(s=>s.includes('same field')));
+   assert.ok(task.correction_acceptance_criteria.some(s=>s.includes('SHA')));
+   assert.ok(task.correction_acceptance_criteria.some(s=>s.includes('attestation')));
+   seen=true;
+   return {ok:true,json:async()=>({id:'response:repair',
+    output_text:JSON.stringify({ticket_hash:t.ticket_hash,
+     original_work_id:t.original_work_id,
+     rationale:'Repair actual negative controls',files:actualFiles()})})};
+  },
+ });
+ await gen({ticket:t,attempt:2,
+  previous_candidate:{artifact_sha256:'previous',files:actualFiles()},
+  verified_feedback:{kind:'INDEPENDENT_SANDBOX_FAILURE',
+   attestation_ref:'provider:independent',
+   log_excerpt:'not ok 6 - foreign repository was accepted\n expected: false\n actual: true'},
+  execution_authority:false});
+ assert.equal(seen,true);
+});
