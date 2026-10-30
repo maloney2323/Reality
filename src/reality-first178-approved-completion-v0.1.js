@@ -76,13 +76,23 @@ export async function finishOriginal178AfterExactApproval({
    fail('PREVIOUS_EXACT_OWNER_APPROVAL_NOT_PROVEN');
  if(fresh){
   const action=ownerAction||{};
-  if(action.intent!=='APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'||
-     action.owner_confirms_installation!==true||
-     action.original_work_id!==ready.original_work_id||
-     action.candidate_artifact_hash!==ready.candidate_artifact_hash||
-     action.checkpoint_hash!==ready.checkpoint_hash||
-     action.checkpoint_receipt_id!==ready.checkpoint_receipt_id)
-   fail('EXACT_HUMAN_INSTALLATION_CONSENT_REQUIRED');
+  const exactConsent=action.intent===
+    'APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH'&&
+   action.owner_confirms_installation===true&&
+   action.original_work_id===ready.original_work_id&&
+   action.candidate_artifact_hash===ready.candidate_artifact_hash&&
+   action.checkpoint_hash===ready.checkpoint_hash&&
+   action.checkpoint_receipt_id===ready.checkpoint_receipt_id;
+  if(!exactConsent){
+   // Automatic reconciliation is permitted ONLY after a previous explicit
+   // human approval was durably reserved. It cannot create new authority.
+   const prior=await adapters?.readExactOwnerApproval?.(ready);
+   if(prior?.verified!==true||
+      prior.owner_id!==session.user_id||
+      prior.candidate_hash!==ready.candidate_artifact_hash||
+      !prior.reservation_id)
+    fail('EXACT_HUMAN_INSTALLATION_CONSENT_REQUIRED');
+  }
  }
  for(const name of [
   'reserveExactOwnerApproval','readExactOwnerApproval',
