@@ -58,3 +58,32 @@ test('unverified exhausted database report fails closed rather than offering ano
    original_work_id:work,installation_authorized:true,job_completed:false}}),
  }),/FIRST178_LIVE_OWNER_COMPLETION_ESCALATED_QUEUE_DURABLE_RECEIPT_UNVERIFIED/);
 });
+
+
+test('real fifth-attempt failure offers one source-linked second recovery, no installation',async()=>{
+ const digest='f'.repeat(64),lastReceipt='88888888-8888-4888-8888-888888888888';
+ const d=await original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>({owner_id:owner,goal_id:goal,original_work_id:work}),
+  dbReader:()=>({}),
+  call:async()=>({queue_id:queueId,original_work_id:work,goal_id:goal,
+   phase:'ESCALATED',report:{state:'ESCALATED',
+    checkpoint_receipt_id:lastReceipt,checkpoint_hash:digest,
+    original_work_id:work,installation_authorized:false,job_completed:false}}),
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>({
+   verified:true,original_work_id:work,checkpoint_hash:digest,
+   continuity_receipt_id:lastReceipt,state:{phase:'ESCALATED',
+    attempt_count:5,attempt_limit:5,
+    recovery_authorization:{verified:true},
+    independent_failure:{classification:{retry_source_without_dependency:true}}}
+  })}),
+ });
+ assert.equal(d.status,'GOVERNED_RECOVERY_READY');
+ assert.equal(d.attempts_used,5);
+ assert.equal(d.attempt_limit,7);
+ assert.equal(d.additional_attempts,2);
+ assert.equal(d.installation_authorized,false);
+});
