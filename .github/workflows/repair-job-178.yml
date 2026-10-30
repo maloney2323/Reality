@@ -21,6 +21,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  guard_dispatch_branch:
+    name: Fail closed on a wrong manual workflow branch
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify isolated original #178 branch only
+        env:
+          ACTUAL_REF: ${{ github.ref }}
+          ACTUAL_REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$ACTUAL_REF" = "refs/heads/feature/first178-live-single-claim-execution-20261029"
+          test "$ACTUAL_REPOSITORY" = "maloney2323/Reality"
   validate:
     name: Verify exact job runner, never consume live work
     if: github.repository == 'maloney2323/Reality' && github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029'
@@ -47,7 +59,7 @@ jobs:
 
   recover:
     name: Recover existing #178, stop at verified Approval 1
-    needs: validate
+    needs: [validate, guard_dispatch_branch]
     if: github.event_name == 'workflow_dispatch' && inputs.original_job == '178' && github.ref == 'refs/heads/feature/first178-live-single-claim-execution-20261029' && github.repository == 'maloney2323/Reality'
     runs-on: ubuntu-latest
     timeout-minutes: 55
