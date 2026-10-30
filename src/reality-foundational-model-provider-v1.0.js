@@ -102,7 +102,7 @@ export function createFoundationalModelGenerator({
    'src/reality-extensions/reality-ci-failure-evidence.mjs')?.content||'';
   // Self-comparisons can never compare independently observed evidence.
   // Reject model-proposed source, do not modify it or treat it as verified.
-  const invalid=/\\b(evidence|input|record|source)\\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\\s*(?:!==|===|!=|==)\\s*\\1\\.\\2\\b/i.test(code);
+  const invalid=/\b(evidence|input|record|source)\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\s*(?:!==|===|!=|==)\s*\1\.\2\b/i.test(code);
   if(!invalid)return validated;
   localRejection='Invalid candidate evidence check: the same provenance field is compared with itself. Compare independently sourced fields instead, satisfy frozen negative cases, and return corrected source. The rejected artifact was not installed or tested.';
   }
