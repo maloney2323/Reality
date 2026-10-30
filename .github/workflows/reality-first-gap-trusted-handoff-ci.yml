@@ -62,13 +62,15 @@ jobs:
           node --check src/reality-first178-approved-completion-v0.1.js
           node --test test/reality-first178-approved-completion-v0.1.test.js
       - name: Execute ORIGINAL frozen #178 acceptance against installed model-authored source
+        # Before owner-approved installation the source is absent. This STEP
+        # must be SKIPPED, never reported as a successful frozen acceptance.
+        # observeFrozenAcceptance independently requires this exact step
+        # conclusion=success and therefore refuses uninstalled candidates.
+        if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
         run: |
-          if [ -f src/reality-extensions/reality-ci-failure-evidence.mjs ]; then
-            test -f test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
-            node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
-          else
-            echo "Original #178 uninstalled; frozen acceptance requires exact owner-authorized source."
-          fi
+          test -f src/reality-extensions/reality-ci-failure-evidence.mjs
+          test -f test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
       - name: Verify exact owner-approved isolated GitHub install and frozen CI readback
         run: |
           node --check src/reality-first178-isolated-github-install-v0.1.js
