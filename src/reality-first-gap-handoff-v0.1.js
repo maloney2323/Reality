@@ -294,11 +294,24 @@ export async function generateAfterTrustedGap({
   // No new model-scope authority on recovery. The original constitutional
   // release hash is retained in the verified journal. Current owner/goal,
   // original work, source receipts and immutable gap identity MUST match.
-  if(resumeState.phase!=='GAP_CONFIRMED'||
-     resumeState.attempt_count!==0||
-     resumeState.journal.length!==1||
-     resumeState.journal[0].kind!=='GAP_CONFIRMED'||
-     resumeState.candidate!==null||
+  const unacceptedGap=resumeState.phase==='GAP_CONFIRMED'&&
+     resumeState.attempt_count===0&&
+     resumeState.journal.length===1&&
+     resumeState.journal[0].kind==='GAP_CONFIRMED'&&
+     resumeState.candidate===null;
+  const unverifiedCandidate=resumeState.phase==='CANDIDATE_READY'&&
+     resumeState.attempt_count===1&&
+     resumeState.journal.length===2&&
+     resumeState.journal[0].kind==='GAP_CONFIRMED'&&
+     resumeState.journal[1].kind==='MODEL_CANDIDATE_PROPOSED'&&
+     resumeState.candidate?.generated_by_model===true&&
+     resumeState.candidate?.verified===false&&
+     resumeState.candidate?.installed===false&&
+     resumeState.candidate?.authorized===false&&
+     resumeState.sandbox_receipt===null;
+  // Existing constitutional journal, not the model, decides the next action:
+  // CANDIDATE_READY goes straight to isolated sandbox, never regenerates code.
+  if((!unacceptedGap&&!unverifiedCandidate)||
      resumeState.attempt_limit!==ticket.max_attempts||
      !rs?.governance_kernel_hash?.startsWith('sha256:')||
      !Object.entries(scope).every(([key,value])=>
