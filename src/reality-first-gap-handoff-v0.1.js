@@ -178,7 +178,7 @@ export async function admitFirstGapBuildTicket({
  reobserveProviderEvidence,maxAttempts=3,
 }={}){
  strictScope(scope);
- if(![3,5].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
+ if(![3,5,7].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
  if(typeof reobserveProviderEvidence!=='function')
   fail('INDEPENDENT_REOBSERVATION_REQUIRED');
  const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
@@ -295,7 +295,8 @@ export async function generateAfterTrustedGap({
   // No new model-scope authority on recovery. The original constitutional
   // release hash is retained in the verified journal. Current owner/goal,
   // original work, source receipts and immutable gap identity MUST match.
-  const recoveryOffset=resumeState.recovery_authorization?.verified===true?1:0;
+  const recoveryOffset=(resumeState.recovery_authorization?.verified===true?1:0)+
+   (resumeState.recovery_continuation_authorization?.verified===true?1:0);
   const unacceptedGap=resumeState.phase==='GAP_CONFIRMED'&&
      resumeState.attempt_count===0&&
      resumeState.journal.length===1&&
@@ -304,8 +305,7 @@ export async function generateAfterTrustedGap({
   const unverifiedCandidate=resumeState.phase==='CANDIDATE_READY'&&
      resumeState.attempt_count>=1&&
      resumeState.attempt_count<=ticket.max_attempts&&
-     resumeState.journal.length===2*resumeState.attempt_count+
-       (resumeState.recovery_authorization?.verified===true?1:0)&&
+     resumeState.journal.length===2*resumeState.attempt_count+recoveryOffset&&
      resumeState.journal.at(-1).kind==='MODEL_CANDIDATE_PROPOSED'&&
      resumeState.candidate?.generated_by_model===true&&
      resumeState.candidate?.verified===false&&
@@ -316,14 +316,17 @@ export async function generateAfterTrustedGap({
       (resumeState.independent_failure?.classification?.retry_source_without_dependency===true&&
        resumeState.independent_failure.attempt===resumeState.attempt_count-1&&
        (resumeState.journal.at(-2).kind==='SANDBOX_FAILED'||
-        (resumeState.attempt_count===4&&recoveryOffset===1&&
+        (((resumeState.attempt_count===4&&recoveryOffset===1)||
+         (resumeState.attempt_count===6&&recoveryOffset===2))&&
          resumeState.journal.at(-2).kind==='RECOVERY_STARTED'&&
          resumeState.journal.at(-3).kind==='SANDBOX_FAILED'))));
   const lastEvent=resumeState.journal.at(-1);
   const recoveryOpening=resumeState.phase==='REPAIR_REQUIRED'&&
-     recoveryOffset===1&&resumeState.attempt_count===3&&
      lastEvent?.kind==='RECOVERY_STARTED'&&
-     resumeState.journal.length===8;
+     ((recoveryOffset===1&&resumeState.attempt_count===3&&
+       resumeState.journal.length===8)||
+      (recoveryOffset===2&&resumeState.attempt_count===5&&
+       resumeState.journal.length===13));
   const repairableCheckpoint=resumeState.phase==='REPAIR_REQUIRED'&&
      resumeState.attempt_count>=1&&
      resumeState.attempt_count<ticket.max_attempts&&
