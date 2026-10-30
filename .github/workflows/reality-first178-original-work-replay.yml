@@ -15,6 +15,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Execute original 178 installed classifier separately
+      - name: Observe real original 178 provider evidence
         if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
-        run: node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+        run: node scripts/reality-first178-original-work-replay.mjs observe
+      - name: Execute original 178 source with observed provider evidence
+        if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
+        run: |
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          node scripts/reality-first178-original-work-replay.mjs execute
