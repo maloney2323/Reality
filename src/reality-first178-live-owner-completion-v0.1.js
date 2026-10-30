@@ -3,6 +3,8 @@
 // installed preview capability -> original execution -> settlement.
 // Provider data is evidence, never authority. No production branch writes.
 import {createHash} from 'node:crypto';
+import {strategyFromConstitutionalJournal}
+ from './reality-self-repair-strategy-v1.0.js';
 import {dbFor,rpc,verifiedOwnerScope}
  from './reality-personal-first-upgrade-178-v0.1.js';
 import {resolveOriginalFirst178OwnerQueue}
@@ -83,8 +85,21 @@ export async function original178OwnerApprovalView({
    production_changed:false,original_claim_preserved:true,
    autonomous_recovery_eligible:true,
   });
+  // Reality itself reads the COMPLETE existing constitutional failure history.
+  // The strategy is a diagnosis/proposal, NOT another retry reservation.
+  const repair=strategyFromConstitutionalJournal(result.state);
   return Object.freeze({
    status:'EXHAUSTED_CORRECTION_ATTEMPTS',
+   self_repair_strategy:{
+    version:repair.version,strategy:repair.strategy,
+    recurring_failures:repair.recurring_failures,
+    root_cause_hypotheses:repair.root_cause_hypotheses,
+    latest_failing_tests:repair.latest_failing_tests,
+    evidence_refs:repair.evidence_refs,
+    discovered_work:repair.discovered_work,
+    automatic_reexecution_permitted:false,
+    execution_authorized:false,
+   },
    original_work_id:scope.original_work_id,queue_id:queue.queue_id,
    attempt_limit:result.state.attempt_limit,
    attempts_used:result.state.attempt_count,
