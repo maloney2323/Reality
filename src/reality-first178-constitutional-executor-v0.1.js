@@ -11,6 +11,7 @@ import {createFirst178ConstitutionalCheckpointService}
  from './reality-first-178-constitutional-continuity-checkpoint-v0.1.js';
 import {createRealityLiveVercelUpgradeAdapters}
  from './reality-foundational-vercel-generation-adapters-v1.0.js';
+import {recoverGovernedEscalation} from './reality-governed-self-improvement-spine-v1.0.js';
 
 const die=(s,status=409)=>{throw Object.assign(
  Error('FIRST178_EXECUTION_'+s),{status})};
@@ -55,9 +56,10 @@ export async function executeFirst178Constitutional({
  const queue=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
  });
- const recovering=queue?.phase==='RUNNING_CONSTITUTIONAL';
+ const exhausted=queue?.phase==='ESCALATED';
+ const recovering=queue?.phase==='RUNNING_CONSTITUTIONAL'||exhausted;
  if(!uuid(queue?.queue_id)||
-    !['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL'].includes(queue?.phase)||
+    !['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL','ESCALATED'].includes(queue?.phase)||
     queue.original_work_id!==scope.original_work_id||
     queue.goal_id!==scope.goal_id||
     !verifiedOriginal178QueuePin(queue,env)||
@@ -86,58 +88,76 @@ export async function executeFirst178Constitutional({
   const restored=await checkpoint.readLatestCheckpoint();
   if(restored?.verified!==true||
      restored.original_work_id!==scope.original_work_id||
-     !['GAP_CONFIRMED','CANDIDATE_READY','REPAIR_REQUIRED'].includes(
+     !['GAP_CONFIRMED','CANDIDATE_READY','REPAIR_REQUIRED','ESCALATED'].includes(
        restored.state?.phase)||
      restored.checkpoint_hash!==restored.state.head_hash||
      !uuid(restored.continuity_receipt_id))
    die('EXACT_UNSETTLED_JOURNAL_RESTORE_FAILED',503);
+  const exhaustionRecovery=restored.state.phase==='ESCALATED'&&
+   restored.state.attempt_count===3&&restored.state.attempt_limit===3;
+  if(exhausted&&!exhaustionRecovery)die('NOT_REPAIRABLE_ORIGINAL_EXHAUSTION');
   const sandboxRecovery=restored.state.phase==='CANDIDATE_READY'&&
    restored.state.attempt_count===1;
   const laterCorrection=restored.state.phase==='REPAIR_REQUIRED'||
    (restored.state.phase==='CANDIDATE_READY'&&restored.state.attempt_count>1);
-  const rpcName=laterCorrection?
-   'reality_reserve_first178_continuation_step_v1':
+  const rpcName=exhaustionRecovery?'reality_reserve_first178_exhaustion_recovery_v1':
+   laterCorrection?'reality_reserve_first178_continuation_step_v1':
    sandboxRecovery?'reality_reserve_first178_candidate_sandbox_v1':
    'reality_reserve_first178_gap_recovery_v1';
   const reserved=await call(db,rpcName,{
    p_owner_id:session.user_id,p_conversation_id:conversationId,
    p_queue_id:queue.queue_id,p_original_work_id:scope.original_work_id,
    p_checkpoint_hash:restored.checkpoint_hash,
-   ...(sandboxRecovery?{
-    p_candidate_hash:restored.state.candidate.artifact_hash,
+   ...(exhaustionRecovery?{
+    p_checkpoint_receipt_id:restored.continuity_receipt_id,
+    p_failure_evidence_ref:restored.state.independent_failure?.evidence_ref,
    }:{}),
+   ...(sandboxRecovery?{p_candidate_hash:restored.state.candidate.artifact_hash}:{}),
    ...(laterCorrection?{
-    p_phase:restored.state.phase,
-    p_attempt_count:restored.state.attempt_count,
-   }:{}),
-   ...(!laterCorrection?{p_continuity_receipt_id:
-    restored.continuity_receipt_id}:{}),
-   ...(laterCorrection?{
+    p_phase:restored.state.phase,p_attempt_count:restored.state.attempt_count,
     p_checkpoint_receipt_id:restored.continuity_receipt_id,
    }:{}),
+   ...(!laterCorrection&&!exhaustionRecovery?{
+    p_continuity_receipt_id:restored.continuity_receipt_id,
+   }:{}),
   });
-  if((laterCorrection?reserved?.reserved_once!==true:
-       reserved?.recovery_reserved!==true)||
-     !uuid(laterCorrection?reserved.reservation_id:
-      sandboxRecovery?reserved.sandbox_reservation_id:
-      reserved.recovery_reservation_id)||
-     !uuid(laterCorrection?reserved.existing_claim_id:reserved.claim_id)||
+  const singleUse=exhaustionRecovery||laterCorrection;
+  if((singleUse?reserved?.reserved_once!==true:reserved?.recovery_reserved!==true)||
+     !uuid(singleUse?reserved.reservation_id:
+       sandboxRecovery?reserved.sandbox_reservation_id:reserved.recovery_reservation_id)||
+     !uuid(singleUse?reserved.existing_claim_id:reserved.claim_id)||
      reserved.original_work_id!==scope.original_work_id||
      reserved.queue_id!==queue.queue_id||
-     (laterCorrection?reserved.checkpoint_receipt_id:
+     (singleUse?reserved.checkpoint_receipt_id:
        reserved.continuity_receipt_id)!==restored.continuity_receipt_id||
      reserved.checkpoint_hash!==restored.checkpoint_hash||
-     (sandboxRecovery&&reserved.candidate_hash!==
-      restored.state.candidate.artifact_hash)||
+     (sandboxRecovery&&reserved.candidate_hash!==restored.state.candidate.artifact_hash)||
+     (exhaustionRecovery&&(reserved.failure_evidence_ref!==
+       restored.state.independent_failure.evidence_ref||
+       reserved.recovery_attempt_limit!==5))||
      (laterCorrection&&(reserved.phase!==restored.state.phase||
        reserved.attempt_count!==restored.state.attempt_count))||
      reserved.installation_authorized!==false)
    die('SINGLE_USE_RECOVERY_RESERVATION_UNVERIFIED',503);
-  claim={claimed:true,claim_id:laterCorrection?
-    reserved.existing_claim_id:reserved.claim_id,
+  claim={claimed:true,claim_id:singleUse?
+   reserved.existing_claim_id:reserved.claim_id,
    queue_id:queue.queue_id,original_work_id:scope.original_work_id,
    installation_authorized:false};
-  resumeState=restored.state;
+  if(exhaustionRecovery){
+   resumeState=recoverGovernedEscalation(restored.state,{
+    verified:true,independent_provider_readback:true,
+    owner_id:scope.owner_id,goal_id:scope.goal_id,
+    original_work_id:scope.original_work_id,
+    checkpoint_hash:restored.checkpoint_hash,
+    checkpoint_receipt_id:restored.continuity_receipt_id,
+    failure_evidence_ref:restored.state.independent_failure.evidence_ref,
+    reservation_id:reserved.reservation_id,installation_authorized:false,
+   });
+   const recoveryReceipt=await checkpoint.persistCheckpoint(resumeState);
+   if(recoveryReceipt?.independent_readback_verified!==true||
+      recoveryReceipt.checkpoint_hash!==resumeState.head_hash)
+    die('EXHAUSTION_RECOVERY_CHECKPOINT_NOT_DURABLE',503);
+  }else resumeState=restored.state;
  }else{
   // The initial database claim is an irreversible single-use reservation.
   // It cannot be retried merely because a model generates malformed output.
@@ -170,6 +190,7 @@ export async function executeFirst178Constitutional({
  };
  const admitted=await claimConfirmedGap({
   scope,providerEvidence:initialEvidence,
+  maxAttempts:resumeState?.attempt_limit===5?5:3,
   persistGap:checkpoint.persistGap,readBackGap:checkpoint.readBackGap,
   reobserveProviderEvidence:()=>observer({scope,apiToken:env.REALITY_FIRST178_GITHUB_READ_TOKEN}),
  });
