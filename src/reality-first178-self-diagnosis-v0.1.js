@@ -46,9 +46,16 @@ export function classifyFirst178Diagnosis({original,view,viewError,
    attempts_used:view.attempts_used,
    checkpoint_receipt_id:view.checkpoint_receipt_id,
    checkpoint_hash:view.checkpoint_hash,
+   last_failure_kind:view.last_failure_kind||null,
+   last_failure_next:view.last_failure_next||null,
+   last_failure_evidence_ref:view.last_failure_evidence_ref||null,
    finding:'The original job exhausted independently checked correction attempts without a verified passing candidate.'+
+    (view.last_failure_kind?' Final independent failure: '+view.last_failure_kind+'.':'')+
     (same===false?' The browser selected a different conversation; this is separate from the sandbox failure.':''),
-   proposed_next_step:'Analyze the last independently observed sandbox failure and the model correction source; propose an evidence-backed capability change before requesting any new bounded recovery authority.'});
+   proposed_next_step:view.last_failure_kind==='REGRESSION'&&
+    view.last_failure_next==='REPAIR_CODE_FROM_TEST_FAILURE'?
+     'Inspect the frozen regression failure and model-authored source, find why eight corrections failed, and design a materially different bounded repair before requesting any new execution authority.':
+     'Analyze the last independently observed sandbox failure and the model correction source; propose an evidence-backed capability change before requesting any new bounded recovery authority.'});
  if(view.status==='GOVERNED_RECOVERY_READY')
   return Object.freeze({...fixed,...source,status:'EXISTING_RECOVERY_AVAILABLE',
    attempts_used:view.attempts_used,
