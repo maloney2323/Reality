@@ -80,7 +80,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_TEAM_ID: team_PorNAPmuRfcBHlWnYFf1a3T7
           REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
           REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
         run: |
@@ -104,10 +104,10 @@ jobs:
           REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REALITY_STANDALONE_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          REALITY_SEMANTIC_REVIEW_MODEL: ${{ vars.REALITY_SEMANTIC_REVIEW_MODEL }}
+          REALITY_SEMANTIC_REVIEW_MODEL: ${{ vars.REALITY_SEMANTIC_REVIEW_MODEL || 'gpt-5.6-luna' }}
           REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
           REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_TEAM_ID: team_PorNAPmuRfcBHlWnYFf1a3T7
           VERCEL_PROJECT_ID: prj_5A3b0WG9IuvzyEUBw9tD9v8jcha8
         run: node scripts/reality-run-first178-github-worker.mjs
