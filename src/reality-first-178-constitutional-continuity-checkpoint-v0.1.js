@@ -177,20 +177,41 @@ export function createFirst178ConstitutionalCheckpointService({
   const candidateHash=Array.isArray(proposedFiles)?
    createHash('sha256').update(JSON.stringify(canon(
     proposedFiles.map(x=>({path:x.path,content:x.content}))))).digest('hex'):null;
-  const pendingSandbox=state?.phase==='CANDIDATE_READY'&&
-   state?.attempt_count===1&&state?.journal?.length===2&&
-   state.journal[0]?.kind==='GAP_CONFIRMED'&&
-   state.journal[1]?.kind==='MODEL_CANDIDATE_PROPOSED'&&
-   Array.isArray(proposedFiles)&&proposedFiles.length>=2&&
+  // Every bounded model correction lives in the SAME append-only journal:
+  // GAP (1), CANDIDATE (2), FAILURE (3), CORRECTED CANDIDATE (4), ...
+  // A timeout must not reset the attempt count or invent a new job.
+  const attempt=state?.attempt_count;
+  const remaining=Number.isInteger(attempt)&&
+   attempt>=1&&attempt<=state.attempt_limit;
+  const baseCandidateValid=Array.isArray(proposedFiles)&&
+   proposedFiles.length>=2&&
    proposedFiles.some(x=>x.path?.startsWith('src/'))&&
    proposedFiles.some(x=>x.path?.startsWith('test/'))&&
    proposed?.artifact_hash===candidateHash&&
-   state.journal[1].body?.artifact_hash===candidateHash&&
-   state.journal[1].body?.original_work_id===originalWorkId&&
-   proposed.generated_by_model===true&&
-   proposed.verified===false&&proposed.installed===false&&
-   proposed.authorized===false&&state.sandbox_receipt===null&&
-   state.independent_failure===null;
+   proposed?.generated_by_model===true&&
+   proposed?.verified===false&&proposed?.installed===false&&
+   proposed?.authorized===false&&state.sandbox_receipt===null;
+  const priorCorrectionValid=attempt===1||(
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.independent_failure?.attempt===attempt-1&&
+   state.journal?.at(-2)?.kind==='SANDBOX_FAILED'&&
+   state.journal.at(-2).evidence_ref===state.independent_failure.evidence_ref
+  );
+  const pendingSandbox=state?.phase==='CANDIDATE_READY'&&
+   remaining&&baseCandidateValid&&priorCorrectionValid&&
+   state?.journal?.length===2*attempt&&
+   state.journal.at(-1)?.kind==='MODEL_CANDIDATE_PROPOSED'&&
+   state.journal.at(-1).body?.artifact_hash===candidateHash&&
+   state.journal.at(-1).body?.attempt===attempt&&
+   state.journal.at(-1).body?.original_work_id===originalWorkId;
+  const pendingRepair=state?.phase==='REPAIR_REQUIRED'&&
+   remaining&&attempt<state.attempt_limit&&
+   baseCandidateValid&&
+   state.journal?.length===2*attempt+1&&
+   state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.attempt===attempt&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true;
   const sandboxApproved=state?.phase==='AWAITING_OWNER_APPROVAL'&&
    state?.attempt_count>=1&&
    state.journal?.at(-1)?.kind==='SANDBOX_VERIFIED'&&
@@ -209,7 +230,7 @@ export function createFirst178ConstitutionalCheckpointService({
    state.sandbox_receipt?.independent_tests_passed===true&&
    state.sandbox_receipt?.frozen_regression_passed===true&&
    state.sandbox_receipt?.governance_preserved===true;
-  if(!pendingGap&&!pendingSandbox&&!sandboxApproved&&!hasOwnerPromotion||
+  if(!pendingGap&&!pendingSandbox&&!pendingRepair&&!sandboxApproved&&!hasOwnerPromotion||
 
      state.scope?.owner_id!==session.user_id||
      state.scope?.goal_id!==g.state.active_goal_id||
