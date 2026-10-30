@@ -483,6 +483,29 @@ test('second recovery exhaustion remains terminal and never silently resets orig
  }
  assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,5);
  assert.equal(s.journal.length,12);
+ const preserved=structuredClone(s);
+ const checkpoint=s.head_hash;
+ s=recoverGovernedEscalation(s,{verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:checkpoint,checkpoint_receipt_id:'receipt:original-five',
+  reservation_id:'reservation:second-single-use',
+  failure_evidence_ref:s.independent_failure.evidence_ref,installation_authorized:false});
+ assert.equal(s.phase,'REPAIR_REQUIRED');
+ assert.equal(s.attempt_limit,7);assert.equal(s.attempt_count,5);
+ assert.equal(s.journal.length,13);assert.equal(verifySelfImprovementJournal(s),true);
+ assert.deepEqual(s.journal.slice(0,12),preserved.journal);
+ assert.notEqual(s.recovery_authorization.reservation_id,
+  s.recovery_continuation_authorization.reservation_id);
+ for(let i=6;i<=7;i++){
+  s=proposeGovernedCandidate(s,candidate('export const stillWrong='+i+';'));
+  s=await acceptGovernedObservation(s,h.issue(s,'SANDBOX_FAILED',{
+   artifact_hash:s.candidate.artifact_hash,
+   diagnostics:{code:'TEST_FAILED',output:'not ok 3 - original frozen regression'},
+  }),{verifyProvider:h.verifyProvider});
+ }
+ assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,7);
+ assert.equal(s.journal.length,17);
+ assert.equal(verifySelfImprovementJournal(s),true);
  assert.throws(()=>recoverGovernedEscalation(s,{
   verified:true,independent_provider_readback:true,
  }),/SELF_IMPROVEMENT_EXACT_REPAIRABLE_EXHAUSTION_REQUIRED/);
