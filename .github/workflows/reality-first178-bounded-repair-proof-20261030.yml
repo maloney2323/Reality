@@ -1,0 +1,30 @@
+name: Reality #178 — Bounded self-repair and second recovery proof
+on:
+  push:
+    branches:
+      - feature/first178-live-single-claim-execution-20261029
+permissions:
+  contents: read
+jobs:
+  trusted-self-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax check audited provider, runner, and constitutional modules
+        run: |
+          node --check src/reality-foundational-model-provider-v1.0.js
+          node --check src/reality-foundational-build-loop-v1.0.js
+          node --check src/reality-first-gap-handoff-v0.1.js
+          node --check src/reality-governed-self-improvement-spine-v1.0.js
+          node --check src/reality-first-178-constitutional-continuity-checkpoint-v0.1.js
+          node --check src/reality-first178-constitutional-executor-v0.1.js
+          node --check src/reality-first178-live-owner-completion-v0.1.js
+      - name: Independently regress exact failed assertions, continuity and approval separation
+        run: |
+          node --test test/reality-foundational-model-strict-candidate-v1.0.test.js test/reality-foundational-build-loop-v1.0.test.js test/reality-first-gap-handoff-v0.1.test.js test/reality-governed-self-improvement-spine-v1.0.test.js test/reality-first-178-constitutional-continuity-checkpoint-v0.1.test.js test/reality-first178-exhausted-one-click-readback-v0.1.test.js test/reality-first178-single-action-v0.1.test.js
