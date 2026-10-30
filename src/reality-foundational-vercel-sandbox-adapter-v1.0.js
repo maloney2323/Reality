@@ -16,6 +16,37 @@ const counts=output=>{
   new RegExp('^# '+key+' (\\d+)$','gm'))].at(-1);return m?Number(m[1]):0};
  return {tests:found('tests'),pass:found('pass'),fail:found('fail')};
 };
+// Provider-command output is untrusted diagnostic DATA. Preserve independent
+// failing assertions, their expected/actual values and stack before any tail.
+export function extractSandboxFailureEvidence(frozenOutput,modelOutput,max=8000){
+ const sections=[];
+ for(const [kind,raw] of [['FROZEN',frozenOutput],['MODEL_CANDIDATE',modelOutput]]){
+  const lines=String(raw||'').split(/\r?\n/);
+  const failing=[];
+  for(let i=0;i<lines.length;i++){
+   if(!/^not ok\s+\d+\s+-\s+/.test(lines[i].trim()))continue;
+   const group=[lines[i]];
+   let count=0;
+   for(let j=i+1;j<lines.length&&count<45;j++){
+    if(/^\s*(?:ok|not ok)\s+\d+\s+-\s+/.test(lines[j]))break;
+    if(/^\s*# (?:Subtest:|tests |pass |fail |duration_ms )/.test(lines[j]))break;
+    group.push(lines[j]);count++;
+    if(/^\s*\.\.\.\s*$/.test(lines[j]))break;
+   }
+   failing.push(group.join('\n'));
+   if(failing.length===8)break;
+  }
+  const counts=lines.filter(x=>/^# (?:tests|pass|fail) \d+/.test(x)).slice(-3);
+  const reason=failing.length?failing.join('\n'):
+   lines.filter(x=>/SyntaxError|ReferenceError|ERR_ASSERTION|ERR_MODULE_NOT_FOUND|Error:/i.test(x)).slice(0,14).join('\n');
+  sections.push('['+kind+' independent sandbox diagnostics]\n'+
+   (reason||'No per-test failure block in returned command output')+
+   '\n'+counts.join('\n'));
+ }
+ const all=sections.join('\n');
+ // Preserve early failing tests instead of truncating the first assertion.
+ return all.slice(0,Math.max(500,Math.min(12000,max)));
+}
 const GITHUB='https://github.com/maloney2323/Reality';
 const BASE='/vercel/Reality';
 const secureManifest=({raw,ticket})=>{
@@ -119,7 +150,7 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
      {kind:'MODEL_CANDIDATE',passed:model.cmd.exitCode===0&&
        model.counts.tests>0&&model.counts.fail===0},
     ],
-    log_excerpt:(frozen.output+'\n'+model.output).slice(-8000),
+    log_excerpt:extractSandboxFailureEvidence(frozen.output,model.output),
     runner_receipt_ref:'vercel-sandbox:'+sessionId+':'+modelId+':'+attempt,
    };
    const reportHash=digest(report);
