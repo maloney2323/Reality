@@ -1161,6 +1161,7 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // model-generated or installed unless the durable provider state proves it.
 // One signed-in owner action for the SAME original #178 work.
 let wcFirstGap178Busy=false;
+let wcFirstGap178AutoResumeAttempted=false;
 function wcFirstGap178Conversation(){
  const selected=$('privateConversations')?.value;
  const saved=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -1185,11 +1186,22 @@ async function wcInspectFirstGap178(){
   if(!r.ok||d.ok!==true||d.issue_number!==178||d.installation_authorized!==false)
    throw Error(String(d.error||'OWNER_PROOF_READBACK_UNVERIFIED'));
   if(d.status==='ALREADY_QUEUED'){
-   status.textContent=d.owner_approval_required===true&&d.queue_phase==='AWAITING_OWNER_APPROVAL'?
-    'Original #178 has a verified candidate awaiting your SEPARATE installation approval. Checkpoint receipt: '+
-    String(d.checkpoint_receipt_id||'UNVERIFIED')+'. Not installed or settled.':
-    'Original #178 recorded status: '+String(d.queue_phase||'UNRESOLVED')+
-    '. Same job retained; no duplicate launch is permitted.';
+   // #178 was explicitly authorized earlier and its original source-linked
+   // work is already durable. The server re-verifies that original receipt and
+   // atomically claims it. No model starts before the trusted single-use claim.
+   if(d.queue_phase==='QUEUED_DISCOVERY'&&
+      /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))&&
+      d.queue_id&&!wcFirstGap178AutoResumeAttempted){
+    wcFirstGap178AutoResumeAttempted=true;
+    status.textContent='Resuming your previously authorized original #178 automatically. No new job, no second approval and no installation…';
+    Promise.resolve().then(()=>{void wcFirstGap178Run();});
+   }else{
+    status.textContent=d.owner_approval_required===true&&d.queue_phase==='AWAITING_OWNER_APPROVAL'?
+     'Original #178 has a verified candidate awaiting your SEPARATE installation approval. Checkpoint receipt: '+
+     String(d.checkpoint_receipt_id||'UNVERIFIED')+'. Not installed or settled.':
+     'Original #178 recorded status: '+String(d.queue_phase||'UNRESOLVED')+
+     '. Same job retained; no duplicate launch is permitted.';
+   }
   }else{
    status.textContent=d.status==='READY_FOR_EXACT_OWNER_CONFIRMATION'?
     'Original #178 is available. Press Run once; Reality will handle discovery, generation and isolated testing until the installation approval gate.':
@@ -1202,7 +1214,7 @@ async function wcInspectFirstGap178(){
  }finally{button.disabled=false;}
 }
 $('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
-$('wcStartFirstGap178').onclick=async()=>{
+async function wcFirstGap178Run(){
  if(wcFirstGap178Busy)return;
  const status=$('wcFirstGap178Status');
  if($('privateReady')?.style.display!=='block'){
@@ -1249,7 +1261,8 @@ $('wcStartFirstGap178').onclick=async()=>{
   $('wcStartFirstGap178').disabled=false;
   $('wcInspectFirstGap178').disabled=false;
  }
-};
+}
+$('wcStartFirstGap178').onclick=()=>{void wcFirstGap178Run();};
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
