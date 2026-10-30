@@ -127,7 +127,7 @@ test('Reality asks the coding model to correct tautological provenance before sa
    calls++;
    const req=JSON.parse(options.body);
    const task=JSON.parse(req.input[1].content[0].text);
-   if(calls===2)assert.ok(task.rejected_proposal_reason.includes('same provenance'));
+   if(calls===2)assert.ok(task.rejected_proposal_reason.includes('compared with itself'));
    const files=actualFiles();
    files[0].content=calls===1?
     'export function classifyVerifiedCiFailure(evidence){if(evidence.repository !== evidence.repository)return false;return true;}':
@@ -142,7 +142,7 @@ test('Reality asks the coding model to correct tautological provenance before sa
  assert.ok(!output.files[0].content.includes('evidence.repository !== evidence.repository'));
  assert.equal(output.installed,false);
 });
-test('invalid self-comparisons fail closed after three bounded model proposals',async()=>{
+test('invalid self-comparisons fail closed after four bounded model proposals',async()=>{
  let calls=0;
  const gen=createFoundationalModelGenerator({
   model:'gpt-6',apiKey:'fake-isolated-key-not-real',
@@ -157,7 +157,7 @@ test('invalid self-comparisons fail closed after three bounded model proposals',
  });
  await assert.rejects(gen({ticket:t,attempt:1,execution_authority:false}),
   /FOUNDATION_MODEL_UNCORRECTED_SELF_COMPARISON/);
- assert.equal(calls,3);
+ assert.equal(calls,4);
 });
 
 
