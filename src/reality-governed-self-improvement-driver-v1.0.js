@@ -5,6 +5,8 @@
 // capability installation and independent provider/Continuity readback.
 // A worker may execute unattended until it reaches an authority boundary.
 // No global singleton, in-memory "completed" flag, or unverified model output.
+import {strategyFromConstitutionalJournal}
+ from './reality-self-repair-strategy-v1.0.js';
 import {
  verifySelfImprovementJournal,
  proposeGovernedCandidate,
@@ -77,6 +79,9 @@ export async function continueGovernedSelfImprovement({
      // Original prior model candidate is untrusted. Its exact source stays
      // paired with the independently verified failure for model correction.
      previous_candidate:current.phase==='REPAIR_REQUIRED'?current.candidate:null,
+     // The SAME independently verified Continuity journal supplies a source-
+     // linked strategy. The model may repair source, never grant authority.
+     repair_strategy:strategyFromConstitutionalJournal(current),
      no_execution_authority:true,
     }));
     current=await committed(proposeGovernedCandidate(current,candidate),adapters);
