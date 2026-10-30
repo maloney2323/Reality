@@ -287,52 +287,30 @@ export async function runOriginal178OneApproval({
   if(ci?.verified===true)return ci;
   return providerCI();
  };
- const providerReceipt=async(kind,extras)=>{
-  const proof=await requireCI();
-  return Object.freeze({
-   kind,owner_id:session.user_id,goal_id:scope.goal_id,
-   original_work_id:scope.original_work_id,
-   continuity_root_id:scope.continuity_root_id,
-   worldline_id:scope.worldline_id,
-   artifact_hash:artifact,
-   evidence_ref:'github:actions:run:'+proof.provider_run_id+':'+kind,
-   evidence_hash:hash({
-    artifact,kind,run_id:proof.provider_run_id,
-    commit:proof.installed_commit_sha,
-    frozen_job_id:proof.provider_frozen_job_id,
-   }),
-   ...extras,
-  });
- };
- const verifyIndependentReceipt=async({receipt,scope_hash,candidate_hash})=>{
+ // The frozen GitHub CI run verifies candidate code only. It cannot attest
+ // registration, resumed original customer execution, observation or settlement.
+ // The previous adapter constructed three distinct-looking receipts from that
+ // same CI run; remove that false success path until separate provider
+ // operations and their independent readbacks are connected.
+ const verifyIndependentReceipt=async({receipt,scope_hash})=>{
   if(receipt.owner_id!==session.user_id||
      receipt.goal_id!==scope.goal_id||
      receipt.original_work_id!==scope.original_work_id||
      (receipt.artifact_hash&&receipt.artifact_hash!==artifact))
    return {verified:false};
-  if(receipt.kind==='PROMOTION_AUTHORIZED'){
-   const proof=await readExactOwnerApproval();
-   if(proof?.verified!==true||
-      approvalRef(proof.reservation_id)!==receipt.evidence_ref||
-      approvalEvidence(proof.reservation_id)!==receipt.evidence_hash||
-      receipt.reservation_ref!==receipt.evidence_ref)
-    return {verified:false};
-  }else if(['CAPABILITY_REGISTERED','ORIGINAL_JOB_RESUMED',
-       'ORIGINAL_JOB_SETTLED'].includes(receipt.kind)){
-   const proof=await requireCI();
-   if(receipt.evidence_ref!=='github:actions:run:'+
-      proof.provider_run_id+':'+receipt.kind||
-      receipt.evidence_hash!==hash({
-       artifact,kind:receipt.kind,run_id:proof.provider_run_id,
-       commit:proof.installed_commit_sha,
-       frozen_job_id:proof.provider_frozen_job_id,
-      }))
-    return {verified:false};
-  }else return {verified:false};
+  if(receipt.kind!=='PROMOTION_AUTHORIZED')
+   return {verified:false,
+    reason:'DISTINCT_CONSEQUENCE_PROVIDER_READBACK_REQUIRED'};
+  const proof=await readExactOwnerApproval();
+  if(proof?.verified!==true||
+     approvalRef(proof.reservation_id)!==receipt.evidence_ref||
+     approvalEvidence(proof.reservation_id)!==receipt.evidence_hash||
+     receipt.reservation_ref!==receipt.evidence_ref)
+   return {verified:false};
   return {verified:true,independent_provider_readback:true,
    evidence_ref:receipt.evidence_ref,evidence_hash:receipt.evidence_hash,
    original_work_id:scope.original_work_id,scope_hash,
-   attestation_ref:'reality:original178:provider:'+receipt.evidence_ref};
+   attestation_ref:'reality:original178:owner:'+receipt.evidence_ref};
  };
  const adapter={
   reserveExactOwnerApproval,readExactOwnerApproval,
@@ -344,31 +322,21 @@ export async function runOriginal178OneApproval({
    return saved;
   },
   registerAndReobserve:async()=>{
-   const proof=await requireCI();
-   return providerReceipt('CAPABILITY_REGISTERED',{
-    authorization_ref:current.promotion_authorization.evidence_ref,
-    status:'ACTIVE',
-    registry_receipt_ref:'github:'+proof.installed_commit_sha,
-    target_worldline_id:scope.worldline_id});
+   // Installation and frozen acceptance are necessary but insufficient.
+   // A separate durable capability-registry mutation/readback is not yet
+   // wired. Never construct a registration receipt from the CI run.
+   await requireCI();
+   fail('DISTINCT_CAPABILITY_REGISTRY_READBACK_REQUIRED');
   },
   resumeOriginalWork:async()=>{
-   const proof=await requireCI();
-   return providerReceipt('ORIGINAL_JOB_RESUMED',{
-    registration_ref:current.registration.registry_receipt_ref,
-    original_work_id:scope.original_work_id,
-    real_execution_observed:true,
-    executor_run_ref:'github:actions:run:'+proof.provider_run_id+
-     ':frozen-job:'+proof.provider_frozen_job_id});
+   // Requires actual re-execution of the SAME original work, with its own
+   // executor operation ID, observed result and provider readback.
+   fail('DISTINCT_ORIGINAL_JOB_EXECUTION_READBACK_REQUIRED');
   },
   settleAndReobserve:async()=>{
-   const proof=await requireCI();
-   return providerReceipt('ORIGINAL_JOB_SETTLED',{
-    resumption_ref:current.resumption.executor_run_ref,
-    original_work_id:scope.original_work_id,
-    durable_settlement_readback:true,
-    independent_outcome_verified:true,
-    settlement_receipt_ref:'github:actions:run:'+proof.provider_run_id+
-      ':commit:'+proof.installed_commit_sha});
+   // Requires independently observed original-job outcome, reconciliation,
+   // and separate durable settlement, not a GitHub acceptance step.
+   fail('DISTINCT_OUTCOME_RECONCILIATION_READBACK_REQUIRED');
   },
   recordAndReobserveFinalSettlement:async result=>{
    const saved=await call(db,'reality_settle_first178_exact_owner_work_v1',{
