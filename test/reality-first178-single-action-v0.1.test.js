@@ -109,9 +109,9 @@ test('previously claimed GAP may continue once only through server recovery rese
  assert.equal(r.status,'AWAITING_OWNER_APPROVAL');
  assert.equal(r.installation_authorized,false);
 });
-test('already claimed or awaiting approval never replays execution',async()=>{
+test('awaiting approval or unresolved execution never replays work',async()=>{
  for(const phase of ['AWAITING_OWNER_APPROVAL',
-  'EXECUTION_UNRESOLVED','ESCALATED']){
+  'EXECUTION_UNRESOLVED']){
   const result=await runFirst178SingleAction({
    session,conversationId,env,resolveOriginal:async()=>null,
    inspect:async()=>({...scope,status:'ALREADY_QUEUED',
@@ -126,6 +126,20 @@ test('already claimed or awaiting approval never replays execution',async()=>{
   assert.equal(result.do_not_retry,true);
   assert.equal(result.installation_authorized,false);
  }
+});
+test('exhausted original work delegates only to trusted same-job recovery executor',async()=>{
+ let calls=0;
+ const result=await runFirst178SingleAction({
+  session,conversationId,env,resolveOriginal:async()=>null,
+  inspect:async()=>({...scope,status:'ALREADY_QUEUED',
+   queue_id:queueId,queue_phase:'ESCALATED'}),
+  start:async()=>{throw Error('SECOND_ORIGINAL_QUEUE_FORBIDDEN')},
+  execute:async()=>{calls++;return validated},
+ });
+ assert.equal(calls,1);
+ assert.equal(result.status,'AWAITING_OWNER_APPROVAL');
+ assert.equal(result.original_work_id,scope.original_work_id);
+ assert.equal(result.installation_authorized,false);
 });
 test('missing prerequisite returns exact blocker without attempting generation',async()=>{
  await assert.rejects(()=>runFirst178SingleAction({
