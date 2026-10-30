@@ -9,7 +9,7 @@ import {resolveOriginalFirst178OwnerQueue}
  from './reality-first178-single-action-v0.1.js';
 import {createFirst178ConstitutionalCheckpointService}
  from './reality-first-178-constitutional-continuity-checkpoint-v0.1.js';
-import {createFirst178GithubInstallationProvider}
+import {createFirst178GithubInstallationProvider,verifyFirst178ScopedGithubWrite}
  from './reality-first178-isolated-github-install-v0.1.js';
 import {describeOriginal178OwnerApproval,finishOriginal178AfterExactApproval}
  from './reality-first178-approved-completion-v0.1.js';
@@ -17,6 +17,8 @@ const fail=x=>{throw Error('FIRST178_LIVE_OWNER_COMPLETION_'+x)};
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(x);
 const SHA40=/^[a-f0-9]{40}$/;
+const previewInstallToken=env=>String(env.REALITY_FIRST178_GITHUB_INSTALL_TOKEN||
+ env.REALITY_GITHUB_TOKEN||'');
 export async function original178OwnerApprovalView({
  session,env=process.env,resolve=resolveOriginalFirst178OwnerQueue,
  call=rpc,checkpointFactory=createFirst178ConstitutionalCheckpointService,
@@ -70,7 +72,7 @@ export async function original178OwnerApprovalView({
    candidate_artifact_hash:state.candidate.artifact_hash,
    checkpoint_hash:state.head_hash,
    checkpoint_receipt_id:restored.continuity_receipt_id,
-   install_connection_ready:String(env.REALITY_FIRST178_GITHUB_INSTALL_TOKEN||'').length>=25,
+   install_connection_ready:await verifyFirst178ScopedGithubWrite({token:previewInstallToken(env)}),
    recovery_no_new_approval:true,original_job_completed:false,
    production_changed:false,
   });
@@ -80,7 +82,7 @@ export async function original178OwnerApprovalView({
   return Object.freeze({...ready,
    // NO approval action when installation provider is not configured.
    install_connection_ready:
-    String(env.REALITY_FIRST178_GITHUB_INSTALL_TOKEN||'').length>=25,
+    await verifyFirst178ScopedGithubWrite({token:previewInstallToken(env)}),
    original_job_completed:false});
  }
  if(!['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
@@ -109,9 +111,9 @@ export async function runOriginal178OneApproval({
     'feature/first178-live-single-claim-execution-20261029'||
     !SHA40.test(env.VERCEL_GIT_COMMIT_SHA||''))
   fail('ISOLATED_RELEASE_REQUIRED');
- const writeToken=String(env.REALITY_FIRST178_GITHUB_INSTALL_TOKEN||'');
- if(writeToken.length<25)
-  fail('SCOPED_GITHUB_INSTALL_CONNECTION_NOT_CONFIGURED');
+ const writeToken=previewInstallToken(env);
+ if(!(await verifyFirst178ScopedGithubWrite({token:writeToken})))
+  fail('SCOPED_GITHUB_INSTALL_WRITE_PERMISSION_NOT_VERIFIED');
  const original=await resolve({session,env});
  if(!original||original.issue_number!==178||!uuid(original.conversation_id))
   fail('ORIGINAL_OWNER_JOB_NOT_FOUND');
