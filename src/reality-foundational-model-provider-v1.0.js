@@ -72,6 +72,14 @@ export function createFoundationalModelGenerator({
    },
    required:['ticket_hash','original_work_id','rationale','files'],
   };
+  // A model proposal is not a sandbox attempt. Reject known tautological
+  // provenance checks and give the model bounded feedback to rewrite them
+  // before consuming a trusted independent sandbox attempt.
+  let localRejection=null;
+  for(let proposal=1;proposal<=3;proposal++){
+  const currentTask=localRejection?{...task,
+   rejected_proposal_reason:localRejection,
+   proposal_number:proposal}:task;
   const response=await fetchImpl(endpoint,{method:'POST',
    headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
    body:JSON.stringify({model,max_output_tokens:11000,
@@ -79,7 +87,7 @@ export function createFoundationalModelGenerator({
      strict:true,schema:sourceSchema}},
     input:[
      {role:'system',content:[{type:'input_text',text:'You are Reality\'s replaceable coding model. Return the required JSON schema exactly: ticket_hash and original_work_id MUST equal the supplied scope; files MUST include at least TWO entries: one implementation source file at src/reality-extensions/reality-ci-failure-evidence.mjs and one model-authored test under test/reality-extensions/. Each file must contain actual working JavaScript content, not descriptions or empty placeholders. Implement exports and behavior required by the frozen acceptance tests supplied as untrusted task data. The frozen failing assertions and expected-versus-actual outputs are acceptance criteria: correct each observed mismatch, including negative evidence controls. Validate all required provenance and exact SHA fields before returning MISSING_CAPABILITY. Reject forged, foreign, stale, unauthorized or incomplete evidence. Place stale/superseding success checks before permitting generation. Never use self-comparisons such as value===value as evidence checks. Do not edit or weaken frozen tests. No security, auth, governance core, installation, promotion or production changes. The model output is only a proposal.'}]},
-     {role:'user',content:[{type:'input_text',text:JSON.stringify(task)}]},
+     {role:'user',content:[{type:'input_text',text:JSON.stringify(currentTask)}]},
     ],
    }),
   });
@@ -88,6 +96,16 @@ export function createFoundationalModelGenerator({
   const raw=outputText(body);
   if(!raw||raw.length>290000)fail('FOUNDATION_MODEL_RESPONSE_EMPTY_OR_OVERSIZE');
   let candidate;try{candidate=JSON.parse(raw)}catch{fail('FOUNDATION_MODEL_RESPONSE_NOT_JSON')}
-  return validateFoundationalCandidate(ticket,{...candidate,model_response_id:body.id||null});
+  const validated=validateFoundationalCandidate(ticket,{
+   ...candidate,model_response_id:body.id||null});
+  const code=validated.files.find(f=>f.path===
+   'src/reality-extensions/reality-ci-failure-evidence.mjs')?.content||'';
+  // Self-comparisons can never compare independently observed evidence.
+  // Reject model-proposed source, do not modify it or treat it as verified.
+  const invalid=/\\b(evidence|input|record|source)\\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\\s*(?:!==|===|!=|==)\\s*\\1\\.\\2\\b/i.test(code);
+  if(!invalid)return validated;
+  localRejection='Invalid candidate evidence check: the same provenance field is compared with itself. Compare independently sourced fields instead, satisfy frozen negative cases, and return corrected source. The rejected artifact was not installed or tested.';
+  }
+  fail('FOUNDATION_MODEL_UNCORRECTED_SELF_COMPARISON');
  };
 }
