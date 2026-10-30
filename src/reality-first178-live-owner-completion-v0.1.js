@@ -55,10 +55,33 @@ export async function original178OwnerApprovalView({
      queue.report?.installation_authorized!==false||
      queue.report?.job_completed!==false)
    fail('ESCALATED_QUEUE_DURABLE_RECEIPT_UNVERIFIED');
+  const checkpoint=checkpointFactory({
+   session,conversationId,originalWorkId:scope.original_work_id,db,env,
+  });
+  const result=await checkpoint.readLatestCheckpoint();
+  if(result?.verified!==true||
+     result.checkpoint_hash!==digest||
+     result.continuity_receipt_id!==receipt||
+     result.original_work_id!==scope.original_work_id||
+     result.state.phase!=='ESCALATED')
+   fail('EXHAUSTED_CONTINUITY_NOT_SOURCE_VERIFIED');
+  const recoverable=result.state.attempt_count===3&&
+   result.state.attempt_limit===3&&
+   result.state.independent_failure?.classification?.retry_source_without_dependency===true;
+  if(recoverable)return Object.freeze({
+   status:'GOVERNED_RECOVERY_READY',
+   original_work_id:scope.original_work_id,queue_id:queue.queue_id,
+   attempt_limit:5,attempts_used:3,additional_attempts:2,
+   checkpoint_receipt_id:receipt,checkpoint_hash:digest,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,original_claim_preserved:true,
+   autonomous_recovery_eligible:true,
+  });
   return Object.freeze({
    status:'EXHAUSTED_CORRECTION_ATTEMPTS',
    original_work_id:scope.original_work_id,queue_id:queue.queue_id,
-   attempt_limit:3,attempts_used:3,
+   attempt_limit:result.state.attempt_limit,
+   attempts_used:result.state.attempt_count,
    checkpoint_receipt_id:receipt,checkpoint_hash:digest,
    one_click_job_attempted:true,owner_approval_required:false,
    cannot_auto_retry_consumed_claim:true,
