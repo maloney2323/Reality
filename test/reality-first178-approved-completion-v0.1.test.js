@@ -98,7 +98,7 @@ test('missing any real installation/registry/settlement adapter blocks BEFORE co
    checkpoint_hash:a.checkpoint_hash,
    checkpoint_receipt_id:a.checkpoint_receipt_id},
   adapters:{reserveExactOwnerApproval:async()=>{reservations++;}},
- }),/FIRST178_COMPLETE_TRUSTED_VERIFYINDEPENDENTRECEIPT_NOT_CONNECTED/);
+ }),/FIRST178_COMPLETE_TRUSTED_READEXACTOWNERAPPROVAL_NOT_CONNECTED/);
  assert.equal(reservations,0);
 });
 test('one owner action executes registration, exact original resumption, settlement through ONE driver',async()=>{
@@ -110,6 +110,7 @@ test('one owner action executes registration, exact original resumption, settlem
  const issueReceipt=(state,kind,extra)=>h.issue(state,kind,extra);
  const receiptFromStage=(kind,props)=>issueReceipt(lastState,kind,props);
  const adapters={
+  readExactOwnerApproval:async()=>({verified:false}),
   reserveExactOwnerApproval:async()=>receiptFromStage('PROMOTION_AUTHORIZED',{
    artifact_hash:a.candidate_artifact_hash,
    approval_origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',
