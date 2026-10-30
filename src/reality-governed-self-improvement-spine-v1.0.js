@@ -192,14 +192,23 @@ export function proposeGovernedCandidate(state,candidate){
 export function classifyIndependentFailure({output='',code='',missingDependency=null}={}){
  const fragment=String(output||'').slice(0,8000);
  const normalized=str(code).toUpperCase();
- if(str(missingDependency)||/MISSING_CAPABILITY|NOT_IMPLEMENTED|METHOD_NOT_AVAILABLE|UNIMPLEMENTED_DATABASE|NO_SUCH_RPC/.test(fragment))
+ // Independent typed provider codes are authority. Strings inside
+ // model stdout or a failing test's expected/actual values are NOT.
+ if(str(missingDependency)||normalized==='MISSING_CAPABILITY')
   return freeze({class:'MISSING_CAPABILITY',next:'DISCOVER_DEPENDENCY',retry_source_without_dependency:false});
- if(/AUTHORITY|APPROVAL|PERMISSION|RESERVATION_REQUIRED|OWNER_SIGN_IN|FORBIDDEN/.test(fragment)||normalized==='AUTHORITY')
+ if(normalized==='AUTHORITY')
   return freeze({class:'AUTHORITY_REQUIRED',next:'REQUEST_OWNER_AUTHORITY',retry_source_without_dependency:false});
- if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module/.test(fragment))
-  return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
- if(/not ok\s+\d+|AssertionError|ERR_ASSERTION|FAIL|TEST_FAILED/.test(fragment)||normalized==='TEST_FAILED')
+ if(normalized==='TEST_FAILED'||normalized==='REGRESSION'||normalized==='SYNTAX'){
+  if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module|ReferenceError/.test(fragment))
+   return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
   return freeze({class:'REGRESSION',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ }
+ if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module|ReferenceError/.test(fragment))
+  return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ if(/not ok\s+\d+|AssertionError|ERR_ASSERTION|FAIL|TEST_FAILED/.test(fragment))
+  return freeze({class:'REGRESSION',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ if(normalized==='MISSING_DEPENDENCY')
+  return freeze({class:'MISSING_CAPABILITY',next:'DISCOVER_DEPENDENCY',retry_source_without_dependency:false});
  if(/TIMEOUT|RATE_LIMIT|ECONNRESET|NETWORK_UNAVAILABLE/.test(fragment)||normalized==='INFRA')
   return freeze({class:'VERIFIER_INFRASTRUCTURE',next:'REOBSERVE_PROVIDER',retry_source_without_dependency:false});
  return freeze({class:'UNRESOLVED',next:'ESCALATE_WITH_EVIDENCE',retry_source_without_dependency:false});
