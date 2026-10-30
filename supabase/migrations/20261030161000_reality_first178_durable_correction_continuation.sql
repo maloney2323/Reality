@@ -98,7 +98,7 @@ begin
   'attempt_count',p_attempt_count,
   'existing_claim_id',q.worker_claim_id,
   'installation_authorized',false,'job_completed',false);
-end $fn$;
+end; $fn$;
 revoke all on function public.reality_reserve_first178_continuation_step_v1(
  uuid,uuid,uuid,text,text,uuid,text,integer)
  from public,anon,authenticated;
