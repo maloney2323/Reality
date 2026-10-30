@@ -165,9 +165,18 @@ export function createFirst178GithubInstallationProvider({
    'FROZEN_ACCEPTANCE_FAILED':'FROZEN_ACCEPTANCE_PENDING',
    installed_commit_sha:commitSha,verified:false,
    original_job_completed:false});
+  const jobs=await api('GET','/repos/'+REPO+'/actions/runs/'+success.id+
+   '/jobs?per_page=100',null,true);
+  const frozenJobs=(jobs.jobs||[]).filter(x=>x.conclusion==='success'&&
+   x.steps?.some(step=>
+    step.name==='Execute ORIGINAL frozen #178 acceptance against installed model-authored source'&&
+    step.conclusion==='success'));
+  if(frozenJobs.length!==1)
+   fail('FROZEN_TEST_EXECUTION_NOT_INDEPENDENTLY_OBSERVED');
   return Object.freeze({
    status:'FROZEN_ACCEPTANCE_VERIFIED',verified:true,
    installed_commit_sha:commitSha,
+   provider_frozen_job_id:frozenJobs[0].id,
    provider_run_id:success.id,
    provider_run_url:success.html_url,
    artifact_hash:candidate.artifact_hash,
