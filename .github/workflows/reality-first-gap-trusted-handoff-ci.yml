@@ -75,6 +75,11 @@ jobs:
         run: |
           node --check src/reality-first178-isolated-github-install-v0.1.js
           node --test test/reality-first178-isolated-github-install-v0.1.test.js
+      - name: Verify Reality independently diagnoses its own original job and conversation drift
+        run: |
+          node --check src/reality-first178-self-diagnosis-v0.1.js
+          node --check api/reality/personal-first-upgrade-178-diagnose.js
+          node --test test/reality-first178-self-diagnosis.test.js
       - name: Verify original #178 existing owner grant resumes in configured preview only
         run: |
           node --check api/reality/personal-first-upgrade-178-recovery.js
