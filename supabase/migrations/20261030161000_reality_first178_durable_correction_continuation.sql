@@ -77,8 +77,10 @@ begin
  st->'promotion_authorization'<>'null'::jsonb or
  st->'registration'<>'null'::jsonb or
  st->'settlement'<>'null'::jsonb or
- st->'journal'->-1->>'kind'<>case when p_phase='REPAIR_REQUIRED'
- then 'SANDBOX_FAILED' else 'MODEL_CANDIDATE_PROPOSED' end or
+ (p_phase='REPAIR_REQUIRED' and
+    st->'journal'->-1->>'kind'<>'SANDBOX_FAILED') or
+ (p_phase='CANDIDATE_READY' and
+    st->'journal'->-1->>'kind'<>'MODEL_CANDIDATE_PROPOSED') or
  (p_phase='REPAIR_REQUIRED' and
    (p_attempt_count>=3 or
     st->'independent_failure'->'classification'->>'retry_source_without_dependency'<>'true')) or
