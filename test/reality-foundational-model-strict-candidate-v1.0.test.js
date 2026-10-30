@@ -159,3 +159,73 @@ test('invalid self-comparisons fail closed after three bounded model proposals',
   /FOUNDATION_MODEL_UNCORRECTED_SELF_COMPARISON/);
  assert.equal(calls,3);
 });
+
+
+test('provider-verified frozen regression drives four bounded model draft corrections',async()=>{
+ let modelCalls=0,independentChecks=0;
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  verifyDraftCandidate:async ({ticket,candidate,attempt,proposal})=>{
+   independentChecks++;
+   assert.equal(ticket.original_work_id,t.original_work_id);
+   assert.equal(attempt,1);
+   assert.equal(proposal,independentChecks);
+   assert.equal(candidate.installed,false);
+   return {independent_provider_readback:true,
+    passed:independentChecks===3,classification:'TEST_REGRESSION',
+    artifact_sha256:candidate.artifact_sha256,
+    attestation_ref:'vercel:provider-verified:reality-draft:'+independentChecks,
+    log_excerpt:'not ok 2 - absent provider evidence\\n actual: MISSING_CAPABILITY\\n expected: INSUFFICIENT_EVIDENCE'};
+  },
+  fetchImpl:async(_url,options)=>{
+   modelCalls++;
+   const task=JSON.parse(JSON.parse(options.body).input[1].content[0].text);
+   if(modelCalls>1){
+    assert.ok(task.rejected_proposal_reason.includes('Independent isolated sandbox FAILED'));
+    assert.ok(task.rejected_proposal_reason.includes('not ok 2'));
+    assert.ok(Array.isArray(task.rejected_proposal_files));
+    assert.equal(task.rejected_proposal_files.length,2);
+   }
+   const files=actualFiles();
+   files[0].content='export function classifyVerifiedCiFailure(evidence){return evidence.repository==="maloney2323/Reality"?'+modelCalls+':0;}';
+   return {ok:true,json:async()=>({
+    id:'draft_response:'+modelCalls,output_text:JSON.stringify({
+     ticket_hash:t.ticket_hash,original_work_id:t.original_work_id,
+     rationale:'Correct independent frozen failure '+modelCalls,files})})};
+  },
+ });
+ const out=await gen({ticket:t,attempt:1,execution_authority:false});
+ assert.equal(modelCalls,3);
+ assert.equal(independentChecks,3);
+ assert.equal(out.installed,false);
+ assert.equal(out.model_response_id,'draft_response:3');
+});
+test('unproven or unverifiable provider result cannot be counted as a successful draft',async()=>{
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  verifyDraftCandidate:async ({candidate})=>({independent_provider_readback:false,
+   passed:true,artifact_sha256:candidate.artifact_sha256,
+   attestation_ref:'model-claim:not-verification'}),
+  fetchImpl:async()=>({ok:true,json:async()=>({
+   id:'draft:unverified',output_text:JSON.stringify({
+    ticket_hash:t.ticket_hash,original_work_id:t.original_work_id,
+    rationale:'Trust only provider readback',files:actualFiles()})})}),
+ });
+ await assert.rejects(gen({ticket:t,attempt:1,execution_authority:false}),
+  /FOUNDATION_DRAFT_INDEPENDENT_VERIFICATION_REQUIRED/);
+});
+test('draft repair cannot bypass missing dependency or owner authority',async()=>{
+ const gen=createFoundationalModelGenerator({
+  model:'gpt-6',apiKey:'fake-isolated-key-not-real',
+  verifyDraftCandidate:async ({candidate})=>({independent_provider_readback:true,
+   passed:false,artifact_sha256:candidate.artifact_sha256,
+   classification:'AUTHORITY_REQUIRED',
+   attestation_ref:'vercel:provider-verified:authority-block'}),
+  fetchImpl:async()=>({ok:true,json:async()=>({
+   id:'draft:blocked',output_text:JSON.stringify({
+    ticket_hash:t.ticket_hash,original_work_id:t.original_work_id,
+    rationale:'Do not fabricate authority',files:actualFiles()})})}),
+ });
+ await assert.rejects(gen({ticket:t,attempt:1,execution_authority:false}),
+  /FOUNDATION_DRAFT_NON_REPAIRABLE_FAILURE/);
+});
