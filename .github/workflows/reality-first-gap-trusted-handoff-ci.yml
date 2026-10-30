@@ -37,6 +37,10 @@ jobs:
         run: |
           node --check src/reality-first-178-constitutional-continuity-checkpoint-v0.1.js
           node --test test/reality-first-178-constitutional-continuity-checkpoint-v0.1.test.js
+      - name: Verify Vercel Sandbox v3 real cmdId and independent provider receipts
+        run: |
+          node --check src/reality-foundational-vercel-sandbox-adapter-v1.0.js
+          node --test test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
       - name: Verify exact owner job #178 admission and approval boundaries
         run: |
           node --check src/reality-personal-first-upgrade-178-v0.1.js
