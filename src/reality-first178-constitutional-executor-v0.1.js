@@ -107,7 +107,7 @@ export async function executeFirst178Constitutional({
    restored.state.attempt_count===1;
   const laterCorrection=restored.state.phase==='REPAIR_REQUIRED'||
    (restored.state.phase==='CANDIDATE_READY'&&restored.state.attempt_count>1);
-  const rpcName=finalRecovery?'reality_reserve_first178_final_verified_draft_recovery_v1':
+  const rpcName=finalRecovery?'reality_reserve_first178_final_bounded_draft_recovery_v1':
    secondRecovery?'reality_reserve_first178_second_exhaustion_recovery_v1':
    firstRecovery?'reality_reserve_first178_exhaustion_recovery_v1':
    laterCorrection?'reality_reserve_first178_continuation_step_v1':
