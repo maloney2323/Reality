@@ -136,7 +136,7 @@ test('the ONE existing original #178 queue survives worker redeploy without requ
 });
 test('queue already running, foreign work or wrong preview can never invoke model',async()=>{
  for(const badQueue of [
-  {...queue,phase:'RUNNING_CONSTITUTIONAL'},
+
   {...queue,original_work_id:'work:'+'b'.repeat(32)},
   {...queue,preview_release_sha:'f'.repeat(40)},
   {...queue,dispatch_commit_sha:'f'.repeat(40)}
@@ -150,6 +150,72 @@ test('queue already running, foreign work or wrong preview can never invoke mode
  await assert.rejects(executeFirst178Constitutional(h.options),
   /FIRST178_EXECUTION_ISOLATED_RUNNER_NOT_CONFIGURED/);
  assert.equal(h.calls.length,0);
+});
+test('claimed original job resumes the only verified gap under exactly one recovery reservation',async()=>{
+ const prior={
+  phase:'GAP_CONFIRMED',attempt_count:0,head_hash:'c'.repeat(64),
+  journal:[{kind:'GAP_CONFIRMED'}],candidate:null,
+  scope:{original_work_id:work,goal_id:scope.goal_id},
+ };
+ const h=kit({
+  queue:{...queue,phase:'RUNNING_CONSTITUTIONAL'},
+  checkpointFactory:()=>({
+   readLatestCheckpoint:async()=>({verified:true,
+    original_work_id:work,checkpoint_hash:prior.head_hash,
+    continuity_receipt_id:'99999999-9999-4999-8999-999999999999',
+    state:prior}),
+   persistGap:async()=>({committed:true,receipt_id:'88888888-8888-4888-8888-888888888888'}),
+   readBackGap:async()=>({verified:true,evidence_hash:provider.evidence_hash,
+    provider_receipt_ref:provider.provider_receipt_ref}),
+   persistCheckpoint:async state=>({persisted:true,
+    independent_readback_verified:true,checkpoint_hash:hash,
+    original_work_id:work,continuity_receipt_id:'99999999-9999-4999-8999-999999999999'}),
+  }),
+  call:async(_db,name,args)=>{
+   h.calls.push({name,args});
+   if(name==='reality_read_governed_build_v1')
+    return {...queue,phase:'RUNNING_CONSTITUTIONAL'};
+   if(name==='reality_reserve_first178_gap_recovery_v1'){
+    assert.equal(args.p_original_work_id,work);
+    assert.equal(args.p_checkpoint_hash,prior.head_hash);
+    return {recovery_reserved:true,
+     recovery_reservation_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+     claim_id:claimId,original_work_id:work,queue_id:queueId,
+     continuity_receipt_id:'99999999-9999-4999-8999-999999999999',
+     checkpoint_hash:prior.head_hash,installation_authorized:false};
+   }
+   if(name==='reality_record_governed_build_178_v1')return {
+    recorded:true,phase:'AWAITING_OWNER_APPROVAL',queue_id:queueId,
+    checkpoint_hash:hash,
+    checkpoint_receipt_id:'99999999-9999-4999-8999-999999999999'};
+   throw Error('UNEXPECTED_RECOVERY_RPC_'+name);
+  },
+  drive:async({resumeState,adapters})=>{
+   assert.equal(resumeState,prior);
+   const saved=await adapters.persistCheckpoint({
+    scope:{original_work_id:work},head_hash:hash});
+   assert.equal(saved.persisted,true);
+   return {status:'OWNER_APPROVAL_REQUIRED',
+    state:{head_hash:hash,scope:{original_work_id:work},
+     attempt_count:1,candidate:{artifact_hash:'d'.repeat(64)}},
+    installation_authorized:false,capability_installed:false,
+    original_job_completed:false};
+  },
+ });
+ const result=await executeFirst178Constitutional(h.options);
+ assert.equal(result.status,'AWAITING_OWNER_APPROVAL');
+ assert.equal(result.installation_authorized,false);
+ assert.deepEqual(h.calls.map(x=>x.name),[
+  'reality_read_governed_build_v1',
+  'reality_reserve_first178_gap_recovery_v1',
+  'reality_record_governed_build_178_v1']);
+ assert.equal(h.calls.some(x=>x.name==='reality_claim_governed_build_178_v1'),false);
+});
+test('claimed original job without independent checkpoint cannot reserve or rerun',async()=>{
+ const h=kit({queue:{...queue,phase:'RUNNING_CONSTITUTIONAL'}});
+ await assert.rejects(executeFirst178Constitutional(h.options),
+  /FIRST178_EXECUTION_DURABLE_RECOVERY_READBACK_UNAVAILABLE/);
+ assert.deepEqual(h.calls.map(x=>x.name),['reality_read_governed_build_v1']);
 });
 test('provider evidence failure stops BEFORE database claim',async()=>{
  const h=kit({observer:async()=>({status:'MODEL_SAYS_VERIFIED'})});
