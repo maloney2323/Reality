@@ -3,7 +3,8 @@
 // The private Supabase lease and an existing signed owner approval are required.
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-import {privateChatConfig} from '../src/reality-private-chat-auth-v0.1.js';
+// GitHub Actions is not a browser and cannot issue a signed-in chat cookie.
+// The authenticated owner comes only from the atomically leased Supabase record.
 import {createLiveGeneralRepairService}
  from '../src/reality-live-approved-install-to-settlement-v1.0.js';
 import {dispatchApprovedBackgroundRepair}
@@ -85,8 +86,12 @@ export async function executeApprovedContinuation({
   SUPABASE_SECRET_KEY:env.SUPABASE_SERVICE_ROLE_KEY};
  // A service-role bearer, not a user token: owner identity comes ONLY from
  // the private leased, verified source in Supabase, never the request file.
+ // No browser cookie, customer publishable key or HMAC secret is needed
+ // inside an isolated trusted server worker. Service identity was already
+ // bounded to ONE owner-approved work lease before constructing this session.
  const session={user_id:leased.owner_id,
-  config:privateChatConfig(workerEnv),
+  config:{url:env.REALITY_PERSONAL_CHAT_SUPABASE_URL,
+   key:env.SUPABASE_SERVICE_ROLE_KEY},
   access_token:env.SUPABASE_SERVICE_ROLE_KEY};
  const service=serviceFactory({session,env:workerEnv});
  let outcome=null,diagnostic='ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING';
