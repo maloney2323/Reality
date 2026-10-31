@@ -1,0 +1,37 @@
+# Default-branch registration only. workflow_dispatch runs the workflow
+# version at the explicitly supplied isolated feature ref. This main version
+# cannot install anything and never runs the customer repair.
+name: Reality — Owner-approved background install and original-job settlement
+on:
+  workflow_dispatch:
+    inputs:
+      reservation_id:
+        description: Exact existing single-use owner approval
+        required: true
+        type: string
+      original_work_id:
+        description: Existing original customer job
+        required: true
+        type: string
+      candidate_hash:
+        description: Independently verified source artifact
+        required: true
+        type: string
+      issue_number:
+        description: Original customer issue
+        required: true
+        type: string
+      install_branch:
+        description: Isolated preview installation target
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  refuse-default-branch-execution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail closed - default branch cannot install customer upgrades
+        run: |
+          echo "::error::Governed customer upgrades must run on the isolated execution branch, with an exact prior Supabase owner approval."
+          exit 1
