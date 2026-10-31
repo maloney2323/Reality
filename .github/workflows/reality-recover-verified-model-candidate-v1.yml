@@ -1,0 +1,93 @@
+name: Reality — Recover original verified model candidate without regeneration
+on:
+  push:
+    branches:
+      - feature/reality-closed-loop-worker-20261031
+    paths:
+      - 'reality-model-response-recoveries/issue-178.json'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: reality-original-178-candidate-publication
+  cancel-in-progress: false
+jobs:
+  restore-exact-sandbox-passing-original:
+    if: github.repository == 'maloney2323/Reality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact publication recovery request
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: executor
+          fetch-depth: 2
+          persist-credentials: true
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify the failed original publish and passing real model sandbox receipts
+        working-directory: executor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-verify-prior-generated-original-178-v1.mjs
+          node --check scripts/reality-autonomous-source-repair-v1.mjs
+          node scripts/reality-verify-prior-generated-original-178-v1.mjs
+      - name: Checkout only exact original failed provider commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: baseline
+          ref: 6e6014f38f9fea382ea93b38418ec77e9158c1ef
+          persist-credentials: false
+      - name: Recheck frozen original bytes at the original SHA
+        run: |
+          set -euo pipefail
+          mkdir -p baseline/reality-worker-result
+          cp executor/reality-worker-result/ticket.json baseline/reality-worker-result/ticket.json
+          node -e 'const fs=require("fs"),c=require("crypto");const t=JSON.parse(fs.readFileSync("baseline/reality-worker-result/ticket.json"));const b=fs.readFileSync("baseline/"+t.frozen_test_path);if(c.createHash("sha256").update(b).digest("hex")!==t.frozen_test_sha256)process.exit(1)'
+      - name: Retrieve ONLY exact stored model response and independently verify in Docker
+        working-directory: baseline
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REALITY_REPAIR_TICKET_PATH: reality-worker-result/ticket.json
+        run: |
+          set -euo pipefail
+          test -n "$OPENAI_API_KEY"
+          node ../executor/scripts/reality-autonomous-source-repair-v1.mjs recover
+          mkdir -p candidate
+          cp artifact/candidate.json candidate/candidate.json
+          node ../executor/scripts/reality-autonomous-source-repair-v1.mjs prepare
+          FROZEN=$(node -p 'JSON.parse(require("fs").readFileSync("reality-worker-result/ticket.json")).frozen_test_path')
+          set +e
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory=512m --cpus=1 \
+            --user 65534:65534 -v "$PWD:/work:ro" -w /work \
+            node:22 node --test "$FROZEN" \
+            test/reality-governed-self-improvement-spine-v1.0.test.js \
+            > sandbox.log 2>&1
+          CODE=$?
+          set -e
+          node ../executor/scripts/reality-autonomous-source-repair-v1.mjs receipt 1 "$CODE"
+          node -e 'const v=JSON.parse(require("fs").readFileSync("artifact/verification.json"));if(!v.passed||v.artifact_sha256!=="105c2c59bde7ae12e4e6e74d6ec8ccf6c159a32fcaaa34db9ff5e4ae358e409a")process.exit(1)'
+      - name: Commit only inert owner-review evidence with safe non-force upstream reconcile
+        working-directory: executor
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node scripts/reality-stage-source-bound-candidate-review-v1.mjs
+          FROZEN=$(node -p 'JSON.parse(require("fs").readFileSync("../baseline/reality-worker-result/ticket.json")).frozen_test_path')
+          git config user.name 'Reality Independently Verified Recovery'
+          git config user.email 'reality-verified-evidence@users.noreply.github.com'
+          git add reality-repair-evidence/issue-178-candidate.json "$FROZEN"
+          test "$(git diff --cached --name-only | wc -l)" -le 2
+          git commit -m 'Reality: exact prior model #178 sandbox verification preserved for owner'
+          git fetch origin feature/reality-closed-loop-worker-20261031
+          git rebase origin/feature/reality-closed-loop-worker-20261031
+          git push origin HEAD:feature/reality-closed-loop-worker-20261031
+      - name: No installation authorization or synthetic original-job completion
+        run: echo 'Verified candidate staged for owner approval. No installation, resumption, production mutation or settlement.'
