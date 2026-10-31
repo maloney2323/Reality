@@ -53,7 +53,11 @@ function setup(extra={}){
   readGoal:async()=>goal,
   call:async(_db,name,payload)=>{
    calls.push({kind:'db',name,payload});
-   if(name==='reality_read_governed_build_v1')return {};
+   if(name==='reality_read_owner_existing_original_issue_v1')return {
+    status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
+   if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
+  if(name==='reality_read_governed_build_v1')return {};
    if(name==='reality_enqueue_governed_build_v1')return {
     queue_id:'d8019af0-c741-4d43-8fa8-f871d4d2cc04',
     original_work_id:workId,goal_id:goalId,phase:'QUEUED_DISCOVERY',
@@ -80,13 +84,14 @@ test('the exact owner source, not a historical discovery, drives queue and worke
  assert.equal(r.worker_dispatch_started,true);
  assert.equal(r.installation_authorized,false);
  assert.equal(r.original_job_completed,false);
- assert.equal(x.calls.length,4);
- assert.equal(x.calls[0].name,'reality_read_governed_build_v1');
- assert.equal(x.calls[1].payload.p_original_work_id,workId);
- assert.equal(x.calls[1].payload.p_conversation_id,conversation);
- assert.equal(x.calls[1].payload.p_goal_transition_event_id,transition);
- assert.equal(x.calls[2].input.original_work_id,workId);
- assert.equal(x.calls[2].input.issue_url,work.issue_url);
+ assert.equal(x.calls.length,5);
+ assert.equal(x.calls[0].name,'reality_read_owner_existing_original_issue_v1');
+ assert.equal(x.calls[1].name,'reality_read_governed_build_v1');
+ assert.equal(x.calls[2].payload.p_original_work_id,workId);
+ assert.equal(x.calls[2].payload.p_conversation_id,conversation);
+ assert.equal(x.calls[2].payload.p_goal_transition_event_id,transition);
+ assert.equal(x.calls[3].input.original_work_id,workId);
+ assert.equal(x.calls[3].input.issue_url,work.issue_url);
 });
 test('a foreign provider run, owner, work ID or source receipt cannot dispatch',async()=>{
  for(const patch of [
@@ -130,6 +135,8 @@ test('no live dispatch on production, disabled feature or partial owner ledger',
 });
 test('a previous claim or escalation is preserved without second worker dispatch',async()=>{
  const x=setup({call:async(_db,name)=>{
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
   if(name==='reality_read_governed_build_v1')return {};
   assert.equal(name,'reality_enqueue_governed_build_v1');
   return {queue_id:randomUUID(),original_work_id:workId,goal_id:goalId,
@@ -151,6 +158,8 @@ test('dispatch failure preserves original queue and never implies installation',
 });
 test('an uncertain DB dispatch-recording failure remains unresolved, not successful',async()=>{
  const x=setup({call:async(_db,name)=>{
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
   if(name==='reality_read_governed_build_v1')return {};
   if(name==='reality_enqueue_governed_build_v1')return {
    queue_id:randomUUID(),original_work_id:workId,goal_id:goalId,
@@ -164,6 +173,8 @@ test('an uncertain DB dispatch-recording failure remains unresolved, not success
 
 test('an existing unresolved original job cannot be silently replaced by a new intake identity',async()=>{
  const x=setup({call:async(_db,name)=>{
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
   assert.equal(name,'reality_read_governed_build_v1');
   return {queue_id:randomUUID(),original_work_id:'work:'+'9'.repeat(32),
    phase:'ESCALATED',job_completed:false};
@@ -171,4 +182,16 @@ test('an existing unresolved original job cannot be silently replaced by a new i
  await assert.rejects(queueVerifiedOriginalRepair(x.params),
   /REAL_ORIGINAL_BUILD_EXISTING_UNFINISHED_WORK_IDENTITY_RECONCILIATION_REQUIRED/);
  assert.equal(x.calls.length,0,'no second enqueue and no worker dispatch');
+});
+
+test('cross-conversation older original-work ID blocks new queue and dispatch',async()=>{
+ const x=setup({call:async(_db,name)=>{
+  assert.equal(name,'reality_read_owner_existing_original_issue_v1');
+  return {status:'EXISTING_UNFINISHED_ORIGINAL',
+   original_work_id:'work:'+'9'.repeat(32),installation_authorized:false,
+   job_completed:false};
+ }});
+ await assert.rejects(queueVerifiedOriginalRepair(x.params),
+  /REAL_ORIGINAL_BUILD_PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED/);
+ assert.equal(x.calls.length,0);
 });
