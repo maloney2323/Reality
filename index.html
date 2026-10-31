@@ -339,6 +339,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
       <p>Use these evidence checks to move from talking about a defect to a real worker task. Only independently verified failures can enter the execution path.</p>
       <div class="repair-chat-actions">
        <button type="button" id="repairChatFind" class="secondary">Find real missing capabilities</button>
+       <button type="button" id="repairChatStartDiscovery" disabled>Start verified unfinished job</button>
        <button type="button" id="repairChatReview" class="secondary">Review verified upgrade</button>
       </div>
       <p id="repairChatJobState" class="muted" role="status">No verified worker or completion receipt has been read in this tab.</p>
@@ -3755,6 +3756,7 @@ setInterval(refreshSavedShiftHome,300000);
  const conv=()=>localStorage.getItem('reality.private.chat.conversation.v1')||'';
  let busy=false;
  let selectedWork=null;
+ let eligibleWork=null;
  const setStatus=(message,tone='neutral')=>{
   el('repairChatStatus').textContent=message;
   el('repairChatStatus').dataset.tone=tone;
@@ -3811,6 +3813,10 @@ setInterval(refreshSavedShiftHome,300000);
   const b=results[0].status==='fulfilled'?results[0].value:null;
   const u=results[1].status==='fulfilled'?results[1].value:null;
   const phase=String(b?.phase||'NOT_VERIFIED');
+  eligibleWork=b?.eligible_for_investigation===true&&
+   b?.queued===false&&b?.phase==='NOT_QUEUED'&&
+   work.test(String(b.original_work_id||''))?b.original_work_id:null;
+  el('repairChatStartDiscovery').disabled=!eligibleWork;
   lines.push('Governed discovery: '+phase.replaceAll('_',' '));
   if(work.test(String(b?.original_work_id||''))){
    selectedWork=b.original_work_id;
@@ -3955,6 +3961,39 @@ setInterval(refreshSavedShiftHome,300000);
    setStatus('Only independently verified source gaps are listed. Select one exact issue to authorize investigation. No installation approval has been created.','verified');
   }catch(e){setStatus('Provider source verification unavailable: '+String(e.message)+'. No repair was started.','blocked');}
   finally{button.disabled=false;}
+ });
+ el('repairChatStartDiscovery').addEventListener('click',async()=>{
+  const target=eligibleWork;
+  if(!isSigned()||!work.test(String(target||''))){
+   setStatus('There is no currently eligible, owner-verified unfinished job to start. No work was dispatched.','blocked');
+   return;
+  }
+  const button=el('repairChatStartDiscovery');button.disabled=true;
+  setStatus('Submitting one exact goal-bound investigation queue for '+target+
+   '. This does not install an upgrade or create a new owner goal.');
+  try{
+   const result=await post('/api/reality/personal-governed-build',{
+    intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY',
+    expected_original_work_id:target,
+   });
+   if(result.original_work_id!==target||
+      result.external_execution_authorized!==false||
+      result.production_changed!==false)
+    throw Error('EXACT_WORK_QUEUE_SCOPE_NOT_VERIFIED');
+   selectedWork=target;eligibleWork=null;
+   const running=result.worker_dispatch_started===true;
+   setStatus('Original job '+target+
+    (running?' has been handed to Reality\'s isolated discovery worker.':
+     ' was saved, but dispatch is blocked. Review worker evidence before retrying.')+
+    ' Phase: '+String(result.phase||result.status||'UNKNOWN')+
+    '. Installation still requires independently verified source and a separate exact approval.',
+    running?'verified':'blocked');
+   await refreshProof();
+  }catch(e){
+   setStatus('Discovery not confirmed: '+String(e.message||'UNAVAILABLE')+
+    '. An earlier queue may exist; use readback before attempting again.','blocked');
+   await refreshProof().catch(()=>{});
+  }
  });
  el('repairChatReview').addEventListener('click',()=>{
   if(!isSigned()){setStatus('Sign in first. No authority granted.','blocked');return;}
