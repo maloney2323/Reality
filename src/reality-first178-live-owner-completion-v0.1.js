@@ -161,6 +161,45 @@ export async function original178OwnerApprovalView({
    final_settlement_receipt_ref:state.settlement.settlement_receipt_ref,
    original_job_completed:true,production_changed:false,
   });
+ // A separately authorized one-attempt redesign can be IN PROGRESS,
+ // even though the previous 8/8 checkpoint is still the last durable phase.
+ // The original queue and its one-use owner consent must be read back.
+ if(queue.phase==='RUNNING_CONSTITUTIONAL'&&
+    uuid(queue.report?.redesign_recovery_reservation_id)&&
+    queue.report?.redesign_recovery_owner_consent===
+     'AUTHENTICATED_OWNER_EXPLICIT_ACTION'){
+  const receipt=await call(db,'reality_read_first178_one_redesign_v1',{
+   p_owner_id:session.user_id,p_conversation_id:conversationId,
+   p_queue_id:queue.queue_id,p_original_work_id:scope.original_work_id,
+  });
+  if(receipt?.reserved_once!==true||
+     receipt.queue_id!==queue.queue_id||
+     receipt.original_work_id!==scope.original_work_id||
+     receipt.reservation_id!==queue.report.redesign_recovery_reservation_id||
+     receipt.owner_confirmed!==true||
+     receipt.authorization_scope!=='ONE_ORIGINAL178_REDESIGN_ATTEMPT'||
+     receipt.installation_authorized!==false||
+     receipt.job_completed!==false)
+   fail('REDESIGN_OWNER_RESERVATION_READBACK_REQUIRED');
+  if(state.phase!=='ESCALATED'&&
+     !['REPAIR_REQUIRED','CANDIDATE_READY'].includes(state.phase))
+   fail('REDESIGN_LATEST_CHECKPOINT_UNRECONCILED');
+  if(state.attempt_count<8||state.attempt_count>9||
+     ![8,9].includes(state.attempt_limit))
+   fail('REDESIGN_ATTEMPT_HISTORY_CHANGED');
+  return Object.freeze({
+   status:'REDESIGN_RECOVERY_IN_PROGRESS',
+   original_work_id:scope.original_work_id,queue_id:queue.queue_id,
+   reservation_id:receipt.reservation_id,
+   attempt_count:state.attempt_count,attempt_limit:state.attempt_limit,
+   checkpoint_receipt_id:restored.continuity_receipt_id,
+   checkpoint_hash:restored.checkpoint_hash,
+   owner_confirmation_consumed:true,
+   original_claim_preserved:true,original_history_preserved:true,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,automatic_regrant_allowed:false,
+  });
+ }
  if(queue.phase!=='AWAITING_OWNER_APPROVAL')
   fail('CANDIDATE_NOT_YET_VERIFIED');
  if(state.phase==='AWAITING_OWNER_APPROVAL'&&
