@@ -88,11 +88,12 @@ export function createIndependentInstalledWorkVerifier({
    '.github/workflows/reality-source-bound-installed-acceptance-v1.yml':WORKFLOW;
   // GitHub's run list is merely an index; inspect exact run+job+steps.
   const result=await get('/actions/workflows/'+runWorkflow.split('/').at(-1)+
-   '/runs?branch='+encodeURIComponent(installedBranch)+'&event=push&per_page=100');
+   '/runs?branch='+encodeURIComponent(installedBranch)+'&per_page=100');
   if(!Array.isArray(result?.workflow_runs)||result.workflow_runs.length>100)
    fail('PROVIDER_RUN_INDEX_UNAVAILABLE');
   const runs=result.workflow_runs.filter(r=>
-   r.head_sha===installedCommitSha&&r.event==='push'&&
+   r.head_sha===installedCommitSha&&
+   ['push','workflow_dispatch'].includes(r.event)&&
    r.path===runWorkflow&&r.head_repository?.full_name===REPO&&
    Number.isSafeInteger(r.id));
   if(runs.length!==1)
