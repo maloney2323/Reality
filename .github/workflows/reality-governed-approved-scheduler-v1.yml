@@ -1,0 +1,110 @@
+# Minimal default-branch scheduler: no app code, source installation, or DB
+# credentials. Supabase independently verifies our signed GitHub Actions OIDC.
+# ONLY an existing signed-owner approval can be dispatched to the isolated job.
+name: Reality — Governed auto-wake of previously approved work
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reality-governed-approved-scheduler-v1.yml'
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+concurrency:
+  group: reality-governed-approved-wake-main
+  cancel-in-progress: false
+jobs:
+  wake-only-previously-approved-original-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Poll exact signed owner approval and wake isolated worker if authorized
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const project='hvkfreoagbrphwghjajw';
+          const repo='maloney2323/Reality';
+          const worker='reality-approved-repair-background-v1.yml';
+          const workerBranch='feature/reality-background-continuation-20261031';
+          const installBranch='feature/reality-closed-loop-worker-20261031';
+          const work='work:9b9578b3c65427589c4c6da68fe0fc87';
+          const artifact='105c2c59bde7ae12e4e6e74d6ec8ccf6c159a32fcaaa34db9ff5e4ae358e409a';
+          assert.equal(process.env.GITHUB_REPOSITORY,repo);
+          assert.equal(process.env.GITHUB_REF,'refs/heads/main');
+          assert.ok(/^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA||''));
+          assert.ok(process.env.ACTIONS_ID_TOKEN_REQUEST_URL&&
+            process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+            'signed GitHub OIDC identity must be available');
+          const issuer=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          issuer.searchParams.set('audience','reality-governed-approved-scheduler-v1');
+          const proof=await fetch(issuer,{method:'GET',cache:'no-store',redirect:'error',
+            headers:{authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}});
+          assert.equal(proof.status,200,'GitHub signed identity mint must succeed');
+          const token=(await proof.json())?.value;
+          assert.ok(typeof token==='string'&&token.length>300);
+          const response=await fetch(
+            'https://'+project+'.supabase.co/functions/v1/reality-governed-approved-scheduler',
+            {method:'POST',cache:'no-store',redirect:'error',
+             headers:{authorization:'Bearer '+token,'content-type':'application/json'},
+             body:JSON.stringify({action:'poll'})});
+          const result=await response.json().catch(()=>null);
+          assert.equal(response.status,200,'Exact signed scheduler identity and provider readback required');
+          assert.equal(result?.ok,true);
+          assert.equal(result.github_oidc_verified,true);
+          assert.equal(result.isolated_supabase_readback_verified,true);
+          assert.equal(result.service_credential_returned,false);
+          assert.equal(result.owner_approval_used,false);
+          assert.equal(result.installation_performed,false);
+          assert.equal(result.production_changed,false);
+          assert.equal(result.repository_commit,process.env.GITHUB_SHA);
+          assert.ok(Array.isArray(result.pending_approvals)&&
+            result.pending_approvals.length<=1);
+          if(result.pending_approvals.length===0){
+            assert.equal(result.status,'NO_APPROVED_WORK');
+            console.log('REALITY_GOVERNED_AUTO_WAKE',JSON.stringify({
+             status:'NO_APPROVED_WORK',customer_button_required:false,
+             install_performed:false,production_changed:false}));
+            process.exit(0);
+          }
+          assert.equal(result.status,'PREVIOUSLY_OWNER_APPROVED_WORK_OBSERVED');
+          for(const item of result.pending_approvals){
+           assert.deepEqual(Object.keys(item).sort(),
+            ['candidate_hash','install_branch','issue_number','original_work_id','reservation_id']);
+           assert.match(item.reservation_id,/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i);
+           assert.equal(item.original_work_id,work);
+           assert.equal(item.candidate_hash,artifact);
+           assert.equal(item.issue_number,178);
+           assert.equal(item.install_branch,installBranch);
+           const dispatched=await fetch('https://api.github.com/repos/'+repo+
+             '/actions/workflows/'+worker+'/dispatches',{
+             method:'POST',redirect:'error',cache:'no-store',
+             headers:{accept:'application/vnd.github+json',
+              authorization:'Bearer '+process.env.GH_TOKEN,
+              'x-github-api-version':'2022-11-28',
+              'user-agent':'Reality-governed-approved-wake-v1',
+              'content-type':'application/json'},
+             body:JSON.stringify({ref:workerBranch,inputs:{
+              reservation_id:item.reservation_id,
+              original_work_id:item.original_work_id,
+              candidate_hash:item.candidate_hash,
+              issue_number:String(item.issue_number),
+              install_branch:item.install_branch}})});
+           assert.equal(dispatched.status,204,
+             'GitHub Actions accepted exact isolated worker workflow_dispatch');
+           console.log('REALITY_GOVERNED_AUTO_WAKE',JSON.stringify({
+            status:'SIGNED_OWNER_APPROVED_WORKER_DISPATCHED',
+            reservation_id:item.reservation_id,original_work_id:work,
+            dispatched_branch:workerBranch,owner_approval_created:false,
+            installation_performed:false,production_changed:false}));
+          }
+          NODE
