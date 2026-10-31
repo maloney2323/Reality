@@ -1,0 +1,61 @@
+name: Reality — Owner-approved background install and original-job settlement
+on:
+  push:
+    branches:
+      - feature/reality-background-continuation-20261031
+    paths:
+      - 'reality-approved-continuations/*.json'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: reality-owner-approved-background-continuation
+  cancel-in-progress: false
+jobs:
+  continue-original-approved-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout only exact signed-off execution branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Fail closed on missing owner-authorized worker credentials
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ secrets.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN }}
+          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
+          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in SUPABASE_SERVICE_ROLE_KEY REALITY_BUILDER_DISPATCH_GITHUB_TOKEN REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY REALITY_CHAT_RECEIPT_HMAC_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Required existing worker credential unavailable: $name"
+              exit 1
+            fi
+          done
+      - name: Run only previously consumed exact owner approval
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ secrets.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN }}
+          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
+          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+          REALITY_BACKGROUND_REPAIR_WORKER_ENABLED: 'true'
+          REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
+          REALITY_CONTINUOUS_RELIABILITY_ENABLED: 'true'
+          VERCEL_ENV: preview
+          REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF: hvkfreoagbrphwghjajw
+          REALITY_PERSONAL_CHAT_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+          REALITY_RELIABILITY_BENCHMARK_PROJECT_REF: hvkfreoagbrphwghjajw
+          REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF: hvkfreoagbrphwghjajw
+          REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-approved-repair-background-worker-v1.mjs
+          node scripts/reality-approved-repair-background-worker-v1.mjs
