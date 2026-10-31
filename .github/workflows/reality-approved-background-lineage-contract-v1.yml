@@ -4,6 +4,8 @@ on:
     branches: [feature/reality-background-continuation-20261031]
     paths:
       - 'src/reality-personal-unfinished-work-v0.1.js'
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'test/reality-live-approved-install-to-settlement-v1.0.test.js'
       - 'test/reality-personal-unfinished-work-v0.1.test.js'
       - 'scripts/reality-approved-repair-background-worker-v1.mjs'
       - '.github/workflows/reality-approved-background-lineage-contract-v1.yml'
