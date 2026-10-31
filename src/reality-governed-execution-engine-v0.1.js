@@ -23,6 +23,8 @@ export async function executeAuthorizedWork({
   independentVerifier,
   requestSummary = null,
   requestFingerprint = null,
+  originalWorkId = null,
+  onVerifiedCapabilityGap = null,
 } = {}) {
   if (!workItem?.work_item_id) throw new Error('WORK_ITEM_REQUIRED');
   if (workItem.workflow_id !== workflowId) throw new Error('WORKFLOW_MISMATCH');
@@ -218,6 +220,58 @@ export async function executeAuthorizedWork({
       });
     }
   }
+  // A trusted internally executing job may encounter a genuine missing
+  // instrument. Do not wait for a customer to browse an upgrades dashboard.
+  // Only the independent verifier can nominate a source-backed gap. Never
+  // launch repair after a connector write, provider uncertainty or a missing
+  // authorization: the outside world may already have changed.
+  let selfRepair=null;
+  const eligible=verified===false&&
+    !requiresReservation&&workItem.connector==null&&
+    typeof originalWorkId==='string'&&
+    /^work:[a-f0-9]{32}$/.test(originalWorkId)&&
+    workItem.work_item_id===originalWorkId&&
+    verification?.independent===true&&
+    verification?.verified===false&&
+    verification?.independently_verified===true&&
+    verification?.evidence_kind==='OBSERVED_FAILURE'&&
+    verification?.blocker_class==='MISSING_INSTRUMENT'&&
+    verification?.original_work_id===originalWorkId&&
+    verification?.external_action_performed===false&&
+    verification?.provider_effect_may_have_occurred!==true&&
+    verification?.no_automatic_retry!==true&&
+    typeof onVerifiedCapabilityGap==='function';
+  if(eligible){
+    try{
+      const response=await onVerifiedCapabilityGap(Object.freeze({
+        original_work_id:originalWorkId,
+        original_execution_receipt:executed.execution_id,
+        independent_failure:verification,
+        authorization_continues_unchanged:true,
+        production_write_permitted:false,
+        customer_job_completed:false,
+      }));
+      if(response?.original_work_id!==originalWorkId||
+         response?.new_job_created!==false||
+         response?.original_job_completed===true)
+        throw Error('REPAIR_NOT_YET_CUSTOMER_SETTLED');
+      selfRepair=Object.freeze({
+        status:response.status||'REPAIR_HANDOFF_RECORDED',
+        original_work_id:originalWorkId,
+        new_job_created:false,
+        owner_action_required:response.owner_action_required===true,
+        original_job_completed:false,
+      });
+    }catch{
+      // Preserve the real failed job. A repair handoff failure is neither
+      // completion nor authority to repeat an uncertain action.
+      selfRepair=Object.freeze({
+        status:'REPAIR_HANDOFF_NEEDS_RECONCILIATION',
+        original_work_id:originalWorkId,
+        new_job_created:false,original_job_completed:false,
+      });
+    }
+  }
   return Object.freeze({
     engine_version:GOVERNED_EXECUTION_ENGINE_VERSION,
     status:verified?'VERIFIED':'UNRESOLVED',
@@ -225,5 +279,6 @@ export async function executeAuthorizedWork({
     verification,
     outcome,
     reservation_settlement:reservationSettlement,
+    ...(selfRepair?{self_repair:selfRepair}:{}),
   });
 }
