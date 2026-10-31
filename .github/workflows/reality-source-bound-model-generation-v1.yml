@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   actions: read
+  id-token: write
 concurrency:
   group: reality-source-bound-generation-${{ github.ref }}
   cancel-in-progress: false
@@ -33,7 +34,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euo pipefail
-          test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$OPENAI_API_KEY"
           node --check executor/scripts/reality-source-bound-model-ticket-worker-v1.mjs
           node --check executor/scripts/reality-autonomous-source-repair-v1.mjs
@@ -47,6 +47,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          REQUEST_FILE=$(git diff --name-only HEAD^ HEAD)
+          test -f "$REQUEST_FILE"
+          REQUEST_KIND=$(node -e 'const f=require("fs");const r=JSON.parse(f.readFileSync(process.argv[1]));console.log(r.schema)' "$REQUEST_FILE")
+          if [ "$REQUEST_KIND" = "reality-original-178-recovery-request-v1" ]; then
+            test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+            test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+            OIDC_REPLY=$(curl --fail --silent --show-error \
+              -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=reality-original-178-recovery-v1")
+            REALITY_RECOVERY_GITHUB_OIDC_TOKEN=$(printf '%s' "$OIDC_REPLY" | node -e 'let b="";process.stdin.on("data",v=>b+=v);process.stdin.on("end",()=>{const t=JSON.parse(b).value;if(!t||t.length<300)process.exit(1);process.stdout.write(t)})')
+            export REALITY_RECOVERY_GITHUB_OIDC_TOKEN
+          else
+            test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          fi
           node scripts/reality-source-bound-model-ticket-worker-v1.mjs
           SOURCE_SHA=$(node -p 'JSON.parse(require("fs").readFileSync("reality-worker-result/ticket.json","utf8")).baseline_source_sha')
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
