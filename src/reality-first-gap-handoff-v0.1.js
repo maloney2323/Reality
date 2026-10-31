@@ -178,7 +178,7 @@ export async function admitFirstGapBuildTicket({
  reobserveProviderEvidence,maxAttempts=3,
 }={}){
  strictScope(scope);
- if(![3,5,7,8].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
+ if(![3,5,7,8,9].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
  if(typeof reobserveProviderEvidence!=='function')
   fail('INDEPENDENT_REOBSERVATION_REQUIRED');
  const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
@@ -297,7 +297,8 @@ export async function generateAfterTrustedGap({
   // original work, source receipts and immutable gap identity MUST match.
   const recoveryOffset=(resumeState.recovery_authorization?.verified===true?1:0)+
    (resumeState.recovery_continuation_authorization?.verified===true?1:0)+
-    (resumeState.recovery_final_authorization?.verified===true?1:0);
+    (resumeState.recovery_final_authorization?.verified===true?1:0)+
+    (resumeState.recovery_redesign_authorization?.verified===true?1:0);
   const unacceptedGap=resumeState.phase==='GAP_CONFIRMED'&&
      resumeState.attempt_count===0&&
      resumeState.journal.length===1&&
@@ -319,7 +320,8 @@ export async function generateAfterTrustedGap({
        (resumeState.journal.at(-2).kind==='SANDBOX_FAILED'||
         (((resumeState.attempt_count===4&&recoveryOffset===1)||
          (resumeState.attempt_count===6&&recoveryOffset===2)||
-         (resumeState.attempt_count===8&&recoveryOffset===3))&&
+         (resumeState.attempt_count===8&&recoveryOffset===3)||
+         (resumeState.attempt_count===9&&recoveryOffset===4))&&
          resumeState.journal.at(-2).kind==='RECOVERY_STARTED'&&
          resumeState.journal.at(-3).kind==='SANDBOX_FAILED'))));
   const lastEvent=resumeState.journal.at(-1);
@@ -330,7 +332,9 @@ export async function generateAfterTrustedGap({
       (recoveryOffset===2&&resumeState.attempt_count===5&&
        resumeState.journal.length===13)||
       (recoveryOffset===3&&resumeState.attempt_count===7&&
-       resumeState.journal.length===18));
+       resumeState.journal.length===18)||
+      (recoveryOffset===4&&resumeState.attempt_count===8&&
+       resumeState.journal.length===21));
   const repairableCheckpoint=resumeState.phase==='REPAIR_REQUIRED'&&
      resumeState.attempt_count>=1&&
      resumeState.attempt_count<ticket.max_attempts&&
