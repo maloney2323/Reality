@@ -141,8 +141,13 @@ async function main(){
   err('ONE_PINNED_OWNER_APPROVAL_DISPATCH_REQUIRED');
  const request=JSON.parse(readFileSync(changed[0],'utf8'));
  const prefix='reality-approved-continuations/'+request.reservation_id;
+ const attemptMatch=/^-retry-([1-9]|1[0-9]|2[0-4])$/.exec(
+  changed[0].slice(prefix.length,-5));
  const index=changed[0]===prefix+'.json'?0:
-  Number((new RegExp('^'+prefix+'-retry-([1-9]|1[0-9]|2[0-4])\\.json
+  attemptMatch?Number(attemptMatch[1]):-1;
+ if(!Number.isInteger(index)||index<0||index>24||
+    changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
+  err('PINNED_DISPATCH_FILENAME_CHANGED');
  const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
  const result=await executeApprovedContinuation({env,request,checkoutSha:sha});
  console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
