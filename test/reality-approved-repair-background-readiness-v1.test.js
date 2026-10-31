@@ -10,7 +10,7 @@ const now=Date.parse('2026-10-31T18:05:00Z');
 const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:preview,
  REALITY_GOVERNED_SCHEDULER_ENABLED:'true'};
 const run=(conclusion='success',extra={})=>({
- id:41227497421,run_number:3,path:workflow,event:'push',
+ id:41227497421,run_number:3,path:workflow,event:'schedule',
  head_branch:'main',head_repository:{full_name:repo},
  status:'completed',conclusion,updated_at:'2026-10-31T18:03:28Z',
  ...extra,
@@ -21,7 +21,7 @@ const fetchWith=runs=>async(url,options)=>{
  assert.match(url,/actions\/runs\?branch=main/);
  return {ok:true,json:async()=>({workflow_runs:runs})};
 };
-test('signed live scheduler passes exact no-secret readiness before one customer approval',async()=>{
+test('actual GitHub cron tick passes exact no-secret readiness before one customer approval',async()=>{
  const result=await verifyApprovedBackgroundReadiness({
   env,fetchImpl:fetchWith([run()]),now});
  assert.equal(result.ready,true);
@@ -37,6 +37,8 @@ test('latest scheduler must be green, exact-main, matching repo and fresh',async
   [run('success',{head_repository:{full_name:'untrusted/repo'}})],
   [run('success',{path:'other.yml'})],
   [run('success',{event:'pull_request'})],
+  [run('success',{event:'push'})],
+  [run('success',{event:'workflow_dispatch'})],
   [],
   [run('success',{updated_at:'2026-10-30T12:00:00Z'})],
   [run('success'),run('failure',{run_number:4,id:41227497422})],
