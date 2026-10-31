@@ -9,6 +9,9 @@ on:
       - 'test/reality-approved-repair-background-worker-v1.test.js'
       - 'test/reality-personal-unfinished-work-v0.1.test.js'
       - 'scripts/reality-approved-repair-background-worker-v1.mjs'
+      - 'src/reality-exact-approved-worker-scope-v1.js'
+      - 'test/reality-exact-approved-worker-scope-v1.test.js'
+      - 'supabase/migrations/20261031_reality_exact_approved_worker_scope_readback_v1.sql'
       - 'src/reality-governed-installed-acceptance-wakeup-v1.js'
       - 'test/reality-governed-installed-acceptance-wakeup-v1.test.js'
       - 'src/reality-general-installed-work-verifier-v1.0.js'
@@ -37,6 +40,8 @@ jobs:
           node --check src/reality-governed-installed-acceptance-wakeup-v1.js
           node --test test/reality-personal-unfinished-work-v0.1.test.js
           node --test test/reality-approved-repair-background-worker-v1.test.js
+          node --check src/reality-exact-approved-worker-scope-v1.js
+          node --test test/reality-exact-approved-worker-scope-v1.test.js
           node --test test/reality-governed-installed-acceptance-wakeup-v1.test.js
           node --test test/reality-general-installed-work-verifier-v1.0.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
