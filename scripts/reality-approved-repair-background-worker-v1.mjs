@@ -105,10 +105,12 @@ export async function executeApprovedContinuation({
  // service-scoped goal readback. Never copy the interactive HMAC issuer secret
  // to Actions or silently treat a missing goal as current.
  let outcome=null,diagnostic='ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING';
+ let phase='SIGNED_SCOPE_READBACK';
  try{
   const scoped=serviceFactory===createLiveGeneralRepairService?
    await createExactApprovedWorkerScope({env:workerEnv,request,lease:leased}):{};
   const service=serviceFactory({session,env:workerEnv,...scoped});
+  phase='ORIGINAL_JOB_CONTINUATION';
   let acceptanceRequested=false;
   for(let attempt=0;attempt<maxChecks;attempt++){
    outcome=await service.continueAfterInstall({
@@ -139,9 +141,9 @@ export async function executeApprovedContinuation({
   }
  }catch(error){
   const safe=String(error?.message||'');
-  diagnostic=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_)[A-Z0-9_]{4,120}$/.test(safe)?
-   safe.replace(/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_)/,'') :
-    'TRUSTED_PROVIDER_RECONCILIATION_REQUIRED';
+  diagnostic=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_|REAL_REPAIR_READBACK_)[A-Z0-9_]{4,120}$/.test(safe)?
+   safe.replace(/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_|REAL_REPAIR_READBACK_)/,''):
+   phase+'_UNCLASSIFIED_PROVIDER_FAILURE';
  }
  const complete=outcome?.original_job_completed===true&&
    outcome?.independent_readback_verified===true;
@@ -277,6 +279,8 @@ async function main(){
   'GOAL_OR_ORIGINAL_WORK_RECONCILIATION_CHANGED',
   'INDEPENDENT_CANDIDATE_OR_ORIGINAL_MISMATCH',
   'ORIGINAL_CONVERSATION_CHANGED',
+  'SIGNED_SCOPE_READBACK_UNCLASSIFIED_PROVIDER_FAILURE',
+  'ORIGINAL_JOB_CONTINUATION_UNCLASSIFIED_PROVIDER_FAILURE',
  ]);
  if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
     blockedForReconciliation.has(result.diagnostic)){
@@ -298,8 +302,11 @@ async function main(){
    attempts:result.attempts,original_job_completed:false,
    production_changed:false}));
  }else if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'){
+  // Inert wake filenames are idempotency identifiers, not a counter of
+  // successful provider leases. A previous GitHub-token push can be silently
+  // dropped by Actions; never equate file suffix with leased attempt count.
   if(!Number.isInteger(result.attempts)||result.attempts<1||
-     result.attempts>24||result.attempts!==index+1)
+     result.attempts>24)
    err('BOUNDED_OWNER_LEASE_ATTEMPT_MISMATCH');
   if(result.attempts<24){
    const wake=await dispatchApprovedBackgroundRepair({
