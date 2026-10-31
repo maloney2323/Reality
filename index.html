@@ -1656,22 +1656,25 @@ $('wcExactInstallConfirm').onclick=async()=>{
   });
   const data=await response.json();
   if(!response.ok||data.ok!==true||
-     data.status!=='INSTALLED_AWAITING_ORIGINAL_INDEPENDENT_ACCEPTANCE'||
+     !['OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
+       'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION'].includes(data.status)||
      data.original_work_id!==ready.original_work_id||
-     data.artifact_hash!==ready.candidate_artifact_hash||
+     data.candidate_artifact_hash!==ready.candidate_artifact_hash||
      data.owner_approval_consumed!==true||
-     data.source_bytes_verified!==true||
+     data.installation_authorized!==true||
      data.original_job_completed!==false)
    throw Error(String(data.error||'EXACT_OWNER_INSTALL_NOT_VERIFIED'));
-  wcRepairStage(4,'complete');wcRepairStage(5,'active');
-  wcRepairSetBadge('Installed, verifying job','ready');
+  wcRepairStage(4,'active');wcRepairStage(5,'active');
+  wcRepairSetBadge(data.worker_dispatched===true?
+   'Approved · Background worker started':'Approved · Worker needs reconciliation','ready');
   localStorage.setItem('reality.pending.exact.preview.repair.v1',
    JSON.stringify({original_work_id:ready.original_work_id,
     issue_number:ready.issue_number}));
   $('wcInstallSettlementStatus').textContent=
-   'Exact owner-approved source installed at '+data.installed_commit_sha+
-   '. Reality is independently running the original job and verifying settlement…';
-  void wcContinueExactInstall(ready.original_work_id,ready.issue_number);
+   data.worker_dispatched===true?
+    'Exact source approved and durably queued. Reality is performing installation, original-job execution and independent settlement in GitHub Actions. You may close this page. No completion is claimed yet.':
+    'The exact owner approval is saved, but the background worker wake-up needs independent reconciliation. Do not approve again.';
+  wcInstallContinuationBusy=false;
  }catch(error){
   wcStopExactInstall('No customer completion claimed. Exact installation/claim readback requires attention: '+
    String(error?.message||'TRUSTED_PROVIDER_UNAVAILABLE')+
@@ -1686,8 +1689,11 @@ function wcResumeSavedExactRepair(){
  let saved;try{saved=JSON.parse(localStorage.getItem('reality.pending.exact.preview.repair.v1')||'null')}catch{return}
  if(!/^work:[a-f0-9]{32}$/.test(String(saved?.original_work_id||''))||
    !Number.isSafeInteger(saved.issue_number)||saved.issue_number<1)return;
- wcInstallContinuationBusy=true;
- void wcContinueExactInstall(saved.original_work_id,saved.issue_number);
+ // Reopening the browser is only a status view, not an execution trigger.
+ // The dedicated background worker uses the original single-use authority.
+ $('wcInstallSettlementStatus').textContent=
+  'Reality has saved this exact approved original job ('+
+  saved.original_work_id+'). Background continuation is independent of this tab. Check the final provider/Continuity receipt before marking it complete.';
 }
 if(typeof setInterval==='function')setInterval(wcResumeSavedExactRepair,15000);
 
