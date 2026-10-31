@@ -89,6 +89,8 @@ async function fixture(){
   state:'REAL_SOURCE_BACKED_REPAIR_PENDING',goal_still_current:true,job_completed:false,
   original_provider_failed_run_id:proof.original_failed_run_id,
   original_source_sha:proof.original_source_sha,
+  frozen_test_path:'test/reality-frozen-regressions/verified-original.test.js',
+  frozen_test_sha256:proof.frozen_test_sha256,
   source_receipt_id:sourceReceipt,conversation_id:conversation,
  }]});
  const fetchImpl=async(url,opts={})=>{
