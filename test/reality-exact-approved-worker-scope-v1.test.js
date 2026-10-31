@@ -38,7 +38,8 @@ const setup=(scopeValue=scope,proofValue=proof)=>{
    assert.deepEqual(JSON.parse(options.body),{
     p_reservation_id:lease.reservation_id,p_lease_id:lease.lease_id,
     p_install_branch:lease.install_branch});
-   return {ok:true,json:async()=>scopeValue};
+   return {ok:true,json:async()=>typeof scopeValue==='function'?
+    scopeValue():scopeValue};
   },
   readCandidate:async args=>{
    assert.equal(args.issueNumber,178);
@@ -72,7 +73,9 @@ test('changed goal epoch rejects resumed job instead of trusting cached scope',a
 test('unmatched independent source, wrong candidate or wrong signed lease fail closed',async()=>{
  await assert.rejects(setup(scope,{...proof,candidate_artifact_sha256:'0'.repeat(64)}).work,
   /INDEPENDENT_CANDIDATE_OR_ORIGINAL_MISMATCH/);
- await assert.rejects(setup({...scope,goal_transition_event_id:randomUUID()}).work
+ let reads=0;
+ await assert.rejects(setup(()=>++reads===1?scope:
+    {...scope,goal_transition_event_id:randomUUID()}).work
   .then(async a=>a.listWork()),
   /GOAL_OR_ORIGINAL_WORK_RECONCILIATION_CHANGED/);
  await assert.rejects(createExactApprovedWorkerScope({
