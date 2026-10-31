@@ -7,6 +7,10 @@ on:
       - 'test/reality-general-isolated-install-v1.0.test.js'
       - 'src/reality-general-provider-failure-observer-v1.0.js'
       - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+      - 'src/reality-foundational-build-loop-v1.0.js'
+      - 'src/reality-foundational-model-provider-v1.0.js'
+      - 'src/reality-foundational-vercel-generation-adapters-v1.0.js'
+      - 'test/reality-generic-preview-generation-v1.0.test.js'
       - '.github/workflows/reality-general-repair-provider-execution-v1.yml'
   pull_request:
     paths:
@@ -27,4 +31,9 @@ jobs:
       - run: node --check src/reality-general-isolated-install-v1.0.js
       - run: node --test test/reality-general-isolated-install-v1.0.test.js
       - run: node --test test/reality-general-provider-failure-observer-v1.0.test.js
+      - run: node --check src/reality-foundational-model-provider-v1.0.js
+      - run: node --check src/reality-foundational-vercel-generation-adapters-v1.0.js
+      - run: node --test test/reality-generic-preview-generation-v1.0.test.js
+      - run: node --test test/reality-foundational-model-strict-candidate-v1.0.test.js
+      - run: node --test test/reality-foundational-build-loop-v1.0.test.js
       - run: echo 'Isolated mocked-provider contract tests only; not a live install or settled job.'
