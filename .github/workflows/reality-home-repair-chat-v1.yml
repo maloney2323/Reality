@@ -1,0 +1,27 @@
+name: Reality — Home Repair Chat bounded UI contract
+on:
+  push:
+    branches:
+      - feature/reality-home-repair-chat-20261031
+    paths:
+      - 'index.html'
+      - 'test/reality-home-repair-chat-ui-v1.test.js'
+      - '.github/workflows/reality-home-repair-chat-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-repair-chat-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify Home UI syntax, real authenticated chat and action boundaries
+        run: node --test test/reality-home-repair-chat-ui-v1.test.js
+      - name: Boundary statement
+        run: echo 'UI contract verified only. No autonomous worker, installation, owner approval or production update was executed.'
