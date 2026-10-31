@@ -48,7 +48,7 @@ export function verifyReadyForInertReview({ticket,candidate,proof,log,runId}){
   frozen_test_sha256:ticket.frozen_test_sha256,
   baseline_source_sha:ticket.baseline_source_sha,
   candidate_artifact_sha256:candidate.artifact_sha256,
-  model_source_run_id:runId,
+  model_source_run_id:ticket.original_model_run_id||runId,
   independent_verification_run_id:runId,
   model_response_id:candidate.model_response_id,
   model_attempt:candidate.attempt,
