@@ -1670,7 +1670,8 @@ $('wcExactInstallConfirm').onclick=async()=>{
   const data=await response.json();
   if(!response.ok||data.ok!==true||
      !['OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
-       'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION'].includes(data.status)||
+       'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION',
+       'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED'].includes(data.status)||
      data.original_work_id!==ready.original_work_id||
      data.candidate_artifact_hash!==ready.candidate_artifact_hash||
      data.owner_approval_consumed!==true||
@@ -1678,12 +1679,16 @@ $('wcExactInstallConfirm').onclick=async()=>{
      data.original_job_completed!==false)
    throw Error(String(data.error||'EXACT_OWNER_INSTALL_NOT_VERIFIED'));
   wcRepairStage(4,'active');wcRepairStage(5,'active');
-  wcRepairSetBadge(data.worker_dispatched===true?
-   'Approved · Background worker started':'Approved · Worker needs reconciliation','ready');
+  wcRepairSetBadge(data.governed_scheduler_wakeup===true?
+   'Approved · Governed auto-trigger queued':
+   data.worker_dispatched===true?'Approved · Background worker started':
+   'Approved · Worker needs reconciliation','ready');
   localStorage.setItem('reality.pending.exact.preview.repair.v1',
    JSON.stringify({original_work_id:ready.original_work_id,
     issue_number:ready.issue_number}));
   $('wcInstallSettlementStatus').textContent=
+   data.governed_scheduler_wakeup===true?
+    'Exact upgrade approved and safely queued. The governed auto-trigger checks for approved work and starts the isolated worker automatically. No second approval or GitHub button is needed. Await the independent final receipt.':
    data.worker_dispatched===true?
     'Exact source approved and durably queued. Reality is performing installation, original-job execution and independent settlement in GitHub Actions. You may close this page. No completion is claimed yet.':
     'The exact owner approval is saved, but the background worker wake-up needs independent reconciliation. Do not approve again.';
