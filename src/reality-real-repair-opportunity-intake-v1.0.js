@@ -14,6 +14,8 @@ import {observeRealityIssueFailure}
  from './reality-general-provider-failure-observer-v1.0.js';
 import {registerOriginalJobCapabilityAutoTrigger}
  from './reality-governed-auto-trigger-v1.0.js';
+import {assertOwnerOriginalIssueIdentity}
+ from './reality-original-repair-worker-handoff-v1.0.js';
 const fail=x=>{throw Error('REALITY_REAL_REPAIR_'+x)};
 const ROOT='https://api.github.com/repos/maloney2323/Reality/';
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -126,6 +128,7 @@ export async function authorizeExistingRealRepairWork({
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
  enqueueAutoTrigger=registerOriginalJobCapabilityAutoTrigger,
+ checkOwnerOriginalIdentity=assertOwnerOriginalIssueIdentity,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
   env.VERCEL_ENV!=='preview'||
@@ -162,6 +165,12 @@ export async function authorizeExistingRealRepairWork({
   session.user_id,conversationId,issueNumber,evidence.source_sha,
   g.last_transition_receipt_id])).slice(0,32);
  if(!WORK.test(workId))fail('ORIGINAL_WORK_ID_INVALID');
+ // An issue's earlier authorized customer job retains its original work ID.
+ // Stop BEFORE creating any new Continuity event when one exists elsewhere.
+ if(env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true')
+  await checkOwnerOriginalIdentity({
+   session,issueNumber,expectedOriginalWorkId:workId,env,
+  });
  const receiptId=continuityUuidFromSource(
   'reality:owner-reviewed:existing-issue:'+session.user_id+':'+workId);
  const payload={

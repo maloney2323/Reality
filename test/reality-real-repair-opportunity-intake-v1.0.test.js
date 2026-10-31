@@ -185,6 +185,7 @@ test('owner-confirmed real source automatically queues one governed trigger unde
   env:{...env,REALITY_GOVERNED_AUTO_TRIGGER_ENABLED:'true'},
   discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
   readGoal:h.readGoal,createPersistence:h.createPersistence,
+  checkOwnerOriginalIdentity:async()=>({status:'OWNER_ORIGINAL_IDENTITY_VERIFIED'}),
   enqueueAutoTrigger:async scope=>{
    calls++;
    assert.equal(scope.originalWorkEventId,
@@ -214,10 +215,25 @@ test('failed trigger enqueue never invents a successful upgrade, settlement, or 
   env:{...env,REALITY_GOVERNED_AUTO_TRIGGER_ENABLED:'true'},
   discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
   readGoal:h.readGoal,createPersistence:h.createPersistence,
+  checkOwnerOriginalIdentity:async()=>({status:'OWNER_ORIGINAL_IDENTITY_VERIFIED'}),
   enqueueAutoTrigger:async()=>{throw Error('DATABASE_UNAVAILABLE')},
  });
  assert.equal(x.governed_auto_trigger.status,'TRIGGER_REGISTRATION_NEEDS_READBACK');
  assert.equal(x.original_job_completed,false);
  assert.equal(x.installation_authorized,false);
  assert.equal(h.calls.append,1);
+});
+
+test('an earlier unresolved customer job prevents a duplicate original event before auto-trigger admission',async()=>{
+ const h=setup();let triggerCalls=0;
+ await assert.rejects(authorizeExistingRealRepairWork({
+  session,conversationId,issueNumber,expectedFailedRunId:runId,
+  expectedSourceSha:sha,env:{...env,REALITY_GOVERNED_AUTO_TRIGGER_ENABLED:'true'},
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+  checkOwnerOriginalIdentity:async()=>{throw Error('REAL_ORIGINAL_BUILD_PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED')},
+  enqueueAutoTrigger:async()=>{triggerCalls++;},
+ }),/PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED/);
+ assert.equal(h.calls.append,0,'no duplicate original Continuity event');
+ assert.equal(triggerCalls,0,'no new trigger or queue');
 });

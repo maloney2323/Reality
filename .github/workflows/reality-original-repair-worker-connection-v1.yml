@@ -1,0 +1,31 @@
+name: Reality original repair -> exact governed worker (preview contract)
+on:
+  push:
+    branches: [feature/reality-self-repair-worker-connection-20261031]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-exact-owner-source-and-safe-worker-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Source parsing and exact job-to-worker dispatch
+        run: |
+          set -euo pipefail
+          node --check src/reality-original-repair-worker-handoff-v1.0.js
+          node --check api/reality/personal-real-repair-opportunities.js
+          node --test test/reality-original-repair-worker-handoff-v1.0.test.js
+          node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+          node --test test/reality-governed-auto-trigger-v1.0.test.js
+          node --test test/reality-governed-auto-trigger-candidate-v1.0.test.js
+      - name: Report limited proof, do not mislabel full loop
+        run: |
+          echo 'Verified: exact owner-source handoff, queue and dispatch boundaries.'
+          echo 'Not verified: background model generation, isolated installation or original-job settlement.'

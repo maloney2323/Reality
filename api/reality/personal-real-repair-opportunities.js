@@ -9,6 +9,8 @@ import {
 } from '../../src/reality-real-repair-opportunity-intake-v1.0.js';
 import {queueOwnerGovernedBuild}
  from '../../src/reality-governed-build-chat-connection-v1.0.js';
+import {queueVerifiedOriginalRepair}
+ from '../../src/reality-original-repair-worker-handoff-v1.0.js';
 import {autoPrepareOriginalJobCandidate}
  from '../../src/reality-governed-auto-trigger-candidate-v1.0.js';
 export const maxDuration=120;
@@ -78,9 +80,11 @@ export default async function handler(req,res){
   // dispatch must remain recoverable without duplicating this original job.
   let queued;
   try{
-   queued=await queueOwnerGovernedBuild({
-    session,expectedOriginalWorkId:work.original_work_id,
-   });
+   queued=process.env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true'?
+    await queueVerifiedOriginalRepair({session,work}):
+    await queueOwnerGovernedBuild({
+     session,expectedOriginalWorkId:work.original_work_id,
+    });
   }catch(error){
    const code=String(error?.message||'');
    return res.status(202).json({
@@ -89,7 +93,7 @@ export default async function handler(req,res){
     original_conversation_id:work.original_conversation_id,
     issue_url:work.issue_url,
     owner_work_receipt_ref:work.source_receipt_id,
-    worker_dispatch_error:/^GOVERNED_BUILD_[A-Z0-9_]+$/.test(code)?
+    worker_dispatch_error:/^(?:GOVERNED_BUILD_|REAL_ORIGINAL_BUILD_)[A-Z0-9_]+$/.test(code)?
      code:'GOVERNED_BUILD_WORKER_NOT_DISPATCHED',
     investigation_authorized:true,installation_authorized:false,
     original_job_completed:false,production_changed:false,
