@@ -328,6 +328,28 @@ export function createLiveGeneralRepairService({
    original_job_completed:false,production_changed:false,
   });
  }
+ async function markDurableSettlement(ctx,state,final){
+  const sourceRef=state?.settlement?.settlement_receipt_ref;
+  const match=/^supabase:universe_events:([a-f0-9-]{36})$/i.exec(String(sourceRef||''));
+  if(!match||!UUID.test(match[1])||!UUID.test(final?.checkpoint_receipt_id)||
+     final.independent_readback_verified!==true)
+   fail('FINAL_DISTINCT_OUTCOME_AND_CHECKPOINT_REQUIRED');
+  const current=await progress(ctx);
+  if(!['INSTALLED','SETTLED'].includes(current.status)||
+     current.candidate_hash!==state.candidate.artifact_hash)
+   fail('SAME_ORIGINAL_INSTALLED_ARTIFACT_REQUIRED');
+  const marked=await record({name:'reality_mark_general_repair_settled_v1',
+   ctx,more:{
+    p_reservation_id:current.reservation_id,
+    p_original_outcome_event_id:match[1],
+    p_final_checkpoint_event_id:final.checkpoint_receipt_id,
+   }});
+  if(marked?.status!=='SETTLED'||marked.original_job_completed!==true||
+    marked.original_work_id!==ctx.job.original_work_id||
+    marked.independent_outcome_verified!==true)
+   fail('FINAL_ATOMIC_SETTLEMENT_READBACK_FAILED');
+  return marked;
+ }
  async function continueAfterInstall({originalWorkId,issueNumber}={}){
   const ctx=await load({originalWorkId,issueNumber});
   const recorded=await progress(ctx);
@@ -360,10 +382,11 @@ export function createLiveGeneralRepairService({
   });
   if(ctx.state.phase==='SETTLED'){
    const read=await ctx.checkpoint.readCheckpoint(ctx.state);
+   const marked=await markDurableSettlement(ctx,ctx.state,read);
    return Object.freeze({status:'ORIGINAL_JOB_INDEPENDENTLY_SETTLED',
     original_work_id:ctx.job.original_work_id,
-    settlement_receipt_ref:ctx.state.settlement.settlement_receipt_ref,
-    independent_readback_verified:read.independent_readback_verified,
+    settlement_receipt_ref:marked.original_outcome_receipt_ref,
+    independent_readback_verified:true,
     original_job_completed:true,production_changed:false});
   }
   const runAgain=async()=>{
@@ -462,6 +485,7 @@ export function createLiveGeneralRepairService({
   const final=await ctx.checkpoint.readCheckpoint(driver.state);
   if(final.independent_readback_verified!==true)
    fail('FINAL_CHECKPOINT_INDEPENDENT_READBACK_MISSING');
+  const marked=await markDurableSettlement(ctx,driver.state,final);
   return Object.freeze({
    status:'ORIGINAL_JOB_INDEPENDENTLY_SETTLED',
    original_work_id:ctx.job.original_work_id,
@@ -469,7 +493,7 @@ export function createLiveGeneralRepairService({
    installed_commit_sha:installed.installed_commit_sha,
    original_execution_ref:outcome.original_work_run_ref,
    original_frozen_tests_passed:true,governance_tests_passed:true,
-   settlement_receipt_ref:driver.state.settlement?.settlement_receipt_ref,
+   settlement_receipt_ref:marked.original_outcome_receipt_ref,
    constitutional_checkpoint_receipt_id:final.checkpoint_receipt_id,
    independent_readback_verified:true,
    original_job_completed:true,production_changed:false,
