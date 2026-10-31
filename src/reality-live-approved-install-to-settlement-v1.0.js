@@ -28,6 +28,8 @@ import {acceptGovernedObservation,verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
 import {dispatchApprovedBackgroundRepair}
  from './reality-approved-repair-github-wakeup-v1.0.js';
+import {verifyApprovedBackgroundReadiness}
+ from './reality-approved-repair-background-readiness-v1.0.js';
 const fail=x=>{throw Error('REAL_LIVE_INSTALL_'+x)};
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/,HASH=/^[a-f0-9]{64}$/;
@@ -85,6 +87,7 @@ export function createLiveGeneralRepairService({
  installer=installVerifiedGenericPreviewExtension,
  continuation=continueExactlyApprovedGeneralRepair,
  dispatchApproved=dispatchApprovedBackgroundRepair,
+ verifyScheduler=verifyApprovedBackgroundReadiness,
 }={}){
  if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
   !session?.user_id||!UUID.test(session.user_id)||!session.config?.url||
