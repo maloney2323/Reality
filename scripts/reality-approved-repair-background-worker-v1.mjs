@@ -19,7 +19,8 @@ const HASH=/^[a-f0-9]{64}$/;
 const BRANCH=/^feature\/reality-[a-z0-9][a-z0-9/-]{5,105}$/;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export function verifyApprovedWorkerEnvironment(env,request,checkoutSha){
- if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
+ if(env.GITHUB_ACTIONS!=='true'||
+    !['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
     env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
     env.GITHUB_REF!=='refs/heads/'+WORKER||
     env.GITHUB_SHA!==checkoutSha||!SHA.test(checkoutSha)||
@@ -190,20 +191,43 @@ export async function signedOriginalWorkLease({request,checkoutSha,env=process.e
 }
 async function main(){
  const env=process.env;
- const changed=execFileSync('git',['diff','--name-only','HEAD^','HEAD'],
-  {encoding:'utf8'}).trim().split(/\r?\n/).filter(Boolean);
- if(changed.length!==1||
-  !/^reality-approved-continuations\/[a-f0-9-]{36}(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\.json$/.test(changed[0]))
-  err('ONE_PINNED_OWNER_APPROVAL_DISPATCH_REQUIRED');
- const request=JSON.parse(readFileSync(changed[0],'utf8'));
- const prefix='reality-approved-continuations/'+request.reservation_id;
- const attemptMatch=/^-retry-([1-9]|1[0-9]|2[0-4])$/.exec(
-  changed[0].slice(prefix.length,-5));
- const index=changed[0]===prefix+'.json'?0:
-  attemptMatch?Number(attemptMatch[1]):-1;
- if(!Number.isInteger(index)||index<0||index>24||
-    changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
-  err('PINNED_DISPATCH_FILENAME_CHANGED');
+ let request,index;
+ if(env.GITHUB_EVENT_NAME==='workflow_dispatch'){
+  // GitHub created this run from the scheduler. Inputs are lookup metadata,
+  // not owner approval. Exact owner authority is atomically checked by the
+  // separately signed Supabase OIDC broker before any GitHub writes.
+  if(!env.GITHUB_EVENT_PATH)err('SIGNED_DISPATCH_EVENT_REQUIRED');
+  const evt=JSON.parse(readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+  const raw=evt?.inputs;
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)||
+   Object.keys(raw).sort().join(',')!==
+    'candidate_hash,install_branch,issue_number,original_work_id,reservation_id')
+   err('EXACT_DISPATCH_INPUTS_REQUIRED');
+  const n=Number(raw.issue_number);
+  if(String(n)!==String(raw.issue_number)||!Number.isSafeInteger(n))
+   err('DISPATCH_ISSUE_NUMBER_INVALID');
+  request={
+   reservation_id:raw.reservation_id,original_work_id:raw.original_work_id,
+   candidate_hash:raw.candidate_hash,install_branch:raw.install_branch,
+   issue_number:n,
+  };
+  index=0;
+ }else{
+  const changed=execFileSync('git',['diff','--name-only','HEAD^','HEAD'],
+   {encoding:'utf8'}).trim().split(/\r?\n/).filter(Boolean);
+  if(changed.length!==1||
+   !/^reality-approved-continuations\/[a-f0-9-]{36}(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\.json$/.test(changed[0]))
+   err('ONE_PINNED_OWNER_APPROVAL_DISPATCH_REQUIRED');
+  request=JSON.parse(readFileSync(changed[0],'utf8'));
+  const prefix='reality-approved-continuations/'+request.reservation_id;
+  const match=/^-retry-([1-9]|1[0-9]|2[0-4])$/.exec(
+   changed[0].slice(prefix.length,-5));
+  index=changed[0]===prefix+'.json'?0:
+   match?Number(match[1]):-1;
+  if(!Number.isInteger(index)||index<0||index>24||
+     changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
+   err('PINNED_DISPATCH_FILENAME_CHANGED');
+ }
  const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
  // Explicit signed owner approval must already exist in Supabase.
  // The OIDC broker will not supply any service credential otherwise.
@@ -218,7 +242,15 @@ async function main(){
  const result=await executeApprovedContinuation({
   env:isolatedEnv,request,checkoutSha:sha,leasedWork:broker.leasedWork});
  console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
- if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'){
+ if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
+    env.GITHUB_EVENT_NAME==='workflow_dispatch'){
+  // Scheduler retries this same durable approved job on a later cycle,
+  // subject to the DB lease and bounded attempt policy. No GitHub-token push.
+  console.log('REALITY_GOVERNED_SCHEDULER_RETRY',JSON.stringify({
+   reservation_id:request.reservation_id,status:'PENDING_APPROVED_WORK',
+   attempts:result.attempts,original_job_completed:false,
+   production_changed:false}));
+ }else if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'){
   if(!Number.isInteger(result.attempts)||result.attempts<1||
      result.attempts>24||result.attempts!==index+1)
    err('BOUNDED_OWNER_LEASE_ATTEMPT_MISMATCH');
