@@ -56,3 +56,36 @@ jobs:
           assert.equal(body.original_job_completed,false);
           assert.equal(body.production_changed,false);
           NODE
+      - name: Prove preflight workflow cannot borrow full installation worker identity
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const issuer=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          issuer.searchParams.set('audience','reality-approved-background-execution-v1');
+          const minted=await fetch(issuer,{headers:{
+           authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN},
+           redirect:'error'});
+          assert.equal(minted.status,200);
+          const token=(await minted.json()).value;
+          const response=await fetch(
+           'https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-approved-worker-oidc-lease',
+           {method:'POST',headers:{authorization:'Bearer '+token,
+            'content-type':'application/json'},redirect:'error',
+            body:JSON.stringify({action:'lease',request:{
+             reservation_id:'00000000-0000-4000-8000-000000000000',
+             original_work_id:'work:9b9578b3c65427589c4c6da68fe0fc87',
+             candidate_hash:'0000000000000000000000000000000000000000000000000000000000000000',
+             issue_number:178,install_branch:'feature/reality-closed-loop-worker-20261031'
+            }})});
+          const body=await response.json().catch(()=>({}));
+          console.log('WRONG_SIGNED_WORKFLOW_DENIED',JSON.stringify({
+           http:response.status,
+           credential_returned:body.service_credential_returned===true,
+           owner_approval_used:body.owner_approval_used===true,
+           installation_performed:body.installation_performed===true}));
+          assert.equal(response.status,403);
+          assert.equal(body.service_role_key,undefined);
+          assert.equal(body.service_credential_returned,false);
+          assert.equal(body.installation_performed,false);
+          assert.equal(body.original_job_completed,false);
+          NODE
