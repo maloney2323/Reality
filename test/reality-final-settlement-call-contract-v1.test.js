@@ -9,3 +9,5 @@ test('final independent settlement verifier binds the same original resumption a
  assert.doesNotMatch(service,/await settle\.verify\(\{registration,resumption\}\)/);
  assert.match(service,/observed\.verified===true/);
 });
+
+// Governed wake readiness probe: a benign CI completion must not recreate approval.
