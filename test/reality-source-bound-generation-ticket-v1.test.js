@@ -42,7 +42,7 @@ test('a public request cannot run a model if GitHub identity or service credenti
   env,checkoutSha:sha,request,
   changed:['reality-requests/'+queue+'.json'],
   fetchImpl:async()=>{requested++;throw Error('UNEXPECTED');},
- }),/REALITY_SOURCE_BOUND_MODEL_PINNED_ISOLATED_GITHUB_WORKER_REQUIRED/);
+ }),/REALITY_SOURCE_BOUND_MODEL_PINNED_SIGNED_WORKER_IDENTITY_REQUIRED/);
  assert.equal(requested,0);
 });
 
