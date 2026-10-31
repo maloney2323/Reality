@@ -56,6 +56,11 @@ export function validateSourceBoundGenerationEvidence(request,receipt){
 export async function prepareOriginalModelTicket({
  env=process.env,checkoutSha,changed,request,fetchImpl=fetch,
 }={}){
+ const recovery=request?.schema==='reality-original-178-recovery-request-v1';
+ if((recovery?!/^eyJ[A-Za-z0-9._-]{250,9000}$/.test(String(env.REALITY_RECOVERY_GITHUB_OIDC_TOKEN||'')):
+    typeof env.SUPABASE_SERVICE_ROLE_KEY!=='string'||
+    env.SUPABASE_SERVICE_ROLE_KEY.length<30))
+  fail('PINNED_SIGNED_WORKER_IDENTITY_REQUIRED');
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
   env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
   env.GITHUB_REF!=='refs/heads/'+WORKER||
@@ -65,12 +70,11 @@ export async function prepareOriginalModelTicket({
    'https://hvkfreoagbrphwghjajw.supabase.co'||
   !Array.isArray(changed)||changed.length!==1||
   changed[0]!=='reality-requests/'+request.queue_id+'.json'||
-  typeof env.SUPABASE_SERVICE_ROLE_KEY!=='string'||
-  env.SUPABASE_SERVICE_ROLE_KEY.length<30)
+  request?.schema!==(recovery?'reality-original-178-recovery-request-v1':
+   'reality-isolated-build-request-v1'))
   fail('PINNED_ISOLATED_GITHUB_WORKER_REQUIRED');
  if(!UUID.test(request.queue_id)||!WORK.test(request.original_work_id))
   fail('UNTRUSTED_REQUEST_SCOPE_INVALID');
- const recovery=request.schema==='reality-original-178-recovery-request-v1';
  if(recovery&&(request.issue_number!==178||
    request.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'))
   fail('ORIGINAL_178_EXISTING_WORK_ONLY');
@@ -83,14 +87,14 @@ export async function prepareOriginalModelTicket({
  // Retry ONLY the unchanged atomic claim; do not create another queue.
  for(let attempt=0;attempt<8;attempt++){
   const response=await fetchImpl(env.REALITY_PERSONAL_CHAT_SUPABASE_URL+
-   '/rest/v1/rpc/'+(recovery?
-    'reality_claim_original_178_recovery_v1':
-    'reality_claim_source_bound_generation_v1'),{
+   (recovery?'/functions/v1/reality-original-178-oidc-claim':
+    '/rest/v1/rpc/reality_claim_source_bound_generation_v1'),{
    method:'POST',redirect:'error',cache:'no-store',
-   headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,
-    authorization:'Bearer '+env.SUPABASE_SERVICE_ROLE_KEY,
+   headers:{...(recovery?{}:{apikey:env.SUPABASE_SERVICE_ROLE_KEY}),
+    authorization:'Bearer '+(recovery?
+     env.REALITY_RECOVERY_GITHUB_OIDC_TOKEN:env.SUPABASE_SERVICE_ROLE_KEY),
     'content-type':'application/json',accept:'application/json'},
-   body:JSON.stringify(body),
+   body:JSON.stringify(recovery?request:body),
   });
   const candidate=await response.json().catch(()=>null);
   if(response.ok){data=candidate;break}
