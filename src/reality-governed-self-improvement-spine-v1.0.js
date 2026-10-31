@@ -121,42 +121,38 @@ export function verifySelfImprovementJournal(state){
   SETTLED:['ORIGINAL_JOB_SETTLED'],
  };
  const recoveryEvents=state.journal.filter(e=>e.kind==='RECOVERY_STARTED');
- // The second recovery cannot rewrite or replace the first reservation.
- // It adds only two more model attempts and retains all failed receipts.
- if(recoveryEvents.length>3||
-    (recoveryEvents.length>0&&(
-      ![5,7,8].includes(state.attempt_limit)||
-      state.recovery_authorization?.verified!==true||
-      recoveryEvents[0].body?.prior_attempt_limit!==3||
-      recoveryEvents[0].body?.prior_checkpoint_hash!==recoveryEvents[0].prior_hash||
-      recoveryEvents[0].body?.original_work_id!==state.scope.original_work_id||
-      recoveryEvents[0].body?.reservation_id!==state.recovery_authorization?.reservation_id||
-      recoveryEvents[0].body?.failed_checkpoint_receipt_id!==state.recovery_authorization?.checkpoint_receipt_id))||
-    (recoveryEvents.length===0&&state.recovery_authorization!=null)||
-    (recoveryEvents.length===1&&
-      (state.attempt_limit!==5||state.recovery_continuation_authorization!=null))||
-    (recoveryEvents.length>=2&&(
-      (recoveryEvents.length===2&&state.attempt_limit!==7)||
-      (recoveryEvents.length===3&&state.attempt_limit!==8)||
-      state.recovery_continuation_authorization?.verified!==true||
-      recoveryEvents[1].body?.prior_attempt_limit!==5||
-      recoveryEvents[1].body?.prior_checkpoint_hash!==recoveryEvents[1].prior_hash||
-      recoveryEvents[1].body?.original_work_id!==state.scope.original_work_id||
-      recoveryEvents[1].body?.reservation_id!==
-        state.recovery_continuation_authorization?.reservation_id||
-      recoveryEvents[1].body?.failed_checkpoint_receipt_id!==
-        state.recovery_continuation_authorization?.checkpoint_receipt_id))||
-    (recoveryEvents.length===3&&(
-      state.recovery_final_authorization?.verified!==true||
-      recoveryEvents[2].body?.prior_attempt_limit!==7||
-      recoveryEvents[2].body?.prior_checkpoint_hash!==recoveryEvents[2].prior_hash||
-      recoveryEvents[2].body?.original_work_id!==state.scope.original_work_id||
-      recoveryEvents[2].body?.additional_attempts!==1||
-      recoveryEvents[2].body?.reservation_id!==state.recovery_final_authorization?.reservation_id||
-      recoveryEvents[2].body?.failed_checkpoint_receipt_id!==state.recovery_final_authorization?.checkpoint_receipt_id))||
-    (recoveryEvents.length<3&&state.recovery_final_authorization!=null)||
-    (recoveryEvents.length===0&&state.recovery_continuation_authorization!=null))
+ // Recoveries 1-3 are already in historic original #178 receipts. Recovery 4
+ // is a NEW explicit owner-authorized one-attempt redesign after 8/8. Every
+ // previous journal hash, receipt and consumed reservation must survive.
+ const authorizations=[
+  ['recovery_authorization',3,5,2],
+  ['recovery_continuation_authorization',5,7,2],
+  ['recovery_final_authorization',7,8,1],
+  ['recovery_redesign_authorization',8,9,1],
+ ];
+ if(recoveryEvents.length>4||
+    (recoveryEvents.length>0&&
+     state.attempt_limit!==authorizations[recoveryEvents.length-1][2]))
   throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+ for(let i=0;i<authorizations.length;i++){
+  const [field,from,to,additional]=authorizations[i];
+  const event=recoveryEvents[i],approval=state[field];
+  if(i>=recoveryEvents.length){
+   if(approval!=null)throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+   continue;
+  }
+  if(approval?.verified!==true||
+     event.body?.prior_attempt_limit!==from||
+     event.body?.additional_attempts!==additional||
+     event.body?.prior_checkpoint_hash!==event.prior_hash||
+     event.body?.original_work_id!==state.scope.original_work_id||
+     event.body?.reservation_id!==approval.reservation_id||
+     event.body?.failed_checkpoint_receipt_id!==approval.checkpoint_receipt_id||
+     event.body?.failure_evidence_ref!==approval.failure_evidence_ref||
+     (i===3&&(approval.owner_confirmed!==true||
+       approval.authorization_scope!=='ONE_ORIGINAL178_REDESIGN_ATTEMPT')))
+   throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+ }
  if(!phases[state.phase]?.includes(last)||
     state.attempt_count!==state.journal.filter(
      e=>e.kind==='MODEL_CANDIDATE_PROPOSED').length)
@@ -176,6 +172,7 @@ export function createGovernedSelfImprovement({scope,attemptLimit=3}={}){
   independent_failure:null,promotion_authorization:null,
   registration:null,resumption:null,settlement:null,recovery_authorization:null,
   recovery_continuation_authorization:null,recovery_final_authorization:null,
+  recovery_redesign_authorization:null,
   journal:[],head_hash:hash({version:GOVERNED_SELF_IMPROVEMENT_VERSION,scope_hash}),
  });
  verifySelfImprovementJournal(state);
@@ -226,7 +223,10 @@ export function recoverGovernedEscalation(state,proof){
     state.recovery_continuation_authorization==null)||
    (state.attempt_count===7&&state.attempt_limit===7&&
     state.recovery_continuation_authorization?.verified===true&&
-    state.recovery_final_authorization==null))&&
+    state.recovery_final_authorization==null)||
+   (state.attempt_count===8&&state.attempt_limit===8&&
+    state.recovery_final_authorization?.verified===true&&
+    state.recovery_redesign_authorization==null))&&
   state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
   state.independent_failure?.classification?.retry_source_without_dependency===true&&
   state.independent_failure?.attempt===state.attempt_count,
@@ -240,23 +240,31 @@ export function recoverGovernedEscalation(state,proof){
   typeof proof?.checkpoint_receipt_id==='string'&&
   proof.checkpoint_receipt_id.length>=16&&
   proof?.failure_evidence_ref===state.independent_failure.evidence_ref&&
-  proof?.installation_authorized===false,
+  proof?.installation_authorized===false&&
+  (state.attempt_count!==8||
+   (proof?.owner_confirmed===true&&
+    proof?.authorization_scope==='ONE_ORIGINAL178_REDESIGN_ATTEMPT')),
+
   'SELF_IMPROVEMENT_GOVERNED_RECOVERY_RESERVATION_REQUIRED');
  const authorization=freeze({verified:true,reservation_id:proof.reservation_id,
   checkpoint_receipt_id:proof.checkpoint_receipt_id,
   checkpoint_hash:proof.checkpoint_hash,
-  failure_evidence_ref:proof.failure_evidence_ref});
+  failure_evidence_ref:proof.failure_evidence_ref,
+  ...(state.attempt_count===8?{
+   owner_confirmed:true,authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT'}:{}),
+ });
  const priorLimit=state.attempt_limit;
  const patch=priorLimit===3?
   {attempt_limit:5,recovery_authorization:authorization}:
   priorLimit===5?{attempt_limit:7,recovery_continuation_authorization:authorization}:
-  {attempt_limit:8,recovery_final_authorization:authorization};
+  priorLimit===7?{attempt_limit:8,recovery_final_authorization:authorization}:
+  {attempt_limit:9,recovery_redesign_authorization:authorization};
  return append(state,{phase:'REPAIR_REQUIRED',kind:'RECOVERY_STARTED',
   body:{original_work_id:state.scope.original_work_id,
    prior_checkpoint_hash:state.head_hash,prior_attempt_limit:priorLimit,
    failed_checkpoint_receipt_id:proof.checkpoint_receipt_id,
    failure_evidence_ref:proof.failure_evidence_ref,
-   reservation_id:proof.reservation_id,additional_attempts:priorLimit===7?1:2},
+   reservation_id:proof.reservation_id,additional_attempts:priorLimit>=7?1:2},
   patch});
 }
 export function proposeGovernedCandidate(state,candidate){
