@@ -9,12 +9,21 @@ const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export function validateSourceBoundGenerationEvidence(request,receipt){
+ const recovery=request?.schema==='reality-original-178-recovery-request-v1';
+ if(recovery&&(request.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'||
+   request.issue_number!==178||
+   receipt?.prior_worker_claim_preserved!==true||
+   !UUID.test(receipt?.original_queue_id)))
+  fail('LEGACY_ORIGINAL_178_RECOVERY_LINEAGE_INVALID');
  if(!UUID.test(request?.queue_id)||!WORK.test(request?.original_work_id)||
   !Number.isSafeInteger(request.issue_number)||request.issue_number<1||
   Object.keys(request).sort().join(',')!==
    'issue_number,original_work_id,queue_id,schema'||
-  request.schema!=='reality-isolated-build-request-v1'||
-  receipt?.status!=='EXACT_SOURCE_BOUND_GENERATION_ADMITTED'||
+  !['reality-isolated-build-request-v1',
+    'reality-original-178-recovery-request-v1'].includes(request.schema)||
+  receipt?.status!==(recovery?
+   'EXACT_ORIGINAL_178_RECOVERY_ADMITTED':
+   'EXACT_SOURCE_BOUND_GENERATION_ADMITTED')||
   receipt.queue_id!==request.queue_id||
   receipt.original_work_id!==request.original_work_id||
   receipt.issue_number!==request.issue_number||
@@ -30,6 +39,8 @@ export function validateSourceBoundGenerationEvidence(request,receipt){
   fail('INDEPENDENT_OWNER_WORK_PROVIDER_RECEIPT_INVALID');
  return Object.freeze({
   schema:'reality-source-verified-repair-job-v1',
+  recovery_of_prior_claim:recovery,
+  original_queue_id:recovery?receipt.original_queue_id:null,
   issue_number:receipt.issue_number,original_work_id:receipt.original_work_id,
   queue_id:receipt.queue_id,claim_id:receipt.claim_id,
   failed_run_id:receipt.failed_run_id,
@@ -59,6 +70,10 @@ export async function prepareOriginalModelTicket({
   fail('PINNED_ISOLATED_GITHUB_WORKER_REQUIRED');
  if(!UUID.test(request.queue_id)||!WORK.test(request.original_work_id))
   fail('UNTRUSTED_REQUEST_SCOPE_INVALID');
+ const recovery=request.schema==='reality-original-178-recovery-request-v1';
+ if(recovery&&(request.issue_number!==178||
+   request.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'))
+  fail('ORIGINAL_178_EXISTING_WORK_ONLY');
  const body={
   p_queue_id:request.queue_id,p_original_work_id:request.original_work_id,
   p_github_sha:checkoutSha,p_request_path:changed[0],
@@ -68,7 +83,9 @@ export async function prepareOriginalModelTicket({
  // Retry ONLY the unchanged atomic claim; do not create another queue.
  for(let attempt=0;attempt<8;attempt++){
   const response=await fetchImpl(env.REALITY_PERSONAL_CHAT_SUPABASE_URL+
-   '/rest/v1/rpc/reality_claim_source_bound_generation_v1',{
+   '/rest/v1/rpc/'+(recovery?
+    'reality_claim_original_178_recovery_v1':
+    'reality_claim_source_bound_generation_v1'),{
    method:'POST',redirect:'error',cache:'no-store',
    headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,
     authorization:'Bearer '+env.SUPABASE_SERVICE_ROLE_KEY,
