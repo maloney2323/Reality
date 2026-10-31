@@ -187,19 +187,3 @@ if(import.meta.url===new URL('file://'+process.argv[1]).href){
   process.exitCode=1;
  }
 }
-)).exec(changed[0])?.[1]);
- if(!Number.isInteger(index)||index<0||index>24||
-  changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
-  err('PINNED_DISPATCH_FILENAME_CHANGED');
- const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
- const result=await executeApprovedContinuation({env,request,checkoutSha:sha});
- console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
-}
-if(import.meta.url===new URL('file://'+process.argv[1]).href){
- try{await main()}catch(e){
-  console.error('REALITY_APPROVED_BACKGROUND_FAILED',
-   /^REALITY_APPROVED_BACKGROUND_[A-Z0-9_]+$/.test(String(e?.message||''))?
-   e.message:'TRUSTED_RECONCILIATION_REQUIRED');
-  process.exitCode=1;
- }
-}
