@@ -12,6 +12,7 @@ const gitBase='https://api.github.com/repos/maloney2323/Reality/';
 const TICKET_PATH='reality-repair-jobs/source-verified-general-receipt-v1.json';
 const ROOT=process.cwd();
 const text=path=>readFileSync(path,'utf8');
+const mode=process.argv[2],attempt=Number(process.argv[3]||1);
 const ticket=JSON.parse(text(TICKET_PATH));
 const allowedPath=p=>typeof p==='string'&&
  /^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(?:js|mjs))$/.test(p)&&
@@ -28,7 +29,7 @@ if(ticket.schema!=='reality-source-verified-repair-job-v1'||
  fail('TRUSTED_SOURCE_TICKET_REQUIRED');
 const frozen=text(ticket.frozen_test_path);
 if(sha(frozen)!==ticket.frozen_test_sha256)fail('FROZEN_ACCEPTANCE_BYTES_CHANGED');
-if(existsSync(ticket.expected_source_path))
+if(mode!=='receipt'&&existsSync(ticket.expected_source_path))
  fail('GAP_ALREADY_FILLED_IN_TRUSTED_BASE');
 const stable=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(stable):
  Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]));
@@ -87,7 +88,6 @@ function checkCandidate(value){
   generated_by_model:true,installation_authorized:false,
   original_job_completed:false,production_changed:false};
 }
-const mode=process.argv[2],attempt=Number(process.argv[3]||1);
 if(mode==='generate'){
  if(![1,2,3].includes(attempt))fail('FINITE_ATTEMPT_REQUIRED');
  const original=await checkOriginalFailure();
