@@ -310,110 +310,6 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
-  <section id="wcGovernedBuild" class="repair-center" aria-labelledby="wcRepairHeading">
-   <div class="repair-heading">
-    <div>
-     <span class="repair-eyebrow">Reality · Capability Center</span>
-     <h3 id="wcRepairHeading">Find it. Repair it. Prove it.</h3>
-     <p class="repair-intro">Reality looks for genuine missing capabilities. You approve an investigation, then approve installation only when an exact repair has been independently verified.</p>
-    </div>
-    <span id="wcRepairBadge" class="repair-live" data-tone="neutral" role="status">Not checked</span>
-   </div>
-   <ol class="repair-timeline" aria-label="Repair progress">
-    <li class="repair-step" id="wcRepairStep1" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">1</span><span class="repair-step-name">Find work</span></div><span class="repair-step-detail">Verify an existing job</span></li>
-    <li class="repair-step" id="wcRepairStep2" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">2</span><span class="repair-step-name">Investigate</span></div><span class="repair-step-detail">Owner-reviewed request</span></li>
-    <li class="repair-step" id="wcRepairStep3" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">3</span><span class="repair-step-name">Test repair</span></div><span class="repair-step-detail">Independent sandbox proof</span></li>
-    <li class="repair-step" id="wcRepairStep4" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">4</span><span class="repair-step-name">Your approval</span></div><span class="repair-step-detail">Exact verified installation</span></li>
-    <li class="repair-step" id="wcRepairStep5" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">5</span><span class="repair-step-name">Results</span></div><span class="repair-step-detail">Real work + final receipt</span></li>
-   </ol>
-   <div class="repair-current" id="wcRealRepairOpportunityPanel" style="margin-bottom:12px">
-    <div>
-     <div class="repair-kicker">New independently verified repair opportunity</div>
-     <h4 id="wcRealRepairOpportunityTitle">Find a genuine missing capability</h4>
-     <p id="wcRealRepairOpportunityDetails">Reality can inspect failing source-backed work that hasn't yet been adopted into your personal Continuity goal. Historical jobs are never duplicated or disguised as new work.</p>
-    </div>
-    <div class="repair-actions">
-     <button type="button" id="wcDiscoverRealRepair" class="repair-secondary">Find verified repair</button>
-     <button type="button" id="wcAuthorizeRealRepair" class="repair-primary" disabled>Review new repair</button>
-    </div>
-   </div>
-   <p id="wcRealRepairOpportunityStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No new owner work has been authorized.</p>
-   <div class="repair-current" id="wcModelRepairReviewPanel" style="margin-bottom:12px">
-    <div>
-     <div class="repair-kicker">Independently verified AI-generated repair</div>
-     <h4 id="wcModelRepairReviewTitle">Review Reality's actual generated code</h4>
-     <p id="wcModelRepairReviewDescription">Once you've authorized the original investigation, Reality can link the independently tested source to your signed-in work and prepare its constitutional approval checkpoint.</p>
-    </div>
-    <div class="repair-actions">
-     <button type="button" id="wcReadModelRepair" class="repair-secondary">Check verified candidate</button>
-     <button type="button" id="wcPrepareModelRepair" class="repair-primary" disabled>Prepare installation review</button>
-    </div>
-   </div>
-   <p id="wcModelRepairReviewStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No exact repair has been approved or installed.</p>
-
-   <div class="repair-current" id="wcInstallSettlementPanel" style="margin-bottom:12px">
-    <div>
-     <div class="repair-kicker">Owner approval · One approval, then automatic continuation</div>
-     <h4 id="wcInstallSettlementHeading">Install, verify, resume and settle</h4>
-     <p id="wcInstallSettlementDetails">Exact installation stays unavailable until Reality has persisted the generated source and independent-test checkpoint for your original job.</p>
-    </div>
-    <div class="repair-actions">
-     <button type="button" id="wcApproveExactInstall" class="repair-primary" disabled>Approve exact repair and finish job</button>
-    </div>
-   </div>
-   <p id="wcInstallSettlementStatus" class="repair-status" role="status" aria-live="polite">No installation is authorized. No final receipt has been recorded.</p>
-   <dialog id="wcExactInstallDialog" class="repair-dialog" aria-labelledby="wcExactInstallDialogHeading">
-    <div class="repair-dialog-body">
-     <span class="repair-eyebrow">Explicit owner authority · Isolated preview only</span>
-     <h3 id="wcExactInstallDialogHeading">Approve this exact verified repair?</h3>
-     <p id="wcExactInstallDialogDetails" class="repair-consent-work">No exact source selected.</p>
-     <p>This permits Reality to install only these verified extension files in its isolated preview, then resume and independently verify the same original job. It does not grant production, billing or external customer action authority.</p>
-     <label class="repair-checkbox"><input id="wcExactInstallCheckbox" type="checkbox">I authorize this exact source installation and its automatic preview-only continuation.</label>
-     <div class="repair-dialog-actions">
-      <button type="button" id="wcExactInstallCancel" class="repair-cancel">Cancel</button>
-      <button type="button" id="wcExactInstallConfirm" class="repair-confirm" disabled>Approve and finish original job</button>
-     </div>
-    </div>
-   </dialog>
-
-   <div class="repair-current">
-    <div>
-     <div class="repair-kicker">Next action</div>
-     <h4 id="wcRepairNextTitle">Check what Reality can repair</h4>
-     <p id="wcRepairNextDescription">Reality will check your saved work and current goal. Checking is read-only and cannot install or publish anything.</p>
-    </div>
-    <div class="repair-actions">
-     <button type="button" id="wcInspectGovernedBuild" class="repair-primary">Check next repair</button>
-     <button type="button" id="wcStartGovernedBuild" class="repair-secondary" disabled>Authorize investigation</button>
-    </div>
-   </div>
-   <p class="repair-status" id="wcGovernedBuildStatus" data-tone="neutral" role="status" aria-live="polite">Sign in and check for eligible work. No repair has been started from this screen.</p>
-   <div class="repair-approval"><div class="repair-lock" aria-hidden="true">●</div><div>
-    <strong>Installation always requires your approval</strong>
-    <p id="wcRepairApprovalInfo">A separate installation approval will become available only when Reality has verified the exact code and the installation connection is ready. Discovery does not authorize installation.</p>
-   </div></div>
-   <details class="repair-evidence"><summary>Technical evidence and safety boundaries</summary>
-    <p id="wcGovernedBuildProof">No trusted worker receipt has been checked yet. Generation, independent sandbox testing, installation, original-job continuation and settlement are unverified.</p>
-    <p>Changes stay within the isolated preview. Nothing in this screen authorizes production, Base44 publishing, customer communications, payments, or an AI to approve itself.</p>
-   </details>
-   <div class="repair-bottom">
-    <button type="button" id="wcExploreRepairDiscoveries">Browse all discoveries</button>
-    <a href="#wcCompletionCenter">View verified work receipts</a>
-   </div>
-   <dialog id="wcRepairConsentDialog" class="repair-dialog" aria-labelledby="wcRepairConsentHeading">
-    <div class="repair-dialog-body">
-     <span class="repair-eyebrow">Owner authorization · Investigation only</span>
-     <h3 id="wcRepairConsentHeading">Let Reality investigate this job?</h3>
-     <p>This authorizes one source-backed investigation through the isolated GitHub worker. It may create a worker-branch request. It does <strong>not</strong> install generated code or authorize production changes.</p>
-     <p id="wcRepairConsentWork" class="repair-consent-work">No verified job selected.</p>
-     <label class="repair-checkbox"><input id="wcRepairConsentCheckbox" type="checkbox">I authorize this one investigation. I understand installation is a separate approval.</label>
-     <div class="repair-dialog-actions">
-      <button type="button" id="wcRepairCancelConsent" class="repair-cancel">Cancel</button>
-      <button type="button" id="wcRepairConfirmInvestigation" class="repair-confirm" disabled>Authorize investigation</button>
-     </div>
-    </div>
-   </dialog>
-  </section>
  </div>
  <div class="wc-diagnostic">
   <button id="wcCredentialCheck" type="button">Check actual Preview GitHub access · No writes</button>
@@ -437,9 +333,117 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <div class="wc-panel-head"><h3 id="wcSelectedTitle">All findings</h3><span class="badge" id="wcSelectedCount">0 found</span></div>
 <label class="wc-sort-label">Rank work by
 <select id="wcSort"><option value="triage">Review priority · evidence heuristic</option><option value="automation">Supported tracking first</option><option value="risk">Higher review risk first</option></select></label>
-<p class="wc-note">Review scores are not measured business impact. Historical commits do not prove outstanding defects.</p>
+<p class="wc-note" id="wcCategoryValueMessage">Review scores are evidence-based triage, not measured business impact. Historical commits do not prove outstanding defects.</p>
    <p class="wc-plan-desc">Findings and evidence come from Reality's discovery feed. A discovered problem is not automatically a task Reality can execute.</p>
    <div id="wcTaskList" aria-live="polite">Loading work…</div>
+   <details id="wcUpgradeDiagnostics" class="wc-repair-diagnostics" hidden>
+    <summary>Self-repair evidence and owner approvals · Advanced testing details</summary>
+    <p class="wc-note">Reality should detect and repair operational weaknesses during the original job. These controls are diagnostics for testing, not the normal customer workflow. A repair may require explicit permission for source installation; the model cannot grant it.</p>
+   <section id="wcGovernedBuild" class="repair-center" aria-labelledby="wcRepairHeading">
+    <div class="repair-heading">
+     <div>
+      <span class="repair-eyebrow">Reality · Capability Center</span>
+      <h3 id="wcRepairHeading">Find it. Repair it. Prove it.</h3>
+      <p class="repair-intro">Reality looks for genuine missing capabilities. You approve an investigation, then approve installation only when an exact repair has been independently verified.</p>
+     </div>
+     <span id="wcRepairBadge" class="repair-live" data-tone="neutral" role="status">Not checked</span>
+    </div>
+    <ol class="repair-timeline" aria-label="Repair progress">
+     <li class="repair-step" id="wcRepairStep1" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">1</span><span class="repair-step-name">Find work</span></div><span class="repair-step-detail">Verify an existing job</span></li>
+     <li class="repair-step" id="wcRepairStep2" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">2</span><span class="repair-step-name">Investigate</span></div><span class="repair-step-detail">Owner-reviewed request</span></li>
+     <li class="repair-step" id="wcRepairStep3" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">3</span><span class="repair-step-name">Test repair</span></div><span class="repair-step-detail">Independent sandbox proof</span></li>
+     <li class="repair-step" id="wcRepairStep4" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">4</span><span class="repair-step-name">Your approval</span></div><span class="repair-step-detail">Exact verified installation</span></li>
+     <li class="repair-step" id="wcRepairStep5" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">5</span><span class="repair-step-name">Results</span></div><span class="repair-step-detail">Real work + final receipt</span></li>
+    </ol>
+    <div class="repair-current" id="wcRealRepairOpportunityPanel" style="margin-bottom:12px">
+     <div>
+      <div class="repair-kicker">New independently verified repair opportunity</div>
+      <h4 id="wcRealRepairOpportunityTitle">Find a genuine missing capability</h4>
+      <p id="wcRealRepairOpportunityDetails">Reality can inspect failing source-backed work that hasn't yet been adopted into your personal Continuity goal. Historical jobs are never duplicated or disguised as new work.</p>
+     </div>
+     <div class="repair-actions">
+      <button type="button" id="wcDiscoverRealRepair" class="repair-secondary">Find verified repair</button>
+      <button type="button" id="wcAuthorizeRealRepair" class="repair-primary" disabled>Review new repair</button>
+     </div>
+    </div>
+    <p id="wcRealRepairOpportunityStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No new owner work has been authorized.</p>
+    <div class="repair-current" id="wcModelRepairReviewPanel" style="margin-bottom:12px">
+     <div>
+      <div class="repair-kicker">Independently verified AI-generated repair</div>
+      <h4 id="wcModelRepairReviewTitle">Review Reality's actual generated code</h4>
+      <p id="wcModelRepairReviewDescription">Once you've authorized the original investigation, Reality can link the independently tested source to your signed-in work and prepare its constitutional approval checkpoint.</p>
+     </div>
+     <div class="repair-actions">
+      <button type="button" id="wcReadModelRepair" class="repair-secondary">Check verified candidate</button>
+      <button type="button" id="wcPrepareModelRepair" class="repair-primary" disabled>Prepare installation review</button>
+     </div>
+    </div>
+    <p id="wcModelRepairReviewStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No exact repair has been approved or installed.</p>
+ 
+    <div class="repair-current" id="wcInstallSettlementPanel" style="margin-bottom:12px">
+     <div>
+      <div class="repair-kicker">Owner approval · One approval, then automatic continuation</div>
+      <h4 id="wcInstallSettlementHeading">Install, verify, resume and settle</h4>
+      <p id="wcInstallSettlementDetails">Exact installation stays unavailable until Reality has persisted the generated source and independent-test checkpoint for your original job.</p>
+     </div>
+     <div class="repair-actions">
+      <button type="button" id="wcApproveExactInstall" class="repair-primary" disabled>Approve exact repair and finish job</button>
+     </div>
+    </div>
+    <p id="wcInstallSettlementStatus" class="repair-status" role="status" aria-live="polite">No installation is authorized. No final receipt has been recorded.</p>
+    <dialog id="wcExactInstallDialog" class="repair-dialog" aria-labelledby="wcExactInstallDialogHeading">
+     <div class="repair-dialog-body">
+      <span class="repair-eyebrow">Explicit owner authority · Isolated preview only</span>
+      <h3 id="wcExactInstallDialogHeading">Approve this exact verified repair?</h3>
+      <p id="wcExactInstallDialogDetails" class="repair-consent-work">No exact source selected.</p>
+      <p>This permits Reality to install only these verified extension files in its isolated preview, then resume and independently verify the same original job. It does not grant production, billing or external customer action authority.</p>
+      <label class="repair-checkbox"><input id="wcExactInstallCheckbox" type="checkbox">I authorize this exact source installation and its automatic preview-only continuation.</label>
+      <div class="repair-dialog-actions">
+       <button type="button" id="wcExactInstallCancel" class="repair-cancel">Cancel</button>
+       <button type="button" id="wcExactInstallConfirm" class="repair-confirm" disabled>Approve and finish original job</button>
+      </div>
+     </div>
+    </dialog>
+ 
+    <div class="repair-current">
+     <div>
+      <div class="repair-kicker">Next action</div>
+      <h4 id="wcRepairNextTitle">Check what Reality can repair</h4>
+      <p id="wcRepairNextDescription">Reality will check your saved work and current goal. Checking is read-only and cannot install or publish anything.</p>
+     </div>
+     <div class="repair-actions">
+      <button type="button" id="wcInspectGovernedBuild" class="repair-primary">Check next repair</button>
+      <button type="button" id="wcStartGovernedBuild" class="repair-secondary" disabled>Authorize investigation</button>
+     </div>
+    </div>
+    <p class="repair-status" id="wcGovernedBuildStatus" data-tone="neutral" role="status" aria-live="polite">Sign in and check for eligible work. No repair has been started from this screen.</p>
+    <div class="repair-approval"><div class="repair-lock" aria-hidden="true">●</div><div>
+     <strong>Installation always requires your approval</strong>
+     <p id="wcRepairApprovalInfo">A separate installation approval will become available only when Reality has verified the exact code and the installation connection is ready. Discovery does not authorize installation.</p>
+    </div></div>
+    <details class="repair-evidence"><summary>Technical evidence and safety boundaries</summary>
+     <p id="wcGovernedBuildProof">No trusted worker receipt has been checked yet. Generation, independent sandbox testing, installation, original-job continuation and settlement are unverified.</p>
+     <p>Changes stay within the isolated preview. Nothing in this screen authorizes production, Base44 publishing, customer communications, payments, or an AI to approve itself.</p>
+    </details>
+    <div class="repair-bottom">
+     <button type="button" id="wcExploreRepairDiscoveries">Browse all discoveries</button>
+     <a href="#wcCompletionCenter">View verified work receipts</a>
+    </div>
+    <dialog id="wcRepairConsentDialog" class="repair-dialog" aria-labelledby="wcRepairConsentHeading">
+     <div class="repair-dialog-body">
+      <span class="repair-eyebrow">Owner authorization · Investigation only</span>
+      <h3 id="wcRepairConsentHeading">Let Reality investigate this job?</h3>
+      <p>This authorizes one source-backed investigation through the isolated GitHub worker. It may create a worker-branch request. It does <strong>not</strong> install generated code or authorize production changes.</p>
+      <p id="wcRepairConsentWork" class="repair-consent-work">No verified job selected.</p>
+      <label class="repair-checkbox"><input id="wcRepairConsentCheckbox" type="checkbox">I authorize this one investigation. I understand installation is a separate approval.</label>
+      <div class="repair-dialog-actions">
+       <button type="button" id="wcRepairCancelConsent" class="repair-cancel">Cancel</button>
+       <button type="button" id="wcRepairConfirmInvestigation" class="repair-confirm" disabled>Authorize investigation</button>
+      </div>
+     </div>
+    </dialog>
+   </section>
+   </details>
   </div>
   <div class="wc-panel" aria-label="Workload and budget planner">
    <h3 id="wcPlanTitle">Your task batch</h3>
@@ -2530,8 +2534,8 @@ $('wcTaskList').addEventListener('click',async event=>{
 function wcUpgradeReviewHTML(){
  const jobs=wcUpgradeReviews.slice(0,30);
  const heading='<section class="wc-upgrade-review" aria-label="Reality Upgrade Discovery">'+
-  '<h4>Reality Upgrade Discovery · Original-job capability reviews</h4>'+
-  '<p class="wc-note">These are owner-scoped unfinished jobs for diagnosis, NOT confirmed missing capabilities or new discovery-feed findings. A verified diagnosis never grants execution or promotion authority.</p>';
+  '<h4>Reality-discovered weaknesses and potential improvements</h4>'+
+  '<p class="wc-note">Reality should surface the cause of an original-job problem, the capability that would resolve it, independent verification, and the additional value or work now possible. These owner-scoped saved jobs remain unfinished; unproven business value must not be presented as savings.</p>';
  if(!jobs.length)return heading+
   '<p class="wc-note">'+
   ($('privateReady')?.style.display==='block'?
@@ -2540,7 +2544,9 @@ function wcUpgradeReviewHTML(){
  return heading+jobs.map(job=>{
   const ready=job.state==='RECOVERY_CHECKPOINT_SAVED'&&
    job.goal_still_current===true&&job.action_completed===true&&job.job_completed===false;
-  const label=ready?'Recovery saved · Ready for evidence recheck':
+  const label=job.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'?
+   'Source-backed weakness found · Original job open':
+   ready?'Recovery evidence saved · Investigating':
    job.state==='PRIOR_ACTION_UNRESOLVED'?'Provider attempt unresolved · No retry':
    job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
    'Recovery checkpoint required':'Original goal or evidence must be verified';
@@ -2549,6 +2555,9 @@ function wcUpgradeReviewHTML(){
    '<span class="wc-tag">'+esc(label)+'</span>'+
    '<p class="wc-note">Original work: '+esc(job.work_id)+
    ' · Job not completed · No code upgrade authorized.</p>'+
+   (job.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'?
+    '<p class="wc-note">Found: missing source-backed instrument blocked the original job. Potential new capability: finish the missing verification contract. Evidence: '+esc(String(job.issue_url||'Provider work receipt'))+'. Additional customer value: NOT YET MEASURED.</p>':
+    '<p class="wc-note">Candidate weakness: still under diagnosis. No verified capability gain or savings claimed.</p>')+
    (ready?
     '<button type="button" data-recovery-run="'+esc(job.work_id)+
     '" data-recovery-conversation="'+esc(job.conversation_id)+
@@ -2567,6 +2576,12 @@ function wcUpgradeReviewHTML(){
 }
 
 function wcRender(){
+ const repairDiagnostics=$('wcUpgradeDiagnostics');
+ if(repairDiagnostics)repairDiagnostics.hidden=wcCurrent!=='upgrades';
+ const valueNote=$('wcCategoryValueMessage');
+ if(valueNote)valueNote.textContent=wcCurrent==='upgrades'?
+  'Weaknesses Reality discovered, capabilities it could improve, and verified results. An issue or code change is not automatically proof of a weakness. Value and time saved remain unmeasured until evidence confirms them.':
+  'Review scores are evidence-based triage, not measured business impact. Historical commits do not prove outstanding defects.';
  $('wcDiscovered').textContent=String(wcWork.length);
  $('wcCategories').innerHTML=workCategories.map(([id,label,desc])=>{
   const n=id==='all'?wcWork.length:wcWork.filter(w=>wcClass(w)===id).length;
@@ -2576,7 +2591,7 @@ function wcRender(){
     '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
      n+' found · '+wcUpgradeReviews.length+' review':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
-     id==='upgrades'?'Upgrade findings + original-job reviews':desc)+'</small></button>';
+     id==='upgrades'?'Observed weaknesses · capability gains · verified value':desc)+'</small></button>';
  }).join('');
  $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
   wcCurrent=b.dataset.wcCat;wcRender()

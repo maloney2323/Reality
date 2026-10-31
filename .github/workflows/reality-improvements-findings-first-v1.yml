@@ -1,0 +1,26 @@
+name: Reality improvements discover-and-report, not operator scavenger hunt
+on:
+  push:
+    branches: [feature/reality-improvements-category-first-20261031]
+    paths:
+      - 'index.html'
+      - 'src/reality-work-catalog-v0.1.js'
+      - 'test/reality-improvements-catalog-routing-v1.test.js'
+      - 'test/reality-improvements-findings-first-ui-v1.test.js'
+      - '.github/workflows/reality-improvements-findings-first-v1.yml'
+permissions: {contents: read}
+jobs:
+  customer-interface-and-owner-approval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --test test/reality-improvements-findings-first-ui-v1.test.js
+      - run: node --test test/reality-improvements-catalog-routing-v1.test.js
+      - run: node --test test/reality-work-catalog-v0.1.test.js
+      - run: node --test test/reality-work-center-owner-approval-ui-v1.test.js
+      - run: node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+      - run: node --test test/reality-general-installed-work-verifier-v1.0.test.js
