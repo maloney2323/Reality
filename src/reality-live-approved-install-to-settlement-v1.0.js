@@ -343,9 +343,15 @@ export function createLiveGeneralRepairService({
  // durable background work; model/worker cannot create or expand this grant.
  async function ownerApproveAndQueue({originalWorkId,issueNumber,
   expectedArtifactHash,expectedCheckpointHash}={}){
-  // Missing dispatcher credentials must not spend the owner's one-time
-  // installation approval; this is infrastructure, not customer work.
-  if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
+  // A signed governed scheduler is an automatic wake-up for previously
+  // approved durable work, never a source of installation authority.
+  // Check it BEFORE using the owner's one-time authorization.
+  const scheduled=env.REALITY_GOVERNED_SCHEDULER_ENABLED==='true';
+  if(scheduled){
+   const ready=await verifyScheduler({env,fetchImpl});
+   if(ready?.ready!==true||ready.code!=='GOVERNED_AUTO_WAKE_VERIFIED')
+    fail('GOVERNED_SCHEDULER_NOT_READY_BEFORE_OWNER_APPROVAL');
+  }else if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
      env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length<25)
    fail('BACKGROUND_WAKEUP_CREDENTIAL_UNAVAILABLE');
   const ctx=await load({originalWorkId,issueNumber});
