@@ -268,10 +268,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button id="wcInspectFirstGap178" type="button">Refresh #178 status · Read only</button>
      <button id="wcSelfDiagnose178" type="button">Reality · Diagnose its own failure</button>
+     <button id="wcAuthorizeRedesign178" type="button" style="display:none">Authorize one #178 self-repair attempt</button>
      <button id="wcStartFirstGap178" type="button">Run original #178 · One click</button>
      <button id="wcApproveFirst178" type="button" style="display:none" disabled>Approve exact verified upgrade · Finish original #178</button>
     </div>
     <p id="wcFirst178ApprovalStatus" role="status" aria-live="polite" class="wc-note">Reality will present one installation approval ONLY after the exact original candidate passes independent tests. No production installation.</p>
+    <p id="wcRedesign178Status" role="status" aria-live="polite" class="wc-note">No additional recovery has been authorized. The original eight failures are preserved.</p>
     <p id="wcSelfDiagnose178Status" role="status" aria-live="polite" class="wc-note">Reality's read-only self-diagnosis will compare the canonical saved job, selected conversation, verified failure checkpoint, and authority boundaries. Diagnosis never retries or grants installation.</p>
     <p id="wcFirstGap178Status" role="status" aria-live="polite" class="wc-note">One owner click starts the exact original #178 investigation, AI generation, and independent sandbox testing. This may consume model/sandbox credits. No capability installation, production change, or settlement is authorized.</p>
    </div>
@@ -1168,6 +1170,8 @@ let wcFirstGap178Busy=false;
 let wcFirstGap178RecoveryEligible=false;
 let wcFirstGap178RecoveryAttempted=false;
 let wcFirst178ApprovalReady=null;
+let wcRedesign178Ready=null;
+let wcRedesign178Started=false;
 let wcFirst178CompletionBusy=false;
 let wcFirst178CompletionAutoStarted=false;
 // Owner GET/Refresh is read-only; only the trusted dispatcher resumes #178.
@@ -1206,10 +1210,56 @@ async function wcContinueOriginal178Recovery(){
   $('wcStartFirstGap178').disabled=true;
  }
 }
+async function wcAuthorizeOriginal178Redesign(){
+ const button=$('wcAuthorizeRedesign178'),status=$('wcRedesign178Status');
+ const ready=wcRedesign178Ready;
+ if(!ready||wcRedesign178Started||
+    $('privateReady')?.style.display!=='block')return;
+ if(ready.status!=='EXHAUSTED_CORRECTION_ATTEMPTS'||
+    ready.attempts_used!==8||ready.attempt_limit!==8||
+    ready.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87')
+  return;
+ wcRedesign178Started=true;
+ button.disabled=true;button.style.display='none';
+ status.textContent='Owner authorized exactly one redesign attempt for saved #178. Reality is using the existing provider, model and independent sandbox. The previous eight failures remain preserved. No installation approval.';
+ try{
+  const response=await fetch('/api/reality/personal-first-upgrade-178-redesign',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'AUTHORIZE_ONE_ORIGINAL_178_SOURCE_REDESIGN_ATTEMPT',
+    original_work_id:ready.original_work_id,
+    checkpoint_hash:ready.checkpoint_hash,
+    checkpoint_receipt_id:ready.checkpoint_receipt_id,
+    owner_confirms_one_attempt:true,
+    owner_confirms_installation:false,
+   }),
+  });
+  const d=await response.json();
+  if(!response.ok||d.ok!==true||
+     d.original_work_id!==ready.original_work_id||
+     d.owner_confirmation_consumed!==true||
+     d.installation_authorized!==false||
+     d.original_job_completed!==false)
+   throw Error(String(d.error||'ORIGINAL178_REDESIGN_RECONCILIATION_REQUIRED'));
+  status.textContent=d.status==='AWAITING_OWNER_APPROVAL'?
+   'Reality generated and independently verified the one redesign. Review exact source and separately approve installation; production remains untouched.':
+   'Saved original #178 redesign: '+String(d.status||'UNVERIFIED')+
+   '. Reservation '+String(d.single_use_redesign_reservation_id||'UNVERIFIED')+
+   '. No additional automatic retries, installation or settlement. Review the durable checkpoint.';
+  void wcReadOwnerApproval178();
+  void wcSelfDiagnoseOriginal178();
+ }catch(e){
+  status.textContent='Outcome uncertain: '+String(e?.message||'UNRESOLVED')+
+   '. Do NOT submit a second grant. Refresh the original saved status and reconcile its Continuity receipt.';
+ }
+}
+$('wcAuthorizeRedesign178').onclick=()=>{void wcAuthorizeOriginal178Redesign()};
 async function wcReadOwnerApproval178(){
  const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
  if(!button||!status||$('privateReady')?.style.display!=='block')return;
  button.disabled=true;button.style.display='none';
+ $('wcAuthorizeRedesign178').style.display='none';
  try{
   const response=await fetch('/api/reality/personal-first-upgrade-178-approve',{
    method:'GET',credentials:'same-origin',cache:'no-store'});
@@ -1238,6 +1288,17 @@ async function wcReadOwnerApproval178(){
      d.cannot_auto_retry_consumed_claim===true){
    wcFirst178ApprovalReady=null;
    $('wcStartFirstGap178').style.display='none';
+   if(d.attempts_used===8&&d.attempt_limit===8&&
+      d.last_failure_kind==='REGRESSION'&&
+      d.last_failure_evidence_ref&&d.original_work_id===
+       'work:9b9578b3c65427589c4c6da68fe0fc87'){
+    wcRedesign178Ready=d;
+    if(!wcRedesign178Started){
+     $('wcAuthorizeRedesign178').style.display='inline-block';
+     $('wcAuthorizeRedesign178').disabled=false;
+     $('wcRedesign178Status').textContent='Original eight failed attempts remain intact. Authorizing ONE new attempt permits source redesign and independent sandbox testing only. Model/sandbox credits may be used. Installation still requires a separate approval.';
+    }
+   }
    status.textContent='Original #178 ran all '+String(d.attempts_used)+
     ' independently checked sandbox attempts and safely STOPPED without a passing candidate. '+
     'No installation, resumption, or final settlement occurred. '+
