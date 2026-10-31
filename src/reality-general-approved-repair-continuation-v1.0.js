@@ -19,7 +19,7 @@ export async function continueExactlyApprovedGeneralRepair({
  state,ticket,session,db,branch,writeToken,
  conversationId,originalWorkEvidenceRef,promotionCheckpointReceiptId,
  env=process.env,
- verifyOwnerApproval,verifyFrozenAcceptance,
+ verifyOwnerApproval,verifyFrozenAcceptance,observePreviouslyInstalled,
  executeOriginalWork,verifyOriginalExecution,
  verifyIndependentReceipt,persistCheckpoint,
  fetchImpl=fetch,maxTransitions=6,
@@ -85,14 +85,30 @@ export async function continueExactlyApprovedGeneralRepair({
     approval?.reservation_ref!==state.promotion_authorization.reservation_ref||
     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
      String(promotionCheckpointReceiptId||''))||
-    sandbox?.verified_by!=='TRUSTED_PROVIDER_ADAPTER'||
-    !sandbox?.trusted_attestation_ref)
+    !state.journal.some(item=>item.kind==='SANDBOX_VERIFIED'&&
+      item.body?.verified_by==='TRUSTED_PROVIDER_ADAPTER'&&
+      item.body?.trusted_attestation_ref&&
+      item.body?.artifact_hash===state.candidate.artifact_hash))
     fail('ORIGINAL_APPROVAL_AND_ATTESTED_SANDBOX_REQUIRED');
-   const installed=await installVerifiedGenericPreviewExtension({
-    ticket,candidate:ctx.candidate,
-    sandbox:{...sandbox,independently_verified:true},
-    approval,verifyOwnerApproval,branch,writeToken,fetchImpl,
-   });
+   // Source installation and independent CI happen in separate provider
+   // transactions. Once installed, NEVER re-run a GitHub write on a retry.
+   const installed=typeof observePreviouslyInstalled==='function'?
+    await observePreviouslyInstalled(Object.freeze({
+     original_work_id:scope.original_work_id,artifact_hash:ctx.candidate.artifact_hash,
+     candidate:ctx.candidate,branch,
+     repository_base_sha:ticket.repository_base_sha,
+     reservation_ref:approval.reservation_ref,
+    })):
+    await installVerifiedGenericPreviewExtension({
+     ticket,candidate:ctx.candidate,
+     sandbox:{...sandbox,independently_verified:true},
+     approval,verifyOwnerApproval,branch,writeToken,fetchImpl,
+    });
+   if(installed?.kind!=='ISOLATED_GITHUB_SOURCE_INSTALLED'||
+      installed.provider_bytes_readback_verified!==true||
+      installed.artifact_hash!==ctx.candidate.artifact_hash||
+      installed.original_work_id!==scope.original_work_id)
+    fail('INSTALLED_SOURCE_PROVIDER_READBACK_REQUIRED');
    // Must be a NEW provider readback at the installed commit, proving the
    // frozen ORIGINAL acceptance and unchanged governance tests actually ran.
    const acceptance=await verifyFrozenAcceptance(Object.freeze({
@@ -103,6 +119,10 @@ export async function continueExactlyApprovedGeneralRepair({
     original_failure_evidence_hash:ticket.confirmed_gap_evidence_hash,
     installed_branch:branch,
    }));
+   if(acceptance?.complete!==true||
+      acceptance?.independent_provider_readback!==true||
+      acceptance?.installed_commit_sha!==installed.installed_commit_sha)
+    fail('INDEPENDENT_INSTALLED_ACCEPTANCE_PENDING');
    const result=await registry.recordAndReadback({
     installed,acceptance,
     approval:{...approval,checkpoint_receipt_id:promotionCheckpointReceiptId},
