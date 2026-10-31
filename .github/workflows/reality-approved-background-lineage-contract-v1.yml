@@ -50,3 +50,38 @@ jobs:
           node --test test/reality-unattended-full-loop-dry-run-v1.test.js
       - name: Keep candidate inert until independently authorized
         run: echo 'Only isolated source contracts were tested. No installation, owner approval, original work mutation, or settlement.'
+
+  wake-existing-owner-approved-work:
+    name: Governed CI completion → signed scheduler
+    needs: [validate-same-original-work]
+    if: ${{ needs.validate-same-original-work.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch exact default-branch signed approval poll
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REPO" = 'maloney2323/Reality'
+          # The untrusted feature-branch code and tests have already exited;
+          # this isolated job receives only the built-in ephemeral token.
+          # Dispatch is observation only; no approval, install or settlement.
+          code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            --header 'Content-Type: application/json' \
+            --data '{"ref":"main"}' \
+            "https://api.github.com/repos/${REPO}/actions/workflows/reality-governed-approved-scheduler-v1.yml/dispatches")"
+          if [ "$code" != 204 ]; then
+            echo "::error::Governed scheduler did not accept CI completion: HTTP $code"
+            exit 1
+          fi
+          echo 'REALITY_GOVERNED_CI_WAKE {"status":"SCHEDULER_DISPATCH_ACCEPTED","approval_created":false,"installation_performed":false,"production_changed":false}'
