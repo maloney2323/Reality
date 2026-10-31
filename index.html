@@ -1139,7 +1139,12 @@ function wcUnfinishedHTML(job){
   /Reality Governed Execution Engine v0\.1/.test(String(job.title||''))?
   '<button type="button" data-repair-check="'+esc(job.work_id)+
    '" data-repair-conversation="'+esc(job.conversation_id)+'">Check repair evidence · Read only</button>':'';
- const upgradeJump='<button type="button" data-wc-upgrade-jump="'+esc(job.work_id)+
+ const isOriginal178=job.work_id==='work:9b9578b3c65427589c4c6da68fe0fc87'&&
+  job.job_completed===false&&job.goal_still_current===true;
+ const upgradeJump=isOriginal178?
+  '<button type="button" data-wc-original178-review="'+esc(job.work_id)+
+  '">Review verified #178 upgrade · Prepare exact approval</button>':
+  '<button type="button" data-wc-upgrade-jump="'+esc(job.work_id)+
   '">Review upgrade discovery in categories</button>';
  const original143Activation=job.work_id==='work:24cda9611404e9bcb47909976067605c'&&
    job.job_completed===false?
