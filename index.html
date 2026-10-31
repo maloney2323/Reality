@@ -1121,44 +1121,46 @@ $('wcUnfinishedList').addEventListener('click',event=>{
  wcOpenUpgradeCategory();
 });
 $('wcUnfinishedList').addEventListener('click',async event=>{
- const button=event.target.closest('button[data-wc-original178-review]');
+ const button=event.target.closest('button[data-wc-verified-repair-review]');
  if(!button||button.disabled)return;
- const original='work:9b9578b3c65427589c4c6da68fe0fc87';
- if(button.dataset.wcOriginal178Review!==original)return;
+ const original=button.dataset.wcVerifiedRepairReview;
+ const issueNumber=Number(button.dataset.wcVerifiedIssue);
+ if(!wcGovernedBuildWork.test(String(original||''))||
+    !Number.isSafeInteger(issueNumber)||issueNumber<1)return;
  const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
  if($('privateReady')?.style.display!=='block'){
   if(feedback)feedback.textContent='Sign in to your Reality account first. No approval or installation occurred.';
   return;
  }
  button.disabled=true;
- wcOriginal178DirectReview=true;
+ wcDirectRepairReviewScope={originalWorkId:original,issueNumber};
  wcCurrent='upgrades';
  wcRender();
- // These exact-source review controls already exist, but were buried inside
- // closed advanced diagnostics. Open ONLY the existing evidence review path.
+ // The verified source and owner approval already exist in the Capability
+ // Center, but the control is nested in advanced diagnostics. Make that
+ // existing read-only review visible without starting an installation.
  const diagnostics=$('wcUpgradeDiagnostics');
  if(diagnostics){diagnostics.hidden=false;diagnostics.open=true;}
- if(feedback)feedback.textContent='Checking exact original #178 evidence and preparing the separately authorized upgrade review. No installation has been approved.';
+ if(feedback)feedback.textContent='Checking the selected original job and preparing its exact verified source review. No installation is authorized.';
  $('wcModelRepairReviewPanel')?.scrollIntoView?.({behavior:'smooth',block:'center'});
  try{
   await $('wcReadModelRepair').onclick();
   const prepared=wcVerifiedInstallReview?.original_work_id===original&&
-   wcVerifiedInstallReview?.issue_number===178;
+   wcVerifiedInstallReview?.issue_number===issueNumber;
   if(prepared){
    if(feedback)feedback.textContent=$('wcApproveExactInstall').disabled?
-    'Original #178 source is verified, but the trusted worker preflight is not green. Installation approval remains disabled.':
-    'Original #178 exact upgrade prepared. Review its evidence below, then use the separate owner-approval button once.';
+    'The exact source is verified, but the trusted worker preflight is not green. Installation approval remains disabled.':
+    'Your exact verified upgrade is ready. Review the evidence and authorize this one installation if you agree.';
    $('wcInstallSettlementPanel')?.scrollIntoView?.({behavior:'smooth',block:'center'});
-  }else{
-   if(feedback)feedback.textContent=
-    'Original #178 upgrade review has not reached an approvable state: '+
+  }else if(feedback){
+   feedback.textContent='This original repair is not yet approvable: '+
     String($('wcModelRepairReviewStatus')?.textContent||'PROVIDER_READBACK_UNAVAILABLE')+
     '. No installation was authorized.';
   }
  }catch{
-  if(feedback)feedback.textContent='Independent original #178 review could not be completed. No installation was authorized.';
+  if(feedback)feedback.textContent='The selected original repair review could not be completed. No installation was authorized.';
  }finally{
-  wcOriginal178DirectReview=false;
+  wcDirectRepairReviewScope=null;
   button.disabled=false;
  }
 });
