@@ -1263,9 +1263,9 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // upgrade loop. GET never starts work; POST is a separate, confirmed action.
 // The current isolated worker is read-only discovery. No stage is described as
 // model-generated or installed unless the durable provider state proves it.
+let wcGovernedBuildEligible=false;
 let wcRealRepairOpportunity=null;
 let wcRepairIntent='EXISTING_WORK';
-let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
 let wcRepairSelectedWork=null;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
