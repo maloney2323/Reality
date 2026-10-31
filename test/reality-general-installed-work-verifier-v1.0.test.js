@@ -29,7 +29,7 @@ function fake({runOverride={},jobOverride={},branchHead=SHA,sourceChanged=false,
  const calls=[];
  const fetchImpl=async(url,{method}={})=>{
   assert.equal(method,'GET');
-  const path=new URL(url).pathname+new URL(url).search;
+  const path=new URL(url).pathname.replace('/repos/maloney2323/Reality','')+new URL(url).search;
   calls.push(path);
   let value;
   if(path==='/git/commits/'+SHA)value={parents:[{sha:BASE}]};
