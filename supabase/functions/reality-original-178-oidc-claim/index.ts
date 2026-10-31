@@ -34,7 +34,7 @@ async function verifyGitHubToken(token:string){
   claim.repository_owner!=='maloney2323'||claim.ref!==BRANCH||
   claim.ref_type!=='branch'||claim.event_name!=='push'||
   claim.workflow_ref!==WORKFLOW||
-  claim.sub!=='repo:'+REPO+':ref:'+BRANCH||
+  claim.sub!=='repo:maloney2323@317309322/Reality@1388852445:ref:'+BRANCH||
   typeof claim.sha!=='string'||!SHA.test(claim.sha)||
   typeof claim.run_id!=='string'||!/^[1-9][0-9]{0,17}$/.test(claim.run_id)||
   typeof claim.exp!=='number'||typeof claim.nbf!=='number'||
@@ -114,7 +114,10 @@ Deno.serve(async req=>{
    result.installation_authorized!==false||result.job_completed!==false)
    throw Error('PRIVATE_RECOVERY_CLAIM_SCOPE_INVALID');
   return body(result);
- }catch(_error){
+  }catch(error){
+  const code=error instanceof Error?error.message:'UNKNOWN_GATE_ERROR';
+  if(/^[A-Z0-9_]{5,90}$/.test(code))
+   console.error('ORIGINAL_178_REJECTED_GATE',code);
   return body({error:'SOURCE_BOUND_GITHUB_IDENTITY_OR_PRIVATE_CLAIM_REJECTED'},403);
  }
 });
