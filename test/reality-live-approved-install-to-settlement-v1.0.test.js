@@ -262,6 +262,45 @@ test('signed governed scheduler queues exact user-approved work without a GitHub
  assert.equal(dispatchCalls,0);
  assert.equal(f.installCalls(),0);
 });
+test('governed auto trigger immediately wakes exact already-approved work when existing dispatch authority is present',async()=>{
+ const dispatched=[];const f=await fixture({
+  envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true'},
+  dispatchApproved:async request=>{
+   dispatched.push(request);
+   return {dispatched:true,production_changed:false,
+    worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'};
+  },
+ });
+ const result=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ });
+ assert.equal(result.status,'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED');
+ assert.equal(result.automatic_wake_mode,'IMMEDIATE_GITHUB_WAKE');
+ assert.equal(result.governed_scheduler_wakeup,true,'signed scheduled recovery remains enabled');
+ assert.equal(dispatched.length,1);
+ assert.equal(dispatched[0].reservationId,f.db().reservation_id);
+ assert.equal(dispatched[0].originalWorkId,work);
+ assert.equal(result.installed,false,'wake-up must never imply a real installation');
+ assert.equal(result.original_job_completed,false);
+});
+test('failed immediate wake falls back to previously signed scheduled poll without consuming authority twice',async()=>{
+ const f=await fixture({
+  envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true'},
+  dispatchApproved:async()=>{throw Error('REALITY_APPROVED_DISPATCH_PROVIDER_HTTP_503')},
+ });
+ const result=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ });
+ assert.equal(result.status,'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED');
+ assert.equal(result.automatic_wake_mode,'SIGNED_SCHEDULED_FALLBACK');
+ assert.equal(result.dispatch_error,'REALITY_APPROVED_DISPATCH_PROVIDER_HTTP_503');
+ assert.equal(result.owner_approval_consumed,true);
+ assert.equal(result.worker_dispatched,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.db().status,'CLAIMED');
+});
 test('unverified governed scheduler refuses to consume a one-use installation approval',async()=>{
  const f=await fixture({
   envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true',
