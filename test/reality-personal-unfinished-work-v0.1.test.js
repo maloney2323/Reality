@@ -214,7 +214,12 @@ test('original #178 historical work is projected from its existing verified gap,
    provenance:{principal_id:user_id,conversation_id:conversationId,
     source:'original-178-legacy-projection-test'},
   });
-  rows.push({...node,entity_type});
+  rows.push({...node,entity_type,provenance:{
+   ...node.provenance,continuity_spine:{
+    prior_lineage_hash:node.prior_lineage_hash,
+    transformation_receipt_id:node.transformation_receipt_id,
+   },
+  }});
   return node;
  };
  const originalReceipt=append('WORK','personal_first_self_upgrade_customer_work',{
