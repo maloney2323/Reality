@@ -69,7 +69,8 @@ async function makeState(){
  }),{verifyProvider});
  return state;
 }
-async function fixture(){
+async function fixture({dispatchApproved=async()=>({dispatched:true,
+ production_changed:false,worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'})}={}){
  let state=await makeState(),dbRow=null,installCalls=0,postInstallReads=0;
  const waitingHash=state.head_hash;
  const readGoal=async()=>({principal_id:owner,conversation_id:conversation,
@@ -115,6 +116,15 @@ async function fixture(){
    assert.equal(body.p_candidate_hash,artifact);
    dbRow.status='CLAIMED';dbRow.consumed_once=true;
    response={claimed:true,consumed_once:true,reservation_id:dbRow.reservation_id};
+  }else if(name==='reality_enqueue_approved_repair_continuation_v1'){
+   assert.equal(body.p_owner_id,owner);
+   assert.equal(body.p_original_work_id,work);
+   assert.equal(body.p_candidate_hash,artifact);
+   assert.equal(body.p_reservation_id,dbRow.reservation_id);
+   assert.equal(dbRow.status,'CLAIMED');
+   response={queued:true,reservation_id:dbRow.reservation_id,
+    original_work_id:work,status:'PENDING',
+    installation_authorized:true,production_changed:false};
   }else if(name==='reality_mark_general_repair_installed_v1'){
    assert.equal(body.p_commit_sha,installedSHA);
    dbRow.status='INSTALLED';dbRow.installed_commit_sha=installedSHA;
@@ -146,7 +156,7 @@ async function fixture(){
  };
  const svc=createLiveGeneralRepairService({session,env,fetchImpl,
   listWork,readGoal,readCandidate:async()=>proof,checkpointFactory,
-  verifierFactory,installer});
+  verifierFactory,installer,dispatchApproved});
  function urlBase(){return url+'/rest/v1/rpc/'}
  return {svc,waitingHash,db:()=>dbRow,installCalls:()=>installCalls,postInstallReads:()=>postInstallReads};
 }
@@ -184,5 +194,37 @@ test('unrelated original work or different reviewed artifact is rejected before 
   originalWorkId:work,issueNumber,
   expectedArtifactHash:'0'.repeat(64),expectedCheckpointHash:f.waitingHash,
  }),/REAL_LIVE_INSTALL_EXACT_OWNER_REVIEWED_ARTIFACT_CHANGED/);
+ assert.equal(f.installCalls(),0);
+});
+
+test('one exact owner click durably schedules background install and settlement, never installs in browser request',async()=>{
+ const observed=[];const f=await fixture({dispatchApproved:async request=>{
+  observed.push(request);return {dispatched:true,production_changed:false,
+   worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'};
+ }});
+ const result=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,expectedArtifactHash:artifact,
+  expectedCheckpointHash:f.waitingHash});
+ assert.equal(result.status,'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED');
+ assert.equal(result.owner_approval_consumed,true);
+ assert.equal(result.worker_dispatched,true);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.installed,false);
+ assert.equal(f.db().status,'CLAIMED');
+ assert.equal(f.installCalls(),0);
+ assert.equal(observed.length,1);
+ assert.equal(observed[0].originalWorkId,work);
+ assert.equal(observed[0].candidateHash,artifact);
+ assert.equal(observed[0].reservationId,f.db().reservation_id);
+});
+test('uncertain GitHub wake cannot fabricate an installed or settled original',async()=>{
+ const f=await fixture({dispatchApproved:async()=>{throw Error('REALITY_APPROVED_DISPATCH_PROVIDER_HTTP_503')}});
+ const r=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,expectedArtifactHash:artifact,
+  expectedCheckpointHash:f.waitingHash});
+ assert.equal(r.status,'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION');
+ assert.equal(r.worker_dispatched,false);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(f.db().status,'CLAIMED');
  assert.equal(f.installCalls(),0);
 });
