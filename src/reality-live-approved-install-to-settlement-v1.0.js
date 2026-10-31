@@ -340,6 +340,11 @@ export function createLiveGeneralRepairService({
  // durable background work; model/worker cannot create or expand this grant.
  async function ownerApproveAndQueue({originalWorkId,issueNumber,
   expectedArtifactHash,expectedCheckpointHash}={}){
+  // Missing dispatcher credentials must not spend the owner's one-time
+  // installation approval; this is infrastructure, not customer work.
+  if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
+     env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length<25)
+   fail('BACKGROUND_WAKEUP_CREDENTIAL_UNAVAILABLE');
   const ctx=await load({originalWorkId,issueNumber});
   if(!HASH.test(expectedArtifactHash)||!HASH.test(expectedCheckpointHash)||
     ctx.state.candidate?.artifact_hash!==expectedArtifactHash)
