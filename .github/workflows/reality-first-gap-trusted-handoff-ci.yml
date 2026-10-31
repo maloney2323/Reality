@@ -75,6 +75,11 @@ jobs:
         run: |
           node --check src/reality-first178-isolated-github-install-v0.1.js
           node --test test/reality-first178-isolated-github-install-v0.1.test.js
+      - name: Verify signed-in one-use eighth-failure redesign API and preservation
+        run: |
+          node --check api/reality/personal-first-upgrade-178-redesign.js
+          node --check src/reality-first178-constitutional-executor-v0.1.js
+          node --test test/reality-first178-owner-redesign-route-v0.1.test.js
       - name: Prove original #178 owner-authored 8-to-9 redesign, no replay or tenth attempt
         run: node --test test/reality-first178-owner-redesign-recovery-v0.1.test.js
       - name: Prove shared constitutional self-repair planning and source-linked recurrent failures
