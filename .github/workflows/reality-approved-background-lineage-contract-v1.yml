@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/reality-personal-unfinished-work-v0.1.js'
       - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'test/reality-final-settlement-call-contract-v1.test.js'
       - 'test/reality-live-approved-install-to-settlement-v1.0.test.js'
       - 'test/reality-approved-repair-background-worker-v1.test.js'
       - 'test/reality-personal-unfinished-work-v0.1.test.js'
@@ -45,6 +46,7 @@ jobs:
           node --test test/reality-governed-installed-acceptance-wakeup-v1.test.js
           node --test test/reality-general-installed-work-verifier-v1.0.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
+          node --test test/reality-final-settlement-call-contract-v1.test.js
           node --test test/reality-unattended-full-loop-dry-run-v1.test.js
       - name: Keep candidate inert until independently authorized
         run: echo 'Only isolated source contracts were tested. No installation, owner approval, original work mutation, or settlement.'
