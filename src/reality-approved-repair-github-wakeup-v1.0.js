@@ -24,8 +24,10 @@ async function github(path,{method='GET',token,body,fetchImpl=fetch}){
 }
 export async function dispatchApprovedBackgroundRepair({
  reservationId,originalWorkId,candidateHash,issueNumber,
- installBranch,env=process.env,fetchImpl=fetch,
+ installBranch,attemptNumber=0,env=process.env,fetchImpl=fetch,
 }={}){
+ if(!Number.isInteger(attemptNumber)||attemptNumber<0||attemptNumber>24)
+  fail('BOUNDED_RETRY_REQUIRED');
  if(env.VERCEL_ENV!=='preview'||!UUID.test(reservationId)||
     !WORK.test(originalWorkId)||!HASH.test(candidateHash)||
     !Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000||
@@ -38,7 +40,8 @@ export async function dispatchApprovedBackgroundRepair({
  const payload={reservation_id:reservationId,original_work_id:originalWorkId,
   candidate_hash:candidateHash,issue_number:issueNumber,
   install_branch:installBranch};
- const path='reality-approved-continuations/'+reservationId+'.json';
+ const path='reality-approved-continuations/'+reservationId+
+  (attemptNumber===0?'':'-retry-'+attemptNumber)+'.json';
  const api=(p,opts={})=>github(p,{token,fetchImpl,...opts});
  const ref=await api('/git/ref/heads/'+WORKER);
  const before=ref?.object?.sha;
