@@ -1,0 +1,27 @@
+name: Reality general failure observer — no fixed issue
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'src/reality-general-provider-failure-observer-v1.0.js'
+      - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+      - '.github/workflows/reality-general-provider-failure-observer-v1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-general-provider-failure-observer-v1.0.js'
+      - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+      - '.github/workflows/reality-general-provider-failure-observer-v1.yml'
+permissions:
+  contents: read
+jobs:
+  provider-failure-no-issue-special-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check src/reality-general-provider-failure-observer-v1.0.js
+      - run: node --test test/reality-general-provider-failure-observer-v1.0.test.js
+      - run: echo 'Read-only provider observation. No model, install, promotion or settlement.'
