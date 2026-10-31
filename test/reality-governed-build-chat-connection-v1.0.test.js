@@ -37,6 +37,7 @@ const goal={principal_id:user,
 function mock(extra={}){
  const calls=[];
  return {calls,params:{session,env,
+  expectedOriginalWorkId:work,
   inspect:async()=>observed,readGoal:async()=>goal,
   dispatch:async()=>({dispatched:true,worker_sha:'d'.repeat(40),
    request_path:'reality-requests/00000000-0000-4000-8000-000000000001.json',
@@ -66,6 +67,12 @@ test('authenticated owner goal and canonical unfinished work enqueue through SER
  assert.equal(m.calls[0].input.p_owner_id,user);
  assert.equal(m.calls[0].input.p_goal_transition_event_id,transition);
  assert.equal(m.calls[0].db.url,'https://'+project+'.supabase.co');
+});
+test('a changed original job is rejected before database queue or dispatch',async()=>{
+ const m=mock({expectedOriginalWorkId:'work:'+'f'.repeat(32)});
+ await assert.rejects(queueOwnerGovernedBuild(m.params),
+  /GOVERNED_BUILD_OWNER_REVIEWED_WORK_CHANGED/);
+ assert.equal(m.calls.length,0);
 });
 test('queue cannot run in production or without signed-in owner',async()=>{
  const m=mock();
@@ -118,7 +125,8 @@ test('API request scope, origin and intent remain server-owned',()=>{
  assert.match(source,/authenticatedChatSession/);
  assert.match(source,/assertSameOrigin\(req\)/);
  assert.match(source,/body.intent!=='QUEUE_SAFE_AUTONOMOUS_DISCOVERY'/);
- assert.match(source,/Object.keys\(body\).length!==1/);
+ assert.match(source,/expected_original_work_id,intent/);
+ assert.match(source,/expectedOriginalWorkId:body\.expected_original_work_id/);
  assert.match(source,/Object.keys\(req.query\|\|\{\}\).length/);
  assert.doesNotMatch(source,/completeOriginal143OwnerAction|githubPost|githubPut|promoteVerifiedUpgrade/);
 });
