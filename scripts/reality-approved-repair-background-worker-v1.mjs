@@ -7,6 +7,8 @@ import {execFileSync} from 'node:child_process';
 // The authenticated owner comes only from the atomically leased Supabase record.
 import {createLiveGeneralRepairService}
  from '../src/reality-live-approved-install-to-settlement-v1.0.js';
+import {createExactApprovedWorkerScope}
+ from '../src/reality-exact-approved-worker-scope-v1.js';
 import {dispatchApprovedBackgroundRepair}
  from '../src/reality-approved-repair-github-wakeup-v1.0.js';
 import {ensureIndependentOriginalAcceptance}
@@ -99,7 +101,12 @@ export async function executeApprovedContinuation({
   config:{url:env.REALITY_PERSONAL_CHAT_SUPABASE_URL,
    key:env.SUPABASE_SERVICE_ROLE_KEY},
   access_token:env.SUPABASE_SERVICE_ROLE_KEY};
- const service=serviceFactory({session,env:workerEnv});
+ // A signed GitHub OIDC worker lease is the ONLY entrance to the
+ // service-scoped goal readback. Never copy the interactive HMAC issuer secret
+ // to Actions or silently treat a missing goal as current.
+ const scoped=serviceFactory===createLiveGeneralRepairService?
+  await createExactApprovedWorkerScope({env:workerEnv,request,lease:leased}):{};
+ const service=serviceFactory({session,env:workerEnv,...scoped});
  let outcome=null,diagnostic='ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING';
  try{
   let acceptanceRequested=false;
