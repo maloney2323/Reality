@@ -12,7 +12,7 @@ const source=x=>typeof x==='string'&&
  /^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(?:js|mjs))$/.test(x)&&
  !x.split('/').includes('..')&&!x.includes('//');
 export async function readExactModelRepairEvidence({
- issueNumber,env=process.env,fetchImpl=fetch,branch=null,sourceCommitSha=null,
+ issueNumber,env=process.env,fetchImpl=fetch,branch=null,atCommitSha=null,sourceCommitSha=null,
 }={}){
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('ISSUE_NOT_GROUNDED');
