@@ -8,7 +8,7 @@ import {
 const project='hvkfreoagbrphwghjajw',url='https://'+project+'.supabase.co';
 const owner=randomUUID(),conv=randomUUID(),event=randomUUID(),goalEvent=randomUUID(),trigger=randomUUID(),claim=randomUUID();
 const original='work:'+'a'.repeat(32);
-const env={VERCEL_ENV:'preview',REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+const env={VERCEL_ENV:'preview',REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
  REALITY_PERSONAL_CHAT_SUPABASE_URL:url,
  REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY:'sb_publishable_testonly',
