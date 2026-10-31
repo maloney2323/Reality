@@ -1,0 +1,11 @@
+{
+  "schema": "reality-reverify-previous-model-candidate-v1",
+  "source_run_id": 41177691547,
+  "source_job": "generate_1",
+  "original_issue_number": 188,
+  "baseline_provider_failure_run_id": 41177409146,
+  "frozen_test_sha256": "f59216f72a63c612279959138877a4243d33a8e15f731e049e40be05dd07ac71",
+  "scope": "ISOLATED_CANDIDATE_VERIFICATION_ONLY",
+  "installation_authorized": false,
+  "original_job_completed": false
+}
