@@ -34,7 +34,11 @@ function store(){
  let writes=0;
  return {createPersistence:()=>({
   reconstruct:async()=>rows,
-  appendEvent:async event=>{writes++;rows.push(event);return event},
+  appendEvent:async event=>{writes++;
+   const persisted={...event,provenance:{...event.provenance,
+    continuity_spine:{prior_lineage_hash:event.prior_lineage_hash,
+     transformation_receipt_id:event.transformation_receipt_id||null}}};
+   rows.push(persisted);return persisted},
  }),writes:()=>writes};
 }
 test('independent provider verified same original work writes durable settlement and reads it back',async()=>{
