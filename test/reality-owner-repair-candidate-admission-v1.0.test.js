@@ -55,7 +55,7 @@ function fixture(){
  const checkpointFactory=()=>({
   async readLatestCheckpoint(){
    if(!latest)throw Error('GENERAL_CHECKPOINT_NO_PERSISTED_GENERAL_CHECKPOINT');
-   return {verified:true,state:latest};
+   return {persisted:true,independent_readback_verified:true,checkpoint_hash:latest.head_hash,state:latest};
   },
   async persistCheckpoint(state){latest=state;writes++;return {
    persisted:true,independent_readback_verified:true,
