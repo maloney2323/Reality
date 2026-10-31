@@ -50,6 +50,35 @@ test('latest scheduler must be green, exact-main, matching repo and fresh',async
   assert.equal(result.original_job_completed,false);
  }
 });
+test('existing branch-scoped credential provides independent immediate wake preflight without pretending cron ran',async()=>{
+ const token='test-credential-that-is-not-a-real-github-secret';
+ const calls=[];
+ const result=await verifyApprovedBackgroundReadiness({
+  env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:token},now,
+  fetchImpl:async(url,opts)=>{
+   calls.push(url);
+   if(url.includes('/actions/runs'))return {ok:true,json:async()=>({workflow_runs:[run('success',{event:'push'})]})};
+   assert.ok(url.endsWith('/git/ref/heads/feature/reality-background-continuation-20261031'));
+   assert.equal(opts.headers.authorization,'Bearer '+token);
+   return {ok:true,json:async()=>({ref:'refs/heads/feature/reality-background-continuation-20261031',object:{sha:'a'.repeat(40)}})};
+  },
+ });
+ assert.equal(result.ready,true);
+ assert.equal(result.code,'GOVERNED_IMMEDIATE_WAKE_READBACK_VERIFIED');
+ assert.equal(calls.length,2);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.original_job_completed,false);
+});
+test('invalid GitHub credential cannot substitute for a never-executed signed scheduler',async()=>{
+ const r=await verifyApprovedBackgroundReadiness({
+  env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'test-credential-that-is-not-a-real-github-secret'},now,
+  fetchImpl:async url=>url.includes('/actions/runs')?
+   {ok:true,json:async()=>({workflow_runs:[run('success',{event:'push'})]})}:
+   {ok:false,status:403},
+ });
+ assert.equal(r.ready,false);
+ assert.equal(r.code,'GOVERNED_SCHEDULER_AUTOMATIC_TICK_NOT_OBSERVED');
+});
 test('production, missing enablement and unreachable provider fail closed',async()=>{
  for(const settings of [
   {...env,VERCEL_ENV:'production'},
