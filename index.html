@@ -1536,7 +1536,13 @@ $('wcReadModelRepair').onclick=async()=>{
  try{
   if($('privateReady')?.style.display!=='block')
    throw Error('SIGN_IN_REQUIRED');
-  const r=await fetch('/api/reality/personal-real-repair-candidate',{
+  // A direct Unfinished Work review binds the read-only candidate lookup
+  // to that exact signed-in original job, not whichever job sorts first.
+  const scope=wcDirectRepairReviewScope;
+  const candidateUrl='/api/reality/personal-real-repair-candidate'+(scope?
+   '?original_work_id='+encodeURIComponent(scope.originalWorkId)+
+   '&issue_number='+encodeURIComponent(String(scope.issueNumber)):'');
+  const r=await fetch(candidateUrl,{
    method:'GET',credentials:'same-origin',cache:'no-store'});
   const data=await r.json();
   if(!r.ok||data.ok!==true)
