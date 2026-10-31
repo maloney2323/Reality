@@ -1165,7 +1165,10 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
  }
 });
 function wcUnfinishedHTML(job){
- const state=job.state==='RECOVERY_CHECKPOINT_SAVED'?
+ const state=job.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'&&
+  job.goal_still_current===true?
+  'Verified source · Ready for owner review':
+  job.state==='RECOVERY_CHECKPOINT_SAVED'?
   'Recovery saved · Original repair unfinished':
   job.state==='TRACKING_DONE_REPAIR_UNFINISHED'?
    'Tracking action finished · Repair unfinished':
