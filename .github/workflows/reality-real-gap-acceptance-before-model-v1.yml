@@ -1,11 +1,12 @@
 name: Reality verified missing capability — frozen original acceptance
 on:
   push:
-    branches: [feature/reality-live-general-repair-bridge-20261031]
+    branches: [feature/reality-live-general-repair-bridge-20261031, feature/reality-install-to-settlement-20261031]
     paths:
       - 'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'
       - 'test/reality-frozen-regressions/general-execution-receipt-v1.json'
-      - 'src/reality-extensions/reality-general-execution-receipt.mjs'
+      - 'src/reality-extensions/**'
+      - 'test/reality-extensions/**'
       - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
 permissions:
   contents: read
@@ -26,3 +27,7 @@ jobs:
         run: sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
       - name: Frozen same-work missing capability acceptance
         run: node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+      - name: Regression: governance and exact-owner installation gates
+        run: |
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+          node --test test/reality-general-isolated-install-v1.0.test.js
