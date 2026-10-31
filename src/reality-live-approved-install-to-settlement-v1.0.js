@@ -127,7 +127,19 @@ export function createLiveGeneralRepairService({
    fail('ORIGINAL_GOAL_OR_CONSTITUTIONAL_SCOPE_CHANGED');
   let proof=null;
   if(includeCandidate){
-   proof=await readCandidate({issueNumber,env});
+   const prior=await rpc(db,'reality_read_general_repair_progress_v2',{
+    p_owner_id:session.user_id,
+    p_conversation_id:job.conversation_id,
+    p_original_work_id:originalWorkId,
+   },fetchImpl);
+   if(prior?.status!=='NOT_APPROVED'&&(
+    prior?.owner_id!==session.user_id||
+    prior?.original_work_id!==originalWorkId||
+    prior?.conversation_id!==job.conversation_id||
+    !SHA.test(String(prior?.review_commit_sha||''))))
+    fail('EXACT_PRIOR_APPROVED_REVIEW_SOURCE_UNVERIFIED');
+   proof=await readCandidate({issueNumber,env,
+    sourceCommitSha:prior?.status==='NOT_APPROVED'?null:prior.review_commit_sha});
    if(proof.independently_verified!==true||
      proof.original_failed_run_id!==job.original_provider_failed_run_id||
      proof.original_source_sha!==job.original_source_sha||
