@@ -97,7 +97,7 @@ if(mode==='generate'){
   feedback=JSON.parse(text('prior/verification.json'));
   if(previous.failed_run_id!==ticket.failed_run_id||
    feedback.artifact_sha256!==previous.artifact_sha256||
-   feedback.provider==='ISOLATED_SECRET_FREE_DOCKER'||
+   feedback.provider!=='ISOLATED_SECRET_FREE_DOCKER'||
    feedback.passed===true||
    !/^[a-f0-9]{64}$/.test(String(feedback.log_sha256||'')))
    fail('INDEPENDENT_PRIOR_FAILED_FEEDBACK_REQUIRED');
@@ -160,10 +160,12 @@ if(mode==='generate'){
  console.log('SOURCE_STAGED_UNEXECUTED',candidate.artifact_sha256);
 }else if(mode==='receipt'){
  const candidate=JSON.parse(text('candidate/candidate.json'));
- const checked=checkCandidate({...candidate,
-  files:candidate.files.filter(f=>!existsSync(f.path))});
- // Called in clean checkout in record step, never after prepare in same job.
- if(checked.artifact_sha256!==candidate.artifact_sha256)
+ if(!Array.isArray(candidate?.files)||
+  candidate.baseline_source_sha!==ticket.baseline_source_sha||
+  candidate.failed_run_id!==ticket.failed_run_id||
+  candidate.files.some(f=>!allowedPath(f.path))||
+  candidate.artifact_sha256!==canonicalHash(
+   candidate.files.map(f=>({path:f.path,content:f.content}))))
   fail('RECEIPT_ARTIFACT_CHANGED');
  const log=text('sandbox.log');
  const exitCode=Number(process.argv[4]);
