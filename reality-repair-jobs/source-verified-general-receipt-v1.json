@@ -1,0 +1,14 @@
+{
+  "schema": "reality-source-verified-repair-job-v1",
+  "issue_number": 188,
+  "failed_run_id": 41177409146,
+  "baseline_source_sha": "8c6cd6c3891e98aaf30520bba2f47ee604d10d69",
+  "frozen_test_path": "test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js",
+  "frozen_test_sha256": "f59216f72a63c612279959138877a4243d33a8e15f731e049e40be05dd07ac71",
+  "expected_source_path": "src/reality-extensions/reality-general-execution-receipt.mjs",
+  "original_requirement": "Prove final status from actual independent approval, installed code, original task run and durable settlement; no model fabricated completion",
+  "authorizing_scope": "CANDIDATE_PROPOSAL_AND_ISOLATED_VERIFICATION_ONLY",
+  "production_changed": false,
+  "installation_authorized": false,
+  "original_job_completed": false
+}
