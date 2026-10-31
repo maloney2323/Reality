@@ -15,7 +15,7 @@ test('Reality main interface uses only the general owner-scoped governed-work qu
   assert.match(html,/id="wcRepairConsentDialog"/);
   assert.match(html,/Installation always requires your approval/);
   assert.match(html,/id="wcInspectGovernedBuild"/);
-  assert.match(html,/id="wcStartGovernedBuild" disabled/);
+  assert.match(html,/id="wcStartGovernedBuild"[^>]*disabled/);
   assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
   assert.doesNotMatch(html,/#178|FirstGap178|FirstUpgrade178|personal-first-upgrade-178/);
 });
