@@ -1,0 +1,23 @@
+name: Reality general isolated worker — provider evidence contract
+on:
+  push:
+    branches: [reality/worker/foundational-build-queue-v1]
+    paths:
+      - 'src/reality-general-provider-failure-observer-v1.0.js'
+      - 'scripts/reality-governed-build-queue-worker-v1.mjs'
+      - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+      - '.github/workflows/reality-worker-general-observation-contract-v1.yml'
+permissions: {contents: read}
+jobs:
+  verify-real-worker-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check scripts/reality-governed-build-queue-worker-v1.mjs
+      - run: node --check src/reality-general-provider-failure-observer-v1.0.js
+      - run: node --test test/reality-general-provider-failure-observer-v1.0.test.js
+      - run: echo 'No live owner queue triggered. No external writes, generation or settlement.'
