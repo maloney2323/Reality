@@ -5,6 +5,10 @@
 // comparison against the database's exact owner, goal epoch and source event.
 import {readExactModelRepairEvidence}
  from './reality-real-verified-repair-readback-v1.0.js';
+import {personalGoalScope}
+ from './reality-personal-goal-readback-v0.1.js';
+import {createContinuitySpine}
+ from './reality-continuity-spine-v2.0.js';
 const PROJECT='hvkfreoagbrphwghjajw';
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -54,6 +58,9 @@ export async function createExactApprovedWorkerScope({
      s.candidate_hash!==lease.candidate_hash||
      !UUID.test(s.original_work_event_id)||
      !UUID.test(s.goal_transition_event_id)||
+     !UUID.test(s.continuity_root_id)||
+     !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(
+       String(s.goal_source_user_message_ref||''))||
      !String(s.goal_id||'').startsWith('user-goal:')||
      !SHA.test(s.review_commit_sha)||
      !HASH.test(s.frozen_test_sha256)||
@@ -112,12 +119,29 @@ export async function createExactApprovedWorkerScope({
    const fresh=await recheck();
    if(conversationId!==lease.conversation_id)
     fail('ORIGINAL_CONVERSATION_CHANGED');
+   const scope=personalGoalScope({
+    userId:lease.owner_id,conversationId:lease.conversation_id,
+   });
+   const spine=createContinuitySpine({
+    continuityRootId:scope.root,worldlineId:scope.worldline,
+    subjectId:lease.owner_id,
+   });
+   if(spine.continuity_root_id!==fresh.continuity_root_id||
+      spine.worldline_id!==fresh.continuity_root_id)
+    fail('CANONICAL_GOAL_CONTINUITY_ROOT_MISMATCH');
    return {
     principal_id:lease.owner_id,conversation_id:lease.conversation_id,
-    state:{active_goal_id:fresh.goal_id,active_goal:{
-     goal_id:fresh.goal_id,status:'ACTIVE',user_confirmed:true,
-     last_transition_receipt_id:fresh.goal_transition_event_id,
-    }},
+    persisted_source:'ISOLATED_CONTINUITY_VERIFIED_READBACK',
+    scope,
+    state:{
+     continuity_root_id:spine.continuity_root_id,
+     world_id:scope.world,
+     active_goal_id:fresh.goal_id,active_goal:{
+      goal_id:fresh.goal_id,status:'ACTIVE',user_confirmed:true,
+      last_transition_receipt_id:fresh.goal_transition_event_id,
+      source_user_message_ref:fresh.goal_source_user_message_ref,
+     },
+    },
    };
   },
   readCandidate:async ({issueNumber})=>{
