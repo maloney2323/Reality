@@ -255,6 +255,27 @@ async function main(){
  const result=await executeApprovedContinuation({
   env:isolatedEnv,request,checkoutSha:sha,leasedWork:broker.leasedWork});
  console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
+ // Deterministic original-work/authority projection failures must NOT burn the
+ // customer's one-use attempts in a rapid loop. Preserve existing approval,
+ // work identity, and the exact failure receipt for trusted reconciliation.
+ const blockedForReconciliation=new Set([
+  'ONE_OWNER_VERIFIED_UNFINISHED_ORIGINAL_WORK_REQUIRED',
+  'CURRENT_ORIGINAL_OWNER_GOAL_CHANGED',
+  'ORIGINAL_GOAL_OR_CONSTITUTIONAL_SCOPE_CHANGED',
+  'EXACT_PRIOR_APPROVED_REVIEW_SOURCE_UNVERIFIED',
+  'MODEL_SOURCE_ORIGINAL_WORK_MISMATCH',
+ ]);
+ if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
+    blockedForReconciliation.has(result.diagnostic)){
+  console.log('REALITY_GOVERNED_AUTHORITY_RECONCILIATION_REQUIRED',JSON.stringify({
+   original_work_id:request.original_work_id,
+   reservation_id:request.reservation_id,
+   diagnostic:result.diagnostic,
+   new_approval_requested:false,original_job_completed:false,
+   production_changed:false,
+  }));
+  return;
+ }
  if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
     env.GITHUB_EVENT_NAME==='workflow_dispatch'){
   // Scheduler retries this same durable approved job on a later cycle,
