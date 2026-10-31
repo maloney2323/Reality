@@ -49,6 +49,9 @@ jobs:
           const installBranch='feature/reality-closed-loop-worker-20261031';
           const work='work:9b9578b3c65427589c4c6da68fe0fc87';
           const artifact='105c2c59bde7ae12e4e6e74d6ec8ccf6c159a32fcaaa34db9ff5e4ae358e409a';
+          assert.ok(['push','schedule','workflow_dispatch','workflow_run']
+            .includes(process.env.GITHUB_EVENT_NAME),
+            'only signed, allowlisted wake event may ask Supabase for an existing approval');
           assert.equal(process.env.GITHUB_REPOSITORY,repo);
           assert.equal(process.env.GITHUB_REF,'refs/heads/main');
           assert.ok(/^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA||''));
