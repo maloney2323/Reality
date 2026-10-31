@@ -26,6 +26,8 @@ import {createGenericVerifiedOriginalWorkSettlement}
  from './reality-general-original-work-settlement-v1.0.js';
 import {acceptGovernedObservation,verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
+import {dispatchApprovedBackgroundRepair}
+ from './reality-approved-repair-github-wakeup-v1.0.js';
 const fail=x=>{throw Error('REAL_LIVE_INSTALL_'+x)};
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/,HASH=/^[a-f0-9]{64}$/;
@@ -82,6 +84,7 @@ export function createLiveGeneralRepairService({
  verifierFactory=createIndependentInstalledWorkVerifier,
  installer=installVerifiedGenericPreviewExtension,
  continuation=continueExactlyApprovedGeneralRepair,
+ dispatchApproved=dispatchApprovedBackgroundRepair,
 }={}){
  if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
   !session?.user_id||!UUID.test(session.user_id)||!session.config?.url||
@@ -366,13 +369,35 @@ export function createLiveGeneralRepairService({
      queued.original_work_id!==originalWorkId||
      queued.installation_authorized!==true||queued.production_changed!==false)
    fail('BACKGROUND_CONTINUATION_DURABLE_READBACK_REQUIRED');
+  let dispatch=null,dispatchError=null;
+  try{
+   dispatch=await dispatchApproved({
+    reservationId:reserved.reservation_id,originalWorkId,
+    candidateHash:expectedArtifactHash,issueNumber,
+    installBranch:env.VERCEL_GIT_COMMIT_REF,env,fetchImpl,
+   });
+   if(dispatch?.dispatched!==true||
+      dispatch?.production_changed!==false)
+    fail('BACKGROUND_WAKEUP_GITHUB_READBACK_REQUIRED');
+  }catch(error){
+   const code=String(error?.message||'');
+   dispatchError=/^REALITY_APPROVED_DISPATCH_[A-Z0-9_]+$/.test(code)?
+    code:'REAL_LIVE_INSTALL_BACKGROUND_WAKEUP_RECONCILIATION_REQUIRED';
+  }
+  // Owner approval is DURABLE even if waking GitHub failed. Never claim
+  // execution or retry a provider write just to paper over uncertainty.
   return Object.freeze({
-   status:'OWNER_APPROVED_BACKGROUND_CONTINUATION_QUEUED',
+   status:dispatchError?
+    'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION':
+    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
    original_work_id:originalWorkId,issue_number:issueNumber,
    candidate_artifact_hash:expectedArtifactHash,
    reservation_id:reserved.reservation_id,
    background_status:queued.status,
+   worker_workflow_url:dispatch?.worker_workflow_url||null,
+   dispatch_error:dispatchError,
    installation_authorized:true,owner_approval_consumed:true,
+   worker_dispatched:dispatch?.dispatched===true,
    installed:false,original_job_completed:false,production_changed:false,
   });
  }
