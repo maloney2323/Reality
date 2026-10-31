@@ -8,6 +8,8 @@ import {readExactModelRepairEvidence}
  from '../../src/reality-real-verified-repair-readback-v1.0.js';
 import {prepareVerifiedOwnerRepairCandidate}
  from '../../src/reality-owner-repair-candidate-admission-v1.0.js';
+import {verifyApprovedBackgroundReadiness}
+ from '../../src/reality-approved-repair-background-readiness-v1.0.js';
 export const maxDuration=150;
 const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('REAL_REPAIR_CANDIDATE_'+x)};
@@ -76,7 +78,11 @@ export default async function handler(req,res){
   if(ready.candidate_artifact_hash!==req.body.candidate_artifact_hash||
    ready.independent_readback_verified!==true)
    fail('CONSTITUTIONAL_CANDIDATE_CHECKPOINT_UNVERIFIED');
-  return res.status(200).json({ok:true,...ready});
+  const preflight=await verifyApprovedBackgroundReadiness();
+  return res.status(200).json({ok:true,...ready,
+   background_preflight_passed:preflight.ready===true,
+   background_preflight_status:preflight.code,
+  });
  }catch(error){
   const code=String(error?.message||'');
   return res.status(error?.status||503).json({
