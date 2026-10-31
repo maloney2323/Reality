@@ -26,6 +26,7 @@ create table if not exists reality_internal.governed_auto_triggers_v1 (
 );
 alter table reality_internal.governed_auto_triggers_v1 enable row level security;
 revoke all on reality_internal.governed_auto_triggers_v1 from public,anon,authenticated;
+grant select,insert,update on reality_internal.governed_auto_triggers_v1 to service_role;
 
 create or replace function public.reality_enqueue_governed_auto_trigger_v1(
  p_owner_id uuid,p_conversation_id uuid,p_original_work_id text,
