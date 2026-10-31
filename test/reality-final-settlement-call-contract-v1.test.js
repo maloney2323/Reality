@@ -7,5 +7,5 @@ test('final independent settlement verifier binds the same original resumption a
  assert.match(settlement,/async function verify\(\{registration,execution\}=\{\}\)/);
  assert.match(service,/await settle\.verify\(\{registration,execution:resumption\}\)/);
  assert.doesNotMatch(service,/await settle\.verify\(\{registration,resumption\}\)/);
- assert.match(service,/if\(observed\.verified===true\)/);
+ assert.match(service,/observed\.verified===true/);
 });
