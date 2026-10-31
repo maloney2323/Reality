@@ -1,0 +1,38 @@
+name: Reality governed same-job auto-trigger contract — preview only
+on:
+  push:
+    branches: [feature/reality-governed-auto-triggers-20261031]
+    paths:
+      - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'src/reality-real-repair-opportunity-intake-v1.0.js'
+      - 'src/reality-execution-self-repair-handoff-v1.0.js'
+      - 'test/reality-governed-auto-trigger-v1.0.test.js'
+      - 'test/reality-real-repair-opportunity-intake-v1.0.test.js'
+      - 'supabase/migrations/20261031_governed_auto_trigger_same_job_v1.sql'
+      - '.github/workflows/reality-governed-auto-triggers-v1.yml'
+permissions: {contents: read}
+jobs:
+  immutable-owner-goal-and-original-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Source parse and owner-trigger contract
+        run: |
+          node --check src/reality-governed-auto-trigger-v1.0.js
+          node --check src/reality-real-repair-opportunity-intake-v1.0.js
+          node --test test/reality-governed-auto-trigger-v1.0.test.js
+          node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+      - name: Constitutional handoff and execution noninterference
+        run: |
+          node --test test/reality-job-triggered-self-repair-v1.0.test.js
+          node --test test/reality-governed-execution-engine-v0.1.test.js
+          node --test test/reality-upgrade-discovery-driver-continuation-v1.test.js
+      - name: No fake owner installation or customer settlement
+        run: |
+          echo 'Verifies source-backed atomic trigger registration and handoff ONLY.'
+          echo 'Customer installation requires separate owner approval.'
+          echo 'No repair is declared installed, resumed, or settled.'
