@@ -9,6 +9,8 @@ import {createLiveGeneralRepairService}
  from '../src/reality-live-approved-install-to-settlement-v1.0.js';
 import {dispatchApprovedBackgroundRepair}
  from '../src/reality-approved-repair-github-wakeup-v1.0.js';
+import {ensureIndependentOriginalAcceptance}
+ from '../src/reality-governed-installed-acceptance-wakeup-v1.js';
 const WORKER='feature/reality-background-continuation-20261031';
 const PROJECT='hvkfreoagbrphwghjajw';
 const err=x=>{throw Error('REALITY_APPROVED_BACKGROUND_'+x)};
@@ -66,7 +68,7 @@ function dbCall(env,name,payload,fetchImpl=fetch){
 export async function executeApprovedContinuation({
  env=process.env,request,checkoutSha,call=dbCall,
  serviceFactory=createLiveGeneralRepairService,wait=pause,maxChecks=15,
- leasedWork=null,
+ acceptanceWake=ensureIndependentOriginalAcceptance,leasedWork=null,
 }={}){
  verifyApprovedWorkerEnvironment(env,request,checkoutSha);
  // Production execution receives a narrowly signed OIDC lease from the
@@ -100,12 +102,23 @@ export async function executeApprovedContinuation({
  const service=serviceFactory({session,env:workerEnv});
  let outcome=null,diagnostic='ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING';
  try{
+  let acceptanceRequested=false;
   for(let attempt=0;attempt<maxChecks;attempt++){
    outcome=await service.continueAfterInstall({
     originalWorkId:leased.original_work_id,issueNumber:leased.issue_number});
    if(outcome?.original_work_id!==leased.original_work_id||
       outcome?.production_changed!==false)
     err('ORIGINAL_WORK_OR_PRODUCTION_SCOPE_CHANGED');
+   if(outcome.status==='AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE'&&
+      SHA.test(String(outcome.installed_commit_sha||''))&&
+      acceptanceRequested===false){
+    await acceptanceWake({
+     env,originalWorkId:leased.original_work_id,
+     installedCommitSha:outcome.installed_commit_sha,
+     installedBranch:leased.install_branch,
+    });
+    acceptanceRequested=true;
+   }
    if(outcome.original_job_completed===true){
     if(outcome.status!=='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'||
        outcome.independent_readback_verified!==true||
