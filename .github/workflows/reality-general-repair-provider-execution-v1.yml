@@ -5,6 +5,8 @@ on:
     paths:
       - 'src/reality-general-preview-capability-registry-v1.0.js'
       - 'src/reality-general-original-work-settlement-v1.0.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
       - 'src/reality-general-approved-repair-continuation-v1.0.js'
       - 'test/reality-general-approved-repair-continuation-v1.0.test.js'
       - 'src/reality-governed-self-improvement-spine-v1.0.js'
@@ -24,6 +26,8 @@ on:
     paths:
       - 'src/reality-general-preview-capability-registry-v1.0.js'
       - 'src/reality-general-original-work-settlement-v1.0.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
       - 'src/reality-general-approved-repair-continuation-v1.0.js'
       - 'test/reality-general-approved-repair-continuation-v1.0.test.js'
       - 'src/reality-governed-self-improvement-spine-v1.0.js'
@@ -56,6 +60,8 @@ jobs:
       - run: node --test test/reality-general-original-work-settlement-v1.0.test.js
       - run: node --check src/reality-general-approved-repair-continuation-v1.0.js
       - run: node --test test/reality-general-approved-repair-continuation-v1.0.test.js
+      - run: node --check src/reality-general-constitutional-checkpoint-v1.0.js
+      - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
       - run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
       - run: node --test test/reality-foundational-model-strict-candidate-v1.0.test.js
       - run: node --test test/reality-foundational-build-loop-v1.0.test.js
