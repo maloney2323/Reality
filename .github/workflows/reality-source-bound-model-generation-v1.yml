@@ -1,0 +1,159 @@
+name: Reality — Source-bound autonomous repair and independent offline correction
+on:
+  push:
+    branches: [feature/reality-closed-loop-worker-20261031]
+    paths:
+      - 'reality-requests/*.json'
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+concurrency:
+  group: reality-source-bound-generation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  generate-and-correct-original-gap:
+    if: github.repository == 'maloney2323/Reality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact isolated worker commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: executor
+          fetch-depth: 2
+          persist-credentials: true
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify existing worker services available before consuming original queue
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OPENAI_API_KEY"
+          node --check executor/scripts/reality-source-bound-model-ticket-worker-v1.mjs
+          node --check executor/scripts/reality-autonomous-source-repair-v1.mjs
+      - name: Atomically claim unchanged owner-approved original work
+        id: claim
+        working-directory: executor
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
+          REALITY_PERSONAL_CHAT_SUPABASE_URL: https://hvkfreoagbrphwghjajw.supabase.co
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST_FILE=$(git diff --name-only HEAD^ HEAD)
+          test -f "$REQUEST_FILE"
+          REQUEST_KIND=$(node -e 'const f=require("fs");const r=JSON.parse(f.readFileSync(process.argv[1]));console.log(r.schema)' "$REQUEST_FILE")
+          if [ "$REQUEST_KIND" = "reality-original-178-recovery-request-v1" ]; then
+            test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+            test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+            OIDC_REPLY=$(curl --fail --silent --show-error \
+              -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=reality-original-178-recovery-v1")
+            REALITY_RECOVERY_GITHUB_OIDC_TOKEN=$(printf '%s' "$OIDC_REPLY" | node -e 'let b="";process.stdin.on("data",v=>b+=v);process.stdin.on("end",()=>{const t=JSON.parse(b).value;if(!t||t.length<300)process.exit(1);process.stdout.write(t)})')
+            export REALITY_RECOVERY_GITHUB_OIDC_TOKEN
+          else
+            test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          fi
+          node scripts/reality-source-bound-model-ticket-worker-v1.mjs
+          SOURCE_SHA=$(node -p 'JSON.parse(require("fs").readFileSync("reality-worker-result/ticket.json","utf8")).baseline_source_sha')
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+      - name: Read original GitHub baseline at exact failed commit (never HEAD)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: baseline
+          ref: ${{ steps.claim.outputs.source_sha }}
+          persist-credentials: false
+      - name: Freeze ticket beside unchanged original regression source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p baseline/reality-worker-result
+          cp executor/reality-worker-result/ticket.json baseline/reality-worker-result/ticket.json
+          node -e 'const fs=require("fs"),crypto=require("crypto");const t=JSON.parse(fs.readFileSync("baseline/reality-worker-result/ticket.json"));const x=fs.readFileSync("baseline/"+t.frozen_test_path);if(crypto.createHash("sha256").update(x).digest("hex")!==t.frozen_test_sha256)process.exit(40)'
+      - name: Actual model generation, correction, and independent secret-free Docker verification
+        working-directory: baseline
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+          REALITY_REPAIR_TICKET_PATH: reality-worker-result/ticket.json
+        run: |
+          set -euo pipefail
+          FROZEN=$(node -p 'JSON.parse(require("fs").readFileSync("reality-worker-result/ticket.json")).frozen_test_path')
+          SUCCESS=false
+          for ATTEMPT in 1 2 3; do
+            rm -rf artifact candidate
+            node ../executor/scripts/reality-autonomous-source-repair-v1.mjs generate "$ATTEMPT"
+            mkdir -p candidate
+            cp artifact/candidate.json candidate/candidate.json
+            node ../executor/scripts/reality-autonomous-source-repair-v1.mjs prepare
+            set +e
+            docker run --rm --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --memory=512m --cpus=1 \
+              --user 65534:65534 -v "$PWD:/work:ro" -w /work \
+              node:22 node --test "$FROZEN" \
+              test/reality-governed-self-improvement-spine-v1.0.test.js \
+              > sandbox.log 2>&1
+            EXIT=$?
+            set -e
+            node ../executor/scripts/reality-autonomous-source-repair-v1.mjs receipt "$ATTEMPT" "$EXIT"
+            if node -e 'process.exit(JSON.parse(require("fs").readFileSync("artifact/verification.json")).passed?0:1)'; then
+              SUCCESS=true
+              break
+            fi
+            mkdir -p prior
+            cp candidate/candidate.json prior/candidate.json
+            cp artifact/verification.json prior/verification.json
+            node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("candidate/candidate.json"));for(const f of c.files){if(!/^(src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(js|mjs))$/.test(f.path)||f.path.includes(".."))process.exit(41);fs.rmSync(f.path)}'
+          done
+          if [ "$SUCCESS" != true ]; then
+            echo "::error::Reality independently rejected all three model attempts."
+            exit 1
+          fi
+          echo 'Original frozen regression AND governance checks independently passed.'
+      - name: Commit inert candidate and unchanged original test for OWNER review only
+        working-directory: executor
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/reality-stage-source-bound-candidate-review-v1.mjs
+          ISSUE=$(node -p 'JSON.parse(require("fs").readFileSync("../baseline/reality-worker-result/ticket.json")).issue_number')
+          FROZEN=$(node -p 'JSON.parse(require("fs").readFileSync("../baseline/reality-worker-result/ticket.json")).frozen_test_path')
+          git config user.name 'Reality Verified Evidence Worker'
+          git config user.email 'reality-verified-evidence@users.noreply.github.com'
+          git add "reality-repair-evidence/issue-$ISSUE-candidate.json" "$FROZEN"
+          test "$(git diff --cached --name-only | wc -l)" -le 2
+          git commit -m "Reality: inert generated source and independent frozen acceptance for issue $ISSUE"
+          # An independent UI/API edit may advance the branch during the sandbox run.
+          # Never force-push or discard its updates. Rebase only the inert evidence
+          # commit, and retry the fast-forward publication within a fixed bound.
+          PUBLISHED=false
+          for TRY in 1 2 3 4 5; do
+            git fetch origin feature/reality-closed-loop-worker-20261031
+            REMOTE=origin/feature/reality-closed-loop-worker-20261031
+            if ! git merge-base --is-ancestor "$REMOTE" HEAD; then
+              git rebase "$REMOTE"
+            fi
+            test "$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l)" -le 2
+            if git push origin HEAD:feature/reality-closed-loop-worker-20261031; then
+              PUBLISHED=true
+              break
+            fi
+            echo "Concurrent branch update on inert candidate publication attempt $TRY; retrying without force"
+          done
+          if [ "$PUBLISHED" != true ]; then
+            echo "::error::Verified candidate could not be published because the branch continued moving."
+            exit 1
+          fi
+      - name: No model-granted installation or final outcome
+        run: echo 'Model code remains inert owner-review DATA. Only a later explicit signed owner action can authorize installation. No settlement.'

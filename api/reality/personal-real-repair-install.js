@@ -5,6 +5,8 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {createLiveGeneralRepairService}
  from '../../src/reality-live-approved-install-to-settlement-v1.0.js';
+import {verifyApprovedBackgroundReadiness}
+ from '../../src/reality-approved-repair-background-readiness-v1.0.js';
 export const maxDuration=300;
 const WORK=/^work:[a-f0-9]{32}$/,HASH=/^[a-f0-9]{64}$/;
 export default async function handler(req,res){
@@ -36,7 +38,13 @@ export default async function handler(req,res){
      !HASH.test(String(b.candidate_artifact_hash||''))||
      !HASH.test(String(b.expected_checkpoint_hash||'')))
     return res.status(403).json({ok:false,error:'REAL_INSTALL_EXPLICIT_EXACT_SOURCE_APPROVAL_REQUIRED'});
-   const result=await service.ownerApproveAndInstall({
+   const preflight=await verifyApprovedBackgroundReadiness();
+   if(preflight.ready!==true)
+    return res.status(503).json({ok:false,
+     error:'REAL_INSTALL_BACKGROUND_PREREQUISITES_UNAVAILABLE',
+     prerequisite_status:preflight.code,owner_approval_consumed:false,
+     original_job_completed:false,production_changed:false});
+   const result=await service.ownerApproveAndQueue({
     originalWorkId:b.expected_original_work_id,issueNumber:b.issue_number,
     expectedArtifactHash:b.candidate_artifact_hash,
     expectedCheckpointHash:b.expected_checkpoint_hash});

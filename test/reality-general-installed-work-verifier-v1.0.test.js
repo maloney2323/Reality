@@ -85,3 +85,15 @@ test('branch advance, source drift, frozen change, failed job and missing govern
    originalWorkId:WORK,expectedFrozenTestPath:FROZEN,expectedFrozenSha:frozenHash}),/REAL_INSTALLED_WORK_/);
  }
 });
+
+test('an explicitly dispatched frozen run is independently verified only at its exact installed SHA',async()=>{
+ const f=fake({runOverride:{event:'workflow_dispatch'}});
+ const verifier=createIndependentInstalledWorkVerifier({fetchImpl:f.fetchImpl});
+ const out=await verifier.observeOriginalRun({
+  installedCommitSha:SHA,installedBranch:BRANCH,originalWorkId:WORK,
+  expectedFrozenTestPath:FROZEN,expectedFrozenSha:frozenHash});
+ assert.equal(out.status,'VERIFIED_ORIGINAL_INSTALLED_WORK');
+ assert.equal(out.complete,true);
+ assert.ok(f.calls.some(x=>x.includes('/actions/workflows/')&&
+  !x.includes('event=push')),'list workflow dispatch alongside push runs');
+});

@@ -14,6 +14,8 @@ import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {projectPersonalCompletionReports}
  from './reality-completion-report-v0.1.js';
+import {readExactModelRepairEvidence}
+ from './reality-real-verified-repair-readback-v1.0.js';
 
 export const PERSONAL_UNFINISHED_WORK_VERSION='reality-personal-unfinished-work-v0.1';
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -163,6 +165,69 @@ export function projectUnfinishedFromConversation({
     'Confirm the original goal again before continuing this work.',
   }));
  }
+ // Historical original customer #178 is NOT a new source-backed work item.
+ // Project its existing signed Continuity work and separately VERIFIED gap
+ // into the SAME work ID. Until independent provider readback enriches the
+ // frozen source, this projection grants no install or execution authority.
+ const original178=history.filter(e=>{
+  const p=e?.payload||{};
+  return e.entity_type==='personal_first_self_upgrade_customer_work'&&
+   e.event_kind==='WORK'&&e.epistemic_status==='OBSERVED'&&
+   p.version==='reality-personal-first-upgrade-178-v0.1'&&
+   p.status==='INVESTIGATION_APPROVED_GAP_WORK_NOT_COMPLETED'&&
+   p.issue_number===178&&
+   p.issue_url==='https://github.com/maloney2323/Reality/issues/178'&&
+   p.original_work_id==='work:9b9578b3c65427589c4c6da68fe0fc87'&&
+   p.installation_authorized===false&&p.original_job_completed===false&&
+   e.provenance?.conversation_id===conversationId;
+ });
+ if(original178.length===1){
+  const source=original178[0],p=source.payload;
+  const run=/^github:actions:run:([1-9][0-9]*):job:([1-9][0-9]*)$/
+   .exec(String(p.gap_provider_receipt_ref||''));
+  const confirmed=history.filter(e=>e.entity_type==='personal_first_178_confirmed_gap'&&
+   e.event_kind==='OBSERVATION'&&e.epistemic_status==='VERIFIED'&&
+   e.payload?.original_source_receipt_ref===source.event_id&&
+   e.payload?.original_work_id===p.original_work_id&&
+   e.payload?.provider_receipt_ref===p.gap_provider_receipt_ref&&
+   e.payload?.evidence_hash===p.gap_evidence_hash&&
+   e.payload?.goal_id===p.original_goal_id&&
+   e.payload?.owner_id===source.provenance?.principal_id&&
+   e.provenance?.conversation_id===conversationId&&
+   e.provenance?.principal_id===source.provenance?.principal_id&&
+   e.payload?.authorization_granted===false&&
+   e.payload?.original_job_completed===false);
+  const current=Boolean(goal?.active_goal_id===p.original_goal_id&&
+   goal?.active_goal?.goal_id===p.original_goal_id&&
+   goal.active_goal.status==='ACTIVE'&&goal.active_goal.user_confirmed===true&&
+   goal.active_goal.last_transition_receipt_id===p.goal_transition_receipt_ref);
+  if(run&&Number.isSafeInteger(Number(run[1]))&&confirmed.length===1&&
+     p.pinned_red_run==='https://github.com/maloney2323/Reality/actions/runs/'+run[1]){
+   const settled=history.some(e=>
+    e.entity_type==='reality_generic_verified_original_work_outcome'&&
+    e.epistemic_status==='VERIFIED'&&
+    e.payload?.original_work_id===p.original_work_id&&
+    e.payload?.owner_id===source.provenance?.principal_id&&
+    e.payload?.independent_outcome_verified===true&&
+    e.payload?.outcome==='SUCCEEDED');
+   if(!settled)out.push(Object.freeze({
+    work_id:p.original_work_id,original_work_id:p.original_work_id,
+    conversation_id:conversationId,issue_number:178,
+    title:'Reality: continue original self-repair customer job #178',
+    state:'ORIGINAL_178_VERIFIED_GAP_AWAITING_CANDIDATE_READBACK',
+    legacy_original_178:true,action_completed:true,job_completed:false,
+    goal_still_current:current,source_receipt_id:source.event_id,
+    verified_gap_receipt_id:confirmed[0].event_id,issue_url:p.issue_url,
+    original_provider_failed_run_id:Number(run[1]),
+    observed_at:source.assertion_time,
+    can_save_recovery:false,can_resume_execution:false,
+    external_action_performed:false,
+    next_step:current?
+     'Read the already generated candidate against original #178. Do not create a second job.':
+     'Reconfirm the existing original goal before any repair action.',
+   }));
+  }
+ }
  return Object.freeze(out);
 }
 
@@ -171,6 +236,7 @@ export async function listAuthenticatedUnfinishedWork({
  listConversations=listPrivateConversations,
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
+ readLegacyCandidate=readExactModelRepairEvidence,
  maxConversations=50,
 }={}){
  if(!validUuid(session?.user_id)||!session?.config?.url||
@@ -234,13 +300,38 @@ export async function listAuthenticatedUnfinishedWork({
  }
  const all=[...unique.values()].sort((a,b)=>
   String(b.observed_at||'').localeCompare(String(a.observed_at||'')));
+ // Only provider-verified ORIGINAL evidence may upgrade the historical #178
+ // projection to a candidate ready for review. The model cannot invent a new
+ // customer work record, and a failed readback leaves installation disabled.
+ const jobs=await Promise.all(all.map(async item=>{
+  if(item.legacy_original_178!==true||item.goal_still_current!==true)
+   return item;
+  try{
+   const proof=await readLegacyCandidate({issueNumber:178,env});
+   if(proof?.independently_verified!==true||
+    proof.issue_number!==178||proof.issue_url!==item.issue_url||
+    proof.original_failed_run_id!==item.original_provider_failed_run_id||
+    !/^[a-f0-9]{40}$/.test(String(proof.original_source_sha||''))||
+    !/^[a-f0-9]{64}$/.test(String(proof.frozen_test_sha256||''))||
+    proof.installed!==false||proof.original_job_completed!==false||
+    proof.installation_authorized!==false||proof.production_changed!==false)
+    return item;
+   return Object.freeze({...item,
+    state:'REAL_SOURCE_BACKED_REPAIR_PENDING',
+    original_source_sha:proof.original_source_sha,
+    frozen_test_path:'test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js',
+    frozen_test_sha256:proof.frozen_test_sha256,
+    next_step:'The original #178 model candidate is source-verified and ready for owner review.',
+   });
+  }catch{return item;}
+ }));
  return Object.freeze({
   version:PERSONAL_UNFINISHED_WORK_VERSION,
   status:unreadable?'PARTIAL_COVERAGE':'SCOPED_READ_ONLY',
   scanned_conversations:selected.length,unreadable_conversations:unreadable,
   coverage_limited:ids.length>selected.length||available.length>=50,
   unfinished_count:all.length,
-  jobs:Object.freeze(all.slice(0,30)),
+  jobs:Object.freeze(jobs.slice(0,30)),
   result_truncated:all.length>30,
   execution_authorized:false,external_action_performed:false,
  });

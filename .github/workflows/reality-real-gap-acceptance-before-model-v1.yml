@@ -27,7 +27,7 @@ jobs:
         run: sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
       - name: Frozen same-work missing capability acceptance
         run: node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
-      - name: Regression: governance and exact-owner installation gates
+      - name: 'Regression: governance and exact-owner installation gates'
         run: |
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
           node --test test/reality-general-isolated-install-v1.0.test.js
