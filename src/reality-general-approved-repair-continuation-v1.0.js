@@ -26,7 +26,8 @@ export async function continueExactlyApprovedGeneralRepair({
 }={}){
  verifySelfImprovementJournal(state);
  const scope=state.scope;
- if(state.phase!=='PROMOTION_AUTHORIZED'||
+ if(!['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
+  'ORIGINAL_JOB_RESUMED','SETTLED'].includes(state.phase)||
   scope?.target_environment!=='ISOLATED_PREVIEW'||
   scope.owner_id!==session?.user_id||
   ticket?.environment!=='ISOLATED_PREVIEW'||
