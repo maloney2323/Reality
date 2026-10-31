@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {verifyApprovedBackgroundReadiness}
  from '../src/reality-approved-repair-background-readiness-v1.0.js';
 const repo='maloney2323/Reality',branch='feature/reality-closed-loop-worker-20261031';
@@ -43,4 +44,18 @@ test('inaccessible Github and a foreign environment fail closed',async()=>{
  const foreign=await verifyApprovedBackgroundReadiness({
   env:{...env,VERCEL_ENV:'production'},fetchImpl:async()=>{throw Error('NO');}});
  assert.equal(foreign.ready,false);
+});
+
+test('preview UI and signed-in owner API both block blind single-use approval',()=>{
+ const installApi=readFileSync(new URL('../api/reality/personal-real-repair-install.js',
+  import.meta.url),'utf8');
+ const candidateApi=readFileSync(new URL('../api/reality/personal-real-repair-candidate.js',
+  import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(candidateApi,/background_preflight_passed:preflight\.ready===true/);
+ assert.match(installApi,/REAL_INSTALL_BACKGROUND_PREREQUISITES_UNAVAILABLE/);
+ assert.ok(installApi.indexOf('const preflight=await verifyApprovedBackgroundReadiness()')<
+  installApi.indexOf('service.ownerApproveAndQueue'));
+ assert.match(ui,/wcApproveExactInstall'\)\.disabled=!workerReady/);
+ assert.match(ui,/Approval is disabled to avoid consuming authorization/);
 });
