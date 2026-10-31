@@ -351,6 +351,31 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    </div>
    <p id="wcModelRepairReviewStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No exact repair has been approved or installed.</p>
 
+   <div class="repair-current" id="wcInstallSettlementPanel" style="margin-bottom:12px">
+    <div>
+     <div class="repair-kicker">Owner approval · One approval, then automatic continuation</div>
+     <h4 id="wcInstallSettlementHeading">Install, verify, resume and settle</h4>
+     <p id="wcInstallSettlementDetails">Exact installation stays unavailable until Reality has persisted the generated source and independent-test checkpoint for your original job.</p>
+    </div>
+    <div class="repair-actions">
+     <button type="button" id="wcApproveExactInstall" class="repair-primary" disabled>Approve exact repair and finish job</button>
+    </div>
+   </div>
+   <p id="wcInstallSettlementStatus" class="repair-status" role="status" aria-live="polite">No installation is authorized. No final receipt has been recorded.</p>
+   <dialog id="wcExactInstallDialog" class="repair-dialog" aria-labelledby="wcExactInstallDialogHeading">
+    <div class="repair-dialog-body">
+     <span class="repair-eyebrow">Explicit owner authority · Isolated preview only</span>
+     <h3 id="wcExactInstallDialogHeading">Approve this exact verified repair?</h3>
+     <p id="wcExactInstallDialogDetails" class="repair-consent-work">No exact source selected.</p>
+     <p>This permits Reality to install only these verified extension files in its isolated preview, then resume and independently verify the same original job. It does not grant production, billing or external customer action authority.</p>
+     <label class="repair-checkbox"><input id="wcExactInstallCheckbox" type="checkbox">I authorize this exact source installation and its automatic preview-only continuation.</label>
+     <div class="repair-dialog-actions">
+      <button type="button" id="wcExactInstallCancel" class="repair-cancel">Cancel</button>
+      <button type="button" id="wcExactInstallConfirm" class="repair-confirm" disabled>Approve and finish original job</button>
+     </div>
+    </div>
+   </dialog>
+
    <div class="repair-current">
     <div>
      <div class="repair-kicker">Next action</div>
@@ -1279,6 +1304,8 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 let wcGovernedBuildEligible=false;
 let wcRealRepairOpportunity=null;
 let wcExactModelCandidate=null;
+let wcVerifiedInstallReview=null;
+let wcInstallContinuationBusy=false;
 let wcRepairIntent='EXISTING_WORK';
 let wcGovernedBuildBusy=false;
 let wcRepairSelectedWork=null;
@@ -1507,6 +1534,19 @@ $('wcPrepareModelRepair').onclick=async()=>{
   $('wcRepairApprovalInfo').textContent=
    'Exact candidate SHA-256: '+proposal.candidate_artifact_hash+
    '. Independent tests and your original-work constitutional checkpoint are verified. Installation remains locked until the separate trusted install action is connected.';
+  wcVerifiedInstallReview={
+   original_work_id:data.original_work_id,
+   issue_number:proposal.issue_number,
+   candidate_artifact_hash:data.candidate_artifact_hash,
+   constitutional_checkpoint_hash:data.constitutional_checkpoint_hash,
+   original_provider_run_id:data.original_provider_failed_run_id,
+   source_files:data.source_files,
+  };
+  $('wcApproveExactInstall').disabled=false;
+  $('wcInstallSettlementDetails').textContent=
+   'Original job '+data.original_work_id+' · Artifact SHA-256: '+
+   data.candidate_artifact_hash+' · Files: '+(data.source_files||[]).join(', ')+
+   '. The separate installation approval is still required.';
   status.textContent='Original-work verification checkpoint saved: '+
    data.constitutional_checkpoint_receipt_id+
    '. Reality has NOT installed, resumed or settled the original job.';
@@ -1516,6 +1556,130 @@ $('wcPrepareModelRepair').onclick=async()=>{
    '. No installation or completion claimed.';
  }finally{wcGovernedBuildBusy=false;}
 };
+
+
+function wcStopExactInstall(status){
+ wcInstallContinuationBusy=false;
+ $('wcInstallSettlementStatus').textContent=status;
+}
+async function wcContinueExactInstall(work,issue,attempt=0){
+ if(!wcInstallContinuationBusy)return;
+ if(attempt>35){
+  wcStopExactInstall('Original job still awaiting independent provider settlement. Reality saved the installation and approval; the next signed-in session can safely resume this same job.');
+  return;
+ }
+ try{
+  const r=await fetch('/api/reality/personal-real-repair-install',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'CONTINUE_PREVIOUSLY_APPROVED_INSTALL',
+    expected_original_work_id:work,issue_number:issue}),
+  });
+  const data=await r.json();
+  if(!r.ok||data.ok!==true)
+   throw Error(String(data.error||'INDEPENDENT_PROVIDER_RESUMPTION_FAILED'));
+  if(data.original_work_id!==work||data.production_changed!==false)
+   throw Error('ORIGINAL_JOB_OR_PRODUCTION_SCOPE_CHANGED');
+  if(data.status==='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'&&
+   data.original_job_completed===true&&
+   data.independent_readback_verified===true&&
+   /^supabase:universe_events:[0-9a-f-]{36}$/i.test(String(data.settlement_receipt_ref||''))){
+   wcRepairStage(4,'complete');wcRepairStage(5,'complete');
+   wcRepairSetBadge('Original job settled','ready');
+   $('wcInstallSettlementHeading').textContent='Original job independently settled';
+   wcStopExactInstall('VERIFIED SETTLEMENT · '+work+
+    ' · Installed commit '+data.installed_commit_sha+
+    ' · Final Continuity receipt '+data.settlement_receipt_ref+
+    '. Source acceptance and governance tests independently passed.');
+   localStorage.removeItem('reality.pending.exact.preview.repair.v1');
+   return;
+  }
+  if(data.original_job_completed!==false)
+   throw Error('UNSUPPORTED_COMPLETION_CLAIM');
+  $('wcInstallSettlementStatus').textContent=
+   'Reality is continuing the SAME original job: '+work+
+   ' · '+String(data.status||'PENDING_PROVIDER_READBACK')+
+   '. Installation alone does not count as completion.';
+  setTimeout(()=>{void wcContinueExactInstall(work,issue,attempt+1);},7000);
+ }catch(error){
+  wcStopExactInstall('Reality stopped without claiming completion: '+
+   String(error?.message||'PROVIDER_UNAVAILABLE')+
+   '. The saved source and receipt can be re-read; no duplicate installation should be authorized.');
+ }
+}
+$('wcApproveExactInstall').onclick=()=>{
+ const ready=wcVerifiedInstallReview,dialog=$('wcExactInstallDialog');
+ if(!ready||wcGovernedBuildBusy||wcInstallContinuationBusy||
+    $('privateReady')?.style.display!=='block'||typeof dialog?.showModal!=='function')return;
+ $('wcExactInstallDialogDetails').textContent=
+  'Original owner job: '+ready.original_work_id+
+  ' · Source SHA-256: '+ready.candidate_artifact_hash+
+  ' · Independently checked original run: '+ready.original_provider_run_id+
+  ' · Extension files: '+(ready.source_files||[]).join(', ');
+ $('wcExactInstallCheckbox').checked=false;
+ $('wcExactInstallConfirm').disabled=true;
+ dialog.showModal();
+};
+$('wcExactInstallCancel').onclick=()=>$('wcExactInstallDialog').close();
+$('wcExactInstallCheckbox').onchange=()=>{
+ $('wcExactInstallConfirm').disabled=
+  !$('wcExactInstallCheckbox').checked||!wcVerifiedInstallReview;
+};
+$('wcExactInstallConfirm').onclick=async()=>{
+ const ready=wcVerifiedInstallReview;
+ if(!ready||!$('wcExactInstallCheckbox').checked||wcInstallContinuationBusy)return;
+ $('wcExactInstallDialog').close();
+ wcInstallContinuationBusy=true;$('wcApproveExactInstall').disabled=true;
+ $('wcInstallSettlementStatus').textContent=
+  'Requesting one atomic owner-approved installation for the exact independently tested source…';
+ try{
+  const response=await fetch('/api/reality/personal-real-repair-install',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'OWNER_APPROVE_EXACT_INSTALL',
+    expected_original_work_id:ready.original_work_id,
+    issue_number:ready.issue_number,
+    candidate_artifact_hash:ready.candidate_artifact_hash,
+    expected_checkpoint_hash:ready.constitutional_checkpoint_hash,
+   }),
+  });
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+     data.status!=='INSTALLED_AWAITING_ORIGINAL_INDEPENDENT_ACCEPTANCE'||
+     data.original_work_id!==ready.original_work_id||
+     data.artifact_hash!==ready.candidate_artifact_hash||
+     data.owner_approval_consumed!==true||
+     data.source_bytes_verified!==true||
+     data.original_job_completed!==false)
+   throw Error(String(data.error||'EXACT_OWNER_INSTALL_NOT_VERIFIED'));
+  wcRepairStage(4,'complete');wcRepairStage(5,'active');
+  wcRepairSetBadge('Installed, verifying job','ready');
+  localStorage.setItem('reality.pending.exact.preview.repair.v1',
+   JSON.stringify({original_work_id:ready.original_work_id,
+    issue_number:ready.issue_number}));
+  $('wcInstallSettlementStatus').textContent=
+   'Exact owner-approved source installed at '+data.installed_commit_sha+
+   '. Reality is independently running the original job and verifying settlement…';
+  void wcContinueExactInstall(ready.original_work_id,ready.issue_number);
+ }catch(error){
+  wcStopExactInstall('No customer completion claimed. Exact installation/claim readback requires attention: '+
+   String(error?.message||'TRUSTED_PROVIDER_UNAVAILABLE')+
+   '. The owner approval may already be consumed; review progress rather than approving again.');
+ }
+};
+// A previously approved exact installation is safe to continue after closing
+// the tab: the server rechecks OWNER, prior reservation and immutable source.
+// This does not grant approval or authorize any new installation.
+function wcResumeSavedExactRepair(){
+ if(wcInstallContinuationBusy||$('privateReady')?.style.display!=='block')return;
+ let saved;try{saved=JSON.parse(localStorage.getItem('reality.pending.exact.preview.repair.v1')||'null')}catch{return}
+ if(!/^work:[a-f0-9]{32}$/.test(String(saved?.original_work_id||''))||
+   !Number.isSafeInteger(saved.issue_number)||saved.issue_number<1)return;
+ wcInstallContinuationBusy=true;
+ void wcContinueExactInstall(saved.original_work_id,saved.issue_number);
+}
+setInterval(wcResumeSavedExactRepair,15000);
 
 $('wcDiscoverRealRepair').onclick=async()=>{
  const button=$('wcDiscoverRealRepair');
