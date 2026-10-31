@@ -9,6 +9,8 @@ import {
 } from '../../src/reality-real-repair-opportunity-intake-v1.0.js';
 import {queueOwnerGovernedBuild}
  from '../../src/reality-governed-build-chat-connection-v1.0.js';
+import {autoPrepareOriginalJobCandidate}
+ from '../../src/reality-governed-auto-trigger-candidate-v1.0.js';
 export const maxDuration=120;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -47,6 +49,30 @@ export default async function handler(req,res){
    issueNumber:data.issue_number,
    expectedFailedRunId:data.expected_failed_run_id,
    expectedSourceSha:data.expected_source_sha,
+  });
+  // Governed auto-trigger: after the existing signed-in owner-authorized
+  // investigation, continue automatically into the ALREADY independently
+  // verified candidate/checkpoint if present. This does not install anything.
+  // If no candidate is ready yet, preserve the original source and continue
+  // to the existing separate model-generation/discovery worker path.
+  let autoTriggerCandidate=null;
+  if(process.env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true'&&
+    work.governed_auto_trigger?.status==='PENDING_VERIFIED_GAP_REOBSERVATION'){
+   try{
+    autoTriggerCandidate=await autoPrepareOriginalJobCandidate({
+     session,trigger:work.governed_auto_trigger,
+     originalWorkId:work.original_work_id,issueNumber:data.issue_number,
+    });
+   }catch{
+    autoTriggerCandidate=null;
+   }
+  }
+  if(autoTriggerCandidate)return res.status(202).json({
+   ok:true,...autoTriggerCandidate,
+   original_conversation_id:work.original_conversation_id,
+   owner_work_receipt_ref:work.source_receipt_id,
+   investigation_authorized:true,installation_authorized:false,
+   original_job_completed:false,production_changed:false,
   });
   // The first action has already persisted independently. A failed worker
   // dispatch must remain recoverable without duplicating this original job.

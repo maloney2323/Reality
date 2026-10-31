@@ -123,7 +123,9 @@ export async function prepareVerifiedOwnerRepairCandidate({
  let state;
  try{
   const previous=await checkpoint.readLatestCheckpoint();
-  if(!previous.verified)fail('PREVIOUS_CHECKPOINT_NOT_VERIFIED');
+  if(previous.persisted!==true||previous.independent_readback_verified!==true||
+     previous.checkpoint_hash!==previous.state?.head_hash)
+   fail('PREVIOUS_CHECKPOINT_NOT_VERIFIED');
   state=previous.state;
  }catch(error){
   if(error.message!=='GENERAL_CHECKPOINT_NO_PERSISTED_GENERAL_CHECKPOINT')

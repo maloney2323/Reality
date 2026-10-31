@@ -176,3 +176,48 @@ test('changed provider source or foreign owner conversation cannot create work',
  }),/REALITY_REAL_REPAIR_EXISTING_OWNER_CONVERSATION_REQUIRED/);
  assert.equal(h.calls.append,0);
 });
+
+
+test('owner-confirmed real source automatically queues one governed trigger under same original work identity',async()=>{
+ const h=setup();let calls=0;
+ const args={session,conversationId,issueNumber,
+  expectedFailedRunId:runId,expectedSourceSha:sha,
+  env:{...env,REALITY_GOVERNED_AUTO_TRIGGER_ENABLED:'true'},
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+  enqueueAutoTrigger:async scope=>{
+   calls++;
+   assert.equal(scope.originalWorkEventId,
+    h.events.find(x=>x.entity_type==='reality_original_source_backed_repair_work')?.event_id);
+   assert.equal(scope.goalTransitionEventId,goalReceipt);
+   assert.equal(scope.evidence.original_provider_failed_run_id,runId);
+   assert.equal(scope.env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED,'true');
+   return {status:'PENDING_VERIFIED_GAP_REOBSERVATION',
+    original_work_id:scope.originalWorkId,installation_authorized:false,
+    original_job_completed:false,new_customer_job_created:false};
+  },
+ };
+ const first=await authorizeExistingRealRepairWork(args);
+ const repeated=await authorizeExistingRealRepairWork(args);
+ assert.equal(first.original_work_id,repeated.original_work_id);
+ assert.equal(first.governed_auto_trigger.status,'PENDING_VERIFIED_GAP_REOBSERVATION');
+ assert.equal(first.governed_auto_trigger.original_work_id,first.original_work_id);
+ assert.equal(first.installation_authorized,false);
+ assert.equal(first.original_job_completed,false);
+ assert.equal(calls,2,'idempotent DB upsert, never a new job');
+ assert.equal(h.calls.append,1,'original customer work persisted only once');
+});
+test('failed trigger enqueue never invents a successful upgrade, settlement, or second job',async()=>{
+ const h=setup();
+ const x=await authorizeExistingRealRepairWork({
+  session,conversationId,issueNumber,expectedFailedRunId:runId,expectedSourceSha:sha,
+  env:{...env,REALITY_GOVERNED_AUTO_TRIGGER_ENABLED:'true'},
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+  enqueueAutoTrigger:async()=>{throw Error('DATABASE_UNAVAILABLE')},
+ });
+ assert.equal(x.governed_auto_trigger.status,'TRIGGER_REGISTRATION_NEEDS_READBACK');
+ assert.equal(x.original_job_completed,false);
+ assert.equal(x.installation_authorized,false);
+ assert.equal(h.calls.append,1);
+});
