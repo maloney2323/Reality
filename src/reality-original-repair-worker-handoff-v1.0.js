@@ -77,6 +77,14 @@ export async function queueVerifiedOriginalRepair({
     !active.source_user_message_ref||
     !validUuid(goal.scope?.root)||!validUuid(goal.scope?.worldline))
   fail('FRESH_OWNER_GOAL_AND_SCOPE_REQUIRED');
+ // Reconcile a previously admitted original job before creating another queue.
+ // A new evidence classification is not a replacement for its prior work ID.
+ const prior=await call(db,'reality_read_governed_build_v1',{
+  p_owner_id:session.user_id,p_conversation_id:work.original_conversation_id,
+ });
+ if(prior?.queue_id&&prior.original_work_id!==work.original_work_id&&
+    !['SETTLED','CANCELLED'].includes(prior.phase))
+  fail('EXISTING_UNFINISHED_WORK_IDENTITY_RECONCILIATION_REQUIRED');
  const queued=await call(db,'reality_enqueue_governed_build_v1',{
   p_owner_id:session.user_id,
   p_conversation_id:work.original_conversation_id,
