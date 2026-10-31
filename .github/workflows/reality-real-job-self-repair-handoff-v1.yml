@@ -20,5 +20,5 @@ jobs:
       - run: node --check src/reality-execution-self-repair-handoff-v1.0.js
       - run: node --test test/reality-job-triggered-self-repair-v1.0.test.js
       - run: node --test test/reality-governed-execution-engine-v0.1.test.js
-      - run: node --test test/reality-governed-self-improvement-driver-v1.0.test.js
+      - run: node --test test/reality-upgrade-discovery-driver-continuation-v1.test.js
       - run: node --test test/reality-upgrade-discovery-v0.1.test.js
