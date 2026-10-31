@@ -9,7 +9,11 @@ import {resolve} from 'node:path';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const fail=x=>{throw Error('REALITY_AUTOREPAIR_'+x)};
 const gitBase='https://api.github.com/repos/maloney2323/Reality/';
-const TICKET_PATH='reality-repair-jobs/source-verified-general-receipt-v1.json';
+const TICKET_PATH=process.env.REALITY_REPAIR_TICKET_PATH||
+ 'reality-repair-jobs/source-verified-general-receipt-v1.json';
+if(!['reality-repair-jobs/source-verified-general-receipt-v1.json',
+ 'reality-worker-result/ticket.json'].includes(TICKET_PATH))
+ fail('UNTRUSTED_TICKET_PATH');
 const ROOT=process.cwd();
 const text=path=>readFileSync(path,'utf8');
 const mode=process.argv[2],attempt=Number(process.argv[3]||1);
@@ -54,7 +58,7 @@ async function checkOriginalFailure(){
  const failures=(jobs.jobs||[]).filter(j=>j.run_id===run.id&&
   j.head_sha===run.head_sha&&j.conclusion==='failure'&&
   j.steps?.some(s=>s.conclusion==='failure'&&
-    String(s.name||'').includes('Frozen same-work')));
+    /^Frozen (?:same-work|customer acceptance)/.test(String(s.name||''))));
  if(failures.length!==1)fail('EXACT_ORIGINAL_FAILED_JOB_NOT_FOUND');
  const issue=await githubGet('issues/'+ticket.issue_number);
  if(issue.state!=='open'||issue.pull_request||
