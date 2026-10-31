@@ -1,0 +1,55 @@
+name: Reality source repair — independently reverify prior generated artifact
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths: ['reality-repair-verify/*.json']
+permissions: {contents: read, actions: read}
+jobs:
+  independent-original-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    outputs:
+      passed: ${{ steps.status.outputs.passed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 2, persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          request=$(git diff --name-only HEAD^ HEAD)
+          [[ "$request" =~ ^reality-repair-verify/[a-z0-9-]+\.json$ ]]
+          read_run=$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).source_run_id")
+          [[ "$read_run" =~ ^[1-9][0-9]{6,14}$ ]]
+          echo "run_id=$read_run" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=reality-repair-candidate-1" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.request.outputs.artifact_name }}
+          run-id: ${{ steps.request.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Validate and stage only exact model-generated extension source
+        run: node scripts/reality-autonomous-source-repair-v1.mjs prepare
+      - name: Frozen independent acceptance in no-secret, network-denied Docker
+        shell: bash
+        run: |
+          set +e
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory=512m --cpus=1 --user 65534:65534 -v "$PWD:/work:ro" -w /work node:22 node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js > sandbox.log 2>&1
+          echo "$?" > sandbox-exit-code
+          set -e
+      - name: Cryptographic exact-candidate verifier receipt
+        run: node scripts/reality-autonomous-source-repair-v1.mjs receipt 1 "$(cat sandbox-exit-code)"
+      - id: status
+        shell: bash
+        run: echo "passed=$(node -p 'JSON.parse(require("fs").readFileSync("artifact/verification.json","utf8")).passed')" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-repair-independent-original-acceptance-${{ github.run_id }}
+          path: |
+            artifact/verification.json
+            sandbox.log
+          if-no-files-found: error
+          retention-days: 14
