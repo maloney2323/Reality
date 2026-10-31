@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {executeApprovedContinuation,signedOriginalWorkLease}
+import {executeApprovedContinuation,signedOriginalWorkLease,verifyApprovedWorkerEnvironment}
  from '../scripts/reality-approved-repair-background-worker-v1.mjs';
 const branch='feature/reality-closed-loop-worker-20261031';
 const sha='a'.repeat(40),reservation=randomUUID();
@@ -136,4 +136,23 @@ test('already verified one-time OIDC lease resumes exact approved job without se
  assert.equal(result.status,'ORIGINAL_JOB_INDEPENDENTLY_SETTLED');
  assert.equal(result.original_job_completed,true);
  assert.deepEqual(calls,['reality_reconcile_approved_repair_continuation_v1']);
+});
+
+test('governed scheduler dispatch can reach ONLY the existing approved worker contract',()=>{
+ const signedDispatch={...env,GITHUB_EVENT_NAME:'workflow_dispatch'};
+ assert.equal(verifyApprovedWorkerEnvironment(signedDispatch,request,sha),true);
+ for(const invalid of [
+  {...signedDispatch,GITHUB_REF:'refs/heads/main'},
+  {...signedDispatch,GITHUB_REPOSITORY:'somebody/Reality'},
+  {...signedDispatch,REALITY_BACKGROUND_REPAIR_WORKER_ENABLED:'false'},
+  {...signedDispatch,SUPABASE_SERVICE_ROLE_KEY:undefined},
+  {...signedDispatch,GITHUB_SHA:'f'.repeat(40)},
+  {...signedDispatch,GITHUB_EVENT_NAME:'schedule'},
+ ]){
+  assert.throws(()=>verifyApprovedWorkerEnvironment(invalid,request,sha),
+   /REALITY_APPROVED_BACKGROUND_EXACT_ISOLATED_ACTIONS_IDENTITY_AND_SERVICE_CONFIG_REQUIRED/);
+ }
+ assert.throws(()=>verifyApprovedWorkerEnvironment(signedDispatch,
+  {...request,candidate_hash:'not-a-verified-artifact'},sha),
+ /REALITY_APPROVED_BACKGROUND_INERT_REQUEST_INVALID/);
 });
