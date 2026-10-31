@@ -129,7 +129,7 @@ test('Work Center connects live queue inspection and one consented discovery act
  assert.match(html,/id="privateContinueOriginal143"/);
  assert.match(html,/wcLoadUnfinishedWork\(\)/);
  assert.match(html,/id="wcInspectGovernedBuild"/);
- assert.match(html,/id="wcStartGovernedBuild" disabled/);
+ assert.match(html,/id="wcStartGovernedBuild"[^>]*disabled/);
  assert.match(html,/\/api\/reality\/personal-governed-build/);
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
  assert.match(html,/id="wcRepairConsentDialog"/);
