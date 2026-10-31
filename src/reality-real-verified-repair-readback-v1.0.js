@@ -12,7 +12,7 @@ const source=x=>typeof x==='string'&&
  /^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(?:js|mjs))$/.test(x)&&
  !x.split('/').includes('..')&&!x.includes('//');
 export async function readExactModelRepairEvidence({
- issueNumber,env=process.env,fetchImpl=fetch,branch=null,
+ issueNumber,env=process.env,fetchImpl=fetch,branch=null,sourceCommitSha=null,
 }={}){
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('ISSUE_NOT_GROUNDED');
@@ -20,6 +20,8 @@ export async function readExactModelRepairEvidence({
  if(typeof ref!=='string'||!/^feature\/reality-[a-z0-9][a-z0-9/-]{5,105}$/.test(ref)||
     ref.includes('..')||env.VERCEL_ENV!=='preview')
   fail('ISOLATED_PREVIEW_BRANCH_REQUIRED');
+ if(sourceCommitSha!==null&&!/^[a-f0-9]{40}$/.test(String(sourceCommitSha)))
+  fail('APPROVED_REVIEW_COMMIT_SHA_INVALID');
  const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
  async function get(path){
   const response=await fetchImpl(ROOT+path,{method:'GET',
@@ -35,7 +37,12 @@ export async function readExactModelRepairEvidence({
  const br=await get('/git/ref/heads/'+ref);
  if(!/^[0-9a-f]{40}$/.test(String(br?.object?.sha||'')))
   fail('SOURCE_BRANCH_HEAD_UNVERIFIED');
- const commit=br.object.sha;
+ const commit=sourceCommitSha||br.object.sha;
+ if(sourceCommitSha!==null){
+  const pinned=await get('/git/commits/'+sourceCommitSha);
+  if(!/^[a-f0-9]{40}$/.test(String(pinned?.tree?.sha||'')))
+   fail('ORIGINAL_APPROVED_SOURCE_COMMIT_NOT_RETRIEVABLE');
+ }
  const filename='reality-repair-evidence/issue-'+issueNumber+'-candidate.json';
  const file=await get('/contents/'+filename+'?ref='+commit);
  if(file?.path!==filename||file?.type!=='file'||
