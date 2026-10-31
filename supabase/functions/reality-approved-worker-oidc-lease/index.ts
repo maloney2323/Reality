@@ -88,8 +88,14 @@ async function verifySingleApprovedRequest(identity:{sha:string,run_id:string},
  const commit=await github('/commits/'+identity.sha);
  const prefix=PREFIX+request.reservation_id;
  const requestPath=commit?.files?.[0]?.filename;
- if(typeof requestPath!=='string'||!new RegExp('^'+prefix+
-   '(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\\\\.json
+ const suffix=typeof requestPath==='string'&&requestPath.startsWith(prefix)?
+  requestPath.slice(prefix.length):null;
+ if(typeof suffix!=='string'||!(/^(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\\.json$/).test(suffix))
+  throw Error('EXACT_OWNER_APPROVED_RETRY_PATH_REQUIRED');
+ if(commit?.sha!==identity.sha||commit?.parents?.length!==1||
+    !Array.isArray(commit.files)||commit.files.length!==1||
+    commit.files[0]?.filename!==requestPath||
+    commit.files[0]?.status!=='added')
   throw Error('SINGLE_APPROVED_WAKE_COMMIT_REQUIRED');
  const run=await github('/actions/runs/'+identity.run_id);
  if(String(run?.id)!==identity.run_id||run?.head_sha!==identity.sha||
