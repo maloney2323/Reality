@@ -12,10 +12,6 @@
     {
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/reality/personal-first-upgrade-178-dispatch",
-      "schedule": "*/15 * * * *"
     }
   ]
 }

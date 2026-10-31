@@ -252,30 +252,15 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
   <section id="wcGovernedBuild" aria-label="Reality governed upgrade pipeline" style="border-top:1px solid #45516a;padding:14px 0;margin-top:14px">
-   <div class="wc-old-general-upgrade" style="display:none" aria-hidden="true">
+   <div class="wc-general-upgrade">
    <strong>Reality · Governed Self-Upgrade</strong>
-   <p class="wc-note">Discover an actual missing capability, generate and independently sandbox-test a correction, then request a separate owner approval before installation. Each stage needs a durable receipt.</p>
+   <p class="wc-note">Inspect verified unfinished work and queue one governed discovery. Generation, sandbox verification, separate owner installation approval and settlement require independent receipts.</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" id="wcInspectGovernedBuild">Check verified upgrade readiness · Read only</button>
     <button type="button" id="wcStartGovernedBuild" disabled>Start owner-scoped investigation · No install</button>
    </div>
    <p class="wc-note" id="wcGovernedBuildStatus" role="status" aria-live="polite">No upgrade run has been started by this screen. Read-only check required.</p>
    <p class="wc-note" id="wcGovernedBuildProof" role="status" aria-live="polite">Generation · Sandbox · Approval · Registration · Original-job resumption · Settlement: not verified.</p>
-   </div>
-   <div id="wcFirstUpgrade178" style="margin-top:4px;padding-top:4px">
-    <strong>First customer self-upgrade · Original job #178</strong>
-    <p class="wc-note">Real missing capability: GitHub Actions failure-to-upgrade evidence. Frozen red run #40962921090. Only this job is eligible here; settled #143 cannot be selected. Generation and isolated verification may use model credits. Installation always requires separate approval.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-     <button id="wcInspectFirstGap178" type="button">Refresh #178 status · Read only</button>
-     <button id="wcSelfDiagnose178" type="button">Reality · Diagnose its own failure</button>
-     <button id="wcAuthorizeRedesign178" type="button" style="display:none">Authorize one #178 self-repair attempt</button>
-     <button id="wcStartFirstGap178" type="button">Run original #178 · One click</button>
-     <button id="wcApproveFirst178" type="button" style="display:none" disabled>Approve exact verified upgrade · Finish original #178</button>
-    </div>
-    <p id="wcFirst178ApprovalStatus" role="status" aria-live="polite" class="wc-note">Reality will present one installation approval ONLY after the exact original candidate passes independent tests. No production installation.</p>
-    <p id="wcRedesign178Status" role="status" aria-live="polite" class="wc-note">No additional recovery has been authorized. The original eight failures are preserved.</p>
-    <p id="wcSelfDiagnose178Status" role="status" aria-live="polite" class="wc-note">Reality's read-only self-diagnosis will compare the canonical saved job, selected conversation, verified failure checkpoint, and authority boundaries. Diagnosis never retries or grants installation.</p>
-    <p id="wcFirstGap178Status" role="status" aria-live="polite" class="wc-note">One owner click starts the exact original #178 investigation, AI generation, and independent sandbox testing. This may consume model/sandbox credits. No capability installation, production change, or settlement is authorized.</p>
    </div>
   </section>
  </div>
@@ -1165,377 +1150,6 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // upgrade loop. GET never starts work; POST is a separate, confirmed action.
 // The current isolated worker is read-only discovery. No stage is described as
 // model-generated or installed unless the durable provider state proves it.
-// One signed-in owner action for the SAME original #178 work.
-let wcFirstGap178Busy=false;
-let wcFirstGap178RecoveryEligible=false;
-let wcFirstGap178RecoveryAttempted=false;
-let wcFirst178ApprovalReady=null;
-let wcRedesign178Ready=null;
-let wcRedesign178Started=false;
-let wcFirst178CompletionBusy=false;
-let wcFirst178CompletionAutoStarted=false;
-// Owner GET/Refresh is read-only; only the trusted dispatcher resumes #178.
-async function wcContinueOriginal178Recovery(){
- const status=$('wcFirst178ApprovalStatus');
- if($('privateReady')?.style.display!=='block'||
-    !wcFirstGap178RecoveryEligible||wcFirstGap178RecoveryAttempted||
-    wcFirstGap178Busy)return;
- wcFirstGap178RecoveryAttempted=true;
- wcFirstGap178Busy=true;
- $('wcStartFirstGap178').disabled=true;
- status.textContent='Reality is continuing the previously authorized original #178 through its trusted preview worker. No new job, installation approval, or production changes…';
- try{
-  const response=await fetch('/api/reality/personal-first-upgrade-178-recovery',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
-   headers:{'content-type':'application/json'},
-   body:JSON.stringify({intent:'RESUME_PREAUTHORIZED_ORIGINAL_178_RECOVERY'}),
-  });
-  const d=await response.json();
-  if(!response.ok||d.ok!==true||
-     d.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'||
-     d.installed!==false||d.original_job_completed!==false||
-     d.production_changed!==false)
-   throw Error(String(d.error||'ORIGINAL_178_PROVIDER_RESULT_UNVERIFIED'));
-  status.textContent=d.status==='AWAITING_OWNER_APPROVAL'?
-   'Original #178: independently verified candidate is ready. Review the separate exact installation approval below. No installation yet.':
-   'Original #178 returned '+String(d.status||'UNVERIFIED')+
-   '. Read durable checkpoint before any further attempt. No installation or settlement claimed.';
-  void wcReadOwnerApproval178();
- }catch(e){
-  status.textContent='Original #178 could not verify recovered execution: '+
-   String(e?.message||'UNRESOLVED')+
-   '. No automatic retry. The existing durable checkpoint is authoritative.';
- }finally{
-  wcFirstGap178Busy=false;
-  $('wcStartFirstGap178').disabled=true;
- }
-}
-async function wcAuthorizeOriginal178Redesign(){
- const button=$('wcAuthorizeRedesign178'),status=$('wcRedesign178Status');
- const ready=wcRedesign178Ready;
- if(!ready||wcRedesign178Started||
-    $('privateReady')?.style.display!=='block')return;
- if(ready.status!=='EXHAUSTED_CORRECTION_ATTEMPTS'||
-    ready.attempts_used!==8||ready.attempt_limit!==8||
-    ready.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87')
-  return;
- wcRedesign178Started=true;
- button.disabled=true;button.style.display='none';
- status.textContent='Owner authorized exactly one redesign attempt for saved #178. Reality is using the existing provider, model and independent sandbox. The previous eight failures remain preserved. No installation approval.';
- try{
-  const response=await fetch('/api/reality/personal-first-upgrade-178-redesign',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
-   headers:{'content-type':'application/json'},
-   body:JSON.stringify({
-    intent:'AUTHORIZE_ONE_ORIGINAL_178_SOURCE_REDESIGN_ATTEMPT',
-    original_work_id:ready.original_work_id,
-    checkpoint_hash:ready.checkpoint_hash,
-    checkpoint_receipt_id:ready.checkpoint_receipt_id,
-    owner_confirms_one_attempt:true,
-    owner_confirms_installation:false,
-   }),
-  });
-  const d=await response.json();
-  if(!response.ok||d.ok!==true||
-     d.original_work_id!==ready.original_work_id||
-     d.owner_confirmation_consumed!==true||
-     d.installation_authorized!==false||
-     d.original_job_completed!==false)
-   throw Error(String(d.error||'ORIGINAL178_REDESIGN_RECONCILIATION_REQUIRED'));
-  status.textContent=d.status==='AWAITING_OWNER_APPROVAL'?
-   'Reality generated and independently verified the one redesign. Review exact source and separately approve installation; production remains untouched.':
-   'Saved original #178 redesign: '+String(d.status||'UNVERIFIED')+
-   '. Reservation '+String(d.single_use_redesign_reservation_id||'UNVERIFIED')+
-   '. No additional automatic retries, installation or settlement. Review the durable checkpoint.';
-  void wcReadOwnerApproval178();
-  void wcSelfDiagnoseOriginal178();
- }catch(e){
-  status.textContent='Outcome uncertain: '+String(e?.message||'UNRESOLVED')+
-   '. Do NOT submit a second grant. Refresh the original saved status and reconcile its Continuity receipt.';
- }
-}
-$('wcAuthorizeRedesign178').onclick=()=>{void wcAuthorizeOriginal178Redesign()};
-async function wcReadOwnerApproval178(){
- const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
- if(!button||!status||$('privateReady')?.style.display!=='block')return;
- button.disabled=true;button.style.display='none';
- $('wcAuthorizeRedesign178').style.display='none';
- try{
-  const response=await fetch('/api/reality/personal-first-upgrade-178-approve',{
-   method:'GET',credentials:'same-origin',cache:'no-store'});
-  const d=await response.json();
-  if(!response.ok||d.ok!==true)throw Error(String(d.error||'NOT_YET_VERIFIED'));
-  if(d.status==='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'&&
-     d.original_job_completed===true){
-   status.textContent='FINISHED original #178 · Settlement '+String(d.final_settlement_receipt_ref||'UNVERIFIED')+
-    ' · Original work '+String(d.original_work_id)+'.';
-   $('wcStartFirstGap178').style.display='none';return;
-  }
-  if(d.status==='GOVERNED_RECOVERY_READY'&&
-     d.autonomous_recovery_eligible===true&&d.original_claim_preserved===true){
-   wcFirst178ApprovalReady=null;
-   wcFirstGap178RecoveryEligible=true;
-   const recovery=$('wcStartFirstGap178');
-   recovery.style.display='inline-block';
-   recovery.textContent='Resume saved #178 recovery · one click';
-   recovery.disabled=wcFirstGap178RecoveryAttempted;
-   status.textContent='Original #178: '+String(d.attempts_used)+' failed candidates, independently verified. The existing authorized job can resume through its one-use Vercel worker. No installation permission granted.';
-   // Read-only status never invokes POST. Actual execution requires this
-   // owner-initiated click, then the server independently rechecks everything.
-   return;
-  }
-  if(d.status==='REDESIGN_RECOVERY_IN_PROGRESS'&&
-     d.owner_confirmation_consumed===true&&d.original_claim_preserved===true){
-   wcRedesign178Ready=null;
-   $('wcAuthorizeRedesign178').style.display='none';
-   $('wcStartFirstGap178').style.display='none';
-   status.textContent='Original #178: one bounded source redesign was authorized. Latest independently restored state: '+String(d.attempt_count)+'/'+String(d.attempt_limit)+
-    '. Reservation: '+String(d.reservation_id)+'. No additional owner grant, installation or settlement. Reality must finish and verify its current provider operation.';
-   $('wcRedesign178Status').textContent='Read-only reconciliation: original eight failures preserved. No new attempt authorized by refreshing this page.';
-   return;
-  }
-  if(d.status==='EXHAUSTED_CORRECTION_ATTEMPTS'&&
-     d.cannot_auto_retry_consumed_claim===true){
-   wcFirst178ApprovalReady=null;
-   $('wcStartFirstGap178').style.display='none';
-   if(d.attempts_used===8&&d.attempt_limit===8&&
-      d.last_failure_kind==='REGRESSION'&&
-      d.last_failure_evidence_ref&&d.original_work_id===
-       'work:9b9578b3c65427589c4c6da68fe0fc87'){
-    wcRedesign178Ready=d;
-    if(!wcRedesign178Started){
-     $('wcAuthorizeRedesign178').style.display='inline-block';
-     $('wcAuthorizeRedesign178').disabled=false;
-     $('wcRedesign178Status').textContent='Original eight failed attempts remain intact. Authorizing ONE new attempt permits source redesign and independent sandbox testing only. Model/sandbox credits may be used. Installation still requires a separate approval.';
-    }
-   }
-   status.textContent='Original #178 ran all '+String(d.attempts_used)+
-    ' independently checked sandbox attempts and safely STOPPED without a passing candidate. '+
-    'No installation, resumption, or final settlement occurred. '+
-    'Verified escalation checkpoint: '+String(d.checkpoint_receipt_id)+
-    '. The original work remains preserved. Further correction requires a separately governed recovery; pressing Run again would not complete it.';
-   return;
-  }
-  if(d.status==='AWAITING_EXACT_OWNER_APPROVAL'){
-   wcFirst178ApprovalReady=d;
-   $('wcStartFirstGap178').style.display='none';
-   if(d.install_connection_ready!==true){
-    status.textContent='Original #178 independently verified candidate '+String(d.candidate_artifact_hash)+
-     '. Installation is BLOCKED because the isolated GitHub installer connection is not configured. No approval consumed.';
-    return;
-   }
-   button.style.display='inline-block';button.disabled=false;
-   status.textContent='One approval is now available for verified candidate '+d.candidate_artifact_hash+
-    '. Approve to install to the ISOLATED preview, run the original frozen GitHub tests, and independently settle the same original #178 job. Production will not change.';
-   return;
-  }
-  if(d.status==='AUTOMATIC_COMPLETION_IN_PROGRESS'){
-   $('wcStartFirstGap178').style.display='none';
-   status.textContent='Original #178 owner approval already recorded. Reality is continuing the SAME installation, verification, and settlement. No new approval required.';
-   // Read-only status inspection never resumes installation or settlement.
-   // Phase 3 will connect previously approved work to a trusted server worker.
-   return;
-  }
-  status.textContent='Original #178 phase: '+String(d.status||'UNVERIFIED')+'. No installation approved.';
- }catch(error){
-  status.textContent='Verified owner completion not yet available: '+String(error?.message||'NO_RESULT')+
-   '. The saved original work and prior approvals are not changed.';
- }
-}
-async function wcCompleteFirst178(payload,auto=false){
- if(wcFirst178CompletionBusy)return;
- const button=$('wcApproveFirst178'),status=$('wcFirst178ApprovalStatus');
- wcFirst178CompletionBusy=true;button.disabled=true;
- status.textContent='Reality is executing the original #178 completion loop: provider installation → frozen test verification → original job → Continuity settlement. No further stage buttons required…';
- try{
-  const r=await fetch('/api/reality/personal-first-upgrade-178-approve',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
-   headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
-  const d=await r.json();
-  if(!r.ok||d.ok!==true||d.status!=='ORIGINAL_JOB_INDEPENDENTLY_SETTLED'||
-     d.original_job_completed!==true||d.independently_verified!==true)
-   throw Error(String(d.error||'EXTERNAL_EXECUTION_NOT_YET_RECONCILED'));
-  button.style.display='none';
-  status.textContent='VERIFIED COMPLETE · Original #178 '+d.original_work_id+
-   ' · GitHub execution '+String(d.executor_run_ref)+
-   ' · Continuity settlement '+String(d.settlement_receipt_ref)+
-   ' · Production unchanged.';
- }catch(error){
-  status.textContent='Original #178 outcome still unverified: '+String(error?.message||'PROVIDER_UNRESOLVED')+
-   '. Do not create another job or approve again; prior authorization, if any, remains durable.';
- }finally{
-  wcFirst178CompletionBusy=false;
-  if(!auto&&button.style.display!=='none')button.disabled=false;
- }
-}
-$('wcApproveFirst178').onclick=()=>{
- const d=wcFirst178ApprovalReady;
- if(!d||d.status!=='AWAITING_EXACT_OWNER_APPROVAL'||
-    d.install_connection_ready!==true||!d.candidate_artifact_hash||
-    !d.checkpoint_receipt_id)return;
- // This button itself is the explicit owner approval: no second confirmation
- // dialog, no model-generated authority, no early approval.
- void wcCompleteFirst178({
-  intent:'APPROVE_EXACT_VERIFIED_178_UPGRADE_AND_FINISH',
-  owner_confirms_installation:true,
-  original_work_id:d.original_work_id,
-  candidate_artifact_hash:d.candidate_artifact_hash,
-  checkpoint_hash:d.checkpoint_hash,
-  checkpoint_receipt_id:d.checkpoint_receipt_id,
- });
-};
-
-function wcFirstGap178Conversation(){
- const selected=$('privateConversations')?.value;
- const saved=localStorage.getItem('reality.private.chat.conversation.v1');
- const candidate=String(selected||saved||'');
- return /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(candidate)?
-  candidate:null;
-}
-let wcFirst178SelfDiagnosisBusy=false;
-async function wcSelfDiagnoseOriginal178(){
- const status=$('wcSelfDiagnose178Status');
- const button=$('wcSelfDiagnose178');
- if(!status||!button||wcFirst178SelfDiagnosisBusy||
-    $('privateReady')?.style.display!=='block')return;
- wcFirst178SelfDiagnosisBusy=true;
- button.disabled=true;
- status.textContent='Reality is independently reading its original saved job and failure checkpoint. No retry or installation…';
- try{
-  const selected=wcFirstGap178Conversation();
-  const qs=selected?'?conversation_id='+encodeURIComponent(selected):'';
-  const response=await fetch('/api/reality/personal-first-upgrade-178-diagnose'+qs,{
-   method:'GET',credentials:'same-origin',cache:'no-store'});
-  const d=await response.json();
-  if(!response.ok||d.ok!==true||
-     d.read_only!==true||d.auto_retry_allowed!==false||
-     d.installation_authorized!==false||d.original_job_completed!==false)
-   throw Error(String(d.error||'DIAGNOSIS_READBACK_UNVERIFIED'));
-  const selectedNote=d.selected_conversation_matches_original===false?
-   ' Detected: browser-selected conversation is NOT the canonical original job; this is separate from the failed sandbox attempts.':'';
-  const failed=Array.isArray(d.failing_tests)?
-   d.failing_tests.slice(0,3).map(x=>String(x).slice(0,120)).join('; '):'';
-  status.textContent='Reality diagnosis · '+String(d.status||'UNVERIFIED')+
-   '. '+String(d.finding||'No verified finding.')+selectedNote+
-   (failed?' Independent tests failing: '+failed+'.':'')+
-   ' Next: '+String(d.proposed_next_step||'Read provider evidence.')+
-   (d.checkpoint_receipt_id?' Evidence receipt: '+d.checkpoint_receipt_id+'.':'')+
-   ' No new claim, approval, installation or settlement.';
- }catch(e){
-  status.textContent='Reality could not verify the full self-diagnosis: '+
-   String(e?.message||'UNAVAILABLE')+
-   '. The original job and authority remain unchanged.';
- }finally{wcFirst178SelfDiagnosisBusy=false;button.disabled=false}
-}
-$('wcSelfDiagnose178').onclick=()=>{void wcSelfDiagnoseOriginal178();};
-async function wcInspectFirstGap178(){
- const status=$('wcFirstGap178Status'),button=$('wcInspectFirstGap178');
- if(wcFirstGap178Busy)return;
- if($('privateReady')?.style.display!=='block'){
-  status.textContent='Sign in to your Reality account; job #178 is not started.';
-  return;
- }
- const conversation_id=wcFirstGap178Conversation();
- if(!conversation_id){
-  status.textContent='No conversation is selected. Reality will inspect the saved canonical #178 job without inventing a new goal.';
-  void wcSelfDiagnoseOriginal178();
-  return;
- }
- button.disabled=true;
- try{
-  const r=await fetch('/api/reality/personal-first-upgrade-178?conversation_id='+
-   encodeURIComponent(conversation_id),{method:'GET',cache:'no-store',credentials:'same-origin'});
-  const d=await r.json();
-  if(!r.ok||d.ok!==true||d.issue_number!==178||d.installation_authorized!==false)
-   throw Error(String(d.error||'OWNER_PROOF_READBACK_UNVERIFIED'));
-  if(d.status==='ALREADY_QUEUED'){
-   // #178 was explicitly authorized earlier and its original source-linked
-   // work is already durable. The server re-verifies that original receipt and
-   // atomically claims it. No model starts before the trusted single-use claim.
-   if(['QUEUED_DISCOVERY','RUNNING_CONSTITUTIONAL','ESCALATED'].includes(d.queue_phase)&&
-      /^work:[a-f0-9]{32}$/.test(String(d.original_work_id||''))&&d.queue_id){
-    status.textContent='Original #178 remains in '+String(d.queue_phase)+
-      '. Trusted server-side dispatch owns execution; opening this view never launches a job.';
-   }else{
-    status.textContent=d.owner_approval_required===true&&d.queue_phase==='AWAITING_OWNER_APPROVAL'?
-     'Original #178 has a verified candidate awaiting your SEPARATE installation approval. Checkpoint receipt: '+
-     String(d.checkpoint_receipt_id||'UNVERIFIED')+'. Not installed or settled.':
-     'Original #178 recorded status: '+String(d.queue_phase||'UNRESOLVED')+
-     '. Same job retained; no duplicate launch is permitted.';
-   }
-  }else{
-   status.textContent=d.status==='READY_FOR_EXACT_OWNER_CONFIRMATION'?
-    'Original #178 is available. Press Run once; Reality will handle discovery, generation and isolated testing until the installation approval gate.':
-    'Original #178 cannot start: '+String(d.status||'UNVERIFIED')+
-    '. No execution or installation performed.';
-  }
- }catch(error){
-  const code=String(error?.message||'UNAVAILABLE');
-  status.textContent=code==='FIRST_PROOF_OWNER_CONFIRMED_GOAL_REQUIRED'?
-   'Selected-conversation goal readback failed. This does NOT prove the canonical original #178 goal is absent. Reality is independently diagnosing the saved original job below; no retries.':
-   'Cannot verify selected conversation for #178: '+code+
-   '. Reality is separately checking the canonical original job; no execution or installation.';
- }finally{
-  button.disabled=false;
-  void wcReadOwnerApproval178();
-  void wcSelfDiagnoseOriginal178();
- }
-}
-$('wcInspectFirstGap178').onclick=()=>{void wcInspectFirstGap178();};
-async function wcFirstGap178Run(){
- if(wcFirstGap178Busy)return;
- if(wcFirstGap178RecoveryEligible){
-  void wcContinueOriginal178Recovery();
-  return;
- }
- const status=$('wcFirstGap178Status');
- if($('privateReady')?.style.display!=='block'){
-  status.textContent='Sign in above, then press Run once. Installation still needs separate approval.';
-  $('privateChat')?.scrollIntoView({behavior:'smooth',block:'start'});
-  $('privateEmail')?.focus({preventScroll:true});return;
- }
- const conversation_id=wcFirstGap178Conversation();
- if(!conversation_id){
-  status.textContent='Your saved conversation is unavailable. Sign in to restore it.';return;
- }
- wcFirstGap178Busy=true;
- $('wcStartFirstGap178').disabled=true;
- $('wcInspectFirstGap178').disabled=true;
- status.textContent='Reality is verifying the original #178 goal and evidence, then generating and independently testing the missing capability. This is ONE job; no install permission granted…';
- try{
-  const r=await fetch('/api/reality/personal-first-upgrade-178-run',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
-   headers:{'content-type':'application/json'},
-   body:JSON.stringify({conversation_id,
-    intent:'RUN_SAME_FIRST178_JOB_UNTIL_EXACT_INSTALL_APPROVAL'}),
-  });
-  const d=await r.json();
-  if(!r.ok||d.ok!==true||d.installation_authorized!==false||
-     d.capability_installed!==false||d.original_job_completed!==false||
-     !/^work:[a-f0-9]{32}$/.test(String(d.original_work_id||'')))
-   throw Error(String(d.error||'OWNER_CONSTITUTIONAL_RESULT_UNVERIFIED'));
-  if(d.status==='AWAITING_OWNER_APPROVAL'&&d.owner_approval_required===true&&
-      /^[a-f0-9]{64}$/.test(String(d.verified_candidate_artifact_hash||''))){
-   status.textContent='Reality independently verified the upgrade for original #178. Awaiting your separate exact installation approval. Artifact: '+
-    d.verified_candidate_artifact_hash+
-    '. Nothing installed; original job not settled.';
-  }else{
-   status.textContent='Original #178 is at '+String(d.status||'UNRESOLVED')+
-    ' (same work ID '+d.original_work_id+'). No installation or settlement. '+
-    (d.do_not_retry?'Refresh status to review; no duplicate run.':'');
-  }
- }catch(error){
-  status.textContent='Exact #178 outcome cannot yet be confirmed: '+
-   String(error?.message||'NETWORK_UNAVAILABLE')+
-   '. Do not start a new job. Use Refresh status for the durable checkpoint.';
- }finally{
-  wcFirstGap178Busy=false;
-  $('wcStartFirstGap178').disabled=false;
-  $('wcInspectFirstGap178').disabled=false;
-  void wcReadOwnerApproval178();
- }
-}
-$('wcStartFirstGap178').onclick=()=>{void wcFirstGap178Run();};
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
@@ -1566,13 +1180,12 @@ async function wcReadGovernedBuild(){
   if(data.queued===false&&phase==='NOT_QUEUED'&&
     data.eligible_for_investigation===true&&
     wcGovernedBuildWork.test(String(data.original_work_id||''))&&
-    String(data.original_work_id)!=='work:24cda9611404e9bcb47909976067605c'&&
     typeof data.goal_id==='string'&&data.goal_id.length>0){
     wcGovernedBuildEligible=true;start.disabled=false;
     status.textContent='Verified candidate '+data.original_work_id+
      ' matches an active, owner-confirmed goal. Investigation is available. No upgrade has been generated or installed.';
   }else if(phase==='NO_VERIFIED_ELIGIBLE_WORK'){
-    status.textContent='No eligible verified unfinished job. Settled #143 cannot be queued again. Reality must find and verify a new genuine gap.';
+    status.textContent='No eligible verified unfinished job. Reality must discover and verify a genuine gap; settled work cannot be queued again.';
   }else if(data.queued===true){
     const observed=data.worker_observation;
     const workerState=typeof observed?.state==='string'&&
@@ -3120,7 +2733,7 @@ setInterval(refreshSavedShiftHome,300000);
    if(data.authenticated){
     await loadSaved();await loadConversations();
     void wcLoadCompletionReports();
-    if(typeof wcInspectFirstGap178==='function')void wcInspectFirstGap178();
+    if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
    }else status('Sign in below with your existing account to resume your conversation.');
   }catch(e){
    guidedSetup.authenticated=false;
@@ -3145,7 +2758,7 @@ setInterval(refreshSavedShiftHome,300000);
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
    el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
-   if(typeof wcInspectFirstGap178==='function')void wcInspectFirstGap178();
+    if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
    void wcLoadCompletionReports();
    if(!confirmedActiveGoal)jumpToWorkSetup('goal');
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}

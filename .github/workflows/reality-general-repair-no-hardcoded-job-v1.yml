@@ -1,0 +1,49 @@
+name: Reality generalized repair without issue-specific hardcoding
+on:
+  push:
+    branches:
+      - feature/reality-remove-178-operational-hardcoding-20261031
+    paths:
+      - 'index.html'
+      - 'vercel.json'
+      - 'src/reality-governed-self-improvement-spine-v1.0.js'
+      - 'src/reality-recovery-authorization-scope-v1.0.js'
+      - 'test/reality-general-repair-without-hardcoded-job-v1.test.js'
+      - 'test/reality-first178-single-action-v0.1.test.js'
+      - '.github/workflows/reality-general-repair-no-hardcoded-job-v1.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'vercel.json'
+      - 'src/reality-governed-self-improvement-spine-v1.0.js'
+      - 'src/reality-recovery-authorization-scope-v1.0.js'
+      - 'test/reality-general-repair-without-hardcoded-job-v1.test.js'
+      - 'test/reality-first178-single-action-v0.1.test.js'
+      - '.github/workflows/reality-general-repair-no-hardcoded-job-v1.yml'
+permissions:
+  contents: read
+jobs:
+  generalized-work-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check generalized source and historic receipt compatibility
+        run: |
+          node --check src/reality-governed-self-improvement-spine-v1.0.js
+          node --check src/reality-recovery-authorization-scope-v1.0.js
+          node --check api/reality/personal-governed-build.js
+      - name: Verify general Work Center, historic receipts and exact authorization separation
+        run: |
+          node --test test/reality-general-repair-without-hardcoded-job-v1.test.js
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+          node --test test/reality-first178-single-action-v0.1.test.js
+          node --test test/reality-governed-build-chat-connection-v1.0.test.js
+          node --test test/reality-autonomous-shift-handoff-v1.0.test.js
+      - name: No live execution or production modification
+        run: echo 'No sandbox installation, owner action, production change or job settlement exercised.'

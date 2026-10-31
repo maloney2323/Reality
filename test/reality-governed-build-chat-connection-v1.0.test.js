@@ -134,7 +134,7 @@ test('Work Center connects live queue inspection and one consented discovery act
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
  assert.match(html,/window\.confirm\(/);
  assert.match(html,/data\.eligible_for_investigation===true/);
- assert.match(html,/String\(data\.original_work_id\)!=='work:24cda9611404e9bcb47909976067605c'/);
+ assert.doesNotMatch(html,/String\(data\.original_work_id\)!=='work:[a-f0-9]{32}'/);
  assert.match(html,/No eligible verified unfinished job/);
  assert.doesNotMatch(html,/setInterval\(.*wcReadGovernedBuild/);
 });

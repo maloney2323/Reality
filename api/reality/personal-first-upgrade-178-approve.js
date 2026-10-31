@@ -8,6 +8,12 @@ import {original178OwnerApprovalView,runOriginal178OneApproval}
  from '../../src/reality-first178-live-owner-completion-v0.1.js';
 export const maxDuration=300;
 export default async function handler(req,res){
+  if(req.method==='POST')return res.status(410).json({
+   ok:false,error:'LEGACY_SINGLE_JOB_EXECUTION_RETIRED',
+   next_route:'/api/reality/personal-governed-build',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,do_not_retry:true});
+
  res.setHeader('Cache-Control','private, no-store');
  try{
   privateChatConfig();
