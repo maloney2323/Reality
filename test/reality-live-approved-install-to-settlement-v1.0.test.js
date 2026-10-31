@@ -70,7 +70,7 @@ async function makeState(){
  return state;
 }
 async function fixture({dispatchApproved=async()=>({dispatched:true,
- production_changed:false,worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'}),envOverrides={}}={}){
+ production_changed:false,worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'}),envOverrides={},verifyScheduler=async()=>({ready:true,code:'GOVERNED_AUTO_WAKE_VERIFIED'})}={}){
  let state=await makeState(),dbRow=null,installCalls=0,postInstallReads=0;
  const waitingHash=state.head_hash;
  const readGoal=async()=>({principal_id:owner,conversation_id:conversation,
@@ -156,7 +156,7 @@ async function fixture({dispatchApproved=async()=>({dispatched:true,
  };
  const svc=createLiveGeneralRepairService({session,env:{...env,...envOverrides},fetchImpl,
   listWork,readGoal,readCandidate:async()=>proof,checkpointFactory,
-  verifierFactory,installer,dispatchApproved});
+  verifierFactory,installer,dispatchApproved,verifyScheduler});
  function urlBase(){return url+'/rest/v1/rpc/'}
  return {svc,waitingHash,db:()=>dbRow,installCalls:()=>installCalls,postInstallReads:()=>postInstallReads};
 }
@@ -236,5 +236,43 @@ test('missing background dispatcher never consumes #178 owner authority or claim
   expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
  }),/REAL_LIVE_INSTALL_BACKGROUND_WAKEUP_CREDENTIAL_UNAVAILABLE/);
  assert.equal(f.db(),null,'no owner approval or reservation may be recorded');
+ assert.equal(f.installCalls(),0);
+});
+
+test('signed governed scheduler queues exact user-approved work without a GitHub dispatcher PAT',async()=>{
+ let dispatchCalls=0;
+ const f=await fixture({
+  envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true',
+   REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:undefined},
+  dispatchApproved:async()=>{dispatchCalls++;throw Error('LEGACY_GITHUB_DISPATCH_MUST_NOT_RUN')},
+ });
+ const result=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ });
+ assert.equal(result.status,'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED');
+ assert.equal(result.owner_approval_consumed,true);
+ assert.equal(result.installation_authorized,true);
+ assert.equal(result.governed_scheduler_wakeup,true);
+ assert.equal(result.worker_dispatched,false,'do not claim worker started before scheduler tick');
+ assert.equal(result.installed,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.production_changed,false);
+ assert.equal(f.db().status,'CLAIMED');
+ assert.equal(dispatchCalls,0);
+ assert.equal(f.installCalls(),0);
+});
+test('unverified governed scheduler refuses to consume a one-use installation approval',async()=>{
+ const f=await fixture({
+  envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true',
+   REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:undefined},
+  verifyScheduler:async()=>({ready:false,code:'GOVERNED_SCHEDULER_HEARTBEAT_STALE'}),
+  dispatchApproved:async()=>{throw Error('NO_DISPATCH_AUTHORITY')},
+ });
+ await assert.rejects(f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ }),/REAL_LIVE_INSTALL_GOVERNED_SCHEDULER_NOT_READY_BEFORE_OWNER_APPROVAL/);
+ assert.equal(f.db(),null,'must not create reserved/consumed owner approval');
  assert.equal(f.installCalls(),0);
 });
