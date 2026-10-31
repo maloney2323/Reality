@@ -5,6 +5,28 @@ on:
       - feature/reality-background-continuation-20261031
     paths:
       - 'reality-approved-continuations/*.json'
+  workflow_dispatch:
+    inputs:
+      reservation_id:
+        description: Exact previously approved reservation
+        required: true
+        type: string
+      original_work_id:
+        description: Original customer work identity
+        required: true
+        type: string
+      candidate_hash:
+        description: Independently verified upgrade artifact SHA256
+        required: true
+        type: string
+      issue_number:
+        description: Original issue number
+        required: true
+        type: string
+      install_branch:
+        description: Isolated preview install branch
+        required: true
+        type: string
 permissions:
   contents: write
   actions: read
