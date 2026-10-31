@@ -3,6 +3,8 @@ on:
   push:
     branches: [feature/reality-install-to-settlement-20261031]
     paths:
+      - 'test/reality-live-approved-install-to-settlement-v1.0.test.js'
+      - 'supabase/migrations/20261031_general_repair_settlement_marker_v1.sql'
       - 'src/reality-live-approved-install-to-settlement-v1.0.js'
       - 'src/reality-general-approved-repair-continuation-v1.0.js'
       - 'api/reality/personal-real-repair-install.js'
@@ -14,6 +16,8 @@ on:
       - '.github/workflows/reality-install-to-settlement-v1.yml'
   pull_request:
     paths:
+      - 'test/reality-live-approved-install-to-settlement-v1.0.test.js'
+      - 'supabase/migrations/20261031_general_repair_settlement_marker_v1.sql'
       - 'src/reality-live-approved-install-to-settlement-v1.0.js'
       - 'src/reality-general-approved-repair-continuation-v1.0.js'
       - 'api/reality/personal-real-repair-install.js'
@@ -34,6 +38,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22'}
       - run: node --check src/reality-live-approved-install-to-settlement-v1.0.js
+      - run: node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
       - run: node --check src/reality-general-approved-repair-continuation-v1.0.js
       - run: node --check api/reality/personal-real-repair-install.js
       - run: node --check src/reality-general-installed-work-verifier-v1.0.js
