@@ -1536,8 +1536,10 @@ $('wcPrepareModelRepair').onclick=async()=>{
    data.installed!==false||data.original_job_completed!==false)
    throw Error(String(data.error||'CONSTITUTIONAL_READBACK_NOT_READY'));
   wcRepairStage(1,'complete');wcRepairStage(2,'complete');
-  wcRepairStage(3,'complete');wcRepairStage(4,'active');
-  wcRepairSetBadge('Verified repair awaiting owner','ready');
+  const workerReady=data.background_preflight_passed===true;
+  wcRepairStage(3,'complete');wcRepairStage(4,workerReady?'active':'pending');
+  wcRepairSetBadge(workerReady?'Verified repair awaiting owner':
+   'Verified repair · Worker connection required',workerReady?'ready':'blocked');
   $('wcRepairApprovalInfo').textContent=
    'Exact candidate SHA-256: '+proposal.candidate_artifact_hash+
    '. Independent frozen tests and the constitutional checkpoint are verified. One explicit approval starts Reality\'s durable background installation, resumption and settlement.';
@@ -1549,14 +1551,20 @@ $('wcPrepareModelRepair').onclick=async()=>{
    original_provider_run_id:data.original_provider_failed_run_id,
    source_files:data.source_files,
   };
-  $('wcApproveExactInstall').disabled=false;
+  // A passing sandbox is never permission to spend the owner's approval
+  // while the actual background execution path is still disconnected.
+  $('wcApproveExactInstall').disabled=!workerReady;
   $('wcInstallSettlementDetails').textContent=
    'Original job '+data.original_work_id+' · Artifact SHA-256: '+
    data.candidate_artifact_hash+' · Files: '+(data.source_files||[]).join(', ')+
    '. The separate installation approval is still required.';
   status.textContent='Original-work verification checkpoint saved: '+
    data.constitutional_checkpoint_receipt_id+
-   '. Reality has NOT installed, resumed or settled the original job.';
+   (workerReady?
+    '. Background prerequisites checked; one exact owner approval is still required.':
+    '. Background worker not verified ('+String(data.background_preflight_status||'UNAVAILABLE')+
+    '). Approval is disabled to avoid consuming authorization for an unexecutable job.')+
+   ' Reality has NOT installed, resumed or settled the original job.';
  }catch(err){
   status.textContent='Source-bound preparation stopped safely: '+
    String(err?.message||'CHECKPOINT_UNVERIFIED')+
