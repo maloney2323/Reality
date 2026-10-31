@@ -1120,6 +1120,48 @@ $('wcUnfinishedList').addEventListener('click',event=>{
  if(!button)return;
  wcOpenUpgradeCategory();
 });
+$('wcUnfinishedList').addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-wc-original178-review]');
+ if(!button||button.disabled)return;
+ const original='work:9b9578b3c65427589c4c6da68fe0fc87';
+ if(button.dataset.wcOriginal178Review!==original)return;
+ const feedback=button.closest('article')?.querySelector('[data-unfinished-feedback]');
+ if($('privateReady')?.style.display!=='block'){
+  if(feedback)feedback.textContent='Sign in to your Reality account first. No approval or installation occurred.';
+  return;
+ }
+ button.disabled=true;
+ wcOriginal178DirectReview=true;
+ wcCurrent='upgrades';
+ wcRender();
+ // These exact-source review controls already exist, but were buried inside
+ // closed advanced diagnostics. Open ONLY the existing evidence review path.
+ const diagnostics=$('wcUpgradeDiagnostics');
+ if(diagnostics){diagnostics.hidden=false;diagnostics.open=true;}
+ if(feedback)feedback.textContent='Checking exact original #178 evidence and preparing the separately authorized upgrade review. No installation has been approved.';
+ $('wcModelRepairReviewPanel')?.scrollIntoView?.({behavior:'smooth',block:'center'});
+ try{
+  await $('wcReadModelRepair').onclick();
+  const prepared=wcVerifiedInstallReview?.original_work_id===original&&
+   wcVerifiedInstallReview?.issue_number===178;
+  if(prepared){
+   if(feedback)feedback.textContent=$('wcApproveExactInstall').disabled?
+    'Original #178 source is verified, but the trusted worker preflight is not green. Installation approval remains disabled.':
+    'Original #178 exact upgrade prepared. Review its evidence below, then use the separate owner-approval button once.';
+   $('wcInstallSettlementPanel')?.scrollIntoView?.({behavior:'smooth',block:'center'});
+  }else{
+   if(feedback)feedback.textContent=
+    'Original #178 upgrade review has not reached an approvable state: '+
+    String($('wcModelRepairReviewStatus')?.textContent||'PROVIDER_READBACK_UNAVAILABLE')+
+    '. No installation was authorized.';
+  }
+ }catch{
+  if(feedback)feedback.textContent='Independent original #178 review could not be completed. No installation was authorized.';
+ }finally{
+  wcOriginal178DirectReview=false;
+  button.disabled=false;
+ }
+});
 function wcUnfinishedHTML(job){
  const state=job.state==='RECOVERY_CHECKPOINT_SAVED'?
   'Recovery saved · Original repair unfinished':
