@@ -333,6 +333,49 @@ export function createLiveGeneralRepairService({
    original_job_completed:false,production_changed:false,
   });
  }
+ // One signed-in owner click records exact installation authority and
+ // durable background work; model/worker cannot create or expand this grant.
+ async function ownerApproveAndQueue({originalWorkId,issueNumber,
+  expectedArtifactHash,expectedCheckpointHash}={}){
+  const ctx=await load({originalWorkId,issueNumber});
+  if(!HASH.test(expectedArtifactHash)||!HASH.test(expectedCheckpointHash)||
+    ctx.state.candidate?.artifact_hash!==expectedArtifactHash)
+   fail('EXACT_OWNER_REVIEWED_ARTIFACT_CHANGED');
+  const previously=await progress(ctx);
+  if(previously.status==='NOT_APPROVED'&&
+     ctx.state.head_hash!==expectedCheckpointHash)
+   fail('EXACT_OWNER_REVIEWED_CHECKPOINT_CHANGED');
+  if(previously.status!=='NOT_APPROVED'&&
+     (previously.candidate_hash!==expectedArtifactHash||
+      previously.checkpoint_hash!==expectedCheckpointHash))
+   fail('EXACT_ALREADY_APPROVED_SOURCE_CHANGED');
+  await claimAndPromote(ctx);
+  const reserved=await progress(ctx);
+  if(!UUID.test(reserved.reservation_id)||
+     !['CLAIMED','INSTALLED','SETTLED'].includes(reserved.status)||
+     reserved.consumed_once!==true)
+   fail('OWNER_APPROVAL_DURABLE_READBACK_REQUIRED');
+  const queued=await record({
+   name:'reality_enqueue_approved_repair_continuation_v1',ctx,
+   more:{p_reservation_id:reserved.reservation_id,
+    p_candidate_hash:expectedArtifactHash,
+    p_install_branch:env.VERCEL_GIT_COMMIT_REF,
+    p_issue_number:issueNumber},
+  });
+  if(queued.queued!==true||queued.reservation_id!==reserved.reservation_id||
+     queued.original_work_id!==originalWorkId||
+     queued.installation_authorized!==true||queued.production_changed!==false)
+   fail('BACKGROUND_CONTINUATION_DURABLE_READBACK_REQUIRED');
+  return Object.freeze({
+   status:'OWNER_APPROVED_BACKGROUND_CONTINUATION_QUEUED',
+   original_work_id:originalWorkId,issue_number:issueNumber,
+   candidate_artifact_hash:expectedArtifactHash,
+   reservation_id:reserved.reservation_id,
+   background_status:queued.status,
+   installation_authorized:true,owner_approval_consumed:true,
+   installed:false,original_job_completed:false,production_changed:false,
+  });
+ }
  async function markDurableSettlement(ctx,state,final){
   const sourceRef=state?.settlement?.settlement_receipt_ref;
   const match=/^supabase:universe_events:([a-f0-9-]{36})$/i.exec(String(sourceRef||''));
@@ -504,5 +547,5 @@ export function createLiveGeneralRepairService({
    original_job_completed:true,production_changed:false,
   });
  }
- return Object.freeze({ownerApproveAndInstall,continueAfterInstall});
+ return Object.freeze({ownerApproveAndQueue,ownerApproveAndInstall,continueAfterInstall});
 }
