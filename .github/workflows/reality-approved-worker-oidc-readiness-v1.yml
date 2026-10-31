@@ -1,0 +1,58 @@
+name: Reality — Signed isolated worker-to-Supabase connection check
+on:
+  push:
+    branches: [feature/reality-background-continuation-20261031]
+    paths:
+      - '.github/workflows/reality-approved-worker-oidc-readiness-v1.yml'
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  signed-read-only-worker-connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify GitHub-signed workflow identity against private isolated Supabase readback
+        env:
+          AUDIENCE: reality-approved-worker-isolated-readiness-v1
+          EXPECTED_PROJECT: hvkfreoagbrphwghjajw
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const api=process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+          const actionBearer=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+          assert.ok(api&&actionBearer,'GitHub Actions OIDC issuer must be enabled');
+          const identity=new URL(api);
+          identity.searchParams.set('audience',process.env.AUDIENCE);
+          const tokenResult=await fetch(identity,{
+           method:'GET',redirect:'error',headers:{authorization:'Bearer '+actionBearer}});
+          assert.equal(tokenResult.status,200,'GitHub OIDC token mint must succeed');
+          const identityJson=await tokenResult.json();
+          assert.ok(typeof identityJson.value==='string'&&identityJson.value.length>300);
+          const endpoint='https://'+process.env.EXPECTED_PROJECT+
+           '.supabase.co/functions/v1/reality-approved-worker-oidc-bridge';
+          const response=await fetch(endpoint,{method:'POST',redirect:'error',
+           headers:{authorization:'Bearer '+identityJson.value,
+            'content-type':'application/json'},
+           body:JSON.stringify({action:'readiness'})});
+          // Never print a signed bearer or provider-secret material.
+          const body=await response.json().catch(()=>({}));
+          console.log('ISOLATED_WORKER_OIDC_BRIDGE',
+           JSON.stringify({http:response.status,status:body.status||body.error||'UNAVAILABLE',
+            signed_worker_identity_verified:body.github_oidc_verified===true,
+            isolated_supabase_verified:body.isolated_supabase_readback_verified===true,
+            credential_returned:body.service_credential_returned===true,
+            owner_approval_used:body.owner_approval_used===true,
+            installed:body.installation_performed===true}));
+          assert.equal(response.status,200,'OIDC bridge must authenticate exact workflow');
+          assert.equal(body.status,'GITHUB_WORKER_IDENTITY_AND_SUPABASE_CONNECTED');
+          assert.equal(body.repository_commit,process.env.GITHUB_SHA);
+          assert.equal(body.github_oidc_verified,true);
+          assert.equal(body.isolated_supabase_readback_verified,true);
+          assert.equal(body.existing_original_gap_present,true);
+          assert.equal(body.service_credential_returned,false);
+          assert.equal(body.owner_approval_used,false);
+          assert.equal(body.installation_performed,false);
+          assert.equal(body.original_job_completed,false);
+          assert.equal(body.production_changed,false);
+          NODE
