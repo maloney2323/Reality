@@ -1180,7 +1180,6 @@ async function wcReadGovernedBuild(){
   if(data.queued===false&&phase==='NOT_QUEUED'&&
     data.eligible_for_investigation===true&&
     wcGovernedBuildWork.test(String(data.original_work_id||''))&&
-    String(data.original_work_id)!=='work:24cda9611404e9bcb47909976067605c'&&
     typeof data.goal_id==='string'&&data.goal_id.length>0){
     wcGovernedBuildEligible=true;start.disabled=false;
     status.textContent='Verified candidate '+data.original_work_id+
