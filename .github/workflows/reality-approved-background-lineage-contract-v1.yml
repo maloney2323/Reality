@@ -1,0 +1,32 @@
+name: Reality — Original #178 approved background worker lineage contract
+on:
+  push:
+    branches: [feature/reality-background-continuation-20261031]
+    paths:
+      - 'src/reality-personal-unfinished-work-v0.1.js'
+      - 'test/reality-personal-unfinished-work-v0.1.test.js'
+      - 'scripts/reality-approved-repair-background-worker-v1.mjs'
+      - '.github/workflows/reality-approved-background-lineage-contract-v1.yml'
+permissions:
+  contents: read
+jobs:
+  validate-same-original-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify historical same-work recovery and approved-worker contracts
+        run: |
+          set -euo pipefail
+          node --check src/reality-personal-unfinished-work-v0.1.js
+          node --check scripts/reality-approved-repair-background-worker-v1.mjs
+          node --test test/reality-personal-unfinished-work-v0.1.test.js
+          node --test test/reality-approved-repair-background-worker-v1.test.js
+          node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
+      - name: Keep candidate inert until independently authorized
+        run: echo 'Only isolated source contracts were tested. No installation, owner approval, original work mutation, or settlement.'
