@@ -66,6 +66,10 @@ export function evaluateTemporaryRepairWindow({
  artifactHash,verifiedSandbox,independentGrantReadback,
  atomicSingleUseConsumption,now=new Date().toISOString(),
 }={}){
+ const {grant_hash,issuance_state,installation_authorized,
+  production_changed,...canonicalGrant}=grant||{};
+ check(grant_hash===hash(canonicalGrant),
+  'SIGNED_GRANT_BYTES_CHANGED');
  const current=Date.parse(now),started=Date.parse(grant?.issued_at),
   expiry=Date.parse(grant?.expires_at);
  check(grant?.version===TEMPORARY_REPAIR_WINDOW_VERSION&&
@@ -86,7 +90,10 @@ export function evaluateTemporaryRepairWindow({
   verifiedSandbox?.frozen_regression_passed===true&&
   verifiedSandbox?.independent_tests_passed===true&&
   verifiedSandbox?.governance_preserved===true&&
-  verifiedSandbox?.independently_verified===true,
+  verifiedSandbox?.independently_verified===true&&
+  (verifiedSandbox?.candidate_files||[]).every(file=>
+   typeof file?.path==='string'&&
+   /^(?:src\\/reality-extensions\\/|test\\/reality-extensions\\/)/.test(file.path)),
   'EXACT_INDEPENDENTLY_VERIFIED_EXTENSION_REQUIRED');
  check(independentGrantReadback?.verified===true&&
   independentGrantReadback?.grant_hash===grant.grant_hash&&
