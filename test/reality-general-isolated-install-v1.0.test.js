@@ -29,7 +29,7 @@ function api({head=SHA,existing=false}={}){
   assert.ok(url.startsWith(ROOT+'/'));const path=url.slice(ROOT.length);
   calls.push([opts.method,path,opts.body?JSON.parse(opts.body):null]);
   let data;
-  if(path==='/git/ref/heads/'+BRANCH){
+  if(path==='/git/ref/heads/'+BRANCH||path==='/git/refs/heads/'+BRANCH){
    if(opts.method==='PATCH'){current=JSON.parse(opts.body).sha;data={object:{sha:current}}}
    else data={object:{sha:current}};
   }else if(path==='/git/commits/'+SHA)data={tree:{sha:'b'.repeat(40)}};
