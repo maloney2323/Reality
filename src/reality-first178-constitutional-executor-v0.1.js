@@ -101,23 +101,36 @@ export async function executeFirst178Constitutional({
   const finalRecovery=restored.state.phase==='ESCALATED'&&
    restored.state.attempt_count===7&&restored.state.attempt_limit===7&&
    restored.state.recovery_continuation_authorization?.verified===true;
-  const exhaustionRecovery=firstRecovery||secondRecovery||finalRecovery;
+  // The owner-approved redesign is reserved independently in PostgreSQL
+  // before the worker runs. Never accept a browser-supplied recovery receipt.
+  const ownerRedesignRecovery=restored.state.phase==='ESCALATED'&&
+   restored.state.attempt_count===8&&restored.state.attempt_limit===8&&
+   restored.state.recovery_final_authorization?.verified===true&&
+   queue.phase==='RUNNING_CONSTITUTIONAL'&&
+   uuid(queue.report?.redesign_recovery_reservation_id)&&
+   queue.report?.redesign_recovery_owner_consent===
+    'AUTHENTICATED_OWNER_EXPLICIT_ACTION';
+  const exhaustionRecovery=firstRecovery||secondRecovery||finalRecovery||
+   ownerRedesignRecovery;
   if(exhausted&&!exhaustionRecovery)die('NOT_REPAIRABLE_ORIGINAL_EXHAUSTION');
   const sandboxRecovery=restored.state.phase==='CANDIDATE_READY'&&
    restored.state.attempt_count===1;
   const laterCorrection=restored.state.phase==='REPAIR_REQUIRED'||
    (restored.state.phase==='CANDIDATE_READY'&&restored.state.attempt_count>1);
-  const rpcName=finalRecovery?'reality_reserve_first178_final_bounded_draft_recovery_v1':
+  const rpcName=ownerRedesignRecovery?'reality_read_first178_one_redesign_v1':
+   finalRecovery?'reality_reserve_first178_final_bounded_draft_recovery_v1':
    secondRecovery?'reality_reserve_first178_second_exhaustion_recovery_v1':
    firstRecovery?'reality_reserve_first178_exhaustion_recovery_v1':
    laterCorrection?'reality_reserve_first178_continuation_step_v1':
    sandboxRecovery?'reality_reserve_first178_candidate_sandbox_v1':
    'reality_reserve_first178_gap_recovery_v1';
   const reserved=await call(db,rpcName,{
+   // The existing owner-approved redesign is READ ONLY at this stage.
+   // Separate, original-owner transaction already reserved it atomically.
    p_owner_id:session.user_id,p_conversation_id:conversationId,
    p_queue_id:queue.queue_id,p_original_work_id:scope.original_work_id,
-   p_checkpoint_hash:restored.checkpoint_hash,
-   ...(exhaustionRecovery?{
+   ...(!ownerRedesignRecovery?{p_checkpoint_hash:restored.checkpoint_hash}:{}),
+   ...(!ownerRedesignRecovery&&exhaustionRecovery?{
     p_checkpoint_receipt_id:restored.continuity_receipt_id,
     p_failure_evidence_ref:restored.state.independent_failure?.evidence_ref,
    }:{}),
@@ -143,7 +156,11 @@ export async function executeFirst178Constitutional({
      (sandboxRecovery&&reserved.candidate_hash!==restored.state.candidate.artifact_hash)||
      (exhaustionRecovery&&(reserved.failure_evidence_ref!==
        restored.state.independent_failure.evidence_ref||
-       reserved.recovery_attempt_limit!==(finalRecovery?8:secondRecovery?7:5)))||
+       reserved.recovery_attempt_limit!==(ownerRedesignRecovery?9:finalRecovery?8:secondRecovery?7:5)))||
+     (ownerRedesignRecovery&&(
+       reserved.owner_confirmed!==true||
+       reserved.authorization_scope!=='ONE_ORIGINAL178_REDESIGN_ATTEMPT'||
+       reserved.reservation_id!==queue.report.redesign_recovery_reservation_id))||
      (laterCorrection&&(reserved.phase!==restored.state.phase||
        reserved.attempt_count!==restored.state.attempt_count))||
      reserved.installation_authorized!==false)
@@ -161,6 +178,8 @@ export async function executeFirst178Constitutional({
     checkpoint_receipt_id:restored.continuity_receipt_id,
     failure_evidence_ref:restored.state.independent_failure.evidence_ref,
     reservation_id:reserved.reservation_id,installation_authorized:false,
+    ...(ownerRedesignRecovery?{
+      owner_confirmed:true,authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT'}:{}),
    });
    const recoveryReceipt=await checkpoint.persistCheckpoint(resumeState);
    if(recoveryReceipt?.independent_readback_verified!==true||
