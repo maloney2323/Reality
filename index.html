@@ -203,11 +203,45 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 @media(max-width:860px){.repair-timeline{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:620px){.repair-center{padding:15px;margin-top:14px}.repair-heading h3{font-size:21px}.repair-timeline{grid-template-columns:1fr;gap:6px}.repair-step{padding:9px 12px}.repair-step-detail{margin:3px 0 0 31px}.repair-current{grid-template-columns:1fr;padding:14px}.repair-actions{min-width:0;width:100%}.repair-actions button{width:100%}.repair-dialog-actions button{flex:1}.repair-dialog-body{padding:17px}}
 
+
+/* Home / Repair Chat: one real authenticated conversation and evidence-bound repair lane. */
+.reality-home-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.reality-home-nav a{display:inline-flex;align-items:center;min-height:42px;padding:9px 15px;border:1px solid #42556b;border-radius:12px;color:#d6e8fa;text-decoration:none;background:#151f2c;font-size:13px;font-weight:700}
+.reality-home-nav a:focus-visible,.reality-chat-tabs button:focus-visible,.repair-chat-shell button:focus-visible{outline:3px solid #b4e7ff;outline-offset:2px}
+.reality-home-nav a[href="#repairChatPanel"]{border-color:#6b99aa;background:#1b3440}
+.reality-chat-tabs{display:flex;gap:8px;margin:18px 0 15px}
+.reality-chat-tabs button{background:#26344a;color:#d8e6f8;margin:0;flex:1;border:1px solid #415a73}
+.reality-chat-tabs button[aria-selected="true"]{background:#e1f4f0;color:#102c2a;border-color:#d5f3e9}
+#repairChatPanel[hidden],#privateConversationPanel[hidden]{display:none!important}
+.repair-chat-shell{border:1px solid #466d7c;border-radius:16px;background:linear-gradient(155deg,#122532,#0d1722);padding:18px;scroll-margin-top:24px}
+.repair-chat-shell h3{margin:6px 0 9px;font-size:21px}.repair-chat-shell p{font-size:13px;line-height:1.65;color:#b7c8d7}
+.repair-chat-flow{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}.repair-chat-flow span{font-size:11px;border:1px solid #4e6373;padding:7px 9px;border-radius:999px;color:#d1e4ef}
+.repair-chat-actions{display:flex;flex-wrap:wrap;gap:8px}.repair-chat-actions button{margin:0;flex:1;min-width:130px;font-size:12px}
+.repair-chat-actions .secondary{background:#26384a;color:#edf5fa;border:1px solid #537085}
+.repair-chat-shell textarea{margin-top:10px;min-height:90px}
+.repair-chat-log{max-height:340px;overflow-y:auto;border:1px solid #324859;border-radius:13px;background:#0b1520;padding:12px;margin:14px 0}
+.repair-chat-line{margin:0 0 10px;border-radius:12px;padding:10px 12px;background:#172637;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6}
+.repair-chat-line[data-role="user"]{background:#233244;border-color:#4c6275}
+.repair-chat-line strong{display:block;font-size:11px;color:#a9c9d8;margin-bottom:4px}
+.repair-chat-evidence{margin-top:18px;border:1px solid #345566;border-radius:13px;padding:14px;background:#10202d}
+.repair-chat-evidence h4{margin:0 0 8px}.repair-chat-evidence p{margin:8px 0}
+.repair-chat-issue{padding:12px 0;border-top:1px solid #344a5c;overflow-wrap:anywhere}
+.repair-chat-issue strong{display:block;font-size:13px}.repair-chat-issue button{background:#d8efe9;color:#0b2e2b;font-size:12px;margin-top:8px}
+.repair-chat-status{font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:13px 0 0;padding:11px;border:1px solid #456576;background:#172b38;border-radius:12px;color:#d9ebf6}
+.repair-chat-status[data-tone="blocked"]{border-color:#91665b;color:#ffd6ca}
+.repair-chat-status[data-tone="verified"]{border-color:#4a927b;color:#c4edd9}
+@media(max-width:600px){.repair-chat-shell{padding:13px}.repair-chat-actions button{width:100%;flex:auto}.reality-home-nav a{flex:1;justify-content:center;font-size:12px;padding:8px}}
+
 </style>
 </head>
 <body>
 <main>
   <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
+  <nav class="reality-home-nav" aria-label="Reality Home navigation">
+    <a href="#startFlow">Home</a>
+    <a href="#repairChatPanel" id="openRepairChatHome">Repair Chat</a>
+    <a href="#workCenter">Work Center</a>
+  </nav>
   <h1>Reality · Let's get started</h1>
   <p class="sub">Follow these three steps. You do <strong>not</strong> need to type a Request for this test. Reality will find the work.</p>
   <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
@@ -282,6 +316,37 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    </div>
    <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
   </div>
+  <div class="reality-chat-tabs" role="tablist" aria-label="Reality conversation and self-repair">
+   <button type="button" id="realityConversationTab" role="tab" aria-selected="true" aria-controls="privateConversationPanel">Conversation</button>
+   <button type="button" id="realityRepairChatTab" role="tab" aria-selected="false" aria-controls="repairChatPanel">Repair Chat · Fix Reality</button>
+  </div>
+  <section id="repairChatPanel" role="tabpanel" aria-labelledby="realityRepairChatTab" class="repair-chat-shell" hidden>
+    <div class="label">REALITY · CONTINUOUS SELF-REPAIR</div>
+    <h3>Talk to Reality about what needs fixing</h3>
+    <p>Reality can investigate real defects, keep the same goal and original job, and queue a governed repair. Discovery and chat do not authorize installation. A verified candidate gets one exact owner approval; after approval Reality's worker installs, resumes the original job, and writes a final receipt.</p>
+    <div class="repair-chat-flow" aria-label="Self-repair stages">
+      <span>1 · Discover verified gap</span><span>2 · Diagnose & test fix</span><span>3 · Review exact upgrade</span><span>4 · Automatic install & resume</span><span>5 · Independently settle</span>
+    </div>
+    <div id="repairChatMessages" class="repair-chat-log" role="log" aria-live="polite" aria-label="Persisted Reality repair conversation"><p class="muted">Open Repair Chat to load your signed-in conversation.</p></div>
+    <label for="repairChatPrompt">What do you want Reality to investigate?</label>
+    <textarea id="repairChatPrompt" maxlength="6000" placeholder="Find why Reality's automatic scheduler and generic self-repair wake-up aren't reliable. Identify the actual failure, build and independently test the smallest governed upgrade, and present the exact installation for my approval."></textarea>
+    <div class="repair-chat-actions">
+      <button type="button" id="repairChatSend">Send to Reality</button>
+      <button type="button" id="repairChatRefresh" class="secondary">Check actual progress</button>
+    </div>
+    <div class="repair-chat-evidence">
+      <h4>Source-backed self-repair</h4>
+      <p>Use these evidence checks to move from talking about a defect to a real worker task. Only independently verified failures can enter the execution path.</p>
+      <div class="repair-chat-actions">
+       <button type="button" id="repairChatFind" class="secondary">Find real missing capabilities</button>
+       <button type="button" id="repairChatReview" class="secondary">Review verified upgrade</button>
+      </div>
+      <p id="repairChatJobState" class="muted" role="status">No verified worker or completion receipt has been read in this tab.</p>
+      <div id="repairChatOpportunities" aria-live="polite"></div>
+    </div>
+    <p id="repairChatStatus" class="repair-chat-status" role="status" aria-live="polite">Sign in to Reality and confirm your existing goal. No repair or installation starts by opening this tab.</p>
+  </section>
+  <section id="privateConversationPanel" role="tabpanel" aria-labelledby="realityConversationTab">
   <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
   <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
   <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
@@ -292,6 +357,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </select>
   <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
   <button id="privateSend" type="button">Send to Reality</button>
+  </section>
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
 </section>
