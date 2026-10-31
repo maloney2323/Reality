@@ -128,16 +128,21 @@ declare t reality_internal.governed_auto_triggers_v1%rowtype;
 begin
  if current_user <> 'service_role' then
   raise exception 'GOVERNED_AUTO_TRIGGER_SERVICE_ROLE_REQUIRED'; end if;
+ -- Read the immutable target without locking first; acquire locks in the
+ -- same goal-epoch -> queue-row order as the enqueue function.
  select * into t from reality_internal.governed_auto_triggers_v1
  where trigger_id=p_trigger_id and owner_id=p_owner_id
-  and original_work_id=p_original_work_id for update;
+  and original_work_id=p_original_work_id;
  if t.trigger_id is null then raise exception 'GOVERNED_AUTO_TRIGGER_NOT_FOUND'; end if;
- if t.phase<>'PENDING_VERIFIED_GAP_REOBSERVATION' or t.claim_id is not null
- then raise exception 'GOVERNED_AUTO_TRIGGER_ALREADY_CLAIMED_NO_REPLAY'; end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
  'reality-goal-pub-v1:'||p_owner_id::text||':'||t.conversation_id::text,0));
  select * into e from reality_internal.goal_publication_epochs
  where user_id=t.owner_id and conversation_id=t.conversation_id for update;
+ select * into t from reality_internal.governed_auto_triggers_v1
+ where trigger_id=p_trigger_id and owner_id=p_owner_id
+  and original_work_id=p_original_work_id for update;
+ if t.phase<>'PENDING_VERIFIED_GAP_REOBSERVATION' or t.claim_id is not null
+ then raise exception 'GOVERNED_AUTO_TRIGGER_ALREADY_CLAIMED_NO_REPLAY'; end if;
  if e.last_transition_event_id is distinct from t.goal_transition_event_id
  then raise exception 'GOVERNED_AUTO_TRIGGER_GOAL_CHANGED'; end if;
  update reality_internal.governed_auto_triggers_v1
