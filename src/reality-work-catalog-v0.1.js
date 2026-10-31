@@ -15,6 +15,11 @@ const safeString=(v,max=220)=>String(v||'').slice(0,max);
 const id=(type,v)=>'catalog:'+crypto.createHash('sha256').update(type+':'+v).digest('hex').slice(0,32);
 const category=(label,defaultCategory)=>{
  const s=safeString(label,400).toLowerCase();
+ // A capability gap found during a real job is an improvement opportunity,
+ // even if its issue/PR title also contains "repair" or "failure". This is
+ // classification only; finding titles and CI links never prove business gain.
+ if(/\b(?:self[-\s]?repair|self[-\s]?improvement|capability gap|missing capability|capability upgrade|capability improvement|operational weakness)\b/.test(s))
+  return 'upgrades';
  if(/customer|client|support|feedback/.test(s))return 'customer';
  if(/security|vulnerab|permission|authority|governance|guard|access|auth/.test(s))return 'security';
  if(/\bfix\b|bug|repair|broken|defect|correct/.test(s))return 'bugs';
