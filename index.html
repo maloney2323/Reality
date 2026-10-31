@@ -3741,5 +3741,233 @@ setInterval(refreshSavedShiftHome,300000);
 })();
 
 </script>
+<script>
+// Reality Repair Chat bridges one existing authenticated conversation to the
+// SAME provider-backed repair intake, worker, owner gate and final receipts.
+// Conversation text NEVER authorizes repairs, installations or goal changes.
+(()=>{
+ 'use strict';
+ const el=id=>document.getElementById(id);
+ const uuid=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+ const work=/^work:[a-f0-9]{32}$/;
+ const sha=/^[a-f0-9]{40}$/;
+ const isSigned=()=>el('privateReady')?.style.display==='block';
+ const conv=()=>localStorage.getItem('reality.private.chat.conversation.v1')||'';
+ let busy=false;
+ let selectedWork=null;
+ const setStatus=(message,tone='neutral')=>{
+  el('repairChatStatus').textContent=message;
+  el('repairChatStatus').dataset.tone=tone;
+ };
+ const append=(role,message)=>{
+  const entry=document.createElement('div');entry.className='repair-chat-line';
+  entry.dataset.role=role;
+  const title=document.createElement('strong');title.textContent=role==='user'?'You':'Reality';
+  const body=document.createElement('div');body.textContent=String(message||'');
+  entry.append(title,body);
+  el('repairChatMessages').append(entry);
+  el('repairChatMessages').scrollTop=el('repairChatMessages').scrollHeight;
+ };
+ const read=async (url)=>{
+  const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data?.ok!==true)
+   throw Error(String(data?.error||'READBACK_NOT_AVAILABLE'));
+  return data;
+ };
+ const post=async (url,body)=>{
+  const response=await fetch(url,{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify(body),
+  });
+  const data=await response.json();
+  if(!response.ok||data?.ok!==true)
+   throw Error(String(data?.error||'OWNER_SCOPE_OR_PROVIDER_NOT_VERIFIED'));
+  return data;
+ };
+ async function loadChat(){
+  if(!isSigned()||!uuid.test(conv()))return;
+  const data=await read('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conv()));
+  const panel=el('repairChatMessages');panel.replaceChildren();
+  const records=Array.isArray(data.messages)?data.messages:[];
+  if(!records.length)append('assistant','Your conversation is ready. Ask Reality to investigate an actual problem; evidence checks below decide whether executable repair work exists.');
+  for(const m of records.slice(-18)){
+   if(['user','assistant'].includes(m.role))append(m.role,m.text);
+  }
+  if(data.continuity?.older_messages_may_be_missing)
+   setStatus('Earlier chat history is incomplete. Reality must recheck original evidence before taking any action.','blocked');
+ }
+ async function refreshProof(){
+  if(!isSigned()){
+   el('repairChatJobState').textContent='Sign in to your Reality account first. No external action performed.';
+   return;
+  }
+  const results=await Promise.allSettled([
+   read('/api/reality/personal-governed-build'),
+   read('/api/reality/personal-unfinished-work'),
+  ]);
+  const lines=[];
+  const b=results[0].status==='fulfilled'?results[0].value:null;
+  const u=results[1].status==='fulfilled'?results[1].value:null;
+  const phase=String(b?.phase||'NOT_VERIFIED');
+  lines.push('Governed discovery: '+phase.replaceAll('_',' '));
+  if(work.test(String(b?.original_work_id||''))){
+   selectedWork=b.original_work_id;
+   lines.push('Original job: '+b.original_work_id);
+  }
+  if(b?.worker_observation?.status)
+   lines.push('Worker observation: '+String(b.worker_observation.status));
+  lines.push('Generated source: '+(b?.model_generated===true?'provider evidenced':'NOT YET VERIFIED'));
+  lines.push('Independent sandbox: '+(b?.sandbox_executed===true?'provider evidenced':'NOT YET VERIFIED'));
+  lines.push('Installed upgrade: '+(b?.capability_installed===true?'provider evidenced':'NOT YET VERIFIED'));
+  if(Array.isArray(u?.jobs))lines.push('Owner-scoped unfinished jobs: '+u.jobs.length);
+  if(!b||!u)lines.push('Some authoritative readbacks unavailable; status remains unverified.');
+  if(selectedWork&&work.test(selectedWork)){
+   try{
+    const proof=await read('/api/reality/personal-loop-completion?work_id='+encodeURIComponent(selectedWork));
+    if(proof.loop_complete===true&&proof.independently_verified===true&&
+       proof.original_job_completed===true&&
+       /^supabase:universe_events:[0-9a-f-]{36}$/i.test(String(proof.settlement_receipt_ref||''))){
+     lines.push('ORIGINAL JOB INDEPENDENTLY SETTLED: '+selectedWork);
+     lines.push('Final receipt: '+proof.settlement_receipt_ref);
+    }else lines.push('Original job: no independently verified final settlement yet.');
+   }catch{lines.push('Final settlement readback unavailable. No completion claimed.');}
+  }
+  el('repairChatJobState').textContent=lines.join('\n');
+ }
+ const setTab=async name=>{
+  const repair=name==='repair';
+  el('repairChatPanel').hidden=!repair;
+  el('privateConversationPanel').hidden=repair;
+  el('realityRepairChatTab').setAttribute('aria-selected',String(repair));
+  el('realityConversationTab').setAttribute('aria-selected',String(!repair));
+  if(repair){
+   if(!isSigned()){
+    setStatus('Sign in above, then confirm your active goal. Repair Chat does not bypass your account or owner authority.','blocked');
+    el('privateChat').scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+   }
+   setStatus('Reading your saved conversation and verified worker state. Nothing is being installed.');
+   try{await Promise.all([loadChat(),refreshProof()]);setStatus('Reality is ready to investigate. Chat is cognition only; use verified source-backed work and a separate exact-owner installation approval.');}
+   catch(e){setStatus('Some evidence could not be read: '+String(e.message||'UNAVAILABLE')+'. No work is authorized.','blocked');}
+   el('repairChatPanel').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+ };
+ el('realityRepairChatTab').addEventListener('click',()=>{void setTab('repair');});
+ el('realityConversationTab').addEventListener('click',()=>{void setTab('conversation');});
+ el('openRepairChatHome').addEventListener('click',event=>{
+  event.preventDefault();void setTab('repair');
+ });
+ el('repairChatSend').addEventListener('click',async()=>{
+  if(busy)return;
+  if(!isSigned()||!uuid.test(conv())){
+   setStatus('Sign in to Reality before requesting a diagnosis. No action performed.','blocked');return;
+  }
+  const field=el('repairChatPrompt'),message=field.value.trim();
+  if(!message||message.length>6000){setStatus('Enter your repair question (up to 6,000 characters).');return;}
+  busy=true;el('repairChatSend').disabled=true;
+  setStatus('Checking this message against saved Continuity. Chat cannot install anything.');
+  try{
+   const result=await post('/api/reality/personal-chat',{
+    conversation_id:conv(),request_id:crypto.randomUUID(),message,
+   });
+   if(typeof result.answer!=='string'||!result.answer.trim())
+    throw Error('CHAT_ANSWER_NOT_PERSISTED');
+   field.value='';
+   await loadChat();
+   setStatus('Answer saved to your Reality conversation. No upgrade or approval has been created. To start real autonomous investigation, select verified work below.','verified');
+   void refreshProof();
+  }catch(e){
+   setStatus('Conversation not confirmed: '+String(e.message||'CHAT_RECONCILIATION_REQUIRED')+'. Any saved user turn must be reconciled before resubmitting. No installation occurred.','blocked');
+  }finally{busy=false;el('repairChatSend').disabled=false;}
+ });
+ el('repairChatRefresh').addEventListener('click',async()=>{
+  const button=el('repairChatRefresh');if(button.disabled)return;
+  button.disabled=true;setStatus('Reading fresh provider-backed job and settlement state. No mutation.');
+  try{await Promise.all([loadChat(),refreshProof()]);setStatus('Readback completed. No new approval, job or installation was created.','verified');}
+  catch(e){setStatus('Readback unavailable: '+String(e.message)+'. Nothing was started.','blocked');}
+  finally{button.disabled=false;}
+ });
+ el('repairChatFind').addEventListener('click',async()=>{
+  const button=el('repairChatFind');if(button.disabled)return;
+  if(!isSigned()||!uuid.test(conv())){setStatus('Sign in and confirm your Reality goal first.','blocked');return;}
+  button.disabled=true;const list=el('repairChatOpportunities');
+  list.replaceChildren();
+  setStatus('Rechecking open issues, actual failed GitHub runs and missing frozen-test source. Read-only.');
+  try{
+   const found=await read('/api/reality/personal-real-repair-opportunities');
+   const options=Array.isArray(found.opportunities)?found.opportunities:[];
+   if(!options.length){
+    const p=document.createElement('p');
+    p.textContent='No independently verified missing-extension repair is currently eligible. An intermittent scheduler failure alone is not a frozen source-backed upgrade. Reality must establish new failure evidence before installation can be approved.';
+    list.append(p);
+    setStatus('No verified candidate for execution. Reality has not started an installation.','blocked');
+    return;
+   }
+   for(const item of options){
+    if(!Number.isSafeInteger(item.issue_number)||item.issue_number<1||
+      !Number.isSafeInteger(item.original_provider_failed_run_id)||
+      !sha.test(String(item.source_sha||''))||
+      item.independently_verified!==true)continue;
+    const box=document.createElement('div');box.className='repair-chat-issue';
+    const title=document.createElement('strong');
+    title.textContent='#'+item.issue_number+' · '+String(item.issue_title||'Source-verified gap');
+    const info=document.createElement('p');
+    info.textContent='Failed GitHub run '+item.original_provider_failed_run_id+
+      ' · Pinned SHA '+item.source_sha.slice(0,12)+
+      ' · Frozen test '+String(item.frozen_test_path||'REQUIRES_READBACK');
+    const button=document.createElement('button');button.type='button';
+    button.textContent='Authorize investigation of this exact gap';
+    button.addEventListener('click',async()=>{
+     if(button.disabled)return;
+     if(!isSigned()||!uuid.test(conv())){setStatus('Sign in first.','blocked');return;}
+     button.disabled=true;
+     setStatus('Authorizing investigation ONLY for reviewed GitHub issue #'+item.issue_number+' and your current confirmed goal. This does not authorize installation.');
+     try{
+      const result=await post('/api/reality/personal-real-repair-opportunities',{
+       intent:'AUTHORIZE_SOURCE_VERIFIED_ORIGINAL_REPAIR',
+       conversation_id:conv(),issue_number:item.issue_number,
+       expected_failed_run_id:item.original_provider_failed_run_id,
+       expected_source_sha:item.source_sha,
+      });
+      if(!work.test(String(result.original_work_id||''))||
+         result.installation_authorized!==false||
+         result.original_job_completed!==false)
+       throw Error('OWNER_SCOPED_INVESTIGATION_RECEIPT_MISMATCH');
+      selectedWork=result.original_work_id;
+      setStatus('Source-bound investigation is '+String(result.status||'QUEUED')+
+       '. Original job '+selectedWork+
+       '. Reality can now use the governed discovery worker. Installation remains unapproved; check its evidence and review the exact candidate when verified.','verified');
+      await refreshProof();
+     }catch(e){setStatus('Investigation not confirmed: '+String(e.message)+
+      '. Check the original owner work before retrying. Installation not authorized.','blocked');}
+     finally{button.disabled=false;}
+    });
+    box.append(title,info,button);
+    if(/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(String(item.issue_url||''))){
+     const link=document.createElement('a');link.href=item.issue_url;
+     link.target='_blank';link.rel='noopener noreferrer';link.textContent='View original GitHub issue';
+     box.append(link);
+    }
+    list.append(box);
+   }
+   setStatus('Only independently verified source gaps are listed. Select one exact issue to authorize investigation. No installation approval has been created.','verified');
+  }catch(e){setStatus('Provider source verification unavailable: '+String(e.message)+'. No repair was started.','blocked');}
+  finally{button.disabled=false;}
+ });
+ el('repairChatReview').addEventListener('click',()=>{
+  if(!isSigned()){setStatus('Sign in first. No authority granted.','blocked');return;}
+  const advanced=el('wcUpgradeDiagnostics');
+  if(advanced){advanced.hidden=false;advanced.open=true;}
+  const target=el('wcGovernedBuild');
+  target?.scrollIntoView({behavior:'smooth',block:'start'});
+  setStatus('Opened the existing governed upgrade review. Check independent candidate evidence, then use its exact-owner approval control only when Reality proves the repair. This chat cannot approve or install source.');
+  const readCandidate=el('wcReadModelRepair');
+  if(readCandidate&&!readCandidate.disabled)readCandidate.click(); // GET-only check
+ });
+})();
+</script>
+
 </body>
 </html>
