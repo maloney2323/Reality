@@ -3,6 +3,7 @@
 // continuation is idempotent, reobserves the installed GitHub commit and the
 // original frozen job, and never asks an LLM to grant approval.
 import {createHash} from 'node:crypto';
+import {continuityUuidFromSource} from './reality-continuity-spine-v2.0.js';
 import {listAuthenticatedUnfinishedWork}
  from './reality-personal-unfinished-work-v0.1.js';
 import {readFreshPersonalGoalState}
@@ -365,9 +366,14 @@ export function createLiveGeneralRepairService({
     fail('ORIGINAL_JOB_PROVIDER_REOBSERVATION_CHANGED');
    return observed;
   };
+  const promotion=ctx.state.journal.find(e=>e.kind==='PROMOTION_AUTHORIZED');
+  if(!promotion?.event_hash)fail('PERSISTED_CONSTITUTIONAL_PROMOTION_MISSING');
+  const promotionCheckpointReceiptId=continuityUuidFromSource(
+   'reality:general:constitutional-checkpoint:'+session.user_id+':'+
+    ctx.job.conversation_id+':'+ctx.job.original_work_id+':'+promotion.event_hash);
   const approval={...ctx.state.promotion_authorization,
    kind:'PROMOTION_AUTHORIZED',
-   checkpoint_receipt_id:ctx.latest.checkpoint_receipt_id};
+   checkpoint_receipt_id:promotionCheckpointReceiptId};
   const registry=createGeneralPreviewCapabilityRegistry({
    db,scope:ctx.state.scope,
    artifactHash:ctx.state.candidate.artifact_hash,fetchImpl});
@@ -411,7 +417,7 @@ export function createLiveGeneralRepairService({
    writeToken:env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN,
    conversationId:ctx.job.conversation_id,
    originalWorkEvidenceRef:ctx.job.source_receipt_id,
-   promotionCheckpointReceiptId:ctx.latest.checkpoint_receipt_id,
+   promotionCheckpointReceiptId,
    observePreviouslyInstalled:async()=>installed,
    verifyOwnerApproval:async()=>({verified:true,consumed_once:true}),
    verifyFrozenAcceptance:async()=>acceptance(),
