@@ -72,59 +72,7 @@ begin
    provenance->>'source'='reality_authenticated_user_goal_command_adapter' and
    length(payload->>'server_issuer_hmac')=64 and
    payload->>'source_user_message_ref' ~
-    '^supabase:reality_chat_messages:[0-9a-f-]{36}
- if w.event_id is null or g.event_id is null or
-    w.continuity_root_id is distinct from g.continuity_root_id then
-  raise exception 'EXACT_WORKER_SCOPE_SOURCE_OR_SIGNED_GOAL_MISSING';
- end if;
- select count(*) into n from public.universe_events v
-  where v.continuity_root_id=w.continuity_root_id and
-   v.entity_type='personal_first_178_confirmed_gap' and
-   v.event_kind='OBSERVATION' and v.epistemic_status='VERIFIED' and
-   v.provenance->>'principal_id'=q.owner_id::text and
-   v.provenance->>'conversation_id'=q.conversation_id::text and
-   v.payload->>'original_work_id'=q.original_work_id and
-   v.payload->>'original_source_receipt_ref'=w.event_id::text and
-   v.payload->>'evidence_hash'=w.payload->>'gap_evidence_hash' and
-   v.payload->>'provider_receipt_ref'=w.payload->>'gap_provider_receipt_ref';
- if n<>1 then
-  raise exception 'EXACT_WORKER_SCOPE_VERIFIED_ORIGINAL_GAP_REQUIRED';
- end if;
- if exists(
-  select 1 from public.universe_events done
-  where done.continuity_root_id=w.continuity_root_id and
-   done.entity_type='reality_generic_verified_original_work_outcome' and
-   done.epistemic_status='VERIFIED' and
-   done.payload->>'original_work_id'=q.original_work_id and
-   done.payload->>'owner_id'=q.owner_id::text and
-   done.payload->>'independent_outcome_verified'='true'
- ) then
-  raise exception 'EXACT_WORKER_SCOPE_ORIGINAL_ALREADY_SETTLED';
- end if;
- return jsonb_build_object(
-  'status','CURRENT_OWNER_GOAL_AND_WORK_VERIFIED',
-  'reservation_id',q.reservation_id,'lease_id',q.lease_id,
-  'owner_id',q.owner_id,'conversation_id',q.conversation_id,
-  'original_work_id',q.original_work_id,'issue_number',q.issue_number,
-  'candidate_hash',q.candidate_hash,'install_branch',q.install_branch,
-  'original_work_event_id',w.event_id,
-  'goal_id',a.goal_id,'goal_transition_event_id',a.goal_transition_event_id,
-  'continuity_root_id',w.continuity_root_id,
-  'goal_source_user_message_ref',g.payload->>'source_user_message_ref',
-  'original_failed_run_id',substring(w.payload->>'gap_provider_receipt_ref'
-   from '^github:actions:run:([1-9][0-9]*):job:')::bigint,
-  'frozen_test_sha256',a.frozen_test_sha256,
-  'review_commit_sha',a.review_commit_sha,
-  'production_changed',false, 'installation_performed',false,
-  'settlement_recorded',false);
-end
-$reality$;
-
-revoke all on function public.reality_read_exact_approved_worker_scope_v1(uuid,uuid,text)
- from public, anon, authenticated;
-grant execute on function public.reality_read_exact_approved_worker_scope_v1(uuid,uuid,text)
- to service_role;
- and
+     '^supabase:reality_chat_messages:[0-9a-f-]{36}$' and
    payload->>'source_user_message_ref'=provenance->>'source_message_ref';
  if w.event_id is null or g.event_id is null or
     w.continuity_root_id is distinct from g.continuity_root_id then
