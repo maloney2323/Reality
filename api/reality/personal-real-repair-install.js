@@ -36,7 +36,7 @@ export default async function handler(req,res){
      !HASH.test(String(b.candidate_artifact_hash||''))||
      !HASH.test(String(b.expected_checkpoint_hash||'')))
     return res.status(403).json({ok:false,error:'REAL_INSTALL_EXPLICIT_EXACT_SOURCE_APPROVAL_REQUIRED'});
-   const result=await service.ownerApproveAndInstall({
+   const result=await service.ownerApproveAndQueue({
     originalWorkId:b.expected_original_work_id,issueNumber:b.issue_number,
     expectedArtifactHash:b.candidate_artifact_hash,
     expectedCheckpointHash:b.expected_checkpoint_hash});
