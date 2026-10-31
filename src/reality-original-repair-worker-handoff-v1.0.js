@@ -28,6 +28,36 @@ async function invoke(db,name,payload,fetchImpl=fetch){
  if(!read||typeof read!=='object')fail('DATABASE_RECEIPT_REQUIRED');
  return read;
 }
+// At admission, before writing a new original-work Continuity event,
+// honor an already unfinished issue-bound original from ANY conversation.
+export async function assertOwnerOriginalIssueIdentity({
+ session,issueNumber,expectedOriginalWorkId,env=process.env,
+ call=invoke,
+}={}){
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED!=='true'||
+    !validUuid(session?.user_id)||!WORK.test(String(expectedOriginalWorkId||''))||
+    !Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
+  fail('OWNER_ORIGINAL_IDENTITY_PREVIEW_SCOPE_REQUIRED');
+ const db=resolveReliabilityBenchmarkDb(env);
+ if(!db?.strictSecrets||!db.secretKey||db.url!==session.config?.url||
+    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+  fail('OWNER_ORIGINAL_IDENTITY_DATABASE_REQUIRED');
+ const result=await call(db,'reality_read_owner_existing_original_issue_v1',{
+  p_owner_id:session.user_id,p_issue_number:issueNumber,
+ });
+ if(result?.status==='EXISTING_UNFINISHED_ORIGINAL'){
+  if(result.original_work_id!==expectedOriginalWorkId||
+     result.installation_authorized!==false||result.job_completed!==false)
+   fail('PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED');
+ }else if(result?.status!=='NO_PRIOR_ORIGINAL'||
+    result.installation_authorized!==false||result.job_completed!==false)
+  fail('OWNER_ORIGINAL_ISSUE_IDENTITY_READBACK_INVALID');
+ return Object.freeze({status:'OWNER_ORIGINAL_IDENTITY_VERIFIED',
+  original_work_id:expectedOriginalWorkId,
+  installation_authorized:false,original_job_completed:false});
+}
+
 export async function queueVerifiedOriginalRepair({
  session,work,env=process.env,
  listWork=listAuthenticatedUnfinishedWork,readGoal=readFreshPersonalGoalState,
@@ -79,6 +109,9 @@ export async function queueVerifiedOriginalRepair({
   fail('FRESH_OWNER_GOAL_AND_SCOPE_REQUIRED');
  // Reconcile a previously admitted original job before creating another queue.
  // A new evidence classification is not a replacement for its prior work ID.
+ await assertOwnerOriginalIssueIdentity({session,
+  issueNumber:Number(work.issue_url.split('/').at(-1)),
+  expectedOriginalWorkId:work.original_work_id,env,call});
  const prior=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:work.original_conversation_id,
  });
