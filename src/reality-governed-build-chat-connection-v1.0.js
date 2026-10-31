@@ -42,7 +42,7 @@ async function rpc(db,name,input,fetchImpl=fetch){
  return result;
 }
 export async function queueOwnerGovernedBuild({
- session,env=process.env,
+ session,env=process.env,expectedOriginalWorkId,
  inspect=inspectAuthenticatedSelfImprovement,readGoal=readFreshPersonalGoalState,
  call=rpc,dispatch=dispatchGovernedBuildToIsolatedWorker,
 }={}){
@@ -53,6 +53,9 @@ export async function queueOwnerGovernedBuild({
   !/^work:[a-f0-9]{32}$/.test(String(next.original_work_id||''))||
   !next.original_job_tracking_receipt_ref)
   fail('GOVERNED_BUILD_VERIFIED_UNFINISHED_WORK_REQUIRED');
+ if(!/^work:[a-f0-9]{32}$/.test(String(expectedOriginalWorkId||''))||
+  expectedOriginalWorkId!==next.original_work_id)
+  fail('GOVERNED_BUILD_OWNER_REVIEWED_WORK_CHANGED');
  const goal=await readGoal({session,conversationId:next.original_conversation_id,env});
  if(goal?.principal_id!==session.user_id||
   goal?.state?.active_goal_id!==next.goal_id||
