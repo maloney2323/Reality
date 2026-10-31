@@ -104,6 +104,10 @@ export function createLiveGeneralRepairService({
    x.goal_still_current===true&&x.job_completed===false);
   if(jobs.length!==1)fail('ONE_OWNER_VERIFIED_UNFINISHED_ORIGINAL_WORK_REQUIRED');
   const job=jobs[0];
+  if(!/^test\/reality-frozen-regressions\/[a-z0-9._/-]+\.test\.js$/.test(
+   String(job.frozen_test_path||''))||
+   !HASH.test(String(job.frozen_test_sha256||'')))
+   fail('ORIGINAL_FROZEN_ACCEPTANCE_SOURCE_MISSING');
   const goal=await readGoal({session,conversationId:job.conversation_id,env});
   if(goal?.principal_id!==session.user_id||
    goal?.conversation_id!==job.conversation_id||
@@ -143,7 +147,8 @@ export function createLiveGeneralRepairService({
    if(proof.independently_verified!==true||
      proof.original_failed_run_id!==job.original_provider_failed_run_id||
      proof.original_source_sha!==job.original_source_sha||
-     state.candidate?.artifact_hash!==proof.candidate_artifact_sha256)
+     state.candidate?.artifact_hash!==proof.candidate_artifact_sha256||
+     proof.frozen_test_sha256!==job.frozen_test_sha256)
     fail('MODEL_SOURCE_ORIGINAL_WORK_MISMATCH');
   }
   return {job,goal,checkpoint,latest,state,proof,db};
@@ -371,7 +376,7 @@ export function createLiveGeneralRepairService({
    installedCommitSha:installed.installed_commit_sha,
    installedBranch:installed.installed_branch,
    originalWorkId:ctx.job.original_work_id,
-   expectedFrozenTestPath:'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js',
+   expectedFrozenTestPath:ctx.job.frozen_test_path,
    expectedFrozenSha:ctx.proof.frozen_test_sha256,
   });
   if(outcome.complete!==true)return Object.freeze({
@@ -394,7 +399,7 @@ export function createLiveGeneralRepairService({
     installedCommitSha:installed.installed_commit_sha,
     installedBranch:installed.installed_branch,
     originalWorkId:ctx.job.original_work_id,
-    expectedFrozenTestPath:'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js',
+    expectedFrozenTestPath:ctx.job.frozen_test_path,
     expectedFrozenSha:ctx.proof.frozen_test_sha256});
    if(observed.complete!==true||observed.evidence_hash!==outcome.evidence_hash||
       observed.installed_commit_sha!==installed.installed_commit_sha)
