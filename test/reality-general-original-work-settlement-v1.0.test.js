@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createGenericVerifiedOriginalWorkSettlement}
  from '../src/reality-general-original-work-settlement-v1.0.js';
+import {createContinuitySpine,appendContinuityNode}
+ from '../src/reality-continuity-spine-v2.0.js';
 const owner='11111111-1111-4111-8111-111111111111';
 const original='work:'+'a'.repeat(32),hash='b'.repeat(64),commit='c'.repeat(40);
 const session={user_id:owner},db={strictSecrets:true,secretKey:'unit-test-only'};
@@ -20,8 +22,15 @@ const execution={kind:'ORIGINAL_JOB_RESUMED',owner_id:owner,
  executor_run_ref:'github:actions:run:1234:job:5678',
  production_changed:false};
 function store(){
- const rows=[{event_id:'33333333-3333-4333-8333-333333333333',
-  lineage_hash:'e'.repeat(64),entity_type:'verified_goal'}];
+ const spine=createContinuitySpine({
+  continuityRootId:scope.continuity_root_id,worldlineId:scope.worldline_id,
+  subjectId:owner});
+ const rows=[appendContinuityNode({
+  spine,stage:'RAW_SIGNAL',entityId:original,eventId:'canonical:source:work',
+  payload:{original_work_id:original},epistemicStatus:'OBSERVED',
+  effectiveTime:'2026-10-31T06:00:00.000Z',
+  assertionTime:'2026-10-31T06:00:00.000Z',
+ })];
  let writes=0;
  return {createPersistence:()=>({
   reconstruct:async()=>rows,
