@@ -134,6 +134,26 @@ jobs:
           git add "reality-repair-evidence/issue-$ISSUE-candidate.json" "$FROZEN"
           test "$(git diff --cached --name-only | wc -l)" -le 2
           git commit -m "Reality: inert generated source and independent frozen acceptance for issue $ISSUE"
-          git push origin HEAD:feature/reality-closed-loop-worker-20261031
+          # An independent UI/API edit may advance the branch during the sandbox run.
+          # Never force-push or discard its updates. Rebase only the inert evidence
+          # commit, and retry the fast-forward publication within a fixed bound.
+          PUBLISHED=false
+          for TRY in 1 2 3 4 5; do
+            git fetch origin feature/reality-closed-loop-worker-20261031
+            REMOTE=origin/feature/reality-closed-loop-worker-20261031
+            if ! git merge-base --is-ancestor "$REMOTE" HEAD; then
+              git rebase "$REMOTE"
+            fi
+            test "$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l)" -le 2
+            if git push origin HEAD:feature/reality-closed-loop-worker-20261031; then
+              PUBLISHED=true
+              break
+            fi
+            echo "Concurrent branch update on inert candidate publication attempt $TRY; retrying without force"
+          done
+          if [ "$PUBLISHED" != true ]; then
+            echo "::error::Verified candidate could not be published because the branch continued moving."
+            exit 1
+          fi
       - name: No model-granted installation or final outcome
         run: echo 'Model code remains inert owner-review DATA. Only a later explicit signed owner action can authorize installation. No settlement.'
