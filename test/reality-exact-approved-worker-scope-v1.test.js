@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createExactApprovedWorkerScope}
  from '../src/reality-exact-approved-worker-scope-v1.js';
+import {personalGoalScope}
+ from '../src/reality-personal-goal-readback-v0.1.js';
+import {createContinuitySpine}
+ from '../src/reality-continuity-spine-v2.0.js';
 const lease={reservation_id:randomUUID(),lease_id:randomUUID(),
  owner_id:randomUUID(),conversation_id:randomUUID(),
  original_work_id:'work:'+'a'.repeat(32),candidate_hash:'b'.repeat(64),
@@ -14,8 +18,15 @@ const env={VERCEL_ENV:'preview',
  REALITY_PERSONAL_CHAT_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
  SUPABASE_SERVICE_ROLE_KEY:'unit-test-service-token-never-a-real-secret',
  VERCEL_GIT_COMMIT_REF:lease.install_branch};
+const canonicalScope=personalGoalScope({
+ userId:lease.owner_id,conversationId:lease.conversation_id});
+const canonicalSpine=createContinuitySpine({
+ continuityRootId:canonicalScope.root,worldlineId:canonicalScope.worldline,
+ subjectId:lease.owner_id});
 const scope={status:'CURRENT_OWNER_GOAL_AND_WORK_VERIFIED',
- ...lease,original_work_event_id:randomUUID(),
+ ...lease,continuity_root_id:canonicalSpine.continuity_root_id,
+ goal_source_user_message_ref:'supabase:reality_chat_messages:'+randomUUID(),
+ original_work_event_id:randomUUID(),
  goal_transition_event_id:randomUUID(),goal_id:'user-goal:'+'e'.repeat(32),
  review_commit_sha:'c'.repeat(40),frozen_test_sha256:'d'.repeat(64),
  original_failed_run_id:1234,production_changed:false,
@@ -59,6 +70,10 @@ test('fresh original owner, signed lease and goal epoch rechecked on each contin
  assert.equal(goal.state.active_goal_id,scope.goal_id);
  assert.equal(goal.state.active_goal.last_transition_receipt_id,
   scope.goal_transition_event_id);
+ assert.equal(goal.state.active_goal.source_user_message_ref,scope.goal_source_user_message_ref);
+ assert.equal(goal.persisted_source,'ISOLATED_CONTINUITY_VERIFIED_READBACK');
+ assert.deepEqual(goal.scope,canonicalScope);
+ assert.equal(goal.state.continuity_root_id,canonicalSpine.continuity_root_id);
  assert.equal((await adapters.readCandidate({issueNumber:178})).candidate_artifact_sha256,
   lease.candidate_hash);
  assert.equal(t.calls(),4,'no once-for-all static goal snapshot');
