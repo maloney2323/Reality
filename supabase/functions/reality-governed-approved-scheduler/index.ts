@@ -86,7 +86,7 @@ Deno.serve(async req=>{
   const body=JSON.parse(json);
   if(!body||typeof body!=='object'||Array.isArray(body)||
      Object.keys(body).sort().join(',')!=='action'||
-     body.action!=='readiness')
+     body.action!=='poll')
     throw Error('READ_ONLY_OIDC_ACTION_REQUIRED');
   const who=await verifySignedGitHubIdentity(bearer);
   const url=Deno.env.get('SUPABASE_URL');
