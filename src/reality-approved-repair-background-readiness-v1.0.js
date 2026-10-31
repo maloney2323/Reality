@@ -1,6 +1,7 @@
 // Read-only infrastructure heartbeat: one exact isolated customer preview.
-// This confirms that the automatic signed scheduler is alive and the worker
-// exists; it never grants installation, spends a customer approval, or
+// This requires an actual scheduled invocation; a successful push/PR test
+// does not prove the periodic worker wake is running. It never grants
+// installation, spends a customer approval, or
 // asserts the original job is complete.
 const REPO='maloney2323/Reality';
 const PREVIEW='feature/reality-closed-loop-worker-20261031';
@@ -36,9 +37,9 @@ export async function verifyApprovedBackgroundReadiness({
    x.path==='.github/workflows/'+SCHEDULER&&
    x.head_branch==='main'&&
    x.head_repository?.full_name===REPO&&
-   ['push','schedule','workflow_dispatch'].includes(x.event)&&
+   x.event==='schedule'&&
    Number.isSafeInteger(x.id));
-  if(!found.length)return reply('GOVERNED_SCHEDULER_NEVER_VERIFIED');
+  if(!found.length)return reply('GOVERNED_SCHEDULER_AUTOMATIC_TICK_NOT_OBSERVED');
   const latest=found.sort((a,b)=>
    Number(b.run_number||0)-Number(a.run_number||0))[0];
   if(latest.status!=='completed'||latest.conclusion!=='success'||
