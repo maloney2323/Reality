@@ -148,7 +148,8 @@ test('saved one-use owner redesign is visible as in progress without inventing a
   checkpointFactory:()=>({readLatestCheckpoint:async()=>({
    verified:true,original_work_id:work,checkpoint_hash:'a'.repeat(64),
    continuity_receipt_id:restored,
-   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9},
+   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9,
+    head_hash:'a'.repeat(64)},
   })}),
  });
  assert.equal(reads,2);
@@ -180,6 +181,7 @@ test('an unverifiable prior owner redesign reservation cannot be promoted into e
   checkpointFactory:()=>({readLatestCheckpoint:async()=>({
    verified:true,original_work_id:work,checkpoint_hash:'a'.repeat(64),
    continuity_receipt_id:'66666666-6666-4666-8666-666666666666',
-   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9}})}),
+   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9,
+    head_hash:'a'.repeat(64)}})}),
  }),/REDESIGN_OWNER_RESERVATION_READBACK_REQUIRED/);
 });
