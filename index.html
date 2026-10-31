@@ -326,6 +326,18 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <li class="repair-step" id="wcRepairStep4" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">4</span><span class="repair-step-name">Your approval</span></div><span class="repair-step-detail">Exact verified installation</span></li>
     <li class="repair-step" id="wcRepairStep5" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">5</span><span class="repair-step-name">Results</span></div><span class="repair-step-detail">Real work + final receipt</span></li>
    </ol>
+   <div class="repair-current" id="wcRealRepairOpportunityPanel" style="margin-bottom:12px">
+    <div>
+     <div class="repair-kicker">New independently verified repair opportunity</div>
+     <h4 id="wcRealRepairOpportunityTitle">Find a genuine missing capability</h4>
+     <p id="wcRealRepairOpportunityDetails">Reality can inspect failing source-backed work that hasn't yet been adopted into your personal Continuity goal. It will not reuse #178 as a new job.</p>
+    </div>
+    <div class="repair-actions">
+     <button type="button" id="wcDiscoverRealRepair" class="repair-secondary">Find verified repair</button>
+     <button type="button" id="wcAuthorizeRealRepair" class="repair-primary" disabled>Review new repair</button>
+    </div>
+   </div>
+   <p id="wcRealRepairOpportunityStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No new owner work has been authorized.</p>
    <div class="repair-current">
     <div>
      <div class="repair-kicker">Next action</div>
@@ -1251,6 +1263,8 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // upgrade loop. GET never starts work; POST is a separate, confirmed action.
 // The current isolated worker is read-only discovery. No stage is described as
 // model-generated or installed unless the durable provider state proves it.
+let wcRealRepairOpportunity=null;
+let wcRepairIntent='EXISTING_WORK';
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
 let wcRepairSelectedWork=null;
@@ -1296,6 +1310,7 @@ function wcRepairResetStages(){
   'Installation stays locked until an exact generated upgrade has passed independent tests and a trusted installation action is available. No installation approval is requested by this discovery screen.';
 }
 function wcRepairCloseConsent(){
+ wcRepairIntent='EXISTING_WORK';
  const dialog=$('wcRepairConsentDialog');
  if(dialog.open)dialog.close();
  $('wcRepairConsentCheckbox').checked=false;
@@ -1393,9 +1408,12 @@ $('wcExploreRepairDiscoveries').onclick=()=>{
 $('wcRepairCancelConsent').onclick=()=>wcRepairCloseConsent();
 $('wcRepairConsentCheckbox').onchange=()=>{
  $('wcRepairConfirmInvestigation').disabled=
-  !$('wcRepairConsentCheckbox').checked||!wcGovernedBuildEligible;
+  !$('wcRepairConsentCheckbox').checked||
+  (wcRepairIntent==='ADOPT_REAL_ISSUE'?
+   !wcRealRepairOpportunity:!wcGovernedBuildEligible);
 };
 $('wcStartGovernedBuild').onclick=()=>{
+ wcRepairIntent='EXISTING_WORK';
  if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
     !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
     $('privateReady')?.style.display!=='block')return;
@@ -1410,7 +1428,119 @@ $('wcStartGovernedBuild').onclick=()=>{
  $('wcRepairConfirmInvestigation').disabled=true;
  dialog.showModal();
 };
+$('wcDiscoverRealRepair').onclick=async()=>{
+ const button=$('wcDiscoverRealRepair');
+ button.disabled=true;$('wcAuthorizeRealRepair').disabled=true;
+ wcRealRepairOpportunity=null;
+ $('wcRealRepairOpportunityStatus').textContent=
+  'Checking actual failing CI evidence and original source bytes…';
+ try{
+  if($('privateReady')?.style.display!=='block')
+   throw Error('SIGN_IN_REQUIRED');
+  const response=await fetch('/api/reality/personal-real-repair-opportunities',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+   !Array.isArray(data.opportunities))
+   throw Error(String(data.error||'PROVIDER_READBACK_UNAVAILABLE'));
+  const chosen=data.opportunities.find(v=>
+   v.independently_verified===true&&
+   Number.isSafeInteger(v.issue_number)&&
+   Number.isSafeInteger(v.original_provider_failed_run_id)&&
+   /^[a-f0-9]{40}$/.test(String(v.source_sha||''))&&
+   /^src\/reality-extensions\//.test(String(v.source_path||'')));
+  if(!chosen){
+   $('wcRealRepairOpportunityTitle').textContent=
+    'No new source-verified missing capability';
+   $('wcRealRepairOpportunityDetails').textContent=
+    'No current issue has the necessary independent failed provider run and frozen missing-source test. No new job was created.';
+   $('wcRealRepairOpportunityStatus').textContent=
+    'No eligible new repair. Existing historical jobs remain unchanged.';
+   return;
+  }
+  wcRealRepairOpportunity=chosen;
+  $('wcRealRepairOpportunityTitle').textContent=
+   'Verified missing extension · Issue #'+chosen.issue_number;
+  $('wcRealRepairOpportunityDetails').textContent=
+   chosen.issue_title+' · Original failing run '+chosen.original_provider_failed_run_id+
+   ' · Source '+chosen.source_path;
+  $('wcRealRepairOpportunityStatus').textContent=
+   'Independent source failure verified. Review and approve investigation to save this as a NEW job in your confirmed Reality goal. Installation is separate.';
+  $('wcAuthorizeRealRepair').disabled=false;
+ }catch(err){
+  $('wcRealRepairOpportunityStatus').textContent=
+   'Could not verify a safe repair opportunity: '+String(err?.message||'READBACK_FAILED')+
+   '. No owner job or installation created.';
+ }finally{button.disabled=false;}
+};
+$('wcAuthorizeRealRepair').onclick=()=>{
+ if(!wcRealRepairOpportunity||
+   $('privateReady')?.style.display!=='block')return;
+ const dialog=$('wcRepairConsentDialog');
+ if(typeof dialog.showModal!=='function')return;
+ wcRepairIntent='ADOPT_REAL_ISSUE';
+ $('wcRepairConsentHeading').textContent=
+  'Authorize Reality to investigate verified issue #'+wcRealRepairOpportunity.issue_number+'?';
+ $('wcRepairConsentWork').textContent=
+  'Source-backed failure: GitHub run '+wcRealRepairOpportunity.original_provider_failed_run_id+
+  '. A new original work receipt will be attached to your current confirmed goal. No installation approval.';
+ $('wcRepairConsentCheckbox').checked=false;
+ $('wcRepairConfirmInvestigation').disabled=true;
+ dialog.showModal();
+};
+
 $('wcRepairConfirmInvestigation').onclick=async()=>{
+ if(wcRepairIntent==='ADOPT_REAL_ISSUE'){
+  const checked=$('wcRepairConsentCheckbox').checked;
+  const chosen=wcRealRepairOpportunity;
+  if(!checked||!chosen||wcGovernedBuildBusy||
+   $('privateReady')?.style.display!=='block')return;
+  const conversationId=typeof window.realityActiveConversationId==='function'?
+   window.realityActiveConversationId():null;
+  if(!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+   String(conversationId||''))){
+   wcRepairStatus('Select an existing signed-in Reality conversation first. No work was created.','blocked');
+   return;
+  }
+  wcRepairCloseConsent();
+  wcGovernedBuildBusy=true;
+  const approve=$('wcAuthorizeRealRepair');
+  approve.disabled=true;
+  $('wcRealRepairOpportunityStatus').textContent=
+   'Recording the exact owner-approved investigation and dispatching the existing general worker…';
+  try{
+   const response=await fetch('/api/reality/personal-real-repair-opportunities',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+     intent:'AUTHORIZE_SOURCE_VERIFIED_ORIGINAL_REPAIR',
+     conversation_id:conversationId,issue_number:chosen.issue_number,
+     expected_failed_run_id:chosen.original_provider_failed_run_id,
+     expected_source_sha:chosen.source_sha,
+    }),
+   });
+   const data=await response.json();
+   if(!response.ok||data.ok!==true||
+    !/^work:[a-f0-9]{32}$/.test(String(data.original_work_id||''))||
+    data.installation_authorized!==false||
+    data.original_job_completed!==false)
+    throw Error(String(data.error||'ORIGINAL_WORK_RECEIPT_UNVERIFIED'));
+   $('wcRealRepairOpportunityStatus').textContent=
+    'Owner-approved original job saved: '+data.original_work_id+
+    '. '+(data.worker_dispatch_started?
+      'General isolated discovery worker dispatched.':
+      'Worker dispatch remains blocked; saved job is recoverable.')+
+    ' Installation and settlement are not authorized.';
+  }catch(error){
+   $('wcRealRepairOpportunityStatus').textContent=
+    'Original job outcome needs readback: '+String(error?.message||'UNKNOWN')+
+    '. Do not submit another approval blindly.';
+  }finally{
+   wcGovernedBuildBusy=false;
+   void wcReadGovernedBuild();
+  }
+  return;
+ }
  if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
     !$('wcRepairConsentCheckbox').checked||
     !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
@@ -2653,6 +2783,7 @@ setInterval(refreshSavedShiftHome,300000);
   }
   return id;
  }
+ window.realityActiveConversationId=conversationId;
  let realitySelfImprovementLoading=false;
  let realityOriginal143Eligible=false;
  const original143WorkId='work:24cda9611404e9bcb47909976067605c';
