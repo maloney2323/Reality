@@ -120,3 +120,66 @@ test('seven preserved failures trigger one final bounded draft repair on same jo
  assert.equal(d.installation_authorized,false);
  assert.equal(d.original_job_completed,false);
 });
+
+test('saved one-use owner redesign is visible as in progress without inventing an installed capability',async()=>{
+ const reservation='55555555-5555-4555-8555-555555555555';
+ const restored='66666666-6666-4666-8666-666666666666';
+ let reads=0;
+ const state=await original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>({owner_id:owner,original_work_id:work,goal_id:goal}),
+  dbReader:()=>({}),
+  call:async(_db,fn)=>{
+   reads++;
+   if(fn==='reality_read_governed_build_v1')
+    return {queue_id:queueId,phase:'RUNNING_CONSTITUTIONAL',
+     original_work_id:work,goal_id:goal,report:{
+      redesign_recovery_reservation_id:reservation,
+      redesign_recovery_owner_consent:'AUTHENTICATED_OWNER_EXPLICIT_ACTION'}};
+   assert.equal(fn,'reality_read_first178_one_redesign_v1');
+   return {reserved_once:true,original_work_id:work,queue_id:queueId,
+    reservation_id:reservation,owner_confirmed:true,
+    authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT',
+    installation_authorized:false,job_completed:false};
+  },
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>({
+   verified:true,original_work_id:work,checkpoint_hash:'a'.repeat(64),
+   continuity_receipt_id:restored,
+   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9},
+  })}),
+ });
+ assert.equal(reads,2);
+ assert.equal(state.status,'REDESIGN_RECOVERY_IN_PROGRESS');
+ assert.equal(state.attempt_count,8);
+ assert.equal(state.attempt_limit,9);
+ assert.equal(state.original_history_preserved,true);
+ assert.equal(state.installation_authorized,false);
+ assert.equal(state.original_job_completed,false);
+});
+
+test('an unverifiable prior owner redesign reservation cannot be promoted into execution status',async()=>{
+ await assert.rejects(original178OwnerApprovalView({
+  session:{user_id:owner},env:{VERCEL_ENV:'preview',
+   VERCEL_GIT_COMMIT_REF:'feature/first178-live-single-claim-execution-20261029'},
+  resolve:async()=>({issue_number:178,conversation_id:cid,
+   original_work_id:work,goal_id:goal,queue_id:queueId}),
+  scopeReader:async()=>({owner_id:owner,original_work_id:work,goal_id:goal}),
+  dbReader:()=>({}),
+  call:async(_db,name)=>name==='reality_read_governed_build_v1'?
+   {queue_id:queueId,phase:'RUNNING_CONSTITUTIONAL',
+    original_work_id:work,goal_id:goal,report:{
+     redesign_recovery_reservation_id:'55555555-5555-4555-8555-555555555555',
+     redesign_recovery_owner_consent:'AUTHENTICATED_OWNER_EXPLICIT_ACTION'}}:
+   {reserved_once:true,queue_id:queueId,original_work_id:work,
+    reservation_id:'77777777-7777-4777-8777-777777777777',
+    owner_confirmed:true,authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT',
+    installation_authorized:false,job_completed:false},
+  checkpointFactory:()=>({readLatestCheckpoint:async()=>({
+   verified:true,original_work_id:work,checkpoint_hash:'a'.repeat(64),
+   continuity_receipt_id:'66666666-6666-4666-8666-666666666666',
+   state:{phase:'REPAIR_REQUIRED',attempt_count:8,attempt_limit:9}})}),
+ }),/REDESIGN_OWNER_RESERVATION_READBACK_REQUIRED/);
+});
