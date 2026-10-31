@@ -48,6 +48,11 @@ export function createFoundationalModelGenerator({
     contract.frozen_regression_sha256!==ticket.frozen_regression_sha256||
     !Array.isArray(contract.files)||contract.files.length<1))
     fail('FOUNDATION_FROZEN_REGRESSION_CONTEXT_UNVERIFIED');
+  const sourceEntrypoint=ticket.source_entrypoint||
+   'src/reality-extensions/reality-ci-failure-evidence.mjs';
+  if(!/^src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs$/.test(sourceEntrypoint)||
+   sourceEntrypoint.includes('//')||sourceEntrypoint.split('/').includes('..'))
+   fail('FOUNDATION_MODEL_TRUSTED_ENTRYPOINT_REQUIRED');
   const task={task:'Propose source and tests for a verified missing capability. Return JSON only with exact ticket_hash and original_work_id. Do not claim installation or completed work.',
    scope:{ticket_hash:ticket.ticket_hash,original_work_id:ticket.original_work_id,
     goal_id:ticket.goal_id,
@@ -113,7 +118,7 @@ export function createFoundationalModelGenerator({
     text:{format:{type:'json_schema',name:'reality_exact_candidate_source_v1',
      strict:true,schema:sourceSchema}},
     input:[
-     {role:'system',content:[{type:'input_text',text:'You are Reality\'s replaceable coding model. Return the required JSON schema exactly: ticket_hash and original_work_id MUST equal the supplied scope; files MUST include at least TWO entries: one implementation source file at src/reality-extensions/reality-ci-failure-evidence.mjs and one model-authored test under test/reality-extensions/. Each file must contain actual working JavaScript content, not descriptions or empty placeholders. Implement exports and behavior required by the frozen acceptance tests supplied as untrusted task data. The frozen failing assertions and expected-versus-actual outputs are acceptance criteria: correct each observed mismatch, including negative evidence controls. Validate all required provenance and exact SHA fields before returning MISSING_CAPABILITY. Reject forged, foreign, stale, unauthorized or incomplete evidence. Place stale/superseding success checks before permitting generation. Never use self-comparisons such as value===value as evidence checks. Do not edit or weaken frozen tests. No security, auth, governance core, installation, promotion or production changes. The model output is only a proposal.'}]},
+     {role:'system',content:[{type:'input_text',text:'You are Reality\'s replaceable coding model. Return the required JSON schema exactly: ticket_hash and original_work_id MUST equal the supplied scope; files MUST include at least TWO entries: one implementation source file at '+sourceEntrypoint+' and one model-authored test under test/reality-extensions/. Each file must contain actual working JavaScript content, not descriptions or empty placeholders. Implement exports and behavior required by the frozen acceptance tests supplied as untrusted task data. The frozen failing assertions and expected-versus-actual outputs are acceptance criteria: correct each observed mismatch, including negative evidence controls. Validate all required provenance and exact SHA fields before returning MISSING_CAPABILITY. Reject forged, foreign, stale, unauthorized or incomplete evidence. Place stale/superseding success checks before permitting generation. Never use self-comparisons such as value===value as evidence checks. Do not edit or weaken frozen tests. No security, auth, governance core, installation, promotion or production changes. The model output is only a proposal.'}]},
      {role:'user',content:[{type:'input_text',text:JSON.stringify(currentTask)}]},
     ],
    }),
@@ -125,8 +130,8 @@ export function createFoundationalModelGenerator({
   let candidate;try{candidate=JSON.parse(raw)}catch{fail('FOUNDATION_MODEL_RESPONSE_NOT_JSON')}
   const validated=validateFoundationalCandidate(ticket,{
    ...candidate,model_response_id:body.id||null});
-  const code=validated.files.find(f=>f.path===
-   'src/reality-extensions/reality-ci-failure-evidence.mjs')?.content||'';
+  const code=validated.files.find(f=>f.path===sourceEntrypoint)?.content||'';
+  if(!code)fail('FOUNDATION_MODEL_TRUSTED_ENTRYPOINT_MISSING');
   // Self-comparisons can never compare independently observed evidence.
   // Reject model-proposed source, do not modify it or treat it as verified.
   const invalid=/\b(evidence|input|record|source)\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\s*(?:!==|===|!=|==)\s*\1\.\2\b/i.test(code);
