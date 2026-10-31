@@ -11,7 +11,9 @@ import {verifySelfImprovementJournal}
 import {orderContinuityHistory}
  from './reality-continuous-reliability-v0.1.js';
 const fail=x=>{throw Error('GENERAL_CHECKPOINT_'+x)};
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const canon=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(canon):
+ Object.fromEntries(Object.keys(x).sort().map(k=>[k,canon(x[k])]));
+const same=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
 const WORK=/^work:[a-f0-9]{32}$/;
 export function createGeneralConstitutionalCheckpointService({
  session,conversationId,originalWorkId,originalWorkEvidenceRef,
