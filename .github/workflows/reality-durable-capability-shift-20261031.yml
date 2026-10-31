@@ -1,0 +1,45 @@
+name: Reality durable capability shift audit — preview only
+on:
+  push:
+    branches:
+      - feature/reality-durable-capability-shift-20261031
+    paths:
+      - 'src/reality-shift-capability-audit-v1.js'
+      - 'src/reality-system-discovery-v0.1.js'
+      - 'api/reality/shift.js'
+      - 'test/reality-shift-capability-audit-v1.test.js'
+      - '.github/workflows/reality-durable-capability-shift-20261031.yml'
+  pull_request:
+    paths:
+      - 'src/reality-shift-capability-audit-v1.js'
+      - 'src/reality-system-discovery-v0.1.js'
+      - 'api/reality/shift.js'
+      - 'test/reality-shift-capability-audit-v1.test.js'
+      - '.github/workflows/reality-durable-capability-shift-20261031.yml'
+permissions:
+  contents: read
+jobs:
+  shift-audit-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check existing shift and discovery source
+        run: |
+          node --check src/reality-system-discovery-v0.1.js
+          node --check src/reality-shift-capability-audit-v1.js
+          node --check api/reality/shift.js
+      - name: Evidence-bound source readback, no false capability claims and shift continuity
+        run: |
+          node --test test/reality-shift-capability-audit-v1.test.js
+          node test/reality-system-discovery-v0.1.test.js
+          node --test test/reality-autonomous-shift-handoff-v1.0.test.js
+      - name: Governance proof
+        run: |
+          echo 'Audit and persistence source regression only.'
+          echo 'No capability installation, owner approval, production deployment or customer settlement.'

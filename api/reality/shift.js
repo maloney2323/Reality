@@ -9,6 +9,8 @@ import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
 import { validateCronCredential, autonomousShiftSlot, projectAutonomousShiftHome, authorizeShiftConfigWrite, authorizeManualShiftRun } from '../../src/reality-autonomous-shift-control-v1.0.js';
 import {projectShiftCycleCompletion} from '../../src/reality-completion-report-v0.1.js';
+import {inspectGitHubRepository} from '../../src/reality-governed-system-access-v0.1.js';
+import {buildShiftCapabilityAudit} from '../../src/reality-shift-capability-audit-v1.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -86,6 +88,29 @@ async function runTick({ config, phase, local, persistence }) {
     provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
   });
   const commits = await githubCommits();
+  // Recover the previous source snapshot from this SAME Universe shift worldline.
+  // Missing provider evidence is UNKNOWN, never "no gaps" or an installed repair.
+  let systemCapabilityAudit;
+  try {
+    const [owner,repo]=SHADOW_REPO.split('/');
+    if(owner!=='maloney2323'||repo!=='Reality')
+      throw Error('CAPABILITY_AUDIT_REPOSITORY_SCOPE_MISMATCH');
+    const priorSnapshot=priorShift.filter(e=>e.entity_type==='shift_result' &&
+      e.payload?.evidence_summary?.system_capability_audit?.snapshot)
+      .sort((a,b)=>String(a.assertion_time).localeCompare(String(b.assertion_time)))
+      .at(-1)?.payload?.evidence_summary?.system_capability_audit?.snapshot||null;
+    const source=await inspectGitHubRepository({
+      owner,repo,ref:process.env.VERCEL_GIT_COMMIT_REF||'main'
+    });
+    systemCapabilityAudit=buildShiftCapabilityAudit({
+      repositoryObservation:source,previousSnapshot:priorSnapshot
+    });
+  } catch {
+    systemCapabilityAudit={state:'PROVIDER_READBACK_UNAVAILABLE',
+      observed_gaps:[],model_can_propose:false,can_install:false,can_settle:false,
+      independently_verified_behavior:false};
+  }
+
   const observations = buildShadowObservations({
     observedAt: new Date().toISOString(),
     commits: commits.map(c => ({
@@ -178,6 +203,7 @@ async function runTick({ config, phase, local, persistence }) {
     'Prioritize work that can remove real operational load from the owner.',
     'Inspect system health, regressions, integrations, governance, product gaps, competitive developments, and capability gaps.',
     'Do not manufacture work merely to fill the shift.',
+    'Use source-pinned system_capability_audit candidates before proposing upgrades. Unknown provider state is not proof of a missing capability; never treat model suggestions as verified execution or installation.',
     'Do not convert inference into authority and do not execute consequential actions without explicit authorization.',
     phase === 'READINESS'
       ? 'Prepare the shift: establish current evidence, identify likely work, capability gaps, risks, and what must be authorized before execution.'
@@ -192,6 +218,7 @@ async function runTick({ config, phase, local, persistence }) {
     recent_observation_count: observations.length,
     newly_persisted_observations: persisted,
     discovered_work: prioritizedWork,
+    system_capability_audit:systemCapabilityAudit,
     recurring_work_candidates: prioritizedWork.filter(w => w.classification === 'RECURRING'),
     authority: 'NONE_UNLESS_EXPLICITLY_GRANTED_PER_WORK_ITEM',
     execution: 'FAIL_CLOSED',
