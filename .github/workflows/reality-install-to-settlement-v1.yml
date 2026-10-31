@@ -3,12 +3,22 @@ on:
   push:
     branches: [feature/reality-install-to-settlement-20261031]
     paths:
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'src/reality-general-approved-repair-continuation-v1.0.js'
+      - 'api/reality/personal-real-repair-install.js'
+      - 'index.html'
+      - 'supabase/migrations/20261031_general_repair_verified_installation_bridge_v2.sql'
       - 'src/reality-general-installed-work-verifier-v1.0.js'
       - 'test/reality-general-installed-work-verifier-v1.0.test.js'
       - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
       - '.github/workflows/reality-install-to-settlement-v1.yml'
   pull_request:
     paths:
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'src/reality-general-approved-repair-continuation-v1.0.js'
+      - 'api/reality/personal-real-repair-install.js'
+      - 'index.html'
+      - 'supabase/migrations/20261031_general_repair_verified_installation_bridge_v2.sql'
       - 'src/reality-general-installed-work-verifier-v1.0.js'
       - 'test/reality-general-installed-work-verifier-v1.0.test.js'
       - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
@@ -23,8 +33,15 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22'}
+      - run: node --check src/reality-live-approved-install-to-settlement-v1.0.js
+      - run: node --check src/reality-general-approved-repair-continuation-v1.0.js
+      - run: node --check api/reality/personal-real-repair-install.js
       - run: node --check src/reality-general-installed-work-verifier-v1.0.js
       - run: node --test test/reality-general-installed-work-verifier-v1.0.test.js
       - run: node --test test/reality-general-isolated-install-v1.0.test.js
       - run: node --test test/reality-general-original-work-settlement-v1.0.test.js
+      - run: node --test test/reality-general-approved-repair-continuation-v1.0.test.js
+      - run: node --test test/reality-work-center-owner-approval-ui-v1.test.js
+      - run: node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
+      - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
       - run: echo 'Contract tests, no real owner approval or installation.'
