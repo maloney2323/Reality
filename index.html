@@ -1502,7 +1502,10 @@ $('wcReadModelRepair').onclick=async()=>{
    'Exact model artifact: '+data.candidate_artifact_hash+
    ' · Independently tested in GitHub run '+data.independent_verification_run_id+
    ' · Files: '+(data.source_files||[]).join(', ');
-  status.textContent='Generated source passed independent frozen tests. Nothing has been installed. Prepare the source-bound checkpoint before a separate exact owner installation approval.';
+  status.textContent='Generated source passed independently frozen tests. Reality is now preparing the exact constitutional checkpoint automatically; owner installation approval remains separate.';
+  // The owner already authorized investigation; checkpoint verification
+  // introduces no installation authority and needs no second owner click.
+  await $('wcPrepareModelRepair').onclick();
  }catch(err){
   status.textContent='Repair review unavailable: '+String(err?.message||'SOURCE_READBACK_FAILED')+
    '. No approval or installation occurred.';
@@ -1537,7 +1540,7 @@ $('wcPrepareModelRepair').onclick=async()=>{
   wcRepairSetBadge('Verified repair awaiting owner','ready');
   $('wcRepairApprovalInfo').textContent=
    'Exact candidate SHA-256: '+proposal.candidate_artifact_hash+
-   '. Independent tests and your original-work constitutional checkpoint are verified. Installation remains locked until the separate trusted install action is connected.';
+   '. Independent frozen tests and the constitutional checkpoint are verified. One explicit approval starts Reality\'s durable background installation, resumption and settlement.';
   wcVerifiedInstallReview={
    original_work_id:data.original_work_id,
    issue_number:proposal.issue_number,
