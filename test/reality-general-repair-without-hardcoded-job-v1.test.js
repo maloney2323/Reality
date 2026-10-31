@@ -38,3 +38,23 @@ test('new work uses generic owner authorization; archival scope can only verify 
   assert.equal(isVerifiedRedesignScope('ONE_ORIGINAL178_REDESIGN_ATTEMPT',{historicalReceipt:true}),true);
   assert.equal(isVerifiedRedesignScope('ARBITRARY_FAKE_OWNER_APPROVAL',{historicalReceipt:true}),false);
 });
+
+test('legacy issue-specific execution routes are retired rather than remaining alternate workers',()=>{
+  const oldRoutes=[
+    'personal-first-upgrade-178.js',
+    'personal-first-upgrade-178-run.js',
+    'personal-first-upgrade-178-execute.js',
+    'personal-first-upgrade-178-recovery.js',
+    'personal-first-upgrade-178-redesign.js',
+    'personal-first-upgrade-178-approve.js',
+    'personal-first-upgrade-178-background.js',
+    'personal-first-upgrade-178-dispatch.js',
+  ];
+  for(const route of oldRoutes){
+    const source=readFileSync('api/reality/'+route,'utf8');
+    const handler=source.slice(source.indexOf('export default async function handler'));
+    assert.match(handler,/LEGACY_SINGLE_JOB_EXECUTION_RETIRED/,route);
+    assert.match(handler,/status\(410\)/,route);
+    assert.match(handler,/original_job_completed:false/,route);
+  }
+});
