@@ -1,0 +1,28 @@
+name: Reality verified missing capability — frozen original acceptance
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'
+      - 'test/reality-frozen-regressions/general-execution-receipt-v1.json'
+      - 'src/reality-extensions/reality-general-execution-receipt.mjs'
+      - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
+permissions:
+  contents: read
+jobs:
+  independent-original-customer-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Record exact original source sha
+        run: git rev-parse HEAD
+      - name: Print immutable frozen acceptance SHA-256
+        run: sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+      - name: Frozen same-work missing capability acceptance
+        run: node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js

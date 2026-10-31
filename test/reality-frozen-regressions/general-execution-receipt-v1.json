@@ -1,0 +1,6 @@
+{
+  "manifest_ref": "general-execution-receipt-v1",
+  "tests": [
+    "test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js"
+  ]
+}

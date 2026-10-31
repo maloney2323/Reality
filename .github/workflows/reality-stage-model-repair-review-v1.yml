@@ -1,0 +1,55 @@
+name: Reality exact model repair evidence — read-only owner review
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'reality-repair-evidence-requests/*.json'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  stage-only-independent-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 2, persist-credentials: true}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=$(git diff --name-only HEAD^ HEAD)
+          [[ "$path" =~ ^reality-repair-evidence-requests/issue-[0-9]+\.json$ ]]
+          node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.schema!=="reality-independent-candidate-review-request-v1"||!Number.isSafeInteger(r.model_run_id)||!Number.isSafeInteger(r.verification_run_id)||!Number.isSafeInteger(r.issue_number))process.exit(1)' "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "model_run=$(node -p "JSON.parse(require('fs').readFileSync('$path','utf8')).model_run_id")" >> "$GITHUB_OUTPUT"
+          echo "proof_run=$(node -p "JSON.parse(require('fs').readFileSync('$path','utf8')).verification_run_id")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-repair-candidate-1
+          run-id: ${{ steps.request.outputs.model_run }}
+          github-token: ${{ github.token }}
+          path: review-artifacts/candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-repair-independent-original-acceptance-${{ steps.request.outputs.proof_run }}
+          run-id: ${{ steps.request.outputs.proof_run }}
+          github-token: ${{ github.token }}
+          path: review-artifacts/proof
+      - name: Independently validate model source SHA, original CI failure and frozen offline test
+        run: node scripts/reality-stage-independent-repair-evidence-v1.mjs "${{ steps.request.outputs.path }}"
+      - name: Commit ONLY inert JSON for owner approval review
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git status --short --untracked-files=all | grep -E '^\?\? reality-repair-evidence/issue-[0-9]+-candidate\.json$' | wc -l)" -eq 1 ]]
+          git config user.name 'Reality Evidence Steward'
+          git config user.email 'reality-evidence-steward@users.noreply.github.com'
+          git add reality-repair-evidence/issue-*-candidate.json
+          git diff --cached --name-only | grep -E '^reality-repair-evidence/issue-[0-9]+-candidate\.json$'
+          git commit -m 'Reality: preserve exact tested model source as owner-review data (not installed)'
+          git push origin HEAD:feature/reality-live-general-repair-bridge-20261031
+      - name: Explicitly preserve owner authority
+        run: echo 'No installation. No production. No model owner approval. No original-work settlement.'

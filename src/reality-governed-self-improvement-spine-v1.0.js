@@ -320,6 +320,11 @@ export async function acceptGovernedObservation(state,receipt,{verifyProvider}={
  const verified=await verifyProvider(freeze(copy({
   scope:state.scope,scope_hash:state.scope_hash,phase:state.phase,
   candidate_hash:state.candidate?.artifact_hash||null,
+  // Only the trusted provider verifier sees the exact prior immutable
+  // receipts needed for independent registration, execution and settlement
+  // readback. A model still cannot create or authorize any transition.
+  registration:state.registration,resumption:state.resumption,
+  promotion_authorization:state.promotion_authorization,
   attempt:state.attempt_count,receipt:copy(receipt),
  })));
  enforce(verified&&verified.verified===true&&

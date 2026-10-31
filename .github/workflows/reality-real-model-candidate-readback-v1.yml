@@ -1,0 +1,34 @@
+name: Reality live independent model-candidate provider readback
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'src/reality-real-verified-repair-readback-v1.0.js'
+      - '.github/workflows/reality-real-model-candidate-readback-v1.yml'
+permissions: {contents: read, actions: read}
+jobs:
+  read-actual-model-and-sandbox-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check src/reality-real-verified-repair-readback-v1.0.js
+      - name: Re-read genuine GitHub provider original run, model and sandbox, hash exact source
+        env:
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
+          VERCEL_ENV: preview
+          VERCEL_GIT_COMMIT_REF: feature/reality-live-general-repair-bridge-20261031
+        run: |
+          node --input-type=module -e '
+            import {readExactModelRepairEvidence} from "./src/reality-real-verified-repair-readback-v1.0.js";
+            const out=await readExactModelRepairEvidence({issueNumber:188});
+            if(out.independently_verified!==true||out.candidate_artifact_sha256!=="4c95744d2935766e81c1b337bf4504ce1e614a4ae54a0ed159e77e7cc7fafd96"||
+            out.original_job_completed!==false||out.installed!==false)process.exit(1);
+            console.log("REALITY_LIVE_PROVIDER_MODEL_PROOF",JSON.stringify({
+              artifact:out.candidate_artifact_sha256,source_run:out.model_source_run_id,
+              verification_run:out.verified_sandbox_run_id,review_commit:out.review_commit_sha,
+              independently_verified:true,installed:false,settled:false}));
+          '

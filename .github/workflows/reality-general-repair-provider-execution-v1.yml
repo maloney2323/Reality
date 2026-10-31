@@ -1,0 +1,68 @@
+name: Reality generic provider install and settlement contract
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'src/reality-general-preview-capability-registry-v1.0.js'
+      - 'src/reality-general-original-work-settlement-v1.0.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
+      - 'src/reality-general-approved-repair-continuation-v1.0.js'
+      - 'test/reality-general-approved-repair-continuation-v1.0.test.js'
+      - 'src/reality-governed-self-improvement-spine-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'test/reality-general-preview-capability-registry-v1.0.test.js'
+      - 'test/reality-general-original-work-settlement-v1.0.test.js'
+      - 'src/reality-general-isolated-install-v1.0.js'
+      - 'test/reality-general-isolated-install-v1.0.test.js'
+      - 'src/reality-general-provider-failure-observer-v1.0.js'
+      - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+      - 'src/reality-foundational-build-loop-v1.0.js'
+      - 'src/reality-foundational-model-provider-v1.0.js'
+      - 'src/reality-foundational-vercel-generation-adapters-v1.0.js'
+      - 'test/reality-generic-preview-generation-v1.0.test.js'
+      - '.github/workflows/reality-general-repair-provider-execution-v1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-general-preview-capability-registry-v1.0.js'
+      - 'src/reality-general-original-work-settlement-v1.0.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
+      - 'src/reality-general-approved-repair-continuation-v1.0.js'
+      - 'test/reality-general-approved-repair-continuation-v1.0.test.js'
+      - 'src/reality-governed-self-improvement-spine-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'test/reality-general-preview-capability-registry-v1.0.test.js'
+      - 'test/reality-general-original-work-settlement-v1.0.test.js'
+      - 'src/reality-general-isolated-install-v1.0.js'
+      - 'test/reality-general-isolated-install-v1.0.test.js'
+      - 'src/reality-general-provider-failure-observer-v1.0.js'
+      - 'test/reality-general-provider-failure-observer-v1.0.test.js'
+permissions: {contents: read}
+jobs:
+  approved-preview-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check src/reality-general-isolated-install-v1.0.js
+      - run: node --test test/reality-general-isolated-install-v1.0.test.js
+      - run: node --test test/reality-general-provider-failure-observer-v1.0.test.js
+      - run: node --check src/reality-foundational-model-provider-v1.0.js
+      - run: node --check src/reality-foundational-vercel-generation-adapters-v1.0.js
+      - run: node --test test/reality-generic-preview-generation-v1.0.test.js
+      - run: node --check src/reality-general-preview-capability-registry-v1.0.js
+      - run: node --check src/reality-general-original-work-settlement-v1.0.js
+      - run: node --test test/reality-general-preview-capability-registry-v1.0.test.js
+      - run: node --test test/reality-general-original-work-settlement-v1.0.test.js
+      - run: node --check src/reality-general-approved-repair-continuation-v1.0.js
+      - run: node --test test/reality-general-approved-repair-continuation-v1.0.test.js
+      - run: node --check src/reality-general-constitutional-checkpoint-v1.0.js
+      - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
+      - run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+      - run: node --test test/reality-foundational-model-strict-candidate-v1.0.test.js
+      - run: node --test test/reality-foundational-build-loop-v1.0.test.js
+      - run: echo 'Isolated mocked-provider contract tests only; not a live install or settled job.'

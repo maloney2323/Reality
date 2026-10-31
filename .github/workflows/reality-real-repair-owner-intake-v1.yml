@@ -1,0 +1,28 @@
+name: Reality source-backed owner repair intake
+on:
+  push:
+    branches: [feature/reality-live-general-repair-bridge-20261031]
+    paths:
+      - 'src/reality-real-repair-opportunity-intake-v1.0.js'
+      - 'src/reality-personal-unfinished-work-v0.1.js'
+      - 'api/reality/personal-real-repair-opportunities.js'
+      - 'test/reality-real-repair-opportunity-intake-v1.0.test.js'
+      - 'index.html'
+      - '.github/workflows/reality-real-repair-owner-intake-v1.yml'
+permissions: {contents: read}
+jobs:
+  real-original-work-source-and-goal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check src/reality-real-repair-opportunity-intake-v1.0.js
+      - run: node --check api/reality/personal-real-repair-opportunities.js
+      - run: node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+      - run: node --test test/reality-work-center-owner-approval-ui-v1.test.js
+      - run: node --test test/reality-governed-build-chat-connection-v1.0.test.js
+      - run: node --test test/reality-personal-unfinished-work-v0.1.test.js
+      - run: echo 'No owner actions, model installation or settlement were performed by this isolated CI.'

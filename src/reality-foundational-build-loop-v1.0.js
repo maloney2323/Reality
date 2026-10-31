@@ -25,8 +25,14 @@ export function createFoundationalBuildTicket(input){
  assert(/^[a-f0-9]{64}$/.test(t.frozen_regression_sha256),'FOUNDATION_FROZEN_SUITE_HASH_INVALID');
  assert(/^[a-zA-Z0-9_-]{1,80}$/.test(t.frozen_regression_manifest_ref),'FOUNDATION_FROZEN_MANIFEST_REF_INVALID');
  assert(t.environment==='ISOLATED_PREVIEW','FOUNDATION_PRODUCTION_NOT_PERMITTED');
- assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&(t.max_attempts<=8||(t.max_attempts===9&&
-  t.original_work_id==='work:9b9578b3c65427589c4c6da68fe0fc87')),
+ if(t.source_entrypoint!==undefined)
+  assert(/^src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs$/.test(t.source_entrypoint)&&
+   !t.source_entrypoint.includes('//')&&!t.source_entrypoint.split('/').includes('..'),
+   'FOUNDATION_TRUSTED_EXTENSION_ENTRYPOINT_REQUIRED');
+ if(t.repository_branch!==undefined)
+  assert(/^feature\/reality-[a-z0-9][a-z0-9/-]{5,105}$/.test(t.repository_branch)&&
+   !t.repository_branch.includes('..'),'FOUNDATION_TRUSTED_ISOLATED_BRANCH_REQUIRED');
+ assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&t.max_attempts<=8,
   'FOUNDATION_FINITE_RETRY_BUDGET_REQUIRED');
  assert(t.confirmed_gap_source==='INDEPENDENT_PROVIDER_READBACK',
   'FOUNDATION_CONFIRMED_GAP_SOURCE_REQUIRED');

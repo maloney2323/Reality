@@ -97,3 +97,36 @@ export async function createRealityLiveVercelUpgradeAdapters({
   }),
  });
 }
+
+
+// Job-agnostic live preview integration for the EXISTING constitutional
+// driver. Strictly bound to the actual deployed Vercel preview SHA and the
+// owner-approved original work ticket. No branch #178 or Actions bypass.
+export async function createRealityPinnedPreviewGenerationAdapters({
+ ticket,env=process.env,modelFetch=fetch,SandboxClient=null,
+}={}){
+ if(ticket?.environment!=='ISOLATED_PREVIEW'||
+  !/^feature\/reality-[a-z0-9][a-z0-9/-]{5,105}$/.test(String(ticket.repository_branch||''))||
+  ticket.repository_branch.includes('..')||
+  !/^[a-f0-9]{40}$/.test(String(ticket.repository_base_sha||''))||
+  !/^src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs$/.test(String(ticket.source_entrypoint||''))||
+  env.VERCEL_ENV!=='preview'||
+  env.VERCEL_GIT_COMMIT_REF!==ticket.repository_branch||
+  env.VERCEL_GIT_COMMIT_SHA!==ticket.repository_base_sha||
+  env.GITHUB_ACTIONS==='true')
+  throw Error('FOUNDATION_GENERIC_PINNED_PREVIEW_SCOPE_REQUIRED');
+ if(typeof env.REALITY_STANDALONE_OPENAI_API_KEY!=='string'||
+   env.REALITY_STANDALONE_OPENAI_API_KEY.length<10||
+   typeof env.REALITY_SEMANTIC_REVIEW_MODEL!=='string')
+  throw Error('FOUNDATION_GENERIC_MODEL_PROVIDER_UNAVAILABLE');
+ const client=SandboxClient||((await import('@vercel/sandbox')).Sandbox);
+ return createRealityVercelGenerationAdapters({
+  ticket,SandboxClient:client,modelFetch,
+  apiKey:env.REALITY_STANDALONE_OPENAI_API_KEY,
+  model:env.REALITY_SEMANTIC_REVIEW_MODEL,
+  readFrozenRegression:createVerifiedFrozenRegressionReader({
+   fetchImpl:modelFetch,
+   token:env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null,
+  }),
+ });
+}
