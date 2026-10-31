@@ -183,7 +183,7 @@ test('missing worker credential is recorded as an explicit non-executed blocker'
 });
 test('the client cannot choose an arbitrary repository, branch or work ID',()=>{
  const code=readFileSync('src/reality-governed-build-github-dispatch-v1.0.js','utf8');
- assert.match(code,/const WORKER='reality\/worker\/foundational-build-queue-v1'/);
+ assert.match(code,/const WORKER='feature\/reality-closed-loop-worker-20261031'/);
  assert.match(code,/const REPO='maloney2323\/Reality'/);
  assert.match(code,/REALITY_BUILDER_DISPATCH_GITHUB_TOKEN/);
  assert.match(code,/force:false/);
