@@ -77,7 +77,8 @@ test('one verified user consent is required before discovery POST',async()=>{
  assert.equal(s.requests.length,2);
  assert.equal(s.requests[1].method,'POST');
  assert.equal(s.requests[1].url,'/api/reality/personal-governed-build');
- assert.deepEqual(JSON.parse(s.requests[1].body),{intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'});
+ assert.deepEqual(JSON.parse(s.requests[1].body),{
+  intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY',expected_original_work_id:work});
  assert.equal(s.node('wcRepairConsentDialog').open,false);
  assert.equal(s.node('wcStartGovernedBuild').disabled,true);
  assert.equal(s.node('wcRepairStep4').dataset.state,'pending');
