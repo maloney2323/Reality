@@ -1,0 +1,13 @@
+{
+  "schema": "reality-independent-candidate-review-request-v1",
+  "issue_number": 188,
+  "model_run_id": 41177691547,
+  "verification_run_id": 41177825313,
+  "original_failed_run_id": 41177409146,
+  "baseline_source_sha": "8c6cd6c3891e98aaf30520bba2f47ee604d10d69",
+  "expected_frozen_sha": "f59216f72a63c612279959138877a4243d33a8e15f731e049e40be05dd07ac71",
+  "expected_candidate_hash": "4c95744d2935766e81c1b337bf4504ce1e614a4ae54a0ed159e77e7cc7fafd96",
+  "purpose": "Expose exact GPT-generated, independently verified source in owner review, no installation, no settlement",
+  "installation_authorized": false,
+  "original_job_completed": false
+}
