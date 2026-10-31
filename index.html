@@ -1253,6 +1253,7 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // model-generated or installed unless the durable provider state proves it.
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
+let wcRepairSelectedWork=null;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
 function wcGovernedBuildSafePhase(data){
  const allowed=new Set(['NOT_QUEUED','NO_VERIFIED_ELIGIBLE_WORK',
@@ -1261,13 +1262,53 @@ function wcGovernedBuildSafePhase(data){
   'GAP_CONFIRMED']);
  return allowed.has(String(data?.phase||''))?data.phase:'UNVERIFIED_PHASE';
 }
+function wcRepairStage(number,state){
+ const el=$('wcRepairStep'+number);
+ if(el)el.dataset.state=['pending','active','complete','blocked'].includes(state)?
+  state:'pending';
+}
+function wcRepairSetBadge(message,tone='neutral'){
+ const el=$('wcRepairBadge');
+ el.textContent=message;
+ el.dataset.tone=['neutral','ready','working','blocked'].includes(tone)?tone:'neutral';
+}
+function wcRepairNext(title,description){
+ $('wcRepairNextTitle').textContent=title;
+ $('wcRepairNextDescription').textContent=description;
+}
+function wcRepairStatus(message,tone='neutral'){
+ const el=$('wcGovernedBuildStatus');el.textContent=message;el.dataset.tone=tone;
+}
+function wcRepairEvidence(message,runUrl=null){
+ const container=$('wcGovernedBuildProof');
+ container.replaceChildren(document.createTextNode(message));
+ if(typeof runUrl==='string'&&
+    /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(runUrl)){
+   const link=document.createElement('a');
+   link.href=runUrl;link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent=' · View observed GitHub run';
+   container.appendChild(link);
+ }
+}
+function wcRepairResetStages(){
+ for(let i=1;i<=5;i++)wcRepairStage(i,'pending');
+ $('wcRepairApprovalInfo').textContent=
+  'Installation stays locked until an exact generated upgrade has passed independent tests and a trusted installation action is available. No installation approval is requested by this discovery screen.';
+}
+function wcRepairCloseConsent(){
+ const dialog=$('wcRepairConsentDialog');
+ if(dialog.open)dialog.close();
+ $('wcRepairConsentCheckbox').checked=false;
+ $('wcRepairConfirmInvestigation').disabled=true;
+}
 async function wcReadGovernedBuild(){
  const btn=$('wcInspectGovernedBuild'),start=$('wcStartGovernedBuild');
- const status=$('wcGovernedBuildStatus'),proof=$('wcGovernedBuildProof');
  if(wcGovernedBuildBusy)return;
  wcGovernedBuildBusy=true;btn.disabled=true;start.disabled=true;
- wcGovernedBuildEligible=false;
- status.textContent='Reading owner-goal-scoped worker queue · No execution…';
+ wcGovernedBuildEligible=false;wcRepairSelectedWork=null;
+ wcRepairResetStages();
+ wcRepairSetBadge('Checking…','working');
+ wcRepairStatus('Reading your saved work and the trusted worker record. This is read-only.','working');
  try{
   if($('privateReady')?.style.display!=='block')
    throw Error('SIGN_IN_REQUIRED');
@@ -1275,75 +1316,142 @@ async function wcReadGovernedBuild(){
    method:'GET',credentials:'same-origin',cache:'no-store'});
   const data=await response.json();
   if(!response.ok||data.ok!==true||data.completed!==false||
-    data.model_generated!==false||data.sandbox_executed!==false)
+     data.model_generated!==false||data.sandbox_executed!==false)
    throw Error(String(data.error||'QUEUE_READBACK_UNVERIFIED'));
   const phase=wcGovernedBuildSafePhase(data);
   if(data.queued===false&&phase==='NOT_QUEUED'&&
-    data.eligible_for_investigation===true&&
-    wcGovernedBuildWork.test(String(data.original_work_id||''))&&
-    typeof data.goal_id==='string'&&data.goal_id.length>0){
-    wcGovernedBuildEligible=true;start.disabled=false;
-    status.textContent='Verified candidate '+data.original_work_id+
-     ' matches an active, owner-confirmed goal. Investigation is available. No upgrade has been generated or installed.';
+     data.eligible_for_investigation===true&&
+     wcGovernedBuildWork.test(String(data.original_work_id||''))&&
+     typeof data.goal_id==='string'&&data.goal_id.length>0){
+    wcGovernedBuildEligible=true;
+    wcRepairSelectedWork=data.original_work_id;
+    start.disabled=false;
+    wcRepairStage(1,'complete');
+    wcRepairStage(2,'active');
+    wcRepairSetBadge('Ready for review','ready');
+    wcRepairNext('An unfinished job is ready for investigation',
+     'Reality found a job associated with a verified active goal. Review and authorize one investigation. Installation is not included.');
+    wcRepairStatus('Next: review the investigation request. Nothing has been generated or installed.');
+    wcRepairEvidence('Verified work: '+data.original_work_id+
+      ' · Confirmed goal: '+data.goal_id+
+      ' · Queue: NOT_QUEUED. No model generation, sandbox outcome or installation proven.');
   }else if(phase==='NO_VERIFIED_ELIGIBLE_WORK'){
-    status.textContent='No eligible verified unfinished job. Reality must discover and verify a genuine gap; settled work cannot be queued again.';
+    wcRepairStage(1,'active');
+    wcRepairSetBadge('No eligible job yet');
+    wcRepairNext('Let Reality discover its next opportunity',
+      'No verified, unfinished job is eligible right now. Browse discoveries to explore potential work, or check again later.');
+    wcRepairStatus('Reality found no eligible verified unfinished job. No new work was invented.');
+    wcRepairEvidence('Trusted result: NO_VERIFIED_ELIGIBLE_WORK. No investigation or installation was authorized.');
   }else if(data.queued===true){
-    const observed=data.worker_observation;
-    const workerState=typeof observed?.state==='string'&&
-      /^[A-Z_]{6,70}$/.test(observed.state)?observed.state:'NOT_INDEPENDENTLY_OBSERVED';
-    status.textContent='Existing owner-scoped queue: '+phase+
-      (data.original_work_id?' · '+data.original_work_id:'')+
-      ' · Isolated GitHub worker: '+workerState+
-      '. Do not enqueue a duplicate. A passing discovery run does NOT prove a missing capability or installed upgrade.';
+    const worker=data.worker_observation;
+    const workerState=typeof worker?.state==='string'&&
+      /^[A-Z_]{6,70}$/.test(worker.state)?worker.state:'NOT_INDEPENDENTLY_OBSERVED';
+    const blocked=phase==='QUEUED_DISPATCH_BLOCKED';
+    wcRepairStage(1,'complete');wcRepairStage(2,blocked?'blocked':'active');
+    wcRepairSetBadge(blocked?'Worker needs attention':'Investigation recorded',
+      blocked?'blocked':'working');
+    wcRepairNext(blocked?'Investigation was queued, but dispatch is blocked':
+      'Investigation request already exists',
+      blocked?'The durable queue was recorded, but the isolated worker did not start. Review the blocker; do not queue a duplicate.':
+      'Reality has recorded a request for this job. Refresh its status to check independent worker evidence. Do not start the same job twice.');
+    wcRepairStatus('Queue: '+phase+' · Worker: '+workerState+
+      '. A queued or passing discovery run does not mean a repair was tested or installed.',
+      blocked?'blocked':'working');
+    wcRepairEvidence('Original work: '+String(data.original_work_id||'NOT_VERIFIED')+
+      ' · Queue receipt: '+String(data.queue_id||'NOT_VERIFIED')+
+      ' · Worker observation: '+workerState+
+      '. Generation, sandbox tests, install approval and final settlement not verified.',
+      worker?.worker_run_ref);
   }else{
-    status.textContent='Upgrade discovery cannot be started safely: '+phase+
-      '. No action or installation authorized.';
-  }
-  proof.textContent='Current independently checked phase: '+phase+
-   '. Generation, sandbox acceptance, owner installation approval, capability registration and original-job settlement remain unproven.';
-  const workerRef=String(data.worker_observation?.worker_run_ref||'');
-  if(data.queued===true&&
-      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(workerRef)){
-   const link=document.createElement('a');link.href=workerRef;
-   link.target='_blank';link.rel='noopener noreferrer';
-   link.textContent=' Independently checked worker run';
-   proof.appendChild(link);
+    wcRepairStage(1,'blocked');
+    wcRepairSetBadge('Needs review','blocked');
+    wcRepairNext('Reality cannot verify a safe next action',
+      'The latest work state does not authorize investigation. Check the technical evidence rather than repeating a potentially executed request.');
+    wcRepairStatus('Verified work is not ready. Phase: '+phase+
+      '. No new action or installation has been authorized.','blocked');
+    wcRepairEvidence('Provider result: '+phase+
+      '. No installation or customer outcome established.');
   }
  }catch(error){
-  status.textContent='Cannot verify upgrade readiness: '+
-   String(error?.message||'READBACK_FAILED')+'. No automatic retry or installation.';
-  proof.textContent='No new upgrade completion can be claimed without durable provider receipts.';
- }finally{wcGovernedBuildBusy=false;btn.disabled=false;}
+  wcRepairResetStages();
+  wcRepairSetBadge('Readback unavailable','blocked');
+  wcRepairNext('Reality cannot confirm the work state',
+    'Sign in if necessary and use Check next repair to re-read the saved job. No new request has been sent.');
+  wcRepairStatus('Read-only verification unavailable: '+
+   String(error?.message||'READBACK_FAILED')+'. No action was started.','blocked');
+  wcRepairEvidence('No provider-backed upgrade, approval or settlement can be claimed.');
+ }finally{
+  wcGovernedBuildBusy=false;btn.disabled=false;
+ }
 }
 $('wcInspectGovernedBuild').onclick=()=>{void wcReadGovernedBuild();};
-$('wcStartGovernedBuild').onclick=async()=>{
- const btn=$('wcStartGovernedBuild'),status=$('wcGovernedBuildStatus');
- if(!wcGovernedBuildEligible||wcGovernedBuildBusy||btn.disabled||
+$('wcExploreRepairDiscoveries').onclick=()=>{
+ const discover=$('wcDiscover');
+ if(discover&&!discover.disabled)discover.click();
+ $('wcCategories')?.scrollIntoView({behavior:'smooth',block:'start'});
+};
+$('wcRepairCancelConsent').onclick=()=>wcRepairCloseConsent();
+$('wcRepairConsentCheckbox').onchange=()=>{
+ $('wcRepairConfirmInvestigation').disabled=
+  !$('wcRepairConsentCheckbox').checked||!wcGovernedBuildEligible;
+};
+$('wcStartGovernedBuild').onclick=()=>{
+ if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
+    !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
     $('privateReady')?.style.display!=='block')return;
- if(!window.confirm('Authorize ONE isolated owner-scoped discovery request? This may create a GitHub worker-branch request. It does NOT authorize model code installation, promotion, production changes, or job settlement.'))return;
+ const dialog=$('wcRepairConsentDialog');
+ if(typeof dialog.showModal!=='function'){
+  wcRepairStatus('This browser cannot show the secure consent review. No investigation was started.','blocked');
+  return;
+ }
+ $('wcRepairConsentWork').textContent='Verified original job: '+wcRepairSelectedWork+
+  '. The server will independently recheck that this is still eligible.';
+ $('wcRepairConsentCheckbox').checked=false;
+ $('wcRepairConfirmInvestigation').disabled=true;
+ dialog.showModal();
+};
+$('wcRepairConfirmInvestigation').onclick=async()=>{
+ if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
+    !$('wcRepairConsentCheckbox').checked||
+    !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
+    $('privateReady')?.style.display!=='block')return;
+ wcRepairCloseConsent();
  wcGovernedBuildEligible=false;wcGovernedBuildBusy=true;
- btn.disabled=true;$('wcInspectGovernedBuild').disabled=true;
- status.textContent='Submitting one governed investigation; no install authority…';
+ const btn=$('wcStartGovernedBuild'),inspect=$('wcInspectGovernedBuild');
+ btn.disabled=true;inspect.disabled=true;
+ wcRepairSetBadge('Submitting investigation','working');
+ wcRepairStatus('Recording one owner-authorized investigation. No installation approval was given.','working');
  try{
   const response=await fetch('/api/reality/personal-governed-build',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'content-type':'application/json'},
    body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'})});
   const data=await response.json();
-  if(!response.ok||data.ok!==true||data.original_job_completed!==undefined&&data.original_job_completed!==false||
+  if(!response.ok||data.ok!==true||
+     (data.original_job_completed!==undefined&&data.original_job_completed!==false)||
      data.installation_authorized!==false)
    throw Error(String(data.error||'QUEUE_SUBMISSION_UNVERIFIED'));
-  status.textContent='Queue result: '+wcGovernedBuildSafePhase(data)+
-   '. Worker discovery is not model generation or capability installation.';
-  $('wcGovernedBuildProof').textContent=
-   'Durable investigation queue ID: '+String(data.queue_id||'unverified')+
-   '. Owner installation approval, sandbox verification and final settlement not established.';
+  const phase=wcGovernedBuildSafePhase(data),blocked=phase==='QUEUED_DISPATCH_BLOCKED';
+  wcRepairStage(1,'complete');wcRepairStage(2,blocked?'blocked':'active');
+  wcRepairSetBadge(blocked?'Dispatch blocked':'Investigation recorded',
+   blocked?'blocked':'working');
+  wcRepairNext(blocked?'Investigate the worker blocker':'Check the existing request',
+   'A new investigation must not be submitted until Reality rechecks the durable queue and worker outcome.');
+  wcRepairStatus('Saved investigation: '+phase+
+   (blocked?' · Worker dispatch could not be confirmed.':' · Worker execution is not yet verified.')+
+   ' Use Check next repair to read back the saved state.',blocked?'blocked':'working');
+  wcRepairEvidence('Queue receipt: '+String(data.queue_id||'UNVERIFIED')+
+   ' · Work ID: '+String(data.original_work_id||'UNVERIFIED')+
+   ' · Installation, sandbox verification and settlement not established.');
  }catch(error){
-  status.textContent='Queue outcome unresolved: '+String(error?.message||'REQUEST_FAILED')+
-   '. Do not resubmit. Use the read-only check to determine prior effects.';
+  wcRepairSetBadge('Outcome needs verification','blocked');
+  wcRepairNext('Recheck before any retry',
+    'The submission result is uncertain. Read the durable queue state; do not authorize a duplicate.');
+  wcRepairStatus('Investigation outcome unresolved: '+
+   String(error?.message||'REQUEST_FAILED')+'. No automatic retry.','blocked');
+  wcRepairEvidence('Submission outcome requires trusted readback. No installation or completion claimed.');
  }finally{
-  wcGovernedBuildBusy=false;
-  $('wcInspectGovernedBuild').disabled=false;
+  wcGovernedBuildBusy=false;inspect.disabled=false;
  }
 };
 
