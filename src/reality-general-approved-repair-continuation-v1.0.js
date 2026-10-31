@@ -12,9 +12,12 @@ import {createGeneralPreviewCapabilityRegistry}
  from './reality-general-preview-capability-registry-v1.0.js';
 import {createGenericVerifiedOriginalWorkSettlement}
  from './reality-general-original-work-settlement-v1.0.js';
+import {createGeneralConstitutionalCheckpointService}
+ from './reality-general-constitutional-checkpoint-v1.0.js';
 const fail=x=>{throw Error('GENERAL_REPAIR_CONTINUATION_'+x)};
 export async function continueExactlyApprovedGeneralRepair({
  state,ticket,session,db,branch,writeToken,
+ conversationId,originalWorkEvidenceRef,env=process.env,
  verifyOwnerApproval,verifyFrozenAcceptance,
  executeOriginalWork,verifyOriginalExecution,
  verifyIndependentReceipt,persistCheckpoint,
@@ -37,10 +40,15 @@ export async function continueExactlyApprovedGeneralRepair({
   fail('SAME_ORIGINAL_OWNER_GOAL_APPROVED_SCOPE_REQUIRED');
  for(const [name,fn] of Object.entries({
   verifyOwnerApproval,verifyFrozenAcceptance,executeOriginalWork,
-  verifyOriginalExecution,verifyIndependentReceipt,persistCheckpoint,
+  verifyOriginalExecution,verifyIndependentReceipt,
  })){
   if(typeof fn!=='function')fail('TRUSTED_PROVIDER_MISSING_'+name.toUpperCase());
  }
+ const checkpointWriter=typeof persistCheckpoint==='function'?persistCheckpoint:
+  createGeneralConstitutionalCheckpointService({
+   session,conversationId,originalWorkId:scope.original_work_id,
+   originalWorkEvidenceRef,db,env,
+  }).persistCheckpoint;
  const same=ctx=>{
   if(ctx?.scope?.owner_id!==scope.owner_id||
    ctx.scope.goal_id!==scope.goal_id||
@@ -66,7 +74,7 @@ export async function continueExactlyApprovedGeneralRepair({
   session,scope,db,verifyOriginalExecution,
  });
  const adapters={
-  persistCheckpoint,
+  persistCheckpoint:checkpointWriter,
   verifyIndependentReceipt,
   async registerAndReobserve(ctx){
    same(ctx);
