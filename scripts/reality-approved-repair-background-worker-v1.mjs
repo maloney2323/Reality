@@ -141,9 +141,10 @@ export async function executeApprovedContinuation({
   }
  }catch(error){
   const safe=String(error?.message||'');
-  diagnostic=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_|REAL_REPAIR_READBACK_)[A-Z0-9_]{4,120}$/.test(safe)?
-   safe.replace(/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_|REAL_REPAIR_READBACK_)/,''):
-   phase+'_UNCLASSIFIED_PROVIDER_FAILURE';
+  // Only an all-uppercase machine error code may be recorded. Never log
+  // arbitrary provider text, URLs, HTTP bodies, credentials or stack traces.
+  diagnostic=/^[A-Z][A-Z0-9_]{4,120}$/.test(safe)?
+   safe:phase+'_UNCLASSIFIED_PROVIDER_FAILURE';
  }
  const complete=outcome?.original_job_completed===true&&
    outcome?.independent_readback_verified===true;
@@ -283,7 +284,9 @@ async function main(){
   'ORIGINAL_JOB_CONTINUATION_UNCLASSIFIED_PROVIDER_FAILURE',
  ]);
  if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
-    blockedForReconciliation.has(result.diagnostic)){
+    (blockedForReconciliation.has(result.diagnostic)||
+     !['ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING',
+       'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE'].includes(result.diagnostic))){
   console.log('REALITY_GOVERNED_AUTHORITY_RECONCILIATION_REQUIRED',JSON.stringify({
    original_work_id:request.original_work_id,
    reservation_id:request.reservation_id,
