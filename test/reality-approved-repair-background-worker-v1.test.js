@@ -156,3 +156,52 @@ test('governed scheduler dispatch can reach ONLY the existing approved worker co
   {...request,candidate_hash:'not-a-verified-artifact'},sha),
  /REALITY_APPROVED_BACKGROUND_INERT_REQUEST_INVALID/);
 });
+
+test('after exact owner-leased installation, worker wakes independent frozen acceptance once then verifies settlement',async()=>{
+ const lease={status:'EXACT_OWNER_APPROVED_WORK_LEASED',
+  reservation_id:reservation,lease_id:randomUUID(),owner_id:randomUUID(),
+  conversation_id:randomUUID(),original_work_id:request.original_work_id,
+  candidate_hash:request.candidate_hash,issue_number:request.issue_number,
+  install_branch:request.install_branch,attempts:1};
+ let runs=0,wakes=0;
+ const installedSHA='d'.repeat(40);
+ const settledRef='supabase:universe_events:'+randomUUID();
+ const result=await executeApprovedContinuation({
+  env:{...env,GITHUB_EVENT_NAME:'workflow_dispatch'},
+  request,checkoutSha:sha,leasedWork:lease,maxChecks:3,
+  wait:async()=>{},
+  acceptanceWake:async args=>{
+   wakes++;
+   assert.equal(args.originalWorkId,lease.original_work_id);
+   assert.equal(args.installedCommitSha,installedSHA);
+   assert.equal(args.installedBranch,lease.install_branch);
+   return {status:'INDEPENDENT_ACCEPTANCE_TRIGGER_ACCEPTED'};
+  },
+  call:async (_env,name,body)=>{
+   assert.equal(name,'reality_reconcile_approved_repair_continuation_v1');
+   assert.equal(body.p_status,'SETTLED');
+   return {status:'SETTLED',original_work_id:request.original_work_id,
+    original_job_completed:true,production_changed:false};
+  },
+  serviceFactory:()=>({continueAfterInstall:async()=>{
+   runs++;
+   return runs<3?{
+    status:'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE',
+    original_work_id:request.original_work_id,
+    installed_commit_sha:installedSHA,
+    original_job_completed:false,production_changed:false,
+   }:{
+    status:'ORIGINAL_JOB_INDEPENDENTLY_SETTLED',
+    original_work_id:request.original_work_id,
+    settlement_receipt_ref:settledRef,
+    original_job_completed:true,independent_readback_verified:true,
+    production_changed:false,
+   };
+  }}),
+ });
+ assert.equal(wakes,1,'single dispatch despite waiting twice for GitHub acceptance');
+ assert.equal(runs,3);
+ assert.equal(result.status,'ORIGINAL_JOB_INDEPENDENTLY_SETTLED');
+ assert.equal(result.settlement_receipt_ref,settledRef);
+ assert.equal(result.original_job_completed,true);
+});
