@@ -169,7 +169,7 @@ test('historic single-job endpoint stays authenticated but generic Work Center n
   new vm.Script(script);
  assert.doesNotMatch(html,/wcStartFirstGap178|personal-first-upgrade-178|wcFirstUpgrade178/);
  assert.match(html,/id="wcInspectGovernedBuild"/);
- assert.match(html,/id="wcStartGovernedBuild" disabled/);
+ assert.match(html,/id="wcStartGovernedBuild"[^>]*disabled/);
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
  const cron=JSON.parse(readFileSync('vercel.json','utf8'));
  assert.equal(cron.crons.some(entry=>/178/.test(entry.path)),false);
