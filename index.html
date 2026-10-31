@@ -338,6 +338,19 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     </div>
    </div>
    <p id="wcRealRepairOpportunityStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No new owner work has been authorized.</p>
+   <div class="repair-current" id="wcModelRepairReviewPanel" style="margin-bottom:12px">
+    <div>
+     <div class="repair-kicker">Independently verified AI-generated repair</div>
+     <h4 id="wcModelRepairReviewTitle">Review Reality's actual generated code</h4>
+     <p id="wcModelRepairReviewDescription">Once you've authorized the original investigation, Reality can link the independently tested source to your signed-in work and prepare its constitutional approval checkpoint.</p>
+    </div>
+    <div class="repair-actions">
+     <button type="button" id="wcReadModelRepair" class="repair-secondary">Check verified candidate</button>
+     <button type="button" id="wcPrepareModelRepair" class="repair-primary" disabled>Prepare installation review</button>
+    </div>
+   </div>
+   <p id="wcModelRepairReviewStatus" class="repair-status" role="status" aria-live="polite" style="margin-top:0;margin-bottom:12px">No exact repair has been approved or installed.</p>
+
    <div class="repair-current">
     <div>
      <div class="repair-kicker">Next action</div>
@@ -1265,6 +1278,7 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // model-generated or installed unless the durable provider state proves it.
 let wcGovernedBuildEligible=false;
 let wcRealRepairOpportunity=null;
+let wcExactModelCandidate=null;
 let wcRepairIntent='EXISTING_WORK';
 let wcGovernedBuildBusy=false;
 let wcRepairSelectedWork=null;
@@ -1428,6 +1442,81 @@ $('wcStartGovernedBuild').onclick=()=>{
  $('wcRepairConfirmInvestigation').disabled=true;
  dialog.showModal();
 };
+$('wcReadModelRepair').onclick=async()=>{
+ const check=$('wcReadModelRepair'),prepare=$('wcPrepareModelRepair');
+ check.disabled=true;prepare.disabled=true;wcExactModelCandidate=null;
+ const status=$('wcModelRepairReviewStatus');
+ status.textContent='Reading your signed-in original work, exact generated source and independent GitHub test results…';
+ try{
+  if($('privateReady')?.style.display!=='block')
+   throw Error('SIGN_IN_REQUIRED');
+  const r=await fetch('/api/reality/personal-real-repair-candidate',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await r.json();
+  if(!r.ok||data.ok!==true)
+   throw Error(String(data.error||'INDEPENDENT_REPAIR_READBACK_FAILED'));
+  if(data.status==='NO_SIGNED_OWNER_REPAIR_WORK_AWAITING_INSTALL'){
+   status.textContent='No signed-in original repair job is ready. Review a genuine verified issue first and authorize its investigation.';
+   return;
+  }
+  if(data.status!=='REAL_SOURCE_VERIFIED_OWNER_REVIEW_AVAILABLE'||
+   !/^work:[a-f0-9]{32}$/.test(String(data.original_work_id||''))||
+   !/^[a-f0-9]{64}$/.test(String(data.candidate_artifact_hash||''))||
+   data.independent_provider_readback!==true||
+   data.installed!==false||data.original_job_completed!==false)
+   throw Error('EXACT_ORIGINAL_WORK_OR_SOURCE_NOT_VERIFIED');
+  wcExactModelCandidate=data;prepare.disabled=false;
+  $('wcModelRepairReviewTitle').textContent='Verified repair for issue #'+data.issue_number;
+  $('wcModelRepairReviewDescription').textContent=
+   'Exact model artifact: '+data.candidate_artifact_hash+
+   ' · Independently tested in GitHub run '+data.independent_verification_run_id+
+   ' · Files: '+(data.source_files||[]).join(', ');
+  status.textContent='Generated source passed independent frozen tests. Nothing has been installed. Prepare the source-bound checkpoint before a separate exact owner installation approval.';
+ }catch(err){
+  status.textContent='Repair review unavailable: '+String(err?.message||'SOURCE_READBACK_FAILED')+
+   '. No approval or installation occurred.';
+ }finally{check.disabled=false;}
+};
+$('wcPrepareModelRepair').onclick=async()=>{
+ const proposal=wcExactModelCandidate,status=$('wcModelRepairReviewStatus');
+ if(!proposal||wcGovernedBuildBusy||
+   $('privateReady')?.style.display!=='block')return;
+ wcGovernedBuildBusy=true;$('wcPrepareModelRepair').disabled=true;
+ status.textContent='Verifying exact code and sandbox receipt in your authenticated Continuity…';
+ try{
+  const r=await fetch('/api/reality/personal-real-repair-candidate',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'PREPARE_EXISTING_VERIFIED_CANDIDATE_FOR_OWNER_REVIEW',
+    expected_original_work_id:proposal.original_work_id,
+    issue_number:proposal.issue_number,
+    candidate_artifact_hash:proposal.candidate_artifact_hash,
+   }),
+  });
+  const data=await r.json();
+  if(!r.ok||data.ok!==true||
+   data.status!=='EXACT_CANDIDATE_AWAITING_SIGNED_OWNER_INSTALL_APPROVAL'||
+   data.candidate_artifact_hash!==proposal.candidate_artifact_hash||
+   data.independent_readback_verified!==true||
+   data.installed!==false||data.original_job_completed!==false)
+   throw Error(String(data.error||'CONSTITUTIONAL_READBACK_NOT_READY'));
+  wcRepairStage(1,'complete');wcRepairStage(2,'complete');
+  wcRepairStage(3,'complete');wcRepairStage(4,'active');
+  wcRepairSetBadge('Verified repair awaiting owner','ready');
+  $('wcRepairApprovalInfo').textContent=
+   'Exact candidate SHA-256: '+proposal.candidate_artifact_hash+
+   '. Independent tests and your original-work constitutional checkpoint are verified. Installation remains locked until the separate trusted install action is connected.';
+  status.textContent='Original-work verification checkpoint saved: '+
+   data.constitutional_checkpoint_receipt_id+
+   '. Reality has NOT installed, resumed or settled the original job.';
+ }catch(err){
+  status.textContent='Source-bound preparation stopped safely: '+
+   String(err?.message||'CHECKPOINT_UNVERIFIED')+
+   '. No installation or completion claimed.';
+ }finally{wcGovernedBuildBusy=false;}
+};
+
 $('wcDiscoverRealRepair').onclick=async()=>{
  const button=$('wcDiscoverRealRepair');
  button.disabled=true;$('wcAuthorizeRealRepair').disabled=true;
