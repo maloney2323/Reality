@@ -548,7 +548,7 @@ export function createLiveGeneralRepairService({
      verified=observed.original_work_run_ref===receipt.executor_run_ref&&
       observed.evidence_hash===receipt.evidence_hash;
     }else if(receipt.kind==='ORIGINAL_JOB_SETTLED'){
-     const observed=await settle.verify({registration,resumption});
+     const observed=await settle.verify({registration,execution:resumption});
      verified=observed.verified===true&&
       observed.settlement_receipt_ref===receipt.settlement_receipt_ref;
     }
