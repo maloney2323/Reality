@@ -178,7 +178,10 @@ export async function admitFirstGapBuildTicket({
  reobserveProviderEvidence,maxAttempts=3,
 }={}){
  strictScope(scope);
- if(![3,5,7,8,9].includes(maxAttempts))fail('UNBOUNDED_RECOVERY_ATTEMPTS');
+ if(![3,5,7,8,9].includes(maxAttempts)||
+   (maxAttempts===9&&scope.original_work_id!==
+    'work:9b9578b3c65427589c4c6da68fe0fc87'))
+  fail('UNBOUNDED_RECOVERY_ATTEMPTS');
  if(typeof reobserveProviderEvidence!=='function')
   fail('INDEPENDENT_REOBSERVATION_REQUIRED');
  const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
