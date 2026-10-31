@@ -1600,8 +1600,8 @@ async function wcContinueExactInstall(work,issue,attempt=0){
    data.independent_readback_verified===true&&
    /^supabase:universe_events:[0-9a-f-]{36}$/i.test(String(data.settlement_receipt_ref||''))){
    wcRepairStage(4,'complete');wcRepairStage(5,'complete');
-   wcRepairSetBadge('Original job settled','ready');
-   $('wcInstallSettlementHeading').textContent='Original job independently settled';
+   wcRepairSetBadge('LOOP COMPLETE','ready');
+   $('wcInstallSettlementHeading').textContent='LOOP COMPLETE · Independently verified original job';
    wcStopExactInstall('VERIFIED SETTLEMENT · '+work+
     ' · Source SHA-256 '+(data.artifact_hash||'independently registered')+
     ' · Final Continuity receipt '+data.settlement_receipt_ref+
@@ -1692,10 +1692,53 @@ $('wcExactInstallConfirm').onclick=async()=>{
    '. The owner approval may already be consumed; review progress rather than approving again.');
  }
 };
+// One independently reconciled, authenticated receipt decides whether the
+// customer may see LOOP COMPLETE. A passing test, model answer, UI local state,
+// or approved-but-uninstalled job is never enough.
+let wcLoopProofReading=false,wcLoopProofNextRead=0;
+async function wcReadOriginal178LoopComplete(){
+ if(wcLoopProofReading||$('privateReady')?.style.display!=='block')return;
+ const now=Date.now();
+ if(now<wcLoopProofNextRead)return;
+ wcLoopProofNextRead=now+60000;wcLoopProofReading=true;
+ const original='work:9b9578b3c65427589c4c6da68fe0fc87';
+ try{
+  const response=await fetch('/api/reality/personal-loop-completion?work_id='+
+    encodeURIComponent(original),{method:'GET',credentials:'same-origin',cache:'no-store'});
+  const result=await response.json();
+  if(!response.ok||result.ok!==true)return;
+  if(result.loop_complete!==true)return;
+  if(result.status!=='LOOP_COMPLETE_VERIFIED'||
+     result.original_work_id!==original||
+     result.original_job_completed!==true||
+     result.independently_verified!==true||
+     result.production_changed!==false||
+     !/^[a-f0-9]{40}$/.test(String(result.installed_commit_sha||''))||
+     !/^[a-f0-9]{64}$/.test(String(result.installed_artifact_hash||''))||
+     !/^supabase:universe_events:[a-f0-9-]{36}$/i.test(
+        String(result.settlement_receipt_ref||''))||
+     !/^supabase:universe_events:[a-f0-9-]{36}$/i.test(
+        String(result.final_checkpoint_receipt_ref||'')))return;
+  wcRepairStage(4,'complete');wcRepairStage(5,'complete');
+  wcRepairSetBadge('LOOP COMPLETE','ready');
+  $('wcInstallSettlementHeading').textContent='LOOP COMPLETE · Original #178';
+  $('wcInstallSettlementStatus').textContent=
+   'LOOP COMPLETE · Original customer job #178 independently settled.'+
+   ' Installed commit '+result.installed_commit_sha+
+   ' · Final Continuity receipt '+result.settlement_receipt_ref+
+   ' · Final constitutional checkpoint '+result.final_checkpoint_receipt_ref;
+  $('wcApproveExactInstall').disabled=true;
+  localStorage.removeItem('reality.pending.exact.preview.repair.v1');
+ }catch{
+  // A failed read can never promote or erase an independently verified receipt.
+ }finally{wcLoopProofReading=false;}
+}
+
 // A previously approved exact installation is safe to continue after closing
 // the tab: the server rechecks OWNER, prior reservation and immutable source.
 // This does not grant approval or authorize any new installation.
 function wcResumeSavedExactRepair(){
+ if($('privateReady')?.style.display==='block')void wcReadOriginal178LoopComplete();
  if(wcInstallContinuationBusy||$('privateReady')?.style.display!=='block')return;
  let saved;try{saved=JSON.parse(localStorage.getItem('reality.pending.exact.preview.repair.v1')||'null')}catch{return}
  if(!/^work:[a-f0-9]{32}$/.test(String(saved?.original_work_id||''))||
