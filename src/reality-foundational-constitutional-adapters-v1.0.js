@@ -34,6 +34,16 @@ export function createConstitutionalGenerationSandboxAdapters({
     'FOUNDATION_CONSTITUTIONAL_ATTEMPT_INVALID');
    const previous=ctx.previous_candidate;
    const failure=ctx.previous_independent_failure;
+   const strategy=ctx.repair_strategy||null;
+   if(strategy&&(
+      strategy.kind!=='VERIFIED_SELF_REPAIR_STRATEGY'||
+      strategy.source!=='CONSTITUTIONAL_INDEPENDENT_PROVIDER_READBACK'||
+      strategy.original_work_id!==ticket.original_work_id||
+      strategy.attempt_count!==ctx.current_attempt-1||
+      strategy.installation_authorized!==false||
+      strategy.external_actions_authorized!==false||
+      (failure&&!strategy.evidence_refs?.includes(failure.evidence_ref))))
+    throw Error('FOUNDATION_REPAIR_STRATEGY_NOT_SOURCE_BOUND');
    if(ctx.current_attempt>1)
     enforce(previous?.artifact_hash&&failure?.evidence_ref&&
      failure?.classification?.class&&failure?.diagnostics,
@@ -43,13 +53,16 @@ export function createConstitutionalGenerationSandboxAdapters({
     attestation_ref:failure?.evidence_ref||null,
     classification:failure?.classification?.class||null,
     report_hash:failure?.feedback_hash||null,
-    log_excerpt:String(failure?.diagnostics?.output||'').slice(-8000),
+    // Failure evidence is pre-extracted with early frozen assertions first.
+    // Using a tail slice silently discarded precisely those assertions.
+    log_excerpt:String(failure?.diagnostics?.output||'').slice(0,8000),
     artifact_sha256:previous?.artifact_hash||null,
    };
    const generated=await modelGenerate(Object.freeze({
     ticket,attempt:ctx.current_attempt,
     previous_candidate:previous||null,
     verified_feedback:verifiedFeedback,
+    repair_strategy:strategy,
     execution_authority:false,
    }));
    const candidate=validateFoundationalCandidate(ticket,generated);

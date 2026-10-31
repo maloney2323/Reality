@@ -112,7 +112,7 @@ export function verifySelfImprovementJournal(state){
   DISCOVERING:[null],
   GAP_CONFIRMED:['GAP_CONFIRMED'],
   CANDIDATE_READY:['MODEL_CANDIDATE_PROPOSED'],
-  REPAIR_REQUIRED:['SANDBOX_FAILED'],
+  REPAIR_REQUIRED:['SANDBOX_FAILED','RECOVERY_STARTED'],
   ESCALATED:['SANDBOX_FAILED'],
   AWAITING_OWNER_APPROVAL:['SANDBOX_VERIFIED'],
   PROMOTION_AUTHORIZED:['PROMOTION_AUTHORIZED'],
@@ -120,6 +120,39 @@ export function verifySelfImprovementJournal(state){
   ORIGINAL_JOB_RESUMED:['ORIGINAL_JOB_RESUMED'],
   SETTLED:['ORIGINAL_JOB_SETTLED'],
  };
+ const recoveryEvents=state.journal.filter(e=>e.kind==='RECOVERY_STARTED');
+ // Recoveries 1-3 are already in historic original #178 receipts. Recovery 4
+ // is a NEW explicit owner-authorized one-attempt redesign after 8/8. Every
+ // previous journal hash, receipt and consumed reservation must survive.
+ const authorizations=[
+  ['recovery_authorization',3,5,2],
+  ['recovery_continuation_authorization',5,7,2],
+  ['recovery_final_authorization',7,8,1],
+  ['recovery_redesign_authorization',8,9,1],
+ ];
+ if(recoveryEvents.length>4||
+    (recoveryEvents.length>0&&
+     state.attempt_limit!==authorizations[recoveryEvents.length-1][2]))
+  throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+ for(let i=0;i<authorizations.length;i++){
+  const [field,from,to,additional]=authorizations[i];
+  const event=recoveryEvents[i],approval=state[field];
+  if(i>=recoveryEvents.length){
+   if(approval!=null)throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+   continue;
+  }
+  if(approval?.verified!==true||
+     event.body?.prior_attempt_limit!==from||
+     event.body?.additional_attempts!==additional||
+     event.body?.prior_checkpoint_hash!==event.prior_hash||
+     event.body?.original_work_id!==state.scope.original_work_id||
+     event.body?.reservation_id!==approval.reservation_id||
+     event.body?.failed_checkpoint_receipt_id!==approval.checkpoint_receipt_id||
+     event.body?.failure_evidence_ref!==approval.failure_evidence_ref||
+     (i===3&&(approval.owner_confirmed!==true||
+       approval.authorization_scope!=='ONE_ORIGINAL178_REDESIGN_ATTEMPT')))
+   throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
+ }
  if(!phases[state.phase]?.includes(last)||
     state.attempt_count!==state.journal.filter(
      e=>e.kind==='MODEL_CANDIDATE_PROPOSED').length)
@@ -137,7 +170,9 @@ export function createGovernedSelfImprovement({scope,attemptLimit=3}={}){
   phase:'DISCOVERING',attempt_count:0,attempt_limit:attemptLimit,
   candidate:null,confirmed_gap:null,sandbox_receipt:null,
   independent_failure:null,promotion_authorization:null,
-  registration:null,resumption:null,settlement:null,
+  registration:null,resumption:null,settlement:null,recovery_authorization:null,
+  recovery_continuation_authorization:null,recovery_final_authorization:null,
+  recovery_redesign_authorization:null,
   journal:[],head_hash:hash({version:GOVERNED_SELF_IMPROVEMENT_VERSION,scope_hash}),
  });
  verifySelfImprovementJournal(state);
@@ -175,6 +210,63 @@ function validateCandidate(candidate){
   generated_by_model:true,verified:false,authorized:false,installed:false,
  });
 }
+// A second, finite recovery round is permitted only by an independently
+// verified single-use reservation for the SAME exhausted original job.
+// The original 3 failed attempts and hashes remain immutable in the journal.
+export function recoverGovernedEscalation(state,proof){
+ verifySelfImprovementJournal(state);
+ enforce(state.phase==='ESCALATED'&&
+  ((state.attempt_count===3&&state.attempt_limit===3&&
+    state.recovery_authorization==null)||
+   (state.attempt_count===5&&state.attempt_limit===5&&
+    state.recovery_authorization?.verified===true&&
+    state.recovery_continuation_authorization==null)||
+   (state.attempt_count===7&&state.attempt_limit===7&&
+    state.recovery_continuation_authorization?.verified===true&&
+    state.recovery_final_authorization==null)||
+   (state.attempt_count===8&&state.attempt_limit===8&&
+    state.recovery_final_authorization?.verified===true&&
+    state.recovery_redesign_authorization==null))&&
+  state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+  state.independent_failure?.classification?.retry_source_without_dependency===true&&
+  state.independent_failure?.attempt===state.attempt_count,
+  'SELF_IMPROVEMENT_EXACT_REPAIRABLE_EXHAUSTION_REQUIRED');
+ enforce(proof?.verified===true&&proof?.independent_provider_readback===true&&
+  proof?.owner_id===state.scope.owner_id&&
+  proof?.original_work_id===state.scope.original_work_id&&
+  proof?.goal_id===state.scope.goal_id&&
+  proof?.checkpoint_hash===state.head_hash&&
+  typeof proof?.reservation_id==='string'&&proof.reservation_id.length>=16&&
+  typeof proof?.checkpoint_receipt_id==='string'&&
+  proof.checkpoint_receipt_id.length>=16&&
+  proof?.failure_evidence_ref===state.independent_failure.evidence_ref&&
+  proof?.installation_authorized===false&&
+  (state.attempt_count!==8||
+   (proof?.owner_confirmed===true&&
+    proof?.authorization_scope==='ONE_ORIGINAL178_REDESIGN_ATTEMPT')),
+
+  'SELF_IMPROVEMENT_GOVERNED_RECOVERY_RESERVATION_REQUIRED');
+ const authorization=freeze({verified:true,reservation_id:proof.reservation_id,
+  checkpoint_receipt_id:proof.checkpoint_receipt_id,
+  checkpoint_hash:proof.checkpoint_hash,
+  failure_evidence_ref:proof.failure_evidence_ref,
+  ...(state.attempt_count===8?{
+   owner_confirmed:true,authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT'}:{}),
+ });
+ const priorLimit=state.attempt_limit;
+ const patch=priorLimit===3?
+  {attempt_limit:5,recovery_authorization:authorization}:
+  priorLimit===5?{attempt_limit:7,recovery_continuation_authorization:authorization}:
+  priorLimit===7?{attempt_limit:8,recovery_final_authorization:authorization}:
+  {attempt_limit:9,recovery_redesign_authorization:authorization};
+ return append(state,{phase:'REPAIR_REQUIRED',kind:'RECOVERY_STARTED',
+  body:{original_work_id:state.scope.original_work_id,
+   prior_checkpoint_hash:state.head_hash,prior_attempt_limit:priorLimit,
+   failed_checkpoint_receipt_id:proof.checkpoint_receipt_id,
+   failure_evidence_ref:proof.failure_evidence_ref,
+   reservation_id:proof.reservation_id,additional_attempts:priorLimit>=7?1:2},
+  patch});
+}
 export function proposeGovernedCandidate(state,candidate){
  verifySelfImprovementJournal(state);
  enforce(['GAP_CONFIRMED','REPAIR_REQUIRED'].includes(state.phase),
@@ -192,14 +284,24 @@ export function proposeGovernedCandidate(state,candidate){
 export function classifyIndependentFailure({output='',code='',missingDependency=null}={}){
  const fragment=String(output||'').slice(0,8000);
  const normalized=str(code).toUpperCase();
- if(str(missingDependency)||/MISSING_CAPABILITY|NOT_IMPLEMENTED|METHOD_NOT_AVAILABLE|UNIMPLEMENTED_DATABASE|NO_SUCH_RPC/.test(fragment))
+ // Independent typed provider codes are authority. Strings inside
+ // model stdout or a failing test's expected/actual values are NOT.
+ if(str(missingDependency)||normalized==='MISSING_CAPABILITY')
   return freeze({class:'MISSING_CAPABILITY',next:'DISCOVER_DEPENDENCY',retry_source_without_dependency:false});
- if(/AUTHORITY|APPROVAL|PERMISSION|RESERVATION_REQUIRED|OWNER_SIGN_IN|FORBIDDEN/.test(fragment)||normalized==='AUTHORITY')
+ if(normalized==='AUTHORITY'||(!normalized&&
+    /^(?:OWNER_APPROVAL_REQUIRED|AUTHORITY_REQUIRED|RESERVATION_REQUIRED|OWNER_SIGN_IN|PERMISSION_DENIED|FORBIDDEN)$/.test(fragment.trim())))
   return freeze({class:'AUTHORITY_REQUIRED',next:'REQUEST_OWNER_AUTHORITY',retry_source_without_dependency:false});
- if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module/.test(fragment))
-  return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
- if(/not ok\s+\d+|AssertionError|ERR_ASSERTION|FAIL|TEST_FAILED/.test(fragment)||normalized==='TEST_FAILED')
+ if(normalized==='TEST_FAILED'||normalized==='REGRESSION'||normalized==='SYNTAX'){
+  if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module|ReferenceError/.test(fragment))
+   return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
   return freeze({class:'REGRESSION',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ }
+ if(/SyntaxError|Unexpected token|ERR_MODULE_NOT_FOUND|Cannot find module|ReferenceError/.test(fragment))
+  return freeze({class:'SYNTAX_OR_IMPORT',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ if(/not ok\s+\d+|AssertionError|ERR_ASSERTION|FAIL|TEST_FAILED/.test(fragment))
+  return freeze({class:'REGRESSION',next:'REPAIR_CODE_FROM_TEST_FAILURE',retry_source_without_dependency:true});
+ if(normalized==='MISSING_DEPENDENCY')
+  return freeze({class:'MISSING_CAPABILITY',next:'DISCOVER_DEPENDENCY',retry_source_without_dependency:false});
  if(/TIMEOUT|RATE_LIMIT|ECONNRESET|NETWORK_UNAVAILABLE/.test(fragment)||normalized==='INFRA')
   return freeze({class:'VERIFIER_INFRASTRUCTURE',next:'REOBSERVE_PROVIDER',retry_source_without_dependency:false});
  return freeze({class:'UNRESOLVED',next:'ESCALATE_WITH_EVIDENCE',retry_source_without_dependency:false});

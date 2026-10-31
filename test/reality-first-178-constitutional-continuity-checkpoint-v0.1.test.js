@@ -70,7 +70,8 @@ function persisted(node){
   },
  }};
 }
-async function gap(){
+async function gap({evidenceRef='provider:trusted-gap:178',
+ evidenceHash='b'.repeat(64)}={}){
  const start=createGovernedSelfImprovement({scope});
  const receipt={kind:'GAP_CONFIRMED',owner_id:owner,
   goal_id:goalId,original_work_id:work,
@@ -79,8 +80,8 @@ async function gap(){
   capability_id:'reality.ci-failure-evidence-v1',
   failure_refs:[sourceEvent.payload.pinned_red_run],
   verification_suite_ref:'first-ci-evidence-gap-v1',
-  evidence_ref:'provider:trusted-gap:178',
-  evidence_hash:'b'.repeat(64),
+  evidence_ref:evidenceRef,
+  evidence_hash:evidenceHash,
  };
  return acceptGovernedObservation(start,receipt,{verifyProvider:async ctx=>({
   verified:true,independent_provider_readback:true,
@@ -210,4 +211,131 @@ test('model-asserted gap and foreign goal never get a durable source receipt',as
   }),/FIRST_178_CONTINUITY_PINNED_OWNER_GAP_INVALID/);
  }
  assert.equal(h.getWrites(),0);
+});
+
+test('one verified original GAP checkpoint restores with same hash and no new work',async()=>{
+ const h=harness();
+ const source={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(source);
+ const checkpoint=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:source.evidence_hash});
+ const recorded=await h.adapter.persistCheckpoint(checkpoint);
+ const writes=h.getWrites();
+ const restored=await h.adapter.readLatestCheckpoint();
+ assert.equal(restored.verified,true);
+ assert.equal(restored.original_work_id,work);
+ assert.equal(restored.checkpoint_hash,checkpoint.head_hash);
+ assert.equal(restored.continuity_receipt_id,recorded.continuity_receipt_id);
+ assert.equal(restored.state.phase,'GAP_CONFIRMED');
+ assert.equal(restored.state.attempt_count,0);
+ assert.equal(h.getWrites(),writes,'readback cannot write or claim');
+});
+test('candidate source checkpoint restores only as unverified sandbox work',async()=>{
+ const h=harness();
+ const src={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(src);
+ const checkpoint=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:src.evidence_hash});
+ await h.adapter.persistCheckpoint(checkpoint);
+ const candidate=proposeGovernedCandidate(checkpoint,{
+  rationale:'Generate model-authored candidate',
+  verification_plan_ref:'first-ci-evidence-gap-v1',
+  files:[
+   {path:'src/reality-extensions/reality-ci-failure-evidence.mjs',
+    content:'export const valid=()=>true'},
+   {path:'test/reality-extensions/valid.test.js',
+    content:'import test from "node:test";test("original",()=>{});'},
+  ],
+ });
+ await h.adapter.persistCheckpoint(candidate);
+ const restored=await h.adapter.readLatestCheckpoint();
+ assert.equal(restored.verified,true);
+ assert.equal(restored.state.phase,'CANDIDATE_READY');
+ assert.equal(restored.state.attempt_count,1);
+ assert.equal(restored.state.sandbox_receipt,null);
+ assert.equal(restored.state.candidate.artifact_hash,candidate.candidate.artifact_hash);
+ assert.equal(restored.state.candidate.installed,false);
+ assert.equal(restored.state.candidate.authorized,false);
+});
+
+test('real #178 failed sandbox checkpoint restores for bounded model correction and second candidate',async()=>{
+ const h=harness();
+ const source={
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  worldline_id:spine.worldline_id,
+  provider_receipt_ref:'github:actions:run:40962921090:job:123760052647',
+  evidence_hash:'d'.repeat(64),
+ };
+ const gapReceipt=await h.adapter.persistGap(source);
+ let state=await gap({evidenceRef:gapReceipt.receipt_id,
+  evidenceHash:source.evidence_hash});
+ await h.adapter.persistCheckpoint(state);
+ const proposal={
+  rationale:'Original model proposal, not execution authority',
+  verification_plan_ref:'first-ci-evidence-gap-v1',
+  files:[
+   {path:'src/reality-extensions/reality-ci-failure-evidence.mjs',
+    content:'export const decision=()=>"MISSING_CAPABILITY"'},
+   {path:'test/reality-extensions/failure-evidence.test.js',
+    content:'import test from "node:test";test("original",()=>{});'},
+  ],
+ };
+ state=proposeGovernedCandidate(state,proposal);
+ await h.adapter.persistCheckpoint(state);
+ const failure={
+  kind:'SANDBOX_FAILED',
+  owner_id:owner,goal_id:goalId,original_work_id:work,
+  continuity_root_id:scope.continuity_root_id,
+  worldline_id:scope.worldline_id,
+  artifact_hash:state.candidate.artifact_hash,
+  evidence_ref:'vercel:independent-sandbox:failure:1',
+  evidence_hash:'f'.repeat(64),
+  diagnostics:{
+   code:'TEST_FAILED',
+   output:"not ok 3 - frozen CI expected INSUFFICIENT_EVIDENCE; actual MISSING_CAPABILITY",
+  },
+ };
+ state=await acceptGovernedObservation(state,failure,{
+  verifyProvider:async x=>({
+   verified:true,independent_provider_readback:true,
+   evidence_ref:failure.evidence_ref,
+   evidence_hash:failure.evidence_hash,
+   original_work_id:work,scope_hash:x.scope_hash,
+   attestation_ref:'vercel:independent:original178:sandbox-failure-1',
+  }),
+ });
+ assert.equal(state.phase,'REPAIR_REQUIRED');
+ await h.adapter.persistCheckpoint(state);
+ const r=await h.adapter.readLatestCheckpoint();
+ assert.equal(r.verified,true);
+ assert.equal(r.state.phase,'REPAIR_REQUIRED');
+ assert.equal(r.state.attempt_count,1);
+ assert.equal(r.state.independent_failure.classification.retry_source_without_dependency,true);
+ assert.equal(r.state.journal.at(-1).kind,'SANDBOX_FAILED');
+ const corrected=proposeGovernedCandidate(r.state,{
+  ...proposal,
+  rationale:'Independent frozen failure correction with same original work',
+  files:[
+   {...proposal.files[0],content:'export const decision=()=>"INSUFFICIENT_EVIDENCE"'},
+   {...proposal.files[1]},
+  ],
+ });
+ await h.adapter.persistCheckpoint(corrected);
+ const next=await h.adapter.readLatestCheckpoint();
+ assert.equal(next.verified,true);
+ assert.equal(next.state.phase,'CANDIDATE_READY');
+ assert.equal(next.state.attempt_count,2);
+ assert.equal(next.state.candidate.artifact_hash,corrected.candidate.artifact_hash);
+ assert.equal(next.state.journal.length,4);
+ assert.equal(next.state.sandbox_receipt,null);
 });

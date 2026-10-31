@@ -70,7 +70,7 @@ test('trusted ticket preserves owner, goal, original work, frozen suite and atte
  assert.equal(ticket.ticket_hash.length,64);
 });
 test('production, model-claimed gap, unbounded retries and path-shaped manifest are rejected',()=>{
- for(const patch of [{environment:'production'},{max_attempts:0},{max_attempts:7},
+ for(const patch of [{environment:'production'},{max_attempts:0},{max_attempts:9},
   {confirmed_gap_source:'MODEL_SAYS_VERIFIED'},
   {frozen_regression_manifest_ref:'../../hidden'}])
   assert.throws(()=>createFoundationalBuildTicket({...scope,...patch}),/FOUNDATION_/);
@@ -210,4 +210,20 @@ test('sandbox refuses even well-tested source if the base repository SHA moves',
    frozen_suite_ref:'frozen-v1',network_permitted:false,secrets_permitted:false}),
    /FOUNDATION_SANDBOX_BASE_COMMIT_CHANGED/);
  }finally{rmSync(root,{recursive:true,force:true})}
+});
+
+test('Real #178: frozen test quoting missing capability remains a repairable regression',()=>{
+ const actual={...report(candidate(),false),exit_code:1,
+  test_results:[{kind:'FROZEN',passed:false},{kind:'MODEL_CANDIDATE',passed:false}],
+  log_excerpt:[
+   'not ok 3 - absent provider provenance or incomplete exact hash cannot start generation',
+   'AssertionError [ERR_ASSERTION]:',
+   "  + 'MISSING_CAPABILITY'",
+   "  - 'INSUFFICIENT_EVIDENCE'",
+   'ReferenceError: describe is not defined',
+  ].join('\n'),
+ };
+ assert.equal(classifyFoundationalFailure(actual),'TEST_REGRESSION');
+ const explicit={...actual,missing_dependency:'trusted:provider:missing_rpc'};
+ assert.equal(classifyFoundationalFailure(explicit),'MISSING_CAPABILITY');
 });

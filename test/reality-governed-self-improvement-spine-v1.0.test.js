@@ -5,7 +5,7 @@ import {
  createGovernedSelfImprovement,verifySelfImprovementJournal,
  acceptGovernedObservation,proposeGovernedCandidate,
  classifyIndependentFailure,nextGovernedSelfImprovementAction,
- readGovernedSelfImprovementOrientation
+ readGovernedSelfImprovementOrientation,recoverGovernedEscalation
 } from '../src/reality-governed-self-improvement-spine-v1.0.js';
 import {continueGovernedSelfImprovement}
  from '../src/reality-governed-self-improvement-driver-v1.0.js';
@@ -400,4 +400,131 @@ test('constitutional journal refuses false settlement or lost attempt count even
  assert.throws(()=>verifySelfImprovementJournal(forgedCount),
   /SELF_IMPROVEMENT_JOURNAL_PHASE_INVARIANT_VIOLATED/);
  assert.equal(verifySelfImprovementJournal(discovered),true);
+});
+
+test('Real original #178: typed independent TEST_FAILED corrects model rather than invents authority/dependency',()=>{
+ const log=[
+  'not ok 3 - absent provider provenance or incomplete exact hash',
+  "  + 'MISSING_CAPABILITY'",
+  "  - 'INSUFFICIENT_EVIDENCE'",
+  'AssertionError [ERR_ASSERTION]: Expected values to be strictly equal',
+  'ReferenceError: describe is not defined',
+ ].join('\n');
+ const result=classifyIndependentFailure({output:log,code:'TEST_FAILED'});
+ assert.equal(result.next,'REPAIR_CODE_FROM_TEST_FAILURE');
+ assert.equal(result.retry_source_without_dependency,true);
+ assert.notEqual(result.class,'MISSING_CAPABILITY');
+ assert.notEqual(result.class,'AUTHORITY_REQUIRED');
+ const realMissing=classifyIndependentFailure({
+  output:log,code:'MISSING_CAPABILITY',missingDependency:'provider:missing:required-rpc'});
+ assert.equal(realMissing.class,'MISSING_CAPABILITY');
+});
+
+
+test('actual #178 recovery extends same immutable three-failure journal exactly once, never grants installation',async()=>{
+ const h=harness();
+ let s=await gap(createGovernedSelfImprovement({scope}),h);
+ for(let i=1;i<=3;i++){
+  s=proposeGovernedCandidate(s,candidate('export const wrong='+i+';'));
+  s=await acceptGovernedObservation(s,h.issue(s,'SANDBOX_FAILED',{
+   artifact_hash:s.candidate.artifact_hash,
+   diagnostics:{code:'TEST_FAILED',output:'not ok 2 - frozen original regression'},
+  }),{verifyProvider:h.verifyProvider});
+ }
+ assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,3);
+ const old=structuredClone(s);
+ // The real persisted #178 escalation predates recovery_authorization.
+ // Its constitutional hash covers the journal, not newly added fields.
+ const historical=structuredClone(s);
+ delete historical.recovery_authorization;
+ assert.equal(verifySelfImprovementJournal(historical),true);
+ s=historical;
+ const proof={verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:s.head_hash,checkpoint_receipt_id:'continuity:original-e12b',
+  reservation_id:'db:recovery:single-use',failure_evidence_ref:s.independent_failure.evidence_ref,
+  installation_authorized:false};
+ assert.throws(()=>recoverGovernedEscalation(s,{...proof,verified:false}),
+  /SELF_IMPROVEMENT_GOVERNED_RECOVERY_RESERVATION_REQUIRED/);
+ s=recoverGovernedEscalation(s,proof);
+ assert.equal(s.phase,'REPAIR_REQUIRED');assert.equal(s.attempt_limit,5);
+ assert.equal(s.attempt_count,3);assert.equal(s.journal.length,8);
+ assert.deepEqual(s.journal.slice(0,7),old.journal);
+ assert.equal(verifySelfImprovementJournal(s),true);
+ assert.throws(()=>recoverGovernedEscalation(s,proof),
+  /SELF_IMPROVEMENT_EXACT_REPAIRABLE_EXHAUSTION_REQUIRED/);
+ s=proposeGovernedCandidate(s,candidate('export const repaired=true;'));
+ assert.equal(s.attempt_count,4);
+ s=await verified(s,h);
+ assert.equal(s.phase,'AWAITING_OWNER_APPROVAL');
+ assert.equal(s.promotion_authorization,null);
+ assert.equal(nextGovernedSelfImprovementAction(s).installation_authorized,false);
+});
+test('seven failures permit a single verified-draft correction then stop at exact owner approval',async()=>{
+ const h=harness();let s=await gap(createGovernedSelfImprovement({scope}),h);
+ for(let i=1;i<=3;i++){
+  s=proposeGovernedCandidate(s,candidate('export const fail='+i+';'));
+  s=await acceptGovernedObservation(s,h.issue(s,'SANDBOX_FAILED',{
+   artifact_hash:s.candidate.artifact_hash,
+   diagnostics:{code:'TEST_FAILED',output:'not ok 3'},
+  }),{verifyProvider:h.verifyProvider});
+ }
+ s=recoverGovernedEscalation(s,{verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:s.head_hash,checkpoint_receipt_id:'receipt:original',
+  reservation_id:'reservation:once',failure_evidence_ref:s.independent_failure.evidence_ref,
+  installation_authorized:false});
+ for(let i=4;i<=5;i++){
+  s=proposeGovernedCandidate(s,candidate('export const fail='+i+';'));
+  s=await acceptGovernedObservation(s,h.issue(s,'SANDBOX_FAILED',{
+   artifact_hash:s.candidate.artifact_hash,
+   diagnostics:{code:'TEST_FAILED',output:'not ok 3'},
+  }),{verifyProvider:h.verifyProvider});
+ }
+ assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,5);
+ assert.equal(s.journal.length,12);
+ const preserved=structuredClone(s);
+ const checkpoint=s.head_hash;
+ s=recoverGovernedEscalation(s,{verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:checkpoint,checkpoint_receipt_id:'receipt:original-five',
+  reservation_id:'reservation:second-single-use',
+  failure_evidence_ref:s.independent_failure.evidence_ref,installation_authorized:false});
+ assert.equal(s.phase,'REPAIR_REQUIRED');
+ assert.equal(s.attempt_limit,7);assert.equal(s.attempt_count,5);
+ assert.equal(s.journal.length,13);assert.equal(verifySelfImprovementJournal(s),true);
+ assert.deepEqual(s.journal.slice(0,12),preserved.journal);
+ assert.notEqual(s.recovery_authorization.reservation_id,
+  s.recovery_continuation_authorization.reservation_id);
+ for(let i=6;i<=7;i++){
+  s=proposeGovernedCandidate(s,candidate('export const stillWrong='+i+';'));
+  s=await acceptGovernedObservation(s,h.issue(s,'SANDBOX_FAILED',{
+   artifact_hash:s.candidate.artifact_hash,
+   diagnostics:{code:'TEST_FAILED',output:'not ok 3 - original frozen regression'},
+  }),{verifyProvider:h.verifyProvider});
+ }
+ assert.equal(s.phase,'ESCALATED');assert.equal(s.attempt_count,7);
+ assert.equal(s.journal.length,17);
+ assert.equal(verifySelfImprovementJournal(s),true);
+ // One final bounded continuation follows all seven independently persisted
+ // failures; no rewrite, no new queue and no silent installation permission.
+ const before=structuredClone(s);
+ const receipt='receipt:source-linked-attempt-seven';
+ s=recoverGovernedEscalation(s,{verified:true,independent_provider_readback:true,
+  owner_id:scope.owner_id,goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+  checkpoint_hash:s.head_hash,checkpoint_receipt_id:receipt,
+  reservation_id:'reservation:final-single-use',
+  failure_evidence_ref:s.independent_failure.evidence_ref,installation_authorized:false});
+ assert.equal(s.attempt_count,7);assert.equal(s.attempt_limit,8);
+ assert.equal(s.journal.length,18);
+ assert.deepEqual(s.journal.slice(0,17),before.journal);
+ assert.equal(verifySelfImprovementJournal(s),true);
+ assert.equal(s.promotion_authorization,null);
+ s=proposeGovernedCandidate(s,candidate('export const finalDraft=true;'));
+ assert.equal(s.attempt_count,8);
+ s=await verified(s,h);
+ assert.equal(s.phase,'AWAITING_OWNER_APPROVAL');
+ assert.equal(s.promotion_authorization,null);
+ assert.equal(nextGovernedSelfImprovementAction(s).installation_authorized,false);
+
 });

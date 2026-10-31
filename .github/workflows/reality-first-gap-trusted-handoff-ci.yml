@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/first-real-gap-to-generation-handoff-20261029
+      - feature/first178-live-single-claim-execution-20261029
   pull_request:
     branches:
       - experiment/reality-live-durable-adversarial-20261025
@@ -24,6 +25,10 @@ jobs:
         run: node --check src/reality-first-gap-handoff-v0.1.js
       - name: Verify first real gap, integrity, and fail-closed owner scope
         run: node --test test/reality-first-gap-handoff-v0.1.test.js
+      - name: Reject malformed model candidates before constitutional admission
+        run: |
+          node --check src/reality-foundational-model-provider-v1.0.js
+          node --test test/reality-foundational-model-strict-candidate-v1.0.test.js
       - name: Verify immutable test source is included in model task data
         run: |
           node --check src/reality-foundational-verified-regression-context-v1.0.js
@@ -32,6 +37,10 @@ jobs:
         run: |
           node --check src/reality-first-178-constitutional-continuity-checkpoint-v0.1.js
           node --test test/reality-first-178-constitutional-continuity-checkpoint-v0.1.test.js
+      - name: Verify Vercel Sandbox v3 real cmdId and independent provider receipts
+        run: |
+          node --check src/reality-foundational-vercel-sandbox-adapter-v1.0.js
+          node --test test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
       - name: Verify exact owner job #178 admission and approval boundaries
         run: |
           node --check src/reality-personal-first-upgrade-178-v0.1.js
@@ -43,5 +52,69 @@ jobs:
         run: |
           node --check scripts/reality-first-178-real-provider-readback-v0.1.mjs
           node scripts/reality-first-178-real-provider-readback-v0.1.mjs
+      - name: Verify one-click owner admission and exactly-once constitutional continuation
+        run: |
+          node --check src/reality-first178-single-action-v0.1.js
+          node --check api/reality/personal-first-upgrade-178-run.js
+          node --test test/reality-first178-single-action-v0.1.test.js
+      - name: Prove one exact owner approval drives real provider install, original resumption and settlement
+        run: |
+          node --check src/reality-first178-approved-completion-v0.1.js
+          node --test test/reality-first178-approved-completion-v0.1.test.js
+      - name: Execute ORIGINAL frozen #178 acceptance against installed model-authored source
+        # Before owner-approved installation the source is absent. This STEP
+        # must be SKIPPED, never reported as a successful frozen acceptance.
+        # observeFrozenAcceptance independently requires this exact step
+        # conclusion=success and therefore refuses uninstalled candidates.
+        if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
+        run: |
+          test -f src/reality-extensions/reality-ci-failure-evidence.mjs
+          test -f test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+      - name: Verify exact owner-approved isolated GitHub install and frozen CI readback
+        run: |
+          node --check src/reality-first178-isolated-github-install-v0.1.js
+          node --test test/reality-first178-isolated-github-install-v0.1.test.js
+      - name: Verify signed-in one-use eighth-failure redesign API and preservation
+        run: |
+          node --check api/reality/personal-first-upgrade-178-redesign.js
+          node --check src/reality-first178-constitutional-executor-v0.1.js
+          node --test test/reality-first178-owner-redesign-route-v0.1.test.js
+      - name: Prove original #178 owner-authored 8-to-9 redesign, no replay or tenth attempt
+        run: node --test test/reality-first178-owner-redesign-recovery-v0.1.test.js
+      - name: Prove shared constitutional self-repair planning and source-linked recurrent failures
+        run: |
+          node --check src/reality-self-repair-strategy-v1.0.js
+          node --check src/reality-governed-self-improvement-driver-v1.0.js
+          node --check src/reality-foundational-constitutional-adapters-v1.0.js
+          node --check src/reality-foundational-model-provider-v1.0.js
+          node --test test/reality-self-repair-strategy-v1.0.test.js
+      - name: Verify Reality independently diagnoses its own original job and conversation drift
+        run: |
+          node --check src/reality-first178-self-diagnosis-v0.1.js
+          node --check api/reality/personal-first-upgrade-178-diagnose.js
+          node --test test/reality-first178-self-diagnosis.test.js
+      - name: Verify original #178 existing owner grant resumes in configured preview only
+        run: |
+          node --check api/reality/personal-first-upgrade-178-recovery.js
+          node --test test/reality-first178-owner-recovery-preview.test.js
+      - name: Verify independent real capability registration and durable outcome adapters
+        run: |
+          node --check src/reality-first178-real-capability-registry-v0.1.js
+          node --check src/reality-first178-real-outcome-settlement-v0.1.js
+          node --check scripts/reality-first178-original-work-replay.mjs
+          node --test test/reality-first178-real-capability-registry.test.js
+      - name: Check real #178 one-click owner API and complete provider service syntax
+        run: |
+          node --check api/reality/personal-first-upgrade-178-approve.js
+          node --check src/reality-first178-live-owner-completion-v0.1.js
+          node --check src/reality-first178-approved-completion-v0.1.js
+          node --check src/reality-first178-isolated-github-install-v0.1.js
+          node --test test/reality-first178-approved-completion-v0.1.test.js test/reality-first178-isolated-github-install-v0.1.test.js test/reality-first178-exhausted-one-click-readback-v0.1.test.js test/reality-first178-live-consequence-truth-v0.1.test.js
+      - name: Regression actual #178 failed sandbox must self-correct rather than false capability escalation
+        run: |
+          node --check src/reality-foundational-build-loop-v1.0.js
+          node --check src/reality-governed-self-improvement-spine-v1.0.js
+          node --test test/reality-foundational-build-loop-v1.0.test.js test/reality-governed-self-improvement-spine-v1.0.test.js
       - name: Preserve constitutional baseline
         run: node --test test/reality-governed-self-improvement-spine-v1.0.test.js

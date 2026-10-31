@@ -48,8 +48,8 @@ function fake({badSha=false,secret=false,providerLie=false,failed=false}={}){
    const code=isEnv&&secret?45:isTest&&failed?1:0;
    const output=isSha?(badSha?'b'.repeat(40):commit):
     isTest?'# tests 2\n# pass '+(failed?1:2)+'\n# fail '+(failed?1:0):'';
-   const cmd={id,exitCode:code,stdout:async()=>output,stderr:async()=>''};
-   commands.set(id,{id,exitCode:code});
+   const cmd={cmdId:id,exitCode:code,stdout:async()=>output,stderr:async()=>''};
+   commands.set(id,{cmdId:id,exitCode:code});
    return cmd;
   },
   async readFileToBuffer({path}){
@@ -103,6 +103,28 @@ test('real Vercel microVM adapter closes egress BEFORE any model bytes are writt
  assert.ok(h.calls.indexOf('deny:deny-all')<h.calls.indexOf('write'));
  assert.equal(h.calls.filter(x=>x.startsWith('getCommand:')).length,2);
 });
+test('sandbox v3 command IDs are cmdId, not id; missing provider cmdId fails closed',async()=>{
+ const h=fake();
+ const originalCreate=h.Client.create;
+ h.Client.create=async(...args)=>{
+  const sbx=await originalCreate(...args);
+  const origRun=sbx.runCommand;
+  let index=0;
+  sbx.runCommand=async opts=>{
+   const cmd=await origRun(opts);
+   if(opts.cmd==='node'&&opts.args[0]==='--test'&&++index===2)
+    return {exitCode:cmd.exitCode,stdout:cmd.stdout,stderr:cmd.stderr};
+   return cmd;
+  };
+  return sbx;
+ };
+ const a=createIsolatedVercelSandbox({SandboxClient:h.Client});
+ await assert.rejects(a.isolatedSandbox({ticket,candidate,attempt:1,
+  frozen_suite_ref:ticket.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false}),
+  /FOUNDATION_SANDBOX_PROVIDER_COMMAND_ID_REQUIRED/);
+ assert.equal(h.stopped,true);
+});
 test('preexisting source SHA mismatch is blocked, and sandbox is stopped',async()=>{
  const h=fake({badSha:true});
  await assert.rejects(run(h),/FOUNDATION_SANDBOX_REPOSITORY_SHA_MISMATCH/);
@@ -139,4 +161,36 @@ test('unauthorized network, foreign scope, and stale attempts fail before sandbo
   /FOUNDATION_VERCEL_SANDBOX_SCOPE_NOT_AUTHORIZED/);
  }
  assert.deepEqual(h.calls,[]);
+});
+
+test('GitHub worker passes scoped external API auth only to Sandbox.create, never VM env',async()=>{
+ const h=fake();
+ const create=h.Client.create;
+ const auth={token:'example-scoped-external-ci-token-123456',
+  teamId:'team_123456789012345',projectId:'prj_5A3b0WG9IuvzyEUBw9tD9v8jcha8'};
+ h.Client.create=async opts=>{
+  assert.equal(opts.token,auth.token);
+  assert.equal(opts.teamId,auth.teamId);
+  assert.equal(opts.projectId,auth.projectId);
+  assert.ok(!('env' in opts));
+  return create(opts);
+ };
+ const adapter=createIsolatedVercelSandbox({SandboxClient:h.Client,providerAuth:auth});
+ const report=await adapter.isolatedSandbox({ticket,candidate,attempt:1,
+  frozen_suite_ref:ticket.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false});
+ const pre=createSandboxEvidenceCandidate(ticket,candidate,report);
+ const verified=await independentlyVerifySandbox(ticket,candidate,pre,
+  {readback:adapter.independentReadback});
+ assert.equal(verified.independently_verified,true);
+ assert.ok(h.calls.includes('deny:deny-all'));
+ assert.equal(h.stopped,true);
+});
+test('invalid external CI auth must fail before creating a sandbox',()=>{
+ const h=fake();
+ assert.throws(()=>createIsolatedVercelSandbox({
+  SandboxClient:h.Client,
+  providerAuth:{token:'short',teamId:'team_fake',projectId:'prj_bad'},
+ }),/FOUNDATION_EXTERNAL_SANDBOX_AUTH_INVALID/);
+ assert.equal(h.calls.length,0);
 });

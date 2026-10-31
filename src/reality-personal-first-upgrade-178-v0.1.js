@@ -17,8 +17,7 @@ import {orderContinuityHistory}
  from './reality-continuous-reliability-v0.1.js';
 import {observeFirstGapFromGithub,FIRST_GAP_PROOF}
  from './reality-first-gap-handoff-v0.1.js';
-import {dispatchGovernedBuildToIsolatedWorker}
- from './reality-governed-build-github-dispatch-v1.0.js';
+
 
 const fail=(s,status=409)=>{throw Object.assign(Error('FIRST_PROOF_'+s),{status})};
 const uuid=x=>validUuid(x);
@@ -55,7 +54,7 @@ function scopeFor(session,goal,conversationId,env){
   goal_current_verified:true,environment:'ISOLATED_PREVIEW',
  });
 }
-function dbFor(session,env){
+export function dbFor(session,env){
  const cfg=privateChatConfig(env);
  const db=resolveReliabilityBenchmarkDb(env);
  if(!db?.strictSecrets||!db?.secretKey||db.url!==cfg.url||
@@ -64,7 +63,7 @@ function dbFor(session,env){
   fail('ISOLATED_DATABASE_UNVERIFIED',503);
  return db;
 }
-async function rpc(db,name,input,fetchImpl=fetch){
+export async function rpc(db,name,input,fetchImpl=fetch){
  const response=await fetchImpl(db.url+'/rest/v1/rpc/'+name,{
   method:'POST',redirect:'error',cache:'no-store',
   headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
@@ -75,7 +74,7 @@ async function rpc(db,name,input,fetchImpl=fetch){
  if(!response.ok)fail('ATOMIC_GOAL_QUEUE_OPERATION_REJECTED',503);
  return data;
 }
-async function verifiedOwnerScope({session,conversationId,env,readGoal}){
+export async function verifiedOwnerScope({session,conversationId,env,readGoal=readFreshPersonalGoalState}){
  if(!uuid(session?.user_id)||!uuid(conversationId))
   fail('AUTHENTICATED_CONVERSATION_REQUIRED',401);
  const goal=await readGoal({session,conversationId,env});
@@ -105,12 +104,30 @@ export async function inspectFirstUpgrade178({
   if(existing.original_work_id!==scope.original_work_id||
     existing.goal_id!==scope.goal_id)
    return publicShape(scope,'BLOCKED_BY_DIFFERENT_QUEUED_WORK');
+  const phase=String(existing.phase||'NOT_VERIFIED');
+  const r=existing.report||{};
+  const stageReceipt=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(
+   String(r.checkpoint_receipt_id||''))?r.checkpoint_receipt_id:null;
+  const exactHash=/^[a-f0-9]{64}$/.test(String(r.checkpoint_hash||''))?
+   r.checkpoint_hash:null;
+  const verifiedGate=phase==='AWAITING_OWNER_APPROVAL'&&
+   r.state===phase&&stageReceipt&&exactHash&&
+   r.installation_authorized===false&&r.job_completed===false;
   return Object.freeze({...publicShape(scope,'ALREADY_QUEUED'),
-   queue_id:existing.queue_id,
-   queue_phase:existing.phase||'NOT_VERIFIED'});
+   queue_id:existing.queue_id,queue_phase:phase,
+   checkpoint_receipt_id:stageReceipt,checkpoint_hash:exactHash,
+   owner_approval_required:Boolean(verifiedGate),
+   model_generated:Boolean(verifiedGate),
+   sandbox_verified:Boolean(verifiedGate),
+   installation_authorized:false,job_completed:false});
  }
- if(!String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||'').trim())
-  return publicShape(scope,'BLOCKED_MISSING_ISOLATED_GITHUB_CREDENTIAL');
+ // The exact public #178 GitHub failure is verified without a write token.
+ // Model and sandbox run on the trusted Vercel host under this same goal.
+ if(!String(env.REALITY_STANDALONE_OPENAI_API_KEY||'').trim()||
+    !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim())
+  return publicShape(scope,'BLOCKED_MODEL_PROVIDER_NOT_CONFIGURED');
+ if(String(env.REALITY_FIRST178_GITHUB_READ_TOKEN||'').length<20)
+  return publicShape(scope,'BLOCKED_GITHUB_READ_ONLY_CREDENTIAL');
  return publicShape(scope,'READY_FOR_EXACT_OWNER_CONFIRMATION');
 }
 // The queue reservation is not itself an event in the owner's Continuity.
@@ -185,14 +202,17 @@ export async function persistFirstUpgrade178Work({
 export async function startFirstUpgrade178({
  session,conversationId,env=process.env,
  readGoal=readFreshPersonalGoalState,call=rpc,
- observe=observeFirstGapFromGithub,dispatch=dispatchGovernedBuildToIsolatedWorker,
+ observe=observeFirstGapFromGithub,
  persistWork=persistFirstUpgrade178Work,
 }={}){
  const db=dbFor(session,env);
  if(!/^[a-f0-9]{40}$/.test(String(env.VERCEL_GIT_COMMIT_SHA||'')))
   fail('PINNED_PREVIEW_RELEASE_REQUIRED',503);
- const token=String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||'');
- if(token.length<25)fail('WORKER_PROVIDER_CREDENTIAL_UNAVAILABLE',503);
+ if(!String(env.REALITY_STANDALONE_OPENAI_API_KEY||'').trim()||
+    !String(env.REALITY_SEMANTIC_REVIEW_MODEL||'').trim())
+  fail('MODEL_PROVIDER_NOT_CONFIGURED',503);
+ if(String(env.REALITY_FIRST178_GITHUB_READ_TOKEN||'').length<20)
+  fail('GITHUB_READ_ONLY_CREDENTIAL_REQUIRED',503);
  const initial=await verifiedOwnerScope({session,conversationId,env,readGoal});
  const existing=await call(db,'reality_read_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
@@ -204,7 +224,7 @@ export async function startFirstUpgrade178({
    queue_id:existing.queue_id,queue_phase:existing.phase,
    external_execution_authorized:false});
  // Real provider logs are fetched by the trusted server, never the browser.
- const observed=await observe({scope:initial,apiToken:token});
+ const observed=await observe({scope:initial,apiToken:env.REALITY_FIRST178_GITHUB_READ_TOKEN});
  if(observed?.status!=='INDEPENDENT_CI_MISSING_CAPABILITY_OBSERVED'||
     observed.original_work_id!==initial.original_work_id||
     observed.goal_id!==initial.goal_id||
@@ -215,6 +235,17 @@ export async function startFirstUpgrade178({
  if(fresh.original_work_id!==initial.original_work_id||
     fresh.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
    fail('GOAL_CHANGED_DURING_PROVIDER_CHECK');
+ const third=await verifiedOwnerScope({session,conversationId,env,readGoal});
+ if(third.original_work_id!==initial.original_work_id||
+    third.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
+   fail('GOAL_CHANGED_BEFORE_CONTINUITY_WORK');
+ const workReceipt=await persistWork({scope:initial,conversationId,
+   providerEvidence:observed,db});
+ if(workReceipt?.verified_readback!==true||
+    workReceipt.original_work_id!==initial.original_work_id||
+    workReceipt.installation_authorized!==false||
+    !uuid(workReceipt.receipt_id))
+   fail('CONTINUITY_WORK_READBACK_FAILED',503);
  const result=await call(db,'reality_enqueue_governed_build_v1',{
   p_owner_id:session.user_id,p_conversation_id:conversationId,
   p_goal_id:initial.goal_id,
@@ -230,38 +261,13 @@ export async function startFirstUpgrade178({
     result.goal_id!==initial.goal_id||result.job_completed!==false||
     result.installation_authorized!==false)
   fail('DURABLE_QUEUE_RECEIPT_UNVERIFIED',503);
- const third=await verifiedOwnerScope({session,conversationId,env,readGoal});
- if(third.original_work_id!==initial.original_work_id||
-    third.goal_transition_receipt_ref!==initial.goal_transition_receipt_ref)
-   fail('GOAL_CHANGED_BEFORE_CONTINUITY_WORK');
- const workReceipt=await persistWork({scope:initial,conversationId,
-   providerEvidence:observed,db});
- if(workReceipt?.verified_readback!==true||
-    workReceipt.original_work_id!==initial.original_work_id||
-    workReceipt.installation_authorized!==false||
-    !uuid(workReceipt.receipt_id))
-   fail('CONTINUITY_WORK_READBACK_FAILED',503);
- let dispatched=null;
- try{
-  dispatched=await dispatch({queue_id:result.queue_id,
-   original_work_id:initial.original_work_id,
-   issue_url:'https://github.com/maloney2323/Reality/issues/178',env});
-  const pinned=await call(db,'reality_mark_governed_build_dispatched_v1',{
-   p_owner_id:session.user_id,p_conversation_id:conversationId,
-   p_queue_id:result.queue_id,p_commit_sha:dispatched.worker_sha,
-   p_request_path:dispatched.request_path,
-  });
-  if(pinned?.dispatched!==true||pinned.queue_id!==result.queue_id)
-   fail('WORKER_DISPATCH_READBACK_FAILED',503);
- }catch{
-  return Object.freeze({...publicShape(initial,'QUEUED_DISPATCH_UNRESOLVED'),
-   queue_id:result.queue_id,continuity_work_receipt_id:workReceipt.receipt_id,
-   provider_receipt_ref:observed.provider_receipt_ref,
-   do_not_retry:true,external_execution_authorized:false});
- }
- return Object.freeze({...publicShape(initial,'DISCOVERY_WORKER_DISPATCHED'),
+ // No GitHub WRITE request here. The existing atomic queue is claimed
+ // separately by the trusted constitutional driver in the same preview.
+ // This avoids copying a protected GitHub dispatch secret and ensures there
+ // is only ONE lifecycle authority for the original owner job.
+ return Object.freeze({...publicShape(initial,'QUEUED_DIRECT_CONSTITUTIONAL'),
   queue_id:result.queue_id,continuity_work_receipt_id:workReceipt.receipt_id,
-  worker_commit_sha:dispatched.worker_sha,
   provider_receipt_ref:observed.provider_receipt_ref,
-  external_execution_authorized:false});
+  worker_dispatch_required:false,external_execution_authorized:false,
+  next_action:'CLAIM_AND_RUN_SAME_ORIGINAL_JOB'});
 }

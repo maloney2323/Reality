@@ -6,7 +6,7 @@
 import {createHash} from 'node:crypto';
 import {createFoundationalBuildTicket}
  from './reality-foundational-build-loop-v1.0.js';
-import {createGovernedSelfImprovement}
+import {createGovernedSelfImprovement,verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
 import {continueGovernedSelfImprovement}
  from './reality-governed-self-improvement-driver-v1.0.js';
@@ -119,14 +119,18 @@ export async function observeFirstGapFromGithub({
  scope,apiToken,fetchImpl=fetch,
 }={}){
  strictScope(scope);
- if(typeof apiToken!=='string'||apiToken.length<20)
-  fail('PROVIDER_READ_CREDENTIAL_REQUIRED');
+ // The pinned #178 source and Actions run are public. No GitHub write or
+ // dispatch credential is needed to independently READ a public job. A
+ // provider 401/403 still fails closed, never downgrades to model assertions.
+ if(apiToken!=null&&apiToken!==''&&
+    (typeof apiToken!=='string'||apiToken.length<20))
+  fail('PROVIDER_READ_CREDENTIAL_INVALID');
  const p=FIRST_GAP_PROOF;
  const root='https://api.github.com/repos/'+p.repository;
  const headers={accept:'application/vnd.github+json',
-  authorization:'Bearer '+apiToken,
   'x-github-api-version':'2022-11-28',
   'user-agent':'Reality-pinned-CI-gap-readback'};
+ if(apiToken)headers.authorization='Bearer '+apiToken;
  async function get(path,{text=false}={}){
   const url=root+path;
   const response=await fetchImpl(url,{method:'GET',cache:'no-store',
@@ -171,9 +175,13 @@ export async function observeFirstGapFromGithub({
 // This requires a real authenticated Reality work ID, NOT the fixture 'work:e...'.
 export async function admitFirstGapBuildTicket({
  scope,providerEvidence,persistGap,readBackGap,
- reobserveProviderEvidence,
+ reobserveProviderEvidence,maxAttempts=3,
 }={}){
  strictScope(scope);
+ if(![3,5,7,8,9].includes(maxAttempts)||
+   (maxAttempts===9&&scope.original_work_id!==
+    'work:9b9578b3c65427589c4c6da68fe0fc87'))
+  fail('UNBOUNDED_RECOVERY_ATTEMPTS');
  if(typeof reobserveProviderEvidence!=='function')
   fail('INDEPENDENT_REOBSERVATION_REQUIRED');
  const fresh=await reobserveProviderEvidence(Object.freeze({...scope}));
@@ -229,7 +237,7 @@ export async function admitFirstGapBuildTicket({
   frozen_regression_manifest_ref:FIRST_GAP_PROOF.manifest_ref,
   frozen_regression_sha256:FIRST_GAP_PROOF.manifest_sha256,
   repository_base_sha:FIRST_GAP_PROOF.run_head_sha,
-  environment:'ISOLATED_PREVIEW',max_attempts:3,
+  environment:'ISOLATED_PREVIEW',max_attempts:maxAttempts,
   allowed_source_roots:['src/reality-extensions/','test/reality-extensions/'],
  });
  return Object.freeze({ticket,
@@ -247,7 +255,7 @@ export async function admitFirstGapBuildTicket({
 // trusted provider adapters, and every transition durably read back in the
 // SAME original owner's Continuity Ledger. Never call this from a browser.
 export async function generateAfterTrustedGap({
- admitted,adapters,verifiedGovernanceReleaseSha,
+ admitted,adapters,verifiedGovernanceReleaseSha,resumeState=null,
 }={}){
  const ticket=admitted?.ticket;
  if(admitted?.proof!=='OWNER_SCOPED_PROVIDER_GAP_DURABLY_READ_BACK'||
@@ -283,9 +291,75 @@ export async function generateAfterTrustedGap({
   governance_kernel_hash:'sha256:'+hex(
    'reality-constitutional-driver-release:'+verifiedGovernanceReleaseSha),
  };
- const initial=createGovernedSelfImprovement({
-  scope,attemptLimit:ticket.max_attempts,
- });
+ let initial;
+ if(resumeState!==null){
+  verifySelfImprovementJournal(resumeState);
+  const rs=resumeState.scope;
+  // No new model-scope authority on recovery. The original constitutional
+  // release hash is retained in the verified journal. Current owner/goal,
+  // original work, source receipts and immutable gap identity MUST match.
+  const recoveryOffset=(resumeState.recovery_authorization?.verified===true?1:0)+
+   (resumeState.recovery_continuation_authorization?.verified===true?1:0)+
+    (resumeState.recovery_final_authorization?.verified===true?1:0)+
+    (resumeState.recovery_redesign_authorization?.verified===true?1:0);
+  const unacceptedGap=resumeState.phase==='GAP_CONFIRMED'&&
+     resumeState.attempt_count===0&&
+     resumeState.journal.length===1&&
+     resumeState.journal[0].kind==='GAP_CONFIRMED'&&
+     resumeState.candidate===null;
+  const unverifiedCandidate=resumeState.phase==='CANDIDATE_READY'&&
+     resumeState.attempt_count>=1&&
+     resumeState.attempt_count<=ticket.max_attempts&&
+     resumeState.journal.length===2*resumeState.attempt_count+recoveryOffset&&
+     resumeState.journal.at(-1).kind==='MODEL_CANDIDATE_PROPOSED'&&
+     resumeState.candidate?.generated_by_model===true&&
+     resumeState.candidate?.verified===false&&
+     resumeState.candidate?.installed===false&&
+     resumeState.candidate?.authorized===false&&
+     resumeState.sandbox_receipt===null&&
+     (resumeState.attempt_count===1||
+      (resumeState.independent_failure?.classification?.retry_source_without_dependency===true&&
+       resumeState.independent_failure.attempt===resumeState.attempt_count-1&&
+       (resumeState.journal.at(-2).kind==='SANDBOX_FAILED'||
+        (((resumeState.attempt_count===4&&recoveryOffset===1)||
+         (resumeState.attempt_count===6&&recoveryOffset===2)||
+         (resumeState.attempt_count===8&&recoveryOffset===3)||
+         (resumeState.attempt_count===9&&recoveryOffset===4))&&
+         resumeState.journal.at(-2).kind==='RECOVERY_STARTED'&&
+         resumeState.journal.at(-3).kind==='SANDBOX_FAILED'))));
+  const lastEvent=resumeState.journal.at(-1);
+  const recoveryOpening=resumeState.phase==='REPAIR_REQUIRED'&&
+     lastEvent?.kind==='RECOVERY_STARTED'&&
+     ((recoveryOffset===1&&resumeState.attempt_count===3&&
+       resumeState.journal.length===8)||
+      (recoveryOffset===2&&resumeState.attempt_count===5&&
+       resumeState.journal.length===13)||
+      (recoveryOffset===3&&resumeState.attempt_count===7&&
+       resumeState.journal.length===18)||
+      (recoveryOffset===4&&resumeState.attempt_count===8&&
+       resumeState.journal.length===21));
+  const repairableCheckpoint=resumeState.phase==='REPAIR_REQUIRED'&&
+     resumeState.attempt_count>=1&&
+     resumeState.attempt_count<ticket.max_attempts&&
+     (recoveryOpening||(
+       resumeState.journal.length===2*resumeState.attempt_count+1+recoveryOffset&&
+       lastEvent?.kind==='SANDBOX_FAILED'&&
+       lastEvent.evidence_ref===resumeState.independent_failure?.evidence_ref))&&
+     resumeState.independent_failure?.attempt===resumeState.attempt_count&&
+     resumeState.independent_failure?.classification?.retry_source_without_dependency===true;
+  // All are *continuations*, never new goals, work or authority.
+  if((!unacceptedGap&&!unverifiedCandidate&&!repairableCheckpoint)||
+     resumeState.attempt_limit!==ticket.max_attempts||
+     !rs?.governance_kernel_hash?.startsWith('sha256:')||
+     !Object.entries(scope).every(([key,value])=>
+       key==='governance_kernel_hash'||rs[key]===value))
+   fail('RECOVERY_ONLY_EXACT_UNACCEPTED_GAP_ALLOWED');
+  initial=resumeState;
+ }else{
+  initial=createGovernedSelfImprovement({
+   scope,attemptLimit:ticket.max_attempts,
+  });
+ }
  const driven=await continueGovernedSelfImprovement({
   state:initial,maxTransitions:12,
   adapters:{

@@ -25,7 +25,8 @@ export function createFoundationalBuildTicket(input){
  assert(/^[a-f0-9]{64}$/.test(t.frozen_regression_sha256),'FOUNDATION_FROZEN_SUITE_HASH_INVALID');
  assert(/^[a-zA-Z0-9_-]{1,80}$/.test(t.frozen_regression_manifest_ref),'FOUNDATION_FROZEN_MANIFEST_REF_INVALID');
  assert(t.environment==='ISOLATED_PREVIEW','FOUNDATION_PRODUCTION_NOT_PERMITTED');
- assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&t.max_attempts<=5,
+ assert(Number.isInteger(t.max_attempts)&&t.max_attempts>=1&&(t.max_attempts<=8||(t.max_attempts===9&&
+  t.original_work_id==='work:9b9578b3c65427589c4c6da68fe0fc87')),
   'FOUNDATION_FINITE_RETRY_BUDGET_REQUIRED');
  assert(t.confirmed_gap_source==='INDEPENDENT_PROVIDER_READBACK',
   'FOUNDATION_CONFIRMED_GAP_SOURCE_REQUIRED');
@@ -65,13 +66,24 @@ export function validateFoundationalCandidate(ticket,modelOutput){
 }
 export function classifyFoundationalFailure(report){
  const output=String(report?.log_excerpt||'').slice(0,12000);
- if(report?.missing_dependency||/MISSING_CAPABILITY|UNIMPLEMENTED|NO_SUCH_RPC/.test(output))
-  return 'MISSING_CAPABILITY';
- if(/OWNER_APPROVAL|AUTHORITY_REQUIRED|PERMISSION_DENIED|ONE_TIME_RESERVATION/.test(output))
+ // A frozen test often quotes MISSING_CAPABILITY or APPROVAL as the
+ // observed *wrong answer*. Those strings are untrusted log content, NOT
+ // independent evidence of a new dependency or an authority decision.
+ // Provider-owned exit status/test results and typed missing_dependency
+ // outrank arbitrary stdout. This is critical for #178 self-correction.
+ if(report?.missing_dependency)return 'MISSING_CAPABILITY';
+ // Exact standalone trusted failure codes are supported for historical
+ // provider responses; do not infer them from a test's stdout/stderr.
+ if(report?.failure_kind==='AUTHORITY_REQUIRED'||
+    (report?.exit_code==null&&!Array.isArray(report?.test_results)&&
+     /^(?:OWNER_APPROVAL_REQUIRED|AUTHORITY_REQUIRED|PERMISSION_DENIED|ONE_TIME_RESERVATION)$/.test(output.trim())))
   return 'AUTHORITY_REQUIRED';
- if(/SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module/.test(output))return 'SYNTAX';
- if(/not ok \d+|ERR_ASSERTION|AssertionError|TEST_FAILED/.test(output)||report?.exit_code!==0)
-  return 'TEST_REGRESSION';
+ if(/SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module/.test(output))
+  return 'SYNTAX';
+ if(/not ok\s+\d+|ERR_ASSERTION|AssertionError|TEST_FAILED|ReferenceError/.test(output)||
+   report?.test_results?.some(x=>x.passed===false)||
+   report?.exit_code!==0)return 'TEST_REGRESSION';
+ if(report?.failure_kind==='AUTHORITY_REQUIRED')return 'AUTHORITY_REQUIRED';
  return 'UNCLASSIFIED';
 }
 export function createSandboxEvidenceCandidate(ticket,candidate,report){

@@ -16,6 +16,37 @@ const counts=output=>{
   new RegExp('^# '+key+' (\\d+)$','gm'))].at(-1);return m?Number(m[1]):0};
  return {tests:found('tests'),pass:found('pass'),fail:found('fail')};
 };
+// Provider-command output is untrusted diagnostic DATA. Preserve independent
+// failing assertions, their expected/actual values and stack before any tail.
+export function extractSandboxFailureEvidence(frozenOutput,modelOutput,max=8000){
+ const sections=[];
+ for(const [kind,raw] of [['FROZEN',frozenOutput],['MODEL_CANDIDATE',modelOutput]]){
+  const lines=String(raw||'').split(/\r?\n/);
+  const failing=[];
+  for(let i=0;i<lines.length;i++){
+   if(!/^not ok\s+\d+\s+-\s+/.test(lines[i].trim()))continue;
+   const group=[lines[i]];
+   let count=0;
+   for(let j=i+1;j<lines.length&&count<45;j++){
+    if(/^\s*(?:ok|not ok)\s+\d+\s+-\s+/.test(lines[j]))break;
+    if(/^\s*# (?:Subtest:|tests |pass |fail |duration_ms )/.test(lines[j]))break;
+    group.push(lines[j]);count++;
+    if(/^\s*\.\.\.\s*$/.test(lines[j]))break;
+   }
+   failing.push(group.join('\n'));
+   if(failing.length===8)break;
+  }
+  const counts=lines.filter(x=>/^# (?:tests|pass|fail) \d+/.test(x)).slice(-3);
+  const reason=failing.length?failing.join('\n'):
+   lines.filter(x=>/SyntaxError|ReferenceError|ERR_ASSERTION|ERR_MODULE_NOT_FOUND|Error:/i.test(x)).slice(0,14).join('\n');
+  sections.push('['+kind+' independent sandbox diagnostics]\n'+
+   (reason||'No per-test failure block in returned command output')+
+   '\n'+counts.join('\n'));
+ }
+ const all=sections.join('\n');
+ // Preserve early failing tests instead of truncating the first assertion.
+ return all.slice(0,Math.max(500,Math.min(12000,max)));
+}
 const GITHUB='https://github.com/maloney2323/Reality';
 const BASE='/vercel/Reality';
 const secureManifest=({raw,ticket})=>{
@@ -36,9 +67,15 @@ const secureManifest=({raw,ticket})=>{
 // published @vercel/sandbox Sandbox client through the existing Vercel OIDC.
 // The VM is created with no environment secrets and network is shut off before
 // model files are uploaded, tests imported, or any model source runs.
-export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
+export function createIsolatedVercelSandbox({SandboxClient,timeout=180000,
+ providerAuth=null}={}){
  if(!SandboxClient||typeof SandboxClient.create!=='function')
   die('FOUNDATION_VERCEL_SANDBOX_CLIENT_REQUIRED');
+ if(providerAuth!==null&&(
+   typeof providerAuth.token!=='string'||providerAuth.token.length<25||
+   !/^[A-Za-z0-9_-]{10,160}$/.test(providerAuth.teamId||'')||
+   !/^prj_[A-Za-z0-9]{10,64}$/.test(providerAuth.projectId||'')))
+  die('FOUNDATION_EXTERNAL_SANDBOX_AUTH_INVALID');
  if(!Number.isInteger(timeout)||timeout<60000||timeout>300000)
   die('FOUNDATION_VERCEL_SANDBOX_TIMEOUT_INVALID');
  const pending=new Map();
@@ -56,6 +93,8 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
   try{
    sandbox=await SandboxClient.create({
     persistent:false,timeout,resources:{vcpus:1},
+    ...(providerAuth?{token:providerAuth.token,
+     teamId:providerAuth.teamId,projectId:providerAuth.projectId}:{}),
     networkPolicy:'allow-all',
     source:{type:'git',url:GITHUB,depth:1,revision:ticket.repository_base_sha},
    });
@@ -95,7 +134,13 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
    const model=await run(tests);
    const session=sandbox.currentSession?.();
    const sessionId=session?.sessionId||session?.id;
-   if(!sessionId||!frozen.cmd?.id||!model.cmd?.id)
+   // @vercel/sandbox v3 returns CommandFinished.cmdId (not .id).
+   // Do not synthesize IDs from model output or fabricate provider receipts.
+   const frozenId=frozen.cmd?.cmdId,modelId=model.cmd?.cmdId;
+   if(typeof sessionId!=='string'||!sessionId.startsWith('sbx_')||
+      typeof frozenId!=='string'||!frozenId.startsWith('cmd_')||
+      typeof modelId!=='string'||!modelId.startsWith('cmd_')||
+      frozenId===modelId)
     die('FOUNDATION_SANDBOX_PROVIDER_COMMAND_ID_REQUIRED');
    const report={
     ticket_hash:ticket.ticket_hash,artifact_sha256:candidate.artifact_sha256,
@@ -113,12 +158,12 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
      {kind:'MODEL_CANDIDATE',passed:model.cmd.exitCode===0&&
        model.counts.tests>0&&model.counts.fail===0},
     ],
-    log_excerpt:(frozen.output+'\n'+model.output).slice(-8000),
-    runner_receipt_ref:'vercel-sandbox:'+sessionId+':'+model.cmd.id+':'+attempt,
+    log_excerpt:extractSandboxFailureEvidence(frozen.output,model.output),
+    runner_receipt_ref:'vercel-sandbox:'+sessionId+':'+modelId+':'+attempt,
    };
    const reportHash=digest(report);
    pending.set(reportHash,{sandbox,report,sessionId,
-    commands:[frozen.cmd.id,model.cmd.id],artifact_hash:candidate.artifact_sha256});
+    commands:[frozenId,modelId],artifact_hash:candidate.artifact_sha256});
    return report;
   }catch(error){
    if(sandbox)await sandbox.stop().catch(()=>{});
@@ -140,7 +185,7 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000}={}){
     ref.commands.map(id=>ref.sandbox.getCommand(id)));
    const expected=ref.report.test_results;
    if(!frozen||!model||
-      frozen.id!==ref.commands[0]||model.id!==ref.commands[1]||
+      frozen.cmdId!==ref.commands[0]||model.cmdId!==ref.commands[1]||
       (frozen.exitCode===0)!==expected[0].passed||
       (model.exitCode===0)!==expected[1].passed)
     die('FOUNDATION_SANDBOX_PROVIDER_COMMAND_READBACK_MISMATCH');

@@ -1,0 +1,25 @@
+name: Reality — Original 178 Work Replay
+on:
+  push:
+    branches:
+      - feature/first178-live-single-claim-execution-20261029
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Observe real original 178 provider evidence
+        if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
+        run: node scripts/reality-first178-original-work-replay.mjs observe
+      - name: Execute original 178 source with observed provider evidence
+        if: ${{ hashFiles('src/reality-extensions/reality-ci-failure-evidence.mjs') != '' }}
+        run: |
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          node scripts/reality-first178-original-work-replay.mjs execute

@@ -3,6 +3,7 @@
 // journal. No parallel job status table, no model authority, no installation.
 // Trusted server creates this adapter after authenticated goal/owner readback.
 // It is consumed as 'persistCheckpoint' by the ONE constitutional driver.
+import {createHash} from 'node:crypto';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {readFreshPersonalGoalState}
  from './reality-personal-goal-readback-v0.1.js';
@@ -152,6 +153,180 @@ export function createFirst178ConstitutionalCheckpointService({
    evidence_hash:gap.payload.evidence_hash,
    provider_receipt_ref:gap.payload.provider_receipt_ref});
  };
+ const readLatestCheckpoint=async()=>{
+  const {g,spine}=await verifyGoal();
+  const history=orderContinuityHistory(await read(spine));
+  const originals=exactOriginal(history).filter(x=>
+   x.payload?.original_goal_id===g.state.active_goal_id&&
+   x.payload?.goal_transition_receipt_ref===
+    g.state.active_goal.last_transition_receipt_id);
+  if(originals.length!==1)
+   fail('RESTORE_ORIGINAL_SOURCE_NOT_UNIQUE');
+  const checkpoints=history.filter(e=>
+   e.entity_type==='personal_first_178_constitutional_checkpoint'&&
+   e.payload?.original_work_id===originalWorkId);
+  if(checkpoints.length<1)fail('RESTORE_CHECKPOINT_NOT_FOUND');
+  const last=checkpoints.at(-1);
+  const state=last?.payload?.driver_state;
+  verifySelfImprovementJournal(state);
+  const pendingGap=state?.phase==='GAP_CONFIRMED'&&
+   state?.attempt_count===0&&state.candidate===null&&
+   state.journal?.length===1&&state.journal[0]?.kind==='GAP_CONFIRMED';
+  const proposed=state?.candidate;
+  const proposedFiles=proposed?.files;
+  const candidateHash=Array.isArray(proposedFiles)?
+   createHash('sha256').update(JSON.stringify(canon(
+    proposedFiles.map(x=>({path:x.path,content:x.content}))))).digest('hex'):null;
+  // Every bounded model correction lives in the SAME append-only journal:
+  // GAP (1), CANDIDATE (2), FAILURE (3), CORRECTED CANDIDATE (4), ...
+  // A timeout must not reset the attempt count or invent a new job.
+  const attempt=state?.attempt_count;
+  const recoveryOffset=(state?.recovery_authorization?.verified===true?1:0)+
+   (state?.recovery_continuation_authorization?.verified===true?1:0)+
+   (state?.recovery_final_authorization?.verified===true?1:0);
+  const remaining=Number.isInteger(attempt)&&
+   attempt>=1&&attempt<=state.attempt_limit;
+  const baseCandidateValid=Array.isArray(proposedFiles)&&
+   proposedFiles.length>=2&&
+   proposedFiles.some(x=>x.path?.startsWith('src/'))&&
+   proposedFiles.some(x=>x.path?.startsWith('test/'))&&
+   proposed?.artifact_hash===candidateHash&&
+   proposed?.generated_by_model===true&&
+   proposed?.verified===false&&proposed?.installed===false&&
+   proposed?.authorized===false&&state.sandbox_receipt===null;
+  const priorCorrectionValid=attempt===1||(
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.independent_failure?.attempt===attempt-1&&
+   ((state.journal?.at(-2)?.kind==='SANDBOX_FAILED'&&
+     state.journal.at(-2).evidence_ref===state.independent_failure.evidence_ref)||
+    (((attempt===4&&recoveryOffset===1)||
+      (attempt===6&&recoveryOffset===2)||
+      (attempt===8&&recoveryOffset===3))&&
+     state.journal?.at(-2)?.kind==='RECOVERY_STARTED'&&
+     state.journal?.at(-3)?.kind==='SANDBOX_FAILED'&&
+     state.journal.at(-3).evidence_ref===state.independent_failure.evidence_ref))
+  );
+  const pendingSandbox=state?.phase==='CANDIDATE_READY'&&
+   remaining&&baseCandidateValid&&priorCorrectionValid&&
+   state?.journal?.length===2*attempt+recoveryOffset&&
+   state.journal.at(-1)?.kind==='MODEL_CANDIDATE_PROPOSED'&&
+   state.journal.at(-1).body?.artifact_hash===candidateHash&&
+   state.journal.at(-1).body?.attempt===attempt&&
+   state.journal.at(-1).body?.original_work_id===originalWorkId;
+  const recoveryOpening=state?.phase==='REPAIR_REQUIRED'&&
+   ((recoveryOffset===1&&attempt===3&&state.attempt_limit===5&&
+     state.journal?.length===8)||
+    (recoveryOffset===2&&attempt===5&&state.attempt_limit===7&&
+     state.journal?.length===13)||
+    (recoveryOffset===3&&attempt===7&&state.attempt_limit===8&&
+     state.journal?.length===18))&&
+   state.journal.at(-1)?.kind==='RECOVERY_STARTED';
+  const pendingRepair=state?.phase==='REPAIR_REQUIRED'&&
+   remaining&&attempt<state.attempt_limit&&baseCandidateValid&&
+   (recoveryOpening||(
+     state.journal?.length===2*attempt+1+recoveryOffset&&
+     state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+     state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref))&&
+   state.independent_failure?.attempt===attempt&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true;
+  const recoverableEscalation=state?.phase==='ESCALATED'&&
+   attempt===3&&state.attempt_limit===3&&recoveryOffset===0&&
+   state.journal?.length===7&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.independent_failure?.attempt===3&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
+  const recoverableSecondEscalation=state?.phase==='ESCALATED'&&
+   attempt===5&&state.attempt_limit===5&&recoveryOffset===1&&
+   state.journal?.length===12&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.independent_failure?.attempt===5&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
+  const recoverableFinalEscalation=state?.phase==='ESCALATED'&&
+   attempt===7&&state.attempt_limit===7&&recoveryOffset===2&&
+   state.journal?.length===17&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.independent_failure?.attempt===7&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.classification?.retry_source_without_dependency===true&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
+  const finalRecoveredExhaustion=state?.phase==='ESCALATED'&&
+   attempt===8&&state.attempt_limit===8&&recoveryOffset===3&&
+   state.journal?.length===20&&state.journal.at(-1)?.kind==='SANDBOX_FAILED'&&
+   state.journal.at(-1).evidence_ref===state.independent_failure?.evidence_ref&&
+   state.independent_failure?.attempt===8&&
+   state.promotion_authorization===null&&state.registration===null&&
+   state.resumption===null&&state.settlement===null;
+  const sandboxApproved=state?.phase==='AWAITING_OWNER_APPROVAL'&&
+   state?.attempt_count>=1&&
+   state.journal?.at(-1)?.kind==='SANDBOX_VERIFIED'&&
+   state.candidate?.artifact_hash===state.sandbox_receipt?.artifact_hash&&
+   state.sandbox_receipt?.independent_tests_passed===true&&
+   state.sandbox_receipt?.frozen_regression_passed===true&&
+   state.sandbox_receipt?.governance_preserved===true&&
+   state.promotion_authorization===null&&
+   state.registration===null&&state.resumption===null&&state.settlement===null;
+  const hasOwnerPromotion=['PROMOTION_AUTHORIZED','CAPABILITY_REGISTERED',
+   'ORIGINAL_JOB_RESUMED','SETTLED'].includes(state?.phase)&&
+   state?.promotion_authorization?.consumed_once===true&&
+   state.promotion_authorization.approval_origin===
+    'AUTHENTICATED_OWNER_EXPLICIT_ACTION'&&
+   state?.candidate?.artifact_hash===state?.sandbox_receipt?.artifact_hash&&
+   state.sandbox_receipt?.independent_tests_passed===true&&
+   state.sandbox_receipt?.frozen_regression_passed===true&&
+   state.sandbox_receipt?.governance_preserved===true;
+  if(!pendingGap&&!pendingSandbox&&!pendingRepair&&
+     !recoverableEscalation&&!recoverableSecondEscalation&&
+     !recoverableFinalEscalation&&
+     !finalRecoveredExhaustion&&
+     !sandboxApproved&&!hasOwnerPromotion||
+
+     state.scope?.owner_id!==session.user_id||
+     state.scope?.goal_id!==g.state.active_goal_id||
+     state.scope?.original_work_id!==originalWorkId||
+     state.scope?.worldline_id!==spine.worldline_id||
+     state.scope?.continuity_root_id!==spine.continuity_root_id||
+     state.scope?.goal_transition_receipt_ref!==
+      g.state.active_goal.last_transition_receipt_id||
+     state.scope?.goal_evidence_ref!==
+      g.state.active_goal.source_user_message_ref||
+     state.scope?.target_environment!=='ISOLATED_PREVIEW'||
+     last.payload?.constitutional_phase!==state.phase||
+     last.payload?.constitutional_head_hash!==state.head_hash||
+     last.payload?.original_source_receipt_ref!==originals[0].event_id||
+     last.payload?.installation_authorized!==
+      Boolean(state.promotion_authorization?.consumed_once)||
+     last.payload?.original_job_completed!==
+      Boolean(state.phase==='SETTLED'&&
+       state.settlement?.durable_settlement_readback===true&&
+       state.settlement?.independent_outcome_verified===true))
+   fail('RESTORE_EXACT_UNCONSUMED_GAP_REQUIRED');
+  // The independent gap evidence must still match this original owner's
+  // worldline. This also verifies there was no model-authored approval.
+  const gap=history.filter(e=>
+   e.entity_type==='personal_first_178_confirmed_gap'&&
+   e.payload?.original_work_id===originalWorkId);
+  if(gap.length!==1||gap[0].payload?.original_source_receipt_ref!==
+     originals[0].event_id||gap[0].payload?.authorization_granted!==false||
+     state.journal[0].evidence_ref!==gapReceiptId||
+     state.journal[0].evidence_hash!==gap[0].payload?.evidence_hash||
+     state.journal[0].body?.original_work_id!==originalWorkId)
+   fail('RESTORE_GAP_PROVENANCE_MISSING');
+  const verified=await readBackGap({
+   owner_id:session.user_id,goal_id:g.state.active_goal_id,
+   original_work_id:originalWorkId,receipt_id:gapReceiptId,
+  });
+  if(!verified.verified||verified.evidence_hash!==
+      gap[0].payload.evidence_hash)
+   fail('RESTORE_PROVIDER_GAP_READBACK_FAILED');
+  return Object.freeze({state,
+   continuity_receipt_id:last.event_id,
+   checkpoint_hash:state.head_hash,
+   original_work_id:originalWorkId,verified:true});
+ };
  const persistCheckpoint=async state=>{
   verifySelfImprovementJournal(state);
   if(state.scope.owner_id!==session.user_id||
@@ -262,5 +437,6 @@ export function createFirst178ConstitutionalCheckpointService({
    continuity_receipt_id:id,
   });
  };
- return Object.freeze({persistCheckpoint,persistGap,readBackGap});
+ return Object.freeze({persistCheckpoint,persistGap,readBackGap,
+  readLatestCheckpoint});
 }

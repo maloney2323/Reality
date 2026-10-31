@@ -4,9 +4,33 @@
 // text as an independent failure, a verified gap, or approval to mutate code.
 import {verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
+import {strategyFromConstitutionalJournal}
+ from './reality-self-repair-strategy-v1.0.js';
 import {continueGovernedSelfImprovement}
  from './reality-governed-self-improvement-driver-v1.0.js';
 
+// Feed provider-attested operational failures into the EXISTING discovered
+// upgrades category, with exact original work ID. This projection never
+// creates an independent job, raises the retry cap, or issues an installation.
+export function projectVerifiedSelfRepairOpportunity({state}={}){
+ const strategy=strategyFromConstitutionalJournal(state);
+ const work=strategy.discovered_work;
+ return Object.freeze({
+  source:'REALITY_CONSTITUTIONAL_PROVIDER_JOURNAL',
+  discovery_status:strategy.evidence_refs.length?
+   'SOURCE_VERIFIED_REPAIR_DISCOVERY':'INDEPENDENT_FAILURE_REQUIRED',
+  discovered_work:work,
+  repair_strategy:strategy.strategy,
+  recurring_failure_count:strategy.recurring_failures.length,
+  root_cause_hypotheses:strategy.root_cause_hypotheses,
+  evidence_refs:strategy.evidence_refs,
+  original_work_id:state.scope.original_work_id,
+  new_job_created:false,
+  installation_authorized:false,
+  original_job_completed:false,
+  model_install_authority:false,
+ });
+}
 // This is a connection to the existing constitutional driver, not another
 // self-upgrading state machine. A discovery is a hypothesis, never a warrant.
 // Only trusted adapters with independent provider readback can advance work.
