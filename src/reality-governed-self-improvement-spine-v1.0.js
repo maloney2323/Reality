@@ -13,6 +13,7 @@ import {detectCapabilityGap,confirmCapabilityGap}
  from './reality-autonomous-capability-loop-v1.0.js';
 import {buildRealitySelfQuestionAgenda}
  from './reality-self-question-engine-v1.0.js';
+import {isVerifiedRedesignScope} from './reality-recovery-authorization-scope-v1.0.js';
 
 export const GOVERNED_SELF_IMPROVEMENT_VERSION='reality-governed-self-improvement-spine-v1.0';
 export const SELF_IMPROVEMENT_STAGES=Object.freeze([
@@ -121,9 +122,9 @@ export function verifySelfImprovementJournal(state){
   SETTLED:['ORIGINAL_JOB_SETTLED'],
  };
  const recoveryEvents=state.journal.filter(e=>e.kind==='RECOVERY_STARTED');
- // Recoveries 1-3 are already in historic original #178 receipts. Recovery 4
- // is a NEW explicit owner-authorized one-attempt redesign after 8/8. Every
- // previous journal hash, receipt and consumed reservation must survive.
+ // Older immutable receipts may contain an archival authorization scope.
+ // The general worker never assumes a specific GitHub issue; preserve every
+ // existing journal hash, receipt and consumed reservation unchanged.
  const authorizations=[
   ['recovery_authorization',3,5,2],
   ['recovery_continuation_authorization',5,7,2],
@@ -150,7 +151,7 @@ export function verifySelfImprovementJournal(state){
      event.body?.failed_checkpoint_receipt_id!==approval.checkpoint_receipt_id||
      event.body?.failure_evidence_ref!==approval.failure_evidence_ref||
      (i===3&&(approval.owner_confirmed!==true||
-       approval.authorization_scope!=='ONE_ORIGINAL178_REDESIGN_ATTEMPT')))
+       !isVerifiedRedesignScope(approval.authorization_scope,{historicalReceipt:true}))))
    throw Error('SELF_IMPROVEMENT_RECOVERY_JOURNAL_INVALID');
  }
  if(!phases[state.phase]?.includes(last)||
@@ -243,7 +244,7 @@ export function recoverGovernedEscalation(state,proof){
   proof?.installation_authorized===false&&
   (state.attempt_count!==8||
    (proof?.owner_confirmed===true&&
-    proof?.authorization_scope==='ONE_ORIGINAL178_REDESIGN_ATTEMPT')),
+    isVerifiedRedesignScope(proof?.authorization_scope,{historicalReceipt:true}))),
 
   'SELF_IMPROVEMENT_GOVERNED_RECOVERY_RESERVATION_REQUIRED');
  const authorization=freeze({verified:true,reservation_id:proof.reservation_id,
@@ -251,7 +252,7 @@ export function recoverGovernedEscalation(state,proof){
   checkpoint_hash:proof.checkpoint_hash,
   failure_evidence_ref:proof.failure_evidence_ref,
   ...(state.attempt_count===8?{
-   owner_confirmed:true,authorization_scope:'ONE_ORIGINAL178_REDESIGN_ATTEMPT'}:{}),
+   owner_confirmed:true,authorization_scope:proof.authorization_scope}:{}),
  });
  const priorLimit=state.attempt_limit;
  const patch=priorLimit===3?
