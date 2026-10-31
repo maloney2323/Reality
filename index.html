@@ -1361,7 +1361,7 @@ let wcGovernedBuildEligible=false;
 let wcRealRepairOpportunity=null;
 let wcExactModelCandidate=null;
 let wcVerifiedInstallReview=null;
-let wcOriginal178DirectReview=false;
+let wcDirectRepairReviewScope=null;
 let wcInstallContinuationBusy=false;
 let wcRepairIntent='EXISTING_WORK';
 let wcGovernedBuildBusy=false;
@@ -1551,10 +1551,10 @@ $('wcReadModelRepair').onclick=async()=>{
    data.independent_provider_readback!==true||
    data.installed!==false||data.original_job_completed!==false)
    throw Error('EXACT_ORIGINAL_WORK_OR_SOURCE_NOT_VERIFIED');
-  if(wcOriginal178DirectReview&&
-   (data.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'||
-    data.issue_number!==178))
-   throw Error('ORIGINAL_178_SOURCE_SCOPE_MISMATCH_NO_APPROVAL');
+  if(wcDirectRepairReviewScope&&
+   (data.original_work_id!==wcDirectRepairReviewScope.originalWorkId||
+    data.issue_number!==wcDirectRepairReviewScope.issueNumber))
+   throw Error('SELECTED_ORIGINAL_SOURCE_SCOPE_MISMATCH_NO_APPROVAL');
   wcExactModelCandidate=data;prepare.disabled=false;
   $('wcModelRepairReviewTitle').textContent='Verified repair for issue #'+data.issue_number;
   $('wcModelRepairReviewDescription').textContent=
