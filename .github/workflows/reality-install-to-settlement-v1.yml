@@ -43,6 +43,31 @@ jobs:
       - run: node --check api/reality/personal-real-repair-install.js
       - run: node --check src/reality-general-installed-work-verifier-v1.0.js
       - run: node --test test/reality-general-installed-work-verifier-v1.0.test.js
+      - name: Real GitHub provider negative control — original failing job cannot count as completed
+        env:
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module -e '
+            import {createIndependentInstalledWorkVerifier} from "./src/reality-general-installed-work-verifier-v1.0.js";
+            const v=createIndependentInstalledWorkVerifier();
+            let refused=false;
+            try {
+              const out=await v.observeOriginalRun({
+                installedCommitSha:"8c6cd6c3891e98aaf30520bba2f47ee604d10d69",
+                installedBranch:"feature/reality-live-general-repair-bridge-20261031",
+                originalWorkId:"work:"+"c".repeat(32),
+                expectedFrozenTestPath:"test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js",
+                expectedFrozenSha:"f59216f72a63c612279959138877a4243d33a8e15f731e049e40be05dd07ac71",
+              });
+              if(out.complete!==false)throw Error("UNVERIFIED_GREEN_WORK");
+              refused=true;
+            } catch (err) {
+              if(err?.message!=="REAL_INSTALLED_WORK_INSTALLED_ORIGINAL_ACCEPTANCE_NOT_SUCCESSFUL")throw err;
+              refused=true;
+            }
+            if(!refused)process.exit(1);
+            console.log("Original failed provider CI could not be promoted to settlement.");
+          '
       - run: node --test test/reality-general-isolated-install-v1.0.test.js
       - run: node --test test/reality-general-original-work-settlement-v1.0.test.js
       - run: node --test test/reality-general-approved-repair-continuation-v1.0.test.js
