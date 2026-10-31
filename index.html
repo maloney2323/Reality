@@ -1767,6 +1767,7 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
   approve.disabled=true;
   $('wcRealRepairOpportunityStatus').textContent=
    'Recording the exact owner-approved investigation and dispatching the existing general worker…';
+  let verifiedNewOriginalWork=false;
   try{
    const response=await fetch('/api/reality/personal-real-repair-opportunities',{
     method:'POST',credentials:'same-origin',cache:'no-store',
@@ -1784,6 +1785,7 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
     data.installation_authorized!==false||
     data.original_job_completed!==false)
     throw Error(String(data.error||'ORIGINAL_WORK_RECEIPT_UNVERIFIED'));
+   verifiedNewOriginalWork=true;
    $('wcRealRepairOpportunityStatus').textContent=
     'Owner-approved original job saved: '+data.original_work_id+
     '. '+(data.worker_dispatch_started?
@@ -1797,6 +1799,16 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
   }finally{
    wcGovernedBuildBusy=false;
    void wcReadGovernedBuild();
+   if(verifiedNewOriginalWork){
+    // These are read-only / proposal-checkpoint steps that cannot grant
+    // installation. The owner should need just the separate exact install
+    // approval after adopting the original job.
+    setTimeout(async()=>{
+     await $('wcReadModelRepair').onclick();
+     if(!$('wcPrepareModelRepair').disabled)
+      await $('wcPrepareModelRepair').onclick();
+    },0);
+   }
   }
   return;
  }
