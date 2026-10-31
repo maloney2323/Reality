@@ -4,9 +4,13 @@ on:
     branches: [feature/reality-governed-auto-triggers-20261031]
     paths:
       - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'src/reality-governed-auto-trigger-candidate-v1.0.js'
+      - 'src/reality-owner-repair-candidate-admission-v1.0.js'
+      - 'api/reality/personal-real-repair-opportunities.js'
       - 'src/reality-real-repair-opportunity-intake-v1.0.js'
       - 'src/reality-execution-self-repair-handoff-v1.0.js'
       - 'test/reality-governed-auto-trigger-v1.0.test.js'
+      - 'test/reality-governed-auto-trigger-candidate-v1.0.test.js'
       - 'test/reality-real-repair-opportunity-intake-v1.0.test.js'
       - 'supabase/migrations/20261031_governed_auto_trigger_same_job_v1.sql'
       - '.github/workflows/reality-governed-auto-triggers-v1.yml'
@@ -25,6 +29,8 @@ jobs:
           node --check src/reality-governed-auto-trigger-v1.0.js
           node --check src/reality-real-repair-opportunity-intake-v1.0.js
           node --test test/reality-governed-auto-trigger-v1.0.test.js
+          node --test test/reality-governed-auto-trigger-candidate-v1.0.test.js
+          node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
           node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
       - name: Constitutional handoff and execution noninterference
         run: |
