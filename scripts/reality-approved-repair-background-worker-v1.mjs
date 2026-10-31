@@ -66,7 +66,8 @@ export async function executeApprovedContinuation({
  serviceFactory=createLiveGeneralRepairService,wait=pause,maxChecks=15,
 }={}){
  verifyApprovedWorkerEnvironment(env,request,checkoutSha);
- const leased=await call(env,'reality_lease_approved_repair_continuation_v1',{
+ const leased=await call(env,'reality_lease_exact_approved_repair_v2',{
+  p_reservation_id:request.reservation_id,
   p_install_branch:request.install_branch});
  if(leased.status==='NO_APPROVED_WORK')return {
   status:'NO_ATOMICALLY_APPROVED_WORK',original_job_completed:false};
