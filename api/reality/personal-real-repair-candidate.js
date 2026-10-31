@@ -25,12 +25,25 @@ export default async function handler(req,res){
   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
   let originalWorkId,issueNumber;
   if(req.method==='GET'){
-   if(Object.keys(req.query||{}).length)
-    return res.status(400).json({ok:false,error:'REAL_REPAIR_CANDIDATE_NO_CLIENT_SCOPE'});
+   const keys=Object.keys(req.query||{}).sort().join(',');
+   if(keys&&keys!=='issue_number,original_work_id')
+    return res.status(400).json({ok:false,error:'REAL_REPAIR_CANDIDATE_EXACT_READ_SCOPE_ONLY'});
+   const scoped=keys.length>0;
+   const scopedWork=scoped?req.query.original_work_id:null;
+   const scopedIssue=scoped?Number(req.query.issue_number):null;
+   if(scoped&&(!WORK.test(String(scopedWork||''))||
+      !Number.isSafeInteger(scopedIssue)||scopedIssue<1||
+      String(req.query.issue_number)!==String(scopedIssue)))
+    return res.status(400).json({ok:false,error:'REAL_REPAIR_CANDIDATE_EXACT_READ_SCOPE_INVALID'});
    const found=await listAuthenticatedUnfinishedWork({session});
    const jobs=(found.jobs||[]).filter(j=>j.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'&&
     j.goal_still_current===true&&WORK.test(String(j.original_work_id||''))&&
-    /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(String(j.issue_url||'')));
+    /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(String(j.issue_url||''))&&
+    (!scoped||(j.original_work_id===scopedWork&&
+     Number(j.issue_url.split('/').at(-1))===scopedIssue)));
+   if(scoped&&jobs.length!==1)
+    return res.status(403).json({ok:false,error:'REAL_REPAIR_CANDIDATE_SELECTED_OWNER_WORK_NOT_VERIFIED',
+     installation_authorized:false,original_job_completed:false});
    if(!jobs.length)return res.status(200).json({
     ok:true,status:'NO_SIGNED_OWNER_REPAIR_WORK_AWAITING_INSTALL',
     installation_authorized:false,original_job_completed:false});
