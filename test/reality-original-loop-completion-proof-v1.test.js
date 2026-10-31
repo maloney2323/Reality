@@ -134,7 +134,7 @@ test('new API only reads and UI has receipt-bound LOOP COMPLETE label',()=>{
  assert.match(api,/authenticatedChatSession/);
  assert.match(api,/readOriginalLoopCompletion/);
  assert.doesNotMatch(api,/ownerApproveAndQueue|continueAfterInstall|installVerifiedGenericPreviewExtension/);
- const start=html.indexOf('async function wcReadOriginal178LoopComplete()');
+ const start=html.indexOf('async function wcReadVerifiedLoopCompletion()');
  assert.ok(start>0);
  const proofBlock=html.slice(start,html.indexOf('// A previously approved exact installation',start));
  assert.match(proofBlock,/result.status!=='LOOP_COMPLETE_VERIFIED'/);
