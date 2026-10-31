@@ -4,8 +4,8 @@ on:
     branches:
       - feature/reality-closed-loop-worker-20261031
     paths:
-      - src/reality-extensions/reality-ci-failure-evidence.mjs
-      - .github/workflows/reality-source-bound-installed-acceptance-v1.yml
+      - 'src/reality-extensions/reality-ci-failure-evidence.mjs'
+      - '.github/workflows/reality-source-bound-installed-acceptance-v1.yml'
 permissions:
   contents: read
 jobs:
