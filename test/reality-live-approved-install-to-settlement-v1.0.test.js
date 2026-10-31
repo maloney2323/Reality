@@ -70,7 +70,7 @@ async function makeState(){
  return state;
 }
 async function fixture({dispatchApproved=async()=>({dispatched:true,
- production_changed:false,worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'})}={}){
+ production_changed:false,worker_workflow_url:'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml'}),envOverrides={}}={}){
  let state=await makeState(),dbRow=null,installCalls=0,postInstallReads=0;
  const waitingHash=state.head_hash;
  const readGoal=async()=>({principal_id:owner,conversation_id:conversation,
@@ -154,7 +154,7 @@ async function fixture({dispatchApproved=async()=>({dispatched:true,
    installed_branch:branch,provider_bytes_readback_verified:true,
    provider_source_files:files.map(f=>f.path),production_changed:false};
  };
- const svc=createLiveGeneralRepairService({session,env,fetchImpl,
+ const svc=createLiveGeneralRepairService({session,env:{...env,...envOverrides},fetchImpl,
   listWork,readGoal,readCandidate:async()=>proof,checkpointFactory,
   verifierFactory,installer,dispatchApproved});
  function urlBase(){return url+'/rest/v1/rpc/'}
@@ -226,5 +226,15 @@ test('uncertain GitHub wake cannot fabricate an installed or settled original',a
  assert.equal(r.worker_dispatched,false);
  assert.equal(r.original_job_completed,false);
  assert.equal(f.db().status,'CLAIMED');
+ assert.equal(f.installCalls(),0);
+});
+
+test('missing background dispatcher never consumes #178 owner authority or claims completion',async()=>{
+ const f=await fixture({envOverrides:{REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:undefined}});
+ await assert.rejects(f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ }),/REAL_LIVE_INSTALL_BACKGROUND_WAKEUP_CREDENTIAL_UNAVAILABLE/);
+ assert.equal(f.db(),null,'no owner approval or reservation may be recorded');
  assert.equal(f.installCalls(),0);
 });
