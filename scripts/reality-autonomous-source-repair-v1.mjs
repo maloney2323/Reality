@@ -151,6 +151,42 @@ if(mode==='generate'){
   artifact_sha256:final.artifact_sha256,
   original_run_id:original.run_id,installation_authorized:false,
   original_job_completed:false}));
+}else if(mode==='recover'){
+ // Recover the EXACT original model response, never ask for another model answer.
+ // A separate trusted GitHub log verifier attests response id/hash first.
+ if(!/^resp_[A-Za-z0-9_-]+$/.test(String(ticket.original_model_response_id||''))||
+    !/^[a-f0-9]{64}$/.test(String(ticket.expected_candidate_sha256||''))||
+    ticket.original_model_run_id!==41217180993)
+  fail('EXACT_PRIOR_MODEL_RESPONSE_EVIDENCE_REQUIRED');
+ const original=await checkOriginalFailure();
+ const key=process.env.OPENAI_API_KEY||'';
+ if(key.length<20)fail('OPENAI_PROVIDER_CREDENTIAL_MISSING');
+ const response=await fetch('https://api.openai.com/v1/responses/'+
+  encodeURIComponent(ticket.original_model_response_id),{
+  headers:{authorization:'Bearer '+key,accept:'application/json'},
+  redirect:'error',cache:'no-store'});
+ if(!response.ok)fail('ORIGINAL_STORED_MODEL_RESPONSE_UNAVAILABLE_'+response.status);
+ const retrieved=await response.json();
+ if(retrieved.id!==ticket.original_model_response_id)
+  fail('ORIGINAL_MODEL_RESPONSE_PROVIDER_ID_CHANGED');
+ const raw=retrieved.output_text||
+  (retrieved.output||[]).flatMap(o=>o.content||[])
+   .filter(x=>x.type==='output_text').map(x=>x.text||'').join('');
+ let proposal;try{proposal=JSON.parse(raw)}catch{fail('ORIGINAL_MODEL_RESPONSE_NOT_JSON')}
+ const checked=checkCandidate(proposal);
+ if(checked.artifact_sha256!==ticket.expected_candidate_sha256)
+  fail('ORIGINAL_SAVED_MODEL_ARTIFACT_HASH_MISMATCH');
+ const final={...checked,attempt:1,
+  model_response_id:ticket.original_model_response_id,
+  actual_provider_evidence:original};
+ mkdirSync('artifact',{recursive:true});
+ writeFileSync('artifact/candidate.json',JSON.stringify(final,null,2)+'\n');
+ console.log('REALITY_EXACT_STORED_MODEL_RECOVERED',JSON.stringify({
+  original_model_run_id:ticket.original_model_run_id,
+  model_response_id:final.model_response_id,
+  artifact_sha256:final.artifact_sha256,original_work_id:ticket.original_work_id,
+  installation_authorized:false,original_job_completed:false,
+ }));
 }else if(mode==='prepare'){
  const candidate=JSON.parse(text('candidate/candidate.json'));
  const checked=checkCandidate(candidate);
