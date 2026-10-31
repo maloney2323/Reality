@@ -211,9 +211,10 @@ test('original #178 historical work is projected from its existing verified gap,
    spine,stage,entityId:original,eventId:randomUUID(),
    parentEventId:prior.event_id,priorLineageHash:prior.lineage_hash,
    effectiveTime:at,assertionTime:at,epistemicStatus:status,payload,
+   provenance:{principal_id:user_id,conversation_id:conversationId,
+    source:'original-178-legacy-projection-test'},
   });
-  rows.push({...node,entity_type,provenance:{
-   ...node.provenance,principal_id:user_id,conversation_id:conversationId}});
+  rows.push({...node,entity_type});
   return node;
  };
  const originalReceipt=append('WORK','personal_first_self_upgrade_customer_work',{
