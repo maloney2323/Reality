@@ -120,7 +120,8 @@ export function createLiveGeneralRepairService({
    fail('CURRENT_ORIGINAL_OWNER_GOAL_CHANGED');
   const checkpoint=checkpointFactory({
    session,conversationId:job.conversation_id,
-   originalWorkId,originalWorkEvidenceRef:job.source_receipt_id,db,env});
+   originalWorkId,originalWorkEvidenceRef:job.source_receipt_id,db,env,
+   readGoal});
   const latest=await checkpoint.readLatestCheckpoint();
   if(!latest?.independent_readback_verified||!latest.state)
    fail('DURABLE_CONSTITUTIONAL_CHECKPOINT_MISSING');
