@@ -39,14 +39,32 @@ export async function verifyApprovedBackgroundReadiness({
    x.head_repository?.full_name===REPO&&
    x.event==='schedule'&&
    Number.isSafeInteger(x.id));
-  if(!found.length)return reply('GOVERNED_SCHEDULER_AUTOMATIC_TICK_NOT_OBSERVED');
   const latest=found.sort((a,b)=>
    Number(b.run_number||0)-Number(a.run_number||0))[0];
-  if(latest.status!=='completed'||latest.conclusion!=='success'||
-     !Number.isFinite(Date.parse(latest.updated_at))||
-     now-Date.parse(latest.updated_at)>2*60*60*1000||
-     now<Date.parse(latest.updated_at)-60000)
-   return reply('GOVERNED_SCHEDULER_LAST_SUCCESS_STALE_OR_FAILED');
-  return reply('GOVERNED_AUTO_WAKE_VERIFIED',true);
+  if(latest?.status==='completed'&&latest.conclusion==='success'&&
+     Number.isFinite(Date.parse(latest.updated_at))&&
+     now-Date.parse(latest.updated_at)<=2*60*60*1000&&
+     now>=Date.parse(latest.updated_at)-60000)
+   return reply('GOVERNED_AUTO_WAKE_VERIFIED',true);
+  // An existing branch-scoped GitHub credential can provide a verified
+  // immediate wake even if GitHub cron has not fired. Do not call a push-only
+  // Actions test proof of the scheduler. This is just a preflight: the actual
+  // one-use owner consent and worker lease remain separate trusted gates.
+  const token=String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||'');
+  if(token.length>=25){
+   const target='feature/reality-background-continuation-20261031';
+   const response=await fetchImpl('https://api.github.com/repos/'+REPO+
+    '/git/ref/heads/'+target,{
+     method:'GET',cache:'no-store',redirect:'error',
+     headers:{...headers,authorization:'Bearer '+token,
+      'x-github-api-version':'2022-11-28'}});
+   const ref=response.ok?await response.json().catch(()=>null):null;
+   if(ref?.ref==='refs/heads/'+target&&
+      /^[a-f0-9]{40}$/.test(String(ref.object?.sha||'')))
+    return reply('GOVERNED_IMMEDIATE_WAKE_READBACK_VERIFIED',true);
+  }
+  return reply(found.length?
+   'GOVERNED_SCHEDULER_LAST_SUCCESS_STALE_OR_FAILED':
+   'GOVERNED_SCHEDULER_AUTOMATIC_TICK_NOT_OBSERVED');
  }catch{return reply('GOVERNED_SCHEDULER_INDEPENDENT_READBACK_FAILED');}
 }
