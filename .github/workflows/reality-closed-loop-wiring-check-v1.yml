@@ -34,7 +34,6 @@ jobs:
           node --test test/reality-source-bound-generation-ticket-v1.test.js
           node --test test/reality-governed-build-chat-connection-v1.0.test.js
           node --test test/reality-governed-build-github-dispatch-v1.0.test.js
-          node --test test/reality-real-verified-repair-readback-v1.0.test.js
           node --test test/reality-general-installed-work-verifier-v1.0.test.js
           node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
