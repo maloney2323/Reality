@@ -1,0 +1,38 @@
+name: Reality #178 — Independently re-run the same original frozen customer acceptance after owner installation
+on:
+  push:
+    branches: [feature/reality-closed-loop-worker-20261031]
+    paths:
+      - 'src/reality-extensions/reality-ci-failure-evidence.mjs'
+      - '.github/workflows/reality-source-bound-installed-acceptance-v1.yml'
+permissions:
+  contents: read
+jobs:
+  independent-original-customer-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify original frozen bytes and same installed branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "maloney2323/Reality"
+          test "$GITHUB_REF" = "refs/heads/feature/reality-closed-loop-worker-20261031"
+          test -f src/reality-extensions/reality-ci-failure-evidence.mjs
+          test -f test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+          EXPECTED=$(node -p 'JSON.parse(require("fs").readFileSync("reality-repair-evidence/issue-178-candidate.json")).frozen_test_sha256')
+          ACTUAL=$(sha256sum test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js | cut -d' ' -f1)
+          test "$ACTUAL" = "$EXPECTED"
+      - name: Frozen same-work missing capability acceptance
+        run: node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+      - name: Regression: governance and exact-owner installation gates
+        run: |
+          set -euo pipefail
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+          node --test test/reality-general-isolated-install-v1.0.test.js
