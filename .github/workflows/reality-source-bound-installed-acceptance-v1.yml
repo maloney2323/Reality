@@ -1,10 +1,11 @@
-name: Reality #178 — Independently re-run the same original frozen customer acceptance after owner installation
+name: Reality source-bound installed acceptance
 on:
   push:
-    branches: [feature/reality-closed-loop-worker-20261031]
+    branches:
+      - feature/reality-closed-loop-worker-20261031
     paths:
-      - 'src/reality-extensions/reality-ci-failure-evidence.mjs'
-      - '.github/workflows/reality-source-bound-installed-acceptance-v1.yml'
+      - src/reality-extensions/reality-ci-failure-evidence.mjs
+      - .github/workflows/reality-source-bound-installed-acceptance-v1.yml
 permissions:
   contents: read
 jobs:
@@ -12,10 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout installed preview source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Verify original frozen bytes and same installed branch
