@@ -145,7 +145,7 @@ export async function executeApprovedContinuation({
  // The Supabase Edge broker verifies the cryptographic GitHub signature,
  // pinned request file, and already-consumed owner authorization BEFORE
  // providing the in-memory service credential. No GitHub Actions DB secret.
-async function signedOriginalWorkLease({request,checkoutSha,env=process.env,
+export async function signedOriginalWorkLease({request,checkoutSha,env=process.env,
  fetchImpl=fetch}={}){
  const issuer=env.ACTIONS_ID_TOKEN_REQUEST_URL;
  const issuerToken=env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
