@@ -6,6 +6,8 @@ import {execFileSync} from 'node:child_process';
 import {privateChatConfig} from '../src/reality-private-chat-auth-v0.1.js';
 import {createLiveGeneralRepairService}
  from '../src/reality-live-approved-install-to-settlement-v1.0.js';
+import {dispatchApprovedBackgroundRepair}
+ from '../src/reality-approved-repair-github-wakeup-v1.0.js';
 const WORKER='feature/reality-background-continuation-20261031';
 const PROJECT='hvkfreoagbrphwghjajw';
 const err=x=>{throw Error('REALITY_APPROVED_BACKGROUND_'+x)};
@@ -123,6 +125,7 @@ export async function executeApprovedContinuation({
  return {
   status:complete?'ORIGINAL_JOB_INDEPENDENTLY_SETTLED':
    'DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP',
+  reservation_id:leased.reservation_id,attempts:leased.attempts,
   original_work_id:leased.original_work_id,
   original_job_completed:complete,production_changed:false,
   settlement_receipt_ref:complete?outcome.settlement_receipt_ref:null,
@@ -134,11 +137,54 @@ async function main(){
  const changed=execFileSync('git',['diff','--name-only','HEAD^','HEAD'],
   {encoding:'utf8'}).trim().split(/\r?\n/).filter(Boolean);
  if(changed.length!==1||
-  !/^reality-approved-continuations\/[a-f0-9-]{36}\.json$/.test(changed[0]))
+  !/^reality-approved-continuations\/[a-f0-9-]{36}(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\.json$/.test(changed[0]))
   err('ONE_PINNED_OWNER_APPROVAL_DISPATCH_REQUIRED');
  const request=JSON.parse(readFileSync(changed[0],'utf8'));
- if(changed[0]!==
-    'reality-approved-continuations/'+request.reservation_id+'.json')
+ const prefix='reality-approved-continuations/'+request.reservation_id;
+ const index=changed[0]===prefix+'.json'?0:
+  Number((new RegExp('^'+prefix+'-retry-([1-9]|1[0-9]|2[0-4])\\.json
+ const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+ const result=await executeApprovedContinuation({env,request,checkoutSha:sha});
+ console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
+ if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'){
+  if(!Number.isInteger(result.attempts)||result.attempts<1||
+     result.attempts>24||result.attempts!==index+1)
+   err('BOUNDED_OWNER_LEASE_ATTEMPT_MISMATCH');
+  if(result.attempts<24){
+   const wake=await dispatchApprovedBackgroundRepair({
+    reservationId:request.reservation_id,
+    originalWorkId:request.original_work_id,
+    candidateHash:request.candidate_hash,
+    issueNumber:request.issue_number,
+    installBranch:request.install_branch,
+    attemptNumber:result.attempts,env,
+   });
+   if(wake.dispatched!==true||wake.production_changed!==false)
+    err('FOLLOWUP_WAKE_PROVIDER_READBACK_REQUIRED');
+   console.log('REALITY_OWNER_APPROVED_RETRY_WAKE',JSON.stringify({
+    reservation_id:request.reservation_id,attempt:result.attempts,
+    status:'DURABLE_UNSETTLED_REQUEUED',original_job_completed:false,
+    production_changed:false,
+   }));
+  }else{
+   console.log('REALITY_RETRY_LIMIT',JSON.stringify({
+    status:'OWNER_REVIEW_REQUIRED_AFTER_24_BOUNDED_LEASES',
+    original_job_completed:false,production_changed:false,
+   }));
+  }
+ }
+}
+if(import.meta.url===new URL('file://'+process.argv[1]).href){
+ try{await main()}catch(e){
+  console.error('REALITY_APPROVED_BACKGROUND_FAILED',
+   /^REALITY_APPROVED_BACKGROUND_[A-Z0-9_]+$/.test(String(e?.message||''))?
+   e.message:'TRUSTED_RECONCILIATION_REQUIRED');
+  process.exitCode=1;
+ }
+}
+)).exec(changed[0])?.[1]);
+ if(!Number.isInteger(index)||index<0||index>24||
+  changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
   err('PINNED_DISPATCH_FILENAME_CHANGED');
  const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
  const result=await executeApprovedContinuation({env,request,checkoutSha:sha});
