@@ -17,7 +17,8 @@ import {createGeneralConstitutionalCheckpointService}
 const fail=x=>{throw Error('GENERAL_REPAIR_CONTINUATION_'+x)};
 export async function continueExactlyApprovedGeneralRepair({
  state,ticket,session,db,branch,writeToken,
- conversationId,originalWorkEvidenceRef,env=process.env,
+ conversationId,originalWorkEvidenceRef,promotionCheckpointReceiptId,
+ env=process.env,
  verifyOwnerApproval,verifyFrozenAcceptance,
  executeOriginalWork,verifyOriginalExecution,
  verifyIndependentReceipt,persistCheckpoint,
@@ -82,7 +83,8 @@ export async function continueExactlyApprovedGeneralRepair({
    const sandbox=ctx.sandbox_receipt;
    if(approval?.evidence_ref!==state.promotion_authorization.evidence_ref||
     approval?.reservation_ref!==state.promotion_authorization.reservation_ref||
-    approval?.checkpoint_receipt_id==null||
+    !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+     String(promotionCheckpointReceiptId||''))||
     sandbox?.verified_by!=='TRUSTED_PROVIDER_ADAPTER'||
     !sandbox?.trusted_attestation_ref)
     fail('ORIGINAL_APPROVAL_AND_ATTESTED_SANDBOX_REQUIRED');
@@ -102,7 +104,8 @@ export async function continueExactlyApprovedGeneralRepair({
     installed_branch:branch,
    }));
    const result=await registry.recordAndReadback({
-    installed,acceptance,approval,
+    installed,acceptance,
+    approval:{...approval,checkpoint_receipt_id:promotionCheckpointReceiptId},
    });
    return scopedReceipt('CAPABILITY_REGISTERED',result,{
     authorization_ref:approval.evidence_ref,
