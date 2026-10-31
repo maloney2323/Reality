@@ -131,7 +131,7 @@ export function createFoundationalModelGenerator({
   const validated=validateFoundationalCandidate(ticket,{
    ...candidate,model_response_id:body.id||null});
   const code=validated.files.find(f=>f.path===sourceEntrypoint)?.content||'';
-  if(!code)fail('FOUNDATION_MODEL_TRUSTED_ENTRYPOINT_MISSING');
+  if(ticket.source_entrypoint&&!code)fail('FOUNDATION_MODEL_TRUSTED_ENTRYPOINT_MISSING');
   // Self-comparisons can never compare independently observed evidence.
   // Reject model-proposed source, do not modify it or treat it as verified.
   const invalid=/\b(evidence|input|record|source)\.(repository|run_head_sha|latest_head_sha|owner_id|goal_id|original_work_id)\s*(?:!==|===|!=|==)\s*\1\.\2\b/i.test(code);
