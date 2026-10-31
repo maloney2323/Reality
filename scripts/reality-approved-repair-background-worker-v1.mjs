@@ -65,9 +65,12 @@ function dbCall(env,name,payload,fetchImpl=fetch){
 export async function executeApprovedContinuation({
  env=process.env,request,checkoutSha,call=dbCall,
  serviceFactory=createLiveGeneralRepairService,wait=pause,maxChecks=15,
+ leasedWork=null,
 }={}){
  verifyApprovedWorkerEnvironment(env,request,checkoutSha);
- const leased=await call(env,'reality_lease_exact_approved_repair_v2',{
+ // Production execution receives a narrowly signed OIDC lease from the
+ // isolated Supabase broker. Direct RPC mode remains for frozen unit tests.
+ const leased=leasedWork||await call(env,'reality_lease_exact_approved_repair_v2',{
   p_reservation_id:request.reservation_id,
   p_install_branch:request.install_branch});
  if(leased.status==='NO_APPROVED_WORK')return {
@@ -138,6 +141,53 @@ export async function executeApprovedContinuation({
   diagnostic:complete?null:diagnostic,
  };
 }
+// Identity is minted by GitHub Actions for this exact workflow run.
+ // The Supabase Edge broker verifies the cryptographic GitHub signature,
+ // pinned request file, and already-consumed owner authorization BEFORE
+ // providing the in-memory service credential. No GitHub Actions DB secret.
+async function signedOriginalWorkLease({request,checkoutSha,env=process.env,
+ fetchImpl=fetch}={}){
+ const issuer=env.ACTIONS_ID_TOKEN_REQUEST_URL;
+ const issuerToken=env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+ if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_SHA!==checkoutSha||
+  !issuer||!issuerToken||!SHA.test(checkoutSha))
+  err('SIGNED_GITHUB_WORKFLOW_IDENTITY_REQUIRED');
+ const signedUrl=new URL(issuer);
+ signedUrl.searchParams.set('audience','reality-approved-background-execution-v1');
+ const token=await fetchImpl(signedUrl.toString(),{
+  method:'GET',redirect:'error',cache:'no-store',
+  headers:{authorization:'Bearer '+issuerToken}});
+ if(!token.ok)err('GITHUB_OIDC_ISSUER_UNAVAILABLE');
+ const payload=await token.json();
+ if(typeof payload?.value!=='string'||payload.value.length<300)
+  err('GITHUB_SIGNED_IDENTITY_UNAVAILABLE');
+ const broker='https://'+PROJECT+'.supabase.co/functions/v1/reality-approved-worker-oidc-lease';
+ const response=await fetchImpl(broker,{method:'POST',redirect:'error',
+  cache:'no-store',headers:{authorization:'Bearer '+payload.value,
+   'content-type':'application/json'},body:JSON.stringify({
+    action:'lease',request})});
+ const result=await response.json().catch(()=>null);
+ if(!response.ok||!result||result.ok!==true)
+  err('OIDC_APPROVED_WORK_LEASE_UNAVAILABLE');
+ if(result.status==='NO_ATOMICALLY_APPROVED_WORK'&&
+    result.service_credential_returned===false)
+  return {status:'NO_ATOMICALLY_APPROVED_WORK'};
+ if(result.status!=='EXACT_OWNER_APPROVED_WORK_LEASED'||
+    result.lease?.status!=='EXACT_OWNER_APPROVED_WORK_LEASED'||
+    result.lease?.reservation_id!==request.reservation_id||
+    result.lease?.original_work_id!==request.original_work_id||
+    result.lease?.candidate_hash!==request.candidate_hash||
+    result.lease?.install_branch!==request.install_branch||
+    result.lease?.issue_number!==request.issue_number||
+    result.service_credential_returned!==true||
+    typeof result.service_role_key!=='string'||
+    result.service_role_key.length<30||
+    result.production_changed!==false||
+    result.original_job_completed!==false)
+  err('SIGNED_APPROVED_WORK_LEASE_SCOPE_MISMATCH');
+ return {status:'EXACT_OWNER_APPROVED_WORK_LEASED',
+  leasedWork:result.lease,serviceKey:result.service_role_key};
+}
 async function main(){
  const env=process.env;
  const changed=execFileSync('git',['diff','--name-only','HEAD^','HEAD'],
@@ -155,7 +205,18 @@ async function main(){
     changed[0]!==prefix+(index===0?'':'-retry-'+index)+'.json')
   err('PINNED_DISPATCH_FILENAME_CHANGED');
  const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
- const result=await executeApprovedContinuation({env,request,checkoutSha:sha});
+ // Explicit signed owner approval must already exist in Supabase.
+ // The OIDC broker will not supply any service credential otherwise.
+ const broker=await signedOriginalWorkLease({request,checkoutSha:sha,env});
+ if(broker.status==='NO_ATOMICALLY_APPROVED_WORK'){
+  console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify({
+   status:'NO_ATOMICALLY_APPROVED_WORK',original_job_completed:false,
+   production_changed:false}));
+  return;
+ }
+ const isolatedEnv={...env,SUPABASE_SERVICE_ROLE_KEY:broker.serviceKey};
+ const result=await executeApprovedContinuation({
+  env:isolatedEnv,request,checkoutSha:sha,leasedWork:broker.leasedWork});
  console.log('REALITY_APPROVED_CONTINUATION',JSON.stringify(result));
  if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'){
   if(!Number.isInteger(result.attempts)||result.attempts<1||
