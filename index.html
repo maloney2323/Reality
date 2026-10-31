@@ -1588,7 +1588,7 @@ async function wcContinueExactInstall(work,issue,attempt=0){
    wcRepairSetBadge('Original job settled','ready');
    $('wcInstallSettlementHeading').textContent='Original job independently settled';
    wcStopExactInstall('VERIFIED SETTLEMENT · '+work+
-    ' · Installed commit '+data.installed_commit_sha+
+    ' · Source SHA-256 '+(data.artifact_hash||'independently registered')+
     ' · Final Continuity receipt '+data.settlement_receipt_ref+
     '. Source acceptance and governance tests independently passed.');
    localStorage.removeItem('reality.pending.exact.preview.repair.v1');
@@ -1630,6 +1630,12 @@ $('wcExactInstallConfirm').onclick=async()=>{
  if(!ready||!$('wcExactInstallCheckbox').checked||wcInstallContinuationBusy)return;
  $('wcExactInstallDialog').close();
  wcInstallContinuationBusy=true;$('wcApproveExactInstall').disabled=true;
+ // Persist the exact work ID BEFORE the network request. The server may have
+ // consumed single-use authority even when the client loses the response.
+ // Resuming may only consume a prior signed reservation; it cannot approve.
+ localStorage.setItem('reality.pending.exact.preview.repair.v1',
+  JSON.stringify({original_work_id:ready.original_work_id,
+   issue_number:ready.issue_number}));
  $('wcInstallSettlementStatus').textContent=
   'Requesting one atomic owner-approved installation for the exact independently tested source…';
  try{
