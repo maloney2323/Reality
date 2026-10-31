@@ -1,0 +1,24 @@
+name: Reality real job missing capability automatically invokes governed repair
+on:
+  push:
+    branches: [feature/reality-job-triggered-self-repair-20261031]
+    paths:
+      - 'src/reality-execution-self-repair-handoff-v1.0.js'
+      - 'src/reality-governed-execution-engine-v0.1.js'
+      - 'test/reality-job-triggered-self-repair-v1.0.test.js'
+      - '.github/workflows/reality-real-job-self-repair-handoff-v1.yml'
+permissions: {contents: read}
+jobs:
+  preserve-same-owner-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - run: node --check src/reality-execution-self-repair-handoff-v1.0.js
+      - run: node --test test/reality-job-triggered-self-repair-v1.0.test.js
+      - run: node --test test/reality-governed-execution-engine-v0.1.test.js
+      - run: node --test test/reality-governed-self-improvement-driver-v1.0.test.js
+      - run: node --test test/reality-upgrade-discovery-v0.1.test.js
