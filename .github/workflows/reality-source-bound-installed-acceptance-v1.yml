@@ -34,7 +34,7 @@ jobs:
           test "$ACTUAL" = "$EXPECTED"
       - name: Frozen same-work missing capability acceptance
         run: node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
-      - name: Regression: governance and exact-owner installation gates
+      - name: 'Regression: governance and exact-owner installation gates'
         run: |
           set -euo pipefail
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
