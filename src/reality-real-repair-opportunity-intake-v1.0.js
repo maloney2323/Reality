@@ -12,6 +12,8 @@ import {createContinuitySpine,appendContinuityNode,continuityUuidFromSource}
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 import {observeRealityIssueFailure}
  from './reality-general-provider-failure-observer-v1.0.js';
+import {registerOriginalJobCapabilityAutoTrigger}
+ from './reality-governed-auto-trigger-v1.0.js';
 const fail=x=>{throw Error('REALITY_REAL_REPAIR_'+x)};
 const ROOT='https://api.github.com/repos/maloney2323/Reality/';
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -123,6 +125,7 @@ export async function authorizeExistingRealRepairWork({
  listConversations=listPrivateConversations,
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
+ enqueueAutoTrigger=registerOriginalJobCapabilityAutoTrigger,
 }={}){
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
   env.VERCEL_ENV!=='preview'||
@@ -211,8 +214,34 @@ export async function authorizeExistingRealRepairWork({
   checked[0].payload?.frozen_test_sha256!==evidence.frozen_test_sha256||
   checked[0].payload?.goal_transition_receipt_ref!==g.last_transition_receipt_id)
   fail('OWNER_REPAIR_WORK_POST_WRITE_READBACK_FAILED');
+ // A verified, owner-confirmed original-work event is sufficient to schedule
+ // investigation. It is NOT authority to install, merge or retry a provider
+ // action. This fires automatically from the original work registration, not
+ // an extra Upgrades dashboard button.
+ let autoTrigger=null;
+ if(env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true'){
+  try{
+   autoTrigger=await enqueueAutoTrigger({
+    session,conversationId,originalWorkId:workId,
+    originalWorkEventId:receiptId,
+    goalTransitionEventId:g.last_transition_receipt_id,
+    evidence,env,
+   });
+   if(autoTrigger.original_work_id!==workId||
+      autoTrigger.installation_authorized!==false||
+      autoTrigger.original_job_completed!==false)
+    throw Error('AUTO_TRIGGER_RECEIPT_NOT_TRUSTED');
+  }catch{
+   // Original source remains committed. Never fake a trigger or create a
+   // duplicate job on retry; an operator/worker must reconcile the source.
+   autoTrigger={status:'TRIGGER_REGISTRATION_NEEDS_READBACK',
+    original_work_id:workId,installation_authorized:false,
+    original_job_completed:false};
+  }
+ }
  return Object.freeze({
   status:'REAL_OWNER_ORIGINAL_WORK_CONFIRMED',
+  governed_auto_trigger:autoTrigger,
   original_work_id:workId,original_conversation_id:conversationId,
   source_receipt_id:receiptId,goal_id:g.goal_id,
   issue_url:evidence.issue_url,
