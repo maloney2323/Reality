@@ -144,6 +144,65 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
 .wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
 .wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Reality Repair Center: accessible, owner-controlled, no simulated completion. */
+.repair-center{margin-top:18px;padding:22px;background:linear-gradient(155deg,#132536 0%,#111a27 54%,#0e1620 100%);border:1px solid #45657d;border-radius:19px;box-shadow:0 14px 28px rgba(0,0,0,.14);scroll-margin-top:20px}
+.repair-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.repair-eyebrow{font-size:11px;letter-spacing:.13em;font-weight:800;color:#a4c8d1;text-transform:uppercase}
+.repair-heading h3{font-size:23px;line-height:1.2;margin:6px 0 8px;color:#f2f7ff}
+.repair-intro{font-size:13px;line-height:1.6;color:#b9c9d8;margin:0;max-width:610px}
+.repair-live{display:inline-flex;align-items:center;gap:7px;border:1px solid #557286;color:#bcd8e8;background:#182d3b;padding:8px 11px;border-radius:999px;font-size:11px;font-weight:800;white-space:normal}
+.repair-live:before{content:"";width:8px;height:8px;border-radius:50%;background:#9ab3c4;flex:none}
+.repair-live[data-tone="ready"]:before{background:#83cdaa}.repair-live[data-tone="ready"]{border-color:#4f8b77;color:#c3f2d6}
+.repair-live[data-tone="working"]:before{background:#e9bb78}.repair-live[data-tone="working"]{border-color:#9d7c4c;color:#f5d9aa}
+.repair-live[data-tone="blocked"]:before{background:#e0a49b}.repair-live[data-tone="blocked"]{border-color:#98665c;color:#f4c7bc}
+.repair-timeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;list-style:none;padding:0;margin:20px 0}
+.repair-step{padding:13px 10px;background:#0c1723;border:1px solid #344859;border-radius:13px;min-width:0}
+.repair-step-top{display:flex;align-items:center;gap:8px;min-height:23px}
+.repair-step-index{flex:none;display:grid;place-items:center;width:22px;height:22px;border:1px solid #60778c;border-radius:50%;color:#c2d3e4;font-size:11px;font-weight:800}
+.repair-step-name{font-size:12px;font-weight:800;color:#dee9f4;overflow-wrap:anywhere}
+.repair-step-detail{display:block;font-size:11px;color:#95aabd;line-height:1.5;margin-top:7px}
+.repair-step[data-state="active"]{border-color:#af895d;background:#221f22}.repair-step[data-state="complete"]{border-color:#4a917e;background:#122d2c}
+.repair-step[data-state="complete"] .repair-step-index{background:#437864;border-color:#437864;color:#fff}
+.repair-step[data-state="blocked"]{border-color:#915d58}
+.repair-current{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:17px;border:1px solid #3d5a71;border-radius:15px;background:rgba(7,14,24,.45)}
+.repair-kicker{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9abbd1;margin:0 0 7px}
+.repair-current h4{margin:0 0 6px;font-size:17px;color:#f5f9ff}
+.repair-current p{font-size:12px;line-height:1.6;color:#b5c4d3;margin:0;overflow-wrap:anywhere}
+.repair-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:200px}
+.repair-actions button{margin:0;padding:11px 14px;min-height:43px}
+.repair-actions .repair-primary{background:#dff3ee;color:#102c27}
+.repair-actions .repair-secondary{background:#293e50;border:1px solid #557087;color:#eaf4ff}
+.repair-actions button:disabled{cursor:not-allowed;opacity:.55}
+.repair-status{margin:14px 0 0;padding:12px 14px;line-height:1.6;font-size:12px;color:#d6e4f0;border-radius:11px;border:1px solid #34546b;background:#112234;overflow-wrap:anywhere}
+.repair-status[data-tone="blocked"]{border-color:#875b50;background:#282022;color:#f0c2b8}
+.repair-status[data-tone="working"]{border-color:#927348;background:#28241d;color:#f2d5a2}
+.repair-approval{margin-top:14px;padding:13px 14px;background:#121d29;border:1px solid #344657;border-radius:12px;display:flex;align-items:flex-start;gap:11px}
+.repair-lock{flex:none;width:28px;height:28px;border-radius:9px;background:#24384a;display:grid;place-items:center;color:#cad7e3;font-size:15px}
+.repair-approval strong{font-size:13px;color:#e9f2fa}.repair-approval p{font-size:12px;line-height:1.55;color:#aebfd0;margin:4px 0 0}
+.repair-evidence{margin-top:12px;border:1px solid #304556;border-radius:12px;padding:10px 13px;background:#101c2a}
+.repair-evidence summary{font-size:12px;font-weight:700;color:#c9deef;cursor:pointer}
+.repair-evidence p{line-height:1.65;color:#b4c5d8;overflow-wrap:anywhere;font-size:12px}
+.repair-evidence a{color:#a4d4ff}
+.repair-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:13px;font-size:12px;color:#b3c6d9}
+.repair-bottom button{font-size:12px;background:transparent;border:1px solid #527087;color:#cfe4f7;margin:0}
+.repair-bottom a{color:#afdcff;text-decoration:underline}
+.repair-dialog{border:1px solid #56758a;border-radius:18px;padding:0;max-width:470px;width:calc(100% - 28px);background:#101a26;color:#f0f7ff;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.repair-dialog::backdrop{background:rgba(3,9,18,.8)}
+.repair-dialog-body{padding:22px}.repair-dialog h3{font-size:21px;margin:5px 0 9px}
+.repair-dialog p{font-size:13px;line-height:1.65;color:#b4c6d9;overflow-wrap:anywhere}
+.repair-consent-work{padding:10px 12px;border-radius:10px;background:#182a3b;font-size:12px!important;color:#d8eaff!important;overflow-wrap:anywhere}
+.repair-checkbox{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.55;color:#edf3fa;margin-top:16px;cursor:pointer}
+.repair-checkbox input{flex:none;min-width:19px;min-height:19px;margin:1px 0 0;accent-color:#8dd2b9}
+.repair-dialog-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+.repair-dialog-actions button{margin:0;min-height:44px}
+.repair-dialog-actions .repair-cancel{background:#273a4b;color:#e6f0fb}
+.repair-dialog-actions .repair-confirm{background:#d9f3e8;color:#123129}
+.repair-dialog-actions button:disabled{opacity:.4}
+.repair-center button:focus-visible,.repair-dialog button:focus-visible,.repair-dialog input:focus-visible,.repair-bottom a:focus-visible{outline:3px solid #a4d7ff;outline-offset:3px}
+@media(max-width:860px){.repair-timeline{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.repair-center{padding:15px;margin-top:14px}.repair-heading h3{font-size:21px}.repair-timeline{grid-template-columns:1fr;gap:6px}.repair-step{padding:9px 12px}.repair-step-detail{margin:3px 0 0 31px}.repair-current{grid-template-columns:1fr;padding:14px}.repair-actions{min-width:0;width:100%}.repair-actions button{width:100%}.repair-dialog-actions button{flex:1}.repair-dialog-body{padding:17px}}
+
 </style>
 </head>
 <body>
@@ -251,17 +310,59 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
-  <section id="wcGovernedBuild" aria-label="Reality governed upgrade pipeline" style="border-top:1px solid #45516a;padding:14px 0;margin-top:14px">
-   <div class="wc-general-upgrade">
-   <strong>Reality · Governed Self-Upgrade</strong>
-   <p class="wc-note">Inspect verified unfinished work and queue one governed discovery. Generation, sandbox verification, separate owner installation approval and settlement require independent receipts.</p>
-   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button type="button" id="wcInspectGovernedBuild">Check verified upgrade readiness · Read only</button>
-    <button type="button" id="wcStartGovernedBuild" disabled>Start owner-scoped investigation · No install</button>
+  <section id="wcGovernedBuild" class="repair-center" aria-labelledby="wcRepairHeading">
+   <div class="repair-heading">
+    <div>
+     <span class="repair-eyebrow">Reality · Capability Center</span>
+     <h3 id="wcRepairHeading">Find it. Repair it. Prove it.</h3>
+     <p class="repair-intro">Reality looks for genuine missing capabilities. You approve an investigation, then approve installation only when an exact repair has been independently verified.</p>
+    </div>
+    <span id="wcRepairBadge" class="repair-live" data-tone="neutral" role="status">Not checked</span>
    </div>
-   <p class="wc-note" id="wcGovernedBuildStatus" role="status" aria-live="polite">No upgrade run has been started by this screen. Read-only check required.</p>
-   <p class="wc-note" id="wcGovernedBuildProof" role="status" aria-live="polite">Generation · Sandbox · Approval · Registration · Original-job resumption · Settlement: not verified.</p>
+   <ol class="repair-timeline" aria-label="Repair progress">
+    <li class="repair-step" id="wcRepairStep1" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">1</span><span class="repair-step-name">Find work</span></div><span class="repair-step-detail">Verify an existing job</span></li>
+    <li class="repair-step" id="wcRepairStep2" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">2</span><span class="repair-step-name">Investigate</span></div><span class="repair-step-detail">Owner-reviewed request</span></li>
+    <li class="repair-step" id="wcRepairStep3" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">3</span><span class="repair-step-name">Test repair</span></div><span class="repair-step-detail">Independent sandbox proof</span></li>
+    <li class="repair-step" id="wcRepairStep4" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">4</span><span class="repair-step-name">Your approval</span></div><span class="repair-step-detail">Exact verified installation</span></li>
+    <li class="repair-step" id="wcRepairStep5" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">5</span><span class="repair-step-name">Results</span></div><span class="repair-step-detail">Real work + final receipt</span></li>
+   </ol>
+   <div class="repair-current">
+    <div>
+     <div class="repair-kicker">Next action</div>
+     <h4 id="wcRepairNextTitle">Check what Reality can repair</h4>
+     <p id="wcRepairNextDescription">Reality will check your saved work and current goal. Checking is read-only and cannot install or publish anything.</p>
+    </div>
+    <div class="repair-actions">
+     <button type="button" id="wcInspectGovernedBuild" class="repair-primary">Check next repair</button>
+     <button type="button" id="wcStartGovernedBuild" class="repair-secondary" disabled>Authorize investigation</button>
+    </div>
    </div>
+   <p class="repair-status" id="wcGovernedBuildStatus" data-tone="neutral" role="status" aria-live="polite">Sign in and check for eligible work. No repair has been started from this screen.</p>
+   <div class="repair-approval"><div class="repair-lock" aria-hidden="true">●</div><div>
+    <strong>Installation always requires your approval</strong>
+    <p id="wcRepairApprovalInfo">A separate installation approval will become available only when Reality has verified the exact code and the installation connection is ready. Discovery does not authorize installation.</p>
+   </div></div>
+   <details class="repair-evidence"><summary>Technical evidence and safety boundaries</summary>
+    <p id="wcGovernedBuildProof">No trusted worker receipt has been checked yet. Generation, independent sandbox testing, installation, original-job continuation and settlement are unverified.</p>
+    <p>Changes stay within the isolated preview. Nothing in this screen authorizes production, Base44 publishing, customer communications, payments, or an AI to approve itself.</p>
+   </details>
+   <div class="repair-bottom">
+    <button type="button" id="wcExploreRepairDiscoveries">Browse all discoveries</button>
+    <a href="#wcCompletionCenter">View verified work receipts</a>
+   </div>
+   <dialog id="wcRepairConsentDialog" class="repair-dialog" aria-labelledby="wcRepairConsentHeading">
+    <div class="repair-dialog-body">
+     <span class="repair-eyebrow">Owner authorization · Investigation only</span>
+     <h3 id="wcRepairConsentHeading">Let Reality investigate this job?</h3>
+     <p>This authorizes one source-backed investigation through the isolated GitHub worker. It may create a worker-branch request. It does <strong>not</strong> install generated code or authorize production changes.</p>
+     <p id="wcRepairConsentWork" class="repair-consent-work">No verified job selected.</p>
+     <label class="repair-checkbox"><input id="wcRepairConsentCheckbox" type="checkbox">I authorize this one investigation. I understand installation is a separate approval.</label>
+     <div class="repair-dialog-actions">
+      <button type="button" id="wcRepairCancelConsent" class="repair-cancel">Cancel</button>
+      <button type="button" id="wcRepairConfirmInvestigation" class="repair-confirm" disabled>Authorize investigation</button>
+     </div>
+    </div>
+   </dialog>
   </section>
  </div>
  <div class="wc-diagnostic">
@@ -1152,6 +1253,7 @@ $('wcUnfinishedList').addEventListener('click',async event=>{
 // model-generated or installed unless the durable provider state proves it.
 let wcGovernedBuildEligible=false;
 let wcGovernedBuildBusy=false;
+let wcRepairSelectedWork=null;
 const wcGovernedBuildWork=/^work:[a-f0-9]{32}$/;
 function wcGovernedBuildSafePhase(data){
  const allowed=new Set(['NOT_QUEUED','NO_VERIFIED_ELIGIBLE_WORK',
@@ -1160,13 +1262,53 @@ function wcGovernedBuildSafePhase(data){
   'GAP_CONFIRMED']);
  return allowed.has(String(data?.phase||''))?data.phase:'UNVERIFIED_PHASE';
 }
+function wcRepairStage(number,state){
+ const el=$('wcRepairStep'+number);
+ if(el)el.dataset.state=['pending','active','complete','blocked'].includes(state)?
+  state:'pending';
+}
+function wcRepairSetBadge(message,tone='neutral'){
+ const el=$('wcRepairBadge');
+ el.textContent=message;
+ el.dataset.tone=['neutral','ready','working','blocked'].includes(tone)?tone:'neutral';
+}
+function wcRepairNext(title,description){
+ $('wcRepairNextTitle').textContent=title;
+ $('wcRepairNextDescription').textContent=description;
+}
+function wcRepairStatus(message,tone='neutral'){
+ const el=$('wcGovernedBuildStatus');el.textContent=message;el.dataset.tone=tone;
+}
+function wcRepairEvidence(message,runUrl=null){
+ const container=$('wcGovernedBuildProof');
+ container.replaceChildren(document.createTextNode(message));
+ if(typeof runUrl==='string'&&
+    /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(runUrl)){
+   const link=document.createElement('a');
+   link.href=runUrl;link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent=' · View observed GitHub run';
+   container.appendChild(link);
+ }
+}
+function wcRepairResetStages(){
+ for(let i=1;i<=5;i++)wcRepairStage(i,'pending');
+ $('wcRepairApprovalInfo').textContent=
+  'Installation stays locked until an exact generated upgrade has passed independent tests and a trusted installation action is available. No installation approval is requested by this discovery screen.';
+}
+function wcRepairCloseConsent(){
+ const dialog=$('wcRepairConsentDialog');
+ if(dialog.open)dialog.close();
+ $('wcRepairConsentCheckbox').checked=false;
+ $('wcRepairConfirmInvestigation').disabled=true;
+}
 async function wcReadGovernedBuild(){
  const btn=$('wcInspectGovernedBuild'),start=$('wcStartGovernedBuild');
- const status=$('wcGovernedBuildStatus'),proof=$('wcGovernedBuildProof');
  if(wcGovernedBuildBusy)return;
  wcGovernedBuildBusy=true;btn.disabled=true;start.disabled=true;
- wcGovernedBuildEligible=false;
- status.textContent='Reading owner-goal-scoped worker queue · No execution…';
+ wcGovernedBuildEligible=false;wcRepairSelectedWork=null;
+ wcRepairResetStages();
+ wcRepairSetBadge('Checking…','working');
+ wcRepairStatus('Reading your saved work and the trusted worker record. This is read-only.','working');
  try{
   if($('privateReady')?.style.display!=='block')
    throw Error('SIGN_IN_REQUIRED');
@@ -1174,75 +1316,143 @@ async function wcReadGovernedBuild(){
    method:'GET',credentials:'same-origin',cache:'no-store'});
   const data=await response.json();
   if(!response.ok||data.ok!==true||data.completed!==false||
-    data.model_generated!==false||data.sandbox_executed!==false)
+     data.model_generated!==false||data.sandbox_executed!==false)
    throw Error(String(data.error||'QUEUE_READBACK_UNVERIFIED'));
   const phase=wcGovernedBuildSafePhase(data);
   if(data.queued===false&&phase==='NOT_QUEUED'&&
-    data.eligible_for_investigation===true&&
-    wcGovernedBuildWork.test(String(data.original_work_id||''))&&
-    typeof data.goal_id==='string'&&data.goal_id.length>0){
-    wcGovernedBuildEligible=true;start.disabled=false;
-    status.textContent='Verified candidate '+data.original_work_id+
-     ' matches an active, owner-confirmed goal. Investigation is available. No upgrade has been generated or installed.';
+     data.eligible_for_investigation===true&&
+     wcGovernedBuildWork.test(String(data.original_work_id||''))&&
+     typeof data.goal_id==='string'&&data.goal_id.length>0){
+    wcGovernedBuildEligible=true;
+    wcRepairSelectedWork=data.original_work_id;
+    start.disabled=false;
+    wcRepairStage(1,'complete');
+    wcRepairStage(2,'active');
+    wcRepairSetBadge('Ready for review','ready');
+    wcRepairNext('An unfinished job is ready for investigation',
+     'Reality found a job associated with a verified active goal. Review and authorize one investigation. Installation is not included.');
+    wcRepairStatus('Next: review the investigation request. Nothing has been generated or installed.');
+    wcRepairEvidence('Verified work: '+data.original_work_id+
+      ' · Confirmed goal: '+data.goal_id+
+      ' · Queue: NOT_QUEUED. No model generation, sandbox outcome or installation proven.');
   }else if(phase==='NO_VERIFIED_ELIGIBLE_WORK'){
-    status.textContent='No eligible verified unfinished job. Reality must discover and verify a genuine gap; settled work cannot be queued again.';
+    wcRepairStage(1,'active');
+    wcRepairSetBadge('No eligible job yet');
+    wcRepairNext('Let Reality discover its next opportunity',
+      'No verified, unfinished job is eligible right now. Browse discoveries to explore potential work, or check again later.');
+    wcRepairStatus('Reality found no eligible verified unfinished job. No new work was invented.');
+    wcRepairEvidence('Trusted result: NO_VERIFIED_ELIGIBLE_WORK. No investigation or installation was authorized.');
   }else if(data.queued===true){
-    const observed=data.worker_observation;
-    const workerState=typeof observed?.state==='string'&&
-      /^[A-Z_]{6,70}$/.test(observed.state)?observed.state:'NOT_INDEPENDENTLY_OBSERVED';
-    status.textContent='Existing owner-scoped queue: '+phase+
-      (data.original_work_id?' · '+data.original_work_id:'')+
-      ' · Isolated GitHub worker: '+workerState+
-      '. Do not enqueue a duplicate. A passing discovery run does NOT prove a missing capability or installed upgrade.';
+    const worker=data.worker_observation;
+    const workerState=typeof worker?.state==='string'&&
+      /^[A-Z_]{6,70}$/.test(worker.state)?worker.state:'NOT_INDEPENDENTLY_OBSERVED';
+    const blocked=phase==='QUEUED_DISPATCH_BLOCKED';
+    wcRepairStage(1,'complete');wcRepairStage(2,blocked?'blocked':'active');
+    wcRepairSetBadge(blocked?'Worker needs attention':'Investigation recorded',
+      blocked?'blocked':'working');
+    wcRepairNext(blocked?'Investigation was queued, but dispatch is blocked':
+      'Investigation request already exists',
+      blocked?'The durable queue was recorded, but the isolated worker did not start. Review the blocker; do not queue a duplicate.':
+      'Reality has recorded a request for this job. Refresh its status to check independent worker evidence. Do not start the same job twice.');
+    wcRepairStatus('Queue: '+phase+' · Worker: '+workerState+
+      '. A queued or passing discovery run does not mean a repair was tested or installed.',
+      blocked?'blocked':'working');
+    wcRepairEvidence('Original work: '+String(data.original_work_id||'NOT_VERIFIED')+
+      ' · Queue receipt: '+String(data.queue_id||'NOT_VERIFIED')+
+      ' · Worker observation: '+workerState+
+      '. Generation, sandbox tests, install approval and final settlement not verified.',
+      worker?.worker_run_ref);
   }else{
-    status.textContent='Upgrade discovery cannot be started safely: '+phase+
-      '. No action or installation authorized.';
-  }
-  proof.textContent='Current independently checked phase: '+phase+
-   '. Generation, sandbox acceptance, owner installation approval, capability registration and original-job settlement remain unproven.';
-  const workerRef=String(data.worker_observation?.worker_run_ref||'');
-  if(data.queued===true&&
-      /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(workerRef)){
-   const link=document.createElement('a');link.href=workerRef;
-   link.target='_blank';link.rel='noopener noreferrer';
-   link.textContent=' Independently checked worker run';
-   proof.appendChild(link);
+    wcRepairStage(1,'blocked');
+    wcRepairSetBadge('Needs review','blocked');
+    wcRepairNext('Reality cannot verify a safe next action',
+      'The latest work state does not authorize investigation. Check the technical evidence rather than repeating a potentially executed request.');
+    wcRepairStatus('Verified work is not ready. Phase: '+phase+
+      '. No new action or installation has been authorized.','blocked');
+    wcRepairEvidence('Provider result: '+phase+
+      '. No installation or customer outcome established.');
   }
  }catch(error){
-  status.textContent='Cannot verify upgrade readiness: '+
-   String(error?.message||'READBACK_FAILED')+'. No automatic retry or installation.';
-  proof.textContent='No new upgrade completion can be claimed without durable provider receipts.';
- }finally{wcGovernedBuildBusy=false;btn.disabled=false;}
+  wcRepairResetStages();
+  wcRepairSetBadge('Readback unavailable','blocked');
+  wcRepairNext('Reality cannot confirm the work state',
+    'Sign in if necessary and use Check next repair to re-read the saved job. No new request has been sent.');
+  wcRepairStatus('Read-only verification unavailable: '+
+   String(error?.message||'READBACK_FAILED')+'. No action was started.','blocked');
+  wcRepairEvidence('No provider-backed upgrade, approval or settlement can be claimed.');
+ }finally{
+  wcGovernedBuildBusy=false;btn.disabled=false;
+ }
 }
 $('wcInspectGovernedBuild').onclick=()=>{void wcReadGovernedBuild();};
-$('wcStartGovernedBuild').onclick=async()=>{
- const btn=$('wcStartGovernedBuild'),status=$('wcGovernedBuildStatus');
- if(!wcGovernedBuildEligible||wcGovernedBuildBusy||btn.disabled||
+$('wcExploreRepairDiscoveries').onclick=()=>{
+ const discover=$('wcDiscover');
+ if(discover&&!discover.disabled)discover.click();
+ $('wcCategories')?.scrollIntoView({behavior:'smooth',block:'start'});
+};
+$('wcRepairCancelConsent').onclick=()=>wcRepairCloseConsent();
+$('wcRepairConsentCheckbox').onchange=()=>{
+ $('wcRepairConfirmInvestigation').disabled=
+  !$('wcRepairConsentCheckbox').checked||!wcGovernedBuildEligible;
+};
+$('wcStartGovernedBuild').onclick=()=>{
+ if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
+    !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
     $('privateReady')?.style.display!=='block')return;
- if(!window.confirm('Authorize ONE isolated owner-scoped discovery request? This may create a GitHub worker-branch request. It does NOT authorize model code installation, promotion, production changes, or job settlement.'))return;
+ const dialog=$('wcRepairConsentDialog');
+ if(typeof dialog.showModal!=='function'){
+  wcRepairStatus('This browser cannot show the secure consent review. No investigation was started.','blocked');
+  return;
+ }
+ $('wcRepairConsentWork').textContent='Verified original job: '+wcRepairSelectedWork+
+  '. The server will independently recheck that this is still eligible.';
+ $('wcRepairConsentCheckbox').checked=false;
+ $('wcRepairConfirmInvestigation').disabled=true;
+ dialog.showModal();
+};
+$('wcRepairConfirmInvestigation').onclick=async()=>{
+ if(!wcGovernedBuildEligible||wcGovernedBuildBusy||
+    !$('wcRepairConsentCheckbox').checked||
+    !wcGovernedBuildWork.test(String(wcRepairSelectedWork||''))||
+    $('privateReady')?.style.display!=='block')return;
+ wcRepairCloseConsent();
  wcGovernedBuildEligible=false;wcGovernedBuildBusy=true;
- btn.disabled=true;$('wcInspectGovernedBuild').disabled=true;
- status.textContent='Submitting one governed investigation; no install authority…';
+ const btn=$('wcStartGovernedBuild'),inspect=$('wcInspectGovernedBuild');
+ btn.disabled=true;inspect.disabled=true;
+ wcRepairSetBadge('Submitting investigation','working');
+ wcRepairStatus('Recording one owner-authorized investigation. No installation approval was given.','working');
  try{
   const response=await fetch('/api/reality/personal-governed-build',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'content-type':'application/json'},
-   body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'})});
+   body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY',
+    expected_original_work_id:wcRepairSelectedWork})});
   const data=await response.json();
-  if(!response.ok||data.ok!==true||data.original_job_completed!==undefined&&data.original_job_completed!==false||
+  if(!response.ok||data.ok!==true||
+     (data.original_job_completed!==undefined&&data.original_job_completed!==false)||
      data.installation_authorized!==false)
    throw Error(String(data.error||'QUEUE_SUBMISSION_UNVERIFIED'));
-  status.textContent='Queue result: '+wcGovernedBuildSafePhase(data)+
-   '. Worker discovery is not model generation or capability installation.';
-  $('wcGovernedBuildProof').textContent=
-   'Durable investigation queue ID: '+String(data.queue_id||'unverified')+
-   '. Owner installation approval, sandbox verification and final settlement not established.';
+  const phase=wcGovernedBuildSafePhase(data),blocked=phase==='QUEUED_DISPATCH_BLOCKED';
+  wcRepairStage(1,'complete');wcRepairStage(2,blocked?'blocked':'active');
+  wcRepairSetBadge(blocked?'Dispatch blocked':'Investigation recorded',
+   blocked?'blocked':'working');
+  wcRepairNext(blocked?'Investigate the worker blocker':'Check the existing request',
+   'A new investigation must not be submitted until Reality rechecks the durable queue and worker outcome.');
+  wcRepairStatus('Saved investigation: '+phase+
+   (blocked?' · Worker dispatch could not be confirmed.':' · Worker execution is not yet verified.')+
+   ' Use Check next repair to read back the saved state.',blocked?'blocked':'working');
+  wcRepairEvidence('Queue receipt: '+String(data.queue_id||'UNVERIFIED')+
+   ' · Work ID: '+String(data.original_work_id||'UNVERIFIED')+
+   ' · Installation, sandbox verification and settlement not established.');
  }catch(error){
-  status.textContent='Queue outcome unresolved: '+String(error?.message||'REQUEST_FAILED')+
-   '. Do not resubmit. Use the read-only check to determine prior effects.';
+  wcRepairSetBadge('Outcome needs verification','blocked');
+  wcRepairNext('Recheck before any retry',
+    'The submission result is uncertain. Read the durable queue state; do not authorize a duplicate.');
+  wcRepairStatus('Investigation outcome unresolved: '+
+   String(error?.message||'REQUEST_FAILED')+'. No automatic retry.','blocked');
+  wcRepairEvidence('Submission outcome requires trusted readback. No installation or completion claimed.');
  }finally{
-  wcGovernedBuildBusy=false;
-  $('wcInspectGovernedBuild').disabled=false;
+  wcGovernedBuildBusy=false;inspect.disabled=false;
  }
 };
 

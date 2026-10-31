@@ -11,9 +11,11 @@ test('Reality main interface uses only the general owner-scoped governed-work qu
   const html=readFileSync('index.html','utf8');
   for(const [,script] of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))
     new vm.Script(script);
-  assert.match(html,/class="wc-general-upgrade"/);
+  assert.match(html,/class="repair-center"/);
+  assert.match(html,/id="wcRepairConsentDialog"/);
+  assert.match(html,/Installation always requires your approval/);
   assert.match(html,/id="wcInspectGovernedBuild"/);
-  assert.match(html,/id="wcStartGovernedBuild" disabled/);
+  assert.match(html,/id="wcStartGovernedBuild"[^>]*disabled/);
   assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
   assert.doesNotMatch(html,/#178|FirstGap178|FirstUpgrade178|personal-first-upgrade-178/);
 });

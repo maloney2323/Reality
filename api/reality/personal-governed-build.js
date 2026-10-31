@@ -28,10 +28,14 @@ export default async function handler(req,res){
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    return res.status(415).json({ok:false,error:'GOVERNED_BUILD_JSON_REQUIRED'});
   const body=req.body&&typeof req.body==='object'&&!Array.isArray(req.body)?req.body:{};
-  if(Object.keys(body).length!==1||
-   body.intent!=='QUEUE_SAFE_AUTONOMOUS_DISCOVERY')
+  if(Object.keys(body).sort().join(',')!==
+   'expected_original_work_id,intent'||
+   body.intent!=='QUEUE_SAFE_AUTONOMOUS_DISCOVERY'||
+   !/^work:[a-f0-9]{32}$/.test(String(body.expected_original_work_id||'')))
    return res.status(403).json({ok:false,error:'GOVERNED_BUILD_EXPLICIT_INVESTIGATION_REQUIRED'});
-  const job=await queueOwnerGovernedBuild({session});
+  const job=await queueOwnerGovernedBuild({
+  session,expectedOriginalWorkId:body.expected_original_work_id,
+ });
   return res.status(202).json({ok:true,...job,
    message:job.worker_dispatch_started?'Isolated discovery worker dispatched. Model generation, installation and job settlement remain unproven.':'Durable discovery queued, but worker dispatch is blocked. No model generation or installation occurred.',
    external_execution_authorized:false,production_changed:false});

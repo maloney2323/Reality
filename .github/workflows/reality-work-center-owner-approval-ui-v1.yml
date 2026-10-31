@@ -1,0 +1,39 @@
+name: Reality Work Center — Real Owner Approval UX
+on:
+  push:
+    branches:
+      - feature/reality-work-center-approval-ux-20261031
+    paths:
+      - 'index.html'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
+      - 'test/reality-governed-build-chat-connection-v1.0.test.js'
+      - 'test/reality-general-repair-without-hardcoded-job-v1.test.js'
+      - '.github/workflows/reality-work-center-owner-approval-ui-v1.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
+      - 'test/reality-governed-build-chat-connection-v1.0.test.js'
+      - 'test/reality-general-repair-without-hardcoded-job-v1.test.js'
+      - '.github/workflows/reality-work-center-owner-approval-ui-v1.yml'
+permissions:
+  contents: read
+jobs:
+  owner-approval-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test genuine signed-in review and owner consent
+        run: |
+          node --test test/reality-work-center-owner-approval-ui-v1.test.js
+          node --test test/reality-governed-build-chat-connection-v1.0.test.js
+          node --test test/reality-general-repair-without-hardcoded-job-v1.test.js
+          node --test test/reality-work-center-v0.1.test.js
+      - name: Ensure no provider or deployment effect
+        run: echo 'UI/test-only isolated preview. No installation, production deployment, owner grant, or settlement.'
