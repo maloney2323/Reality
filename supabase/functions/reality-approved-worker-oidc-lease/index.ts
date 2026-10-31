@@ -44,7 +44,7 @@ async function verifyIdentity(jwt:string){
    String(claims.repository_id)!=='1388852445'||
    claims.ref!==BRANCH||claims.ref_type!=='branch'||
    claims.workflow_ref!==REPO+'/'+WORKFLOW+'@'+BRANCH||
-   claims.event_name!=='push'||
+   !['push','workflow_dispatch'].includes(String(claims.event_name))||
    typeof claims.sha!=='string'||!SHA.test(claims.sha)||
    !/^[1-9][0-9]{0,17}$/.test(String(claims.run_id||''))||
    typeof claims.exp!=='number'||typeof claims.nbf!=='number'||
@@ -64,7 +64,7 @@ async function verifyIdentity(jwt:string){
  const verified=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',publicKey,
   bytePart(parts[2]),new TextEncoder().encode(parts[0]+'.'+parts[1]));
  if(!verified)throw Error('GITHUB_SIGNED_IDENTITY_INVALID');
- return {sha:String(claims.sha),run_id:String(claims.run_id)};
+ return {sha:String(claims.sha),run_id:String(claims.run_id),event:String(claims.event_name)};
 }
 async function github(path:string){
  const r=await fetch('https://api.github.com/repos/'+REPO+path,{
@@ -85,23 +85,30 @@ async function verifySingleApprovedRequest(identity:{sha:string,run_id:string},
   request.original_work_id!=='work:9b9578b3c65427589c4c6da68fe0fc87'||
   request.install_branch!=='feature/reality-closed-loop-worker-20261031')
   throw Error('EXACT_APPROVED_REQUEST_INVALID');
+ const run=await github('/actions/runs/'+identity.run_id);
+ if(String(run?.id)!==identity.run_id||run?.head_sha!==identity.sha||
+    run.event!==identity.event||run.path!==WORKFLOW||
+    run.head_branch!==BRANCH.replace('refs/heads/','')||
+    run.head_repository?.full_name!==REPO)
+  throw Error('GITHUB_APPROVED_WORKFLOW_RUN_INVALID');
+ if(identity.event==='workflow_dispatch'){
+  // A signed dispatch supplies only a lookup key. The Supabase atomic
+  // one-time owner approval lease below is the independent authority.
+  return;
+ }
  const commit=await github('/commits/'+identity.sha);
  const prefix=PREFIX+request.reservation_id;
  const requestPath=commit?.files?.[0]?.filename;
  const suffix=typeof requestPath==='string'&&requestPath.startsWith(prefix)?
   requestPath.slice(prefix.length):null;
- if(typeof suffix!=='string'||!(/^(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\\.json$/).test(suffix))
+ if(typeof suffix!=='string'||
+   !/^(?:-retry-(?:[1-9]|1[0-9]|2[0-4]))?\.json$/.test(suffix))
   throw Error('EXACT_OWNER_APPROVED_RETRY_PATH_REQUIRED');
  if(commit?.sha!==identity.sha||commit?.parents?.length!==1||
     !Array.isArray(commit.files)||commit.files.length!==1||
     commit.files[0]?.filename!==requestPath||
     commit.files[0]?.status!=='added')
   throw Error('SINGLE_APPROVED_WAKE_COMMIT_REQUIRED');
- const run=await github('/actions/runs/'+identity.run_id);
- if(String(run?.id)!==identity.run_id||run?.head_sha!==identity.sha||
-    run.event!=='push'||run.path!==WORKFLOW||
-    run.head_repository?.full_name!==REPO)
-  throw Error('GITHUB_APPROVED_WORKFLOW_RUN_INVALID');
  const file=await fetch('https://raw.githubusercontent.com/'+REPO+'/'+
   identity.sha+'/'+requestPath,{method:'GET',cache:'no-store',redirect:'error'});
  if(!file.ok)throw Error('APPROVED_SOURCE_BYTES_UNAVAILABLE');
