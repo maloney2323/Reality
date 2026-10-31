@@ -41,6 +41,15 @@ export function classifyFirst178Diagnosis({original,view,viewError,
   return Object.freeze({...fixed,...source,status:'ORIGINAL_STATE_UNVERIFIED',
    finding:'Live original-job readback did not satisfy the canonical status contract.',
    proposed_next_step:'Reconcile the conflicting readbacks; do not infer success.'});
+ if(view.status==='REDESIGN_RECOVERY_IN_PROGRESS')
+  return Object.freeze({...fixed,...source,
+   status:'VERIFIED_ORIGINAL_REDESIGN_IN_PROGRESS',
+   checkpoint_receipt_id:view.checkpoint_receipt_id,
+   checkpoint_hash:view.checkpoint_hash,
+   reservation_id:view.reservation_id,
+   attempts_used:view.attempt_count,attempt_limit:view.attempt_limit,
+   finding:'The exact original job has an independently verified, one-use owner redesign authorization. Provider execution is unresolved until its latest checkpoint is independently reconciled.',
+   proposed_next_step:'Read the saved original constitutional checkpoint; do not create another job, consume another grant or claim completion from passing CI.'});
  if(view.status==='EXHAUSTED_CORRECTION_ATTEMPTS')
   return Object.freeze({...fixed,...source,status:'BLOCKED_REPAIR_BUDGET_EXHAUSTED',
    attempts_used:view.attempts_used,
