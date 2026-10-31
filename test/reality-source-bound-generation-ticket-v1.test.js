@@ -45,3 +45,42 @@ test('a public request cannot run a model if GitHub identity or service credenti
  }),/REALITY_SOURCE_BOUND_MODEL_PINNED_ISOLATED_GITHUB_WORKER_REQUIRED/);
  assert.equal(requested,0);
 });
+
+test('original #178 recovery is a separately claimed attempt, never the exhausted original worker claim',async()=>{
+ const recoveryId=randomUUID(),originalQueueId=randomUUID(),oldWork=
+  'work:9b9578b3c65427589c4c6da68fe0fc87';
+ const recoveryRequest={queue_id:recoveryId,original_work_id:oldWork,
+  issue_number:178,schema:'reality-original-178-recovery-request-v1'};
+ const received={...receipt,queue_id:recoveryId,original_work_id:oldWork,
+  status:'EXACT_ORIGINAL_178_RECOVERY_ADMITTED',
+  original_queue_id:originalQueueId,prior_worker_claim_preserved:true};
+ const env={GITHUB_ACTIONS:'true',GITHUB_EVENT_NAME:'push',
+  GITHUB_REPOSITORY:'maloney2323/Reality',
+  GITHUB_REF:'refs/heads/feature/reality-closed-loop-worker-20261031',
+  GITHUB_SHA:sha,REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+  REALITY_PERSONAL_CHAT_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY:'s'.repeat(40)};
+ let calls=0;
+ const ticket=await prepareOriginalModelTicket({
+  env,checkoutSha:sha,request:recoveryRequest,
+  changed:['reality-requests/'+recoveryId+'.json'],
+  fetchImpl:async(url,options)=>{
+   calls++;
+   assert.match(url,/reality_claim_original_178_recovery_v1$/);
+   assert.equal(JSON.parse(options.body).p_queue_id,recoveryId);
+   return {ok:true,json:async()=>received};
+  },
+ });
+ assert.equal(calls,1);
+ assert.equal(ticket.original_work_id,oldWork);
+ assert.equal(ticket.original_queue_id,originalQueueId);
+ assert.equal(ticket.recovery_of_prior_claim,true);
+ assert.equal(ticket.installation_authorized,false);
+ assert.equal(ticket.original_job_completed,false);
+ assert.throws(()=>validateSourceBoundGenerationEvidence(recoveryRequest,
+  {...received,prior_worker_claim_preserved:false}),
+  /LEGACY_ORIGINAL_178_RECOVERY_LINEAGE_INVALID/);
+ assert.throws(()=>validateSourceBoundGenerationEvidence(
+  {...recoveryRequest,original_work_id:work},received),
+  /LEGACY_ORIGINAL_178_RECOVERY_LINEAGE_INVALID/);
+});
