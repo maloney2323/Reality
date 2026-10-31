@@ -26,22 +26,20 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Fail closed on missing owner-authorized worker credentials
+      - name: Fail closed if built-in GitHub identity or ephemeral job token is unavailable
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          for name in SUPABASE_SERVICE_ROLE_KEY REALITY_BUILDER_DISPATCH_GITHUB_TOKEN; do
+          for name in REALITY_BUILDER_DISPATCH_GITHUB_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::Required existing worker credential unavailable: $name"
+              echo "::error::Signed GitHub runtime prerequisite unavailable: $name"
               exit 1
             fi
           done
       - name: Run only previously consumed exact owner approval
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
           REALITY_BACKGROUND_REPAIR_WORKER_ENABLED: 'true'
           REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
