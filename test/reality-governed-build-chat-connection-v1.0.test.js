@@ -132,10 +132,12 @@ test('Work Center connects live queue inspection and one consented discovery act
  assert.match(html,/id="wcStartGovernedBuild" disabled/);
  assert.match(html,/\/api\/reality\/personal-governed-build/);
  assert.match(html,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
- assert.match(html,/window\.confirm\(/);
+ assert.match(html,/id="wcRepairConsentDialog"/);
+ assert.match(html,/wcRepairConsentCheckbox/);
+ assert.match(html,/dialog\.showModal\(\)/);
  assert.match(html,/data\.eligible_for_investigation===true/);
  assert.doesNotMatch(html,/String\(data\.original_work_id\)!=='work:[a-f0-9]{32}'/);
- assert.match(html,/No eligible verified unfinished job/);
+ assert.match(html,/No verified, unfinished job is eligible right now/);
  assert.doesNotMatch(html,/setInterval\(.*wcReadGovernedBuild/);
 });
 
