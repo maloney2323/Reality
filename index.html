@@ -1425,7 +1425,8 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
   const response=await fetch('/api/reality/personal-governed-build',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'content-type':'application/json'},
-   body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY'})});
+   body:JSON.stringify({intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY',
+    expected_original_work_id:wcRepairSelectedWork})});
   const data=await response.json();
   if(!response.ok||data.ok!==true||
      (data.original_job_completed!==undefined&&data.original_job_completed!==false)||
