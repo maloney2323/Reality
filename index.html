@@ -144,6 +144,65 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .wc-direct-action{margin:14px 0 0;padding:14px;border:1px solid #41546b;border-radius:14px;background:#172334}
 .wc-direct-action .wc-plan-button{width:100%;margin:0 0 10px}
 .wc-direct-action .wc-feedback{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Reality Repair Center: accessible, owner-controlled, no simulated completion. */
+.repair-center{margin-top:18px;padding:22px;background:linear-gradient(155deg,#132536 0%,#111a27 54%,#0e1620 100%);border:1px solid #45657d;border-radius:19px;box-shadow:0 14px 28px rgba(0,0,0,.14);scroll-margin-top:20px}
+.repair-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.repair-eyebrow{font-size:11px;letter-spacing:.13em;font-weight:800;color:#a4c8d1;text-transform:uppercase}
+.repair-heading h3{font-size:23px;line-height:1.2;margin:6px 0 8px;color:#f2f7ff}
+.repair-intro{font-size:13px;line-height:1.6;color:#b9c9d8;margin:0;max-width:610px}
+.repair-live{display:inline-flex;align-items:center;gap:7px;border:1px solid #557286;color:#bcd8e8;background:#182d3b;padding:8px 11px;border-radius:999px;font-size:11px;font-weight:800;white-space:normal}
+.repair-live:before{content:"";width:8px;height:8px;border-radius:50%;background:#9ab3c4;flex:none}
+.repair-live[data-tone="ready"]:before{background:#83cdaa}.repair-live[data-tone="ready"]{border-color:#4f8b77;color:#c3f2d6}
+.repair-live[data-tone="working"]:before{background:#e9bb78}.repair-live[data-tone="working"]{border-color:#9d7c4c;color:#f5d9aa}
+.repair-live[data-tone="blocked"]:before{background:#e0a49b}.repair-live[data-tone="blocked"]{border-color:#98665c;color:#f4c7bc}
+.repair-timeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;list-style:none;padding:0;margin:20px 0}
+.repair-step{padding:13px 10px;background:#0c1723;border:1px solid #344859;border-radius:13px;min-width:0}
+.repair-step-top{display:flex;align-items:center;gap:8px;min-height:23px}
+.repair-step-index{flex:none;display:grid;place-items:center;width:22px;height:22px;border:1px solid #60778c;border-radius:50%;color:#c2d3e4;font-size:11px;font-weight:800}
+.repair-step-name{font-size:12px;font-weight:800;color:#dee9f4;overflow-wrap:anywhere}
+.repair-step-detail{display:block;font-size:11px;color:#95aabd;line-height:1.5;margin-top:7px}
+.repair-step[data-state="active"]{border-color:#af895d;background:#221f22}.repair-step[data-state="complete"]{border-color:#4a917e;background:#122d2c}
+.repair-step[data-state="complete"] .repair-step-index{background:#437864;border-color:#437864;color:#fff}
+.repair-step[data-state="blocked"]{border-color:#915d58}
+.repair-current{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:17px;border:1px solid #3d5a71;border-radius:15px;background:rgba(7,14,24,.45)}
+.repair-kicker{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9abbd1;margin:0 0 7px}
+.repair-current h4{margin:0 0 6px;font-size:17px;color:#f5f9ff}
+.repair-current p{font-size:12px;line-height:1.6;color:#b5c4d3;margin:0;overflow-wrap:anywhere}
+.repair-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:200px}
+.repair-actions button{margin:0;padding:11px 14px;min-height:43px}
+.repair-actions .repair-primary{background:#dff3ee;color:#102c27}
+.repair-actions .repair-secondary{background:#293e50;border:1px solid #557087;color:#eaf4ff}
+.repair-actions button:disabled{cursor:not-allowed;opacity:.55}
+.repair-status{margin:14px 0 0;padding:12px 14px;line-height:1.6;font-size:12px;color:#d6e4f0;border-radius:11px;border:1px solid #34546b;background:#112234;overflow-wrap:anywhere}
+.repair-status[data-tone="blocked"]{border-color:#875b50;background:#282022;color:#f0c2b8}
+.repair-status[data-tone="working"]{border-color:#927348;background:#28241d;color:#f2d5a2}
+.repair-approval{margin-top:14px;padding:13px 14px;background:#121d29;border:1px solid #344657;border-radius:12px;display:flex;align-items:flex-start;gap:11px}
+.repair-lock{flex:none;width:28px;height:28px;border-radius:9px;background:#24384a;display:grid;place-items:center;color:#cad7e3;font-size:15px}
+.repair-approval strong{font-size:13px;color:#e9f2fa}.repair-approval p{font-size:12px;line-height:1.55;color:#aebfd0;margin:4px 0 0}
+.repair-evidence{margin-top:12px;border:1px solid #304556;border-radius:12px;padding:10px 13px;background:#101c2a}
+.repair-evidence summary{font-size:12px;font-weight:700;color:#c9deef;cursor:pointer}
+.repair-evidence p{line-height:1.65;color:#b4c5d8;overflow-wrap:anywhere;font-size:12px}
+.repair-evidence a{color:#a4d4ff}
+.repair-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:13px;font-size:12px;color:#b3c6d9}
+.repair-bottom button{font-size:12px;background:transparent;border:1px solid #527087;color:#cfe4f7;margin:0}
+.repair-bottom a{color:#afdcff;text-decoration:underline}
+.repair-dialog{border:1px solid #56758a;border-radius:18px;padding:0;max-width:470px;width:calc(100% - 28px);background:#101a26;color:#f0f7ff;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.repair-dialog::backdrop{background:rgba(3,9,18,.8)}
+.repair-dialog-body{padding:22px}.repair-dialog h3{font-size:21px;margin:5px 0 9px}
+.repair-dialog p{font-size:13px;line-height:1.65;color:#b4c6d9;overflow-wrap:anywhere}
+.repair-consent-work{padding:10px 12px;border-radius:10px;background:#182a3b;font-size:12px!important;color:#d8eaff!important;overflow-wrap:anywhere}
+.repair-checkbox{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.55;color:#edf3fa;margin-top:16px;cursor:pointer}
+.repair-checkbox input{flex:none;min-width:19px;min-height:19px;margin:1px 0 0;accent-color:#8dd2b9}
+.repair-dialog-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+.repair-dialog-actions button{margin:0;min-height:44px}
+.repair-dialog-actions .repair-cancel{background:#273a4b;color:#e6f0fb}
+.repair-dialog-actions .repair-confirm{background:#d9f3e8;color:#123129}
+.repair-dialog-actions button:disabled{opacity:.4}
+.repair-center button:focus-visible,.repair-dialog button:focus-visible,.repair-dialog input:focus-visible,.repair-bottom a:focus-visible{outline:3px solid #a4d7ff;outline-offset:3px}
+@media(max-width:860px){.repair-timeline{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.repair-center{padding:15px;margin-top:14px}.repair-heading h3{font-size:21px}.repair-timeline{grid-template-columns:1fr;gap:6px}.repair-step{padding:9px 12px}.repair-step-detail{margin:3px 0 0 31px}.repair-current{grid-template-columns:1fr;padding:14px}.repair-actions{min-width:0;width:100%}.repair-actions button{width:100%}.repair-dialog-actions button{flex:1}.repair-dialog-body{padding:17px}}
+
 </style>
 </head>
 <body>
@@ -251,17 +310,59 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
   <p class="wc-note" id="wcUnfinishedStatus" role="status" aria-live="polite">Sign in to see your unfinished jobs. No completion or recovery is assumed.</p>
   <div id="wcUnfinishedList"><p class="muted">No verified unfinished-job list loaded yet.</p></div>
-  <section id="wcGovernedBuild" aria-label="Reality governed upgrade pipeline" style="border-top:1px solid #45516a;padding:14px 0;margin-top:14px">
-   <div class="wc-general-upgrade">
-   <strong>Reality · Governed Self-Upgrade</strong>
-   <p class="wc-note">Inspect verified unfinished work and queue one governed discovery. Generation, sandbox verification, separate owner installation approval and settlement require independent receipts.</p>
-   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button type="button" id="wcInspectGovernedBuild">Check verified upgrade readiness · Read only</button>
-    <button type="button" id="wcStartGovernedBuild" disabled>Start owner-scoped investigation · No install</button>
+  <section id="wcGovernedBuild" class="repair-center" aria-labelledby="wcRepairHeading">
+   <div class="repair-heading">
+    <div>
+     <span class="repair-eyebrow">Reality · Capability Center</span>
+     <h3 id="wcRepairHeading">Find it. Repair it. Prove it.</h3>
+     <p class="repair-intro">Reality looks for genuine missing capabilities. You approve an investigation, then approve installation only when an exact repair has been independently verified.</p>
+    </div>
+    <span id="wcRepairBadge" class="repair-live" data-tone="neutral" role="status">Not checked</span>
    </div>
-   <p class="wc-note" id="wcGovernedBuildStatus" role="status" aria-live="polite">No upgrade run has been started by this screen. Read-only check required.</p>
-   <p class="wc-note" id="wcGovernedBuildProof" role="status" aria-live="polite">Generation · Sandbox · Approval · Registration · Original-job resumption · Settlement: not verified.</p>
+   <ol class="repair-timeline" aria-label="Repair progress">
+    <li class="repair-step" id="wcRepairStep1" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">1</span><span class="repair-step-name">Find work</span></div><span class="repair-step-detail">Verify an existing job</span></li>
+    <li class="repair-step" id="wcRepairStep2" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">2</span><span class="repair-step-name">Investigate</span></div><span class="repair-step-detail">Owner-reviewed request</span></li>
+    <li class="repair-step" id="wcRepairStep3" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">3</span><span class="repair-step-name">Test repair</span></div><span class="repair-step-detail">Independent sandbox proof</span></li>
+    <li class="repair-step" id="wcRepairStep4" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">4</span><span class="repair-step-name">Your approval</span></div><span class="repair-step-detail">Exact verified installation</span></li>
+    <li class="repair-step" id="wcRepairStep5" data-state="pending"><div class="repair-step-top"><span class="repair-step-index">5</span><span class="repair-step-name">Results</span></div><span class="repair-step-detail">Real work + final receipt</span></li>
+   </ol>
+   <div class="repair-current">
+    <div>
+     <div class="repair-kicker">Next action</div>
+     <h4 id="wcRepairNextTitle">Check what Reality can repair</h4>
+     <p id="wcRepairNextDescription">Reality will check your saved work and current goal. Checking is read-only and cannot install or publish anything.</p>
+    </div>
+    <div class="repair-actions">
+     <button type="button" id="wcInspectGovernedBuild" class="repair-primary">Check next repair</button>
+     <button type="button" id="wcStartGovernedBuild" class="repair-secondary" disabled>Authorize investigation</button>
+    </div>
    </div>
+   <p class="repair-status" id="wcGovernedBuildStatus" data-tone="neutral" role="status" aria-live="polite">Sign in and check for eligible work. No repair has been started from this screen.</p>
+   <div class="repair-approval"><div class="repair-lock" aria-hidden="true">●</div><div>
+    <strong>Installation always requires your approval</strong>
+    <p id="wcRepairApprovalInfo">A separate installation approval will become available only when Reality has verified the exact code and the installation connection is ready. Discovery does not authorize installation.</p>
+   </div></div>
+   <details class="repair-evidence"><summary>Technical evidence and safety boundaries</summary>
+    <p id="wcGovernedBuildProof">No trusted worker receipt has been checked yet. Generation, independent sandbox testing, installation, original-job continuation and settlement are unverified.</p>
+    <p>Changes stay within the isolated preview. Nothing in this screen authorizes production, Base44 publishing, customer communications, payments, or an AI to approve itself.</p>
+   </details>
+   <div class="repair-bottom">
+    <button type="button" id="wcExploreRepairDiscoveries">Browse all discoveries</button>
+    <a href="#wcCompletionCenter">View verified work receipts</a>
+   </div>
+   <dialog id="wcRepairConsentDialog" class="repair-dialog" aria-labelledby="wcRepairConsentHeading">
+    <div class="repair-dialog-body">
+     <span class="repair-eyebrow">Owner authorization · Investigation only</span>
+     <h3 id="wcRepairConsentHeading">Let Reality investigate this job?</h3>
+     <p>This authorizes one source-backed investigation through the isolated GitHub worker. It may create a worker-branch request. It does <strong>not</strong> install generated code or authorize production changes.</p>
+     <p id="wcRepairConsentWork" class="repair-consent-work">No verified job selected.</p>
+     <label class="repair-checkbox"><input id="wcRepairConsentCheckbox" type="checkbox">I authorize this one investigation. I understand installation is a separate approval.</label>
+     <div class="repair-dialog-actions">
+      <button type="button" id="wcRepairCancelConsent" class="repair-cancel">Cancel</button>
+      <button type="button" id="wcRepairConfirmInvestigation" class="repair-confirm" disabled>Authorize investigation</button>
+     </div>
+    </div>
+   </dialog>
   </section>
  </div>
  <div class="wc-diagnostic">
