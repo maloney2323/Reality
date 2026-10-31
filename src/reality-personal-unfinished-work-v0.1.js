@@ -154,6 +154,8 @@ export function projectUnfinishedFromConversation({
    observed_at:event.assertion_time,
    original_provider_failed_run_id:p.original_provider_failed_run_id,
    original_source_sha:p.original_source_sha,
+   frozen_test_path:p.frozen_test_path,
+   frozen_test_sha256:p.frozen_test_sha256,
    can_save_recovery:false,can_resume_execution:false,
    external_action_performed:false,
    next_step:current?
