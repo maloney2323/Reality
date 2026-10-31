@@ -119,3 +119,43 @@ export function evaluateTemporaryRepairWindow({
   installed:false,job_completed:false,
  });
 }
+
+/**
+ * Adapter for the EXISTING constitutional approval transition. This converts
+ * one independently checked, already owner-issued and atomically consumed
+ * ten-minute permit into a source-bound approval receipt. It never bypasses
+ * the constitutional transition or directly writes a capability registry.
+ * A separate trusted provider verifier must re-attest this receipt there.
+ */
+export function buildPreviewPromotionReceiptFromTemporaryGrant({
+ permit,grant,atomicSingleUseConsumption,verifierReceipt,
+}={}){
+ check(permit?.status==='ONE_PREVIEW_EXTENSION_ACTIVATION_PERMITTED'&&
+  permit.preview_only===true&&permit.production_changed===false&&
+  permit.grant_id===grant?.grant_id&&
+  permit.exact_artifact_hash===atomicSingleUseConsumption?.artifact_hash,
+  'VERIFIED_PREVIEW_PERMIT_REQUIRED');
+ check(typeof atomicSingleUseConsumption?.reservation_ref==='string'&&
+  atomicSingleUseConsumption.reservation_ref.length>=16&&
+  typeof verifierReceipt?.evidence_ref==='string'&&
+  verifierReceipt.evidence_ref.length>8&&
+  /^[a-f0-9]{64}$/.test(String(verifierReceipt?.evidence_hash||'')),
+  'TRUSTED_CONSUMPTION_AND_EVIDENCE_REFERENCES_REQUIRED');
+ return Object.freeze({
+  kind:'PROMOTION_AUTHORIZED',
+  owner_id:grant.owner_id,goal_id:grant.goal_id,
+  original_work_id:grant.original_work_id,
+  continuity_root_id:grant.continuity_root_id,worldline_id:grant.worldline_id,
+  artifact_hash:permit.exact_artifact_hash,
+  evidence_ref:verifierReceipt.evidence_ref,
+  evidence_hash:verifierReceipt.evidence_hash,
+  approval_origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',
+  authorization_mode:'TEN_MINUTE_OWNER_PREAUTHORIZATION',
+  authorization_scope:TEMPORARY_REPAIR_SCOPE,
+  signed_grant_receipt_ref:atomicSingleUseConsumption.reservation_ref,
+  consumed_once:true,
+  reservation_ref:atomicSingleUseConsumption.reservation_ref,
+  target_environment:'ISOLATED_PREVIEW',
+  production_changed:false,
+ });
+}
