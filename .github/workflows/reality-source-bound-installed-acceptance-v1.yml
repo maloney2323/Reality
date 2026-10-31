@@ -1,0 +1,23 @@
+# Register exact installed-acceptance dispatch with GitHub's default branch.
+# This branch cannot run an installation or settlement. Real acceptance uses
+# the isolated preview's workflow file and immutable installed commit SHA.
+name: Reality source-bound installed acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      installed_commit_sha:
+        required: true
+        type: string
+      original_work_id:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  reject-main-branch-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep production outside isolated customer repair acceptance
+        run: |
+          echo "::error::Only the exact isolated preview branch may execute customer frozen acceptance."
+          exit 1
