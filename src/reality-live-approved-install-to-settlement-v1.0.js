@@ -26,6 +26,8 @@ import {createGenericVerifiedOriginalWorkSettlement}
  from './reality-general-original-work-settlement-v1.0.js';
 import {acceptGovernedObservation,verifySelfImprovementJournal}
  from './reality-governed-self-improvement-spine-v1.0.js';
+import {dispatchApprovedBackgroundRepair}
+ from './reality-approved-repair-github-wakeup-v1.0.js';
 const fail=x=>{throw Error('REAL_LIVE_INSTALL_'+x)};
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/,HASH=/^[a-f0-9]{64}$/;
@@ -82,6 +84,7 @@ export function createLiveGeneralRepairService({
  verifierFactory=createIndependentInstalledWorkVerifier,
  installer=installVerifiedGenericPreviewExtension,
  continuation=continueExactlyApprovedGeneralRepair,
+ dispatchApproved=dispatchApprovedBackgroundRepair,
 }={}){
  if(env.VERCEL_ENV!=='preview'||env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
   !session?.user_id||!UUID.test(session.user_id)||!session.config?.url||
@@ -333,6 +336,76 @@ export function createLiveGeneralRepairService({
    original_job_completed:false,production_changed:false,
   });
  }
+ // One signed-in owner click records exact installation authority and
+ // durable background work; model/worker cannot create or expand this grant.
+ async function ownerApproveAndQueue({originalWorkId,issueNumber,
+  expectedArtifactHash,expectedCheckpointHash}={}){
+  // Missing dispatcher credentials must not spend the owner's one-time
+  // installation approval; this is infrastructure, not customer work.
+  if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
+     env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length<25)
+   fail('BACKGROUND_WAKEUP_CREDENTIAL_UNAVAILABLE');
+  const ctx=await load({originalWorkId,issueNumber});
+  if(!HASH.test(expectedArtifactHash)||!HASH.test(expectedCheckpointHash)||
+    ctx.state.candidate?.artifact_hash!==expectedArtifactHash)
+   fail('EXACT_OWNER_REVIEWED_ARTIFACT_CHANGED');
+  const previously=await progress(ctx);
+  if(previously.status==='NOT_APPROVED'&&
+     ctx.state.head_hash!==expectedCheckpointHash)
+   fail('EXACT_OWNER_REVIEWED_CHECKPOINT_CHANGED');
+  if(previously.status!=='NOT_APPROVED'&&
+     (previously.candidate_hash!==expectedArtifactHash||
+      previously.checkpoint_hash!==expectedCheckpointHash))
+   fail('EXACT_ALREADY_APPROVED_SOURCE_CHANGED');
+  await claimAndPromote(ctx);
+  const reserved=await progress(ctx);
+  if(!UUID.test(reserved.reservation_id)||
+     !['CLAIMED','INSTALLED','SETTLED'].includes(reserved.status)||
+     reserved.consumed_once!==true)
+   fail('OWNER_APPROVAL_DURABLE_READBACK_REQUIRED');
+  const queued=await record({
+   name:'reality_enqueue_approved_repair_continuation_v1',ctx,
+   more:{p_reservation_id:reserved.reservation_id,
+    p_candidate_hash:expectedArtifactHash,
+    p_install_branch:env.VERCEL_GIT_COMMIT_REF,
+    p_issue_number:issueNumber},
+  });
+  if(queued.queued!==true||queued.reservation_id!==reserved.reservation_id||
+     queued.original_work_id!==originalWorkId||
+     queued.installation_authorized!==true||queued.production_changed!==false)
+   fail('BACKGROUND_CONTINUATION_DURABLE_READBACK_REQUIRED');
+  let dispatch=null,dispatchError=null;
+  try{
+   dispatch=await dispatchApproved({
+    reservationId:reserved.reservation_id,originalWorkId,
+    candidateHash:expectedArtifactHash,issueNumber,
+    installBranch:env.VERCEL_GIT_COMMIT_REF,env,fetchImpl,
+   });
+   if(dispatch?.dispatched!==true||
+      dispatch?.production_changed!==false)
+    fail('BACKGROUND_WAKEUP_GITHUB_READBACK_REQUIRED');
+  }catch(error){
+   const code=String(error?.message||'');
+   dispatchError=/^REALITY_APPROVED_DISPATCH_[A-Z0-9_]+$/.test(code)?
+    code:'REAL_LIVE_INSTALL_BACKGROUND_WAKEUP_RECONCILIATION_REQUIRED';
+  }
+  // Owner approval is DURABLE even if waking GitHub failed. Never claim
+  // execution or retry a provider write just to paper over uncertainty.
+  return Object.freeze({
+   status:dispatchError?
+    'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION':
+    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
+   original_work_id:originalWorkId,issue_number:issueNumber,
+   candidate_artifact_hash:expectedArtifactHash,
+   reservation_id:reserved.reservation_id,
+   background_status:queued.status,
+   worker_workflow_url:dispatch?.worker_workflow_url||null,
+   dispatch_error:dispatchError,
+   installation_authorized:true,owner_approval_consumed:true,
+   worker_dispatched:dispatch?.dispatched===true,
+   installed:false,original_job_completed:false,production_changed:false,
+  });
+ }
  async function markDurableSettlement(ctx,state,final){
   const sourceRef=state?.settlement?.settlement_receipt_ref;
   const match=/^supabase:universe_events:([a-f0-9-]{36})$/i.exec(String(sourceRef||''));
@@ -504,5 +577,5 @@ export function createLiveGeneralRepairService({
    original_job_completed:true,production_changed:false,
   });
  }
- return Object.freeze({ownerApproveAndInstall,continueAfterInstall});
+ return Object.freeze({ownerApproveAndQueue,ownerApproveAndInstall,continueAfterInstall});
 }

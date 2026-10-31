@@ -1,0 +1,38 @@
+name: Reality — Live owner-approved continuation prerequisite audit (no execution)
+on:
+  push:
+    branches: [feature/reality-closed-loop-worker-20261031]
+    paths:
+      - '.github/workflows/reality-owner-approved-continuation-readiness-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-real-background-worker-prerequisites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect configured shared Actions secrets without exposing values
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ secrets.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN }}
+          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
+          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+        run: |
+          set -euo pipefail
+          MISSING=0
+          for name in SUPABASE_SERVICE_ROLE_KEY REALITY_BUILDER_DISPATCH_GITHUB_TOKEN REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY REALITY_CHAT_RECEIPT_HMAC_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Prerequisite unavailable: $name"
+              MISSING=$((MISSING+1))
+            else
+              echo "Configured: $name"
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::error::$MISSING preexisting worker prerequisites unavailable; no original job or approval was touched."
+            exit 1
+          fi
+          echo 'All four preexisting Actions credential names configured. This does not prove installation or owner approval.'
+      - name: No permission granted by prerequisite audit
+        run: echo 'No owner action, deployment, Git write, installation, or settlement.'

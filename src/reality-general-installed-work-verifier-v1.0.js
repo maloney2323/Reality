@@ -81,14 +81,19 @@ export function createIndependentInstalledWorkVerifier({
   if(frozen?.encoding!=='base64'||
    bytesHash(Buffer.from(String(frozen.content||'').replace(/\s/g,''),'base64'))!==expectedFrozenSha)
    fail('ORIGINAL_FROZEN_ACCEPTANCE_CHANGED');
+  // #178 has a different exact frozen acceptance from the newer generic
+  // review. Select ONLY a source-grounded, allowlisted workflow contract.
+  const runWorkflow=expectedFrozenTestPath===
+   'test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js'?
+   '.github/workflows/reality-source-bound-installed-acceptance-v1.yml':WORKFLOW;
   // GitHub's run list is merely an index; inspect exact run+job+steps.
-  const result=await get('/actions/workflows/'+WORKFLOW.split('/').at(-1)+
+  const result=await get('/actions/workflows/'+runWorkflow.split('/').at(-1)+
    '/runs?branch='+encodeURIComponent(installedBranch)+'&event=push&per_page=100');
   if(!Array.isArray(result?.workflow_runs)||result.workflow_runs.length>100)
    fail('PROVIDER_RUN_INDEX_UNAVAILABLE');
   const runs=result.workflow_runs.filter(r=>
    r.head_sha===installedCommitSha&&r.event==='push'&&
-   r.path===WORKFLOW&&r.head_repository?.full_name===REPO&&
+   r.path===runWorkflow&&r.head_repository?.full_name===REPO&&
    Number.isSafeInteger(r.id));
   if(runs.length!==1)
    return Object.freeze({status:runs.length?'BLOCKED_DUPLICATE_SOURCE_RUN':

@@ -1,0 +1,10 @@
+{
+  "version": "reality-previous-verified-response-publish-v1",
+  "original_work_id": "work:9b9578b3c65427589c4c6da68fe0fc87",
+  "issue_number": 178,
+  "source_run_id": 41217180993,
+  "source_job_id": 124584489310,
+  "source_sha": "ae169df1a33705059a2f6d0f4fb6c6346566b448",
+  "model_response_id": "resp_0fa66a8bbbf80757006ae61002ee8887d1964292bf8f15c559",
+  "artifact_sha256": "105c2c59bde7ae12e4e6e74d6ec8ccf6c159a32fcaaa34db9ff5e4ae358e409a"
+}

@@ -5,7 +5,7 @@
 export const GOVERNED_BUILD_GITHUB_DISPATCH_VERSION=
  'reality-governed-build-github-dispatch-v1.0';
 const REPO='maloney2323/Reality';
-const WORKER='reality/worker/foundational-build-queue-v1';
+const WORKER='feature/reality-closed-loop-worker-20261031';
 const BASE='/repos/'+REPO;
 const fail=code=>{throw Object.assign(Error(code),{status:503})};
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(x);
@@ -75,7 +75,7 @@ export async function dispatchGovernedBuildToIsolatedWorker({
   fail('GOVERNED_BUILD_WORKER_DISPATCH_READBACK_FAILED');
  return Object.freeze({dispatched:true,existing:false,
   worker_branch:WORKER,worker_sha:commit.sha,request_path:file,
-  workflow_runs_url:'https://github.com/'+REPO+'/actions/workflows/reality-governed-build-worker-v1.yml',
+  workflow_runs_url:'https://github.com/'+REPO+'/actions/workflows/reality-source-bound-model-generation-v1.yml',
   external_effect:'ISOLATED_WORKER_BRANCH_REQUEST_ONLY',
   production_changed:false,installation_authorized:false,
  });

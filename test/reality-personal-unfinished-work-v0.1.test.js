@@ -198,3 +198,93 @@ test('read-only list endpoint has authenticated session and cannot create work',
  assert.match(api,/listAuthenticatedUnfinishedWork/);
  assert.doesNotMatch(api,/runPersonalIssueDispatch|create_issue|executeAuthorizedWork|method:'POST'/);
 });
+
+
+test('original #178 historical work is projected from its existing verified gap, never cloned',async()=>{
+ const original='work:9b9578b3c65427589c4c6da68fe0fc87';
+ const provider='github:actions:run:40962921090:job:123760052647';
+ const transition=randomUUID(),evidenceHash='5'.repeat(64);
+ const rows=history();
+ const append=(stage,entity_type,payload,status='OBSERVED')=>{
+  const prior=rows.at(-1);
+  const node=appendContinuityNode({
+   spine,stage,entityId:original,eventId:randomUUID(),
+   parentEventId:prior.event_id,priorLineageHash:prior.lineage_hash,
+   effectiveTime:at,assertionTime:at,epistemicStatus:status,payload,
+   provenance:{principal_id:user_id,conversation_id:conversationId,
+    source:'original-178-legacy-projection-test'},
+  });
+  rows.push({...node,entity_type,provenance:{
+   ...node.provenance,continuity_spine:{
+    prior_lineage_hash:node.prior_lineage_hash,
+    transformation_receipt_id:node.transformation_receipt_id,
+   },
+  }});
+  return node;
+ };
+ const originalReceipt=append('WORK','personal_first_self_upgrade_customer_work',{
+  version:'reality-personal-first-upgrade-178-v0.1',
+  status:'INVESTIGATION_APPROVED_GAP_WORK_NOT_COMPLETED',
+  issue_url:'https://github.com/maloney2323/Reality/issues/178',
+  issue_number:178,original_work_id:original,
+  original_goal_id:goalId,goal_transition_receipt_ref:transition,
+  pinned_red_run:'https://github.com/maloney2323/Reality/actions/runs/40962921090',
+  gap_provider_receipt_ref:provider,gap_evidence_hash:evidenceHash,
+  original_job_completed:false,installation_authorized:false,
+ });
+ append('OBSERVATION','personal_first_178_confirmed_gap',{
+  original_work_id:original,original_source_receipt_ref:originalReceipt.event_id,
+  provider_receipt_ref:provider,evidence_hash:evidenceHash,
+  goal_id:goalId,owner_id:user_id,authorization_granted:false,
+  original_job_completed:false,
+ },'VERIFIED');
+ const currentGoal={...goal,active_goal:{
+  ...goal.active_goal,last_transition_receipt_id:transition}};
+ const projected=projectUnfinishedFromConversation({
+  conversationId,events:rows,goal:currentGoal,
+ }).find(x=>x.original_work_id===original);
+ assert.ok(projected,'must use actual original work');
+ assert.equal(projected.state,'ORIGINAL_178_VERIFIED_GAP_AWAITING_CANDIDATE_READBACK');
+ assert.equal(projected.source_receipt_id,originalReceipt.event_id);
+ assert.equal(projected.original_provider_failed_run_id,40962921090);
+ assert.equal(projected.job_completed,false);
+ assert.equal(projected.can_resume_execution,false);
+ const proof={
+  independently_verified:true,issue_number:178,
+  issue_url:'https://github.com/maloney2323/Reality/issues/178',
+  original_failed_run_id:40962921090,
+  original_source_sha:'6'.repeat(40),frozen_test_sha256:'b'.repeat(64),
+  installed:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,
+ };
+ const read=async()=>({principal_id:user_id,conversation_id:conversationId,
+  scope,state:{...currentGoal,
+   continuity_root_id:spine.continuity_root_id,world_id:scope.world}});
+ const result=await listAuthenticatedUnfinishedWork({
+  session,env,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:read,createPersistence:()=>({reconstruct:async()=>rows}),
+  readLegacyCandidate:async({issueNumber})=>{
+   assert.equal(issueNumber,178);return proof;
+  },
+ });
+ const existing=result.jobs.filter(x=>x.original_work_id===original);
+ assert.equal(existing.length,1);
+ assert.equal(existing[0].state,'REAL_SOURCE_BACKED_REPAIR_PENDING');
+ assert.equal(existing[0].source_receipt_id,originalReceipt.event_id);
+ assert.equal(existing[0].original_source_sha,proof.original_source_sha);
+ assert.equal(existing[0].frozen_test_sha256,proof.frozen_test_sha256);
+ assert.equal(existing[0].job_completed,false);
+ assert.equal(existing[0].can_resume_execution,false);
+ const blocked=await listAuthenticatedUnfinishedWork({
+  session,env,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:read,createPersistence:()=>({reconstruct:async()=>rows}),
+  readLegacyCandidate:async()=>({...proof,installation_authorized:true}),
+ });
+ assert.equal(blocked.jobs.find(x=>x.original_work_id===original).state,
+  'ORIGINAL_178_VERIFIED_GAP_AWAITING_CANDIDATE_READBACK');
+ const contaminated=rows.map(x=>({...x}));
+ contaminated.at(-1).payload={...contaminated.at(-1).payload,owner_id:randomUUID()};
+ assert.throws(()=>projectUnfinishedFromConversation({
+  conversationId,events:contaminated,goal:currentGoal,
+ }),/RELIABILITY_HISTORY_CONTENT_HASH_INVALID/);
+});

@@ -1502,7 +1502,10 @@ $('wcReadModelRepair').onclick=async()=>{
    'Exact model artifact: '+data.candidate_artifact_hash+
    ' · Independently tested in GitHub run '+data.independent_verification_run_id+
    ' · Files: '+(data.source_files||[]).join(', ');
-  status.textContent='Generated source passed independent frozen tests. Nothing has been installed. Prepare the source-bound checkpoint before a separate exact owner installation approval.';
+  status.textContent='Generated source passed independently frozen tests. Reality is now preparing the exact constitutional checkpoint automatically; owner installation approval remains separate.';
+  // The owner already authorized investigation; checkpoint verification
+  // introduces no installation authority and needs no second owner click.
+  await $('wcPrepareModelRepair').onclick();
  }catch(err){
   status.textContent='Repair review unavailable: '+String(err?.message||'SOURCE_READBACK_FAILED')+
    '. No approval or installation occurred.';
@@ -1533,11 +1536,15 @@ $('wcPrepareModelRepair').onclick=async()=>{
    data.installed!==false||data.original_job_completed!==false)
    throw Error(String(data.error||'CONSTITUTIONAL_READBACK_NOT_READY'));
   wcRepairStage(1,'complete');wcRepairStage(2,'complete');
-  wcRepairStage(3,'complete');wcRepairStage(4,'active');
-  wcRepairSetBadge('Verified repair awaiting owner','ready');
+  const workerReady=data.background_preflight_passed===true;
+  wcRepairStage(3,'complete');wcRepairStage(4,workerReady?'active':'pending');
+  wcRepairSetBadge(workerReady?'Verified repair awaiting owner':
+   'Verified repair · Worker connection required',workerReady?'ready':'blocked');
   $('wcRepairApprovalInfo').textContent=
    'Exact candidate SHA-256: '+proposal.candidate_artifact_hash+
-   '. Independent tests and your original-work constitutional checkpoint are verified. Installation remains locked until the separate trusted install action is connected.';
+   '. Independent frozen tests and the constitutional checkpoint are verified. One explicit approval starts Reality\'s durable background installation, resumption and settlement.';
+  localStorage.setItem('reality.latest.exact.preview.repair.work.v1',
+   JSON.stringify({original_work_id:data.original_work_id}));
   wcVerifiedInstallReview={
    original_work_id:data.original_work_id,
    issue_number:proposal.issue_number,
@@ -1546,14 +1553,20 @@ $('wcPrepareModelRepair').onclick=async()=>{
    original_provider_run_id:data.original_provider_failed_run_id,
    source_files:data.source_files,
   };
-  $('wcApproveExactInstall').disabled=false;
+  // A passing sandbox is never permission to spend the owner's approval
+  // while the actual background execution path is still disconnected.
+  $('wcApproveExactInstall').disabled=!workerReady;
   $('wcInstallSettlementDetails').textContent=
    'Original job '+data.original_work_id+' · Artifact SHA-256: '+
    data.candidate_artifact_hash+' · Files: '+(data.source_files||[]).join(', ')+
    '. The separate installation approval is still required.';
   status.textContent='Original-work verification checkpoint saved: '+
    data.constitutional_checkpoint_receipt_id+
-   '. Reality has NOT installed, resumed or settled the original job.';
+   (workerReady?
+    '. Background prerequisites checked; one exact owner approval is still required.':
+    '. Background worker not verified ('+String(data.background_preflight_status||'UNAVAILABLE')+
+    '). Approval is disabled to avoid consuming authorization for an unexecutable job.')+
+   ' Reality has NOT installed, resumed or settled the original job.';
  }catch(err){
   status.textContent='Source-bound preparation stopped safely: '+
    String(err?.message||'CHECKPOINT_UNVERIFIED')+
@@ -1589,8 +1602,8 @@ async function wcContinueExactInstall(work,issue,attempt=0){
    data.independent_readback_verified===true&&
    /^supabase:universe_events:[0-9a-f-]{36}$/i.test(String(data.settlement_receipt_ref||''))){
    wcRepairStage(4,'complete');wcRepairStage(5,'complete');
-   wcRepairSetBadge('Original job settled','ready');
-   $('wcInstallSettlementHeading').textContent='Original job independently settled';
+   wcRepairSetBadge('LOOP COMPLETE','ready');
+   $('wcInstallSettlementHeading').textContent='LOOP COMPLETE · Independently verified original job';
    wcStopExactInstall('VERIFIED SETTLEMENT · '+work+
     ' · Source SHA-256 '+(data.artifact_hash||'independently registered')+
     ' · Final Continuity receipt '+data.settlement_receipt_ref+
@@ -1656,38 +1669,90 @@ $('wcExactInstallConfirm').onclick=async()=>{
   });
   const data=await response.json();
   if(!response.ok||data.ok!==true||
-     data.status!=='INSTALLED_AWAITING_ORIGINAL_INDEPENDENT_ACCEPTANCE'||
+     !['OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
+       'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION'].includes(data.status)||
      data.original_work_id!==ready.original_work_id||
-     data.artifact_hash!==ready.candidate_artifact_hash||
+     data.candidate_artifact_hash!==ready.candidate_artifact_hash||
      data.owner_approval_consumed!==true||
-     data.source_bytes_verified!==true||
+     data.installation_authorized!==true||
      data.original_job_completed!==false)
    throw Error(String(data.error||'EXACT_OWNER_INSTALL_NOT_VERIFIED'));
-  wcRepairStage(4,'complete');wcRepairStage(5,'active');
-  wcRepairSetBadge('Installed, verifying job','ready');
+  wcRepairStage(4,'active');wcRepairStage(5,'active');
+  wcRepairSetBadge(data.worker_dispatched===true?
+   'Approved · Background worker started':'Approved · Worker needs reconciliation','ready');
   localStorage.setItem('reality.pending.exact.preview.repair.v1',
    JSON.stringify({original_work_id:ready.original_work_id,
     issue_number:ready.issue_number}));
   $('wcInstallSettlementStatus').textContent=
-   'Exact owner-approved source installed at '+data.installed_commit_sha+
-   '. Reality is independently running the original job and verifying settlement…';
-  void wcContinueExactInstall(ready.original_work_id,ready.issue_number);
+   data.worker_dispatched===true?
+    'Exact source approved and durably queued. Reality is performing installation, original-job execution and independent settlement in GitHub Actions. You may close this page. No completion is claimed yet.':
+    'The exact owner approval is saved, but the background worker wake-up needs independent reconciliation. Do not approve again.';
+  wcInstallContinuationBusy=false;
  }catch(error){
   wcStopExactInstall('No customer completion claimed. Exact installation/claim readback requires attention: '+
    String(error?.message||'TRUSTED_PROVIDER_UNAVAILABLE')+
    '. The owner approval may already be consumed; review progress rather than approving again.');
  }
 };
+// One independently reconciled, authenticated receipt decides whether the
+// customer may see LOOP COMPLETE. A passing test, model answer, UI local state,
+// or approved-but-uninstalled job is never enough.
+let wcLoopProofReading=false,wcLoopProofNextRead=0;
+async function wcReadVerifiedLoopCompletion(){
+ if(wcLoopProofReading||$('privateReady')?.style.display!=='block')return;
+ let saved;
+ try{saved=JSON.parse(localStorage.getItem('reality.latest.exact.preview.repair.work.v1')||'null');}catch{saved=null;}
+ const original=wcVerifiedInstallReview?.original_work_id||saved?.original_work_id;
+ if(!/^work:[a-f0-9]{32}$/.test(String(original||'')))return;
+ const now=Date.now();
+ if(now<wcLoopProofNextRead)return;
+ wcLoopProofNextRead=now+60000;wcLoopProofReading=true;
+ try{
+  const response=await fetch('/api/reality/personal-loop-completion?work_id='+
+    encodeURIComponent(original),{method:'GET',credentials:'same-origin',cache:'no-store'});
+  const result=await response.json();
+  if(!response.ok||result.ok!==true)return;
+  if(result.loop_complete!==true)return;
+  if(result.status!=='LOOP_COMPLETE_VERIFIED'||
+     result.original_work_id!==original||
+     result.original_job_completed!==true||
+     result.independently_verified!==true||
+     result.production_changed!==false||
+     !/^[a-f0-9]{40}$/.test(String(result.installed_commit_sha||''))||
+     !/^[a-f0-9]{64}$/.test(String(result.installed_artifact_hash||''))||
+     !/^supabase:universe_events:[a-f0-9-]{36}$/i.test(
+        String(result.settlement_receipt_ref||''))||
+     !/^supabase:universe_events:[a-f0-9-]{36}$/i.test(
+        String(result.final_checkpoint_receipt_ref||'')))return;
+  wcRepairStage(4,'complete');wcRepairStage(5,'complete');
+  wcRepairSetBadge('LOOP COMPLETE','ready');
+  $('wcInstallSettlementHeading').textContent='LOOP COMPLETE · Original job';
+  $('wcInstallSettlementStatus').textContent=
+   'LOOP COMPLETE · Original customer job '+original+' independently settled.'+
+   ' Installed commit '+result.installed_commit_sha+
+   ' · Final Continuity receipt '+result.settlement_receipt_ref+
+   ' · Final constitutional checkpoint '+result.final_checkpoint_receipt_ref;
+  $('wcApproveExactInstall').disabled=true;
+  localStorage.removeItem('reality.pending.exact.preview.repair.v1');
+ }catch{
+  // A failed read can never promote or erase an independently verified receipt.
+ }finally{wcLoopProofReading=false;}
+}
+
 // A previously approved exact installation is safe to continue after closing
 // the tab: the server rechecks OWNER, prior reservation and immutable source.
 // This does not grant approval or authorize any new installation.
 function wcResumeSavedExactRepair(){
+ if($('privateReady')?.style.display==='block')void wcReadVerifiedLoopCompletion();
  if(wcInstallContinuationBusy||$('privateReady')?.style.display!=='block')return;
  let saved;try{saved=JSON.parse(localStorage.getItem('reality.pending.exact.preview.repair.v1')||'null')}catch{return}
  if(!/^work:[a-f0-9]{32}$/.test(String(saved?.original_work_id||''))||
    !Number.isSafeInteger(saved.issue_number)||saved.issue_number<1)return;
- wcInstallContinuationBusy=true;
- void wcContinueExactInstall(saved.original_work_id,saved.issue_number);
+ // Reopening the browser is only a status view, not an execution trigger.
+ // The dedicated background worker uses the original single-use authority.
+ $('wcInstallSettlementStatus').textContent=
+  'Reality has saved this exact approved original job ('+
+  saved.original_work_id+'). Background continuation is independent of this tab. Check the final provider/Continuity receipt before marking it complete.';
 }
 if(typeof setInterval==='function')setInterval(wcResumeSavedExactRepair,15000);
 
