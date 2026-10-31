@@ -3,6 +3,9 @@ on:
   push:
     branches: [feature/reality-live-general-repair-bridge-20261031]
     paths:
+      - 'src/reality-real-verified-repair-readback-v1.0.js'
+      - 'api/reality/personal-real-repair-candidate.js'
+      - 'index.html'
       - 'src/reality-owner-repair-candidate-admission-v1.0.js'
       - 'test/reality-owner-repair-candidate-admission-v1.0.test.js'
       - '.github/workflows/reality-owner-repair-candidate-admission-v1.yml'
@@ -16,6 +19,8 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22'}
+      - run: node --check api/reality/personal-real-repair-candidate.js
+      - run: node --check src/reality-real-verified-repair-readback-v1.0.js
       - run: node --check src/reality-owner-repair-candidate-admission-v1.0.js
       - run: node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
       - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
