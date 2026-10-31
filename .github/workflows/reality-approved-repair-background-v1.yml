@@ -29,7 +29,7 @@ on:
         type: string
 permissions:
   contents: write
-  actions: read
+  actions: write
   id-token: write
 concurrency:
   group: reality-owner-approved-background-continuation
