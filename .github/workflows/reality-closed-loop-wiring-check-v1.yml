@@ -19,6 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check src/reality-approved-repair-github-wakeup-v1.0.js
+          node --check src/reality-approved-repair-background-readiness-v1.0.js
           node --check src/reality-live-approved-install-to-settlement-v1.0.js
           node --check api/reality/personal-real-repair-install.js
           node --check scripts/reality-approved-repair-background-worker-v1.mjs
@@ -30,6 +31,7 @@ jobs:
           node --check src/reality-general-installed-work-verifier-v1.0.js
           node --check src/reality-personal-unfinished-work-v0.1.js
           node --test test/reality-personal-unfinished-work-v0.1.test.js
+          node --test test/reality-approved-repair-background-readiness-v1.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
           node --test test/reality-approved-repair-background-worker-v1.test.js
           node --test test/reality-original-repair-worker-handoff-v1.0.test.js
