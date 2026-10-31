@@ -37,6 +37,12 @@ async function observe(state,kind,operation,adapters){
   kind,phase:state.phase,scope:state.scope,
   checkpoint_hash:state.head_hash,
   candidate_artifact_hash:state.candidate?.artifact_hash||null,
+  // Trusted provider adapters need the exact already-journaled artifact,
+  // sandbox, atomic approval and previous provider receipt to perform the
+  // next real stage. No model receives these promotion capabilities.
+  candidate:state.candidate,sandbox_receipt:state.sandbox_receipt,
+  promotion_authorization:state.promotion_authorization,
+  registration:state.registration,resumption:state.resumption,
   previous_failure:state.independent_failure,
  }));
  if(!result||result.kind!==kind)
