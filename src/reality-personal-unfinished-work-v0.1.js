@@ -111,6 +111,56 @@ export function projectUnfinishedFromConversation({
     'Review the original conversation goal before recovery can be saved.',
   }));
  }
+ // New, owner-confirmed REAL missing extension issues are independent of
+ // previous one-off issue-creation tracking actions. Do not reuse #178's work.
+ // Require signed-in owner goal binding and an actual source-backed failure.
+ for(const event of history){
+  const p=event?.payload||{};
+  if(event?.entity_type!=='reality_original_source_backed_repair_work'||
+     event.event_kind!=='OBSERVATION'||event.epistemic_status!=='VERIFIED'||
+     p.version!=='reality-original-source-backed-repair-v1'||
+     !WORK.test(String(p.original_work_id||''))||
+     !ISSUE.test(String(p.issue_url||''))||
+     p.owner_authorized_investigation!==true||
+     p.owner_authorized_installation!==false||
+     p.original_job_completed!==false||
+     !/^[a-f0-9]{40}$/.test(String(p.original_source_sha||''))||
+     !/^[a-f0-9]{64}$/.test(String(p.frozen_test_sha256||''))||
+     event.provenance?.conversation_id!==conversationId||
+     event.provenance?.principal_id!==p.owner_id)continue;
+  // An independently settled exact original work must disappear from new-work
+  // candidates. A passing CI job or model answer is NOT a settlement.
+  const settled=history.some(item=>
+    item.entity_type==='reality_generic_verified_original_work_outcome'&&
+    item.epistemic_status==='VERIFIED'&&
+    item.payload?.original_work_id===p.original_work_id&&
+    item.payload?.owner_id===p.owner_id&&
+    item.payload?.independent_outcome_verified===true&&
+    item.payload?.outcome==='SUCCEEDED');
+  if(settled)continue;
+  const current=Boolean(goal?.active_goal_id===p.original_goal_id&&
+   goal?.active_goal?.goal_id===p.original_goal_id&&
+   goal.active_goal.status==='ACTIVE'&&
+   goal.active_goal.user_confirmed===true&&
+   goal.active_goal.last_transition_receipt_id===p.goal_transition_receipt_ref);
+  out.push(Object.freeze({
+   work_id:p.original_work_id,original_work_id:p.original_work_id,
+   conversation_id:conversationId,
+   title:'Reality: repair verified missing extension for issue #'+p.issue_number,
+   state:'REAL_SOURCE_BACKED_REPAIR_PENDING',
+   action_completed:true,job_completed:false,
+   goal_still_current:current,
+   source_receipt_id:event.event_id,issue_url:p.issue_url,
+   observed_at:event.assertion_time,
+   original_provider_failed_run_id:p.original_provider_failed_run_id,
+   original_source_sha:p.original_source_sha,
+   can_save_recovery:false,can_resume_execution:false,
+   external_action_performed:false,
+   next_step:current?
+    'Continue the same owner-authorized repair through the isolated worker.':
+    'Confirm the original goal again before continuing this work.',
+  }));
+ }
  return Object.freeze(out);
 }
 
