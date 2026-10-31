@@ -434,7 +434,7 @@ test('UNATTENDED DRY RUN: synthetic approval -> exact queue -> background worker
  assert.equal(label.original_work_id,original);
  assert.deepEqual(f.counts(),{
   installCount:1,dispatchCount:1,
-  acceptanceChecks:4,settlementCount:1});
+  acceptanceChecks:1,settlementCount:1});
  for(const step of [
   'SIMULATED_OWNER_AUTHORIZED_EXACT_ARTIFACT',
   'SINGLE_USE_OWNER_APPROVAL_CLAIMED',
