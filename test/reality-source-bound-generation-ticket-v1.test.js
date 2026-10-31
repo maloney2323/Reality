@@ -59,15 +59,17 @@ test('original #178 recovery is a separately claimed attempt, never the exhauste
   GITHUB_REF:'refs/heads/feature/reality-closed-loop-worker-20261031',
   GITHUB_SHA:sha,REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
   REALITY_PERSONAL_CHAT_SUPABASE_URL:'https://hvkfreoagbrphwghjajw.supabase.co',
-  SUPABASE_SERVICE_ROLE_KEY:'s'.repeat(40)};
+  REALITY_RECOVERY_GITHUB_OIDC_TOKEN:'eyJ'+'x'.repeat(340)};
  let calls=0;
  const ticket=await prepareOriginalModelTicket({
   env,checkoutSha:sha,request:recoveryRequest,
   changed:['reality-requests/'+recoveryId+'.json'],
   fetchImpl:async(url,options)=>{
    calls++;
-   assert.match(url,/reality_claim_original_178_recovery_v1$/);
-   assert.equal(JSON.parse(options.body).p_queue_id,recoveryId);
+   assert.match(url,/functions\/v1\/reality-original-178-oidc-claim$/);
+   assert.equal(JSON.parse(options.body).queue_id,recoveryId);
+   assert.equal(options.headers.authorization,'Bearer '+env.REALITY_RECOVERY_GITHUB_OIDC_TOKEN);
+   assert.equal(options.headers.apikey,undefined);
    return {ok:true,json:async()=>received};
   },
  });
