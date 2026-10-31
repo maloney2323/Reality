@@ -6,8 +6,9 @@ on:
     paths:
       - 'reality-approved-continuations/*.json'
 permissions:
-  contents: read
+  contents: write
   actions: read
+  id-token: write
 concurrency:
   group: reality-owner-approved-background-continuation
   cancel-in-progress: false
@@ -28,13 +29,11 @@ jobs:
       - name: Fail closed on missing owner-authorized worker credentials
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ secrets.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN }}
-          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
-          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          for name in SUPABASE_SERVICE_ROLE_KEY REALITY_BUILDER_DISPATCH_GITHUB_TOKEN REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY REALITY_CHAT_RECEIPT_HMAC_KEY; do
+          for name in SUPABASE_SERVICE_ROLE_KEY REALITY_BUILDER_DISPATCH_GITHUB_TOKEN; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Required existing worker credential unavailable: $name"
               exit 1
@@ -43,9 +42,7 @@ jobs:
       - name: Run only previously consumed exact owner approval
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ secrets.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN }}
-          REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY: ${{ secrets.REALITY_PERSONAL_CHAT_PUBLISHABLE_KEY }}
-          REALITY_CHAT_RECEIPT_HMAC_KEY: ${{ secrets.REALITY_CHAT_RECEIPT_HMAC_KEY }}
+          REALITY_BUILDER_DISPATCH_GITHUB_TOKEN: ${{ github.token }}
           REALITY_BACKGROUND_REPAIR_WORKER_ENABLED: 'true'
           REALITY_UNIVERSE_PERSISTENCE_ENABLED: 'true'
           REALITY_CONTINUOUS_RELIABILITY_ENABLED: 'true'
