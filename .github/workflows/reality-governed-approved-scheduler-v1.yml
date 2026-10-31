@@ -4,8 +4,12 @@
 name: Reality — Governed auto-wake of previously approved work
 on:
   schedule:
-    - cron: '2-59/5 * * * *'
+    - cron: '3-58/5 * * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Reality — Original #178 approved background worker lineage contract"]
+    types: [completed]
+    branches: [feature/reality-background-continuation-20261031]
   push:
     branches: [main]
     paths:
@@ -19,6 +23,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   wake-only-previously-approved-original-work:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'feature/reality-background-continuation-20261031' &&
+       github.event.workflow_run.head_repository.full_name == 'maloney2323/Reality' &&
+       github.event.workflow_run.path == '.github/workflows/reality-approved-background-lineage-contract-v1.yml')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
