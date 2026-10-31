@@ -104,11 +104,11 @@ export async function executeApprovedContinuation({
  // A signed GitHub OIDC worker lease is the ONLY entrance to the
  // service-scoped goal readback. Never copy the interactive HMAC issuer secret
  // to Actions or silently treat a missing goal as current.
- const scoped=serviceFactory===createLiveGeneralRepairService?
-  await createExactApprovedWorkerScope({env:workerEnv,request,lease:leased}):{};
- const service=serviceFactory({session,env:workerEnv,...scoped});
  let outcome=null,diagnostic='ORIGINAL_PROVIDER_EVIDENCE_STILL_PENDING';
  try{
+  const scoped=serviceFactory===createLiveGeneralRepairService?
+   await createExactApprovedWorkerScope({env:workerEnv,request,lease:leased}):{};
+  const service=serviceFactory({session,env:workerEnv,...scoped});
   let acceptanceRequested=false;
   for(let attempt=0;attempt<maxChecks;attempt++){
    outcome=await service.continueAfterInstall({
@@ -139,8 +139,8 @@ export async function executeApprovedContinuation({
   }
  }catch(error){
   const safe=String(error?.message||'');
-  diagnostic=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_)[A-Z0-9_]{4,120}$/.test(safe)?
-   safe.replace(/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_)/,'') :
+  diagnostic=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_)[A-Z0-9_]{4,120}$/.test(safe)?
+   safe.replace(/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|GENERAL_|REALITY_APPROVED_BACKGROUND_|REALITY_APPROVED_WORKER_SCOPE_)/,'') :
     'TRUSTED_PROVIDER_RECONCILIATION_REQUIRED';
  }
  const complete=outcome?.original_job_completed===true&&
@@ -271,6 +271,12 @@ async function main(){
   'ORIGINAL_GOAL_OR_CONSTITUTIONAL_SCOPE_CHANGED',
   'EXACT_PRIOR_APPROVED_REVIEW_SOURCE_UNVERIFIED',
   'MODEL_SOURCE_ORIGINAL_WORK_MISMATCH',
+  'EXACT_SIGNED_LEASE_REQUIRED',
+  'FRESH_OWNER_GOAL_SCOPE_RPC_UNAVAILABLE',
+  'FRESH_OWNER_GOAL_SCOPE_MISMATCH',
+  'GOAL_OR_ORIGINAL_WORK_RECONCILIATION_CHANGED',
+  'INDEPENDENT_CANDIDATE_OR_ORIGINAL_MISMATCH',
+  'ORIGINAL_CONVERSATION_CHANGED',
  ]);
  if(result.status==='DURABLE_PENDING_REQUIRES_FUTURE_WORKER_WAKEUP'&&
     blockedForReconciliation.has(result.diagnostic)){
