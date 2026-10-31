@@ -349,7 +349,9 @@ export function createLiveGeneralRepairService({
   const scheduled=env.REALITY_GOVERNED_SCHEDULER_ENABLED==='true';
   if(scheduled){
    const ready=await verifyScheduler({env,fetchImpl});
-   if(ready?.ready!==true||ready.code!=='GOVERNED_AUTO_WAKE_VERIFIED')
+   if(ready?.ready!==true||
+      !['GOVERNED_AUTO_WAKE_VERIFIED',
+        'GOVERNED_IMMEDIATE_WAKE_READBACK_VERIFIED'].includes(ready.code))
     fail('GOVERNED_SCHEDULER_NOT_READY_BEFORE_OWNER_APPROVAL');
   }else if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
      env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length<25)
