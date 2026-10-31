@@ -22,5 +22,7 @@ jobs:
           node-version: '22'
       - name: Record exact original source sha
         run: git rev-parse HEAD
+      - name: Print immutable frozen acceptance SHA-256
+        run: sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
       - name: Frozen same-work missing capability acceptance
         run: node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
