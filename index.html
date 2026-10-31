@@ -1679,7 +1679,7 @@ function wcResumeSavedExactRepair(){
  wcInstallContinuationBusy=true;
  void wcContinueExactInstall(saved.original_work_id,saved.issue_number);
 }
-setInterval(wcResumeSavedExactRepair,15000);
+if(typeof setInterval==='function')setInterval(wcResumeSavedExactRepair,15000);
 
 $('wcDiscoverRealRepair').onclick=async()=>{
  const button=$('wcDiscoverRealRepair');
