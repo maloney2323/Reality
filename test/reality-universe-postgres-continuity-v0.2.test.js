@@ -17,6 +17,11 @@ test('persistence automatically links sequential events into one continuity tail
       const exact = rows.find((row) => row.event_id === requestedId);
       return new Response(JSON.stringify(exact ? [exact] : []), { status: 200, headers: { 'content-type': 'application/json' } });
     }
+    if (u.searchParams.has('select')) {
+      const offset=Number(u.searchParams.get('offset')||0);
+      const limit=Number(u.searchParams.get('limit')||400);
+      return new Response(JSON.stringify(rows.slice(offset,offset+limit)),{status:200});
+    }
     const latest = rows.slice().sort((a, b) => String(b.assertion_time).localeCompare(String(a.assertion_time)))[0];
     return new Response(JSON.stringify(latest ? [latest] : []), { status: 200, headers: { 'content-type': 'application/json' } });
   };
