@@ -258,9 +258,20 @@ export function createLiveGeneralRepairService({
    recorded?.install_branch!==env.VERCEL_GIT_COMMIT_REF)
    fail('PINNED_INSTALLED_COMMIT_REQUIRED');
   const installed=installationFromDb(recorded,ctx.state.scope,ctx.proof);
-  await verifier.inspectInstalled({installed,candidate:ctx.state.candidate,
-   expectedBaseSha:ctx.proof.review_commit_sha,
-   originalWorkId:ctx.job.original_work_id});
+  if(recorded.review_commit_sha===recorded.installed_commit_sha&&
+     typeof verifier.inspectPreexistingAtReviewCommit==='function'){
+   await verifier.inspectPreexistingAtReviewCommit({
+    installed,candidate:ctx.state.candidate,
+    originalWorkId:ctx.job.original_work_id,
+    expectedReviewSha:ctx.proof.review_commit_sha,
+    expectedFrozenTestPath:ctx.job.frozen_test_path,
+    expectedFrozenSha:ctx.proof.frozen_test_sha256,
+   });
+  }else{
+   await verifier.inspectInstalled({installed,candidate:ctx.state.candidate,
+    expectedBaseSha:ctx.proof.review_commit_sha,
+    originalWorkId:ctx.job.original_work_id});
+  }
   return installed;
  }
  async function install(ctx){
@@ -282,13 +293,39 @@ export function createLiveGeneralRepairService({
     expectedBaseSha:ctx.proof.review_commit_sha,
     originalWorkId:ctx.job.original_work_id});
   }else{
-   const ticket={
-    owner_id:session.user_id,goal_id:ctx.state.scope.goal_id,
-    original_work_id:ctx.job.original_work_id,
-    repository_base_sha:ctx.proof.review_commit_sha,
-    environment:'ISOLATED_PREVIEW',
-   };
-   installed=await installer({
+   // When exact independently accepted source was merged BEFORE the later
+   // owner decision, reconcile its factual provenance. Never claim that the
+   // owner's later approval authorized the earlier GitHub source write.
+   if(typeof verifier.inspectPreexistingAtReviewCommit==='function'){
+    const prior=installationFromDb({
+     reservation_id:current.reservation_id,
+     installed_commit_sha:head,
+     install_branch:env.VERCEL_GIT_COMMIT_REF,
+    },ctx.state.scope,ctx.proof);
+    try{
+     await verifier.inspectPreexistingAtReviewCommit({
+      installed:prior,candidate:ctx.state.candidate,
+      originalWorkId:ctx.job.original_work_id,
+      expectedReviewSha:ctx.proof.review_commit_sha,
+      expectedFrozenTestPath:ctx.job.frozen_test_path,
+      expectedFrozenSha:ctx.proof.frozen_test_sha256,
+     });
+     installed=prior;
+    }catch(error){
+     // Only missing candidate source is an ordinary new-install situation.
+     // Invalid bytes, incomplete acceptance or changed refs must stop.
+     if(String(error?.message)!=='REAL_INSTALLED_WORK_GITHUB_READBACK_HTTP_404')
+      throw error;
+    }
+   }
+   if(!installed){
+    const ticket={
+     owner_id:session.user_id,goal_id:ctx.state.scope.goal_id,
+     original_work_id:ctx.job.original_work_id,
+     repository_base_sha:ctx.proof.review_commit_sha,
+     environment:'ISOLATED_PREVIEW',
+    };
+    installed=await installer({
     ticket,candidate:ctx.state.candidate,
     sandbox:{...ctx.state.sandbox_receipt,independently_verified:true},
     approval:{...ctx.state.promotion_authorization,
@@ -306,9 +343,10 @@ export function createLiveGeneralRepairService({
       target_environment:'ISOLATED_PREVIEW'};
     },fetchImpl,
    });
-   await verifier.inspectInstalled({installed,candidate:ctx.state.candidate,
-    expectedBaseSha:ctx.proof.review_commit_sha,
-    originalWorkId:ctx.job.original_work_id});
+    await verifier.inspectInstalled({installed,candidate:ctx.state.candidate,
+     expectedBaseSha:ctx.proof.review_commit_sha,
+     originalWorkId:ctx.job.original_work_id});
+   }
   }
   const marked=await record({name:'reality_mark_general_repair_installed_v1',
    ctx,more:{p_reservation_id:current.reservation_id,
