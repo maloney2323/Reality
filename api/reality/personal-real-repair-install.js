@@ -13,6 +13,7 @@ export const maxDuration=300;
 const WORK=/^work:[a-f0-9]{32}$/,HASH=/^[a-f0-9]{64}$/;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
+ let stage='REQUEST_VALIDATION';
  try{
   privateChatConfig();
   if(req.method!=='POST'){
@@ -26,6 +27,7 @@ export default async function handler(req,res){
    return res.status(415).json({ok:false,error:'REAL_INSTALL_JSON_REQUIRED'});
   if(Object.keys(req.query||{}).length)
    return res.status(403).json({ok:false,error:'REAL_INSTALL_CLIENT_SCOPE_REJECTED'});
+  stage='AUTHENTICATE_OWNER';
   const session=await authenticatedChatSession(req,res);
   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
   const b=req.body;
@@ -33,6 +35,7 @@ export default async function handler(req,res){
     !Number.isSafeInteger(b.issue_number)||b.issue_number<1||
     !WORK.test(String(b.expected_original_work_id||'')))
    return res.status(400).json({ok:false,error:'REAL_INSTALL_EXACT_ORIGINAL_WORK_REQUIRED'});
+  stage='ISOLATED_SERVICE_CONSTRUCTION';
   const service=createLiveGeneralRepairService({session});
   // A single authenticated, same-origin owner command can prepare the exact
   // persisted constitutional checkpoint AND queue the worker. No browser
@@ -45,12 +48,14 @@ export default async function handler(req,res){
     return res.status(403).json({ok:false,
      error:'REAL_INSTALL_EXPLICIT_EXACT_SOURCE_APPROVAL_REQUIRED'});
    // Verify real unattended-worker readiness before consuming owner authority.
+   stage='SCHEDULER_READINESS';
    const preflight=await verifyApprovedBackgroundReadiness();
    if(preflight.ready!==true||preflight.code!=='GOVERNED_AUTO_WAKE_VERIFIED')
     return res.status(503).json({ok:false,
      error:'REAL_INSTALL_BACKGROUND_PREREQUISITES_UNAVAILABLE',
      prerequisite_status:preflight.code,owner_approval_consumed:false,
      original_job_completed:false,production_changed:false});
+   stage='CONSTITUTIONAL_CHECKPOINT_PREPARATION';
    const ready=await prepareVerifiedOwnerRepairCandidate({
     session,expectedOriginalWorkId:b.expected_original_work_id,
     issueNumber:b.issue_number,
@@ -65,6 +70,7 @@ export default async function handler(req,res){
     return res.status(409).json({ok:false,
      error:'REAL_INSTALL_SOURCE_OR_CHECKPOINT_CHANGED_BEFORE_APPROVAL',
      owner_approval_consumed:false,original_job_completed:false,production_changed:false});
+   stage='OWNER_RESERVATION_AND_WORKER_QUEUING';
    const result=await service.ownerApproveAndQueue({
     originalWorkId:b.expected_original_work_id,issueNumber:b.issue_number,
     expectedArtifactHash:b.candidate_artifact_hash,
@@ -104,10 +110,17 @@ export default async function handler(req,res){
   return res.status(403).json({ok:false,error:'REAL_INSTALL_UNKNOWN_AUTHORITY_INTENT'});
  }catch(error){
   const code=String(error?.message||'');
-  const safe=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|REAL_REPAIR_READBACK_|REAL_OWNER_CANDIDATE_|GENERAL_CHECKPOINT_|GENERAL_PREVIEW_INSTALL_|GENERAL_PREVIEW_REGISTRY_|GENERAL_SETTLEMENT_|SELF_IMPROVEMENT_|GENERAL_REPAIR_CONTINUATION_)[A-Z0-9_]{3,140}$/;
+  // Only externally safe failure codes and a stage label are exposed.
+  // Never put credentials, provider response bodies or owner data into logs.
+  const safe=/^(?:REAL_LIVE_INSTALL_|REAL_INSTALLED_WORK_|REAL_REPAIR_READBACK_|REAL_OWNER_CANDIDATE_|GENERAL_CHECKPOINT_|GENERAL_PREVIEW_INSTALL_|GENERAL_PREVIEW_REGISTRY_|GENERAL_SETTLEMENT_|SELF_IMPROVEMENT_|GENERAL_REPAIR_CONTINUATION_|UNFINISHED_|PERSONAL_GOAL_|RELIABILITY_|REALITY_REAL_REPAIR_|GOAL_LEDGER_|GOVERNED_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
+  const diagnostic=safe.test(code)?code:'REAL_INSTALL_TRUSTED_PROVIDER_RECONCILIATION_REQUIRED';
+  console.warn('REALITY_EXACT_OWNER_APPROVAL_BLOCKED',
+    JSON.stringify({stage,error:diagnostic,owner_reservation_verified:false,
+      original_job_completed:false,production_changed:false}));
   return res.status(error?.status||409).json({
-   ok:false,error:safe.test(code)?code:'REAL_INSTALL_TRUSTED_PROVIDER_RECONCILIATION_REQUIRED',
-   original_job_completed:false,production_changed:false,
+   ok:false,error:diagnostic,failed_stage:stage,
+   owner_approval_unverified:true,original_job_completed:false,
+   production_changed:false,
   });
  }
 }
