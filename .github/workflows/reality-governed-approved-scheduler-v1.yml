@@ -47,9 +47,7 @@ jobs:
           const worker='reality-approved-repair-background-v1.yml';
           const workerBranch='feature/reality-background-continuation-20261031';
           const installBranch='feature/reality-closed-loop-worker-20261031';
-          const work='work:9b9578b3c65427589c4c6da68fe0fc87';
-          const artifact='105c2c59bde7ae12e4e6e74d6ec8ccf6c159a32fcaaa34db9ff5e4ae358e409a';
-          assert.ok(['push','schedule','workflow_dispatch','workflow_run']
+          // No historic work ID or artifact can be a scheduler authority.\n          assert.ok(['push','schedule','workflow_dispatch','workflow_run']
             .includes(process.env.GITHUB_EVENT_NAME),
             'only signed, allowlisted wake event may ask Supabase for an existing approval');
           assert.equal(process.env.GITHUB_REPOSITORY,repo);
@@ -81,7 +79,7 @@ jobs:
           assert.equal(result.production_changed,false);
           assert.equal(result.repository_commit,process.env.GITHUB_SHA);
           assert.ok(Array.isArray(result.pending_approvals)&&
-            result.pending_approvals.length<=1);
+            result.pending_approvals.length<=5);
           if(result.pending_approvals.length===0){
             assert.equal(result.status,'NO_APPROVED_WORK');
             console.log('REALITY_GOVERNED_AUTO_WAKE',JSON.stringify({
@@ -90,14 +88,19 @@ jobs:
             process.exit(0);
           }
           assert.equal(result.status,'PREVIOUSLY_OWNER_APPROVED_WORK_OBSERVED');
+          const seen=new Set();
           for(const item of result.pending_approvals){
            assert.deepEqual(Object.keys(item).sort(),
             ['candidate_hash','install_branch','issue_number','original_work_id','reservation_id']);
            assert.match(item.reservation_id,/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i);
-           assert.equal(item.original_work_id,work);
-           assert.equal(item.candidate_hash,artifact);
-           assert.equal(item.issue_number,178);
+           assert.match(item.original_work_id,/^work:[0-9a-f]{32}$/);
+           assert.match(item.candidate_hash,/^[0-9a-f]{64}$/);
+           assert.ok(Number.isSafeInteger(item.issue_number)&&
+            item.issue_number>=1&&item.issue_number<=100000);
            assert.equal(item.install_branch,installBranch);
+           assert.ok(!seen.has(item.reservation_id),
+            'a single owner approval must not be dispatched twice in one poll');
+           seen.add(item.reservation_id);
            const dispatched=await fetch('https://api.github.com/repos/'+repo+
              '/actions/workflows/'+worker+'/dispatches',{
              method:'POST',redirect:'error',cache:'no-store',
@@ -116,7 +119,7 @@ jobs:
              'GitHub Actions accepted exact isolated worker workflow_dispatch');
            console.log('REALITY_GOVERNED_AUTO_WAKE',JSON.stringify({
             status:'SIGNED_OWNER_APPROVED_WORKER_DISPATCHED',
-            reservation_id:item.reservation_id,original_work_id:work,
+            reservation_id:item.reservation_id,original_work_id:item.original_work_id,
             dispatched_branch:workerBranch,owner_approval_created:false,
             installation_performed:false,production_changed:false}));
           }
