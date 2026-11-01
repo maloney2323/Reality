@@ -3,7 +3,10 @@
 // exists; it never grants installation, spends a customer approval, or
 // asserts the original job is complete.
 const REPO='maloney2323/Reality';
-const PREVIEW='feature/reality-closed-loop-worker-20261031';
+const APPROVED_ISOLATED_PREVIEWS=new Set([
+ 'feature/reality-closed-loop-worker-20261031',
+ 'feature/reality-home-repair-chat-20261031',
+]);
 const SCHEDULER='reality-governed-approved-scheduler-v1.yml';
 const WORKER='reality-approved-repair-background-v1.yml';
 const reply=(code,ready=false)=>Object.freeze({
@@ -14,7 +17,7 @@ export async function verifyApprovedBackgroundReadiness({
  env=process.env,fetchImpl=fetch,now=Date.now(),
 }={}){
  if(env.VERCEL_ENV!=='preview'||
-    env.VERCEL_GIT_COMMIT_REF!==PREVIEW||
+    !APPROVED_ISOLATED_PREVIEWS.has(env.VERCEL_GIT_COMMIT_REF)||
     env.REALITY_GOVERNED_SCHEDULER_ENABLED!=='true')
   return reply('EXACT_ISOLATED_SIGNED_SCHEDULER_REQUIRED');
  try{
