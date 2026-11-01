@@ -384,7 +384,8 @@ export function createLiveGeneralRepairService({
      queued.installation_authorized!==true||queued.production_changed!==false)
    fail('BACKGROUND_CONTINUATION_DURABLE_READBACK_REQUIRED');
   let dispatch=null,dispatchError=null;
-  if(!scheduled)try{
+  if(!scheduled||
+   String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||'').length>=25)try{
    dispatch=await dispatchApproved({
     reservationId:reserved.reservation_id,originalWorkId,
     candidateHash:expectedArtifactHash,issueNumber,
@@ -401,9 +402,10 @@ export function createLiveGeneralRepairService({
   // Owner approval is DURABLE even if waking GitHub failed. Never claim
   // execution or retry a provider write just to paper over uncertainty.
   return Object.freeze({
-   status:scheduled?'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED':
-    dispatchError?'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION':
-    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
+   status:dispatch?.dispatched===true?
+    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED':
+    scheduled?'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED':
+    'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION',
    original_work_id:originalWorkId,issue_number:issueNumber,
    candidate_artifact_hash:expectedArtifactHash,
    reservation_id:reserved.reservation_id,
@@ -411,7 +413,7 @@ export function createLiveGeneralRepairService({
    worker_workflow_url:scheduled?
     'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml':
     dispatch?.worker_workflow_url||null,
-   governed_scheduler_wakeup:scheduled,
+   governed_scheduler_wakeup:scheduled&&dispatch?.dispatched!==true,
    dispatch_error:dispatchError,
    installation_authorized:true,owner_approval_consumed:true,
    worker_dispatched:dispatch?.dispatched===true,
