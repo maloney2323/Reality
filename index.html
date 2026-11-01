@@ -3820,8 +3820,8 @@ setInterval(refreshSavedShiftHome,300000);
   el('repairChatStartDiscovery').disabled=!eligibleWork;
   lines.push('Governed discovery: '+phase.replaceAll('_',' '));
   if(work.test(String(b?.original_work_id||''))){
-   selectedWork=b.original_work_id;
-   lines.push('Original job: '+b.original_work_id);
+   if(!selectedIssue)selectedWork=b.original_work_id;
+   lines.push('Original job from authenticated queue: '+b.original_work_id);
   }
   if(b?.worker_observation?.status)
    lines.push('Worker observation: '+String(b.worker_observation.status));
@@ -3982,7 +3982,7 @@ setInterval(refreshSavedShiftHome,300000);
       result.external_execution_authorized!==false||
       result.production_changed!==false)
     throw Error('EXACT_WORK_QUEUE_SCOPE_NOT_VERIFIED');
-   selectedWork=target;eligibleWork=null;
+   selectedWork=target;selectedIssue=null;eligibleWork=null;
    const running=result.worker_dispatch_started===true;
    setStatus('Original job '+target+
     (running?' has been handed to Reality\'s isolated discovery worker.':
