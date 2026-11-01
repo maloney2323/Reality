@@ -87,3 +87,59 @@ test('a repair handoff must not turn original failed job into verified completio
  await assert.rejects(runner({originalWorkId:work}),
   /GENUINE_EXECUTION_RUNTIME_ORIGINAL_EXECUTION_NOT_PRESERVED/);
 });
+
+test('real internal failure reports the precise safe intake blocker instead of silent reconciliation',async()=>{
+ const {executeAuthorizedWork}=await import('../src/reality-governed-execution-engine-v0.1.js');
+ const failure={
+  verified:false,independent:true,independently_verified:true,
+  original_work_id:work,evidence_kind:'OBSERVED_FAILURE',
+  blocker_class:'MISSING_INSTRUMENT',capability_id:'business.observed.missing',
+  source_ref:'https://github.com/maloney2323/Reality/actions/runs/41350477102',
+  verification_suite_ref:'source:pinned:frozen-regression',
+  external_action_performed:false,provider_effect_may_have_occurred:false,
+  no_automatic_retry:false,
+ };
+ const args={
+  workItem:job.work_item,workflowId:job.work_item.workflow_id,
+  authorization:job.authorization,connector:job.connector,
+  independentVerifier:{verify:async()=>failure},originalWorkId:work,
+ };
+ let called=0;
+ const observed=await executeAuthorizedWork({
+  ...args,onVerifiedCapabilityGap:async()=>{called++;
+   throw Error('GENUINE_CAPABILITY_INTAKE_INDEPENDENT_PROVIDER_FAILURE_CHANGED')},
+ });
+ assert.equal(called,1);
+ assert.equal(observed.status,'UNRESOLVED');
+ assert.equal(observed.self_repair.status,'REPAIR_HANDOFF_NEEDS_RECONCILIATION');
+ assert.equal(observed.self_repair.intake_attempted,true);
+ assert.equal(observed.self_repair.handoff_error_code,
+  'GENUINE_CAPABILITY_INTAKE_INDEPENDENT_PROVIDER_FAILURE_CHANGED');
+ assert.equal(observed.self_repair.original_job_completed,false);
+ const unsafe=await executeAuthorizedWork({
+  ...args,onVerifiedCapabilityGap:async()=>{throw Error('secret-supabase-token-do-not-print')},
+ });
+ assert.equal(unsafe.self_repair.handoff_error_code,'REPAIR_HANDOFF_UNTRUSTED_FAILURE');
+ assert.equal(JSON.stringify(unsafe.self_repair).includes('secret-supabase'),false);
+});
+
+test('trusted runner forwards only bounded intake failures and keeps original job open',async()=>{
+ const runner=createGenuineOriginalWorkRunner({
+  session,conversationId:conversation,loadAuthorizedInternalJob:async()=>job,
+  makeProviderReadback:()=>async()=>({}),workerWake:async()=>({}),
+  makeLiveIntake:()=>async()=>({}),
+  runExecution:async()=>({
+   status:'UNRESOLVED',self_repair:{
+    status:'REPAIR_HANDOFF_NEEDS_RECONCILIATION',intake_attempted:true,
+    handoff_error_code:'GENUINE_PREVIEW_CURRENT_CONFIRMED_OWNER_GOAL_REQUIRED',
+    original_work_id:work,new_job_created:false,original_job_completed:false,
+   },
+  }),
+ });
+ const observed=await runner({originalWorkId:work});
+ assert.equal(observed.handoff_error_code,
+  'GENUINE_PREVIEW_CURRENT_CONFIRMED_OWNER_GOAL_REQUIRED');
+ assert.equal(observed.intake_attempted,true);
+ assert.equal(observed.original_job_completed,false);
+ assert.equal(observed.new_job_created,false);
+});
