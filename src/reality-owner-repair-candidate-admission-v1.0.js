@@ -110,10 +110,13 @@ export async function prepareVerifiedOwnerRepairCandidate({
  providerRead=readExactModelRepairEvidence,
  checkpointFactory=createGeneralConstitutionalCheckpointService,
 }={}){
+ let preparationStage='OWNER_WORK_AND_PROVIDER_READBACK';
+ try{
  const {db,scope,job,proof}=await context({
   session,env,listWork,readGoal,providerRead,expectedOriginalWorkId,
   issueNumber,
  });
+ preparationStage='CHECKPOINT_SERVICE_INITIALIZATION';
  const checkpoint=checkpointFactory({
   session,conversationId:job.conversation_id,
   originalWorkId:job.original_work_id,
@@ -122,6 +125,7 @@ export async function prepareVerifiedOwnerRepairCandidate({
  });
  let state;
  try{
+  preparationStage='READ_EXISTING_OWNER_CHECKPOINT';
   const previous=await checkpoint.readLatestCheckpoint();
   if(previous.persisted!==true||previous.independent_readback_verified!==true||
      previous.checkpoint_hash!==previous.state?.head_hash)
@@ -130,6 +134,7 @@ export async function prepareVerifiedOwnerRepairCandidate({
  }catch(error){
   if(error.message!=='GENERAL_CHECKPOINT_NO_PERSISTED_GENERAL_CHECKPOINT')
    throw error;
+  preparationStage='CREATE_ORIGINAL_GOVERNED_STATE';
   state=createGovernedSelfImprovement({scope});
  }
  if(state.scope.owner_id!==scope.owner_id||
@@ -152,6 +157,7 @@ export async function prepareVerifiedOwnerRepairCandidate({
   };
  };
  if(state.phase==='DISCOVERING'){
+  preparationStage='VERIFY_ORIGINAL_GAP_OBSERVATION';
   state=await acceptGovernedObservation(state,{
    kind:'GAP_CONFIRMED',
    owner_id:scope.owner_id,goal_id:scope.goal_id,
@@ -165,9 +171,11 @@ export async function prepareVerifiedOwnerRepairCandidate({
     'github:actions:run:'+proof.original_failed_run_id],
    verification_suite_ref:'github:frozen-regression:'+proof.frozen_test_sha256,
   },{verifyProvider:checkProvider});
+  preparationStage='PERSIST_ORIGINAL_GAP_CHECKPOINT';
   await checkpoint.persistCheckpoint(state);
  }
  if(state.phase==='GAP_CONFIRMED'){
+  preparationStage='PROPOSE_EXACT_MODEL_CANDIDATE';
   state=proposeGovernedCandidate(state,{
    files:proof.files,rationale:'Reality independently generated and tested '+proof.model_response_id,
    verification_plan_ref:'github:frozen-regression:'+proof.frozen_test_sha256,
@@ -175,9 +183,11 @@ export async function prepareVerifiedOwnerRepairCandidate({
   });
   if(state.candidate.artifact_hash!==proof.candidate_artifact_sha256)
    fail('MODEL_GENERATED_BYTES_CHANGED_AFTER_GITHUB_TEST');
+  preparationStage='PERSIST_EXACT_CANDIDATE_CHECKPOINT';
   await checkpoint.persistCheckpoint(state);
  }
  if(state.phase==='CANDIDATE_READY'){
+  preparationStage='REVERIFY_INDEPENDENT_SANDBOX';
   state=await acceptGovernedObservation(state,{
    kind:'SANDBOX_VERIFIED',
    owner_id:scope.owner_id,goal_id:scope.goal_id,
@@ -192,10 +202,24 @@ export async function prepareVerifiedOwnerRepairCandidate({
    external_action_performed:false,
    installation_authorized:false,original_job_completed:false,
   },{verifyProvider:checkProvider});
+  preparationStage='PERSIST_SANDBOX_CHECKPOINT';
   await checkpoint.persistCheckpoint(state);
  }
  if(state.phase!=='AWAITING_OWNER_APPROVAL')
   fail('EXISTING_JOB_ALREADY_ADVANCED_OR_BLOCKED');
+ preparationStage='FINAL_INDEPENDENT_CHECKPOINT_READBACK';
  const receipt=await checkpoint.readCheckpoint(state);
  return summary(state,receipt,proof,job);
+ }catch(error){
+  const code=String(error?.message||'');
+  const safe=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|GENERAL_CHECKPOINT_|SELF_IMPROVEMENT_|PERSONAL_GOAL_|RELIABILITY_|UNFINISHED_|CONTINUITY_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
+  // Do not log provider bodies, access tokens, original user content, or
+  // arbitrary exception messages. Stage codes contain no private input.
+  console.warn('REALITY_ORIGINAL_CANDIDATE_PREPARATION_BLOCKED',
+   JSON.stringify({stage:preparationStage,
+    code:safe.test(code)?code:'UNCLASSIFIED_PROVIDER_OR_RUNTIME_FAILURE',
+    owner_installation_approved:false,original_job_completed:false}));
+  if(error&&typeof error==='object')error.preparation_stage=preparationStage;
+  throw error;
+ }
 }
