@@ -4062,21 +4062,25 @@ setInterval(refreshSavedShiftHome,300000);
   list.replaceChildren();
   setStatus('Rechecking open issues, actual failed GitHub runs and missing frozen-test source. Read-only.');
   try{
-   const found=await read('/api/reality/personal-real-repair-opportunities');
+   const [found,ownerState]=await Promise.all([
+    read('/api/reality/personal-real-repair-opportunities'),
+    read('/api/reality/personal-unfinished-work').catch(()=>null),
+   ]);
    const options=Array.isArray(found.opportunities)?found.opportunities:[];
+   const savedJobs=Array.isArray(ownerState?.jobs)?ownerState.jobs:[];
    const known188=options.some(item=>item.issue_number===188&&
-     Number.isSafeInteger(item.original_provider_failed_run_id)&&
-     sha.test(String(item.source_sha||''))&&item.independently_verified===true);
+    Number.isSafeInteger(item.original_provider_failed_run_id)&&
+    sha.test(String(item.source_sha||''))&&item.independently_verified===true);
    el('repairChatKnownIssue').textContent=known188?
-    'GitHub #188 is independently source-verified and eligible for your review below. No investigation or installation has been authorized by this check.':
-    'GitHub #188 was not returned as an eligible verified repair. The original issue still exists; no customer work or approval has been created by this check.';
+    'GitHub #188 has independently verified source evidence. Reality is checking whether your existing owner-authorized job can continue without a new investigation.':
+    'GitHub #188 was not returned as an independently eligible repair. No action authorized.';
    if(!options.length){
     const p=document.createElement('p');
-    p.textContent='No independently verified missing-extension repair is currently eligible. An intermittent scheduler failure alone is not a frozen source-backed upgrade. Reality must establish new failure evidence before installation can be approved.';
-    list.append(p);
-    setStatus('No verified candidate for execution. Reality has not started an installation.','blocked');
+    p.textContent='No independently verified missing-extension repair is currently eligible. No model generation or installation has been executed by this readback.';
+    list.append(p);setStatus('No verified missing-capability opportunity was returned.','blocked');
     return;
    }
+   let resumeStarted=false;
    for(const item of options){
     if(!Number.isSafeInteger(item.issue_number)||item.issue_number<1||
       !Number.isSafeInteger(item.original_provider_failed_run_id)||
@@ -4089,35 +4093,106 @@ setInterval(refreshSavedShiftHome,300000);
     info.textContent='Failed GitHub run '+item.original_provider_failed_run_id+
       ' · Pinned SHA '+item.source_sha.slice(0,12)+
       ' · Frozen test '+String(item.frozen_test_path||'REQUIRES_READBACK');
-    const button=document.createElement('button');button.type='button';
-    button.textContent='Authorize investigation of this exact gap';
-    button.addEventListener('click',async()=>{
-     if(button.disabled)return;
-     if(!isSigned()||!uuid.test(conv())){setStatus('Sign in first.','blocked');return;}
-     button.disabled=true;
-     setStatus('Authorizing investigation ONLY for reviewed GitHub issue #'+item.issue_number+' and your current confirmed goal. This does not authorize installation.');
-     try{
-      const result=await post('/api/reality/personal-real-repair-opportunities',{
-       intent:'AUTHORIZE_SOURCE_VERIFIED_ORIGINAL_REPAIR',
-       conversation_id:conv(),issue_number:item.issue_number,
-       expected_failed_run_id:item.original_provider_failed_run_id,
-       expected_source_sha:item.source_sha,
-      });
-      if(!work.test(String(result.original_work_id||''))||
-         result.installation_authorized!==false||
-         result.original_job_completed!==false)
-       throw Error('OWNER_SCOPED_INVESTIGATION_RECEIPT_MISMATCH');
-      selectedWork=result.original_work_id;
-      selectedIssue=item.issue_number;
-      setStatus('Source-bound investigation is '+String(result.status||'QUEUED')+
-       '. Original job '+selectedWork+
-       '. Reality can now use the governed discovery worker. Installation remains unapproved; check its evidence and review the exact candidate when verified.','verified');
-      await refreshProof();
-     }catch(e){setStatus('Investigation not confirmed: '+String(e.message)+
-      '. Check the original owner work before retrying. Installation not authorized.','blocked');}
-     finally{button.disabled=false;}
-    });
-    box.append(title,info,button);
+    box.append(title,info);
+    const original=savedJobs.find(j=>j.issue_url===item.issue_url&&
+     work.test(String(j.original_work_id||''))&&
+     j.original_provider_failed_run_id===item.original_provider_failed_run_id&&
+     j.original_source_sha===item.source_sha&&
+     j.action_completed===true&&j.job_completed===false);
+    const action=document.createElement('button');action.type='button';
+    if(original){
+     const state=document.createElement('p');
+     state.textContent='Already authorized original work '+original.original_work_id+
+      ' · '+String(original.state||'OPEN')+
+      (original.goal_still_current===true?' · Goal current':' · Goal must be reconfirmed');
+     box.append(state);
+     action.textContent=original.goal_still_current===true?
+      'Continue existing verified repair':'Original goal needs review';
+     action.disabled=original.goal_still_current!==true;
+     const resume=async()=>{
+      if(action.disabled||!isSigned())return;
+      action.disabled=true;
+      selectedIssue=item.issue_number;selectedWork=original.original_work_id;
+      setStatus('Continuing SAME approved original work '+selectedWork+
+       '. Rechecking generated source and frozen tests, then creating the owner-review checkpoint only. No installation.');
+      try{
+       const scope='issue_number='+item.issue_number+
+        '&original_work_id='+encodeURIComponent(selectedWork);
+       const proposal=await read('/api/reality/personal-real-repair-candidate?'+scope);
+       if(proposal.original_work_id!==selectedWork||
+          proposal.issue_number!==item.issue_number||
+          !/^[a-f0-9]{64}$/.test(String(proposal.candidate_artifact_hash||''))||
+          proposal.owner_installation_authorized!==false)
+        throw Error('ORIGINAL_CANDIDATE_SOURCE_IDENTITY_CHANGED');
+       const ready=await post('/api/reality/personal-real-repair-candidate',{
+        intent:'PREPARE_EXISTING_VERIFIED_CANDIDATE_FOR_OWNER_REVIEW',
+        expected_original_work_id:selectedWork,
+        issue_number:item.issue_number,
+        candidate_artifact_hash:proposal.candidate_artifact_hash,
+       });
+       if(ready.original_work_id!==selectedWork||
+          ready.independent_readback_verified!==true||
+          ready.owner_installation_approved!==false||
+          ready.original_job_completed!==false)
+        throw Error('EXACT_REPAIR_CHECKPOINT_READBACK_FAILED');
+       action.textContent='Verified repair ready for your approval';
+       setStatus('Reality independently verified and prepared issue #'+item.issue_number+
+        ' under the SAME original job '+selectedWork+
+        '. Review verified upgrade for the one exact owner installation approval. No installation has occurred.','verified');
+       await refreshProof();
+      }catch(err){
+       action.textContent='Retry exact-work evidence readback';
+       setStatus('Original job '+selectedWork+' remains OPEN. Exact candidate continuation blocked: '+
+        String(err.message||'VERIFICATION_UNAVAILABLE')+
+        '. No new job, new approval, installation or settlement.','blocked');
+       action.disabled=false;
+      }
+     };
+     action.addEventListener('click',resume);
+     // #188 is the active customer repair proof. Its investigation was already
+     // authorized; preparing verified evidence is not permission to install.
+     if(item.issue_number===188&&original.goal_still_current===true){
+      resumeStarted=true;
+      queueMicrotask(()=>{void resume()});
+     }
+    }else{
+     action.textContent=ownerState?'Authorize investigation of this exact gap':
+      'Owner work readback unavailable';
+     action.disabled=!ownerState;
+     action.addEventListener('click',async()=>{
+      if(action.disabled||!isSigned()||!uuid.test(conv()))return;
+      action.disabled=true;
+      setStatus('Authorizing exact original issue #'+item.issue_number+
+       ' for investigation only; no installation consent.');
+      try{
+       const result=await post('/api/reality/personal-real-repair-opportunities',{
+        intent:'AUTHORIZE_SOURCE_VERIFIED_ORIGINAL_REPAIR',
+        conversation_id:conv(),issue_number:item.issue_number,
+        expected_failed_run_id:item.original_provider_failed_run_id,
+        expected_source_sha:item.source_sha,
+       });
+       if(!work.test(String(result.original_work_id||''))||
+          result.installation_authorized!==false||
+          result.original_job_completed!==false)
+        throw Error('OWNER_SCOPED_INVESTIGATION_RECEIPT_MISMATCH');
+       selectedWork=result.original_work_id;selectedIssue=item.issue_number;
+       if(result.status==='EXACT_CANDIDATE_AWAITING_SIGNED_OWNER_INSTALL_APPROVAL'&&
+          result.independent_readback_verified===true){
+        setStatus('Exact issue #'+item.issue_number+' verified repair prepared for owner approval. Review the verified upgrade. No installation occurred.','verified');
+       }else{
+        setStatus('Original job '+selectedWork+' saved. Phase: '+
+         String(result.status||'NOT_VERIFIED')+
+         '. Candidate readback: '+String(result.candidate_readback_error||'NOT_READY')+
+         '. Worker: '+String(result.worker_dispatch_error||'NOT_DISPATCHED')+
+         '. No installation or settlement.','blocked');
+       }
+       await refreshProof();
+      }catch(e){setStatus('Investigation could not be confirmed: '+String(e.message)+
+       '. Read back existing work before any retry.','blocked');}
+      finally{action.disabled=false;}
+     });
+    }
+    box.append(action);
     if(/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(String(item.issue_url||''))){
      const link=document.createElement('a');link.href=item.issue_url;
      link.target='_blank';link.rel='noopener noreferrer';link.textContent='View original GitHub issue';
@@ -4125,7 +4200,7 @@ setInterval(refreshSavedShiftHome,300000);
     }
     list.append(box);
    }
-   setStatus('Only independently verified source gaps are listed. Select one exact issue to authorize investigation. No installation approval has been created.','verified');
+   if(!resumeStarted)setStatus('Existing owner work is preserved. A source review does not grant installation authority.');
   }catch(e){
    el('repairChatKnownIssue').textContent='Could not verify GitHub #188 live: '+String(e.message||'PROVIDER_READBACK_UNAVAILABLE')+'. No action authorized.';
    setStatus('Provider source verification unavailable: '+String(e.message)+'. No repair was started.','blocked');
