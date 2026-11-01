@@ -63,16 +63,19 @@ New business connectors must implement an independent trusted provider
 adapter. Typed references alone confer no credibility.
 
 ## Not yet connected live
-This branch implements the verified evidence-to-existing-driver contract and
-its internal execution callback. It does **not** deploy a new live autonomous
-worker or invoke OpenAI/sandbox in a new customer job.
+This branch implements the verified evidence-to-existing-driver contract,
+its internal execution callback, and the gap-scoped adapter factory for the
+existing OpenAI / Vercel Sandbox components. It does **not** deploy a new live
+autonomous worker or invoke OpenAI/sandbox in a new customer job.
 
 Remaining work (required for a new genuine full-loop proof):
 - Bind a *real* customer execution stream and provider-specific frozen
   reproduction to these adapters; do not use preselected issues or fixtures.
-- Wire the existing `createFoundationalModelGenerator`,
-  `createIsolatedVercelSandbox` and constitutional adapter to this
-  source-bound ticket, with durable receipts and bounded corrections.
+- The new `createEvidenceBoundGenerationFactory` binds the existing
+  OpenAI generator / isolated Vercel Sandbox adapters to the *independently
+  issued*, gap-matching build ticket. Connect a live trusted ticket issuer
+  and real provider-backed frozen-regression readback; stage the resulting
+  artifacts in Continuity. No model or sandbox call occurred in these tests.
 - Connect the saved `AWAITING_OWNER_APPROVAL` state to the existing
   signed-owner single-use installation and unattended background scheduler.
 - Replace remaining hard-coded #178 acceptance wakeup identifiers with
