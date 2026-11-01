@@ -1,0 +1,89 @@
+name: Reality 188 isolated installed-source proof
+on:
+  push:
+    branches:
+      - feature/reality-188-isolated-proof-20261101
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-proof:
+    if: github.repository == 'maloney2323/Reality' && github.ref == 'refs/heads/feature/reality-188-isolated-proof-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Read pinned isolated proof commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Confirm installed candidate bytes match independently reviewed source
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const record=JSON.parse(fs.readFileSync('reality-repair-evidence/issue-188-candidate.json','utf8'));
+          const hash=(x)=>crypto.createHash('sha256').update(x).digest('hex');
+          const ordered=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(ordered):
+            Object.fromEntries(Object.keys(x).sort().map(k=>[k,ordered(x[k])]));
+          assert.equal(record.schema,'reality-model-candidate-independent-review-v1');
+          assert.equal(record.original_issue_number,188);
+          assert.equal(record.baseline_source_sha,'8c6cd6c3891e98aaf30520bba2f47ee604d10d69');
+          assert.equal(record.independent_sandbox.passed,true);
+          assert.equal(record.independent_sandbox.network_disabled,true);
+          assert.equal(record.independent_sandbox.credential_count,0);
+          assert.equal(record.independent_sandbox.artifact_sha256,record.candidate_artifact_sha256);
+          assert.equal(record.candidate_artifact_sha256,
+            '4c95744d2935766e81c1b337bf4504ce1e614a4ae54a0ed159e77e7cc7fafd96');
+          const files=record.source_files.map(({path,content})=>{
+            assert.match(path,/^(?:src\/reality-extensions\/[\w./-]+\.mjs|test\/reality-extensions\/[\w./-]+\.test\.mjs)$/);
+            assert.equal(fs.readFileSync(path,'utf8'),content);
+            return {path,content};
+          });
+          assert.equal(hash(JSON.stringify(ordered(files))),record.candidate_artifact_sha256);
+          assert.equal(hash(fs.readFileSync(
+            'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'
+          )),record.frozen_test_sha256);
+          console.log('EXACT_INSTALLED_CANDIDATE_BYTES_VERIFIED',record.candidate_artifact_sha256);
+          NODE
+      - name: Frozen original acceptance and independent model tests in network-denied Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory=512m --cpus=1 \
+            --user 65534:65534 -v "$PWD:/work:ro" -w /work \
+            node:22 node --test \
+            test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js \
+            test/reality-extensions/reality-general-execution-receipt.model.test.mjs \
+            test/reality-governed-self-improvement-spine-v1.0.test.js
+      - name: Publish provider-observed code installation acceptance, not settlement
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const record=JSON.parse(fs.readFileSync('reality-repair-evidence/issue-188-candidate.json','utf8'));
+          const receipt={
+            schema:'reality-188-isolated-installed-source-proof-v1',
+            issue_number:188,
+            installed_branch:process.env.GITHUB_REF_NAME,
+            installed_commit_sha:process.env.GITHUB_SHA,
+            provider_run_id:Number(process.env.GITHUB_RUN_ID),
+            original_failed_run_id:record.original_failed_provider_run_id,
+            candidate_sha256:record.candidate_artifact_sha256,
+            exact_bytes_checked:true,
+            frozen_test_passed:true,
+            independent_docker_network_disabled:true,
+            production_changed:false,
+            owner_approval_recorded:false,
+            original_job_resumed:false,
+            original_job_settled:false,
+          };
+          fs.writeFileSync('reality-188-proof.json',JSON.stringify(receipt,null,2)+'\n');
+          console.log('ISOLATED_CODE_ACCEPTANCE_VERIFIED_NOT_CUSTOMER_SETTLEMENT',JSON.stringify(receipt));
+          NODE
+      - name: Upload signed-by-run proof artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-188-installed-source-acceptance
+          path: reality-188-proof.json
+          if-no-files-found: error
