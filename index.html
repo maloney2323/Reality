@@ -1867,6 +1867,40 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
  }
 };
 
+// An existing verified owner investigation permits a read-only initiation.
+// Server independently rechecks owner, current goal, GitHub and source bytes.
+const wcGenuineStarted=new Set();
+async function wcStartVerifiedGenuineGap(job){
+ const key=job.work_id+'|'+job.conversation_id;
+ if(wcGenuineStarted.has(key))return;
+ wcGenuineStarted.add(key);
+ const feedback=[...$('wcUnfinishedList').querySelectorAll('[data-unfinished-feedback]')]
+  .find(e=>e.dataset.unfinishedFeedback===job.work_id);
+ if(feedback)feedback.textContent='Reality is independently checking the original missing capability…';
+ try{
+  const response=await fetch('/api/reality/personal-genuine-original-investigate',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'INVESTIGATE_VERIFIED_ORIGINAL_CAPABILITY_GAP',
+    original_work_id:job.work_id,conversation_id:job.conversation_id}),
+  });
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||
+   result.original_work_id!==job.work_id||
+   result.original_job_completed!==false||result.new_job_created!==false||
+   result.production_changed!==false)
+   throw Error(/^[A-Z0-9_]{5,110}$/.test(String(result.error||''))?
+    result.error:'ORIGINAL_INVESTIGATION_NOT_VERIFIED');
+  if(feedback)feedback.textContent=
+   result.capability_response==='GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'?
+    'Verified gap queued for Reality. Awaiting worker reproduction and upgrade; installation still requires approval.':
+    result.handoff_error_code?'Capability intake blocked: '+result.handoff_error_code:
+    'Original investigation unresolved. No customer-job completion or installation was claimed.';
+ }catch(e){
+  if(feedback)feedback.textContent='Original job remains open. Investigation blocked: '+
+   String(e.message||'UNAVAILABLE').slice(0,110);
+ }
+}
 let wcUnfinishedReadSerial=0;
 async function wcLoadUnfinishedWork(){
  const panel=$('wcUnfinishedList'),status=$('wcUnfinishedStatus');
@@ -1905,6 +1939,12 @@ async function wcLoadUnfinishedWork(){
    ' No job is being executed.';
   panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
    '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
+  // Only an already owner-authorized, source-verified, active-goal
+  // original investigation is eligible. No self-install or external retry.
+  const eligible=safe.find(j=>j.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'&&
+   j.goal_still_current===true&&j.job_completed===false&&
+   j.can_resume_execution===false&&!!j.source_receipt_id);
+  if(eligible)void wcStartVerifiedGenuineGap(eligible);
  }catch{
   if(serial!==wcUnfinishedReadSerial)return;
   $('wcUnfinishedCount').textContent='';
