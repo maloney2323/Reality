@@ -47,7 +47,11 @@ export default async function handler(req,res){
    if(!jobs.length)return res.status(200).json({
     ok:true,status:'NO_SIGNED_OWNER_REPAIR_WORK_AWAITING_INSTALL',
     installation_authorized:false,original_job_completed:false});
-   const job=jobs[0];originalWorkId=job.original_work_id;
+   // The default review should prioritize the newest existing real issue,
+   // not a later duplicate investigation for an older settled issue.
+   const ordered=[...jobs].sort((a,b)=>
+    Number(b.issue_url.split('/').at(-1))-Number(a.issue_url.split('/').at(-1)));
+   const job=ordered[0];originalWorkId=job.original_work_id;
    issueNumber=Number(job.issue_url.split('/').at(-1));
   }else{
    if(!req.headers?.origin)
