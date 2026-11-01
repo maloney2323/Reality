@@ -86,18 +86,24 @@ function proofCheck(proof,observed){
 // inspectRegisteredCapability, or authorize its own promotion.
 export function createGenuineCapabilityEngine({
  observeOriginalFailure,reobserveOriginalFailure,reproduceFrozenFailure,
- inspectRegisteredCapability,adapters,runRepair=continueOriginalJobFromVerifiedCapabilityGap,
+ inspectRegisteredCapability,adapters=null,createAdapters=null,
+ runRepair=continueOriginalJobFromVerifiedCapabilityGap,
 }={}){
  for(const [name,fn] of Object.entries({
   observeOriginalFailure,reobserveOriginalFailure,reproduceFrozenFailure,
   inspectRegisteredCapability,runRepair})){
   if(typeof fn!=='function')fail('TRUSTED_ADAPTER_MISSING_'+name.toUpperCase());
  }
- for(const name of ['observeMissingCapability','generateCandidate',
-  'runIsolatedSandbox','persistCheckpoint','verifyIndependentReceipt']){
-  if(typeof adapters?.[name]!=='function')
-   fail('TRUSTED_DRIVER_ADAPTER_MISSING_'+name.toUpperCase());
+ if(typeof createAdapters!=='function'&&createAdapters!==null)
+  fail('TRUSTED_ADAPTER_FACTORY_INVALID');
+ function checkDrivers(a){
+  for(const name of ['observeMissingCapability','generateCandidate',
+   'runIsolatedSandbox','persistCheckpoint','verifyIndependentReceipt']){
+   if(typeof a?.[name]!=='function')
+    fail('TRUSTED_DRIVER_ADAPTER_MISSING_'+name.toUpperCase());
+  }
  }
+ if(!createAdapters)checkDrivers(adapters);
  async function run({originalWorkId,scope,expectedFailure=null,currentState=null,maxTransitions=12}={}){
   scopeCheck(scope,originalWorkId);
   if(!Number.isInteger(maxTransitions)||maxTransitions<1||maxTransitions>50)
@@ -150,6 +156,10 @@ export function createGenuineCapabilityEngine({
    independently_verified:true,
    frozen_failure_ref:gap.frozen_failure_ref,
    frozen_suite_sha256:gap.frozen_suite_sha256});
+  const activeAdapters=createAdapters?
+    await createAdapters(Object.freeze({scope,confirmed_gap:gap,
+     original_work_id:originalWorkId,installed:false})):adapters;
+  checkDrivers(activeAdapters);
   const continuation=await runRepair({
    originalWorkId,scope,originalJobFailure:input,currentState,
    providerReobserve:async request=>{
@@ -164,7 +174,7 @@ export function createGenuineCapabilityEngine({
      fail('REOBSERVATION_DIFFERENT_FAILURE');
     return Object.freeze({...fresh,frozen_failure_ref:gap.frozen_failure_ref});
    },
-   capabilityRegistry:[],adapters,maxTransitions,
+   capabilityRegistry:[],adapters:activeAdapters,maxTransitions,
   });
   if(continuation?.original_work_id!==originalWorkId||
    continuation.original_goal_id!==scope.goal_id||
