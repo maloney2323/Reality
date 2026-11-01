@@ -7,6 +7,8 @@ import {createLiveGeneralRepairService}
  from '../../src/reality-live-approved-install-to-settlement-v1.0.js';
 import {verifyApprovedBackgroundReadiness}
  from '../../src/reality-approved-repair-background-readiness-v1.0.js';
+import {prepareVerifiedOwnerRepairCandidate}
+ from '../../src/reality-owner-repair-candidate-admission-v1.0.js';
 export const maxDuration=300;
 const WORK=/^work:[a-f0-9]{32}$/,HASH=/^[a-f0-9]{64}$/;
 export default async function handler(req,res){
@@ -32,6 +34,46 @@ export default async function handler(req,res){
     !WORK.test(String(b.expected_original_work_id||'')))
    return res.status(400).json({ok:false,error:'REAL_INSTALL_EXACT_ORIGINAL_WORK_REQUIRED'});
   const service=createLiveGeneralRepairService({session});
+  // A single authenticated, same-origin owner command can prepare the exact
+  // persisted constitutional checkpoint AND queue the worker. No browser
+  // approval is inferred from GET, a chat model, source code or a scheduler.
+  if(b.intent==='OWNER_AUTHORIZE_PREPARE_AND_QUEUE_EXACT_REPAIR'){
+   if(Object.keys(b).sort().join(',')!==
+     'candidate_artifact_hash,consent_statement,expected_original_work_id,intent,issue_number'||
+     b.consent_statement!=='I_AUTHORIZE_THIS_EXACT_ISOLATED_REPAIR_AND_ORIGINAL_JOB_CONTINUATION'||
+     !HASH.test(String(b.candidate_artifact_hash||'')))
+    return res.status(403).json({ok:false,
+     error:'REAL_INSTALL_EXPLICIT_EXACT_SOURCE_APPROVAL_REQUIRED'});
+   // Verify real unattended-worker readiness before consuming owner authority.
+   const preflight=await verifyApprovedBackgroundReadiness();
+   if(preflight.ready!==true||preflight.code!=='GOVERNED_AUTO_WAKE_VERIFIED')
+    return res.status(503).json({ok:false,
+     error:'REAL_INSTALL_BACKGROUND_PREREQUISITES_UNAVAILABLE',
+     prerequisite_status:preflight.code,owner_approval_consumed:false,
+     original_job_completed:false,production_changed:false});
+   const ready=await prepareVerifiedOwnerRepairCandidate({
+    session,expectedOriginalWorkId:b.expected_original_work_id,
+    issueNumber:b.issue_number,
+   });
+   if(ready.status!=='EXACT_CANDIDATE_AWAITING_SIGNED_OWNER_INSTALL_APPROVAL'||
+     ready.original_work_id!==b.expected_original_work_id||
+     ready.candidate_artifact_hash!==b.candidate_artifact_hash||
+     ready.independent_readback_verified!==true||
+     ready.owner_installation_approved!==false||
+     ready.original_job_completed!==false||
+     !HASH.test(String(ready.constitutional_checkpoint_hash||'')))
+    return res.status(409).json({ok:false,
+     error:'REAL_INSTALL_SOURCE_OR_CHECKPOINT_CHANGED_BEFORE_APPROVAL',
+     owner_approval_consumed:false,original_job_completed:false,production_changed:false});
+   const result=await service.ownerApproveAndQueue({
+    originalWorkId:b.expected_original_work_id,issueNumber:b.issue_number,
+    expectedArtifactHash:b.candidate_artifact_hash,
+    expectedCheckpointHash:ready.constitutional_checkpoint_hash,
+   });
+   return res.status(202).json({ok:true,...result,
+    review_checkpoint_receipt_id:ready.constitutional_checkpoint_receipt_id,
+    original_job_completed:false,production_changed:false});
+  }
   if(b.intent==='OWNER_APPROVE_EXACT_INSTALL'){
    if(Object.keys(b).sort().join(',')!==
      'candidate_artifact_hash,expected_checkpoint_hash,expected_original_work_id,intent,issue_number'||
