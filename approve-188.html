@@ -63,7 +63,8 @@ async function session(){
      ready.owner_installation_approved!==false)
    throw Error('CHECKPOINT_PREPARATION: '+String(ready.error||
       'ORIGINAL_OWNER_CHECKPOINT_NOT_VERIFIED')+
-      (ready.failed_stage?' · stage '+ready.failed_stage:''));
+      (ready.failed_stage?' · stage '+ready.failed_stage:'')+
+      (ready.failed_substage?' · exact step '+ready.failed_substage:''));
   if(ready.background_preflight_passed!==true)
    throw Error('SIGNED_WORKER_PREFLIGHT: '+String(ready.background_preflight_status||'NOT_READY'));
   btn.disabled=false;btn.textContent='Authorize exact #188 repair and continue';
