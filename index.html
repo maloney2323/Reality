@@ -1891,9 +1891,14 @@ async function wcStartVerifiedGenuineGap(job){
    result.production_changed!==false)
    throw Error(/^[A-Z0-9_]{5,110}$/.test(String(result.error||''))?
     result.error:'ORIGINAL_INVESTIGATION_NOT_VERIFIED');
-  if(feedback)feedback.textContent=
-   result.capability_response==='GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'?
-    'Verified gap queued for Reality. Awaiting worker reproduction and upgrade; installation still requires approval.':
+  const queued=result.capability_response==='GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'&&
+    /^[0-9a-f-]{36}$/i.test(String(result.queue_trigger_id||''));
+  const wake=result.worker_wake_status==='WORKER_WAKE_DISPATCHED'?
+   ' Signed worker wake dispatched; generation still unproven.':
+   ' Worker wake not independently confirmed; Reality must reconcile.';
+  if(feedback)feedback.textContent=queued?
+    'Original missing capability durably queued. Trigger: '+
+      result.queue_trigger_id+'.'+wake+' No installation authorized.':
     result.handoff_error_code?'Capability intake blocked: '+result.handoff_error_code:
     'Original investigation unresolved. No customer-job completion or installation was claimed.';
  }catch(e){
