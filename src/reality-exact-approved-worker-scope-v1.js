@@ -64,6 +64,8 @@ export async function createExactApprovedWorkerScope({
      !String(s.goal_id||'').startsWith('user-goal:')||
      !SHA.test(s.review_commit_sha)||
      !HASH.test(s.frozen_test_sha256)||
+     !/^test\/reality-frozen-regressions\/[a-z0-9._/-]+[.]test[.]js$/.test(
+       String(s.frozen_test_path||''))||
      !Number.isSafeInteger(s.original_failed_run_id)||
      s.original_failed_run_id<1||
      s.production_changed!==false||
@@ -94,7 +96,8 @@ export async function createExactApprovedWorkerScope({
      fresh.goal_transition_event_id!==first.goal_transition_event_id||
      fresh.original_work_event_id!==first.original_work_event_id||
      fresh.review_commit_sha!==first.review_commit_sha||
-     fresh.frozen_test_sha256!==first.frozen_test_sha256)
+     fresh.frozen_test_sha256!==first.frozen_test_sha256||
+     fresh.frozen_test_path!==first.frozen_test_path)
    fail('GOAL_OR_ORIGINAL_WORK_RECONCILIATION_CHANGED');
   return fresh;
  };
@@ -111,7 +114,7 @@ export async function createExactApprovedWorkerScope({
     source_receipt_id:fresh.original_work_event_id,
     original_provider_failed_run_id:fresh.original_failed_run_id,
     original_source_sha:candidate.original_source_sha,
-    frozen_test_path:'test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js',
+    frozen_test_path:fresh.frozen_test_path,
     frozen_test_sha256:fresh.frozen_test_sha256,
    }]};
   },
