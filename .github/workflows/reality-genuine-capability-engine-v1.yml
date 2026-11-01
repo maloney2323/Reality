@@ -6,6 +6,11 @@ on:
       - 'src/reality-genuine-capability-engine-v1.js'
       - 'src/reality-genuine-capability-live-intake-v1.js'
       - 'src/reality-genuine-capability-github-wakeup-v1.js'
+      - 'scripts/reality-genuine-capability-worker-v1.mjs'
+      - 'test/reality-genuine-capability-worker-v1.test.js'
+      - 'supabase/functions/reality-genuine-capability-wake/index.ts'
+      - 'supabase/migrations/20261101_genuine_capability_wake_readback_v1.sql'
+      - '.github/workflows/reality-genuine-capability-worker-v1.yml'
       - 'test/reality-genuine-capability-github-wakeup-v1.test.js'
       - 'src/reality-genuine-capability-preview-intake-v1.js'
       - 'src/reality-genuine-capability-execution-runtime-v1.js'
@@ -38,6 +43,7 @@ jobs:
           node --test test/reality-genuine-capability-engine-v1.test.js
           node --test test/reality-genuine-capability-live-intake-v1.test.js
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
+          node --test test/reality-genuine-capability-worker-v1.test.js
           node --test test/reality-genuine-capability-execution-runtime-v1.test.js
           node --test test/reality-continuity-actual-tail-append-v1.test.js
           node --test test/reality-genuine-capability-generation-bridge-v1.test.js
