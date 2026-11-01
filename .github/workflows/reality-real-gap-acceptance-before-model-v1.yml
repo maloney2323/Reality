@@ -12,6 +12,7 @@ on:
       # one-step approval and external-source reconciliation code changes.
       - 'approve-188.html'
       - 'api/reality/personal-real-repair-install.js'
+      - 'api/reality/approve-188.js'
       - 'src/reality-live-approved-install-to-settlement-v1.0.js'
       - 'src/reality-general-installed-work-verifier-v1.0.js'
       - 'test/reality-preexisting-isolated-source-reconciliation-v1.test.js'
