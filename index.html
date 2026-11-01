@@ -3936,27 +3936,116 @@ setInterval(refreshSavedShiftHome,300000);
  el('openRepairChatHome').addEventListener('click',event=>{
   event.preventDefault();void setTab('repair');
  });
+ // Shows only emitted, real request checkpoints. No fake timers, thoughts,
+ // model token guesses, or implied background execution.
+ const activity=el('repairChatActivity');
+ const activityList=el('repairChatActivityEvents');
+ const activityLabel=el('repairChatActivityLabel');
+ const activityStages=new Set(['session','message_saved','model_running',
+  'review_complete','goal_checked','answer_saved']);
+ function activityLine(text){
+  const line=document.createElement('li');
+  line.textContent=String(text||'');
+  activityList.append(line);
+  activityList.scrollTop=activityList.scrollHeight;
+ }
+ function activityStart(){
+  activity.hidden=false;activity.dataset.state='active';
+  activityLabel.textContent='Reality is working';
+  activityList.replaceChildren();
+  activityLine('Sending your message to Reality… (browser request)');
+ }
+ function activityEnd(ok){
+  activity.dataset.state=ok?'done':'error';
+  activityLabel.textContent=ok?'Response saved and verified':
+   'Response not confirmed · check saved chat before retrying';
+ }
+ async function streamChatMessage(body){
+  const response=await fetch('/api/reality/personal-chat',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json','accept':'text/event-stream'},
+   body:JSON.stringify(body),
+  });
+  const type=String(response.headers.get('content-type')||'');
+  if(!type.includes('text/event-stream')){
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true)
+    throw Error(String(data?.error||'CHAT_READBACK_UNAVAILABLE'));
+   activityLine('Answer returned through compatible JSON endpoint');
+   return data;
+  }
+  if(!response.ok||!response.body)throw Error('CHAT_STREAM_UNAVAILABLE');
+  const reader=response.body.getReader(),decoder=new TextDecoder();
+  let buf='',finalResult=null,streamError=null;
+  function applyFrame(frame){
+   if(!frame.trim())return;
+   const lines=frame.split('\n');
+   const kind=lines.find(line=>line.startsWith('event:'))?.slice(6).trim();
+   const raw=lines.filter(line=>line.startsWith('data:'))
+     .map(line=>line.slice(5).trimStart()).join('\n');
+   if(!raw)return;
+   let data;
+   try{data=JSON.parse(raw)}catch{throw Error('CHAT_STREAM_EVENT_INVALID')}
+   if(kind==='progress'){
+    if(activityStages.has(data.stage)&&typeof data.message==='string')
+     activityLine(data.message);
+   }else if(kind==='result'){
+    if(data?.ok!==true||typeof data.answer!=='string')
+     throw Error('CHAT_STREAM_FINAL_PROOF_INVALID');
+    finalResult=data;
+   }else if(kind==='error'){
+    streamError=String(data.error||'CHAT_RECONCILIATION_REQUIRED');
+   }
+  }
+  while(true){
+   const next=await reader.read();
+   if(next.done)break;
+   buf+=decoder.decode(next.value,{stream:true});
+   buf=buf.replace(/\r\n/g,'\n');
+   let index;
+   while((index=buf.indexOf('\n\n'))!==-1){
+    applyFrame(buf.slice(0,index));buf=buf.slice(index+2);
+   }
+  }
+  buf+=decoder.decode();
+  if(buf.trim())applyFrame(buf);
+  if(streamError)throw Error(streamError);
+  if(!finalResult)throw Error('CHAT_STREAM_INCOMPLETE_RECONCILE');
+  return finalResult;
+ }
+ el('repairChatPrompt').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+   e.preventDefault();if(!busy)el('repairChatSend').click();
+  }
+ });
  el('repairChatSend').addEventListener('click',async()=>{
   if(busy)return;
   if(!isSigned()||!uuid.test(conv())){
-   setStatus('Sign in to Reality before requesting a diagnosis. No action performed.','blocked');return;
+   setStatus('Sign in first to use your private Reality conversation. No action performed.','blocked');return;
   }
   const field=el('repairChatPrompt'),message=field.value.trim();
-  if(!message||message.length>6000){setStatus('Enter your repair question (up to 6,000 characters).');return;}
+  if(!message||message.length>6000){setStatus('Enter a message (up to 6,000 characters).');return;}
   busy=true;el('repairChatSend').disabled=true;
-  setStatus('Checking this message against saved Continuity. Chat cannot install anything.');
+  activityStart();
+  append('user',message);
+  setStatus('Reply in progress. Activity shows real verified checkpoints only.');
   try{
-   const result=await post('/api/reality/personal-chat',{
+   const result=await streamChatMessage({
     conversation_id:conv(),request_id:crypto.randomUUID(),message,
    });
-   if(typeof result.answer!=='string'||!result.answer.trim())
+   if(typeof result.answer!=='string'||!result.answer.trim()||
+      result.continuity?.current_answer_persisted!==true)
     throw Error('CHAT_ANSWER_NOT_PERSISTED');
    field.value='';
    await loadChat();
-   setStatus('Answer saved to your Reality conversation. No upgrade or approval has been created. To start real autonomous investigation, select verified work below.','verified');
+   activityEnd(true);
+   setStatus('Source-linked answer saved. Chat alone never approves external work.','verified');
    void refreshProof();
   }catch(e){
-   setStatus('Conversation not confirmed: '+String(e.message||'CHAT_RECONCILIATION_REQUIRED')+'. Any saved user turn must be reconciled before resubmitting. No installation occurred.','blocked');
+   activityLine('The final answer was not confirmed. Your message may already have been saved.');
+   activityEnd(false);
+   setStatus('Conversation not confirmed: '+String(e.message||'CHAT_RECONCILIATION_REQUIRED')+
+    '. Use Refresh to reconcile before sending again. No installation was approved.','blocked');
   }finally{busy=false;el('repairChatSend').disabled=false;}
  });
  el('repairChatRefresh').addEventListener('click',async()=>{
