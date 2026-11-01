@@ -16,7 +16,8 @@ const CAP=/^[a-z][a-z0-9._-]{2,90}$/;
 const fail=why=>{throw Error('EXECUTION_SELF_REPAIR_'+why)};
 const allowedEvidence=x=>typeof x==='string'&&(
  /^https:\/\/github\.com\/maloney2323\/Reality\/(?:actions\/runs\/[1-9]\d*|issues\/[1-9]\d*)$/.test(x)||
- /^vercel:provider-verified:[A-Za-z0-9_.:/-]{8,340}$/.test(x));
+ /^vercel:provider-verified:[A-Za-z0-9_.:/-]{8,340}$/.test(x)||
+ /^reality:provider-verified:[a-z][a-z0-9_-]{2,40}:[A-Za-z0-9_.:/-]{12,340}$/.test(x));
 const noEffect=x=>x?.external_action_performed===false&&
  x?.provider_effect_may_have_occurred!==true&&
  x?.no_automatic_retry!==true;
