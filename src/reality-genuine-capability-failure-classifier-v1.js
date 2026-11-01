@@ -5,12 +5,16 @@ export const GENUINE_FAILURE_CLASSIFIER_VERSION='reality-genuine-capability-fail
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const safe=x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{4,110}$/.test(x)?x:null;
+const verifiedRef=x=>typeof x==='string'&&(
+ /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(x)||
+ /^vercel:provider-verified:[A-Za-z0-9_.:/-]{8,340}$/.test(x)||
+ /^reality:provider-verified:[a-z][a-z0-9_-]{2,40}:[A-Za-z0-9_.:/-]{12,340}$/.test(x));
 function verdict(classification,action,{originalWorkId=null,evidenceRef=null,capabilityId=null}={}){
  return Object.freeze({
   classifier_version:GENUINE_FAILURE_CLASSIFIER_VERSION,
   classification,recommended_action:action,
   original_work_id:WORK.test(originalWorkId)?originalWorkId:null,
-  evidence_ref:typeof evidenceRef==='string'&&evidenceRef.length<=360?evidenceRef:null,
+  evidence_ref:verifiedRef(evidenceRef)?evidenceRef:null,
   capability_id:typeof capabilityId==='string'&&/^[a-z][a-z0-9._-]{2,90}$/.test(capabilityId)?capabilityId:null,
   authority_granted:false,model_generation_authorized:false,
   installation_authorized:false,original_job_completed:false,
@@ -24,8 +28,7 @@ function authenticFailure(f,work){
   f?.external_action_performed===false&&
   f?.provider_effect_may_have_occurred===false&&
   f?.no_automatic_retry!==true&&
-  typeof f?.source_ref==='string'&&
-  f.source_ref.length>=20&&f.source_ref.length<=360&&
+  verifiedRef(f?.source_ref)&&
   typeof f?.verification_suite_ref==='string'&&
   f.verification_suite_ref.length>=13;
 }
