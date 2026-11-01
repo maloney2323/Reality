@@ -232,6 +232,50 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .repair-chat-status[data-tone="verified"]{border-color:#4a927b;color:#c4edd9}
 @media(max-width:600px){.repair-chat-shell{padding:13px}.repair-chat-actions button{width:100%;flex:auto}.reality-home-nav a{flex:1;justify-content:center;font-size:12px;padding:8px}}
 
+/* Conversation-first Reality Home. The activity timeline shows observable stages,
+   not a model's hidden deliberation or fabricated background execution. */
+#privateChat{width:100%;max-width:none;scroll-margin-top:18px}
+.repair-chat-shell{display:flex;flex-direction:column;min-height:74vh;padding:20px;background:linear-gradient(155deg,#101b2a,#0b1320);border-color:#385368}
+.reality-dialogue-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.reality-dialogue-head h3{font-size:clamp(23px,4vw,30px);margin:4px 0 5px}
+.reality-dialogue-head p{margin:3px 0 12px;max-width:680px}
+.reality-dialogue-head button{background:#243748;color:#e3f1fb;border:1px solid #557388;margin:0;flex:none}
+#repairChatMessages{flex:1;min-height:300px;height:52vh;max-height:none;overflow-y:auto;border:0;padding:16px 4px;background:transparent;margin:4px 0}
+#repairChatMessages .repair-chat-line{width:fit-content;max-width:88%;padding:14px 16px;border-radius:17px;background:#1a293a;font-size:15px;line-height:1.55;margin-bottom:15px}
+#repairChatMessages .repair-chat-line[data-role="user"]{margin-left:auto;background:#263b50}
+#repairChatMessages .repair-chat-line[data-role="assistant"]{background:transparent;padding-left:2px}
+.reality-chat-composer{border:1px solid #526a80;border-radius:17px;background:#152435;padding:13px;margin-top:10px}
+.reality-chat-composer label{display:block;color:#cfe5f6;font-size:12px;font-weight:600}
+#repairChatPrompt{display:block;width:100%;min-height:66px;resize:vertical;background:transparent;border:none;color:#f4f8ff;font:inherit;font-size:15px;outline-offset:4px;margin:5px 0;padding:7px}
+.reality-chat-compose-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.reality-chat-compose-actions span{font-size:11px;color:#9dafc0}
+.reality-chat-compose-actions button{background:#d9f2e8;color:#173b30;margin:0;min-height:42px;font-size:13px;flex:none}
+.reality-activity{margin:8px 0;padding:12px 15px;border:1px solid #3b5871;border-radius:13px;background:#101d2b}
+.reality-activity[hidden]{display:none!important}
+.reality-activity-head{display:flex;align-items:center;gap:9px;font-size:13px}
+.reality-activity-pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:#9bd6c6;animation:realityPulse 1.3s ease-in-out infinite}
+.reality-activity[data-state="done"] .reality-activity-pulse{animation:none}
+.reality-activity[data-state="error"] .reality-activity-pulse{animation:none;background:#f8bba7}
+@keyframes realityPulse{50%{opacity:.23;transform:scale(.72)}}
+.reality-activity ol{margin:8px 0 4px;padding-left:21px;color:#bbd1e2;font-size:12px;line-height:1.55}
+.reality-activity li{margin:5px 0}
+.reality-activity p{font-size:11px;color:#93a9ba;margin:8px 0 0}
+.reality-work-drawer{margin-top:15px;border:1px solid #364c60;border-radius:13px;padding:13px;background:#101c2a}
+.reality-work-drawer summary{font-size:14px;font-weight:700;cursor:pointer;color:#d0e7f4}
+.reality-work-drawer summary span{display:block;margin-top:4px;font-weight:400;font-size:12px;color:#a8bfce}
+.reality-work-drawer .repair-chat-evidence{margin-top:12px}
+#repairChatStatus{font-size:11px;margin:10px 0 0;padding:9px;background:transparent;border-color:#334b5e}
+@media(max-width:620px){
+ .repair-chat-shell{min-height:78vh;padding:12px}
+ #repairChatMessages{height:48vh;min-height:260px;padding:12px 2px}
+ #repairChatMessages .repair-chat-line{max-width:96%;font-size:14px}
+ .reality-dialogue-head h3{font-size:22px}
+ .reality-dialogue-head button{font-size:12px}
+ .reality-chat-compose-actions{flex-wrap:wrap}
+ .reality-chat-compose-actions span{font-size:10px}
+ .reality-chat-compose-actions button{margin-left:auto}
+}
+
 </style>
 </head>
 <body>
@@ -321,36 +365,50 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <button type="button" id="realityRepairChatTab" role="tab" aria-selected="false" aria-controls="repairChatPanel">Repair Chat · Fix Reality</button>
   </div>
   <section id="repairChatPanel" role="tabpanel" aria-labelledby="realityRepairChatTab" class="repair-chat-shell" hidden>
-    <div class="label">REALITY · CONTINUOUS SELF-REPAIR</div>
-    <h3>Talk to Reality about what needs fixing</h3>
-    <div class="repair-chat-issue" id="repairChatKnownIssueBox">
-      <strong>Original repair case #188 · Independently verify final job receipts</strong>
-      <p id="repairChatKnownIssue" role="status">Known GitHub source issue #188. Current eligibility has not been checked in this session; no customer approval or installation is implied.</p>
-      <a href="https://github.com/maloney2323/Reality/issues/188" target="_blank" rel="noopener noreferrer">View original issue #188 and its failure evidence</a>
-    </div>
-    <p>Reality can investigate real defects, keep the same goal and original job, and queue a governed repair. Discovery and chat do not authorize installation. A verified candidate gets one exact owner approval; after approval Reality's worker installs, resumes the original job, and writes a final receipt.</p>
-    <div class="repair-chat-flow" aria-label="Self-repair stages">
-      <span>1 · Discover verified gap</span><span>2 · Diagnose & test fix</span><span>3 · Review exact upgrade</span><span>4 · Automatic install & resume</span><span>5 · Independently settle</span>
-    </div>
-    <div id="repairChatMessages" class="repair-chat-log" role="log" aria-live="polite" aria-label="Persisted Reality repair conversation"><p class="muted">Open Repair Chat to load your signed-in conversation.</p></div>
-    <label for="repairChatPrompt">What do you want Reality to investigate?</label>
-    <textarea id="repairChatPrompt" maxlength="6000" placeholder="Find why Reality's automatic scheduler and generic self-repair wake-up aren't reliable. Identify the actual failure, build and independently test the smallest governed upgrade, and present the exact installation for my approval."></textarea>
-    <div class="repair-chat-actions">
-      <button type="button" id="repairChatSend">Send to Reality</button>
-      <button type="button" id="repairChatRefresh" class="secondary">Check actual progress</button>
-    </div>
-    <div class="repair-chat-evidence">
-      <h4>Source-backed self-repair</h4>
-      <p>Use these evidence checks to move from talking about a defect to a real worker task. Only independently verified failures can enter the execution path.</p>
-      <div class="repair-chat-actions">
-       <button type="button" id="repairChatFind" class="secondary">Find real missing capabilities</button>
-       <button type="button" id="repairChatStartDiscovery" disabled>Start verified unfinished job</button>
-       <button type="button" id="repairChatReview" class="secondary">Review verified upgrade</button>
+    <header class="reality-dialogue-head">
+      <div><div class="label">REALITY · YOUR CONTINUOUS INTELLIGENCE</div>
+       <h3>What can I work on for you?</h3>
+       <p>Your conversation and work carry forward. Reality reports checks and results, not private internal reasoning.</p></div>
+      <button type="button" id="repairChatRefresh" class="secondary" title="Refresh saved conversation and real job receipts">Refresh</button>
+    </header>
+    <div id="repairChatMessages" class="repair-chat-log" role="log" aria-live="polite" aria-label="Persisted Reality conversation"><p class="muted">Sign in to restore your conversation.</p></div>
+    <section id="repairChatActivity" class="reality-activity" aria-label="Live Reality activity" hidden>
+      <div class="reality-activity-head">
+        <span class="reality-activity-pulse" aria-hidden="true"></span>
+        <strong id="repairChatActivityLabel" role="status" aria-live="polite">Reality is working</strong>
       </div>
-      <p id="repairChatJobState" class="muted" role="status">No verified worker or completion receipt has been read in this tab.</p>
-      <div id="repairChatOpportunities" aria-live="polite"></div>
+      <ol id="repairChatActivityEvents" role="log" aria-live="polite" aria-label="Verified processing checkpoints"></ol>
+      <p>Shows actual request stages and evidence readbacks when available. No hidden reasoning or external action is implied.</p>
+    </section>
+    <div class="reality-chat-composer">
+      <label for="repairChatPrompt">Message Reality</label>
+      <textarea id="repairChatPrompt" maxlength="6000" rows="3" placeholder="Ask anything, or tell Reality what business problem to investigate…"></textarea>
+      <div class="reality-chat-compose-actions"><span>Enter to send · Shift+Enter for a new line</span>
+       <button type="button" id="repairChatSend">Send to Reality</button></div>
     </div>
-    <p id="repairChatStatus" class="repair-chat-status" role="status" aria-live="polite">Sign in to Reality and confirm your existing goal. No repair or installation starts by opening this tab.</p>
+    <details id="repairChatWorkDetails" class="reality-work-drawer">
+      <summary>Work & upgrades <span>Existing case #188 · Evidence, worker status and approvals</span></summary>
+      <div class="repair-chat-issue" id="repairChatKnownIssueBox">
+        <strong>Original repair case #188 · Independently verify final job receipts</strong>
+        <p id="repairChatKnownIssue" role="status">Known GitHub source issue #188. Current eligibility has not been checked in this session; no customer approval or installation is implied.</p>
+        <a href="https://github.com/maloney2323/Reality/issues/188" target="_blank" rel="noopener noreferrer">View original issue #188 and its failure evidence</a>
+      </div>
+      <div class="repair-chat-flow" aria-label="Governed self-repair stages">
+        <span>Discover verified gap</span><span>Diagnose & test</span><span>Review exact upgrade</span><span>Approved installation</span><span>Independent settlement</span>
+      </div>
+      <div class="repair-chat-evidence">
+       <h4>Source-backed self-repair</h4>
+       <p>Only independently verified existing failures can enter execution. Conversation does not authorize installation.</p>
+       <div class="repair-chat-actions">
+        <button type="button" id="repairChatFind" class="secondary">Find real missing capabilities</button>
+        <button type="button" id="repairChatStartDiscovery" disabled>Start verified unfinished job</button>
+        <button type="button" id="repairChatReview" class="secondary">Review verified upgrade</button>
+       </div>
+       <p id="repairChatJobState" class="muted" role="status">No independently verified worker or settlement receipt read in this tab.</p>
+       <div id="repairChatOpportunities" aria-live="polite"></div>
+      </div>
+    </details>
+    <p id="repairChatStatus" class="repair-chat-status" role="status" aria-live="polite">Sign in to Reality to use your persistent conversation. No job starts or approval is granted simply by opening chat.</p>
   </section>
   <section id="privateConversationPanel" role="tabpanel" aria-labelledby="realityConversationTab">
   <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
