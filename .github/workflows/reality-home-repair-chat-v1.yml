@@ -14,6 +14,10 @@ on:
       - 'api/reality/personal-real-repair-candidate.js'
       - 'src/reality-owner-repair-candidate-admission-v1.0.js'
       - 'test/reality-owner-repair-candidate-admission-v1.0.test.js'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-continuity-actual-tail-append-v1.test.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
       - 'api/reality/personal-real-repair-install.js'
       - 'test/reality-one-step-backend-owner-approval-v1.test.js'
       - 'approve-188.html'
@@ -50,6 +54,8 @@ jobs:
           node --test test/reality-one-step-backend-owner-approval-v1.test.js
           node --test test/reality-direct-owner-188-page-v1.test.js
           node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
+          node --test test/reality-continuity-actual-tail-append-v1.test.js
+          node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
           node --test test/reality-preexisting-isolated-source-reconciliation-v1.test.js
           node --test test/reality-github-read-only-preview-token-v1.test.js
           node --test test/reality-approved-repair-background-readiness-v1.test.js
