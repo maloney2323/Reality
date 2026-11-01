@@ -30,6 +30,9 @@ test('repair Home navigation, conversation and exact worker review surfaces are 
    assert.equal(ids.filter(x=>x===name).length,1,name+' has one DOM target');
  }
  assert.match(section,/Source-backed self-repair/);
+ assert.match(section,/id="repairChatKnownIssueBox"/);
+ assert.match(section,/id="repairChatKnownIssue"/);
+ assert.match(section,/Original repair case #188/);
  assert.match(section,/owner approval/);
  assert.match(section,/Independently settle/);
 });
@@ -38,6 +41,8 @@ test('only owner-bound source-backed actions can start an investigation; chat ca
  assert.match(client,/\/api\/reality\/personal-chat/);
  assert.match(client,/request_id:crypto\.randomUUID\(\)/);
  assert.match(client,/\/api\/reality\/personal-real-repair-opportunities/);
+ assert.match(client,/if\(check&&!check\.disabled\)check\.click\(\)/);
+ assert.match(client,/const known188=options\.some/);
  assert.match(client,/AUTHORIZE_SOURCE_VERIFIED_ORIGINAL_REPAIR/);
  assert.match(client,/expected_failed_run_id/);
  assert.match(client,/expected_source_sha/);
