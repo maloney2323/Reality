@@ -3,6 +3,7 @@
 // verifier, never by user JSON, a chat model, or a scheduled guessing pass.
 // This creates only a durable discovery trigger. Installation is separate.
 import {createHash} from 'node:crypto';
+import {createCapabilityValuePassport} from './reality-genuine-capability-value-passport-v1.js';
 
 export const GENUINE_CAPABILITY_LIVE_INTAKE_VERSION='v1';
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -81,6 +82,12 @@ export function createGenuineCapabilityLiveIntake({
    continuity_root_id:owner.continuity_root_id,worldline_id:owner.worldline_id,
    observed_failure:stableFailure(current),
    provider_failure_hash:digest(stableFailure(current)),
+   value_passport:createCapabilityValuePassport({
+    originalWorkId:work,capabilityId:current.capability_id,
+    originalWorkEventId:owner.original_work_event_id,
+    providerFailureRef:current.source_ref,
+    originalBusinessEvidence:owner.original_business_evidence,
+   }),
    installation_authorized:false,original_job_completed:false,
    production_changed:false,
   });
@@ -121,6 +128,8 @@ export function createGenuineCapabilityLiveIntake({
    wake_status:wakeStatus,original_work_id:work,
    trigger_id:queued.trigger_id,
    original_failure_receipt:evidence.event_id,
+   value_passport_source_event_id:evidence.event_id,
+   value_passport_status:stable.value_passport.qualification_status,
    owner_action_required:false,new_job_created:false,
    installation_authorized:false,original_job_completed:false,
    production_changed:false,
