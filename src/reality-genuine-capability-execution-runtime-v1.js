@@ -68,6 +68,14 @@ export function createGenuineOriginalWorkRunner({
    original_work_id:originalWorkId,
    execution_status:result.status,
    capability_response:result.self_repair?.status||null,
+   // Report a trusted intake failure without leaking arbitrary exceptions.
+   intake_attempted:result.self_repair?.intake_attempted===true,
+   handoff_error_code:result.self_repair?.status==='REPAIR_HANDOFF_NEEDS_RECONCILIATION'
+    &&/^(?:GENUINE_CAPABILITY_INTAKE_|GENUINE_PREVIEW_|GENUINE_WAKE_DISPATCH_|GENUINE_EXECUTION_RUNTIME_|GENUINE_CAPABILITY_)[A-Z0-9_]{3,100}$/.test(
+     String(result.self_repair.handoff_error_code||''))
+     ?result.self_repair.handoff_error_code:
+      result.self_repair?.status==='REPAIR_HANDOFF_NEEDS_RECONCILIATION'
+       ?'REPAIR_HANDOFF_UNTRUSTED_FAILURE':null,
    original_job_completed:false,
    new_job_created:false,
    production_changed:false,
