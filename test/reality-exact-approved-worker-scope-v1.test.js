@@ -29,6 +29,7 @@ const scope={status:'CURRENT_OWNER_GOAL_AND_WORK_VERIFIED',
  original_work_event_id:randomUUID(),
  goal_transition_event_id:randomUUID(),goal_id:'user-goal:'+'e'.repeat(32),
  review_commit_sha:'c'.repeat(40),frozen_test_sha256:'d'.repeat(64),
+ frozen_test_path:'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js',
  original_failed_run_id:1234,production_changed:false,
  installation_performed:false,settlement_recorded:false};
 const proof={independently_verified:true,issue_number:178,
@@ -66,6 +67,7 @@ test('fresh original owner, signed lease and goal epoch rechecked on each contin
  assert.equal(pending.jobs[0].original_work_id,lease.original_work_id);
  assert.equal(pending.jobs[0].source_receipt_id,scope.original_work_event_id);
  assert.equal(pending.jobs[0].frozen_test_sha256,scope.frozen_test_sha256);
+  assert.equal(pending.jobs[0].frozen_test_path,scope.frozen_test_path);
  const goal=await adapters.readGoal({conversationId:lease.conversation_id});
  assert.equal(goal.state.active_goal_id,scope.goal_id);
  assert.equal(goal.state.active_goal.last_transition_receipt_id,
