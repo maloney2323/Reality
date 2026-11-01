@@ -11,12 +11,14 @@ const conversation='22222222-2222-4222-8222-222222222222';
 const transition='33333333-3333-4333-8333-333333333333';
 const work='work:'+'a'.repeat(32),runId=99887766,jobId=667788;
 const sourceSha='6e6014f38f9fea382ea93b38418ec77e9158c1ef';
+const deployedSha='b'.repeat(40);
 const sourcePath='src/reality-extensions/real-business-helper.mjs';
 const suitePath='test/reality-frozen-regressions/real-business-helper.test.js';
 const frozen=Buffer.from("import './real-business-helper.mjs';\n",'utf8');
 const hash=createHash('sha256').update(frozen).digest('hex');
 const env={
- VERCEL_ENV:'preview',REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
+ VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_SHA:deployedSha,
+ REALITY_UNIVERSE_PERSISTENCE_ENABLED:'true',
  REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
  REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:project,
  REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:project,
@@ -62,7 +64,8 @@ const state={
  }},
 };
 const root='https://api.github.com/repos/maloney2323/Reality';
-function harness({events=[first,source],providerOK=true,goal=state}={}){
+function harness({events=[first,source],providerOK=true,goal=state,
+ currentCapabilityPresent=false,currentSuiteChanged=false}={}){
  let calls=[];
  const fetchImpl=async input=>{
   calls.push(input);
@@ -79,6 +82,12 @@ function harness({events=[first,source],providerOK=true,goal=state}={}){
     content:frozen.toString('base64')})};
   if(input===root+'/contents/'+sourcePath+'?ref='+sourceSha)
    return {ok:false,status:404};
+  if(input===root+'/contents/'+suitePath+'?ref='+deployedSha)
+   return {ok:true,json:async()=>({path:suitePath,encoding:'base64',
+    content:(currentSuiteChanged?Buffer.from('tampered'):frozen).toString('base64')})};
+  if(input===root+'/contents/'+sourcePath+'?ref='+deployedSha)
+   return currentCapabilityPresent?{ok:true,json:async()=>({path:sourcePath})}:
+    {ok:false,status:404};
   throw Error('UNEXPECTED_PROVIDER_URL');
  };
  return {
@@ -112,7 +121,7 @@ test('current owner source-backed original work makes only provider GETs, return
   source_ref:verified.source_ref,read_only:true,
  });
  assert.deepEqual(again,verified);
- assert.equal(h.calls.length,8);
+ assert.equal(h.calls.length,12);
 });
 test('settled original work is never restarted as a new capability job',async()=>{
  const done={...source,
@@ -151,4 +160,21 @@ test('provider now green cannot be misreported as missing capability',async()=>{
  });
  await assert.rejects(job.independent_verifier.verify(),
   /GENUINE_SOURCE_JOB_ORIGINAL_PROVIDER_RUN_NOT_VERIFIED/);
+});
+
+test('already installed current capability must not enqueue stale historical failure',async()=>{
+ const h=harness({currentCapabilityPresent:true});
+ const job=await h.adapters.loadAuthorizedInternalJob({
+  original_work_id:work,owner_id:owner,conversation_id:conversation,read_only:true,
+ });
+ await assert.rejects(job.independent_verifier.verify(),
+  /GENUINE_SOURCE_JOB_CURRENT_PREVIEW_CAPABILITY_ALREADY_PRESENT/);
+});
+test('altered current frozen acceptance cannot be passed off as original job proof',async()=>{
+ const h=harness({currentSuiteChanged:true});
+ const job=await h.adapters.loadAuthorizedInternalJob({
+  original_work_id:work,owner_id:owner,conversation_id:conversation,read_only:true,
+ });
+ await assert.rejects(job.independent_verifier.verify(),
+  /GENUINE_SOURCE_JOB_CURRENT_PREVIEW_FROZEN_SUITE_CHANGED/);
 });
