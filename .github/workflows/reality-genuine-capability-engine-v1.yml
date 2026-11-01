@@ -25,5 +25,5 @@ jobs:
           node --check src/reality-genuine-capability-engine-v1.js
           node --test test/reality-genuine-capability-engine-v1.test.js
           node --test test/reality-job-triggered-self-repair-v1.0.test.js
-          node --test test/reality-governed-self-improvement-driver-v1.0.test.js
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
           node --test test/reality-governed-execution-engine-v0.1.test.js
