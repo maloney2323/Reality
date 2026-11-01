@@ -2,6 +2,7 @@
 // The caller is an ALREADY AUTHENTICATED internal job executor. A model and
 // a browser cannot supply providerReadback or write an owner authority receipt.
 import {createGenuineCapabilityLiveIntake} from './reality-genuine-capability-live-intake-v1.js';
+import {dispatchGenuineCapabilityWake} from './reality-genuine-capability-github-wakeup-v1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
 import {readFreshPersonalGoalState} from './reality-personal-goal-readback-v0.1.js';
@@ -18,7 +19,7 @@ const canonical=x=>x===null||typeof x!=='object'?x:
 const equal=(x,y)=>JSON.stringify(canonical(x))===JSON.stringify(canonical(y));
 export function createGenuinePreviewLiveIntake({
  session,conversationId,env=process.env,
- providerReadback,workerWake,
+ providerReadback,workerWake=null,
  readGoal=readFreshPersonalGoalState,
  createPersistence=createUniversePostgresPersistence,
  rpcFetch=fetch,
@@ -28,7 +29,7 @@ export function createGenuinePreviewLiveIntake({
   !validUuid(session?.user_id)||!validUuid(conversationId)||
   !session?.config?.url||
   typeof providerReadback!=='function'||
-  typeof workerWake!=='function')
+  (workerWake!==null&&typeof workerWake!=='function'))
   fail('AUTHENTICATED_OR_TRUSTED_PROVIDER_ADAPTER_REQUIRED');
  const db=resolveReliabilityBenchmarkDb(env);
  if(!db?.strictSecrets||!db.secretKey||db.url!==session.config.url||
@@ -184,7 +185,7 @@ export function createGenuinePreviewLiveIntake({
     p_gap_event_id:gap_event_id});
   },
   async signalUnattendedWorker(request){
-   return workerWake(request);
+   return (workerWake||((input)=>dispatchGenuineCapabilityWake({...input,env})))(request);
   },
  });
 }
