@@ -10,7 +10,7 @@ const now=Date.parse('2026-10-31T18:05:00Z');
 const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:preview,
  REALITY_GOVERNED_SCHEDULER_ENABLED:'true'};
 const run=(conclusion='success',extra={})=>({
- id:41227497421,run_number:3,path:workflow,event:'push',
+ id:41227497421,run_number:3,path:workflow,event:'schedule',
  head_branch:'main',head_repository:{full_name:repo},
  status:'completed',conclusion,updated_at:'2026-10-31T18:03:28Z',
  ...extra,
@@ -21,7 +21,7 @@ const fetchWith=runs=>async(url,options)=>{
  assert.match(url,/actions\/runs\?branch=main/);
  return {ok:true,json:async()=>({workflow_runs:runs})};
 };
-test('signed live scheduler passes exact no-secret readiness before one customer approval',async()=>{
+test('actual GitHub cron tick passes exact no-secret readiness before one customer approval',async()=>{
  const result=await verifyApprovedBackgroundReadiness({
   env,fetchImpl:fetchWith([run()]),now});
  assert.equal(result.ready,true);
@@ -37,6 +37,8 @@ test('latest scheduler must be green, exact-main, matching repo and fresh',async
   [run('success',{head_repository:{full_name:'untrusted/repo'}})],
   [run('success',{path:'other.yml'})],
   [run('success',{event:'pull_request'})],
+  [run('success',{event:'push'})],
+  [run('success',{event:'workflow_dispatch'})],
   [],
   [run('success',{updated_at:'2026-10-30T12:00:00Z'})],
   [run('success'),run('failure',{run_number:4,id:41227497422})],
@@ -47,6 +49,35 @@ test('latest scheduler must be green, exact-main, matching repo and fresh',async
   assert.equal(result.ready,false);
   assert.equal(result.original_job_completed,false);
  }
+});
+test('existing branch-scoped credential provides independent immediate wake preflight without pretending cron ran',async()=>{
+ const token='test-credential-that-is-not-a-real-github-secret';
+ const calls=[];
+ const result=await verifyApprovedBackgroundReadiness({
+  env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:token},now,
+  fetchImpl:async(url,opts)=>{
+   calls.push(url);
+   if(url.includes('/actions/runs'))return {ok:true,json:async()=>({workflow_runs:[run('success',{event:'push'})]})};
+   assert.ok(url.endsWith('/git/ref/heads/feature/reality-background-continuation-20261031'));
+   assert.equal(opts.headers.authorization,'Bearer '+token);
+   return {ok:true,json:async()=>({ref:'refs/heads/feature/reality-background-continuation-20261031',object:{sha:'a'.repeat(40)}})};
+  },
+ });
+ assert.equal(result.ready,true);
+ assert.equal(result.code,'GOVERNED_IMMEDIATE_WAKE_READBACK_VERIFIED');
+ assert.equal(calls.length,2);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.original_job_completed,false);
+});
+test('invalid GitHub credential cannot substitute for a never-executed signed scheduler',async()=>{
+ const r=await verifyApprovedBackgroundReadiness({
+  env:{...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'test-credential-that-is-not-a-real-github-secret'},now,
+  fetchImpl:async url=>url.includes('/actions/runs')?
+   {ok:true,json:async()=>({workflow_runs:[run('success',{event:'push'})]})}:
+   {ok:false,status:403},
+ });
+ assert.equal(r.ready,false);
+ assert.equal(r.code,'GOVERNED_SCHEDULER_AUTOMATIC_TICK_NOT_OBSERVED');
 });
 test('production, missing enablement and unreachable provider fail closed',async()=>{
  for(const settings of [

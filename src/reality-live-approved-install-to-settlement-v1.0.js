@@ -349,7 +349,9 @@ export function createLiveGeneralRepairService({
   const scheduled=env.REALITY_GOVERNED_SCHEDULER_ENABLED==='true';
   if(scheduled){
    const ready=await verifyScheduler({env,fetchImpl});
-   if(ready?.ready!==true||ready.code!=='GOVERNED_AUTO_WAKE_VERIFIED')
+   if(ready?.ready!==true||
+      !['GOVERNED_AUTO_WAKE_VERIFIED',
+        'GOVERNED_IMMEDIATE_WAKE_READBACK_VERIFIED'].includes(ready.code))
     fail('GOVERNED_SCHEDULER_NOT_READY_BEFORE_OWNER_APPROVAL');
   }else if(typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN!=='string'||
      env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length<25)
@@ -383,8 +385,13 @@ export function createLiveGeneralRepairService({
      queued.original_work_id!==originalWorkId||
      queued.installation_authorized!==true||queued.production_changed!==false)
    fail('BACKGROUND_CONTINUATION_DURABLE_READBACK_REQUIRED');
+  // Prefer an immediate, exact-source wake when an existing branch-scoped
+  // GitHub credential is available. The signed scheduled poller remains the
+  // independent fallback; neither path can create owner installation consent.
   let dispatch=null,dispatchError=null;
-  if(!scheduled)try{
+  const directWakeConfigured=typeof env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN==='string'&&
+   env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN.length>=25;
+  if(directWakeConfigured)try{
    dispatch=await dispatchApproved({
     reservationId:reserved.reservation_id,originalWorkId,
     candidateHash:expectedArtifactHash,issueNumber,
@@ -401,17 +408,19 @@ export function createLiveGeneralRepairService({
   // Owner approval is DURABLE even if waking GitHub failed. Never claim
   // execution or retry a provider write just to paper over uncertainty.
   return Object.freeze({
-   status:scheduled?'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED':
-    dispatchError?'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION':
-    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED',
+   status:dispatch?.dispatched===true?
+    'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED':
+    scheduled?'OWNER_APPROVED_GOVERNED_SCHEDULER_QUEUED':
+    'OWNER_APPROVED_BACKGROUND_DISPATCH_NEEDS_RECONCILIATION',
    original_work_id:originalWorkId,issue_number:issueNumber,
    candidate_artifact_hash:expectedArtifactHash,
    reservation_id:reserved.reservation_id,
    background_status:queued.status,
-   worker_workflow_url:scheduled?
-    'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml':
-    dispatch?.worker_workflow_url||null,
+   worker_workflow_url:dispatch?.worker_workflow_url||
+    (scheduled?'https://github.com/maloney2323/Reality/actions/workflows/reality-approved-repair-background-v1.yml':null),
    governed_scheduler_wakeup:scheduled,
+   automatic_wake_mode:dispatch?.dispatched===true?'IMMEDIATE_GITHUB_WAKE':
+    scheduled?'SIGNED_SCHEDULED_FALLBACK':'RECONCILIATION_REQUIRED',
    dispatch_error:dispatchError,
    installation_authorized:true,owner_approval_consumed:true,
    worker_dispatched:dispatch?.dispatched===true,

@@ -39,6 +39,7 @@ jobs:
         with: {node-version: '22'}
       - run: node --check src/reality-live-approved-install-to-settlement-v1.0.js
       - run: node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
+      - run: node --test test/reality-approved-repair-background-readiness-v1.test.js
       - run: node --check src/reality-general-approved-repair-continuation-v1.0.js
       - run: node --check api/reality/personal-real-repair-install.js
       - run: node --check src/reality-general-installed-work-verifier-v1.0.js
