@@ -1,0 +1,29 @@
+name: Reality genuine capability engine — original job evidence gate
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'src/reality-genuine-capability-engine-v1.js'
+      - 'test/reality-genuine-capability-engine-v1.test.js'
+      - 'src/reality-execution-self-repair-handoff-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'src/reality-governed-execution-engine-v0.1.js'
+      - '.github/workflows/reality-genuine-capability-engine-v1.yml'
+permissions:
+  contents: read
+jobs:
+  real-original-job-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify code and source-backed original job handoff
+        run: |
+          node --check src/reality-genuine-capability-engine-v1.js
+          node --test test/reality-genuine-capability-engine-v1.test.js
+          node --test test/reality-job-triggered-self-repair-v1.0.test.js
+          node --test test/reality-governed-self-improvement-driver-v1.0.test.js
+          node --test test/reality-governed-execution-engine-v0.1.test.js
