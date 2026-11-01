@@ -114,6 +114,22 @@ export function createGenuineSourceBackedJobAdapters({
   const installed=await getJson(fetchImpl,api+'/contents/'+p.source_path+
    '?ref='+run.head_sha,{allowMissing:true});
   if(installed!==null)fail('HISTORICAL_SOURCE_CAPABILITY_NOT_ABSENT');
+  // Historical failed CI is not enough: reobserve this DEPLOYED isolated
+  // preview commit to reject capabilities already installed since then.
+  const currentSha=String(env.VERCEL_GIT_COMMIT_SHA||'');
+  if(!SHA40.test(currentSha))fail('CURRENT_PREVIEW_COMMIT_REQUIRED');
+  const currentSuite=await getJson(fetchImpl,api+'/contents/'+
+   p.frozen_test_path+'?ref='+currentSha);
+  if(currentSuite?.path!==p.frozen_test_path||
+     currentSuite.encoding!=='base64'||
+     typeof currentSuite.content!=='string'||
+     createHash('sha256').update(Buffer.from(
+       currentSuite.content.replace(/\\s/g,''),'base64')).digest('hex')!==
+       p.frozen_test_sha256)
+   fail('CURRENT_PREVIEW_FROZEN_SUITE_CHANGED');
+  const currentCapability=await getJson(fetchImpl,api+'/contents/'+
+   p.source_path+'?ref='+currentSha,{allowMissing:true});
+  if(currentCapability!==null)fail('CURRENT_PREVIEW_CAPABILITY_ALREADY_PRESENT');
   const cap=p.source_path.split('/').at(-1).replace(/\.mjs$/,'');
   return Object.freeze({
    verified:false,independent:true,independently_verified:true,
