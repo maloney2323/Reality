@@ -70,3 +70,53 @@ test('wrong original source or owner cannot write checkpoint',async()=>{
   /GENERAL_CHECKPOINT_ORIGINAL_GOAL_OR_WORLDLINE_CHANGED/);
  assert.equal(h.writes(),0);
 });
+
+test('checkpoint reobserves chain and hashes a new parent when a concurrent append wins',async()=>{
+ const h=harness();let raced=false,attempts=0;
+ const createPersistence=()=>{
+  const baseStore=h.createPersistence();
+  return {
+   reconstruct:baseStore.reconstruct,
+   async appendEvent(event){
+    attempts++;
+    if(!raced){
+     raced=true;
+     const prior=h.rows.at(-1);
+     const competing=appendContinuityNode({
+      spine,stage:'OBSERVATION',entityId:work,
+      eventId:'77777777-7777-4777-8777-777777777777',
+      parentEventId:prior.event_id,priorLineageHash:prior.lineage_hash,
+      effectiveTime:'2026-10-31T06:00:00.100Z',
+      assertionTime:'2026-10-31T06:00:00.100Z',
+      payload:{event:'another-real-owner-event'},
+     });
+     h.rows.push({...competing,provenance:{...competing.provenance,
+      continuity_spine:{prior_lineage_hash:competing.prior_lineage_hash,
+       transformation_receipt_id:competing.transformation_receipt_id||null}}});
+     throw Error('CONTINUITY_APPEND_NOT_TAIL');
+    }
+    return baseStore.appendEvent(event);
+   },
+  };
+ };
+ const service=createGeneralConstitutionalCheckpointService({
+  session,conversationId:conversation,originalWorkId:work,
+  originalWorkEvidenceRef:original.event_id,db,env,readGoal,createPersistence});
+ const receipt=await service.persistCheckpoint(state);
+ assert.equal(receipt.independent_readback_verified,true);
+ assert.equal(attempts,2);
+ assert.equal(h.rows.at(-1).parent_event_id,'77777777-7777-4777-8777-777777777777');
+ assert.equal((await service.readLatestCheckpoint()).state.head_hash,state.head_hash);
+});
+test('non-tail failure cannot bypass genuine fork/integrity errors',async()=>{
+ const h=harness();let appendCalls=0;
+ const createPersistence=()=>({
+  reconstruct:async()=>h.rows,
+  appendEvent:async()=>{appendCalls++;throw Error('CONTINUITY_LINEAGE_HASH_INVALID');},
+ });
+ const service=createGeneralConstitutionalCheckpointService({
+  session,conversationId:conversation,originalWorkId:work,
+  originalWorkEvidenceRef:original.event_id,db,env,readGoal,createPersistence});
+ await assert.rejects(service.persistCheckpoint(state),/CONTINUITY_LINEAGE_HASH_INVALID/);
+ assert.equal(appendCalls,1);
+});
