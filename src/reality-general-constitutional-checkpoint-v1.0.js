@@ -110,15 +110,20 @@ export function createGeneralConstitutionalCheckpointService({
  async function persistCheckpoint(state){
   const {goal,spine}=await trustedGoal();
   checkState(state,goal,spine);
-  const {history}=await source(spine);
   const id=receiptId(state);
-  const existing=history.filter(e=>e.event_id===id);
-  if(existing.length>1)fail('DUPLICATE_CHECKPOINT_ID');
   const p=evidenceOf(state);
-  if(existing.length){
-   if(existing[0].entity_type!=='reality_general_constitutional_checkpoint'||
-    !same(existing[0].payload,p))fail('CHECKPOINT_BYTES_CONFLICT');
-  }else{
+  // A concurrent legitimate conversation event may advance the same
+  // worldline between reconstruct and append. Rebuild the node from the
+  // NEW independently verified parent, never weaken its hash verification.
+  for(let attempt=0;attempt<3;attempt++){
+   const {history}=await source(spine);
+   const existing=history.filter(e=>e.event_id===id);
+   if(existing.length>1)fail('DUPLICATE_CHECKPOINT_ID');
+   if(existing.length){
+    if(existing[0].entity_type!=='reality_general_constitutional_checkpoint'||
+     !same(existing[0].payload,p))fail('CHECKPOINT_BYTES_CONFLICT');
+    return readCheckpoint(state);
+   }
    const tail=history.at(-1);
    if(!tail?.event_id||!tail?.lineage_hash)
     fail('CONTINUITY_TAIL_UNAVAILABLE');
@@ -131,10 +136,21 @@ export function createGeneralConstitutionalCheckpointService({
     payload:p,provenance:{source:'reality-general-constitutional-checkpoint-v1',
      principal_id:session.user_id,conversation_id:conversationId},
    });
-   await store.appendEvent({...node,
-    entity_type:'reality_general_constitutional_checkpoint'});
+   try{
+    await store.appendEvent({...node,
+     entity_type:'reality_general_constitutional_checkpoint'});
+    return readCheckpoint(state);
+   }catch(error){
+    const code=String(error?.message||'');
+    // These are retriable chain-advance conflicts only. All other errors,
+    // especially fork, content hash or owner-scope violations, fail closed.
+    if(!['CONTINUITY_APPEND_NOT_TAIL',
+      'CONTINUITY_PRIOR_LINEAGE_HASH_MISMATCH',
+      'CONTINUITY_EVENT_ID_COLLISION'].includes(code))throw error;
+    if(attempt===2)fail('CONCURRENT_CONTINUITY_APPEND_RETRY_EXHAUSTED');
+   }
   }
-  return readCheckpoint(state);
+  fail('CONCURRENT_CONTINUITY_APPEND_RETRY_EXHAUSTED');
  }
  async function readLatestCheckpoint(){
   const {goal,spine}=await trustedGoal();
