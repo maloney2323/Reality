@@ -260,9 +260,19 @@ export async function executeAuthorizedWork({
          response?.new_job_created!==false||
          response?.original_job_completed===true)
         throw Error('REPAIR_NOT_YET_CUSTOMER_SETTLED');
+      const durable=response.status==='GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'&&
+        /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(
+         String(response.trigger_id||''))&&
+        response.original_work_id===originalWorkId;
       selfRepair=Object.freeze({
         status:response.status||'REPAIR_HANDOFF_RECORDED',
         original_work_id:originalWorkId,
+        queue_trigger_id:durable?response.trigger_id:null,
+        wake_status:durable&&['WORKER_WAKE_DISPATCHED',
+         'WORKER_WAKE_NEEDS_RECONCILIATION'].includes(response.wake_status)?
+          response.wake_status:null,
+        value_passport_status:durable?
+         response.value_passport_status||null:null,
         new_job_created:false,
         owner_action_required:response.owner_action_required===true,
         original_job_completed:false,
