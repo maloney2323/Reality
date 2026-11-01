@@ -323,6 +323,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <section id="repairChatPanel" role="tabpanel" aria-labelledby="realityRepairChatTab" class="repair-chat-shell" hidden>
     <div class="label">REALITY · CONTINUOUS SELF-REPAIR</div>
     <h3>Talk to Reality about what needs fixing</h3>
+    <div class="repair-chat-issue" id="repairChatKnownIssueBox">
+      <strong>Original repair case #188 · Independently verify final job receipts</strong>
+      <p id="repairChatKnownIssue" role="status">Known GitHub source issue #188. Current eligibility has not been checked in this session; no customer approval or installation is implied.</p>
+      <a href="https://github.com/maloney2323/Reality/issues/188" target="_blank" rel="noopener noreferrer">View original issue #188 and its failure evidence</a>
+    </div>
     <p>Reality can investigate real defects, keep the same goal and original job, and queue a governed repair. Discovery and chat do not authorize installation. A verified candidate gets one exact owner approval; after approval Reality's worker installs, resumes the original job, and writes a final receipt.</p>
     <div class="repair-chat-flow" aria-label="Self-repair stages">
       <span>1 · Discover verified gap</span><span>2 · Diagnose & test fix</span><span>3 · Review exact upgrade</span><span>4 · Automatic install & resume</span><span>5 · Independently settle</span>
@@ -3856,7 +3861,14 @@ setInterval(refreshSavedShiftHome,300000);
     return;
    }
    setStatus('Reading your saved conversation and verified worker state. Nothing is being installed.');
-   try{await Promise.all([loadChat(),refreshProof()]);setStatus('Reality is ready to investigate. Chat is cognition only; use verified source-backed work and a separate exact-owner installation approval.');}
+   try{
+    await Promise.all([loadChat(),refreshProof()]);
+    setStatus('Checking source-backed repair eligibility. This read-only check cannot create a job, grant approval or install code.');
+    // Automatically discover existing verified repairs when Repair Chat opens;
+    // this is provider readback ONLY, not owner authorization.
+    const check=el('repairChatFind');
+    if(check&&!check.disabled)check.click();
+   }
    catch(e){setStatus('Some evidence could not be read: '+String(e.message||'UNAVAILABLE')+'. No work is authorized.','blocked');}
    el('repairChatPanel').scrollIntoView({behavior:'smooth',block:'start'});
   }
@@ -3905,6 +3917,12 @@ setInterval(refreshSavedShiftHome,300000);
   try{
    const found=await read('/api/reality/personal-real-repair-opportunities');
    const options=Array.isArray(found.opportunities)?found.opportunities:[];
+   const known188=options.some(item=>item.issue_number===188&&
+     Number.isSafeInteger(item.original_provider_failed_run_id)&&
+     sha.test(String(item.source_sha||''))&&item.independently_verified===true);
+   el('repairChatKnownIssue').textContent=known188?
+    'GitHub #188 is independently source-verified and eligible for your review below. No investigation or installation has been authorized by this check.':
+    'GitHub #188 was not returned as an eligible verified repair. The original issue still exists; no customer work or approval has been created by this check.';
    if(!options.length){
     const p=document.createElement('p');
     p.textContent='No independently verified missing-extension repair is currently eligible. An intermittent scheduler failure alone is not a frozen source-backed upgrade. Reality must establish new failure evidence before installation can be approved.';
@@ -3961,7 +3979,10 @@ setInterval(refreshSavedShiftHome,300000);
     list.append(box);
    }
    setStatus('Only independently verified source gaps are listed. Select one exact issue to authorize investigation. No installation approval has been created.','verified');
-  }catch(e){setStatus('Provider source verification unavailable: '+String(e.message)+'. No repair was started.','blocked');}
+  }catch(e){
+   el('repairChatKnownIssue').textContent='Could not verify GitHub #188 live: '+String(e.message||'PROVIDER_READBACK_UNAVAILABLE')+'. No action authorized.';
+   setStatus('Provider source verification unavailable: '+String(e.message)+'. No repair was started.','blocked');
+  }
   finally{button.disabled=false;}
  });
  el('repairChatStartDiscovery').addEventListener('click',async()=>{
