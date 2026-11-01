@@ -205,3 +205,16 @@ test('handoff never conceals missing durable readback or altered runtime evidenc
   independent_failure:{...original,source_ref:'https://github.com/maloney2323/Reality/actions/runs/9999'}}),
   /GENUINE_CAPABILITY_RUNTIME_FAILURE_AND_PROVIDER_EVIDENCE_DISAGREE/);
 });
+
+test('job-agnostic trusted connector receipt supports non-GitHub customer work',async()=>{
+ const inventoryRef='reality:provider-verified:inventory:observation-5500-original-work';
+ const observed={...original,source_ref:inventoryRef};
+ const proof={...providerProof,source_ref:inventoryRef,
+  provider_run_ref:'reality:provider-verified:inventory:frozen-reproduction-5500'};
+ const f=fixture({observation:observed,reobserved:observed,proof});
+ const result=await f.engine.run({originalWorkId:WORK,scope});
+ assert.equal(result.status,'OWNER_APPROVAL_REQUIRED');
+ assert.equal(result.confirmed_gap.original_failure_ref,inventoryRef);
+ assert.equal(result.production_changed,false);
+ assert.equal(f.calls().drivers,1);
+});
