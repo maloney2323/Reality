@@ -40,6 +40,11 @@ function harness({source=failure,goalOverride={},queuedPhase='PENDING_FROZEN_REP
   readOriginalProviderFailure:async()=>{called.push('provider');return source;},
   persistGapAndReadback:async receipt=>{
    called.push('persist');assert.equal(receipt.owner_id,owner);
+   assert.equal(receipt.value_passport.original_work_id,work);
+   assert.equal(receipt.value_passport.original_work_event_id,originalEvent);
+   assert.equal(receipt.value_passport.technical_gap_source_ref,failure.source_ref);
+   assert.equal(receipt.value_passport.estimated_annual_net_value_usd,null);
+   assert.equal(receipt.value_passport.reuse_authorized,false);
    assert.equal(receipt.installation_authorized,false);
    assert.equal(receipt.original_job_completed,false);
    return {independently_verified:durable,event_id:gapEvent,
@@ -68,6 +73,8 @@ test('original live executor failure is observed, persisted, enqueued and wakes 
  assert.equal(result.status,'GENUINE_CAPABILITY_GAP_DURABLY_QUEUED');
  assert.equal(result.wake_status,'WORKER_WAKE_DISPATCHED');
  assert.equal(result.trigger_id,trigger);
+ assert.equal(result.value_passport_source_event_id,gapEvent);
+ assert.equal(result.value_passport_status,'BUSINESS_VALUE_ASSESSMENT_PENDING');
  assert.deepEqual(h.called,['goal','provider','persist','queue','wake']);
  assert.equal(result.new_job_created,false);
  assert.equal(result.installation_authorized,false);
