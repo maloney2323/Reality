@@ -33,8 +33,11 @@ test('repair Home navigation, conversation and exact worker review surfaces are 
  assert.match(section,/id="repairChatKnownIssueBox"/);
  assert.match(section,/id="repairChatKnownIssue"/);
  assert.match(section,/Original repair case #188/);
- assert.match(section,/owner approval/);
- assert.match(section,/Independently settle/);
+ assert.match(section,/id="repairChatActivity"/);
+ assert.match(section,/id="repairChatActivityEvents"/);
+ assert.match(section,/id="repairChatWorkDetails"/);
+ assert.match(section,/Approved installation/);
+ assert.match(section,/Independent settlement/);
 });
 test('only owner-bound source-backed actions can start an investigation; chat cannot install',()=>{
  assert.ok(client);
@@ -65,5 +68,10 @@ test('no synthetic success or install triggered by viewing, asking or queuing',(
  assert.match(client,/repairChatStartDiscovery/);
  assert.match(client,/worker_dispatch_started===true/);
  assert.match(client,/source and a separate exact approval/);
+ assert.match(client,/headers:\{'content-type':'application\/json','accept':'text\/event-stream'\}/);
+ assert.match(client,/activityStages\.has\(data\.stage\)/);
+ assert.match(client,/CHAT_STREAM_INCOMPLETE_RECONCILE/);
+ assert.match(client,/result\.continuity\?\.current_answer_persisted!==true/);
+ assert.match(client,/activityEnd\(true\)/);
  assert.doesNotMatch(client,/result\.original_job_completed=true/);
 });
