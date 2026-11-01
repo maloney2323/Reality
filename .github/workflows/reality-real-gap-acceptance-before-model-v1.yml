@@ -12,6 +12,8 @@ on:
       # one-step approval and external-source reconciliation code changes.
       - 'approve-188.html'
       - 'api/reality/personal-real-repair-install.js'
+      - 'api/reality/personal-real-repair-candidate.js'
+      - 'test/reality-direct-owner-188-page-v1.test.js'
       - 'api/reality/approve-188.js'
       - 'src/reality-live-approved-install-to-settlement-v1.0.js'
       - 'src/reality-general-installed-work-verifier-v1.0.js'
