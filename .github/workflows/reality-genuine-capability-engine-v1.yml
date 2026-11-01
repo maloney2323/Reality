@@ -4,6 +4,8 @@ on:
     branches: [feature/reality-general-capability-engine-20261101]
     paths:
       - 'src/reality-genuine-capability-engine-v1.js'
+      - 'src/reality-genuine-capability-failure-classifier-v1.js'
+      - 'test/reality-genuine-capability-failure-classifier-v1.test.js'
       - 'src/reality-genuine-capability-live-intake-v1.js'
       - 'src/reality-genuine-capability-github-wakeup-v1.js'
       - 'scripts/reality-genuine-capability-worker-v1.mjs'
@@ -40,6 +42,7 @@ jobs:
       - name: Verify code and source-backed original job handoff
         run: |
           node --check src/reality-genuine-capability-engine-v1.js
+          node --test test/reality-genuine-capability-failure-classifier-v1.test.js
           node --test test/reality-genuine-capability-engine-v1.test.js
           node --test test/reality-genuine-capability-live-intake-v1.test.js
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
