@@ -147,7 +147,8 @@ test('signed-in owner confirms new source-backed issue against existing goal and
  const args={session,conversationId,issueNumber,
   expectedFailedRunId:runId,expectedSourceSha:sha,env,
   discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
-  readGoal:h.readGoal,createPersistence:h.createPersistence};
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+  checkOwnerOriginalIdentity:async()=>({status:'OWNER_ORIGINAL_IDENTITY_VERIFIED'})};
  const result=await authorizeExistingRealRepairWork(args);
  assert.equal(result.status,'REAL_OWNER_ORIGINAL_WORK_CONFIRMED');
  assert.equal(result.installation_authorized,false);
@@ -168,7 +169,8 @@ test('changed provider source or foreign owner conversation cannot create work',
  const h=setup(),args={session,conversationId,issueNumber,
   expectedFailedRunId:runId,expectedSourceSha:'e'.repeat(40),env,
   discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
-  readGoal:h.readGoal,createPersistence:h.createPersistence};
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+  checkOwnerOriginalIdentity:async()=>({status:'OWNER_ORIGINAL_IDENTITY_VERIFIED'})};
  await assert.rejects(authorizeExistingRealRepairWork(args),
   /REALITY_REAL_REPAIR_ISSUE_CHANGED_SINCE_OWNER_REVIEW/);
  await assert.rejects(authorizeExistingRealRepairWork({

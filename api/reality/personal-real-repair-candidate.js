@@ -15,6 +15,7 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('REAL_REPAIR_CANDIDATE_'+x)};
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
+ let stage='AUTHENTICATED_SOURCE_READBACK';
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method)){
@@ -47,7 +48,11 @@ export default async function handler(req,res){
    if(!jobs.length)return res.status(200).json({
     ok:true,status:'NO_SIGNED_OWNER_REPAIR_WORK_AWAITING_INSTALL',
     installation_authorized:false,original_job_completed:false});
-   const job=jobs[0];originalWorkId=job.original_work_id;
+   // The default review should prioritize the newest existing real issue,
+   // not a later duplicate investigation for an older settled issue.
+   const ordered=[...jobs].sort((a,b)=>
+    Number(b.issue_url.split('/').at(-1))-Number(a.issue_url.split('/').at(-1)));
+   const job=ordered[0];originalWorkId=job.original_work_id;
    issueNumber=Number(job.issue_url.split('/').at(-1));
   }else{
    if(!req.headers?.origin)
@@ -85,6 +90,7 @@ export default async function handler(req,res){
   });
   if(proof.candidate_artifact_sha256!==req.body.candidate_artifact_hash)
    fail('REVIEWED_CANDIDATE_BYTES_CHANGED');
+  stage='PERSIST_PREAPPROVAL_CHECKPOINT';
   const ready=await prepareVerifiedOwnerRepairCandidate({
    session,expectedOriginalWorkId:originalWorkId,issueNumber,
   });
@@ -98,11 +104,19 @@ export default async function handler(req,res){
   });
  }catch(error){
   const code=String(error?.message||'');
+  const safe=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_|UNFINISHED_|PERSONAL_GOAL_|RELIABILITY_|GOAL_LEDGER_|SELF_IMPROVEMENT_|CONTINUITY_|GOVERNED_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
+  const diagnostic=safe.test(code)?code:
+   'REAL_REPAIR_CANDIDATE_INDEPENDENT_PROVIDER_RECONCILIATION_REQUIRED';
+  const substage=typeof error?.preparation_stage==='string'&&
+   /^(?:OWNER_WORK_AND_PROVIDER_READBACK|CHECKPOINT_SERVICE_INITIALIZATION|READ_EXISTING_OWNER_CHECKPOINT|CREATE_ORIGINAL_GOVERNED_STATE|VERIFY_ORIGINAL_GAP_OBSERVATION|PERSIST_ORIGINAL_GAP_CHECKPOINT|PROPOSE_EXACT_MODEL_CANDIDATE|PERSIST_EXACT_CANDIDATE_CHECKPOINT|REVERIFY_INDEPENDENT_SANDBOX|PERSIST_SANDBOX_CHECKPOINT|FINAL_INDEPENDENT_CHECKPOINT_READBACK)$/.test(error.preparation_stage)?
+    error.preparation_stage:'UNCLASSIFIED_CHECKPOINT_STAGE';
+  console.warn('REALITY_PREAPPROVAL_CHECKPOINT_BLOCKED',
+   JSON.stringify({stage,substage,error:diagnostic,owner_approval_created:false,
+     original_job_completed:false,production_changed:false}));
   return res.status(error?.status||503).json({
-   ok:false,error:/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_)[A-Z0-9_]{4,140}$/.test(code)?
-    code:'REAL_REPAIR_CANDIDATE_INDEPENDENT_PROVIDER_RECONCILIATION_REQUIRED',
-   installation_authorized:false,original_job_completed:false,
-   production_changed:false,
+   ok:false,error:diagnostic,failed_stage:stage,failed_substage:substage,
+   owner_approval_created:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,
   });
  }
 }

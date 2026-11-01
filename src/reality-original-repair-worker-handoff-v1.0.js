@@ -35,7 +35,6 @@ export async function assertOwnerOriginalIssueIdentity({
  call=invoke,
 }={}){
  if(env.VERCEL_ENV!=='preview'||
-    env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED!=='true'||
     !validUuid(session?.user_id)||!WORK.test(String(expectedOriginalWorkId||''))||
     !Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('OWNER_ORIGINAL_IDENTITY_PREVIEW_SCOPE_REQUIRED');
@@ -65,7 +64,6 @@ export async function queueVerifiedOriginalRepair({
 }={}){
  if(env.VERCEL_ENV!=='preview'||
     env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
-    env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED!=='true'||
     !validUuid(session?.user_id)||!session.config?.url||
     !validUuid(work?.original_conversation_id)||
     !validUuid(work?.source_receipt_id)||

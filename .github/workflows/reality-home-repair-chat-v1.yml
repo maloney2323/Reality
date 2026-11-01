@@ -1,0 +1,68 @@
+name: Reality — Home Repair Chat bounded UI contract
+on:
+  push:
+    branches:
+      - feature/reality-home-repair-chat-20261031
+    paths:
+      - 'index.html'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-chat-live-activity-stream-v1.js'
+      - 'test/reality-chat-live-activity-stream-v1.test.js'
+      - 'test/reality-github-read-only-preview-token-v1.test.js'
+      - 'src/reality-real-verified-repair-readback-v1.0.js'
+      - 'src/reality-real-repair-opportunity-intake-v1.0.js'
+      - 'api/reality/personal-real-repair-candidate.js'
+      - 'src/reality-owner-repair-candidate-admission-v1.0.js'
+      - 'test/reality-owner-repair-candidate-admission-v1.0.test.js'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'src/reality-general-constitutional-checkpoint-v1.0.js'
+      - 'test/reality-continuity-actual-tail-append-v1.test.js'
+      - 'test/reality-general-constitutional-checkpoint-v1.0.test.js'
+      - 'api/reality/personal-real-repair-install.js'
+      - 'test/reality-one-step-backend-owner-approval-v1.test.js'
+      - 'approve-188.html'
+      - 'test/reality-direct-owner-188-page-v1.test.js'
+      - 'test/reality-preexisting-isolated-source-reconciliation-v1.test.js'
+      - 'src/reality-general-installed-work-verifier-v1.0.js'
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'test/reality-home-repair-chat-ui-v1.test.js'
+      - 'test/reality-live-real-issue-188-review-v1.test.js'
+      - 'test/reality-approved-repair-background-readiness-v1.test.js'
+      - 'src/reality-approved-repair-background-readiness-v1.0.js'
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'test/reality-live-approved-install-to-settlement-v1.0.test.js'
+      - '.github/workflows/reality-home-repair-chat-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  static-repair-chat-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify Home UI syntax, real authenticated chat and action boundaries
+        run: |
+          node --test test/reality-home-repair-chat-ui-v1.test.js
+          node --test test/reality-chat-live-activity-stream-v1.test.js
+          node --test test/reality-one-step-backend-owner-approval-v1.test.js
+          node --test test/reality-direct-owner-188-page-v1.test.js
+          node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
+          node --test test/reality-continuity-actual-tail-append-v1.test.js
+          node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
+          node --test test/reality-preexisting-isolated-source-reconciliation-v1.test.js
+          node --test test/reality-github-read-only-preview-token-v1.test.js
+          node --test test/reality-approved-repair-background-readiness-v1.test.js
+          node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
+      - name: Independently reobserve real #188 failed GitHub CI and exact model candidate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node --test test/reality-live-real-issue-188-review-v1.test.js
+      - name: Boundary statement
+        run: echo 'UI contract verified only. No autonomous worker, installation, owner approval or production update was executed.'

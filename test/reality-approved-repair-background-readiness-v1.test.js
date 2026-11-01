@@ -30,6 +30,18 @@ test('signed live scheduler passes exact no-secret readiness before one customer
  assert.equal(result.original_job_completed,false);
  assert.equal(result.production_changed,false);
 });
+test('new Home Repair Chat preview uses same signed scheduler without broad production access',async()=>{
+ const current={...env,VERCEL_GIT_COMMIT_REF:'feature/reality-home-repair-chat-20261031'};
+ const checked=await verifyApprovedBackgroundReadiness({
+  env:current,fetchImpl:fetchWith([run()]),now});
+ assert.equal(checked.ready,true);
+ assert.equal(checked.installation_authorized,false);
+ assert.equal(checked.original_job_completed,false);
+ const other=await verifyApprovedBackgroundReadiness({
+  env:{...env,VERCEL_GIT_COMMIT_REF:'feature/reality-other-not-approved'},
+  fetchImpl:async()=>{throw Error('DO_NOT_FETCH')},now});
+ assert.equal(other.ready,false);
+});
 test('latest scheduler must be green, exact-main, matching repo and fresh',async()=>{
  const variations=[
   [run('failure')],

@@ -45,7 +45,8 @@ export async function verifyRealMissingRepairIssue({
 }={}){
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('GITHUB_ISSUE_ID_REQUIRED');
- const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||env.GITHUB_TOKEN||null;
+ const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+  env.REALITY_FIRST178_GITHUB_READ_TOKEN||env.GITHUB_TOKEN||null;
  const issue=await provider('issues/'+issueNumber,{token,fetchImpl});
  if(issue.number!==issueNumber||issue.state!=='open'||issue.pull_request||
   issue.repository_url!==ROOT.slice(0,-1))
@@ -98,7 +99,8 @@ export async function discoverRealRepairOpportunities({
 }={}){
  if(!Number.isInteger(maxIssues)||maxIssues<1||maxIssues>40)
   fail('BOUNDED_PROVIDER_DISCOVERY_REQUIRED');
- const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
+ const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+  env.REALITY_FIRST178_GITHUB_READ_TOKEN||null;
  const issues=await provider('issues?state=open&per_page='+maxIssues,
   {token,fetchImpl});
  if(!Array.isArray(issues)||issues.length>maxIssues)
@@ -167,8 +169,10 @@ export async function authorizeExistingRealRepairWork({
  if(!WORK.test(workId))fail('ORIGINAL_WORK_ID_INVALID');
  // An issue's earlier authorized customer job retains its original work ID.
  // Stop BEFORE creating any new Continuity event when one exists elsewhere.
- if(env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true')
-  await checkOwnerOriginalIdentity({
+ // Always check the owner's existing original-issue identity BEFORE writing,
+ // even when optional auto-trigger dispatch is disabled. Otherwise the same
+ // settled or escalated issue can be admitted as a second customer job.
+ await checkOwnerOriginalIdentity({
    session,issueNumber,expectedOriginalWorkId:workId,env,
   });
  const receiptId=continuityUuidFromSource(

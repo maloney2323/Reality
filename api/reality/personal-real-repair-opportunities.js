@@ -13,6 +13,8 @@ import {queueVerifiedOriginalRepair}
  from '../../src/reality-original-repair-worker-handoff-v1.0.js';
 import {autoPrepareOriginalJobCandidate}
  from '../../src/reality-governed-auto-trigger-candidate-v1.0.js';
+import {prepareVerifiedOwnerRepairCandidate}
+ from '../../src/reality-owner-repair-candidate-admission-v1.0.js';
 export const maxDuration=120;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -52,6 +54,35 @@ export default async function handler(req,res){
    expectedFailedRunId:data.expected_failed_run_id,
    expectedSourceSha:data.expected_source_sha,
   });
+  // Existing owner-authorized work already has generated, independently tested
+  // candidate evidence. Prepare that exact work for owner review first,
+  // without dispatching a second job or granting installation authority.
+  let candidateReadbackError=null;
+  try{
+   const ready=await prepareVerifiedOwnerRepairCandidate({
+    session,expectedOriginalWorkId:work.original_work_id,
+    issueNumber:data.issue_number,
+   });
+   if(ready.status!=='EXACT_CANDIDATE_AWAITING_SIGNED_OWNER_INSTALL_APPROVAL'||
+      ready.original_work_id!==work.original_work_id||
+      ready.independent_readback_verified!==true||
+      ready.owner_installation_approved!==false||
+      ready.original_job_completed!==false||
+      ready.production_changed!==false)
+    throw Error('REAL_REPAIR_CANDIDATE_UNTRUSTED_PREPARATION');
+   return res.status(202).json({
+    ok:true,...ready,
+    original_conversation_id:work.original_conversation_id,
+    owner_work_receipt_ref:work.source_receipt_id,
+    investigation_authorized:true,installation_authorized:false,
+    owner_action_required:true,worker_dispatch_started:false,
+    original_job_completed:false,production_changed:false,
+   });
+  }catch(error){
+   const code=String(error?.message||'');
+   candidateReadbackError=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|GENERAL_CHECKPOINT_)[A-Z0-9_]{4,140}$/.test(code)?
+    code:'REAL_REPAIR_CANDIDATE_RECONCILIATION_REQUIRED';
+  }
   // Governed auto-trigger: after the existing signed-in owner-authorized
   // investigation, continue automatically into the ALREADY independently
   // verified candidate/checkpoint if present. This does not install anything.
@@ -89,6 +120,7 @@ export default async function handler(req,res){
    const code=String(error?.message||'');
    return res.status(202).json({
     ok:true,status:'REAL_OWNER_WORK_SAVED_WORKER_DISPATCH_BLOCKED',
+    candidate_readback_error:candidateReadbackError,
     original_work_id:work.original_work_id,
     original_conversation_id:work.original_conversation_id,
     issue_url:work.issue_url,

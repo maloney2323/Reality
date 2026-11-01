@@ -22,7 +22,10 @@ export async function readExactModelRepairEvidence({
   fail('ISOLATED_PREVIEW_BRANCH_REQUIRED');
  if(sourceCommitSha!==null&&!/^[a-f0-9]{40}$/.test(String(sourceCommitSha)))
   fail('APPROVED_REVIEW_COMMIT_SHA_INVALID');
- const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
+ // Use the existing preview-scoped read-only GitHub credential for all
+ // independently verified repairs. Never require a write token for readback.
+ const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+  env.REALITY_FIRST178_GITHUB_READ_TOKEN||null;
  async function get(path){
   const response=await fetchImpl(ROOT+path,{method:'GET',
    cache:'no-store',redirect:'error',headers:{
