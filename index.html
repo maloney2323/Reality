@@ -3479,6 +3479,7 @@ setInterval(refreshSavedShiftHome,300000);
   try{await loadSaved();await loadConversations();void wcLoadCompletionReports()}catch(e){status(e.message)}
  };
  let confirmedActiveGoal=null;
+ let automaticExactReviewStarted=false;
  async function loadGoals(){
   const label=el('privateGoalStatus');
   try{
@@ -3607,6 +3608,16 @@ setInterval(refreshSavedShiftHome,300000);
    (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
   el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
   await loadGoals();
+  // Existing owner-authorized repairs may already have independently tested
+  // source. Start READBACK and checkpoint preparation automatically after
+  // signed-in goal recovery. This cannot approve or install code.
+  if(confirmedActiveGoal&&!automaticExactReviewStarted&&
+     el('privateReady').style.display==='block'){
+   automaticExactReviewStarted=true;
+   const verifier=el('wcReadModelRepair');
+   if(typeof verifier?.onclick==='function'&&!verifier.disabled)
+    void verifier.onclick();
+  }
  }
  async function init(){
   // Never hide the account section when a preview auth check is slow,
