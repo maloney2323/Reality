@@ -146,5 +146,55 @@ export function createIndependentInstalledWorkVerifier({
    production_changed:false,
   });
  }
- return Object.freeze({inspectInstalled,observeOriginalRun});
+ async function inspectPreexistingAtReviewCommit({
+  installed,candidate,originalWorkId,expectedReviewSha,
+  expectedFrozenTestPath,expectedFrozenSha,
+ }={}){
+  // An independently merged preview source can already exist BEFORE an owner
+  // signs permission to continue the customer job. Verify it without
+  // pretending this approval caused the earlier GitHub installation.
+  if(installed?.kind!=='ISOLATED_GITHUB_SOURCE_INSTALLED'||
+    !work(originalWorkId)||installed.original_work_id!==originalWorkId||
+    !sha40(expectedReviewSha)||
+    installed.installed_commit_sha!==expectedReviewSha||
+    !sha40(installed.installed_commit_sha)||
+    !/^feature\/reality-[a-z0-9][a-z0-9/-]{5,105}$/.test(
+      String(installed.installed_branch||''))||
+    !Array.isArray(candidate?.files)||candidate.files.length<2||
+    candidate.files.some(f=>!allowed(f.path)||typeof f.content!=='string')||
+    hash(candidate.files.map(f=>({path:f.path,content:f.content})))!==
+     installed.artifact_hash||
+    installed.provider_bytes_readback_verified!==true||
+    installed.production_changed!==false)
+   fail('PREEXISTING_PREVIEW_SOURCE_NOT_TRUSTED');
+  const ref=await get('/git/ref/heads/'+installed.installed_branch);
+  if(ref?.object?.sha!==installed.installed_commit_sha)
+   fail('PREEXISTING_INSTALL_HEAD_CHANGED');
+  for(const file of candidate.files){
+   const contents=await get('/contents/'+file.path+'?ref='+installed.installed_commit_sha);
+   if(contents.encoding!=='base64'||
+    Buffer.from(String(contents.content||'').replace(/\s/g,''),'base64').toString('utf8')!==file.content)
+    fail('PREEXISTING_INSTALLED_BYTES_MISMATCH');
+  }
+  const acceptance=await observeOriginalRun({
+   installedCommitSha:installed.installed_commit_sha,
+   installedBranch:installed.installed_branch,
+   originalWorkId,expectedFrozenTestPath,expectedFrozenSha,
+  });
+  if(acceptance.complete!==true||
+    acceptance.original_frozen_tests_passed!==true||
+    acceptance.governance_tests_passed!==true||
+    acceptance.installed_commit_sha!==installed.installed_commit_sha)
+   fail('PREEXISTING_ORIGINAL_ACCEPTANCE_PENDING');
+  return Object.freeze({
+   verified:true,independent_provider_readback:true,
+   original_work_id:originalWorkId,
+   installed_commit_sha:installed.installed_commit_sha,
+   source_preexisted_owner_installation_approval:true,
+   source_bytes_sha256:installed.artifact_hash,
+   original_acceptance_run_id:acceptance.provider_run_id,
+   production_changed:false,
+  });
+ }
+ return Object.freeze({inspectInstalled,inspectPreexistingAtReviewCommit,observeOriginalRun});
 }
