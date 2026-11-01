@@ -94,6 +94,15 @@ export function createGenuinePreviewLiveIntake({
     goal_id:goal.state.active_goal_id,
     goal_transition_event_id:goal.state.active_goal.last_transition_receipt_id,
     original_work_event_id:original.event_id,
+    // Only metadata from the separately verified original-work event;
+    // its business projections remain source-linked claims, never proof
+    // of ROI, competitive advantage, or transfer authorization.
+    original_business_evidence:{
+     work_kind:original.payload?.kind,
+     business_category:original.payload?.business_category,
+     expected_business_outcome:original.payload?.expected_business_outcome,
+     value_dimensions:original.payload?.value_dimensions,
+    },
     continuity_root_id:spine.continuity_root_id,
     worldline_id:spine.worldline_id,
    });
@@ -121,6 +130,7 @@ export function createGenuinePreviewLiveIntake({
     capability_id:input.observed_failure.capability_id,
     provider_failure_hash:input.provider_failure_hash,
     original_execution_receipt:input.original_execution_receipt,
+    value_passport:input.value_passport,
     evidence_kind:'OBSERVED_FAILURE',blocker_class:'MISSING_INSTRUMENT',
     independently_verified:true,external_action_performed:false,
     provider_effect_may_have_occurred:false,installation_authorized:false,
