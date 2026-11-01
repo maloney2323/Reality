@@ -14,6 +14,8 @@ on:
       - 'api/reality/personal-real-repair-candidate.js'
       - 'api/reality/personal-real-repair-install.js'
       - 'test/reality-one-step-backend-owner-approval-v1.test.js'
+      - 'approve-188.html'
+      - 'test/reality-direct-owner-188-page-v1.test.js'
       - 'test/reality-home-repair-chat-ui-v1.test.js'
       - 'test/reality-live-real-issue-188-review-v1.test.js'
       - 'test/reality-approved-repair-background-readiness-v1.test.js'
@@ -41,6 +43,7 @@ jobs:
           node --test test/reality-home-repair-chat-ui-v1.test.js
           node --test test/reality-chat-live-activity-stream-v1.test.js
           node --test test/reality-one-step-backend-owner-approval-v1.test.js
+          node --test test/reality-direct-owner-188-page-v1.test.js
           node --test test/reality-github-read-only-preview-token-v1.test.js
           node --test test/reality-approved-repair-background-readiness-v1.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
