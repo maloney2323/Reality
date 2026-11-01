@@ -8,6 +8,13 @@ on:
       - 'src/reality-extensions/**'
       - 'test/reality-extensions/**'
       - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
+      # Revalidate the SAME frozen customer test after the authenticated
+      # one-step approval and external-source reconciliation code changes.
+      - 'approve-188.html'
+      - 'api/reality/personal-real-repair-install.js'
+      - 'src/reality-live-approved-install-to-settlement-v1.0.js'
+      - 'src/reality-general-installed-work-verifier-v1.0.js'
+      - 'test/reality-preexisting-isolated-source-reconciliation-v1.test.js'
 permissions:
   contents: read
 jobs:
