@@ -18,6 +18,10 @@ on:
       - 'test/reality-genuine-capability-github-wakeup-v1.test.js'
       - 'src/reality-genuine-capability-preview-intake-v1.js'
       - 'src/reality-genuine-capability-execution-runtime-v1.js'
+      - 'src/reality-genuine-source-backed-job-v1.js'
+      - 'api/reality/personal-genuine-original-investigate.js'
+      - 'test/reality-genuine-source-backed-job-v1.test.js'
+      - 'test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js'
       - 'test/reality-genuine-capability-execution-runtime-v1.test.js'
       - 'src/reality-universe-postgres-persistence-v0.1.js'
       - 'test/reality-continuity-actual-tail-append-v1.test.js'
@@ -51,6 +55,7 @@ jobs:
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
           node --test test/reality-genuine-capability-worker-v1.test.js
           node --test test/reality-genuine-capability-execution-runtime-v1.test.js
+          node --test test/reality-genuine-source-backed-job-v1.test.js
           node --test test/reality-continuity-actual-tail-append-v1.test.js
           node --test test/reality-genuine-capability-generation-bridge-v1.test.js
           node --test test/reality-job-triggered-self-repair-v1.0.test.js
