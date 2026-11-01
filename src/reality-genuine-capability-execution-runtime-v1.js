@@ -5,6 +5,8 @@
 import {executeAuthorizedWork} from './reality-governed-execution-engine-v0.1.js';
 import {createGenuinePreviewLiveIntake}
  from './reality-genuine-capability-preview-intake-v1.js';
+import {classifyGenuineExecutionFailure}
+ from './reality-genuine-capability-failure-classifier-v1.js';
 const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('GENUINE_EXECUTION_RUNTIME_'+x)};
 export function createGenuineOriginalWorkRunner({
@@ -67,6 +69,8 @@ export function createGenuineOriginalWorkRunner({
   return Object.freeze({
    original_work_id:originalWorkId,
    execution_status:result.status,
+   failure_diagnosis:result.capability_diagnosis||
+    classifyGenuineExecutionFailure({result,originalWorkId}),
    capability_response:result.self_repair?.status||null,
    // Report a trusted intake failure without leaking arbitrary exceptions.
    intake_attempted:result.self_repair?.intake_attempted===true,
