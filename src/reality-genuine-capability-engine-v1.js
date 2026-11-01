@@ -95,7 +95,7 @@ export function createGenuineCapabilityEngine({
   if(typeof adapters?.[name]!=='function')
    fail('TRUSTED_DRIVER_ADAPTER_MISSING_'+name.toUpperCase());
  }
- async function run({originalWorkId,scope,currentState=null,maxTransitions=12}={}){
+ async function run({originalWorkId,scope,expectedFailure=null,currentState=null,maxTransitions=12}={}){
   scopeCheck(scope,originalWorkId);
   if(!Number.isInteger(maxTransitions)||maxTransitions<1||maxTransitions>50)
    fail('TRANSITION_BUDGET_INVALID');
@@ -107,6 +107,12 @@ export function createGenuineCapabilityEngine({
    return Object.freeze({status:'NOT_A_VERIFIED_CAPABILITY_GAP',
     original_work_id:originalWorkId,model_generated:false,installed:false,
     owner_action_required:false,original_job_completed:false});
+  // Runtime independent verifier's nominated gap must match the trusted
+  // provider's independently observed original failure.
+  if(expectedFailure!==null&&
+     (!scoped(expectedFailure,originalWorkId)||
+      sha(stableFailure(expectedFailure))!==sha(stableFailure(observed))))
+    fail('RUNTIME_FAILURE_AND_PROVIDER_EVIDENCE_DISAGREE');
   const reobserved=await reobserveOriginalFailure(Object.freeze(stableFailure(observed)));
   if(!scoped(reobserved,originalWorkId)||
    sha(stableFailure(observed))!==sha(stableFailure(reobserved)))
@@ -164,6 +170,7 @@ export function createGenuineCapabilityEngine({
   return Object.freeze({
    version:GENUINE_CAPABILITY_ENGINE_VERSION,
    status:continuation.status,original_work_id:originalWorkId,
+   new_job_created:false,
    capability_id:gap.capability_id,confirmed_gap:gap,
    capability_phase:continuation.capability_phase,
    owner_action_required:continuation.owner_action_required===true,
@@ -176,4 +183,52 @@ export function createGenuineCapabilityEngine({
   });
  }
  return Object.freeze({run,version:GENUINE_CAPABILITY_ENGINE_VERSION});
+}
+
+// This is the exact callback expected by executeAuthorizedWork's
+// onVerifiedCapabilityGap hook. It never rewrites the executor's failed
+// result as success: the separately durable constitutional job owns settlement.
+export function createGenuineCapabilityExecutionHandoff({
+ engine,scope,persistAndReadback,
+}={}){
+ if(typeof engine?.run!=='function'||typeof persistAndReadback!=='function')
+  fail('DURABLE_EXECUTION_HANDOFF_ADAPTERS_REQUIRED');
+ scopeCheck(scope,scope.original_work_id);
+ return async function onVerifiedCapabilityGap(request){
+  if(request?.original_work_id!==scope.original_work_id||
+   request?.authorization_continues_unchanged!==true||
+   request?.production_write_permitted!==false||
+   request?.customer_job_completed!==false||
+   typeof request?.original_execution_receipt!=='string'||
+   !scoped(request?.independent_failure,scope.original_work_id))
+   fail('ORIGINAL_EXECUTION_FAILURE_BOUNDARY_INVALID');
+  const result=await engine.run({
+   originalWorkId:scope.original_work_id,scope,
+   expectedFailure:request.independent_failure,
+  });
+  const receipt=await persistAndReadback(Object.freeze({
+   original_work_id:scope.original_work_id,
+   original_execution_receipt:request.original_execution_receipt,
+   status:result.status,
+   capability_phase:result.capability_phase||null,
+   constitutional_state_hash:result.state?.head_hash||null,
+   frozen_gap_hash:result.confirmed_gap?.evidence_hash||null,
+   no_new_job:true,execution_not_yet_settled:true,
+  }));
+  if(receipt?.independently_verified!==true||
+    receipt.original_work_id!==scope.original_work_id||
+    receipt.original_execution_receipt!==request.original_execution_receipt||
+    receipt.status!==result.status||
+    receipt.execution_not_yet_settled!==true)
+   fail('DURABLE_ORIGINAL_REPAIR_HANDOFF_READBACK_REQUIRED');
+  return Object.freeze({
+   status:result.status,
+   original_work_id:scope.original_work_id,
+   new_job_created:false,
+   owner_action_required:result.owner_action_required===true,
+   original_job_completed:false,
+   installation_authorized_by_handoff:false,
+   reconciliation_receipt_ref:receipt.receipt_ref||null,
+  });
+ };
 }
