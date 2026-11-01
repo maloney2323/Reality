@@ -21,8 +21,12 @@ export async function verifyApprovedBackgroundReadiness({
     env.REALITY_GOVERNED_SCHEDULER_ENABLED!=='true')
   return reply('EXACT_ISOLATED_SIGNED_SCHEDULER_REQUIRED');
  try{
+  const readToken=env.REALITY_FIRST178_GITHUB_READ_TOKEN||
+   env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
   const headers={accept:'application/vnd.github+json',
-   'user-agent':'Reality-governed-wake-readiness-v1'};
+   'user-agent':'Reality-governed-wake-readiness-v1',
+   ...(typeof readToken==='string'&&readToken.length>20?
+     {authorization:'Bearer '+readToken}:{})};
   const get=async path=>{
    const res=await fetchImpl('https://api.github.com/repos/'+REPO+path,{
     method:'GET',headers,cache:'no-store',redirect:'error'});
