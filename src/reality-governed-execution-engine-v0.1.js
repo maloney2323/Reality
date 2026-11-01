@@ -4,6 +4,7 @@ import { evaluateGoalExecutionBoundary } from './reality-goal-execution-boundary
 import { verifyFreshGoalExecutionAdmission } from './reality-fresh-goal-execution-admission-v0.1.js';
 import { fingerprintApprovedWorkItem } from './reality-authority-v1.0.js';
 import { validUuid } from './reality-private-chat-store-v0.1.js';
+import {classifyGenuineExecutionFailure} from './reality-genuine-capability-failure-classifier-v1.js';
 
 export const GOVERNED_EXECUTION_ENGINE_VERSION = 'reality-governed-execution-engine-v0.1';
 
@@ -226,7 +227,11 @@ export async function executeAuthorizedWork({
   // launch repair after a connector write, provider uncertainty or a missing
   // authorization: the outside world may already have changed.
   let selfRepair=null;
-  const eligible=verified===false&&
+  const capabilityDiagnosis=classifyGenuineExecutionFailure({
+    result:{status:verified?'VERIFIED':'UNRESOLVED',verification},originalWorkId,
+  });
+  const eligible=capabilityDiagnosis.classification==='CAPABILITY_VOID_CANDIDATE'&&
+    verified===false&&
     !requiresReservation&&workItem.connector==null&&
     typeof originalWorkId==='string'&&
     /^work:[a-f0-9]{32}$/.test(originalWorkId)&&
@@ -285,6 +290,7 @@ export async function executeAuthorizedWork({
     verification,
     outcome,
     reservation_settlement:reservationSettlement,
+    capability_diagnosis:capabilityDiagnosis,
     ...(selfRepair?{self_repair:selfRepair}:{}),
   });
 }
