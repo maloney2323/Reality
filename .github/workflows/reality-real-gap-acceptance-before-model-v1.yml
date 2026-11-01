@@ -1,13 +1,16 @@
 name: Reality verified missing capability — frozen original acceptance
 on:
   push:
-    branches: [feature/reality-live-general-repair-bridge-20261031, feature/reality-install-to-settlement-20261031]
+    branches: [feature/reality-live-general-repair-bridge-20261031, feature/reality-install-to-settlement-20261031, feature/reality-general-capability-engine-20261101]
     paths:
       - 'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'
       - 'test/reality-frozen-regressions/general-execution-receipt-v1.json'
       - 'src/reality-extensions/**'
       - 'test/reality-extensions/**'
       - '.github/workflows/reality-real-gap-acceptance-before-model-v1.yml'
+      - 'src/reality-genuine-capability-*.js'
+      - 'test/reality-genuine-capability-*.test.js'
+      - 'supabase/migrations/20261101_genuine_capability_*.sql'
 permissions:
   contents: read
 jobs:
