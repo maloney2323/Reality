@@ -45,7 +45,11 @@ test('only owner-bound source-backed actions can start an investigation; chat ca
  assert.match(client,/QUEUE_SAFE_AUTONOMOUS_DISCOVERY/);
  assert.match(client,/eligible_for_investigation===true/);
  assert.match(client,/\/api\/reality\/personal-loop-completion/);
- assert.match(client,/readCandidate\.click\(\)/);
+ assert.match(client,/wcDirectRepairReviewScope=scope/);
+ assert.match(client,/selectedIssue=item.issue_number/);
+ assert.match(client,/await readCandidate.onclick\(\)/);
+ assert.match(client,/wcDirectRepairReviewScope=null/);
+ assert.match(client,/if\(!selectedIssue\)selectedWork=b.original_work_id/);
  assert.doesNotMatch(client,/OWNER_APPROVE_EXACT_INSTALL/);
  assert.doesNotMatch(client,/wcApproveExactInstall.*\.click\(/);
  assert.doesNotMatch(client,/goal_command/);
