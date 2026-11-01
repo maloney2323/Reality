@@ -47,7 +47,8 @@ jobs:
           const worker='reality-approved-repair-background-v1.yml';
           const workerBranch='feature/reality-background-continuation-20261031';
           const installBranch='feature/reality-closed-loop-worker-20261031';
-          // No historic work ID or artifact can be a scheduler authority.\n          assert.ok(['push','schedule','workflow_dispatch','workflow_run']
+          // No historic work ID or artifact can be a scheduler authority.
+          assert.ok(['push','schedule','workflow_dispatch','workflow_run']
             .includes(process.env.GITHUB_EVENT_NAME),
             'only signed, allowlisted wake event may ask Supabase for an existing approval');
           assert.equal(process.env.GITHUB_REPOSITORY,repo);
