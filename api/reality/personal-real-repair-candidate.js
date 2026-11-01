@@ -15,6 +15,7 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('REAL_REPAIR_CANDIDATE_'+x)};
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
+ let stage='AUTHENTICATED_SOURCE_READBACK';
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method)){
@@ -89,6 +90,7 @@ export default async function handler(req,res){
   });
   if(proof.candidate_artifact_sha256!==req.body.candidate_artifact_hash)
    fail('REVIEWED_CANDIDATE_BYTES_CHANGED');
+  stage='PERSIST_PREAPPROVAL_CHECKPOINT';
   const ready=await prepareVerifiedOwnerRepairCandidate({
    session,expectedOriginalWorkId:originalWorkId,issueNumber,
   });
@@ -102,11 +104,16 @@ export default async function handler(req,res){
   });
  }catch(error){
   const code=String(error?.message||'');
+  const safe=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_|UNFINISHED_|PERSONAL_GOAL_|RELIABILITY_|GOAL_LEDGER_|SELF_IMPROVEMENT_|GOVERNED_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
+  const diagnostic=safe.test(code)?code:
+   'REAL_REPAIR_CANDIDATE_INDEPENDENT_PROVIDER_RECONCILIATION_REQUIRED';
+  console.warn('REALITY_PREAPPROVAL_CHECKPOINT_BLOCKED',
+   JSON.stringify({stage,error:diagnostic,owner_approval_created:false,
+     original_job_completed:false,production_changed:false}));
   return res.status(error?.status||503).json({
-   ok:false,error:/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_)[A-Z0-9_]{4,140}$/.test(code)?
-    code:'REAL_REPAIR_CANDIDATE_INDEPENDENT_PROVIDER_RECONCILIATION_REQUIRED',
-   installation_authorized:false,original_job_completed:false,
-   production_changed:false,
+   ok:false,error:diagnostic,failed_stage:stage,
+   owner_approval_created:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,
   });
  }
 }
