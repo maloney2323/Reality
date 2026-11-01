@@ -17,7 +17,7 @@ const required=[
  '.github/workflows/reality-continuous-reliability-v0.1.yml',
  '.github/workflows/reality-install-to-settlement-v1.yml',
 ];
-const run={id:12345,path,head_sha:ancestor,
+const sourceRun={id:12345,path,head_sha:ancestor,
  event:'push',head_repository:{full_name:'maloney2323/Reality'},
  conclusion:'success',status:'completed'};
 const job={id:345,run_id:12345,head_sha:ancestor,
@@ -43,7 +43,7 @@ function fake({badFile=false,missingGreen=false,notAncestor=false}={}){
   if(p.includes('/contents/')){
    result={encoding:'base64',content:Buffer.from(frozenText).toString('base64')};
   }else if(p.startsWith('/actions/workflows/')){
-   result={workflow_runs:[run]};
+   result={workflow_runs:[sourceRun]};
   }else if(p.startsWith('/compare/')){
    result={status:notAncestor?'diverged':'ahead',ahead_by:3,behind_by:0,
     files:fixtureNames.map((filename,i)=>({filename:i===0&&badFile?
@@ -60,12 +60,12 @@ function fake({badFile=false,missingGreen=false,notAncestor=false}={}){
  };
  return {verifier:createIndependentInstalledWorkVerifier({fetchImpl}),calls};
 }
-async function run(f){return f.verifier.observeOriginalRun({
+async function evaluate(f){return f.verifier.observeOriginalRun({
  installedCommitSha:installed,installedBranch:branch,originalWorkId:original,
  expectedFrozenTestPath:frozen,expectedFrozenSha:frozenSha,
 });}
 test('only unchanged runtime source plus independently green installed CI can reconcile earlier frozen run',async()=>{
- const f=fake(),value=await run(f);
+ const f=fake(),value=await evaluate(f);
  assert.equal(value.complete,true);
  assert.equal(value.installed_commit_sha,installed);
  assert.equal(value.verified_acceptance_commit_sha,ancestor);
@@ -76,7 +76,7 @@ test('only unchanged runtime source plus independently green installed CI can re
 });
 test('any changed installed extension, missing current CI, or nonancestor forbids equivalence',async()=>{
  for(const scenario of [{badFile:true},{missingGreen:true},{notAncestor:true}]){
-  const f=fake(scenario),value=await run(f);
+  const f=fake(scenario),value=await evaluate(f);
   assert.equal(value.complete,false);
   assert.equal(value.status,'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE');
  }
