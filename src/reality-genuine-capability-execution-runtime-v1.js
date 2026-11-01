@@ -72,6 +72,11 @@ export function createGenuineOriginalWorkRunner({
    failure_diagnosis:result.capability_diagnosis||
     classifyGenuineExecutionFailure({result,originalWorkId}),
    capability_response:result.self_repair?.status||null,
+   // Only source-bound queue and OIDC wake receipts; neither authorizes
+   // generation, installation, cross-tenant reuse or original settlement.
+   queue_trigger_id:result.self_repair?.queue_trigger_id||null,
+   worker_wake_status:result.self_repair?.wake_status||null,
+   value_passport_status:result.self_repair?.value_passport_status||null,
    // Report a trusted intake failure without leaking arbitrary exceptions.
    intake_attempted:result.self_repair?.intake_attempted===true,
    handoff_error_code:result.self_repair?.status==='REPAIR_HANDOFF_NEEDS_RECONCILIATION'
