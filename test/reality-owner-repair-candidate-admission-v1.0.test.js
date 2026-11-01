@@ -97,3 +97,31 @@ test('foreign job, changed provider candidate and unverified goal fail before a 
   /REAL_OWNER_CANDIDATE_MODEL_GENERATED_BYTES_CHANGED_AFTER_GITHUB_TEST/);
  assert.equal(f.writes(),1,'gap checkpoint is persisted, candidate mismatch cannot advance');
 });
+
+test('candidate failure surfaces bounded phase metadata and preserves no-install boundary',async()=>{
+ const f=fixture();
+ const failed=()=>{throw Error('SELF_IMPROVEMENT_INDEPENDENT_PROVIDER_READBACK_FAILED');};
+ const err=await prepareVerifiedOwnerRepairCandidate({
+  ...args(f),providerRead:async({issueNumber})=>issueNumber===188?proof:failed(),
+ }).then(()=>null,e=>e);
+ // Source-level stage metadata is kept on any error for authenticated incident
+ // diagnosis without treating the error as an install approval.
+ assert.equal(err,null,'fixture provider is consistent and creates a checkpoint');
+ const refused=await prepareVerifiedOwnerRepairCandidate({
+  ...args(f),providerRead:async()=>({...proof,original_source_sha:'0'.repeat(40)}),
+ }).then(()=>null,e=>e);
+ assert.match(refused?.message||'',/REAL_OWNER_CANDIDATE_ORIGINAL_FAILURE_OR_VERIFIED_CANDIDATE_CHANGED/);
+ assert.equal(refused?.preparation_stage,'OWNER_WORK_AND_PROVIDER_READBACK');
+});
+test('persist failure identifies the precise checkpoint stage, not a generic provider error',async()=>{
+ const f=fixture();
+ const badFactory=()=>({
+  async readLatestCheckpoint(){throw Error('GENERAL_CHECKPOINT_NO_PERSISTED_GENERAL_CHECKPOINT');},
+  async persistCheckpoint(){throw Error('UNIVERSE_WRITE_UNAVAILABLE');},
+ });
+ const caught=await prepareVerifiedOwnerRepairCandidate({
+  ...args(f),checkpointFactory:badFactory,
+ }).then(()=>null,e=>e);
+ assert.equal(caught?.message,'UNIVERSE_WRITE_UNAVAILABLE');
+ assert.equal(caught?.preparation_stage,'PERSIST_ORIGINAL_GAP_CHECKPOINT');
+});
