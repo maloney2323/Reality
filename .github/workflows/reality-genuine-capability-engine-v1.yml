@@ -50,3 +50,11 @@ jobs:
           node --test test/reality-job-triggered-self-repair-v1.0.test.js
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
           node --test test/reality-governed-execution-engine-v0.1.test.js
+
+      - name: BREAK-FIRST — execute original customer frozen acceptance on isolated source
+        run: |
+          echo 'REALITY_FULL_CYCLE_STAGE=ORIGINAL_JOB_ACCEPTANCE'
+          echo 'REALITY_PRODUCTION_CHANGED=false'
+          echo 'REALITY_INSTALLATION_AUTHORIZED=false'
+          sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+          node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
