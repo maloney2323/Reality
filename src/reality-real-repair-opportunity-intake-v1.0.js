@@ -167,8 +167,10 @@ export async function authorizeExistingRealRepairWork({
  if(!WORK.test(workId))fail('ORIGINAL_WORK_ID_INVALID');
  // An issue's earlier authorized customer job retains its original work ID.
  // Stop BEFORE creating any new Continuity event when one exists elsewhere.
- if(env.REALITY_GOVERNED_AUTO_TRIGGER_ENABLED==='true')
-  await checkOwnerOriginalIdentity({
+ // Always check the owner's existing original-issue identity BEFORE writing,
+ // even when optional auto-trigger dispatch is disabled. Otherwise the same
+ // settled or escalated issue can be admitted as a second customer job.
+ await checkOwnerOriginalIdentity({
    session,issueNumber,expectedOriginalWorkId:workId,env,
   });
  const receiptId=continuityUuidFromSource(
