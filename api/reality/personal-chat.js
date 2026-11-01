@@ -4,6 +4,7 @@ import {readPrivateChat,recordPrivateMessage,publishPrivateAssistantAtomically,l
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createHash} from 'node:crypto';
+import {openChatActivityStream} from '../../src/reality-chat-live-activity-stream-v1.js';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
@@ -18,6 +19,7 @@ export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ let chatActivity=null;
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method))
@@ -80,11 +82,15 @@ export default async function handler(req,res){
   }
   const key=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||process.env.OPENAI_API_KEY||'');
   if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
+  // An opted-in chat may show genuine processing checkpoints while the same
+  // atomic goal/publication pipeline runs. Existing JSON consumers are intact.
+  chatActivity=openChatActivityStream(req,res);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
   // continuity success when source persistence fails.
   const recordedUser=await recordPrivateMessage(session,{
    conversationId,requestId,role:'user',text,
   });
+  chatActivity?.progress('message_saved','Your message was saved to your private conversation');
   // RLS readback is the authentication evidence for a USER goal directive.
   // A supplied model answer, client source_ref or username is never accepted.
   let verifiedUserGoalCommand=null;
@@ -126,6 +132,7 @@ export default async function handler(req,res){
        verifiedUserGoalCommand.source_ref)
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
+  chatActivity?.progress('model_running','Reality is processing saved context and running its governed answer review');
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    model:'gpt-4.1-mini',apiKey:key,
@@ -155,6 +162,7 @@ export default async function handler(req,res){
   // authenticated user-goal command changed the active objective meanwhile.
   // Always validate from an independently reconstructed, HMAC-attested
   // Continuity readback; never accept the client's or model's goal claims.
+  chatActivity?.progress('review_complete','Continuity and final-answer checks passed; checking current goal before publication');
   const goalAtGeneration=result?.reliability?.goal_authority_contracts
     ?.authorized_user_goal_state;
   if(!goalAtGeneration)
@@ -179,6 +187,7 @@ export default async function handler(req,res){
   });
   if(publicationGoal.status!=='USER_GOAL_SNAPSHOT_CURRENT')
    fail('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN',409);
+  chatActivity?.progress('goal_checked','Confirmed goal is still current; saving the checked response');
   // This atomic RPC reads the same conversation/goal revision while inserting
   // the EXACT answer checked by the final Integrity publication decision.
   const publication=await publishPrivateAssistantAtomically(session,{
@@ -189,7 +198,8 @@ export default async function handler(req,res){
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
    fail('CHAT_ASSISTANT_DURABILITY_NOT_VERIFIED',503);
-  return res.status(200).json({ok:true,conversation_id:conversationId,answer,replayed:false,
+  chatActivity?.progress('answer_saved','Answer was committed and independently read back');
+  const responsePayload={ok:true,conversation_id:conversationId,answer,replayed:false,
    continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',
     recovered_messages:check.messages.length,coverage:check.history_status,
     older_messages_may_be_missing:check.older_missing,
@@ -239,8 +249,11 @@ export default async function handler(req,res){
         external_action_authorized:false}:null,
      independently_verified_semantic_correctness:false,
    },
-   execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
+   execution:{status:'NOT_EXECUTED',external_actions_authorized:false}};
+  if(chatActivity){chatActivity.complete(responsePayload);return;}
+  return res.status(200).json(responsePayload);
  }catch(e){
+  if(chatActivity){chatActivity.failure(e.message);return;}
   const status=Number(e.status)||503;
   return res.status(status).json({ok:false,error:e.message||'CHAT_UNAVAILABLE'});
  }
