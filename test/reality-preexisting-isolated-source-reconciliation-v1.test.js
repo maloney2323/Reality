@@ -27,7 +27,8 @@ function fixture({tamper=false,missingRun=false,moveHead=false}={}){
    steps:['Frozen same-work missing capability acceptance',
     'Regression: governance and exact-owner installation gates'].map(name=>({name,conclusion:'success'}))};
   let response;
-  if(path.endsWith('/git/ref/heads/'+branch))
+  if(path.endsWith('/git/commits/'+commit))response={parents:[]};
+  else if(path.endsWith('/git/ref/heads/'+branch))
    response={object:{sha:moveHead?'c'.repeat(40):commit}};
   else if(path.endsWith('/contents/'+frozen))
    response={encoding:'base64',content:Buffer.from(frozenBytes).toString('base64')};
