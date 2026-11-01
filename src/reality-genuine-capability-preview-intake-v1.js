@@ -12,6 +12,10 @@ import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
 
 const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('GENUINE_PREVIEW_'+x)};
+const canonical=x=>x===null||typeof x!=='object'?x:
+ Array.isArray(x)?x.map(canonical):
+ Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])]));
+const equal=(x,y)=>JSON.stringify(canonical(x))===JSON.stringify(canonical(y));
 export function createGenuinePreviewLiveIntake({
  session,conversationId,env=process.env,
  providerReadback,workerWake,
@@ -130,7 +134,7 @@ export function createGenuinePreviewLiveIntake({
     if(existing.length===1){
      const event=existing[0];
      if(event.entity_type!=='reality_genuine_capability_gap_v1'||
-      JSON.stringify(event.payload)!==JSON.stringify(payload)||
+      !equal(event.payload,payload)||
       event.epistemic_status!=='VERIFIED')
       fail('EXISTING_GAP_BYTES_CHANGED');
      return Object.freeze({independently_verified:true,event_id:id,
@@ -166,7 +170,7 @@ export function createGenuinePreviewLiveIntake({
    const {events}=await getContext(input.original_work_id);
    const matched=events.filter(e=>e.event_id===id);
    if(matched.length!==1||matched[0].entity_type!=='reality_genuine_capability_gap_v1'||
-    JSON.stringify(matched[0].payload)!==JSON.stringify(payload)||
+    !equal(matched[0].payload,payload)||
     matched[0].epistemic_status!=='VERIFIED')
     fail('POST_WRITE_GAP_READBACK_FAILED');
    return Object.freeze({independently_verified:true,event_id:id,
