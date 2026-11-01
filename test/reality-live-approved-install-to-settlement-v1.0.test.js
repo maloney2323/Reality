@@ -262,6 +262,33 @@ test('signed governed scheduler queues exact user-approved work without a GitHub
  assert.equal(dispatchCalls,0);
  assert.equal(f.installCalls(),0);
 });
+test('one exact owner approval wakes the worker immediately when the preview has a scoped GitHub dispatch adapter',async()=>{
+ let dispatched=0;
+ const f=await fixture({
+  envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true'},
+  dispatchApproved:async request=>{
+   dispatched++;
+   assert.equal(request.originalWorkId,work);
+   assert.equal(request.issueNumber,issueNumber);
+   assert.equal(request.candidateHash,artifact);
+   assert.equal(request.installBranch,branch);
+   return {dispatched:true,production_changed:false};
+  },
+ });
+ const result=await f.svc.ownerApproveAndQueue({
+  originalWorkId:work,issueNumber,
+  expectedArtifactHash:artifact,expectedCheckpointHash:f.waitingHash,
+ });
+ assert.equal(result.status,'OWNER_APPROVED_BACKGROUND_CONTINUATION_DISPATCHED');
+ assert.equal(result.worker_dispatched,true);
+ assert.equal(result.governed_scheduler_wakeup,false);
+ assert.equal(result.owner_approval_consumed,true);
+ assert.equal(result.installed,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.production_changed,false);
+ assert.equal(dispatched,1,'exact same approval causes one worker wake attempt');
+ assert.equal(f.installCalls(),0,'no installation occurs in the browser request');
+});
 test('unverified governed scheduler refuses to consume a one-use installation approval',async()=>{
  const f=await fixture({
   envOverrides:{REALITY_GOVERNED_SCHEDULER_ENABLED:'true',
