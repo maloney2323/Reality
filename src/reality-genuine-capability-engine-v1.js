@@ -21,7 +21,10 @@ const sorted=x=>x===null||typeof x!=='object'?x:
 const sha=x=>createHash('sha256').update(JSON.stringify(sorted(x))).digest('hex');
 const source=x=>typeof x==='string'&&(
  /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(x)||
- /^vercel:provider-verified:[A-Za-z0-9_.:/-]{8,340}$/.test(x));
+ /^vercel:provider-verified:[A-Za-z0-9_.:/-]{8,340}$/.test(x)||
+ // Typed receipts from a separately trusted connector adapter, not URLs or
+ // free-text claims. This permits businesses beyond this GitHub repository.
+ /^reality:provider-verified:[a-z][a-z0-9_-]{2,40}:[A-Za-z0-9_.:/-]{12,340}$/.test(x));
 const noSideEffect=x=>x?.external_action_performed===false&&
  x?.provider_effect_may_have_occurred!==true&&x?.no_automatic_retry!==true;
 const scoped=(x,work)=>x?.original_work_id===work&&
