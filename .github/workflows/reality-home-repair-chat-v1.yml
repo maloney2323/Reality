@@ -8,6 +8,10 @@ on:
       - 'api/reality/personal-chat.js'
       - 'src/reality-chat-live-activity-stream-v1.js'
       - 'test/reality-chat-live-activity-stream-v1.test.js'
+      - 'test/reality-github-read-only-preview-token-v1.test.js'
+      - 'src/reality-real-verified-repair-readback-v1.0.js'
+      - 'src/reality-real-repair-opportunity-intake-v1.0.js'
+      - 'api/reality/personal-real-repair-candidate.js'
       - 'test/reality-home-repair-chat-ui-v1.test.js'
       - 'test/reality-live-real-issue-188-review-v1.test.js'
       - 'test/reality-approved-repair-background-readiness-v1.test.js'
@@ -34,6 +38,7 @@ jobs:
         run: |
           node --test test/reality-home-repair-chat-ui-v1.test.js
           node --test test/reality-chat-live-activity-stream-v1.test.js
+          node --test test/reality-github-read-only-preview-token-v1.test.js
           node --test test/reality-approved-repair-background-readiness-v1.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
       - name: Independently reobserve real #188 failed GitHub CI and exact model candidate
