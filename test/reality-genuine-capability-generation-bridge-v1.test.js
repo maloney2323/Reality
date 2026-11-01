@@ -137,6 +137,7 @@ test('end-to-end original gap proof can select existing live generation adapters
  });
  const result=await engine.run({originalWorkId:work,scope});
  assert.equal(result.status,'OWNER_APPROVAL_REQUIRED');
- assert.equal(result.installed,false);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.original_job_completed,false);
  assert.equal(builds,1);assert.equal(drivers,1);
 });
