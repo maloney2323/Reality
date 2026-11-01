@@ -57,6 +57,15 @@ jobs:
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
           node --test test/reality-governed-execution-engine-v0.1.test.js
 
+      - name: BREAK-FIRST — re-run frozen acceptance from current unfinished source-backed Reality customer job
+        run: |
+          echo 'REALITY_ORIGINAL_SOURCE_BACKED_JOB=UNFINISHED'
+          echo 'REALITY_PROVIDER_HISTORICAL_FAILED_RUN=40962921090'
+          echo 'REALITY_INSTALLATION_AUTHORIZED=false'
+          echo 'REALITY_PRODUCTION_CHANGED=false'
+          test "$(sha256sum test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js | cut -d' ' -f1)" = "b42935d7300333ac7f1ecfce0aded8d2c7698bb88a55cbd413a96ebe0d73afdd"
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+
       - name: BREAK-FIRST — execute original customer frozen acceptance on isolated source
         run: |
           echo 'REALITY_FULL_CYCLE_STAGE=ORIGINAL_JOB_ACCEPTANCE'
