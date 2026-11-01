@@ -49,7 +49,9 @@ const source=Object.freeze({
    original_provider_failed_run_id:runId,
    original_provider_failed_job_id:jobId,
   },provenance:{principal_id:owner,conversation_id:conversation},
- }),entity_type:'reality_original_source_backed_repair_work'});
+ }),entity_type:'reality_original_source_backed_repair_work',
+ provenance:{principal_id:owner,conversation_id:conversation,
+  continuity_spine:{prior_lineage_hash:first.lineage_hash}}});
 const state={
  principal_id:owner,conversation_id:conversation,
  persisted_source:'ISOLATED_CONTINUITY_VERIFIED_READBACK',
