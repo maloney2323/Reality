@@ -9,13 +9,13 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const fail=x=>{throw Error('GENUINE_EXECUTION_RUNTIME_'+x)};
 export function createGenuineOriginalWorkRunner({
  session,conversationId,env=process.env,
- loadAuthorizedInternalJob,makeProviderReadback,workerWake,
+ loadAuthorizedInternalJob,makeProviderReadback,workerWake=null,
  runExecution=executeAuthorizedWork,
  makeLiveIntake=createGenuinePreviewLiveIntake,
 }={}){
  if(typeof loadAuthorizedInternalJob!=='function'||
   typeof makeProviderReadback!=='function'||
-  typeof workerWake!=='function'||
+  (workerWake!==null&&typeof workerWake!=='function')||
   typeof runExecution!=='function'||typeof makeLiveIntake!=='function')
   fail('TRUSTED_SERVER_ADAPTERS_REQUIRED');
  return async function executeOriginal({originalWorkId}={}){
