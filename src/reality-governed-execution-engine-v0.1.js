@@ -262,11 +262,17 @@ export async function executeAuthorizedWork({
         owner_action_required:response.owner_action_required===true,
         original_job_completed:false,
       });
-    }catch{
-      // Preserve the real failed job. A repair handoff failure is neither
-      // completion nor authority to repeat an uncertain action.
+    }catch(error){
+      // The previous blanket catch hid the very first real intake failure,
+      // leaving the customer with an empty queue and no actionable receipt.
+      // Only trusted, fixed-format server error identifiers are surfaced;
+      // NEVER echo provider responses, arbitrary exception text or secrets.
+      const raw=String(error?.message||'');
+      const trusted=/^(?:GENUINE_CAPABILITY_INTAKE_|GENUINE_PREVIEW_|GENUINE_WAKE_DISPATCH_|GENUINE_EXECUTION_RUNTIME_|GENUINE_CAPABILITY_)[A-Z0-9_]{3,100}$/;
       selfRepair=Object.freeze({
         status:'REPAIR_HANDOFF_NEEDS_RECONCILIATION',
+        intake_attempted:true,
+        handoff_error_code:trusted.test(raw)?raw:'REPAIR_HANDOFF_UNTRUSTED_FAILURE',
         original_work_id:originalWorkId,
         new_job_created:false,original_job_completed:false,
       });
