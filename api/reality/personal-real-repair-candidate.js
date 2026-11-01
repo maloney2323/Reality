@@ -104,14 +104,17 @@ export default async function handler(req,res){
   });
  }catch(error){
   const code=String(error?.message||'');
-  const safe=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_|UNFINISHED_|PERSONAL_GOAL_|RELIABILITY_|GOAL_LEDGER_|SELF_IMPROVEMENT_|GOVERNED_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
+  const safe=/^(?:REAL_OWNER_CANDIDATE_|REAL_REPAIR_READBACK_|REAL_REPAIR_CANDIDATE_|GENERAL_CHECKPOINT_|UNFINISHED_|PERSONAL_GOAL_|RELIABILITY_|GOAL_LEDGER_|SELF_IMPROVEMENT_|CONTINUITY_|GOVERNED_|UNIVERSE_)[A-Z0-9_]{3,140}$/;
   const diagnostic=safe.test(code)?code:
    'REAL_REPAIR_CANDIDATE_INDEPENDENT_PROVIDER_RECONCILIATION_REQUIRED';
+  const substage=typeof error?.preparation_stage==='string'&&
+   /^(?:OWNER_WORK_AND_PROVIDER_READBACK|CHECKPOINT_SERVICE_INITIALIZATION|READ_EXISTING_OWNER_CHECKPOINT|CREATE_ORIGINAL_GOVERNED_STATE|VERIFY_ORIGINAL_GAP_OBSERVATION|PERSIST_ORIGINAL_GAP_CHECKPOINT|PROPOSE_EXACT_MODEL_CANDIDATE|PERSIST_EXACT_CANDIDATE_CHECKPOINT|REVERIFY_INDEPENDENT_SANDBOX|PERSIST_SANDBOX_CHECKPOINT|FINAL_INDEPENDENT_CHECKPOINT_READBACK)$/.test(error.preparation_stage)?
+    error.preparation_stage:'UNCLASSIFIED_CHECKPOINT_STAGE';
   console.warn('REALITY_PREAPPROVAL_CHECKPOINT_BLOCKED',
-   JSON.stringify({stage,error:diagnostic,owner_approval_created:false,
+   JSON.stringify({stage,substage,error:diagnostic,owner_approval_created:false,
      original_job_completed:false,production_changed:false}));
   return res.status(error?.status||503).json({
-   ok:false,error:diagnostic,failed_stage:stage,
+   ok:false,error:diagnostic,failed_stage:stage,failed_substage:substage,
    owner_approval_created:false,installation_authorized:false,
    original_job_completed:false,production_changed:false,
   });
