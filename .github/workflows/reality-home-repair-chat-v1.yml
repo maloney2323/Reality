@@ -6,6 +6,8 @@ on:
     paths:
       - 'index.html'
       - 'test/reality-home-repair-chat-ui-v1.test.js'
+      - 'test/reality-approved-repair-background-readiness-v1.test.js'
+      - 'src/reality-approved-repair-background-readiness-v1.0.js'
       - '.github/workflows/reality-home-repair-chat-v1.yml'
   workflow_dispatch:
 permissions:
@@ -22,6 +24,8 @@ jobs:
         with:
           node-version: '22'
       - name: Verify Home UI syntax, real authenticated chat and action boundaries
-        run: node --test test/reality-home-repair-chat-ui-v1.test.js
+        run: |
+          node --test test/reality-home-repair-chat-ui-v1.test.js
+          node --test test/reality-approved-repair-background-readiness-v1.test.js
       - name: Boundary statement
         run: echo 'UI contract verified only. No autonomous worker, installation, owner approval or production update was executed.'
