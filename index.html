@@ -1936,7 +1936,7 @@ async function wcLoadUnfinishedWork(){
    'Found '+safe.length+' unfinished job(s) in saved Continuity.':
    'No tracked unfinished jobs were verified in the scanned conversations.')+
    (partial?' Some conversations were not fully checked; this list may be incomplete.':'')+
-   ' No job is being executed.';
+   ' Owner-authorized read-only source investigations may start automatically; installation is never automatic.';
   panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
    '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
   // Only an already owner-authorized, source-verified, active-goal
