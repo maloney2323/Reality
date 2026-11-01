@@ -18,6 +18,8 @@ test('both Home scripts parse without changing the existing authenticated chat',
  assert.match(html,/id="privateTranscript"/);
  assert.match(html,/id="privateSend"/);
  assert.match(html,/id="wcApproveExactInstall"/);
+ assert.match(html,/if\(confirmedActiveGoal&&!automaticExactReviewStarted&&/);
+ assert.match(html,/void verifier\.onclick\(\)/);
  assert.match(html,/id="wcInstallSettlementPanel"/);
 });
 test('repair Home navigation, conversation and exact worker review surfaces are unique',()=>{
