@@ -124,7 +124,7 @@ export function createGenuineSourceBackedJobAdapters({
      currentSuite.encoding!=='base64'||
      typeof currentSuite.content!=='string'||
      createHash('sha256').update(Buffer.from(
-       currentSuite.content.replace(/\\s/g,''),'base64')).digest('hex')!==
+       currentSuite.content.replace(/\s/g,''),'base64')).digest('hex')!==
        p.frozen_test_sha256)
    fail('CURRENT_PREVIEW_FROZEN_SUITE_CHANGED');
   const currentCapability=await getJson(fetchImpl,api+'/contents/'+
