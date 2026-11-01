@@ -5,6 +5,9 @@ on:
       - feature/reality-home-repair-chat-20261031
     paths:
       - 'index.html'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-chat-live-activity-stream-v1.js'
+      - 'test/reality-chat-live-activity-stream-v1.test.js'
       - 'test/reality-home-repair-chat-ui-v1.test.js'
       - 'test/reality-live-real-issue-188-review-v1.test.js'
       - 'test/reality-approved-repair-background-readiness-v1.test.js'
@@ -30,6 +33,7 @@ jobs:
       - name: Verify Home UI syntax, real authenticated chat and action boundaries
         run: |
           node --test test/reality-home-repair-chat-ui-v1.test.js
+          node --test test/reality-chat-live-activity-stream-v1.test.js
           node --test test/reality-approved-repair-background-readiness-v1.test.js
           node --test test/reality-live-approved-install-to-settlement-v1.0.test.js
       - name: Independently reobserve real #188 failed GitHub CI and exact model candidate
