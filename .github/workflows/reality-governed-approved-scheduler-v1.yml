@@ -46,7 +46,10 @@ jobs:
           const repo='maloney2323/Reality';
           const worker='reality-approved-repair-background-v1.yml';
           const workerBranch='feature/reality-background-continuation-20261031';
-          const installBranch='feature/reality-closed-loop-worker-20261031';
+          const installBranches=new Set([
+            'feature/reality-closed-loop-worker-20261031',
+            'feature/reality-home-repair-chat-20261031',
+          ]);
           // No historic work ID or artifact can be a scheduler authority.
           assert.ok(['push','schedule','workflow_dispatch','workflow_run']
             .includes(process.env.GITHUB_EVENT_NAME),
@@ -98,7 +101,8 @@ jobs:
            assert.match(item.candidate_hash,/^[0-9a-f]{64}$/);
            assert.ok(Number.isSafeInteger(item.issue_number)&&
             item.issue_number>=1&&item.issue_number<=100000);
-           assert.equal(item.install_branch,installBranch);
+           assert.ok(installBranches.has(item.install_branch),
+            'only supported isolated preview installation branches may be dispatched');
            assert.ok(!seen.has(item.reservation_id),
             'a single owner approval must not be dispatched twice in one poll');
            seen.add(item.reservation_id);
