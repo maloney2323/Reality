@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGenuineCapabilityEngine}
+import {createGenuineCapabilityEngine,createGenuineCapabilityExecutionHandoff}
  from '../src/reality-genuine-capability-engine-v1.js';
+import {executeAuthorizedWork}
+ from '../src/reality-governed-execution-engine-v0.1.js';
 
 const WORK='work:'+'a'.repeat(32);
 const SOURCE='https://github.com/maloney2323/Reality/actions/runs/41311122233';
@@ -150,4 +152,56 @@ test('driver cannot swap original work or fabricate settlement identity',async()
  })});
  await assert.rejects(f.engine.run({originalWorkId:WORK,scope}),
   /GENUINE_CAPABILITY_DRIVER_ORIGINAL_JOB_IDENTITY_CHANGED/);
+});
+
+test('actual internal job executor hands off same unverified work to durable capability engine',async()=>{
+ const f=fixture();let persisted=0;
+ const handler=createGenuineCapabilityExecutionHandoff({
+  engine:f.engine,scope,persistAndReadback:async x=>{
+   persisted++;
+   assert.equal(x.original_work_id,WORK);
+   assert.equal(x.execution_not_yet_settled,true);
+   assert.equal(x.no_new_job,true);
+   return {...x,independently_verified:true,
+    receipt_ref:'supabase:continuity:verified-gap'};
+  },
+ });
+ const workItem={work_item_id:WORK,workflow_id:'customer:original-work',
+  action:'Internal audit outcome',connector:null,operation:'read',consequential:false};
+ const result=await executeAuthorizedWork({
+  workItem,workflowId:workItem.workflow_id,originalWorkId:WORK,
+  authorization:{authorization_id:'internal:read-only'},
+  connector:{execute:async()=>({providerExecutionId:'internal:read-only',
+   observation:{original_work_id:WORK}})},
+  independentVerifier:{verify:async()=>({
+   ...original,independent:true,verified:false,
+  })},
+  onVerifiedCapabilityGap:handler,
+ });
+ assert.equal(result.status,'UNRESOLVED');
+ assert.equal(result.self_repair?.status,'OWNER_APPROVAL_REQUIRED');
+ assert.equal(result.self_repair?.new_job_created,false);
+ assert.equal(result.self_repair?.original_job_completed,false);
+ assert.equal(f.calls().drivers,1);
+ assert.equal(persisted,1);
+});
+test('handoff never conceals missing durable readback or altered runtime evidence',async()=>{
+ const f=fixture();
+ const base={original_work_id:WORK,authorization_continues_unchanged:true,
+  production_write_permitted:false,customer_job_completed:false,
+  original_execution_receipt:'internal:original-execution',
+  independent_failure:original};
+ const noReceipt=createGenuineCapabilityExecutionHandoff({
+  engine:f.engine,scope,
+  persistAndReadback:async()=>({independently_verified:false}),
+ });
+ await assert.rejects(noReceipt(base),
+  /GENUINE_CAPABILITY_DURABLE_ORIGINAL_REPAIR_HANDOFF_READBACK_REQUIRED/);
+ const forged=createGenuineCapabilityExecutionHandoff({
+  engine:f.engine,scope,
+  persistAndReadback:async()=>{throw Error('must never persist')},
+ });
+ await assert.rejects(forged({...base,
+  independent_failure:{...original,source_ref:'https://github.com/maloney2323/Reality/actions/runs/9999'}}),
+  /GENUINE_CAPABILITY_RUNTIME_FAILURE_AND_PROVIDER_EVIDENCE_DISAGREE/);
 });
