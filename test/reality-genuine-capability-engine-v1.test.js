@@ -1,0 +1,153 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createGenuineCapabilityEngine}
+ from '../src/reality-genuine-capability-engine-v1.js';
+
+const WORK='work:'+'a'.repeat(32);
+const SOURCE='https://github.com/maloney2323/Reality/actions/runs/41311122233';
+const FROZEN='github:frozen-regression:sha256:'+'b'.repeat(64);
+const scope={owner_id:'independently-verified-owner',goal_id:'verified-goal',
+ original_work_id:WORK,continuity_root_id:'root:customer',
+ worldline_id:'worldline:customer',
+ goal_transition_receipt_ref:'owner-goal-transition',
+ goal_evidence_ref:'supabase:owner-confirmed-goal',
+ target_environment:'ISOLATED_PREVIEW',governance_kernel_hash:'sha256:'+'c'.repeat(64)};
+const original={
+ original_work_id:WORK,evidence_kind:'OBSERVED_FAILURE',
+ blocker_class:'MISSING_INSTRUMENT',independently_verified:true,
+ capability_id:'business_receipt_validator',source_ref:SOURCE,
+ verification_suite_ref:FROZEN,
+ external_action_performed:false,provider_effect_may_have_occurred:false,
+ no_automatic_retry:false,
+};
+const providerProof={
+ original_work_id:WORK,capability_id:original.capability_id,
+ source_ref:SOURCE,verification_suite_ref:FROZEN,
+ frozen_suite_sha256:'d'.repeat(64),
+ provider_run_ref:'https://github.com/maloney2323/Reality/actions/runs/41311122334',
+ frozen_failure_ref:'github:frozen-regression:receipt:41311122334',
+ reproduced_failure:true,independently_verified:true,
+ external_action_performed:false,provider_effect_may_have_occurred:false,
+};
+function fixture({
+ observation=original,reobserved=original,proof=providerProof,registryStatus='ABSENT',
+ after=null,
+}={}){
+ let observations=0,registryReads=0,reproductions=0,drivers=0;
+ const modelAdapter={
+  observeMissingCapability:async()=>{throw Error('NOT_INVOKED')},
+  generateCandidate:async()=>{throw Error('NOT_INVOKED')},
+  runIsolatedSandbox:async()=>{throw Error('NOT_INVOKED')},
+  persistCheckpoint:async()=>{throw Error('NOT_INVOKED')},
+  verifyIndependentReceipt:async()=>{throw Error('NOT_INVOKED')},
+ };
+ const engine=createGenuineCapabilityEngine({
+  observeOriginalFailure:async()=>{observations++;return observation},
+  reobserveOriginalFailure:async()=>reobserved,
+  reproduceFrozenFailure:async()=>{reproductions++;return proof},
+  inspectRegisteredCapability:async()=>{registryReads++;
+   return {independently_verified:true,original_work_id:WORK,
+    capability_id:original.capability_id,status:registryStatus};
+  },adapters:modelAdapter,
+  runRepair:async argument=>{
+   drivers++;return after?after(argument):{
+    status:'OWNER_APPROVAL_REQUIRED',original_work_id:WORK,
+    original_goal_id:scope.goal_id,new_job_created:false,
+    capability_phase:'AWAITING_OWNER_APPROVAL',
+    installation_authorized:false,original_job_completed:false,
+    owner_action_required:true,state:{original:WORK},
+   };
+  },
+ });
+ return {engine,calls:()=>({observations,registryReads,reproductions,drivers})};
+}
+test('proven real failure + independent frozen reproduction reaches original-work driver',async()=>{
+ const f=fixture({after:args=>{
+  assert.equal(args.originalWorkId,WORK);
+  assert.equal(args.scope.goal_id,scope.goal_id);
+  assert.equal(args.originalJobFailure.source_ref,SOURCE);
+  assert.equal(args.originalJobFailure.frozen_suite_sha256,'d'.repeat(64));
+  assert.equal(args.originalJobFailure.external_action_performed,false);
+  assert.ok(typeof args.adapters.generateCandidate==='function');
+  assert.ok(typeof args.adapters.persistCheckpoint==='function');
+  return {status:'OWNER_APPROVAL_REQUIRED',original_work_id:WORK,
+   original_goal_id:scope.goal_id,new_job_created:false,
+   capability_phase:'AWAITING_OWNER_APPROVAL',owner_action_required:true,
+   installation_authorized:false,original_job_completed:false,
+   state:{journal:'managed by separate constitutional driver'}};
+ }});
+ const result=await f.engine.run({originalWorkId:WORK,scope});
+ assert.equal(result.status,'OWNER_APPROVAL_REQUIRED');
+ assert.equal(result.capability_id,'business_receipt_validator');
+ assert.equal(result.confirmed_gap.frozen_suite_sha256,'d'.repeat(64));
+ assert.equal(result.confirmed_gap.install_authorized,false);
+ assert.equal(result.owner_action_required,true);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.production_changed,false);
+ assert.deepEqual(f.calls(),{observations:1,registryReads:1,reproductions:1,drivers:1});
+});
+test('transient, policy, uncertain external effect or unverified failures do not generate',async()=>{
+ for(const modified of [
+  {blocker_class:'TRANSIENT_NETWORK'},
+  {blocker_class:'AUTHORITY_MISSING'},
+  {independently_verified:false},
+  {external_action_performed:true},
+  {provider_effect_may_have_occurred:true},
+  {no_automatic_retry:true},
+  {original_work_id:'work:'+'f'.repeat(32)},
+  {source_ref:'https://attacker.example/issue/123'},
+ ]){
+  const f=fixture({observation:{...original,...modified}});
+  const r=await f.engine.run({originalWorkId:WORK,scope});
+  assert.equal(r.status,'NOT_A_VERIFIED_CAPABILITY_GAP');
+  assert.equal(r.original_job_completed,false);
+  assert.equal(f.calls().drivers,0);
+  assert.equal(f.calls().reproductions,0);
+ }
+});
+test('stale independent re-observation never becomes new model work',async()=>{
+ const f=fixture({reobserved:{...original,verification_suite_ref:'changed-suite'}});
+ await assert.rejects(f.engine.run({originalWorkId:WORK,scope}),
+  /GENUINE_CAPABILITY_ORIGINAL_PROVIDER_FAILURE_CHANGED/);
+ assert.equal(f.calls().drivers,0);
+});
+test('registered capability triggers existing-job reassessment, not another installation',async()=>{
+ const f=fixture({registryStatus:'ACTIVE'});
+ const r=await f.engine.run({originalWorkId:WORK,scope});
+ assert.equal(r.status,'CAPABILITY_ALREADY_PRESENT_REASSESS_JOB');
+ assert.equal(r.model_generated,false);
+ assert.equal(r.installed,false);
+ assert.equal(f.calls().reproductions,0);
+});
+test('unverified frozen regression cannot become generation or owner approval',async()=>{
+ for(const broken of [
+  {independently_verified:false},
+  {reproduced_failure:false},
+  {frozen_suite_sha256:'invalid'},
+  {original_work_id:'work:'+'f'.repeat(32)},
+  {capability_id:'different_capability'},
+  {provider_effect_may_have_occurred:true},
+ ]){
+  const f=fixture({proof:{...providerProof,...broken}});
+  await assert.rejects(f.engine.run({originalWorkId:WORK,scope}),
+   /GENUINE_CAPABILITY_FROZEN_INDEPENDENT_REPRODUCTION_REQUIRED/);
+  assert.equal(f.calls().drivers,0);
+ }
+});
+test('no synthetic or model-provided adapter can bypass trusted provider boundary',async()=>{
+ assert.throws(()=>createGenuineCapabilityEngine({}),
+  /GENUINE_CAPABILITY_TRUSTED_ADAPTER_MISSING/);
+ const f=fixture();
+ await assert.rejects(f.engine.run({originalWorkId:WORK,
+  scope:{...scope,target_environment:'production'}}),
+  /GENUINE_CAPABILITY_ORIGINAL_GOAL_SCOPE_REQUIRED/);
+});
+test('driver cannot swap original work or fabricate settlement identity',async()=>{
+ const f=fixture({after:()=>({
+  status:'ORIGINAL_JOB_INDEPENDENTLY_SETTLED',
+  original_work_id:'work:'+'f'.repeat(32),original_goal_id:scope.goal_id,
+  new_job_created:false,original_job_completed:true,
+ })});
+ await assert.rejects(f.engine.run({originalWorkId:WORK,scope}),
+  /GENUINE_CAPABILITY_DRIVER_ORIGINAL_JOB_IDENTITY_CHANGED/);
+});
