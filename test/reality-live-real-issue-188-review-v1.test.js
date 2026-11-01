@@ -4,6 +4,8 @@ import {verifyRealMissingRepairIssue}
  from '../src/reality-real-repair-opportunity-intake-v1.0.js';
 import {readExactModelRepairEvidence}
  from '../src/reality-real-verified-repair-readback-v1.0.js';
+import {verifyApprovedBackgroundReadiness}
+ from '../src/reality-approved-repair-background-readiness-v1.0.js';
 const ISSUE=188;
 const env={
  VERCEL_ENV:'preview',
@@ -34,4 +36,16 @@ test('actual model-generated #188 exact bytes and independent secret-free sandbo
  assert.equal(proof.installation_authorized,false);
  assert.equal(proof.original_job_completed,false);
  assert.equal(proof.production_changed,false);
+});
+
+test('live exact-owner preview preflight sees a successful signed scheduler, not a model claim',async()=>{
+ const preflight=await verifyApprovedBackgroundReadiness({
+  env:{...env,REALITY_GOVERNED_SCHEDULER_ENABLED:'true'},
+ });
+ assert.equal(preflight.ready,true,
+  'real signed scheduler must be healthy before permitting exact owner approval');
+ assert.equal(preflight.code,'GOVERNED_AUTO_WAKE_VERIFIED');
+ assert.equal(preflight.installation_authorized,false);
+ assert.equal(preflight.original_job_completed,false);
+ assert.equal(preflight.production_changed,false);
 });
