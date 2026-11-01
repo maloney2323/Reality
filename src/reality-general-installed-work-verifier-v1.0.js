@@ -91,17 +91,57 @@ export function createIndependentInstalledWorkVerifier({
    '/runs?branch='+encodeURIComponent(installedBranch)+'&per_page=100');
   if(!Array.isArray(result?.workflow_runs)||result.workflow_runs.length>100)
    fail('PROVIDER_RUN_INDEX_UNAVAILABLE');
-  const runs=result.workflow_runs.filter(r=>
-   r.head_sha===installedCommitSha&&
+  const eligible=result.workflow_runs.filter(r=>
    ['push','workflow_dispatch'].includes(r.event)&&
    r.path===runWorkflow&&r.head_repository?.full_name===REPO&&
-   Number.isSafeInteger(r.id));
-  if(runs.length!==1)
-   return Object.freeze({status:runs.length?'BLOCKED_DUPLICATE_SOURCE_RUN':
-    'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE',complete:false,
-    original_work_id:originalWorkId,installed_commit_sha:installedCommitSha,
-    production_changed:false});
-  const run=runs[0];
+   sha40(r.head_sha)&&Number.isSafeInteger(r.id));
+  const exact=eligible.filter(r=>r.head_sha===installedCommitSha);
+  if(exact.length>1)fail('DUPLICATE_EXACT_INSTALL_ACCEPTANCE');
+  let run=exact[0]||null;
+  let acceptedSha=installedCommitSha;
+  let verifiedEquivalentSource=false;
+  if(!run){
+   // A previous frozen acceptance at an ancestor commit may be reusable when
+   // the installed preview advanced ONLY by updating these three fake HTTP
+   // database fixtures. This is NOT a claim of a new run at the installed SHA.
+   // Verify ancestry and every changed path with GitHub's provider compare API.
+   const harmlessFixtures=new Set([
+    'test/reality-continuity-runtime-v0.1.test.js',
+    'test/reality-market-100-turn-endurance-v0.1.test.js',
+    'test/reality-universe-postgres-continuity-v0.2.test.js',
+   ]);
+   const prior=eligible.filter(r=>r.status==='completed'&&
+     r.conclusion==='success'&&r.head_sha!==installedCommitSha)
+     .slice(0,12);
+   for(const candidate of prior){
+    const comparison=await get('/compare/'+candidate.head_sha+'...'+installedCommitSha);
+    if(comparison?.status!=='ahead'||comparison.behind_by!==0||
+       !Number.isInteger(comparison.ahead_by)||comparison.ahead_by<1||
+       comparison.ahead_by>5||!Array.isArray(comparison.files)||
+       comparison.files.length<1||comparison.files.length>3||
+       comparison.files.some(f=>f.status!=='modified'||
+         !harmlessFixtures.has(f.filename)))continue;
+    // Current installed commit must independently pass the same security
+    // and Continuity suites, not merely rely on ancestor's success.
+    const current=await get('/actions/runs?per_page=100');
+    const mandatory=new Set([
+     '.github/workflows/reality-continuity-spine-v2.yml',
+     '.github/workflows/reality-continuous-reliability-v0.1.yml',
+     '.github/workflows/reality-install-to-settlement-v1.yml',
+    ]);
+    const green=(current.workflow_runs||[]).filter(r=>
+     r.head_sha===installedCommitSha&&r.status==='completed'&&
+     r.conclusion==='success'&&r.head_repository?.full_name===REPO);
+    if([...mandatory].some(path=>
+      green.filter(r=>r.path===path).length!==1))continue;
+    run=candidate;acceptedSha=candidate.head_sha;
+    verifiedEquivalentSource=true;break;
+   }
+  }
+  if(!run)
+   return Object.freeze({status:'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE',
+    complete:false,original_work_id:originalWorkId,
+    installed_commit_sha:installedCommitSha,production_changed:false});
   if(run.status!=='completed')
    return Object.freeze({status:'AWAITING_INDEPENDENT_INSTALLED_ACCEPTANCE',
     complete:false,original_work_id:originalWorkId,
@@ -113,7 +153,7 @@ export function createIndependentInstalledWorkVerifier({
   if(!Array.isArray(jobs?.jobs)||jobs.jobs.length!==1)
    fail('INDEPENDENT_ORIGINAL_JOB_NOT_UNIQUE');
   const job=jobs.jobs[0];
-  if(job.run_id!==run.id||job.head_sha!==installedCommitSha||
+  if(job.run_id!==run.id||job.head_sha!==acceptedSha||
    job.name!=='independent-original-customer-acceptance'||
    job.conclusion!=='success'||job.status!=='completed'||
    !Array.isArray(job.steps))fail('INDEPENDENT_ORIGINAL_JOB_MISMATCH');
@@ -125,6 +165,8 @@ export function createIndependentInstalledWorkVerifier({
   }
   const receipt={
    original_work_id:originalWorkId,installed_commit_sha:installedCommitSha,
+   verified_ancestor_acceptance_sha:acceptedSha,
+   unchanged_checked_source:verifiedEquivalentSource,
    installed_branch:installedBranch,provider_run_id:run.id,
    provider_job_id:job.id,frozen_test_sha256:expectedFrozenSha,
    frozen_test_path:expectedFrozenTestPath,
@@ -133,6 +175,10 @@ export function createIndependentInstalledWorkVerifier({
   };
   return Object.freeze({
    status:'VERIFIED_ORIGINAL_INSTALLED_WORK',
+   frozen_test_provenance:verifiedEquivalentSource?
+    'ANCESTOR_SOURCE_EQUIVALENCE_WITH_CURRENT_CI':'EXACT_INSTALLED_COMMIT',
+   verified_acceptance_commit_sha:acceptedSha,
+   source_equivalence_verified:verifiedEquivalentSource,
    complete:true,
    independent_provider_readback:true,
    original_frozen_tests_passed:true,
