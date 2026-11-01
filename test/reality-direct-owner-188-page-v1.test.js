@@ -6,6 +6,11 @@ test('a signed-in human action, never page load, grants exact isolated repair sc
  assert.match(page,/id="approve" disabled/);
  assert.match(page,/await fetch\('\/api\/reality\/personal-session'/);
  assert.match(page,/btn\.onclick=async\(\)=>/);
+ assert.match(page,/\/api\/reality\/personal-real-repair-candidate\?/);
+ assert.match(page,/PREPARE_EXISTING_VERIFIED_CANDIDATE_FOR_OWNER_REVIEW/);
+ assert.match(page,/ready\.independent_readback_verified!==true/);
+ assert.match(page,/ready\.background_preflight_passed!==true/);
+ assert.match(page,/Repair readiness not confirmed/);
  assert.match(page,/method:'POST',credentials:'same-origin'/);
  assert.match(page,/OWNER_AUTHORIZE_PREPARE_AND_QUEUE_EXACT_REPAIR/);
  assert.match(page,/I_AUTHORIZE_THIS_EXACT_ISOLATED_REPAIR_AND_ORIGINAL_JOB_CONTINUATION/);
