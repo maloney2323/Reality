@@ -45,7 +45,8 @@ export async function verifyRealMissingRepairIssue({
 }={}){
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('GITHUB_ISSUE_ID_REQUIRED');
- const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||env.GITHUB_TOKEN||null;
+ const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+  env.REALITY_FIRST178_GITHUB_READ_TOKEN||env.GITHUB_TOKEN||null;
  const issue=await provider('issues/'+issueNumber,{token,fetchImpl});
  if(issue.number!==issueNumber||issue.state!=='open'||issue.pull_request||
   issue.repository_url!==ROOT.slice(0,-1))
@@ -98,7 +99,8 @@ export async function discoverRealRepairOpportunities({
 }={}){
  if(!Number.isInteger(maxIssues)||maxIssues<1||maxIssues>40)
   fail('BOUNDED_PROVIDER_DISCOVERY_REQUIRED');
- const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
+ const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+  env.REALITY_FIRST178_GITHUB_READ_TOKEN||null;
  const issues=await provider('issues?state=open&per_page='+maxIssues,
   {token,fetchImpl});
  if(!Array.isArray(issues)||issues.length>maxIssues)
