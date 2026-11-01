@@ -34,11 +34,45 @@ async function session(){
    status.textContent='Sign in to your private Reality account first, then reopen this page. No authority created.';
    btn.textContent='Sign-in required';return;
   }
+  // The already authorized investigation may persist an independently
+  // checked candidate checkpoint without granting installation authority.
+  // Never enable approval until this exact source and owner work are verified.
+  btn.textContent='Checking original repair checkpoint…';
+  status.textContent='Signed in. Independently reading your exact #188 work and preparing its existing investigation checkpoint. No installation approval.';
+  const scope='issue_number=188&original_work_id='+encodeURIComponent(job);
+  const checked=await fetch('/api/reality/personal-real-repair-candidate?'+scope,{
+    method:'GET',credentials:'same-origin',cache:'no-store'});
+  const selected=await checked.json();
+  if(!checked.ok||selected.ok!==true||selected.original_work_id!==job||
+     selected.issue_number!==188||selected.candidate_artifact_hash!==candidate)
+   throw Error('SOURCE_CHECK: '+String(selected.error||'EXACT_OWNER_CANDIDATE_UNVERIFIED'));
+  const prepared=await fetch('/api/reality/personal-real-repair-candidate',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'PREPARE_EXISTING_VERIFIED_CANDIDATE_FOR_OWNER_REVIEW',
+    expected_original_work_id:job,issue_number:188,candidate_artifact_hash:candidate,
+   }),
+  });
+  const ready=await prepared.json();
+  if(!prepared.ok||ready.ok!==true||
+     ready.status!=='EXACT_CANDIDATE_AWAITING_SIGNED_OWNER_INSTALL_APPROVAL'||
+     ready.independent_readback_verified!==true||
+     ready.original_work_id!==job||
+     ready.candidate_artifact_hash!==candidate||
+     ready.owner_installation_approved!==false)
+   throw Error('CHECKPOINT_PREPARATION: '+String(ready.error||
+      'ORIGINAL_OWNER_CHECKPOINT_NOT_VERIFIED')+
+      (ready.failed_stage?' · stage '+ready.failed_stage:''));
+  if(ready.background_preflight_passed!==true)
+   throw Error('SIGNED_WORKER_PREFLIGHT: '+String(ready.background_preflight_status||'NOT_READY'));
   btn.disabled=false;btn.textContent='Authorize exact #188 repair and continue';
-  status.textContent='Signed-in owner session present. Your approval has not yet been used.';
- }catch{
-  status.textContent='Could not independently verify the signed-in session. No authority created.';
-  btn.textContent='Sign-in check unavailable';
+  status.textContent='Original #188 checkpoint independently verified. No installation approved yet. One owner action may authorize its continuation.';
+ }catch(error){
+  status.textContent='Pre-approval verification blocked: '+String(error.message||'READBACK_UNAVAILABLE')+
+   '. No installation approval has been submitted.';
+  btn.textContent='Repair readiness not confirmed';
+  btn.disabled=true;
  }
 }
 btn.onclick=async()=>{
@@ -63,7 +97,8 @@ btn.onclick=async()=>{
      data.original_job_completed!==false||
      data.owner_approval_consumed!==true||
      data.installation_authorized!==true)
-   throw Error(data.error||'OWNER_APPROVAL_AND_WORKER_RECEIPT_UNVERIFIED');
+   throw Error(String(data.error||'OWNER_APPROVAL_AND_WORKER_RECEIPT_UNVERIFIED')+
+     (data.failed_stage?' · stage '+data.failed_stage:''));
   status.textContent='Exact approval durably recorded and submitted to governed background execution. Work remains unfinished until independent settlement.';
   result.textContent='Reservation: '+String(data.reservation_id||'NOT_RETURNED')+
    ' · Worker: '+String(data.status||'PENDING')+
