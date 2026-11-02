@@ -123,8 +123,8 @@ async function database(path,{method='GET',body}={}){
  }
  return result;
 }
-async function providerSource(path,sha){
- const found=await api('/contents/'+path+'?ref='+sha);
+async function providerSource(path,sha,githubToken?:string|null){
+ const found=await api('/contents/'+path+'?ref='+sha,githubToken);
  if(!found||found.path!==path||found.encoding!=='base64'||
   typeof found.content!=='string')deny('PINNED_TEST_SOURCE_UNVERIFIED');
  const bytes=Uint8Array.from(atob(found.content.replace(/\s/g,'')),
@@ -486,7 +486,7 @@ async function claimFrozenOriginal(request:Record<string,unknown>,runId:number){
   original_job_completed:false,production_changed:false};
 }
 
-async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number){
+async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number,githubToken?:string|null){
  const trigger=String(proof?.trigger_id||''),gap=String(proof?.gap_event_id||'');
  const work=String(proof?.original_work_id||'');
  const frozen=String(proof?.frozen_test_path||'');
@@ -516,8 +516,8 @@ async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number
   orig[0].payload?.source_path!==missing||
   orig[0].payload?.original_work_id!==work)
   deny('FROZEN_SOURCE_ORIGINAL_MISMATCH');
- if(await hash(await providerSource(frozen,sha))!==frozenHash||
-    await api('/contents/'+missing+'?ref='+sha)!==null)
+ if(await hash(await providerSource(frozen,sha,githubToken))!==frozenHash||
+    await api('/contents/'+missing+'?ref='+sha,githubToken)!==null)
   deny('PINNED_SOURCE_OR_CAPABILITY_DRIFT');
  const receipt={
   trigger_id:trigger,claim_id:q.claim_id,gap_event_id:gap,
@@ -547,7 +547,7 @@ async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number
   original_job_completed:false,production_changed:false};
 }
 
-async function prepareFrozenGeneration(input:Record<string,unknown>){
+async function prepareFrozenGeneration(input:Record<string,unknown>,githubToken?:string|null){
  const trigger=String(input.trigger_id||''),gapId=String(input.gap_event_id||'');
  const sha=String(input.repository_sha||'');
  if(!UUID.test(trigger)||!UUID.test(gapId)||!SHA40.test(sha))
@@ -587,9 +587,9 @@ async function prepareFrozenGeneration(input:Record<string,unknown>){
     g.payload?.verification_suite_ref!==
      'github:frozen-regression:sha256:'+p.frozen_test_sha256)
   deny('ORIGINAL_OWNER_GAP_DRIFT');
- if(await hash(await providerSource(p.frozen_test_path,sha))!==
+ if(await hash(await providerSource(p.frozen_test_path,sha,githubToken))!==
     p.frozen_test_sha256||
-    await api('/contents/'+p.source_path+'?ref='+sha)!==null)
+    await api('/contents/'+p.source_path+'?ref='+sha,githubToken)!==null)
   deny('FROZEN_GENERATION_SOURCE_STALE');
  return {status:'VERIFIED_FROZEN_READY_FOR_MODEL',
   trigger_id:trigger,gap_event_id:gapId,claim_id:q.claim_id,
@@ -1171,7 +1171,7 @@ Deno.serve(async request=>{
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
-  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest')&&
+  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest'||input?.action==='reconcile'||input?.action==='prepare')&&
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
@@ -1285,14 +1285,14 @@ Deno.serve(async request=>{
   if(input?.action==='prepare'&&SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
     deny('GENERATION_SCOPE_FIELDS_INVALID');
-   await verify(bearer,input.scope.repository_sha);
-   return respond({ok:true,...await prepareFrozenGeneration(input.scope)});
+   await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   return respond({ok:true,...await prepareFrozenGeneration(input.scope,ghProviderToken)});
   }
   if(input?.action==='reconcile'&&SHA40.test(input?.proof?.runner_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,proof')
     deny('RECONCILIATION_ENVELOPE_INVALID');
-   const verifiedRun=await verify(bearer,input.proof.runner_sha);
-   const receipt=await reconcileFrozenOriginal(input.proof,verifiedRun.id);
+   const verifiedRun=await verify(bearer,input.proof.runner_sha,ghProviderToken);
+   const receipt=await reconcileFrozenOriginal(input.proof,verifiedRun.id,ghProviderToken);
    return respond({ok:true,...receipt});
   }
   if(input?.action==='claim'&&input?.proof?.repository_sha&&
