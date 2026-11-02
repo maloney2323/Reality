@@ -579,10 +579,9 @@ jobs:
           retention-days: 30
 
   prove_live_inflight_continuity_recovery:
-    # Evidence-only isolated task on the real #201 customer repair lineage.
-    # Deliberately interrupts an alive worker; never replays the settled customer job.
-    needs: [resume_original_job, recover_claimed_original_settlement]
-    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight-v3]') }}
+    # Independent evidence-only audit. Preflight checks original source is already settled.
+    # It cannot claim, replay or modify the original customer job.
+    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight-v4]') }}
     permissions:
       contents: read
       actions: read
