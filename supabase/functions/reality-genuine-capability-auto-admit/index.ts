@@ -561,6 +561,100 @@ async function prepareFrozenGeneration(input:Record<string,unknown>){
   repository_sha:sha,installation_authorized:false,
   original_job_completed:false,production_changed:false};
 }
+
+async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
+ proof:Record<string,unknown>,runId:number,sha:string){
+ const ticket=proposal?.ticket as Record<string,unknown>;
+ const candidate=proposal?.candidate as Record<string,unknown>;
+ if(proposal?.source!=='REAL_OPENAI_MODEL_GENERATION'||
+    proposal?.installation_authorized!==false||
+    proposal?.original_job_completed!==false||
+    !ticket||!candidate||!SHA64.test(String(ticket.ticket_hash||''))||
+    !SHA64.test(String(candidate.artifact_sha256||''))||
+    candidate.ticket_hash!==ticket.ticket_hash||
+    candidate.original_work_id!==ticket.original_work_id||
+    !Array.isArray(candidate.files)||candidate.files.length<2||
+    candidate.files.length>16||
+    candidate.installed!==false||candidate.authority_granted!==false||
+    ticket.repository_base_sha!==sha||
+    proof?.runner_git_sha!==sha||
+    proof?.workflow_run_id!==String(runId)||
+    proof?.original_work_id!==ticket.original_work_id||
+    proof?.ticket_hash!==ticket.ticket_hash||
+    proof?.artifact_sha256!==candidate.artifact_sha256||
+    proof?.model_response_id!==candidate.model_response_id||
+    proof?.frozen_suite_sha256!==ticket.frozen_regression_sha256||
+    proof?.passed!==true||
+    proof?.runner_isolation!=='DOCKER_NETWORK_NONE_READONLY_NO_SECRETS'||
+    proof?.installation_authorized!==false||
+    proof?.original_job_completed!==false||
+    proof?.production_changed!==false)
+  deny('MODEL_CANDIDATE_OR_SANDBOX_NOT_VERIFIED');
+ const files=candidate.files as Array<Record<string,unknown>>;
+ const names=new Set();
+ for(const file of files){
+  const path=String(file.path||''),content=file.content;
+  if(!/^(?:src\\/reality-extensions\\/|test\\/reality-extensions\\/)[A-Za-z0-9._/-]{3,220}$/.test(path)||
+   path.includes('..')||names.has(path)||
+   typeof content!=='string'||content.length<1||content.length>70000)
+    deny('GENERATED_FILES_OUTSIDE_SAFE_EXTENSION_ROOT');
+  names.add(path);
+ }
+ const sorted=[...files].sort((a,b)=>
+  String(a.path).localeCompare(String(b.path)));
+ const computed=await hash(JSON.stringify(stable(sorted.map(f=>({
+  path:f.path,content:f.content
+ })))));
+ if(computed!==candidate.artifact_sha256)
+  deny('MODEL_PROPOSAL_BYTES_DIFFER_FROM_VERIFIED_HASH');
+ const frozen=proof.frozen_result as Record<string,unknown>;
+ const made=proof.candidate_result as Record<string,unknown>;
+ if(!frozen||!made||
+    frozen.exit_code!==0||made.exit_code!==0||
+    !(Number(frozen.tests)>0&&Number(made.tests)>0)||
+    frozen.pass!==frozen.tests||made.pass!==made.tests||
+    frozen.fail!==0||made.fail!==0)
+  deny('INDEPENDENT_ACCEPTANCE_COUNTS_NOT_ALL_GREEN');
+ const jobs=await api('/actions/runs/'+runId+'/jobs?per_page=100');
+ if(!Array.isArray(jobs?.jobs)||
+    jobs.jobs.filter((j:Record<string,unknown>)=>
+     j.name==='verify_missing_capability'&&j.status==='completed'&&
+     j.conclusion==='success').length!==1)
+  deny('PROVIDER_VERIFICATION_JOB_NOT_SUCCESSFUL');
+ const matching=await database('universe_events?'+new URLSearchParams({
+  entity_type:'eq.reality_genuine_capability_gap_v1',
+  select:'event_id,payload',
+  limit:'200'}));
+ const gap=matching?.find((e:Record<string,unknown>)=>
+  (e.payload as Record<string,unknown>)?.original_work_id===ticket.original_work_id &&
+  (e.payload as Record<string,unknown>)?.provider_failure_hash===
+    ticket.confirmed_gap_evidence_hash);
+ if(!gap||!UUID.test(gap.event_id))deny('ORIGINAL_VERIFIED_GAP_NOT_FOUND');
+ const q=await database('rpc/reality_read_genuine_worker_claim_v1',{
+  method:'POST',body:{p_trigger_id:proof.trigger_id,
+   p_gap_event_id:gap.event_id}});
+ if(q?.original_work_id!==ticket.original_work_id||
+    q?.phase!=='FROZEN_REPRODUCED_AWAITING_CANDIDATE'||
+    q?.claim_id!==proof.claim_id)
+  deny('EXACT_FROZEN_CLAIM_CHANGED');
+ const record={
+  original_work_id:ticket.original_work_id,
+  ticket_hash:ticket.ticket_hash,
+  artifact_sha256:candidate.artifact_sha256,
+  model_response_id:candidate.model_response_id,
+  files:sorted,
+ };
+ const receipt=await database('rpc/reality_qualify_genuine_candidate_v1',{
+  method:'POST',body:{p_trigger_id:proof.trigger_id,
+   p_gap_event_id:gap.event_id,p_candidate:record,p_proof:proof}});
+ if(receipt?.status!=='AWAITING_OWNER_APPROVAL'||
+   receipt.original_work_id!==ticket.original_work_id||
+   receipt.artifact_sha256!==candidate.artifact_sha256||
+   receipt.installation_authorized!==false||
+   receipt.original_job_completed!==false)
+  deny('DURABLE_QUALIFICATION_RECONCILIATION_REQUIRED');
+ return receipt;
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -570,8 +664,17 @@ Deno.serve(async request=>{
    /^Bearer ([A-Za-z0-9._-]+)$/)?.[1];
   if(!bearer)return respond({ok:false,error:'SIGNED_GITHUB_OIDC_REQUIRED'},401);
   const raw=await request.text();
-  if(raw.length>9500)deny('REQUEST_TOO_LARGE');
+  if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  if(input?.action==='qualify'&&
+    SHA40.test(input?.proof?.runner_git_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,proof,proposal')
+    deny('QUALIFICATION_ENVELOPE_INVALID');
+   const run=await verify(bearer,input.proof.runner_git_sha);
+   const receipt=await qualifyVerifiedCandidate(
+     input.proposal,input.proof,run.id,input.proof.runner_git_sha);
+   return respond({ok:true,...receipt});
+  }
   if(input?.action==='prepare'&&SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
     deny('GENERATION_SCOPE_FIELDS_INVALID');
@@ -593,6 +696,7 @@ Deno.serve(async request=>{
    const receipt=await claimFrozenOriginal(input.proof,verifiedRun.id);
    return respond({ok:true,...receipt});
   }
+  if(raw.length>9500)deny('STANDARD_REQUEST_TOO_LARGE');
   if(!input||Array.isArray(input)||typeof input!=='object'||
    Object.keys(input).sort().join(',')!=='action,report'||
    input.action!=='admit'||input.report?.schema!==
