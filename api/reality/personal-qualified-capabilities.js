@@ -3,6 +3,8 @@ import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {createCapabilityValueReport,summarizeQualifiedCapabilityValueReports}
+ from '../../src/reality-capability-value-report-v1.js';
 export const maxDuration=30;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -34,9 +36,15 @@ export default async function handler(req,res){
     x.qualification?.installation_authorized!==false||
     x.qualification?.original_job_completed!==false))
    throw Error('QUALIFICATION_READBACK_INVALID');
+  // Derive read-only economic and technical explanations solely from the
+  // signed, owner-scoped qualification readback. No further rights granted.
+  const valueReports=entries.map(createCapabilityValueReport);
+  const enriched=entries.map((entry,i)=>({...entry,value_report:valueReports[i]}));
+  const valuePortfolio=summarizeQualifiedCapabilityValueReports(valueReports);
   return res.status(200).json({
    ok:true,status:entries.length?'VERIFIED_UPGRADES_WAITING_FOR_OWNER':'NO_VERIFIED_UPGRADES',
-   entries,installation_authorized:false,original_job_completed:false,
+   entries:enriched,value_portfolio:valuePortfolio,
+   installation_authorized:false,original_job_completed:false,
    changes_performed:false,
   });
  }catch(e){
