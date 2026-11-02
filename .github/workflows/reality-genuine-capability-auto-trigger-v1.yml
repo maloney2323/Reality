@@ -313,3 +313,98 @@ jobs:
           path: artifact/out/reality-durable-preview-activation.json
           if-no-files-found: error
           retention-days: 14
+
+  recover_consumed_preview_install:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      recovered: ${{ steps.complete.outputs.recovered }}
+      installer_run_id: ${{ steps.scope.outputs.installer_run_id }}
+      installer_source_sha: ${{ steps.scope.outputs.installer_source_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Resolve already-consumed owner approval without a new installation
+        id: scope
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-recovery-prepare-v1.mjs
+          node scripts/reality-genuine-recovery-prepare-v1.mjs
+      - name: Retrieve immutable artifact from original successful installation
+        if: steps.scope.outputs.recover == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_RUN: ${{ steps.scope.outputs.installer_run_id }}
+        run: |
+          mkdir -p artifact/install
+          gh run download "$INSTALL_RUN" --repo maloney2323/Reality --name "reality-owner-approved-isolated-install-$INSTALL_RUN" --dir artifact/install
+      - name: Independently monitor installed original capability without reinstallation
+        if: steps.scope.outputs.recover == 'true'
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+          REALITY_RECOVERY_SOURCE_SHA: ${{ steps.scope.outputs.installer_source_sha }}
+          REALITY_RECOVERY_INSTALL_RUN_ID: ${{ steps.scope.outputs.installer_run_id }}
+        run: |
+          node --check scripts/reality-genuine-monitor-installed-preview-v1.mjs
+          node scripts/reality-genuine-monitor-installed-preview-v1.mjs
+      - name: Preserve new independent recovery monitor receipt
+        if: steps.scope.outputs.recover == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-activation-${{ github.run_id }}
+          path: artifact/out/reality-independent-installed-preview-activation.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Confirm monitoring has independently completed
+        id: complete
+        if: steps.scope.outputs.recover == 'true'
+        run: echo "recovered=true" >> "$GITHUB_OUTPUT"
+
+  record_consumed_preview_recovery:
+    needs: recover_consumed_preview_install
+    if: needs.recover_consumed_preview_install.outputs.recovered == 'true'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Re-read original exact approved install evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_RUN: ${{ needs.recover_consumed_preview_install.outputs.installer_run_id }}
+        run: |
+          mkdir -p artifact/install
+          gh run download "$INSTALL_RUN" --repo maloney2323/Reality --name "reality-owner-approved-isolated-install-$INSTALL_RUN" --dir artifact/install
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-recovery-activation-${{ github.run_id }}
+          path: artifact/monitor
+      - name: Reconcile two independently verified runs into existing original job
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+          REALITY_RECOVERY_MODE: 'true'
+          REALITY_RECOVERY_INSTALL_RUN_ID: ${{ needs.recover_consumed_preview_install.outputs.installer_run_id }}
+          REALITY_RECOVERY_SOURCE_SHA: ${{ needs.recover_consumed_preview_install.outputs.installer_source_sha }}
+        run: |
+          node --check scripts/reality-genuine-record-activation-v1.mjs
+          node scripts/reality-genuine-record-activation-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-durable-recovered-activation-${{ github.run_id }}
+          path: artifact/out/reality-durable-preview-activation.json
+          if-no-files-found: error
+          retention-days: 14
