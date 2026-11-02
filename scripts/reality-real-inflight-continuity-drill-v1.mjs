@@ -160,7 +160,10 @@ if(process.argv[2]==='first'){
   halted=false;
   const recovered=await spawnWorker('resume','SAME_AUDIT_RECOVERED_AND_FINISHED');
   const child=recovered.child;
-  await new Promise((resolve,reject)=>child.once('exit',code=>code===0?resolve():reject(Error('RECOVERY_PROCESS_FAILED_'+code))));
+  await new Promise((resolve,reject)=>{
+   if(child.exitCode!==null){child.exitCode===0?resolve():reject(Error('RECOVERY_PROCESS_FAILED_'+child.exitCode));return;}
+   child.once('exit',code=>code===0?resolve():reject(Error('RECOVERY_PROCESS_FAILED_'+code)));
+  });
   const final=await broker('inflight_verify');
   if(final.status!=='SETTLED'||final.checkpoint_count!==3||
    final.checkpoint_event_ids.length!==3||
