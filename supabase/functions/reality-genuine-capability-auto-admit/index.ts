@@ -70,7 +70,7 @@ async function verify(jwt,commit,githubToken?:string|null){
   c.repository_owner!=='maloney2323'||
   String(c.repository_id)!=='1388852445'||
   c.workflow_ref!==REF||c.ref!==BRANCH||c.ref_type!=='branch'||
-  c.event_name!=='push'||c.sha!==commit||!SHA40.test(commit)||
+  !['push','workflow_dispatch'].includes(c.event_name)||c.sha!==commit||!SHA40.test(commit)||
   !/^[1-9][0-9]{0,17}$/.test(String(c.run_id||''))||
   typeof c.exp!=='number'||typeof c.iat!=='number'||
   typeof c.nbf!=='number'||c.exp<now-30||c.nbf>now+30||
@@ -91,7 +91,7 @@ async function verify(jwt,commit,githubToken?:string|null){
  if(!good)deny('SIGNATURE_FAILED');
  const run=await api('/actions/runs/'+c.run_id,githubToken);
  if(run?.id!==Number(c.run_id)||run.head_sha!==commit||
-  run.event!=='push'||run.path!==WORKFLOW||
+  run.event!==c.event_name||run.path!==WORKFLOW||
   run.head_branch!==BRANCH.slice('refs/heads/'.length)||
   run.head_repository?.full_name!==REPO)
   deny('GITHUB_WORKFLOW_PROVIDER_READBACK_MISMATCH');
@@ -985,6 +985,46 @@ async function continueOriginalPrepare(sha:string,run:number,token:string){
     receipt?.full_probation_complete!==false||
     receipt?.original_job_completed!==false)
   deny('ORIGINAL_RESUME_ACCEPTANCE_READBACK_NOT_VERIFIED');
+ let targetEvidence:Record<string,unknown>={};
+ if(o.source_path==='src/reality-extensions/reality-continuity-settlement-reconciler.mjs'){
+  const target=await database('rpc/reality_read_genuine_reconciliation_target_v1',{
+   method:'POST',body:{p_repairing_trigger_id:s.trigger_id}});
+  if(target?.status!=='TARGET_SETTLED_SIDE_CAR_UNIVERSE_MISSING'||
+    !WORK.test(target.reconciliation_target_work_id)||
+    target.reconciliation_target_work_id===s.original_work_id||
+    target.repairing_original_work_id!==s.original_work_id||
+    target.original?.epistemic_status!=='VERIFIED'||
+    target.settlement?.independent_outcome_verified!==true||
+    target.ledger?.append_only_verified!==true)
+   deny('RECONCILIATION_TARGET_AUTHORITATIVE_SOURCE_UNAVAILABLE');
+  const provider=await api('/actions/runs/'+target.target_provider_run_id,token);
+  const jobs=await api('/actions/runs/'+target.target_provider_run_id+'/jobs?per_page=100',token);
+  const artifacts=await api('/actions/runs/'+target.target_provider_run_id+'/artifacts?per_page=100',token);
+  if(provider?.id!==Number(target.target_provider_run_id)||
+     provider?.status!=='completed'||
+     provider?.head_repository?.full_name!==REPO||
+     provider?.head_branch!==BRANCH.slice('refs/heads/'.length)||
+     !Array.isArray(jobs?.jobs)||
+     !jobs.jobs.some((x:Record<string,unknown>)=>x.name==='resume_original_job'&&x.conclusion==='success')||
+     !jobs.jobs.some((x:Record<string,unknown>)=>x.name==='record_independent_original_settlement'&&x.conclusion==='success')||
+     !(artifacts?.artifacts||[]).some((x:Record<string,unknown>)=>
+       x.name==='reality-original-final-settlement-'+provider.id&&
+       x.expired===false&&/^sha256:[a-f0-9]{64}$/.test(String(x.digest||''))))
+    deny('RECONCILIATION_TARGET_GITHUB_PROVIDER_NOT_INDEPENDENTLY_SETTLED');
+  const evidence={original:target.original,approval:target.approval,
+    installation:target.installation,
+    provider:{
+      repository:REPO,run_id:provider.id,run_status:provider.status,
+      // The historical workflow itself may be RED while its two original
+      // continuation/settlement jobs succeeded; do not rewrite its conclusion.
+      run_conclusion:provider.conclusion,
+      original_job_success:true,independent_provider_readback:true,
+      provider_outcome_digest:target.settlement.provider_outcome_digest,
+      evidence_source:'GITHUB_ACTIONS_API'},
+    settlement:target.settlement,ledger:target.ledger};
+  targetEvidence={reconciliation_target_work_id:target.reconciliation_target_work_id,
+    reconciliation_evidence:evidence};
+ }
  return {status:'ACCEPTED_FOR_ISOLATED_RESUMPTION',acceptance_receipt:receipt,
   original_work_id:s.original_work_id,trigger_id:s.trigger_id,
   approval_id:s.approval_id,installed_commit_sha:s.installed_commit_sha,
@@ -995,6 +1035,7 @@ async function continueOriginalPrepare(sha:string,run:number,token:string){
   frozen_test_path:o.frozen_test_path,frozen_test_sha256:o.frozen_test_sha256,
   source_path:o.source_path,
   owner_id:s.owner_id,goal_id:s.goal_id,
+  ...targetEvidence,
   full_probation_complete:false,production_changed:false,original_job_completed:false};
 }
 async function continueOriginalClaim(sha:string,run:number,token:string,trigger:string){
@@ -1023,7 +1064,14 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
     proof.installed_commit_sha!==s.installed_commit_sha||
     proof.artifact_sha256!==s.artifact_sha256||
     proof.github_run_id!==String(run)||
-    proof.classification!=='MISSING_CAPABILITY'||
+    !(
+      (proof.extension_protocol==='VERIFIED_CI_FAILURE_CLASSIFICATION_V1'&&
+       proof.classification==='MISSING_CAPABILITY')||
+      (proof.extension_protocol==='TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1'&&
+       proof.classification==='RECONCILIATION_REQUIRED'&&
+       WORK.test(String(proof.reconciliation_target_original_work_id||''))&&
+       proof.original_job_completed===false)
+     )||
     proof.original_provider_failure_verified!==true||
     proof.frozen_suite_passed!==true||
     proof.isolated_execution!==true||
@@ -1044,13 +1092,39 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
     a.name==='reality-original-resumption-'+run&&!a.expired);
  if(saved.length!==1||!/^sha256:[a-f0-9]{64}$/.test(saved[0].digest||''))
   deny('ORIGINAL_SETTLEMENT_PROVIDER_ARTIFACT_NOT_VERIFIED');
- const receipt=await database('rpc/reality_settle_genuine_original_v1',{
-  method:'POST',body:{p_trigger_id:s.trigger_id,p_run_id:run,p_proof:{
-    original_work_id:s.original_work_id,installed_commit_sha:s.installed_commit_sha,
-    artifact_sha256:s.artifact_sha256,github_run_id:String(run),
-    provider_resume_job_success:true,provider_original_failure_verified:true,
-    isolated_original_acceptance_passed:true,observed_classification:'MISSING_CAPABILITY',
-    provider_outcome_digest:proof.provider_outcome_digest,production_changed:false}}});
+ const reconcile=proof.extension_protocol==='TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1';
+ const receipt=await database(
+  reconcile?'rpc/reality_settle_and_reconcile_genuine_original_v1':
+    'rpc/reality_settle_genuine_original_v1',{
+  method:'POST',body:{
+    p_trigger_id:s.trigger_id,p_run_id:run,
+    ...(reconcile?{p_target_original_work_id:proof.reconciliation_target_original_work_id}:{}),
+    p_proof:{
+     original_work_id:s.original_work_id,
+     reconciliation_target_original_work_id:reconcile?
+       proof.reconciliation_target_original_work_id:null,
+     installed_commit_sha:s.installed_commit_sha,
+     artifact_sha256:s.artifact_sha256,
+     github_run_id:String(run),
+     provider_resume_job_success:true,
+     provider_original_failure_verified:true,
+     isolated_original_acceptance_passed:true,
+     observed_classification:proof.classification,
+     provider_outcome_digest:proof.provider_outcome_digest,
+     production_changed:false}
+  }});
+ let universe=null;
+ if(reconcile){
+  universe=await database('rpc/reality_read_verified_genuine_universe_settlement_v1',{
+    method:'POST',body:{p_target_original_work_id:proof.reconciliation_target_original_work_id}});
+  if(universe?.status!=='VERIFIED_UNIVERSE_SETTLED'||
+     universe?.original_work_id!==proof.reconciliation_target_original_work_id||
+     universe?.repairing_work_id!==s.original_work_id||
+     universe?.independent_database_readback!==true||
+     universe?.production_changed!==false||
+     universe?.verified_event_id!==receipt?.universe_event_id)
+   deny('ORIGINAL_RECONCILIATION_INDEPENDENT_UNIVERSE_READBACK_REQUIRED');
+ }
  if(receipt?.status!=='SETTLED_ISOLATED'||
     receipt?.original_work_id!==s.original_work_id||
     receipt?.installed_commit_sha!==s.installed_commit_sha||
@@ -1063,9 +1137,134 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
  if(after?.original_work_id!==s.original_work_id||
     after?.phase!=='SETTLED_ISOLATED'||after?.continuation_state!=='SETTLED_ISOLATED')
   deny('ORIGINAL_SETTLEMENT_SECOND_DATABASE_READBACK_FAILED');
- return receipt;
+ return universe?{...receipt,universe_settlement_verified:true,universe_receipt:universe}:receipt;
 }
 
+
+
+/** One-time historical settlement recovery. No original execution or claim is replayed. */
+async function recoverClaimedOriginalSettlement(sha:string,runnerRun:number,token:string,
+ proof?:Record<string,unknown>){
+ const claim=await database('rpc/reality_read_claimed_genuine_original_settlement_v1',{
+  method:'POST',body:{}});
+ if(claim?.status==='NO_CLAIMED_ORIGINAL_SETTLEMENT_RECOVERY'){
+  if(proof)deny('ORIGINAL_RECOVERY_NO_CLAIM_TO_SETTLE');
+  return {status:claim.status};
+ }
+ if(claim?.status!=='SIGNED_ORIGINAL_SETTLEMENT_RECOVERY_REQUIRED'||
+    !UUID.test(claim.trigger_id)||!WORK.test(claim.original_work_id)||
+    !UUID.test(claim.approval_id)||!SHA40.test(claim.original_claim_runner_sha)||
+    !SHA40.test(claim.installed_commit_sha)||!SHA64.test(claim.artifact_sha256)||
+    !Number.isSafeInteger(Number(claim.original_claim_run_id))||
+    claim.installation_replay_authorized!==false||
+    claim.production_changed!==false||claim.original_job_completed!==false)
+  deny('ORIGINAL_RECOVERY_SERVICE_SCOPE_INVALID');
+ const s=await originalContinuationScope(token);
+ if(!s||s.scope.continuation_state!=='RESUMPTION_CLAIMED'||
+    s.scope.trigger_id!==claim.trigger_id||
+    s.scope.original_work_id!==claim.original_work_id||
+    s.scope.installed_commit_sha!==claim.installed_commit_sha||
+    s.scope.artifact_sha256!==claim.artifact_sha256||
+    s.scope.approval_id!==claim.approval_id)
+  deny('ORIGINAL_RECOVERY_OWNER_INSTALL_CLAIM_CHANGED');
+ const historical=Number(claim.original_claim_run_id);
+ const run=await api('/actions/runs/'+historical,token);
+ if(run?.id!==historical||run.head_sha!==claim.original_claim_runner_sha||
+    run.head_branch!==BRANCH.slice('refs/heads/'.length)||
+    run.head_repository?.full_name!==REPO||
+    run.path!==WORKFLOW||run.event!=='push'||run.status!=='completed')
+  deny('ORIGINAL_RECOVERY_HISTORICAL_PROVIDER_RUN_INVALID');
+ const [joblist,artlist]=await Promise.all([
+  api('/actions/runs/'+historical+'/jobs?per_page=100',token),
+  api('/actions/runs/'+historical+'/artifacts?per_page=100',token)]);
+ const done=(Array.isArray(joblist?.jobs)?joblist.jobs:[]).filter(j=>
+  j.name==='resume_original_job'&&j.run_id===historical&&
+  j.status==='completed'&&j.conclusion==='success'&&
+  j.steps?.some(x=>x.name==='Execute original frozen acceptance against installed source'&&
+    x.conclusion==='success'));
+ if(done.length!==1)deny('ORIGINAL_RECOVERY_RESUME_PROVIDER_NOT_SUCCESS');
+ const exact=(Array.isArray(artlist?.artifacts)?artlist.artifacts:[]).filter(a=>
+   a.name==='reality-original-resumption-'+historical&&a.expired===false&&
+   /^sha256:[a-f0-9]{64}$/.test(String(a.digest||'')));
+ if(exact.length!==1)deny('ORIGINAL_RECOVERY_PROVIDER_ARTIFACT_MISSING');
+ const target=await database('rpc/reality_read_genuine_reconciliation_target_v1',{
+  method:'POST',body:{p_repairing_trigger_id:claim.trigger_id}});
+ if(target?.status!=='TARGET_SETTLED_SIDE_CAR_UNIVERSE_MISSING'||
+    !WORK.test(String(target.reconciliation_target_work_id||''))||
+    target.reconciliation_target_work_id===claim.original_work_id||
+    target.repairing_original_work_id!==claim.original_work_id||
+    target.settlement?.independent_outcome_verified!==true||
+    target.ledger?.append_only_verified!==true)
+  deny('ORIGINAL_RECOVERY_TARGET_SETTLEMENT_NOT_VERIFIED');
+ const scope={
+  status:'SIGNED_ORIGINAL_SETTLEMENT_RECOVERY_REQUIRED',
+  original_work_id:claim.original_work_id,
+  target_original_work_id:target.reconciliation_target_work_id,
+  trigger_id:claim.trigger_id,approval_id:claim.approval_id,
+  original_claim_run_id:historical,
+  original_claim_runner_sha:claim.original_claim_runner_sha,
+  installed_commit_sha:claim.installed_commit_sha,
+  artifact_sha256:claim.artifact_sha256,
+  provider_artifact_digest:exact[0].digest,
+  installation_replay_authorized:false,
+  original_job_completed:false,production_changed:false};
+ if(!proof)return scope;
+ if(proof.schema!=='reality-original-job-execution-proof-v1'||
+   proof.original_work_id!==claim.original_work_id||
+   proof.trigger_id!==claim.trigger_id||
+   proof.approval_id!==claim.approval_id||
+   proof.artifact_sha256!==claim.artifact_sha256||
+   proof.installed_commit_sha!==claim.installed_commit_sha||
+   proof.github_run_id!==String(historical)||
+   proof.provider_artifact_digest!==exact[0].digest||
+   proof.reconciliation_target_original_work_id!==target.reconciliation_target_work_id||
+   proof.extension_protocol!=='TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1'||
+   proof.classification!=='RECONCILIATION_REQUIRED'||
+   proof.original_provider_failure_verified!==true||
+   proof.frozen_suite_passed!==true||
+   proof.isolated_execution!==true||proof.production_changed!==false||
+   proof.original_job_completed!==false||
+   !SHA64.test(String(proof.provider_outcome_digest||'')))
+  deny('ORIGINAL_RECOVERY_HISTORICAL_PROOF_NOT_PINNED');
+ const receipt=await database('rpc/reality_settle_and_reconcile_genuine_original_v1',{
+  method:'POST',body:{p_trigger_id:claim.trigger_id,p_run_id:historical,
+    p_target_original_work_id:target.reconciliation_target_work_id,
+    p_proof:{
+     original_work_id:claim.original_work_id,
+     reconciliation_target_original_work_id:target.reconciliation_target_work_id,
+     installed_commit_sha:claim.installed_commit_sha,
+     artifact_sha256:claim.artifact_sha256,github_run_id:String(historical),
+     provider_resume_job_success:true,provider_original_failure_verified:true,
+     isolated_original_acceptance_passed:true,
+     observed_classification:'RECONCILIATION_REQUIRED',
+     provider_outcome_digest:proof.provider_outcome_digest,
+     production_changed:false}}});
+ const universe=await database('rpc/reality_read_verified_genuine_universe_settlement_v1',{
+  method:'POST',body:{p_target_original_work_id:target.reconciliation_target_work_id}});
+ if(receipt?.status!=='SETTLED_ISOLATED'||
+    receipt.original_work_id!==claim.original_work_id||
+    receipt.installed_commit_sha!==claim.installed_commit_sha||
+    receipt.original_job_completed!==true||
+    receipt.independent_outcome_verified!==true||
+    receipt.production_changed!==false||
+    receipt.full_probation_complete!==false||
+    universe?.status!=='VERIFIED_UNIVERSE_SETTLED'||
+    universe.original_work_id!==target.reconciliation_target_work_id||
+    universe.repairing_work_id!==claim.original_work_id||
+    universe.verified_event_id!==receipt.universe_event_id||
+    universe.independent_database_readback!==true||
+    universe.production_changed!==false)
+  deny('ORIGINAL_RECOVERY_INDEPENDENT_UNIVERSE_READBACK_FAILED');
+ const after=await database('rpc/reality_read_genuine_original_scope_v2',{
+  method:'POST',body:{}});
+ if(after?.original_work_id!==claim.original_work_id||
+    after.phase!=='SETTLED_ISOLATED'||
+    after.continuation_state!=='SETTLED_ISOLATED')
+  deny('ORIGINAL_RECOVERY_DURABLE_SIDECAR_READBACK_FAILED');
+ return {...receipt,universe_settlement_verified:true,
+  universe_receipt:universe,settlement_recovered_from_provider_run:historical,
+  recovery_witness_run_id:runnerRun};
+}
 
 async function attestSignedOwnerIssue(proof:Record<string,unknown>,sha:string,runId:number,token:string){
  const n=Number(proof?.issue_number),failedRun=Number(proof?.original_provider_failed_run_id);
@@ -1185,6 +1384,17 @@ Deno.serve(async request=>{
    const result=await attestSignedOwnerIssue(input.proof,input.scope.repository_sha,
       run.id,ghProviderToken);
    return respond({ok:true,...result});
+  }
+  if(['original_settlement_recover_prepare','original_settlement_recover_finish'].includes(input?.action)&&
+      SHA40.test(input?.scope?.repository_sha||'')){
+    const finish=input.action==='original_settlement_recover_finish';
+    if(Object.keys(input).sort().join(',')!==(finish?'action,proof,scope':'action,scope')||
+       Object.keys(input.scope).sort().join(',')!=='repository_sha')
+      deny('ORIGINAL_RECOVERY_EXACT_ENVELOPE_REQUIRED');
+    const verified=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+    const result=await recoverClaimedOriginalSettlement(input.scope.repository_sha,
+       verified.id,ghProviderToken,finish?input.proof:undefined);
+    return respond({ok:true,...result});
   }
   if(['original_prepare','original_claim','original_settle'].includes(input?.action)&&
     SHA40.test(input?.scope?.repository_sha||'')){
