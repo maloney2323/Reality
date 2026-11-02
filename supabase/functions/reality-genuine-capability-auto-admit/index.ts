@@ -316,6 +316,16 @@ async function admit(report){
    e.payload?.frozen_test_sha256===signal.frozen_sha256);
   if(matching.length!==1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
   const original=matching[0];
+  // A successfully settled isolated customer job is authoritative durable state,
+  // even while its historical frozen test remains red on the base branch.
+  const last=await database('rpc/reality_read_genuine_original_scope_v2',{
+   method:'POST',body:{}});
+  if(last?.original_work_id===original.payload.original_work_id&&
+     last?.phase==='SETTLED_ISOLATED'&&
+     last?.continuation_state==='SETTLED_ISOLATED'){
+   skippedSettled.push(original.payload.original_work_id);
+   continue;
+  }
   // A frozen test can remain red long after Reality independently settled
   // its ORIGINAL work on another authorized path. Never reopen or requeue it.
   const scoped=await readChain(original.continuity_root_id,
@@ -882,6 +892,8 @@ async function prepareConsumedOwnerInstallationRecovery(
 async function originalContinuationScope(token:string){
  const s=await database('rpc/reality_read_genuine_original_scope_v2',{method:'POST',body:{}});
  if(s?.status==='NO_ELIGIBLE_ORIGINAL')return null;
+ if(s?.phase==='SETTLED_ISOLATED'&&s?.continuation_state==='SETTLED_ISOLATED')
+  return {scope:s,original:{}};
  if(!UUID.test(s?.trigger_id)||!WORK.test(s?.original_work_id)||
     !SHA40.test(s?.installed_commit_sha)||!SHA64.test(s?.artifact_sha256)||
     s?.phase!=='ISOLATED_INSTALLED_PROBATION'||
