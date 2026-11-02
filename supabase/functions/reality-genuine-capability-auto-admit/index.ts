@@ -295,7 +295,7 @@ async function admit(report){
   epistemic_status:'eq.VERIFIED',
   select:'*',order:'created_at.desc',limit:'200'}));
  if(!Array.isArray(all)||all.length===200)deny('ORIGINAL_SOURCE_DISCOVERY_COVERAGE_LIMIT');
- const queued=[],skippedSettled=[];
+ const queued=[],alreadyClaimed=[],skippedSettled=[];
  for(const signal of report.findings){
   if(signal.kind!=='UNVERIFIED_MISSING_CAPABILITY_CANDIDATE'||
      !TEST.test(signal.test_path)||!MODULE.test(signal.candidate_module_path)||
@@ -331,17 +331,25 @@ async function admit(report){
    method:'POST',body:{p_gap_event_id:gapId}});
   if(receipt?.source_event_id!==gapId||
      receipt.original_work_id!==original.payload.original_work_id||
-     receipt.phase!=='PENDING_FROZEN_REPRODUCTION'||
+     !['PENDING_FROZEN_REPRODUCTION',
+       'LEASED_FOR_INDEPENDENT_REPRODUCTION',
+       'EVIDENCE_RECONCILIATION_REQUIRED',
+       'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(receipt.phase)||
      receipt.installation_authorized!==false||
      receipt.original_job_completed!==false||
      receipt.new_customer_job_created!==false||
      !UUID.test(receipt.trigger_id))
     deny('ATOMIC_QUEUE_READBACK_MISMATCH');
-  queued.push({original_work_id:receipt.original_work_id,
+  // Repeated CI runs may observe a consumed one-time lease. Only newly
+  // pending rows may reach the worker claim stage; never issue a second
+  // claim for a leased, reconciled, or already-reproduced original job.
+  const item={original_work_id:receipt.original_work_id,
    source_event_id:gapId,trigger_id:receipt.trigger_id,
-   queue_phase:receipt.phase});
+   queue_phase:receipt.phase};
+  if(receipt.phase==='PENDING_FROZEN_REPRODUCTION')queued.push(item);
+  else alreadyClaimed.push(item);
  }
- return {queued,skippedSettled};
+ return {queued,alreadyClaimed,skippedSettled};
 }
 // Only the signed exact CI workflow may claim a source-bound, red frozen test.
 // The original owner and goal are resolved from private Continuity by service
@@ -448,14 +456,16 @@ Deno.serve(async request=>{
    input.report.original_job_completed!==false)
    deny('EXACT_SIGNED_CI_OBSERVATION_REQUIRED');
   const run=await verify(bearer,input.report.repository_sha);
-  const {queued,skippedSettled}=await admit(input.report);
-  if(queued.length+skippedSettled.length!==input.report.findings.length)
+  const {queued,alreadyClaimed,skippedSettled}=await admit(input.report);
+  if(queued.length+alreadyClaimed.length+skippedSettled.length!==
+     input.report.findings.length)
    deny('DETECTION_DISPOSITION_INCOMPLETE');
   return respond({ok:true,
    status:'GENUINE_ORIGINAL_GAPS_RECONCILED',
    signed_github_run_id:run.id,
    observed_candidate_count:input.report.findings.length,
    verified_queue_count:queued.length,
+   verified_already_claimed_count:alreadyClaimed.length,
    verified_already_settled_count:skippedSettled.length,
    verified_original_count:queued.length,queued,
    installation_authorized:false,original_job_completed:false,
