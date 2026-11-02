@@ -143,3 +143,50 @@ test('trusted runner forwards only bounded intake failures and keeps original jo
  assert.equal(observed.original_job_completed,false);
  assert.equal(observed.new_job_created,false);
 });
+
+test('independent original-source readback failure explains empty queue without granting upgrade',async()=>{
+ const {executeAuthorizedWork}=await import('../src/reality-governed-execution-engine-v0.1.js');
+ let enqueueCalls=0;
+ const runner=createGenuineOriginalWorkRunner({
+  session,conversationId:conversation,
+  loadAuthorizedInternalJob:async()=>({
+   ...job,
+   independent_verifier:{verify:async()=>{
+    throw Error('GENUINE_SOURCE_JOB_CURRENT_PREVIEW_FROZEN_SUITE_CHANGED');
+   }},
+  }),
+  makeProviderReadback:()=>async()=>({}),
+  makeLiveIntake:()=>async()=>{
+   enqueueCalls++;throw Error('UNEXPECTED_QUEUE');
+  },
+  runExecution:executeAuthorizedWork,
+ });
+ const result=await runner({originalWorkId:work});
+ assert.equal(result.execution_status,'UNRESOLVED');
+ assert.equal(result.capability_response,null);
+ assert.equal(result.independent_source_readback_error_code,
+  'GENUINE_SOURCE_JOB_CURRENT_PREVIEW_FROZEN_SUITE_CHANGED');
+ assert.equal(enqueueCalls,0);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.production_changed,false);
+});
+test('unexpected independent provider exception never leaks private source or generates capabilities',async()=>{
+ const {executeAuthorizedWork}=await import('../src/reality-governed-execution-engine-v0.1.js');
+ let enqueueCalls=0;
+ const runner=createGenuineOriginalWorkRunner({
+  session,conversationId:conversation,
+  loadAuthorizedInternalJob:async()=>({
+   ...job,independent_verifier:{verify:async()=>{
+    throw Error('internal-sensitive-secret-dont-print');
+   }},
+  }),
+  makeProviderReadback:()=>async()=>({}),
+  makeLiveIntake:()=>async()=>{enqueueCalls++;return {};},
+  runExecution:executeAuthorizedWork,
+ });
+ const result=await runner({originalWorkId:work});
+ assert.equal(result.execution_status,'UNRESOLVED');
+ assert.equal(result.independent_source_readback_error_code,null);
+ assert.equal(enqueueCalls,0);
+ assert.equal(JSON.stringify(result).includes('internal-sensitive-secret'),false);
+});
