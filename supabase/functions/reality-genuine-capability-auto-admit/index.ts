@@ -1042,6 +1042,21 @@ Deno.serve(async request=>{
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
+
+  if(['original_prepare','original_claim','original_settle'].includes(input?.action)&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   const names=Object.keys(input).sort().join(',');
+   if((input.action==='original_prepare'||input.action==='original_claim')&&names!=='action,scope'||
+      input.action==='original_settle'&&names!=='action,proof,scope')
+    deny('ORIGINAL_CONTINUATION_ENVELOPE_INVALID');
+   const verified=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const receipt=input.action==='original_prepare'?
+     await continueOriginalPrepare(input.scope.repository_sha,verified.id,ghProviderToken):
+     input.action==='original_claim'?
+     await continueOriginalClaim(input.scope.repository_sha,verified.id,ghProviderToken,input.scope.trigger_id):
+     await continueOriginalSettle(input.scope.repository_sha,verified.id,ghProviderToken,input.proof);
+   return respond({ok:true,...receipt});
+  }
   if(input?.action==='installer_recover_prepare'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
