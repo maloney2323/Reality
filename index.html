@@ -449,6 +449,7 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
  </div>
  <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
  <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
+ <div id="homeOwnerFollowonReview" class="home-owner-items" aria-live="polite" style="margin-top:12px"></div>
  <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
  <div id="homeOwnerDialogs"></div>
  <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
@@ -2162,9 +2163,68 @@ async function homeOwnerRead(){
   throw Error('AUTHENTICATED_QUALIFICATION_READBACK_REQUIRED');
  return data.entries;
 }
+async function homeOwnerShowUnboundFollowonReview(epoch){
+ const target=$('homeOwnerFollowonReview');
+ if(!target)return;
+ target.replaceChildren();
+ if(!homeOwnerSignedIn()){
+  target.textContent='Sign in to review the separately verified but not yet owner-bound #188 repair.';
+  return;
+ }
+ const pending=document.createElement('p');
+ pending.className='home-owner-note';
+ pending.textContent='Checking independently verified follow-on repair evidence…';
+ target.appendChild(pending);
+ try{
+  const response=await fetch('/api/reality/personal-issue188-candidate-review',{
+   method:'GET',cache:'no-store',credentials:'same-origin'});
+  const receipt=await response.json();
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  if(!response.ok||receipt.ok!==true||
+   receipt.status!=='HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND'||
+   receipt.issue_number!==188||
+   receipt.previous_owner_work_already_settled!==true||
+   receipt.new_owner_work_binding_required!==true||
+   receipt.qualified_for_owner_installation!==false||
+   receipt.owner_approval_issued!==false||
+   receipt.installed!==false||
+   receipt.production_changed!==false||
+   receipt.independent_tests_passed!==23||
+   receipt.security_regressions_remaining!==0||
+   !/^[a-f0-9]{64}$/.test(String(receipt.source_sha256||'')))
+   throw Error('INDEPENDENT_OWNER_REVIEW_PROOF_UNAVAILABLE');
+  target.replaceChildren();
+  const card=document.createElement('article');card.className='home-owner-item';
+  const title=document.createElement('h3');
+  title.textContent='Follow-on capability proposal · Independently verified';
+  const status=document.createElement('p');
+  status.className='home-owner-state';
+  status.textContent='23/23 tests passed · Zero checked security regressions · New owner job required';
+  const body=document.createElement('p');
+  body.textContent='Reality corrected its execution-receipt verifier. The original #188 job is already settled, so this new source cannot borrow its approval or be installed until it is tied to a new authenticated original work item.';
+  const source=document.createElement('code');
+  source.style.overflowWrap='anywhere';
+  source.textContent='Exact source SHA-256: '+receipt.source_sha256;
+  const next=document.createElement('p');
+  next.className='home-owner-not-complete';
+  next.textContent='Not authorized: no new work binding, no exact installation approval, no new job settlement or production change.';
+  const link=document.createElement('a');
+  link.href=receipt.draft_review_url;link.target='_blank';link.rel='noopener noreferrer';
+  link.textContent='Review independently verified repair evidence (draft PR #202)';
+  const note=document.createElement('p');
+  note.className='home-owner-note';
+  note.textContent='Approval is intentionally unavailable until Reality records a fresh owner-confirmed goal/work binding and independently qualifies these exact source bytes. Do not approve the old settled work again.';
+  card.append(title,status,body,source,next,link,note);
+  target.appendChild(card);
+ }catch{
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  target.textContent='The new repair review could not be independently revalidated. No installation or authorization is available.';
+ }
+}
 async function homeOwnerRefresh(){
  const epoch=++homeOwnerRefreshEpoch;
  homeOwnerLegacyVisibility();
+ void homeOwnerShowUnboundFollowonReview(epoch);
  const list=$('homeOwnerItems'),status=$('homeOwnerStatus'),count=$('homeOwnerCount');
  list.replaceChildren();
  if(!homeOwnerSignedIn()){
