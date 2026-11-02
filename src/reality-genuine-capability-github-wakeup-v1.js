@@ -1,8 +1,8 @@
-// Inert trigger file: automatic GitHub Actions wake, NOT installation.
+// Durable source-bound trigger: wake the full isolated capability workflow, NOT installation.
 // A trusted Reality server sends this only AFTER Universe + service-role
 // atomic gap queue independently confirm the original customer job.
 const REPO='maloney2323/Reality';
-const BRANCH='feature/reality-genuine-capability-worker-20261101';
+const BRANCH='feature/reality-general-capability-engine-20261101';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -65,7 +65,7 @@ export async function dispatchGenuineCapabilityWake({
   trigger_id,source_event_id,original_work_id,
   worker_commit_sha:created.commit.sha,
   worker_workflow_url:'https://github.com/'+REPO+
-   '/actions/workflows/reality-genuine-capability-worker-v1.yml',
+   '/actions/workflows/reality-genuine-capability-auto-trigger-v1.yml',
   installation_authorized:false,original_job_completed:false,
   production_changed:false,
  });
