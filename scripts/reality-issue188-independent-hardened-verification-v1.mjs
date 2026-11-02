@@ -10,7 +10,7 @@ const REPO='maloney2323/Reality',REF='refs/heads/feature/reality-general-capabil
 const SOURCE='src/reality-extensions/reality-general-execution-receipt.mjs',
  TEST='test/reality-extensions/reality-general-execution-receipt-proposed.test.mjs',
  FROZEN='test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js',
- HOLD='test/reality-business-value-execution-receipt-holdout-v1.test.js';
+ HOLD='test/reality-business-value-execution-receipt-governed-holdout-v2.test.js';
 if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_REF!==REF||e.GITHUB_REPOSITORY!==REPO||
  !/^[a-f0-9]{40}$/.test(e.GITHUB_SHA||'')||
  e.OPENAI_API_KEY||e.SUPABASE_SERVICE_ROLE_KEY||e.SUPABASE_SECRET_KEY)
