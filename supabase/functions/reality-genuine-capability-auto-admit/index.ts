@@ -502,6 +502,65 @@ async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number
   model_generated:false,installation_authorized:false,
   original_job_completed:false,production_changed:false};
 }
+
+async function prepareFrozenGeneration(input:Record<string,unknown>){
+ const trigger=String(input.trigger_id||''),gapId=String(input.gap_event_id||'');
+ const sha=String(input.repository_sha||'');
+ if(!UUID.test(trigger)||!UUID.test(gapId)||!SHA40.test(sha))
+  deny('GENERATION_PINNED_SCOPE_REQUIRED');
+ const q=await database('rpc/reality_read_genuine_worker_claim_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_gap_event_id:gapId}});
+ if(q?.phase!=='FROZEN_REPRODUCED_AWAITING_CANDIDATE'||
+    !UUID.test(q?.claim_id)||q.gap_event_id!==gapId)
+  deny('DURABLE_FROZEN_REPRODUCTION_NOT_VERIFIED');
+ const originals=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+q.original_work_event_id,select:'*'}));
+ const gaps=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+gapId,select:'*'}));
+ const o=originals?.[0],g=gaps?.[0],p=o?.payload;
+ if(!Array.isArray(originals)||originals.length!==1||
+    !Array.isArray(gaps)||gaps.length!==1||
+    o.entity_type!=='reality_original_source_backed_repair_work'||
+    o.epistemic_status!=='VERIFIED'||
+    g.entity_type!=='reality_genuine_capability_gap_v1'||
+    g.epistemic_status!=='VERIFIED'||
+    p?.owner_id!==q.owner_id||
+    p?.original_work_id!==q.original_work_id||
+    p?.owner_authorized_investigation!==true||
+    p?.owner_authorized_installation!==false||
+    p?.original_job_completed!==false||
+    g.payload?.installation_authorized!==false||
+    g.payload?.original_job_completed!==false||
+    g.payload?.independently_verified!==true||
+    g.payload?.original_work_id!==q.original_work_id||
+    g.payload?.original_work_event_id!==o.event_id||
+    g.continuity_root_id!==o.continuity_root_id||
+    g.worldline_id!==o.worldline_id||
+    g.payload?.goal_transition_event_id!==p.goal_transition_receipt_ref||
+    !TEST.test(p.frozen_test_path)||!MODULE.test(p.source_path)||
+    !SHA64.test(p.frozen_test_sha256)||
+    !SHA64.test(g.payload?.provider_failure_hash)||
+    g.payload?.verification_suite_ref!==
+     'github:frozen-regression:sha256:'+p.frozen_test_sha256)
+  deny('ORIGINAL_OWNER_GAP_DRIFT');
+ if(await hash(await providerSource(p.frozen_test_path,sha))!==
+    p.frozen_test_sha256||
+    await api('/contents/'+p.source_path+'?ref='+sha)!==null)
+  deny('FROZEN_GENERATION_SOURCE_STALE');
+ return {status:'VERIFIED_FROZEN_READY_FOR_MODEL',
+  trigger_id:trigger,gap_event_id:gapId,claim_id:q.claim_id,
+  original_work_id:q.original_work_id,
+  owner_id:q.owner_id,goal_id:p.original_goal_id,
+  goal_transition_receipt_ref:p.goal_transition_receipt_ref,
+  continuity_root_id:o.continuity_root_id,
+  worldline_id:o.worldline_id,
+  confirmed_gap_evidence_hash:g.payload.provider_failure_hash,
+  frozen_test_path:p.frozen_test_path,
+  frozen_sha256:p.frozen_test_sha256,
+  source_entrypoint:p.source_path,
+  repository_sha:sha,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -513,6 +572,12 @@ Deno.serve(async request=>{
   const raw=await request.text();
   if(raw.length>9500)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  if(input?.action==='prepare'&&SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope')
+    deny('GENERATION_SCOPE_FIELDS_INVALID');
+   await verify(bearer,input.scope.repository_sha);
+   return respond({ok:true,...await prepareFrozenGeneration(input.scope)});
+  }
   if(input?.action==='reconcile'&&SHA40.test(input?.proof?.runner_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,proof')
     deny('RECONCILIATION_ENVELOPE_INVALID');
