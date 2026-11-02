@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assessContinuityReconciliation as assess} from '../../src/reality-extensions/reality-continuity-settlement-reconciler.mjs';
+import {assessContinuityReconciliation as assess} from '../src/reality-extensions/reality-continuity-settlement-reconciler.mjs';
 
 // Relationship-level holdout from the independently read Nov 2 customer
 // provider record. Do not publish customer owner or conversation UUIDs.
