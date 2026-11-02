@@ -32,7 +32,8 @@ if(typeof jwt!=='string'||jwt.length<300)die('OIDC_SIGNATURE_MISSING');
 const response=await fetch(
  'https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit',{
  method:'POST',redirect:'error',cache:'no-store',
- headers:{authorization:'Bearer '+jwt,'content-type':'application/json'},
+ headers:{authorization:'Bearer '+jwt,'content-type':'application/json',
+   'x-reality-github-provider-token':env.GH_TOKEN||''},
  body:JSON.stringify({action:'prepare',scope:{
   trigger_id:item.trigger_id,gap_event_id:item.source_event_id,
   repository_sha:env.GITHUB_SHA}})});
