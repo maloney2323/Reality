@@ -47,17 +47,18 @@ function stable(v){
   Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])]));
 }
 const digest=async v=>hash(JSON.stringify(stable(v)));
-async function api(path){
+async function api(path,githubToken?:string|null){
  const r=await fetch('https://api.github.com/repos/'+REPO+path,{
   redirect:'error',cache:'no-store',headers:{
    accept:'application/vnd.github+json',
    'x-github-api-version':'2022-11-28',
-   'user-agent':'Reality-genuine-auto-admit-v1'}});
+   'user-agent':'Reality-genuine-auto-admit-v1',
+   ...(githubToken?{authorization:'Bearer '+githubToken}:{})}});
  if(r.status===404)return null;
  if(!r.ok)deny('GITHUB_READBACK_UNAVAILABLE');
  return r.json();
 }
-async function verify(jwt,commit){
+async function verify(jwt,commit,githubToken?:string|null){
  if(typeof jwt!=='string'||jwt.length<300||jwt.length>9000)
   deny('SIGNED_IDENTITY_INVALID');
  const p=jwt.split('.');
@@ -88,7 +89,7 @@ async function verify(jwt,commit){
  const good=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,
   decode64(p[2]),new TextEncoder().encode(p[0]+'.'+p[1]));
  if(!good)deny('SIGNATURE_FAILED');
- const run=await api('/actions/runs/'+c.run_id);
+ const run=await api('/actions/runs/'+c.run_id,githubToken);
  if(run?.id!==Number(c.run_id)||run.head_sha!==commit||
   run.event!=='push'||run.path!==WORKFLOW||
   run.head_branch!==BRANCH.slice('refs/heads/'.length)||
@@ -661,7 +662,7 @@ async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
  return receipt;
 }
 
-async function prepareExactlyApprovedPreviewInstall(runSha:string,runId:number){
+async function prepareExactlyApprovedPreviewInstall(runSha:string,runId:number,githubToken:string){
  const item=await database('rpc/reality_read_approved_genuine_preview_v1',{
   method:'POST',body:{}});
  if(item?.status==='NO_APPROVED_WORK')return {
@@ -709,7 +710,7 @@ async function prepareExactlyApprovedPreviewInstall(runSha:string,runId:number){
  if(computed!==item.artifact_sha256)
   deny('APPROVED_MODEL_BYTES_HASH_MISMATCH');
  for(const file of entries){
-  if(await api('/contents/'+String(file.path)+'?ref='+runSha)!==null)
+  if(await api('/contents/'+String(file.path)+'?ref='+runSha,githubToken)!==null)
    deny('MODEL_GENERATED_SOURCE_WOULD_OVERWRITE_EXISTING_FILE');
  }
  return {status:'OWNER_APPROVED_CANDIDATE_READY_FOR_ISOLATED_INSTALL',
@@ -733,21 +734,26 @@ Deno.serve(async request=>{
   const raw=await request.text();
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  const ghProviderToken=request.headers.get('x-reality-github-provider-token');
+  if(input?.action?.startsWith('installer_')&&
+     (typeof ghProviderToken!=='string'||
+      !/^[A-Za-z0-9_]{25,300}$/.test(ghProviderToken)))
+    deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
   if(input?.action==='installer_prepare'&&
      SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
     deny('INSTALL_PREPARE_ENVELOPE_INVALID');
-   const run=await verify(bearer,input.scope.repository_sha);
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
    return respond({ok:true,...await prepareExactlyApprovedPreviewInstall(
-     input.scope.repository_sha,run.id)});
+     input.scope.repository_sha,run.id,ghProviderToken)});
   }
   if(input?.action==='installer_reserve'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
     deny('INSTALL_RESERVE_ENVELOPE_INVALID');
-   const run=await verify(bearer,input.scope.repository_sha);
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
    const prepared=await prepareExactlyApprovedPreviewInstall(
-     input.scope.repository_sha,run.id);
+     input.scope.repository_sha,run.id,ghProviderToken);
    if(prepared.status!=='OWNER_APPROVED_CANDIDATE_READY_FOR_ISOLATED_INSTALL'||
     prepared.trigger_id!==input.scope.trigger_id||
     prepared.approval_id!==input.scope.approval_id||
