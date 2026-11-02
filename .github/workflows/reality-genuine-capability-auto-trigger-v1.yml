@@ -408,3 +408,69 @@ jobs:
           path: artifact/out/reality-durable-preview-activation.json
           if-no-files-found: error
           retention-days: 14
+
+  resume_original_job:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      performed: ${{ steps.resume.outputs.performed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Execute original frozen acceptance against installed source
+        id: resume
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-resume-v1.mjs
+          node scripts/reality-genuine-original-resume-v1.mjs
+      - name: Preserve original provider work proof
+        if: steps.resume.outputs.performed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-resumption-${{ github.run_id }}
+          path: artifact/out/reality-original-resumption.json
+          if-no-files-found: error
+          retention-days: 14
+
+  record_independent_original_settlement:
+    needs: resume_original_job
+    if: ${{ needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'true' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-original-resumption-${{ github.run_id }}
+          path: artifact/resume
+      - name: Independently verify original provider outcome and write final settlement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-settle-v1.mjs
+          node scripts/reality-genuine-original-settle-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-final-settlement-${{ github.run_id }}
+          path: artifact/out/reality-original-final-settlement.json
+          if-no-files-found: error
+          retention-days: 14
