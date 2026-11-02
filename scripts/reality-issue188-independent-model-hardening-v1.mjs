@@ -44,7 +44,7 @@ if(sha(existing.source)!==previousSha||existing.source_sha256!==previousSha||
  independent.status!=='INDEPENDENT_SOURCE_CANDIDATE_PASSED'||
  regression.proposal_source_sha256!==previousSha||
  regression.decision!=='BLOCK_NEW_APPROVAL_UNTIL_HARDENED'||
- regression.regressions?.length!==4||
+ regression.confirmed_regressions?.length!==4||
  regression.historical_original_work_status!=='ALREADY_SETTLED_DO_NOT_REPLAY')
  fail('REAL_INDEPENDENT_FALSE_POSITIVE_REGRESSION_PROOF_REQUIRED');
 const historical=await gh('/contents/'+SOURCE+'?ref=a7ff52787dd9c026c8354c27dae4c2520bf83af8');
@@ -76,7 +76,7 @@ for(let attempt=1;attempt<=3;attempt++){
   previous_model_source:existing.source,
   actual_owner_approved_historical_source_sha256:sha(alreadyInstalled),
   prior_model_response_id:existing.model_response_id,
-  confirmed_independent_provider_regressions:regression.regressions,
+  confirmed_independent_provider_regressions:regression.confirmed_regressions,
   required_hardening:[
    'Only a goal ID beginning verified: may count as verified',
    'Require reservation ref prefix supabase:owner:single-use:',
