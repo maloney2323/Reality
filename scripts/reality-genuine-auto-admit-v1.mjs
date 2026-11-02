@@ -35,10 +35,13 @@ const res=await fetch(
 });
 const outcome=await res.json().catch(()=>null);
 if(!res.ok||outcome?.ok!==true||
- outcome.status!=='GENUINE_ORIGINAL_GAPS_DURABLY_QUEUED'||
- outcome.verified_original_count!==report.findings.length||
+ outcome.status!=='GENUINE_ORIGINAL_GAPS_RECONCILED'||
+ outcome.observed_candidate_count!==report.findings.length||
+ !Number.isInteger(outcome.verified_already_settled_count)||
+ outcome.verified_already_settled_count<0||
  !Array.isArray(outcome.queued)||
- outcome.queued.length!==report.findings.length||
+ outcome.verified_queue_count!==outcome.queued.length||
+ outcome.verified_queue_count+outcome.verified_already_settled_count!==report.findings.length||
  outcome.installation_authorized!==false||
  outcome.original_job_completed!==false||
  outcome.production_changed!==false)
@@ -46,7 +49,7 @@ if(!res.ok||outcome?.ok!==true||
   outcome.error:'SIGNED_PROVIDER_OR_DURABLE_QUEUE_UNVERIFIED');
 console.log('REALITY_SIGNED_AUTO_ADMISSION',JSON.stringify({
  status:outcome.status,discovered:report.findings.length,
- queued:outcome.queued,
+ queued:outcome.queued,skipped_independently_settled:outcome.verified_already_settled_count,
  installation_authorized:false,original_job_completed:false,
  production_changed:false,
 }));
