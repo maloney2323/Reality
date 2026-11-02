@@ -519,7 +519,36 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  reconcile_all_settled_outcomes:
+    # Runs independently of discovery failures, without any replay or owner click.
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Reconcile every already-settled job into Universe and prove idempotent repeat
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-universe-outcome-auto-finalize-v2.mjs
+          node scripts/reality-genuine-universe-outcome-auto-finalize-v2.mjs
+      - name: Preserve independently verified settlement and no-duplicate receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-universe-outcome-auto-finalize-${{ github.run_id }}
+          path: artifact/out/reality-all-settled-universe-outcomes.json
+          if-no-files-found: error
+          retention-days: 30
+
   independently_measure_production_readiness:
+    needs: reconcile_all_settled_outcomes
     if: github.event_name == 'push'
     permissions:
       contents: read
