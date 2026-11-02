@@ -877,6 +877,155 @@ async function prepareConsumedOwnerInstallationRecovery(
    installation_replay_authorized:false,
    original_job_completed:false,production_changed:false};
 }
+
+/** Governed continuation: installed preview only, never production. */
+async function originalContinuationScope(token:string){
+ const s=await database('rpc/reality_read_genuine_original_scope_v2',{method:'POST',body:{}});
+ if(s?.status==='NO_ELIGIBLE_ORIGINAL')return null;
+ if(!UUID.test(s?.trigger_id)||!WORK.test(s?.original_work_id)||
+    !SHA40.test(s?.installed_commit_sha)||!SHA64.test(s?.artifact_sha256)||
+    s?.phase!=='ISOLATED_INSTALLED_PROBATION'||
+    s?.target_environment!=='ISOLATED_PREVIEW'||
+    s?.probation_status!=='ACTIVE'||!s?.consumed_at||
+    !UUID.test(s?.approval_id)||!UUID.test(s?.original_work_event_id))
+    deny('ORIGINAL_RESUME_INSTALLED_SCOPE_MISSING');
+ const r=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+s.original_work_event_id,
+  select:'event_id,epistemic_status,payload'}));
+ if(!Array.isArray(r)||r.length!==1||r[0].epistemic_status!=='VERIFIED')
+  deny('ORIGINAL_RESUME_SOURCE_EVENT_NOT_VERIFIED');
+ const orig=r[0].payload||{};
+ if(orig.original_work_id!==s.original_work_id||
+    orig.original_job_completed!==false||
+    orig.production_changed!==false||
+    orig.frozen_test_sha256?.match(SHA64)?.[0]!==orig.frozen_test_sha256||
+    !SHA40.test(orig.original_source_sha)||
+    !/^[1-9]\d{5,18}$/.test(String(orig.original_provider_failed_run_id))||
+    !/^[1-9]\d{5,18}$/.test(String(orig.original_provider_failed_job_id)))
+  deny('ORIGINAL_RESUME_UNCHANGED_CUSTOMER_SCOPE_REQUIRED');
+ const ref=await api('/git/ref/heads/'+s.install_branch,token);
+ if(ref?.object?.sha!==s.installed_commit_sha)
+  deny('ORIGINAL_RESUME_INSTALLED_BRANCH_CHANGED');
+ const installed=await api('/contents/'+orig.source_path+'?ref='+s.installed_commit_sha,token);
+ if(installed?.encoding!=='base64'||typeof installed.content!=='string')
+  deny('ORIGINAL_RESUME_SOURCE_NOT_INSTALLED');
+ const first=await api('/contents/'+orig.source_path+'?ref='+orig.original_source_sha,token);
+ if(first!==null)deny('ORIGINAL_RESUME_HISTORICAL_GAP_NOT_REAL');
+ const source=await providerSource(orig.frozen_test_path,orig.original_source_sha);
+ const nowTest=await providerSource(orig.frozen_test_path,s.installed_commit_sha);
+ if(await hash(source)!==orig.frozen_test_sha256||
+    await hash(nowTest)!==orig.frozen_test_sha256)
+  deny('ORIGINAL_RESUME_FROZEN_SUITE_CHANGED');
+ const old=await api('/actions/runs/'+orig.original_provider_failed_run_id,token);
+ if(old?.head_sha!==orig.original_source_sha||old?.conclusion!=='failure'||
+    old?.status!=='completed'||old?.head_repository?.full_name!==REPO)
+  deny('ORIGINAL_RESUME_FAILURE_RUN_UNVERIFIED');
+ const jobs=await api('/actions/runs/'+old.id+'/jobs?per_page=100',token);
+ if(!Array.isArray(jobs?.jobs)||!jobs.jobs.some((j:Record<string,unknown>)=>
+   j.id===Number(orig.original_provider_failed_job_id)&&j.conclusion==='failure'))
+  deny('ORIGINAL_RESUME_FAILURE_JOB_UNVERIFIED');
+ return {scope:s,original:orig};
+}
+async function continueOriginalPrepare(sha:string,run:number,token:string){
+ const item=await originalContinuationScope(token);
+ if(!item)return {status:'NO_ELIGIBLE_ORIGINAL'};
+ const {scope:s,original:o}=item;
+ if(s.continuation_state==='SETTLED_ISOLATED')
+  return {status:'ALREADY_SETTLED'};
+ if(s.continuation_state==='RESUMPTION_CLAIMED')
+  return {status:'RESUMPTION_ALREADY_CLAIMED_NO_REPLAY'};
+ const receipt=await database('rpc/reality_accept_genuine_original_v1',{
+  method:'POST',body:{p_trigger_id:s.trigger_id,p_run_id:run,p_runner_sha:sha,
+   p_proof:{installed_commit_sha:s.installed_commit_sha,
+    provider_branch_verified:true,installed_bytes_verified:true,
+    production_changed:false}}});
+ if(receipt?.status!=='ACCEPTED_FOR_ISOLATED_RESUMPTION'||
+    receipt?.original_work_id!==s.original_work_id||
+    receipt?.installed_commit_sha!==s.installed_commit_sha||
+    receipt?.full_probation_complete!==false||
+    receipt?.original_job_completed!==false)
+  deny('ORIGINAL_RESUME_ACCEPTANCE_READBACK_NOT_VERIFIED');
+ return {status:'ACCEPTED_FOR_ISOLATED_RESUMPTION',acceptance_receipt:receipt,
+  original_work_id:s.original_work_id,trigger_id:s.trigger_id,
+  approval_id:s.approval_id,installed_commit_sha:s.installed_commit_sha,
+  artifact_sha256:s.artifact_sha256,installed_branch:s.install_branch,
+  original_source_sha:o.original_source_sha,
+  original_failed_run_id:o.original_provider_failed_run_id,
+  original_failed_job_id:o.original_provider_failed_job_id,
+  frozen_test_path:o.frozen_test_path,frozen_test_sha256:o.frozen_test_sha256,
+  source_path:o.source_path,
+  owner_id:s.owner_id,goal_id:s.goal_id,
+  full_probation_complete:false,production_changed:false,original_job_completed:false};
+}
+async function continueOriginalClaim(sha:string,run:number,token:string,trigger:string){
+ if(!UUID.test(trigger))deny('ORIGINAL_RESUME_TRIGGER_INVALID');
+ const item=await originalContinuationScope(token);
+ if(!item||item.scope.trigger_id!==trigger||
+    item.scope.continuation_state!=='ACCEPTED_FOR_ISOLATED_RESUMPTION')
+  deny('ORIGINAL_RESUME_ACCEPTED_SCOPE_CHANGED');
+ const receipt=await database('rpc/reality_claim_genuine_original_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_run_id:run,p_runner_sha:sha}});
+ if(receipt?.status!=='RESUMPTION_CLAIMED'||
+    receipt?.original_work_id!==item.scope.original_work_id||
+    receipt?.installed_commit_sha!==item.scope.installed_commit_sha||
+    receipt?.original_job_completed!==false||
+    receipt?.production_changed!==false)
+  deny('ORIGINAL_RESUME_SINGLE_USE_READBACK_FAILED');
+ return receipt;
+}
+async function continueOriginalSettle(sha:string,run:number,token:string,proof:Record<string,unknown>){
+ const item=await originalContinuationScope(token);
+ if(!item||item.scope.continuation_state!=='RESUMPTION_CLAIMED')
+  deny('ORIGINAL_SETTLEMENT_CLAIMED_JOB_REQUIRED');
+ const s=item.scope,o=item.original;
+ if(proof?.schema!=='reality-original-job-execution-proof-v1'||
+    proof.original_work_id!==s.original_work_id||
+    proof.installed_commit_sha!==s.installed_commit_sha||
+    proof.artifact_sha256!==s.artifact_sha256||
+    proof.github_run_id!==String(run)||
+    proof.classification!=='MISSING_CAPABILITY'||
+    proof.original_provider_failure_verified!==true||
+    proof.frozen_suite_passed!==true||
+    proof.isolated_execution!==true||
+    proof.production_changed!==false||
+    !SHA64.test(String(proof.provider_outcome_digest||'')))
+  deny('ORIGINAL_SETTLEMENT_EXECUTION_PROOF_INVALID');
+ const jobs=await api('/actions/runs/'+run+'/jobs?per_page=100',token);
+ const completed=(Array.isArray(jobs?.jobs)?jobs.jobs:[]).filter(
+  (j:Record<string,unknown>)=>j.name==='resume_original_job'&&
+    j.status==='completed'&&j.conclusion==='success'&&j.run_id===run);
+ if(completed.length!==1||
+    !completed[0].steps?.some((step:Record<string,unknown>)=>
+      step.name==='Execute original frozen acceptance against installed source'&&
+      step.conclusion==='success'))
+  deny('ORIGINAL_SETTLEMENT_PROVIDER_JOB_NOT_SUCCESSFUL');
+ const artifacts=await api('/actions/runs/'+run+'/artifacts?per_page=100',token);
+ const saved=(artifacts?.artifacts||[]).filter((a:Record<string,unknown>)=>
+    a.name==='reality-original-resumption-'+run&&!a.expired);
+ if(saved.length!==1||!/^sha256:[a-f0-9]{64}$/.test(saved[0].digest||''))
+  deny('ORIGINAL_SETTLEMENT_PROVIDER_ARTIFACT_NOT_VERIFIED');
+ const receipt=await database('rpc/reality_settle_genuine_original_v1',{
+  method:'POST',body:{p_trigger_id:s.trigger_id,p_run_id:run,p_proof:{
+    original_work_id:s.original_work_id,installed_commit_sha:s.installed_commit_sha,
+    artifact_sha256:s.artifact_sha256,github_run_id:String(run),
+    provider_resume_job_success:true,provider_original_failure_verified:true,
+    isolated_original_acceptance_passed:true,observed_classification:'MISSING_CAPABILITY',
+    provider_outcome_digest:proof.provider_outcome_digest,production_changed:false}}});
+ if(receipt?.status!=='SETTLED_ISOLATED'||
+    receipt?.original_work_id!==s.original_work_id||
+    receipt?.installed_commit_sha!==s.installed_commit_sha||
+    receipt?.original_job_completed!==true||
+    receipt?.independent_outcome_verified!==true||
+    receipt?.full_probation_complete!==false||
+    receipt?.production_changed!==false)
+  deny('ORIGINAL_SETTLEMENT_DURABLE_READBACK_FAILED');
+ const after=await database('rpc/reality_read_genuine_original_scope_v2',{method:'POST',body:{}});
+ if(after?.original_work_id!==s.original_work_id||
+    after?.phase!=='SETTLED_ISOLATED'||after?.continuation_state!=='SETTLED_ISOLATED')
+  deny('ORIGINAL_SETTLEMENT_SECOND_DATABASE_READBACK_FAILED');
+ return receipt;
+}
+
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -889,7 +1038,7 @@ Deno.serve(async request=>{
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
-  if(input?.action?.startsWith('installer_')&&
+  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_'))&&
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
