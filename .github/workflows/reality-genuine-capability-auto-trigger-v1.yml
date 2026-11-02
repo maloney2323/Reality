@@ -175,3 +175,39 @@ jobs:
           path: artifact/genuine-capability-sandbox-verification.json
           if-no-files-found: warn
           retention-days: 7
+
+  qualify_verified_capability:
+    needs: verify_missing_capability
+    if: needs.verify_missing_capability.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: proof
+      - name: Reality records signed owner-reviewable capability after independent GREEN
+        run: |
+          node --check scripts/reality-genuine-qualify-v1.mjs
+          node scripts/reality-genuine-qualify-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-owner-review-receipt-${{ github.run_id }}
+          path: artifact/genuine-capability-owner-review.json
+          if-no-files-found: error
+          retention-days: 7
