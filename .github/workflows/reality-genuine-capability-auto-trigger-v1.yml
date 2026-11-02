@@ -644,3 +644,62 @@ jobs:
           path: artifact/out/reality-201-corrected-holdout.json
           if-no-files-found: error
           retention-days: 30
+
+  requalify_201_model_candidate:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[requalify-201]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Retrieve earlier genuine model response
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p previous
+          gh run download 41399383154 --repo maloney2323/Reality --name reality-uninstalled-model-proposal-41399383154 --dir previous
+          test -s previous/genuine-capability-model-proposal.json
+      - name: Reality proposes fresh corrected source without installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: node scripts/reality-201-model-requalify-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: artifact/genuine-capability-model-proposal.json
+          if-no-files-found: error
+          retention-days: 14
+
+  verify_201_new_model_candidate:
+    needs: requalify_201_model_candidate
+    if: needs.requalify_201_model_candidate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: candidate
+      - name: Verify frozen contract in isolated Docker
+        run: node scripts/reality-genuine-sandbox-verify-v1.mjs
+      - name: Hold out historical provider evidence in isolated Docker
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --memory 512m --cpus 1 --tmpfs /tmp:rw,noexec,nosuid,size=16m -v "${PWD}:/work:ro" -w /work node:22 node --test test/reality-201-provider-backed-relationship-holdout-v1.test.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-new-model-verification-${{ github.run_id }}
+          path: artifact/genuine-capability-sandbox-verification.json
+          if-no-files-found: error
+          retention-days: 14
