@@ -1,0 +1,1 @@
+grant select,insert,update on reality_internal.genuine_preview_install_approvals_v1 to service_role;
