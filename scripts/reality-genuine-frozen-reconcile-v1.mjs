@@ -22,8 +22,35 @@ if(admitted.repository_sha!==env.GITHUB_SHA||
  !Array.isArray(admitted.previously_claimed)||
  admitted.previously_claimed.length>10)
  die('SIGNED_ADMISSION_RECEIPT_MISSING');
-const selected=[...admitted.previously_claimed].filter(row=>
+// Same-run claims are persisted by the signed broker but must also be
+// reconciled in this run. Otherwise the first real customer job waits for a
+// second unrelated GitHub push before its frozen RED can become model-ready.
+const claimArtifact='artifact/genuine-capability-worker-claim.json';
+const newClaim=existsSync(claimArtifact)?
+ JSON.parse(readFileSync(claimArtifact,'utf8')):null;
+if(newClaim&&(newClaim.schema!=='reality-genuine-worker-claim-v1'||
+ newClaim.repository_sha!==env.GITHUB_SHA||
+ newClaim.installation_authorized!==false||
+ newClaim.original_job_completed!==false||
+ !Array.isArray(newClaim.claims)||newClaim.claims.length>10))
+ die('SAME_RUN_SIGNED_WORKER_CLAIM_ARTIFACT_INVALID');
+const newClaims=(newClaim?.claims||[]).map(claim=>{
+ const pinned=(admitted.queued||[]).filter(q=>
+  q.trigger_id===claim.trigger_id&&
+  q.original_work_id===claim.original_work_id&&
+  q.source_event_id===claim.source_event_id&&
+  q.queue_phase==='PENDING_FROZEN_REPRODUCTION');
+ if(pinned.length!==1||
+    !/^[a-f0-9-]{36}$/.test(String(claim.claim_id||''))||
+    claim.installation_authorized!==false||
+    claim.original_job_completed!==false)
+  die('SAME_RUN_ATOMIC_CLAIM_READBACK_CHANGED');
+ return {...pinned[0],queue_phase:'LEASED_FOR_INDEPENDENT_REPRODUCTION'};
+});
+const selected=[...admitted.previously_claimed,...newClaims].filter(row=>
  row.queue_phase==='LEASED_FOR_INDEPENDENT_REPRODUCTION');
+if(new Set(selected.map(x=>x.trigger_id)).size!==selected.length)
+ die('DUPLICATE_ORIGINAL_REPRODUCTION_CLAIM');
 const completed=[];
 for(const row of selected){
  const potential=report.findings.filter(f=>
