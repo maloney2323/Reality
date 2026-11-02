@@ -1,0 +1,24 @@
+name: Reality signed owner source verification — preview 403 regression
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'src/reality-real-repair-opportunity-intake-v1.0.js'
+      - 'test/reality-owner-issue-witness-fallback-v1.test.js'
+      - '.github/workflows/reality-owner-issue-witness-fallback-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify_signed_provider_witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Reject forged, expired and unauthorized source evidence
+        run: |
+          node --check src/reality-real-repair-opportunity-intake-v1.0.js
+          node --test test/reality-owner-issue-witness-fallback-v1.test.js
