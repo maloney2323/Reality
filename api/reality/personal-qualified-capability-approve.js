@@ -5,7 +5,9 @@ import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
-import {wakeApprovedIsolatedInstall}\n from '../../src/reality-genuine-approved-install-wake-v1.js';\nexport const maxDuration=30;
+import {wakeApprovedIsolatedInstall}
+ from '../../src/reality-genuine-approved-install-wake-v1.js';
+export const maxDuration=45;
 const WORK=/^work:[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
 export default async function handler(req,res){
@@ -62,9 +64,36 @@ export default async function handler(req,res){
    receipt?.original_job_completed!==false||
    receipt?.production_changed!==false)
    throw Error('OWNER_APPROVAL_RECEIPT_MISMATCH');
+  // Durable owner permission has already been granted. Wake only that exact
+  // approval using a once-only GitHub commit; the worker independently
+  // rechecks the signed receipt. Never claim that a wake equals execution.
+  let wake;
+  try{
+   wake=await wakeApprovedIsolatedInstall({receipt});
+   if(wake.original_work_id!==receipt.original_work_id||
+      wake.artifact_sha256!==receipt.artifact_sha256||
+      wake.approval_id!==receipt.approval_id||
+      wake.dispatched!==true||
+      !['SIGNED_WORKER_WAKE_COMMITTED','SIGNED_WORKER_WAKE_ALREADY_PRESENT']
+        .includes(wake.status))
+    throw Error('APPROVED_WAKE_READBACK_MISMATCH');
+  }catch(error){
+   // The owner approval is still durable: an error here must never prompt
+   // a second approval or claim the worker executed.
+   console.warn('REALITY_OWNER_APPROVED_WAKE_PENDING',
+    String(error?.message||'').startsWith('REALITY_APPROVED_WAKE_')?
+     'PROVIDER_WAKE_UNAVAILABLE':'WORKER_WAKE_READBACK');
+   return res.status(202).json({ok:true,...receipt,
+    worker_wake_status:'WORKER_WAKE_NOT_VERIFIED',
+    worker_execution_started:false,installation_completed:false,
+    next_step:'OWNER_APPROVED_WORKER_WAKE_RECOVERY_REQUIRED',
+    retry_owner_approval:false});
+  }
   return res.status(202).json({ok:true,...receipt,
-   next_step:'AUTHORIZED_PENDING_GOVERNED_ISOLATED_EXECUTOR',
-   worker_execution_started:false,installation_completed:false});
+   worker_wake_status:wake.status,
+   worker_execution_started:false,installation_completed:false,
+   next_step:'APPROVAL_RECORDED_WORKER_WAKE_COMMITTED',
+   retry_owner_approval:false});
  }catch{
   return res.status(503).json({ok:false,
    error:'OWNER_EXACT_APPROVAL_UNAVAILABLE',
