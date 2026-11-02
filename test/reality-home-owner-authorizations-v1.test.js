@@ -202,3 +202,28 @@ test('Reality Chat is one tap from any part of the dashboard without losing the 
  assert.match(inlineScript,/accountShortcut'\)\.addEventListener\('click'/);
  assert.match(inlineScript,/e.key==='Escape'/);
 });
+
+test('after one approval the chat reports actual worker wake or recovery, never an invented execution',()=>{
+ const start=inlineScript.indexOf('async function realityChatApproveOnce(');
+ const end=inlineScript.indexOf('async function realityChatRefreshEvents()',start);
+ const source=inlineScript.slice(start,end);
+ assert.match(source,/SIGNED_WORKER_WAKE_COMMITTED/);
+ assert.match(source,/SIGNED_WORKER_WAKE_ALREADY_PRESENT/);
+ assert.match(source,/has not verified that the worker started/);
+ assert.match(source,/Do not approve again/);
+ assert.match(source,/worker was notified/);
+ assert.doesNotMatch(source,/worker_execution_started=true/);
+});
+test('chat displays every verifiable stage and refuses unproven final outcome or financial savings',()=>{
+ const start=inlineScript.indexOf('async function realityChatRefreshEvents()');
+ const end=inlineScript.indexOf('async function homeOwnerOpen(',start);
+ const source=inlineScript.slice(start,end);
+ for(const stage of ['Missing capability identified','Upgrade generated and tested',
+  'Owner authorization','Isolated installation','Original job settlement','Final Universe verification'])
+   assert.ok(source.includes(stage),'missing evidence stage: '+stage);
+ assert.match(source,/j\.isolated_installed===true/);
+ assert.match(source,/j\.independently_settled===true/);
+ assert.match(source,/j\.universe_settlement_verified===true/);
+ assert.match(source,/Financial value: not yet measured/);
+ assert.match(source,/No verified financial value can be claimed/);
+});
