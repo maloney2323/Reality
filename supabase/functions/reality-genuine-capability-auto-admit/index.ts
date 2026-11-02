@@ -1410,6 +1410,34 @@ Deno.serve(async request=>{
      await continueOriginalSettle(input.scope.repository_sha,verified.id,ghProviderToken,input.proof);
    return respond({ok:true,...receipt});
   }
+  if(input?.action==='universe_outcome_reconcile'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope'||
+      Object.keys(input.scope||{}).sort().join(',')!=='repository_sha'||
+      typeof ghProviderToken!=='string'||
+      !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken))
+    deny('OUTCOME_AUTOMATION_SIGNED_SCOPE_REQUIRED');
+   const signedRun=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const receipt=await database('rpc/reality_reconcile_all_genuine_original_outcomes_v2',{
+     method:'POST',body:{}});
+   const snapshot=await database('rpc/reality_genuine_production_readiness_snapshot_v1',{
+     method:'POST',body:{}});
+   if(receipt?.status!=='ALL_SETTLED_OUTCOMES_VERIFIED'||
+     !Number.isInteger(receipt?.newly_reconciled)||
+     !Number.isInteger(receipt?.already_verified)||
+     receipt?.production_changed!==false||
+     receipt?.production_release_authorized!==false||
+     snapshot?.schema!=='reality-independent-production-readiness-snapshot-v1'||
+     snapshot?.unreconciled_settlements!==0||
+     snapshot?.settled_original_jobs!==snapshot?.verified_universe_settlements||
+     snapshot?.settled_original_jobs!==snapshot?.independent_provider_verified_settlements||
+     snapshot?.production_changed!==false||
+     snapshot?.production_release_authorized!==false)
+     deny('OUTCOME_AUTOMATION_INDEPENDENT_READBACK_REQUIRED');
+   return respond({ok:true,status:'SETTLED_OUTCOMES_RECONCILED',
+     signed_run_id:signedRun.id,repository_sha:input.scope.repository_sha,
+     receipt,snapshot,production_changed:false,production_release_authorized:false});
+  }
   if(input?.action==='readiness_snapshot'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope'||
