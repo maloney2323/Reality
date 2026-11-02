@@ -175,8 +175,36 @@ export async function discoverRealRepairOpportunities({
  if(!Number.isInteger(maxIssues)||maxIssues<1||maxIssues>40)
   fail('BOUNDED_PROVIDER_DISCOVERY_REQUIRED');
  const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
- const issues=await provider('issues?state=open&per_page='+maxIssues,
-  {token,fetchImpl});
+ let issues;
+ try{
+  issues=await provider('issues?state=open&per_page='+maxIssues,
+   {token,fetchImpl});
+ }catch(error){
+  if(String(error?.message||'')!=='REALITY_REAL_REPAIR_GITHUB_PROVIDER_SOURCE_READBACK_403'||
+     env.VERCEL_ENV!=='preview')throw error;
+  const db=resolveReliabilityBenchmarkDb(env);
+  if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+   fail('SIGNED_OWNER_WITNESS_PROJECT_SCOPE_NOT_VERIFIED');
+  const response=await fetchImpl(db.url+'/rest/v1/rpc/reality_list_genuine_owner_issue_witnesses_v1',{
+   method:'POST',cache:'no-store',redirect:'error',
+   headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    accept:'application/json','content-type':'application/json'},body:'{}'});
+  const numbers=await response.json().catch(()=>null);
+  if(!response.ok||!Array.isArray(numbers)||numbers.length>8||
+     numbers.some(x=>!Number.isInteger(x)||x<1||x>100000))
+   fail('SIGNED_OWNER_WITNESS_LIST_UNVERIFIED');
+  const opportunities=[];
+  for(const issueNumber of numbers){
+   try{opportunities.push(await readSignedOwnerIssueWitness({issueNumber,env,fetchImpl}));}
+   catch{/* Only fresh matching signed provider evidence is eligible. */}
+  }
+  if(!opportunities.length)fail('SIGNED_OWNER_WITNESS_LIST_UNAVAILABLE');
+  return Object.freeze({
+   status:'INDEPENDENT_SOURCE_BACKED_REPAIR_OPPORTUNITIES',
+   opportunities,examined:opportunities.length,
+   owner_installation_authorized:false,external_action_performed:false
+  });
+ }
  if(!Array.isArray(issues)||issues.length>maxIssues)
   fail('ISSUE_PROVIDER_PAGINATION_UNVERIFIED');
  const candidates=[];
