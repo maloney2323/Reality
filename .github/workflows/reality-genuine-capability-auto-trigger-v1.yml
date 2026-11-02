@@ -608,6 +608,70 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  prove_real_work_portfolio_first_half:
+    # Real user-repository source-backed review tasks only.
+    # Does not claim, execute, authorize, or settle customer jobs.
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-portfolio]') }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Review first 15 independently read GitHub PR/issue sources
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-30-real-work-portfolio-continuity-v1.mjs
+          node scripts/reality-30-real-work-portfolio-continuity-v1.mjs first
+      - name: Preserve durable halfway work receipt across GitHub worker shutdown
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-portfolio-halfway-${{ github.run_id }}
+          path: artifact/out/reality-portfolio-halfway.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_real_work_portfolio_resume_second_half:
+    needs: [prove_real_work_portfolio_first_half]
+    if: ${{ needs.prove_real_work_portfolio_first_half.result == 'success' }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Restore source-backed halfway checkpoint from previous GitHub worker
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-portfolio-halfway-${{ github.run_id }}
+          path: artifact/in
+      - name: Independently verify first 15 and continue the same 30 work cases
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-30-real-work-portfolio-continuity-v1.mjs
+          node scripts/reality-30-real-work-portfolio-continuity-v1.mjs resume
+      - name: Preserve 30 source-backed work-review continuity and capability-gap receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-30-real-work-portfolio-${{ github.run_id }}
+          path: artifact/out/reality-30-work-batch-readonly-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
   independently_measure_production_readiness:
     needs: reconcile_all_settled_outcomes
     if: github.event_name == 'push'
