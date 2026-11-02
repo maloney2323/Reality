@@ -68,3 +68,37 @@ test('homepage mobile layout and fail-closed sign-in behavior',()=>{
  assert.match(inlineScript,/Sign-in required/);
  assert.match(inlineScript,/Readback unavailable/);
 });
+
+
+test('homepage explains the actual settlement repair before the authorization button',()=>{
+ const pos=inlineScript.indexOf('const reconciler=entry.capability_id');
+ assert.ok(pos>0);
+ const card=inlineScript.slice(pos,inlineScript.indexOf("list.appendChild(card);",pos));
+ for(const label of ['What problem did Reality find?','What did Reality actually do?',
+   'Independent test results','What happens if you approve?',
+   'NOT DONE: No installation approved. Original job not resumed. No final Universe settlement',
+   'Review installation approval'])
+   assert.ok(card.includes(label),'missing plain-language milestone: '+label);
+ assert.ok(card.indexOf("What problem did Reality find?") <
+   card.indexOf("What did Reality actually do?"));
+ assert.ok(card.indexOf("What did Reality actually do?") <
+   card.indexOf('Review installation approval'));
+});
+test('frozen, candidate and historical test results are read from signed qualification not hardcoded',()=>{
+ const pos=inlineScript.indexOf("const counts=[['Original regression tests'");
+ assert.ok(pos>0);
+ const proof=inlineScript.slice(pos,pos+1300);
+ assert.match(proof,/\['New capability tests','candidate_pass'\]/);
+ assert.match(proof,/\['Historical evidence tests','holdout_pass'\]/);
+ assert.match(proof,/Number\.isSafeInteger\(q\[key\]\)&&q\[key\]>0&&verified/);
+ assert.match(proof,/These results verify the candidate against the checked tests/);
+});
+test('technical hashes and original work ids are collapsible while meaningful outcome stays visible',()=>{
+ const p=inlineScript.indexOf("const evidence=document.createElement('details')");
+ assert.ok(p>0);
+ const content=inlineScript.slice(p,p+1150);
+ assert.match(content,/summary\.textContent='View technical evidence and exact source'/);
+ assert.match(content,/Exact source SHA-256/);
+ assert.match(content,/evidence\.append\(summary,work,hash\)/);
+ assert.match(inlineScript,/card\.appendChild\(notDone\)/);
+});
