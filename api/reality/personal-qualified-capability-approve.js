@@ -5,7 +5,7 @@ import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
-export const maxDuration=30;
+import {wakeApprovedIsolatedInstall}\n from '../../src/reality-genuine-approved-install-wake-v1.js';\nexport const maxDuration=30;
 const WORK=/^work:[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
 export default async function handler(req,res){
