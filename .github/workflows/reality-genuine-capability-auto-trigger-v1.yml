@@ -582,7 +582,7 @@ jobs:
     # Evidence-only isolated task on the real #201 customer repair lineage.
     # Deliberately interrupts an alive worker; never replays the settled customer job.
     needs: [resume_original_job, recover_claimed_original_settlement]
-    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight-v2]') }}
+    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight-v3]') }}
     permissions:
       contents: read
       actions: read
