@@ -1,0 +1,35 @@
+name: Reality governed automatic capability discovery — original frozen failures
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  detect-real-frozen-capability-deficits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Assert detector never grants owner or installation authority
+        run: |
+          node --check src/reality-genuine-auto-detect-v1.js
+          node --check scripts/reality-genuine-auto-trigger-v1.mjs
+          node --test test/reality-genuine-auto-trigger-v1.test.js
+      - name: Discover actual missing capabilities from frozen customer acceptance tests
+        run: node scripts/reality-genuine-auto-trigger-v1.mjs
+      - name: Persist source-hashed discovery observations for independent owner-gap admission
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-auto-capability-discovery-${{ github.run_id }}
+          path: artifact/genuine-capability-auto-trigger.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Do not silently convert an observation into an authorized queue claim
+        run: |
+          echo 'A failing frozen test is an unverified discovery candidate, not owner-approved work.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Existing Reality Continuity, independent provider, owner-goal and atomic queue gates remain mandatory.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No install, model-generated capability or original job settlement claimed.' >> "$GITHUB_STEP_SUMMARY"
