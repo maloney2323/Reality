@@ -47,7 +47,7 @@ begin
       c.claimed_at,c.settled_at,
       case when c.claimed_at is not null and c.settled_at is not null and
                 c.settled_at >= c.claimed_at
-           then pg_catalog.floor(pg_catalog.extract(epoch from
+           then pg_catalog.floor(extract(epoch from
               c.settled_at - c.claimed_at)*1000)::bigint else null end
            as claim_to_settlement_ms,
       case when (q.qualification_receipt->>'candidate_pass') ~ '^[0-9]{1,6}$'
