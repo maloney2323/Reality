@@ -117,7 +117,7 @@ async function database(path,{method='GET',body}={}){
   console.warn('REALITY_QUALIFICATION_DATABASE_ERROR_CLASS',
    String(result?.code||'UNKNOWN').slice(0,24),
    String(path).split('?')[0].slice(0,100));
-  const safeCode=String(result?.message||'').match(/(?:GENUINE_AUTO|QUALIFICATION)_[A-Z0-9_]{4,100}/)?.[0];
+  const safeCode=String(result?.message||'').match(/(?:GENUINE_AUTO|QUALIFICATION|REALITY_INFLIGHT)_[A-Z0-9_]{4,100}/)?.[0];
   if(safeCode)throw Error(safeCode);
   deny('DATABASE_'+response.status+'_UNAVAILABLE');
  }
@@ -1409,6 +1409,104 @@ Deno.serve(async request=>{
      await continueOriginalClaim(input.scope.repository_sha,verified.id,ghProviderToken,input.scope.trigger_id):
      await continueOriginalSettle(input.scope.repository_sha,verified.id,ghProviderToken,input.proof);
    return respond({ok:true,...receipt});
+  }
+  if(['inflight_start','inflight_read','inflight_pause','inflight_resume',
+     'inflight_checkpoint','inflight_blocked_checkpoint'].includes(input?.action)&&
+     SHA40.test(input?.scope?.repository_sha||'')){
+    const check=input.action==='inflight_checkpoint'||input.action==='inflight_blocked_checkpoint';
+    if(Object.keys(input).sort().join(',')!=='action,scope'||
+       Object.keys(input.scope||{}).sort().join(',')!==
+        (check?'lease_epoch,repository_sha,step':'repository_sha')||
+       typeof ghProviderToken!=='string'||ghProviderToken.length<20)
+      deny('INFLIGHT_SIGNED_SCOPE_INVALID');
+    const signed=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+    const runId=signed.id;
+    const rpc=async (action:string,epoch?:number,step?:number,evidence?:any)=>
+      database('rpc/reality_inflight_audit_control_v1',{method:'POST',body:{
+        p_action:action,p_run_id:runId,p_expected_epoch:epoch??null,
+        p_step:step??null,p_evidence:evidence??null}});
+    if(input.action==='inflight_start'||input.action==='inflight_read'||
+       input.action==='inflight_pause'||input.action==='inflight_resume'){
+      const code=({inflight_start:'START',inflight_read:'READ',inflight_pause:'PAUSE',
+        inflight_resume:'RESUME'} as Record<string,string>)[input.action];
+      const state=await rpc(code);
+      if(state?.run_id!==runId||!/^audit:provider-continuity:[0-9]+$/.test(
+        String(state?.job_id||'audit:provider-continuity:'+runId))&&code==='READ'||
+        state?.production_changed!==false)
+        deny('INFLIGHT_STATE_INDEPENDENT_READBACK_INVALID');
+      return respond({ok:true,...state,signed_run_id:runId});
+    }
+    const epoch=Number(input.scope.lease_epoch),step=Number(input.scope.step);
+    if(!Number.isSafeInteger(epoch)||epoch<1||!Number.isInteger(step)||step<1||step>3)
+      deny('INFLIGHT_CHECKPOINT_EXACT_STAGE_REQUIRED');
+    if(input.action==='inflight_blocked_checkpoint'){
+      try{await rpc('CHECKPOINT',epoch,step,{verified:true,source:'GITHUB_PROVIDER_JOB_READBACK',
+        source_work_id:'work:00000000000000000000000000000000'});}
+      catch(err){
+        if(String(err?.message||'')==='REALITY_INFLIGHT_STOP_ACTIVE')
+          return respond({ok:true,status:'ACTIVE_WORKER_CHECKPOINT_DENIED_BY_HALT',
+            signed_run_id:runId,lease_epoch:epoch,blocked_step:step,
+            production_changed:false});
+        throw err;
+      }
+      deny('INFLIGHT_HALTED_CHECKPOINT_UNEXPECTEDLY_ACCEPTED');
+    }
+    const current=await rpc('READ');
+    if(current?.state!=='ACTIVE'||current.lease_epoch!==epoch||
+      current.checkpoint_step!==step-1)
+      deny('INFLIGHT_CHECKPOINT_STALE_LEASE_OR_ORDER');
+    const source=await database('rpc/reality_inflight_audit_source_readback_v1',{
+      method:'POST',body:{p_run_id:runId}});
+    if(source?.source_original_work_id!==current.source_original_work_id||
+       source.source_universe_completion_count!==1||
+       !SHA64.test(source.source_universe_content_hash)||
+       !SHA64.test(source.source_universe_lineage_hash)||
+       source.current_lease_epoch!==epoch||
+       source.production_changed!==false)
+       deny('INFLIGHT_GENUINE_ORIGINAL_SOURCE_NOT_VERIFIED');
+    let evidence:Record<string,unknown>;
+    if(step===1){
+      const provider=await api('/actions/runs/'+source.source_claim_run_id,ghProviderToken);
+      const jobs=await api('/actions/runs/'+source.source_claim_run_id+'/jobs?per_page=100',ghProviderToken);
+      if(provider?.id!==source.source_claim_run_id||provider.status!=='completed'||
+         provider.head_repository?.full_name!==REPO||
+         !Array.isArray(jobs?.jobs)||
+         jobs.jobs.filter((j:any)=>j.name==='resume_original_job'&&
+           j.status==='completed'&&j.conclusion==='success').length!==1)
+        deny('INFLIGHT_HISTORICAL_REAL_PROVIDER_SUCCESS_MISSING');
+      evidence={verified:true,source:'GITHUB_PROVIDER_JOB_READBACK',
+        source_work_id:source.source_original_work_id,
+        provider_run_id:source.source_claim_run_id,job:'resume_original_job',
+        conclusion:'success'};
+    }else if(step===2){
+      evidence={verified:true,source:'UNIVERSE_VERIFIED_SOURCE_READBACK',
+        source_work_id:source.source_original_work_id,
+        universe_event_id:source.source_universe_event_id,
+        canonical_content_hash:source.source_universe_content_hash,
+        canonical_lineage_hash:source.source_universe_lineage_hash,completion_count:1};
+    }else{
+      const snapshot=await database('rpc/reality_genuine_production_readiness_snapshot_v1',{
+       method:'POST',body:{}});
+      if(snapshot?.schema!=='reality-independent-production-readiness-snapshot-v1'||
+        snapshot.settled_original_jobs<2||
+        snapshot.unreconciled_settlements!==0||
+        snapshot.verified_universe_settlements!==snapshot.settled_original_jobs||
+        snapshot.production_release_authorized!==false||
+        snapshot.production_changed!==false)
+        deny('INFLIGHT_SIGNED_RELEASE_EVIDENCE_MISSING');
+      evidence={verified:true,source:'SIGNED_REAL_READINESS_REPORT',
+        source_work_id:source.source_original_work_id,
+        settled:snapshot.settled_original_jobs,
+        ledger_verified:snapshot.verified_universe_settlements,
+        decision:snapshot.release_gate,production_release_authorized:false};
+    }
+    const next=await rpc('CHECKPOINT',epoch,step,evidence);
+    if(next?.checkpoint_step!==step||next.lease_epoch!==epoch||
+       !SHA64.test(next.last_checkpoint_hash)||!UUID.test(next.last_event_id)||
+       next.production_changed!==false)
+       deny('INFLIGHT_CHECKPOINT_DURABLE_READBACK_FAILED');
+    return respond({ok:true,...next,evidence_source:evidence.source,
+      signed_run_id:runId});
   }
   if(['safety_halt','safety_probe','safety_release','safety_rollback_scope','safety_rollback_record'].includes(input?.action)&&
     SHA40.test(input?.scope?.repository_sha||'')){
