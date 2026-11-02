@@ -80,7 +80,7 @@ for(let attempt=1;attempt<=3;attempt++){
  writeFileSync(TEST,output.test_source,{mode:0o644});
  const docker=spawnSync('docker',['run','--rm','--network','none','--read-only','--cap-drop','ALL',
   '--security-opt','no-new-privileges','--memory','512m','--cpus','1',
-  '--user','65534:65534','--tmpfs','/tmp:rw:rw,noexec,nosuid,size=16m',
+  '--user','65534:65534','--tmpfs','/tmp:rw,noexec,nosuid,size=16m',
   '-v',process.cwd()+':/work:ro','-w','/work','node:22','node','--test','--test-reporter=tap',
   FROZEN,HOLD,TEST],{encoding:'utf8',timeout:160000,maxBuffer:400000,
   env:{PATH:e.PATH,HOME:e.HOME}});
