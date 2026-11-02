@@ -441,6 +441,67 @@ async function claimFrozenOriginal(request:Record<string,unknown>,runId:number){
   model_generated:false,installation_authorized:false,
   original_job_completed:false,production_changed:false};
 }
+
+async function reconcileFrozenOriginal(proof:Record<string,unknown>,runId:number){
+ const trigger=String(proof?.trigger_id||''),gap=String(proof?.gap_event_id||'');
+ const work=String(proof?.original_work_id||'');
+ const frozen=String(proof?.frozen_test_path||'');
+ const missing=String(proof?.candidate_source_path||'');
+ const frozenHash=String(proof?.frozen_sha256||'');
+ const sha=String(proof?.runner_sha||'');
+ if(!UUID.test(trigger)||!UUID.test(gap)||!WORK.test(work)||
+  !TEST.test(frozen)||!MODULE.test(missing)||!SHA64.test(frozenHash)||
+  !SHA40.test(sha)||!SHA64.test(String(proof?.output_sha256||''))||
+  proof?.status!=='ORIGINAL_FROZEN_REPRODUCED_RED'||
+  proof?.installer_authorized!==false||proof?.production_changed!==false||
+  proof?.model_generated!==false||proof?.network_disabled!==true||
+  !Number.isInteger(proof?.exit_code)||Number(proof.exit_code)<1)
+  deny('FROZEN_REPROOF_UNTRUSTED');
+ const q=await database('rpc/reality_read_genuine_worker_claim_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_gap_event_id:gap}});
+ if(q?.gap_event_id!==gap||q?.original_work_id!==work||
+    !UUID.test(q?.claim_id)||
+    !['LEASED_FOR_INDEPENDENT_REPRODUCTION',
+      'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(q?.phase))
+  deny('CLAIM_ORIGINAL_MISMATCH');
+ const orig=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+q.original_work_event_id,select:'event_id,payload'}));
+ if(!Array.isArray(orig)||orig.length!==1||
+  orig[0].payload?.frozen_test_path!==frozen||
+  orig[0].payload?.frozen_test_sha256!==frozenHash||
+  orig[0].payload?.source_path!==missing||
+  orig[0].payload?.original_work_id!==work)
+  deny('FROZEN_SOURCE_ORIGINAL_MISMATCH');
+ if(await hash(await providerSource(frozen,sha))!==frozenHash||
+    await api('/contents/'+missing+'?ref='+sha)!==null)
+  deny('PINNED_SOURCE_OR_CAPABILITY_DRIFT');
+ const receipt={
+  trigger_id:trigger,claim_id:q.claim_id,gap_event_id:gap,
+  original_work_id:work,frozen_test_path:frozen,
+  frozen_sha256:frozenHash,candidate_source_path:missing,
+  status:'ORIGINAL_FROZEN_REPRODUCED_RED',
+  exit_code:String(proof.exit_code),
+  output_sha256:String(proof.output_sha256),
+  github_run_id:String(runId),runner_sha:sha,
+  installer_authorized:false,production_changed:false,
+  model_generated:false,network_disabled:true,
+ };
+ const result=await database('rpc/reality_reconcile_genuine_frozen_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_gap_id:gap,p_receipt:receipt}});
+ if(result?.phase!=='FROZEN_REPRODUCED_AWAITING_CANDIDATE'||
+    result.original_work_id!==work||result.claim_id!==q.claim_id)
+  deny('REPRODUCTION_DURABLE_READBACK_INVALID');
+ return {status:'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
+  original_work_id:work,trigger_id:trigger,gap_event_id:gap,
+  original_work_event_id:q.original_work_event_id,
+  claim_id:q.claim_id,frozen_test_path:frozen,frozen_sha256:frozenHash,
+  candidate_source_path:missing,repository_sha:sha,
+  original_goal_id:orig[0].payload.original_goal_id,
+  goal_transition_receipt_ref:orig[0].payload.goal_transition_receipt_ref,
+  owner_id:q.owner_id,
+  model_generated:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -452,6 +513,13 @@ Deno.serve(async request=>{
   const raw=await request.text();
   if(raw.length>9500)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  if(input?.action==='reconcile'&&SHA40.test(input?.proof?.runner_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,proof')
+    deny('RECONCILIATION_ENVELOPE_INVALID');
+   const verifiedRun=await verify(bearer,input.proof.runner_sha);
+   const receipt=await reconcileFrozenOriginal(input.proof,verifiedRun.id);
+   return respond({ok:true,...receipt});
+  }
   if(input?.action==='claim'&&input?.proof?.repository_sha&&
    SHA40.test(input.proof.repository_sha)){
    if(Object.keys(input).sort().join(',')!=='action,proof')
@@ -482,6 +550,7 @@ Deno.serve(async request=>{
    observed_candidate_count:input.report.findings.length,
    verified_queue_count:queued.length,
    verified_already_claimed_count:alreadyClaimed.length,
+   previously_claimed:alreadyClaimed,
    verified_already_settled_count:skippedSettled.length,
    verified_original_count:queued.length,queued,
    installation_authorized:false,original_job_completed:false,
