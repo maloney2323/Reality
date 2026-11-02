@@ -115,3 +115,36 @@ jobs:
           path: artifact/genuine-capability-sandbox-verification.json
           if-no-files-found: warn
           retention-days: 7
+
+  correct_failed_capability:
+    needs: verify_missing_capability
+    if: ${{ always() && needs.verify_missing_capability.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: previous
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: failed
+      - name: Reality uses independently failed tests to correct its capability
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: |
+          node --check scripts/reality-genuine-openai-correct-v1.mjs
+          node scripts/reality-genuine-openai-correct-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-corrected-candidate-${{ github.run_id }}
+          path: artifact/genuine-capability-model-proposal.json
+          if-no-files-found: error
+          retention-days: 7
