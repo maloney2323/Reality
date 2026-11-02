@@ -27,6 +27,11 @@ on:
       - 'test/reality-continuity-actual-tail-append-v1.test.js'
       - 'test/reality-genuine-capability-live-intake-v1.test.js'
       - 'supabase/migrations/20261101_genuine_capability_queue_v1.sql'
+      - 'src/reality-foundational-build-loop-v1.0.js'
+      - 'src/reality-foundational-verified-regression-context-v1.0.js'
+      - 'src/reality-foundational-vercel-sandbox-adapter-v1.0.js'
+      - 'test/reality-foundational-verified-regression-context-v1.0.test.js'
+      - 'test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js'
       - 'src/reality-genuine-capability-generation-bridge-v1.js'
       - 'test/reality-genuine-capability-generation-bridge-v1.test.js'
       - 'test/reality-genuine-capability-engine-v1.test.js'
@@ -57,6 +62,8 @@ jobs:
           node --test test/reality-genuine-capability-execution-runtime-v1.test.js
           node --test test/reality-genuine-source-backed-job-v1.test.js
           node --test test/reality-continuity-actual-tail-append-v1.test.js
+          node --test test/reality-foundational-verified-regression-context-v1.0.test.js
+          node --test test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
           node --test test/reality-genuine-capability-generation-bridge-v1.test.js
           node --test test/reality-job-triggered-self-repair-v1.0.test.js
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
