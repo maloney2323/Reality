@@ -115,7 +115,7 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000,
    if(ticket.frozen_regression_contract_kind==='PINNED_SINGLE_TEST'){
     const path=ticket.frozen_test_path;
     if(typeof path!=='string'||
-      !/^test\\/reality-frozen-regressions\\/[A-Za-z0-9._-]+\\.test\\.js$/.test(path))
+      !/^test\/reality-frozen-regressions\/[A-Za-z0-9._-]+\.test\.js$/.test(path))
      die('FOUNDATION_SANDBOX_SOURCE_BACKED_FROZEN_PATH_INVALID');
     const bytes=await sandbox.readFileToBuffer({path:BASE+'/'+path});
     if(!bytes||hash(bytes)!==ticket.frozen_regression_sha256)
