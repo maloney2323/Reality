@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createEvidenceBoundGenerationFactory}
+import {createEvidenceBoundGenerationFactory,createPinnedSourceBackedOriginalBuildTicket}
  from '../src/reality-genuine-capability-generation-bridge-v1.js';
 import {createGenuineCapabilityEngine}
  from '../src/reality-genuine-capability-engine-v1.js';
@@ -140,4 +140,82 @@ test('end-to-end original gap proof can select existing live generation adapters
  assert.equal(result.installation_authorized,false);
  assert.equal(result.original_job_completed,false);
  assert.equal(builds,1);assert.equal(drivers,1);
+});
+
+test('source-backed ticket is derived from the original business job, not an issue or built-in module',()=>{
+ const user='11111111-1111-4111-8111-111111111111';
+ const originalId='22222222-2222-4222-8222-222222222222';
+ const gapId='33333333-3333-4333-8333-333333333333';
+ const transition='44444444-4444-4444-8444-444444444444';
+ const claimId='55555555-5555-4555-8555-555555555555';
+ const triggerId='66666666-6666-4666-8666-666666666666';
+ const frozenSha='f'.repeat(64),gapHash='e'.repeat(64);
+ const module='src/reality-extensions/inventory-adjustment.mjs';
+ const path='test/reality-frozen-regressions/inventory-adjustment.test.js';
+ const sourceEvent={
+  entity_type:'reality_original_source_backed_repair_work',
+  epistemic_status:'VERIFIED',event_id:originalId,
+  continuity_root_id:'personal:owner',worldline_id:'personal:owner',
+  payload:{owner_id:user,original_work_id:work,original_goal_id:goal,
+   goal_transition_receipt_ref:transition,
+   owner_authorized_investigation:true,owner_authorized_installation:false,
+   original_job_completed:false,production_changed:false,
+   source_path:module,frozen_test_path:path,frozen_test_sha256:frozenSha},
+ };
+ const gapEvent={
+  entity_type:'reality_genuine_capability_gap_v1',
+  epistemic_status:'VERIFIED',event_id:gapId,
+  continuity_root_id:sourceEvent.continuity_root_id,
+  worldline_id:sourceEvent.worldline_id,
+  payload:{owner_id:user,conversation_id:'77777777-7777-4777-8777-777777777777',
+   original_work_id:work,original_work_event_id:originalId,
+   independently_verified:true,original_job_completed:false,
+   installation_authorized:false,production_changed:false,
+   provider_failure_hash:gapHash,
+   capability_id:'inventory-adjustment',
+   verification_suite_ref:'github:frozen-regression:sha256:'+frozenSha,
+   goal_transition_event_id:transition},
+ };
+ const queue={
+  source_event_id:gapId,original_work_id:work,original_work_event_id:originalId,
+  owner_id:user,provider_failure_hash:gapHash,
+  phase:'FROZEN_REPRODUCED_AWAITING_CANDIDATE',claim_id:claimId,trigger_id:triggerId,
+  installation_authorized:false,original_job_completed:false,
+ };
+ const frozen={
+  independently_verified:true,reproduced_failure:true,
+  original_work_id:work,capability_id:'inventory-adjustment',
+  source_event_id:gapId,trigger_id:triggerId,claim_id:claimId,
+  frozen_suite_sha256:frozenSha,
+  provider_run_ref:'reality:provider-verified:inventory:independent-frozen-run',
+  external_action_performed:false,provider_effect_may_have_occurred:false,
+ };
+ const goalReadback={
+  persisted_source:'ISOLATED_CONTINUITY_VERIFIED_READBACK',
+  principal_id:user,conversation_id:gapEvent.payload.conversation_id,
+  state:{active_goal_id:goal,active_goal:{status:'ACTIVE',user_confirmed:true,
+   last_transition_receipt_id:transition}},
+ };
+ const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_SHA:'a'.repeat(40),
+  VERCEL_GIT_COMMIT_REF:'feature/reality-customer-branch'};
+ const args={sourceEvent,gapEvent,queueReadback:queue,frozenReproduction:frozen,
+  goalReadback,env,maxAttempts:2};
+ const ticket=createPinnedSourceBackedOriginalBuildTicket(args);
+ assert.equal(ticket.source_entrypoint,module);
+ assert.equal(ticket.frozen_test_path,path);
+ assert.equal(ticket.frozen_regression_contract_kind,'PINNED_SINGLE_TEST');
+ assert.equal(ticket.frozen_regression_sha256,frozenSha);
+ assert.equal(ticket.repository_base_sha,env.VERCEL_GIT_COMMIT_SHA);
+ assert.equal(ticket.owner_id,user);
+ assert.equal(ticket.original_work_id,work);
+ assert.equal(ticket.environment,'ISOLATED_PREVIEW');
+ for(const patch of [
+  {queueReadback:{...queue,phase:'PENDING_FROZEN_REPRODUCTION'}},
+  {frozenReproduction:{...frozen,reproduced_failure:false}},
+  {goalReadback:{...goalReadback,principal_id:'foreign'}},
+  {sourceEvent:{...sourceEvent,payload:{...sourceEvent.payload,
+    frozen_test_sha256:'d'.repeat(64)}}},
+  {env:{...env,VERCEL_ENV:'production'}},
+ ])assert.throws(()=>createPinnedSourceBackedOriginalBuildTicket({...args,...patch}),
+  /GENUINE_GENERATION_/);
 });
