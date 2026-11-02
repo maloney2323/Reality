@@ -1,6 +1,6 @@
 // Autonomous bridge: GitHub-signed discovery receipt -> service-verified
 // owner Continuity -> existing atomic queue. No GitHub token or DB secret.
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 const err=x=>{throw Error('GENUINE_AUTO_ADMISSION_'+x)};
 const report=JSON.parse(readFileSync('artifact/genuine-capability-auto-trigger.json','utf8'));
 const REF='refs/heads/feature/reality-general-capability-engine-20261101';
@@ -47,6 +47,10 @@ if(!res.ok||outcome?.ok!==true||
  outcome.production_changed!==false)
  err(/^AUTO_ADMIT_[A-Z0-9_]+$/.test(String(outcome?.error||''))?
   outcome.error:'SIGNED_PROVIDER_OR_DURABLE_QUEUE_UNVERIFIED');
+writeFileSync('artifact/genuine-capability-admitted-queue.json',
+ JSON.stringify({schema:'reality-genuine-admitted-queue-v1',
+ repository_sha:report.repository_sha,queued:outcome.queued,
+ installation_authorized:false,original_job_completed:false})+'\n');
 console.log('REALITY_SIGNED_AUTO_ADMISSION',JSON.stringify({
  status:outcome.status,discovered:report.findings.length,
  queued:outcome.queued,skipped_independently_settled:outcome.verified_already_settled_count,
