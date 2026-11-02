@@ -607,7 +607,7 @@ async function prepareFrozenGeneration(input:Record<string,unknown>,githubToken?
 }
 
 async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
- proof:Record<string,unknown>,runId:number,sha:string){
+ proof:Record<string,unknown>,runId:number,sha:string,githubToken?:string|null){
  const ticket=proposal?.ticket as Record<string,unknown>;
  const candidate=proposal?.candidate as Record<string,unknown>;
  if(proposal?.source!=='REAL_OPENAI_MODEL_GENERATION'||
@@ -659,7 +659,7 @@ async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
     frozen.pass!==frozen.tests||made.pass!==made.tests||
     frozen.fail!==0||made.fail!==0)
   deny('INDEPENDENT_ACCEPTANCE_COUNTS_NOT_ALL_GREEN');
- const jobs=await api('/actions/runs/'+runId+'/jobs?per_page=100');
+ const jobs=await api('/actions/runs/'+runId+'/jobs?per_page=100',githubToken);
  if(!Array.isArray(jobs?.jobs)||
     jobs.jobs.filter((j:Record<string,unknown>)=>
      j.name==='verify_missing_capability'&&j.status==='completed'&&
@@ -1171,7 +1171,7 @@ Deno.serve(async request=>{
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
-  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest'||input?.action==='reconcile'||input?.action==='prepare')&&
+  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest'||input?.action==='reconcile'||input?.action==='prepare'||input?.action==='qualify')&&
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
@@ -1277,9 +1277,9 @@ Deno.serve(async request=>{
     SHA40.test(input?.proof?.runner_git_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,proof,proposal')
     deny('QUALIFICATION_ENVELOPE_INVALID');
-   const run=await verify(bearer,input.proof.runner_git_sha);
+   const run=await verify(bearer,input.proof.runner_git_sha,ghProviderToken);
    const receipt=await qualifyVerifiedCandidate(
-     input.proposal,input.proof,run.id,input.proof.runner_git_sha);
+     input.proposal,input.proof,run.id,input.proof.runner_git_sha,ghProviderToken);
    return respond({ok:true,...receipt});
   }
   if(input?.action==='prepare'&&SHA40.test(input?.scope?.repository_sha||'')){
