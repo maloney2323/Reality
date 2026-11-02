@@ -140,13 +140,22 @@ export async function executeAuthorizedWork({
     // user-scoped IDs or arbitrary exception strings. Preserve only a
     // bounded diagnostic category and which provider phase failed.
     const providerMessage=String(error?.message||'');
+    // GENUINE source readback is an internal, effect-free investigation.
+    // Preserve a constrained diagnostic when its independent read fails;
+    // otherwise customers see an empty queue and an opaque unresolved job.
+    // Never turn this into gap evidence or auto-retry a consequential write.
+    const sourceReadbackError=workItem.connector==null&&
+      effect.consequential===false&&
+      /^GENUINE_SOURCE_JOB_[A-Z0-9_]{3,110}$/.test(providerMessage)?
+       providerMessage:null;
     const http=providerMessage.match(/^GITHUB_CONNECTOR_(401|403|404|409|422|429|500|502|503)$/);
     const safeDenial=error?.safeGitHubDenial;
     const githubFailureDetail=providerMessage==='GITHUB_CONNECTOR_403'&&
       typeof safeDenial==='string'&&
       /^(SSO_AUTHORIZATION_REQUIRED|SECONDARY_RATE_LIMIT|PRIMARY_RATE_LIMIT|TOKEN_REPOSITORY_OR_ISSUES_SCOPE_DENIED|NETWORK_ACCESS_POLICY|REPOSITORY_WRITE_UNAVAILABLE|GITHUB_WRITE_POLICY_RESTRICTED|FORBIDDEN_REASON_NOT_DISCLOSED)$/.test(safeDenial)?
        safeDenial:null;
-    const failureCode=http?'GITHUB_HTTP_'+http[1]:
+    const failureCode=sourceReadbackError?'INTERNAL_SOURCE_READBACK_UNVERIFIED':
+      http?'GITHUB_HTTP_'+http[1]:
       providerMessage==='PERSONAL_GITHUB_PROVIDER_CREATE_RESPONSE_UNCERTAIN'?
        'GITHUB_CREATE_RESPONSE_INVALID':
       providerMessage==='PERSONAL_GITHUB_PROVIDER_ID_MISSING'?
@@ -170,6 +179,9 @@ export async function executeAuthorizedWork({
       reservation_state:settlement,
       provider_failure_stage:providerFailureStage,
       provider_failure_code:failureCode,
+      // A narrowly typed, internal-only failure code is diagnostic, never
+      // independent proof of a capability gap. Never echo arbitrary errors.
+      independent_source_readback_error_code:sourceReadbackError,
       provider_failure_detail:githubFailureDetail,
       // Provider POST claims are diagnostic only, NEVER independently verified.
       unverified_provider_claim:providerResult?.observation?.number?
