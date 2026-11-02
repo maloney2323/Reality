@@ -825,6 +825,47 @@ async function recordIndependentlyMonitoredInstall(
   deny('DURABLE_INSTALLED_PROBATION_READBACK_FAILED');
  return recorded;
 }
+
+async function prepareConsumedOwnerInstallationRecovery(
+ currentSha:string,currentRunId:number,githubToken:string){
+ const r=await database('rpc/reality_read_consumed_genuine_preview_recovery_v1',{
+  method:'POST',body:{}});
+ if(r?.status==='NO_CONSUMED_INSTALL_AWAITING_RECONCILIATION')
+  return {status:'NO_CONSUMED_INSTALL_AWAITING_RECONCILIATION',
+   original_job_completed:false,production_changed:false};
+ if(r?.status!=='CONSUMED_APPROVAL_RECOVERY_REQUIRED'||
+   !WORK.test(r.original_work_id)||!UUID.test(r.trigger_id)||
+   !UUID.test(r.approval_id)||!SHA64.test(r.artifact_sha256)||
+   !SHA40.test(r.installer_source_sha)||
+   !/^[1-9][0-9]{7,17}$/.test(String(r.installer_run_id||''))||
+   r.target_environment!=='ISOLATED_PREVIEW'||
+   r.production_changed!==false||r.original_job_completed!==false)
+  deny('CONSUMED_APPROVAL_RECOVERY_UNTRUSTED');
+ const oldRun=await api('/actions/runs/'+r.installer_run_id,githubToken);
+ if(oldRun?.id!==Number(r.installer_run_id)||
+  oldRun.head_sha!==r.installer_source_sha||
+  oldRun.head_repository?.full_name!==REPO||
+  oldRun.path!==WORKFLOW)
+  deny('ORIGINAL_SIGNED_INSTALL_RUN_MISMATCH');
+ const jobs=await api('/actions/runs/'+r.installer_run_id+'/jobs?per_page=100',githubToken);
+ if(!Array.isArray(jobs?.jobs)||!
+  jobs.jobs.some((j:Record<string,unknown>)=>j.name==='activate_owner_approved_preview'&&
+   j.status==='completed'&&j.conclusion==='success'))
+  deny('ORIGINAL_INSTALL_PROVIDER_JOB_NOT_SUCCESSFUL');
+ const branch='feature/reality-qualified-install-'+r.artifact_sha256.slice(0,12);
+ const ref=await api('/git/ref/heads/'+branch,githubToken);
+ if(!SHA40.test(ref?.object?.sha))
+  deny('ORIGINAL_ISOLATED_INSTALL_BRANCH_NOT_FOUND');
+ return {status:'CONSUMED_APPROVAL_READY_FOR_INDEPENDENT_RECOVERY',
+   original_work_id:r.original_work_id,trigger_id:r.trigger_id,
+   approval_id:r.approval_id,artifact_sha256:r.artifact_sha256,
+   installer_run_id:String(r.installer_run_id),
+   installer_source_sha:r.installer_source_sha,
+   installed_branch:branch,installed_commit_sha:ref.object.sha,
+   recovery_run_id:String(currentRunId),recovery_source_sha:currentSha,
+   installation_replay_authorized:false,
+   original_job_completed:false,production_changed:false};
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -841,6 +882,15 @@ Deno.serve(async request=>{
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
+  if(input?.action==='installer_recover_prepare'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope')
+    deny('INSTALL_RECOVER_ENVELOPE_INVALID');
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const prepared=await prepareConsumedOwnerInstallationRecovery(
+    input.scope.repository_sha,run.id,ghProviderToken);
+   return respond({ok:true,...prepared});
+  }
   if(input?.action==='installer_record_activation'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,install,monitor,scope')
