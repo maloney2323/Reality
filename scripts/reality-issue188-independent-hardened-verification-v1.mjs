@@ -32,7 +32,7 @@ if(r?.schema==='reality-issue188-independent-hardened-proposal-v1'&&
   model_input_tokens:r.input_tokens,model_output_tokens:r.output_tokens,
   independent_secret_free_runner:true,
  original_already_settled:true,owner_new_work_bound:false,
- comparative_regression_cases:cases,comparative_regressions:0,
+ comparative_regression_cases:[],comparative_regressions:null,
   tested:0,passed:0,failed:0,installation_authorized:false,
   installation_performed:false,original_customer_job_settled:false,
   production_changed:false,verified_customer_dollars_saved:null};
