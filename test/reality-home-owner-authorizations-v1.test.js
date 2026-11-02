@@ -17,8 +17,8 @@ test('homepage JavaScript stays syntactically valid',()=>{
 test('exactly one homepage Owner Authorizations location is prominent',()=>{
  assert.equal((html.match(/id="homeOwnerAuthorizations"/g)||[]).length,1);
  assert.match(section(),/Owner Authorizations/);
- assert.ok(html.indexOf('id="homeOwnerAuthorizations"')<
-  html.indexOf('id="privateChat"'));
+ assert.ok(html.indexOf('id="privateChat"')<
+  html.indexOf('id="homeOwnerAuthorizations"'));
  assert.match(section(),/id="homeOwnerItems"/);
  assert.match(section(),/id="homeOwnerStatus"/);
 });
@@ -55,11 +55,11 @@ test('exact one-time authenticated approval route and explicit checkbox are reta
  assert.match(inlineScript,/!\$\('wcEasyGenuineApprovalCheck'\)\.checked/);
 });
 test('no auto-approval on page load, session refresh or queue readback',()=>{
- const home=inlineScript.slice(inlineScript.indexOf('let homeOwnerRefreshEpoch=0;'),
-  inlineScript.indexOf("\$('wcEasyGenuineCancel'\).onclick="));
- assert.doesNotMatch(home,/personal-qualified-capability-approve/);
- assert.doesNotMatch(home,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
- assert.match(inlineScript,/if\(yes\)\{void refreshRealitySelfImprovement\(\);void homeOwnerRefresh\(\);\}/);
+ const refresh=inlineScript.slice(inlineScript.indexOf('async function homeOwnerRefresh()'),
+  inlineScript.indexOf('async function realityChatApproveOnce('));
+ assert.doesNotMatch(refresh,/personal-qualified-capability-approve/);
+ assert.doesNotMatch(refresh,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
+ assert.match(inlineScript,/if\(yes\)\{void refreshRealitySelfImprovement\(\);void homeOwnerRefresh\(\);void realityChatRefreshEvents\(\);\}/);
  assert.match(inlineScript,/if\(homeOwnerSignedIn\(\)\)void homeOwnerRefresh\(\)/);
 });
 test('homepage mobile layout and fail-closed sign-in behavior',()=>{
@@ -77,12 +77,12 @@ test('homepage explains the actual settlement repair before the authorization bu
  for(const label of ['What problem did Reality find?','What did Reality actually do?',
    'Independent test results','What happens if you approve?',
    'NOT DONE: No installation approved. Original job not resumed. No final Universe settlement',
-   'Review installation approval'])
+   'Approve once · Install in preview & continue job'])
    assert.ok(card.includes(label),'missing plain-language milestone: '+label);
  assert.ok(card.indexOf("What problem did Reality find?") <
    card.indexOf("What did Reality actually do?"));
  assert.ok(card.indexOf("What did Reality actually do?") <
-   card.indexOf('Review installation approval'));
+   card.indexOf('Approve once · Install in preview & continue job'));
 });
 test('frozen, candidate and historical test results are read from signed qualification not hardcoded',()=>{
  const pos=inlineScript.indexOf("const counts=[['Original regression tests'");
@@ -101,4 +101,43 @@ test('technical hashes and original work ids are collapsible while meaningful ou
  assert.match(content,/Exact source SHA-256/);
  assert.match(content,/evidence\.append\(summary,work,hash\)/);
  assert.match(inlineScript,/card\.appendChild\(notDone\)/);
+});
+
+test('existing persistent chat is the primary above-dashboard customer interface',()=>{
+ assert.ok(html.indexOf('<section id="privateChat"')<
+  html.indexOf('<section class="home-owner-center"'));
+ assert.ok(html.indexOf('<section id="privateChat"')<
+  html.indexOf('<section id="startFlow"'));
+ assert.match(html,/id="privateTranscript"/);
+ assert.match(html,/id="privatePrompt"/);
+ assert.match(html,/id="realityChatActivityEntries"/);
+ assert.match(inlineScript,/insertBefore\(homeOwnerCenter,\$\('privatePrompt'\)\)/);
+});
+test('one customer approval click verifies exact source and uses existing authenticated endpoint',()=>{
+ const from=inlineScript.indexOf('async function realityChatApproveOnce(');
+ const to=inlineScript.indexOf('async function realityChatRefreshEvents()',from);
+ assert.ok(from>0&&to>from);
+ const method=inlineScript.slice(from,to);
+ assert.match(method,/realityChatApprovalInFlight=true/);
+ assert.match(method,/await homeOwnerRead\(\)/);
+ assert.match(method,/matching.length!==1/);
+ assert.match(method,/matching\[0\]\.qualification\.artifact_sha256!==expectedHash/);
+ assert.match(method,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
+ assert.match(method,/APPROVE EXACT VERIFIED UPGRADE IN ISOLATED PREVIEW/);
+ assert.match(method,/original_job_completed!==false/);
+ assert.match(method,/production_changed!==false/);
+ assert.match(method,/DO_NOT_RETRY/);
+ assert.doesNotMatch(method,/showModal\(\)/);
+});
+test('chat live work progress relies on authenticated read-only worker evidence',()=>{
+ const from=inlineScript.indexOf('async function realityChatRefreshEvents()');
+ const to=inlineScript.indexOf('async function homeOwnerOpen(',from);
+ assert.ok(from>0&&to>from);
+ const method=inlineScript.slice(from,to);
+ assert.match(method,/personal-genuine-loop-status/);
+ assert.match(method,/data.status!=='OWNER_GOVERNED_LOOP_READBACK'/);
+ assert.match(method,/j.independently_settled===true&&j.universe_settlement_verified===true/);
+ assert.match(method,/Final Universe proof still required/);
+ assert.match(method,/Live worker readback unavailable/);
+ assert.doesNotMatch(method,/method:'POST'/);
 });
