@@ -417,8 +417,11 @@ jobs:
           retention-days: 14
 
   resume_original_job:
-    needs: [record_owner_approved_activation]
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') }}
+    needs: [record_owner_approved_activation, record_consumed_preview_recovery]
+    # Wait for BOTH governed activation paths, then let the signed broker
+    # check whether a previously accepted original job can be resumed.
+    # Any upstream failure blocks continuation. Skipped paths cannot grant work.
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
     permissions:
       contents: read
       actions: read
