@@ -38,6 +38,13 @@ if(!resp.ok||result?.ok!==true||
  result?.full_probation_complete!==false||
  result?.production_changed!==false)
  fail('DURABLE_INDEPENDENT_SETTLEMENT_'+String(result?.error||'REFUSED').slice(0,70));
+if(proof.extension_protocol==='TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1'&&(
+ result.universe_settlement_verified!==true||
+ result.universe_receipt?.status!=='VERIFIED_UNIVERSE_SETTLED'||
+ result.universe_receipt?.original_work_id!==proof.reconciliation_target_original_work_id||
+ result.universe_receipt?.independent_database_readback!==true||
+ result.universe_receipt?.production_changed!==false))
+ fail('RECONCILIATION_DURABLE_UNIVERSE_READBACK_REQUIRED');
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-original-final-settlement.json',JSON.stringify(result,null,2)+'\n');
 console.log('REALITY_ORIGINAL_JOB_DURABLY_SETTLED',JSON.stringify({
