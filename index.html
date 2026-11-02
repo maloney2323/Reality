@@ -297,13 +297,20 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 </section>
 <section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
 <section class="work-center" id="workCenter" aria-label="Reality Work Center">
- <div id="wcRepairQuickStart" class="repair-current" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 18px;margin-bottom:18px;border:1px solid #6ba5ba;border-radius:14px;background:#142437;">
-  <div style="flex:1;min-width:190px">
-   <strong style="font-size:17px">Reality · Repair &amp; Upgrades</strong>
-   <p style="font-size:13px;line-height:1.55;color:#b8d1e4;margin:6px 0 0">Find a verified missing capability and review it for investigation. Installation always requires a separate approval.</p>
+ <section id="wcRepairQuickStart" class="repair-current" aria-label="Reality guided self-repair" style="padding:18px;margin:0 0 18px;border:1px solid #6ba5ba;border-radius:16px;background:#142437">
+  <div class="repair-kicker">REALITY · EASY SELF-REPAIR</div>
+  <h3 style="font-size:22px;margin:5px 0">Reality repairs the problem, then finishes your job</h3>
+  <p id="wcEasyRepairSummary" role="status" aria-live="polite" style="font-size:13px;line-height:1.55;color:#c6d6e6;margin:8px 0 15px">Sign in, then Reality will find your existing work. You won't need to enter job numbers or approval codes.</p>
+  <div id="wcEasyRepairStages" aria-label="Repair progress" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:8px;margin-bottom:14px">
+   <span id="wcEasyStage1" style="padding:10px;border:1px solid #4d6374;border-radius:10px">1 · Find work</span>
+   <span id="wcEasyStage2" style="padding:10px;border:1px solid #4d6374;border-radius:10px">2 · Repair &amp; test</span>
+   <span id="wcEasyStage3" style="padding:10px;border:1px solid #4d6374;border-radius:10px">3 · Your approval</span>
+   <span id="wcEasyStage4" style="padding:10px;border:1px solid #4d6374;border-radius:10px">4 · Finished receipt</span>
   </div>
-  <button id="wcQuickFindRepair" type="button" class="repair-primary" style="margin:0;min-height:48px;white-space:normal">Find verified repair</button>
- </div>
+  <button id="wcEasyRepairMain" type="button" class="repair-primary" style="display:block;width:100%;font-size:16px;min-height:52px;margin:0">Continue Reality's repair</button>
+  <p id="wcEasyRepairStatus" role="status" aria-live="polite" style="font-size:12px;color:#b8d1e4;margin:11px 0 0">Reality checks the saved job first. A previous owner approval is never submitted twice.</p>
+  <details id="wcEasyRepairEvidence" style="margin-top:12px"><summary style="cursor:pointer;color:#b8d1e4">Technical evidence &amp; detailed controls</summary><p style="font-size:12px;color:#b8d1e4">The existing detailed repair workflow remains below under Upgrades &amp; Improvements. Verification and installation authority remain separate.</p><button id="wcQuickFindRepair" type="button" class="repair-secondary">Open detailed repair controls</button></details>
+ </section>
  <div class="wc-head">
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
    <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
@@ -1705,6 +1712,132 @@ function wcResumeSavedExactRepair(){
 if(typeof setInterval==='function')setInterval(wcResumeSavedExactRepair,15000);
 
 // Visible customer entry point. The old control was under a hidden diagnostics panel.
+// One visible, owner-friendly path; the old detailed controls remain available.
+// GETs inspect existing work, not owner authority. Only the existing modal
+// permits investigation authorization or exact artifact-specific installation.
+let wcEasyRepairBusy=false;
+let wcEasyRepairCurrent=null;
+function wcEasyStage(number,state){
+ const el=$('wcEasyStage'+number);
+ if(!el)return;
+ el.style.background=state==='complete'?'#15392f':state==='active'?'#1f3f57':'transparent';
+ el.style.borderColor=state==='complete'?'#4d9f86':state==='active'?'#8fbbd1':'#4d6374';
+ el.setAttribute('data-state',state);
+}
+function wcEasyStatus(text,label){
+ $('wcEasyRepairSummary').textContent=text;
+ if(label)$('wcEasyRepairMain').textContent=label;
+}
+async function wcEasyReadExisting(){
+ if($('privateReady')?.style.display!=='block'){
+  wcEasyRepairCurrent=null;
+  wcEasyStatus('Sign in to continue Reality’s work. Your saved job will appear here automatically.','Sign in to continue');
+  return null;
+ }
+ const response=await fetch('/api/reality/personal-unfinished-work',{
+  method:'GET',credentials:'same-origin',cache:'no-store'});
+ const data=await response.json();
+ if(!response.ok||data.ok!==true||data.status!=='SCOPED_READ_ONLY'||
+    data.coverage_limited===true||data.result_truncated===true||
+    !Array.isArray(data.jobs))
+  throw Error('OWNER_WORK_READBACK_UNAVAILABLE');
+ const jobs=data.jobs.filter(j=>j.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'&&
+   /^work:[a-f0-9]{32}$/.test(String(j.original_work_id||''))&&
+   /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(String(j.issue_url||''))&&
+   j.action_completed===true&&j.job_completed===false);
+ jobs.sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||'')));
+ wcEasyRepairCurrent=jobs[0]||null;
+ if(wcEasyRepairCurrent){
+  const j=wcEasyRepairCurrent;
+  const issue=j.issue_url.split('/').at(-1);
+  wcEasyStage(1,'complete');wcEasyStage(2,'active');
+  wcEasyStage(3,'pending');wcEasyStage(4,'pending');
+  if(j.goal_still_current!==true){
+   wcEasyStatus('Your existing repair job #'+issue+' is saved. Reconfirm its original goal to continue safely.','Review original goal');
+  }else if(wcVerifiedInstallReview?.original_work_id===j.original_work_id){
+   wcEasyStage(2,'complete');wcEasyStage(3,'active');
+   wcEasyStatus('Reality has a verified exact repair for issue #'+issue+'. Review the installation request once.','Review exact upgrade');
+  }else{
+   wcEasyStatus('Investigation approved for issue #'+issue+
+     '. Reality is checking the same saved job, not creating another.','Continue original job');
+  }
+  $('wcEasyRepairStatus').textContent='Original work: '+j.original_work_id+
+    ' · Installation not approved · Final settlement not verified.';
+  return j;
+ }
+ wcEasyStage(1,'active');wcEasyStage(2,'pending');
+ wcEasyStage(3,'pending');wcEasyStage(4,'pending');
+ wcEasyStatus('No unfinished source-backed repair is saved under your current account. Reality can find a verified problem for you.','Find a verified repair');
+ $('wcEasyRepairStatus').textContent='Finding a repair is read-only. You approve any new investigation separately.';
+ return null;
+}
+async function wcEasyRefresh(){
+ if(wcEasyRepairBusy)return;
+ try{await wcEasyReadExisting();}
+ catch(e){
+  wcEasyStatus('Reality cannot verify your saved original job right now. Nothing was restarted.','Retry verified status');
+  $('wcEasyRepairStatus').textContent='Trusted owner-work readback unavailable; no duplicate job or installation created.';
+ }
+}
+$('wcEasyRepairMain').onclick=async()=>{
+ const button=$('wcEasyRepairMain');
+ if(wcEasyRepairBusy)return;
+ if($('privateReady')?.style.display!=='block'){
+  $('privateChat').scrollIntoView({behavior:'smooth',block:'start'});return;
+ }
+ wcEasyRepairBusy=true;button.disabled=true;
+ try{
+  const existing=await wcEasyReadExisting();
+  if(!existing){
+   wcCurrent='upgrades';wcRender();
+   const diag=$('wcUpgradeDiagnostics');if(diag){diag.hidden=false;diag.open=true;}
+   await $('wcDiscoverRealRepair').onclick();
+   if(wcRealRepairOpportunity){
+    $('wcAuthorizeRealRepair').onclick();
+    $('wcEasyRepairStatus').textContent='Review the investigation consent. It does not authorize installation.';
+   }else{
+    $('wcEasyRepairStatus').textContent='Reality has no verified missing extension to authorize. No new job created.';
+   }
+   return;
+  }
+  if(existing.goal_still_current!==true){
+   $('privateGoalText').scrollIntoView({behavior:'smooth',block:'center'});
+   return;
+  }
+  if(wcVerifiedInstallReview?.original_work_id===existing.original_work_id){
+   $('wcApproveExactInstall').onclick();
+   return;
+  }
+  // Existing, already-approved investigation: no new original job and no
+  // repeat approval. Read the independent candidate and prepare a checkpoint
+  // only when the source is actually verified.
+  wcCurrent='upgrades';wcRender();
+  const diag=$('wcUpgradeDiagnostics');if(diag){diag.hidden=false;diag.open=true;}
+  $('wcEasyRepairStatus').textContent='Checking for Reality’s independently tested upgrade…';
+  await $('wcReadModelRepair').onclick();
+  if(wcExactModelCandidate?.original_work_id===existing.original_work_id&&
+     !$('wcPrepareModelRepair').disabled)
+   await $('wcPrepareModelRepair').onclick();
+  if(wcVerifiedInstallReview?.original_work_id===existing.original_work_id){
+   wcEasyStage(2,'complete');wcEasyStage(3,'active');
+   wcEasyStatus('Reality verified the exact repair. One separate approval is needed before installation.','Review exact upgrade');
+   $('wcEasyRepairStatus').textContent='Independent test checkpoint ready. You have not approved installation yet.';
+  }else{
+   wcEasyStatus('Your original investigation is saved. Reality has not yet produced a verified upgrade.','Check Reality’s progress');
+   $('wcEasyRepairStatus').textContent=
+    'The background repair is not verified yet. No new customer job or installation was started. '+
+    $('wcModelRepairReviewStatus').textContent;
+  }
+ }catch(e){
+  wcEasyStatus('The saved job requires a verified readback before further action.','Recheck Reality’s job');
+  $('wcEasyRepairStatus').textContent='No repeat authorization or installation occurred. '+String(e?.message||'READBACK_FAILED');
+ }finally{wcEasyRepairBusy=false;button.disabled=false;}
+};
+const wcEasyOriginalDiscover=$('wcQuickFindRepair').onclick;
+setTimeout(()=>{void wcEasyRefresh();},500);
+setInterval(()=>{if($('privateReady')?.style.display==='block'&&
+  !wcEasyRepairBusy)void wcEasyRefresh();},30000);
+
 $('wcQuickFindRepair').onclick=()=>{
  if($('privateReady')?.style.display!=='block'){
   $('wcRealRepairOpportunityStatus').textContent='Sign in to review genuine missing capabilities. No work is authorized yet.';
