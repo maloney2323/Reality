@@ -40,8 +40,11 @@ if(!res.ok||outcome?.ok!==true||
  !Number.isInteger(outcome.verified_already_settled_count)||
  outcome.verified_already_settled_count<0||
  !Array.isArray(outcome.queued)||
+ !Number.isInteger(outcome.verified_already_claimed_count)||
+ outcome.verified_already_claimed_count<0||
  outcome.verified_queue_count!==outcome.queued.length||
- outcome.verified_queue_count+outcome.verified_already_settled_count!==report.findings.length||
+ outcome.verified_queue_count+outcome.verified_already_claimed_count+
+ outcome.verified_already_settled_count!==report.findings.length||
  outcome.installation_authorized!==false||
  outcome.original_job_completed!==false||
  outcome.production_changed!==false)
@@ -53,7 +56,9 @@ writeFileSync('artifact/genuine-capability-admitted-queue.json',
  installation_authorized:false,original_job_completed:false})+'\n');
 console.log('REALITY_SIGNED_AUTO_ADMISSION',JSON.stringify({
  status:outcome.status,discovered:report.findings.length,
- queued:outcome.queued,skipped_independently_settled:outcome.verified_already_settled_count,
+ queued:outcome.queued,
+ previously_claimed:outcome.verified_already_claimed_count,
+ skipped_independently_settled:outcome.verified_already_settled_count,
  installation_authorized:false,original_job_completed:false,
  production_changed:false,
 }));
