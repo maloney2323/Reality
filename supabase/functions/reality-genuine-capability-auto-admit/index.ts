@@ -1,0 +1,372 @@
+// Signed GitHub Actions discovery -> independent provider readback ->
+// owner-authorized original Continuity append -> existing atomic genuine queue.
+// Never grants installation, execution, model trust, or customer settlement.
+// This endpoint is NOT authenticated by a user or a GitHub issue body.
+// It verifies the GitHub-issued OIDC signature and immutable workflow identity.
+const PROJECT='hvkfreoagbrphwghjajw';
+const REPO='maloney2323/Reality';
+const BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
+const WORKFLOW='.github/workflows/reality-genuine-capability-auto-trigger-v1.yml';
+const AUDIENCE='reality-genuine-capability-auto-admit-v1';
+const REF=REPO+'/'+WORKFLOW+'@'+BRANCH;
+const SHA40=/^[a-f0-9]{40}$/;
+const SHA64=/^[a-f0-9]{64}$/;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+const TEST=/^test\/reality-frozen-regressions\/[a-z0-9._-]+\.test\.js$/;
+const MODULE=/^src\/reality-extensions\/[a-z0-9._-]+\.mjs$/;
+const WORK=/^work:[a-f0-9]{32}$/;
+const respond=(data,status=200)=>new Response(JSON.stringify(data),{
+ status,headers:{'content-type':'application/json','cache-control':'no-store',
+ 'x-content-type-options':'nosniff'}});
+const deny=code=>{throw Error('AUTO_ADMIT_'+code)};
+function decode64(s){
+ if(!/^[A-Za-z0-9_-]{1,10000}$/.test(s))deny('BASE64URL_INVALID');
+ const normalized=s.replace(/-/g,'+').replace(/_/g,'/');
+ return Uint8Array.from(atob(normalized+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
+}
+function jsonPart(s){
+ const v=JSON.parse(new TextDecoder().decode(decode64(s)));
+ if(!v||Array.isArray(v)||typeof v!=='object')deny('TOKEN_PART_NOT_OBJECT');
+ return v;
+}
+async function hash(bytes){
+ const b=typeof bytes==='string'?new TextEncoder().encode(bytes):bytes;
+ const output=new Uint8Array(await crypto.subtle.digest('SHA-256',b));
+ return [...output].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function uuid(text){
+ const bits=new Uint8Array(await crypto.subtle.digest('SHA-256',
+  new TextEncoder().encode(text)));
+ bits[6]=(bits[6]&15)|80;bits[8]=(bits[8]&63)|128;
+ const s=[...bits.slice(0,16)].map(x=>x.toString(16).padStart(2,'0')).join('');
+ return s.slice(0,8)+'-'+s.slice(8,12)+'-'+s.slice(12,16)+'-'+
+  s.slice(16,20)+'-'+s.slice(20);
+}
+function stable(v){
+ return v===null||typeof v!=='object'?v:Array.isArray(v)?v.map(stable):
+  Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])]));
+}
+const digest=async v=>hash(JSON.stringify(stable(v)));
+async function api(path){
+ const r=await fetch('https://api.github.com/repos/'+REPO+path,{
+  redirect:'error',cache:'no-store',headers:{
+   accept:'application/vnd.github+json',
+   'x-github-api-version':'2022-11-28',
+   'user-agent':'Reality-genuine-auto-admit-v1'}});
+ if(r.status===404)return null;
+ if(!r.ok)deny('GITHUB_READBACK_UNAVAILABLE');
+ return r.json();
+}
+async function verify(jwt,commit){
+ if(typeof jwt!=='string'||jwt.length<300||jwt.length>9000)
+  deny('SIGNED_IDENTITY_INVALID');
+ const p=jwt.split('.');
+ if(p.length!==3)deny('JWT_FORMAT');
+ const h=jsonPart(p[0]),c=jsonPart(p[1]),now=Math.floor(Date.now()/1000);
+ if(h.alg!=='RS256'||typeof h.kid!=='string'||
+  c.iss!=='https://token.actions.githubusercontent.com'||
+  c.aud!==AUDIENCE||c.repository!==REPO||
+  c.repository_owner!=='maloney2323'||
+  String(c.repository_id)!=='1388852445'||
+  c.workflow_ref!==REF||c.ref!==BRANCH||c.ref_type!=='branch'||
+  c.event_name!=='push'||c.sha!==commit||!SHA40.test(commit)||
+  !/^[1-9][0-9]{0,17}$/.test(String(c.run_id||''))||
+  typeof c.exp!=='number'||typeof c.iat!=='number'||
+  typeof c.nbf!=='number'||c.exp<now-30||c.nbf>now+30||
+  c.iat>now+30||c.exp-c.iat>900)
+  deny('EXACT_SIGNED_GITHUB_WORKFLOW_REQUIRED');
+ const jwks=await fetch('https://token.actions.githubusercontent.com/.well-known/jwks',
+  {redirect:'error',cache:'no-store'});
+ if(!jwks.ok)deny('SIGNING_JWKS_UNAVAILABLE');
+ const keys=(await jwks.json()).keys;
+ const found=(Array.isArray(keys)?keys:[]).filter(k=>
+  k.kid===h.kid&&k.kty==='RSA'&&(!k.alg||k.alg==='RS256')&&
+  (!k.use||k.use==='sig'));
+ if(found.length!==1)deny('SIGNER_NOT_UNIQUE');
+ const key=await crypto.subtle.importKey('jwk',found[0],
+  {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
+ const good=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,
+  decode64(p[2]),new TextEncoder().encode(p[0]+'.'+p[1]));
+ if(!good)deny('SIGNATURE_FAILED');
+ const run=await api('/actions/runs/'+c.run_id);
+ if(run?.id!==Number(c.run_id)||run.head_sha!==commit||
+  run.event!=='push'||run.path!==WORKFLOW||
+  run.head_branch!==BRANCH.slice('refs/heads/'.length)||
+  run.head_repository?.full_name!==REPO)
+  deny('GITHUB_WORKFLOW_PROVIDER_READBACK_MISMATCH');
+ return run;
+}
+function credentials(){
+ const url=Deno.env.get('SUPABASE_URL');
+ const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+ if(url!=='https://'+PROJECT+'.supabase.co'||!key||key.length<30)
+  deny('ISOLATED_SERVICE_DATABASE_UNAVAILABLE');
+ return {url,key};
+}
+async function database(path,{method='GET',body}={}){
+ const {url,key}=credentials();
+ const response=await fetch(url+'/rest/v1/'+path,{
+  method,redirect:'error',cache:'no-store',
+  headers:{apikey:key,authorization:'Bearer '+key,
+   accept:'application/json','content-type':'application/json',
+   ...(method==='POST'?{Prefer:'return=representation'}:{})},
+  body:body===undefined?undefined:JSON.stringify(body)});
+ const result=await response.json().catch(()=>null);
+ if(!response.ok){
+  const safeCode=String(result?.message||'').match(/GENUINE_AUTO_[A-Z_]{4,100}/)?.[0];
+  if(safeCode)throw Error(safeCode);
+  deny('DATABASE_'+response.status+'_UNAVAILABLE');
+ }
+ return result;
+}
+async function providerSource(path,sha){
+ const found=await api('/contents/'+path+'?ref='+sha);
+ if(!found||found.path!==path||found.encoding!=='base64'||
+  typeof found.content!=='string')deny('PINNED_TEST_SOURCE_UNVERIFIED');
+ const bytes=Uint8Array.from(atob(found.content.replace(/\s/g,'')),
+  x=>x.charCodeAt(0));
+ return bytes;
+}
+async function readChain(root,worldline){
+ const byId=new Map(),children=new Set();
+ for(let offset=0;offset<=4000;offset+=400){
+  const page=await database('universe_events?'+
+   new URLSearchParams({continuity_root_id:'eq.'+root,
+    worldline_id:'eq.'+worldline,
+    select:'event_id,parent_event_id,lineage_hash,entity_type,epistemic_status,payload',
+    order:'created_at.asc,event_id.asc',limit:'400',offset:String(offset)}));
+  if(!Array.isArray(page))deny('CHAIN_PAGE_UNVERIFIED');
+  for(const row of page){
+   if(!UUID.test(row.event_id)||!SHA64.test(row.lineage_hash)||
+      byId.has(row.event_id))deny('CHAIN_EVENT_INVALID');
+   byId.set(row.event_id,row);
+   if(row.parent_event_id)children.add(row.parent_event_id);
+  }
+  if(page.length<400)break;
+  if(offset===4000)deny('CHAIN_BOUND_EXHAUSTED');
+ }
+ if(!byId.size||[...children].some(id=>!byId.has(id)))
+  deny('CHAIN_UNVERIFIED');
+ const tips=[...byId.values()].filter(e=>!children.has(e.event_id));
+ if(tips.length!==1)deny('CHAIN_NOT_LINEAR');
+ return {tip:tips[0],events:[...byId.values()]};
+}
+async function verifyOriginal(original,signal,commit){
+ const p=original?.payload||{};
+ if(original.entity_type!=='reality_original_source_backed_repair_work'||
+  original.epistemic_status!=='VERIFIED'||
+  !UUID.test(original.event_id)||!UUID.test(p.owner_id)||
+  !UUID.test(original.provenance?.conversation_id)||
+  original.provenance?.principal_id!==p.owner_id||
+  p.owner_authorized_investigation!==true||
+  p.owner_authorized_installation!==false||
+  p.original_job_completed!==false||p.production_changed!==false||
+  !WORK.test(p.original_work_id)||!TEST.test(p.frozen_test_path)||
+  !MODULE.test(p.source_path)||!SHA64.test(p.frozen_test_sha256)||
+  !SHA40.test(p.original_source_sha)||
+  p.frozen_test_path!==signal.test_path||
+  p.source_path!==signal.candidate_module_path||
+  p.frozen_test_sha256!==signal.frozen_sha256)
+  deny('OWNER_SOURCE_SCOPE_NOT_MATCHED');
+ const failed=await api('/actions/runs/'+p.original_provider_failed_run_id);
+ if(failed?.id!==Number(p.original_provider_failed_run_id)||
+  failed.head_sha!==p.original_source_sha||
+  failed.head_repository?.full_name!==REPO||
+  failed.status!=='completed'||failed.conclusion!=='failure')
+  deny('HISTORICAL_FAILED_RUN_UNVERIFIED');
+ const jobs=await api('/actions/runs/'+failed.id+'/jobs?per_page=100');
+ if(!Array.isArray(jobs?.jobs)||!jobs.jobs.some(j=>
+   j.id===Number(p.original_provider_failed_job_id)&&
+   j.run_id===failed.id&&j.head_sha===failed.head_sha&&
+   j.conclusion==='failure'&&j.steps?.some(s=>s.conclusion==='failure')))
+  deny('FAILED_PROVIDER_JOB_UNVERIFIED');
+ const [historic,current]=await Promise.all([
+  providerSource(p.frozen_test_path,p.original_source_sha),
+  providerSource(p.frozen_test_path,commit)]);
+ if(await hash(historic)!==p.frozen_test_sha256||
+    await hash(current)!==p.frozen_test_sha256)
+  deny('FROZEN_SOURCE_SHA_DRIFT');
+ if(await api('/contents/'+p.source_path+'?ref='+p.original_source_sha)!==null||
+    await api('/contents/'+p.source_path+'?ref='+commit)!==null)
+  deny('MISSING_CAPABILITY_ALREADY_EXISTS');
+ return true;
+}
+async function appendGap(original,signal){
+ const p=original.payload,root=original.continuity_root_id,
+  worldline=original.worldline_id;
+ const source_ref='https://github.com/'+REPO+'/actions/runs/'+
+  p.original_provider_failed_run_id;
+ const cap=p.source_path.split('/').at(-1).replace(/\.mjs$/,'');
+ const observed={
+  original_work_id:p.original_work_id,evidence_kind:'OBSERVED_FAILURE',
+  blocker_class:'MISSING_INSTRUMENT',capability_id:cap,source_ref,
+  verification_suite_ref:'github:frozen-regression:sha256:'+
+   p.frozen_test_sha256,
+  independently_verified:true,external_action_performed:false,
+  provider_effect_may_have_occurred:false,no_automatic_retry:false,
+ };
+ const failureHash=await digest(observed);
+ let chain=await readChain(root,worldline);
+ const existing=chain.events.filter(e=>
+  e.entity_type==='reality_genuine_capability_gap_v1'&&
+  e.epistemic_status==='VERIFIED'&&
+  e.payload?.owner_id===p.owner_id&&
+  e.payload?.original_work_id===p.original_work_id&&
+  e.payload?.provider_failure_hash===failureHash&&
+  e.payload?.original_work_event_id===original.event_id&&
+  e.payload?.installation_authorized===false&&
+  e.payload?.original_job_completed===false);
+ if(existing.length>1)deny('DUPLICATE_GENUINE_GAP');
+ if(existing.length===1)return existing[0].event_id;
+ const conv=original.provenance.conversation_id;
+ const receipt='execution:github-provider-observation:'+
+  p.original_provider_failed_run_id;
+ const id=await uuid('genuine-capability-gap:'+p.owner_id+':'+
+  conv+':'+p.original_work_id+':'+receipt+':'+failureHash);
+ const payload={
+  version:'reality_genuine_capability_gap_v1',
+  owner_id:p.owner_id,conversation_id:conv,
+  goal_id:p.original_goal_id,original_work_id:p.original_work_id,
+  original_work_event_id:original.event_id,
+  goal_transition_event_id:p.goal_transition_receipt_ref,
+  source_ref,verification_suite_ref:observed.verification_suite_ref,
+  capability_id:cap,provider_failure_hash:failureHash,
+  original_execution_receipt:receipt,
+  value_passport:{qualification_status:'EVIDENCE_ONLY_VALUE_NOT_MEASURED',
+   verified_savings:false,original_work_id:p.original_work_id},
+  evidence_kind:'OBSERVED_FAILURE',blocker_class:'MISSING_INSTRUMENT',
+  independently_verified:true,external_action_performed:false,
+  provider_effect_may_have_occurred:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,
+ };
+ for(let attempt=0;attempt<3;attempt++){
+  const tip=chain.tip,now=new Date().toISOString();
+  const provenance={source:'reality-genuine-capability-auto-admit-v1',
+   principal_id:p.owner_id,conversation_id:conv};
+  const entityId=await uuid(p.original_work_id);
+  const refs=[original.event_id];
+  const line=await digest({
+   spine_version:'reality-continuity-spine-v2.1',
+   continuity_root_id:root,worldline_id:worldline,
+   parent_event_id:tip.event_id,prior_lineage_hash:tip.lineage_hash,
+   stage:'OBSERVATION',entity_id:entityId,evidence_refs:refs,
+   transformation_receipt_id:null,effective_time:now,assertion_time:now,
+   epistemic_status:'VERIFIED',payload,provenance,
+  });
+  const record={
+   event_id:id,event_kind:'OBSERVATION',
+   entity_type:'reality_genuine_capability_gap_v1',
+   entity_id:entityId,continuity_root_id:root,worldline_id:worldline,
+   parent_event_id:tip.event_id,effective_time:now,assertion_time:now,
+   epistemic_status:'VERIFIED',payload,evidence_refs:refs,
+   provenance:{...provenance,continuity_spine:{
+    version:'reality-continuity-spine-v2.1',
+    prior_lineage_hash:tip.lineage_hash,transformation_receipt_id:null,
+    source_event_id:null,source_entity_id:null,
+    source_continuity_root_id:null,source_worldline_id:null,
+   }},
+   content_hash:await digest(payload),lineage_hash:line,
+  };
+  try{
+   const added=await database('rpc/reality_commit_auto_genuine_gap_v1',{
+    method:'POST',body:{p_original_event_id:original.event_id,
+     p_node:record}});
+   if(added.gap_event_id!==id||
+     added.original_work_id!==p.original_work_id)
+    deny('PERSISTED_NODE_READBACK_MISMATCH');
+   const confirm=await database('universe_events?'+
+    new URLSearchParams({event_id:'eq.'+id,select:'event_id,lineage_hash,payload'}));
+   if(!Array.isArray(confirm)||confirm.length!==1||
+      confirm[0].lineage_hash!==line||
+      JSON.stringify(stable(confirm[0].payload))!==JSON.stringify(stable(payload)))
+    deny('POST_WRITE_LINEAGE_READBACK_FAILED');
+   return id;
+  }catch(error){
+   if(String(error?.message||'')!=='GENUINE_AUTO_CHAIN_HEAD_MOVED'||
+      attempt===2)throw error;
+   chain=await readChain(root,worldline);
+  }
+ }
+ deny('APPEND_EXHAUSTED');
+}
+async function admit(report){
+ const all=await database('universe_events?'+new URLSearchParams({
+  entity_type:'eq.reality_original_source_backed_repair_work',
+  epistemic_status:'eq.VERIFIED',
+  select:'*',order:'created_at.desc',limit:'200'}));
+ if(!Array.isArray(all)||all.length===200)deny('ORIGINAL_SOURCE_DISCOVERY_COVERAGE_LIMIT');
+ const queued=[];
+ for(const signal of report.findings){
+  if(signal.kind!=='UNVERIFIED_MISSING_CAPABILITY_CANDIDATE'||
+     !TEST.test(signal.test_path)||!MODULE.test(signal.candidate_module_path)||
+     !SHA64.test(signal.frozen_sha256)||
+     signal.repository_sha!==report.repository_sha||
+     signal.queued_in_governed_capability_queue!==false||
+     signal.owner_approval_granted!==false||
+     signal.installation_authorized!==false||
+     signal.original_job_completed!==false)
+   deny('CI_CANDIDATE_NOT_SOURCE_BOUND');
+  const matching=all.filter(e=>
+   e.payload?.frozen_test_path===signal.test_path&&
+   e.payload?.source_path===signal.candidate_module_path&&
+   e.payload?.frozen_test_sha256===signal.frozen_sha256);
+  if(matching.length!==1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
+  const original=matching[0];
+  await verifyOriginal(original,signal,report.repository_sha);
+  const gapId=await appendGap(original,signal);
+  const receipt=await database('rpc/reality_enqueue_genuine_capability_gap_v1',{
+   method:'POST',body:{p_gap_event_id:gapId}});
+  if(receipt?.source_event_id!==gapId||
+     receipt.original_work_id!==original.payload.original_work_id||
+     receipt.phase!=='PENDING_FROZEN_REPRODUCTION'||
+     receipt.installation_authorized!==false||
+     receipt.original_job_completed!==false||
+     receipt.new_customer_job_created!==false||
+     !UUID.test(receipt.trigger_id))
+    deny('ATOMIC_QUEUE_READBACK_MISMATCH');
+  queued.push({original_work_id:receipt.original_work_id,
+   source_event_id:gapId,trigger_id:receipt.trigger_id,
+   queue_phase:receipt.phase});
+ }
+ return queued;
+}
+Deno.serve(async request=>{
+ try{
+  if(request.method!=='POST'||
+    !/^application\/json(?:;|$)/i.test(request.headers.get('content-type')||''))
+   return respond({ok:false,error:'METHOD_OR_CONTENT_TYPE_REQUIRED'},405);
+  const bearer=request.headers.get('authorization')?.match(
+   /^Bearer ([A-Za-z0-9._-]+)$/)?.[1];
+  if(!bearer)return respond({ok:false,error:'SIGNED_GITHUB_OIDC_REQUIRED'},401);
+  const raw=await request.text();
+  if(raw.length>9500)deny('REQUEST_TOO_LARGE');
+  const input=JSON.parse(raw);
+  if(!input||Array.isArray(input)||typeof input!=='object'||
+   Object.keys(input).sort().join(',')!=='action,report'||
+   input.action!=='admit'||input.report?.schema!==
+    'reality-genuine-auto-trigger-observation-v1'||
+   input.report.source!=='GITHUB_CI_ACTUAL_FROZEN_TEST_EXIT'||
+   !SHA40.test(input.report.repository_sha)||
+   !Array.isArray(input.report.findings)||
+   input.report.findings.length<1||input.report.findings.length>30||
+   input.report.installation_authorized!==false||
+   input.report.original_job_completed!==false)
+   deny('EXACT_SIGNED_CI_OBSERVATION_REQUIRED');
+  const run=await verify(bearer,input.report.repository_sha);
+  const queued=await admit(input.report);
+  return respond({ok:true,
+   status:'GENUINE_ORIGINAL_GAPS_DURABLY_QUEUED',
+   signed_github_run_id:run.id,
+   verified_original_count:queued.length,queued,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false});
+ }catch(error){
+  const safe=String(error?.message||'');
+  const code=/^AUTO_ADMIT_[A-Z0-9_]{3,120}$/.test(safe)?safe:
+   /^GENUINE_AUTO_[A-Z0-9_]{3,120}$/.test(safe)?safe:
+   'AUTO_ADMIT_UNVERIFIED_PROVIDER_OR_DATABASE';
+  console.warn('REALITY_GENUINE_AUTO_ADMISSION_REFUSED',code);
+  return respond({ok:false,error:code,installation_authorized:false,
+   original_job_completed:false,production_changed:false},403);
+ }
+});
