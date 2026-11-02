@@ -279,3 +279,37 @@ jobs:
           path: artifact/out/reality-independent-installed-preview-activation.json
           if-no-files-found: warn
           retention-days: 14
+
+  record_owner_approved_activation:
+    needs: monitor_owner_approved_preview
+    if: ${{ needs.monitor_owner_approved_preview.result == 'success' }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-${{ github.run_id }}
+          path: artifact/install
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-approved-preview-activation-proof-${{ github.run_id }}
+          path: artifact/monitor
+      - name: Independently reconcile preview activation and monitor into original Continuity
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-record-activation-v1.mjs
+          node scripts/reality-genuine-record-activation-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-durable-owner-activation-${{ github.run_id }}
+          path: artifact/out/reality-durable-preview-activation.json
+          if-no-files-found: error
+          retention-days: 14
