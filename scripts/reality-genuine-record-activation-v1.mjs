@@ -4,7 +4,7 @@ import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 const env=process.env;
 const fail=x=>{throw Error('REALITY_PROBATION_RECORD_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||
- env.GITHUB_EVENT_NAME!=='push'||
+ !['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
  env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
  fail('SIGNED_ORIGINAL_WORKFLOW_REQUIRED');
