@@ -53,6 +53,7 @@ if(!res.ok||outcome?.ok!==true||
 writeFileSync('artifact/genuine-capability-admitted-queue.json',
  JSON.stringify({schema:'reality-genuine-admitted-queue-v1',
  repository_sha:report.repository_sha,queued:outcome.queued,
+ previously_claimed:outcome.previously_claimed||[],
  installation_authorized:false,original_job_completed:false})+'\n');
 console.log('REALITY_SIGNED_AUTO_ADMISSION',JSON.stringify({
  status:outcome.status,discovered:report.findings.length,
