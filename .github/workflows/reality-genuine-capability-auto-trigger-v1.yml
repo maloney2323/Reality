@@ -220,7 +220,6 @@ jobs:
           retention-days: 7
 
   activate_owner_approved_preview:
-    needs: detect-real-frozen-capability-deficits
     if: github.event_name == 'push'
     permissions:
       contents: write
