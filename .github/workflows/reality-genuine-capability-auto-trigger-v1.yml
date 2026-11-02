@@ -40,6 +40,14 @@ jobs:
         run: |
           node --check scripts/reality-genuine-frozen-reconcile-v1.mjs
           node scripts/reality-genuine-frozen-reconcile-v1.mjs
+      - name: Save original-job queue receipt for Reality capability engine
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: artifact/genuine-capability-admitted-queue.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Show exact authorization boundary
         if: github.event_name == 'push'
         run: |
