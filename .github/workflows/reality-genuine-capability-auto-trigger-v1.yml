@@ -86,3 +86,32 @@ jobs:
           path: artifact/genuine-capability-model-proposal.json
           if-no-files-found: error
           retention-days: 7
+
+  verify_missing_capability:
+    needs: generate_missing_capability
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - name: Independently run original frozen acceptance and candidate tests
+        run: |
+          node --check scripts/reality-genuine-sandbox-verify-v1.mjs
+          node scripts/reality-genuine-sandbox-verify-v1.mjs
+      - name: Preserve independent verifier evidence, whether passed or failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: artifact/genuine-capability-sandbox-verification.json
+          if-no-files-found: warn
+          retention-days: 7
