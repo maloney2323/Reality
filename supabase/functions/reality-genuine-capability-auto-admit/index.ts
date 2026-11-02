@@ -660,6 +660,68 @@ async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
   deny('DURABLE_QUALIFICATION_RECONCILIATION_REQUIRED');
  return receipt;
 }
+
+async function prepareExactlyApprovedPreviewInstall(runSha:string,runId:number){
+ const item=await database('rpc/reality_read_approved_genuine_preview_v1',{
+  method:'POST',body:{}});
+ if(item?.status==='NO_APPROVED_WORK')return {
+  status:'NO_APPROVED_WORK',installation_verified:false,
+  original_job_completed:false,production_changed:false};
+ const q=item?.candidate,approval=item?.approval,receipt=item?.qualification;
+ if(item?.status!=='OWNER_APPROVED_CAPABILITY_FOUND'||
+    item.phase!=='AWAITING_OWNER_APPROVAL'||
+    item.target_environment!=='ISOLATED_PREVIEW'||
+    item.production_changed!==false||
+    !UUID.test(item.trigger_id)||!UUID.test(item.gap_event_id)||
+    !UUID.test(item.approval_id)||!UUID.test(item.owner_id)||
+    !WORK.test(item.original_work_id)||
+    !SHA64.test(item.artifact_sha256)||
+    !q||!Array.isArray(q.files)||
+    q.files.length<2||q.files.length>12||
+    q.original_work_id!==item.original_work_id||
+    q.artifact_sha256!==item.artifact_sha256||
+    approval?.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+    approval?.approval_id!==item.approval_id||
+    approval?.artifact_sha256!==item.artifact_sha256||
+    approval?.source_installation_completed!==false||
+    approval?.original_job_completed!==false||
+    receipt?.artifact_sha256!==item.artifact_sha256||
+    receipt?.status!=='AWAITING_OWNER_APPROVAL'||
+    receipt?.installation_authorized!==false)
+   deny('EXACT_OWNER_APPROVED_CANDIDATE_NOT_VERIFIED');
+ const entries=q.files as Array<Record<string,unknown>>;
+ const unique=new Set();
+ for(const file of entries){
+  const path=String(file.path||'');
+  if(!/^(?:src\/reality-extensions\/[a-zA-Z0-9._/-]+\.mjs|test\/reality-extensions\/[a-zA-Z0-9._/-]+\.test\.(?:js|mjs))$/.test(path)||
+    path.includes('..')||path.includes('//')||
+    typeof file.content!=='string'||file.content.length<1||
+    file.content.length>70000||unique.has(path))
+    deny('OWNER_APPROVED_EXTENSION_PATH_INVALID');
+  unique.add(path);
+ }
+ if(!entries.some(f=>String(f.path).startsWith('src/'))||
+    !entries.some(f=>String(f.path).startsWith('test/')))
+  deny('APPROVED_SOURCE_AND_TESTS_REQUIRED');
+ const computed=await hash(JSON.stringify(stable([...entries]
+  .sort((a,b)=>String(a.path).localeCompare(String(b.path)))
+  .map(f=>({path:f.path,content:f.content})))));
+ if(computed!==item.artifact_sha256)
+  deny('APPROVED_MODEL_BYTES_HASH_MISMATCH');
+ for(const file of entries){
+  if(await api('/contents/'+String(file.path)+'?ref='+runSha)!==null)
+   deny('MODEL_GENERATED_SOURCE_WOULD_OVERWRITE_EXISTING_FILE');
+ }
+ return {status:'OWNER_APPROVED_CANDIDATE_READY_FOR_ISOLATED_INSTALL',
+   signed_run_id:runId,source_repository_sha:runSha,
+   original_work_id:item.original_work_id,trigger_id:item.trigger_id,
+   gap_event_id:item.gap_event_id,approval_id:item.approval_id,
+   owner_id:item.owner_id,artifact_sha256:item.artifact_sha256,
+   qualification_receipt:receipt,approval_receipt:approval,
+   candidate:q,target_environment:'ISOLATED_PREVIEW',
+   installation_verified:false,original_job_completed:false,
+   production_changed:false};
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -671,6 +733,40 @@ Deno.serve(async request=>{
   const raw=await request.text();
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  if(input?.action==='installer_prepare'&&
+     SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope')
+    deny('INSTALL_PREPARE_ENVELOPE_INVALID');
+   const run=await verify(bearer,input.scope.repository_sha);
+   return respond({ok:true,...await prepareExactlyApprovedPreviewInstall(
+     input.scope.repository_sha,run.id)});
+  }
+  if(input?.action==='installer_reserve'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope')
+    deny('INSTALL_RESERVE_ENVELOPE_INVALID');
+   const run=await verify(bearer,input.scope.repository_sha);
+   const prepared=await prepareExactlyApprovedPreviewInstall(
+     input.scope.repository_sha,run.id);
+   if(prepared.status!=='OWNER_APPROVED_CANDIDATE_READY_FOR_ISOLATED_INSTALL'||
+    prepared.trigger_id!==input.scope.trigger_id||
+    prepared.approval_id!==input.scope.approval_id||
+    prepared.artifact_sha256!==input.scope.artifact_sha256)
+    deny('EXACT_PREAPPROVED_INSTALL_SCOPE_CHANGED');
+   const reservation=await database('rpc/reality_reserve_approved_genuine_preview_v1',{
+    method:'POST',body:{
+     p_trigger_id:prepared.trigger_id,p_approval_id:prepared.approval_id,
+     p_artifact_hash:prepared.artifact_sha256,
+     p_runner_sha:input.scope.repository_sha,p_run_id:String(run.id)}});
+   if(reservation?.status!=='AUTHORIZED_INSTALL_RESERVATION_CONSUMED_ONCE'||
+      reservation?.original_work_id!==prepared.original_work_id||
+      reservation?.approval_id!==prepared.approval_id||
+      reservation?.artifact_sha256!==prepared.artifact_sha256||
+      reservation?.installation_verified!==false||
+      reservation?.production_changed!==false)
+     deny('INSTALL_RESERVATION_READBACK_MISMATCH');
+   return respond({ok:true,...reservation});
+  }
   if(input?.action==='qualify'&&
     SHA40.test(input?.proof?.runner_git_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,proof,proposal')
