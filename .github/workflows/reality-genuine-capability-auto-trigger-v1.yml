@@ -8,6 +8,8 @@ permissions:
   id-token: write
 jobs:
   detect-real-frozen-capability-deficits:
+    outputs:
+      build_ready: ${{ steps.eligibility.outputs.build_ready }}
     runs-on: ubuntu-latest
     timeout-minutes: 9
     steps:
@@ -48,6 +50,11 @@ jobs:
           path: artifact/genuine-capability-admitted-queue.json
           if-no-files-found: error
           retention-days: 7
+      - name: Only request OpenAI if a real original job still needs a capability
+        id: eligibility
+        if: github.event_name == 'push'
+        run: |
+          node -e "const fs=require('node:fs');const q=JSON.parse(fs.readFileSync('artifact/genuine-capability-admitted-queue.json'));const ready=[...(q.queued||[]),...(q.previously_claimed||[])].some(x=>['PENDING_FROZEN_REPRODUCTION','LEASED_FOR_INDEPENDENT_REPRODUCTION','FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(x.queue_phase));fs.appendFileSync(process.env.GITHUB_OUTPUT,'build_ready='+ready+'\\n');"
       - name: Show exact authorization boundary
         if: github.event_name == 'push'
         run: |
@@ -61,7 +68,7 @@ jobs:
 
   generate_missing_capability:
     needs: detect-real-frozen-capability-deficits
-    if: github.event_name == 'push'
+    if: ${{ github.event_name == 'push' && needs['detect-real-frozen-capability-deficits'].outputs.build_ready == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
