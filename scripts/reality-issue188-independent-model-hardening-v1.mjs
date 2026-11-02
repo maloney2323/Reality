@@ -136,7 +136,7 @@ for(let attempt=1;attempt<=3;attempt++){
   source_sha256:sha(output.source),test_sha256:sha(output.test_source),
   exit_code:docker.status,tests:m('tests'),passed:m('pass'),failed:m('fail'),
   output_sha256:sha(out),elapsed_ms:Date.now()-started,
-  failure_excerpt:out.slice(-3500),
+  failure_excerpt:out.match(/^not ok \d+ - [^\n]+$/m)?out.slice(Math.max(0,out.indexOf(out.match(/^not ok \d+ - [^\n]+$/m)[0])-130),out.indexOf(out.match(/^not ok \d+ - [^\n]+$/m)[0])+4000):out.slice(-3500),
   comparative_regressions:escaped,comparison_exit_code:compared.status,
   comparison_result_hash:sha(JSON.stringify(regressionCases))};
  reports.push(check);
@@ -146,7 +146,11 @@ for(let attempt=1;attempt<=3;attempt++){
    source_sha256:check.source_sha256,test_sha256:check.test_sha256,
    frozen_hash:frozenHash,holdout_hash:holdHash};break;
  }
- prior=out.slice(-3300)+'\n\nIndependent comparison failures: '+JSON.stringify(escaped);
+ const failedLine=out.match(/^not ok \d+ - [^\n]+$/m);
+ const failureContext=failedLine?out.slice(Math.max(0,out.indexOf(failedLine[0])-130),
+   out.indexOf(failedLine[0])+5200):out.slice(-3300);
+ prior='Independent failing exact assertions:\n'+failureContext+
+   '\n\nIndependent comparison failures: '+JSON.stringify(escaped);
  console.log('REALITY_ISSUE188_MODEL_RESEARCH_ATTEMPT_FAILED',JSON.stringify({
   attempt,tests:check.tests,passed:check.passed,failed:check.failed,
   exit_code:check.exit_code,model_response_id:check.model_response_id}));
