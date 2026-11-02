@@ -737,7 +737,7 @@ Deno.serve(async request=>{
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
   if(input?.action?.startsWith('installer_')&&
      (typeof ghProviderToken!=='string'||
-      !/^[\\x21-\\x7e]{20,4000}$/.test(ghProviderToken)))
+      !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
   if(input?.action==='installer_prepare'&&
      SHA40.test(input?.scope?.repository_sha||'')){
