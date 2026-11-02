@@ -337,7 +337,8 @@ async function admit(report){
      !['PENDING_FROZEN_REPRODUCTION',
        'LEASED_FOR_INDEPENDENT_REPRODUCTION',
        'EVIDENCE_RECONCILIATION_REQUIRED',
-       'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(receipt.phase)||
+       'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
+       'AWAITING_OWNER_APPROVAL'].includes(receipt.phase)||
      receipt.installation_authorized!==false||
      receipt.original_job_completed!==false||
      receipt.new_customer_job_created!==false||
@@ -350,7 +351,8 @@ async function admit(report){
      !['PENDING_FROZEN_REPRODUCTION',
        'LEASED_FOR_INDEPENDENT_REPRODUCTION',
        'EVIDENCE_RECONCILIATION_REQUIRED',
-       'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(receipt?.phase)?'PHASE':null,
+       'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
+       'AWAITING_OWNER_APPROVAL'].includes(receipt?.phase)?'PHASE':null,
      receipt?.installation_authorized!==false?'INSTALL_BOUNDARY':null,
      receipt?.original_job_completed!==false?'COMPLETION_BOUNDARY':null,
      receipt?.new_customer_job_created!==false?'NEW_JOB_BOUNDARY':null,
