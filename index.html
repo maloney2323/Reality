@@ -203,6 +203,23 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 @media(max-width:860px){.repair-timeline{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:620px){.repair-center{padding:15px;margin-top:14px}.repair-heading h3{font-size:21px}.repair-timeline{grid-template-columns:1fr;gap:6px}.repair-step{padding:9px 12px}.repair-step-detail{margin:3px 0 0 31px}.repair-current{grid-template-columns:1fr;padding:14px}.repair-actions{min-width:0;width:100%}.repair-actions button{width:100%}.repair-dialog-actions button{flex:1}.repair-dialog-body{padding:17px}}
 
+
+.home-owner-center{margin:18px 0 24px;padding:20px;border:1px solid #547c97;border-radius:16px;background:linear-gradient(145deg,#142638,#0f1a2b);scroll-margin-top:20px}
+.home-owner-head{display:flex;align-items:start;justify-content:space-between;gap:18px}
+.home-owner-head h2{margin:4px 0 8px;font-size:24px}
+.home-owner-head p{margin:0 0 12px;color:#bfcfdc;max-width:750px;line-height:1.55;font-size:14px}
+.home-owner-count{white-space:nowrap;border:1px solid #55728a;border-radius:999px;padding:7px 12px;color:#d3e4ef;font-size:12px}
+.home-owner-items{display:grid;gap:12px;margin:13px 0}
+.home-owner-item{border:1px solid #3e617b;border-radius:12px;background:#0c1b2b;padding:15px}
+.home-owner-item h3{font-size:16px;margin:0 0 6px}
+.home-owner-item p{font-size:13px;color:#c5d4e1;line-height:1.55;margin:7px 0}
+.home-owner-item code{font-size:11px;overflow-wrap:anywhere;color:#a6d3ea}
+.home-owner-item button{margin-top:12px;min-height:44px}
+.home-owner-note{font-size:12px;line-height:1.5;color:#b5c9d7;margin:14px 0 0}
+#homeLegacyInstallSlot:not([hidden]){margin:15px 0}
+#homeLegacyInstallSlot .repair-current{margin-top:8px}
+@media(max-width:640px){.home-owner-center{padding:15px}.home-owner-head{flex-direction:column;gap:3px}.home-owner-count{margin-bottom:5px}.home-owner-item button{width:100%}}
+
 </style>
 </head>
 <body>
@@ -215,6 +232,22 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
     <span><strong id="liveHeadline">Verifying connected services…</strong>
     <span id="liveDetail">No real-world outcome has been claimed.</span></span>
   </div>
+
+<section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
+ <div class="home-owner-head">
+  <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
+   <h2 id="homeOwnerTitle">Owner Authorizations</h2>
+   <p>Every verified capability installation needing your authorization appears here. Reality discovers, repairs and verifies the work first; you approve the exact result once.</p>
+  </div>
+  <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
+ </div>
+ <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
+ <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
+ <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
+ <div id="homeOwnerDialogs"></div>
+ <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
+ <p class="home-owner-note">Approval is separate from execution. Each request is checked against your account, its exact source hash and Reality's independent evidence. No approval authorizes production changes or another job.</p>
+</section>
 
 <section id="startFlow" class="start-flow" aria-label="Start here: three steps">
  <div class="start-flow-head"><span class="label">START HERE</span><h2>3 steps. That's it.</h2><p>Reality tells you what to do next.</p></div>
@@ -1574,6 +1607,7 @@ $('wcPrepareModelRepair').onclick=async()=>{
    source_files:data.source_files,
   };
   $('wcApproveExactInstall').disabled=false;
+  homeOwnerLegacyVisibility();
   $('wcInstallSettlementDetails').textContent=
    'Original job '+data.original_work_id+' · Artifact SHA-256: '+
    data.candidate_artifact_hash+' · Files: '+(data.source_files||[]).join(', ')+
@@ -1844,34 +1878,138 @@ async function wcEasyRefresh(){
 // This is the general engine's REAL independently qualified artifact,
 // not the separate historical repair-candidate UI.
 let wcEasyGenuineCandidate=null;
-async function wcEasyReviewQualified(job){
- const r=await fetch('/api/reality/personal-qualified-capabilities',{
+
+// The HOME owner-control center is the ONLY presentation location for
+// installation authorizations. Existing dialogues and legacy approval actions
+// retain their original server-side one-time security contracts.
+let homeOwnerRefreshEpoch=0;
+const homeOwnerCenter=$('homeOwnerAuthorizations');
+const homeOwnerDialogs=$('homeOwnerDialogs');
+homeOwnerDialogs.appendChild($('wcEasyGenuineApproval'));
+const homeLegacyInstallSlot=$('homeLegacyInstallSlot');
+homeLegacyInstallSlot.append(
+ $('wcInstallSettlementPanel'),
+ $('wcInstallSettlementStatus')
+);
+const homeLegacyExactDialog=$('wcExactInstallDialog');
+homeOwnerDialogs.appendChild(homeLegacyExactDialog);
+function homeOwnerSignedIn(){return $('privateReady')?.style.display==='block'}
+function homeOwnerLegacyVisibility(){
+ homeLegacyInstallSlot.hidden=!(wcVerifiedInstallReview||wcInstallContinuationBusy);
+}
+function homeOwnerFocus(){
+ homeOwnerCenter.scrollIntoView({behavior:'smooth',block:'start'});
+ void homeOwnerRefresh();
+}
+function homeOwnerEntryVerified(entry){
+ const q=entry?.qualification||{};
+ const holdoutRequired=entry?.capability_id==='reality-continuity-settlement-reconciler';
+ return /^work:[a-f0-9]{32}$/.test(String(entry?.original_work_id||''))&&
+  entry.phase==='AWAITING_OWNER_APPROVAL'&&
+  q.status==='AWAITING_OWNER_APPROVAL'&&
+  q.installation_authorized===false&&q.original_job_completed===false&&
+  /^[a-f0-9]{64}$/.test(String(q.artifact_sha256||''))&&
+  Array.isArray(entry.source_paths)&&entry.source_paths.length>0&&
+  entry.source_paths.length<=16&&
+  entry.source_paths.every(p=>typeof p==='string'&&
+   /^(src\/reality-extensions\/|test\/reality-extensions\/)/.test(p))&&
+  (!holdoutRequired||(q.real_provider_holdout_verified===true&&
+   q.real_provider_holdout_artifact_sha256===q.artifact_sha256));
+}
+async function homeOwnerRead(){
+ const response=await fetch('/api/reality/personal-qualified-capabilities',{
   method:'GET',credentials:'same-origin',cache:'no-store'});
- const data=await r.json();
- if(!r.ok||data.ok!==true||!Array.isArray(data.entries)||
-    data.installation_authorized!==false)
-  throw Error('INDEPENDENT_QUALIFIED_SOURCE_READBACK_UNAVAILABLE');
- const entries=data.entries.filter(e=>e.original_work_id===job.original_work_id&&
-  e.phase==='AWAITING_OWNER_APPROVAL'&&
-  e.qualification?.installation_authorized===false&&
-  e.qualification?.original_job_completed===false&&
-  /^[a-f0-9]{64}$/.test(String(e.qualification?.artifact_sha256||''))&&
-  Array.isArray(e.source_paths)&&e.source_paths.length>0&&
-  e.source_paths.length<=16);
- if(entries.length!==1||entries[0].approval)
-  throw Error('EXACT_UNAPPROVED_ORIGINAL_CANDIDATE_REQUIRED');
- const entry=entries[0],hash=entry.qualification.artifact_sha256;
- if(job._verified_loop?.candidate_verified!==true)
-  throw Error('OWNER_LOOP_INDEPENDENT_CANDIDATE_CHECK_REQUIRED');
- wcEasyGenuineCandidate={original_work_id:job.original_work_id,
-  artifact_sha256:hash,source_paths:entry.source_paths};
+ const data=await response.json();
+ if(!response.ok||data.ok!==true||!Array.isArray(data.entries)||
+  data.entries.length>20||data.installation_authorized!==false||
+  data.original_job_completed!==false)
+  throw Error('AUTHENTICATED_QUALIFICATION_READBACK_REQUIRED');
+ return data.entries;
+}
+async function homeOwnerRefresh(){
+ const epoch=++homeOwnerRefreshEpoch;
+ homeOwnerLegacyVisibility();
+ const list=$('homeOwnerItems'),status=$('homeOwnerStatus'),count=$('homeOwnerCount');
+ list.replaceChildren();
+ if(!homeOwnerSignedIn()){
+  count.textContent='Sign-in required';
+  status.textContent='Sign in to your Reality account to review pending authorizations. Nothing has been approved.';
+  return;
+ }
+ count.textContent='Checking…';
+ status.textContent='Reading independently qualified requests for your signed-in account…';
+ try{
+  const entries=await homeOwnerRead();
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  let pending=0;
+  for(const entry of entries){
+   const verified=homeOwnerEntryVerified(entry);
+   const approved=Boolean(entry.approval);
+   if(verified&&!approved)pending++;
+   const card=document.createElement('article');
+   card.className='home-owner-item';
+   const name=document.createElement('h3');
+   name.textContent=entry.capability_id==='reality-continuity-settlement-reconciler'?
+    'Continuity settlement repair':String(entry.capability_id||'Verified capability upgrade').replace(/[-_]/g,' ');
+   const detail=document.createElement('p');
+   detail.textContent='Original job: '+String(entry.original_work_id||'NOT VERIFIED')+
+    ' · '+(approved?'Owner approval already recorded':
+     verified?'Independent qualification saved · Installation not approved':
+      'Additional independent verification required · Cannot approve');
+   const hash=document.createElement('code');
+   hash.textContent='Exact source SHA-256: '+String(entry.qualification?.artifact_sha256||'UNKNOWN');
+   card.append(name,detail,hash);
+   if(verified&&!approved){
+    const button=document.createElement('button');
+    button.type='button';button.className='repair-primary';
+    button.textContent='Review & authorize this upgrade';
+    button.addEventListener('click',async()=>{
+     button.disabled=true;status.textContent='Rechecking exact source and owner scope before approval…';
+     try{await homeOwnerOpen(entry.original_work_id,entry.qualification.artifact_sha256);}
+     catch(e){status.textContent='Review stopped: '+String(e?.message||'EVIDENCE_UNAVAILABLE')+
+      '. No authorization performed.';}
+     finally{button.disabled=false}
+    });
+    card.appendChild(button);
+   }
+   list.appendChild(card);
+  }
+  count.textContent=pending+' awaiting approval';
+  status.textContent=pending?'Review one independently verified request below. Each authorization is specific to one artifact.':
+   entries.length?'No new approval is needed for these records. Reality will show independent worker results separately.':
+    'No verified installations need your approval right now.';
+ }catch(e){
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  count.textContent='Readback unavailable';
+  status.textContent='Reality could not verify your owner authorization queue. No approval or installation was attempted.';
+ }
+}
+async function homeOwnerOpen(workId,expectedHash){
+ if(!homeOwnerSignedIn())throw Error('SIGN_IN_REQUIRED');
+ const entries=await homeOwnerRead();
+ const matching=entries.filter(e=>e.original_work_id===workId);
+ if(matching.length!==1||!homeOwnerEntryVerified(matching[0])||
+   matching[0].approval||matching[0].qualification.artifact_sha256!==expectedHash)
+  throw Error('EXACT_OWNER_CANDIDATE_CHANGED_OR_NOT_VERIFIED');
+ const entry=matching[0];
+ wcEasyGenuineCandidate={
+  original_work_id:workId,
+  artifact_sha256:entry.qualification.artifact_sha256,
+  source_paths:entry.source_paths.slice()
+ };
  $('wcEasyGenuineApprovalDetails').textContent=
-  'Original work: '+job.original_work_id+
-  ' · Independently verified SHA-256: '+hash+
-  ' · Source files: '+entry.source_paths.join(', ');
+  'Original work: '+workId+' · Exact SHA-256: '+expectedHash+
+  ' · Verified extension files: '+entry.source_paths.join(', ')+
+  '. This is one isolated-preview authorization only.';
  $('wcEasyGenuineApprovalCheck').checked=false;
  $('wcEasyGenuineConfirm').disabled=true;
  $('wcEasyGenuineApproval').showModal();
+}
+$('homeOwnerRefresh').addEventListener('click',()=>void homeOwnerRefresh());
+
+async function wcEasyReviewQualified(job){
+ // Do not open installation approval anywhere except the home owner center.
+ homeOwnerFocus();
 }
 $('wcEasyGenuineCancel').onclick=()=>{
  $('wcEasyGenuineApproval').close();
@@ -1918,7 +2056,8 @@ $('wcEasyGenuineConfirm').onclick=async()=>{
  }catch(e){
   wcEasyStatus('The approval response needs independent readback. Do not approve again.','Recheck verified status');
   $('wcEasyRepairStatus').textContent='No installation or completion claimed. '+String(e?.message||'READBACK_UNAVAILABLE');
- }finally{wcEasyRepairBusy=false;$('wcEasyRepairMain').disabled=false;void wcEasyRefresh();}
+ }finally{wcEasyRepairBusy=false;$('wcEasyRepairMain').disabled=false;
+  void homeOwnerRefresh();void wcEasyRefresh();}
 };
 
 $('wcEasyRepairMain').onclick=async()=>{
@@ -1947,7 +2086,7 @@ $('wcEasyRepairMain').onclick=async()=>{
    return;
   }
   if(wcVerifiedInstallReview?.original_work_id===existing.original_work_id){
-   $('wcApproveExactInstall').onclick();
+   homeOwnerFocus();
    return;
   }
   if(existing._verified_loop?.independently_settled===true){
@@ -1960,7 +2099,7 @@ $('wcEasyRepairMain').onclick=async()=>{
    return;
   }
   if(existing._verified_loop?.candidate_verified===true){
-   await wcEasyReviewQualified(existing);
+   homeOwnerFocus();
    return;
   }
   if(existing._verified_loop&&existing._verified_loop.candidate_verified!==true){
@@ -1996,9 +2135,10 @@ $('wcEasyRepairMain').onclick=async()=>{
  }finally{wcEasyRepairBusy=false;button.disabled=false;}
 };
 const wcEasyOriginalDiscover=$('wcQuickFindRepair').onclick;
-setTimeout(()=>{void wcEasyRefresh();},500);
+setTimeout(()=>{void wcEasyRefresh();void homeOwnerRefresh();},500);
 setInterval(()=>{if($('privateReady')?.style.display==='block'&&
   !wcEasyRepairBusy)void wcEasyRefresh();},30000);
+setInterval(()=>{if(homeOwnerSignedIn())void homeOwnerRefresh();},30000);
 
 $('wcQuickFindRepair').onclick=()=>{
  if($('privateReady')?.style.display!=='block'){
@@ -3580,8 +3720,8 @@ setInterval(refreshSavedShiftHome,300000);
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes)void refreshRealitySelfImprovement();
-  else{
+  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();}
+  else{void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
    el('privateSelfImprovementStatus').textContent=
