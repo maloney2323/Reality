@@ -4,6 +4,7 @@ import {readFileSync,writeFileSync,mkdirSync,existsSync,appendFileSync} from 'no
 import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {deriveOriginalResumeContract} from '../src/reality-genuine-original-resume-contract-v1.js';
 const env=process.env, repo='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_ORIGINAL_RESUME_'+x)};
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -51,6 +52,9 @@ if(ready.status!=='ACCEPTED_FOR_ISOLATED_RESUMPTION'||
    ready.installed_commit_sha!==ready.acceptance_receipt?.installed_commit_sha||
    !/^[a-f0-9]{64}$/.test(ready.frozen_test_sha256||''))
  fail('DURABLE_ORIGINAL_ACCEPTANCE_INVALID');
+// Verify the extension protocol and any independent target evidence BEFORE
+// consuming the one-time original-work claim. #201 must never replay #178.
+const contract=deriveOriginalResumeContract(ready);
 const claim=await broker('original_claim',{trigger_id:ready.trigger_id});
 if(claim.status!=='RESUMPTION_CLAIMED'||
  claim.original_work_id!==ready.original_work_id||
@@ -66,7 +70,7 @@ if(older.id!==Number(ready.original_failed_run_id)||
  fail('ACTUAL_ORIGINAL_PROVIDER_FAILURE_REQUIRED');
 const oldLog=await github('/actions/jobs/'+oldJob.id+'/logs',true);
 if(!oldLog.includes('ERR_MODULE_NOT_FOUND')||
- !oldLog.includes('reality-ci-failure-evidence.mjs'))
+ !oldLog.includes(contract.source_path.split('/').at(-1)))
  fail('ORIGINAL_PROVIDER_FAILURE_LOG_NOT_REPRODUCED');
 const originalTest=readFileSync(ready.frozen_test_path);
 if(sha(originalTest)!==ready.frozen_test_sha256)
@@ -80,7 +84,7 @@ async function installedFile(path){
  mkdirSync(dirname(path),{recursive:true});writeFileSync(path,contents,{flag:'wx'});
 }
 await installedFile(ready.source_path);
-const generatedTest='test/reality-extensions/reality-ci-failure-evidence.test.js';
+const generatedTest=contract.companion_test_path;
 await installedFile(generatedTest);
 const suite=[ready.frozen_test_path,generatedTest];
 const command=['run','--rm','--network','none','--read-only','--cap-drop','ALL',
@@ -94,9 +98,11 @@ const log=String(exec.stdout||'')+'\n'+String(exec.stderr||'');
 const last=n=>{const found=[...log.matchAll(new RegExp('^# '+n+' (\\d+)$','gm'))].at(-1);return found?Number(found[1]):0;};
 if(exec.status!==0||last('tests')<7||last('fail')!==0||
  last('tests')!==last('pass'))fail('ORIGINAL_FROZEN_ACCEPTANCE_NOT_GREEN');
-const module=await import('../'+ready.source_path);
-if(typeof module.classifyVerifiedCiFailure!=='function')fail('INSTALLED_CAPABILITY_EXPORT_MISSING');
-const evidence={
+// Execute model-produced code only inside a network-disabled, read-only,
+// secret-free container. Neither an imported module nor a model can authorize
+// installation, a Universe write, or customer settlement.
+const evaluationInput=contract.requires_reconciliation_evidence?
+ ready.reconciliation_evidence:{
  owner_id:'owner:'+ready.owner_id,goal_id:ready.goal_id,
  original_work_id:ready.original_work_id,repository:repo,
  source:'GITHUB_ACTIONS_INDEPENDENT_PROVIDER_READBACK',
@@ -113,14 +119,39 @@ const evidence={
  frozen_regression_sha256:ready.frozen_test_sha256,
  source_receipt_ref:'github:actions:run:'+older.id+':job:'+oldJob.id+':verified',
  superseding_success:null};
-const disposition=module.classifyVerifiedCiFailure(evidence);
-if(disposition?.decision!=='MISSING_CAPABILITY'||
- disposition?.original_work_id!==ready.original_work_id||
- disposition?.can_generate_candidate!==true||
+const evaluationCode=
+ 'import * as module from '+JSON.stringify('file:///work/'+contract.source_path)+';'+
+ 'const f=module['+JSON.stringify(contract.export_name)+'];'+
+ 'if(typeof f!=="function")process.exit(42);'+
+ 'const evidence=JSON.parse(process.argv[1]);'+
+ 'const out=f(evidence);'+
+ 'process.stdout.write("REALITY_RESULT="+JSON.stringify(out)+"\\n");';
+const evaluation=spawnSync('docker',[
+ 'run','--rm','--network','none','--read-only','--cap-drop','ALL',
+ '--security-opt','no-new-privileges','--memory','256m','--cpus','1',
+ '--user','65534:65534','--tmpfs','/tmp:rw,noexec,nosuid,size=16m',
+ '-v',process.cwd()+':/work:ro','-w','/work','node:22',
+ 'node','--input-type=module','-e',evaluationCode,JSON.stringify(evaluationInput)
+],{encoding:'utf8',timeout:40000,maxBuffer:100000,
+ env:{PATH:env.PATH,HOME:env.HOME}});
+const lines=String(evaluation.stdout||'').split('\\n').filter(x=>x.startsWith('REALITY_RESULT='));
+if(evaluation.status!==0||lines.length!==1)fail('ISOLATED_EXTENSION_EVALUATION_FAILED');
+const disposition=JSON.parse(lines[0].slice('REALITY_RESULT='.length));
+const actualDecision=contract.requires_reconciliation_evidence?
+ disposition?.status:disposition?.decision;
+if(actualDecision!==contract.required_decision||
+ (contract.requires_reconciliation_evidence?
+   disposition?.original_work_id!==contract.reconciliation_target_work_id:
+   (disposition?.original_work_id!==ready.original_work_id||
+    disposition?.can_generate_candidate!==true))||
  disposition?.installation_authorized!==false||
- disposition?.original_job_completed!==false||
  disposition?.production_changed!==false)
- fail('ACTUAL_ORIGINAL_PROVIDER_CLASSIFICATION_FAILED');
+ fail('PROVIDER_BACKED_EXTENSION_RESULT_UNVERIFIED');
+if(contract.requires_reconciliation_evidence&&(
+ disposition?.reconciliation?.status!=='PROPOSED_NOT_APPENDED'||
+ disposition?.universe_settlement_verified!==false||
+ disposition?.original_job_completed_in_universe!==false))
+ fail('RECONCILIATION_PROPOSAL_NOT_AN_AUTHORITATIVE_SETTLEMENT');
 const proof={
  schema:'reality-original-job-execution-proof-v1',
  original_work_id:ready.original_work_id,
@@ -130,18 +161,20 @@ const proof={
  original_provider_run_id:older.id,original_provider_job_id:oldJob.id,
  original_provider_failure_verified:true,
  original_failure_log_sha256:sha(oldLog),
- classification:disposition.decision,
+ classification:actualDecision,
+ extension_protocol:contract.protocol,
+ reconciliation_target_original_work_id:contract.reconciliation_target_work_id,
  frozen_suite_passed:true,frozen_suite_tests:last('tests'),
  frozen_suite_output_sha256:sha(log),
  isolated_execution:true,production_changed:false,
- provider_outcome_digest:sha(log+'|'+ready.installed_commit_sha+'|'+oldJob.id+'|'+disposition.decision),
- full_probation_complete:false,original_job_completed:true
+ provider_outcome_digest:sha(log+'|'+ready.installed_commit_sha+'|'+oldJob.id+'|'+actualDecision),
+ full_probation_complete:false,original_job_completed:!contract.requires_reconciliation_evidence
 };
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-original-resumption.json',JSON.stringify(proof,null,2)+'\n');
 console.log('REALITY_ORIGINAL_JOB_PROVIDER_EXECUTION_PASSED',JSON.stringify({
  original_work_id:proof.original_work_id,installed_commit_sha:proof.installed_commit_sha,
- frozen_suite_tests:proof.frozen_suite_tests,classification:proof.classification,
+ frozen_suite_tests:proof.frozen_suite_tests,classification:proof.classification,extension_protocol:proof.extension_protocol,
  original_provider_run_id:proof.original_provider_run_id,production_changed:false,
  database_settlement_recorded:false
 }));
