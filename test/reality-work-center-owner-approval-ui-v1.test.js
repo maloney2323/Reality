@@ -18,6 +18,11 @@ function setup({reply,authenticated=true}={}){
     children:[],href:'',target:'',rel:'',
     replaceChildren(...args){this.children=args},
     appendChild(value){this.children.push(value)},
+    insertBefore(value,reference){
+     const i=this.children.indexOf(reference);
+     if(i<0)this.children.push(value);else this.children.splice(i,0,value);
+     return value;
+    },
     showModal(){this.open=true},
     close(){this.open=false},
     scrollIntoView(){this.scrolled=true},
