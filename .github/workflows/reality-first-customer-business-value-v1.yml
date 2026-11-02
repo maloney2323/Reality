@@ -1,0 +1,152 @@
+name: Reality first customer operational business value proof
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+permissions:
+  contents: read
+jobs:
+  execute_12_real_source_work_deliverables:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-customer-value]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Produce 12 actionable internal work outputs for real GitHub owner issues and drafts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-business-value-12-actual-work-deliverables-v1.mjs
+          node scripts/reality-business-value-12-actual-work-deliverables-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-customer-operational-deliverables-${{ github.run_id }}
+          path: artifact/out/
+          if-no-files-found: error
+          retention-days: 30
+
+  independently_reverify_12_work_deliverables:
+    needs: execute_12_real_source_work_deliverables
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-operational-deliverables-${{ github.run_id }}
+          path: work
+      - name: Independently re-read GitHub provider state and reconcile all 12 source deliverables
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-business-value-independent-12-work-v1.mjs
+          node scripts/reality-business-value-independent-12-work-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-customer-12-work-independent-evidence-${{ github.run_id }}
+          path: artifact/out/reality-12-work-independent-readback.json
+          if-no-files-found: error
+          retention-days: 30
+
+  reality_real_model_draft_for_unresolved_issue_188:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-customer-value]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Reality model generates a real source-only repair and tries independent offline acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: |
+          node --check scripts/reality-business-value-generate-uninstalled-issue188-v1.mjs
+          node scripts/reality-business-value-generate-uninstalled-issue188-v1.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reality-customer-issue188-model-research-${{ github.run_id }}
+          path: artifact/out/
+          if-no-files-found: warn
+          retention-days: 30
+
+  independently_verify_real_model_source:
+    needs: reality_real_model_draft_for_unresolved_issue_188
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-issue188-model-research-${{ github.run_id }}
+          path: candidate
+      - name: Secret-free independent readback and offline frozen+blind-holdout verification
+        run: |
+          node --check scripts/reality-business-value-verify-uninstalled-issue188-v1.mjs
+          node scripts/reality-business-value-verify-uninstalled-issue188-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-customer-issue188-independent-sandbox-${{ github.run_id }}
+          path: artifact/out/reality-issue188-independent-value-verification.json
+          if-no-files-found: error
+          retention-days: 30
+
+  independent_customer_business_value_scoreboard:
+    needs:
+      - independently_reverify_12_work_deliverables
+      - independently_verify_real_model_source
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-12-work-independent-evidence-${{ github.run_id }}
+          path: artifact/work
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-issue188-independent-sandbox-${{ github.run_id }}
+          path: artifact/model
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-issue188-model-research-${{ github.run_id }}
+          path: artifact/generation
+      - name: Independently score real work, model token use, labor-value evidence and authorization
+        run: |
+          node --check scripts/reality-first-customer-operational-value-final-v1.mjs
+          node scripts/reality-first-customer-operational-value-final-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-first-customer-operational-value-scorecard-${{ github.run_id }}
+          path: artifact/out/reality-first-customer-operational-value-scorecard.json
+          if-no-files-found: error
+          retention-days: 30
