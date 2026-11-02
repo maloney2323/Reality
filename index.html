@@ -255,22 +255,118 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 #privateReady #homeOwnerAuthorizations .home-owner-item button{width:100%;min-height:50px;font-size:15px}
 @media(max-width:640px){#privateChat{padding:15px!important}.reality-chat-activity{padding:12px}}
 
+
+/* Business operating picture first; chat is a universal fixed tool. */
+.business-home{padding:22px;margin:18px 0 24px;border:1px solid #405f7b;border-radius:20px;background:linear-gradient(160deg,#152335,#0c1724);scroll-margin-top:18px}
+.business-home-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.business-home-header h2{font-size:clamp(20px,3.5vw,28px);margin:5px 0 10px}
+.business-home-header p{font-size:13px;line-height:1.6;color:#b6c8d9;margin:0 0 15px;max-width:580px}
+.business-home-source{font-size:11px;color:#d6c8a7;background:#3d3121;border-radius:999px;padding:7px 11px;white-space:nowrap}
+.business-home-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:15px 0}
+.business-home-stat{border:1px solid #34475b;border-radius:13px;padding:14px;background:#101c2b;display:flex;flex-direction:column;gap:10px;min-height:159px;min-width:0}
+.business-stat-label{font-size:12px;font-weight:700;color:#c9d7e5}
+.business-home-stat strong{font-size:clamp(15px,2vw,22px);color:#e9f0f6;line-height:1.3;overflow-wrap:anywhere}
+.business-home-stat small{color:#9fb5c8;font-size:11px;line-height:1.5}
+.business-home-value{border-color:#487b70;background:#123029}
+.business-home-insights{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.business-home-block{border:1px solid #314c61;border-radius:14px;background:#0d1b2b;padding:16px;min-width:0}
+.business-home-block h3{margin:0 0 7px;font-size:17px}
+.business-home-block>p{color:#afc2d3;font-size:12px;line-height:1.5;margin:0 0 11px}
+.business-spending-list>div{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid #24384b;padding:10px 0;font-size:12px}
+.business-spending-list>div span:last-child{color:#a4b3c2;white-space:nowrap}
+.business-operations-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.business-operations-list>div{border-radius:9px;background:#13283b;padding:12px 8px;min-width:0}
+.business-operations-list strong{font-size:24px;display:block}
+.business-operations-list span{display:block;color:#a8bed1;font-size:11px;line-height:1.4}
+.business-home-block .business-evidence-note{margin:13px 0 0;color:#bfccdb;font-size:11px;line-height:1.5}
+.business-home-actions{display:flex;gap:15px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.business-home-actions p{font-size:11px;color:#adbfd1;max-width:560px;line-height:1.5}
+.business-ask-reality{margin-top:0;background:#cfeaf4;color:#092334;min-height:45px}
+#privateChat{display:none!important;position:fixed!important;z-index:100;top:14px;right:14px;left:auto;bottom:14px;margin:0!important;max-width:540px;width:min(540px,calc(100vw - 28px));overflow-y:auto;overflow-x:hidden;box-shadow:0 20px 75px #000b;background:linear-gradient(165deg,#17283b,#0b1320)!important;border:1px solid #507893!important;border-radius:20px;padding:20px!important;scroll-margin-top:0}
+#privateChat[data-open="true"]{display:block!important}
+.reality-chat-close{position:sticky;top:0;float:right;z-index:2;background:#243e52;color:#f0f7ff;border:1px solid #42627b;border-radius:50%;font-size:23px;padding:0;width:38px;height:38px;margin:0}
+.reality-chat-dock-open{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:98;display:flex;gap:9px;align-items:center;min-height:56px;padding:11px 18px;background:#e7f3fb;color:#0e2438;border:2px solid #5884a1;box-shadow:0 8px 28px #0008;border-radius:999px;font-size:15px}
+body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;background:#030912ac}
+@media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
+@media(max-width:600px){.business-home{padding:15px;margin:14px 0 20px}.business-home-insights{grid-template-columns:1fr}.business-home-stat{min-height:155px;padding:12px}.business-home-source{white-space:normal}.business-operations-list strong{font-size:22px}#privateChat{top:0!important;right:0!important;bottom:0!important;left:0!important;width:100vw;max-width:none;border-radius:0!important;padding:16px!important}.reality-chat-dock-open{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}}
+
 </style>
 </head>
 <body>
 <main>
   <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
-  <h1>Reality · Your AI workspace</h1>
-  <p class="sub">Talk to Reality naturally. It can help you plan, build and work through problems. Verified work, approvals and results stay in this conversation.</p>
+  <h1>Your Business Reality</h1>
+  <p class="sub">See where money goes, what's happening in the business, and the value Reality can prove. Ask Reality about anything, from anywhere.</p>
   <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
     <strong id="productState">CHECKING REALITY</strong>
     <span><strong id="liveHeadline">Verifying connected services…</strong>
     <span id="liveDetail">No real-world outcome has been claimed.</span></span>
   </div>
 
-<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation">
+
+<section class="business-home" id="businessHome" aria-labelledby="businessHomeTitle">
+  <div class="business-home-header">
+    <div>
+      <div class="label">YOUR BUSINESS · OPERATING PICTURE</div>
+      <h2 id="businessHomeTitle">Money, operations & verified value</h2>
+      <p>Every number needs a trusted source, a time period and evidence. Reality won't invent business performance.</p>
+    </div>
+    <span id="businessHomeSource" class="business-home-source" role="status">Financial sources not connected</span>
+  </div>
+  <div class="business-home-grid">
+    <article class="business-home-stat">
+      <span class="business-stat-label">Money coming in</span>
+      <strong id="businessRevenue">Not connected</strong>
+      <small>Requires verified sales, invoicing or accounting transactions</small>
+    </article>
+    <article class="business-home-stat">
+      <span class="business-stat-label">Money going out</span>
+      <strong id="businessExpenses">Not connected</strong>
+      <small>Labor, materials, software, suppliers and overhead</small>
+    </article>
+    <article class="business-home-stat">
+      <span class="business-stat-label">Cash position</span>
+      <strong id="businessCash">Not connected</strong>
+      <small>Requires an authorized financial source</small>
+    </article>
+    <article class="business-home-stat business-home-value">
+      <span class="business-stat-label">Reality's verified financial value</span>
+      <strong id="businessVerifiedValue">Not measured</strong>
+      <small>Only independently verified time, cost or revenue impact counts</small>
+    </article>
+  </div>
+  <div class="business-home-insights">
+    <article class="business-home-block" aria-labelledby="businessSpendingTitle">
+      <h3 id="businessSpendingTitle">Where your money goes</h3>
+      <p>Understand spend by category. Actual costs and estimates are never mixed.</p>
+      <div class="business-spending-list">
+        <div><span>People & labor</span><span>Source needed</span></div>
+        <div><span>Materials & purchasing</span><span>Source needed</span></div>
+        <div><span>Technology & subscriptions</span><span>Source needed</span></div>
+        <div><span>Operating overhead</span><span>Source needed</span></div>
+      </div>
+      <p class="business-evidence-note" id="businessFinancialStatus">No connected financial records. Reality cannot verify costs or savings yet.</p>
+    </article>
+    <article class="business-home-block" aria-labelledby="businessOperationsTitle">
+      <h3 id="businessOperationsTitle">What Reality is working on</h3>
+      <p>Verified, account-owned self-repair jobs. Other business operations require connected sources.</p>
+      <div class="business-operations-list">
+        <div><strong id="businessTrackedJobs">Checking…</strong><span>Tracked repair jobs</span></div>
+        <div><strong id="businessPendingApprovals">Checking…</strong><span>Awaiting approval</span></div>
+        <div><strong id="businessVerifiedCompletions">Checking…</strong><span>Verified completions</span></div>
+      </div>
+      <p class="business-evidence-note" id="businessOperationsStatus">Verifying work receipts for your account…</p>
+    </article>
+  </div>
+  <div class="business-home-actions">
+    <button type="button" id="businessAskReality" class="business-ask-reality">Ask Reality about my business <span aria-hidden="true">↗</span></button>
+    <p>Reality can discuss priorities now. Financial conclusions require connected, authorized records.</p>
+  </div>
+</section>
+<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation" role="dialog" aria-modal="false" aria-labelledby="realityChatTitle" data-open="false" tabindex="-1">
+ <button type="button" id="realityChatDockClose" class="reality-chat-close" aria-label="Close Reality chat">×</button>
  <div class="label">REALITY · CONVERSATION & CONTINUOUS WORK</div>
- <h3>Talk to Reality</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
+ <h3 id="realityChatTitle">Talk to Reality</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
  <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
  <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
@@ -677,8 +773,92 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   </div>
 </details>
 </main>
+<button type="button" id="realityChatDockOpen" class="reality-chat-dock-open" aria-controls="privateChat" aria-expanded="false" title="Ask Reality about anything">
+ <span aria-hidden="true">✦</span><span>Ask Reality</span>
+</button>
 <script>
-const $=id=>document.getElementById(id);const SPEECH_STATE={utterance:null,button:null};
+const $=id=>document.getElementById(id);
+
+let realityChatPreviousFocus=null;
+function realityOpenChatDock(focusPrompt=false){
+ realityChatPreviousFocus=document.activeElement;
+ const panel=$('privateChat');
+ panel.dataset.open='true';
+ panel.setAttribute('aria-modal','true');
+ document.body.classList.add('reality-chat-is-open');
+ $('realityChatDockOpen').setAttribute('aria-expanded','true');
+ const target=focusPrompt&&$('privateReady').style.display==='block'?
+   $('privatePrompt'):$('privateLogin').style.display==='block'?
+   $('privateEmail'):$('realityChatDockClose');
+ target?.focus({preventScroll:true});
+}
+function realityCloseChatDock(){
+ const panel=$('privateChat');
+ panel.dataset.open='false';
+ panel.setAttribute('aria-modal','false');
+ document.body.classList.remove('reality-chat-is-open');
+ $('realityChatDockOpen').setAttribute('aria-expanded','false');
+ const prior=realityChatPreviousFocus;
+ if(prior?.isConnected&&typeof prior.focus==='function')prior.focus({preventScroll:true});
+ else $('realityChatDockOpen').focus({preventScroll:true});
+}
+$('realityChatDockOpen').addEventListener('click',()=>realityOpenChatDock(true));
+$('realityChatDockClose').addEventListener('click',realityCloseChatDock);
+$('businessAskReality').addEventListener('click',()=>realityOpenChatDock(true));
+$('accountShortcut').addEventListener('click',e=>{e.preventDefault();realityOpenChatDock(false)});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&$('privateChat').dataset.open==='true'){
+  e.preventDefault();realityCloseChatDock();
+ }
+});
+let realityBusinessReadEpoch=0;
+function realityBusinessResetMoney(){
+ // No finance connector is authorized yet: never substitute modeled ROI, tests or invented figures.
+ $('businessRevenue').textContent='Not connected';
+ $('businessExpenses').textContent='Not connected';
+ $('businessCash').textContent='Not connected';
+ $('businessVerifiedValue').textContent='Not measured';
+ $('businessHomeSource').textContent='Financial sources not connected';
+ $('businessFinancialStatus').textContent='No connected financial records. Reality cannot verify costs or savings yet.';
+}
+async function realityBusinessRefresh(){
+ const epoch=++realityBusinessReadEpoch;
+ realityBusinessResetMoney();
+ if($('privateReady')?.style.display!=='block'){
+  $('businessTrackedJobs').textContent='—';
+  $('businessPendingApprovals').textContent='—';
+  $('businessVerifiedCompletions').textContent='—';
+  $('businessOperationsStatus').textContent='Sign in to see source-linked operations for your account.';
+  return;
+ }
+ $('businessOperationsStatus').textContent='Checking your account’s recorded work…';
+ try{
+  const response=await fetch('/api/reality/personal-genuine-loop-status',{
+   credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+   data.status!=='OWNER_GOVERNED_LOOP_READBACK'||
+   !Array.isArray(data.jobs)||data.jobs.length>12||
+   data.production_changed!==false||data.external_action_performed!==false)
+    throw Error('BUSINESS_SOURCE_READBACK_UNAVAILABLE');
+  if(epoch!==realityBusinessReadEpoch)return;
+  const jobs=data.jobs.filter(j=>/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||''))&&
+   typeof j.phase==='string'&&j.environment==='ISOLATED_PREVIEW');
+  const pending=jobs.filter(j=>j.candidate_verified===true&&j.owner_install_approved===false).length;
+  const settled=jobs.filter(j=>j.independently_settled===true&&j.universe_settlement_verified===true).length;
+  $('businessTrackedJobs').textContent=String(jobs.length);
+  $('businessPendingApprovals').textContent=String(pending);
+  $('businessVerifiedCompletions').textContent=String(settled);
+  $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. Counts cover only returned repair jobs; they are not financial results.';
+ }catch{
+  if(epoch!==realityBusinessReadEpoch)return;
+  $('businessTrackedJobs').textContent='—';
+  $('businessPendingApprovals').textContent='—';
+  $('businessVerifiedCompletions').textContent='—';
+  $('businessOperationsStatus').textContent='Source-linked operations unavailable. No completion or financial impact can be inferred.';
+ }
+}
+const SPEECH_STATE={utterance:null,button:null};
 function stopRealitySpeech(){try{window.speechSynthesis?.cancel()}catch{} SPEECH_STATE.utterance=null; if(SPEECH_STATE.button){SPEECH_STATE.button.textContent='🔊 Read aloud';SPEECH_STATE.button.disabled=false}}
 function speakRealityText(text,button){if(!('speechSynthesis' in window)){alert('Read aloud is not supported by this browser.');return} if(window.speechSynthesis.speaking){stopRealitySpeech();return} const clean=String(text||'').replace(/\\s+/g,' ').trim();if(!clean)return; const u=new SpeechSynthesisUtterance(clean);SPEECH_STATE.utterance=u;SPEECH_STATE.button=button;u.onend=stopRealitySpeech;u.onerror=stopRealitySpeech;button.textContent='⏹ Stop reading';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
 function addReadAloudButton(target,text){if(!target)return;target.querySelectorAll('[data-read-aloud]').forEach(x=>x.remove());const b=document.createElement('button');b.type='button';b.dataset.readAloud='1';b.textContent='🔊 Read aloud';b.className='read-aloud';b.onclick=()=>speakRealityText(text,b);target.appendChild(b)}
@@ -868,6 +1048,7 @@ const realityWork=$('findWork');const workResult=$('workResult');
 let guidedWorkPending=false;
 function jumpToWorkSetup(kind){
  guidedWorkPending=true;
+ realityOpenChatDock(false);
  const chat=$('privateChat');
  if(chat?.style.display==='none'){
   workResult.textContent='Private goal/approval setup is not available in this deployment. Work remains blocked.';
@@ -1945,6 +2126,7 @@ function homeOwnerLegacyVisibility(){
  homeLegacyInstallSlot.hidden=!(wcVerifiedInstallReview||wcInstallContinuationBusy);
 }
 function homeOwnerFocus(){
+ realityOpenChatDock(false);
  homeOwnerCenter.scrollIntoView({behavior:'smooth',block:'start'});
  void homeOwnerRefresh();
 }
@@ -2343,6 +2525,8 @@ setInterval(()=>{if($('privateReady')?.style.display==='block'&&
   !wcEasyRepairBusy)void wcEasyRefresh();},30000);
 setInterval(()=>{if(homeOwnerSignedIn())void homeOwnerRefresh();},30000);
 setInterval(()=>{if(homeOwnerSignedIn())void realityChatRefreshEvents();},12000);
+setInterval(()=>{if(homeOwnerSignedIn())void realityBusinessRefresh();},30000);
+setTimeout(()=>void realityBusinessRefresh(),600);
 
 $('wcQuickFindRepair').onclick=()=>{
  if($('privateReady')?.style.display!=='block'){
@@ -3924,7 +4108,8 @@ setInterval(refreshSavedShiftHome,300000);
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();}
+  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
+  else{void realityBusinessRefresh();}
   else{void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
