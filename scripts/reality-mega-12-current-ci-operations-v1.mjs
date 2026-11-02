@@ -33,16 +33,17 @@ async function api(path){
  return res.json();
 }
 const started=Date.now();let previous_hash='0'.repeat(64);
+const pages=await Promise.all([1,2,3,4,5].map(page=>
+ api('/actions/runs?per_page=100&page='+page)));
+if(pages.some(x=>!Array.isArray(x.workflow_runs)))fatal('GITHUB_HISTORY_WINDOW_UNAVAILABLE');
+const providerRuns=pages.flatMap(x=>x.workflow_runs).filter(x=>x.head_branch===BRANCH);
 const investigations=[];
 for(let i=0;i<workflows.length;i++){
  const file=workflows[i];
- const [headPath,history]=await Promise.all([
-  api('/contents/.github/workflows/'+file+'?ref='+e.GITHUB_SHA),
-  api('/actions/workflows/'+file+'/runs?branch='+encodeURIComponent(BRANCH)+'&per_page=20')
- ]);
- if(headPath.path!=='.github/workflows/'+file||
-    !Array.isArray(history.workflow_runs))fatal('WORKFLOW_PROVIDER_SOURCE_UNVERIFIED');
- const runs=history.workflow_runs;
+ const headPath=await api('/contents/.github/workflows/'+file+'?ref='+e.GITHUB_SHA);
+ if(headPath.path!=='.github/workflows/'+file)
+   fatal('WORKFLOW_PROVIDER_SOURCE_UNVERIFIED');
+ const runs=providerRuns.filter(x=>x.path==='.github/workflows/'+file);
  const latest=runs[0]||null;
  const completed=runs.find(x=>x.status==='completed')||null;
  const failing=runs.find(x=>x.status==='completed'&&x.conclusion==='failure')||null;
@@ -65,7 +66,8 @@ for(let i=0;i<workflows.length;i++){
   source_workflow_path:'.github/workflows/'+file,
   current_workflow_exists:true,
   latest_run_id:latest?.id??null,latest_run_url:latest?.html_url??null,
-  latest_run_status:latest?.status??'NO_RUN',
+  latest_run_status:latest?.status??'NOT_PRESENT_IN_LAST_500_RUNS',
+  observation_window:'LATEST_500_REPOSITORY_WORKFLOW_RUNS',
   latest_completed_run_id:completed?.id??null,
   latest_completed_conclusion:conclusion,
   last_failed_run_id:failing?.id??null,
