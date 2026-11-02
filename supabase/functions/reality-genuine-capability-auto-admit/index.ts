@@ -1485,7 +1485,7 @@ Deno.serve(async request=>{
       deny('INFLIGHT_STALE_CHECKPOINT_UNEXPECTEDLY_ACCEPTED');
     }
     const current=await rpc('READ');
-    if(current?.state!=='ACTIVE'||current.lease_epoch!==epoch||
+    if(current?.status!=='ACTIVE'||current.lease_epoch!==epoch||
       current.checkpoint_step!==step-1)
       deny('INFLIGHT_CHECKPOINT_STALE_LEASE_OR_ORDER');
     const source=await database('rpc/reality_inflight_audit_source_readback_v1',{
