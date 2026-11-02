@@ -343,6 +343,80 @@ async function admit(report){
  }
  return {queued,skippedSettled};
 }
+// Only the signed exact CI workflow may claim a source-bound, red frozen test.
+// The original owner and goal are resolved from private Continuity by service
+// RPC, not from the GitHub request. The response is not an execution token.
+async function claimFrozenOriginal(request:Record<string,unknown>,runId:number){
+ const trigger=String(request.trigger_id||''),gap=String(request.source_event_id||'');
+ const work=String(request.original_work_id||'');
+ const frozenPath=String(request.frozen_test_path||'');
+ const missing=String(request.candidate_module_path||'');
+ const sha=String(request.frozen_test_sha256||'');
+ if(!UUID.test(trigger)||!UUID.test(gap)||!WORK.test(work)||
+    !TEST.test(frozenPath)||!MODULE.test(missing)||!SHA64.test(sha)||
+    request.reproduced_failure!==true||
+    request.exit_code===0||!Number.isInteger(request.exit_code)||
+    !SHA64.test(String(request.output_sha256||''))||
+    request.installation_authorized!==false||
+    request.external_action_performed!==false)
+  deny('SIGNED_RED_REPRODUCTION_FIELDS_INVALID');
+ const scoped=await database('rpc/reality_read_genuine_capability_wake_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_source_event_id:gap}});
+ if(scoped?.original_work_id!==work||
+   scoped?.phase!=='PENDING_FROZEN_REPRODUCTION'||
+   scoped?.source_event_id!==gap||
+   scoped?.owner_goal_current!==true||
+   scoped?.source_readback_verified!==true||
+   scoped?.installation_authorized!==false||
+   scoped?.original_job_completed!==false)
+  deny('CURRENT_GOVERNED_QUEUE_UNVERIFIED');
+ const events=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+gap,select:'event_id,payload,continuity_root_id,worldline_id'}));
+ if(!Array.isArray(events)||events.length!==1||
+   events[0].payload?.original_work_id!==work)
+  deny('GAP_SOURCE_EVENT_UNVERIFIED');
+ const sources=await database('universe_events?'+new URLSearchParams({
+  event_id:'eq.'+events[0].payload.original_work_event_id,
+  select:'event_id,entity_type,epistemic_status,payload'}));
+ const source=sources?.[0];
+ if(!Array.isArray(sources)||sources.length!==1||
+    source?.entity_type!=='reality_original_source_backed_repair_work'||
+    source?.epistemic_status!=='VERIFIED'||
+    source?.payload?.original_work_id!==work||
+    source.payload.frozen_test_path!==frozenPath||
+    source.payload.source_path!==missing||
+    source.payload.frozen_test_sha256!==sha||
+    source.payload.original_job_completed!==false||
+    source.payload.owner_authorized_investigation!==true||
+    source.payload.owner_authorized_installation!==false)
+  deny('FROZEN_ORIGINAL_SOURCE_CHANGED');
+ const content=await providerSource(frozenPath,String(request.repository_sha));
+ if(await hash(content)!==sha||
+    await api('/contents/'+missing+'?ref='+request.repository_sha)!==null)
+  deny('FROZEN_TEST_OR_CAPABILITY_CHANGED');
+ const claimed=await database('rpc/reality_claim_genuine_capability_gap_v1',{
+  method:'POST',body:{p_trigger_id:trigger,p_gap_event_id:gap}});
+ if(claimed?.trigger_id!==trigger||
+    claimed?.source_event_id!==gap||
+    claimed?.original_work_id!==work||
+    claimed?.phase!=='LEASED_FOR_INDEPENDENT_REPRODUCTION'||
+    claimed?.installation_authorized!==false||
+    claimed?.original_job_completed!==false||
+    !UUID.test(claimed?.claim_id))
+  deny('ATOMIC_CLAIM_NOT_VERIFIED');
+ return {status:'ORIGINAL_FROZEN_FAILURE_CLAIMED',claim_id:claimed.claim_id,
+  source_event_id:gap,trigger_id:trigger,original_work_id:work,
+  original_work_event_id:source.event_id,
+  original_goal_id:source.payload.original_goal_id,
+  goal_transition_receipt_ref:source.payload.goal_transition_receipt_ref,
+  owner_id:claimed.owner_id,conversation_id:claimed.conversation_id,
+  capability_id:claimed.capability_id,frozen_test_path:frozenPath,
+  frozen_test_sha256:sha,source_path:missing,
+  repository_sha:request.repository_sha,
+  independent_runner_ref:'github:actions:run:'+runId,
+  model_generated:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -354,6 +428,14 @@ Deno.serve(async request=>{
   const raw=await request.text();
   if(raw.length>9500)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
+  if(input?.action==='claim'&&input?.proof?.repository_sha&&
+   SHA40.test(input.proof.repository_sha)){
+   if(Object.keys(input).sort().join(',')!=='action,proof')
+    deny('CLAIM_ENVELOPE_FIELDS_INVALID');
+   const verifiedRun=await verify(bearer,input.proof.repository_sha);
+   const receipt=await claimFrozenOriginal(input.proof,verifiedRun.id);
+   return respond({ok:true,...receipt});
+  }
   if(!input||Array.isArray(input)||typeof input!=='object'||
    Object.keys(input).sort().join(',')!=='action,report'||
    input.action!=='admit'||input.report?.schema!==
