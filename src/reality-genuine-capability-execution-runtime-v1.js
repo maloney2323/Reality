@@ -72,6 +72,10 @@ export function createGenuineOriginalWorkRunner({
    failure_diagnosis:result.capability_diagnosis||
     classifyGenuineExecutionFailure({result,originalWorkId}),
    capability_response:result.self_repair?.status||null,
+   independent_source_readback_error_code:
+    /^GENUINE_SOURCE_JOB_[A-Z0-9_]{3,110}$/.test(
+     String(result.independent_source_readback_error_code||''))?
+      result.independent_source_readback_error_code:null,
    // Only source-bound queue and OIDC wake receipts; neither authorizes
    // generation, installation, cross-tenant reuse or original settlement.
    queue_trigger_id:result.self_repair?.queue_trigger_id||null,
