@@ -47,7 +47,7 @@ test('same new job only can be passed into existing read-only investigation',()=
  assert.match(route,/createGenuineSourceBackedJobAdapters/);
  assert.match(route,/createGenuineOriginalWorkRunner/);
  assert.match(route,/run\(\{originalWorkId:created\.new_original_work_id\}\)/);
- assert.match(route,/qualification_status/);
+ assert.match(route,/exact_candidate_qualified:false/);
  assert.match(route,/installation_performed:false/);
  assert.match(route,/owner_approval_issued:false/);
 });
