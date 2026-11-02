@@ -502,3 +502,30 @@ jobs:
           path: artifact/out/reality-production-readiness.json
           if-no-files-found: error
           retention-days: 30
+
+  independently_attest_owner_repair_issues:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently verify issue and frozen provider source, then store signed witness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-signed-owner-issue-witness-v1.mjs
+          node scripts/reality-signed-owner-issue-witness-v1.mjs
+      - name: Preserve signed provider evidence without granting owner authority
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-signed-owner-issue-witnesses-${{ github.run_id }}
+          path: artifact/out/reality-owner-issue-witnesses.json
+          if-no-files-found: error
+          retention-days: 14
