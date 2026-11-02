@@ -141,3 +141,16 @@ test('chat live work progress relies on authenticated read-only worker evidence'
  assert.match(method,/Live worker readback unavailable/);
  assert.doesNotMatch(method,/method:'POST'/);
 });
+
+test('chat composer and live event updates precede legacy account and goal settings',()=>{
+ const ready=html.indexOf('<div id="privateReady"');
+ const transcript=html.indexOf('id="privateTranscript"',ready);
+ const progress=html.indexOf('id="realityChatActivityEntries"',transcript);
+ const prompt=html.indexOf('id="privatePrompt"',progress);
+ const send=html.indexOf('id="privateSend"',prompt);
+ const extras=html.indexOf('id="realityChatSettings"',send);
+ const goal=html.indexOf('id="privateGoalText"',extras);
+ assert.ok(ready>=0&&ready<transcript&&transcript<progress&&progress<prompt&&
+  prompt<send&&send<extras&&extras<goal);
+ assert.match(inlineScript,/\$\('realityChatSettings'\)\.open=true/);
+});
