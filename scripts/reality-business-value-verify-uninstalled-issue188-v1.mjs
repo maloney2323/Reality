@@ -16,6 +16,27 @@ if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_REF!==REF||e.GITHUB_REPOSITORY!==REPO||
  e.OPENAI_API_KEY||e.SUPABASE_SERVICE_ROLE_KEY||e.SUPABASE_SECRET_KEY)
  fail('INDEPENDENT_SECRET_FREE_VERIFIER_REQUIRED');
 const r=JSON.parse(readFileSync('candidate/reality-issue188-model-value-receipt.json','utf8'));
+if(r?.schema==='reality-uninstalled-source-repair-business-value-v1'&&
+ r.status==='MODEL_DRAFTS_FAILED_SANDBOX'&&
+ r.run_id===Number(e.GITHUB_RUN_ID)&&r.base_sha===e.GITHUB_SHA&&
+ r.owner_approval_verified===false&&r.production_changed===false&&
+ Array.isArray(r.attempts)&&r.attempts.length===3){
+ mkdirSync('artifact/out',{recursive:true});
+ const report={schema:'reality-independent-uninstalled-source-value-v1',
+  signed_run_id:Number(e.GITHUB_RUN_ID),repository_sha:e.GITHUB_SHA,
+  source_issue:188,source_sha256:null,model_response_id:null,
+  status:'MODEL_DRAFTS_NOT_INDEPENDENTLY_QUALIFIED',
+  model_attempts:r.attempts.length,
+  model_input_tokens:r.input_tokens,model_output_tokens:r.output_tokens,
+  independent_secret_free_runner:true,
+  tested:0,passed:0,failed:0,installation_authorized:false,
+  installation_performed:false,original_customer_job_settled:false,
+  production_changed:false,verified_customer_dollars_saved:null};
+ writeFileSync('artifact/out/reality-issue188-independent-value-verification.json',
+ JSON.stringify(report,null,2)+'\n');
+ console.log('REALITY_VALUE_NO_QUALIFIED_MODEL_REPAIR',JSON.stringify(report));
+ process.exit(0);
+}
 const proposed=JSON.parse(readFileSync('candidate/reality-issue188-uninstalled-proposal.json','utf8'));
 if(r.schema!=='reality-uninstalled-source-repair-business-value-v1'||
  r.run_id!==Number(e.GITHUB_RUN_ID)||r.base_sha!==e.GITHUB_SHA||
