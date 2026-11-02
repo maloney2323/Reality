@@ -86,7 +86,8 @@ function proofCheck(proof,observed){
 // inspectRegisteredCapability, or authorize its own promotion.
 export function createGenuineCapabilityEngine({
  observeOriginalFailure,reobserveOriginalFailure,reproduceFrozenFailure,
- inspectRegisteredCapability,adapters=null,createAdapters=null,
+ inspectRegisteredCapability,arbitrateAndReceipt=null,
+ adapters=null,createAdapters=null,
  runRepair=continueOriginalJobFromVerifiedCapabilityGap,
 }={}){
  for(const [name,fn] of Object.entries({
@@ -96,6 +97,8 @@ export function createGenuineCapabilityEngine({
  }
  if(typeof createAdapters!=='function'&&createAdapters!==null)
   fail('TRUSTED_ADAPTER_FACTORY_INVALID');
+ if(arbitrateAndReceipt!==null&&typeof arbitrateAndReceipt!=='function')
+  fail('ARBITRAGE_RECEIPT_ADAPTER_INVALID');
  function checkDrivers(a){
   for(const name of ['observeMissingCapability','generateCandidate',
    'runIsolatedSandbox','persistCheckpoint','verifyIndependentReceipt']){
@@ -149,6 +152,57 @@ export function createGenuineCapabilityEngine({
    execution_authorized:false,
   }));
   const gap=proofCheck(reproduced,observed);
+  // A verified missing capability is necessary, but NOT sufficient,
+  // to call OpenAI. The controller must first prove reuse and authorized
+  // protocol integration have been evaluated and write a bitemporal receipt.
+  if(!arbitrateAndReceipt)fail('DURABLE_CAPABILITY_ARBITRAGE_REQUIRED');
+  const arbitration=await arbitrateAndReceipt(Object.freeze({
+   original_work_id:originalWorkId,owner_id:scope.owner_id,
+   goal_id:scope.goal_id,capability_id:gap.capability_id,
+   verified_frozen_failure_ref:gap.frozen_failure_ref,
+   frozen_suite_sha256:gap.frozen_suite_sha256,
+   known_capability_status:existing.status,
+   installation_authorized:false,
+  }));
+  if(arbitration?.original_work_id!==originalWorkId||
+     arbitration?.owner_id!==scope.owner_id||
+     arbitration?.goal_id!==scope.goal_id||
+     arbitration?.capability_id!==gap.capability_id||
+     arbitration?.verified_frozen_failure_ref!==gap.frozen_failure_ref||
+     arbitration?.persisted!==true||
+     arbitration?.independently_verified!==true||
+     arbitration?.signature_verified!==true||
+     arbitration?.source!=='REALITY_BITEMPORAL_CONTINUITY'||
+     arbitration?.reused_capabilities_checked!==true||
+     arbitration?.authorized_integrations_checked!==true||
+     !['REUSE','INTEGRATE','BUILD'].includes(arbitration?.selected_tier)||
+     !HASH.test(arbitration?.receipt_hash)||
+     !HASH.test(arbitration?.pre_state_hash)||
+     !HASH.test(arbitration?.post_state_hash)||
+     typeof arbitration?.valid_time!=='string'||
+     !Number.isFinite(Date.parse(arbitration.valid_time))||
+     typeof arbitration?.transaction_time!=='string'||
+     !Number.isFinite(Date.parse(arbitration.transaction_time))||
+     !arbitration?.receipt_ref||
+     arbitration?.installation_authorized!==false)
+    fail('SIGNED_BITEMPORAL_ARBITRAGE_RECEIPT_REQUIRED');
+  if(arbitration.selected_tier==='BUILD'&&
+     (arbitration?.reusable_candidate_count!==0||
+      arbitration?.authorized_compatible_integration_count!==0||
+      arbitration?.why_reuse_not_viable!=='NO_COMPATIBLE_REGISTERED_CAPABILITY'||
+      arbitration?.why_integration_not_viable!=='NO_AUTHORIZED_COMPATIBLE_INTEGRATION'))
+    fail('BUILD_ARBITRAGE_NEGATIVE_EVIDENCE_REQUIRED');
+  if(arbitration.selected_tier==='REUSE'||
+     arbitration.selected_tier==='INTEGRATE')
+    return Object.freeze({
+     status:arbitration.selected_tier==='REUSE'?
+      'REGISTERED_CAPABILITY_REUSE_REQUIRES_ORIGINAL_REASSESSMENT':
+      'AUTHORIZED_INTEGRATION_REQUIRES_ORIGINAL_REASSESSMENT',
+     original_work_id:originalWorkId,
+     capability_id:gap.capability_id,arbitrage_receipt_ref:arbitration.receipt_ref,
+     model_generated:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false,
+    });
   // The frozen provider failure is now a *capability* problem, not merely a
   // failed workflow. Existing constitutional driver performs model synthesis,
   // correction and tests with finite retries, saving/readbacking each state.
@@ -185,6 +239,7 @@ export function createGenuineCapabilityEngine({
    status:continuation.status,original_work_id:originalWorkId,
    new_job_created:false,
    capability_id:gap.capability_id,confirmed_gap:gap,
+   arbitrage_receipt_ref:arbitration.receipt_ref,
    capability_phase:continuation.capability_phase,
    owner_action_required:continuation.owner_action_required===true,
    model_cannot_authorize_install:true,
