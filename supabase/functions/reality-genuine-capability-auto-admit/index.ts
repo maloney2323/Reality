@@ -1422,6 +1422,11 @@ Deno.serve(async request=>{
        typeof ghProviderToken!=='string'||ghProviderToken.length<20)
       deny('INFLIGHT_SIGNED_SCOPE_INVALID');
     const signed=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+    if(input.action==='inflight_start'){
+      const branchHead=await api('/git/ref/heads/'+BRANCH.slice('refs/heads/'.length),ghProviderToken);
+      if(branchHead?.object?.sha!==input.scope.repository_sha)
+        deny('INFLIGHT_STALE_BRANCH_RUN_CANNOT_BEGIN');
+    }
     const runId=signed.id;
     const rpc=async (action:string,epoch?:number,step?:number,evidence?:any)=>
       database('rpc/reality_inflight_audit_control_v1',{method:'POST',body:{
