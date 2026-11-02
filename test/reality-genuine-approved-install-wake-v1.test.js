@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {wakeApprovedIsolatedInstall} from '../src/reality-genuine-approved-install-wake-v1.js';
 const receipt={status:'OWNER_APPROVED_ISOLATED_INSTALL_PENDING',target_environment:'ISOLATED_PREVIEW',
  approval_origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',source_installation_completed:false,
@@ -44,4 +47,23 @@ test('missing preview write credentials, forged approval or production must fail
   {...receipt,production_changed:true},
  ])await assert.rejects(()=>wakeApprovedIsolatedInstall({receipt:incorrect,env,fetchImpl:p.fetchImpl}),/EXACT_DURABLE_OWNER_APPROVAL/);
  assert.equal(p.writes,0);
+});
+
+test('actual owner approval route parses as a valid module and dispatches only after database proof',()=>{
+ const routePath=new URL('../api/reality/personal-qualified-capability-approve.js',import.meta.url);
+ const source=readFileSync(routePath,'utf8');
+ const parse=spawnSync(process.execPath,['--check',fileURLToPath(routePath)],{encoding:'utf8'});
+ assert.equal(parse.status,0,parse.stderr);
+ assert.doesNotMatch(source,/\\n from '\.\.\//);
+ const rpc=source.indexOf('reality_owner_approve_qualified_preview_v1');
+ const validate=source.indexOf("receipt?.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'");
+ const wake=source.indexOf('wake=await wakeApprovedIsolatedInstall({receipt})');
+ assert.ok(rpc>0&&validate>rpc&&wake>validate,'wake only after exact durable signed owner receipt');
+ assert.match(source,/SIGNED_WORKER_WAKE_COMMITTED/);
+ assert.match(source,/SIGNED_WORKER_WAKE_ALREADY_PRESENT/);
+ assert.match(source,/WORKER_WAKE_NOT_VERIFIED/);
+ assert.match(source,/retry_owner_approval:false/);
+ assert.match(source,/worker_execution_started:false/);
+ assert.match(source,/installation_completed:false/);
+ assert.match(source,/original_job_completed:false/);
 });
