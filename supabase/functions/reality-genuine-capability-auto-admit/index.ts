@@ -1448,6 +1448,8 @@ Deno.serve(async request=>{
       method:'POST',body:{}});
    const integrity=await database('rpc/reality_genuine_release_integrity_audit_v1',{
       method:'POST',body:{}});
+   const faultProbes=await database('rpc/reality_genuine_fault_injection_probe_v1',{
+      method:'POST',body:{}});
    if(integrity?.schema!=='reality-genuine-release-integrity-audit-v1'||
       integrity.scope!=='ISOLATED_PROJECT_READ_ONLY'||
       integrity.release_decision!=='NOT_READY'||
@@ -1463,6 +1465,19 @@ Deno.serve(async request=>{
       typeof integrity.anon_settlement_execute!=='boolean'||
       typeof integrity.authenticated_settlement_execute!=='boolean')
       deny('READINESS_REAL_EVENT_INTEGRITY_AUDIT_UNAVAILABLE');
+   if(faultProbes?.schema!=='reality-genuine-fault-injection-probe-v1'||
+      faultProbes.scope!=='ISOLATED_PROJECT_ONLY'||
+      faultProbes.invalid_settlement_claim_denied!==true||
+      faultProbes.nonexistent_work_outcome_denied!==true||
+      faultProbes.durable_queue_write_rolled_back!==true||
+      faultProbes.live_original_job_unchanged!==true||
+      faultProbes.fault_injection_cases_total!==3||
+      faultProbes.fault_injection_cases_passed!==3||
+      faultProbes.actual_install_rollback!=='NOT_TESTED'||
+      faultProbes.emergency_kill_switch!=='NOT_TESTED'||
+      faultProbes.production_release_authorized!==false||
+      faultProbes.production_changed!==false)
+      deny('READINESS_GENUINE_FAULT_INJECTION_FAILED');
    if(snapshot?.schema!=='reality-independent-production-readiness-snapshot-v1'||
       snapshot.scope!=='ISOLATED_PROJECT_READ_ONLY'||
       snapshot.production_release_authorized!==false||
@@ -1473,7 +1488,7 @@ Deno.serve(async request=>{
     deny('READINESS_INDEPENDENT_DATABASE_READBACK_FAILED');
    return respond({ok:true,status:'READINESS_EVIDENCE_VERIFIED',
      signed_run_id:run.id,repository_sha:input.scope.repository_sha,
-     snapshot,integrity,production_release_authorized:false,production_changed:false});
+     snapshot,integrity,fault_probes:faultProbes,production_release_authorized:false,production_changed:false});
   }
   if(input?.action==='installer_recover_prepare'&&
     SHA40.test(input?.scope?.repository_sha||'')){
