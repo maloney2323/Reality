@@ -129,7 +129,7 @@ jobs:
             installation_performed:false,production_changed:false}));
           }
           NODE
-- name: Poll exact genuine capability owner approvals and wake isolated worker
+      - name: Poll exact genuine capability owner approvals and wake isolated worker
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
