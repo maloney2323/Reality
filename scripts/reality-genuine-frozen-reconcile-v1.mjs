@@ -7,6 +7,7 @@ import {createHash} from 'node:crypto';
 const env=process.env;
 const die=c=>{throw Error('GENUINE_RECONCILE_'+c)};
 const sha=v=>createHash('sha256').update(v).digest('hex');
+if(!env.GH_TOKEN||env.GH_TOKEN.length<20)die('SIGNED_READ_ONLY_GITHUB_TOKEN_REQUIRED');
 if(env.GITHUB_ACTIONS!=='true'||
  env.GITHUB_EVENT_NAME!=='push'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
@@ -94,7 +95,8 @@ for(const row of selected){
   const response=await fetch(
    'https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit',{
    method:'POST',headers:{authorization:'Bearer '+jwt,
-    'content-type':'application/json'},cache:'no-store',redirect:'error',
+    'content-type':'application/json',
+    'x-reality-github-provider-token':env.GH_TOKEN||''},cache:'no-store',redirect:'error',
    body:JSON.stringify({action:'reconcile',proof})});
   const outcome=await response.json().catch(()=>null);
   if(!response.ok||outcome?.ok!==true||
