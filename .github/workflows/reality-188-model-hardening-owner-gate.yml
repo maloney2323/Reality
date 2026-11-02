@@ -1,4 +1,4 @@
-name: Reality #188 independently corrected capability proposal — owner approval gate
+name: Reality #188 independent correction — previously approved source and governed v2 holdout
 on:
   push:
     branches: [feature/reality-general-capability-engine-20261101]
