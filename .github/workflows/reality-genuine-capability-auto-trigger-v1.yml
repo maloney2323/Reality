@@ -192,6 +192,7 @@ jobs:
     if: needs.verify_missing_capability.result == 'success'
     permissions:
       contents: read
+      actions: read
       id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -213,6 +214,8 @@ jobs:
           name: reality-independent-candidate-proof-${{ github.run_id }}
           path: proof
       - name: Reality records signed owner-reviewable capability after independent GREEN
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           node --check scripts/reality-genuine-qualify-v1.mjs
           node scripts/reality-genuine-qualify-v1.mjs
