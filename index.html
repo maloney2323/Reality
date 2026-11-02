@@ -1763,6 +1763,55 @@ async function wcEasyReadExisting(){
   }
   $('wcEasyRepairStatus').textContent='Original work: '+j.original_work_id+
     ' · Installation not approved · Final settlement not verified.';
+  // Independent durable queue readback, scoped by authenticated account
+  // and the VERIFIED original Universe event. No approval or job ID input.
+  try{
+   const progress=await fetch('/api/reality/personal-genuine-loop-status',{
+    method:'GET',credentials:'same-origin',cache:'no-store'});
+   const actual=await progress.json();
+   if(progress.ok&&actual.ok===true&&actual.status==='OWNER_GOVERNED_LOOP_READBACK'&&
+      Array.isArray(actual.jobs)){
+    const found=actual.jobs.filter(q=>q.original_work_id===j.original_work_id);
+    if(found.length===1){
+     const q=found[0];
+     j._verified_loop=q;
+     if(q.independently_settled===true){
+      wcEasyStage(1,'complete');wcEasyStage(2,'complete');
+      wcEasyStage(3,'complete');wcEasyStage(4,'complete');
+      wcEasyStatus('Reality independently settled original issue #'+issue+
+       '. The original receipt is saved.','Review finished receipt');
+      $('wcEasyRepairStatus').textContent='Verified original work: '+j.original_work_id+
+       ' · Independent settlement recorded · No production change.';
+     }else if(q.owner_install_approved===true){
+      wcEasyStage(1,'complete');wcEasyStage(2,'complete');
+      wcEasyStage(3,'complete');wcEasyStage(4,'active');
+      wcEasyStatus('Exact upgrade approved for #'+issue+
+       '. Reality is installing and reconciling the same job.','Check verified result');
+      $('wcEasyRepairStatus').textContent=
+       'Owner approval persisted. Do not approve or install a second time. Queue: '+q.phase;
+     }else if(q.candidate_verified===true){
+      wcEasyStage(2,'complete');wcEasyStage(3,'active');
+      wcEasyStatus('Reality independently verified an upgrade for issue #'+issue+
+       '. Review its exact source before installation.','Review verified upgrade');
+      $('wcEasyRepairStatus').textContent='Frozen test and candidate evidence passed. Installation is NOT authorized.';
+     }else{
+      wcEasyStage(1,'complete');wcEasyStage(2,'active');
+      const phase=String(q.phase);
+      const label=phase==='PENDING_FROZEN_REPRODUCTION'?'Queued for independent reproduction':
+       phase==='LEASED_FOR_INDEPENDENT_REPRODUCTION'?'Independently reproducing the failure':
+       phase==='FROZEN_REPRODUCED_AWAITING_CANDIDATE'?'Generating and verifying a missing capability':
+       'Checking the original work evidence';
+      wcEasyStatus('Issue #'+issue+' · '+label+
+       '. Reality is working from the existing approved job.','Check Reality’s progress');
+      $('wcEasyRepairStatus').textContent=
+       'Durable phase: '+phase+' · Original job: '+j.original_work_id+
+       ' · No installation or settlement claimed.';
+     }
+    }
+   }
+  }catch{
+   $('wcEasyRepairStatus').textContent='Original work saved. Worker progress readback unavailable; no completion claimed.';
+  }
   return j;
  }
  wcEasyStage(1,'active');wcEasyStage(2,'pending');
@@ -1806,6 +1855,22 @@ $('wcEasyRepairMain').onclick=async()=>{
   }
   if(wcVerifiedInstallReview?.original_work_id===existing.original_work_id){
    $('wcApproveExactInstall').onclick();
+   return;
+  }
+  if(existing._verified_loop?.independently_settled===true){
+   $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
+   $('wcRefreshCompletion')?.click();
+   return;
+  }
+  if(existing._verified_loop?.owner_install_approved===true){
+   $('wcInstallSettlementPanel').scrollIntoView({behavior:'smooth',block:'center'});
+   return;
+  }
+  if(existing._verified_loop&&existing._verified_loop.candidate_verified!==true){
+   // The worker must independently generate a candidate before Reality
+   // may open any approval dialog. A status click cannot re-authorize or
+   // repeat a leased job or alter the original frozen acceptance.
+   $('wcEasyRepairStatus').textContent='The verified background worker has not finished the independent repair. No approval or duplicate job was created.';
    return;
   }
   // Existing, already-approved investigation: no new original job and no
