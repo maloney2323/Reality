@@ -4,6 +4,7 @@ import {readFileSync,mkdirSync,writeFileSync,existsSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {deriveGenuineActivationSuite} from '../src/reality-genuine-activation-suite-v1.js';
 const env=process.env;
 const fail=x=>{throw Error('REALITY_ACTIVATION_MONITOR_'+x)};
 const sha=b=>createHash('sha256').update(b).digest('hex');
@@ -56,11 +57,9 @@ for(const file of evidence.file_sha256){
  mkdirSync(dirname(file.path),{recursive:true});
  writeFileSync(file.path,content,{flag:'wx'});
 }
-const testPath='test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js';
-const suite=[
- testPath,'test/reality-governed-self-improvement-spine-v1.0.test.js',
- ...evidence.file_sha256.filter(f=>f.path.startsWith('test/')).map(f=>f.path)
-];
+const activation=deriveGenuineActivationSuite(evidence);
+const testPath=activation.frozen_test_path;
+const suite=activation.tests;
 const observations=[];
 for(let i=0;i<5;i++){
  const docker=['run','--rm','--network','none','--read-only',
