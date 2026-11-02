@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {verifyRealMissingRepairIssue,readSignedOwnerIssueWitness}
+import {verifyRealMissingRepairIssue,readSignedOwnerIssueWitness,discoverRealRepairOpportunities}
  from '../src/reality-real-repair-opportunity-intake-v1.0.js';
 
 const project='hvkfreoagbrphwghjajw';
@@ -87,4 +87,22 @@ test('witness refuses non-preview, wrong project, or storage-off contexts',async
     issueNumber:201,env:e,fetchImpl:fetchWithWitness(fixture())
   }),/SIGNED_OWNER_WITNESS_/);
  }
+});
+
+test('GitHub issue-list 403 still presents only recent independently signed opportunities',async()=>{
+ const witness=fixture();
+ const fetchImpl=async(url,options)=>{
+  if(String(url).startsWith('https://api.github.com/'))
+   return {ok:false,status:403};
+  if(String(url).endsWith('/rpc/reality_list_genuine_owner_issue_witnesses_v1'))
+   return {ok:true,json:async()=>[201]};
+  if(String(url).endsWith('/rpc/reality_read_genuine_owner_issue_witness_v1'))
+   return {ok:true,json:async()=>witness};
+  throw Error('UNEXPECTED_READ_'+url);
+ };
+ const discovered=await discoverRealRepairOpportunities({env,fetchImpl});
+ assert.equal(discovered.opportunities.length,1);
+ assert.equal(discovered.opportunities[0].issue_number,201);
+ assert.equal(discovered.opportunities[0].installation_authorized,false);
+ assert.equal(discovered.external_action_performed,false);
 });
