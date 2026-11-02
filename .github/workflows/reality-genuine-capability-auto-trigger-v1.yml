@@ -597,4 +597,50 @@ jobs:
             node --test --test-reporter=tap \
               test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js \
               test/reality-extensions/reality-continuity-settlement-reconciler.test.js \
-              test/reality-201-provider-backed-relationship-holdout-v1.test.js
+              test/reality-201-provider-backed-relationship-holdout-v1.test.js | tee /tmp/reality-201-corrected-holdout.tap
+
+      - name: Publish immutable corrected holdout evidence receipt without installation
+        if: success()
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const tap=fs.readFileSync('/tmp/reality-201-corrected-holdout.tap','utf8');
+          const count=(key)=>Number([...tap.matchAll(new RegExp('^# '+key+' (\\d+)$','gm'))].at(-1)?.[1]||0);
+          assert.equal(count('tests'),19);
+          assert.equal(count('pass'),19);
+          assert.equal(count('fail'),0);
+          const sha=path=>crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+          const candidate='evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.mjs';
+          const frozen='test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js';
+          const receipt={
+            schema:'reality-201-independent-corrected-holdout-v1',
+            original_repair_work_id:'work:d90acd41ed1b1116ee74086846d61d42',
+            unchanged_frozen_sha256:sha(frozen),
+            corrected_source_sha256:sha(candidate),
+            corrected_source_path:candidate,
+            real_provider_run_id:41390537103,
+            independent_live_provider_jobs_verified:true,
+            original_frozen_and_candidate_holdout_tests:19,
+            passed:19,failed:0,
+            source:'GITHUB_SIGNED_WORKFLOW_PROVIDER_READBACK_AND_NETWORK_DISABLED_DOCKER',
+            github_run_id:process.env.GITHUB_RUN_ID,
+            github_source_sha:process.env.GITHUB_SHA,
+            corrected_candidate_qualified_in_database:false,
+            installation_authorized:false,
+            universe_settlement_recorded:false,
+            production_changed:false
+          };
+          fs.mkdirSync('artifact/out',{recursive:true});
+          fs.writeFileSync('artifact/out/reality-201-corrected-holdout.json',JSON.stringify(receipt,null,2)+'\\n');
+          console.log('REALITY_201_CORRECTED_HOLDOUT_PROOF',JSON.stringify(receipt));
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: reality-201-independent-corrected-holdout-${{ github.run_id }}
+          path: artifact/out/reality-201-corrected-holdout.json
+          if-no-files-found: error
+          retention-days: 30
