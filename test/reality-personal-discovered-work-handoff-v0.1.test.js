@@ -365,7 +365,8 @@ test('conversational Reality is the first task; governed three-step setup remain
   prompt=html.indexOf('id="optionalPrompt"');
  assert.ok(chat>0&&chat<start&&start<matrix&&matrix<work&&work<advanced&&advanced<prompt);
  assert.ok(html.includes("3 steps. That's it."));
- assert.ok(html.includes('Reality · Your AI workspace'));
+ assert.ok(html.includes('Your Business Reality'));
+ assert.ok(html.indexOf('id="businessHome"')<chat);
  assert.ok(html.includes('id="realityChatActivityEntries"'));
  for(const id of ['startStep1','startStep2','startStep3',
    'startAction1','startAction2','startAction3',
