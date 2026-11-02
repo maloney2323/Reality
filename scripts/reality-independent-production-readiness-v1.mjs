@@ -45,6 +45,23 @@ if(integrity?.schema!=='reality-genuine-release-integrity-audit-v1'||
  integrity.anon_settlement_execute!==false||
  integrity.authenticated_settlement_execute!==false)
  die('INDEPENDENT_LIVE_LEDGER_INTEGRITY_OR_AUTHORITY_FAILED');
+// Verify real isolated owner-settlement denial and rollback after a durable write.
+const fault=result.fault_probes;
+if(fault?.schema!=='reality-genuine-fault-injection-probe-v1'||
+ fault.scope!=='ISOLATED_PROJECT_ONLY'||
+ !/^work:[a-f0-9]{32}$/.test(fault.genuine_original_work_id||'')||
+ fault.invalid_settlement_claim_denied!==true||
+ fault.nonexistent_work_outcome_denied!==true||
+ fault.durable_queue_write_rolled_back!==true||
+ fault.live_original_job_unchanged!==true||
+ fault.verified_original_outcome_count!==1||
+ fault.fault_injection_cases_passed!==3||
+ fault.fault_injection_cases_total!==3||
+ fault.actual_install_rollback!=='NOT_TESTED'||
+ fault.emergency_kill_switch!=='NOT_TESTED'||
+ fault.production_release_authorized!==false||
+ fault.production_changed!==false)
+ die('REAL_PRIVILEGED_SETTLEMENT_FAULT_INJECTION_FAILED');
 // Real network probes against the deployed signed broker. Untrusted callers must fail.
 const endpoint='https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit';
 const body=JSON.stringify({action:'universe_outcome_reconcile',scope:{repository_sha:env.GITHUB_SHA}});
@@ -96,10 +113,30 @@ const gates={
   broken_lineages:integrity.broken_parent_lineages,
   invalid_hashes:integrity.invalid_content_hashes},
  signed_broker_negative_authorization:{status:'PASS',probes:negative},
- adversarial_safety:{status:'PARTIAL_ONLY',unmeasured:'FAULT_INJECTION_ROLLBACK_AND_EXTERNAL_EXECUTION'},
- rollback_and_emergency_stop:{status:'UNPROVEN'},
+ isolated_database_fault_injection:{status:'PASS',cases:fault.fault_injection_cases_passed,
+  observed_rejections:2,rolled_back_probe_writes:1,
+  scope:'SETTLEMENT_DENIAL_AND_QUEUE_SUBTRANSACTION_ONLY'},
+ adversarial_safety:{status:'PARTIAL_ONLY',unmeasured:'REAL_EXTERNAL_EXECUTION_FAILURE_AND_RETRY'},
+ rollback_and_emergency_stop:{status:'UNPROVEN',database_subtransaction_rollback:'PASS',
+  actual_install_rollback:'NOT_TESTED',emergency_kill_switch:'NOT_TESTED'},
  production_canary:{status:'NOT_AUTHORIZED'}
 };
+// Explicit reasons for NOT_READY. Nothing here authorizes production.
+const releaseBlockers=[];
+if(gates.isolated_provider_settlement.status!=='PASS') releaseBlockers.push('UNVERIFIED_PROVIDER_SETTLEMENT');
+if(gates.primary_universe_settlement.status!=='PASS') releaseBlockers.push('UNRECONCILED_UNIVERSE_COMPLETION');
+if(s.qualifying_live_business_executions<s.probation_target)
+ releaseBlockers.push('LIVE_BUSINESS_PROBATION_'+s.qualifying_live_business_executions+'_OF_'+s.probation_target);
+if(s.distinct_isolated_capability_families<3)
+ releaseBlockers.push('CAPABILITY_FAMILIES_'+s.distinct_isolated_capability_families+'_OF_3');
+if(s.unbound_capability_discoveries>0)
+ releaseBlockers.push('UNBOUND_OWNER_DISCOVERIES_'+s.unbound_capability_discoveries);
+if(s.unfinished_owner_bound_work>0)
+ releaseBlockers.push('UNFINISHED_OWNER_WORK_'+s.unfinished_owner_bound_work);
+releaseBlockers.push('REAL_INSTALLED_CAPABILITY_ROLLBACK_UNTESTED');
+releaseBlockers.push('EMERGENCY_KILL_SWITCH_UNTESTED');
+releaseBlockers.push('FAULTED_EXTERNAL_EXECUTION_RECOVERY_UNTESTED');
+releaseBlockers.push('PRODUCTION_CANARY_NOT_AUTHORIZED');
 const report={
  schema:'reality-independent-production-readiness-report-v1',
  source:'SIGNED_GITHUB_WORKFLOW_AND_SERVICE_ONLY_DATABASE_READBACK',
@@ -114,6 +151,8 @@ const report={
  evidence:s,
  independent_integrity_audit:integrity,
  negative_authorization_probes:negative,
+ isolated_database_fault_probes:fault,
+ release_blockers:releaseBlockers,
 };
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-production-readiness.json',JSON.stringify(report,null,2)+'\n');
@@ -129,4 +168,6 @@ console.log('REALITY_INDEPENDENT_READINESS_GATE',JSON.stringify({
  integrity_audited:integrity.verified_completion_events_audited,
  false_completion_claims:integrity.unsupported_verified_completion_claims,
  signed_broker_negative_probes:negative.length,
+ real_fault_injection_passed:fault.fault_injection_cases_passed,
+ remaining_release_blockers:releaseBlockers.length,
  production_changed:false}));
