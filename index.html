@@ -235,58 +235,37 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 #homeLegacyInstallSlot .repair-current{margin-top:8px}
 @media(max-width:640px){.home-owner-center{padding:15px}.home-owner-head{flex-direction:column;gap:3px}.home-owner-count{margin-bottom:5px}.home-owner-item button{width:100%}}
 
+/* Chat is Reality's customer-facing home; the operations console remains secondary. */
+#privateChat{border:1px solid #466d88;background:linear-gradient(155deg,#14253a,#101724);margin:16px 0 22px;border-radius:18px;scroll-margin-top:15px}
+#privateChat>h3{font-size:24px}
+#privateReady #homeOwnerAuthorizations{margin:16px 0;padding:16px;border-color:#4f8293;background:#12283b}
+#privateReady #homeOwnerAuthorizations .home-owner-head h2{font-size:19px}
+.reality-chat-activity{border:1px solid #35546c;border-radius:14px;padding:15px;margin:14px 0;background:#101d2b}
+.reality-chat-activity h4{font-size:18px;margin:4px 0 8px}
+.reality-chat-activity p{line-height:1.5}
+.reality-chat-progress{background:#172b39;border:1px solid #395b70;border-radius:10px;padding:12px;margin:10px 0}
+.reality-chat-progress strong{display:block;margin-bottom:4px;color:#eaf5fc}
+.reality-chat-progress small{color:#b5ccda;font-size:12px}
+#privateReady #homeOwnerAuthorizations .home-owner-item{border-color:#55899c}
+#privateReady #homeOwnerAuthorizations .home-owner-item button{width:100%;min-height:50px;font-size:15px}
+@media(max-width:640px){#privateChat{padding:15px!important}.reality-chat-activity{padding:12px}}
+
 </style>
 </head>
 <body>
 <main>
   <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
-  <h1>Reality · Let's get started</h1>
-  <p class="sub">Follow these three steps. You do <strong>not</strong> need to type a Request for this test. Reality will find the work.</p>
+  <h1>Reality · Your AI workspace</h1>
+  <p class="sub">Talk to Reality naturally. It can help you plan, build and work through problems. Verified work, approvals and results stay in this conversation.</p>
   <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
     <strong id="productState">CHECKING REALITY</strong>
     <span><strong id="liveHeadline">Verifying connected services…</strong>
     <span id="liveDetail">No real-world outcome has been claimed.</span></span>
   </div>
 
-<section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
- <div class="home-owner-head">
-  <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
-   <h2 id="homeOwnerTitle">Owner Authorizations</h2>
-   <p>See what Reality found, what it fixed, what the independent tests proved, and what still needs your approval. Nothing installs without your decision.</p>
-  </div>
-  <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
- </div>
- <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
- <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
- <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
- <div id="homeOwnerDialogs"></div>
- <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
- <p class="home-owner-note">Approval is separate from execution. Each request is checked against your account, its exact source hash and Reality's independent evidence. No approval authorizes production changes or another job.</p>
-</section>
-
-<section id="startFlow" class="start-flow" aria-label="Start here: three steps">
- <div class="start-flow-head"><span class="label">START HERE</span><h2>3 steps. That's it.</h2><p>Reality tells you what to do next.</p></div>
- <div class="start-step" id="startStep1" data-state="pending">
-  <div class="start-step-heading"><span class="start-number">1</span><div><h3>Step 1 · Sign in</h3><p>Use your existing Reality account.</p></div></div>
-  <p id="startStatus1" class="start-status" role="status">Checking your sign-in…</p>
-  <button id="startAction1" type="button">Step 1 · Sign in</button>
- </div>
- <div class="start-step" id="startStep2" data-state="pending">
-  <div class="start-step-heading"><span class="start-number">2</span><div><h3>Step 2 · Confirm your goal</h3><p>Tell Reality what your business is trying to achieve, or resume an existing goal.</p></div></div>
-  <p id="startStatus2" class="start-status" role="status">Complete Step 1 first.</p>
-  <button id="startAction2" type="button">Step 2 · Set my goal</button>
- </div>
- <div class="start-step" id="startStep3" data-state="pending">
-  <div class="start-step-heading"><span class="start-number">3</span><div><h3>Step 3 · Find and review work</h3><p>Let Reality find a task, review its evidence, then approve the exact action.</p></div></div>
-  <p id="startStatus3" class="start-status" role="status">Complete Steps 1 and 2 first.</p>
-  <button id="startAction3" type="button">Step 3 · Find work</button>
- </div>
- <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
- <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
-</section>
 <section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation">
- <div class="label">REALITY · ACCOUNT & PERSISTENT CONVERSATION (PREVIEW)</div>
- <h3>Account · Sign in or continue</h3>
+ <div class="label">REALITY · CONVERSATION & CONTINUOUS WORK</div>
+ <h3>Talk to Reality</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
  <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
  <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
@@ -330,7 +309,13 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    </div>
    <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
   </div>
-  <div id="privateTranscript" aria-live="polite" style="max-height:380px;overflow-y:auto;margin:12px 0"></div>
+  <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <section class="reality-chat-activity" id="realityChatActivity" aria-label="Reality live work updates">
+    <div class="label">REALITY · WORK UPDATES</div>
+    <h4>What Reality is doing</h4>
+    <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
+    <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
+  </section>
   <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
   <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
   <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
@@ -342,6 +327,42 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <button id="privateSend" type="button">Send to Reality</button>
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
+</section>
+<section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
+ <div class="home-owner-head">
+  <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
+   <h2 id="homeOwnerTitle">Owner Authorizations</h2>
+   <p>See what Reality found, what it fixed, what the independent tests proved, and what still needs your approval. Nothing installs without your decision.</p>
+  </div>
+  <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
+ </div>
+ <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
+ <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
+ <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
+ <div id="homeOwnerDialogs"></div>
+ <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
+ <p class="home-owner-note">Approval is separate from execution. Each request is checked against your account, its exact source hash and Reality's independent evidence. No approval authorizes production changes or another job.</p>
+</section>
+
+<section id="startFlow" class="start-flow" aria-label="Start here: three steps">
+ <div class="start-flow-head"><span class="label">START HERE</span><h2>3 steps. That's it.</h2><p>Reality tells you what to do next.</p></div>
+ <div class="start-step" id="startStep1" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">1</span><div><h3>Step 1 · Sign in</h3><p>Use your existing Reality account.</p></div></div>
+  <p id="startStatus1" class="start-status" role="status">Checking your sign-in…</p>
+  <button id="startAction1" type="button">Step 1 · Sign in</button>
+ </div>
+ <div class="start-step" id="startStep2" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">2</span><div><h3>Step 2 · Confirm your goal</h3><p>Tell Reality what your business is trying to achieve, or resume an existing goal.</p></div></div>
+  <p id="startStatus2" class="start-status" role="status">Complete Step 1 first.</p>
+  <button id="startAction2" type="button">Step 2 · Set my goal</button>
+ </div>
+ <div class="start-step" id="startStep3" data-state="pending">
+  <div class="start-step-heading"><span class="start-number">3</span><div><h3>Step 3 · Find and review work</h3><p>Let Reality find a task, review its evidence, then approve the exact action.</p></div></div>
+  <p id="startStatus3" class="start-status" role="status">Complete Steps 1 and 2 first.</p>
+  <button id="startAction3" type="button">Step 3 · Find work</button>
+ </div>
+ <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
+ <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
 </section>
 <section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
 <section class="work-center" id="workCenter" aria-label="Reality Work Center">
@@ -1899,6 +1920,8 @@ let wcEasyGenuineCandidate=null;
 // retain their original server-side one-time security contracts.
 let homeOwnerRefreshEpoch=0;
 const homeOwnerCenter=$('homeOwnerAuthorizations');
+// Move the single existing owner-authorization center into persistent chat.
+$('privateReady').insertBefore(homeOwnerCenter,$('privatePrompt'));
 const homeOwnerDialogs=$('homeOwnerDialogs');
 homeOwnerDialogs.appendChild($('wcEasyGenuineApproval'));
 const homeLegacyInstallSlot=$('homeLegacyInstallSlot');
@@ -2038,10 +2061,10 @@ async function homeOwnerRefresh(){
    if(verified&&!approved){
     const button=document.createElement('button');
     button.type='button';button.className='repair-primary';
-    button.textContent='Review installation approval';
+    button.textContent='Approve once · Install in preview & continue job';
     button.addEventListener('click',async()=>{
      button.disabled=true;status.textContent='Rechecking exact source and owner scope before approval…';
-     try{await homeOwnerOpen(entry.original_work_id,entry.qualification.artifact_sha256);}
+     try{await realityChatApproveOnce(entry.original_work_id,entry.qualification.artifact_sha256);}
      catch(e){status.textContent='Review stopped: '+String(e?.message||'EVIDENCE_UNAVAILABLE')+
       '. No authorization performed.';}
      finally{button.disabled=false}
@@ -2058,6 +2081,100 @@ async function homeOwnerRefresh(){
   if(epoch!==homeOwnerRefreshEpoch)return;
   count.textContent='Readback unavailable';
   status.textContent='Reality could not verify your owner authorization queue. No approval or installation was attempted.';
+ }
+}
+
+// A single explicit user click grants one exact isolated-preview approval.
+// Refresh independently before posting; on ambiguous result, do NOT resubmit.
+let realityChatApprovalInFlight=false;
+async function realityChatApproveOnce(workId,expectedHash){
+ if(realityChatApprovalInFlight)throw Error('OWNER_APPROVAL_ALREADY_PENDING');
+ if(!homeOwnerSignedIn())throw Error('SIGN_IN_REQUIRED');
+ realityChatApprovalInFlight=true;
+ try{
+  const entries=await homeOwnerRead();
+  const matching=entries.filter(e=>e.original_work_id===workId);
+  if(matching.length!==1||!homeOwnerEntryVerified(matching[0])||
+    matching[0].approval||matching[0].qualification.artifact_sha256!==expectedHash)
+   throw Error('EXACT_SOURCE_CHANGED_OR_ALREADY_APPROVED');
+  $('homeOwnerStatus').textContent='Recording your one exact isolated-preview approval…';
+  const response=await fetch('/api/reality/personal-qualified-capability-approve',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+     intent:'OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY',
+     original_work_id:workId,
+     artifact_sha256:expectedHash,
+     confirmation:'APPROVE EXACT VERIFIED UPGRADE IN ISOLATED PREVIEW'
+    })
+  });
+  const receipt=await response.json();
+  if(!response.ok||receipt.ok!==true||
+     receipt.status!=='OWNER_APPROVED_ISOLATED_INSTALL_PENDING'||
+     receipt.original_work_id!==workId||
+     receipt.artifact_sha256!==expectedHash||
+     receipt.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+     receipt.source_installation_completed!==false||
+     receipt.original_job_completed!==false||
+     receipt.production_changed!==false)
+   throw Error('OWNER_APPROVAL_READBACK_UNCERTAIN_DO_NOT_RETRY');
+  $('homeOwnerStatus').textContent='Approved once. Reality must now independently install, monitor and resume this same job. You do not need to approve again.';
+ }catch(err){
+  $('homeOwnerStatus').textContent='Approval status needs an independent readback. Do not click approval a second time. '+String(err?.message||'UNKNOWN');
+  throw err;
+ }finally{
+  realityChatApprovalInFlight=false;
+  void homeOwnerRefresh();
+  void realityChatRefreshEvents();
+ }
+}
+async function realityChatRefreshEvents(){
+ const container=$('realityChatActivityEntries');
+ if(!container)return;
+ if(!homeOwnerSignedIn()){
+  container.textContent='Sign in to see verified work progress. Reality has not been authorized to install anything.';
+  return;
+ }
+ try{
+  const response=await fetch('/api/reality/personal-genuine-loop-status',{
+    credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+     data.status!=='OWNER_GOVERNED_LOOP_READBACK'||!Array.isArray(data.jobs)||
+     data.jobs.length>12||data.production_changed!==false||
+     data.external_action_performed!==false)
+   throw Error('SOURCE_LINKED_WORK_READBACK_UNAVAILABLE');
+  container.replaceChildren();
+  if(!data.jobs.length){
+   container.textContent='No live governed self-repair job was returned for this account.';
+   return;
+  }
+  for(const j of data.jobs.slice(0,6)){
+   if(!/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')))continue;
+   const bubble=document.createElement('div');bubble.className='reality-chat-progress';
+   const title=document.createElement('strong');
+   const note=document.createElement('small');
+   if(j.independently_settled===true&&j.universe_settlement_verified===true){
+    title.textContent='Original job finished · Independently verified';
+    note.textContent='Reality recorded verified settlement for the original job. Business value is reported only where measured evidence is available.';
+   }else if(j.independently_settled===true){
+    title.textContent='Settlement reported · Final Universe proof still required';
+    note.textContent='Reality has not independently verified the final Universe event yet. Completion cannot be claimed.';
+   }else if(j.owner_install_approved===true){
+    title.textContent='Owner approved · Checking installation and continuation';
+    note.textContent='Exact approval is saved. Current worker state: '+String(j.phase||'UNKNOWN')+'. No final outcome has been verified.';
+   }else if(j.candidate_verified===true){
+    title.textContent='Repair generated and independently tested';
+    note.textContent='The exact repair is awaiting your approval in this chat. No installation or settlement is authorized yet.';
+   }else{
+    title.textContent='Reality is examining a missing capability';
+    note.textContent='Last independently recorded worker phase: '+String(j.phase||'UNKNOWN')+'. No completion has been verified.';
+   }
+   bubble.append(title,note);container.appendChild(bubble);
+  }
+  if(!container.childElementCount)container.textContent='No verified source-linked activity was available.';
+ }catch{
+  container.textContent='Live worker readback unavailable. No progress or completion is being inferred. Your saved conversation remains available.';
  }
 }
 async function homeOwnerOpen(workId,expectedHash){
@@ -2215,6 +2332,7 @@ setTimeout(()=>{void wcEasyRefresh();void homeOwnerRefresh();},500);
 setInterval(()=>{if($('privateReady')?.style.display==='block'&&
   !wcEasyRepairBusy)void wcEasyRefresh();},30000);
 setInterval(()=>{if(homeOwnerSignedIn())void homeOwnerRefresh();},30000);
+setInterval(()=>{if(homeOwnerSignedIn())void realityChatRefreshEvents();},12000);
 
 $('wcQuickFindRepair').onclick=()=>{
  if($('privateReady')?.style.display!=='block'){
@@ -3796,7 +3914,7 @@ setInterval(refreshSavedShiftHome,300000);
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();}
+  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();}
   else{void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
