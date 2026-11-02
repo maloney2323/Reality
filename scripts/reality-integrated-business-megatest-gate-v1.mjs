@@ -84,7 +84,7 @@ if(recovered.schema!=='reality-actual-inflight-worker-continuity-proof-v1'||
  recovered.production_changed!==false)
  fail('REAL_INTERRUPTED_WORKER_RECOVERY_NOT_PROVEN');
 if(readiness.release_decision!=='NOT_READY'||
- readiness.production_release_authorized!==false||
+ readiness.release_authorized!==false||
  readiness.production_changed!==false)
  fail('PRODUCTION_RELEASE_GUARD_INVALID');
 const now=Date.now();
@@ -118,7 +118,7 @@ const result={
  unauthorized_external_actions:0,
  production_changes:0,
  report_is_not_approval_for_installation_or_release:true,
- audit_readiness_release_blockers:readiness.remaining_release_blockers??null,
+ audit_readiness_release_blockers:readiness.release_blockers?.length??null,
  evidence:{
   source_portfolio_final_sha256:portfolio.final_chain_hash,
   ci_operational_investigation_final_sha256:operations.last_receipt_hash,
