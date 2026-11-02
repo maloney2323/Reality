@@ -12,13 +12,23 @@ const install=JSON.parse(readFileSync(
  'artifact/install/reality-owner-approved-preview-install.json','utf8'));
 const monitor=JSON.parse(readFileSync(
  'artifact/monitor/reality-independent-installed-preview-activation.json','utf8'));
+const installerRun=env.REALITY_RECOVERY_MODE==='true'?
+ env.REALITY_RECOVERY_INSTALL_RUN_ID:env.GITHUB_RUN_ID;
+const installerSha=env.REALITY_RECOVERY_MODE==='true'?
+ env.REALITY_RECOVERY_SOURCE_SHA:env.GITHUB_SHA;
+if(!/^[0-9]{8,17}$/.test(String(installerRun||''))||
+ !/^[a-f0-9]{40}$/.test(String(installerSha||''))||
+ (env.REALITY_RECOVERY_MODE==='true'&&
+  (installerRun===env.GITHUB_RUN_ID||installerSha===env.GITHUB_SHA)))
+ fail('RECOVERY_CANNOT_REPEAT_OLD_INSTALL');
 if(install.original_work_id!==monitor.original_work_id||
  install.installed_commit_sha!==monitor.installed_commit_sha||
  install.artifact_sha256!==monitor.artifact_sha256||
- install.source_sha!==env.GITHUB_SHA||
- monitor.source_sha!==env.GITHUB_SHA||
- install.installer_run_id!==env.GITHUB_RUN_ID||
+ install.source_sha!==installerSha||
+ monitor.source_sha!==installerSha||
+ install.installer_run_id!==installerRun||
  monitor.independent_run_id!==env.GITHUB_RUN_ID||
+ monitor.independent_runner_sha!==env.GITHUB_SHA||
  monitor.all_passed!==true||
  monitor.probation_isolated_monitoring_executions!==5||
  monitor.original_job_settled!==false||
