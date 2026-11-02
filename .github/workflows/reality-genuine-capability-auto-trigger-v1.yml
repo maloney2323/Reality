@@ -39,6 +39,8 @@ jobs:
         run: node scripts/reality-genuine-frozen-worker-claim-v1.mjs
       - name: Reconcile signed original frozen failure in isolated Docker
         if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           node --check scripts/reality-genuine-frozen-reconcile-v1.mjs
           node scripts/reality-genuine-frozen-reconcile-v1.mjs
@@ -82,6 +84,7 @@ jobs:
           path: artifact
       - name: Reality proposes the original missing capability using OpenAI
         env:
+          GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
         run: |
