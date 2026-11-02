@@ -111,6 +111,26 @@ test('end-to-end original gap proof can select existing live generation adapters
   inspectRegisteredCapability:async()=>({
    independently_verified:true,original_work_id:work,
    capability_id:gap.capability_id,status:'ABSENT'}),
+  arbitrateAndReceipt:async request=>({
+   original_work_id:request.original_work_id,
+   owner_id:request.owner_id,goal_id:request.goal_id,
+   capability_id:request.capability_id,
+   verified_frozen_failure_ref:request.verified_frozen_failure_ref,
+   persisted:true,independently_verified:true,signature_verified:true,
+   source:'REALITY_BITEMPORAL_CONTINUITY',
+   reused_capabilities_checked:true,authorized_integrations_checked:true,
+   selected_tier:'BUILD',reusable_candidate_count:0,
+   authorized_compatible_integration_count:0,
+   why_reuse_not_viable:'NO_COMPATIBLE_REGISTERED_CAPABILITY',
+   why_integration_not_viable:'NO_AUTHORIZED_COMPATIBLE_INTEGRATION',
+   receipt_hash:'d'.repeat(64),pre_state_hash:'a'.repeat(64),
+   post_state_hash:'b'.repeat(64),
+   valid_time:'2026-10-28T14:32:00.000Z',
+   transaction_time:'2026-10-28T14:32:05.120Z',
+   receipt_ref:'test:arbitrage:source-bound',
+   installation_authorized:false,
+  }),
+
   createAdapters:async input=>{
    // Real source proof hash is computed by the capability engine, rather than
    // taken from the fabricated gap variable in this purely isolated test.
