@@ -723,6 +723,108 @@ async function prepareExactlyApprovedPreviewInstall(runSha:string,runId:number,g
    installation_verified:false,original_job_completed:false,
    production_changed:false};
 }
+
+async function recordIndependentlyMonitoredInstall(
+ install:Record<string,unknown>,monitor:Record<string,unknown>,
+ sha:string,runId:number,githubToken:string){
+ if(install?.schema!=='reality-owner-approved-preview-source-install-v1'||
+  monitor?.schema!=='reality-independent-installed-preview-activation-v1'||
+  install?.source_sha!==sha||monitor?.source_sha!==sha||
+  install?.installer_run_id!==String(runId)||
+  monitor?.independent_run_id!==String(runId)||
+  monitor?.installed_commit_sha!==install.installed_commit_sha||
+  monitor?.install_branch!==install.installed_branch||
+  monitor?.approval_id!==install.approval_id||
+  monitor?.original_work_id!==install.original_work_id||
+  monitor?.artifact_sha256!==install.artifact_sha256||
+  install?.source_installation_verified!==true||
+  install?.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+  install?.production_changed!==false||
+  monitor?.production_changed!==false||
+  monitor?.original_job_settled!==false||
+  monitor?.all_passed!==true||
+  monitor?.probation_status!=='ACTIVE'||
+  monitor?.probation_live_business_executions!==0||
+  monitor?.probation_isolated_monitoring_executions!==5||
+  !UUID.test(String(install.approval_id||''))||
+  !UUID.test(String(install.original_trigger_id||''))||
+  !WORK.test(String(install.original_work_id||''))||
+  !SHA64.test(String(install.artifact_sha256||''))||
+  !SHA40.test(String(install.installed_commit_sha||''))||
+  !/^feature\/reality-qualified-install-[a-f0-9]{12}$/.test(
+    String(install.installed_branch||''))||
+  !Array.isArray(install.file_sha256)||
+  install.file_sha256.length<2||install.file_sha256.length>12||
+  !Array.isArray(monitor.observations)||
+  monitor.observations.length!==5)
+  deny('INDEPENDENT_INSTALL_ACTIVATION_EVIDENCE_INVALID');
+ let total=0;
+ for(const observation of monitor.observations as Array<Record<string,unknown>>){
+  if(observation.exit_code!==0||
+   !(Number(observation.tests)>=44)||
+   observation.tests!==observation.passed||
+   observation.failed!==0||
+   observation.sandbox_network_disabled!==true||
+   observation.executor_privileges_dropped!==true||
+   !SHA64.test(String(observation.output_hash_sha256||'')))
+   deny('INDEPENDENT_PROBATION_ASSERTION_FAILED');
+  total+=Number(observation.passed);
+ }
+ const jobs=await api('/actions/runs/'+runId+'/jobs?per_page=100',githubToken);
+ if(!Array.isArray(jobs?.jobs)||
+  !jobs.jobs.some((j:Record<string,unknown>)=>
+   j.name==='activate_owner_approved_preview'&&
+   j.status==='completed'&&j.conclusion==='success')||
+  !jobs.jobs.some((j:Record<string,unknown>)=>
+   j.name==='monitor_owner_approved_preview'&&
+   j.status==='completed'&&j.conclusion==='success'))
+  deny('PROVIDER_INSTALL_MONITOR_JOBS_NOT_INDEPENDENTLY_COMPLETE');
+ const ref=await api('/git/ref/heads/'+install.installed_branch,githubToken);
+ if(ref?.object?.sha!==install.installed_commit_sha)
+  deny('INSTALLED_BRANCH_PROVIDER_COMMIT_CHANGED');
+ for(const source of install.file_sha256 as Array<Record<string,unknown>>){
+  const path=String(source.path||'');
+  if(!/^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(?:js|mjs))$/.test(path)||
+   path.includes('..')||!SHA64.test(String(source.sha256||'')))
+   deny('INSTALLED_SOURCE_PATH_OR_HASH_INVALID');
+  const found=await api('/contents/'+path+'?ref='+install.installed_commit_sha,githubToken);
+  if(found?.path!==path||found.encoding!=='base64'||
+   typeof found.content!=='string')
+   deny('INDEPENDENT_INSTALLED_PROVIDER_FILE_MISSING');
+  const bytes=Uint8Array.from(atob(found.content.replace(/\s/g,'')),x=>x.charCodeAt(0));
+  if(await hash(bytes)!==source.sha256)
+   deny('INDEPENDENT_INSTALLED_PROVIDER_BYTES_CHANGED');
+ }
+ const proof={
+  original_work_id:install.original_work_id,
+  approval_id:install.approval_id,
+  artifact_sha256:install.artifact_sha256,
+  installer_run_id:String(runId),
+  installed_branch:install.installed_branch,
+  installed_commit_sha:install.installed_commit_sha,
+  independent_run_id:String(runId),
+  independent_verified:true,
+  original_frozen_acceptance_passed:true,
+  isolation_network_disabled:true,
+  monitored_executions:5,
+  passed_assertions:total,
+  failed_assertions:0,
+  observations:monitor.observations,
+  production_changed:false,
+  original_job_completed:false,
+ };
+ const recorded=await database('rpc/reality_record_genuine_preview_activation_v1',{
+  method:'POST',body:{p_trigger_id:install.original_trigger_id,
+   p_approval_id:install.approval_id,p_proof:proof}});
+ if(recorded?.status!=='ISOLATED_INSTALLED_PROBATION'||
+  recorded?.original_work_id!==install.original_work_id||
+  recorded?.installed_commit_sha!==install.installed_commit_sha||
+  recorded?.monitored_executions!==5||
+  recorded?.original_job_completed!==false||
+  recorded?.settlement_verified!==false)
+  deny('DURABLE_INSTALLED_PROBATION_READBACK_FAILED');
+ return recorded;
+}
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -739,6 +841,16 @@ Deno.serve(async request=>{
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
+  if(input?.action==='installer_record_activation'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,install,monitor,scope')
+    deny('INSTALL_ACTIVATION_ENVELOPE_INVALID');
+   const verified=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const receipt=await recordIndependentlyMonitoredInstall(
+    input.install,input.monitor,input.scope.repository_sha,
+    verified.id,ghProviderToken);
+   return respond({ok:true,...receipt});
+  }
   if(input?.action==='installer_prepare'&&
      SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
