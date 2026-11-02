@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {dispatchGenuineCapabilityWake}
  from '../src/reality-genuine-capability-github-wakeup-v1.js';
 const trigger='11111111-1111-4111-8111-111111111111';
@@ -71,4 +72,25 @@ test('no production, missing credential, unrelated work, or forged scope can wak
    env,fetchImpl:m.fetchImpl,...inputs}),/GENUINE_WAKE_DISPATCH_/);
   assert.equal(m.calls.length,0);
  }
+});
+
+test('source-bound wake targets the full governed pipeline, not inert inspect-only workflow',()=>{
+ const full=readFileSync(new URL('../.github/workflows/reality-genuine-capability-auto-trigger-v1.yml',import.meta.url),'utf8');
+ const wake=readFileSync(new URL('../src/reality-genuine-capability-github-wakeup-v1.js',import.meta.url),'utf8');
+ assert.match(wake,/const BRANCH='feature\\/reality-general-capability-engine-20261101'/);
+ assert.match(wake,/reality-genuine-capability-auto-trigger-v1\\.yml/);
+ assert.match(full,/branches: \\[feature\\/reality-general-capability-engine-20261101\\]/);
+ for(const required of [
+  'Signed automatic owner-evidence admission',
+  'Reconcile signed original frozen failure',
+  'generate_missing_capability:',
+  'verify_missing_capability:',
+  'qualify_verified_capability:',
+  'activate_owner_approved_preview:',
+  'resume_original_job:',
+  'record_independent_original_settlement:',
+ ])assert.ok(full.includes(required),'Full-loop stage absent: '+required);
+ assert.match(full,/scripts\\/reality-genuine-qualify-v1\\.mjs/);
+ assert.match(full,/scripts\\/reality-genuine-original-settle-v1\\.mjs/);
+ assert.match(full,/APPROVAL|approval/i);
 });
