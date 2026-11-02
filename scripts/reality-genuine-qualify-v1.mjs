@@ -40,7 +40,8 @@ const endpoint=
  'https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit';
 async function rpc(body){
  const r=await fetch(endpoint,{method:'POST',redirect:'error',cache:'no-store',
- headers:{authorization:'Bearer '+jwt,'content-type':'application/json'},
+ headers:{authorization:'Bearer '+jwt,'content-type':'application/json',
+  'x-reality-github-provider-token':env.GH_TOKEN||''},
  body:JSON.stringify(body)});
  const result=await r.json().catch(()=>null);
  if(!r.ok||result?.ok!==true)
