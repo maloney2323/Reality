@@ -25,6 +25,21 @@ export function createFoundationalBuildTicket(input){
  assert(/^[a-f0-9]{64}$/.test(t.frozen_regression_sha256),'FOUNDATION_FROZEN_SUITE_HASH_INVALID');
  assert(/^[a-zA-Z0-9_-]{1,80}$/.test(t.frozen_regression_manifest_ref),'FOUNDATION_FROZEN_MANIFEST_REF_INVALID');
  assert(t.environment==='ISOLATED_PREVIEW','FOUNDATION_PRODUCTION_NOT_PERMITTED');
+ // Original jobs may come with one independently SHA-pinned frozen test,
+ // not a pre-authored manifest. This is a source contract, never an
+ // alternative authorization or permission to weaken the original suite.
+ if(t.frozen_regression_contract_kind!==undefined){
+  assert(t.frozen_regression_contract_kind==='PINNED_SINGLE_TEST',
+   'FOUNDATION_FROZEN_CONTRACT_KIND_INVALID');
+  assert(typeof t.frozen_test_path==='string'&&
+   /^test\/reality-frozen-regressions\/[A-Za-z0-9._-]+\.test\.js$/.test(t.frozen_test_path)&&
+   !t.frozen_test_path.split('/').includes('..'),
+   'FOUNDATION_SOURCE_BACKED_FROZEN_TEST_PATH_REQUIRED');
+ }else{
+  assert(t.frozen_test_path===undefined,
+   'FOUNDATION_FROZEN_TEST_CONTRACT_KIND_REQUIRED');
+ }
+
  if(t.source_entrypoint!==undefined)
   assert(/^src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs$/.test(t.source_entrypoint)&&
    !t.source_entrypoint.includes('//')&&!t.source_entrypoint.split('/').includes('..'),
