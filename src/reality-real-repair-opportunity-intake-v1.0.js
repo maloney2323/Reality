@@ -39,6 +39,69 @@ function pathSafe(path,prefix){
   /^[a-z0-9._/-]+$/.test(path)&&!path.includes('//')&&
   !path.split('/').includes('..');
 }
+// Explicit isolated fallback for preview GitHub API rate/permission failure.
+// Only a recent, independently re-read, signed Github Actions OIDC witness
+// may stand in for the blocked API GET. It is never owner authorization.
+export async function readSignedOwnerIssueWitness({
+ issueNumber,env=process.env,fetchImpl=fetch,
+}={}){
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1||
+    env.VERCEL_ENV!=='preview'||
+    env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+  fail('SIGNED_OWNER_WITNESS_ISOLATED_SCOPE_REQUIRED');
+ const db=resolveReliabilityBenchmarkDb(env);
+ if(!db?.strictSecrets||
+    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    !db.secretKey)
+  fail('SIGNED_OWNER_WITNESS_PROJECT_SCOPE_NOT_VERIFIED');
+ const resp=await fetchImpl(db.url+'/rest/v1/rpc/reality_read_genuine_owner_issue_witness_v1',{
+  method:'POST',cache:'no-store',redirect:'error',
+  headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    accept:'application/json','content-type':'application/json'},
+  body:JSON.stringify({p_issue_number:issueNumber})
+ });
+ const v=await resp.json().catch(()=>null);
+ if(!resp.ok||v?.status!=='SOURCE_PINNED_MISSING_EXTENSION_READY_FOR_OWNER_REVIEW'||
+    v.issue_number!==issueNumber||
+    v.issue_url!=='https://github.com/maloney2323/Reality/issues/'+issueNumber||
+    v.source!=='SIGNED_GITHUB_OIDC_PROVIDER_REVERIFY_READBACK'||
+    !pathSafe(v.source_path,'src/reality-extensions/')||
+    !pathSafe(v.frozen_test_path,'test/reality-frozen-regressions/')||
+    !/^[a-f0-9]{64}$/.test(v.frozen_test_sha256||'')||
+    !/^[a-f0-9]{64}$/.test(v.actual_provider_failure_hash||'')||
+    !/^[a-f0-9]{40}$/.test(v.source_sha||'')||
+    !Number.isSafeInteger(Number(v.original_provider_failed_run_id))||
+    Number(v.original_provider_failed_run_id)<10000||
+    !Number.isSafeInteger(Number(v.original_provider_failed_job_id))||
+    Number(v.original_provider_failed_job_id)<10000||
+    !Number.isSafeInteger(Number(v.signed_witness_run_id))||
+    Number(v.signed_witness_run_id)<10000||
+    v.original_work_id_for_provider_observation!==
+      'work:'+hash('reality:issue:'+issueNumber).slice(0,32)||
+    v.owner_goal_bound!==false||
+    v.installation_authorized!==false||
+    v.job_completed!==false||
+    v.production_changed!==false)
+  fail('SIGNED_OWNER_WITNESS_FRESH_PROVIDER_READBACK_REQUIRED');
+ const age=Date.now()-Date.parse(v.witnessed_at||'');
+ if(!Number.isFinite(age)||age< -30000||age>3600000)
+  fail('SIGNED_OWNER_WITNESS_FRESH_PROVIDER_READBACK_REQUIRED');
+ return Object.freeze({
+  status:v.status,issue_number:v.issue_number,issue_title:v.issue_title,
+  issue_url:v.issue_url,
+  original_provider_failed_run_id:Number(v.original_provider_failed_run_id),
+  original_provider_failed_job_id:Number(v.original_provider_failed_job_id),
+  source_sha:v.source_sha,source_path:v.source_path,
+  frozen_test_path:v.frozen_test_path,frozen_test_sha256:v.frozen_test_sha256,
+  actual_provider_failure_hash:v.actual_provider_failure_hash,
+  original_work_id_for_provider_observation:v.original_work_id_for_provider_observation,
+  independently_verified:true,owner_goal_bound:false,
+  installation_authorized:false,job_completed:false,production_changed:false,
+  signed_witness_run_id:Number(v.signed_witness_run_id),
+  source:'SIGNED_GITHUB_OIDC_PROVIDER_REVERIFY_READBACK'
+ });
+}
+
 export async function verifyRealMissingRepairIssue({
  issueNumber,env=process.env,fetchImpl=fetch,
  observe=observeRealityIssueFailure,
@@ -46,6 +109,7 @@ export async function verifyRealMissingRepairIssue({
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('GITHUB_ISSUE_ID_REQUIRED');
  const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||env.GITHUB_TOKEN||null;
+ try{
  const issue=await provider('issues/'+issueNumber,{token,fetchImpl});
  if(issue.number!==issueNumber||issue.state!=='open'||issue.pull_request||
   issue.repository_url!==ROOT.slice(0,-1))
@@ -91,6 +155,18 @@ export async function verifyRealMissingRepairIssue({
   owner_goal_bound:false,installation_authorized:false,
   job_completed:false,production_changed:false,
  });
+ }catch(error){
+  // GitHub GET is frequently unauthenticated in preview: production's
+  // credential is intentionally NOT available here. Never treat an
+  // arbitrary 403 as permission to skip independent source verification.
+  // A signed GitHub Actions witness, bound to the exact historical run,
+  // frozen hash and original issue, is required and separately re-read.
+  if(String(error?.message||'')==='REALITY_REAL_REPAIR_GITHUB_PROVIDER_SOURCE_READBACK_403'&&
+     env.VERCEL_ENV==='preview')
+   return readSignedOwnerIssueWitness({issueNumber,env,fetchImpl});
+  throw error;
+ }
+
 }
 export async function discoverRealRepairOpportunities({
  env=process.env,fetchImpl=fetch,maxIssues=20,
