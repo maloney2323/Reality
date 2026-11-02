@@ -16,7 +16,9 @@ async function provider(path){
   method:'GET',cache:'no-store',redirect:'error',headers:{
    accept:'application/vnd.github+json',
    'x-github-api-version':'2022-11-28',
-   'user-agent':'Reality-independent-owner-uninstalled-proposal-review-v1'}});
+   'user-agent':'Reality-independent-owner-uninstalled-proposal-review-v1',
+   ...(String(process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||'').length>20?
+      {authorization:'Bearer '+process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN}:{})}});
  if(!response.ok)throw Error('PROVIDER_PROPOSAL_READBACK_FAILED');
  return response.json();
 }
