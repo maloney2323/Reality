@@ -99,6 +99,9 @@ for(const row of selected){
     'x-reality-github-provider-token':env.GH_TOKEN||''},cache:'no-store',redirect:'error',
    body:JSON.stringify({action:'reconcile',proof})});
   const outcome=await response.json().catch(()=>null);
+  if(!response.ok||outcome?.ok!==true)
+   console.warn('REALITY_FROZEN_BROKER_SAFE_FAILURE',String(outcome?.error||'UNVERIFIED').slice(0,110),
+    'http_status',response.status);
   if(!response.ok||outcome?.ok!==true||
     outcome.status!=='FROZEN_REPRODUCED_AWAITING_CANDIDATE'||
     outcome.original_work_id!==row.original_work_id||
