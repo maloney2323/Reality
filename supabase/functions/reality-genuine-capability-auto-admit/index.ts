@@ -1411,9 +1411,11 @@ Deno.serve(async request=>{
    return respond({ok:true,...receipt});
   }
   if(['inflight_start','inflight_read','inflight_pause','inflight_resume',
-     'inflight_checkpoint','inflight_blocked_checkpoint'].includes(input?.action)&&
+     'inflight_checkpoint','inflight_blocked_checkpoint','inflight_stale_checkpoint_probe',
+     'inflight_verify'].includes(input?.action)&&
      SHA40.test(input?.scope?.repository_sha||'')){
-    const check=input.action==='inflight_checkpoint'||input.action==='inflight_blocked_checkpoint';
+    const check=['inflight_checkpoint','inflight_blocked_checkpoint',
+      'inflight_stale_checkpoint_probe'].includes(input.action);
     if(Object.keys(input).sort().join(',')!=='action,scope'||
        Object.keys(input.scope||{}).sort().join(',')!==
         (check?'lease_epoch,repository_sha,step':'repository_sha')||
@@ -1436,6 +1438,20 @@ Deno.serve(async request=>{
         deny('INFLIGHT_STATE_INDEPENDENT_READBACK_INVALID');
       return respond({ok:true,...state,signed_run_id:runId});
     }
+    if(input.action==='inflight_verify'){
+      const readback=await database('rpc/reality_inflight_independent_checkpoint_readback_v1',{
+        method:'POST',body:{p_run_id:runId}});
+      if(readback?.run_id!==runId||
+         !['ACTIVE','PAUSED','SETTLED'].includes(readback.status)||
+         !Number.isInteger(readback.checkpoint_count)||
+         !Array.isArray(readback.checkpoint_event_ids)||
+         readback.checkpoint_event_ids.length!==readback.checkpoint_count||
+         !SHA64.test(readback.last_checkpoint_hash)||
+         readback.original_job_reexecuted!==false||
+         readback.production_changed!==false)
+        deny('INFLIGHT_INDEPENDENT_UNIVERSE_READBACK_INVALID');
+      return respond({ok:true,...readback,signed_run_id:runId});
+    }
     const epoch=Number(input.scope.lease_epoch),step=Number(input.scope.step);
     if(!Number.isSafeInteger(epoch)||epoch<1||!Number.isInteger(step)||step<1||step>3)
       deny('INFLIGHT_CHECKPOINT_EXACT_STAGE_REQUIRED');
@@ -1450,6 +1466,18 @@ Deno.serve(async request=>{
         throw err;
       }
       deny('INFLIGHT_HALTED_CHECKPOINT_UNEXPECTEDLY_ACCEPTED');
+    }
+    if(input.action==='inflight_stale_checkpoint_probe'){
+      try{await rpc('CHECKPOINT',epoch,step,{verified:true,source:'UNIVERSE_VERIFIED_SOURCE_READBACK',
+        source_work_id:'work:00000000000000000000000000000000'});}
+      catch(err){
+        if(String(err?.message||'')==='REALITY_INFLIGHT_STALE_WORKER_FENCED')
+          return respond({ok:true,status:'STALE_WORKER_LEASE_DENIED',
+            signed_run_id:runId,lease_epoch:epoch,blocked_step:step,
+            production_changed:false});
+        throw err;
+      }
+      deny('INFLIGHT_STALE_CHECKPOINT_UNEXPECTEDLY_ACCEPTED');
     }
     const current=await rpc('READ');
     if(current?.state!=='ACTIVE'||current.lease_epoch!==epoch||
