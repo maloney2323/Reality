@@ -310,6 +310,19 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <button id="wcEasyRepairMain" type="button" class="repair-primary" style="display:block;width:100%;font-size:16px;min-height:52px;margin:0">Continue Reality's repair</button>
   <p id="wcEasyRepairStatus" role="status" aria-live="polite" style="font-size:12px;color:#b8d1e4;margin:11px 0 0">Reality checks the saved job first. A previous owner approval is never submitted twice.</p>
   <details id="wcEasyRepairEvidence" style="margin-top:12px"><summary style="cursor:pointer;color:#b8d1e4">Technical evidence &amp; detailed controls</summary><p style="font-size:12px;color:#b8d1e4">The existing detailed repair workflow remains below under Upgrades &amp; Improvements. Verification and installation authority remain separate.</p><button id="wcQuickFindRepair" type="button" class="repair-secondary">Open detailed repair controls</button></details>
+  <dialog id="wcEasyGenuineApproval" class="repair-dialog" aria-labelledby="wcEasyGenuineApprovalHeading">
+   <div class="repair-dialog-body">
+    <span class="repair-eyebrow">Exact owner authorization · Isolated preview only</span>
+    <h3 id="wcEasyGenuineApprovalHeading">Approve this verified upgrade?</h3>
+    <p id="wcEasyGenuineApprovalDetails" class="repair-consent-work">The independently tested artifact will be shown here.</p>
+    <p>Approval authorizes one exact isolated installation for the original job. It does not authorize production changes, new jobs or future upgrades.</p>
+    <label class="repair-checkbox"><input id="wcEasyGenuineApprovalCheck" type="checkbox">I approve this exact verified upgrade in the isolated preview.</label>
+    <div class="repair-dialog-actions">
+     <button type="button" id="wcEasyGenuineCancel" class="repair-cancel">Cancel</button>
+     <button type="button" id="wcEasyGenuineConfirm" class="repair-confirm" disabled>Approve exact upgrade</button>
+    </div>
+   </div>
+  </dialog>
  </section>
  <div class="wc-head">
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
@@ -1828,6 +1841,86 @@ async function wcEasyRefresh(){
   $('wcEasyRepairStatus').textContent='Trusted owner-work readback unavailable; no duplicate job or installation created.';
  }
 }
+// This is the general engine's REAL independently qualified artifact,
+// not the separate historical repair-candidate UI.
+let wcEasyGenuineCandidate=null;
+async function wcEasyReviewQualified(job){
+ const r=await fetch('/api/reality/personal-qualified-capabilities',{
+  method:'GET',credentials:'same-origin',cache:'no-store'});
+ const data=await r.json();
+ if(!r.ok||data.ok!==true||!Array.isArray(data.entries)||
+    data.installation_authorized!==false)
+  throw Error('INDEPENDENT_QUALIFIED_SOURCE_READBACK_UNAVAILABLE');
+ const entries=data.entries.filter(e=>e.original_work_id===job.original_work_id&&
+  e.phase==='AWAITING_OWNER_APPROVAL'&&
+  e.qualification?.installation_authorized===false&&
+  e.qualification?.original_job_completed===false&&
+  /^[a-f0-9]{64}$/.test(String(e.qualification?.artifact_sha256||''))&&
+  Array.isArray(e.source_paths)&&e.source_paths.length>0&&
+  e.source_paths.length<=16);
+ if(entries.length!==1||entries[0].approval)
+  throw Error('EXACT_UNAPPROVED_ORIGINAL_CANDIDATE_REQUIRED');
+ const entry=entries[0],hash=entry.qualification.artifact_sha256;
+ if(job._verified_loop?.candidate_verified!==true)
+  throw Error('OWNER_LOOP_INDEPENDENT_CANDIDATE_CHECK_REQUIRED');
+ wcEasyGenuineCandidate={original_work_id:job.original_work_id,
+  artifact_sha256:hash,source_paths:entry.source_paths};
+ $('wcEasyGenuineApprovalDetails').textContent=
+  'Original work: '+job.original_work_id+
+  ' · Independently verified SHA-256: '+hash+
+  ' · Source files: '+entry.source_paths.join(', ');
+ $('wcEasyGenuineApprovalCheck').checked=false;
+ $('wcEasyGenuineConfirm').disabled=true;
+ $('wcEasyGenuineApproval').showModal();
+}
+$('wcEasyGenuineCancel').onclick=()=>{
+ $('wcEasyGenuineApproval').close();
+ wcEasyGenuineCandidate=null;
+ $('wcEasyGenuineApprovalCheck').checked=false;
+};
+$('wcEasyGenuineApprovalCheck').onchange=()=>{
+ $('wcEasyGenuineConfirm').disabled=
+  !$('wcEasyGenuineApprovalCheck').checked||!wcEasyGenuineCandidate;
+};
+$('wcEasyGenuineConfirm').onclick=async()=>{
+ const c=wcEasyGenuineCandidate,button=$('wcEasyGenuineConfirm');
+ if(!c||button.disabled||!$('wcEasyGenuineApprovalCheck').checked)return;
+ button.disabled=true;
+ $('wcEasyGenuineApproval').close();
+ wcEasyGenuineCandidate=null;
+ wcEasyRepairBusy=true;
+ $('wcEasyRepairMain').disabled=true;
+ $('wcEasyRepairStatus').textContent='Recording one owner approval for the exact verified source…';
+ try{
+  const r=await fetch('/api/reality/personal-qualified-capability-approve',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    intent:'OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY',
+    original_work_id:c.original_work_id,
+    artifact_sha256:c.artifact_sha256,
+    confirmation:'APPROVE EXACT VERIFIED UPGRADE IN ISOLATED PREVIEW'
+   })});
+  const proof=await r.json();
+  if(!r.ok||proof.ok!==true||
+     proof.status!=='OWNER_APPROVED_ISOLATED_INSTALL_PENDING'||
+     proof.original_work_id!==c.original_work_id||
+     proof.artifact_sha256!==c.artifact_sha256||
+     proof.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+     proof.source_installation_completed!==false||
+     proof.original_job_completed!==false||
+     proof.production_changed!==false)
+   throw Error('OWNER_APPROVAL_DURABLE_READBACK_NOT_VERIFIED');
+  wcEasyStage(3,'complete');wcEasyStage(4,'active');
+  wcEasyStatus('Exact source approved. Reality’s isolated executor must finish installation and the original job before settlement can be claimed.','Check verified result');
+  $('wcEasyRepairStatus').textContent='Approved once for '+c.original_work_id+
+   ' · No production changes · Worker execution pending independent confirmation.';
+ }catch(e){
+  wcEasyStatus('The approval response needs independent readback. Do not approve again.','Recheck verified status');
+  $('wcEasyRepairStatus').textContent='No installation or completion claimed. '+String(e?.message||'READBACK_UNAVAILABLE');
+ }finally{wcEasyRepairBusy=false;$('wcEasyRepairMain').disabled=false;void wcEasyRefresh();}
+};
+
 $('wcEasyRepairMain').onclick=async()=>{
  const button=$('wcEasyRepairMain');
  if(wcEasyRepairBusy)return;
@@ -1863,7 +1956,11 @@ $('wcEasyRepairMain').onclick=async()=>{
    return;
   }
   if(existing._verified_loop?.owner_install_approved===true){
-   $('wcInstallSettlementPanel').scrollIntoView({behavior:'smooth',block:'center'});
+   $('wcEasyRepairStatus').textContent='The exact owner approval is already saved. Reality will report the independent installation and settlement readback. Do not approve again.';
+   return;
+  }
+  if(existing._verified_loop?.candidate_verified===true){
+   await wcEasyReviewQualified(existing);
    return;
   }
   if(existing._verified_loop&&existing._verified_loop.candidate_verified!==true){
