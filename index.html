@@ -874,6 +874,7 @@ function jumpToWorkSetup(kind){
   return;
  }
  chat?.scrollIntoView({behavior:'smooth',block:'start'});
+ if(kind==='goal'&&$('realityChatSettings'))$('realityChatSettings').open=true;
  const input=kind==='account'?'privateEmail':'privateGoalText';
  $(input)?.focus({preventScroll:true});
 }
@@ -2283,6 +2284,7 @@ $('wcEasyRepairMain').onclick=async()=>{
    return;
   }
   if(existing.goal_still_current!==true){
+   if($('realityChatSettings'))$('realityChatSettings').open=true;
    $('privateGoalText').scrollIntoView({behavior:'smooth',block:'center'});
    return;
   }
