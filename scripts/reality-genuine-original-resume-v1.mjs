@@ -55,11 +55,6 @@ if(ready.status!=='ACCEPTED_FOR_ISOLATED_RESUMPTION'||
 // Verify the extension protocol and any independent target evidence BEFORE
 // consuming the one-time original-work claim. #201 must never replay #178.
 const contract=deriveOriginalResumeContract(ready);
-const claim=await broker('original_claim',{trigger_id:ready.trigger_id});
-if(claim.status!=='RESUMPTION_CLAIMED'||
- claim.original_work_id!==ready.original_work_id||
- claim.installed_commit_sha!==ready.installed_commit_sha||
- claim.original_job_completed!==false)fail('SINGLE_USE_ORIGINAL_CLAIM_REQUIRED');
 const older=await github('/actions/runs/'+ready.original_failed_run_id);
 const oldJob=await github('/actions/jobs/'+ready.original_failed_job_id);
 if(older.id!==Number(ready.original_failed_run_id)||
@@ -152,6 +147,14 @@ if(contract.requires_reconciliation_evidence&&(
  disposition?.universe_settlement_verified!==false||
  disposition?.original_job_completed_in_universe!==false))
  fail('RECONCILIATION_PROPOSAL_NOT_AN_AUTHORITATIVE_SETTLEMENT');
+// Single-use claim is consumed only AFTER provider evidence, unchanged
+// frozen suite, offline extension evaluation and the exact business decision
+// pass. A failed real-world holdout cannot burn the original job's claim.
+const claim=await broker('original_claim',{trigger_id:ready.trigger_id});
+if(claim.status!=='RESUMPTION_CLAIMED'||
+ claim.original_work_id!==ready.original_work_id||
+ claim.installed_commit_sha!==ready.installed_commit_sha||
+ claim.original_job_completed!==false)fail('SINGLE_USE_ORIGINAL_CLAIM_REQUIRED');
 const proof={
  schema:'reality-original-job-execution-proof-v1',
  original_work_id:ready.original_work_id,
