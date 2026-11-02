@@ -578,6 +578,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  prove_live_inflight_continuity_recovery:
+    # Evidence-only isolated task on the real #201 customer repair lineage.
+    # Deliberately interrupts an alive worker; never replays the settled customer job.
+    needs: [resume_original_job, recover_claimed_original_settlement, reconcile_all_settled_outcomes]
+    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight]') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Stop an alive worker and recover its real provider audit from Universe checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-real-inflight-continuity-drill-v1.mjs
+          node scripts/reality-real-inflight-continuity-drill-v1.mjs
+      - name: Preserve independent signed interruption recovery and Universe proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-inflight-continuity-proof-${{ github.run_id }}
+          path: artifact/out/reality-actual-interruption-recovery.json
+          if-no-files-found: error
+          retention-days: 30
+
   independently_measure_production_readiness:
     needs: reconcile_all_settled_outcomes
     if: github.event_name == 'push'
