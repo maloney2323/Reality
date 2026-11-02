@@ -28,8 +28,8 @@ const completed=[];
 for(const row of selected){
  const potential=report.findings.filter(f=>
   f.kind==='UNVERIFIED_MISSING_CAPABILITY_CANDIDATE'&&
-  /^test\\/reality-frozen-regressions\\/[a-z0-9._-]+\\.test\\.js$/.test(f.test_path)&&
-  /^src\\/reality-extensions\\/[a-z0-9._-]+\\.mjs$/.test(f.candidate_module_path)&&
+  /^test\/reality-frozen-regressions\/[a-z0-9._-]+\.test\.js$/.test(f.test_path)&&
+  /^src\/reality-extensions\/[a-z0-9._-]+\.mjs$/.test(f.candidate_module_path)&&
   existsSync(f.test_path)&&!existsSync(f.candidate_module_path)&&
   sha(readFileSync(f.test_path))===f.frozen_sha256);
  for(const item of potential){
@@ -43,7 +43,7 @@ for(const row of selected){
    'node:22','node','--test',item.test_path];
   const run=spawnSync('docker',args,{encoding:'utf8',timeout:120000,
    maxBuffer:200000,env:{PATH:env.PATH,HOME:env.HOME}});
-  const output=String(run.stdout||'')+'\\n'+String(run.stderr||'');
+  const output=String(run.stdout||'')+'\n'+String(run.stderr||'');
   if(!Number.isInteger(run.status)||run.status<1||
    !/ERR_MODULE_NOT_FOUND|Cannot find module/.test(output)||
    !output.includes(item.candidate_module_path))continue;
@@ -85,7 +85,7 @@ for(const row of selected){
 writeFileSync('artifact/genuine-capability-reproduced.json',
  JSON.stringify({schema:'reality-genuine-frozen-reproduced-v1',
   repository_sha:env.GITHUB_SHA,reconciled:completed,
-  installation_authorized:false,original_job_completed:false},null,2)+'\\n');
+  installation_authorized:false,original_job_completed:false},null,2)+'\n');
 console.log('REALITY_DURABLE_FROZEN_REPRODUCTION',JSON.stringify({
  original_work_ids:completed.map(x=>x.original_work_id),
  reproduced:completed.length,model_generated:false,installation_authorized:false
