@@ -32,6 +32,9 @@ jobs:
       - name: Signed automatic owner-evidence admission into the existing durable queue
         if: github.event_name == 'push'
         run: node scripts/reality-genuine-auto-admit-v1.mjs
+      - name: Wake frozen-test worker for the admitted original job
+        if: github.event_name == 'push'
+        run: node scripts/reality-genuine-frozen-worker-claim-v1.mjs
       - name: Show exact authorization boundary
         if: github.event_name == 'push'
         run: |
