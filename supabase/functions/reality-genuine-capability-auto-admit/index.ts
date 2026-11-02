@@ -1410,6 +1410,97 @@ Deno.serve(async request=>{
      await continueOriginalSettle(input.scope.repository_sha,verified.id,ghProviderToken,input.proof);
    return respond({ok:true,...receipt});
   }
+  if(['safety_halt','safety_probe','safety_release','safety_rollback_scope','safety_rollback_record'].includes(input?.action)&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   const record=input.action==='safety_rollback_record';
+   if(Object.keys(input).sort().join(',')!==(record?'action,proof,scope':'action,scope')||
+      Object.keys(input.scope||{}).sort().join(',')!=='repository_sha'||
+      typeof ghProviderToken!=='string'||
+      !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken))
+    deny('SAFETY_SIGNED_EXACT_ENVELOPE_REQUIRED');
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   if(input.action==='safety_halt'||input.action==='safety_release'){
+    const mode=input.action==='safety_halt'?'HALTED':'RUNNING';
+    const state=await database('rpc/reality_set_genuine_preview_emergency_mode_v1',{
+      method:'POST',body:{p_mode:mode,p_run_id:run.id,p_source_sha:input.scope.repository_sha}});
+    if(state?.mode!==mode||state?.run_id!==run.id||
+       state?.production_changed!==false||state?.production_release_authorized!==false)
+       deny('SAFETY_MODE_STATE_READBACK_FAILED');
+    return respond({ok:true,...state,signed_run_id:run.id});
+   }
+   const control=await database('rpc/reality_read_genuine_preview_emergency_state_v1',{
+     method:'POST',body:{}});
+   if(control?.mode!=='HALTED'||control.halt_run_id!==run.id)
+     deny('SAFETY_DRILL_OWN_HALTED_CONTROLLER_REQUIRED');
+   if(input.action==='safety_probe'){
+    const probe=await database('rpc/reality_probe_genuine_preview_emergency_stop_v1',{
+      method:'POST',body:{}});
+    if(probe?.status!=='ISOLATED_HALT_ENFORCED'||probe.blocked_admission_operations!==3||
+       probe.halt_controller_run_id!==run.id||probe.production_changed!==false)
+       deny('SAFETY_ACTIVE_HALT_NEGATIVE_PROBES_FAILED');
+    return respond({ok:true,...probe,signed_run_id:run.id});
+   }
+   const scope=await database('rpc/reality_genuine_isolated_rollback_drill_scope_v1',{
+     method:'POST',body:{}});
+   if(scope?.schema!=='reality-signed-isolated-rollback-scope-v1'||
+      scope.target_environment!=='ISOLATED_PREVIEW'||
+      !WORK.test(scope.original_work_id)||
+      !SHA40.test(scope.installed_commit_sha)||
+      !SHA64.test(scope.artifact_sha256)||
+      !/^feature\/reality-qualified-install-[a-f0-9]{12}$/.test(scope.installed_branch)||
+      !Array.isArray(scope.source_paths)||scope.source_paths.length<2||
+      scope.source_paths.some((x:string)=>typeof x!=='string'||!/^((src|test)\/reality-extensions\/)[a-zA-Z0-9._-]+\.(mjs|js)$/.test(x))||
+      scope.original_install_branch_must_remain_unchanged!==true||
+      scope.production_changed!==false)
+      deny('SAFETY_ROLLBACK_PINNED_SCOPE_INVALID');
+   if(input.action==='safety_rollback_scope')
+      return respond({ok:true,...scope,signed_run_id:run.id});
+   const proof=input.proof;
+   const expectedBranch='feature/reality-rollback-drill-'+run.id;
+   if(!proof||Object.keys(proof).sort().join(',')!==
+     'base_tree_sha,drill_branch,installed_commit_sha,original_work_id,rollback_commit_sha,source_paths'||
+     proof.original_work_id!==scope.original_work_id||
+     proof.installed_commit_sha!==scope.installed_commit_sha||
+     proof.drill_branch!==expectedBranch||
+     !SHA40.test(proof.base_tree_sha)||!SHA40.test(proof.rollback_commit_sha)||
+     JSON.stringify(proof.source_paths)!==JSON.stringify(scope.source_paths))
+     deny('SAFETY_ROLLBACK_PROOF_EXACT_PIN_MISMATCH');
+   const [installedRef,drillRef,rolledCommit,installedCommit,baseTree,installedTree]=
+     await Promise.all([
+      api('/git/ref/heads/'+scope.installed_branch,ghProviderToken),
+      api('/git/ref/heads/'+expectedBranch,ghProviderToken),
+      api('/git/commits/'+proof.rollback_commit_sha,ghProviderToken),
+      api('/git/commits/'+scope.installed_commit_sha,ghProviderToken),
+      api('/git/trees/'+proof.base_tree_sha+'?recursive=1',ghProviderToken),
+      api('/git/trees/'+proof.base_tree_sha+'?recursive=1',ghProviderToken)
+     ]);
+   // Git tree API requires a tree SHA, not a commit SHA.
+   const installedTreeActual=await api('/git/trees/'+installedCommit?.tree?.sha+'?recursive=1',ghProviderToken);
+   if(installedRef?.object?.sha!==scope.installed_commit_sha||
+      drillRef?.object?.sha!==proof.rollback_commit_sha||
+      rolledCommit?.parents?.length!==1||
+      rolledCommit.parents[0]?.sha!==scope.installed_commit_sha||
+      rolledCommit.tree?.sha!==proof.base_tree_sha||
+      baseTree?.truncated!==false||installedTreeActual?.truncated!==false||
+      !Array.isArray(baseTree?.tree)||!Array.isArray(installedTreeActual?.tree)||
+      scope.source_paths.some((p:string)=>!installedTreeActual.tree.some((x:any)=>x.path===p)||
+        baseTree.tree.some((x:any)=>x.path===p)))
+     deny('SAFETY_PROVIDER_REAL_ROLLBACK_SOURCE_READBACK_FAILED');
+   const receipt=await database('rpc/reality_record_genuine_isolated_rollback_drill_v1',{
+     method:'POST',body:{
+      p_run_id:run.id,p_repository_sha:input.scope.repository_sha,
+      p_original_work_id:scope.original_work_id,
+      p_installed_commit_sha:scope.installed_commit_sha,
+      p_rollback_commit_sha:proof.rollback_commit_sha,
+      p_drill_branch:expectedBranch,p_base_tree_sha:proof.base_tree_sha,
+      p_source_paths:scope.source_paths}});
+   if(receipt?.status!=='ISOLATED_ROLLBACK_DRILL_RECORDED'||
+      receipt.original_branch_preserved!==true||
+      receipt.rolled_back_source_absent!==true||
+      receipt.production_changed!==false)
+      deny('SAFETY_ROLLBACK_DURABLE_RECEIPT_FAILED');
+   return respond({ok:true,...receipt,signed_run_id:run.id});
+  }
   if(input?.action==='universe_outcome_reconcile'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope'||
