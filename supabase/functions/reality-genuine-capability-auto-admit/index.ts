@@ -1097,6 +1097,26 @@ Deno.serve(async request=>{
      await continueOriginalSettle(input.scope.repository_sha,verified.id,ghProviderToken,input.proof);
    return respond({ok:true,...receipt});
   }
+  if(input?.action==='readiness_snapshot'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope'||
+      Object.keys(input.scope||{}).sort().join(',')!=='repository_sha')
+    deny('READINESS_ENVELOPE_UNVERIFIED');
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const snapshot=await database('rpc/reality_genuine_production_readiness_snapshot_v1',{
+      method:'POST',body:{}});
+   if(snapshot?.schema!=='reality-independent-production-readiness-snapshot-v1'||
+      snapshot.scope!=='ISOLATED_PROJECT_READ_ONLY'||
+      snapshot.production_release_authorized!==false||
+      snapshot.production_changed!==false||
+      !Number.isInteger(snapshot.settled_original_jobs)||
+      !Number.isInteger(snapshot.unreconciled_settlements)||
+      !Number.isInteger(snapshot.unbound_capability_discoveries))
+    deny('READINESS_INDEPENDENT_DATABASE_READBACK_FAILED');
+   return respond({ok:true,status:'READINESS_EVIDENCE_VERIFIED',
+     signed_run_id:run.id,repository_sha:input.scope.repository_sha,
+     snapshot,production_release_authorized:false,production_changed:false});
+  }
   if(input?.action==='installer_recover_prepare'&&
     SHA40.test(input?.scope?.repository_sha||'')){
    if(Object.keys(input).sort().join(',')!=='action,scope')
