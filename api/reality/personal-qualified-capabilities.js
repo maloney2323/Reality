@@ -1,6 +1,8 @@
 // Read-only and owner-scoped. Does not install, authorize, or resume a job.
 import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
+import {resolveReliabilityBenchmarkDb}
+ from '../../src/reality-reliability-db-boundary-v0.1.js';
 export const maxDuration=30;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -12,10 +14,12 @@ export default async function handler(req,res){
   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
   if(Object.keys(req.query||{}).length)
    return res.status(400).json({ok:false,error:'CLIENT_SCOPE_NOT_ACCEPTED'});
-  const url=String(process.env.SUPABASE_URL||'').replace(/\/$/,'');
-  const secret=String(process.env.SUPABASE_SECRET_KEY||'');
-  if(url!==session.config.url||!secret.startsWith('sb_secret_'))
+  const db=resolveReliabilityBenchmarkDb();
+  if(!db?.strictSecrets||!db.secretKey||
+    db.url!==session.config.url||
+    db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
    throw Error('ISOLATED_OWNER_DATABASE_NOT_VERIFIED');
+  const url=db.url,secret=db.secretKey;
   const response=await fetch(
    url+'/rest/v1/rpc/reality_read_owner_qualified_capabilities_v1',{
     method:'POST',headers:{
