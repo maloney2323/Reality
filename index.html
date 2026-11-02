@@ -1870,21 +1870,47 @@ $('wcRepairConfirmInvestigation').onclick=async()=>{
 // An existing verified owner investigation permits a read-only initiation.
 // Server independently rechecks owner, current goal, GitHub and source bytes.
 const wcGenuineStarted=new Set();
+const wcGenuineFeedback=new Map();
+function wcShowGenuineFeedback(job,message){
+ const key=job.work_id+'|'+job.conversation_id;
+ wcGenuineFeedback.set(key,message);
+ const panel=$('wcUnfinishedList');
+ if(!panel)return;
+ // The list may have been re-rendered while an independent read was running.
+ // Always update the CURRENT card instead of a detached DOM element.
+ const feedback=[...panel.querySelectorAll('[data-unfinished-feedback]')]
+  .find(e=>e.dataset.unfinishedFeedback===job.work_id);
+ if(feedback)feedback.textContent=message;
+}
+async function wcBoundedJson(url,options,maxMs){
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),maxMs);
+ try{
+  const response=await fetch(url,{...options,signal:controller.signal});
+  const data=await response.json();
+  return {response,data};
+ }finally{clearTimeout(timeout)}
+}
 async function wcStartVerifiedGenuineGap(job){
  const key=job.work_id+'|'+job.conversation_id;
- if(wcGenuineStarted.has(key))return;
+ if(wcGenuineStarted.has(key)){
+  const previous=wcGenuineFeedback.get(key);
+  if(previous)wcShowGenuineFeedback(job,previous);
+  return;
+ }
  wcGenuineStarted.add(key);
- const feedback=[...$('wcUnfinishedList').querySelectorAll('[data-unfinished-feedback]')]
-  .find(e=>e.dataset.unfinishedFeedback===job.work_id);
- if(feedback)feedback.textContent='Reality is independently checking the original missing capability…';
+ wcShowGenuineFeedback(job,
+  'Checking the original capability evidence in the background. The rest of Reality remains usable…');
  try{
-  const response=await fetch('/api/reality/personal-genuine-original-investigate',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
-   headers:{'content-type':'application/json'},
-   body:JSON.stringify({intent:'INVESTIGATE_VERIFIED_ORIGINAL_CAPABILITY_GAP',
-    original_work_id:job.work_id,conversation_id:job.conversation_id}),
-  });
-  const result=await response.json();
+  // One bounded request only. An uncertain POST may have committed its
+  // queue event; never automatically re-dispatch or retry after timeout.
+  const {response,data:result}=await wcBoundedJson(
+   '/api/reality/personal-genuine-original-investigate',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'INVESTIGATE_VERIFIED_ORIGINAL_CAPABILITY_GAP',
+     original_work_id:job.work_id,conversation_id:job.conversation_id}),
+   },45000);
   if(!response.ok||result.ok!==true||
    result.original_work_id!==job.work_id||
    result.original_job_completed!==false||result.new_job_created!==false||
@@ -1896,7 +1922,7 @@ async function wcStartVerifiedGenuineGap(job){
   const wake=result.worker_wake_status==='WORKER_WAKE_DISPATCHED'?
    ' Signed worker wake dispatched; generation still unproven.':
    ' Worker wake not independently confirmed; Reality must reconcile.';
-  if(feedback)feedback.textContent=queued?
+  wcShowGenuineFeedback(job,queued?
     'Original missing capability durably queued. Trigger: '+
       result.queue_trigger_id+'.'+wake+' No installation authorized.':
     result.handoff_error_code?'Capability intake blocked: '+result.handoff_error_code:
@@ -1904,10 +1930,15 @@ async function wcStartVerifiedGenuineGap(job){
      'Independent source check blocked the queue: '+
       result.independent_source_readback_error_code+
       '. Reality correctly refused to promote unverified evidence.':
-    'Original investigation unresolved. No customer-job completion or installation was claimed.';
+    'Original investigation unresolved. No customer-job completion or installation was claimed.');
  }catch(e){
-  if(feedback)feedback.textContent='Original job remains open. Investigation blocked: '+
-   String(e.message||'UNAVAILABLE').slice(0,110);
+  // Do not falsely claim the POST never ran: it may have committed before the
+  // browser lost contact. The next step is READ-ONLY reconciliation.
+  wcShowGenuineFeedback(job,e?.name==='AbortError'?
+   'The investigation exceeded 45 seconds. Its durable outcome is uncertain. No automatic retry or installation; review saved receipts before continuing.':
+   'Original job remains open. Investigation blocked: '+
+    String(e?.message||'UNAVAILABLE').slice(0,110)+
+    '. No automatic retry. Review saved receipts before continuing.');
  }
 }
 let wcUnfinishedReadSerial=0;
@@ -1922,10 +1953,9 @@ async function wcLoadUnfinishedWork(){
  status.textContent='Checking your saved jobs across conversations · Read only…';
  panel.textContent='Reading Continuity. No jobs are being started.';
  try{
-  const response=await fetch('/api/reality/personal-unfinished-work',{
-   credentials:'same-origin',cache:'no-store',
-  });
-  const data=await response.json();
+  const {response,data}=await wcBoundedJson(
+   '/api/reality/personal-unfinished-work',
+   {credentials:'same-origin',cache:'no-store'},20000);
   if(serial!==wcUnfinishedReadSerial)return;
   if(!response.ok||data.ok!==true||!Array.isArray(data.jobs)||
      !['SCOPED_READ_ONLY','PARTIAL_COVERAGE'].includes(data.status)||
@@ -1948,18 +1978,26 @@ async function wcLoadUnfinishedWork(){
    ' Owner-authorized read-only source investigations may start automatically; installation is never automatic.';
   panel.innerHTML=safe.length?safe.map(wcUnfinishedHTML).join(''):
    '<p class="wc-note">No unfinished tracking jobs to display yet. Newly discovered opportunities are separate from authorized work.</p>';
+  // Restore progress after list re-render. A pending background POST must
+  // never lose its visible status or be silently sent a second time.
+  for(const job of safe){
+   const remembered=wcGenuineFeedback.get(job.work_id+'|'+job.conversation_id);
+   if(remembered)wcShowGenuineFeedback(job,remembered);
+  }
   // Only an already owner-authorized, source-verified, active-goal
   // original investigation is eligible. No self-install or external retry.
   const eligible=safe.find(j=>j.state==='REAL_SOURCE_BACKED_REPAIR_PENDING'&&
    j.goal_still_current===true&&j.job_completed===false&&
    j.can_resume_execution===false&&!!j.source_receipt_id);
   if(eligible)void wcStartVerifiedGenuineGap(eligible);
- }catch{
+ }catch(error){
   if(serial!==wcUnfinishedReadSerial)return;
   $('wcUnfinishedCount').textContent='';
   wcUpgradeReviews=[];wcRender();
-  status.textContent='Could not verify unfinished work. This does not mean all jobs are done.';
-  panel.textContent='Reconnect and refresh this section. No actions were performed.';
+  status.textContent=error?.name==='AbortError'?
+   'Unfinished Work read exceeded 20 seconds. This is not a completed or failed job.':
+   'Could not verify unfinished work. This does not mean all jobs are done.';
+  panel.textContent='The saved jobs were not confirmed by this read. You can refresh this read-only section; no repair was started by this request.';
  }
 }
 $('wcRefreshUnfinished').onclick=()=>{void wcLoadUnfinishedWork()};
