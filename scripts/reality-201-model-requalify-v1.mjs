@@ -55,6 +55,9 @@ if(run?.status!=='completed'||run?.conclusion!=='success'||
 const ticket=createFoundationalBuildTicket({
  ...oldInput,repository_base_sha:env.GITHUB_SHA,max_attempts:3});
 const originalFrozenSource=readFileSync(ticket.frozen_test_path,'utf8');
+const holdoutPath='test/reality-201-provider-backed-relationship-holdout-v1.test.js';
+const holdoutSource=readFileSync(holdoutPath,'utf8');
+const holdoutSha256=sha(holdoutSource);
 const model=createFoundationalModelGenerator({
  model:env.REALITY_REPAIR_MODEL||'gpt-5.6',
  apiKey:env.OPENAI_API_KEY,
@@ -63,8 +66,11 @@ const model=createFoundationalModelGenerator({
   return {source:'GITHUB_PINNED_READ_ONLY_TEST_FILES',
    repository_base_sha:ticket.repository_base_sha,
    frozen_regression_sha256:originalFrozen,
-   files:[{path:ticket.frozen_test_path,content:originalFrozenSource,
-   sha256:originalFrozen}]};
+   files:[
+    {path:ticket.frozen_test_path,content:originalFrozenSource,
+     sha256:originalFrozen},
+    {path:holdoutPath,content:holdoutSource,sha256:holdoutSha256}
+   ]};
  }
 });
 const feedback={
