@@ -29,6 +29,36 @@ if(!r.ok||result?.ok!==true||
  result?.snapshot?.production_changed!==false||
  result?.production_release_authorized!==false)
  die('DURABLE_DATABASE_READBACK_OR_SIGNED_WORKFLOW_UNVERIFIED');
+const integrity=result.integrity;
+if(integrity?.schema!=='reality-genuine-release-integrity-audit-v1'||
+ integrity.scope!=='ISOLATED_PROJECT_READ_ONLY'||
+ integrity.production_release_authorized!==false||
+ integrity.production_changed!==false||
+ integrity.release_decision!=='NOT_READY'||
+ integrity.verified_completion_events_audited!==result.snapshot.verified_universe_settlements||
+ integrity.missing_verified_completion_events!==0||
+ integrity.duplicate_completion_work_ids!==0||
+ integrity.invalid_content_hashes!==0||
+ integrity.broken_parent_lineages!==0||
+ integrity.unsupported_verified_completion_claims!==0||
+ integrity.authority_mismatch_events!==0||
+ integrity.anon_settlement_execute!==false||
+ integrity.authenticated_settlement_execute!==false)
+ die('INDEPENDENT_LIVE_LEDGER_INTEGRITY_OR_AUTHORITY_FAILED');
+// Real network probes against the deployed signed broker. Untrusted callers must fail.
+const endpoint='https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit';
+const body=JSON.stringify({action:'universe_outcome_reconcile',scope:{repository_sha:env.GITHUB_SHA}});
+const negative=[];
+for(const [label,headers] of [
+ ['missing_signature',{'content-type':'application/json'}],
+ ['invalid_signature',{'content-type':'application/json',authorization:'Bearer invalid.jwt.signature'}]
+]){
+ const probe=await fetch(endpoint,{method:'POST',cache:'no-store',redirect:'error',headers,body});
+ const outcome=await probe.json().catch(()=>null);
+ if(probe.ok||outcome?.ok===true||probe.status<400||probe.status>499)
+   die('UNSIGNED_BROKER_REQUEST_WAS_NOT_DENIED_'+label);
+ negative.push({label,denied_http_status:probe.status,authorized:false});
+}
 const s=result.snapshot;
 if(s.settled_original_jobs<0||
  s.unreconciled_settlements<0||
@@ -59,7 +89,14 @@ const gates={
  unbound_owner_work:{
   status:s.unbound_capability_discoveries===0?'PASS':'PENDING_OWNER_BINDING',
   waiting:s.unbound_capability_discoveries},
- adversarial_safety:{status:'UNPROVEN'},
+ observed_universe_completion_integrity:{
+  status:'PASS',audited:integrity.verified_completion_events_audited,
+  unsupported_claims:integrity.unsupported_verified_completion_claims,
+  duplicate_work_ids:integrity.duplicate_completion_work_ids,
+  broken_lineages:integrity.broken_parent_lineages,
+  invalid_hashes:integrity.invalid_content_hashes},
+ signed_broker_negative_authorization:{status:'PASS',probes:negative},
+ adversarial_safety:{status:'PARTIAL_ONLY',unmeasured:'FAULT_INJECTION_ROLLBACK_AND_EXTERNAL_EXECUTION'},
  rollback_and_emergency_stop:{status:'UNPROVEN'},
  production_canary:{status:'NOT_AUTHORIZED'}
 };
@@ -75,6 +112,8 @@ const report={
  production_changed:false,
  gates,
  evidence:s,
+ independent_integrity_audit:integrity,
+ negative_authorization_probes:negative,
 };
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-production-readiness.json',JSON.stringify(report,null,2)+'\n');
@@ -87,4 +126,7 @@ console.log('REALITY_INDEPENDENT_READINESS_GATE',JSON.stringify({
  probation_target:s.probation_target,
  distinct_capability_families:s.distinct_isolated_capability_families,
  waiting_owner_binding:s.unbound_capability_discoveries,
+ integrity_audited:integrity.verified_completion_events_audited,
+ false_completion_claims:integrity.unsupported_verified_completion_claims,
+ signed_broker_negative_probes:negative.length,
  production_changed:false}));
