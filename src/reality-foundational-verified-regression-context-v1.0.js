@@ -44,7 +44,7 @@ export function createVerifiedFrozenRegressionReader({
   }
   if(ticket.frozen_regression_contract_kind==='PINNED_SINGLE_TEST'){
    const path=ticket.frozen_test_path;
-   if(!safePath(path)||!/^test\\/reality-frozen-regressions\\/[A-Za-z0-9._-]+\\.test\\.js$/.test(path))
+   if(!safePath(path)||!/^test\/reality-frozen-regressions\/[A-Za-z0-9._-]+\.test\.js$/.test(path))
     fail('SOURCE_BACKED_FROZEN_PATH_INVALID');
    const content=await read(path);
    if(hash(content)!==ticket.frozen_regression_sha256)
