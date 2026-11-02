@@ -1446,6 +1446,23 @@ Deno.serve(async request=>{
    const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
    const snapshot=await database('rpc/reality_genuine_production_readiness_snapshot_v1',{
       method:'POST',body:{}});
+   const integrity=await database('rpc/reality_genuine_release_integrity_audit_v1',{
+      method:'POST',body:{}});
+   if(integrity?.schema!=='reality-genuine-release-integrity-audit-v1'||
+      integrity.scope!=='ISOLATED_PROJECT_READ_ONLY'||
+      integrity.release_decision!=='NOT_READY'||
+      integrity.production_changed!==false||
+      integrity.production_release_authorized!==false||
+      !Number.isInteger(integrity.verified_completion_events_audited)||
+      !Number.isInteger(integrity.missing_verified_completion_events)||
+      !Number.isInteger(integrity.duplicate_completion_work_ids)||
+      !Number.isInteger(integrity.invalid_content_hashes)||
+      !Number.isInteger(integrity.broken_parent_lineages)||
+      !Number.isInteger(integrity.unsupported_verified_completion_claims)||
+      !Number.isInteger(integrity.authority_mismatch_events)||
+      typeof integrity.anon_settlement_execute!=='boolean'||
+      typeof integrity.authenticated_settlement_execute!=='boolean')
+      deny('READINESS_REAL_EVENT_INTEGRITY_AUDIT_UNAVAILABLE');
    if(snapshot?.schema!=='reality-independent-production-readiness-snapshot-v1'||
       snapshot.scope!=='ISOLATED_PROJECT_READ_ONLY'||
       snapshot.production_release_authorized!==false||
@@ -1456,7 +1473,7 @@ Deno.serve(async request=>{
     deny('READINESS_INDEPENDENT_DATABASE_READBACK_FAILED');
    return respond({ok:true,status:'READINESS_EVIDENCE_VERIFIED',
      signed_run_id:run.id,repository_sha:input.scope.repository_sha,
-     snapshot,production_release_authorized:false,production_changed:false});
+     snapshot,integrity,production_release_authorized:false,production_changed:false});
   }
   if(input?.action==='installer_recover_prepare'&&
     SHA40.test(input?.scope?.repository_sha||'')){
