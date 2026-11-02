@@ -113,7 +113,7 @@ async function database(path,{method='GET',body}={}){
   body:body===undefined?undefined:JSON.stringify(body)});
  const result=await response.json().catch(()=>null);
  if(!response.ok){
-  const safeCode=String(result?.message||'').match(/GENUINE_AUTO_[A-Z_]{4,100}/)?.[0];
+  const safeCode=String(result?.message||'').match(/(?:GENUINE_AUTO|QUALIFICATION)_[A-Z0-9_]{4,100}/)?.[0];
   if(safeCode)throw Error(safeCode);
   deny('DATABASE_'+response.status+'_UNAVAILABLE');
  }
