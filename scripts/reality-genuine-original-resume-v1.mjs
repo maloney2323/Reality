@@ -5,6 +5,7 @@ import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {deriveOriginalResumeContract} from '../src/reality-genuine-original-resume-contract-v1.js';
+import {verifyReconciliationProviderEvidence} from '../src/reality-original-provider-relationship-v1.js';
 const env=process.env, repo='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_ORIGINAL_RESUME_'+x)};
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -114,6 +115,28 @@ const evaluationInput=contract.requires_reconciliation_evidence?
  frozen_regression_sha256:ready.frozen_test_sha256,
  source_receipt_ref:'github:actions:run:'+older.id+':job:'+oldJob.id+':verified',
  superseding_success:null};
+// The signed broker provides a separately verified target and owner scope.
+// For a previously failed workflow, also read the exact provider job graph
+// and immutable settlement artifact before the repaired extension evaluates it.
+if(contract.requires_reconciliation_evidence){
+ const target=ready.reconciliation_evidence?.provider;
+ const runId=target?.run_id;
+ if(!Number.isSafeInteger(runId)||runId<1)
+  fail('RECONCILIATION_TARGET_RUN_REQUIRED');
+ const [providerRun,providerJobs,providerArtifacts]=await Promise.all([
+  github('/actions/runs/'+runId),
+  github('/actions/runs/'+runId+'/jobs?per_page=100'),
+  github('/actions/runs/'+runId+'/artifacts?per_page=100')
+ ]);
+ evaluationInput.provider=verifyReconciliationProviderEvidence(
+  target,providerRun,providerJobs,providerArtifacts);
+ console.log('REALITY_RECONCILIATION_PROVIDER_RELATIONSHIP_VERIFIED',
+  JSON.stringify({historical_run_id:runId,
+   resume_job_success:true,settlement_job_success:true,
+   unrelated_job_failure_verified:
+     evaluationInput.provider.unrelated_job_failure_verified,
+   settlement_artifact_digest_verified:true}));
+}
 const evaluationCode=
  'import * as module from '+JSON.stringify('file:///work/'+contract.source_path)+';'+
  'const f=module['+JSON.stringify(contract.export_name)+'];'+
