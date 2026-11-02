@@ -339,7 +339,23 @@ async function admit(report){
      receipt.original_job_completed!==false||
      receipt.new_customer_job_created!==false||
      !UUID.test(receipt.trigger_id))
+   {
+    // Emit only fixed diagnostic field names (no owner ids, tokens or body).
+    const wrong=[
+     receipt?.source_event_id!==gapId?'EVENT_ID':null,
+     receipt?.original_work_id!==original.payload.original_work_id?'WORK_ID':null,
+     !['PENDING_FROZEN_REPRODUCTION',
+       'LEASED_FOR_INDEPENDENT_REPRODUCTION',
+       'EVIDENCE_RECONCILIATION_REQUIRED',
+       'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(receipt?.phase)?'PHASE':null,
+     receipt?.installation_authorized!==false?'INSTALL_BOUNDARY':null,
+     receipt?.original_job_completed!==false?'COMPLETION_BOUNDARY':null,
+     receipt?.new_customer_job_created!==false?'NEW_JOB_BOUNDARY':null,
+     !UUID.test(receipt?.trigger_id)?'TRIGGER':null,
+    ].filter(Boolean);
+    console.warn('REALITY_QUEUE_READBACK_RECONCILIATION',wrong.join(','));
     deny('ATOMIC_QUEUE_READBACK_MISMATCH');
+   }
   // Repeated CI runs may observe a consumed one-time lease. Only newly
   // pending rows may reach the worker claim stage; never issue a second
   // claim for a leased, reconciled, or already-reproduced original job.
