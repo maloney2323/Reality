@@ -455,7 +455,7 @@ jobs:
 
   record_independent_original_settlement:
     needs: resume_original_job
-    if: ${{ needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'true' }}
+    if: ${{ always() && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'true' }}
     permissions:
       contents: read
       actions: read
