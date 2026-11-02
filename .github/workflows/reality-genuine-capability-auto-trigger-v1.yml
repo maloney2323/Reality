@@ -1,0 +1,19 @@
+# GitHub registers workflow_dispatch only for workflows present on default.
+# This default-branch stub has NO installation/execution privileges. All real
+# owner-approved execution is defined on the isolated feature branch and
+# must pass its signed GitHub OIDC + independent database approval gates.
+name: Reality governed automatic capability discovery — original frozen failures
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  no-production-execution:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse execution from default branch
+        run: |
+          echo 'Genuine capability installation is isolated-preview only.'
+          echo 'Never execute a capability job from main.'
+          exit 1
