@@ -235,6 +235,11 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 #homeLegacyInstallSlot .repair-current{margin-top:8px}
 @media(max-width:640px){.home-owner-center{padding:15px}.home-owner-head{flex-direction:column;gap:3px}.home-owner-count{margin-bottom:5px}.home-owner-item button{width:100%}}
 
+
+.reality-chat-settings{border:1px solid #395269;border-radius:12px;margin-top:18px;padding:12px;background:#101d2b}
+.reality-chat-settings summary{font-size:13px;color:#c3dced;cursor:pointer}
+#privateTranscript{min-height:130px}
+#privateSend{min-height:50px;padding:12px 20px}
 /* Chat is Reality's customer-facing home; the operations console remains secondary. */
 #privateChat{border:1px solid #466d88;background:linear-gradient(155deg,#14253a,#101724);margin:16px 0 22px;border-radius:18px;scroll-margin-top:15px}
 #privateChat>h3{font-size:24px}
@@ -277,6 +282,23 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
+  <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <section class="reality-chat-activity" id="realityChatActivity" aria-label="Reality live work updates">
+    <div class="label">REALITY · WORK UPDATES</div>
+    <h4>What Reality is doing</h4>
+    <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
+    <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
+  </section>
+  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
+  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
+   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
+   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
+   <option value="START_DETOUR">Temporarily detour from my active objective</option>
+  </select>
+  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
+  <button id="privateSend" type="button">Send to Reality</button>
+  <details class="reality-chat-settings" id="realityChatSettings"><summary>Saved conversations, business goal and account settings</summary>
   <label for="privateConversations">Saved conversations</label>
   <select id="privateConversations" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"><option value="">Current conversation</option></select>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -309,22 +331,8 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    </div>
    <p class="muted" style="font-size:11px">Goal changes are written only after you explicitly confirm them. Completing a conversational goal does not verify a real business outcome or authorize any external action.</p>
   </div>
-  <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
-  <section class="reality-chat-activity" id="realityChatActivity" aria-label="Reality live work updates">
-    <div class="label">REALITY · WORK UPDATES</div>
-    <h4>What Reality is doing</h4>
-    <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
-    <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
-  </section>
-  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
-  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
-  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
-   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
-   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
-   <option value="START_DETOUR">Temporarily detour from my active objective</option>
-  </select>
-  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
-  <button id="privateSend" type="button">Send to Reality</button>
+
+  </details>
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
 </section>
