@@ -297,6 +297,13 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 </section>
 <section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
 <section class="work-center" id="workCenter" aria-label="Reality Work Center">
+ <div id="wcRepairQuickStart" class="repair-current" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 18px;margin-bottom:18px;border:1px solid #6ba5ba;border-radius:14px;background:#142437;">
+  <div style="flex:1;min-width:190px">
+   <strong style="font-size:17px">Reality · Repair &amp; Upgrades</strong>
+   <p style="font-size:13px;line-height:1.55;color:#b8d1e4;margin:6px 0 0">Find a verified missing capability and review it for investigation. Installation always requires a separate approval.</p>
+  </div>
+  <button id="wcQuickFindRepair" type="button" class="repair-primary" style="margin:0;min-height:48px;white-space:normal">Find verified repair</button>
+ </div>
  <div class="wc-head">
   <div><div class="label">REALITY WORK CENTER</div><h2>Choose a task. Or plan a shift.</h2>
    <p>Explore what Reality actually discovered, inspect evidence and workload, then choose individual work or a bounded shift. Plans are drafts, not authorizations.</p></div>
@@ -337,7 +344,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
    <p class="wc-plan-desc">Findings and evidence come from Reality's discovery feed. A discovered problem is not automatically a task Reality can execute.</p>
    <div id="wcTaskList" aria-live="polite">Loading work…</div>
    <details id="wcUpgradeDiagnostics" class="wc-repair-diagnostics" hidden>
-    <summary>Self-repair evidence and owner approvals · Advanced testing details</summary>
+    <summary>Repair &amp; upgrades · Find work, review and approve</summary>
     <p class="wc-note">Reality should detect and repair operational weaknesses during the original job. These controls are diagnostics for testing, not the normal customer workflow. A repair may require explicit permission for source installation; the model cannot grant it.</p>
    <section id="wcGovernedBuild" class="repair-center" aria-labelledby="wcRepairHeading">
     <div class="repair-heading">
@@ -1697,6 +1704,20 @@ function wcResumeSavedExactRepair(){
 }
 if(typeof setInterval==='function')setInterval(wcResumeSavedExactRepair,15000);
 
+// Visible customer entry point. The old control was under a hidden diagnostics panel.
+$('wcQuickFindRepair').onclick=()=>{
+ if($('privateReady')?.style.display!=='block'){
+  $('wcRealRepairOpportunityStatus').textContent='Sign in to review genuine missing capabilities. No work is authorized yet.';
+  $('privateChat').scrollIntoView({behavior:'smooth',block:'start'});
+  return;
+ }
+ wcCurrent='upgrades';
+ wcRender();
+ const diagnostics=$('wcUpgradeDiagnostics');
+ if(diagnostics){diagnostics.hidden=false;diagnostics.open=true;}
+ $('wcRealRepairOpportunityPanel').scrollIntoView({behavior:'smooth',block:'center'});
+ $('wcDiscoverRealRepair').click();
+};
 $('wcDiscoverRealRepair').onclick=async()=>{
  const button=$('wcDiscoverRealRepair');
  button.disabled=true;$('wcAuthorizeRealRepair').disabled=true;
