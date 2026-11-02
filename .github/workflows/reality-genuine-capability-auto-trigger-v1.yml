@@ -582,27 +582,29 @@ jobs:
             verified_artifact_present:true,
             production_change_claimed:false}));
           NODE
-      - name: Independently reproduce real-evidence failure in previously qualified candidate
+      - name: Verify original qualified candidate independently fails held-out real-evidence case
         shell: bash
         run: |
           set -euo pipefail
           test ! -f src/reality-extensions/reality-continuity-settlement-reconciler.mjs
           mkdir -p src/reality-extensions
           cp evidence/reality-201-corrected-candidate/prior-qualified-reconciler.mjs src/reality-extensions/reality-continuity-settlement-reconciler.mjs
-          set +e
-          docker run --rm --network none --read-only --cap-drop ALL \
+          if docker run --rm --network none --read-only --cap-drop ALL \
             --security-opt no-new-privileges --memory 512m --cpus 1 \
             --user 65534:65534 --tmpfs /tmp:rw,noexec,nosuid,size=16m \
             -v "${PWD}:/work:ro" -w /work node:22 \
             node --test --test-reporter=tap \
               test/reality-201-provider-backed-relationship-holdout-v1.test.js \
-              > /tmp/reality-201-old-candidate.tap 2>&1
-          code=$?
-          set -e
+              > /tmp/reality-201-old-candidate.tap 2>&1; then
+            echo 'ERROR: previous qualified candidate unexpectedly passed'
+            exit 1
+          fi
           cat /tmp/reality-201-old-candidate.tap
-          test "$code" -ne 0
-          grep -q 'not ok 1 - authentic observed shape' /tmp/reality-201-old-candidate.tap
-          grep -q '^# tests 5
+          grep -Fq 'not ok 1 - authentic observed shape' /tmp/reality-201-old-candidate.tap
+          grep -Fq '# fail 1' /tmp/reality-201-old-candidate.tap
+          rm src/reality-extensions/reality-continuity-settlement-reconciler.mjs
+          echo REALITY_201_PRIOR_QUALIFIED_CANDIDATE_REPRODUCED_RED
+      - name: Independently test proposed corrected source in secret-free offline sandbox
         shell: bash
         run: |
           set -euo pipefail
@@ -618,7 +620,6 @@ jobs:
               test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js \
               test/reality-extensions/reality-continuity-settlement-reconciler.test.js \
               test/reality-201-provider-backed-relationship-holdout-v1.test.js | tee /tmp/reality-201-corrected-holdout.tap
-
       - name: Publish immutable corrected holdout evidence receipt without installation
         if: success()
         run: |
