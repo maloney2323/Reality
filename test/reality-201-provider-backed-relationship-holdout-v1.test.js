@@ -41,7 +41,7 @@ function realShape(){
     owner_approval_id:approval,artifact_sha256:artifactHash,
     installed_commit_sha:installedCommit,provider_run_id:41390537103,
     provider_outcome_digest:digest,production_changed:false},
-  ledger:{continuity_root_id:root,worldline_id:world,
+  ledger:{continuity_root_id:root,worldline_id:worldline,
     append_only_verified:true,original_event_in_chain_verified:true,
     head_lineage_hash:currentTip,verified_completion_events:[]}
  };
