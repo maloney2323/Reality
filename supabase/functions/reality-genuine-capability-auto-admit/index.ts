@@ -1066,6 +1066,99 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
  return receipt;
 }
 
+
+async function attestSignedOwnerIssue(proof:Record<string,unknown>,sha:string,runId:number,token:string){
+ const n=Number(proof?.issue_number),failedRun=Number(proof?.original_provider_failed_run_id);
+ const failedJob=Number(proof?.original_provider_failed_job_id);
+ if(!Number.isInteger(n)||n<1||n>100000||
+  !Number.isSafeInteger(failedRun)||failedRun<10000||
+  !Number.isSafeInteger(failedJob)||failedJob<10000||
+  !SHA40.test(String(proof?.source_sha||''))||
+  !SHA64.test(String(proof?.frozen_test_sha256||''))||
+  !SHA64.test(String(proof?.actual_provider_failure_hash||''))||
+  !TEST.test(String(proof?.frozen_test_path||''))||
+  !MODULE.test(String(proof?.source_path||''))||
+  proof?.independently_verified!==true||
+  proof?.owner_goal_bound!==false||
+  proof?.installation_authorized!==false||
+  proof?.job_completed!==false||
+  proof?.production_changed!==false)
+  deny('OWNER_WITNESS_PINNED_PROVIDER_SCOPE_REQUIRED');
+ const issue=await api('/issues/'+n,token);
+ if(issue?.number!==n||issue.state!=='open'||issue.pull_request||
+    issue.repository_url!=='https://api.github.com/repos/'+REPO)
+   deny('OWNER_WITNESS_ISSUE_NOT_CURRENT');
+ const txt=String(issue.body||'');
+ const src=[...new Set(txt.match(/src\/reality-extensions\/[a-z0-9._/-]+\.mjs/g)||[])];
+ const tests=[...new Set(txt.match(/test\/reality-frozen-regressions\/[a-z0-9._/-]+\.test\.js/g)||[])];
+ if(src.length!==1||src[0]!==proof.source_path||tests.length!==1||
+    tests[0]!==proof.frozen_test_path||
+    !txt.includes('https://github.com/'+REPO+'/actions/runs/'+failedRun))
+   deny('OWNER_WITNESS_ISSUE_PROVENANCE_CHANGED');
+ const run=await api('/actions/runs/'+failedRun,token);
+ if(run?.id!==failedRun||run.status!=='completed'||run.conclusion!=='failure'||
+    run.head_sha!==proof.source_sha||run.head_repository?.full_name!==REPO||
+    !['push','pull_request','workflow_dispatch'].includes(run.event))
+   deny('OWNER_WITNESS_HISTORICAL_RUN_CHANGED');
+ const listed=await api('/actions/runs/'+failedRun+'/jobs?per_page=100',token);
+ const jobs=(Array.isArray(listed?.jobs)?listed.jobs:[]).filter(j=>
+    j.run_id===failedRun&&j.head_sha===run.head_sha&&
+    j.conclusion==='failure'&&Array.isArray(j.steps)&&
+    j.steps.some(step=>step.conclusion==='failure'));
+ if(!jobs.some(j=>j.id===failedJob))deny('OWNER_WITNESS_FAILED_JOB_CHANGED');
+ const work='work:'+(await hash('reality:issue:'+n)).slice(0,32);
+ const receipt={issue_number:n,original_work_id:work,run_id:failedRun,
+   run_url:'https://github.com/'+REPO+'/actions/runs/'+failedRun,
+   source_sha:run.head_sha,workflow_name:String(run.name||'').slice(0,160),
+   failed_jobs:jobs.map(j=>({job_id:j.id,name:String(j.name||'').slice(0,120),
+    failed_steps:j.steps.filter(step=>step.conclusion==='failure')
+      .map(step=>String(step.name||'').slice(0,160)).slice(0,20)})).slice(0,12)};
+ if(await hash(JSON.stringify(receipt))!==proof.actual_provider_failure_hash)
+  deny('OWNER_WITNESS_ORIGINAL_PROVIDER_FAILURE_HASH_CHANGED');
+ const test=await api('/contents/'+proof.frozen_test_path+'?ref='+run.head_sha,token);
+ if(test?.encoding!=='base64'||test.path!==proof.frozen_test_path)
+   deny('OWNER_WITNESS_TEST_SOURCE_NOT_VERIFIED');
+ const bytes=Uint8Array.from(atob(String(test.content).replace(/\s/g,'')),c=>c.charCodeAt(0));
+ if(bytes.length>80000||await hash(bytes)!==proof.frozen_test_sha256)
+   deny('OWNER_WITNESS_FROZEN_BYTES_CHANGED');
+ const testText=new TextDecoder().decode(bytes);
+ if(!testText.includes(String(proof.source_path).split('/').at(-1))||
+    !testText.includes('node:test'))
+   deny('OWNER_WITNESS_FROZEN_ACCEPTANCE_NOT_SOURCE_BOUND');
+ if(await api('/contents/'+proof.source_path+'?ref='+run.head_sha,token)!==null)
+   deny('OWNER_WITNESS_MODULE_NOT_MISSING');
+ const stored=await database('rpc/reality_record_genuine_owner_issue_witness_v1',
+  {method:'POST',body:{p_proof:{
+    schema:'reality-provider-verified-owner-issue-witness-v1',
+    issue_number:n,issue_title:String(issue.title||'').slice(0,160),
+    original_provider_failed_run_id:failedRun,original_provider_failed_job_id:failedJob,
+    original_source_sha:run.head_sha,source_path:proof.source_path,
+    frozen_test_path:proof.frozen_test_path,
+    frozen_test_sha256:proof.frozen_test_sha256,
+    actual_provider_failure_hash:proof.actual_provider_failure_hash,
+    witness_repository_sha:sha,witness_run_id:runId,
+    provider_readback_verified:true,owner_authorized:false,
+    installation_authorized:false,production_changed:false
+  }}});
+ if(stored?.status!=='SIGNED_PROVIDER_WITNESS_PERSISTED'||
+    stored.issue_number!==n||
+    stored.owner_authorized!==false||stored.installation_authorized!==false)
+  deny('OWNER_WITNESS_PERSISTENCE_NOT_VERIFIED');
+ const read=await database('rpc/reality_read_genuine_owner_issue_witness_v1',
+   {method:'POST',body:{p_issue_number:n}});
+ if(read?.status!=='SOURCE_PINNED_MISSING_EXTENSION_READY_FOR_OWNER_REVIEW'||
+    read.source_sha!==run.head_sha||
+    read.frozen_test_sha256!==proof.frozen_test_sha256||
+    read.actual_provider_failure_hash!==proof.actual_provider_failure_hash||
+    read.original_provider_failed_job_id!==failedJob||
+    read.owner_goal_bound!==false||read.installation_authorized!==false||
+    read.job_completed!==false||read.production_changed!==false)
+  deny('OWNER_WITNESS_INDEPENDENT_DATABASE_READBACK_FAILED');
+ return {status:'SIGNED_PROVIDER_WITNESS_VERIFIED',issue_number:n,
+    signed_witness_run_id:runId,original_provider_failed_run_id:failedRun,
+    installation_authorized:false,production_changed:false};
+}
+
 Deno.serve(async request=>{
  try{
   if(request.method!=='POST'||
@@ -1078,11 +1171,21 @@ Deno.serve(async request=>{
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
-  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_'))&&
+  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest')&&
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
 
+  if(input?.action==='owner_source_attest'){
+   if(Object.keys(input).sort().join(',')!=='action,proof,scope'||
+      Object.keys(input.scope||{}).sort().join(',')!=='repository_sha'||
+      !SHA40.test(input.scope.repository_sha))
+    deny('OWNER_WITNESS_SIGNED_ENVELOPE_REQUIRED');
+   const run=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const result=await attestSignedOwnerIssue(input.proof,input.scope.repository_sha,
+      run.id,ghProviderToken);
+   return respond({ok:true,...result});
+  }
   if(['original_prepare','original_claim','original_settle'].includes(input?.action)&&
     SHA40.test(input?.scope?.repository_sha||'')){
    const names=Object.keys(input).sort().join(',');
