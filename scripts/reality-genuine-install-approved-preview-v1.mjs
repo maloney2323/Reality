@@ -44,7 +44,7 @@ async function signedBroker(body){
   fail('SIGNED_BROKER_'+String(result?.error||'UNAVAILABLE').slice(0,90));
  return result;
 }
-if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
+if(env.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
  env.GITHUB_REPOSITORY!==repo||
  env.GITHUB_REF!=='refs/heads/'+BRANCH||!COMMIT.test(env.GITHUB_SHA))
  fail('EXACT_ISOLATED_WORKFLOW_IDENTITY_REQUIRED');
