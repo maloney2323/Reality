@@ -42,9 +42,14 @@ if(!res.ok||outcome?.ok!==true||
  !Array.isArray(outcome.queued)||
  !Number.isInteger(outcome.verified_already_claimed_count)||
  outcome.verified_already_claimed_count<0||
+ !Number.isInteger(outcome.verified_awaiting_owner_binding_count)||
+ outcome.verified_awaiting_owner_binding_count<0||
+ !Array.isArray(outcome.awaiting_owner_binding)||
+ outcome.verified_awaiting_owner_binding_count!==outcome.awaiting_owner_binding.length||
  outcome.verified_queue_count!==outcome.queued.length||
  outcome.verified_queue_count+outcome.verified_already_claimed_count+
- outcome.verified_already_settled_count!==report.findings.length||
+ outcome.verified_already_settled_count+
+ outcome.verified_awaiting_owner_binding_count!==report.findings.length||
  outcome.installation_authorized!==false||
  outcome.original_job_completed!==false||
  outcome.production_changed!==false)
@@ -54,12 +59,14 @@ writeFileSync('artifact/genuine-capability-admitted-queue.json',
  JSON.stringify({schema:'reality-genuine-admitted-queue-v1',
  repository_sha:report.repository_sha,queued:outcome.queued,
  previously_claimed:outcome.previously_claimed||[],
+ awaiting_owner_binding:outcome.awaiting_owner_binding||[],
  installation_authorized:false,original_job_completed:false})+'\n');
 console.log('REALITY_SIGNED_AUTO_ADMISSION',JSON.stringify({
  status:outcome.status,discovered:report.findings.length,
  queued:outcome.queued,
  previously_claimed:outcome.verified_already_claimed_count,
  skipped_independently_settled:outcome.verified_already_settled_count,
+ awaiting_owner_work_binding:outcome.verified_awaiting_owner_binding_count,
  installation_authorized:false,original_job_completed:false,
  production_changed:false,
 }));
