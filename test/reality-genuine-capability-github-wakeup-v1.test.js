@@ -16,7 +16,7 @@ function mock({existing=false,tamper=false}={}){
   const pathInfo=new URL(url).pathname;
   calls.push({path:pathInfo,method:options.method,body:options.body});
   let body,status=200;
-  if(pathInfo.endsWith('/git/ref/heads/feature/reality-genuine-capability-worker-20261101')){
+  if(pathInfo.endsWith('/git/ref/heads/feature/reality-general-capability-engine-20261101')){
    body={object:{sha:base}};
   }else if(pathInfo.includes('/contents/reality-genuine-triggers/')){
    if(options.method==='PUT'){
@@ -41,7 +41,7 @@ test('real source-bound gap performs exactly one isolated GitHub wake write',asy
  const writes=m.calls.filter(c=>c.method==='PUT');
  assert.equal(writes.length,1);
  const submitted=JSON.parse(writes[0].body);
- assert.equal(submitted.branch,'feature/reality-genuine-capability-worker-20261101');
+ assert.equal(submitted.branch,'feature/reality-general-capability-engine-20261101');
  assert.equal(Buffer.from(submitted.content,'base64').toString('utf8'),original);
 });
 test('identical existing wake is idempotent; changed source fails closed',async()=>{
