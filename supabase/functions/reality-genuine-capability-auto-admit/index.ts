@@ -113,6 +113,9 @@ async function database(path,{method='GET',body}={}){
   body:body===undefined?undefined:JSON.stringify(body)});
  const result=await response.json().catch(()=>null);
  if(!response.ok){
+  console.warn('REALITY_QUALIFICATION_DATABASE_ERROR_CLASS',
+   String(result?.code||'UNKNOWN').slice(0,24),
+   String(path).split('?')[0].slice(0,100));
   const safeCode=String(result?.message||'').match(/(?:GENUINE_AUTO|QUALIFICATION)_[A-Z0-9_]{4,100}/)?.[0];
   if(safeCode)throw Error(safeCode);
   deny('DATABASE_'+response.status+'_UNAVAILABLE');
