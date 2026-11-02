@@ -729,8 +729,10 @@ async function recordIndependentlyMonitoredInstall(
  sha:string,runId:number,githubToken:string){
  if(install?.schema!=='reality-owner-approved-preview-source-install-v1'||
   monitor?.schema!=='reality-independent-installed-preview-activation-v1'||
-  install?.source_sha!==sha||monitor?.source_sha!==sha||
-  install?.installer_run_id!==String(runId)||
+  !SHA40.test(String(install?.source_sha||''))||
+  install?.source_sha!==monitor?.source_sha||
+  monitor?.independent_runner_sha!==sha||
+  !/^[1-9][0-9]{7,17}$/.test(String(install?.installer_run_id||''))||
   monitor?.independent_run_id!==String(runId)||
   monitor?.installed_commit_sha!==install.installed_commit_sha||
   monitor?.install_branch!==install.installed_branch||
@@ -770,13 +772,22 @@ async function recordIndependentlyMonitoredInstall(
    deny('INDEPENDENT_PROBATION_ASSERTION_FAILED');
   total+=Number(observation.passed);
  }
- const jobs=await api('/actions/runs/'+runId+'/jobs?per_page=100',githubToken);
- if(!Array.isArray(jobs?.jobs)||
-  !jobs.jobs.some((j:Record<string,unknown>)=>
+ const original=await api('/actions/runs/'+install.installer_run_id,githubToken);
+ if(original?.id!==Number(install.installer_run_id)||
+   original.head_sha!==install.source_sha||
+   original.head_repository?.full_name!==REPO||
+   original.path!==WORKFLOW)
+  deny('HISTORICAL_SIGNED_INSTALL_RUN_UNVERIFIED');
+ const installJobs=await api('/actions/runs/'+install.installer_run_id+'/jobs?per_page=100',githubToken);
+ const monitorJobs=await api('/actions/runs/'+runId+'/jobs?per_page=100',githubToken);
+ const monitorJobName=String(runId)===String(install.installer_run_id)?
+  'monitor_owner_approved_preview':'recover_consumed_preview_install';
+ if(!Array.isArray(installJobs?.jobs)||!Array.isArray(monitorJobs?.jobs)||
+  !installJobs.jobs.some((j:Record<string,unknown>)=>
    j.name==='activate_owner_approved_preview'&&
    j.status==='completed'&&j.conclusion==='success')||
-  !jobs.jobs.some((j:Record<string,unknown>)=>
-   j.name==='monitor_owner_approved_preview'&&
+  !monitorJobs.jobs.some((j:Record<string,unknown>)=>
+   j.name===monitorJobName&&
    j.status==='completed'&&j.conclusion==='success'))
   deny('PROVIDER_INSTALL_MONITOR_JOBS_NOT_INDEPENDENTLY_COMPLETE');
  const ref=await api('/git/ref/heads/'+install.installed_branch,githubToken);
@@ -799,7 +810,7 @@ async function recordIndependentlyMonitoredInstall(
   original_work_id:install.original_work_id,
   approval_id:install.approval_id,
   artifact_sha256:install.artifact_sha256,
-  installer_run_id:String(runId),
+  installer_run_id:String(install.installer_run_id),
   installed_branch:install.installed_branch,
   installed_commit_sha:install.installed_commit_sha,
   independent_run_id:String(runId),
