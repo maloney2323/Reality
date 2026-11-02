@@ -1900,6 +1900,10 @@ async function wcStartVerifiedGenuineGap(job){
     'Original missing capability durably queued. Trigger: '+
       result.queue_trigger_id+'.'+wake+' No installation authorized.':
     result.handoff_error_code?'Capability intake blocked: '+result.handoff_error_code:
+    result.independent_source_readback_error_code?
+     'Independent source check blocked the queue: '+
+      result.independent_source_readback_error_code+
+      '. Reality correctly refused to promote unverified evidence.':
     'Original investigation unresolved. No customer-job completion or installation was claimed.';
  }catch(e){
   if(feedback)feedback.textContent='Original job remains open. Investigation blocked: '+
