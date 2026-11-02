@@ -295,7 +295,7 @@ async function admit(report){
   epistemic_status:'eq.VERIFIED',
   select:'*',order:'created_at.desc',limit:'200'}));
  if(!Array.isArray(all)||all.length===200)deny('ORIGINAL_SOURCE_DISCOVERY_COVERAGE_LIMIT');
- const queued=[];
+ const queued=[],skippedSettled=[];
  for(const signal of report.findings){
   if(signal.kind!=='UNVERIFIED_MISSING_CAPABILITY_CANDIDATE'||
      !TEST.test(signal.test_path)||!MODULE.test(signal.candidate_module_path)||
@@ -312,6 +312,19 @@ async function admit(report){
    e.payload?.frozen_test_sha256===signal.frozen_sha256);
   if(matching.length!==1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
   const original=matching[0];
+  // A frozen test can remain red long after Reality independently settled
+  // its ORIGINAL work on another authorized path. Never reopen or requeue it.
+  const scoped=await readChain(original.continuity_root_id,
+   original.worldline_id);
+  const settled=scoped.events.some(e=>
+   e.epistemic_status==='VERIFIED'&&
+   e.payload?.original_work_id===original.payload.original_work_id&&
+   (e.payload?.original_job_completed===true||
+    e.payload?.constitutional_phase==='SETTLED'));
+  if(settled){
+   skippedSettled.push(original.payload.original_work_id);
+   continue;
+  }
   await verifyOriginal(original,signal,report.repository_sha);
   const gapId=await appendGap(original,signal);
   const receipt=await database('rpc/reality_enqueue_genuine_capability_gap_v1',{
@@ -328,7 +341,7 @@ async function admit(report){
    source_event_id:gapId,trigger_id:receipt.trigger_id,
    queue_phase:receipt.phase});
  }
- return queued;
+ return {queued,skippedSettled};
 }
 Deno.serve(async request=>{
  try{
@@ -353,10 +366,15 @@ Deno.serve(async request=>{
    input.report.original_job_completed!==false)
    deny('EXACT_SIGNED_CI_OBSERVATION_REQUIRED');
   const run=await verify(bearer,input.report.repository_sha);
-  const queued=await admit(input.report);
+  const {queued,skippedSettled}=await admit(input.report);
+  if(queued.length+skippedSettled.length!==input.report.findings.length)
+   deny('DETECTION_DISPOSITION_INCOMPLETE');
   return respond({ok:true,
-   status:'GENUINE_ORIGINAL_GAPS_DURABLY_QUEUED',
+   status:'GENUINE_ORIGINAL_GAPS_RECONCILED',
    signed_github_run_id:run.id,
+   observed_candidate_count:input.report.findings.length,
+   verified_queue_count:queued.length,
+   verified_already_settled_count:skippedSettled.length,
    verified_original_count:queued.length,queued,
    installation_authorized:false,original_job_completed:false,
    production_changed:false});
