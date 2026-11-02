@@ -116,6 +116,6 @@ console.log('REALITY_INDEPENDENT_POST_INSTALL_MONITOR',JSON.stringify({
  original_work_id:report.original_work_id,
  installed_commit_sha:report.installed_commit_sha,
  observations:observations.map(x=>({pass:x.passed,tests:x.tests,elapsed_ms:x.elapsed_ms})),
- all_passed,probation_status:report.probation_status,
+ all_passed:allPassed,probation_status:report.probation_status,
  original_job_settled:false,production_changed:false}));
 if(!allPassed)process.exitCode=2;
