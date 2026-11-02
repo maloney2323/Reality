@@ -154,3 +154,51 @@ test('chat composer and live event updates precede legacy account and goal setti
   prompt<send&&send<extras&&extras<goal);
  assert.match(inlineScript,/\$\('realityChatSettings'\)\.open=true/);
 });
+
+test('Business Reality money and verified value lead the customer home',()=>{
+ const business=html.indexOf('id="businessHome"'),chat=html.indexOf('id="privateChat"');
+ assert.ok(business>0&&business<chat);
+ assert.match(html,/Your Business Reality/);
+ for(const id of ['businessRevenue','businessExpenses','businessCash','businessVerifiedValue',
+  'businessFinancialStatus','businessTrackedJobs','businessPendingApprovals','businessVerifiedCompletions'])
+  assert.ok(html.includes('id="'+id+'"'),id);
+ assert.match(html,/Money, operations & verified value/);
+ assert.match(html,/Where your money goes/);
+ assert.match(html,/What Reality is working on/);
+});
+test('money is explicitly unknown without a connected source, never modeled from worker tests',()=>{
+ const start=inlineScript.indexOf('function realityBusinessResetMoney()');
+ const end=inlineScript.indexOf('async function realityBusinessRefresh()',start);
+ assert.ok(start>0&&end>start);
+ const reset=inlineScript.slice(start,end);
+ for(const field of ['businessRevenue','businessExpenses','businessCash'])
+  assert.match(reset,new RegExp(field+"'\\)\\.textContent='Not connected'"));
+ assert.match(reset,/businessVerifiedValue'\)\.textContent='Not measured'/);
+ assert.match(reset,/Financial sources not connected/);
+ assert.match(reset,/cannot verify costs or savings yet/);
+});
+test('work counters use owner-authenticated read-only evidence and refuse false completions',()=>{
+ const start=inlineScript.indexOf('async function realityBusinessRefresh()');
+ const end=inlineScript.indexOf('const SPEECH_STATE=',start);
+ const method=inlineScript.slice(start,end);
+ assert.ok(start>0&&end>start);
+ assert.match(method,/personal-genuine-loop-status/);
+ assert.match(method,/data.status!=='OWNER_GOVERNED_LOOP_READBACK'/);
+ assert.match(method,/j.independently_settled===true&&j.universe_settlement_verified===true/);
+ assert.match(method,/data.production_changed!==false/);
+ assert.match(method,/businessOperationsStatus/);
+ assert.doesNotMatch(method,/method:'POST'/);
+});
+test('Reality Chat is one tap from any part of the dashboard without losing the conversation',()=>{
+ assert.match(html,/id="realityChatDockOpen"/);
+ assert.match(html,/id="businessAskReality"/);
+ assert.match(html,/id="realityChatDockClose"/);
+ assert.match(html,/id="privateTranscript"/);
+ assert.match(html,/id="privatePrompt"/);
+ assert.match(html,/#privateChat\[data-open="true"\]/);
+ assert.match(inlineScript,/function realityOpenChatDock\(focusPrompt=false\)/);
+ assert.match(inlineScript,/function realityCloseChatDock\(\)/);
+ assert.match(inlineScript,/businessAskReality'\)\.addEventListener\('click'/);
+ assert.match(inlineScript,/accountShortcut'\)\.addEventListener\('click'/);
+ assert.match(inlineScript,/e.key==='Escape'/);
+});
