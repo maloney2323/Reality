@@ -99,6 +99,13 @@ for(const row of selected){
     'x-reality-github-provider-token':env.GH_TOKEN||''},cache:'no-store',redirect:'error',
    body:JSON.stringify({action:'reconcile',proof})});
   const outcome=await response.json().catch(()=>null);
+  // Multiple unrelated frozen defects can exist. The signed broker owns
+  // the original-work mapping; only its exact scope-mismatch rejection
+  // is a safe negative match. Every other failure remains fatal.
+  if(response.status===403&&outcome?.error==='AUTO_ADMIT_FROZEN_SOURCE_ORIGINAL_MISMATCH'){
+   console.log('REALITY_FROZEN_TEST_NOT_THIS_ORIGINAL',item.test_path);
+   continue;
+  }
   if(!response.ok||outcome?.ok!==true)
    console.warn('REALITY_FROZEN_BROKER_SAFE_FAILURE',String(outcome?.error||'UNVERIFIED').slice(0,110),
     'http_status',response.status);
