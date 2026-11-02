@@ -50,7 +50,26 @@ function fixture({
   inspectRegisteredCapability:async()=>{registryReads++;
    return {independently_verified:true,original_work_id:WORK,
     capability_id:original.capability_id,status:registryStatus};
-  },adapters:modelAdapter,
+  },
+  arbitrateAndReceipt:async()=>({
+   original_work_id:WORK,owner_id:scope.owner_id,goal_id:scope.goal_id,
+   capability_id:original.capability_id,
+   verified_frozen_failure_ref:providerProof.frozen_failure_ref,
+   persisted:true,independently_verified:true,signature_verified:true,
+   source:'REALITY_BITEMPORAL_CONTINUITY',
+   reused_capabilities_checked:true,authorized_integrations_checked:true,
+   selected_tier:'BUILD',reusable_candidate_count:0,
+   authorized_compatible_integration_count:0,
+   why_reuse_not_viable:'NO_COMPATIBLE_REGISTERED_CAPABILITY',
+   why_integration_not_viable:'NO_AUTHORIZED_COMPATIBLE_INTEGRATION',
+   receipt_hash:'d'.repeat(64),pre_state_hash:'a'.repeat(64),
+   post_state_hash:'b'.repeat(64),
+   valid_time:'2026-10-28T14:32:00.000Z',
+   transaction_time:'2026-10-28T14:32:05.120Z',
+   receipt_ref:'fixture:verified:arbitrage',
+   installation_authorized:false,
+  }),
+  adapters:modelAdapter,
   runRepair:async argument=>{
    drivers++;return after?after(argument):{
     status:'OWNER_APPROVAL_REQUIRED',original_work_id:WORK,
