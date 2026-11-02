@@ -35,6 +35,11 @@ jobs:
       - name: Wake frozen-test worker for the admitted original job
         if: github.event_name == 'push'
         run: node scripts/reality-genuine-frozen-worker-claim-v1.mjs
+      - name: Reconcile signed original frozen failure in isolated Docker
+        if: github.event_name == 'push'
+        run: |
+          node --check scripts/reality-genuine-frozen-reconcile-v1.mjs
+          node scripts/reality-genuine-frozen-reconcile-v1.mjs
       - name: Show exact authorization boundary
         if: github.event_name == 'push'
         run: |
