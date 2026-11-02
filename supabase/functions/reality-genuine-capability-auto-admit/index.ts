@@ -594,7 +594,7 @@ async function qualifyVerifiedCandidate(proposal:Record<string,unknown>,
  const names=new Set();
  for(const file of files){
   const path=String(file.path||''),content=file.content;
-  if(!/^(?:src\\/reality-extensions\\/|test\\/reality-extensions\\/)[A-Za-z0-9._/-]{3,220}$/.test(path)||
+  if(!/^(?:src\/reality-extensions\/|test\/reality-extensions\/)[A-Za-z0-9._/-]{3,220}$/.test(path)||
    path.includes('..')||names.has(path)||
    typeof content!=='string'||content.length<1||content.length>70000)
     deny('GENERATED_FILES_OUTSIDE_SAFE_EXTENSION_ROOT');
