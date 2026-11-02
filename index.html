@@ -256,6 +256,13 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 @media(max-width:640px){#privateChat{padding:15px!important}.reality-chat-activity{padding:12px}}
 
 
+
+.reality-chat-work-steps{margin:10px 0 5px;padding:0;list-style:none;border-top:1px solid #355468}
+.reality-chat-work-steps li{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #2c4555;font-size:12px}
+.reality-chat-work-steps li span{color:#d6e4ed}
+.reality-step-verified{color:#9de3c3}
+.reality-step-pending{color:#d5c6a7}
+.reality-chat-value-result{font-size:12px;color:#bfe1d2;line-height:1.5;margin:11px 0 0}
 /* Business operating picture first; chat is a universal fixed tool. */
 .business-home{padding:22px;margin:18px 0 24px;border:1px solid #405f7b;border-radius:20px;background:linear-gradient(160deg,#152335,#0c1724);scroll-margin-top:18px}
 .business-home-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
@@ -2309,7 +2316,14 @@ async function realityChatApproveOnce(workId,expectedHash){
      receipt.original_job_completed!==false||
      receipt.production_changed!==false)
    throw Error('OWNER_APPROVAL_READBACK_UNCERTAIN_DO_NOT_RETRY');
-  $('homeOwnerStatus').textContent='Approved once. Reality must now independently install, monitor and resume this same job. You do not need to approve again.';
+  if(receipt.worker_wake_status==='SIGNED_WORKER_WAKE_COMMITTED'||
+     receipt.worker_wake_status==='SIGNED_WORKER_WAKE_ALREADY_PRESENT'){
+   $('homeOwnerStatus').textContent=
+    'Approved once. Reality’s governed worker was notified. Watch verified progress in this conversation; no more approval clicks are needed.';
+  }else{
+   $('homeOwnerStatus').textContent=
+    'Owner approval is saved, but Reality has not verified that the worker started. Do not approve again. The worker connection needs recovery.';
+  }
  }catch(err){
   $('homeOwnerStatus').textContent='Approval status needs an independent readback. Do not click approval a second time. '+String(err?.message||'UNKNOWN');
   throw err;
@@ -2361,7 +2375,36 @@ async function realityChatRefreshEvents(){
     title.textContent='Reality is examining a missing capability';
     note.textContent='Last independently recorded worker phase: '+String(j.phase||'UNKNOWN')+'. No completion has been verified.';
    }
-   bubble.append(title,note);container.appendChild(bubble);
+   bubble.append(title,note);
+   const sequence=document.createElement('ol');
+   sequence.className='reality-chat-work-steps';
+   const stages=[
+    ['Missing capability identified',j.candidate_verified===true?'verified':'recorded'],
+    ['Upgrade generated and tested',j.candidate_verified===true?'verified':'waiting'],
+    ['Owner authorization',j.owner_install_approved===true?'verified':'waiting'],
+    ['Isolated installation',j.isolated_installed===true?'verified':'waiting'],
+    ['Original job settlement',j.independently_settled===true?'receipt recorded':'waiting'],
+    ['Final Universe verification',j.universe_settlement_verified===true&&j.independently_settled===true?'verified':'not proven']
+   ];
+   for(const [label,state] of stages){
+    const step=document.createElement('li');
+    const stepName=document.createElement('span');
+    stepName.textContent=label;
+    const outcome=document.createElement('strong');
+    outcome.textContent=state;
+    outcome.className=state==='verified'?'reality-step-verified':'reality-step-pending';
+    step.append(stepName,outcome);sequence.appendChild(step);
+   }
+   bubble.appendChild(sequence);
+   if(j.independently_settled===true){
+    const result=document.createElement('p');
+    result.className='reality-chat-value-result';
+    result.textContent=j.universe_settlement_verified===true?
+     'Verified result: Original work completed and settled. Financial value: not yet measured; no savings amount has been invented.':
+     'Reality recorded a settlement receipt, but final Universe verification is still missing. No verified financial value can be claimed.';
+    bubble.appendChild(result);
+   }
+   container.appendChild(bubble);
   }
   if(!container.childElementCount)container.textContent='No verified source-linked activity was available.';
  }catch{
