@@ -18,7 +18,7 @@ const outcomeArtifact='f'.repeat(64);
 function realShape(){
  return {
   original:{owner_id:owner,goal_id:'user-goal:actual',
-    original_work_id:id,continuity_root_id:root,worldline_id:world,
+    original_work_id:id,continuity_root_id:root,worldline_id:worldline,
     original_event_id:source,source_content_hash:sourceHash,
     original_event_lineage_hash:sourceLineage,
     epistemic_status:'VERIFIED',original_job_completed:false},
