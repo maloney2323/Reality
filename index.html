@@ -215,6 +215,21 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .home-owner-item p{font-size:13px;color:#c5d4e1;line-height:1.55;margin:7px 0}
 .home-owner-item code{font-size:11px;overflow-wrap:anywhere;color:#a6d3ea}
 .home-owner-item button{margin-top:12px;min-height:44px}
+.home-owner-state{font-weight:700;color:#bde6d1}
+.home-owner-explanation{padding:11px 0;border-top:1px solid #31475b}
+.home-owner-explanation strong,.home-owner-test-proof strong{font-size:14px;color:#f4f8fc}
+.home-owner-explanation p{margin:5px 0 0!important;color:#ccdae5!important}
+.home-owner-test-proof{padding:12px;margin:9px 0;border-radius:10px;border:1px solid #3c786a;background:#102c2d}
+.home-owner-test-rows{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}
+.home-owner-test-rows span{font-size:12px;padding:7px 10px;border-radius:8px;background:#174238;color:#d3f1e0}
+.home-owner-test-proof p{margin:7px 0 0;font-size:12px}
+.home-owner-not-complete{font-weight:700;color:#f3d8a9!important;padding:10px 0}
+.home-owner-technical{margin-top:10px;border-top:1px solid #344c60;padding-top:12px;color:#b9ccdd}
+.home-owner-technical summary{cursor:pointer;color:#c7dfeb;font-size:13px}
+.home-owner-technical p{margin:8px 0 5px}
+.home-owner-technical code{display:block;overflow-wrap:anywhere}
+.home-owner-technical a{color:#bce7f7}
+
 .home-owner-note{font-size:12px;line-height:1.5;color:#b5c9d7;margin:14px 0 0}
 #homeLegacyInstallSlot:not([hidden]){margin:15px 0}
 #homeLegacyInstallSlot .repair-current{margin-top:8px}
@@ -237,7 +252,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
  <div class="home-owner-head">
   <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
    <h2 id="homeOwnerTitle">Owner Authorizations</h2>
-   <p>Every verified capability installation needing your authorization appears here. Reality discovers, repairs and verifies the work first; you approve the exact result once.</p>
+   <p>See what Reality found, what it fixed, what the independent tests proved, and what still needs your approval. Nothing installs without your decision.</p>
   </div>
   <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
  </div>
@@ -1951,18 +1966,79 @@ async function homeOwnerRefresh(){
    const name=document.createElement('h3');
    name.textContent=entry.capability_id==='reality-continuity-settlement-reconciler'?
     'Continuity settlement repair':String(entry.capability_id||'Verified capability upgrade').replace(/[-_]/g,' ');
-   const detail=document.createElement('p');
-   detail.textContent='Original job: '+String(entry.original_work_id||'NOT VERIFIED')+
-    ' · '+(approved?'Owner approval already recorded':
-     verified?'Independent qualification saved · Installation not approved':
-      'Additional independent verification required · Cannot approve');
+   const q=entry.qualification||{};
+   const reconciler=entry.capability_id==='reality-continuity-settlement-reconciler';
+   const state=document.createElement('p');
+   state.className='home-owner-state';
+   state.textContent=approved?'Approved previously · Do not approve again':
+    verified?'Repair built and independently tested · Waiting for your decision':
+    'Further independent verification required · Cannot approve';
+   card.append(name,state);
+   const explain=(heading,body)=>{
+    const box=document.createElement('div');
+    box.className='home-owner-explanation';
+    const label=document.createElement('strong');
+    label.textContent=heading;
+    const content=document.createElement('p');
+    content.textContent=body;
+    box.append(label,content);
+    card.appendChild(box);
+   };
+   explain('What problem did Reality find?',reconciler?
+    'The original job had an independently verified settlement, but its final Universe completion record was missing. The first repair incorrectly compared unrelated hashes, assumed the original event was still the newest, and treated an overall failed workflow as proof the required jobs failed.':
+    'A missing capability was identified while Reality was trying to continue the original work. The upgrade is limited to the independently verified source and tests.');
+   explain('What did Reality actually do?',reconciler?
+    'Reality generated a new settlement-reconciliation capability, corrected those evidence assumptions, preserved the previous candidate and qualified the newly generated source.':
+    'Reality generated and saved a source-linked capability candidate and an independent qualification receipt. It has not installed the capability.');
+   const counts=[['Original regression tests','frozen_pass'],
+     ['New capability tests','candidate_pass'],
+     ['Historical evidence tests','holdout_pass']];
+   const tested=counts.filter(([label,key])=>
+    Number.isSafeInteger(q[key])&&q[key]>0&&verified);
+   if(tested.length){
+    const proof=document.createElement('div');proof.className='home-owner-test-proof';
+    const heading=document.createElement('strong');
+    heading.textContent='Independent test results';
+    proof.appendChild(heading);
+    const rows=document.createElement('div');rows.className='home-owner-test-rows';
+    for(const [label,key] of tested){
+     const item=document.createElement('span');
+     item.textContent=label+': '+q[key]+'/'+q[key]+' passed';
+     rows.appendChild(item);
+    }
+    proof.appendChild(rows);
+    const note=document.createElement('p');
+    note.textContent='These results verify the candidate against the checked tests. They do not prove the original customer job has finished.';
+    proof.appendChild(note);card.appendChild(proof);
+   }
+   explain('What happens if you approve?', 
+    'You authorize installation of this exact capability in the isolated preview. Reality must then monitor activation, resume the original job, and independently verify the final Universe settlement. Nothing is complete just because installation starts.');
+   const notDone=document.createElement('p');
+   notDone.className='home-owner-not-complete';
+   notDone.textContent=approved?
+    'Owner approval already recorded. Installation, resumption and settlement still require independent confirmation.':
+    'NOT DONE: No installation approved. Original job not resumed. No final Universe settlement recorded by this request.';
+   card.appendChild(notDone);
+   const evidence=document.createElement('details');evidence.className='home-owner-technical';
+   const summary=document.createElement('summary');
+   summary.textContent='View technical evidence and exact source';
+   const work=document.createElement('p');
+   work.textContent='Original job: '+String(entry.original_work_id||'NOT VERIFIED');
    const hash=document.createElement('code');
-   hash.textContent='Exact source SHA-256: '+String(entry.qualification?.artifact_sha256||'UNKNOWN');
-   card.append(name,detail,hash);
+   hash.textContent='Exact source SHA-256: '+String(q.artifact_sha256||'UNKNOWN');
+   evidence.append(summary,work,hash);
+   if(/^[1-9][0-9]{6,17}$/.test(String(q.provider_run_id||''))){
+    const p=document.createElement('p'),link=document.createElement('a');
+    link.href='https://github.com/maloney2323/Reality/actions/runs/'+q.provider_run_id;
+    link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent='View independent GitHub verification';
+    p.appendChild(link);evidence.appendChild(p);
+   }
+   card.appendChild(evidence);
    if(verified&&!approved){
     const button=document.createElement('button');
     button.type='button';button.className='repair-primary';
-    button.textContent='Review & authorize this upgrade';
+    button.textContent='Review installation approval';
     button.addEventListener('click',async()=>{
      button.disabled=true;status.textContent='Rechecking exact source and owner scope before approval…';
      try{await homeOwnerOpen(entry.original_work_id,entry.qualification.artifact_sha256);}
