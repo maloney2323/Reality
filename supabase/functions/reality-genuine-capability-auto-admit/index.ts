@@ -299,7 +299,7 @@ async function admit(report){
   epistemic_status:'eq.VERIFIED',
   select:'*',order:'created_at.desc',limit:'200'}));
  if(!Array.isArray(all)||all.length===200)deny('ORIGINAL_SOURCE_DISCOVERY_COVERAGE_LIMIT');
- const queued=[],alreadyClaimed=[],skippedSettled=[];
+ const queued=[],alreadyClaimed=[],skippedSettled=[],unbound=[];
  for(const signal of report.findings){
   if(signal.kind!=='UNVERIFIED_MISSING_CAPABILITY_CANDIDATE'||
      !TEST.test(signal.test_path)||!MODULE.test(signal.candidate_module_path)||
@@ -314,7 +314,35 @@ async function admit(report){
    e.payload?.frozen_test_path===signal.test_path&&
    e.payload?.source_path===signal.candidate_module_path&&
    e.payload?.frozen_test_sha256===signal.frozen_sha256);
-  if(matching.length!==1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
+  if(matching.length===0){
+   // An absent owner-bound work event is NOT an execution/installation warrant.
+   // Preserve the source-backed discovery for authenticated owner adoption.
+   const pinned=await providerSource(signal.test_path,report.repository_sha);
+   if(await hash(pinned)!==signal.frozen_sha256)
+    deny('UNBOUND_FROZEN_BYTES_UNVERIFIED');
+   const missing=await api('/contents/'+signal.candidate_module_path+
+     '?ref='+report.repository_sha);
+   if(missing!==null)deny('UNBOUND_MODULE_NOT_MISSING');
+   const record=await database('rpc/reality_record_genuine_unbound_discovery_v1',{
+    method:'POST',body:{
+     p_test_path:signal.test_path,
+     p_missing_module_path:signal.candidate_module_path,
+     p_frozen_sha256:signal.frozen_sha256,
+     p_repository_sha:report.repository_sha
+    }});
+   if(record?.status!=='AWAITING_OWNER_WORK_BINDING'||
+      record.frozen_sha256!==signal.frozen_sha256||
+      record.frozen_test_path!==signal.test_path||
+      record.missing_module_path!==signal.candidate_module_path||
+      record.owner_authorized!==false||
+      record.installation_authorized!==false||
+      record.original_job_completed!==false||
+      record.production_changed!==false)
+    deny('UNBOUND_DISCOVERY_DURABLE_READBACK_FAILED');
+   unbound.push(record);
+   continue;
+  }
+  if(matching.length>1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
   const original=matching[0];
   // A successfully settled isolated customer job is authoritative durable state,
   // even while its historical frozen test remains red on the base branch.
@@ -381,7 +409,7 @@ async function admit(report){
   if(receipt.phase==='PENDING_FROZEN_REPRODUCTION')queued.push(item);
   else alreadyClaimed.push(item);
  }
- return {queued,alreadyClaimed,skippedSettled};
+ return {queued,alreadyClaimed,skippedSettled,unbound};
 }
 // Only the signed exact CI workflow may claim a source-bound, red frozen test.
 // The original owner and goal are resolved from private Continuity by service
@@ -1165,8 +1193,8 @@ Deno.serve(async request=>{
    input.report.original_job_completed!==false)
    deny('EXACT_SIGNED_CI_OBSERVATION_REQUIRED');
   const run=await verify(bearer,input.report.repository_sha);
-  const {queued,alreadyClaimed,skippedSettled}=await admit(input.report);
-  if(queued.length+alreadyClaimed.length+skippedSettled.length!==
+  const {queued,alreadyClaimed,skippedSettled,unbound}=await admit(input.report);
+  if(queued.length+alreadyClaimed.length+skippedSettled.length+unbound.length!==
      input.report.findings.length)
    deny('DETECTION_DISPOSITION_INCOMPLETE');
   return respond({ok:true,
@@ -1177,6 +1205,8 @@ Deno.serve(async request=>{
    verified_already_claimed_count:alreadyClaimed.length,
    previously_claimed:alreadyClaimed,
    verified_already_settled_count:skippedSettled.length,
+   verified_awaiting_owner_binding_count:unbound.length,
+   awaiting_owner_binding:unbound,
    verified_original_count:queued.length,queued,
    installation_authorized:false,original_job_completed:false,
    production_changed:false});
