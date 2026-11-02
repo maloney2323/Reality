@@ -1,0 +1,28 @@
+name: Reality unseen continuity reconciliation gap — frozen RED
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - '.github/workflows/reality-unseen-continuity-gap-v1.yml'
+      - 'test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js'
+      - 'src/reality-extensions/reality-continuity-settlement-reconciler.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify_real_unseen_continuity_gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify frozen acceptance source identity
+        run: |
+          git rev-parse HEAD
+          sha256sum test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js
+      - name: Frozen unseen capability acceptance — Reality continuity settlement reconciliation
+        run: node --test test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js
