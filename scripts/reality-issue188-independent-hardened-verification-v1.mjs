@@ -124,4 +124,4 @@ console.log('REALITY_INDEPENDENT_OWNER_APPROVAL_HARDENED_SOURCE_READY',JSON.stri
  independent_verification_ms:receipt.independent_verification_ms,
  installation_performed:false,original_customer_job_settled:false,production_changed:false
 }));
-if(receipt.status!=='INDEPENDENT_SOURCE_CANDIDATE_PASSED')process.exitCode=2;
+if(receipt.status!=='INDEPENDENT_HARDENED_CANDIDATE_PASSED')process.exitCode=2;
