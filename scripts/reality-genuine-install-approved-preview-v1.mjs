@@ -36,7 +36,8 @@ async function signedBroker(body){
  const r=await fetch(
  'https://hvkfreoagbrphwghjajw.supabase.co/functions/v1/reality-genuine-capability-auto-admit',{
  method:'POST',redirect:'error',cache:'no-store',
- headers:{authorization:'Bearer '+jwt,'content-type':'application/json'},
+ headers:{authorization:'Bearer '+jwt,'content-type':'application/json',
+  'x-reality-github-provider-token':env.REALITY_INSTALL_JOB_GITHUB_TOKEN},
  body:JSON.stringify(body)});
  const result=await r.json().catch(()=>null);
  if(!r.ok||result?.ok!==true)
