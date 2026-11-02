@@ -703,3 +703,38 @@ jobs:
           path: artifact/genuine-capability-sandbox-verification.json
           if-no-files-found: error
           retention-days: 14
+
+  durably_requalify_201_candidate:
+    needs: verify_201_new_model_candidate
+    if: needs.verify_201_new_model_candidate.result == 'success'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-new-model-verification-${{ github.run_id }}
+          path: proof
+      - name: Verify signed provider results and atomically supersede previous qualified candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-201-record-model-requalification-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-durable-qualified-for-owner-review-${{ github.run_id }}
+          path: artifact/out/reality-201-durable-requalification.json
+          if-no-files-found: error
+          retention-days: 30
