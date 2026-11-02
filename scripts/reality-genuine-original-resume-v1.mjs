@@ -9,7 +9,7 @@ const env=process.env, repo='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_ORIGINAL_RESUME_'+x)};
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const output=(v)=>{if(env.GITHUB_OUTPUT)appendFileSync(env.GITHUB_OUTPUT,'performed='+v+'\n')};
-if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
+if(env.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
   env.GITHUB_REPOSITORY!==repo||
   env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
   !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||''))fail('ISOLATED_SIGNED_WORKFLOW_ONLY');
