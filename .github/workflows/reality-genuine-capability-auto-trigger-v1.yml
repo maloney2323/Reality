@@ -486,6 +486,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  recover_claimed_original_settlement:
+    needs: resume_original_job
+    # A prior run may have consumed the one-time execution claim and saved a
+    # successful immutable artifact before downstream settlement was skipped.
+    # Recover only that result. Never dispatch or repeat original execution.
+    if: ${{ always() && github.event_name == 'push' && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed != 'true' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently recover original successful provider artifact and atomically settle once
+        id: recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-settlement-recover-v1.mjs
+          node scripts/reality-genuine-original-settlement-recover-v1.mjs
+      - name: Preserve independently verified historical settlement and Universe readback
+        if: steps.recovery.outputs.performed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-recovered-final-settlement-${{ github.run_id }}
+          path: artifact/out/reality-original-final-settlement.json
+          if-no-files-found: error
+          retention-days: 30
+
   independently_measure_production_readiness:
     if: github.event_name == 'push'
     permissions:
