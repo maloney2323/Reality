@@ -11,7 +11,7 @@ const REPO='maloney2323/Reality';
 const SOURCE='src/reality-extensions/reality-general-execution-receipt.mjs';
 const TEST='test/reality-extensions/reality-general-execution-receipt-proposed.test.mjs';
 const FROZEN='test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js';
-const HOLD='test/reality-business-value-execution-receipt-holdout-v1.test.js';
+const HOLD='test/reality-business-value-execution-receipt-governed-holdout-v2.test.js';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_EVENT_NAME!=='push'||e.GITHUB_REPOSITORY!==REPO||
  e.GITHUB_REF!==BRANCH||!/^[a-f0-9]{40}$/.test(e.GITHUB_SHA||'')||
@@ -53,6 +53,22 @@ if(historical.encoding!=='base64'||historical.path!==SOURCE)
 const alreadyInstalled=Buffer.from(historical.content.replace(/\s/g,''),'base64');
 mkdirSync('scratch',{recursive:true});
 writeFileSync('scratch/installed.mjs',alreadyInstalled);
+mkdirSync(dirname(SOURCE),{recursive:true});
+writeFileSync(SOURCE,alreadyInstalled);
+const baseline=spawnSync('docker',['run','--rm','--network','none','--read-only',
+ '--cap-drop','ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1',
+ '--user','65534:65534','--tmpfs','/tmp:rw,noexec,nosuid,size=16m',
+ '-v',process.cwd()+':/work:ro','-w','/work','node:22',
+ 'node','--test','--test-reporter=tap',FROZEN,HOLD],{
+ encoding:'utf8',timeout:120000,maxBuffer:220000,env:{PATH:e.PATH,HOME:e.HOME}});
+const bLog=String(baseline.stdout||'')+'\n'+String(baseline.stderr||'');
+const bPass=Number([...bLog.matchAll(/^# pass (\d+)$/gm)].at(-1)?.[1]||0);
+const bFail=Number([...bLog.matchAll(/^# fail (\d+)$/gm)].at(-1)?.[1]||0);
+if(baseline.status!==0||bPass<15||bFail!==0)
+ fail('PREVIOUS_OWNER_APPROVED_SOURCE_DID_NOT_PASS_GOVERNED_V2_HOLDOUT');
+console.log('REALITY_INSTALLED_OWNER_APPROVED_V2_VALIDITY_PROVEN',JSON.stringify({
+ old_installed_sha:'a7ff52787dd9c026c8354c27dae4c2520bf83af8',
+ tests_passed:bPass,tests_failed:bFail,production_changed:false}));
 const frozenHash=sha(readFileSync(FROZEN)),holdHash=sha(readFileSync(HOLD));
 mkdirSync('artifact/out',{recursive:true});
 const reports=[];
