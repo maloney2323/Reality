@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createFoundationalBuildTicket}
  from '../src/reality-foundational-build-loop-v1.0.js';
 import {createVerifiedFrozenRegressionReader}
@@ -120,4 +121,82 @@ test('a model receives no independent authority from reading the immutable suite
  assert.equal(context.model_execution_authority,false);
  assert.equal(context.repository_base_sha,sha);
  assert.equal(context.frozen_regression_sha256,ticket.frozen_regression_sha256);
+});
+
+test('original-job single frozen test is SHA-pinned and supplied to OpenAI without fabricated manifest',async()=>{
+ const {ticket_hash,version,...plain}=ticket;
+ const frozenPath='test/reality-frozen-regressions/source-backed-business-gap.test.js';
+ const frozenSource='import test from "node:test";test("original acceptance",()=>{});\n';
+ const actualSha=createHash('sha256').update(frozenSource).digest('hex');
+ const direct=createFoundationalBuildTicket({
+  ...plain,
+  frozen_regression_contract_kind:'PINNED_SINGLE_TEST',
+  frozen_test_path:frozenPath,
+  frozen_regression_manifest_ref:'source-backed-business-gap',
+  frozen_regression_sha256:actualSha,
+  source_entrypoint:'src/reality-extensions/source-backed-business-gap.mjs',
+ });
+ const seen=[];
+ const reader=createVerifiedFrozenRegressionReader({
+  fetchImpl:async url=>{
+   seen.push(url);
+   const u=new URL(url);
+   assert.ok(u.pathname.endsWith('/contents/'+frozenPath));
+   assert.equal(u.searchParams.get('ref'),sha);
+   return {ok:true,json:async()=>({
+    encoding:'base64',path:frozenPath,size:Buffer.byteLength(frozenSource),
+    content:Buffer.from(frozenSource).toString('base64'),
+   })};
+  },
+ });
+ const result=await reader(direct);
+ assert.equal(seen.length,1);
+ assert.equal(result.source,'GITHUB_PINNED_READ_ONLY_TEST_FILES');
+ assert.equal(result.files.length,1);
+ assert.equal(result.files[0].sha256,actualSha);
+ assert.equal(result.files[0].content,frozenSource);
+ assert.equal(result.installation_authorized,false);
+ const model=createFoundationalModelGenerator({
+  model:'gpt-test',apiKey:'test-local-fake-key-123456',
+  readFrozenRegression:reader,
+  fetchImpl:async(_endpoint,{body})=>{
+   const prompt=JSON.parse(JSON.parse(body).input[1].content[0].text);
+   assert.equal(prompt.verified_frozen_test_source.length,1);
+   assert.equal(prompt.verified_frozen_test_source[0].content,frozenSource);
+   return {ok:true,json:async()=>({id:'model-test',
+    output_text:JSON.stringify({
+     ticket_hash:direct.ticket_hash,original_work_id:direct.original_work_id,
+     rationale:'Source-bound capability proposal; not installed',
+     files:[
+      {path:direct.source_entrypoint,content:'export const valid=true;'},
+      {path:'test/reality-extensions/source-backed-business-gap.test.js',
+       content:'import test from "node:test";test("valid",()=>{});'},
+     ],
+    }),
+   })};
+  },
+ });
+ const proposal=await model({ticket:direct,attempt:1,execution_authority:false});
+ assert.equal(proposal.original_work_id,direct.original_work_id);
+ assert.equal(proposal.installed,false);
+});
+test('single frozen original contract rejects altered provider source before model generation',async()=>{
+ const {ticket_hash,version,...plain}=ticket;
+ const frozenPath='test/reality-frozen-regressions/source-backed-business-gap.test.js';
+ const direct=createFoundationalBuildTicket({
+  ...plain,frozen_regression_contract_kind:'PINNED_SINGLE_TEST',
+  frozen_test_path:frozenPath,
+  frozen_regression_sha256:'c'.repeat(64),
+ });
+ const reader=createVerifiedFrozenRegressionReader({
+  fetchImpl:async()=>({ok:true,json:async()=>({
+   path:frozenPath,encoding:'base64',size:4,
+   content:Buffer.from('fake').toString('base64'),
+  })}),
+ });
+ await assert.rejects(reader(direct),/FOUNDATION_REGRESSION_CONTEXT_SOURCE_BACKED_FROZEN_BYTES_CHANGED/);
+ assert.throws(()=>createFoundationalBuildTicket({
+  ...plain,frozen_regression_contract_kind:'PINNED_SINGLE_TEST',
+  frozen_test_path:'../outside.test.js',
+ }),/FOUNDATION_SOURCE_BACKED_FROZEN_TEST_PATH_REQUIRED/);
 });
