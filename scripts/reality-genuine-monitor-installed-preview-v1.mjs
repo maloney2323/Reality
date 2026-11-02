@@ -17,13 +17,15 @@ const evidence=JSON.parse(readFileSync(source,'utf8'));
 const acceptedBranch=/^feature\/reality-qualified-install-[a-f0-9]{12}$/;
 const acceptedFile=/^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.(?:js|mjs))$/;
 if(evidence.schema!=='reality-owner-approved-preview-source-install-v1'||
- evidence.source_sha!==env.GITHUB_SHA||
+ evidence.source_sha!==(env.REALITY_RECOVERY_SOURCE_SHA||env.GITHUB_SHA)||
  !acceptedBranch.test(evidence.installed_branch)||
  !/^[a-f0-9]{40}$/.test(evidence.installed_commit_sha)||
  !/^[a-f0-9]{64}$/.test(evidence.artifact_sha256)||
  !Array.isArray(evidence.file_sha256)||
  evidence.file_sha256.length<2||evidence.file_sha256.length>12||
  evidence.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'||
+ (env.REALITY_RECOVERY_INSTALL_RUN_ID&&
+  evidence.installer_run_id!==env.REALITY_RECOVERY_INSTALL_RUN_ID)||
  evidence.source_installation_verified!==true||
  evidence.production_changed!==false||evidence.original_job_completed!==false)
  fail('INSTALLED_APPROVAL_AND_SOURCE_INVALID');
