@@ -115,15 +115,18 @@ export async function createRealityPinnedPreviewGenerationAdapters({
   env.VERCEL_GIT_COMMIT_SHA!==ticket.repository_base_sha||
   env.GITHUB_ACTIONS==='true')
   throw Error('FOUNDATION_GENERIC_PINNED_PREVIEW_SCOPE_REQUIRED');
+ const configuredOpenAIModel=env.REALITY_SEMANTIC_REVIEW_MODEL||
+  env.REALITY_OPENAI_MODEL;
  if(typeof env.REALITY_STANDALONE_OPENAI_API_KEY!=='string'||
    env.REALITY_STANDALONE_OPENAI_API_KEY.length<10||
-   typeof env.REALITY_SEMANTIC_REVIEW_MODEL!=='string')
+   typeof configuredOpenAIModel!=='string'||
+   !/^[a-zA-Z0-9._-]{3,100}$/.test(configuredOpenAIModel))
   throw Error('FOUNDATION_GENERIC_MODEL_PROVIDER_UNAVAILABLE');
  const client=SandboxClient||((await import('@vercel/sandbox')).Sandbox);
  return createRealityVercelGenerationAdapters({
   ticket,SandboxClient:client,modelFetch,
   apiKey:env.REALITY_STANDALONE_OPENAI_API_KEY,
-  model:env.REALITY_SEMANTIC_REVIEW_MODEL,
+  model:configuredOpenAIModel,
   readFrozenRegression:createVerifiedFrozenRegressionReader({
    fetchImpl:modelFetch,
    token:env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null,
