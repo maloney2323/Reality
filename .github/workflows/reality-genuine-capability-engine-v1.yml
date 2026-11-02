@@ -12,6 +12,9 @@ on:
       - 'src/reality-genuine-capability-value-passport-v1.js'
       - 'test/reality-genuine-capability-value-passport-v1.test.js'
       - 'src/reality-genuine-capability-github-wakeup-v1.js'
+      - 'src/reality-genuine-approved-install-wake-v1.js'
+      - 'test/reality-genuine-approved-install-wake-v1.test.js'
+      - 'api/reality/personal-qualified-capability-approve.js'
       - 'scripts/reality-genuine-capability-worker-v1.mjs'
       - 'test/reality-genuine-capability-worker-v1.test.js'
       - 'supabase/functions/reality-genuine-capability-wake/index.ts'
@@ -60,6 +63,7 @@ jobs:
           node --test test/reality-genuine-capability-live-intake-v1.test.js
           node --test test/reality-genuine-capability-value-passport-v1.test.js
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
+          node --test test/reality-genuine-approved-install-wake-v1.test.js
           node --test test/reality-genuine-capability-worker-v1.test.js
           node --test test/reality-unfinished-work-freeze-resilience-v1.test.js
           node --test test/reality-genuine-capability-execution-runtime-v1.test.js
