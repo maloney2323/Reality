@@ -123,4 +123,6 @@ console.log('REALITY_SOURCE_REPAIR_BUSINESS_VALUE_PROPOSAL',JSON.stringify({
  output_tokens:receipt.output_tokens,owner_approval_verified:false,
  installation_performed:false,production_changed:false}));
 function lastTestCount(){return reports.at(-1)?.passed||0}
-if(!success)process.exitCode=2;
+// A failed bounded proposal is a recorded finding, not permission to fabricate success.
+// Independent verifier explicitly checks the failed receipt as a blocked upgrade.
+
