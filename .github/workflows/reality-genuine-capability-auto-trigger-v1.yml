@@ -759,14 +759,43 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  mega_independent_release_readiness:
+    # Never withhold the read-only readiness audit merely because an unrelated
+    # reconciliation job failed, timed out, or was skipped.
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently inspect release gates even if upstream settlement automation fails
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-independent-production-readiness-v1.mjs
+          node scripts/reality-independent-production-readiness-v1.mjs
+      - name: Preserve release blockers without promoting production
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-mega-independent-readiness-${{ github.run_id }}
+          path: artifact/out/reality-production-readiness.json
+          if-no-files-found: error
+          retention-days: 30
+
   mega_independent_final_business_value_scorecard:
     needs:
       - prove_real_work_portfolio_resume_second_half
       - prove_existing_vs_missing_capability_on_real_work
       - mega_prove_12_live_ci_operations
       - mega_prove_live_interruption_after_42_source_jobs
-      - independently_measure_production_readiness
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') && needs.prove_real_work_portfolio_resume_second_half.result == 'success' && needs.prove_existing_vs_missing_capability_on_real_work.result == 'success' && needs.mega_prove_12_live_ci_operations.result == 'success' && needs.mega_prove_live_interruption_after_42_source_jobs.result == 'success' && needs.independently_measure_production_readiness.result == 'success' }}
+      - mega_independent_release_readiness
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') && needs.prove_real_work_portfolio_resume_second_half.result == 'success' && needs.prove_existing_vs_missing_capability_on_real_work.result == 'success' && needs.mega_prove_12_live_ci_operations.result == 'success' && needs.mega_prove_live_interruption_after_42_source_jobs.result == 'success' && needs.mega_independent_release_readiness.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -800,7 +829,7 @@ jobs:
       - name: Restore independent signed production release-readiness evidence
         uses: actions/download-artifact@v4
         with:
-          name: reality-independent-production-readiness-${{ github.run_id }}
+          name: reality-mega-independent-readiness-${{ github.run_id }}
           path: artifact/readiness
       - name: Reject forged completion claims, reconcile every source and compute meaningful measured results
         run: |
