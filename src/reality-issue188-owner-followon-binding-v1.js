@@ -15,9 +15,9 @@ import {verifyRealMissingRepairIssue}
 
 export const FOLLOWON_VERSION='reality-issue188-authenticated-followon-owner-original-v1';
 const WORK=/^work:[a-f0-9]{32}$/;
-const OWNER_SOURCE='45d26806d0e192d6fdecd177464d13af2ab3b98a70070b8fd268a2f05bedee64';
+const OWNER_SOURCE='d084f46d840027acd412b67fceb1636fd35a64f2cc08b9ebb6666d470d1af43d';
 const PREVIOUS_WORK='work:1eecc0d71b21492e0cfdd527f9c257f3';
-const RUN=41533824456;
+const RUN=41547631404;
 const REPO='maloney2323/Reality';
 const fail=code=>{throw Error('FOLLOWON_188_'+code)};
 const digest=x=>createHash('sha256').update(String(x)).digest('hex');
@@ -55,12 +55,12 @@ async function checkNewCandidateProvider({
     run.head_branch!=='feature/reality-general-capability-engine-20261101'||
     !Array.isArray(artifacts.artifacts)||
     !artifacts.artifacts.some(x=>
-      x.name==='reality-188-corrected-model-review-'+RUN&&
-      x.digest==='sha256:de6318fcc6a9619aff9b946991c2ed5ace12f1a6a8d5745f77d4676c6c04cc59'&&
+      x.name==='reality-customer-issue188-model-research-'+RUN&&
+      x.digest==='sha256:a15f718461a9af61663f10797088df28abac312bf338269bb16b16f6cd0122b4'&&
       !x.expired)||
     !artifacts.artifacts.some(x=>
-      x.name==='reality-188-owner-hardened-independent-acceptance-'+RUN&&
-      x.digest==='sha256:9367575b9f3eb7b23f70d4f8443310814675362e3f2ab2a1b3d81a09946385e0'&&
+      x.name==='reality-customer-issue188-independent-sandbox-'+RUN&&
+      x.digest==='sha256:166309eddaef9878341871551283989b5da0d612ebb799d2647d8163d8250bdd'&&
       !x.expired))
   fail('PINNED_INDEPENDENT_CAPABILITY_PROOF_CHANGED');
  return {run_id:RUN,source_sha256:OWNER_SOURCE,
