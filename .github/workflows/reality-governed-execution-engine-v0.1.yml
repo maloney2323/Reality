@@ -45,6 +45,9 @@ on:
       - 'index.html'
       - 'api/reality/personal-qualified-capability-approve.js'
       - 'src/reality-genuine-approved-install-wake-v1.js'
+      - 'src/reality-governed-execution-wake-protocol-v1.js'
+      - 'sql/reality-governed-execution-wake-outbox-v1.sql'
+      - 'test/reality-governed-execution-wake-protocol-v1.test.js'
       - 'test/reality-genuine-approved-install-wake-v1.test.js'
       - 'test/reality-home-owner-authorizations-v1.test.js'
       - 'src/reality-genuine-activation-suite-v1.js'
@@ -114,6 +117,9 @@ on:
       - 'index.html'
       - 'api/reality/personal-qualified-capability-approve.js'
       - 'src/reality-genuine-approved-install-wake-v1.js'
+      - 'src/reality-governed-execution-wake-protocol-v1.js'
+      - 'sql/reality-governed-execution-wake-outbox-v1.sql'
+      - 'test/reality-governed-execution-wake-protocol-v1.test.js'
       - 'test/reality-genuine-approved-install-wake-v1.test.js'
       - 'src/reality-stewardship-pass-v1.0.js'
       - 'test/reality-stewardship-preview-readonly-v0.1.test.js'
@@ -136,4 +142,5 @@ jobs:
    - uses: actions/checkout@v4
    - uses: actions/setup-node@v4
      with: {node-version: 22}
+   - run: node --check src/reality-governed-execution-wake-protocol-v1.js && node --test test/reality-governed-execution-wake-protocol-v1.test.js
    - run: node --test test/reality-governed-execution-engine-v0.1.test.js test/reality-execution-goal-grounding-v0.1.test.js test/reality-personal-work-grounding-v0.1.test.js test/reality-personal-action-authority-v0.1.test.js test/reality-personal-execution-admission-v0.1.test.js test/reality-single-use-execution-reservation-v0.1.test.js test/reality-legacy-external-write-closure-v0.1.test.js test/reality-personal-discovered-work-handoff-v0.1.test.js test/reality-stewardship-preview-readonly-v0.1.test.js test/reality-personal-issue-dispatch-v0.1.test.js test/reality-vertical-slice-proof-v0.1.test.js test/reality-principal-prior-effect-v0.1.test.js test/reality-work-center-v0.1.test.js test/reality-work-catalog-v0.1.test.js test/reality-work-value-assessment-v0.1.test.js test/reality-workforce-impact-v0.1.test.js test/reality-github-403-diagnostics-v0.1.test.js test/reality-home-owner-authorizations-v1.test.js test/reality-genuine-approved-install-wake-v1.test.js test/reality-genuine-activation-suite-v1.test.js test/reality-original-provider-relationship-v1.test.js test/reality-genuine-settlement-upstream-skips-v1.test.js
