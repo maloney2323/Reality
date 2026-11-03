@@ -366,10 +366,12 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
  <div class="simple-actions">
   <button type="button" id="simpleReviewFirst" class="simple-primary">Review first opportunity</button>
   <button type="button" id="simpleChat" class="simple-secondary">Talk to Reality</button>
+  <button type="button" id="simpleViewGapCategory" class="simple-secondary">View all capability candidates</button>
  </div>
  <div id="simpleResearchList" class="simple-list" aria-live="polite">
   <div class="simple-finding"><p>Loading completed background assessments; no new search or job will start.</p></div>
  </div>
+ <p id="simpleGapFeedStatus" class="simple-status" role="status" aria-live="polite">Checking complete capability intake…</p>
  <p id="simpleResearchStatus" class="simple-status" role="status">Reading automatically inspected upgrades from Reality’s ledger…</p>
  <div class="simple-footer">
   <span class="simple-note">Research ideas aren't approved jobs. Reality must prove a missing capability before proposing installation.</span>
@@ -1397,7 +1399,10 @@ const workCategories=[
 ];
 let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
 let wcUpgradeReviews=[]; // Owner-authenticated unfinished jobs, not discovered new defects.
-let wcMarketReviewFindings=[]; // Research hypotheses are NOT eligible task admissions.
+let wcMarketReviewFindings=[]; // Research is distinct from verified gaps.
+let wcGapFeed=[],wcGapHistory=[],wcGapFeedReady=false,wcGapFeedSerial=0;
+let wcGapCounts={current_candidates:0,verified_current_gaps:0,historical_completed:0};
+let wcGapFeedStatus='Signed-in source-backed category not yet checked.';
 let wcSort='triage';
 let wcJobStarting=false;
 const wcJobAttemptLocked=new Set();
@@ -3134,6 +3139,7 @@ setInterval(()=>{if($('privateReady')?.style.display==='block'&&
 setInterval(()=>{if(homeOwnerSignedIn())void homeOwnerRefresh();},30000);
 setInterval(()=>{if(homeOwnerSignedIn())void realityChatRefreshEvents();},12000);
 setInterval(()=>{if(homeOwnerSignedIn())void realityBusinessRefresh();},30000);
+setInterval(()=>{if(homeOwnerSignedIn())void wcLoadGapFeed();},60000);
 setTimeout(()=>void realityBusinessRefresh(),600);
 
 $('wcQuickFindRepair').onclick=()=>{
@@ -4589,6 +4595,12 @@ function realitySimpleAccount(yes){
 }
 $('simpleChat').textContent='Watch Reality diagnose & recover · Chat';
 $('simpleChat').onclick=()=>realityOpenChatDock(false);
+$('simpleViewGapCategory').onclick=()=>{
+ wcCurrent='upgrades';wcRender();
+ if(!document.body.classList.contains('reality-details-open'))
+  $('simpleAdvancedToggle').click();
+ $('wcCategories')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+};
 $('simpleReviewFirst').onclick=()=>{
  const first=$('simpleResearchList')?.querySelector('.simple-finding');
  if(first&&realitySimpleFindings.length){
@@ -4683,6 +4695,7 @@ async function wcInvestigateMarket({restore=false}={}){
   realitySimpleRender(data);
   wcMarketReviewFindings=data.findings.filter(f=>f?.status==='RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST');
   wcRender();
+  void wcLoadGapFeed();
   status.textContent=(restore?'Saved research restored · ':'Governed research recorded · ')+data.researched_source_count+
    ' web source(s), '+cards.length+' review hypothesis(es). '+
    'Pinned Reality commit '+data.pinned_commit_sha.slice(0,12)+
@@ -5140,12 +5153,17 @@ setInterval(refreshSavedShiftHome,300000);
   guidedSetup.authenticated=yes;
   guidedSetup.accountError='';
   realitySimpleAccount(yes);
+  if(!yes){++wcGapFeedSerial;wcGapFeedReady=false;wcGapFeed=[];wcGapHistory=[];
+   wcGapCounts={current_candidates:0,verified_current_gaps:0,historical_completed:0};
+   wcGapFeedStatus='Sign in to see your capability gap intake.';
+   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;wcRender();
+  }
   if(!yes)void realityChatMarketStage();
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
   if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
-  if(yes){void wcInvestigateMarket({restore:true});}
+  if(yes){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
   else{void realityBusinessRefresh();void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
