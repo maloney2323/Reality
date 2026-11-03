@@ -102,11 +102,16 @@ Deno.serve(async req=>{
   // runner independently rechecks the original signed owner approval.
   const ref=await github('/git/ref/heads/'+BRANCH);
   if(!SHA40.test(String(ref?.object?.sha||'')))reject('PINNED_BRANCH_UNAVAILABLE');
-  const path='reality-approved-install-wakes/'+claim.approval_id+'.json';
+  // Each bounded retry gets a NEW wake file. An old runner is rejected by
+  // the latest database fence, and an accepted retry genuinely fires GitHub.
+  const path='reality-approved-install-wakes/'+claim.approval_id+
+   '-attempt-'+claim.dispatch_fence+'.json';
   const source=JSON.stringify({
     approval_id:claim.approval_id,
     trigger_id:claim.trigger_id, // exact queued job identity; NOT authority
+    dispatch_fence:claim.dispatch_fence,
     original_work_id:claim.original_work_id,
+    pre_state_hash:claim.pre_state_hash,
     artifact_sha256:claim.artifact_sha256,
     target_environment:'ISOLATED_PREVIEW',
     authorization_source:'DURABLE_OWNER_RECEIPT_READBACK_REQUIRED'
