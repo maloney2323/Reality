@@ -1104,6 +1104,12 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
       (proof.extension_protocol==='TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1'&&
        proof.classification==='RECONCILIATION_REQUIRED'&&
        WORK.test(String(proof.reconciliation_target_original_work_id||''))&&
+       proof.original_job_completed===false)||
+      (proof.extension_protocol==='TRUSTED_GENERAL_COMPLETION_RECEIPT_V1'&&
+       o.source_path==='src/reality-extensions/reality-general-execution-receipt.mjs'&&
+       o.frozen_test_path==='test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'&&
+       proof.classification==='PRE_SETTLEMENT_DENIED'&&
+       proof.pre_settlement_denial_verified===true&&
        proof.original_job_completed===false)
      )||
     proof.original_provider_failure_verified!==true||
@@ -1144,6 +1150,7 @@ async function continueOriginalSettle(sha:string,run:number,token:string,proof:R
      provider_original_failure_verified:true,
      isolated_original_acceptance_passed:true,
      observed_classification:proof.classification,
+     pre_settlement_denial_verified:proof.pre_settlement_denial_verified===true,
      provider_outcome_digest:proof.provider_outcome_digest,
      production_changed:false}
   }});
