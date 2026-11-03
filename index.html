@@ -297,12 +297,24 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
 @media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
 @media(max-width:600px){.business-home{padding:15px;margin:14px 0 20px}.business-home-insights{grid-template-columns:1fr}.business-home-stat{min-height:155px;padding:12px}.business-home-source{white-space:normal}.business-operations-list strong{font-size:22px}#privateChat{top:0!important;right:0!important;bottom:0!important;left:0!important;width:100vw;max-width:none;border-radius:0!important;padding:16px!important}.reality-chat-dock-open{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}}
 
+.reality-chat-decision-inbox{border-color:#648da9;background:#142335}
+.reality-chat-decision-inbox .reality-chat-progress button{display:block;width:100%;min-height:50px;margin-top:12px}
+#realityChatApprovalInbox .reality-chat-progress p{font-size:13px;line-height:1.5}
+#realityChatApprovalEvidence>summary{padding:10px 0;cursor:pointer;color:#c6e1ef}
+#homeChatApprovalShortcut{margin:8px 0 20px;padding:15px;border:1px solid #426a84;border-radius:12px;background:#102437}
+#homeChatApprovalShortcut p{margin:8px 0;color:#bbd0df}
+#homeChatApprovalShortcut button{margin-top:8px;min-height:48px}
 </style>
 </head>
 <body>
 <main>
   <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
-  <!-- OWNER AUTHORIZATIONS: first Home section, independent of the chat dock. -->
+  <section class="business-home-actions" id="homeChatApprovalShortcut" aria-label="Reality chat and approvals">
+   <strong>Talk to Reality about your work and approvals.</strong>
+   <p>Review source-backed progress and make your decisions in the conversation. No searching through settings or approval pages.</p>
+   <button type="button" id="homeOpenApprovalChat" class="business-ask-reality">Open Reality · Work & approvals</button>
+  </section>
+  <!-- The owner evidence panel is placed inside signed-in chat on startup. -->
 <section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
  <div class="home-owner-head">
   <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
@@ -412,6 +424,18 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <h4>What Reality is doing</h4>
     <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
     <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
+  </section>
+  <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
+   <div class="label">REALITY · DECISIONS FOR YOU</div>
+   <h4>Approvals in this conversation</h4>
+   <p class="muted">Review the exact repair, test evidence and installation scope. An ordinary chat message never grants execution authority.</p>
+   <p id="realityChatApprovalStatus" role="status" aria-live="polite">Checking your saved decisions…</p>
+   <div id="realityChatApprovalItems" aria-live="polite"></div>
+   <details id="realityChatApprovalEvidence" class="reality-chat-settings">
+    <summary>Detailed evidence and older repair records</summary>
+    <div id="realityChatApprovalLegacyContainer"></div>
+   </details>
+   <div id="realityChatApprovalDialogs"></div>
   </section>
   <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
   <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
@@ -803,6 +827,10 @@ function realityOpenChatDock(focusPrompt=false){
    $('privatePrompt'):$('privateLogin').style.display==='block'?
    $('privateEmail'):$('realityChatDockClose');
  target?.focus({preventScroll:true});
+ if($('privateReady')?.style.display==='block'){
+  void homeOwnerRefresh();
+  void realityChatRefreshEvents();
+ }
 }
 function realityCloseChatDock(){
  const panel=$('privateChat');
@@ -817,6 +845,7 @@ function realityCloseChatDock(){
 $('realityChatDockOpen').addEventListener('click',()=>realityOpenChatDock(true));
 $('realityChatDockClose').addEventListener('click',realityCloseChatDock);
 $('businessAskReality').addEventListener('click',()=>realityOpenChatDock(true));
+$('homeOpenApprovalChat').addEventListener('click',()=>homeOwnerFocus());
 $('accountShortcut').addEventListener('click',e=>{e.preventDefault();realityOpenChatDock(false)});
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&$('privateChat').dataset.open==='true'){
@@ -2139,8 +2168,11 @@ let wcEasyGenuineCandidate=null;
 // retain their original server-side one-time security contracts.
 let homeOwnerRefreshEpoch=0;
 const homeOwnerCenter=$('homeOwnerAuthorizations');
-// This panel stays on Home. Chat remains available without hiding the approval.
+// One server-owned authorization source, visible in signed-in chat only.
+$('realityChatApprovalLegacyContainer').appendChild(homeOwnerCenter);
 const homeOwnerDialogs=$('homeOwnerDialogs');
+// Modal dialogs stay outside collapsed history so existing auth still works.
+$('realityChatApprovalDialogs').appendChild(homeOwnerDialogs);
 homeOwnerDialogs.appendChild($('wcEasyGenuineApproval'));
 const homeLegacyInstallSlot=$('homeLegacyInstallSlot');
 homeLegacyInstallSlot.append(
@@ -2154,9 +2186,8 @@ function homeOwnerLegacyVisibility(){
  homeLegacyInstallSlot.hidden=!(wcVerifiedInstallReview||wcInstallContinuationBusy);
 }
 function homeOwnerFocus(){
- // Bring the customer back to Home rather than opening Chat over their approval.
- if($('privateChat').dataset.open==='true')realityCloseChatDock();
- homeOwnerCenter.scrollIntoView({behavior:'smooth',block:'start'});
+ realityOpenChatDock(false);
+ $('realityChatApprovalInbox').scrollIntoView({behavior:'smooth',block:'nearest'});
  void homeOwnerRefresh();
 }
 function homeOwnerEntryVerified(entry){
@@ -2349,6 +2380,72 @@ async function homeOwnerShowCurrentProgress(epoch){
   out.textContent='Independent current-job progress temporarily unavailable. No installation or completion claimed from an unavailable read.';
  }
 }
+// The inline decision is created only from signed-in owner-scoped source
+// readback. The model cannot emit an authority-bearing approval or click it.
+function realityChatRenderApprovalInbox(entries){
+ const list=$('realityChatApprovalItems'),status=$('realityChatApprovalStatus');
+ list.replaceChildren();
+ const pending=entries.filter(e=>homeOwnerEntryVerified(e)&&
+   !e.approval&&e.full_loop_preflight?.approval_gate_open===true);
+ const blocked=entries.filter(e=>homeOwnerEntryVerified(e)&&
+   !e.approval&&e.full_loop_preflight?.approval_gate_open!==true);
+ status.textContent=pending.length?
+  pending.length+' independently verified repair'+(pending.length===1?' needs':'s need')+
+   ' your authorization. Ordinary chat does not approve anything.':
+  blocked.length?
+   'Repair evidence exists, but the install-to-settlement path is not ready. Approval is locked.':
+   'No new authorization is needed. Your recorded jobs and receipts are shown above.';
+ for(const entry of pending){
+  const q=entry.qualification||{};
+  const card=document.createElement('article');card.className='reality-chat-progress';
+  const heading=document.createElement('strong');
+  heading.textContent='Reality: I found and tested a repair that needs your decision.';
+  const what=document.createElement('p');
+  what.textContent=entry.capability_id==='reality-continuity-settlement-reconciler'?
+   'The original job needs a missing settlement record repaired. Reality qualified the source against independent tests.':
+   'Your original job needs a missing capability. Reality generated and independently tested the exact candidate source.';
+  const tests=[];
+  if(Number.isSafeInteger(q.frozen_pass)&&q.frozen_pass>0)tests.push('Frozen tests '+q.frozen_pass+' passed');
+  if(Number.isSafeInteger(q.candidate_pass)&&q.candidate_pass>0)tests.push('New capability tests '+q.candidate_pass+' passed');
+  if(Number.isSafeInteger(q.holdout_pass)&&q.holdout_pass>0)tests.push('Holdout tests '+q.holdout_pass+' passed');
+  const proof=document.createElement('p');
+  proof.textContent=tests.length?'Evidence · '+tests.join(' · '):
+   'The verified source is qualified; numerical test totals were not provided.';
+  const scope=document.createElement('p');
+  scope.textContent='One decision: permit this exact verified upgrade in isolated preview so Reality can continue the SAME job. No production changes.';
+  const evidence=document.createElement('details');
+  const summary=document.createElement('summary');
+  summary.textContent='Exact source hash and original job';
+  const exact=document.createElement('p');
+  exact.textContent='Job '+entry.original_work_id+' · Source SHA-256 '+q.artifact_sha256;
+  evidence.append(summary,exact);
+  if(/^[1-9][0-9]{6,17}$/.test(String(q.provider_run_id||''))){
+   const link=document.createElement('a');
+   link.href='https://github.com/maloney2323/Reality/actions/runs/'+q.provider_run_id;
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent='Independent GitHub verification';evidence.appendChild(link);
+  }
+  const approve=document.createElement('button');
+  approve.type='button';approve.className='repair-primary';
+  approve.textContent='Approve this exact upgrade · Isolated preview';
+  approve.setAttribute('aria-label','Approve verified isolated upgrade for original job '+entry.original_work_id);
+  approve.addEventListener('click',async()=>{
+   if(realityChatApprovalInFlight)return;
+   approve.disabled=true;
+   status.textContent='Rechecking source, ownership and approval state…';
+   try{await realityChatApproveOnce(entry.original_work_id,q.artifact_sha256);}
+   catch{status.textContent='Approval readback uncertain; do not click again. Reality will read your saved approval.';}
+  });
+  card.append(heading,what,proof,scope,evidence,approve);list.appendChild(card);
+ }
+ for(const entry of blocked){
+  const card=document.createElement('article');card.className='reality-chat-progress';
+  const h=document.createElement('strong');h.textContent='Reality: repair verified, execution path still blocked';
+  const p=document.createElement('p');
+  p.textContent='No approval is requested until the exact installation, resumption, and settlement path is independently verified.';
+  card.append(h,p);list.appendChild(card);
+ }
+}
 async function homeOwnerRefresh(){
  const epoch=++homeOwnerRefreshEpoch;
  homeOwnerLegacyVisibility();
@@ -2359,13 +2456,17 @@ async function homeOwnerRefresh(){
  if(!homeOwnerSignedIn()){
   count.textContent='Sign-in required';
   status.textContent='Sign in to your Reality account to review pending authorizations. Nothing has been approved.';
+  $('realityChatApprovalStatus').textContent='Sign in to read pending decisions. No action has been taken.';
+  $('realityChatApprovalItems').replaceChildren();
   return;
  }
+ $('realityChatApprovalStatus').textContent='Checking owner approval records…';
  count.textContent='Checking…';
  status.textContent='Reading independently qualified requests for your signed-in account…';
  try{
   const entries=await homeOwnerRead();
   if(epoch!==homeOwnerRefreshEpoch)return;
+  realityChatRenderApprovalInbox(entries);
   let pending=0;
   for(const entry of entries){
    const verified=homeOwnerEntryVerified(entry);
@@ -2476,6 +2577,8 @@ async function homeOwnerRefresh(){
   if(epoch!==homeOwnerRefreshEpoch)return;
   count.textContent='Readback unavailable';
   status.textContent='Reality could not verify your owner authorization queue. No approval or installation was attempted.';
+  $('realityChatApprovalStatus').textContent='Approval records unavailable. No action was taken. Do not retry an uncertain approval.';
+  $('realityChatApprovalItems').replaceChildren();
  }
 }
 
@@ -2494,6 +2597,7 @@ async function realityChatApproveOnce(workId,expectedHash){
     matching[0].approval||matching[0].qualification.artifact_sha256!==expectedHash)
    throw Error('EXACT_SOURCE_CHANGED_OR_ALREADY_APPROVED');
   $('homeOwnerStatus').textContent='Recording your one exact isolated-preview approval…';
+  $('realityChatApprovalStatus').textContent='Recording exact approval. Do not tap twice…';
   const response=await fetch('/api/reality/personal-qualified-capability-approve',{
     method:'POST',credentials:'same-origin',cache:'no-store',
     headers:{'content-type':'application/json'},
@@ -2518,17 +2622,21 @@ async function realityChatApproveOnce(workId,expectedHash){
      receipt.worker_wake_status==='SIGNED_WORKER_WAKE_ALREADY_PRESENT'){
    $('homeOwnerStatus').textContent=
     'Approved once. Reality’s governed worker was notified. Watch verified progress in this conversation; no more approval clicks are needed.';
+   $('realityChatApprovalStatus').textContent='Approval saved. Worker wake dispatched but execution is not yet verified. No second approval needed.';
   }else if(receipt.auto_trigger_fallback==='SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL'&&
             receipt.auto_trigger_status==='AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH'&&
             receipt.retry_owner_approval===false){
    $('homeOwnerStatus').textContent=
     'Your approval is saved. Reality’s signed background auto-trigger will poll for approved work without keeping this page open. GitHub polling can be delayed; worker start is NOT yet verified. Do not approve again.';
+   $('realityChatApprovalStatus').textContent='Approval saved. Background auto-trigger pickup is pending. Worker start is not verified; do not approve again.';
   }else{
    $('homeOwnerStatus').textContent=
     'Owner approval is saved, but Reality has not verified that the worker started. Do not approve again. The worker connection needs recovery.';
+   $('realityChatApprovalStatus').textContent='Approval saved; worker start remains unverified. Do not approve again.';
   }
  }catch(err){
   $('homeOwnerStatus').textContent='Approval status needs an independent readback. Do not click approval a second time. '+String(err?.message||'UNKNOWN');
+  $('realityChatApprovalStatus').textContent='Approval uncertain. No automatic retry; check saved status before any further action.';
   throw err;
  }finally{
   realityChatApprovalInFlight=false;
