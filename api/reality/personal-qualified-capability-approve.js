@@ -103,15 +103,24 @@ export default async function handler(req,res){
         .includes(wake.status))
     throw Error('APPROVED_WAKE_READBACK_MISMATCH');
   }catch(error){
-   // The owner approval is still durable: an error here must never prompt
-   // a second approval or claim the worker executed.
+   // Fast GitHub write dispatch is optional; the signed default-branch
+   // GitHub Actions scheduler independently polls the same durable owner
+   // approval and dispatches only after rechecking exact signed ownership.
+   // GitHub schedule timing can be delayed: DO NOT claim the worker woke.
+   // Never ask the owner to approve again, mint another approval, or replay.
+   const fastPathUnavailable=
+    String(error?.message||'')===
+     'REALITY_APPROVED_WAKE_PREVIEW_GITHUB_WORKER_WRITE_TOKEN_REQUIRED';
    console.warn('REALITY_OWNER_APPROVED_WAKE_PENDING',
-    String(error?.message||'').startsWith('REALITY_APPROVED_WAKE_')?
-     'PROVIDER_WAKE_UNAVAILABLE':'WORKER_WAKE_READBACK');
+    fastPathUnavailable?'SIGNED_SCHEDULED_FALLBACK_REQUIRED':
+     'PROVIDER_WAKE_OR_READBACK_UNVERIFIED');
    return res.status(202).json({ok:true,...receipt,
     worker_wake_status:'WORKER_WAKE_NOT_VERIFIED',
+    auto_trigger_fallback:'SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL',
+    auto_trigger_status:'AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH',
+    auto_trigger_instant:false,
     worker_execution_started:false,installation_completed:false,
-    next_step:'OWNER_APPROVED_WORKER_WAKE_RECOVERY_REQUIRED',
+    next_step:'AUTO_TRIGGER_PENDING_NO_SECOND_OWNER_ACTION',
     retry_owner_approval:false});
   }
   return res.status(202).json({ok:true,...receipt,
