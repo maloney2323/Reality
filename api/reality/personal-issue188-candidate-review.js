@@ -6,11 +6,11 @@ import {authenticatedChatSession,privateChatConfig}
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 const REPO='maloney2323/Reality';
-const ID=41533824456;
+const ID=41547631404;
 const HISTORICAL='work:1eecc0d71b21492e0cfdd527f9c257f3';
-const SOURCE='45d26806d0e192d6fdecd177464d13af2ab3b98a70070b8fd268a2f05bedee64';
-const PROPOSAL_ARCHIVE='sha256:de6318fcc6a9619aff9b946991c2ed5ace12f1a6a8d5745f77d4676c6c04cc59';
-const VERIFIER_ARCHIVE='sha256:9367575b9f3eb7b23f70d4f8443310814675362e3f2ab2a1b3d81a09946385e0';
+const SOURCE='d084f46d840027acd412b67fceb1636fd35a64f2cc08b9ebb6666d470d1af43d';
+const PROPOSAL_ARCHIVE='sha256:a15f718461a9af61663f10797088df28abac312bf338269bb16b16f6cd0122b4';
+const VERIFIER_ARCHIVE='sha256:166309eddaef9878341871551283989b5da0d612ebb799d2647d8163d8250bdd';
 async function provider(path){
  const response=await fetch('https://api.github.com/repos/'+REPO+path,{
   method:'GET',cache:'no-store',redirect:'error',headers:{
@@ -52,9 +52,9 @@ export default async function handler(req,res){
     run.head_repository?.full_name!==REPO||
     run.head_branch!=='feature/reality-general-capability-engine-20261101'||
     !Array.isArray(artifacts.artifacts)||
-    !artifacts.artifacts.some(a=>a.name==='reality-188-corrected-model-review-'+ID&&
+    !artifacts.artifacts.some(a=>a.name==='reality-customer-issue188-model-research-'+ID&&
       a.digest===PROPOSAL_ARCHIVE&&!a.expired)||
-    !artifacts.artifacts.some(a=>a.name==='reality-188-owner-hardened-independent-acceptance-'+ID&&
+    !artifacts.artifacts.some(a=>a.name==='reality-customer-issue188-independent-sandbox-'+ID&&
       a.digest===VERIFIER_ARCHIVE&&!a.expired)||
     owner?.status!=='OWNER_GOVERNED_LOOP_READBACK'||!Array.isArray(owner.jobs)||
     owner.jobs.length>12||
@@ -66,14 +66,14 @@ export default async function handler(req,res){
   // Even with an existing qualified *different* candidate, this specific
   // uninstalled proposal is not automatically bound to it.
   return res.status(200).json({
-   ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
+   ok:true,status:'INDEPENDENT_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
    proposal_title:'Independent execution-receipt verification upgrade',
    issue_number:188,previous_owner_work_id:HISTORICAL,
    previous_owner_work_already_settled:true,
    source_sha256:SOURCE,independent_run_id:ID,
    independent_run_url:'https://github.com/'+REPO+'/actions/runs/'+ID,
    draft_review_url:'https://github.com/'+REPO+'/pull/202',
-   independent_tests_passed:23,
+   independent_tests_passed:21,
    security_regressions_remaining:0,
    installed:false,qualified_for_owner_installation:false,
    owner_approval_issued:false,new_original_work_id:null,
