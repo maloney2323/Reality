@@ -2303,7 +2303,8 @@ async function homeOwnerRefresh(){
   for(const entry of entries){
    const verified=homeOwnerEntryVerified(entry);
    const approved=Boolean(entry.approval);
-   if(verified&&!approved)pending++;
+   const finalPathReady=entry.full_loop_preflight?.approval_gate_open===true;
+   if(verified&&!approved&&finalPathReady)pending++;
    const card=document.createElement('article');
    card.className='home-owner-item';
    const name=document.createElement('h3');
@@ -2314,6 +2315,7 @@ async function homeOwnerRefresh(){
    const state=document.createElement('p');
    state.className='home-owner-state';
    state.textContent=approved?'Approved previously · Do not approve again':
+    verified&&!finalPathReady?'Verified repair · Final execution path needs repair before approval':
     verified?'Repair built and independently tested · Waiting for your decision':
     'Further independent verification required · Cannot approve';
    card.append(name,state);
@@ -2362,6 +2364,12 @@ async function homeOwnerRefresh(){
     'Owner approval already recorded. Installation, resumption and settlement still require independent confirmation.':
     'NOT DONE: No installation approved. Original job not resumed. No final Universe settlement recorded by this request.';
    card.appendChild(notDone);
+   if(verified&&!approved&&!finalPathReady){
+    const warning=document.createElement('p');
+    warning.className='home-owner-not-complete';
+    warning.textContent='Approval is locked: the exact installation → original-job resumption → settlement path is not yet verified for this capability. Reality must fix this connection before taking your second authorization. No additional authorization is required for intermediate repairs.';
+    card.appendChild(warning);
+   }
    const evidence=document.createElement('details');evidence.className='home-owner-technical';
    const summary=document.createElement('summary');
    summary.textContent='View technical evidence and exact source';
@@ -2378,7 +2386,7 @@ async function homeOwnerRefresh(){
     p.appendChild(link);evidence.appendChild(p);
    }
    card.appendChild(evidence);
-   if(verified&&!approved){
+   if(verified&&!approved&&finalPathReady){
     const button=document.createElement('button');
     button.type='button';button.className='repair-primary';
     button.textContent='Approve once · Install in preview & continue job';
@@ -2395,7 +2403,7 @@ async function homeOwnerRefresh(){
   }
   count.textContent=pending+' awaiting approval';
   status.textContent=pending?'Review one independently verified request below. Each authorization is specific to one artifact.':
-   entries.length?'No new approval is needed for these records. Reality will show independent worker results separately.':
+   entries.length?'No eligible second approval yet. If a verified repair is blocked by its continuation path, Reality must fix that path before asking you to approve.':
     'No verified installations need your approval right now.';
  }catch(e){
   if(epoch!==homeOwnerRefreshEpoch)return;
@@ -2415,6 +2423,7 @@ async function realityChatApproveOnce(workId,expectedHash){
   const entries=await homeOwnerRead();
   const matching=entries.filter(e=>e.original_work_id===workId);
   if(matching.length!==1||!homeOwnerEntryVerified(matching[0])||
+    matching[0].full_loop_preflight?.approval_gate_open!==true||
     matching[0].approval||matching[0].qualification.artifact_sha256!==expectedHash)
    throw Error('EXACT_SOURCE_CHANGED_OR_ALREADY_APPROVED');
   $('homeOwnerStatus').textContent='Recording your one exact isolated-preview approval…';
