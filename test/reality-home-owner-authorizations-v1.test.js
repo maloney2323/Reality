@@ -17,8 +17,12 @@ test('homepage JavaScript stays syntactically valid',()=>{
 test('exactly one homepage Owner Authorizations location is prominent',()=>{
  assert.equal((html.match(/id="homeOwnerAuthorizations"/g)||[]).length,1);
  assert.match(section(),/Owner Authorizations/);
- assert.ok(html.indexOf('id="privateChat"')<
+ assert.ok(html.indexOf('<div class="top">')<
   html.indexOf('id="homeOwnerAuthorizations"'));
+ assert.ok(html.indexOf('id="homeOwnerAuthorizations"')<
+  html.indexOf('<h1>Your Business Reality'));
+ assert.ok(html.indexOf('id="homeOwnerAuthorizations"')<
+  html.indexOf('id="businessHome"'));
  assert.match(section(),/id="homeOwnerItems"/);
  assert.match(section(),/id="homeOwnerStatus"/);
 });
@@ -103,15 +107,16 @@ test('technical hashes and original work ids are collapsible while meaningful ou
  assert.match(inlineScript,/card\.appendChild\(notDone\)/);
 });
 
-test('existing persistent chat is the primary above-dashboard customer interface',()=>{
- assert.ok(html.indexOf('<section id="privateChat"')<
-  html.indexOf('<section class="home-owner-center"'));
- assert.ok(html.indexOf('<section id="privateChat"')<
+test('owner authorization is first on Home; persistent chat stays available without hiding approval',()=>{
+ assert.ok(html.indexOf('<section class="home-owner-center"')<
+  html.indexOf('<section id="privateChat"'));
+ assert.ok(html.indexOf('<section class="home-owner-center"')<
   html.indexOf('<section id="startFlow"'));
  assert.match(html,/id="privateTranscript"/);
  assert.match(html,/id="privatePrompt"/);
  assert.match(html,/id="realityChatActivityEntries"/);
- assert.match(inlineScript,/insertBefore\(homeOwnerCenter,\$\('privatePrompt'\)\)/);
+ assert.doesNotMatch(inlineScript,/insertBefore\(homeOwnerCenter,\$\('privatePrompt'\)\)/);
+ assert.match(inlineScript,/function homeOwnerFocus\(\)\{[\s\S]*?realityCloseChatDock\(\)/);
 });
 test('one customer approval click verifies exact source and uses existing authenticated endpoint',()=>{
  const from=inlineScript.indexOf('async function realityChatApproveOnce(');
