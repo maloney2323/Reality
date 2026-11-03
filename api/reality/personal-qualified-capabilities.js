@@ -5,6 +5,8 @@ import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createCapabilityValueReport,summarizeQualifiedCapabilityValueReports}
  from '../../src/reality-capability-value-report-v1.js';
+import {assessTwoAuthorizationExecutionPreflight}
+ from '../../src/reality-two-authorization-execution-preflight-v1.js';
 export const maxDuration=30;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -39,7 +41,8 @@ export default async function handler(req,res){
   // Derive read-only economic and technical explanations solely from the
   // signed, owner-scoped qualification readback. No further rights granted.
   const valueReports=entries.map(createCapabilityValueReport);
-  const enriched=entries.map((entry,i)=>({...entry,value_report:valueReports[i]}));
+  const enriched=entries.map((entry,i)=>({...entry,value_report:valueReports[i],
+   full_loop_preflight:assessTwoAuthorizationExecutionPreflight(entry)}));
   const valuePortfolio=summarizeQualifiedCapabilityValueReports(valueReports);
   return res.status(200).json({
    ok:true,status:entries.length?'VERIFIED_UPGRADES_WAITING_FOR_OWNER':'NO_VERIFIED_UPGRADES',
