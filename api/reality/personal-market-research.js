@@ -7,6 +7,16 @@ import {resolveReliabilityBenchmarkDb}
 import {readPinnedRealityMarketSnapshot,runGovernedMarketResearch,
  persistOwnerMarketResearch}
  from '../../src/reality-autonomous-market-intelligence-v1.js';
+async function researchBudgetRpc(db,method,body){
+ const r=await fetch(db.url+'/rest/v1/rpc/'+method,{
+  method:'POST',cache:'no-store',redirect:'error',
+  headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+   Accept:'application/json','content-type':'application/json'},
+  body:JSON.stringify(body)});
+ const data=await r.json().catch(()=>null);
+ if(!r.ok||data?.ok!==true)throw Error('RESEARCH_BUDGET_OR_FINALIZATION_UNVERIFIED');
+ return data;
+}
 export const maxDuration=120;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -36,14 +46,33 @@ export default async function handler(req,res){
   const apiKey=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||
    process.env.OPENAI_API_KEY||'');
   if(!apiKey)throw Error('RESEARCH_OPENAI_NOT_CONFIGURED');
-  const snapshot=await readPinnedRealityMarketSnapshot();
-  const report=await runGovernedMarketResearch({snapshot,apiKey,
-   model:process.env.REALITY_MARKET_RESEARCH_MODEL||'gpt-6-astra'});
-  const saved=await persistOwnerMarketResearch({
-   report,ownerId:session.user_id,db});
+  const reservation=await researchBudgetRpc(db,
+   'reality_reserve_owner_market_research_v1',
+   {p_owner_id:session.user_id});
+  if(reservation.status!=='OWNER_RESEARCH_RESERVED'||!reservation.reservation_id)
+   throw Error('RESEARCH_BUDGET_RESERVATION_INVALID');
+  let snapshot,report,saved;
+  try{
+   snapshot=await readPinnedRealityMarketSnapshot();
+   report=await runGovernedMarketResearch({snapshot,apiKey,
+    model:process.env.REALITY_MARKET_RESEARCH_MODEL||'gpt-6-astra'});
+   saved=await persistOwnerMarketResearch({
+    report,ownerId:session.user_id,db});
+   const final=await researchBudgetRpc(db,
+    'reality_finalize_owner_market_research_v1',{
+     p_owner_id:session.user_id,p_reservation_id:reservation.reservation_id,
+     p_phase:'COMPLETE'});
+   if(final.phase!=='COMPLETE')throw Error('RESEARCH_FINALIZATION_UNVERIFIED');
+  }catch(error){
+   await researchBudgetRpc(db,'reality_finalize_owner_market_research_v1',{
+    p_owner_id:session.user_id,p_reservation_id:reservation.reservation_id,
+    p_phase:'FAILED'}).catch(()=>null);
+   throw error;
+  }
   return res.status(200).json({
    ok:true,status:'GOVERNED_MARKET_RESEARCH_RECORDED',
    receipt_id:saved.receipt_id,verified_readback:saved.verified_readback,
+   research_reservation_id:reservation.reservation_id,
    report_sha256:report.report_sha256,
    source_coverage:'HOSTED_WEB_SEARCH_AND_PINNED_REALITY_CODE_EXCERPTS',
    pinned_commit_sha:snapshot.commit_sha,
