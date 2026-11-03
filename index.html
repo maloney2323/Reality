@@ -484,6 +484,11 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
     <div class="label">REALITY · WORK UPDATES</div>
     <h4>What Reality is doing</h4>
     <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
+  <section class="reality-chat-progress" id="realityChatMarketStage" aria-label="Reality autonomous research recovery" style="border:1px solid #4e7590;border-radius:13px;padding:15px;margin:12px 0">
+   <strong>Reality · Self-repair &amp; next stage</strong>
+   <p id="realityChatMarketStatus" role="status" aria-live="polite">Checking why research did not advance…</p>
+   <div id="realityChatMarketEvents" aria-live="polite"></div>
+  </section>
     <p id="realityChatWakeStatus" class="muted" role="status" aria-live="polite">Checking the automatic worker wake and retry ledger…</p>
     <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
   </section>
@@ -2791,8 +2796,83 @@ async function realityChatReadWakeStatus(){
   out.textContent='Automatic worker status unavailable. No execution or receipt is inferred.';
  }
 }
+// The stage watchdog runs in Supabase Cron, independent of the browser.
+// This view only reads authentic owner-scoped stage receipts.
+let realityMarketChatEpoch=0;
+async function realityChatMarketStage(){
+ const epoch=++realityMarketChatEpoch, status=$('realityChatMarketStatus');
+ const entries=$('realityChatMarketEvents');
+ if(!status||!entries)return;
+ if($('privateReady')?.style.display!=='block'){
+  status.textContent='Sign in to see Reality’s source-backed self-repair activity.';
+  entries.replaceChildren();
+  return;
+ }
+ try{
+  const response=await fetch('/api/reality/personal-market-stage',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(epoch!==realityMarketChatEpoch)return;
+  if(!response.ok||data?.ok!==true||data.read_only!==true||
+    data.installation_authorized!==false||
+    data.external_execution_authorized!==false||
+    data.production_changed!==false||
+    !Array.isArray(data.items)||!Array.isArray(data.events))
+    throw Error('UNTRUSTED_RECONCILIATION');
+  entries.replaceChildren();
+  if(data.status==='NO_SAVED_RESEARCH'){
+   status.textContent='No completed market investigation is recorded for this account.';
+   return;
+  }
+  if(data.status==='RESEARCH_STALLED_NO_INVESTIGATION_HANDOFF'){
+   status.textContent='Reality detected a research-stage handoff that has not been restored. The autonomous database watchdog is responsible for reconciliation; no upgrade or job was started.';
+   return;
+  }
+  if(data.status!=='AUTO_REPAIRED_RESEARCH_STAGE_HANDOFF'||
+    data.stage_handoff_verified!==true||
+    data.expected_findings!==data.items.length||
+    data.items.some(x=>x.phase!=='EVIDENCE_INSPECTED_INDEPENDENT_TEST_REQUIRED'||
+      x.stage_repair_verified!==true||x.verified_missing_capability!==false||
+      x.owner_install_authorized!==false))
+   throw Error('STAGE_RECOVERY_NOT_INDEPENDENTLY_READ_BACK');
+  const kinds=new Set(data.events.map(e=>e.event_code));
+  for(const expected of ['RESEARCH_HANDOFF_ABSENT_DETECTED',
+    'AUTO_REPAIRED_INVESTIGATION_HANDOFF',
+    'INDEPENDENT_FAILURE_PROOF_STILL_REQUIRED']){
+   if(!kinds.has(expected))throw Error('RECOVERY_EVENTS_INCOMPLETE');
+  }
+  status.textContent='Reality found the broken research handoff and automatically repaired the read-only stage for '+
+    data.items.length+' finding(s). The next blocker is genuine: independent frozen tests have not proven any missing capability. No code install or job execution.';
+  const messages=[
+   ['1 · Stalled stage detected',
+    'The market report was saved, but no verified research-to-investigation transition existed.'],
+   ['2 · Handoff recovered automatically',
+    'Reality’s database watchdog recorded and reconciled investigation entries without a browser click.'],
+   ['3 · Evidence sufficiency assessed',
+    'These are source-backed market hypotheses, not observed failures of original customer jobs.'],
+   ['4 · Next step: independent reproduction',
+    'A read-only test must demonstrate a current missing capability. Only then can the existing governed repair worker propose an upgrade. Owner installation approval remains separate.']
+  ];
+  for(const [title,description] of messages){
+   const el=document.createElement('div');el.className='reality-chat-progress';
+   const h=document.createElement('strong');h.textContent=title;
+   const p=document.createElement('p');p.textContent=description;
+   el.append(h,p);entries.append(el);
+  }
+  const receipt=document.createElement('small');
+  receipt.textContent='Recorded source report: '+String(data.receipt_id||'unknown')+
+   ' · '+data.events.length+' durable stage event(s) · Source-bound, read-only.';
+  entries.append(receipt);
+ }catch{
+  if(epoch!==realityMarketChatEpoch)return;
+  entries.replaceChildren();
+  status.textContent='Reality cannot verify the self-repair ledger at the moment. No repair completion, code installation or automatic retry is being inferred.';
+ }
+}
+
 async function realityChatRefreshEvents(){
  void realityChatReadWakeStatus();
+ void realityChatMarketStage();
  const container=$('realityChatActivityEntries');
  if(!container)return;
  if(!homeOwnerSignedIn()){
@@ -4440,7 +4520,8 @@ function realitySimpleAccount(yes){
   realitySimpleSetStatus('Your saved research appears after sign-in. No paid search is started automatically.');
  }
 }
-$('simpleChat').onclick=()=>realityOpenChatDock(true);
+$('simpleChat').textContent='Watch Reality diagnose & recover · Chat';
+$('simpleChat').onclick=()=>realityOpenChatDock(false);
 $('simpleReviewFirst').onclick=()=>{
  const first=$('simpleResearchList')?.querySelector('.simple-finding');
  if(first&&realitySimpleFindings.length){
@@ -4992,6 +5073,7 @@ setInterval(refreshSavedShiftHome,300000);
   guidedSetup.authenticated=yes;
   guidedSetup.accountError='';
   realitySimpleAccount(yes);
+  if(!yes)void realityChatMarketStage();
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
