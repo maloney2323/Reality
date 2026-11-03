@@ -66,7 +66,7 @@ export default async function handler(req,res){
   // Even with an existing qualified *different* candidate, this specific
   // uninstalled proposal is not automatically bound to it.
   return res.status(200).json({
-   ok:true,status:'INDEPENDENT_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
+   ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
    proposal_title:'Independent execution-receipt verification upgrade',
    issue_number:188,previous_owner_work_id:HISTORICAL,
    previous_owner_work_already_settled:true,
