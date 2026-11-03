@@ -79,11 +79,11 @@ test('no prior research reports no results and does not manufacture opportunitie
 });
 test('research and executable work remain separate categories',()=>{
  assert.match(page,/wcMarketReviewFindings=\[\]/);
- assert.match(page,/id==='research'\?n\+' tasks/);
- assert.match(page,/Not approved work/);
+ assert.match(page,/id==='research'\?wcMarketReviewFindings\.filter/);
+ assert.match(page,/Automatically inspected upgrade opportunities/);
  assert.match(page,/wcCurrent==='research'&&wcMarketReviewFindings\.length/);
  assert.match(page,/wcInvestigateMarket\(\{restore:true\}\)/);
- assert.match(page,/No work authorized/);
+ assert.match(page,/No executable jobs|Not executable/);
 });
 test('owner-only GET uses exact owner ID, strict isolated DB, and no action authority',()=>{
  assert.match(server,/req\.method==='GET'/);
