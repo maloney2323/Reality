@@ -4126,6 +4126,88 @@ function wcUpgradeReviewHTML(){
  }).join('')+'</section>';
 }
 
+// The gap intake connects actual saved source evidence and status. It never
+// supplies a write action. A passed candidate test is NOT a fresh owner gap.
+function wcGapEvidenceCards(){
+ if(!wcGapFeedReady)return '<section class="wc-market-research-brief"><strong>Capability gap intake</strong>'+
+  '<p>'+esc(wcGapFeedStatus)+'</p></section>';
+ const cards=wcGapFeed.slice().sort((a,b)=>a.priority-b.priority).map(x=>{
+  const label=x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?
+   'TESTED CANDIDATE · NEEDS CURRENT OWNER WORK':
+   x.kind==='GOVERNED_ORIGINAL_JOB_GAP'?
+    (x.verified_missing_capability?'PROVEN GAP · GOVERNED QUEUE':'ORIGINAL JOB · FROZEN VERIFICATION PENDING'):
+   x.kind==='CI_FAILURE_INVESTIGATION'?
+    'PROVIDER FAILURE OBSERVED · CAUSE UNKNOWN':
+    'ASSESSED RESEARCH · GAP NOT YET PROVEN';
+  const bullet=(label,items)=>'<div><strong>'+esc(label)+'</strong><ul>'+
+    items.slice(0,4).map(z=>'<li>'+esc(String(z).slice(0,400))+'</li>').join('')+'</ul></div>';
+  const link=typeof x.source_url==='string'&&
+   /^https:\/\//.test(x.source_url)&&!/[<>"'\s]/.test(x.source_url)?
+    '<a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Review original evidence</a>':'';
+  return '<article class="wc-task"><small>'+esc(label)+'</small>'+
+   '<h4>'+esc(x.title)+'</h4>'+
+   '<p><strong>What it could change:</strong> '+esc(x.what_it_does||'Unknown')+'</p>'+
+   '<p><strong>Potential value:</strong> '+esc(x.potential_value||'Not yet measured')+'</p>'+
+   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+
+   '<details><summary>Pros · Cons · Risk · Evidence</summary>'+
+   bullet('Pros',x.pros)+bullet('Cons',x.cons)+
+   '<p><strong>Risk:</strong> '+esc(x.risk||'Not assessed')+'</p>'+
+   '<p><strong>Source receipt:</strong> '+esc(x.source_receipt||'Owner-scope proof')+'</p>'+
+   link+'</details>'+
+   '<p><strong>Next proof:</strong> '+esc(x.next_proof)+'</p>'+
+   '<p>Actual cost, time saved and ROI: NOT MEASURED. No new installation authorized.</p></article>';
+ }).join('');
+ const hist=wcGapHistory.slice(0,12).map(x=>
+   '<li><strong>'+esc(x.title)+'</strong> · Settled previously in isolated Preview · '+
+   '<a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Installed source</a></li>').join('');
+ return '<section class="wc-market-research-brief"><strong>Capability gap pipeline · '+
+  wcGapFeed.length+' tracked · '+wcGapCounts.verified_current_gaps+' proven current gaps</strong>'+
+  '<p>Four research findings, stored provider observations, independently tested candidates and actual governed jobs are separated by evidence stage. Stored evidence is not a fresh provider scan.</p>'+
+  '<p>'+esc(wcGapFeedStatus)+'</p>'+cards+
+  (wcGapHistory.length?'<details><summary>'+wcGapHistory.length+
+   ' prior completed upgrades · Not new gaps</summary><ul>'+hist+'</ul></details>':'')+
+  '</section>';
+}
+async function wcLoadGapFeed(){
+ const serial=++wcGapFeedSerial;
+ if($('privateReady')?.style.display!=='block')return;
+ try{
+  const response=await fetch('/api/reality/personal-gap-intake',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(serial!==wcGapFeedSerial||$('privateReady')?.style.display!=='block')return;
+  if(!response.ok||data?.ok!==true||
+    data.status!=='OWNER_GAP_INTAKE_RECONCILED'||
+    data.source_basis!=='PERSISTED_OWNER_EVIDENCE_NO_PROVIDER_LIVE_REFRESH'||
+    data.read_only!==true||data.installation_authorized!==false||
+    data.work_started!==false||data.production_changed!==false||
+    !Array.isArray(data.items)||data.items.length>30||
+    !Array.isArray(data.settled_history)||data.settled_history.length>12||
+    data.counts?.current_candidates!==data.items.length||
+    data.counts?.historical_completed!==data.settled_history.length||
+    data.counts?.verified_current_gaps!==
+     data.items.filter(x=>x.verified_missing_capability===true).length||
+    data.items.some(x=>x.installation_authorized!==false||
+       x.executable_job!==false||
+       (x.verified_missing_capability===true&&x.kind!=='GOVERNED_ORIGINAL_JOB_GAP')))
+   throw Error('GAP_INTAKE_UNVERIFIED');
+  wcGapFeed=data.items;wcGapHistory=data.settled_history;
+  wcGapCounts=data.counts;wcGapFeedReady=true;
+  wcGapFeedStatus=data.counts.current_candidates+' tracked · '+
+   data.counts.independently_tested_candidates+' independently tested · '+
+   data.counts.verified_current_gaps+' proven current gaps · '+
+   data.counts.historical_completed+' previous completed upgrades. No new install approved.';
+  $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
+  wcRender();
+ }catch{
+  if(serial!==wcGapFeedSerial)return;
+  wcGapFeedReady=false;wcGapFeed=[];wcGapHistory=[];
+  wcGapFeedStatus='The owner-scoped gap ledger could not be verified. The four saved research findings remain visible; no installation is inferred.';
+  $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
+  wcRender();
+ }
+}
+
 function wcRender(){
  const repairDiagnostics=$('wcUpgradeDiagnostics');
  if(repairDiagnostics)repairDiagnostics.hidden=wcCurrent!=='upgrades';
@@ -4139,8 +4221,9 @@ function wcRender(){
   const unavailable=wcNeedsSource(id)&&wcCoverage[wcNeedsSource(id)]==='not_connected';
   return '<button class="wc-category" type="button" data-wc-cat="'+id+
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
-    '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
-     wcMarketReviewFindings.length+' inspected ideas · '+wcUpgradeReviews.length+' earlier reviews':
+    '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?(wcGapFeedReady?
+     wcGapFeed.length+' tracked · '+wcGapHistory.length+' completed':
+     wcMarketReviewFindings.length+' inspected ideas · '+wcUpgradeReviews.length+' earlier reviews'):
      id==='research'?wcMarketReviewFindings.filter(f=>f.prehome_assessment?.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST').length+' assessed · '+wcMarketReviewFindings.length+' findings':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
      id==='upgrades'?'Proposed improvements · value and risks inspected · approval separate':desc)+'</small></button>';
@@ -4164,10 +4247,12 @@ function wcRender(){
  const unconnected=wcNeedsSource(wcCurrent)&&wcCoverage[wcNeedsSource(wcCurrent)]==='not_connected';
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
  $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
-  shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
+  (wcGapFeedReady?wcGapFeed.length+' tracked · '+wcGapCounts.verified_current_gaps+
+   ' proven gaps · '+wcGapHistory.length+' completed':
+   shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review'):
   wcCurrent==='research'?wcMarketReviewFindings.length+' source-backed assessments · Not executable':
   shown.length+' found';
- const marketBrief=(wcCurrent==='research'||wcCurrent==='upgrades')&&wcMarketReviewFindings.length?
+ const marketBrief=(wcCurrent==='research'||(wcCurrent==='upgrades'&&!wcGapFeedReady))&&wcMarketReviewFindings.length?
   '<section class="wc-market-research-brief"><strong>Automatically inspected upgrade opportunities · Not installed</strong>'+
   '<p>Every finding receives a value and risk assessment in the background. Business ROI and missing capabilities are not verified.</p>'+
   wcMarketReviewFindings.slice(0,4).map(f=>{
@@ -4185,7 +4270,9 @@ function wcRender(){
      '<p><strong>Cost and savings:</strong> Unknown; not measured.</p>':'')+
     '<p><strong>Next proof:</strong> '+esc(f.falsification_test||'Independent source-backed test required')+'</p></div>';
   }).join('')+'</section>':'';
- $('wcTaskList').innerHTML=marketBrief+(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
+ $('wcTaskList').innerHTML=
+  (wcCurrent==='upgrades'?wcGapEvidenceCards():'')+
+  marketBrief+(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
   (shown.length?shown.map((w,i)=>{
   const time=wcTime(w),status=wcStatuses.get(wcKey(w));
   const assessment=w.value_assessment||{};
@@ -4237,7 +4324,9 @@ function wcRender(){
       (wcJobProgress.verifiedIssueUrl?
        '<a target="_blank" rel="noopener noreferrer" href="'+esc(wcJobProgress.verifiedIssueUrl)+'">View verified GitHub issue</a>':''):
       '')+'</div>':'')+'</div>';
- }).join(''):(wcCurrent==='research'&&wcMarketReviewFindings.length?'':'<div class="attention-empty">'+
+ }).join(''):((wcCurrent==='research'&&wcMarketReviewFindings.length)||
+   (wcCurrent==='upgrades'&&wcGapFeedReady&&wcGapFeed.length)?'':
+   '<div class="attention-empty">'+
   esc(unconnected?'This business data source is not connected. Zero is NOT a no-opportunity conclusion.':
   wcCatalogStatus==='PARTIAL'?'Discovery was partial; no findings in this category from successfully checked sources.':
   'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>'));
