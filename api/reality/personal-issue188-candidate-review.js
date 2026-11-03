@@ -72,7 +72,7 @@ export default async function handler(req,res){
    previous_owner_work_already_settled:true,
    source_sha256:SOURCE,independent_run_id:ID,
    independent_run_url:'https://github.com/'+REPO+'/actions/runs/'+ID,
-   draft_review_url:'https://github.com/'+REPO+'/pull/202',
+   draft_review_url:'https://github.com/'+REPO+'/actions/runs/'+ID,
    independent_tests_passed:21,
    security_regressions_remaining:0,
    installed:false,qualified_for_owner_installation:false,
