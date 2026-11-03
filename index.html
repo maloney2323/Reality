@@ -559,8 +559,8 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <h3 id="wcCapabilityShelfHeading">Capabilities to review</h3>
     <p>See what Reality can do now, what it could improve, and which missing capabilities have independent evidence. A refresh never starts a repair.</p>
    </div>
-   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities · Run governed audit</button>
-   <button type="button" id="wcResearchMarket">Research market & capability gaps</button>
+   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities · Audit + market research</button>
+   <button type="button" id="wcResearchMarket">Run market research only</button>
   </div>
   <p id="wcCapabilityRefreshStatus" class="wc-capability-status" role="status" aria-live="polite">Explore an implemented Reality capability below, then sign in and refresh to run a governed audit of current failures and gaps.</p>
   <div id="wcCapabilityList" class="wc-capability-cards" aria-live="polite">
@@ -4316,7 +4316,7 @@ async function wcRefreshCapabilities(){
   status.textContent='Capability discovery unavailable. Existing implementation only. No work started.';
  }finally{button.disabled=false;}
 }
-$('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities()};
+$('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities();void wcInvestigateMarket()};
 
 let wcMarketResearchSerial=0;
 async function wcInvestigateMarket(){
