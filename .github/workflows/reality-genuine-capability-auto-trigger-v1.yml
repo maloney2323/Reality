@@ -489,7 +489,8 @@ jobs:
 
   independently_verify_final_customer_receipt:
     needs: record_independent_original_settlement
-    if: ${{ needs.record_independent_original_settlement.result == 'success' }}
+    # Explicit status check prevents an unrelated skipped ancestor from suppressing the final verifier.
+    if: ${{ always() && needs.record_independent_original_settlement.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -529,7 +530,8 @@ jobs:
 
   record_independent_final_receipt:
     needs: independently_verify_final_customer_receipt
-    if: ${{ needs.independently_verify_final_customer_receipt.result == 'success' && needs.independently_verify_final_customer_receipt.outputs.performed == 'true' }}
+    # The recorder requires an actual successful verifier and immutable artifact.
+    if: ${{ always() && needs.independently_verify_final_customer_receipt.result == 'success' && needs.independently_verify_final_customer_receipt.outputs.performed == 'true' }}
     permissions:
       contents: read
       actions: read
