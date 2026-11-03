@@ -34,6 +34,20 @@ export default async function handler(req,res){
    return res.status(405).json({ok:false,error:'REVIEW_ONLY_NO_CLIENT_SCOPE'});
   const session=await authenticatedChatSession(req,res);
   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
+  const report=await verifiedOwnerCandidateReview(session);
+  return res.status(200).json(report);
+ }catch{
+  return res.status(503).json({ok:false,
+   error:'EXACT_PROPOSAL_OWNER_REVIEW_NOT_INDEPENDENTLY_AVAILABLE',
+   owner_approval_issued:false,installation_performed:false,
+   original_job_completed:false,production_changed:false});
+ }
+}
+
+// Shared source of truth for both on-screen receipt and authenticated PDF export.
+export async function verifiedOwnerCandidateReview(session){
+ if(!session?.user_id||!session?.config?.url)
+  throw Error('RECEIPT_AUTHENTICATED_OWNER_SCOPE_REQUIRED');
   const db=resolveReliabilityBenchmarkDb();
   if(process.env.VERCEL_ENV!=='preview'||
    process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF!=='hvkfreoagbrphwghjajw'||
@@ -85,7 +99,7 @@ export default async function handler(req,res){
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
   // Even with an existing qualified *different* candidate, this specific
   // uninstalled proposal is not automatically bound to it.
-  return res.status(200).json({
+  return ({
    ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
    automatic_candidate_receipt:automaticReceipt,
    proposal_title:'Independent execution-receipt verification upgrade',
@@ -104,10 +118,4 @@ export default async function handler(req,res){
    external_action_performed:false,original_job_completed_by_this_review:false,
    production_changed:false
   });
- }catch{
-  return res.status(503).json({ok:false,
-   error:'EXACT_PROPOSAL_OWNER_REVIEW_NOT_INDEPENDENTLY_AVAILABLE',
-   owner_approval_issued:false,installation_performed:false,
-   original_job_completed:false,production_changed:false});
- }
 }
