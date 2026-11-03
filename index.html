@@ -302,6 +302,24 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
 <body>
 <main>
   <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
+  <!-- OWNER AUTHORIZATIONS: first Home section, independent of the chat dock. -->
+<section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
+ <div class="home-owner-head">
+  <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
+   <h2 id="homeOwnerTitle">Owner Authorizations</h2>
+   <p>See what Reality found, what it fixed, what the independent tests proved, and what still needs your approval. Nothing installs without your decision.</p>
+  </div>
+  <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
+ </div>
+ <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
+ <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
+ <div id="homeOwnerFollowonReview" class="home-owner-items" aria-live="polite" style="margin-top:12px"></div>
+ <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
+ <div id="homeOwnerDialogs"></div>
+ <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
+ <p class="home-owner-note">Approval is separate from execution. Each request is checked against your account, its exact source hash and Reality's independent evidence. No approval authorizes production changes or another job.</p>
+</section>
+
   <h1>Your Business Reality</h1>
   <p class="sub">See where money goes, what's happening in the business, and the value Reality can prove. Ask Reality about anything, from anywhere.</p>
   <div class="trust-pulse" role="status" aria-live="polite" style="margin:15px 0 20px">
@@ -439,23 +457,6 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
  </div>
  <p id="privateStatus" class="muted" role="status"></p>
 </section>
-<section class="home-owner-center" id="homeOwnerAuthorizations" aria-labelledby="homeOwnerTitle">
- <div class="home-owner-head">
-  <div><div class="label">OWNER CONTROL CENTER · ONE APPROVAL LOCATION</div>
-   <h2 id="homeOwnerTitle">Owner Authorizations</h2>
-   <p>See what Reality found, what it fixed, what the independent tests proved, and what still needs your approval. Nothing installs without your decision.</p>
-  </div>
-  <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
- </div>
- <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
- <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
- <div id="homeOwnerFollowonReview" class="home-owner-items" aria-live="polite" style="margin-top:12px"></div>
- <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
- <div id="homeOwnerDialogs"></div>
- <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
- <p class="home-owner-note">Approval is separate from execution. Each request is checked against your account, its exact source hash and Reality's independent evidence. No approval authorizes production changes or another job.</p>
-</section>
-
 <section id="startFlow" class="start-flow" aria-label="Start here: three steps">
  <div class="start-flow-head"><span class="label">START HERE</span><h2>3 steps. That's it.</h2><p>Reality tells you what to do next.</p></div>
  <div class="start-step" id="startStep1" data-state="pending">
@@ -2135,8 +2136,7 @@ let wcEasyGenuineCandidate=null;
 // retain their original server-side one-time security contracts.
 let homeOwnerRefreshEpoch=0;
 const homeOwnerCenter=$('homeOwnerAuthorizations');
-// Move the single existing owner-authorization center into persistent chat.
-$('privateReady').insertBefore(homeOwnerCenter,$('privatePrompt'));
+// This panel stays on Home. Chat remains available without hiding the approval.
 const homeOwnerDialogs=$('homeOwnerDialogs');
 homeOwnerDialogs.appendChild($('wcEasyGenuineApproval'));
 const homeLegacyInstallSlot=$('homeLegacyInstallSlot');
@@ -2151,7 +2151,8 @@ function homeOwnerLegacyVisibility(){
  homeLegacyInstallSlot.hidden=!(wcVerifiedInstallReview||wcInstallContinuationBusy);
 }
 function homeOwnerFocus(){
- realityOpenChatDock(false);
+ // Bring the customer back to Home rather than opening Chat over their approval.
+ if($('privateChat').dataset.open==='true')realityCloseChatDock();
  homeOwnerCenter.scrollIntoView({behavior:'smooth',block:'start'});
  void homeOwnerRefresh();
 }
