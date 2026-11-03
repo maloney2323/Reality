@@ -259,7 +259,7 @@ test('chat refresh rechecks the signed-in owner and keeps ambiguous approvals fa
  assert.match(html,/id="realityChatApprovalEvidence"/);
  assert.match(html,/id="realityChatApprovalDialogs"/);
  assert.match(inlineScript,/Worker start is not verified/);
- assert.match(inlineScript,/SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL/);
+ assert.match(inlineScript,/SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1/);
  assert.match(inlineScript,/Approval uncertain\. No automatic retry/);
  assert.match(inlineScript,/if\(\$\('privateReady'\)\?\.style\.display==='block'\)/);
 });
