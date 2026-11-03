@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-const browser=readFileSync(new URL('../public/one-button-full-loop-v1.js',import.meta.url),'utf8');
+const browser=readFileSync(new URL('../one-button-full-loop-v1.js',import.meta.url),'utf8');
 const UUID='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const WORK='work:'+'a'.repeat(32);
 function el(tag='div'){
