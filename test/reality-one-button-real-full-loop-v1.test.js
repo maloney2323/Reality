@@ -196,3 +196,42 @@ test('anonymous click opens sign-in and never dispatches or installs',async()=>{
  assert.equal(f.calls.length,0);
  assert.match(f.nodes.simpleFullLoopStatus.textContent,/Sign in/);
 });
+
+test('one-button follows same source-backed original through independent continuity readback',async()=>{
+ const nodes={simpleRunFullLoop:el('button'),simpleFullLoopStatus:el(),
+  simpleFullLoopReceipt:el()},timers=[],calls=[];
+ const issue={independently_verified:true,issue_number:201,
+  original_provider_failed_run_id:41393750252,source_sha:'a'.repeat(40),
+  source_path:'src/reality-extensions/reality-continuity-settlement-reconciler.mjs'};
+ const urls={
+  '/api/reality/personal-genuine-loop-status':noActive,
+  '/api/reality/personal-governed-build':noWork,
+  '/api/reality/personal-real-repair-opportunities':{ok:true,opportunities:[issue]},
+  '/api/reality/personal-original-continuity-status':{
+   ok:true,status:'OWNER_ORIGINAL_CONTINUITY_VERIFIED_READ_ONLY',
+   jobs:[{original_work_id:WORK,decision:'WORKER_RUNNING_MONITOR_SAME_JOB'}],
+   installation_authorized:false,original_job_completed:false,
+  },
+ };
+ vm.runInNewContext(browser,{
+  document:{getElementById:id=>nodes[id],createElement:tag=>el(tag)},
+  window:{homeOwnerSignedIn:()=>true,realityActiveConversationId:()=>UUID,
+   homeOwnerRefresh:()=>{}},encodeURIComponent,
+  setInterval:fn=>{timers.push(fn)},
+  fetch:async(url,opt)=>{calls.push({url,opt});
+   if(opt.method==='POST')return {ok:true,json:async()=>({
+    ok:true,original_work_id:WORK,installation_authorized:false,
+    original_job_completed:false,production_changed:false,
+    worker_dispatch_started:false,continuity_decision:'WORKER_RUNNING_MONITOR_SAME_JOB'})};
+   return {ok:true,json:async()=>urls[url]};
+  }
+ });
+ await nodes.simpleRunFullLoop.listeners.click();
+ timers[0]();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match(nodes.simpleFullLoopStatus.textContent,/Exact worker run observed/);
+ assert.equal(calls.filter(c=>c.opt.method==='POST').length,1,
+  'continuity polling never retries or dispatches a duplicate original');
+ assert.equal(nodes.simpleFullLoopReceipt.children.length,0,
+  'worker acknowledgment is not a final settlement receipt');
+});
