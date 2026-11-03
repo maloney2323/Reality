@@ -2619,21 +2619,23 @@ async function realityChatApproveOnce(workId,expectedHash){
      receipt.original_job_completed!==false||
      receipt.production_changed!==false)
    throw Error('OWNER_APPROVAL_READBACK_UNCERTAIN_DO_NOT_RETRY');
-  if(receipt.worker_wake_status==='SIGNED_WORKER_WAKE_COMMITTED'||
-     receipt.worker_wake_status==='SIGNED_WORKER_WAKE_ALREADY_PRESENT'){
-   $('homeOwnerStatus').textContent=
-    'Approved once. Reality’s governed worker was notified. Watch verified progress in this conversation; no more approval clicks are needed.';
-   $('realityChatApprovalStatus').textContent='Approval saved. Worker wake dispatched but execution is not yet verified. No second approval needed.';
-  }else if(receipt.auto_trigger_fallback==='SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL'&&
-            receipt.auto_trigger_status==='AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH'&&
-            receipt.retry_owner_approval===false){
-   $('homeOwnerStatus').textContent=
-    'Your approval is saved. Reality’s signed background auto-trigger will poll for approved work without keeping this page open. GitHub polling can be delayed; worker start is NOT yet verified. Do not approve again.';
-   $('realityChatApprovalStatus').textContent='Approval saved. Background auto-trigger pickup is pending. Worker start is not verified; do not approve again.';
+  if(receipt.auto_trigger==='SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1'&&
+     receipt.retry_owner_approval===false){
+   const status=String(receipt.auto_trigger_status||'UNKNOWN');
+   const delivered=['DISPATCH_ACCEPTED','WORKER_ALIVE','GOVERNANCE_READY','EXECUTING','SETTLED','RECEIPT_VERIFIED'].includes(status);
+   const message=delivered?
+    'Approval saved. Reality’s edge dispatcher delivered the wake. Worker progress is tracked below; delivery is not proof of execution.':
+    status==='STALE_APPROVAL_BLOCKED'?
+    'Approval saved, but Reality blocked execution because relevant conditions changed. No reapproval or installation was attempted.':
+    status==='ESCALATED'?
+    'Approval saved. Reality escalated an unresolved worker wake. No duplicate execution or approval was made.':
+    'Approval saved. Reality’s independent database watchdog will recover pending dispatch automatically; worker start is not verified. No second approval needed.';
+   $('homeOwnerStatus').textContent=message;
+   $('realityChatApprovalStatus').textContent=message;
   }else{
    $('homeOwnerStatus').textContent=
-    'Owner approval is saved, but Reality has not verified that the worker started. Do not approve again. The worker connection needs recovery.';
-   $('realityChatApprovalStatus').textContent='Approval saved; worker start remains unverified. Do not approve again.';
+    'Your approval is saved. The automatic worker wake readback is not verified; do not approve again.';
+   $('realityChatApprovalStatus').textContent='Approval saved, wake state unverified. Reality will read the durable ledger; do not approve again.';
   }
  }catch(err){
   $('homeOwnerStatus').textContent='Approval status needs an independent readback. Do not click approval a second time. '+String(err?.message||'UNKNOWN');
