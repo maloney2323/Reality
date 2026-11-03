@@ -46,11 +46,11 @@ async function github(path:string,{method='GET',body}:{method?:string,body?:unkn
 }
 function decodeSource(raw:unknown){
  if(typeof raw!=='string'||raw.length>10000)reject('GITHUB_WAKE_SOURCE_INVALID');
- try{return atob(raw.replace(/\\s/g,''))}catch{reject('GITHUB_WAKE_SOURCE_INVALID')}
+ try{return atob(raw.replace(/\s/g,''))}catch{reject('GITHUB_WAKE_SOURCE_INVALID')}
 }
 Deno.serve(async req=>{
  try{
-  if(req.method!=='POST'||!/application\\/json/i.test(req.headers.get('content-type')||''))
+  if(req.method!=='POST'||!/application\/json/i.test(req.headers.get('content-type')||''))
    return respond({ok:false,error:'POST_JSON_SIGNED_HINT_REQUIRED'},405);
   const raw=await req.text();
   if(raw.length>512)reject('BODY_TOO_LONG');
