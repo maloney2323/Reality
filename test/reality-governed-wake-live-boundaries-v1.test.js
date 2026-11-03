@@ -36,7 +36,7 @@ test('broker validates signed wake before any GitHub dispatch or leasing',()=>{
  assert.match(broker,/reality_record_governed_delivery_v1/);
  assert.match(broker,/EXISTING_WAKE_FILE_COLLISION/);
  assert.match(broker,/reality_issue_governed_wake_relay_v1/);
- assert.match(broker,/reality-blond\\.vercel\\.app\\/api\\/reality\\/governed-wake-relay/);
+ assert.ok(broker.includes('reality-blond.vercel.app/api/reality/governed-wake-relay'));
  assert.match(broker,/owner_approval_created!==false/);
  assert.match(broker,/signed_hint_verified:true/);
 });
