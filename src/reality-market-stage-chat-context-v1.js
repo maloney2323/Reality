@@ -7,7 +7,7 @@ const REPORT=/^[a-f0-9]{64}$/;
 const EVENT=new Set(['RESEARCH_HANDOFF_ABSENT_DETECTED',
  'AUTO_REPAIRED_INVESTIGATION_HANDOFF',
  'INDEPENDENT_FAILURE_PROOF_STILL_REQUIRED']);
-const allowText=t=>/\b(reality|repair|upgrade|research|capabilit|market|competitor|fix|broken|stuck|stage|progress|investigat|why|next step|automation|self.?heal|self.?improve)\b/i.test(t||'');
+const allowText=t=>/\b(reality|repair|upgrade|research|capabilit(?:y|ies)|market|competitor|fix|broken|stuck|stage|progress|investigat(?:e|ion)|why|next step|automation|self.?heal|self.?improve)\b/i.test(t||'');
 export async function readVerifiedMarketStageForChat({
  session,message,env=process.env,db=resolveReliabilityBenchmarkDb(env),
  fetchImpl=fetch
