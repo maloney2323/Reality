@@ -71,13 +71,46 @@ Deno.serve(async req=>{
      proof.delivery_not_execution!==true||proof.permission_granted!==false)
    reject('SIGNED_HINT_DATABASE_VERIFICATION_FAILED');
 
-  // First authenticate the database signal; then require dedicated preview
-  // dispatch credentials BEFORE claiming a lease. No uncredentialed claims.
+  // Delivery only: production Vercel holds the existing GitHub token.
+  // The signed hint has already been checked by the database. Give the
+  // production secret-holder a single-use 90-second outbox pickup nonce.
+  // Neither the nonce nor the relay conveys authorization to install.
   if(!Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||
-     (Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'').length<25)
-   return respond({ok:false,status:'DISPATCH_CREDENTIAL_MISSING',
+     (Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'').length<25){
+   const grant=await rpc('reality_issue_governed_wake_relay_v1',{});
+   if(grant.status!=='ONE_TIME_DELIVERY_TOKEN_ISSUED'||
+      !UUID.test(String(grant.relay_nonce||''))||
+      grant.execution_authorized!==false||
+      grant.owner_approval_created!==false)
+    reject('ONE_TIME_DELIVERY_NONCE_NOT_VERIFIED');
+   let provider:Response;
+   try{
+    provider=await fetch(
+     'https://reality-blond.vercel.app/api/reality/governed-wake-relay',{
+      method:'POST',cache:'no-store',redirect:'error',
+      headers:{'content-type':'application/json','accept':'application/json'},
+      body:JSON.stringify({version:1,relay_nonce:grant.relay_nonce}),
+      signal:AbortSignal.timeout(11000)});
+   }catch{
+    return respond({ok:false,status:'PRODUCTION_RELAY_UNREACHABLE',
+     signed_hint_verified:true,worker_started:false,
+     retry_will_be_reconsidered_by_watchdog:true,production_changed:false},503);
+   }
+   const delivered=await provider.json().catch(()=>null);
+   if(provider.ok&&delivered?.ok===true&&
+      delivered.execution_authorized===false&&
+      delivered.production_changed===false&&
+      ['NO_APPROVED_WAKE_READY','STALE_APPROVAL_BLOCKED','ESCALATED',
+       'DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN'].includes(
+        String(delivered.status||'')))
+    return respond({ok:true,status:delivered.status,
+      signed_hint_verified:true,worker_started:false,
+      installation_performed:false,production_changed:false,
+      delivery_provider:'PRODUCTION_SECRET_HOLDER_ONLY'});
+   return respond({ok:false,status:'PRODUCTION_RELAY_NOT_READY',
     signed_hint_verified:true,worker_started:false,
     retry_will_be_reconsidered_by_watchdog:true,production_changed:false},503);
+  }
   const claim=await rpc('reality_claim_governed_wake_v1',{});
   if(claim.status==='NO_APPROVED_WAKE_READY')
    return respond({ok:true,status:'NO_APPROVED_WAKE_READY',
