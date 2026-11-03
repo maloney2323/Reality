@@ -59,11 +59,26 @@ Deno.serve(async request=>{
       claim.target_environment!=='ISOLATED_PREVIEW'||
       claim.execution_authorized!==false||claim.owner_approval_created!==false)
     fail('EXACT_LEDGER_CLAIM_REQUIRED');
-   return reply({ok:true,...claim,delivery_only:true,
-    worker_started:false,production_changed:false});
+   // A second short-lived nonce is bound to this exact approved claim.
+   // Only the production-held credential relay receives it; public callers
+   // cannot acknowledge someone else's delivery from IDs alone.
+   const ack=await rpc('reality_issue_governed_relay_ack_v1',{
+    p_approval_id:claim.approval_id,
+    p_claim_id:claim.claim_id,
+    p_fence:claim.dispatch_fence});
+   if(ack.status!=='EXACT_DELIVERY_ACK_NONCE_ISSUED'||
+      !ID.test(String(ack.ack_nonce||''))||
+      ack.approval_id!==claim.approval_id||
+      ack.claim_id!==claim.claim_id||
+      ack.dispatch_fence!==claim.dispatch_fence||
+      ack.execution_authorized!==false)
+     fail('SCOPED_DELIVERY_ACK_NONCE_UNVERIFIED');
+   return reply({ok:true,...claim,ack_nonce:ack.ack_nonce,
+    delivery_only:true,worker_started:false,production_changed:false});
   }
   if(payload.action==='ack'){
-   if(Object.keys(payload).sort().join(',')!=='action,approval_id,claim_id,delivery_id,fence'||
+   if(Object.keys(payload).sort().join(',')!=='ack_nonce,action,approval_id,claim_id,delivery_id,fence'||
+      !ID.test(String(payload.ack_nonce||''))||
       !ID.test(String(payload.approval_id||''))||
       !ID.test(String(payload.claim_id||''))||
       !ID.test(String(payload.delivery_id||''))||
@@ -71,7 +86,8 @@ Deno.serve(async request=>{
       Number(payload.fence)<1||Number(payload.fence)>5)
     fail('FENCED_ACK_REQUIRED');
    // Receipt remains dispatch-only. OIDC is separately verified by worker.
-   const receipt=await rpc('reality_record_governed_delivery_v1',{
+   const receipt=await rpc('reality_record_governed_relay_delivery_v1',{
+    p_ack_nonce:payload.ack_nonce,
     p_approval_id:payload.approval_id,p_claim_id:payload.claim_id,
     p_fence:payload.fence,p_delivery_id:payload.delivery_id});
    if(receipt.status!=='DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN'||
