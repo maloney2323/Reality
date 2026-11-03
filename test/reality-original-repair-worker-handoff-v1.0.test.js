@@ -195,3 +195,75 @@ test('cross-conversation older original-work ID blocks new queue and dispatch',a
   /REAL_ORIGINAL_BUILD_PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED/);
  assert.equal(x.calls.length,0);
 });
+
+test('existing exact dispatched original is monitored; no new release queue or ticket',async()=>{
+ const qid=randomUUID();const workerSha='b'.repeat(40);
+ const seen=[];
+ const x=setup({call:async(_db,name,payload)=>{
+  seen.push(name);
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
+   installation_authorized:false,job_completed:false};
+  assert.equal(name,'reality_read_governed_build_v1');
+  return {queue_id:qid,original_work_id:workId,goal_id:goalId,
+   phase:'QUEUED_DISCOVERY',dispatch_commit_sha:workerSha,
+   request_path:'reality-requests/'+qid+'.json',
+   installation_authorized:false,job_completed:false};
+ },verifyContinuity:async({queue})=>{
+  assert.equal(queue.queue_id,qid);
+  return {decision:'WORKER_RUNNING_MONITOR_SAME_JOB',
+   worker_observation:{state:'DISCOVERY_WORKER_PENDING'},
+   original_work_id:workId,queue_id:qid,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,dispatch_allowed:false};
+ },dispatch:async()=>{throw Error('DUPLICATE_DISPATCH_NOT_ALLOWED')}});
+ const r=await queueVerifiedOriginalRepair(x.params);
+ assert.equal(r.status,'EXISTING_ORIGINAL_QUEUE_PRESERVED');
+ assert.equal(r.continuity_decision,'WORKER_RUNNING_MONITOR_SAME_JOB');
+ assert.equal(r.worker_dispatch_started,true);
+ assert.equal(r.installation_authorized,false);
+ assert.deepEqual(seen,['reality_read_owner_existing_original_issue_v1',
+  'reality_read_governed_build_v1']);
+});
+test('existing same-job queue in a different preview release reuses its ticket',async()=>{
+ const qid=randomUUID();const seen=[];
+ const x=setup({call:async(_db,name,payload)=>{
+  seen.push(name);
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
+   installation_authorized:false,job_completed:false};
+  if(name==='reality_read_governed_build_v1')return {
+   queue_id:qid,original_work_id:workId,goal_id:goalId,
+   phase:'QUEUED_DISCOVERY',preview_release_sha:'c'.repeat(40),
+   installation_authorized:false,job_completed:false};
+  if(name==='reality_mark_governed_build_dispatched_v1')return {
+   queue_id:qid,dispatched:true};
+  throw Error('NO_NEW_PER_RELEASE_QUEUE_ALLOWED '+name);
+ },dispatch:async({queue_id})=>{
+  assert.equal(queue_id,qid);
+  return {worker_sha:'b'.repeat(40),request_path:'reality-requests/'+qid+'.json'};
+ }});
+ const result=await queueVerifiedOriginalRepair(x.params);
+ assert.equal(result.status,'ORIGINAL_JOB_DISPATCHED_TO_ISOLATED_WORKER');
+ assert.equal(result.queue_id,qid);
+ assert.equal(result.worker_dispatch_started,true);
+ assert.deepEqual(seen,['reality_read_owner_existing_original_issue_v1',
+  'reality_read_governed_build_v1','reality_mark_governed_build_dispatched_v1']);
+});
+test('partial dispatch receipt never creates another ticket',async()=>{
+ const qid=randomUUID();let dispatch=0;
+ const x=setup({call:async(_db,name)=>{
+  if(name==='reality_read_owner_existing_original_issue_v1')return {
+   status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
+   installation_authorized:false,job_completed:false};
+  if(name==='reality_read_governed_build_v1')return {
+   queue_id:qid,original_work_id:workId,goal_id:goalId,
+   phase:'QUEUED_DISCOVERY',dispatch_commit_sha:'b'.repeat(40),
+   installation_authorized:false,job_completed:false};
+  throw Error('UNEXPECTED_QUEUE_MUTATION');
+ },dispatch:async()=>{dispatch++}});
+ const result=await queueVerifiedOriginalRepair(x.params);
+ assert.equal(result.continuity_decision,'DISPATCH_RECEIPT_RECONCILIATION_REQUIRED');
+ assert.equal(dispatch,0);
+ assert.equal(result.original_job_completed,false);
+});
