@@ -11,7 +11,7 @@ test('browser parses with visible automatic assessment and retains existing auth
  assert.match(page,/Potential customer value/);
  assert.match(page,/Costs, time saved and ROI/);
  assert.match(page,/What Reality must prove next/);
- assert.match(page,/const marketBrief=\(wcCurrent==='research'\|\|wcCurrent==='upgrades'\)/);
+ assert.match(page,/const marketBrief=\(wcCurrent==='research'\|\|\(wcCurrent==='upgrades'&&!wcGapFeedReady\)\)/);
  assert.match(page,/wcMarketReviewFindings\.length\+' inspected ideas/);
  assert.match(page,/id="privateChat"/);
  assert.match(page,/id="simpleResearchList"/);
