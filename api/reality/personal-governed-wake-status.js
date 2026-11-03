@@ -40,7 +40,16 @@ export default async function handler(req,res){
        w.dispatch_attempts<0||w.dispatch_attempts>5||
        w.preview_only!==true||
        typeof w.ledger_phase!=='string'||
-       w.ledger_phase.length>80))
+       w.ledger_phase.length>80)||
+     !data.watchdog||
+     !['WATCHDOG_RECENTLY_SUCCEEDED','WATCHDOG_STALE_OR_UNVERIFIED']
+       .includes(data.watchdog.status)||
+     !['DISPATCH_CREDENTIAL_MISSING','BROKER_READY_IDLE',
+       'DELIVERY_ACCEPTED','BROKER_FAIL_CLOSED',
+       'NO_VALID_BROKER_PROOF','NO_RECENT_BROKER_PROOF']
+       .includes(data.watchdog.broker_delivery_status)||
+     typeof data.watchdog.delivery_ready_proven!=='boolean'||
+     data.watchdog.source!=='POSTGRES_CRON_AND_SIGNED_EDGE_HTTP_READBACK')
    throw Error('WAKE_OWNER_READBACK_NOT_TRUSTED');
   return res.status(200).json({ok:true,...data});
  }catch{
