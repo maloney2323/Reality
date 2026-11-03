@@ -82,6 +82,6 @@ test('owner UI and read-only API may display only independently verified final r
  assert.match(api,/full_loop_independently_verified:/);
  assert.match(api,/independent_final_receipts:final.receipts/);
  assert.match(html,/full_loop_independently_verified===true/);
- assert.match(html,/View independent final job receipt and evidence/);
+ assert.match(html,/Download verified final customer receipt \(PDF\)/);
  assert.match(html,/Final independent completion check pending/);
 });
