@@ -337,6 +337,13 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .simple-finding p{margin:9px 0;color:#bfd0df;font-size:14px;line-height:1.48}
 #realitySimpleHome .simple-finding summary{cursor:pointer;padding:10px 0;color:#a9d9ee;font-weight:650}
 #realitySimpleHome .simple-finding details{border-top:1px solid #39485e;margin-top:10px}
+#realitySimpleHome .simple-assess{display:grid;gap:12px;margin-top:14px}
+#realitySimpleHome .simple-aspect strong{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#a5d8ee;margin-bottom:4px}
+#realitySimpleHome .simple-aspect p{margin:0;color:#e2edf7;font-size:14px}
+#realitySimpleHome .simple-aspect ul{margin:3px 0 0;padding-left:21px;color:#e2edf7;font-size:14px;line-height:1.52}
+#realitySimpleHome .simple-aspect li{margin:4px 0}
+#realitySimpleHome .simple-priority{color:#b8e5d4;font-size:13px}
+
 #realitySimpleHome .simple-finding a{display:inline-block;overflow-wrap:anywhere;font-size:13px;color:#a5ddff;margin-top:8px}
 #realitySimpleHome .simple-status{font-size:14px;line-height:1.5;color:#bfd3e5;margin:15px 0 0}
 #realitySimpleHome .simple-footer{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #364a61}
@@ -350,20 +357,20 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 
 <section id="realitySimpleHome" aria-labelledby="simpleRealityTitle">
  <div class="simple-kicker">REALITY · YOUR NEXT MOVE</div>
- <h1 id="simpleRealityTitle">What Reality found for you</h1>
- <p class="simple-lead">Your opportunities, what needs proof, and what to do next. Nothing to configure or search for.</p>
+ <h1 id="simpleRealityTitle">Upgrades Reality has inspected</h1>
+ <p class="simple-lead">Before you arrive, Reality checks each discovery and prepares its potential value, pros, cons, risks and next test. No extra button needed.</p>
  <div class="simple-bar">
   <span class="simple-info" id="simpleLoginState" role="status">Checking your account…</span>
-  <span class="simple-info" id="simpleResearchCount">Checking saved research…</span>
+  <span class="simple-info" id="simpleResearchCount">Loading assessed upgrades…</span>
  </div>
  <div class="simple-actions">
   <button type="button" id="simpleReviewFirst" class="simple-primary">Review first opportunity</button>
   <button type="button" id="simpleChat" class="simple-secondary">Talk to Reality</button>
  </div>
  <div id="simpleResearchList" class="simple-list" aria-live="polite">
-  <div class="simple-finding"><p>Loading your saved opportunities. No new research run will be started.</p></div>
+  <div class="simple-finding"><p>Loading completed background assessments; no new search or job will start.</p></div>
  </div>
- <p id="simpleResearchStatus" class="simple-status" role="status">Reading your saved research from Reality's verified ledger…</p>
+ <p id="simpleResearchStatus" class="simple-status" role="status">Reading automatically inspected upgrades from Reality’s ledger…</p>
  <div class="simple-footer">
   <span class="simple-note">Research ideas aren't approved jobs. Reality must prove a missing capability before proposing installation.</span>
   <button type="button" id="simpleAdvancedToggle" class="simple-secondary" aria-expanded="false">Show full dashboard & technical controls</button>
@@ -4128,7 +4135,7 @@ function wcRender(){
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
     '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
      n+' found · '+wcUpgradeReviews.length+' review':
-     id==='research'?n+' tasks · '+wcMarketReviewFindings.length+' hypotheses':String(n))+
+     id==='research'?wcMarketReviewFindings.filter(f=>f.prehome_assessment?.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST').length+' assessed · '+wcMarketReviewFindings.length+' findings':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
      id==='upgrades'?'Observed weaknesses · capability gains · verified value':desc)+'</small></button>';
  }).join('');
@@ -4152,11 +4159,26 @@ function wcRender(){
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
  $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
   shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
-  wcCurrent==='research'?shown.length+' runnable findings · '+wcMarketReviewFindings.length+' research hypotheses':
+  wcCurrent==='research'?wcMarketReviewFindings.length+' source-backed assessments · Not executable':
   shown.length+' found';
  const marketBrief=wcCurrent==='research'&&wcMarketReviewFindings.length?
-  '<section class="wc-market-research-brief"><strong>Saved strategic research · Not approved work</strong><p>Research hypotheses need independent verification before becoming executable customer jobs. Complete source evidence is in Capabilities to review above.</p>'+
-  wcMarketReviewFindings.slice(0,4).map(f=>'<div class="wc-task"><strong>'+esc(f.title||'Strategic opportunity')+'</strong><p>Hypothesis · Not a verified new gap · No work authorized</p><p>Verification needed: '+esc(f.falsification_test||'Independently reproduce the claimed gap')+'</p></div>').join('')+'</section>':'';
+  '<section class="wc-market-research-brief"><strong>Automatically inspected upgrade opportunities · Not installed</strong>'+
+  '<p>Every finding receives a value and risk assessment in the background. Business ROI and missing capabilities are not verified.</p>'+
+  wcMarketReviewFindings.slice(0,4).map(f=>{
+   const a=f.prehome_assessment||{},ok=a.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST'&&
+    a.system_gap_verified===false&&a.code_install_authorized===false&&
+    Array.isArray(a.pros)&&Array.isArray(a.cons);
+   const li=xs=>'<ul>'+xs.slice(0,4).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+   return '<div class="wc-task"><strong>'+esc(f.title||'Strategic opportunity')+'</strong>'+
+    '<p><strong>Inspection:</strong> '+(ok?'Completed · Gap still unproven':'Assessment pending')+'</p>'+
+    (ok?'<p><strong>System upgrade:</strong> '+esc(a.what_it_does)+'</p>'+
+     '<p><strong>Potential value:</strong> '+esc(a.potential_customer_value)+'</p>'+
+     '<p><strong>Pros:</strong></p>'+li(a.pros)+
+     '<p><strong>Cons:</strong></p>'+li(a.cons)+
+     '<p><strong>Risk:</strong> '+esc(a.risk)+'</p>'+
+     '<p><strong>Cost and savings:</strong> Unknown; not measured.</p>':'')+
+    '<p><strong>Next proof:</strong> '+esc(f.falsification_test||'Independent source-backed test required')+'</p></div>';
+  }).join('')+'</section>':'';
  $('wcTaskList').innerHTML=marketBrief+(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
   (shown.length?shown.map((w,i)=>{
   const time=wcTime(w),status=wcStatuses.get(wcKey(w));
@@ -4472,38 +4494,83 @@ function realitySimpleRender(data){
   Array.isArray(f?.evidence_urls)&&f.evidence_urls.length>0);
  list.replaceChildren();
  count.textContent=realitySimpleFindings.length+' saved opportunities · Review only';
+ // The cron worker has already saved the assessment. The browser only renders it.
+ let inspected=0;
  realitySimpleFindings.forEach((finding,i)=>{
+  const a=finding.prehome_assessment||{};
+  const assessed=a.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST'&&
+   a.source_report_sha256===data.report_sha256&&
+   a.pinned_source_commit===data.pinned_commit_sha&&
+   /^[a-f0-9]{64}$/.test(String(a.assessment_receipt_sha256||''))&&
+   Array.isArray(a.pros)&&a.pros.length>=2&&a.pros.length<=4&&
+   Array.isArray(a.cons)&&a.cons.length>=2&&a.cons.length<=4&&
+   a.system_gap_verified===false&&a.independent_test_passed===false&&
+   a.code_install_authorized===false&&a.execution_started===false&&
+   a.estimated_business_value_usd===null&&a.estimated_time_saved_minutes===null;
+  if(assessed)inspected++;
   const card=document.createElement('article');card.className='simple-finding';
   const step=document.createElement('div');step.className='simple-step';
-  step.textContent='OPPORTUNITY '+(i+1)+' · NEEDS VERIFICATION';
+  step.textContent='FINDING '+(i+1)+' · '+(assessed?'INSPECTED · MISSING GAP NOT YET PROVEN':'ASSESSMENT PENDING');
   const heading=document.createElement('h3');heading.textContent=String(finding.title||'Research opportunity');
-  const summary=document.createElement('p');
-  summary.textContent='Suggested improvement: '+String(finding.proposed_improvement||'Investigate further').slice(0,340);
+  card.append(step,heading);
+  const wrap=document.createElement('div');wrap.className='simple-assess';
+  function paragraph(label,value){
+   const item=document.createElement('div');item.className='simple-aspect';
+   const h=document.createElement('strong');h.textContent=label;
+   const p=document.createElement('p');p.textContent=String(value||'Unknown');
+   item.append(h,p);wrap.append(item);
+  }
+  function points(label,values){
+   const item=document.createElement('div');item.className='simple-aspect';
+   const h=document.createElement('strong');h.textContent=label;
+   const ul=document.createElement('ul');
+   for(const value of values.slice(0,4)){
+    const li=document.createElement('li');li.textContent=String(value).slice(0,400);ul.append(li);
+   }
+   item.append(h,ul);wrap.append(item);
+  }
+  if(assessed){
+   paragraph('What this upgrade would do',a.what_it_does);
+   paragraph('Potential customer value',a.potential_customer_value);
+   points('Pros',a.pros);
+   points('Cons',a.cons);
+   paragraph('Main risk',a.risk);
+   paragraph('Costs, time saved and ROI','Not measured. No estimated dollars or labor saved are claimed.');
+   paragraph('What Reality must prove next',a.next_verification);
+   if(a.priority==='FIRST_TO_VERIFY'){
+    const label=document.createElement('small');label.className='simple-priority';
+    label.textContent='First to verify · Connected to Reality’s core original-job repair promise';
+    wrap.append(label);
+   }
+  }else{
+   paragraph('Automatic inspection','Assessment not verified yet; no value or readiness is invented.');
+  }
+  card.append(wrap);
   const details=document.createElement('details');
-  const disclosure=document.createElement('summary');disclosure.textContent='Why this matters · View evidence';
+  const disclosure=document.createElement('summary');disclosure.textContent='Original evidence and Reality code comparison';
   details.append(disclosure);
   for(const [name,value] of [
    ['Market evidence',finding.market_claim],
-   ['Reality comparison',finding.reality_comparison],
-   ['What must be tested',finding.falsification_test]]){
-   const p=document.createElement('p');
-   p.textContent=name+': '+String(value||'Unverified');
+   ['Existing Reality code evidence',finding.reality_comparison],
+   ['How to disprove the gap',finding.falsification_test]]){
+   const p=document.createElement('p');p.textContent=name+': '+String(value||'Unverified');
    details.append(p);
   }
   for(const entry of finding.evidence_urls.slice(0,3)){
    let u;try{u=new URL(entry)}catch{continue}
    if(u.protocol!=='https:'||u.username||u.password)continue;
-   const anchor=document.createElement('a');
-   anchor.href=u.href;anchor.target='_blank';anchor.rel='noopener noreferrer';
+   const anchor=document.createElement('a');anchor.href=u.href;
+   anchor.target='_blank';anchor.rel='noopener noreferrer';
    anchor.textContent='Source: '+u.hostname;details.append(anchor);
   }
-  card.append(step,heading,summary,details);list.append(card);
+  card.append(details);list.append(card);
  });
+ count.textContent=inspected+'/'+realitySimpleFindings.length+' inspected automatically · No upgrade installed';
  if(!realitySimpleFindings.length){
   const p=document.createElement('p');p.textContent='No source-backed opportunities were verified in your saved report.';
   list.append(p);
  }
- realitySimpleSetStatus('Research report restored from your account. This is not a verified new capability or an installation approval.');
+ realitySimpleSetStatus('Background inspection complete. Potential value, pros and cons are preliminary. No missing capability, measured savings, or installation is claimed.');
 }
 function realitySimpleNoResearch(){
  realitySimpleFindings=[];
