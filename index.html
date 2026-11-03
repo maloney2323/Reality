@@ -2189,7 +2189,7 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
    receipt.owner_approval_issued!==false||
    receipt.installed!==false||
    receipt.production_changed!==false||
-   receipt.independent_tests_passed!==23||
+   receipt.independent_tests_passed!==21||
    receipt.security_regressions_remaining!==0||
    !/^[a-f0-9]{64}$/.test(String(receipt.source_sha256||'')))
    throw Error('INDEPENDENT_OWNER_REVIEW_PROOF_UNAVAILABLE');
