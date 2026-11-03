@@ -2227,7 +2227,22 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   const autoNote=document.createElement('p');
   autoNote.className='home-owner-note';
   autoNote.textContent='No receipt button is required. Reality already recorded the independently verified candidate in GitHub. A separate original-work authorization must be verified before isolated installation can be offered.';
-  card.append(title,status,body,source,receiptId,next,link,note,autoNote);
+  const downloadPdf=document.createElement('a');
+  downloadPdf.href='/api/reality/personal-receipt-pdf';
+  downloadPdf.textContent='Download receipt as PDF';
+  downloadPdf.setAttribute('download',
+    'reality-receipt-'+receipt.automatic_candidate_receipt.receipt_id.split(':')[1]+'.pdf');
+  downloadPdf.className='repair-secondary';
+  downloadPdf.setAttribute('aria-label','Download this verified Reality receipt as a PDF');
+  downloadPdf.style.display='inline-block';
+  downloadPdf.style.marginTop='10px';
+  downloadPdf.style.padding='10px 14px';
+  downloadPdf.style.borderRadius='10px';
+  downloadPdf.style.textDecoration='none';
+  downloadPdf.style.width='fit-content';
+  // The export endpoint authenticates the account and re-verifies exact evidence.
+  // Clicking this never changes a receipt or approves installation.
+  card.append(title,status,body,source,receiptId,next,link,note,autoNote,downloadPdf);
   target.appendChild(card);
  }catch{
   if(epoch!==homeOwnerRefreshEpoch)return;
