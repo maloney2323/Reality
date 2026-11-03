@@ -21,7 +21,7 @@ jobs:
           node-version: '22'
       - name: Verify button, exact owner route, duplicate protection and final receipt
         run: |
-          node --check public/one-button-full-loop-v1.js
+          node --check one-button-full-loop-v1.js
           node --test test/reality-one-button-real-full-loop-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js
