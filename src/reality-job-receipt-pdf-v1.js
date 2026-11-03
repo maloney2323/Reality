@@ -193,99 +193,11 @@ export function renderRealityReceiptPdf(report){
   z.txt(44,yy+5,a.assumed_human_diagnostic_hours+' hypothetical human hr'+(i?'s':''),9,navy,true);
   draw(145,yy+5,304*a.qa_median_wage_labor_equivalent_usd/max,[0.44,0.69,0.68]);
   draw(145,yy-10,304*a.developer_median_wage_labor_equivalent_usd/max,teal);
-  z.txt(459,yy+7,'QA  base fonts + vector rectangles and bars; no external fonts.
- const objs=[];const put=v=>{objs.push(v);return objs.length;};
- const f1=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
- const f2=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
- const cat=put(''),root=put(''),ids=[];
- for(const stream of pages){
-  const content=put('<< /Length '+Buffer.byteLength(stream,'latin1')+' >>\nstream\n'+stream+'endstream');
-  ids.push(put('<< /Type /Page /Parent '+root+' 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >> >> /Contents '+content+' 0 R >>'));
+  z.txt(459,yy+7,'QA USD '+a.qa_median_wage_labor_equivalent_usd.toFixed(2),8.5,grey);
+  z.txt(459,yy-8,'DEV USD '+a.developer_median_wage_labor_equivalent_usd.toFixed(2),8.5,navy);
  }
- objs[cat-1]='<< /Type /Catalog /Pages '+root+' 0 R >>';
- objs[root-1]='<< /Type /Pages /Kids ['+ids.map(x=>x+' 0 R').join(' ')+'] /Count '+ids.length+' >>';
- let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n',offsets=[];
- for(let i=0;i<objs.length;i++){offsets.push(Buffer.byteLength(out,'latin1'));out+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
- const start=Buffer.byteLength(out,'latin1');
- out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
- for(const offset of offsets)out+=String(offset).padStart(10,'0')+' 00000 n \n';
- const digest=createHash('md5').update(r.receipt_id).digest('hex');
- out+='trailer\n<< /Size '+(objs.length+1)+' /Root '+cat+' 0 R /ID [<'+digest+'> <'+digest+'>] >>\nstartxref\n'+start+'\n%%EOF\n';
- const pdf=Buffer.from(out,'latin1');
- if(pdf.length>250000||pdf.toString('latin1',0,8)!=='%PDF-1.4')fail('INVALID_BINARY');
- return pdf;
-}
-+a.qa_median_wage_labor_equivalent_usd.toFixed(2),8.5,grey);
-  z.txt(459,yy-8,'DEV  base fonts + vector rectangles and bars; no external fonts.
- const objs=[];const put=v=>{objs.push(v);return objs.length;};
- const f1=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
- const f2=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
- const cat=put(''),root=put(''),ids=[];
- for(const stream of pages){
-  const content=put('<< /Length '+Buffer.byteLength(stream,'latin1')+' >>\nstream\n'+stream+'endstream');
-  ids.push(put('<< /Type /Page /Parent '+root+' 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >> >> /Contents '+content+' 0 R >>'));
- }
- objs[cat-1]='<< /Type /Catalog /Pages '+root+' 0 R >>';
- objs[root-1]='<< /Type /Pages /Kids ['+ids.map(x=>x+' 0 R').join(' ')+'] /Count '+ids.length+' >>';
- let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n',offsets=[];
- for(let i=0;i<objs.length;i++){offsets.push(Buffer.byteLength(out,'latin1'));out+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
- const start=Buffer.byteLength(out,'latin1');
- out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
- for(const offset of offsets)out+=String(offset).padStart(10,'0')+' 00000 n \n';
- const digest=createHash('md5').update(r.receipt_id).digest('hex');
- out+='trailer\n<< /Size '+(objs.length+1)+' /Root '+cat+' 0 R /ID [<'+digest+'> <'+digest+'>] >>\nstartxref\n'+start+'\n%%EOF\n';
- const pdf=Buffer.from(out,'latin1');
- if(pdf.length>250000||pdf.toString('latin1',0,8)!=='%PDF-1.4')fail('INVALID_BINARY');
- return pdf;
-}
-+a.developer_median_wage_labor_equivalent_usd.toFixed(2),8.5,navy);
- }
- z.txt(44,209,'Light = QA median  base fonts + vector rectangles and bars; no external fonts.
- const objs=[];const put=v=>{objs.push(v);return objs.length;};
- const f1=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
- const f2=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
- const cat=put(''),root=put(''),ids=[];
- for(const stream of pages){
-  const content=put('<< /Length '+Buffer.byteLength(stream,'latin1')+' >>\nstream\n'+stream+'endstream');
-  ids.push(put('<< /Type /Page /Parent '+root+' 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >> >> /Contents '+content+' 0 R >>'));
- }
- objs[cat-1]='<< /Type /Catalog /Pages '+root+' 0 R >>';
- objs[root-1]='<< /Type /Pages /Kids ['+ids.map(x=>x+' 0 R').join(' ')+'] /Count '+ids.length+' >>';
- let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n',offsets=[];
- for(let i=0;i<objs.length;i++){offsets.push(Buffer.byteLength(out,'latin1'));out+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
- const start=Buffer.byteLength(out,'latin1');
- out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
- for(const offset of offsets)out+=String(offset).padStart(10,'0')+' 00000 n \n';
- const digest=createHash('md5').update(r.receipt_id).digest('hex');
- out+='trailer\n<< /Size '+(objs.length+1)+' /Root '+cat+' 0 R /ID [<'+digest+'> <'+digest+'>] >>\nstartxref\n'+start+'\n%%EOF\n';
- const pdf=Buffer.from(out,'latin1');
- if(pdf.length>250000||pdf.toString('latin1',0,8)!=='%PDF-1.4')fail('INVALID_BINARY');
- return pdf;
-}
-+d.public_wage_context.qa_median_usd_per_hour+
-     '/hr   Dark = developer median  base fonts + vector rectangles and bars; no external fonts.
- const objs=[];const put=v=>{objs.push(v);return objs.length;};
- const f1=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
- const f2=put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
- const cat=put(''),root=put(''),ids=[];
- for(const stream of pages){
-  const content=put('<< /Length '+Buffer.byteLength(stream,'latin1')+' >>\nstream\n'+stream+'endstream');
-  ids.push(put('<< /Type /Page /Parent '+root+' 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >> >> /Contents '+content+' 0 R >>'));
- }
- objs[cat-1]='<< /Type /Catalog /Pages '+root+' 0 R >>';
- objs[root-1]='<< /Type /Pages /Kids ['+ids.map(x=>x+' 0 R').join(' ')+'] /Count '+ids.length+' >>';
- let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n',offsets=[];
- for(let i=0;i<objs.length;i++){offsets.push(Buffer.byteLength(out,'latin1'));out+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
- const start=Buffer.byteLength(out,'latin1');
- out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
- for(const offset of offsets)out+=String(offset).padStart(10,'0')+' 00000 n \n';
- const digest=createHash('md5').update(r.receipt_id).digest('hex');
- out+='trailer\n<< /Size '+(objs.length+1)+' /Root '+cat+' 0 R /ID [<'+digest+'> <'+digest+'>] >>\nstartxref\n'+start+'\n%%EOF\n';
- const pdf=Buffer.from(out,'latin1');
- if(pdf.length>250000||pdf.toString('latin1',0,8)!=='%PDF-1.4')fail('INVALID_BINARY');
- return pdf;
-}
-+d.public_wage_context.developer_median_usd_per_hour+'/hr',8.5,grey);
+ z.txt(44,209,'Light = QA median USD '+d.public_wage_context.qa_median_usd_per_hour+
+     '/hr   Dark = developer median USD '+d.public_wage_context.developer_median_usd_per_hour+'/hr',8.5,grey);
  z.h('ACTUAL FINANCIAL ROI: NOT YET VERIFIABLE',183);
  z.txt(44,162,'Comparable human diagnosis time: UNKNOWN    |    Human review time: UNKNOWN',8.5,navy);
  z.txt(44,145,'Provider charge and infrastructure cost: NOT VERIFIED',8.5,navy);
