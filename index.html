@@ -2518,6 +2518,11 @@ async function realityChatApproveOnce(workId,expectedHash){
      receipt.worker_wake_status==='SIGNED_WORKER_WAKE_ALREADY_PRESENT'){
    $('homeOwnerStatus').textContent=
     'Approved once. Reality’s governed worker was notified. Watch verified progress in this conversation; no more approval clicks are needed.';
+  }else if(receipt.auto_trigger_fallback==='SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL'&&
+            receipt.auto_trigger_status==='AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH'&&
+            receipt.retry_owner_approval===false){
+   $('homeOwnerStatus').textContent=
+    'Your approval is saved. Reality’s signed background auto-trigger will poll for approved work without keeping this page open. GitHub polling can be delayed; worker start is NOT yet verified. Do not approve again.';
   }else{
    $('homeOwnerStatus').textContent=
     'Owner approval is saved, but Reality has not verified that the worker started. Do not approve again. The worker connection needs recovery.';
