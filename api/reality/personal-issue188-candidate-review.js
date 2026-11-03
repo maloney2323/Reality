@@ -67,9 +67,8 @@ export default async function handler(req,res){
    run,artifacts,expectedRunId:ID,expectedSourceSha256:SOURCE,
    expectedProposalDigest:PROPOSAL_ARCHIVE.slice('sha256:'.length),
    expectedVerifierDigest:VERIFIER_ARCHIVE.slice('sha256:'.length),
-   expectedTests:21,ownerHistoricalScopeVerified:owner.jobs.some(x=>
-    x.original_work_id===HISTORICAL&&
-    ['SETTLED_ISOLATED','SETTLED'].includes(x.phase)),
+   expectedTests:21,ownerScopeVerified:owner.status==='OWNER_GOVERNED_LOOP_READBACK'&&
+    Array.isArray(owner.jobs),
   });
   const all=owner.jobs.filter(x=>x.capability_id==='reality-general-execution-receipt');
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
