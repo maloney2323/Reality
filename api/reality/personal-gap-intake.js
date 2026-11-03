@@ -80,12 +80,72 @@ export default async function handler(req,res){
    payload.counts.verified_current_gaps!==
     payload.items.filter(x=>x.verified_missing_capability===true).length)
    throw Error('CATEGORY_INTAKE_READBACK_INCONSISTENT');
+  // Independently source-pinned research-derived defect proofs have their
+  // own read-only owner receipt. A frozen RED->GREEN candidate does NOT
+  // change the original-job queue or grant installation rights.
+  const receiptResponse=await fetch(db.url+
+   '/rest/v1/rpc/reality_read_owner_market_repair_proofs_v1',{
+   method:'POST',cache:'no-store',redirect:'error',headers:{
+    apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    accept:'application/json','content-type':'application/json'},
+   body:JSON.stringify({p_owner_id:session.user_id})
+  });
+  const proofs=await receiptResponse.json().catch(()=>null);
+  if(!receiptResponse.ok||proofs?.ok!==true||
+    proofs.status!=='SOURCE_PINNED_BUDGET_REPAIR_CANDIDATE_READBACK'||
+    proofs.owner_id!==session.user_id||proofs.read_only!==true||
+    proofs.installation_authorized!==false||
+    proofs.production_changed!==false||
+    !Array.isArray(proofs.items)||proofs.items.length>4||
+    proofs.items.some(p=>p.status!=='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'||
+      p.proof_kind!=='EXISTING_CAPABILITY_IMPLEMENTATION_DEFECT'||
+      !/^research:[a-f0-9]{64}$/.test(p.key||'')||
+      !SHA.test(p.frozen_test_sha256)||!SHA.test(p.finding_fingerprint)||
+      !/^[a-f0-9]{40}$/.test(p.baseline_commit_sha||'')||
+      !/^[a-f0-9]{40}$/.test(p.repair_commit_sha||'')||
+      !Number.isSafeInteger(p.baseline_run_id)||p.baseline_run_id<1||
+      !Number.isSafeInteger(p.green_run_id)||p.green_run_id<1||
+      !Number.isSafeInteger(p.pull_request_number)||p.pull_request_number<1||
+      !Number.isInteger(p.independent_red_assertion_failures)||
+      p.independent_red_assertion_failures<1||
+      !Number.isInteger(p.independent_green_assertion_passes)||
+      p.independent_green_assertion_passes<1||
+      p.owner_install_authorized!==false||
+      p.fresh_original_work_verified!==false||
+      p.installed!==false||p.production_changed!==false||
+      p.candidate_created_by!=='ASSISTANT_AUTHORED_IN_ISOLATED_FEATURE_BRANCH'||
+      typeof p.corrected_behavior!=='string'||
+      typeof p.proven_defect_scope!=='string'||
+      typeof p.remaining_unproven!=='string'||
+      !payload.items.some(item=>item.key===p.key&&
+       item.kind==='RESEARCH_OPPORTUNITY'&&
+       item.verified_missing_capability===false))||
+    new Set(proofs.items.map(p=>p.key)).size!==proofs.items.length)
+   throw Error('CATEGORY_INTAKE_REPAIR_PROOFS_UNVERIFIED');
+
+  const proofMap=new Map(proofs.items.map(p=>[p.key,p]));
+  const merged=payload.items.map(item=>{
+   const proof=proofMap.get(item.key);
+   return proof?{...item,
+    stage:'IMPLEMENTATION_DEFECT_REPRODUCED_REPAIR_TESTED_OWNER_REVIEW',
+    priority:0,
+    next_proof:'Owner review of exact candidate and original-job binding; independently verify isolated installation and original-job final settlement before calling it complete.',
+    repair_proof:proof,
+    // A real implementation defect is narrower than a missing executable
+    // original-customer-job capability, so keep separate classifications.
+    verified_missing_capability:false,
+    candidate_independently_tested:true,
+    owner_approval_needed:true,
+    installation_authorized:false,executable_job:false}:item;
+  });
   // Strictly bound to authenticated server session; no browser role or
   // model instruction can change eligibility, findings, or work authority.
   return res.status(200).json({
    ok:true,status:payload.status,
-   counts:payload.counts,
-   items:payload.items,
+   counts:{...payload.counts,
+    verified_implementation_defects:proofs.items.length,
+    independently_tested_research_repairs:proofs.items.length},
+   items:merged,
    settled_history:payload.settled_history,
    source_basis:payload.source_basis,
    read_only:true,installation_authorized:false,

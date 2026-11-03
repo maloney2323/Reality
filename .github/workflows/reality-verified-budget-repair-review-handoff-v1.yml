@@ -1,0 +1,29 @@
+name: Reality verified research gap owner review — source proof
+on:
+  push:
+    branches:
+      - feature/reality-verified-budget-repair-review-handoff-20261103
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+permissions:
+  contents: read
+jobs:
+  verified-owner-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check owner readback API and red to green proof UI
+        run: |
+          node --check api/reality/personal-gap-intake.js
+          node --test test/reality-verified-budget-gap-owner-review-v1.test.js
+          node --test test/reality-evidence-bound-gap-category-intake-v1.test.js
+          node --test test/reality-simple-customer-home-v1.test.js
+          node --test test/reality-upgrade-discovery-category-v0.1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js
