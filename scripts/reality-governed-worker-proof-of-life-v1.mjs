@@ -16,14 +16,29 @@ if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_REPOSITORY!==repo||
  console.log('REALITY_GOVERNED_LIFE_NOT_A_BROKER_WAKE');
  setReady('false');process.exit(0);
 }
-if(!e.GITHUB_EVENT_PATH)fail('PUSH_EVENT_READBACK_MISSING');
-const event=JSON.parse(readFileSync(e.GITHUB_EVENT_PATH,'utf8'));
-const added=event?.head_commit?.added;
-if(!Array.isArray(added))fail('GITHUB_PUSH_ADDED_FILES_UNVERIFIED');
+// Do not assume GitHub includes head_commit.added in every push payload.
+ // Read exact committed file metadata from the trusted GitHub provider API.
+if(!/^[a-f0-9]{40}$/.test(String(e.GITHUB_SHA||''))||
+   !e.REALITY_INSTALL_JOB_GITHUB_TOKEN)
+ fail('SIGNED_PROVIDER_COMMIT_READBACK_REQUIRED');
+const commitResponse=await fetch('https://api.github.com/repos/'+repo+
+ '/commits/'+e.GITHUB_SHA,{
+  redirect:'error',cache:'no-store',headers:{
+   authorization:'Bearer '+e.REALITY_INSTALL_JOB_GITHUB_TOKEN,
+   accept:'application/vnd.github+json',
+   'x-github-api-version':'2022-11-28',
+   'user-agent':'Reality-governed-worker-life-v1'}});
+if(!commitResponse.ok)fail('SIGNED_PROVIDER_COMMIT_UNAVAILABLE');
+const commit=await commitResponse.json();
+if(commit.sha!==e.GITHUB_SHA||
+   !Array.isArray(commit.files)||commit.files.length>100||
+   typeof commit.commit?.message!=='string')
+ fail('SIGNED_PROVIDER_COMMIT_SCOPE_INVALID');
 const pathPattern=/^reality-approved-install-wakes\/([a-f0-9-]{36})-attempt-([1-5])\.json$/;
-const wakeFiles=added.filter(p=>pathPattern.test(String(p)));
+const wakeFiles=commit.files.filter(p=>p.status==='added'&&
+   pathPattern.test(String(p.filename))).map(p=>p.filename);
 if(wakeFiles.length===0){
- if(String(event?.head_commit?.message||'').startsWith('Wake only existing approved isolated job'))
+ if(commit.commit.message.startsWith('Wake only existing approved isolated job'))
   fail('WAKE_COMMIT_MISSING_FENCED_FILE');
  console.log('REALITY_GOVERNED_LIFE_NOT_AN_APPROVED_BROKER_WAKE');
  setReady('false');process.exit(0);
