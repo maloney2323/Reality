@@ -1,0 +1,31 @@
+name: Reality single Run Full Loop button — real worker contract
+on:
+  push:
+    branches:
+      - feature/reality-one-button-real-full-loop-20261103
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+permissions:
+  contents: read
+jobs:
+  one-button:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify button, exact owner route, duplicate protection and final receipt
+        run: |
+          node --check public/one-button-full-loop-v1.js
+          node --test test/reality-one-button-real-full-loop-v1.test.js
+          node --test test/reality-simple-customer-home-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js
+          node --test test/reality-verified-budget-gap-owner-review-v1.test.js
+          node --test test/reality-conversational-upgrade-review-v1.test.js
+          node --test test/reality-market-research-restoration-v1.test.js
+          node --test test/reality-evidence-bound-gap-category-intake-v1.test.js
