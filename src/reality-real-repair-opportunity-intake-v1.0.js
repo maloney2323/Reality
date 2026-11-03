@@ -374,7 +374,7 @@ export async function authorizeExistingRealRepairWork({
   owner_authorized_installation:false,
   original_job_completed:false,production_changed:false,
  };
- const store=createPersistence({...db});
+
  const fetchHistory=()=>store.reconstruct({
   continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id});
  const history=orderContinuityHistory(await fetchHistory());
