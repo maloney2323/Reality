@@ -7,7 +7,7 @@ const route=readFileSync('api/reality/personal-issue188-candidate-review.js','ut
 test('new independently verified but unbound review is visibly separate from owner installation queue',()=>{
  assert.match(page,/id="homeOwnerFollowonReview"/);
  assert.match(page,/homeOwnerShowUnboundFollowonReview/);
- assert.match(page,/INDEPENDENT_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND/);
+ assert.match(page,/HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND/);
  assert.match(page,/new_owner_work_binding_required/);
  assert.match(page,/Approval is intentionally unavailable until Reality records a fresh owner-confirmed goal/);
 });
