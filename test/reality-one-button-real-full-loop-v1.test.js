@@ -187,7 +187,7 @@ test('only matching independent final receipt exposes a PDF after resumed work',
  assert.match(nodes.simpleFullLoopStatus.textContent,/FULL LOOP COMPLETED/);
  assert.equal(nodes.simpleFullLoopReceipt.children.length,1);
  assert.equal(nodes.simpleFullLoopReceipt.children[0].href,
-  '/api/reality/personal-genuine-final-receipt-pdf?work_id='+WORK);
+  '/api/reality/personal-genuine-final-receipt-pdf?work_id='+encodeURIComponent(WORK));
 });
 test('anonymous click opens sign-in and never dispatches or installs',async()=>{
  const f=fixture({signed:false,routes:base});
