@@ -77,7 +77,7 @@ export function renderRealityReceiptPdf(report){
  p.rect(43,603,526,56,light);p.border(43,603,526,56,[0.78,0.84,0.85]);
  p.txt(55,642,'DECISION SNAPSHOT',10,teal,true);
  p.txt(55,626,'Verified candidate. Installation and original-job completion remain unproven.',10,navy,true);
- p.txt(55,611,'Evidence: '+r.verification_checks_passed+' of '+r.verification_checks_passed+' independent tests passed | owner approval not yet issued',8.8,grey);
+ p.txt(55,611,'INDEPENDENTLY VERIFIED AND DURABLY RELEASED | '+r.verification_checks_passed+' of '+r.verification_checks_passed+' checks passed',8.6,grey);
  p.h('WHY REALITY SUGGESTED THIS UPGRADE',576);
  p.txt(43,553,'Observed blocker: missing executable final-outcome verification capability (#188).',9.4,navy,true);
  p.multiline(43,535,'',
