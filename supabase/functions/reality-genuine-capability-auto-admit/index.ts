@@ -342,31 +342,65 @@ async function admit(report){
    unbound.push(record);
    continue;
   }
-  if(matching.length>1)deny('UNIQUE_ORIGINAL_CUSTOMER_BINDING_REQUIRED');
-  const original=matching[0];
-  // A successfully settled isolated customer job is authoritative durable state,
-  // even while its historical frozen test remains red on the base branch.
-  const last=await database('rpc/reality_read_genuine_original_scope_v2',{
-   method:'POST',body:{}});
-  if(last?.original_work_id===original.payload.original_work_id&&
-     last?.phase==='SETTLED_ISOLATED'&&
-     last?.continuation_state==='SETTLED_ISOLATED'){
-   skippedSettled.push(original.payload.original_work_id);
+  // The frozen test can be shared by many historical attempts.
+  // Idempotency belongs to the distinct ORIGINAL execution generation and
+  // immutable candidate, not to the issue number or already-settled parent.
+  // Check every matching work ID's own ledger evidence before choosing one.
+  const unsettled=[];
+  for(const candidateWork of matching){
+   if(!WORK.test(String(candidateWork.payload?.original_work_id||''))||
+      !UUID.test(String(candidateWork.event_id||''))||
+      candidateWork.payload?.owner_authorized_installation!==false&&
+      candidateWork.payload?.owner_authorized_installation!=='false')
+    deny('CANDIDATE_SCOPED_ORIGINAL_IDENTITY_INVALID');
+   const history=await readChain(candidateWork.continuity_root_id,
+      candidateWork.worldline_id);
+   const settled=history.events.some(e=>
+    e.epistemic_status==='VERIFIED'&&
+    e.payload?.original_work_id===candidateWork.payload.original_work_id&&
+    (e.payload?.original_job_completed===true||
+     e.payload?.constitutional_phase==='SETTLED'||
+     e.payload?.driver_state?.phase==='SETTLED'));
+   if(!settled)unsettled.push(candidateWork);
+  }
+  if(unsettled.length>1)
+   deny('UNIQUE_UNSETTLED_CANDIDATE_ORIGINAL_BINDING_REQUIRED');
+  if(unsettled.length===0){
+   // Do not reactivate, overwrite or fabricate a new attempt.
+   skippedSettled.push(matching[0].payload.original_work_id);
    continue;
   }
-  // A frozen test can remain red long after Reality independently settled
-  // its ORIGINAL work on another authorized path. Never reopen or requeue it.
-  const scoped=await readChain(original.continuity_root_id,
-   original.worldline_id);
-  const settled=scoped.events.some(e=>
-   e.epistemic_status==='VERIFIED'&&
-   e.payload?.original_work_id===original.payload.original_work_id&&
-   (e.payload?.original_job_completed===true||
-    e.payload?.constitutional_phase==='SETTLED'));
-  if(settled){
-   skippedSettled.push(original.payload.original_work_id);
-   continue;
+  const original=unsettled[0];
+  if(original.payload?.followon_version===
+     'reality-governed-verified-candidate-followon-v1'){
+   const p=original.payload;
+   if(p.investigation_authority_origin!=='OWNER_CONFIRMED_STANDING_GOAL'||
+      p.owner_authorized_investigation!==true||
+      p.owner_authorized_installation!==false||
+      p.original_job_completed!==false||
+      p.production_changed!==false||
+      p.execution_generation!==1||
+      !WORK.test(String(p.parent_original_work_id||''))||
+      p.parent_original_work_id===p.original_work_id||
+      !SHA64.test(String(p.original_model_candidate_sha256||''))||
+      !/^candidate-receipt:[a-f0-9]{32}$/.test(
+         String(p.verified_candidate_receipt_id||''))||
+      !UUID.test(String(p.owner_id||'')))
+    deny('NEW_GENERATION_SCOPE_OR_AUTHORITATIVE_GOAL_MISSING');
+   const proof=await database(
+    'rpc/reality_read_owner_released_capability_receipts_v1',{
+     method:'POST',body:{p_owner_id:p.owner_id}});
+   const matches=(proof?.receipts||[]).filter(r=>
+     r.receipt_id===p.verified_candidate_receipt_id&&
+     r.source_sha256===p.original_model_candidate_sha256&&
+     r.source_issue===Number(p.issue_number)&&
+     r.status==='RELEASED_VERIFIED_PROVIDER_EVIDENCE'&&
+     r.durable_readback_verified===true&&
+     r.installation_authorized===false&&r.installed===false);
+   if(matches.length!==1)
+    deny('NEW_GENERATION_CANDIDATE_IMMUTABLE_RECEIPT_REQUIRED');
   }
+
   await verifyOriginal(original,signal,report.repository_sha);
   const gapId=await appendGap(original,signal);
   const receipt=await database('rpc/reality_enqueue_genuine_capability_gap_v1',{
