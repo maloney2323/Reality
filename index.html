@@ -559,7 +559,8 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <h3 id="wcCapabilityShelfHeading">Capabilities to review</h3>
     <p>See what Reality can do now, what it could improve, and which missing capabilities have independent evidence. A refresh never starts a repair.</p>
    </div>
-   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities · Run governed audit</button>
+   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities · Audit + market research</button>
+   <button type="button" id="wcResearchMarket">Run market research only</button>
   </div>
   <p id="wcCapabilityRefreshStatus" class="wc-capability-status" role="status" aria-live="polite">Explore an implemented Reality capability below, then sign in and refresh to run a governed audit of current failures and gaps.</p>
   <div id="wcCapabilityList" class="wc-capability-cards" aria-live="polite">
@@ -570,6 +571,8 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <a href="https://github.com/maloney2323/Reality/blob/feature/reality-general-capability-engine-20261101/src/reality-genuine-capability-engine-v1.js" target="_blank" rel="noopener noreferrer">View the implementation evidence</a>
    </article>
   </div>
+  <p class="wc-capability-status" id="wcMarketResearchStatus" role="status" aria-live="polite">Research compares current market evidence with a pinned sample of Reality source. Findings are hypotheses until independently tested.</p>
+  <div class="wc-capability-cards" id="wcMarketResearchFindings" aria-live="polite"></div>
   <p class="wc-note">Qualified upgrades, source-verified gaps, and tracked improvement ideas are different stages. Nothing here approves investigation, installation, or production changes.</p>
  </section>
  <div class="wc-unfinished" id="wcUnfinishedCenter" role="region" aria-label="Reality unfinished work">
@@ -4313,7 +4316,78 @@ async function wcRefreshCapabilities(){
   status.textContent='Capability discovery unavailable. Existing implementation only. No work started.';
  }finally{button.disabled=false;}
 }
-$('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities()};
+$('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities();void wcInvestigateMarket()};
+
+let wcMarketResearchSerial=0;
+async function wcInvestigateMarket(){
+ const button=$('wcResearchMarket'),status=$('wcMarketResearchStatus');
+ const list=$('wcMarketResearchFindings');
+ if(button.disabled)return;
+ if($('privateReady')?.style.display!=='block'){
+  status.textContent='Sign in to Reality before researching the market. No research started.';
+  return;
+ }
+ const serial=++wcMarketResearchSerial;
+ button.disabled=true;
+ status.textContent='Researching recent competitor and API documentation, comparing pinned Reality source, and verifying the receipt…';
+ list.replaceChildren();
+ try{
+  const response=await fetch('/api/reality/personal-market-research',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RUN_GOVERNED_STRATEGIC_RESEARCH'})});
+  const data=await response.json();
+  if(serial!==wcMarketResearchSerial)return;
+  if(!response.ok||data?.ok!==true||
+   data.status!=='GOVERNED_MARKET_RESEARCH_RECORDED'||
+   data.verified_readback!==true||data.review_only!==true||
+   data.installation_authorized!==false||data.job_started!==false||
+   data.production_changed!==false||!Array.isArray(data.findings))
+    throw Error('RESEARCH_NOT_VERIFIED');
+  const cards=[];
+  for(const finding of data.findings.slice(0,4)){
+   if(finding?.status!=='RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST'||
+      !Array.isArray(finding.evidence_urls)||!finding.evidence_urls.length)continue;
+   const card=document.createElement('article');
+   card.className='wc-capability-card';
+   const level=document.createElement('span');
+   level.className='wc-capability-level';
+   level.textContent=finding.novelty==='RESEARCH_PREVIOUSLY_OBSERVED'?
+    'RESEARCHED · PREVIOUSLY OBSERVED · NOT VERIFIED':
+    'NEW RESEARCH HYPOTHESIS · NOT VERIFIED';
+   const title=document.createElement('h4');
+   title.textContent=String(finding.title||'Market opportunity');
+   card.append(level,title);
+   for(const [label,value] of [
+    ['Market evidence',finding.market_claim],
+    ['Reality comparison',finding.reality_comparison],
+    ['Proposed upgrade',finding.proposed_improvement],
+    ['Required verification',finding.falsification_test]]){
+    const p=document.createElement('p');
+    p.textContent=label+': '+String(value||'Not established');
+    card.append(p);
+   }
+   for(const url of finding.evidence_urls.slice(0,4)){
+    let parsed;try{parsed=new URL(url)}catch{continue}
+    if(parsed.protocol!=='https:')continue;
+    const link=document.createElement('a');
+    link.href=parsed.href;link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent='Source: '+parsed.hostname;
+    card.append(link,document.createTextNode(' '));
+   }
+   cards.push(card);
+  }
+  list.replaceChildren(...cards);
+  status.textContent='Governed research recorded · '+data.researched_source_count+
+   ' web source(s), '+cards.length+' review hypothesis(es). '+
+   'Pinned Reality commit '+data.pinned_commit_sha.slice(0,12)+
+   ' · Receipt '+data.receipt_id+
+   ' · Independent DB readback confirmed. These are NOT verified gaps or approved upgrades.';
+ }catch{
+  status.textContent='Market research NOT verified. No upgrade, job or installation initiated. Review the research configuration and provider evidence.';
+ }finally{button.disabled=false}
+}
+$('wcResearchMarket').onclick=()=>{void wcInvestigateMarket()};
 
 async function wcDiscoverCatalog(){
  const epoch=++wcEpoch;
