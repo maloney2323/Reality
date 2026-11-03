@@ -4,6 +4,7 @@ import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {Script} from 'node:vm';
 import {renderRealityReceiptPdf} from '../src/reality-job-receipt-pdf-v1.js';
+import {projectDiscoveryEconomicContext} from '../src/reality-discovery-value-v1.js';
 const id='candidate-receipt:'+'a'.repeat(32);
 const candidate={
  receipt_id:id,
@@ -24,7 +25,16 @@ const candidate={
  new_owner_job_created:false,
  production_changed:false,
 };
+const economicRow={
+ receipt_id:id,status:'RELEASED_VERIFIED_PROVIDER_EVIDENCE',
+ durable_readback_verified:true,source_sha256:candidate.source_sha256,
+ verified_checks_passed:21,source_of_usage:'IMMUTABLE_INDEPENDENT_VERIFIER_REPORT',
+ observed_model_attempts:1,observed_model_input_tokens:2651,
+ observed_model_output_tokens:3592,observed_independent_verification_ms:15793,
+ observed_model_cost_usd:null,installation_authorized:false,installed:false,
+};
 const report={
+ discovery_value:projectDiscoveryEconomicContext({candidateReceipt:candidate,ownerEconomicReadback:economicRow}),
  ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
  automatic_candidate_receipt:candidate,
  source_sha256:candidate.source_sha256,
@@ -52,8 +62,15 @@ test('verified released owner receipt renders a genuine PDF with incomplete step
  assert.match(b.toString('latin1'),/CONS \/ RISKS - unresolved/);
  assert.match(b.toString('latin1'),/INDEPENDENT VERIFICATION GRAPH/);
  assert.match(b.toString('latin1'),/LIFECYCLE PROGRESS/);
- assert.match(b.toString('latin1'),/\/Count 2 >>/);
+ assert.match(b.toString('latin1'),/\/Count 3 >>/);
  assert.match(b.toString('latin1'),/Human baseline \/ supervision: UNKNOWN/);
+ assert.match(b.toString('latin1'),/DISCOVERY VALUE/);
+ assert.match(b.toString('latin1'),/ILLUSTRATIVE HUMAN DIAGNOSIS LABOR VALUE/);
+ assert.match(b.toString('latin1'),/QA \$100\.28/);
+ assert.match(b.toString('latin1'),/DEV \$130\.76/);
+ assert.match(b.toString('latin1'),/DEV \$261\.52/);
+ assert.match(b.toString('latin1'),/ACTUAL FINANCIAL ROI: NOT YET VERIFIABLE/);
+
 
  assert.ok(b.length<30000);
  if(process.env.REALITY_PDF_SMOKE_OUT){
