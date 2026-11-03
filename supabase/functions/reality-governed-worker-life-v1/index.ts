@@ -109,6 +109,27 @@ Deno.serve(async req=>{
     .match(/^Bearer ([A-Za-z0-9._-]+)$/)?.[1]||'';
   const providerToken=req.headers.get('x-reality-github-read-token')||'';
   const id=await verifySignedRunner(jwt,providerToken);
+  if(body.action==='alive'){
+   // GitHub may start the Actions worker immediately after a committed wake
+   // file, before the trusted broker has finished independent provider
+   // readback and recording DISPATCH_ACCEPTED. Never infer authorization
+   // from that GitHub commit alone. Only defer this already authenticated
+   // worker for the current approval/fence, and never install on a deferral.
+   const check=await rpc('reality_check_governed_worker_dispatch_v1',{
+    p_approval_id:body.approval_id,p_fence:body.dispatch_fence});
+   if(check.execution_authorized!==false)
+    deny('DISPATCH_INSPECTION_INVALID');
+   if(check.status==='DISPATCH_RECEIPT_PENDING'&&
+      check.retry_signed_life_only===true)
+    return out({ok:false,status:'SIGNED_WORKER_AWAITING_DELIVERY_RECEIPT',
+      exact_approval_id:body.approval_id,dispatch_fence:body.dispatch_fence,
+      oidc_verified:true,execution_authorized:false,
+      worker_started:true,installation_performed:false,
+      production_changed:false},425);
+   if(check.status!=='DISPATCH_RECEIPT_VERIFIED'||
+      check.retry_signed_life_only!==false)
+    deny('FENCED_DISPATCH_NOT_CURRENT');
+  }
   const result=body.action==='alive'?
     await rpc('reality_ack_governed_worker_alive_v1',{
      p_approval_id:body.approval_id,p_fence:body.dispatch_fence,
