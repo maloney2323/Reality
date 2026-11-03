@@ -12,6 +12,8 @@ import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {dispatchGovernedBuildToIsolatedWorker}
  from './reality-governed-build-github-dispatch-v1.0.js';
+import {verifyGovernedOriginalContinuity}
+ from './reality-governed-original-continuity-v1.0.js';
 
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -62,6 +64,7 @@ export async function queueVerifiedOriginalRepair({
  session,work,env=process.env,
  listWork=listAuthenticatedUnfinishedWork,readGoal=readFreshPersonalGoalState,
  call=invoke,dispatch=dispatchGovernedBuildToIsolatedWorker,
+ verifyContinuity=verifyGovernedOriginalContinuity,
 }={}){
  if(env.VERCEL_ENV!=='preview'||
     env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
@@ -118,33 +121,48 @@ export async function queueVerifiedOriginalRepair({
  if(prior?.queue_id&&prior.original_work_id!==work.original_work_id&&
     !['SETTLED','CANCELLED'].includes(prior.phase))
   fail('EXISTING_UNFINISHED_WORK_IDENTITY_RECONCILIATION_REQUIRED');
- const queued=await call(db,'reality_enqueue_governed_build_v1',{
-  p_owner_id:session.user_id,
-  p_conversation_id:work.original_conversation_id,
-  p_goal_id:work.goal_id,
-  p_goal_transition_event_id:active.last_transition_receipt_id,
-  p_original_work_id:work.original_work_id,
-  p_original_work_evidence_ref:'universe:'+work.source_receipt_id,
-  p_goal_evidence_ref:active.source_user_message_ref,
-  p_continuity_root_id:goal.scope.root,
-  p_worldline_id:goal.scope.worldline,
-  p_preview_release_sha:env.VERCEL_GIT_COMMIT_SHA,
- });
+ // An exact existing queue belongs to the original job across preview
+ // deployments. Re-read its continuity BEFORE any enqueue or worker write.
+ // This also avoids creating a second per-release queue for the same job.
+ const queued=prior?.queue_id&&prior.original_work_id===work.original_work_id?
+  prior:await call(db,'reality_enqueue_governed_build_v1',{
+   p_owner_id:session.user_id,
+   p_conversation_id:work.original_conversation_id,
+   p_goal_id:work.goal_id,
+   p_goal_transition_event_id:active.last_transition_receipt_id,
+   p_original_work_id:work.original_work_id,
+   p_original_work_evidence_ref:'universe:'+work.source_receipt_id,
+   p_goal_evidence_ref:active.source_user_message_ref,
+   p_continuity_root_id:goal.scope.root,
+   p_worldline_id:goal.scope.worldline,
+   p_preview_release_sha:env.VERCEL_GIT_COMMIT_SHA,
+  });
  if(!validUuid(queued?.queue_id)||
     queued.original_work_id!==work.original_work_id||
     queued.goal_id!==work.goal_id||
     queued.installation_authorized!==false||
     queued.job_completed!==false)
   fail('EXACT_QUEUE_READBACK_REQUIRED');
- // An old claim, escalation or previously dispatched work is never
- // restarted through this entrypoint. The original queue remains readable.
- if(queued.phase!=='QUEUED_DISCOVERY')
+ const continuity=await verifyContinuity({session,work,goal,queue:queued,env});
+ if(continuity.original_work_id!==work.original_work_id||
+    continuity.queue_id!==queued.queue_id||
+    continuity.installation_authorized!==false||
+    continuity.original_job_completed!==false||
+    continuity.production_changed!==false)
+  fail('CONTINUITY_VERIFIER_RECEIPT_INVALID');
+ if(continuity.decision!=='SAFE_FIRST_DISPATCH'){
   return Object.freeze({
    status:'EXISTING_ORIGINAL_QUEUE_PRESERVED',phase:queued.phase,
+   continuity_decision:continuity.decision,
+   worker_observation:continuity.worker_observation,
    queue_id:queued.queue_id,original_work_id:work.original_work_id,
-   worker_dispatch_started:false,installation_authorized:false,
-   original_job_completed:false,production_changed:false,
+   worker_dispatch_started:Boolean(queued.dispatch_commit_sha),
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,
   });
+ }
+ if(continuity.dispatch_allowed!==true)
+  fail('CONTINUITY_DISPATCH_WARRANT_REQUIRED');
  let sent;
  try{
   sent=await dispatch({
