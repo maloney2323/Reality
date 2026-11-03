@@ -65,20 +65,25 @@ test('valid production secret is not enough: revoked relay nonce fails closed',a
  const calls=[];
  global.fetch=async(url,opts)=>{
   calls.push([String(url),opts?.method]);
+  if(String(url).includes('/git/ref/heads/'))
+   return json({object:{sha:'a'.repeat(40)}});
   return json({ok:false,status:'RELAY_REJECTED'},403);
  };
  const r=response();
  await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
  assert.equal(r.statusCode,503);
  assert.equal(r.body.worker_started,false);
- assert.equal(calls.length,1);
- assert.ok(calls[0][0].includes('supabase.co/functions/v1/'));
+ assert.equal(calls.length,2);
+ assert.ok(calls[0][0].includes('/git/ref/heads/'));
+ assert.ok(calls[1][0].includes('supabase.co/functions/v1/'));
 });
 test('no approved durable work returns idle without GitHub writes',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
  const calls=[];
  global.fetch=async(url,opts)=>{
   calls.push([String(url),opts?.method]);
+  if(String(url).includes('/git/ref/heads/'))
+   return json({object:{sha:'a'.repeat(40)}});
   return json({ok:true,status:'NO_APPROVED_WAKE_READY',
    execution_authorized:false,approval_created:false});
  };
@@ -86,7 +91,9 @@ test('no approved durable work returns idle without GitHub writes',async()=>{
  assert.equal(r.statusCode,200);
  assert.equal(r.body.status,'NO_APPROVED_WAKE_READY');
  assert.equal(r.body.execution_authorized,false);
- assert.equal(calls.length,1);
+ assert.equal(calls.length,2);
+ assert.ok(calls[0][0].includes('/git/ref/heads/'));
+ assert.ok(calls.every(x=>x[1]!=='PUT'));
 });
 test('a real bounded approval can deliver ONE exact preview wake with readback',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
@@ -142,6 +149,8 @@ test('claim lacking a scoped ack nonce cannot initiate any GitHub writes',async(
  let writes=0;
  global.fetch=async(url,opts)=>{
   if(opts.method==='PUT')writes++;
+  if(String(url).includes('/git/ref/heads/'))
+   return json({object:{sha:'a'.repeat(40)}});
   return json({...claim,ack_nonce:undefined});
  };
  const r=response();
@@ -155,6 +164,8 @@ test('fabricated claim never writes a file or reports a started worker',async()=
  let writes=0;
  global.fetch=async(url,opts)=>{
   if(opts.method==='PUT')writes++;
+  if(String(url).includes('/git/ref/heads/'))
+   return json({object:{sha:'a'.repeat(40)}});
   return json({...claim,artifact_sha256:'forged'});
  };
  const r=response();
@@ -162,4 +173,21 @@ test('fabricated claim never writes a file or reports a started worker',async()=
  assert.equal(r.statusCode,503);
  assert.equal(writes,0);
  assert.equal(r.body.worker_started,false);
+});
+
+test('invalid or expired GitHub token fails before consuming nonce or claiming work',async()=>{
+ process.env.REALITY_GITHUB_TOKEN=fakeToken;
+ const calls=[];
+ global.fetch=async(url,opts)=>{
+  calls.push([String(url),opts?.method]);
+  return json({message:'Bad credentials'},401);
+ };
+ const r=response();
+ await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
+ assert.equal(r.statusCode,503);
+ assert.equal(r.body?.status,'RELAY_DELIVERY_NOT_VERIFIED');
+ assert.equal(r.body?.execution_authorized,false);
+ assert.equal(calls.length,1);
+ assert.ok(calls[0][0].includes('/git/ref/heads/'));
+ assert.ok(!calls[0][0].includes('/functions/v1/'));
 });
