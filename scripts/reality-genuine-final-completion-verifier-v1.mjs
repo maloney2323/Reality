@@ -1,6 +1,6 @@
 // Independent, post-settlement check of the exact installed model capability.
 // This step does not grant approval, install, resume or settle anything.
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,appendFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 const e=process.env,REPO='maloney2323/Reality';
@@ -16,6 +16,12 @@ if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_EVENT_NAME!=='push'||
  fail('SIGNED_ISOLATED_WORKER_ONLY');
 const settlement=JSON.parse(readFileSync('artifact/final/reality-original-final-settlement.json','utf8'));
 const installed=JSON.parse(readFileSync('artifact/install/reality-owner-approved-preview-install.json','utf8'));
+if(!Array.isArray(installed.source_paths)||!installed.source_paths.includes(
+ 'src/reality-extensions/reality-general-execution-receipt.mjs')){
+ if(e.GITHUB_OUTPUT)appendFileSync(e.GITHUB_OUTPUT,'performed=false\n');
+ console.log('REALITY_FINAL_RECEIPT_OTHER_EXTENSION_PROTOCOL_NO_ACTION');
+ process.exit(0);
+}
 if(settlement.status!=='SETTLED_ISOLATED'||
  !/^work:[a-f0-9]{32}$/.test(settlement.original_work_id||'')||
  settlement.original_work_id!==installed.original_work_id||
@@ -140,6 +146,7 @@ const report={
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-independent-final-completion-verifier.json',
  JSON.stringify(report,null,2)+'\n',{flag:'wx'});
+if(e.GITHUB_OUTPUT)appendFileSync(e.GITHUB_OUTPUT,'performed=true\n');
 console.log('REALITY_FINAL_COMPLETION_CANDIDATE_INDEPENDENTLY_VERIFIED',
  JSON.stringify({work:report.original_work_id,negative_cases_rejected:5,
   installed_sha:report.installed_commit_sha,production_changed:false}));
