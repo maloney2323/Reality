@@ -329,6 +329,11 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .simple-actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
 #realitySimpleHome button{min-height:46px;padding:10px 16px;border-radius:12px;font-size:15px;font-weight:680}
 #realitySimpleHome .simple-primary{background:#98d5f2;color:#091826;border:0}
+#simpleRunFullLoop{font-size:18px!important;min-height:58px!important;font-weight:800!important;padding:14px 25px!important}
+#simpleRunFullLoop:disabled{opacity:.64;cursor:progress}
+#simpleFullLoopPanel{border:1px solid #4d817c;background:#0f2931;border-radius:14px;padding:14px 17px;margin:4px 0 19px}
+#simpleFullLoopPanel .simple-status{margin:4px 0 6px!important}
+#simpleFullLoopReceipt a{color:#b3e6ff;text-decoration:underline}
 #realitySimpleHome .simple-secondary{background:#15263a;color:#daedfa;border:1px solid #56758b}
 #realitySimpleHome .simple-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:11px}
 #realitySimpleHome .simple-finding{min-width:0;padding:18px;border:1px solid #3f536d;background:#101f31;border-radius:16px}
@@ -364,10 +369,15 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
   <span class="simple-info" id="simpleResearchCount">Loading assessed upgrades…</span>
  </div>
  <div class="simple-actions">
-  <button type="button" id="simpleReviewFirst" class="simple-primary">Review first opportunity</button>
+  <button type="button" id="simpleRunFullLoop" class="simple-primary">Run Full Loop</button>
+  <button type="button" id="simpleReviewFirst" class="simple-secondary">Review first opportunity</button>
   <button type="button" id="simpleChat" class="simple-secondary">Talk to Reality</button>
   <button type="button" id="simpleViewGapCategory" class="simple-secondary">View all capability candidates</button>
  </div>
+ <section id="simpleFullLoopPanel" aria-label="Run Reality full loop">
+  <p id="simpleFullLoopStatus" class="simple-status" role="status" aria-live="polite">One click starts the existing real-job worker. Reality then tests, builds and verifies, requests your exact installation approval in Chat when ready, and continues to the final receipt automatically.</p>
+  <div id="simpleFullLoopReceipt" aria-live="polite"></div>
+ </section>
  <div id="simpleResearchList" class="simple-list" aria-live="polite">
   <div class="simple-finding"><p>Loading completed background assessments; no new search or job will start.</p></div>
  </div>
@@ -5747,5 +5757,6 @@ setInterval(refreshSavedShiftHome,300000);
 })();
 
 </script>
+<script defer src="/one-button-full-loop-v1.js"></script>
 </body>
 </html>
