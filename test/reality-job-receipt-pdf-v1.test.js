@@ -45,6 +45,16 @@ test('verified released owner receipt renders a genuine PDF with incomplete step
  assert.match(b.toString('latin1'),/Exact installation approval: NOT GIVEN/);
  assert.match(b.toString('latin1'),/Cash savings \/ ROI: UNKNOWN/);
  assert.match(b.toString('latin1'),/No receipt, approval, or external action is created by downloading this PDF/);
+ assert.match(b.toString('latin1'),/WHY REALITY SUGGESTED THIS UPGRADE/);
+ assert.match(b.toString('latin1'),/missing executable final-outcome verification capability/);
+ assert.match(b.toString('latin1'),/EXPECTED VALUE \(NOT YET REALIZED\)/);
+ assert.match(b.toString('latin1'),/PROS - expected/);
+ assert.match(b.toString('latin1'),/CONS \/ RISKS - unresolved/);
+ assert.match(b.toString('latin1'),/INDEPENDENT VERIFICATION GRAPH/);
+ assert.match(b.toString('latin1'),/LIFECYCLE PROGRESS/);
+ assert.match(b.toString('latin1'),/\/Count 2 >>/);
+ assert.match(b.toString('latin1'),/Human baseline \/ supervision: UNKNOWN/);
+
  assert.ok(b.length<30000);
  if(process.env.REALITY_PDF_SMOKE_OUT){
   mkdirSync(dirname(process.env.REALITY_PDF_SMOKE_OUT),{recursive:true});
