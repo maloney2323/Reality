@@ -143,6 +143,11 @@ test('preview API preserves same-origin, sign-in and owner review gates',()=>{
  assert.match(api,/persistOwnerMarketResearch/);
  assert.match(html,/id="wcResearchMarket"/);
  assert.match(html,/wcInvestigateMarket/);
+ assert.match(html,/void wcRefreshCapabilities\(\);void wcInvestigateMarket\(\)/);
+ assert.match(api,/reality_reserve_owner_market_research_v1/);
+ assert.match(api,/reality_finalize_owner_market_research_v1/);
+ assert.match(api,/p_phase:'COMPLETE'/);
+ assert.match(api,/p_phase:'FAILED'/);
  assert.match(html,/RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST/);
  assert.match(html,/textContent=finding\.market_claim|finding\.market_claim/);
  assert.doesNotMatch(api,/create_issue|merge_pull_request|installCapability/);
