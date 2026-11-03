@@ -14,6 +14,13 @@ const interfaces=Object.freeze({
   protocol:'TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1',
   export_name:'assessContinuityReconciliation',required_decision:'RECONCILIATION_REQUIRED',
   requires_reconciliation_evidence:true}),
+ 'reality-general-execution-receipt':Object.freeze({
+  protocol:'TRUSTED_GENERAL_COMPLETION_RECEIPT_V1',
+  export_name:'verifyRealityCompletion',
+  required_decision:'PRE_SETTLEMENT_DENIED',
+  frozen_test_path:'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js',
+  requires_reconciliation_evidence:false,
+  requires_pre_settlement_denial:true}),
 });
 export function deriveOriginalResumeContract(ready){
  if(!WORK.test(ready?.original_work_id)||!SHA.test(ready?.installed_commit_sha)||
@@ -26,6 +33,8 @@ export function deriveOriginalResumeContract(ready){
  const slug=ready.source_path.slice('src/reality-extensions/'.length,-4);
  const known=interfaces[slug];
  if(!known)fail('EXTENSION_PROTOCOL_NOT_VERIFIED');
+ if(known.frozen_test_path&&ready.frozen_test_path!==known.frozen_test_path)
+  fail('SOURCE_SPECIFIC_FROZEN_SUITE_REQUIRED');
  const companion='test/reality-extensions/'+slug+'.test.js';
  if(companion.includes('..')||!/^test\/reality-extensions\/[a-z][a-z0-9._-]+\.test\.js$/.test(companion))
   fail('COMPANION_SUITE_INVALID');
@@ -47,6 +56,7 @@ export function deriveOriginalResumeContract(ready){
   reconciliation_target_work_id:known.requires_reconciliation_evidence?
    ready.reconciliation_target_work_id:null,
   requires_reconciliation_evidence:known.requires_reconciliation_evidence,
+  requires_pre_settlement_denial:known.requires_pre_settlement_denial===true,
   production_changed:false,installation_authorized:false,
  });
 }
