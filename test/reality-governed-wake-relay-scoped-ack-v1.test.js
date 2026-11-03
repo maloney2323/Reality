@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=(path)=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const code=read('supabase/functions/reality-governed-wake-relay-v1/index.ts');
+const sql=read('sql/reality-governed-wake-relay-scoped-ack-v1.sql');
+test('acknowledgment requires exact approval-bound short-lived nonce',()=>{
+ assert.match(code,/reality_issue_governed_relay_ack_v1/);
+ assert.match(code,/reality_record_governed_relay_delivery_v1/);
+ assert.match(code,/ack_nonce,action,approval_id,claim_id,delivery_id,fence/);
+ assert.match(code,/SCOPED_DELIVERY_ACK_NONCE_UNVERIFIED/);
+ assert.doesNotMatch(code,/rpc\('reality_record_governed_delivery_v1'/);
+ assert.match(sql,/ack_nonce uuid PRIMARY KEY DEFAULT gen_random_uuid/);
+ assert.match(sql,/claim_id uuid NOT NULL/);
+ assert.match(sql,/dispatch_fence bigint NOT NULL/);
+ assert.match(sql,/interval '90 seconds'/);
+ assert.match(sql,/FOR UPDATE/);
+ assert.match(sql,/ack\.consumed_at IS NOT NULL/);
+ assert.match(sql,/ack\.approval_id IS DISTINCT FROM p_approval_id/);
+ assert.match(sql,/ack\.claim_id IS DISTINCT FROM p_claim_id/);
+ assert.match(sql,/ack\.dispatch_fence IS DISTINCT FROM p_fence/);
+ assert.match(sql,/receipt:=public\.reality_record_governed_delivery_v1\(/);
+ assert.match(sql,/SET consumed_at=clock_timestamp\(\)/);
+});
+test('untrusted application roles cannot issue or consume protected ack',()=>{
+ assert.match(sql,/REVOKE ALL ON FUNCTION public\.reality_issue_governed_relay_ack_v1/);
+ assert.match(sql,/REVOKE ALL ON FUNCTION public\.reality_record_governed_relay_delivery_v1/);
+ assert.match(sql,/FROM PUBLIC,anon,authenticated/g);
+ assert.match(sql,/IF current_user<>'service_role'/g);
+ assert.doesNotMatch(sql,/SECURITY DEFINER/);
+});
