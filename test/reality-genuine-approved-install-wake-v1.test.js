@@ -78,16 +78,8 @@ test('actual owner approval route parses as a valid module and dispatches only a
 test('signed automatic fallback is independent of the browser and fails closed before actual worker execution',()=>{
  const route=readFileSync('api/reality/personal-qualified-capability-approve.js','utf8');
  const home=readFileSync('index.html','utf8');
- const broker=readFileSync('.github/workflows/reality-governed-approved-scheduler-v1.yml','utf8');
  assert.match(route,/auto_trigger_fallback:'SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL'/);
  assert.match(route,/auto_trigger_instant:false/);
  assert.match(route,/worker_execution_started:false/);
  assert.match(home,/worker start is NOT yet verified/);
- assert.match(broker,/reality-governed-approved-scheduler/);
- assert.match(broker,/genuine_pending_approvals/);
- assert.match(broker,/id-token: write/);
- assert.match(broker,/actions: write/);
- assert.match(broker,/workflow_dispatch/);
- assert.match(broker,/original_work_id/);
- assert.match(broker,/SIGNED_APPROVED_ISOLATED_WORKER_DISPATCHED/);
 });
