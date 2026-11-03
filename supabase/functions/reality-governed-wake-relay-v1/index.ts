@@ -34,6 +34,22 @@ Deno.serve(async request=>{
   try{payload=JSON.parse(data)}catch{fail('MALFORMED_JSON')}
   if(!payload||Array.isArray(payload)||typeof payload!=='object')
    fail('INVALID_ENVELOPE');
+  if(payload.action==='verify'){
+   // Read-only, service-gated nonce validation before any Vercel-held
+   // GitHub credential gets used. A forged envelope never touches GitHub.
+   if(Object.keys(payload).sort().join(',')!=='action,relay_nonce'||
+      !ID.test(String(payload.relay_nonce||'')))
+    fail('PREFLIGHT_ONE_TIME_NONCE_REQUIRED');
+   const proof=await rpc('reality_verify_governed_wake_relay_nonce_v1',{
+    p_relay_nonce:payload.relay_nonce});
+   if(proof.status!=='ONE_TIME_DELIVERY_NONCE_VALID'||
+      proof.execution_authorized!==false||
+      proof.owner_approval_created!==false)
+    fail('PREFLIGHT_UNCONSUMED_NONCE_UNVERIFIED');
+   return reply({ok:true,status:'RELAY_NONCE_VERIFIED_NOT_CONSUMED',
+    execution_authorized:false,owner_approval_created:false,
+    worker_started:false,production_changed:false});
+  }
   if(payload.action==='claim'){
    if(Object.keys(payload).sort().join(',')!=='action,relay_nonce'||
      !ID.test(String(payload.relay_nonce||'')))fail('CLAIM_ONE_TIME_NONCE_REQUIRED');
