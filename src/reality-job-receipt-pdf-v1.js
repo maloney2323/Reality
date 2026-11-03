@@ -191,8 +191,8 @@ export function renderRealityReceiptPdf(report){
      !Number.isFinite(a.qa_median_wage_labor_equivalent_usd))
     fail('DISCOVERY_VALUE_SCENARIO_SOURCE_INVALID');
   z.txt(44,yy+5,a.assumed_human_diagnostic_hours+' hypothetical human hr'+(i?'s':''),9,navy,true);
-  draw(145,yy+5,304*a.qa_median_wage_labor_equivalent_usd/max,[0.44,0.69,0.68]);
-  draw(145,yy-10,304*a.developer_median_wage_labor_equivalent_usd/max,teal);
+  draw(230,yy+5,215*a.qa_median_wage_labor_equivalent_usd/max,[0.44,0.69,0.68]);
+  draw(230,yy-10,215*a.developer_median_wage_labor_equivalent_usd/max,teal);
   z.txt(459,yy+7,'QA USD '+a.qa_median_wage_labor_equivalent_usd.toFixed(2),8.5,grey);
   z.txt(459,yy-8,'DEV USD '+a.developer_median_wage_labor_equivalent_usd.toFixed(2),8.5,navy);
  }
