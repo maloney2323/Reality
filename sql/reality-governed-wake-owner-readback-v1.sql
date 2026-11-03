@@ -2,6 +2,11 @@
 CREATE OR REPLACE FUNCTION public.reality_read_owner_governed_wakes_v1(p_owner_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
 DECLARE records jsonb;
+ watchdog_last_run timestamptz;
+ watchdog_last_status text;
+ broker_last_status text;
+ broker_last_at timestamptz;
+
 BEGIN
  IF current_user<>'service_role' THEN
   RAISE EXCEPTION 'WAKE_OWNER_SERVICE_ROLE_REQUIRED'; END IF;
@@ -33,9 +38,49 @@ BEGIN
     AND w.target_environment='ISOLATED_PREVIEW'
   ORDER BY w.created_at DESC LIMIT 12
  ) s;
+ SELECT d.start_time,d.status
+ INTO watchdog_last_run,watchdog_last_status
+ FROM cron.job_run_details d
+ WHERE d.jobid=(SELECT jobid FROM cron.job
+   WHERE jobname='reality-governed-wake-watchdog-v1')
+ ORDER BY d.start_time DESC LIMIT 1;
+ SELECT CASE
+    WHEN content LIKE '%"status":"DISPATCH_CREDENTIAL_MISSING"%'
+      THEN 'DISPATCH_CREDENTIAL_MISSING'
+    WHEN content LIKE '%"status":"NO_APPROVED_WAKE_READY"%'
+      THEN 'BROKER_READY_IDLE'
+    WHEN content LIKE '%"status":"DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN"%'
+      THEN 'DELIVERY_ACCEPTED'
+    WHEN content LIKE '%"status":"WAKE_BROKER_FAIL_CLOSED"%'
+      THEN 'BROKER_FAIL_CLOSED'
+    ELSE 'NO_VALID_BROKER_PROOF'
+   END,
+   created
+ INTO broker_last_status,broker_last_at
+ FROM net._http_response
+ WHERE content LIKE '%"status":"DISPATCH_CREDENTIAL_MISSING"%'
+    OR content LIKE '%"status":"NO_APPROVED_WAKE_READY"%'
+    OR content LIKE '%"status":"DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN"%'
+    OR content LIKE '%"status":"WAKE_BROKER_FAIL_CLOSED"%'
+ ORDER BY created DESC LIMIT 1;
  RETURN jsonb_build_object('status','OWNER_GOVERNED_WAKE_READBACK',
   'wakes',records,'read_only',true,
-  'production_changed',false,'execution_authorized_by_read',false);
+  'production_changed',false,'execution_authorized_by_read',false,
+  'watchdog',jsonb_build_object(
+    'status',CASE WHEN watchdog_last_status='succeeded' AND
+        watchdog_last_run>=clock_timestamp()-interval '3 minutes'
+       THEN 'WATCHDOG_RECENTLY_SUCCEEDED' ELSE 'WATCHDOG_STALE_OR_UNVERIFIED' END,
+    'last_run_at',watchdog_last_run,
+    'broker_delivery_status',CASE
+      WHEN broker_last_at>=clock_timestamp()-interval '30 minutes'
+      THEN coalesce(broker_last_status,'NO_VALID_BROKER_PROOF')
+      ELSE 'NO_RECENT_BROKER_PROOF' END,
+    'broker_checked_at',broker_last_at,
+    'delivery_ready_proven',broker_last_status IN
+        ('BROKER_READY_IDLE','DELIVERY_ACCEPTED') AND
+      broker_last_at>=clock_timestamp()-interval '30 minutes',
+    'source','POSTGRES_CRON_AND_SIGNED_EDGE_HTTP_READBACK'
+  ));
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_read_owner_governed_wakes_v1(uuid)
  FROM PUBLIC,anon,authenticated;
