@@ -2227,6 +2227,23 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   const autoNote=document.createElement('p');
   autoNote.className='home-owner-note';
   autoNote.textContent='No receipt button is required. Reality already recorded the independently verified candidate in GitHub. A separate original-work authorization must be verified before isolated installation can be offered.';
+  const liveCandidate=receipt.new_job_scoped_candidate_review;
+  if(liveCandidate){
+   if(!/^work:[a-f0-9]{32}$/.test(String(liveCandidate.original_work_id||''))||
+      liveCandidate.status!=='AWAITING_OWNER_APPROVAL'||
+      liveCandidate.independently_verified!==true||
+      liveCandidate.artifact_is_distinct_from_earlier_21_check_receipt!==true||
+      liveCandidate.owner_approval_issued!==false||
+      liveCandidate.production_changed!==false)
+     throw Error('NEW_JOB_CANDIDATE_OWNER_SCOPE_UNVERIFIED');
+   title.textContent='Historical evidence receipt · Fresh verified upgrade ready below';
+   status.textContent='Earlier: 21/21 verified. Fresh original job: independently qualified for approval.';
+   body.textContent='Reality has now created a separate owner-bound original job and independently qualified a new exact artifact. The 21/21 receipt remains evidence for the earlier candidate; it is NOT approval for or proof of this newer artifact.';
+   next.textContent='NEXT: Review the fresh job in Owner Authorizations below and approve its exact verified artifact. Installation, resumption and settlement have not occurred.';
+   note.textContent='Fresh original job: '+liveCandidate.original_work_id+
+    '. One exact installation authorization is still required. No extra receipt or investigation button.';
+   autoNote.textContent='The historical settled work remains preserved. The new job is not complete, and no production change is authorized.';
+  }
   const downloadPdf=document.createElement('a');
   downloadPdf.href='/api/reality/personal-receipt-pdf';
   downloadPdf.textContent='Download receipt as PDF';
