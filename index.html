@@ -2192,20 +2192,21 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
    receipt.independent_tests_passed!==21||
    receipt.security_regressions_remaining!==0||
    !/^[a-f0-9]{64}$/.test(String(receipt.source_sha256||''))||
-   receipt.automatic_candidate_receipt?.status!=='VERIFIED_CANDIDATE_SOURCE_OBSERVED'||
+   receipt.automatic_candidate_receipt?.status!=='INDEPENDENTLY_VERIFIED_AND_DURABLY_RELEASED'||
    receipt.automatic_candidate_receipt?.source_sha256!==receipt.source_sha256||
    receipt.automatic_candidate_receipt?.verification_checks_passed!==21||
    receipt.automatic_candidate_receipt?.installation_authorized!==false||
+   receipt.automatic_candidate_receipt?.durable_release_readback_verified!==true||
    !/^candidate-receipt:[a-f0-9]{32}$/.test(
        String(receipt.automatic_candidate_receipt?.receipt_id||'')))
    throw Error('INDEPENDENT_OWNER_REVIEW_PROOF_UNAVAILABLE');
   target.replaceChildren();
   const card=document.createElement('article');card.className='home-owner-item';
   const title=document.createElement('h3');
-  title.textContent='Automatic candidate evidence receipt · Independently verified';
+  title.textContent='Released capability evidence receipt · Independently verified';
   const status=document.createElement('p');
   status.className='home-owner-state';
-  status.textContent='21/21 independently verified checks passed · Evidence receipt ready';
+  status.textContent='21/21 independently verified checks passed · Immutable receipt released';
   const body=document.createElement('p');
   body.textContent='Reality independently verified a proposed execution-receipt repair. This evidence receipt is automatic and does not grant installation authority. The earlier #188 job remains settled.';
   const source=document.createElement('code');
@@ -2222,7 +2223,7 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   note.textContent='Reality must establish a fresh, currently authorized work scope and qualify the exact candidate before it can request installation consent. No manual receipt step.';
   const receiptId=document.createElement('p');
   receiptId.className='home-owner-note';
-  receiptId.textContent='Automatic source-evidence receipt: '+receipt.automatic_candidate_receipt.receipt_id;
+  receiptId.textContent='Durably released verified receipt: '+receipt.automatic_candidate_receipt.receipt_id;
   const autoNote=document.createElement('p');
   autoNote.className='home-owner-note';
   autoNote.textContent='No receipt button is required. Reality already recorded the independently verified candidate in GitHub. A separate original-work authorization must be verified before isolated installation can be offered.';
