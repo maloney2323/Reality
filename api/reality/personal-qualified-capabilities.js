@@ -40,9 +40,19 @@ export default async function handler(req,res){
    throw Error('QUALIFICATION_READBACK_INVALID');
   // Derive read-only economic and technical explanations solely from the
   // signed, owner-scoped qualification readback. No further rights granted.
-  const valueReports=entries.map(createCapabilityValueReport);
-  const enriched=entries.map((entry,i)=>({...entry,value_report:valueReports[i],
-   full_loop_preflight:assessTwoAuthorizationExecutionPreflight(entry)}));
+  // After consent is durable, the same owner-scoped queue can still expose
+  // its approval receipt. Never send that already-approved row through the
+  // UNINSTALLED pre-approval value validator or erase the legitimate approval.
+  const waiting=entries.filter(entry=>entry.approval==null);
+  const valueReports=waiting.map(createCapabilityValueReport);
+  const valueByWork=new Map(waiting.map((entry,i)=>[
+   entry.original_work_id,valueReports[i]]));
+  const enriched=entries.map(entry=>({...entry,
+   value_report:valueByWork.get(entry.original_work_id)||null,
+   full_loop_preflight:entry.approval?
+    {approval_gate_open:false,status:'ALREADY_OWNER_APPROVED_DO_NOT_REAPPROVE',
+     two_authorizations_only:true,original_job_completed:false}:
+    assessTwoAuthorizationExecutionPreflight(entry)}));
   const valuePortfolio=summarizeQualifiedCapabilityValueReports(valueReports);
   return res.status(200).json({
    ok:true,status:entries.length?'VERIFIED_UPGRADES_WAITING_FOR_OWNER':'NO_VERIFIED_UPGRADES',
