@@ -33,6 +33,7 @@ jobs:
           node --check scripts/reality-genuine-final-completion-record-v1.mjs
           node --check scripts/reality-genuine-original-settle-v1.mjs
           node --check src/reality-genuine-completed-receipt-pdf-v1.js
+          node --check src/reality-two-authorization-execution-preflight-v1.js
           node --check api/reality/personal-genuine-final-receipt-pdf.js
           node --check api/reality/personal-receipt-pdf.js
       - name: Verify exact owner original-work lineage, anti-replay, read-only intake and frontend
