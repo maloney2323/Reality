@@ -11,6 +11,7 @@ const claim={
  approval_id:'22222222-2222-4222-8222-222222222222',
  trigger_id:'33333333-3333-4333-8333-333333333333',
  claim_id:'44444444-4444-4444-8444-444444444444',
+ ack_nonce:'55555555-5555-4555-8555-555555555555',
  original_work_id:'work:'+'a'.repeat(32),
  artifact_sha256:'b'.repeat(64),pre_state_hash:'c'.repeat(64),
  target_environment:'ISOLATED_PREVIEW',dispatch_fence:1
@@ -99,6 +100,7 @@ test('a real bounded approval can deliver ONE exact preview wake with readback',
    if(request.action==='ack'){
     assert.equal(request.approval_id,claim.approval_id);
     assert.equal(request.claim_id,claim.claim_id);
+    assert.equal(request.ack_nonce,claim.ack_nonce);
     assert.equal(request.fence,1);
     return json({ok:true,status:'DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN',
       approval_id:claim.approval_id,dispatch_fence:1,
@@ -134,6 +136,19 @@ test('a real bounded approval can deliver ONE exact preview wake with readback',
  assert.equal(calls.filter(x=>x[1]==='PUT').length,1);
  assert.ok(calls.every(x=>!x[0].includes('/git/refs')),'never target production refs');
  assert.ok(!JSON.stringify(r.body).includes(fakeToken));
+});
+test('claim lacking a scoped ack nonce cannot initiate any GitHub writes',async()=>{
+ process.env.REALITY_GITHUB_TOKEN=fakeToken;
+ let writes=0;
+ global.fetch=async(url,opts)=>{
+  if(opts.method==='PUT')writes++;
+  return json({...claim,ack_nonce:undefined});
+ };
+ const r=response();
+ await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
+ assert.equal(r.statusCode,503);
+ assert.equal(writes,0);
+ assert.equal(r.body?.execution_authorized,false);
 });
 test('fabricated claim never writes a file or reports a started worker',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
