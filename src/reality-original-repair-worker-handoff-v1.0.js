@@ -115,8 +115,9 @@ export async function queueVerifiedOriginalRepair({
  await assertOwnerOriginalIssueIdentity({session,
   issueNumber:Number(work.issue_url.split('/').at(-1)),
   expectedOriginalWorkId:work.original_work_id,env,call});
- const prior=await call(db,'reality_read_governed_build_v1',{
+ const prior=await call(db,'reality_read_exact_original_queue_v1',{
   p_owner_id:session.user_id,p_conversation_id:work.original_conversation_id,
+  p_original_work_id:work.original_work_id,
  });
  if(prior?.queue_id&&prior.original_work_id!==work.original_work_id&&
     !['SETTLED','CANCELLED'].includes(prior.phase))
@@ -125,7 +126,7 @@ export async function queueVerifiedOriginalRepair({
  // deployments. Re-read its continuity BEFORE any enqueue or worker write.
  // This also avoids creating a second per-release queue for the same job.
  const queued=prior?.queue_id&&prior.original_work_id===work.original_work_id?
-  prior:await call(db,'reality_enqueue_governed_build_v1',{
+  prior:await call(db,'reality_enqueue_exact_original_queue_v1',{
    p_owner_id:session.user_id,
    p_conversation_id:work.original_conversation_id,
    p_goal_id:work.goal_id,
