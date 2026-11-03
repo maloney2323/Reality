@@ -30,9 +30,9 @@ test('fresh original never reuses the settled work or previous approval',()=>{
 });
 test('identity is pinned to both exact source and independent GitHub proof artifact digests',()=>{
  for(const x of [
-  '45d26806d0e192d6fdecd177464d13af2ab3b98a70070b8fd268a2f05bedee64',
-  'de6318fcc6a9619aff9b946991c2ed5ace12f1a6a8d5745f77d4676c6c04cc59',
-  '9367575b9f3eb7b23f70d4f8443310814675362e3f2ab2a1b3d81a09946385e0'
+  'd084f46d840027acd412b67fceb1636fd35a64f2cc08b9ebb6666d470d1af43d',
+  'a15f718461a9af61663f10797088df28abac312bf338269bb16b16f6cd0122b4',
+  '166309eddaef9878341871551283989b5da0d612ebb799d2647d8163d8250bdd'
  ])assert.ok(module.includes(x));
 });
 test('no owner-job POST proceeds without same-origin user, exact JSON, and confirmed goal',()=>{
