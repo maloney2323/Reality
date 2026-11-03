@@ -14,19 +14,18 @@ test('homepage JavaScript stays syntactically valid',()=>{
  assert.ok(inlineScript.length>150000,'real inline app script must be parsed');
  assert.doesNotThrow(()=>new Script(inlineScript,{filename:'Reality homepage'}));
 });
-test('exactly one homepage Owner Authorizations location is prominent',()=>{
+test('one owner authorization source is relocated to the actual conversation',()=>{
  assert.equal((html.match(/id="homeOwnerAuthorizations"/g)||[]).length,1);
  assert.match(section(),/Owner Authorizations/);
- assert.ok(html.indexOf('<div class="top">')<
-  html.indexOf('id="homeOwnerAuthorizations"'));
- assert.ok(html.indexOf('id="homeOwnerAuthorizations"')<
-  html.indexOf('<h1>Your Business Reality'));
- assert.ok(html.indexOf('id="homeOwnerAuthorizations"')<
-  html.indexOf('id="businessHome"'));
+ assert.match(html,/id="homeChatApprovalShortcut"/);
+ assert.match(html,/id="homeOpenApprovalChat"/);
+ assert.match(html,/id="realityChatApprovalLegacyContainer"/);
+ assert.match(inlineScript,/appendChild\(homeOwnerCenter\)/);
  assert.match(section(),/id="homeOwnerItems"/);
  assert.match(section(),/id="homeOwnerStatus"/);
 });
-test('both prior self-repair installation consent dialogs are physically moved into home center',()=>{
+test('the original approval dialogs are moved into the chat modal layer',()=>{
+ assert.match(inlineScript,/appendChild\(homeOwnerDialogs\)/);
  assert.match(inlineScript,/homeOwnerDialogs\.appendChild\(\$\('wcEasyGenuineApproval'\)\)/);
  assert.match(inlineScript,/homeOwnerDialogs\.appendChild\(homeLegacyExactDialog\)/);
  assert.match(inlineScript,/homeLegacyInstallSlot\.append\(/);
@@ -107,16 +106,15 @@ test('technical hashes and original work ids are collapsible while meaningful ou
  assert.match(inlineScript,/card\.appendChild\(notDone\)/);
 });
 
-test('owner authorization is first on Home; persistent chat stays available without hiding approval',()=>{
- assert.ok(html.indexOf('<section class="home-owner-center"')<
-  html.indexOf('<section id="privateChat"'));
- assert.ok(html.indexOf('<section class="home-owner-center"')<
-  html.indexOf('<section id="startFlow"'));
+test('Home opens Reality chat and all approvals live in the signed-in conversation',()=>{
+ assert.match(html,/id="homeOpenApprovalChat"/);
+ assert.match(html,/id="realityChatApprovalInbox"/);
+ assert.match(html,/id="realityChatApprovalItems"/);
  assert.match(html,/id="privateTranscript"/);
  assert.match(html,/id="privatePrompt"/);
- assert.match(html,/id="realityChatActivityEntries"/);
- assert.doesNotMatch(inlineScript,/insertBefore\(homeOwnerCenter,\$\('privatePrompt'\)\)/);
- assert.match(inlineScript,/function homeOwnerFocus\(\)\{[\s\S]*?realityCloseChatDock\(\)/);
+ assert.match(inlineScript,/function homeOwnerFocus\(\)\{[\s\S]*?realityOpenChatDock\(false\)/);
+ assert.match(inlineScript,/homeOpenApprovalChat'\)\.addEventListener\('click',\(\)=>homeOwnerFocus\(\)\)/);
+ assert.doesNotMatch(inlineScript,/if\(\$\('privateChat'\)\.dataset\.open==='true'\)realityCloseChatDock\(\)/);
 });
 test('one customer approval click verifies exact source and uses existing authenticated endpoint',()=>{
  const from=inlineScript.indexOf('async function realityChatApproveOnce(');
@@ -148,19 +146,19 @@ test('chat live work progress relies on authenticated read-only worker evidence'
  assert.doesNotMatch(method,/method:'POST'/);
 });
 
-test('chat composer and live event updates precede legacy account and goal settings',()=>{
+test('saved conversation, work updates and chat approvals precede composer and settings',()=>{
  const ready=html.indexOf('<div id="privateReady"');
  const transcript=html.indexOf('id="privateTranscript"',ready);
  const progress=html.indexOf('id="realityChatActivityEntries"',transcript);
- const prompt=html.indexOf('id="privatePrompt"',progress);
+ const approvals=html.indexOf('id="realityChatApprovalInbox"',progress);
+ const prompt=html.indexOf('id="privatePrompt"',approvals);
  const send=html.indexOf('id="privateSend"',prompt);
  const extras=html.indexOf('id="realityChatSettings"',send);
  const goal=html.indexOf('id="privateGoalText"',extras);
- assert.ok(ready>=0&&ready<transcript&&transcript<progress&&progress<prompt&&
-  prompt<send&&send<extras&&extras<goal);
+ assert.ok(ready>=0&&ready<transcript&&transcript<progress&&
+  progress<approvals&&approvals<prompt&&prompt<send&&send<extras&&extras<goal);
  assert.match(inlineScript,/\$\('realityChatSettings'\)\.open=true/);
 });
-
 test('Business Reality money and verified value lead the customer home',()=>{
  const business=html.indexOf('id="businessHome"'),chat=html.indexOf('id="privateChat"');
  assert.ok(business>0&&business<chat);
@@ -234,4 +232,28 @@ test('chat displays every verifiable stage and refuses unproven final outcome or
  assert.match(source,/Financial value: not yet measured/);
  assert.match(source,/No verified full-loop completion is being claimed/);
  assert.match(source,/full_loop_independently_verified===true/);
+});
+
+test('Reality chat renders source-scoped approvals with one explicit click and no model authority',()=>{
+ const from=inlineScript.indexOf('function realityChatRenderApprovalInbox(');
+ const to=inlineScript.indexOf('async function homeOwnerRefresh()',from);
+ assert.ok(from>0&&to>from);
+ const render=inlineScript.slice(from,to);
+ assert.match(render,/homeOwnerEntryVerified\(e\)/);
+ assert.match(render,/approval_gate_open===true/);
+ assert.match(render,/!e\.approval/);
+ assert.match(render,/realityChatApproveOnce\(entry\.original_work_id,q\.artifact_sha256\)/);
+ assert.match(render,/Isolated preview/);
+ assert.match(render,/No production changes/);
+ assert.doesNotMatch(render,/personal-qualified-capability-approve/);
+ assert.match(inlineScript,/realityChatRenderApprovalInbox\(entries\)/);
+});
+test('chat refresh rechecks the signed-in owner and keeps ambiguous approvals fail-closed',()=>{
+ assert.match(html,/id="realityChatApprovalStatus"/);
+ assert.match(html,/id="realityChatApprovalEvidence"/);
+ assert.match(html,/id="realityChatApprovalDialogs"/);
+ assert.match(inlineScript,/worker start is not verified/);
+ assert.match(inlineScript,/SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL/);
+ assert.match(inlineScript,/Approval uncertain\. No automatic retry/);
+ assert.match(inlineScript,/if\(\$\('privateReady'\)\?\.style\.display==='block'\)/);
 });
