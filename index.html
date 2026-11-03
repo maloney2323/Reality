@@ -2666,9 +2666,20 @@ async function realityChatReadWakeStatus(){
      data.read_only!==true||data.production_changed!==false||
      !Array.isArray(data.wakes)||data.wakes.length>12)
    throw Error('WAKE_READBACK_UNAVAILABLE');
+  const watchdog=data.watchdog||{};
+  const watchdogNote=watchdog.status==='WATCHDOG_RECENTLY_SUCCEEDED'?
+    'One-minute watchdog recently ran.':
+    'One-minute watchdog not recently verified.';
+  const deliveryNote=watchdog.broker_delivery_status==='DISPATCH_CREDENTIAL_MISSING'?
+    'Automatic GitHub delivery BLOCKED: dedicated broker credential not configured.':
+    watchdog.delivery_ready_proven===true?
+      'Trusted edge delivery has a recent successful provider readback.':
+      'Edge-to-GitHub delivery is NOT yet proven healthy.';
+  const health=watchdogNote+' '+deliveryNote;
   const wake=data.wakes[0];
   if(!wake){
-   out.textContent='Automatic wake: no pending signed worker wake. Past job settlement is shown separately.';
+   out.textContent='Automatic wake · '+health+
+    ' No approved work is waiting. An empty queue does not prove execution readiness.';
    return;
   }
   const phrases={
@@ -2688,7 +2699,7 @@ async function realityChatReadWakeStatus(){
   const note=phrases[phase]||'Wake record unavailable';
   out.textContent='Automatic worker · '+note+
    ' · Delivery attempts '+Number(wake.dispatch_attempts||0)+
-   ' · Browser not required.'+
+   ' · '+health+' Browser not required.'+
    (wake.ledger_phase==='SETTLED_ISOLATED'?
     ' Original job marked settled; final receipt is verified separately.':'');
  }catch{
