@@ -17,7 +17,7 @@ const base=(capability_id='reality-general-execution-receipt')=>({
 test('new #188 capability cannot consume the second owner consent until its resume/settle protocol exists',()=>{
  const r=preflight(base());
  assert.equal(r.approval_gate_open,false);
- assert.equal(r.status,'EXACT_INSTALL_TO_SETTLEMENT_PROTOCOL_MISSING');
+ assert.equal(r.status,'SIGNED_SOURCE_AND_COMPLETE_EXECUTION_PRECHECK_NOT_VERIFIED');
  assert.equal(r.two_authorizations_only,true);
  assert.equal(r.original_job_completed,false);
 });
@@ -61,4 +61,26 @@ test('both the authenticated owner approval endpoint and home screen block the d
  assert.match(home,/full_loop_preflight\?\.approval_gate_open!==true/);
  assert.match(read,/full_loop_preflight:assessTwoAuthorizationExecutionPreflight\(entry\)/);
  assert.match(home,/Approval is locked:/);
+});
+
+test('genuine source-signed #188 candidate becomes statically eligible for exactly one final authorization',()=>{
+ const e=base();
+ e.qualification={...e.qualification,
+  original_work_id:e.original_work_id,artifact_sha256:HASH,
+  attestation_source:'SIGNED_GITHUB_WORKFLOW_WITH_INDEPENDENT_SANDBOX',
+  provider_run_id:41562481013,frozen_pass:35,candidate_pass:5,
+  production_changed:false};
+ const r=preflight(e);
+ assert.equal(r.approval_gate_open,true);
+ assert.equal(r.protocol,'TRUSTED_GENERAL_COMPLETION_RECEIPT_V1');
+ assert.equal(r.live_completion_guaranteed,false);
+ assert.equal(r.scope,'EXACT_ISOLATED_INSTALL_ONLY');
+ assert.equal(r.two_authorizations_only,true);
+ for(const wrong of [
+  {...e,qualification:{...e.qualification,provider_run_id:null}},
+  {...e,qualification:{...e.qualification,candidate_pass:0}},
+  {...e,qualification:{...e.qualification,frozen_pass:5}},
+  {...e,qualification:{...e.qualification,attestation_source:'MODEL_CLAIM'}},
+  {...e,qualification:{...e.qualification,original_work_id:'work:'+'c'.repeat(32)}},
+ ])assert.equal(preflight(wrong).approval_gate_open,false);
 });
