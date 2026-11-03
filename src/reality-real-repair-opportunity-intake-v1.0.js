@@ -243,14 +243,95 @@ export async function authorizeExistingRealRepairWork({
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail('TRUSTED_OWNER_DATABASE_REQUIRED');
  const own=await listConversations(session);
- if(!Array.isArray(own)||!own.some(c=>c?.conversation_id===conversationId))
-  fail('EXISTING_OWNER_CONVERSATION_REQUIRED');
+ if(!Array.isArray(own)||own.length>50||
+    own.some(c=>!validUuid(c?.conversation_id)))
+  fail('OWNER_CONVERSATION_COVERAGE_UNVERIFIED');
  const evidence=await discoverIssue({issueNumber,env});
  if(evidence.independently_verified!==true||
   evidence.original_provider_failed_run_id!==expectedFailedRunId||
   evidence.source_sha!==expectedSourceSha)
   fail('ISSUE_CHANGED_SINCE_OWNER_REVIEW');
- const goal=await readGoal({session,conversationId,env});
+ // The homepage may be opened on a new Vercel preview origin. Its browser
+ // conversation ID is not an owner-verified job identity. Reconcile against
+ // saved owner conversations and their verified Continuity histories FIRST.
+ // Never create a second job for an issue already tied to an original.
+ const contexts=[];
+ const store=createPersistence({...db});
+ for(const saved of own){
+  const id=saved.conversation_id;
+  let foundGoal;
+  try{foundGoal=await readGoal({session,conversationId:id,env});}
+  catch{continue;} // Not every saved chat has a confirmed authoritative goal.
+  if(foundGoal?.principal_id!==session.user_id||
+     foundGoal.conversation_id!==id||
+     foundGoal.persisted_source!=='ISOLATED_CONTINUITY_VERIFIED_READBACK'||
+     foundGoal.state?.active_goal?.status!=='ACTIVE'||
+     foundGoal.state.active_goal.user_confirmed!==true||
+     foundGoal.state.active_goal_id!==foundGoal.state.active_goal.goal_id||
+     !validUuid(foundGoal.state.active_goal.last_transition_receipt_id))
+   continue;
+  const candidateSpine=createContinuitySpine({
+   continuityRootId:foundGoal.scope.root,
+   worldlineId:foundGoal.scope.worldline,subjectId:session.user_id,
+  });
+  if(candidateSpine.continuity_root_id!==foundGoal.state.continuity_root_id)
+   fail('OWNER_GOAL_SCOPE_RECONCILIATION_FAILED');
+  // Do not skip a failed integrity read and mistakenly conclude there is no
+  // earlier source-bound original work.
+  const candidateHistory=orderContinuityHistory(await store.reconstruct({
+   continuityRootId:candidateSpine.continuity_root_id,
+   worldlineId:candidateSpine.worldline_id,
+  }));
+  contexts.push({id,goal:foundGoal,spine:candidateSpine,
+   history:candidateHistory});
+ }
+ const previouslyBound=[];
+ for(const ctx of contexts){
+  for(const event of ctx.history){
+   const p=event.payload||{};
+   if(event.entity_type!=='reality_original_source_backed_repair_work'||
+      p.issue_number!==issueNumber||p.owner_id!==session.user_id)
+    continue;
+   if(p.original_source_sha!==evidence.source_sha||
+      p.original_provider_failed_run_id!==evidence.original_provider_failed_run_id)
+    fail('PRIOR_ORIGINAL_SOURCE_IDENTITY_CHANGED');
+   if(!WORK.test(p.original_work_id)||
+      !validUuid(event.event_id)||
+      p.goal_id!==ctx.goal.state.active_goal_id||
+      event.provenance?.conversation_id!==ctx.id)
+    fail('PRIOR_ORIGINAL_OWNER_LINEAGE_UNVERIFIED');
+   previouslyBound.push({ctx,event});
+  }
+ }
+ if(previouslyBound.length){
+  // The newest independently reconstructed original stays the canonical
+  // recovery target. Older duplicates are NEVER replayed or reminted here.
+  previouslyBound.sort((a,b)=>String(b.event.assertion_time||'')
+   .localeCompare(String(a.event.assertion_time||'')));
+  const chosen=previouslyBound[0],p=chosen.event.payload;
+  return Object.freeze({
+   status:'REAL_OWNER_EXISTING_ORIGINAL_WORK_RECOVERED',
+   original_work_id:p.original_work_id,
+   original_conversation_id:chosen.ctx.id,
+   source_receipt_id:chosen.event.event_id,
+   goal_id:p.goal_id,
+   issue_url:evidence.issue_url,
+   original_provider_failed_run_id:evidence.original_provider_failed_run_id,
+   original_source_sha:evidence.source_sha,
+   governed_auto_trigger:null,
+   previous_originals_preserved:previouslyBound.length,
+   investigation_authorized:true,installation_authorized:false,
+   original_job_completed:false,production_changed:false,
+  });
+ }
+ // Only an authenticated, explicitly confirmed and still-active saved goal
+ // may receive NEW investigation work. Prefer the current verified
+ // conversation; otherwise use the latest saved confirmed owner goal.
+ const selected=contexts.find(x=>x.id===conversationId)||contexts[0];
+ if(!selected||own.length===50)
+  fail('EXISTING_OWNER_CONVERSATION_REQUIRED');
+ conversationId=selected.id;
+ const goal=selected.goal;
  if(goal.principal_id!==session.user_id||
   goal.conversation_id!==conversationId||
   goal.persisted_source!=='ISOLATED_CONTINUITY_VERIFIED_READBACK'||
