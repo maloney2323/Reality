@@ -84,3 +84,20 @@ test('genuine source-signed #188 candidate becomes statically eligible for exact
   {...e,qualification:{...e.qualification,original_work_id:'work:'+'c'.repeat(32)}},
  ])assert.equal(preflight(wrong).approval_gate_open,false);
 });
+
+test('signed provider run IDs from the live database may be canonical decimal strings only',()=>{
+ const e=base();
+ e.qualification={...e.qualification,
+  original_work_id:e.original_work_id,
+  attestation_source:'SIGNED_GITHUB_WORKFLOW_WITH_INDEPENDENT_SANDBOX',
+  frozen_pass:35,candidate_pass:5,production_changed:false};
+ for(const provider_run_id of [41562481013,'41562481013',1,'9007199254740991']){
+  e.qualification.provider_run_id=provider_run_id;
+  assert.equal(preflight(e).approval_gate_open,true);
+ }
+ for(const provider_run_id of [0,'0','01','1e4','1.0',' 41562481013',
+  '41562481013 ','9007199254740992','999999999999999999',true,null,'']){
+  e.qualification.provider_run_id=provider_run_id;
+  assert.equal(preflight(e).approval_gate_open,false,String(provider_run_id));
+ }
+});
