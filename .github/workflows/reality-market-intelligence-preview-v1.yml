@@ -24,4 +24,4 @@ jobs:
           node --check src/reality-autonomous-market-intelligence-v1.js
           node --check api/reality/personal-market-research.js
       - name: Verify bounded research and no unauthorized side effects
-        run: node --test test/reality-autonomous-market-intelligence-v1.test.js
+        run: node --test test/reality-autonomous-market-intelligence-v1.test.js test/reality-market-research-restoration-v1.test.js

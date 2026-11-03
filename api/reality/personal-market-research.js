@@ -21,6 +21,31 @@ export const maxDuration=120;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  try{
+  if(req.method==='GET'){
+   if(process.env.VERCEL_ENV!=='preview')
+    return res.status(403).json({ok:false,error:'RESEARCH_PREVIEW_ONLY'});
+   privateChatConfig();
+   const session=await authenticatedChatSession(req,res);
+   if(!session)return res.status(401).json({ok:false,error:'CHAT_SIGN_IN_REQUIRED'});
+   const db=resolveReliabilityBenchmarkDb();
+   if(!db?.strictSecrets||!db.secretKey||
+      db.url!==session.config.url||
+      db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+    throw Error('RESEARCH_ISOLATED_OWNER_DATABASE_UNVERIFIED');
+   const response=await fetch(db.url+'/rest/v1/rpc/reality_read_latest_owner_market_research_v1',{
+    method:'POST',cache:'no-store',redirect:'error',
+    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+      Accept:'application/json','content-type':'application/json'},
+    body:JSON.stringify({p_owner_id:session.user_id})});
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true||data.verified_readback!==true||
+      data.review_only!==true||data.installation_authorized!==false||
+      data.job_started!==false||data.production_changed!==false||
+      !['GOVERNED_MARKET_RESEARCH_RECORDED','NO_RESEARCH_RECEIPT'].includes(data.status)||
+      !Array.isArray(data.findings)||data.findings.length>4)
+    throw Error('RESEARCH_OWNER_READBACK_UNVERIFIED');
+   return res.status(200).json(data);
+  }
   if(req.method!=='POST')
    return res.status(405).setHeader('Allow','POST').json({
     ok:false,error:'RESEARCH_EXPLICIT_POST_REQUIRED'});

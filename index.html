@@ -1337,6 +1337,7 @@ const workCategories=[
 ];
 let wcWork=[],wcCurrent='all',wcMode='tasks',wcPicked=new Set(),wcStatuses=new Map(),wcEpoch=0;
 let wcUpgradeReviews=[]; // Owner-authenticated unfinished jobs, not discovered new defects.
+let wcMarketReviewFindings=[]; // Research hypotheses are NOT eligible task admissions.
 let wcSort='triage';
 let wcJobStarting=false;
 const wcJobAttemptLocked=new Set();
@@ -3998,7 +3999,8 @@ function wcRender(){
   return '<button class="wc-category" type="button" data-wc-cat="'+id+
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
     '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
-     n+' found · '+wcUpgradeReviews.length+' review':String(n))+
+     n+' found · '+wcUpgradeReviews.length+' review':
+     id==='research'?n+' tasks · '+wcMarketReviewFindings.length+' hypotheses':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
      id==='upgrades'?'Observed weaknesses · capability gains · verified value':desc)+'</small></button>';
  }).join('');
@@ -4022,8 +4024,12 @@ function wcRender(){
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
  $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
   shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
+  wcCurrent==='research'?shown.length+' runnable findings · '+wcMarketReviewFindings.length+' research hypotheses':
   shown.length+' found';
- $('wcTaskList').innerHTML=(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
+ const marketBrief=wcCurrent==='research'&&wcMarketReviewFindings.length?
+  '<section class="wc-market-research-brief"><strong>Saved strategic research · Not approved work</strong><p>Research hypotheses need independent verification before becoming executable customer jobs. Complete source evidence is in Capabilities to review above.</p>'+
+  wcMarketReviewFindings.slice(0,4).map(f=>'<div class="wc-task"><strong>'+esc(f.title||'Strategic opportunity')+'</strong><p>Hypothesis · Not a verified new gap · No work authorized</p><p>Verification needed: '+esc(f.falsification_test||'Independently reproduce the claimed gap')+'</p></div>').join('')+'</section>':'';
+ $('wcTaskList').innerHTML=marketBrief+(wcCurrent==='upgrades'?wcUpgradeReviewHTML():'')+
   (shown.length?shown.map((w,i)=>{
   const time=wcTime(w),status=wcStatuses.get(wcKey(w));
   const assessment=w.value_assessment||{};
@@ -4075,10 +4081,10 @@ function wcRender(){
       (wcJobProgress.verifiedIssueUrl?
        '<a target="_blank" rel="noopener noreferrer" href="'+esc(wcJobProgress.verifiedIssueUrl)+'">View verified GitHub issue</a>':''):
       '')+'</div>':'')+'</div>';
- }).join(''):'<div class="attention-empty">'+
+ }).join(''):(wcCurrent==='research'&&wcMarketReviewFindings.length?'':'<div class="attention-empty">'+
   esc(unconnected?'This business data source is not connected. Zero is NOT a no-opportunity conclusion.':
   wcCatalogStatus==='PARTIAL'?'Discovery was partial; no findings in this category from successfully checked sources.':
-  'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>');
+  'No findings from checked sources in this category. Other business sources may be unconnected.')+'</div>'));
  $('wcTaskList').querySelectorAll('[data-wc-task]').forEach(c=>c.onchange=()=>{
   const w=shown[Number(c.dataset.wcTask)];
   if(!w)return;
@@ -4319,7 +4325,7 @@ async function wcRefreshCapabilities(){
 $('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities();void wcInvestigateMarket()};
 
 let wcMarketResearchSerial=0;
-async function wcInvestigateMarket(){
+async function wcInvestigateMarket({restore=false}={}){
  const button=$('wcResearchMarket'),status=$('wcMarketResearchStatus');
  const list=$('wcMarketResearchFindings');
  if(button.disabled)return;
@@ -4329,15 +4335,24 @@ async function wcInvestigateMarket(){
  }
  const serial=++wcMarketResearchSerial;
  button.disabled=true;
- status.textContent='Researching recent competitor and API documentation, comparing pinned Reality source, and verifying the receipt…';
- list.replaceChildren();
+ status.textContent=restore?'Restoring saved source-backed market investigation…':
+  'Researching recent competitor and API documentation, comparing pinned Reality source, and verifying the receipt…';
+ if(!restore)list.replaceChildren();
  try{
-  const response=await fetch('/api/reality/personal-market-research',{
-   method:'POST',credentials:'same-origin',cache:'no-store',
+  const response=await fetch('/api/reality/personal-market-research',restore?
+   {method:'GET',credentials:'same-origin',cache:'no-store'}:
+   {method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'content-type':'application/json'},
    body:JSON.stringify({intent:'RUN_GOVERNED_STRATEGIC_RESEARCH'})});
   const data=await response.json();
   if(serial!==wcMarketResearchSerial)return;
+  if(restore&&response.ok&&data.ok===true&&
+   data.status==='NO_RESEARCH_RECEIPT'&&data.verified_readback===true){
+   wcMarketReviewFindings=[];
+   wcRender();
+   status.textContent='No saved market investigation yet. Run capability refresh to research external opportunities.';
+   return;
+  }
   if(!response.ok||data?.ok!==true||
    data.status!=='GOVERNED_MARKET_RESEARCH_RECORDED'||
    data.verified_readback!==true||data.review_only!==true||
@@ -4352,7 +4367,8 @@ async function wcInvestigateMarket(){
    card.className='wc-capability-card';
    const level=document.createElement('span');
    level.className='wc-capability-level';
-   level.textContent=finding.novelty==='RESEARCH_PREVIOUSLY_OBSERVED'?
+   level.textContent=restore?'SAVED RESEARCH HYPOTHESIS · NOT VERIFIED':
+    finding.novelty==='RESEARCH_PREVIOUSLY_OBSERVED'?
     'RESEARCHED · PREVIOUSLY OBSERVED · NOT VERIFIED':
     'NEW RESEARCH HYPOTHESIS · NOT VERIFIED';
    const title=document.createElement('h4');
@@ -4378,13 +4394,16 @@ async function wcInvestigateMarket(){
    cards.push(card);
   }
   list.replaceChildren(...cards);
-  status.textContent='Governed research recorded · '+data.researched_source_count+
+  wcMarketReviewFindings=data.findings.filter(f=>f?.status==='RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST');
+  wcRender();
+  status.textContent=(restore?'Saved research restored · ':'Governed research recorded · ')+data.researched_source_count+
    ' web source(s), '+cards.length+' review hypothesis(es). '+
    'Pinned Reality commit '+data.pinned_commit_sha.slice(0,12)+
    ' · Receipt '+data.receipt_id+
    ' · Independent DB readback confirmed. These are NOT verified gaps or approved upgrades.';
  }catch{
-  status.textContent='Market research NOT verified. No upgrade, job or installation initiated. Review the research configuration and provider evidence.';
+  status.textContent=restore?'Saved research readback unavailable. Earlier research remains recorded; no actions started.':
+   'Market research NOT verified. No upgrade, job or installation initiated. Review the research configuration and provider evidence.';
  }finally{button.disabled=false}
 }
 $('wcResearchMarket').onclick=()=>{void wcInvestigateMarket()};
@@ -4836,6 +4855,7 @@ setInterval(refreshSavedShiftHome,300000);
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
   if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
+  if(yes){void wcInvestigateMarket({restore:true});}
   else{void realityBusinessRefresh();void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
