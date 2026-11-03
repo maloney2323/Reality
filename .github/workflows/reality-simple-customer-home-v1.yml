@@ -1,0 +1,26 @@
+name: Reality simple customer home — preview checks
+on:
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+  push:
+    branches:
+      - feature/reality-customer-first-simple-home-20261103
+permissions:
+  contents: read
+jobs:
+  customer-first-home:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify simple home and research noninterference
+        run: |
+          node --test test/reality-simple-customer-home-v1.test.js
+          node --test test/reality-market-research-restoration-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js
