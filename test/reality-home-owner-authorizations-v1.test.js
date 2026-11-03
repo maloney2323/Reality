@@ -136,8 +136,9 @@ test('chat live work progress relies on authenticated read-only worker evidence'
  const method=inlineScript.slice(from,to);
  assert.match(method,/personal-genuine-loop-status/);
  assert.match(method,/data.status!=='OWNER_GOVERNED_LOOP_READBACK'/);
- assert.match(method,/j.independently_settled===true&&j.universe_settlement_verified===true/);
- assert.match(method,/Final Universe proof still required/);
+ assert.match(method,/j.universe_settlement_verified===true&&/);
+ assert.match(method,/j.full_loop_independently_verified===true/);
+ assert.match(method,/Final independent completion check pending/);
  assert.match(method,/Live worker readback unavailable/);
  assert.doesNotMatch(method,/method:'POST'/);
 });
@@ -184,7 +185,8 @@ test('work counters use owner-authenticated read-only evidence and refuse false 
  assert.ok(start>0&&end>start);
  assert.match(method,/personal-genuine-loop-status/);
  assert.match(method,/data.status!=='OWNER_GOVERNED_LOOP_READBACK'/);
- assert.match(method,/j.independently_settled===true&&j.universe_settlement_verified===true/);
+ assert.match(method,/j.universe_settlement_verified===true&&/);
+ assert.match(method,/j.full_loop_independently_verified===true/);
  assert.match(method,/data.production_changed!==false/);
  assert.match(method,/businessOperationsStatus/);
  assert.doesNotMatch(method,/method:'POST'/);
@@ -225,5 +227,6 @@ test('chat displays every verifiable stage and refuses unproven final outcome or
  assert.match(source,/j\.independently_settled===true/);
  assert.match(source,/j\.universe_settlement_verified===true/);
  assert.match(source,/Financial value: not yet measured/);
- assert.match(source,/No verified financial value can be claimed/);
+ assert.match(source,/No verified full-loop completion is being claimed/);
+ assert.match(source,/full_loop_independently_verified===true/);
 });
