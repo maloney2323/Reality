@@ -42,6 +42,36 @@ begin
  if current_user<>'service_role' then
    raise exception 'VERIFIED_RECEIPT_TRUSTED_RELEASE_ONLY';
  end if;
+ if not (p_report ?& array[
+  'schema','status','signed_run_id','repository_sha','source_issue',
+  'source_sha256','frozen_test_sha256','holdout_test_sha256',
+  'output_sha256','model_response_id','tested','passed','failed',
+  'exit_code','installation_authorized','installation_performed',
+  'original_customer_job_settled','production_changed',
+  'verified_customer_dollars_saved','independent_secret_free_runner',
+  'offline_docker_network_none'
+ ] and p_proof ?& array[
+  'schema','provider_job_conclusion','provider_run_conclusion',
+  'provider_run_status','provider_repository','provider_branch',
+  'independent_job_id','verifier_archive_sha256',
+  'proposal_archive_sha256','verifier_report_sha256',
+  'provider_repository_sha','provider_run_id','source_sha256'
+ ]) then
+  raise exception 'VERIFIED_RECEIPT_REQUIRED_PROOF_FIELDS_MISSING';
+ end if;
+ if pg_catalog.jsonb_typeof(p_report->'tested')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'passed')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'failed')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'exit_code')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'signed_run_id')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'source_issue')<>'number' or
+    pg_catalog.jsonb_typeof(p_proof->'provider_run_id')<>'number' or
+    pg_catalog.jsonb_typeof(p_proof->'independent_job_id')<>'number' or
+    pg_catalog.jsonb_typeof(p_report->'installation_authorized')<>'boolean' or
+    pg_catalog.jsonb_typeof(p_report->'installation_performed')<>'boolean' or
+    pg_catalog.jsonb_typeof(p_report->'original_customer_job_settled')<>'boolean' or
+    pg_catalog.jsonb_typeof(p_report->'production_changed')<>'boolean'
+ then raise exception 'VERIFIED_RECEIPT_PROOF_TYPES_INVALID'; end if;
  if p_report is null or p_proof is null or
     p_report->>'schema'<>'reality-independent-uninstalled-source-value-v1' or
     p_report->>'status'<>'INDEPENDENT_SOURCE_CANDIDATE_PASSED' or
