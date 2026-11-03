@@ -37,10 +37,11 @@ async function githubGet(path,{fetchImpl=fetch}={}){
 }
 export async function readPinnedRealityMarketSnapshot({fetchImpl=fetch,ref=PREVIEW_BRANCH}={}){
  if(ref!==PREVIEW_BRANCH)fail('UNAPPROVED_REPOSITORY_REF');
- const commit=await githubGet('commits/'+encodeURIComponent(ref),{fetchImpl});
- if(!SHA.test(commit?.sha)||commit?.commit?.tree?.sha==null)
+ const branchRef=await githubGet('git/ref/heads/'+ref,{fetchImpl});
+ if(branchRef?.ref!=='refs/heads/'+ref||
+    branchRef?.object?.type!=='commit'||!SHA.test(branchRef?.object?.sha))
   fail('GITHUB_COMMIT_UNVERIFIED');
- const sha=commit.sha,files=[];
+ const sha=branchRef.object.sha,files=[];
  for(const path of SOURCE_PATHS){
   const file=await githubGet('contents/'+path+'?ref='+sha,{fetchImpl});
   if(file?.path!==path||!SHA.test(file.sha)||file.encoding!=='base64'||
