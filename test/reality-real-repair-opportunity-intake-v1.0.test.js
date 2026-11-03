@@ -205,7 +205,7 @@ test('owner-confirmed real source automatically queues one governed trigger unde
  assert.equal(first.governed_auto_trigger.original_work_id,first.original_work_id);
  assert.equal(first.installation_authorized,false);
  assert.equal(first.original_job_completed,false);
- assert.equal(calls,2,'idempotent DB upsert, never a new job');
+ assert.equal(calls,1,'recovered original does not re-register or dispatch a duplicate trigger');
  assert.equal(h.calls.append,1,'original customer work persisted only once');
 });
 test('failed trigger enqueue never invents a successful upgrade, settlement, or second job',async()=>{
