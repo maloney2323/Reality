@@ -92,7 +92,43 @@ async function observe(){
    return {kind:'ACTIVE',workId:startedWork};
   }
   if(startedWork){
-   setStatus('Original job '+startedWork+' requires independent reconciliation. No duplicate job or installation will be started.');
+   // The genuine installation ledger contains only jobs admitted to its
+   // separate upgrade pipeline. Missing there is NOT proof the original
+   // source-backed discovery job disappeared. Reverify its own queue.
+   try{
+    const continuity=await read('/api/reality/personal-original-continuity-status');
+    if(continuity.status!=='OWNER_ORIGINAL_CONTINUITY_VERIFIED_READ_ONLY'||
+       continuity.installation_authorized!==false||
+       continuity.original_job_completed!==false||
+       !Array.isArray(continuity.jobs)||continuity.jobs.length>12)
+     throw Error('ORIGINAL_CONTINUITY_OWNER_RECEIPT_INVALID');
+    const exact=continuity.jobs.find(j=>j.original_work_id===startedWork);
+    if(exact){
+     const progress={
+      SAFE_FIRST_DISPATCH:'Original queue verified. First worker dispatch is still required.',
+      VERIFIED_OWNER_ORIGINAL_AWAITING_FIRST_QUEUE:'Original job verified. Worker queue has not been admitted.',
+      WORKER_RUNNING_MONITOR_SAME_JOB:'Exact worker run observed. Monitoring the same original job.',
+      DISCOVERY_EXECUTED_NOT_FINAL_SETTLEMENT:'Discovery worker completed. Capability construction, installation and settlement are not yet proven.',
+      WORKER_FAILED_RECOVERY_REVIEW_REQUIRED:'Worker failed. Preserve the original job; recovery requires independent evidence.',
+      DISPATCH_DELIVERY_UNCONFIRMED_NO_REPLAY:'Worker delivery not independently observed. No duplicate dispatch.',
+      WORKER_READBACK_UNAVAILABLE_NO_REPLAY:'Worker readback unavailable. No execution or settlement inferred.',
+      DISPATCH_RECEIPT_RECONCILIATION_REQUIRED:'Dispatch receipt incomplete. No unverified replay.',
+      PREVIOUS_EXECUTION_RECONCILIATION_REQUIRED:'Previously claimed work must be verified before continuation.',
+      EXISTING_JOB_BLOCKED_NO_REPLAY:'Existing job is blocked. No duplicate execution.',
+      SETTLEMENT_REQUIRES_INDEPENDENT_FINAL_RECEIPT:'Settlement requires a matching independent final receipt.'
+     };
+     setStatus('Original job '+startedWork+' · '+
+      (progress[exact.decision]||'Continuity decision: '+String(exact.decision).slice(0,80))+
+      ' Any installation approval stays in Reality Chat.');
+     return {kind:'OWNER_ORIGINAL_OBSERVED',workId:startedWork};
+    }
+   }catch{
+    setStatus('Original job '+startedWork+
+     ' · independent continuity readback is unavailable. No duplicate job will be started.');
+    return {kind:'UNAVAILABLE'};
+   }
+   setStatus('Original job '+startedWork+
+    ' has no matching current continuity entry. Do not replay or claim settlement.');
    return {kind:'NEEDS_RECONCILIATION'};
   }
   return {kind:'NO_ACTIVE'};
@@ -156,8 +192,12 @@ async function start(){
     throw Error('ORIGINAL_JOB_RECEIPT_NOT_VERIFIED_DO_NOT_RETRY');
    startedWork=joined.original_work_id;
    setStatus(joined.worker_dispatch_started===true?
-    'Real original job accepted and worker dispatched. Reality now tests, builds and verifies; the exact install approval will appear in Chat when ready.':
-    'Original job saved, but worker dispatch needs recovery. Reality must continue this same job; do not start a duplicate.');
+    'Exact original job dispatched. Verifying worker continuation and independent receipts.':
+    joined.continuity_decision?
+     'Existing original job retained · '+String(joined.continuity_decision).replaceAll('_',' ').toLowerCase()+'. No duplicate worker execution.':
+    joined.worker_dispatch_error?
+     'Original job saved. Worker blocked: '+String(joined.worker_dispatch_error).slice(0,100)+'.':
+     'Original job saved; independent worker acknowledgment is still pending.');
    if(typeof window.homeOwnerRefresh==='function')void window.homeOwnerRefresh();
    return;
   }
