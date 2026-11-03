@@ -4134,10 +4134,10 @@ function wcRender(){
   return '<button class="wc-category" type="button" data-wc-cat="'+id+
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
     '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?
-     n+' found · '+wcUpgradeReviews.length+' review':
+     wcMarketReviewFindings.length+' inspected ideas · '+wcUpgradeReviews.length+' earlier reviews':
      id==='research'?wcMarketReviewFindings.filter(f=>f.prehome_assessment?.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST').length+' assessed · '+wcMarketReviewFindings.length+' findings':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
-     id==='upgrades'?'Observed weaknesses · capability gains · verified value':desc)+'</small></button>';
+     id==='upgrades'?'Proposed improvements · value and risks inspected · approval separate':desc)+'</small></button>';
  }).join('');
  $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
   wcCurrent=b.dataset.wcCat;wcRender()
@@ -4161,7 +4161,7 @@ function wcRender(){
   shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review':
   wcCurrent==='research'?wcMarketReviewFindings.length+' source-backed assessments · Not executable':
   shown.length+' found';
- const marketBrief=wcCurrent==='research'&&wcMarketReviewFindings.length?
+ const marketBrief=(wcCurrent==='research'||wcCurrent==='upgrades')&&wcMarketReviewFindings.length?
   '<section class="wc-market-research-brief"><strong>Automatically inspected upgrade opportunities · Not installed</strong>'+
   '<p>Every finding receives a value and risk assessment in the background. Business ROI and missing capabilities are not verified.</p>'+
   wcMarketReviewFindings.slice(0,4).map(f=>{
