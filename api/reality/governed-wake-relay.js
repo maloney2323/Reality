@@ -59,6 +59,17 @@ export default async function handler(req,res){
  if(req.method!=='POST')return res.status(405).json({ok:false,error:'POST_ONLY'});
  try{
   exact(req.body);
+  // Prevent unauthenticated probes from spending the server's GitHub API
+  // quota: before touching the production-held token, verify that this is
+  // an unexpired, unconsumed nonce issued by the signed HMAC broker.
+  // Verification is read-only; the nonce is consumed later on claim.
+  const preflight=await edge({action:'verify',relay_nonce:req.body.relay_nonce});
+  if(preflight.status!=='RELAY_NONCE_VERIFIED_NOT_CONSUMED'||
+     preflight.execution_authorized!==false||
+     preflight.owner_approval_created!==false||
+     preflight.worker_started!==false||
+     preflight.production_changed!==false)
+    fail('SIGNED_DELIVERY_NONCE_PREFLIGHT_REQUIRED');
   const token=tok(); // Credential never leaves this server process.
   // A read-only GitHub authentication check MUST succeed before leasing the
   // durable outbox. An expired, revoked, or repository-inaccessible token
