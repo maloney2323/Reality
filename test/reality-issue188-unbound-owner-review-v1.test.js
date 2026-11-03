@@ -9,7 +9,7 @@ test('new independently verified but unbound review is visibly separate from own
  assert.match(page,/homeOwnerShowUnboundFollowonReview/);
  assert.match(page,/HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND/);
  assert.match(page,/new_owner_work_binding_required/);
- assert.match(page,/Approval is intentionally unavailable until Reality records a fresh owner-confirmed goal/);
+ assert.match(page,/No receipt button is required/);
 });
 test('candidate review is GET-only, signed-in, preview-scoped and read-only',()=>{
  assert.match(route,/req\.method!=='GET'/);
