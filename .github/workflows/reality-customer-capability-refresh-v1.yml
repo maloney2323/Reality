@@ -1,0 +1,26 @@
+name: Reality customer capability refresh — read-only proof
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'test/reality-customer-capability-refresh-v1.test.js'
+      - '.github/workflows/reality-customer-capability-refresh-v1.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'test/reality-customer-capability-refresh-v1.test.js'
+      - '.github/workflows/reality-customer-capability-refresh-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capability-shelf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify refresh displays evidence without authorizing execution
+        run: node --test test/reality-customer-capability-refresh-v1.test.js
