@@ -7,6 +7,8 @@ import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {wakeApprovedIsolatedInstall}
  from '../../src/reality-genuine-approved-install-wake-v1.js';
+import {assessTwoAuthorizationExecutionPreflight}
+ from '../../src/reality-two-authorization-execution-preflight-v1.js';
 export const maxDuration=45;
 const WORK=/^work:[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
@@ -37,6 +39,29 @@ export default async function handler(req,res){
    db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
    !db.secretKey)
    throw Error('OWNER_BOUND_PREVIEW_SERVICE_DATABASE_UNAVAILABLE');
+  // No installation consent may be consumed while the exact original
+  // candidate lacks a supported path through post-install resumption.
+  const qualification=await fetch(db.url+
+   '/rest/v1/rpc/reality_read_owner_qualified_capabilities_v1',{
+   method:'POST',redirect:'error',cache:'no-store',
+   headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    'content-type':'application/json','accept':'application/json'},
+   body:JSON.stringify({p_owner_id:session.user_id})});
+  if(!qualification.ok)throw Error('OWNER_SCOPE_PREFLIGHT_UNAVAILABLE');
+  const ownerEntries=await qualification.json();
+  if(!Array.isArray(ownerEntries)||ownerEntries.length>20)
+   throw Error('OWNER_SCOPE_PREFLIGHT_NOT_TRUSTED');
+  const matching=ownerEntries.filter(e=>e.original_work_id===body.original_work_id&&
+   e.qualification?.artifact_sha256===body.artifact_sha256);
+  if(matching.length!==1)return res.status(409).json({
+   ok:false,error:'EXACT_OWNER_QUALIFIED_ARTIFACT_NOT_AVAILABLE',
+   installation_completed:false,original_job_completed:false});
+  const preflight=assessTwoAuthorizationExecutionPreflight(matching[0]);
+  if(preflight.approval_gate_open!==true)return res.status(409).json({
+   ok:false,error:'EXACT_FULL_LOOP_EXECUTION_PATH_NOT_READY',
+   preflight_status:preflight.status,
+   approval_not_recorded:true,installation_completed:false,
+   original_job_completed:false,production_changed:false});
   const response=await fetch(db.url+
    '/rest/v1/rpc/reality_owner_approve_qualified_preview_v1',{
    method:'POST',redirect:'error',cache:'no-store',
