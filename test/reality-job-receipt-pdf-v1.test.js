@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
+import {dirname} from 'node:path';
 import {Script} from 'node:vm';
 import {renderRealityReceiptPdf} from '../src/reality-job-receipt-pdf-v1.js';
 const id='candidate-receipt:'+'a'.repeat(32);
@@ -45,6 +46,10 @@ test('verified released owner receipt renders a genuine PDF with incomplete step
  assert.match(b.toString('latin1'),/Cash savings \/ ROI: UNKNOWN/);
  assert.match(b.toString('latin1'),/No receipt, approval, or external action is created by downloading this PDF/);
  assert.ok(b.length<30000);
+ if(process.env.REALITY_PDF_SMOKE_OUT){
+  mkdirSync(dirname(process.env.REALITY_PDF_SMOKE_OUT),{recursive:true});
+  writeFileSync(process.env.REALITY_PDF_SMOKE_OUT,b);
+ }
 });
 test('unverified, forged or already-installed statuses cannot generate official evidence PDF',()=>{
  for(const changed of [
