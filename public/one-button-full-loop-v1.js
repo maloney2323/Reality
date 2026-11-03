@@ -187,7 +187,7 @@ async function start(){
    '. Reality cannot claim installation or settlement; reconcile this job before trying again.');
  }finally{requesting=false;button.disabled=false;}
 }
-button.addEventListener('click',()=>void start());
+button.addEventListener('click',start);
 // Poll read-only state; real autonomous execution occurs in the existing
 // durable worker, not in a browser timer.
 setInterval(()=>{if(signedIn()&&startedWork)void observe()},12000);
