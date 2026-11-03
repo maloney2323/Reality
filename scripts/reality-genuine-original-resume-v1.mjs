@@ -98,7 +98,28 @@ if(exec.status!==0||last('tests')<7||last('fail')!==0||
 // secret-free container. Neither an imported module nor a model can authorize
 // installation, a Universe write, or customer settlement.
 const evaluationInput=contract.requires_reconciliation_evidence?
- ready.reconciliation_evidence:{
+ ready.reconciliation_evidence:
+ contract.requires_pre_settlement_denial?{
+ // The actual owner-bound work has NOT resumed or settled yet.
+ // We must demonstrate that the installed verifier refuses to call it complete.
+ owner_id:ready.owner_id,goal_id:ready.goal_id,
+ original_work_id:ready.original_work_id,artifact_hash:ready.artifact_sha256,
+ signed_owner_approval:{
+  verified:true,consumed_once:true,
+  owner_id:ready.owner_id,original_work_id:ready.original_work_id,
+  artifact_hash:ready.artifact_sha256,
+  origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',
+  reservation_ref:'supabase:owner:single-use:'+ready.approval_id,
+ },
+ sandbox:{independently_verified:true,artifact_hash:ready.artifact_sha256,
+  frozen_regression_passed:true,governance_preserved:true},
+ installation:{independent_provider_readback:true,
+  original_work_id:ready.original_work_id,artifact_hash:ready.artifact_sha256,
+  installed_commit_sha:ready.installed_commit_sha,production_changed:false,
+  installed_branch:ready.install_branch},
+ // Never synthesize a successful execution or settlement from unperformed work.
+ resumption:null,settlement:null
+ }:{
  owner_id:'owner:'+ready.owner_id,goal_id:ready.goal_id,
  original_work_id:ready.original_work_id,repository:repo,
  source:'GITHUB_ACTIONS_INDEPENDENT_PROVIDER_READBACK',
@@ -155,15 +176,22 @@ const evaluation=spawnSync('docker',[
 const lines=String(evaluation.stdout||'').split('\\n').filter(x=>x.startsWith('REALITY_RESULT='));
 if(evaluation.status!==0||lines.length!==1)fail('ISOLATED_EXTENSION_EVALUATION_FAILED');
 const disposition=JSON.parse(lines[0].slice('REALITY_RESULT='.length));
-const actualDecision=contract.requires_reconciliation_evidence?
- disposition?.status:disposition?.decision;
+const preSettlementDenial=contract.requires_pre_settlement_denial===true&&
+ disposition?.verified===false&&
+ disposition?.status!=='VERIFIED_SETTLED'&&
+ disposition?.production_changed!==true;
+const actualDecision=contract.requires_pre_settlement_denial?
+  (preSettlementDenial?'PRE_SETTLEMENT_DENIED':'INVALID_PRE_SETTLEMENT_CLAIM'):
+ contract.requires_reconciliation_evidence?
+  disposition?.status:disposition?.decision;
 if(actualDecision!==contract.required_decision||
- (contract.requires_reconciliation_evidence?
+ (!contract.requires_pre_settlement_denial&&
+  (contract.requires_reconciliation_evidence?
    disposition?.original_work_id!==contract.reconciliation_target_work_id:
    (disposition?.original_work_id!==ready.original_work_id||
-    disposition?.can_generate_candidate!==true))||
- disposition?.installation_authorized!==false||
- disposition?.production_changed!==false)
+    disposition?.can_generate_candidate!==true)))||
+ (!contract.requires_pre_settlement_denial&&disposition?.installation_authorized!==false)||
+ disposition?.production_changed===true)
  fail('PROVIDER_BACKED_EXTENSION_RESULT_UNVERIFIED');
 if(contract.requires_reconciliation_evidence&&(
  disposition?.reconciliation?.status!=='PROPOSED_NOT_APPENDED'||
@@ -194,7 +222,9 @@ const proof={
  frozen_suite_output_sha256:sha(log),
  isolated_execution:true,production_changed:false,
  provider_outcome_digest:sha(log+'|'+ready.installed_commit_sha+'|'+oldJob.id+'|'+actualDecision),
- full_probation_complete:false,original_job_completed:!contract.requires_reconciliation_evidence
+ pre_settlement_denial_verified:preSettlementDenial,
+ full_probation_complete:false,original_job_completed:!contract.requires_reconciliation_evidence&&
+  !contract.requires_pre_settlement_denial
 };
 mkdirSync('artifact/out',{recursive:true});
 writeFileSync('artifact/out/reality-original-resumption.json',JSON.stringify(proof,null,2)+'\n');
