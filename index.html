@@ -423,6 +423,7 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <div class="label">REALITY · WORK UPDATES</div>
     <h4>What Reality is doing</h4>
     <p class="muted">Verified work events and progress, not hidden model reasoning or simulated activity.</p>
+    <p id="realityChatWakeStatus" class="muted" role="status" aria-live="polite">Checking the automatic worker wake and retry ledger…</p>
     <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
   </section>
   <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
@@ -2644,7 +2645,56 @@ async function realityChatApproveOnce(workId,expectedHash){
   void realityChatRefreshEvents();
  }
 }
+// Owner-scoped auto-trigger evidence. Never use model narrative to claim a
+// worker started; the only source is authenticated durable wake receipts.
+async function realityChatReadWakeStatus(){
+ const out=$('realityChatWakeStatus');
+ if(!out)return;
+ if(!homeOwnerSignedIn()){
+  out.textContent='Sign in to inspect automatic worker wake and recovery.';
+  return;
+ }
+ out.textContent='Checking automatic wake, worker acknowledgment and retry receipts…';
+ try{
+  const response=await fetch('/api/reality/personal-governed-wake-status',{
+   credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+     data.status!=='OWNER_GOVERNED_WAKE_READBACK'||
+     data.read_only!==true||data.production_changed!==false||
+     !Array.isArray(data.wakes)||data.wakes.length>12)
+   throw Error('WAKE_READBACK_UNAVAILABLE');
+  const wake=data.wakes[0];
+  if(!wake){
+   out.textContent='Automatic wake: no pending signed worker wake. Past job settlement is shown separately.';
+   return;
+  }
+  const phrases={
+   WAKE_PENDING:'Approved wake saved · Awaiting automatic edge dispatch',
+   RETRY_PENDING:'Automatic retry pending · Existing owner approval retained',
+   DISPATCH_CLAIMED:'Dispatcher claimed wake · Provider acceptance not yet proven',
+   DISPATCH_ACCEPTED:'Wake delivered · Waiting for signed runner proof-of-life',
+   WORKER_ALIVE:'Worker alive · GitHub OIDC proof recorded · Governance recheck pending',
+   GOVERNANCE_READY:'Worker verified fresh conditions · Existing single-use install gate next',
+   EXECUTING:'Isolated execution admitted · Waiting for independent settlement',
+   STALE_APPROVAL_BLOCKED:'Paused · Material conditions changed; no execution permitted',
+   ESCALATED:'Worker wake escalated · Automatic recovery has not succeeded',
+   SETTLED:'Original job settlement recorded · Final independent receipt still checked separately',
+   RECEIPT_VERIFIED:'Verified wake lifecycle receipt recorded'
+  };
+  const phase=String(wake.wake_state||'UNKNOWN');
+  const note=phrases[phase]||'Wake record unavailable';
+  out.textContent='Automatic worker · '+note+
+   ' · Delivery attempts '+Number(wake.dispatch_attempts||0)+
+   ' · Browser not required.'+
+   (wake.ledger_phase==='SETTLED_ISOLATED'?
+    ' Original job marked settled; final receipt is verified separately.':'');
+ }catch{
+  out.textContent='Automatic worker status unavailable. No execution or receipt is inferred.';
+ }
+}
 async function realityChatRefreshEvents(){
+ void realityChatReadWakeStatus();
  const container=$('realityChatActivityEntries');
  if(!container)return;
  if(!homeOwnerSignedIn()){
