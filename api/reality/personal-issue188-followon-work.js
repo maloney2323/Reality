@@ -12,7 +12,7 @@ import {createGenuineSourceBackedJobAdapters}
 import {createGenuineOriginalWorkRunner}
  from '../../src/reality-genuine-capability-execution-runtime-v1.js';
 export const maxDuration=120;
-const SHA='45d26806d0e192d6fdecd177464d13af2ab3b98a70070b8fd268a2f05bedee64';
+const SHA='d084f46d840027acd412b67fceb1636fd35a64f2cc08b9ebb6666d470d1af43d';
 const safe=/^FOLLOWON_188_[A-Z0-9_]{5,130}$/;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
