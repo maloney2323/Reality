@@ -57,8 +57,8 @@ function setup(extra={}){
     status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
    if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
-  if(name==='reality_read_governed_build_v1')return {};
-   if(name==='reality_enqueue_governed_build_v1')return {
+  if(name==='reality_read_exact_original_queue_v1')return {};
+   if(name==='reality_enqueue_exact_original_queue_v1')return {
     queue_id:'d8019af0-c741-4d43-8fa8-f871d4d2cc04',
     original_work_id:workId,goal_id:goalId,phase:'QUEUED_DISCOVERY',
     installation_authorized:false,job_completed:false,
@@ -86,7 +86,7 @@ test('the exact owner source, not a historical discovery, drives queue and worke
  assert.equal(r.original_job_completed,false);
  assert.equal(x.calls.length,5);
  assert.equal(x.calls[0].name,'reality_read_owner_existing_original_issue_v1');
- assert.equal(x.calls[1].name,'reality_read_governed_build_v1');
+ assert.equal(x.calls[1].name,'reality_read_exact_original_queue_v1');
  assert.equal(x.calls[2].payload.p_original_work_id,workId);
  assert.equal(x.calls[2].payload.p_conversation_id,conversation);
  assert.equal(x.calls[2].payload.p_goal_transition_event_id,transition);
@@ -137,8 +137,8 @@ test('a previous claim or escalation is preserved without second worker dispatch
  const x=setup({call:async(_db,name)=>{
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
-  if(name==='reality_read_governed_build_v1')return {};
-  assert.equal(name,'reality_enqueue_governed_build_v1');
+  if(name==='reality_read_exact_original_queue_v1')return {};
+  assert.equal(name,'reality_enqueue_exact_original_queue_v1');
   return {queue_id:randomUUID(),original_work_id:workId,goal_id:goalId,
    phase:'ESCALATED',installation_authorized:false,job_completed:false};
  }});
@@ -160,8 +160,8 @@ test('an uncertain DB dispatch-recording failure remains unresolved, not success
  const x=setup({call:async(_db,name)=>{
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
-  if(name==='reality_read_governed_build_v1')return {};
-  if(name==='reality_enqueue_governed_build_v1')return {
+  if(name==='reality_read_exact_original_queue_v1')return {};
+  if(name==='reality_enqueue_exact_original_queue_v1')return {
    queue_id:randomUUID(),original_work_id:workId,goal_id:goalId,
    phase:'QUEUED_DISCOVERY',installation_authorized:false,job_completed:false,
   };
@@ -175,7 +175,7 @@ test('an existing unresolved original job cannot be silently replaced by a new i
  const x=setup({call:async(_db,name)=>{
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'NO_PRIOR_ORIGINAL',installation_authorized:false,job_completed:false};
-  assert.equal(name,'reality_read_governed_build_v1');
+  assert.equal(name,'reality_read_exact_original_queue_v1');
   return {queue_id:randomUUID(),original_work_id:'work:'+'9'.repeat(32),
    phase:'ESCALATED',job_completed:false};
  }});
@@ -204,7 +204,7 @@ test('existing exact dispatched original is monitored; no new release queue or t
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
    installation_authorized:false,job_completed:false};
-  assert.equal(name,'reality_read_governed_build_v1');
+  assert.equal(name,'reality_read_exact_original_queue_v1');
   return {queue_id:qid,original_work_id:workId,goal_id:goalId,
    phase:'QUEUED_DISCOVERY',dispatch_commit_sha:workerSha,
    request_path:'reality-requests/'+qid+'.json',
@@ -223,7 +223,7 @@ test('existing exact dispatched original is monitored; no new release queue or t
  assert.equal(r.worker_dispatch_started,true);
  assert.equal(r.installation_authorized,false);
  assert.deepEqual(seen,['reality_read_owner_existing_original_issue_v1',
-  'reality_read_governed_build_v1']);
+  'reality_read_exact_original_queue_v1']);
 });
 test('existing same-job queue in a different preview release reuses its ticket',async()=>{
  const qid=randomUUID();const seen=[];
@@ -232,7 +232,7 @@ test('existing same-job queue in a different preview release reuses its ticket',
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
    installation_authorized:false,job_completed:false};
-  if(name==='reality_read_governed_build_v1')return {
+  if(name==='reality_read_exact_original_queue_v1')return {
    queue_id:qid,original_work_id:workId,goal_id:goalId,
    phase:'QUEUED_DISCOVERY',preview_release_sha:'c'.repeat(40),
    installation_authorized:false,job_completed:false};
@@ -248,7 +248,7 @@ test('existing same-job queue in a different preview release reuses its ticket',
  assert.equal(result.queue_id,qid);
  assert.equal(result.worker_dispatch_started,true);
  assert.deepEqual(seen,['reality_read_owner_existing_original_issue_v1',
-  'reality_read_governed_build_v1','reality_mark_governed_build_dispatched_v1']);
+  'reality_read_exact_original_queue_v1','reality_mark_governed_build_dispatched_v1']);
 });
 test('partial dispatch receipt never creates another ticket',async()=>{
  const qid=randomUUID();let dispatch=0;
@@ -256,7 +256,7 @@ test('partial dispatch receipt never creates another ticket',async()=>{
   if(name==='reality_read_owner_existing_original_issue_v1')return {
    status:'EXISTING_UNFINISHED_ORIGINAL',original_work_id:workId,
    installation_authorized:false,job_completed:false};
-  if(name==='reality_read_governed_build_v1')return {
+  if(name==='reality_read_exact_original_queue_v1')return {
    queue_id:qid,original_work_id:workId,goal_id:goalId,
    phase:'QUEUED_DISCOVERY',dispatch_commit_sha:'b'.repeat(40),
    installation_authorized:false,job_completed:false};
