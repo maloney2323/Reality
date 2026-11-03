@@ -37,3 +37,19 @@ test('unknown extension and foreign production scope are never executed',()=>{
   {...ready,artifact_sha256:'not-a-hash'},
  ])assert.throws(()=>deriveOriginalResumeContract(x),/REALITY_GENERAL_ORIGINAL_RESUME_/);
 });
+
+test('general execution receipt resumes only under its pinned frozen suite and never authorizes false completion',()=>{
+ const known={...ready,
+  source_path:'src/reality-extensions/reality-general-execution-receipt.mjs',
+  frozen_test_path:'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'};
+ const exact=deriveOriginalResumeContract(known);
+ assert.equal(exact.protocol,'TRUSTED_GENERAL_COMPLETION_RECEIPT_V1');
+ assert.equal(exact.export_name,'verifyRealityCompletion');
+ assert.equal(exact.requires_pre_settlement_denial,true);
+ assert.equal(exact.required_decision,'PRE_SETTLEMENT_DENIED');
+ assert.equal(exact.production_changed,false);
+ assert.equal(exact.installation_authorized,false);
+ assert.throws(()=>deriveOriginalResumeContract({
+   ...known,frozen_test_path:ready.frozen_test_path
+ }),/SOURCE_SPECIFIC_FROZEN_SUITE_REQUIRED/);
+});
