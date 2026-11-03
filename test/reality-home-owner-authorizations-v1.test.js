@@ -218,11 +218,11 @@ test('after one approval the chat reports actual worker wake or recovery, never 
  const start=inlineScript.indexOf('async function realityChatApproveOnce(');
  const end=inlineScript.indexOf('async function realityChatRefreshEvents()',start);
  const source=inlineScript.slice(start,end);
- assert.match(source,/SIGNED_WORKER_WAKE_COMMITTED/);
- assert.match(source,/SIGNED_WORKER_WAKE_ALREADY_PRESENT/);
- assert.match(source,/has not verified that the worker started/);
- assert.match(source,/Do not approve again/);
- assert.match(source,/worker was notified/);
+ assert.match(source,/SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1/);
+ assert.match(source,/receipt\.retry_owner_approval===false/);
+ assert.match(source,/worker start is not verified/);
+ assert.match(source,/No second approval needed/);
+ assert.match(source,/delivery is not proof of execution/i);
  assert.doesNotMatch(source,/worker_execution_started=true/);
 });
 test('chat displays every verifiable stage and refuses unproven final outcome or financial savings',()=>{
@@ -258,7 +258,7 @@ test('chat refresh rechecks the signed-in owner and keeps ambiguous approvals fa
  assert.match(html,/id="realityChatApprovalStatus"/);
  assert.match(html,/id="realityChatApprovalEvidence"/);
  assert.match(html,/id="realityChatApprovalDialogs"/);
- assert.match(inlineScript,/Worker start is not verified/);
+ assert.match(inlineScript,/worker start is not verified/);
  assert.match(inlineScript,/SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1/);
  assert.match(inlineScript,/Approval uncertain\. No automatic retry/);
  assert.match(inlineScript,/if\(\$\('privateReady'\)\?\.style\.display==='block'\)/);
