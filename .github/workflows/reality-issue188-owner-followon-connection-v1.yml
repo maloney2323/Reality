@@ -19,5 +19,6 @@ jobs:
           node --check src/reality-issue188-owner-followon-binding-v1.js
           node --check api/reality/personal-issue188-followon-work.js
           node --check api/reality/personal-issue188-candidate-review.js
+          node --check src/reality-automatic-candidate-receipt-v1.js
       - name: Verify exact owner original-work lineage, anti-replay, read-only intake and frontend
-        run: node --test test/reality-issue188-owner-followon-connection-v1.test.js
+        run: node --test test/reality-issue188-owner-followon-connection-v1.test.js test/reality-issue188-unbound-owner-review-v1.test.js test/reality-automatic-candidate-receipt-v1.test.js
