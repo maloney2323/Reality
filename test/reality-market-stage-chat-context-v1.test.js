@@ -96,7 +96,7 @@ test('wrong environment or secrets does not permit model grounding',async()=>{
  assert.deepEqual(badDb.result,[]);
  assert.equal(badDb.seen.length,0);
 });
-test('chat's existing governance and atomic publication remain intact',()=>{
+test('chat existing governance and atomic publication remain intact',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(api,/readVerifiedMarketStageForChat/);
  assert.match(api,/connected_world_observations:marketStageObservations/);
