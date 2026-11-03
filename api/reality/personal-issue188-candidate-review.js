@@ -7,6 +7,8 @@ import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {createAutomaticCandidateReceipt,independentlyReadBackReleasedCandidate}
  from '../../src/reality-automatic-candidate-receipt-v1.js';
+import {projectDiscoveryEconomicContext}
+ from '../../src/reality-discovery-value-v1.js';
 const REPO='maloney2323/Reality';
 const ID=41547631404;
 const HISTORICAL='work:1eecc0d71b21492e0cfdd527f9c257f3';
@@ -90,10 +92,18 @@ export async function verifiedOwnerCandidateReview(session){
    expectedTests:21,ownerScopeVerified:owner.status==='OWNER_GOVERNED_LOOP_READBACK'&&
     Array.isArray(owner.jobs),
   });
+  const ownerReleased=await released.json();
   const automaticReceipt=independentlyReadBackReleasedCandidate({
    candidateReceipt:sourceReceipt,
-   ownerReadback:await released.json(),
+   ownerReadback:ownerReleased,
    expectedVerifierReportSha256:VERIFIER_REPORT,
+  });
+  const economicRows=ownerReleased.receipts.filter(x=>
+   x.receipt_id===automaticReceipt.receipt_id);
+  if(economicRows.length!==1)throw Error('RECEIPT_VALUE_EVIDENCE_NOT_UNIQUE');
+  const discoveryValue=projectDiscoveryEconomicContext({
+   candidateReceipt:automaticReceipt,
+   ownerEconomicReadback:economicRows[0],
   });
   const all=owner.jobs.filter(x=>x.capability_id==='reality-general-execution-receipt');
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
@@ -102,6 +112,7 @@ export async function verifiedOwnerCandidateReview(session){
   return ({
    ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
    automatic_candidate_receipt:automaticReceipt,
+   discovery_value:discoveryValue,
    proposal_title:'Independent execution-receipt verification upgrade',
    issue_number:188,previous_owner_work_id:HISTORICAL,
    previous_owner_work_already_settled:true,
