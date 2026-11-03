@@ -1,0 +1,8 @@
+{
+  "approval_id": "0f644fb6-1aeb-48c8-9a7c-3821611be60b",
+  "trigger_id": "20a1873a-f2a5-4e22-92d6-e69145a99150",
+  "original_work_id": "work:61aa43a890e57eba12b16953a9b883c1",
+  "artifact_sha256": "cdde1901ede4ea6062ffd132d8305b898fd3be83a75c54a7a3ef52dbef9bc8e9",
+  "target_environment": "ISOLATED_PREVIEW",
+  "authorization_source": "DURABLE_OWNER_RECEIPT_READBACK_REQUIRED"
+}
