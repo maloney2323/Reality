@@ -5,6 +5,8 @@ import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {createAutomaticCandidateReceipt}
+ from '../../src/reality-automatic-candidate-receipt-v1.js';
 const REPO='maloney2323/Reality';
 const ID=41547631404;
 const HISTORICAL='work:1eecc0d71b21492e0cfdd527f9c257f3';
@@ -61,12 +63,21 @@ export default async function handler(req,res){
     owner.jobs.some(x=>x.original_work_id===HISTORICAL&&
       x.phase!=='SETTLED_ISOLATED'&&x.phase!=='SETTLED'))
    throw Error('PROPOSAL_OR_HISTORICAL_GUARD_READBACK_FAILED');
+  const automaticReceipt=createAutomaticCandidateReceipt({
+   run,artifacts,expectedRunId:ID,expectedSourceSha256:SOURCE,
+   expectedProposalDigest:PROPOSAL_ARCHIVE.slice('sha256:'.length),
+   expectedVerifierDigest:VERIFIER_ARCHIVE.slice('sha256:'.length),
+   expectedTests:21,ownerHistoricalScopeVerified:owner.jobs.some(x=>
+    x.original_work_id===HISTORICAL&&
+    ['SETTLED_ISOLATED','SETTLED'].includes(x.phase)),
+  });
   const all=owner.jobs.filter(x=>x.capability_id==='reality-general-execution-receipt');
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
   // Even with an existing qualified *different* candidate, this specific
   // uninstalled proposal is not automatically bound to it.
   return res.status(200).json({
    ok:true,status:'HARDENED_SOURCE_VERIFIED_NOT_OWNER_WORK_BOUND',
+   automatic_candidate_receipt:automaticReceipt,
    proposal_title:'Independent execution-receipt verification upgrade',
    issue_number:188,previous_owner_work_id:HISTORICAL,
    previous_owner_work_already_settled:true,
