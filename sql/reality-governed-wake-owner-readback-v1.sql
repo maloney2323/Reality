@@ -6,6 +6,8 @@ BEGIN
  IF current_user<>'service_role' THEN
   RAISE EXCEPTION 'WAKE_OWNER_SERVICE_ROLE_REQUIRED'; END IF;
  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'approval_id',s.approval_id,
+    'artifact_sha256',s.artifact_sha256,
     'original_work_id',s.original_work_id,
     'wake_state',s.wake_state,
     'dispatch_attempts',s.dispatch_attempts,
@@ -17,7 +19,7 @@ BEGIN
    ) ORDER BY s.created_at DESC),'[]'::jsonb)
  INTO records
  FROM (
-  SELECT w.original_work_id,w.wake_state,w.dispatch_attempts,
+  SELECT w.approval_id,w.artifact_sha256,w.original_work_id,w.wake_state,w.dispatch_attempts,
     w.dispatched_at,w.first_worker_alive_at,w.updated_at,w.created_at,q.phase
   FROM reality_internal.governed_execution_wake_outbox_v1 w
   JOIN reality_internal.genuine_capability_queue_v1 q ON q.trigger_id=w.trigger_id
