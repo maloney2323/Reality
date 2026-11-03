@@ -44,7 +44,43 @@ export default async function handler(req,res){
       typeof j.independently_settled!=='boolean'||
       j.environment!=='ISOLATED_PREVIEW'))
    return res.status(503).json({ok:false,error:'GENUINE_LOOP_INDEPENDENT_READBACK_UNAVAILABLE'});
-  return res.status(200).json({ok:true,...v});
+  const finalResponse=await fetch(db.url+
+    '/rest/v1/rpc/reality_read_owner_final_receipts_v1',{
+    method:'POST',redirect:'error',cache:'no-store',
+    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+     accept:'application/json','content-type':'application/json'},
+    body:JSON.stringify({p_owner_id:session.user_id})});
+  const final=await finalResponse.json().catch(()=>null);
+  if(!finalResponse.ok||final?.status!=='INDEPENDENT_FINAL_RECEIPT_READBACK'||
+     !Array.isArray(final.receipts)||final.receipts.length>12||
+     final.does_not_authorize_actions!==true||
+     final.receipts.some(r=>
+       r.status!=='FULL_LOOP_INDEPENDENTLY_VERIFIED'||
+       !WORK.test(r.original_work_id)||
+       !/^[a-f0-9]{64}$/.test(r.artifact_sha256||'')||
+       !/^[a-f0-9]{40}$/.test(r.installed_commit_sha||'')||
+       !UUID.test(r.settlement_event_id)||
+       !/^sha256:[a-f0-9]{64}$/.test(r.verifier_artifact_digest||'')||
+       !Number.isSafeInteger(r.provider_run_id)||r.provider_run_id<1||
+       r.production_changed!==false))
+   return res.status(503).json({ok:false,error:'FINAL_RECEIPT_TRUSTED_OWNER_READBACK_UNAVAILABLE'});
+  const jobs=v.jobs.map(j=>{
+    const receipt=final.receipts.find(r=>r.original_work_id===j.original_work_id);
+    return {...j,
+      owner_install_approved:j.owner_install_approved===true,
+      candidate_verified:j.candidate_verified===true,
+      independently_settled:j.independently_settled===true,
+      isolated_installed:j.isolated_installed===true,
+      universe_settlement_verified:j.universe_settlement_verified===true,
+      full_loop_independently_verified:
+        j.capability_id==='reality-general-execution-receipt'&&
+        j.independently_settled===true&&
+        j.universe_settlement_verified===true&&
+        Boolean(receipt)};
+  });
+  return res.status(200).json({ok:true,...v,jobs,
+   independent_final_receipts:final.receipts,
+   full_loop_proof_not_inferred_from_settlement:true});
  }catch{
   return res.status(503).json({
    ok:false,error:'GENUINE_LOOP_TRUSTED_STATUS_UNAVAILABLE',
