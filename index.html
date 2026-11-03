@@ -861,6 +861,20 @@ async function realityBusinessRefresh(){
   $('businessPendingApprovals').textContent=String(pending);
   $('businessVerifiedCompletions').textContent=String(settled);
   $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. Counts cover only returned repair jobs; they are not financial results.';
+  const finalJob=jobs.find(j=>j.capability_id==='reality-general-execution-receipt'&&
+    j.full_loop_independently_verified===true);
+  const finalReceipt=(data.independent_final_receipts||[]).find(r=>
+    r.original_work_id===finalJob?.original_work_id&&
+    r.status==='FULL_LOOP_INDEPENDENTLY_VERIFIED');
+  if(finalReceipt){
+    const pdf=document.createElement('a');
+    pdf.href='/api/reality/personal-genuine-final-receipt-pdf?work_id='+
+      encodeURIComponent(finalReceipt.original_work_id);
+    pdf.textContent='Download verified final customer receipt (PDF)';
+    pdf.style.display='block';
+    pdf.style.marginTop='9px';
+    $('businessOperationsStatus').appendChild(pdf);
+  }
  }catch{
   if(epoch!==realityBusinessReadEpoch)return;
   $('businessTrackedJobs').textContent='—';
@@ -2542,9 +2556,10 @@ async function realityChatRefreshEvents(){
     if(receipt?.status==='FULL_LOOP_INDEPENDENTLY_VERIFIED'&&
        Number.isSafeInteger(receipt.provider_run_id)){
      const link=document.createElement('a');
-     link.href='https://github.com/maloney2323/Reality/actions/runs/'+receipt.provider_run_id;
+     link.href='/api/reality/personal-genuine-final-receipt-pdf?work_id='+
+       encodeURIComponent(receipt.original_work_id);
      link.target='_blank';link.rel='noopener noreferrer';
-     link.textContent='View independent final job receipt and evidence';
+     link.textContent='Download verified final customer receipt (PDF)';
      bubble.appendChild(link);
     }
    }
