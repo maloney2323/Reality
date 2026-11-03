@@ -177,7 +177,7 @@ BEGIN
  VALUES(w.approval_id,next_fence,'DISPATCH_CLAIMED',
   jsonb_build_object('attempt',next_tries,'claim_id',claim));
  RETURN jsonb_build_object('status','DELIVERY_CLAIMED_NOT_EXECUTION_AUTHORIZED',
-   'approval_id',w.approval_id,'claim_id',claim,
+   'approval_id',w.approval_id,'trigger_id',w.trigger_id,'claim_id',claim,
    'dispatch_fence',next_fence,'original_work_id',w.original_work_id,
    'artifact_sha256',w.artifact_sha256,'pre_state_hash',w.pre_state_hash,
    'valid_time',w.approval_valid_time,'goal_transition_event_id',w.goal_transition_event_id,
