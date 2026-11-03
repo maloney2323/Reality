@@ -96,13 +96,19 @@ test('frozen, candidate and historical test results are read from signed qualifi
  assert.match(proof,/Number\.isSafeInteger\(q\[key\]\)&&q\[key\]>0&&verified/);
  assert.match(proof,/These results verify the candidate against the checked tests/);
 });
-test('technical hashes and original work ids are collapsible while meaningful outcome stays visible',()=>{
+test('conversation decisions and detailed legacy records keep source hashes collapsible',()=>{
  const p=inlineScript.indexOf("const evidence=document.createElement('details')");
  assert.ok(p>0);
- const content=inlineScript.slice(p,p+1150);
- assert.match(content,/summary\.textContent='View technical evidence and exact source'/);
- assert.match(content,/Exact source SHA-256/);
- assert.match(content,/evidence\.append\(summary,work,hash\)/);
+ const chat=inlineScript.slice(p,p+1500);
+ assert.match(chat,/summary\.textContent='Exact source hash and original job'/);
+ assert.match(chat,/Source SHA-256/);
+ assert.match(chat,/evidence\.append\(summary,exact\)/);
+ const older=inlineScript.indexOf("const evidence=document.createElement('details')",p+20);
+ assert.ok(older>p);
+ const details=inlineScript.slice(older,older+1150);
+ assert.match(details,/summary\.textContent='View technical evidence and exact source'/);
+ assert.match(details,/Exact source SHA-256/);
+ assert.match(details,/evidence\.append\(summary,work,hash\)/);
  assert.match(inlineScript,/card\.appendChild\(notDone\)/);
 });
 
@@ -252,7 +258,7 @@ test('chat refresh rechecks the signed-in owner and keeps ambiguous approvals fa
  assert.match(html,/id="realityChatApprovalStatus"/);
  assert.match(html,/id="realityChatApprovalEvidence"/);
  assert.match(html,/id="realityChatApprovalDialogs"/);
- assert.match(inlineScript,/worker start is not verified/);
+ assert.match(inlineScript,/Worker start is not verified/);
  assert.match(inlineScript,/SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL/);
  assert.match(inlineScript,/Approval uncertain\. No automatic retry/);
  assert.match(inlineScript,/if\(\$\('privateReady'\)\?\.style\.display==='block'\)/);
