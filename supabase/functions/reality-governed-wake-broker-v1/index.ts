@@ -71,13 +71,43 @@ Deno.serve(async req=>{
      proof.delivery_not_execution!==true||proof.permission_granted!==false)
    reject('SIGNED_HINT_DATABASE_VERIFICATION_FAILED');
 
-  // First authenticate the database signal; then require dedicated preview
-  // dispatch credentials BEFORE claiming a lease. No uncredentialed claims.
+  // The existing GitHub credential is held only in Vercel production.
+  // Never copy it into Supabase, branch previews, databases or logs.
+  // This one-use, delivery-only relay transports the signed DB wake to a
+  // narrow production endpoint. A relay nonce is NOT execution authority.
   if(!Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||
-     (Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'').length<25)
-   return respond({ok:false,status:'DISPATCH_CREDENTIAL_MISSING',
+     (Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'').length<25){
+   const token=await rpc('reality_issue_governed_wake_relay_v1',{});
+   if(token.status!=='ONE_TIME_DELIVERY_TOKEN_ISSUED'||
+      !UUID.test(String(token.relay_nonce||''))||
+      token.execution_authorized!==false||
+      token.owner_approval_created!==false)
+     reject('RELAY_ISSUANCE_NOT_VERIFIED');
+   let relayStatus=0,relay:Record<string,unknown>|null=null;
+   try{
+    const response=await fetch(
+      'https://reality-blond.vercel.app/api/reality/governed-wake-relay',{
+       method:'POST',cache:'no-store',redirect:'error',
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({version:1,relay_nonce:token.relay_nonce})});
+    relayStatus=response.status;
+    relay=await response.json().catch(()=>null);
+   }catch{
+    return respond({ok:false,status:'PRODUCTION_GITHUB_RELAY_UNREACHABLE',
+     signed_hint_verified:true,worker_started:false,
+     retry_will_be_reconsidered_by_watchdog:true,production_changed:false},503);
+   }
+   if(relayStatus===200&&relay?.ok===true&&
+      ['NO_APPROVED_WAKE_READY','DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN',
+       'STALE_APPROVAL_BLOCKED','ESCALATED'].includes(String(relay.status))&&
+      relay.production_changed===false&&relay.execution_authorized===false)
+    return respond({ok:true,status:relay.status,
+     signed_hint_verified:true,worker_started:false,
+     production_changed:false,via:'PRODUCTION_SECRET_HOLDER_DELIVERY_ONLY'});
+   return respond({ok:false,status:'PRODUCTION_GITHUB_RELAY_NOT_YET_READY',
     signed_hint_verified:true,worker_started:false,
     retry_will_be_reconsidered_by_watchdog:true,production_changed:false},503);
+  }
   const claim=await rpc('reality_claim_governed_wake_v1',{});
   if(claim.status==='NO_APPROVED_WAKE_READY')
    return respond({ok:true,status:'NO_APPROVED_WAKE_READY',
@@ -115,7 +145,7 @@ Deno.serve(async req=>{
     artifact_sha256:claim.artifact_sha256,
     target_environment:'ISOLATED_PREVIEW',
     authorization_source:'DURABLE_OWNER_RECEIPT_READBACK_REQUIRED'
-  },null,2)+'\\n';
+  },null,2)+'\n';
   const endpoint='/contents/'+path+'?ref='+encodeURIComponent(BRANCH);
   const before=await github(endpoint);
   if(before){
