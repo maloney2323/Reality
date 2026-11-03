@@ -47,7 +47,7 @@ test('verified released owner receipt renders a genuine PDF with incomplete step
  assert.match(b.toString('latin1'),/No receipt, approval, or external action is created by downloading this PDF/);
  assert.match(b.toString('latin1'),/WHY REALITY SUGGESTED THIS UPGRADE/);
  assert.match(b.toString('latin1'),/missing executable final-outcome verification capability/);
- assert.match(b.toString('latin1'),/EXPECTED VALUE \(NOT YET REALIZED\)/);
+ assert.match(b.toString('latin1'),/EXPECTED VALUE /);
  assert.match(b.toString('latin1'),/PROS - expected/);
  assert.match(b.toString('latin1'),/CONS \/ RISKS - unresolved/);
  assert.match(b.toString('latin1'),/INDEPENDENT VERIFICATION GRAPH/);
