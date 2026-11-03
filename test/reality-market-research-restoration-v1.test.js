@@ -45,7 +45,8 @@ function preview({status='GOVERNED_MARKET_RESEARCH_RECORDED',findings}={}){
   // The full customer page defines these before the research adapter.
   // Isolated adapter tests stub the independent customer-facing projection.
   realitySimpleSetStatus:()=>{},realitySimpleNoResearch:()=>{},
-  realitySimpleRender:()=>{}
+  realitySimpleRender:()=>{},
+  wcLoadGapFeed:()=>{}
  };
  vm.createContext(context);
  vm.runInContext('let wcMarketReviewFindings=[];'+fixture(),context);

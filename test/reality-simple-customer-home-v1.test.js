@@ -25,7 +25,7 @@ function setup(){
   }
  });
  for(const id of ['simpleResearchList','simpleResearchCount','simpleResearchStatus',
-  'simpleLoginState','simpleChat','simpleReviewFirst','simpleAdvancedToggle','realitySimpleHome',
+  'simpleLoginState','simpleChat','simpleViewGapCategory','simpleReviewFirst','simpleAdvancedToggle','realitySimpleHome',
   'privateReady'])elements[id]=element();
  elements.privateReady.style.display='block';
  const body={classList:{value:new Set(['reality-simple-home']),toggle(c){
