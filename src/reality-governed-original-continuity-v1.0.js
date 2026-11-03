@@ -51,6 +51,18 @@ export async function verifyGovernedOriginalContinuity({
     queue.job_completed!==false||
     !PHASES.has(queue.phase))
   fail('EXACT_DURABLE_QUEUE_READBACK_REQUIRED');
+ // Exact database readback may include the durable owner/lineage columns.
+ // Compare them to separately re-verified owner Continuity and goal epochs.
+ if((queue.owner_id!=null&&queue.owner_id!==session.user_id)||
+    (queue.conversation_id!=null&&
+     queue.conversation_id!==work.original_conversation_id)||
+    (queue.goal_transition_event_id!=null&&
+     queue.goal_transition_event_id!==goal.state.active_goal.last_transition_receipt_id)||
+    (queue.continuity_root_id!=null&&
+     queue.continuity_root_id!==goal.scope?.root)||
+    (queue.worldline_id!=null&&
+     queue.worldline_id!==goal.scope?.worldline))
+  fail('QUEUE_OWNER_GOAL_LINEAGE_CHANGED');
  if(queue.preview_release_sha!=null&&
     !SHA.test(queue.preview_release_sha))
   fail('QUEUE_RELEASE_ATTESTATION_INVALID');
