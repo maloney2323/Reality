@@ -41,7 +41,8 @@ export default async function handler(req,res){
       typeof j.phase!=='string'||j.phase.length>80||
       typeof j.candidate_verified!=='boolean'||
       typeof j.owner_install_approved!=='boolean'||
-      typeof j.independently_settled!=='boolean'||
+      (j.independently_settled!=null&&
+       typeof j.independently_settled!=='boolean')||
       j.environment!=='ISOLATED_PREVIEW'))
    return res.status(503).json({ok:false,error:'GENUINE_LOOP_INDEPENDENT_READBACK_UNAVAILABLE'});
   const finalResponse=await fetch(db.url+
