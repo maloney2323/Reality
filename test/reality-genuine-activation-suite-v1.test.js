@@ -45,3 +45,23 @@ test('real installed monitor consumes capability-specific activation suite witho
  assert.match(code,/--cap-drop','ALL'/);
  assert.match(code,/process\.exitCode=2/);
 });
+
+// The genuine #188 capability must NEVER be monitored against the unrelated
+// CI-evidence fixture. Its frozen suite is source-bound and remains immutable.
+test('general completion receipt gets the exact frozen acceptance and governance regressions',()=>{
+ const evidence={file_sha256:[
+  {path:'src/reality-extensions/reality-general-execution-receipt.mjs',sha256:'c'.repeat(64)},
+  {path:'test/reality-extensions/reality-general-execution-receipt.test.js',sha256:'d'.repeat(64)}
+ ]};
+ const result=deriveGenuineActivationSuite(evidence);
+ assert.equal(result.capability,'REALITY_GENERAL_EXECUTION_RECEIPT');
+ assert.equal(result.frozen_test_path,
+  'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js');
+ assert.ok(result.tests.includes(result.frozen_test_path));
+ assert.ok(result.tests.includes('test/reality-governed-self-improvement-spine-v1.0.test.js'));
+ assert.ok(result.tests.includes('test/reality-genuine-original-resume-contract-v1.test.js'));
+ assert.ok(result.tests.includes('test/reality-genuine-activation-suite-v1.test.js'));
+ assert.ok(result.tests.includes('test/reality-extensions/reality-general-execution-receipt.test.js'));
+ assert.ok(!result.tests.includes('test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js'));
+ assert.ok(result.minimum_verified_tests>=44);
+});
