@@ -66,7 +66,9 @@ BEGIN
     w.worker_run_id::text IS DISTINCT FROM NEW.installer_run_id THEN
    RAISE EXCEPTION 'GOVERNED_RESERVATION_ACK_NOT_MATCHED'; END IF;
  UPDATE reality_internal.governed_execution_wake_outbox_v1
- SET wake_state='EXECUTING',updated_at=clock_timestamp()
+ SET wake_state='EXECUTING',
+     dispatch_lease_expires_at=clock_timestamp()+interval '90 minutes',
+     updated_at=clock_timestamp()
  WHERE approval_id=NEW.approval_id;
  INSERT INTO reality_internal.governed_execution_wake_events_v1
   (approval_id,dispatch_fence,wake_state,detail)
