@@ -10,6 +10,10 @@ const EXACT={
   source:'src/reality-extensions/reality-continuity-settlement-reconciler.mjs',
   protocol:'TRUSTED_ORIGINAL_SETTLEMENT_RECONCILIATION_V1',
  },
+ 'reality-general-execution-receipt':{
+  source:'src/reality-extensions/reality-general-execution-receipt.mjs',
+  protocol:'TRUSTED_GENERAL_COMPLETION_RECEIPT_V1',
+ },
 };
 const HASH=/^[0-9a-f]{64}$/;
 const WORK=/^work:[0-9a-f]{32}$/;
@@ -45,6 +49,19 @@ export function assessTwoAuthorizationExecutionPreflight(entry){
    original_job_completed:false,
   });
  }
+ if(id==='reality-general-execution-receipt'&&(
+   q.attestation_source!=='SIGNED_GITHUB_WORKFLOW_WITH_INDEPENDENT_SANDBOX'||
+   !Number.isSafeInteger(q.provider_run_id)||q.provider_run_id<1||
+   !Number.isSafeInteger(q.frozen_pass)||q.frozen_pass<35||
+   !Number.isSafeInteger(q.candidate_pass)||q.candidate_pass<5||
+   q.original_work_id!==entry.original_work_id||
+   q.artifact_sha256!==entry.qualification.artifact_sha256||
+   q.production_changed!==false))
+  return Object.freeze({
+    approval_gate_open:false,
+    status:'SIGNED_SOURCE_AND_COMPLETE_EXECUTION_PRECHECK_NOT_VERIFIED',
+    two_authorizations_only:true,original_job_completed:false,
+  });
  const holdoutNeeded=id==='reality-continuity-settlement-reconciler';
  if(holdoutNeeded&&(q.real_provider_holdout_verified!==true||
   q.real_provider_holdout_artifact_sha256!==q.artifact_sha256))
