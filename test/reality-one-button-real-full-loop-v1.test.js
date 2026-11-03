@@ -86,7 +86,7 @@ test('one click adopts one real source-backed failure and dispatches only origin
  assert.equal(payload.issue_number,188);
  assert.equal(payload.expected_failed_run_id,41547631404);
  assert.equal(payload.expected_source_sha,'a'.repeat(40));
- assert.match(nodes.simpleFullLoopStatus.textContent,/worker dispatched/i);
+ assert.match(nodes.simpleFullLoopStatus.textContent,/original job dispatched/i);
  assert.equal(nodes.simpleRunFullLoop.disabled,false);
 });
 test('existing original queue prevents any new customer job admission',async()=>{
