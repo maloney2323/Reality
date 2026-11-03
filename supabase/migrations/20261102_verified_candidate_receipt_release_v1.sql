@@ -183,16 +183,16 @@ begin
  from reality_internal.verified_capability_receipt_releases_v1 r
  where exists(
   select 1 from public.universe_events e
-  join reality_internal.genuine_capability_queue_v1 q
-   on q.original_work_event_id=e.event_id
-   and q.owner_id=p_owner_id and q.original_work_id=e.payload->>'original_work_id'
+  -- The owner may have legitimate VERIFIED historical source work even
+  -- if it was settled outside the current active capability queue.
+  -- This join identifies an owner, NOT a fresh execution authorization.
   where e.entity_type='reality_original_source_backed_repair_work'
    and e.epistemic_status='VERIFIED'
    and e.payload->>'owner_id'=p_owner_id::text
    and e.provenance->>'principal_id'=p_owner_id::text
    and e.payload->>'issue_number'=r.source_issue::text
    and e.payload->>'frozen_test_sha256'=r.frozen_test_sha256
-   and q.phase='SETTLED_ISOLATED'
+   and e.payload->>'owner_authorized_installation'='false'
  );
  return pg_catalog.jsonb_build_object(
   'schema','reality-owner-released-capability-receipts-v1',
