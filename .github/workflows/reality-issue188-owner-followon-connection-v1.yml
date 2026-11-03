@@ -23,4 +23,13 @@ jobs:
           node --check src/reality-job-receipt-pdf-v1.js
           node --check api/reality/personal-receipt-pdf.js
       - name: Verify exact owner original-work lineage, anti-replay, read-only intake and frontend
+        env:
+          REALITY_PDF_SMOKE_OUT: artifact/reality-synthetic-receipt-render-check.pdf
         run: node --test test/reality-issue188-owner-followon-connection-v1.test.js test/reality-issue188-unbound-owner-review-v1.test.js test/reality-automatic-candidate-receipt-v1.test.js test/reality-verified-candidate-receipt-release-v1.test.js test/reality-job-receipt-pdf-v1.test.js
+      - name: Retain synthetic PDF rendering smoke fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-receipt-pdf-synthetic-smoke-${{ github.run_id }}
+          path: artifact/reality-synthetic-receipt-render-check.pdf
+          if-no-files-found: error
+          retention-days: 1
