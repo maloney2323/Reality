@@ -67,7 +67,7 @@ test('full legacy dashboard is visually hidden by default but remains mounted an
 });
 test('homepage shows exactly four source-backed saved research cards, no fabricated executable jobs',()=>{
  const x=setup();
- vm.runInContext('realitySimpleRender(input)',vm.createContext({...x.ctx,input:savedFindings()}));
+ x.ctx.input=savedFindings();vm.runInContext('realitySimpleRender(input)',x.ctx);
  assert.equal(x.elements.simpleResearchList.children.length,4);
  assert.match(x.elements.simpleResearchCount.textContent,/4 saved opportunities/);
  assert.match(x.elements.simpleResearchStatus.textContent,/not a verified new capability/);
