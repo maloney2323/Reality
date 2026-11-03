@@ -66,9 +66,9 @@ test('verified released owner receipt renders a genuine PDF with incomplete step
  assert.match(b.toString('latin1'),/Human baseline \/ supervision: UNKNOWN/);
  assert.match(b.toString('latin1'),/DISCOVERY VALUE/);
  assert.match(b.toString('latin1'),/ILLUSTRATIVE HUMAN DIAGNOSIS LABOR VALUE/);
- assert.match(b.toString('latin1'),/QA \$100\.28/);
- assert.match(b.toString('latin1'),/DEV \$130\.76/);
- assert.match(b.toString('latin1'),/DEV \$261\.52/);
+ assert.match(b.toString('latin1'),/QA USD 100\.28/);
+ assert.match(b.toString('latin1'),/DEV USD 130\.76/);
+ assert.match(b.toString('latin1'),/DEV USD 261\.52/);
  assert.match(b.toString('latin1'),/ACTUAL FINANCIAL ROI: NOT YET VERIFIABLE/);
 
 
