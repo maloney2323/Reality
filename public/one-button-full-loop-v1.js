@@ -114,6 +114,20 @@ async function start(){
   setStatus('Checking current jobs and final receipts to avoid duplicate execution…');
   const current=await observe();
   if(current.kind!=='NO_ACTIVE')return;
+  // Check the exact owner-goal queue first. Never adopt a new issue while
+  // an existing original-job discovery request may already be dispatched.
+  let known=null;
+  try{known=await read('/api/reality/personal-governed-build')}
+  catch(error){
+   if(String(error?.message)!=='GOVERNED_BUILD_FRESH_ELIGIBILITY_REQUIRED')
+    throw error;
+  }
+  if(known?.queued===true&&exactWork(known.original_work_id)){
+   startedWork=known.original_work_id;
+   setStatus('Existing original job found: '+startedWork+
+    '. Reality will continue this queue without creating another authorization.');
+   return;
+  }
   // Fresh owner goal admission is performed only by the existing server.
   // Discover a genuine provider-backed failed source, not a research idea.
   setStatus('Finding a genuine independently verified capability failure…');
@@ -150,13 +164,7 @@ async function start(){
   // If none of the current provider issues qualifies, resume an ALREADY
   // identified original job; do not invent a customer work item.
   setStatus('No new source-qualified issue. Checking previously authorized unfinished work…');
-  const known=await read('/api/reality/personal-governed-build');
-  if(known.queued===true&&exactWork(known.original_work_id)){
-   startedWork=known.original_work_id;
-   setStatus('Existing original job found: '+startedWork+'. Reality will continue that queue without a new authorization.');
-   return;
-  }
-  if(known.phase==='NOT_QUEUED'&&known.eligible_for_investigation===true&&
+  if(known?.phase==='NOT_QUEUED'&&known.eligible_for_investigation===true&&
    exactWork(known.original_work_id)){
    setStatus('Queuing your verified unfinished original job with the existing autonomous worker…');
    const result=await write('/api/reality/personal-governed-build',{
