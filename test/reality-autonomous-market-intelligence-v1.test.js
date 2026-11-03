@@ -36,8 +36,8 @@ test('pin every sampled file to one provider-verified GitHub commit',async()=>{
  const calls=[];
  const result=await readPinnedRealityMarketSnapshot({fetchImpl:async request=>{
   calls.push(request);
-  if(request.includes('/commits/'))
-   return {ok:true,json:async()=>({sha,commit:{tree:{sha:'f'.repeat(40)}}})};
+  if(request.includes('/git/ref/heads/'))
+   return {ok:true,json:async()=>({ref:'refs/heads/feature/reality-general-capability-engine-20261101',object:{sha,type:'commit'}})};
   const path=files.find(path=>request.includes('/contents/'+path+'?ref='+sha));
   assert.ok(path,'unapproved source path requested');
   const bytes='// independently retrieved source for '+path;
