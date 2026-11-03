@@ -200,7 +200,7 @@ BEGIN
  THEN RAISE EXCEPTION 'WAKE_DELIVERY_FENCE_EXPIRED_OR_CONFLICT';END IF;
  UPDATE reality_internal.governed_execution_wake_outbox_v1
  SET wake_state='DISPATCH_ACCEPTED',last_delivery_id=p_delivery_id,
-     dispatch_lease_expires_at=now()+interval '2 minutes',dispatched_at=now(),
+     dispatch_lease_expires_at=now()+interval '15 minutes',dispatched_at=now(),
      updated_at=now()
  WHERE approval_id=p_approval_id;
  INSERT INTO reality_internal.governed_execution_wake_events_v1
