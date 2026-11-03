@@ -75,6 +75,7 @@ export default async function handler(req,res){
      !UUID.test(String(claim.approval_id||''))||
      !UUID.test(String(claim.trigger_id||''))||
      !UUID.test(String(claim.claim_id||''))||
+     !UUID.test(String(claim.ack_nonce||''))||
      !WORK.test(String(claim.original_work_id||''))||
      !HASH.test(String(claim.artifact_sha256||''))||
      !HASH.test(String(claim.pre_state_hash||''))||
@@ -107,7 +108,8 @@ export default async function handler(req,res){
    Buffer.from(verified.content.replace(/\s/g,''),'base64').toString('utf8'):null;
   if(verified?.path!==wakePath||readback!==bodyText)
    fail('GITHUB_WAKE_PROVIDER_READBACK_MISMATCH',503);
-  const receipt=await edge({action:'ack',approval_id:claim.approval_id,
+  const receipt=await edge({action:'ack',ack_nonce:claim.ack_nonce,
+    approval_id:claim.approval_id,
     claim_id:claim.claim_id,fence:claim.dispatch_fence,
     delivery_id:crypto.randomUUID()});
   if(receipt.status!=='DISPATCH_ACCEPTED_NOT_EXECUTION_PROVEN'||
