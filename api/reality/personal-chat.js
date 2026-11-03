@@ -3,6 +3,8 @@ import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../..
 import {readPrivateChat,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {readVerifiedMarketStageForChat}
+ from '../../src/reality-market-stage-chat-context-v1.js';
 import {createHash} from 'node:crypto';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
@@ -126,6 +128,9 @@ export default async function handler(req,res){
        verifiedUserGoalCommand.source_ref)
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
+  // Context comes only from trusted owner-scoped database stage receipts.
+  const marketStageObservations=await readVerifiedMarketStageForChat({
+   session,message:text,db:isolated});
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    model:'gpt-4.1-mini',apiKey:key,
@@ -134,6 +139,7 @@ export default async function handler(req,res){
     continuity_root_id:'personal:chat:'+scope,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
+    connected_world_observations:marketStageObservations,
     action_authorized:false,execution_authorized:false,
    },
    verifiedConversationTurns:history.messages,
