@@ -230,7 +230,7 @@ revoke all on function public.reality_read_latest_owner_market_research_v1(uuid)
 grant execute on function public.reality_read_latest_owner_market_research_v1(uuid) to service_role;
 
 -- Single autonomously repeating research progression: stage THEN value inspection.
-select pg_catalog.cron.unschedule(jobid)
+select cron.unschedule(jobid)
  from cron.job where jobname='reality-market-investigation-stage-watchdog-v1';
 select cron.schedule(
  'reality-market-investigation-stage-watchdog-v1',
