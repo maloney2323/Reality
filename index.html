@@ -2236,12 +2236,12 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
       liveCandidate.owner_approval_issued!==false||
       liveCandidate.production_changed!==false)
      throw Error('NEW_JOB_CANDIDATE_OWNER_SCOPE_UNVERIFIED');
-   title.textContent='Historical evidence receipt · Fresh verified upgrade ready below';
-   status.textContent='Earlier: 21/21 verified. Fresh original job: independently qualified for approval.';
+   title.textContent='Historical evidence receipt · Fresh repair verified, final execution path pending';
+   status.textContent='Earlier: 21/21 verified. Fresh original job: independently tested; installation-to-settlement path not yet cleared.';
    body.textContent='Reality has now created a separate owner-bound original job and independently qualified a new exact artifact. The 21/21 receipt remains evidence for the earlier candidate; it is NOT approval for or proof of this newer artifact.';
-   next.textContent='NEXT: Review the fresh job in Owner Authorizations below and approve its exact verified artifact. Installation, resumption and settlement have not occurred.';
+   next.textContent='NEXT: Reality must complete the end-to-end execution connection. The final owner approval remains locked until that path is ready. Installation, resumption and settlement have not occurred.';
    note.textContent='Fresh original job: '+liveCandidate.original_work_id+
-    '. One exact installation authorization is still required. No extra receipt or investigation button.';
+    '. Your one final installation authorization is reserved for a verified executable path; do not approve a partial upgrade.';
    autoNote.textContent='The historical settled work remains preserved. The new job is not complete, and no production change is authorized.';
   }
   const downloadPdf=document.createElement('a');
