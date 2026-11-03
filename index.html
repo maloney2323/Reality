@@ -501,6 +501,13 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
     <p id="realityChatWakeStatus" class="muted" role="status" aria-live="polite">Checking the automatic worker wake and retry ledger…</p>
     <div id="realityChatActivityEntries" role="status" aria-live="polite">Checking the original work receipts…</div>
   </section>
+  <section class="reality-chat-activity" id="realityChatVerifiedRepairReview" aria-label="Verified repair in this conversation">
+   <div class="label">REALITY · VERIFIED UPGRADE DISCUSSION</div>
+   <h4>Discuss your upgrade here</h4>
+   <p class="muted">You should never have to go to GitHub to approve an upgrade. Reality shows the proof and explains the decision here. A one-click approval appears in this conversation only when the exact repair is install-ready.</p>
+   <p id="realityChatRepairReviewStatus" role="status" aria-live="polite">Checking verified upgrades and approval readiness…</p>
+   <div id="realityChatRepairReviewItems" aria-live="polite"></div>
+  </section>
   <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
    <div class="label">REALITY · DECISIONS FOR YOU</div>
    <h4>Approvals in this conversation</h4>
@@ -2882,8 +2889,90 @@ async function realityChatMarketStage(){
  }
 }
 
+// Verified candidate review lives inside Reality Chat. This is READ-ONLY;
+// the only existing exact-owner approval button remains independently gated.
+let chatVerifiedRepairEpoch=0;
+async function realityChatVerifiedRepairReview(){
+ const epoch=++chatVerifiedRepairEpoch, status=$('realityChatRepairReviewStatus');
+ const list=$('realityChatRepairReviewItems');if(!status||!list)return;
+ if(!homeOwnerSignedIn()){
+  list.replaceChildren();
+  status.textContent='Sign in to review your exact verified upgrade.';
+  return;
+ }
+ try{
+  const response=await fetch('/api/reality/personal-gap-intake',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(epoch!==chatVerifiedRepairEpoch||!homeOwnerSignedIn())return;
+  if(!response.ok||data?.ok!==true||data.read_only!==true||
+    data.installation_authorized!==false||
+    data.work_started!==false||data.production_changed!==false||
+    !Array.isArray(data.items)||data.items.length>30||
+    !Number.isSafeInteger(data.counts?.verified_implementation_defects))
+   throw Error('OWNER_PROOF_UNAVAILABLE');
+  const items=data.items.filter(x=>x.repair_proof?.status===
+    'FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED');
+  if(items.length!==data.counts.verified_implementation_defects||
+    items.some(x=>x.kind!=='RESEARCH_OPPORTUNITY'||
+     x.verified_missing_capability!==false||
+     x.installation_authorized!==false||
+     x.repair_proof.installed!==false||
+     x.repair_proof.owner_install_authorized!==false||
+     x.repair_proof.fresh_original_work_verified!==false||
+     !/^[a-f0-9]{40}$/.test(x.repair_proof.repair_commit_sha||'')))
+   throw Error('OWNER_PROOF_INCONSISTENT');
+  list.replaceChildren();
+  status.textContent=items.length?
+   'Reality has '+items.length+' independently tested repair candidate(s) to discuss. Installation is not yet authorized for these research-derived repairs.':
+   'No research-derived verified repair is available for approval.';
+  for(const item of items){
+   const p=item.repair_proof;
+   const card=document.createElement('article');card.className='reality-chat-progress';
+   const heading=document.createElement('strong');
+   heading.textContent='Reality: I found and tested a real repair';
+   const explain=document.createElement('p');
+   explain.textContent='What it does: '+p.corrected_behavior;
+   const proof=document.createElement('p');
+   proof.textContent='Independent evidence: '+p.independent_red_assertion_failures+
+    ' frozen failures before repair → '+p.independent_green_assertion_passes+
+    ' checks passed on the unchanged suite.';
+   const risk=document.createElement('p');
+   risk.textContent='Limits and risks: '+p.remaining_unproven;
+   const gate=document.createElement('p');gate.className='home-owner-not-complete';
+   gate.textContent='Not installation-ready: this repair needs an authorized original job and a verified install → resume → settlement path. When that passes, the one Approve button appears here in Chat, not GitHub.';
+   const discuss=document.createElement('button');
+   discuss.type='button';discuss.className='repair-primary';
+   discuss.textContent='Talk to Reality about this upgrade';
+   discuss.addEventListener('click',()=>{
+    const input=$('privatePrompt');
+    input.value='Reality, explain the verified budget-integrity repair from research finding four. What exactly improves, what are the benefits, drawbacks and risks, and what must happen before I can approve installation here in our conversation?';
+    input.focus({preventScroll:true});
+    // Sends an ordinary conversation message, never a grant.
+    $('privateSend').click();
+   });
+   const details=document.createElement('details');
+   const summary=document.createElement('summary');
+   summary.textContent='Technical proof, optional';
+   const hashes=document.createElement('p');
+   hashes.textContent='Frozen SHA-256 '+p.frozen_test_sha256+
+     ' · Candidate commit '+p.repair_commit_sha+
+     ' · Failed run '+p.baseline_run_id+
+     ' · Passing run '+p.green_run_id;
+   details.append(summary,hashes);
+   card.append(heading,explain,proof,risk,gate,discuss,details);
+   list.append(card);
+  }
+ }catch{
+  if(epoch!==chatVerifiedRepairEpoch)return;
+  list.replaceChildren();
+  status.textContent='Owner-verified repair evidence is unavailable. Reality cannot offer installation approval on an uncertain read.';
+ }
+}
+
 async function realityChatRefreshEvents(){
  void realityChatReadWakeStatus();
+ void realityChatVerifiedRepairReview();
  void realityChatMarketStage();
  const container=$('realityChatActivityEntries');
  if(!container)return;
