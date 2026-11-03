@@ -49,37 +49,33 @@ test('missing preview write credentials, forged approval or production must fail
  assert.equal(p.writes,0);
 });
 
-test('actual owner approval route parses as a valid module and dispatches only after database proof',()=>{
+test('owner approval saves consent once and lets the durable database outbox wake the worker',()=>{
  const routePath=new URL('../api/reality/personal-qualified-capability-approve.js',import.meta.url);
  const source=readFileSync(routePath,'utf8');
  const parse=spawnSync(process.execPath,['--check',fileURLToPath(routePath)],{encoding:'utf8'});
  assert.equal(parse.status,0,parse.stderr);
- assert.doesNotMatch(source,/\\n from '\.\.\//);
- const rpc=source.indexOf('reality_owner_approve_qualified_preview_v1');
- const validate=source.indexOf("receipt?.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'");
- const wake=source.indexOf('wake=await wakeApprovedIsolatedInstall({receipt})');
- assert.ok(rpc>0&&validate>rpc&&wake>validate,'wake only after exact durable signed owner receipt');
- assert.match(source,/SIGNED_WORKER_WAKE_COMMITTED/);
- assert.match(source,/SIGNED_WORKER_WAKE_ALREADY_PRESENT/);
- assert.match(source,/WORKER_WAKE_NOT_VERIFIED/);
- assert.match(source,/SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL/);
- assert.match(source,/AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH/);
- assert.match(source,/AUTO_TRIGGER_PENDING_NO_SECOND_OWNER_ACTION/);
- assert.match(source,/auto_trigger_instant:false/);
+ const approve=source.indexOf('reality_owner_approve_qualified_preview_v1');
+ const validated=source.indexOf("receipt?.approval_origin!=='AUTHENTICATED_OWNER_EXPLICIT_ACTION'");
+ const verified=source.indexOf("reality_read_owner_governed_wakes_v1");
+ assert.ok(approve>0&&validated>approve&&verified>validated,
+  'durable outbox readback follows and matches the exact source-authorized approval');
+ assert.match(source,/SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1/);
+ assert.match(source,/DURABLE_OUTBOX_READBACK_UNAVAILABLE/);
+ assert.match(source,/EDGE_DISPATCH_AND_WATCHDOG_OWN_RECOVERY/);
+ assert.match(source,/entry\.approval_id===receipt\.approval_id/);
+ assert.match(source,/entry\.artifact_sha256===receipt\.artifact_sha256/);
  assert.match(source,/retry_owner_approval:false/);
  assert.match(source,/worker_execution_started:false/);
  assert.match(source,/installation_completed:false/);
- assert.match(source,/original_job_completed:false/);
+ assert.doesNotMatch(source,/wakeApprovedIsolatedInstall\(/);
+ assert.doesNotMatch(source,/REALITY_BUILDER_DISPATCH_GITHUB_TOKEN/);
 });
-
-// The default-branch GitHub Actions worker is the credential-free fallback:
-// it obtains a short-lived GITHUB_TOKEN and verifies the durable owner approval
-// with signed OIDC; the preview's absent token cannot grant model authority.
-test('signed automatic fallback is independent of the browser and fails closed before actual worker execution',()=>{
+test('chat reports the ledger wake state and avoids falsely claiming GitHub started',()=>{
+ const html=readFileSync('index.html','utf8');
  const route=readFileSync('api/reality/personal-qualified-capability-approve.js','utf8');
- const home=readFileSync('index.html','utf8');
- assert.match(route,/auto_trigger_fallback:'SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL'/);
- assert.match(route,/auto_trigger_instant:false/);
- assert.match(route,/worker_execution_started:false/);
- assert.match(home,/worker start is NOT yet verified/);
+ assert.match(html,/receipt\.auto_trigger==='SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1'/);
+ assert.match(html,/worker start is not verified/);
+ assert.match(html,/No second approval needed/);
+ assert.match(route,/production_changed:false/);
+ assert.match(route,/retry_owner_approval:false/);
 });
