@@ -22,11 +22,14 @@ jobs:
           node --check src/reality-automatic-candidate-receipt-v1.js
           node --check src/reality-job-receipt-pdf-v1.js
           node --check src/reality-discovery-value-v1.js
+          node --check src/reality-two-authorization-execution-preflight-v1.js
+          node --check api/reality/personal-qualified-capabilities.js
+          node --check api/reality/personal-qualified-capability-approve.js
           node --check api/reality/personal-receipt-pdf.js
       - name: Verify exact owner original-work lineage, anti-replay, read-only intake and frontend
         env:
           REALITY_PDF_SMOKE_OUT: artifact/reality-synthetic-receipt-render-check.pdf
-        run: node --test test/reality-issue188-owner-followon-connection-v1.test.js test/reality-issue188-unbound-owner-review-v1.test.js test/reality-automatic-candidate-receipt-v1.test.js test/reality-verified-candidate-receipt-release-v1.test.js test/reality-job-receipt-pdf-v1.test.js test/reality-discovery-value-v1.test.js
+        run: node --test test/reality-issue188-owner-followon-connection-v1.test.js test/reality-issue188-unbound-owner-review-v1.test.js test/reality-automatic-candidate-receipt-v1.test.js test/reality-verified-candidate-receipt-release-v1.test.js test/reality-job-receipt-pdf-v1.test.js test/reality-discovery-value-v1.test.js test/reality-two-authorization-execution-preflight-v1.test.js test/reality-home-owner-authorizations-v1.test.js
       - name: Retain synthetic PDF rendering smoke fixture
         uses: actions/upload-artifact@v4
         with:
