@@ -107,6 +107,14 @@ export async function verifiedOwnerCandidateReview(session){
   });
   const all=owner.jobs.filter(x=>x.capability_id==='reality-general-execution-receipt');
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
+  if(active.length>1)throw Error('CANDIDATE_OWNER_REVIEW_AMBIGUOUS_ACTIVE_WORK');
+  const fresh=active.length===1?Object.freeze({
+   original_work_id:active[0].original_work_id,
+   status:'AWAITING_OWNER_APPROVAL',
+   independently_verified:true,
+   artifact_is_distinct_from_earlier_21_check_receipt:true,
+   owner_approval_issued:false,production_changed:false
+  }):null;
   // Even with an existing qualified *different* candidate, this specific
   // uninstalled proposal is not automatically bound to it.
   return ({
@@ -126,6 +134,7 @@ export async function verifiedOwnerCandidateReview(session){
    new_owner_work_binding_required:true,
    next_step:'CONFIRM_NEW_FOLLOWON_OWNER_WORK_AND_QUALIFY_EXACT_ARTIFACT',
    existing_qualified_other_candidates:active.length,
+   new_job_scoped_candidate_review:fresh,
    external_action_performed:false,original_job_completed_by_this_review:false,
    production_changed:false
   });
