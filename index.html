@@ -4132,7 +4132,15 @@ function wcGapEvidenceCards(){
  if(!wcGapFeedReady)return '<section class="wc-market-research-brief"><strong>Capability gap intake</strong>'+
   '<p>'+esc(wcGapFeedStatus)+'</p></section>';
  const cards=wcGapFeed.slice().sort((a,b)=>a.priority-b.priority).map(x=>{
-  const label=x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?
+  const proof=x.repair_proof;
+  const verifiedRepair=proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'&&
+   proof.installed===false&&proof.owner_install_authorized===false&&
+   proof.fresh_original_work_verified===false&&
+   /^[a-f0-9]{40}$/.test(proof.repair_commit_sha||'')&&
+   Number.isSafeInteger(proof.pull_request_number)&&proof.pull_request_number>0;
+  const label=verifiedRepair?
+   'IMPLEMENTATION DEFECT PROVEN · REPAIR TESTED · INSTALLATION REQUIRES APPROVAL':
+   x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?
    'TESTED CANDIDATE · NEEDS CURRENT OWNER WORK':
    x.kind==='GOVERNED_ORIGINAL_JOB_GAP'?
     (x.verified_missing_capability?'PROVEN GAP · GOVERNED QUEUE':'ORIGINAL JOB · FROZEN VERIFICATION PENDING'):
@@ -4141,6 +4149,21 @@ function wcGapEvidenceCards(){
     'ASSESSED RESEARCH · GAP NOT YET PROVEN';
   const bullet=(label,items)=>'<div><strong>'+esc(label)+'</strong><ul>'+
     items.slice(0,4).map(z=>'<li>'+esc(String(z).slice(0,400))+'</li>').join('')+'</ul></div>';
+  const evidence=verifiedRepair?
+   '<div><strong>Independent frozen RED → GREEN repair proof</strong>'+
+   '<p>Before: '+Number(proof.independent_red_assertion_failures)+
+   ' failed checks · After: '+Number(proof.independent_green_assertion_passes)+
+   ' passed, on the unchanged frozen tests.</p>'+
+   '<p><strong>Confirmed defect:</strong> '+esc(proof.proven_defect_scope)+'</p>'+
+   '<p><strong>Candidate fix:</strong> '+esc(proof.corrected_behavior)+'</p>'+
+   '<p><strong>Not yet proven:</strong> '+esc(proof.remaining_unproven)+'</p>'+
+   '<p><a href="https://github.com/maloney2323/Reality/pull/'+
+    proof.pull_request_number+'" target="_blank" rel="noopener noreferrer">Review exact repair PR</a> · '+
+    '<a href="https://github.com/maloney2323/Reality/actions/runs/'+
+    proof.baseline_run_id+'" target="_blank" rel="noopener noreferrer">Failed baseline</a> · '+
+    '<a href="https://github.com/maloney2323/Reality/actions/runs/'+
+    proof.green_run_id+'" target="_blank" rel="noopener noreferrer">Passed repair tests</a></p>'+
+   '<p><strong>Next:</strong> Owner approval of exact candidate; then isolated install, automatic original-job continuation and independently recorded settlement. None of those completion stages is claimed.</p></div>':'';
   const link=typeof x.source_url==='string'&&
    /^https:\/\//.test(x.source_url)&&!/[<>"'\s]/.test(x.source_url)?
     '<a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Review original evidence</a>':'';
@@ -4148,7 +4171,7 @@ function wcGapEvidenceCards(){
    '<h4>'+esc(x.title)+'</h4>'+
    '<p><strong>What it could change:</strong> '+esc(x.what_it_does||'Unknown')+'</p>'+
    '<p><strong>Potential value:</strong> '+esc(x.potential_value||'Not yet measured')+'</p>'+
-   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+
+   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+evidence+
    '<details><summary>Pros · Cons · Risk · Evidence</summary>'+
    bullet('Pros',x.pros)+bullet('Cons',x.cons)+
    '<p><strong>Risk:</strong> '+esc(x.risk||'Not assessed')+'</p>'+
@@ -4185,6 +4208,15 @@ async function wcLoadGapFeed(){
     !Array.isArray(data.settled_history)||data.settled_history.length>12||
     data.counts?.current_candidates!==data.items.length||
     data.counts?.historical_completed!==data.settled_history.length||
+    !Number.isSafeInteger(data.counts?.verified_implementation_defects??0)||
+    (data.counts?.verified_implementation_defects??0)!==
+     data.items.filter(x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED').length||
+    data.items.some(x=>x.repair_proof&&
+     (x.kind!=='RESEARCH_OPPORTUNITY'||
+      x.repair_proof.installed!==false||
+      x.repair_proof.owner_install_authorized!==false||
+      x.repair_proof.fresh_original_work_verified!==false||
+      x.verified_missing_capability!==false))||
     data.counts?.verified_current_gaps!==
      data.items.filter(x=>x.verified_missing_capability===true).length||
     data.items.some(x=>x.installation_authorized!==false||
@@ -4194,7 +4226,8 @@ async function wcLoadGapFeed(){
   wcGapFeed=data.items;wcGapHistory=data.settled_history;
   wcGapCounts=data.counts;wcGapFeedReady=true;
   wcGapFeedStatus=data.counts.current_candidates+' tracked · '+
-   data.counts.independently_tested_candidates+' independently tested · '+
+   (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
+   data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
    data.counts.historical_completed+' previous completed upgrades. No new install approved.';
   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
