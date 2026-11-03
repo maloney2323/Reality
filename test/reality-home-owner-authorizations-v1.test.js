@@ -62,7 +62,8 @@ test('no auto-approval on page load, session refresh or queue readback',()=>{
   inlineScript.indexOf('async function realityChatApproveOnce('));
  assert.doesNotMatch(refresh,/personal-qualified-capability-approve/);
  assert.doesNotMatch(refresh,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
- assert.match(inlineScript,/if\(yes\)\{void refreshRealitySelfImprovement\(\);void homeOwnerRefresh\(\);void realityChatRefreshEvents\(\);void realityBusinessRefresh\(\);\}/);
+ assert.match(inlineScript,/if\(yes\)\{void refreshRealitySelfImprovement\(\);void homeOwnerRefresh\(\);void realityChatRefreshEvents\(\);void realityBusinessRefresh\(\);void wcInvestigateMarket\(\{restore:true\}\);\}/);
+ assert.doesNotMatch(inlineScript,/if\(yes\)\{[^}]*OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
  assert.match(inlineScript,/if\(homeOwnerSignedIn\(\)\)void homeOwnerRefresh\(\)/);
 });
 test('homepage mobile layout and fail-closed sign-in behavior',()=>{
