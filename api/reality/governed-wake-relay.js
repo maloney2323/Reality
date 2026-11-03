@@ -60,6 +60,14 @@ export default async function handler(req,res){
  try{
   exact(req.body);
   const token=tok(); // Credential never leaves this server process.
+  // A read-only GitHub authentication check MUST succeed before leasing the
+  // durable outbox. An expired, revoked, or repository-inaccessible token
+  // cannot claim a customer's job and force a preventable recovery delay.
+  // This does not prove Contents:write; that is established by the first
+  // independently authorized, exact preview-only wake-file write.
+  const repositoryRef=await github(token,'/git/ref/heads/'+BRANCH);
+  if(!COMMIT.test(String(repositoryRef?.object?.sha||'')))
+   fail('GITHUB_CREDENTIAL_READONLY_PREFLIGHT_UNVERIFIED',503);
   const claim=await edge({action:'claim',relay_nonce:req.body.relay_nonce});
   if(claim.status==='NO_APPROVED_WAKE_READY'&&claim.execution_authorized===false)
    return res.status(200).json({ok:true,status:claim.status,
