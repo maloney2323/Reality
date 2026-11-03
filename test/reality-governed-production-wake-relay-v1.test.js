@@ -26,6 +26,7 @@ function response(){
 const prior=process.env.REALITY_GITHUB_TOKEN;
 const originalFetch=global.fetch;
 const fakeToken='test-token-never-a-real-credential-123456';
+const verifiedNonce={ok:true,status:'RELAY_NONCE_VERIFIED_NOT_CONSUMED',execution_authorized:false,owner_approval_created:false,worker_started:false,production_changed:false};
 test.after(()=>{global.fetch=originalFetch;
  if(prior===undefined)delete process.env.REALITY_GITHUB_TOKEN;
  else process.env.REALITY_GITHUB_TOKEN=prior;
@@ -51,31 +52,32 @@ test('forged or incorrectly scoped input never uses a GitHub credential',async()
  }
  assert.equal(called,0);
 });
-test('missing production-only credential fails before consuming relay nonce',async()=>{
+test('missing production-only credential fails after nonce verification but before claiming work',async()=>{
  delete process.env.REALITY_GITHUB_TOKEN;
- let called=0;global.fetch=async()=>{called++;return json({})};
+ let called=0;global.fetch=async(url,opts)=>{
+  called++;assert.equal(JSON.parse(opts.body).action,'verify');
+  return json(verifiedNonce)
+ };
  const r=response();
  await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
  assert.equal(r.statusCode,503);
- assert.equal(called,0);
+ assert.equal(called,1);
  assert.equal(r.body.production_changed,false);
 });
-test('valid production secret is not enough: revoked relay nonce fails closed',async()=>{
+test('revoked relay nonce fails before any GitHub API call',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
  const calls=[];
  global.fetch=async(url,opts)=>{
   calls.push([String(url),opts?.method]);
-  if(String(url).includes('/git/ref/heads/'))
-   return json({object:{sha:'a'.repeat(40)}});
+  assert.equal(JSON.parse(opts.body).action,'verify');
   return json({ok:false,status:'RELAY_REJECTED'},403);
  };
  const r=response();
  await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
  assert.equal(r.statusCode,503);
  assert.equal(r.body.worker_started,false);
- assert.equal(calls.length,2);
- assert.ok(calls[0][0].includes('/git/ref/heads/'));
- assert.ok(calls[1][0].includes('supabase.co/functions/v1/'));
+ assert.equal(calls.length,1);
+ assert.ok(calls[0][0].includes('supabase.co/functions/v1/'));
 });
 test('no approved durable work returns idle without GitHub writes',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
@@ -84,6 +86,8 @@ test('no approved durable work returns idle without GitHub writes',async()=>{
   calls.push([String(url),opts?.method]);
   if(String(url).includes('/git/ref/heads/'))
    return json({object:{sha:'a'.repeat(40)}});
+  const action=JSON.parse(opts.body).action;
+  if(action==='verify')return json(verifiedNonce);
   return json({ok:true,status:'NO_APPROVED_WAKE_READY',
    execution_authorized:false,approval_created:false});
  };
@@ -91,8 +95,9 @@ test('no approved durable work returns idle without GitHub writes',async()=>{
  assert.equal(r.statusCode,200);
  assert.equal(r.body.status,'NO_APPROVED_WAKE_READY');
  assert.equal(r.body.execution_authorized,false);
- assert.equal(calls.length,2);
- assert.ok(calls[0][0].includes('/git/ref/heads/'));
+ assert.equal(calls.length,3);
+ assert.ok(calls[0][0].includes('supabase.co/functions/v1/'));
+ assert.ok(calls[1][0].includes('/git/ref/heads/'));
  assert.ok(calls.every(x=>x[1]!=='PUT'));
 });
 test('a real bounded approval can deliver ONE exact preview wake with readback',async()=>{
@@ -103,6 +108,7 @@ test('a real bounded approval can deliver ONE exact preview wake with readback',
   const u=String(url);calls.push([u,opts?.method]);
   if(u.includes('/functions/v1/reality-governed-wake-relay-v1')){
    const request=JSON.parse(opts.body);
+   if(request.action==='verify')return json(verifiedNonce);
    if(request.action==='claim')return json(claim);
    if(request.action==='ack'){
     assert.equal(request.approval_id,claim.approval_id);
@@ -151,6 +157,8 @@ test('claim lacking a scoped ack nonce cannot initiate any GitHub writes',async(
   if(opts.method==='PUT')writes++;
   if(String(url).includes('/git/ref/heads/'))
    return json({object:{sha:'a'.repeat(40)}});
+  if(String(url).includes('supabase.co/functions/v1/')&&
+     JSON.parse(opts.body).action==='verify')return json(verifiedNonce);
   return json({...claim,ack_nonce:undefined});
  };
  const r=response();
@@ -166,6 +174,8 @@ test('fabricated claim never writes a file or reports a started worker',async()=
   if(opts.method==='PUT')writes++;
   if(String(url).includes('/git/ref/heads/'))
    return json({object:{sha:'a'.repeat(40)}});
+  if(String(url).includes('supabase.co/functions/v1/')&&
+     JSON.parse(opts.body).action==='verify')return json(verifiedNonce);
   return json({...claim,artifact_sha256:'forged'});
  };
  const r=response();
@@ -175,11 +185,12 @@ test('fabricated claim never writes a file or reports a started worker',async()=
  assert.equal(r.body.worker_started,false);
 });
 
-test('invalid or expired GitHub token fails before consuming nonce or claiming work',async()=>{
+test('invalid GitHub token fails AFTER verified nonce but BEFORE claiming work',async()=>{
  process.env.REALITY_GITHUB_TOKEN=fakeToken;
  const calls=[];
  global.fetch=async(url,opts)=>{
   calls.push([String(url),opts?.method]);
+  if(String(url).includes('supabase.co/functions/v1/'))return json(verifiedNonce);
   return json({message:'Bad credentials'},401);
  };
  const r=response();
@@ -187,7 +198,23 @@ test('invalid or expired GitHub token fails before consuming nonce or claiming w
  assert.equal(r.statusCode,503);
  assert.equal(r.body?.status,'RELAY_DELIVERY_NOT_VERIFIED');
  assert.equal(r.body?.execution_authorized,false);
+ assert.equal(calls.length,2);
+ assert.ok(calls[0][0].includes('/functions/v1/'));
+ assert.ok(calls[1][0].includes('/git/ref/heads/'));
+ assert.ok(!calls.some((x,i)=>i>1));
+});
+
+test('invalid but well-formed nonce never consumes production credential quota',async()=>{
+ process.env.REALITY_GITHUB_TOKEN=fakeToken;
+ const calls=[];
+ global.fetch=async(url,opts)=>{
+  calls.push([String(url),opts?.method]);
+  return json({ok:false,status:'RELAY_REJECTED'},403);
+ };
+ const r=response();
+ await handler({method:'POST',body:{version:1,relay_nonce:nonce}},r);
+ assert.equal(r.statusCode,503);
  assert.equal(calls.length,1);
- assert.ok(calls[0][0].includes('/git/ref/heads/'));
- assert.ok(!calls[0][0].includes('/functions/v1/'));
+ assert.ok(calls.every(x=>!x[0].includes('api.github.com')));
+ assert.equal(r.body.production_changed,false);
 });
