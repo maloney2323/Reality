@@ -76,6 +76,19 @@ async function callBroker(action){
   body:JSON.stringify({action,approval_id:wake.approval_id,
    dispatch_fence:wake.dispatch_fence})});
  const proof=await response.json().catch(()=>null);
+ if(action==='alive'&&response.status===425){
+  // Bounded ACK-arrival wait is permitted only for an independently
+  // authenticated GitHub OIDC worker and the EXACT current wake receipt.
+  // Other 4xx/5xx responses, missing proof or changed claims fail closed.
+  if(proof?.status==='SIGNED_WORKER_AWAITING_DELIVERY_RECEIPT'&&
+     proof.oidc_verified===true&&proof.execution_authorized===false&&
+     proof.exact_approval_id===wake.approval_id&&
+     proof.dispatch_fence===wake.dispatch_fence&&
+     proof.installation_performed===false&&
+     proof.production_changed===false)
+    return 'DELIVERY_RECEIPT_PENDING';
+  fail('UNVERIFIED_DELIVERY_PENDING_RESPONSE');
+ }
  if(!response.ok||proof?.ok!==true||
    proof.status!==(action==='alive'?
      'WORKER_ALIVE_SIGNED_AND_RECORDED':'GOVERNANCE_READY')||
@@ -86,8 +99,23 @@ async function callBroker(action){
    String(proof.provider_run_attempt)!==e.GITHUB_RUN_ATTEMPT||
    proof.production_changed!==false)
   fail('SIGNED_'+action.toUpperCase()+'_NOT_VERIFIED');
+ return 'VERIFIED';
 }
-await callBroker('alive');
+// A signed GitHub worker may start before the provider-readback recorder
+// stores DISPATCH_ACCEPTED. Wait a strictly bounded period for the current
+// fence, without reusing an OIDC token or installing on an unverified signal.
+const receiptWaitMs=[700,1200,1900,3000,4500,6500,9000];
+let signedLife=false;
+for(let attempt=0;attempt<=receiptWaitMs.length;attempt++){
+ const result=await callBroker('alive');
+ if(result==='VERIFIED'){signedLife=true;break}
+ if(result!=='DELIVERY_RECEIPT_PENDING')
+  fail('UNEXPECTED_SIGNED_DELIVERY_STATE');
+ if(attempt===receiptWaitMs.length)
+  fail('SIGNED_DELIVERY_RECEIPT_TIMEOUT_NO_INSTALL');
+ await new Promise(resolve=>setTimeout(resolve,receiptWaitMs[attempt]));
+}
+if(!signedLife)fail('SIGNED_LIFE_NOT_RECORDED');
 await callBroker('ready');
 setReady('true');
 console.log('REALITY_OIDC_LIFE_AND_FRESH_GOVERNANCE_RECORDED',JSON.stringify({
