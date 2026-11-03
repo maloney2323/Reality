@@ -5,8 +5,6 @@ import {authenticatedChatSession,privateChatConfig,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
-import {wakeApprovedIsolatedInstall}
- from '../../src/reality-genuine-approved-install-wake-v1.js';
 import {assessTwoAuthorizationExecutionPreflight}
  from '../../src/reality-two-authorization-execution-preflight-v1.js';
 export const maxDuration=45;
@@ -89,45 +87,56 @@ export default async function handler(req,res){
    receipt?.original_job_completed!==false||
    receipt?.production_changed!==false)
    throw Error('OWNER_APPROVAL_RECEIPT_MISMATCH');
-  // Durable owner permission has already been granted. Wake only that exact
-  // approval using a once-only GitHub commit; the worker independently
-  // rechecks the signed receipt. Never claim that a wake equals execution.
+  // Approval and wake intent are committed in the SAME database transaction.
+  // pg_net notifies the trusted edge broker asynchronously, and Postgres cron
+  // checks the durable outbox every minute even with the browser closed.
+  // This route NEVER writes a GitHub file, mints new authority, or retries
+  // installation. Post-commit readback identifies this exact approval only.
   let wake;
   try{
-   wake=await wakeApprovedIsolatedInstall({receipt});
-   if(wake.original_work_id!==receipt.original_work_id||
-      wake.artifact_sha256!==receipt.artifact_sha256||
-      wake.approval_id!==receipt.approval_id||
-      wake.dispatched!==true||
-      !['SIGNED_WORKER_WAKE_COMMITTED','SIGNED_WORKER_WAKE_ALREADY_PRESENT']
-        .includes(wake.status))
-    throw Error('APPROVED_WAKE_READBACK_MISMATCH');
-  }catch(error){
-   // Fast GitHub write dispatch is optional; the signed default-branch
-   // GitHub Actions scheduler independently polls the same durable owner
-   // approval and dispatches only after rechecking exact signed ownership.
-   // GitHub schedule timing can be delayed: DO NOT claim the worker woke.
-   // Never ask the owner to approve again, mint another approval, or replay.
-   const fastPathUnavailable=
-    String(error?.message||'')===
-     'REALITY_APPROVED_WAKE_PREVIEW_GITHUB_WORKER_WRITE_TOKEN_REQUIRED';
-   console.warn('REALITY_OWNER_APPROVED_WAKE_PENDING',
-    fastPathUnavailable?'SIGNED_SCHEDULED_FALLBACK_REQUIRED':
-     'PROVIDER_WAKE_OR_READBACK_UNVERIFIED');
+   const readback=await fetch(db.url+
+    '/rest/v1/rpc/reality_read_owner_governed_wakes_v1',{
+    method:'POST',redirect:'error',cache:'no-store',
+    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+      accept:'application/json','content-type':'application/json'},
+    body:JSON.stringify({p_owner_id:session.user_id})});
+   const data=await readback.json().catch(()=>null);
+   if(!readback.ok||data?.status!=='OWNER_GOVERNED_WAKE_READBACK'||
+      data?.read_only!==true||data?.production_changed!==false||
+      !Array.isArray(data?.wakes)||data.wakes.length>12)
+     throw Error('DURABLE_WAKE_READBACK_UNAVAILABLE');
+   const exact=data.wakes.filter(entry=>
+     entry.approval_id===receipt.approval_id &&
+     entry.original_work_id===receipt.original_work_id &&
+     entry.artifact_sha256===receipt.artifact_sha256 &&
+     entry.preview_only===true);
+   if(exact.length!==1||
+     !['WAKE_PENDING','DISPATCH_CLAIMED','DISPATCH_ACCEPTED',
+       'WORKER_ALIVE','GOVERNANCE_READY','EXECUTING','RETRY_PENDING',
+       'STALE_APPROVAL_BLOCKED','ESCALATED','SETTLED',
+       'RECEIPT_VERIFIED'].includes(exact[0].wake_state))
+     throw Error('DURABLE_EXACT_WAKE_MISSING');
+   wake=exact[0];
+  }catch{
+   // The approval may already have committed. No second owner action is safe.
+   console.warn('REALITY_APPROVED_WAKE_READBACK_UNAVAILABLE');
    return res.status(202).json({ok:true,...receipt,
     worker_wake_status:'WORKER_WAKE_NOT_VERIFIED',
-    auto_trigger_fallback:'SIGNED_DEFAULT_BRANCH_SCHEDULER_POLL',
-    auto_trigger_status:'AWAITING_INDEPENDENT_GITHUB_SCHEDULED_DISPATCH',
-    auto_trigger_instant:false,
+    auto_trigger:'SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1',
+    auto_trigger_status:'DURABLE_OUTBOX_READBACK_UNAVAILABLE',
     worker_execution_started:false,installation_completed:false,
-    next_step:'AUTO_TRIGGER_PENDING_NO_SECOND_OWNER_ACTION',
-    retry_owner_approval:false});
+    next_step:'READ_ONLY_LEDGER_RECOVERY_DO_NOT_REAPPROVE',
+    retry_owner_approval:false,production_changed:false});
   }
   return res.status(202).json({ok:true,...receipt,
-   worker_wake_status:wake.status,
-   worker_execution_started:false,installation_completed:false,
-   next_step:'APPROVAL_RECORDED_WORKER_WAKE_COMMITTED',
-   retry_owner_approval:false});
+   auto_trigger:'SIGNED_DB_OUTBOX_EDGE_WATCHDOG_V1',
+   auto_trigger_status:wake.wake_state,
+   worker_wake_status:wake.wake_state,
+   delivery_attempts:wake.dispatch_attempts,
+   worker_execution_started:!!wake.worker_alive_at,
+   installation_completed:false,
+   next_step:'EDGE_DISPATCH_AND_WATCHDOG_OWN_RECOVERY',
+   retry_owner_approval:false,production_changed:false});
  }catch{
   return res.status(503).json({ok:false,
    error:'OWNER_EXACT_APPROVAL_UNAVAILABLE',
