@@ -37,7 +37,7 @@ export function assessMaterialWakeDrift(approvalSnapshot,current){
     current.approval_consumed!==false||current.original_job_settled!==false)
   return Object.freeze({status:'EVIDENCE_UNAVAILABLE_BLOCKED',governance_ready:false});
  const fields=['original_work_id','artifact_sha256','pre_state_hash',
-  'goal_transition_event_id','provider_failure_hash','target_environment'];
+  'goal_transition_event_id','provider_failure_hash','target_environment','valid_time'];
  const changed=fields.filter(field=>!equal(a[field],current[field]));
  if(changed.length)
   return Object.freeze({status:'STALE_APPROVAL_BLOCKED',
@@ -60,7 +60,8 @@ export function mintDeliveryWarrant({snapshot,fence,privateKey,kid,now=Date.now(
  const payload={iss:ISSUER,aud:AUDIENCE,iat:ts,nbf:ts-2,exp:ts+ttlSeconds,
   jti:nonce,approval_id:s.approval_id,original_work_id:s.original_work_id,
   artifact_sha256:s.artifact_sha256,pre_state_hash:s.pre_state_hash,
-  goal_transition_event_id:s.goal_transition_event_id,valid_time:s.valid_time,
+  goal_transition_event_id:s.goal_transition_event_id,
+  provider_failure_hash:s.provider_failure_hash,valid_time:s.valid_time,
   target_environment:s.target_environment,fence};
  const body=encode(header)+'.'+encode(payload);
  const signature=sign(null,Buffer.from(body),privateKey).toString('base64url');
@@ -94,7 +95,8 @@ export function verifyDeliveryWarrant({token,publicKey,kid,expected,now=Date.now
   fail('WARRANT_EXPIRED_OR_NOT_YET_VALID');
  const e=assertWakeIdentity(expected);
  for(const field of ['approval_id','original_work_id','artifact_sha256',
-    'pre_state_hash','goal_transition_event_id','target_environment','valid_time'])
+    'pre_state_hash','goal_transition_event_id','provider_failure_hash',
+    'target_environment','valid_time'])
   if(!equal(body[field],e[field]))fail('WARRANT_APPROVAL_MISMATCH');
  if(!Number.isSafeInteger(body.fence)||body.fence<1||
     body.fence!==expected.fence)fail('WARRANT_FENCE_MISMATCH');
