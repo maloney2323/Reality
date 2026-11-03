@@ -53,8 +53,8 @@ SET search_path TO '' AS $fn$
 BEGIN
  IF current_user<>'service_role' THEN
    RAISE EXCEPTION 'WAKE_HINT_SERVICE_ROLE_REQUIRED'; END IF;
- IF NOT reality_internal.verify_governed_wake_hmac_v1(
-    p_nonce,p_issued_at,p_cause,p_signature) THEN
+ IF reality_internal.verify_governed_wake_hmac_v1(
+    p_nonce,p_issued_at,p_cause,p_signature) IS DISTINCT FROM true THEN
    RAISE EXCEPTION 'WAKE_HINT_SIGNATURE_OR_TIME_INVALID'; END IF;
  INSERT INTO reality_internal.governed_wake_hint_nonces_v1(nonce,issued_at)
  VALUES(p_nonce,to_timestamp(p_issued_at))
@@ -96,7 +96,10 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.send_governed_wake_hint_v1(text)
  FROM PUBLIC,anon,authenticated;
--- Invoked only by its database trigger or the trusted postgres cron job.
+-- Exactly the signed owner-approval trigger (service_role) may enqueue hints;
+-- the regular watchdog runs as postgres.
+GRANT EXECUTE ON FUNCTION reality_internal.send_governed_wake_hint_v1(text)
+ TO service_role;
 
 CREATE OR REPLACE FUNCTION reality_internal.wake_approved_on_outbox_v1()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER
