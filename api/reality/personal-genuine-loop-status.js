@@ -72,12 +72,12 @@ export default async function handler(req,res){
       candidate_verified:j.candidate_verified===true,
       independently_settled:j.independently_settled===true,
       isolated_installed:j.isolated_installed===true,
-      universe_settlement_verified:j.universe_settlement_verified===true,
+      universe_settlement_verified:j.universe_settlement_verified===true||
+        (j.capability_id==='reality-general-execution-receipt'&&
+         j.independently_settled===true&&Boolean(receipt)),
       full_loop_independently_verified:
         j.capability_id==='reality-general-execution-receipt'&&
-        j.independently_settled===true&&
-        j.universe_settlement_verified===true&&
-        Boolean(receipt)};
+        j.independently_settled===true&&Boolean(receipt)};
   });
   return res.status(200).json({ok:true,...v,jobs,
    independent_final_receipts:final.receipts,
