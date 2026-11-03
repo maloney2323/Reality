@@ -61,7 +61,7 @@ Deno.serve(async req=>{
      body.version!==1||body.action!=='wake'||
      !['approval','watchdog','audit'].includes(String(body.cause))||
      !UUID.test(String(body.nonce||''))||
-     !Number.isSafeInteger(body.issued_at)||
+     (typeof body.issued_at!=='number'||!Number.isSafeInteger(body.issued_at))||
      !SHA64.test(req.headers.get('x-reality-wake-signature')||''))
    reject('SIGNED_HINT_ENVELOPE_INVALID');
   const proof=await rpc('reality_authenticate_governed_wake_hint_v1',{
@@ -87,11 +87,11 @@ Deno.serve(async req=>{
     signed_hint_verified:true,worker_started:false,production_changed:false});
   if(claim.status!=='DELIVERY_CLAIMED_NOT_EXECUTION_AUTHORIZED'||
      !UUID.test(String(claim.approval_id||''))||
-     !UUID.test(String(claim.trigger_id||''))&&claim.trigger_id!==undefined||
+     !UUID.test(String(claim.trigger_id||''))||
      !UUID.test(String(claim.claim_id||''))||
      !WORK.test(String(claim.original_work_id||''))||
      !SHA64.test(String(claim.artifact_sha256||''))||
-     !Number.isSafeInteger(claim.dispatch_fence)||
+     (typeof claim.dispatch_fence!=='number'||!Number.isSafeInteger(claim.dispatch_fence))||
      claim.dispatch_fence<1||
      claim.target_environment!=='ISOLATED_PREVIEW'||
      claim.execution_authorized!==false||
@@ -105,7 +105,7 @@ Deno.serve(async req=>{
   const path='reality-approved-install-wakes/'+claim.approval_id+'.json';
   const source=JSON.stringify({
     approval_id:claim.approval_id,
-    trigger_id:undefined, // no authority is inferred from the wake file
+    trigger_id:claim.trigger_id, // exact queued job identity; NOT authority
     original_work_id:claim.original_work_id,
     artifact_sha256:claim.artifact_sha256,
     target_environment:'ISOLATED_PREVIEW',
