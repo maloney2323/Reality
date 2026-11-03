@@ -34,7 +34,7 @@ test('broker validates signed wake before any GitHub dispatch or leasing',()=>{
  assert.match(broker,/-attempt-/);
  assert.match(broker,/reality_record_governed_delivery_v1/);
  assert.match(broker,/EXISTING_WAKE_FILE_COLLISION/);
- assert.doesNotMatch(broker,/\/application\\\\\/json\/i/);
+ assert.match(broker,/DISPATCH_CREDENTIAL_MISSING/);
 });
 test('worker OIDC identity verifies official GitHub signature, claims and provider run',()=>{
  assert.match(life,/token\.actions\.githubusercontent\.com/);
