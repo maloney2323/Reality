@@ -198,7 +198,7 @@ grant execute on function public.reality_read_owner_market_stage_v1(uuid)
 -- Backfill the already-saved customer report without claiming any new model run.
 select reality_internal.reconcile_market_stages_v1();
 -- Independent of browser or sign-in. Reconciliation is bounded and idempotent.
-select pg_catalog.cron.schedule(
+select cron.schedule(
  'reality-market-investigation-stage-watchdog-v1',
  '* * * * *',
  'select reality_internal.reconcile_market_stages_v1()'
