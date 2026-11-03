@@ -50,3 +50,47 @@ export function createAutomaticCandidateReceipt({
   production_changed:false,
  });
 }
+
+export function independentlyReadBackReleasedCandidate({
+ candidateReceipt, ownerReadback, expectedVerifierReportSha256,
+}={}){
+ if(candidateReceipt?.schema!=='reality-automatic-verified-candidate-receipt-v1'||
+   candidateReceipt.status!=='VERIFIED_CANDIDATE_SOURCE_OBSERVED'||
+   candidateReceipt.installation_authorized!==false||
+   !sha.test(expectedVerifierReportSha256)||
+   ownerReadback?.schema!=='reality-owner-released-capability-receipts-v1'||
+   ownerReadback.owner_work_authorized_by_receipts!==false||
+   ownerReadback.installation_authorized!==false||
+   ownerReadback.production_changed!==false||
+   !Array.isArray(ownerReadback.receipts)||ownerReadback.receipts.length>20)
+   fail('DURABLE_OWNER_RELEASE_READBACK_REQUIRED');
+ const found=ownerReadback.receipts.filter(r=>
+   r.receipt_id===candidateReceipt.receipt_id);
+ if(found.length!==1)fail('DURABLE_RECEIPT_NOT_UNIQUE');
+ const r=found[0];
+ if(r.status!=='RELEASED_VERIFIED_PROVIDER_EVIDENCE'||
+   r.durable_readback_verified!==true||
+   r.receipt_id!==candidateReceipt.receipt_id||
+   r.source_issue!==candidateReceipt.source_issue||
+   r.source_sha256!==candidateReceipt.source_sha256||
+   r.provider_run_id!==candidateReceipt.provider_run_id||
+   r.verified_checks_passed!==candidateReceipt.verification_checks_passed||
+   r.verifier_archive_sha256!==candidateReceipt.independent_verification_archive_sha256||
+   r.verifier_report_sha256!==expectedVerifierReportSha256||
+   r.owner_work_binding_verified!==false||
+   r.installation_authorized!==false||r.installed!==false||
+   r.original_job_settled_by_this_receipt!==false||
+   r.production_changed!==false||
+   typeof r.released_at!=='string'||!Number.isFinite(Date.parse(r.released_at)))
+   fail('DURABLE_RECEIPT_SOURCE_OR_AUTHORITY_MISMATCH');
+ return Object.freeze({
+   ...candidateReceipt,
+   status:'INDEPENDENTLY_VERIFIED_AND_DURABLY_RELEASED',
+   durable_release_readback_verified:true,
+   durable_release_at:r.released_at,
+   record_is_immutable:true,
+   new_owner_job_created:false,owner_work_authorized:false,
+   installation_authorized:false,installed:false,
+   original_job_settled_by_candidate:false,production_changed:false,
+ });
+}
