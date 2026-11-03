@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/reality-one-button-real-full-loop-20261103
+      - feature/reality-general-capability-engine-20261101
   pull_request:
     branches:
       - feature/reality-general-capability-engine-20261101
@@ -22,6 +23,9 @@ jobs:
       - name: Verify button, exact owner route, duplicate protection and final receipt
         run: |
           node --check one-button-full-loop-v1.js
+          node --check src/reality-real-repair-opportunity-intake-v1.0.js
+          node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+          node --test test/reality-original-repair-worker-handoff-v1.0.test.js
           node --test test/reality-one-button-real-full-loop-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js
