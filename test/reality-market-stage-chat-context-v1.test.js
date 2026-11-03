@@ -99,7 +99,8 @@ test('wrong environment or secrets does not permit model grounding',async()=>{
 test('chat existing governance and atomic publication remain intact',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(api,/readVerifiedMarketStageForChat/);
- assert.match(api,/connected_world_observations:marketStageObservations/);
+ assert.match(api,/connected_world_observations:\[/);
+ assert.match(api,/\.\.\.marketStageObservations,\.\.\.verifiedUpgradeObservations/);
  assert.match(api,/action_authorized:false,execution_authorized:false/);
  assert.match(api,/assertFinalChatPublicationProof/);
  assert.match(api,/publishPrivateAssistantAtomically/);

@@ -5,6 +5,8 @@ import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intellige
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
+import {readVerifiedResearchUpgradeForChat}
+ from '../../src/reality-verified-repair-chat-context-v1.js';
 import {createHash} from 'node:crypto';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
@@ -129,8 +131,10 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const marketStageObservations=await readVerifiedMarketStageForChat({
-   session,message:text,db:isolated});
+  const [marketStageObservations,verifiedUpgradeObservations]=await Promise.all([
+   readVerifiedMarketStageForChat({session,message:text,db:isolated}),
+   readVerifiedResearchUpgradeForChat({session,message:text,db:isolated})
+  ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    model:'gpt-4.1-mini',apiKey:key,
@@ -139,7 +143,9 @@ export default async function handler(req,res){
     continuity_root_id:'personal:chat:'+scope,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
-    connected_world_observations:marketStageObservations,
+    connected_world_observations:[
+     ...marketStageObservations,...verifiedUpgradeObservations
+    ],
     action_authorized:false,execution_authorized:false,
    },
    verifiedConversationTurns:history.messages,
