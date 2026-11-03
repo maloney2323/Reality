@@ -27,14 +27,18 @@ test('broker validates signed wake before any GitHub dispatch or leasing',()=>{
  const signed=broker.indexOf("reality_authenticate_governed_wake_hint_v1");
  const claim=broker.indexOf("reality_claim_governed_wake_v1");
  const githubWrite=broker.indexOf("method:'PUT'");
- assert.ok(signed>0&&claim>signed&&githubWrite>claim);
- assert.match(broker,/DISPATCH_CREDENTIAL_MISSING/);
+ const relay=broker.indexOf("reality_issue_governed_wake_relay_v1");
+ assert.ok(signed>0&&relay>signed&&claim>signed&&githubWrite>claim);
+ assert.match(broker,/PRODUCTION_RELAY_NOT_READY/);
  assert.match(broker,/worker_started:false/);
  assert.match(broker,/dispatch_fence/);
  assert.match(broker,/-attempt-/);
  assert.match(broker,/reality_record_governed_delivery_v1/);
  assert.match(broker,/EXISTING_WAKE_FILE_COLLISION/);
- assert.match(broker,/DISPATCH_CREDENTIAL_MISSING/);
+ assert.match(broker,/reality_issue_governed_wake_relay_v1/);
+ assert.match(broker,/reality-blond\\.vercel\\.app\\/api\\/reality\\/governed-wake-relay/);
+ assert.match(broker,/owner_approval_created!==false/);
+ assert.match(broker,/signed_hint_verified:true/);
 });
 test('worker OIDC identity verifies official GitHub signature, claims and provider run',()=>{
  assert.match(life,/token\.actions\.githubusercontent\.com/);
