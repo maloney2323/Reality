@@ -1,0 +1,32 @@
+name: Reality independent budget integrity gap — red / green proof
+on:
+  push:
+    branches:
+      - feature/reality-budget-gap-independent-proof-20261103
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+permissions:
+  contents: read
+jobs:
+  frozen-budget-gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Pin actual source and unmodified acceptance bytes
+        run: |
+          git rev-parse HEAD
+          sha256sum test/reality-frozen-regressions/reality-budget-identity-and-evaluation-quota-v1.test.js
+          sha256sum src/reality-cognitive-research-engine-v0.1.js
+      - name: Frozen real-module budget identity and evaluation-call quota
+        run: node --test test/reality-frozen-regressions/reality-budget-identity-and-evaluation-quota-v1.test.js
+      - name: Existing cognitive research and governance regressions
+        run: |
+          node --test test/reality-cognitive-research-engine-v0.1.test.js
+          node --test test/reality-genuine-capability-failure-classifier-v1.test.js
