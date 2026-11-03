@@ -55,7 +55,7 @@ test('owner review does not provide direct install or hidden approval',()=>{
  assert.match(review,/method:'GET'/);
  assert.doesNotMatch(review,/reality_owner_approve_qualified_preview_v1/);
  assert.match(review,/new_owner_work_binding_required:true/);
- assert.match(html,/Automatic source-evidence receipt:/);
+ assert.match(html,/Durably released verified receipt:/);
  assert.match(html,/receipt\.automatic_candidate_receipt\.receipt_id/);
  assert.doesNotMatch(html,/Save work receipt · Start automatic repair preparation/);
  assert.doesNotMatch(html,/confirm\('Create new follow-on Reality work for verified #188/);
