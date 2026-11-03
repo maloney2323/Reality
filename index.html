@@ -2199,7 +2199,7 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   title.textContent='Follow-on capability proposal · Independently verified';
   const status=document.createElement('p');
   status.className='home-owner-state';
-  status.textContent='23/23 tests passed · Zero checked security regressions · New owner job required';
+  status.textContent='21/21 independently verified tests passed · New owner work receipt required';
   const body=document.createElement('p');
   body.textContent='Reality corrected its execution-receipt verifier. The original #188 job is already settled, so this new source cannot borrow its approval or be installed until it is tied to a new authenticated original work item.';
   const source=document.createElement('code');
@@ -2216,10 +2216,10 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   note.textContent='Approval is intentionally unavailable until Reality records a fresh owner-confirmed goal/work binding and independently qualifies these exact source bytes. Do not approve the old settled work again.';
   const action=document.createElement('button');action.type='button';
   action.className='repair-primary';
-  action.textContent='Create new owner-bound job · Investigate only';
+  action.textContent='Save work receipt · Start automatic repair preparation';
   const progress=document.createElement('p');progress.className='home-owner-note';
   progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');
-  progress.textContent='This creates a different original work ID under your currently confirmed goal. It does not authorize installation.';
+  progress.textContent='This records an original work receipt for the verified repair under your confirmed goal and starts governed investigation. Installation will require your later approval.';
   action.addEventListener('click',async()=>{
    if(action.disabled)return;
    if(!homeOwnerSignedIn()){progress.textContent='Sign in first.';return}
@@ -2229,7 +2229,6 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
     progress.textContent='Open your saved Reality conversation before creating owner work.';
     return;
    }
-   if(!confirm('Create new follow-on Reality work for verified #188? This only authorizes source investigation under your confirmed goal, not installation, issue closure, or production changes.'))return;
    action.disabled=true;
    progress.textContent='Recording new original owner work and independently investigating source… Do not submit again if the response is uncertain.';
    try{
@@ -2252,10 +2251,10 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
        data.original_job_completed!==false||
        data.production_changed!==false)
       throw Error(String(data.error||'OWNER_WORK_READBACK_UNVERIFIED_DO_NOT_RESUBMIT'));
-    progress.textContent='New original work independently recorded: '+data.new_original_work_id+
+    progress.textContent='Verified owner work receipt: '+data.new_original_work_id+
       '. Investigation: '+String(data.investigation_status||'CHECK_REQUIRED')+
       '. Next: independently qualify the exact artifact and obtain separate installation approval. No installation occurred.';
-    action.textContent='Follow-on job recorded · Do not repeat';
+    action.textContent='Work receipt saved · Investigation initiated';
    }catch(error){
     progress.textContent='Work status uncertain: '+String(error?.message||'UNKNOWN')+
       '. Do not click again. Check Unfinished Work or ask Reality to reconcile the saved owner-work receipt.';
