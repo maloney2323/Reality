@@ -2191,17 +2191,23 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
    receipt.production_changed!==false||
    receipt.independent_tests_passed!==21||
    receipt.security_regressions_remaining!==0||
-   !/^[a-f0-9]{64}$/.test(String(receipt.source_sha256||'')))
+   !/^[a-f0-9]{64}$/.test(String(receipt.source_sha256||''))||
+   receipt.automatic_candidate_receipt?.status!=='VERIFIED_CANDIDATE_SOURCE_OBSERVED'||
+   receipt.automatic_candidate_receipt?.source_sha256!==receipt.source_sha256||
+   receipt.automatic_candidate_receipt?.verification_checks_passed!==21||
+   receipt.automatic_candidate_receipt?.installation_authorized!==false||
+   !/^candidate-receipt:[a-f0-9]{32}$/.test(
+       String(receipt.automatic_candidate_receipt?.receipt_id||'')))
    throw Error('INDEPENDENT_OWNER_REVIEW_PROOF_UNAVAILABLE');
   target.replaceChildren();
   const card=document.createElement('article');card.className='home-owner-item';
   const title=document.createElement('h3');
-  title.textContent='Follow-on capability proposal · Independently verified';
+  title.textContent='Automatic candidate evidence receipt · Independently verified';
   const status=document.createElement('p');
   status.className='home-owner-state';
-  status.textContent='21/21 independently verified tests passed · New owner work receipt required';
+  status.textContent='21/21 independently verified checks passed · Evidence receipt ready';
   const body=document.createElement('p');
-  body.textContent='Reality corrected its execution-receipt verifier. The original #188 job is already settled, so this new source cannot borrow its approval or be installed until it is tied to a new authenticated original work item.';
+  body.textContent='Reality independently verified a proposed execution-receipt repair. This evidence receipt is automatic and does not grant installation authority. The earlier #188 job remains settled.';
   const source=document.createElement('code');
   source.style.overflowWrap='anywhere';
   source.textContent='Exact source SHA-256: '+receipt.source_sha256;
@@ -2213,54 +2219,14 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   link.textContent='Review current independently verified repair evidence (GitHub run)';
   const note=document.createElement('p');
   note.className='home-owner-note';
-  note.textContent='Approval is intentionally unavailable until Reality records a fresh owner-confirmed goal/work binding and independently qualifies these exact source bytes. Do not approve the old settled work again.';
-  const action=document.createElement('button');action.type='button';
-  action.className='repair-primary';
-  action.textContent='Save work receipt · Start automatic repair preparation';
-  const progress=document.createElement('p');progress.className='home-owner-note';
-  progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');
-  progress.textContent='This records an original work receipt for the verified repair under your confirmed goal and starts governed investigation. Installation will require your later approval.';
-  action.addEventListener('click',async()=>{
-   if(action.disabled)return;
-   if(!homeOwnerSignedIn()){progress.textContent='Sign in first.';return}
-   const conversation=typeof window.realityActiveConversationId==='function'?
-    window.realityActiveConversationId():null;
-   if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(conversation||''))){
-    progress.textContent='Open your saved Reality conversation before creating owner work.';
-    return;
-   }
-   action.disabled=true;
-   progress.textContent='Recording new original owner work and independently investigating source… Do not submit again if the response is uncertain.';
-   try{
-    const response=await fetch('/api/reality/personal-issue188-followon-work',{
-     method:'POST',credentials:'same-origin',cache:'no-store',
-     headers:{'content-type':'application/json'},
-     body:JSON.stringify({
-      intent:'CREATE_FRESH_ISSUE188_FOLLOWON_INVESTIGATION',
-      conversation_id:conversation,source_sha256:receipt.source_sha256
-     })
-    });
-    const data=await response.json();
-    if(!response.ok||data.ok!==true||
-       data.status!=='FRESH_FOLLOWON_OWNER_INVESTIGATION_BOUND'||
-       data.prior_settled_work_id!==receipt.previous_owner_work_id||
-       !/^work:[a-f0-9]{32}$/.test(String(data.new_original_work_id||''))||
-       data.new_original_work_id===data.prior_settled_work_id||
-       data.owner_approval_issued!==false||
-       data.installation_performed!==false||
-       data.original_job_completed!==false||
-       data.production_changed!==false)
-      throw Error(String(data.error||'OWNER_WORK_READBACK_UNVERIFIED_DO_NOT_RESUBMIT'));
-    progress.textContent='Verified owner work receipt: '+data.new_original_work_id+
-      '. Investigation: '+String(data.investigation_status||'CHECK_REQUIRED')+
-      '. Next: independently qualify the exact artifact and obtain separate installation approval. No installation occurred.';
-    action.textContent='Work receipt saved · Investigation initiated';
-   }catch(error){
-    progress.textContent='Work status uncertain: '+String(error?.message||'UNKNOWN')+
-      '. Do not click again. Check Unfinished Work or ask Reality to reconcile the saved owner-work receipt.';
-   }
-  });
-  card.append(title,status,body,source,next,link,note,action,progress);
+  note.textContent='Reality must establish a fresh, currently authorized work scope and qualify the exact candidate before it can request installation consent. No manual receipt step.';
+  const receiptId=document.createElement('p');
+  receiptId.className='home-owner-note';
+  receiptId.textContent='Automatic source-evidence receipt: '+receipt.automatic_candidate_receipt.receipt_id;
+  const autoNote=document.createElement('p');
+  autoNote.className='home-owner-note';
+  autoNote.textContent='No receipt button is required. Reality already recorded the independently verified candidate in GitHub. A separate original-work authorization must be verified before isolated installation can be offered.';
+  card.append(title,status,body,source,receiptId,next,link,note,autoNote);
   target.appendChild(card);
  }catch{
   if(epoch!==homeOwnerRefreshEpoch)return;
