@@ -51,7 +51,7 @@ export function assessTwoAuthorizationExecutionPreflight(entry){
  }
  if(id==='reality-general-execution-receipt'&&(
    q.attestation_source!=='SIGNED_GITHUB_WORKFLOW_WITH_INDEPENDENT_SANDBOX'||
-   !Number.isSafeInteger(q.provider_run_id)||q.provider_run_id<1||
+   !validProviderRunId||
    !Number.isSafeInteger(q.frozen_pass)||q.frozen_pass<35||
    !Number.isSafeInteger(q.candidate_pass)||q.candidate_pass<5||
    q.original_work_id!==entry.original_work_id||
@@ -62,6 +62,14 @@ export function assessTwoAuthorizationExecutionPreflight(entry){
     status:'SIGNED_SOURCE_AND_COMPLETE_EXECUTION_PRECHECK_NOT_VERIFIED',
     two_authorizations_only:true,original_job_completed:false,
   });
+ // Postgres JSON readbacks may carry the signed Actions run as decimal text.
+ // Accept only canonical positive safe integers: never coerce scientific notation,
+ // fractions, leading zeros, booleans, whitespace or unsafe/out-of-range IDs.
+ const runId=q?.provider_run_id;
+ const validProviderRunId=
+  (typeof runId==='number'&&Number.isSafeInteger(runId)&&runId>0)||
+  (typeof runId==='string'&&/^[1-9][0-9]{0,15}$/.test(runId)&&
+   Number.isSafeInteger(Number(runId))&&Number(runId)>0);
  const holdoutNeeded=id==='reality-continuity-settlement-reconciler';
  if(holdoutNeeded&&(q.real_provider_holdout_verified!==true||
   q.real_provider_holdout_artifact_sha256!==q.artifact_sha256))
