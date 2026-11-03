@@ -230,6 +230,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
+      actions: read
       id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -240,7 +241,15 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: {node-version: '22'}
+      - name: Independently record signed worker life and current governance
+        id: worker_life
+        env:
+          REALITY_INSTALL_JOB_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-governed-worker-proof-of-life-v1.mjs
+          node scripts/reality-governed-worker-proof-of-life-v1.mjs
       - name: Only after exact owner approval install on new isolated branch
+        if: steps.worker_life.outputs.ready == 'true'
         id: isolated_install
         env:
           REALITY_INSTALL_JOB_GITHUB_TOKEN: ${{ github.token }}
