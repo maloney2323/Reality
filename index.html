@@ -4854,7 +4854,8 @@ setInterval(refreshSavedShiftHome,300000);
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();void wcInvestigateMarket({restore:true});}
+  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
+  if(yes){void wcInvestigateMarket({restore:true});}
   else{void realityBusinessRefresh();void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
