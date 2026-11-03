@@ -191,7 +191,9 @@ if(actualDecision!==contract.required_decision||
    (disposition?.original_work_id!==ready.original_work_id||
     disposition?.can_generate_candidate!==true)))||
  (!contract.requires_pre_settlement_denial&&disposition?.installation_authorized!==false)||
- disposition?.production_changed===true)
+ (contract.requires_pre_settlement_denial?
+   disposition?.production_changed===true:
+   disposition?.production_changed!==false))
  fail('PROVIDER_BACKED_EXTENSION_RESULT_UNVERIFIED');
 if(contract.requires_reconciliation_evidence&&(
  disposition?.reconciliation?.status!=='PROPOSED_NOT_APPENDED'||
