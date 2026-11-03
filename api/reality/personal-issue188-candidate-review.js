@@ -5,7 +5,7 @@ import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
-import {createAutomaticCandidateReceipt}
+import {createAutomaticCandidateReceipt,independentlyReadBackReleasedCandidate}
  from '../../src/reality-automatic-candidate-receipt-v1.js';
 const REPO='maloney2323/Reality';
 const ID=41547631404;
@@ -13,6 +13,7 @@ const HISTORICAL='work:1eecc0d71b21492e0cfdd527f9c257f3';
 const SOURCE='d084f46d840027acd412b67fceb1636fd35a64f2cc08b9ebb6666d470d1af43d';
 const PROPOSAL_ARCHIVE='sha256:a15f718461a9af61663f10797088df28abac312bf338269bb16b16f6cd0122b4';
 const VERIFIER_ARCHIVE='sha256:166309eddaef9878341871551283989b5da0d612ebb799d2647d8163d8250bdd';
+const VERIFIER_REPORT='cc51acf1bee7f88e7e8e49cb586dd325a5ccb0aa1ee8f5a6406d7580e31d67ae';
 async function provider(path){
  const response=await fetch('https://api.github.com/repos/'+REPO+path,{
   method:'GET',cache:'no-store',redirect:'error',headers:{
@@ -39,16 +40,21 @@ export default async function handler(req,res){
    !db?.strictSecrets||!db.secretKey||
    db.url!==session.config.url||db.project!=='hvkfreoagbrphwghjajw')
    throw Error('ISOLATED_OWNER_REVIEW_PROJECT_MISMATCH');
-  const [run,artifacts,old]=await Promise.all([
+  const [run,artifacts,old,released]=await Promise.all([
    provider('/actions/runs/'+ID),
    provider('/actions/runs/'+ID+'/artifacts?per_page=30'),
    fetch(db.url+'/rest/v1/rpc/reality_read_owner_genuine_loop_v1',{
     method:'POST',cache:'no-store',redirect:'error',headers:{
      apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
      'content-type':'application/json',accept:'application/json'},
+    body:JSON.stringify({p_owner_id:session.user_id})}),
+   fetch(db.url+'/rest/v1/rpc/reality_read_owner_released_capability_receipts_v1',{
+    method:'POST',cache:'no-store',redirect:'error',headers:{
+     apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+     'content-type':'application/json',accept:'application/json'},
     body:JSON.stringify({p_owner_id:session.user_id})})
   ]);
-  if(!old.ok)throw Error('OWNER_UNIVERSE_READBACK_UNAVAILABLE');
+  if(!old.ok||!released.ok)throw Error('OWNER_RECEIPT_DURABLE_READBACK_UNAVAILABLE');
   const owner=await old.json();
   if(run.id!==ID||run.status!=='completed'||run.conclusion!=='success'||
     run.head_repository?.full_name!==REPO||
@@ -63,12 +69,17 @@ export default async function handler(req,res){
     owner.jobs.some(x=>x.original_work_id===HISTORICAL&&
       x.phase!=='SETTLED_ISOLATED'&&x.phase!=='SETTLED'))
    throw Error('PROPOSAL_OR_HISTORICAL_GUARD_READBACK_FAILED');
-  const automaticReceipt=createAutomaticCandidateReceipt({
+  const sourceReceipt=createAutomaticCandidateReceipt({
    run,artifacts,expectedRunId:ID,expectedSourceSha256:SOURCE,
    expectedProposalDigest:PROPOSAL_ARCHIVE.slice('sha256:'.length),
    expectedVerifierDigest:VERIFIER_ARCHIVE.slice('sha256:'.length),
    expectedTests:21,ownerScopeVerified:owner.status==='OWNER_GOVERNED_LOOP_READBACK'&&
     Array.isArray(owner.jobs),
+  });
+  const automaticReceipt=independentlyReadBackReleasedCandidate({
+   candidateReceipt:sourceReceipt,
+   ownerReadback:await released.json(),
+   expectedVerifierReportSha256:VERIFIER_REPORT,
   });
   const all=owner.jobs.filter(x=>x.capability_id==='reality-general-execution-receipt');
   const active=all.filter(x=>x.phase==='AWAITING_OWNER_APPROVAL'&&x.candidate_verified===true);
