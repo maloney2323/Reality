@@ -7,12 +7,12 @@ const repo='maloney2323/Reality';
 export function createAutomaticCandidateReceipt({
  run,artifacts,expectedRunId,expectedSourceSha256,
  expectedProposalDigest,expectedVerifierDigest,
- expectedTests,ownerHistoricalScopeVerified=false,
+ expectedTests,ownerScopeVerified=false,
 }={}){
  if(!Number.isSafeInteger(expectedRunId)||expectedRunId<1||
   !sha.test(expectedSourceSha256)||!sha.test(expectedProposalDigest)||
   !sha.test(expectedVerifierDigest)||!Number.isSafeInteger(expectedTests)||
-  expectedTests<1||ownerHistoricalScopeVerified!==true||
+  expectedTests<1||ownerScopeVerified!==true||
   run?.id!==expectedRunId||run?.status!=='completed'||
   run?.conclusion!=='success'||run?.head_repository?.full_name!==repo||
   run?.head_branch!=='feature/reality-general-capability-engine-20261101'||
