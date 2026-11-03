@@ -559,9 +559,9 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
     <h3 id="wcCapabilityShelfHeading">Capabilities to review</h3>
     <p>See what Reality can do now, what it could improve, and which missing capabilities have independent evidence. A refresh never starts a repair.</p>
    </div>
-   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities</button>
+   <button type="button" id="wcRefreshCapabilities">↻ Refresh capabilities · Run governed audit</button>
   </div>
-  <p id="wcCapabilityRefreshStatus" class="wc-capability-status" role="status" aria-live="polite">Explore one existing Reality capability below, or refresh for source-backed improvement opportunities.</p>
+  <p id="wcCapabilityRefreshStatus" class="wc-capability-status" role="status" aria-live="polite">Explore an implemented Reality capability below, then sign in and refresh to run a governed audit of current failures and gaps.</p>
   <div id="wcCapabilityList" class="wc-capability-cards" aria-live="polite">
    <article class="wc-capability-card">
     <span class="wc-capability-level">BUILT-IN · IMPLEMENTED COMPONENTS</span>
@@ -4168,52 +4168,48 @@ function wcCapabilityCard(record){
  }
  return item;
 }
-function wcCapabilityPick({qualified=[],gaps=[],catalog=[]}={}){
+function wcCapabilityPick({qualified=[],audit=[],catalog=[]}={}){
  const ranked=[],seen=new Set();
  const add=(record,key)=>{
-  if(ranked.length>=6||seen.has(key)||!wcCapabilityValidProof(record.url))return;
+  if(ranked.length>=6||seen.has(key))return;
   seen.add(key);ranked.push(record);
  };
- // Qualified for owner review, NOT approved or installed.
  for(const q of qualified){
   if(q?.phase!=='AWAITING_OWNER_APPROVAL'||q?.approval!=null||
      q?.qualification?.installation_authorized!==false||
      q?.qualification?.original_job_completed!==false||
      !/^work:[a-f0-9]{32}$/.test(String(q.original_work_id||''))||
      typeof q.capability_id!=='string')continue;
-  // Qualified records may contain private provider paths but NO verified
-  // public URL. Show the owner the exact work ID, without inventing proof.
-  const item={
+  add({
    level:'INDEPENDENTLY QUALIFIED · OWNER REVIEW',
    title:'Qualified capability: '+q.capability_id.slice(0,90),
    description:'Exact original job '+q.original_work_id+
-    ' has a saved qualification for owner review. No installation has been authorized.',
-   url:wcCapabilityBuiltIn.url,
-  };
-  // Do not imply that generic engine source is proof of this exact repair.
-  // Such records instead appear as text-only cards with no generic proof.
-  if(!seen.has('qualified:'+q.original_work_id)){
-   seen.add('qualified:'+q.original_work_id);
-   ranked.push({...item,url:null});
-  }
-  if(ranked.length>=6)break;
+    ' has a saved qualification for owner review. Installation is not authorized.',
+   url:null,reviewCategory:'upgrades',
+  },'qualified:'+q.original_work_id);
  }
- for(const g of gaps){
+ for(const finding of audit){
   if(ranked.length>=6)break;
-  const url=String(g?.issue_url||'');
-  if(g?.independently_verified!==true||g?.job_completed!==false||
-     g?.installation_authorized!==false||
-     !Number.isSafeInteger(g.issue_number)||
-     !Number.isSafeInteger(g.original_provider_failed_run_id)||
-     !/^[a-f0-9]{40}$/.test(String(g.source_sha||''))||
-     !/^src\/reality-extensions\/[a-z0-9._/-]+$/.test(String(g.source_path||''))||
-     url!==wcCapabilityProofBase+'issues/'+g.issue_number)continue;
+  if(!['FIRST_OBSERVED_IN_OWNER_AUDIT','PREVIOUSLY_OBSERVED'].includes(finding?.novelty)||
+     !['SOURCE_VERIFIED_GAP','REPEATED_CI_FAILURE'].includes(finding?.kind)||
+     !/^[a-f0-9]{64}$/.test(String(finding.fingerprint||''))||
+     !wcCapabilityValidProof(finding.evidence_url))continue;
+  const first=finding.novelty==='FIRST_OBSERVED_IN_OWNER_AUDIT';
+  const sourceGap=finding.kind==='SOURCE_VERIFIED_GAP';
+  const originFirst=first?'FIRST OBSERVED IN YOUR AUDIT':'PREVIOUSLY OBSERVED';
   add({
-   level:'SOURCE-VERIFIED GAP · NOT INSTALLED',
-   title:String(g.issue_title||'Missing capability').slice(0,150),
-   description:'Issue #'+g.issue_number+' has independently re-observed source and failed-run evidence. Current authorization and completion must still be checked.',
-   url,
-  },'issue:'+g.issue_number);
+   level:originFirst+(sourceGap?' · SOURCE-VERIFIED GAP':' · RECENT CI FAILURES'),
+   title:String(finding.title||'Capability audit finding').slice(0,165),
+   description:sourceGap?
+    'Reality independently verified missing source at an original failed-run snapshot. It has NOT proved that the gap is still unresolved now. Review the exact evidence before adopting work.':
+    'Reality independently observed repeated recent workflow failures after the latest success. Whether these require a new capability is NOT yet proven.',
+   url:finding.evidence_url,
+   reviewCategory:sourceGap?'upgrades':'reliability',
+  },'provider:'+finding.fingerprint);
+  // Do not show the same GitHub issue again as a generic historical proposal.
+  seen.add(finding.evidence_url.includes('/issues/')?
+   'issue:'+finding.evidence_url.split('/').at(-1):
+   'source:'+finding.evidence_url);
  }
  for(const w of catalog){
   if(ranked.length>=6)break;
@@ -4223,13 +4219,28 @@ function wcCapabilityPick({qualified=[],gaps=[],catalog=[]}={}){
   const url=w.evidence_refs.find(wcCapabilityValidProof);
   if(!url)continue;
   add({
-   level:'TRACKED OPPORTUNITY · NEEDS VERIFICATION',
+   level:'TRACKED OPPORTUNITY · NOT A VERIFIED NEW GAP',
    title:String(w.title||'Improvement opportunity').slice(0,165),
-   description:'An open source-backed item to investigate. Not a proven missing capability, completed repair, or authorized customer job.',
-   url,
+   description:'Open source-backed review item. May be historical, already underway or resolved; not a new capability or an executable customer job.',
+   url,reviewCategory:'upgrades',
   },url.includes('/issues/')?'issue:'+url.split('/').at(-1):'source:'+url);
  }
  return ranked;
+}
+function wcCapabilityReviewCard(record){
+ const card=wcCapabilityCard(record);
+ if(record.reviewCategory){
+  const action=document.createElement('button');
+  action.type='button';
+  action.textContent='Review in Reality · No approval';
+  action.onclick=()=>{
+   wcCurrent=record.reviewCategory;
+   wcRender();
+   $('wcCategories')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+  };
+  card.append(action);
+ }
+ return card;
 }
 async function wcRefreshCapabilities(){
  const button=$('wcRefreshCapabilities');
@@ -4238,8 +4249,10 @@ async function wcRefreshCapabilities(){
  if(button.disabled)return;
  const serial=++wcCapabilityRefreshSerial;
  button.disabled=true;
- status.textContent='Checking verified upgrades, real capability gaps, and open improvements · Read only…';
  const signed=$('privateReady')?.style.display==='block';
+ status.textContent=signed?
+  'Running governed audit: checking recent real provider failures, independent frozen gaps and previously handled work · No installation…':
+  'Sign in to run the governed audit. Reading public source-backed work only…';
  const get=async url=>{
   const response=await fetch(url,{
    method:'GET',credentials:'same-origin',cache:'no-store'});
@@ -4247,36 +4260,57 @@ async function wcRefreshCapabilities(){
   if(!response.ok||data?.ok!==true)throw Error('SOURCE_READBACK_UNAVAILABLE');
   return data;
  };
+ const audit=async()=>{
+  const response=await fetch('/api/reality/personal-capability-discovery-audit',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({intent:'RUN_GOVERNED_CAPABILITY_DISCOVERY_AUDIT'})
+  });
+  const data=await response.json();
+  if(!response.ok||data?.ok!==true||data?.status!=='GOVERNED_AUDIT_RECORDED'||
+     data.audit_executed!==true||data.review_only!==true||
+     !Array.isArray(data.candidates)||
+     !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(String(data.audit_id||''))||
+     data.installation_authorized!==false||
+     data.job_started!==false||data.production_changed!==false)
+   throw Error('GOVERNED_AUDIT_RECEIPT_UNAVAILABLE');
+  return data;
+ };
  const checks=[get('/api/reality/work-catalog')];
  if(signed){
   checks.push(get('/api/reality/personal-qualified-capabilities'));
-  checks.push(get('/api/reality/personal-real-repair-opportunities'));
+  checks.push(audit());
  }
  try{
   const results=await Promise.allSettled(checks);
-  if(serial!==wcCapabilityRefreshSerial)return;
+  if(serial!==wcCapabilityRefreshSerial||
+     (signed&&$('privateReady')?.style.display!=='block'))return;
   const catalog=results[0].status==='fulfilled'&&
    Array.isArray(results[0].value.items)?results[0].value.items:[];
   const qualified=signed&&results[1]?.status==='fulfilled'&&
    Array.isArray(results[1].value.entries)?results[1].value.entries:[];
-  const gaps=signed&&results[2]?.status==='fulfilled'&&
-   Array.isArray(results[2].value.opportunities)?results[2].value.opportunities:[];
-  const picked=wcCapabilityPick({qualified,gaps,catalog});
-  // The established engine is visible even if NO live gap was verified.
-  // It is never counted as a newly discovered or qualified candidate.
-  list.replaceChildren(...picked.map(wcCapabilityCard),
+  const auditResult=signed&&results[2]?.status==='fulfilled'?
+   results[2].value:null;
+  const picked=wcCapabilityPick({
+   qualified,audit:auditResult?.candidates||[],catalog,
+  });
+  list.replaceChildren(...picked.map(wcCapabilityReviewCard),
    wcCapabilityCard(wcCapabilityBuiltIn));
   const failures=results.filter(x=>x.status==='rejected').length;
-  const message=picked.length?
-   picked.length+' evidence-linked item(s) for review; 1 existing capability shown.':
-   'No new independently qualified or tracked capability found; 1 existing implementation shown.';
-  status.textContent=message+
-   (failures?' '+failures+' source(s) unavailable; results may be incomplete.':'')+
-   (!signed?' Sign in to include your private qualified upgrades and real-gap evidence.':'')+
-   ' No work authorized.';
+  const auditStatus=auditResult?
+   'Governed audit recorded · '+auditResult.new_evidence_count+
+    ' first-observed finding(s), '+auditResult.previously_observed_count+
+    ' previously seen, '+auditResult.already_handled_count+
+    ' existing/settled items withheld. Audit receipt '+auditResult.audit_id+'. ':
+   signed?'Governed audit was NOT verified; only read-only catalog observations shown. ':
+   'Sign in to launch a governed capability audit. ';
+  status.textContent=auditStatus+
+   picked.length+' review item(s) displayed, plus 1 existing engine. '+
+   (failures?failures+' source(s) unavailable; coverage incomplete. ':'')+
+   'No job created, approval granted or capability installed.';
  }catch{
   list.replaceChildren(wcCapabilityCard(wcCapabilityBuiltIn));
-  status.textContent='Capability discovery unavailable. Existing implementation remains visible. No new gap or work is claimed.';
+  status.textContent='Capability discovery unavailable. Existing implementation only. No work started.';
  }finally{button.disabled=false;}
 }
 $('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities()};
