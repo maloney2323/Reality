@@ -312,8 +312,11 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
   <span id="homeOwnerCount" class="home-owner-count">Checking account…</span>
  </div>
  <p id="homeOwnerStatus" role="status" aria-live="polite">Sign in to see verified upgrades waiting for your decision. No action is authorized automatically.</p>
+ <p id="homeOwnerCurrentProgress" role="status" aria-live="polite" class="home-owner-state">Checking verified original-job status…</p>
  <div id="homeOwnerItems" class="home-owner-items" aria-live="polite"></div>
- <div id="homeOwnerFollowonReview" class="home-owner-items" aria-live="polite" style="margin-top:12px"></div>
+ <details class="home-owner-technical"><summary>Earlier repair evidence · Not the current job</summary>
+  <div id="homeOwnerFollowonReview" class="home-owner-items" aria-live="polite" style="margin-top:12px"></div>
+ </details>
  <div id="homeLegacyInstallSlot" hidden aria-label="Previously prepared verified installation"></div>
  <div id="homeOwnerDialogs"></div>
  <button id="homeOwnerRefresh" type="button" class="repair-secondary">Refresh authorizations</button>
@@ -2301,9 +2304,55 @@ async function homeOwnerShowUnboundFollowonReview(epoch){
   target.textContent='The new repair review could not be independently revalidated. No installation or authorization is available.';
  }
 }
+// Separate durable job progress from new installation eligibility.
+// This read never approves, retries, installs, or settles a customer job.
+async function homeOwnerShowCurrentProgress(epoch){
+ const out=$('homeOwnerCurrentProgress');
+ if(!out)return;
+ if(!homeOwnerSignedIn()){
+  out.textContent='Sign in to read your saved job status. No action was taken.';
+  return;
+ }
+ out.textContent='Checking independent installation and settlement receipts…';
+ try{
+  const response=await fetch('/api/reality/personal-genuine-loop-status',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||
+     data.status!=='OWNER_GOVERNED_LOOP_READBACK'||
+     !Array.isArray(data.jobs)||data.jobs.length>12||
+     data.production_changed!==false||data.external_action_performed!==false||
+     !Array.isArray(data.independent_final_receipts))
+   throw Error('PROVIDER_PROGRESS_UNAVAILABLE');
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  const jobs=data.jobs.filter(j=>
+    j.capability_id==='reality-general-execution-receipt'&&
+    /^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')));
+  const job=jobs[0];
+  if(!job){out.textContent='No current general-capability repair job was returned for this account.';return;}
+  const final=data.independent_final_receipts.some(x=>
+   x.original_work_id===job.original_work_id&&
+   x.status==='FULL_LOOP_INDEPENDENTLY_VERIFIED');
+  if(final&&job.full_loop_independently_verified===true){
+   out.textContent='FULL LOOP VERIFIED · Original job settled and independently verified final receipt recorded. No further approval needed.';
+  }else if(job.independently_settled===true&&job.isolated_installed===true){
+   out.textContent='ORIGINAL JOB SETTLED · Upgrade installed, original work resumed and settled. Final independent customer receipt still pending. No further approval needed.';
+  }else if(job.isolated_installed===true){
+   out.textContent='UPGRADE INSTALLED · Independent final settlement not yet verified. Do not approve again.';
+  }else if(job.owner_install_approved===true){
+   out.textContent='YOUR APPROVAL WAS RECORDED · Installation and original-job settlement not yet verified. Do not approve again.';
+  }else{
+   out.textContent='No final installation authorization has been verified for the current job.';
+  }
+ }catch{
+  if(epoch!==homeOwnerRefreshEpoch)return;
+  out.textContent='Independent current-job progress temporarily unavailable. No installation or completion claimed from an unavailable read.';
+ }
+}
 async function homeOwnerRefresh(){
  const epoch=++homeOwnerRefreshEpoch;
  homeOwnerLegacyVisibility();
+ void homeOwnerShowCurrentProgress(epoch);
  void homeOwnerShowUnboundFollowonReview(epoch);
  const list=$('homeOwnerItems'),status=$('homeOwnerStatus'),count=$('homeOwnerCount');
  list.replaceChildren();
@@ -2422,7 +2471,7 @@ async function homeOwnerRefresh(){
   count.textContent=pending+' awaiting approval';
   status.textContent=pending?'Review one independently verified request below. Each authorization is specific to one artifact.':
    entries.length?'No eligible second approval yet. If a verified repair is blocked by its continuation path, Reality must fix that path before asking you to approve.':
-    'No verified installations need your approval right now.';
+    'No unapproved installation requests found. Current-job status is shown above.';
  }catch(e){
   if(epoch!==homeOwnerRefreshEpoch)return;
   count.textContent='Readback unavailable';
