@@ -183,7 +183,7 @@ test('only matching independent final receipt exposes a PDF after resumed work',
  vm.runInNewContext(browser,ctx);
  await nodes.simpleRunFullLoop.listeners.click();
  phase=1;timer[0]();
- for(let i=0;i<5;i++)await Promise.resolve();
+ await new Promise(resolve=>setImmediate(resolve));
  assert.match(nodes.simpleFullLoopStatus.textContent,/FULL LOOP COMPLETED/);
  assert.equal(nodes.simpleFullLoopReceipt.children.length,1);
  assert.equal(nodes.simpleFullLoopReceipt.children[0].href,
