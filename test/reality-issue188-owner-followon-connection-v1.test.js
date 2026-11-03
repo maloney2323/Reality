@@ -55,12 +55,13 @@ test('owner review does not provide direct install or hidden approval',()=>{
  assert.match(review,/method:'GET'/);
  assert.doesNotMatch(review,/reality_owner_approve_qualified_preview_v1/);
  assert.match(review,/new_owner_work_binding_required:true/);
- assert.match(html,/Save work receipt · Start automatic repair preparation/);
- assert.match(html,/Save work receipt · Start automatic repair preparation/);
- assert.match(html,/OWNER_WORK_READBACK_UNVERIFIED_DO_NOT_RESUBMIT/);
- assert.match(html,/No installation occurred/);
+ assert.match(html,/Automatic source-evidence receipt:/);
+ assert.match(html,/receipt\.automatic_candidate_receipt\.receipt_id/);
+ assert.doesNotMatch(html,/Save work receipt · Start automatic repair preparation/);
+ assert.doesNotMatch(html,/confirm\('Create new follow-on Reality work for verified #188/);
+ assert.match(html,/Not authorized: no new work binding/);
 });
-test('all homepage inline scripts parse with owner follow-on action in place',()=>{
+test('all homepage inline scripts parse without automatic receipt button',()=>{
  const tags=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
  assert.ok(tags.length>0);
  tags.forEach(([full,src],i)=>assert.doesNotThrow(()=>new Script(src,{filename:'index:inline:'+i})));
