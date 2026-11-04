@@ -3,6 +3,7 @@
 import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
 import {buildRealityEightHourShiftDraft} from '../../src/reality-eight-hour-shift-plan-v1.js';
+import {computeShiftFingerprint} from '../../src/reality-governed-shift-boundary-v1.js';
 export const maxDuration=60;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -15,7 +16,7 @@ export default async function handler(req,res){
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const plan=buildRealityEightHourShiftDraft(brief);
-  return res.status(200).json({ok:true,...plan});
+  return res.status(200).json({ok:true,...plan,plan_fingerprint:computeShiftFingerprint(plan)});
  }catch{
   return res.status(503).json({
    ok:false,error:'EMPLOYEE_SHIFT_SOURCE_READBACK_UNAVAILABLE',

@@ -46,6 +46,12 @@ jobs:
           node --check api/reality/eight-hour-employee-shift-plan.js
           node --check reality-eight-hour-shift-plan-v1.js
           node --test test/reality-eight-hour-shift-plan-v1.test.js
+          node --check src/reality-governed-shift-boundary-v1.js
+          node --check src/reality-employee-shift-capability-handoff-v1.js
+          node --check src/reality-governed-employee-shift-worker-v1.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-governed-employee-shift-v1.test.js
           node --check reality-economic-evidence-dashboard-v1.js
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --check reality-engine-delta-v1.js

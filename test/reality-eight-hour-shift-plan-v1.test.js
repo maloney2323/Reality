@@ -126,7 +126,9 @@ test('homepage preserves exact Run Full Loop, chat, receipts and source links af
  assert.ok(html.indexOf('id="realityBuildEmployeeShift"')<
   html.indexOf('id="simpleRunFullLoop"'));
  assert.match(html,/src="\/reality-eight-hour-shift-plan-v1\.js"/);
- assert.doesNotMatch(client,/\bmethod:\s*['"]POST|OWNER_APPROVE_EXACT_VERIFIED|INSTALL_CAPABILITY|localStorage/);
+ assert.match(client,/AUTHORIZE_EXACT_EMPLOYEE_SHIFT/);
+ assert.match(client,/\/api\/reality\/personal-governed-employee-shift/);
+ assert.doesNotMatch(client,/OWNER_APPROVE_EXACT_VERIFIED|INSTALL_CAPABILITY|localStorage/);
  assert.doesNotThrow(()=>new vm.Script(client));
 });
 test('one click requests ONLY draft via GET, renders an evidence-linked eight-hour agenda',async()=>{
