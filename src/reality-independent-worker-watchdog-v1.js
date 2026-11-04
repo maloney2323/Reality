@@ -49,9 +49,15 @@ export function diagnoseIndependentWorkerWake({watchdog,wakes=[],now=Date.now(),
    'Inspect broker credentials and signed delivery; do not grant new execution rights');
  for(const w of wakes){
   if(['SETTLED','RECEIPT_VERIFIED'].includes(w.wake_state))continue;
-  if(w.wake_state==='ESCALATED'||w.wake_state==='STALE_APPROVAL_BLOCKED')
-   return outcome('GOVERNANCE_OR_EXECUTION_ESCALATED',
-    'Preserve failure evidence, independently recheck lease, ledger and owner approval',w.original_work_id);
+  if(w.wake_state==='ESCALATED'||w.wake_state==='STALE_APPROVAL_BLOCKED'){
+   const alreadyWoke=Boolean(w.worker_alive_at);
+   return outcome(alreadyWoke?'WORKER_WOKE_THEN_ESCALATED':
+    'WAKE_ESCALATED_WITHOUT_WORKER_ACK',
+    alreadyWoke?
+     'The worker acknowledged a wake; inspect its signed run and failed stage, broker RPC, lease, ledger, and verified settlement before considering a repair. Do not repeat installation.':
+     'Inspect signed delivery, worker acknowledgment, credential health, lease and owner scope before a fenced retry.',
+    w.original_work_id);
+  }
   if(['WAKE_PENDING','DISPATCH_CLAIMED','DISPATCH_ACCEPTED','RETRY_PENDING'].includes(w.wake_state)){
    const at=t(w.dispatched_at)||t(w.last_updated_at);
    if(at!==null&&Number.isFinite(at)&&now-at>deadAfterMs){
