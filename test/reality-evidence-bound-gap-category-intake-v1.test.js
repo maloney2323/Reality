@@ -80,7 +80,7 @@ test('active category displays only current evidence and keeps settled history o
  assert.equal(x.reads[0].opt.credentials,'same-origin');
  assert.match(x.nodes.simpleGapFeedStatus.textContent,/6 tracked/);
  assert.match(x.nodes.simpleGapFeedStatus.textContent,/0 proven current gaps/);
- assert.match(x.nodes.simpleGapFeedStatus.textContent,/3 past records in Past Jobs & Receipts/);
+ assert.match(x.nodes.simpleGapFeedStatus.textContent,/Historical records are filed separately in Past Jobs & Receipts/);
  const html=vm.runInContext('wcGapEvidenceCards()',x.context);
  assert.match(html,/6 tracked · 0 proven current gaps/);
  assert.match(html,/TESTED CANDIDATE/);
