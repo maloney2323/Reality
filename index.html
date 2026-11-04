@@ -326,6 +326,28 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .simple-lead{margin:0 0 18px;color:#b9ccdb;max-width:680px;line-height:1.5}
 #realitySimpleHome .simple-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0 18px}
 #realitySimpleHome .simple-info{border:1px solid #405671;background:#102039;color:#d2e7f6;padding:9px 12px;border-radius:12px;font-size:14px}
+#realitySimpleHome .reality-economic-evidence{padding:clamp(16px,3.5vw,25px);border:1px solid #3b546f;border-radius:20px;background:linear-gradient(155deg,#0c1726,#121c2c 78%);margin:14px 0 22px;box-shadow:0 8px 22px rgba(0,0,0,.13);color:#e8f0fa}
+#realitySimpleHome .reality-econ-heading{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+#realitySimpleHome .reality-econ-heading h2{font-size:clamp(20px,4vw,25px);line-height:1.23;margin:8px 0 6px;color:#f7fbff}
+#realitySimpleHome .reality-econ-scope{font-size:11px;color:#c1d2e2;border:1px solid #3d566e;border-radius:30px;padding:7px 10px;white-space:nowrap}
+#realitySimpleHome #realityEconomicStatus{font-size:13px;line-height:1.5;color:#bfcedd;margin:9px 0 20px}
+#realitySimpleHome .reality-econ-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 20px;padding:4px 0 20px}
+#realitySimpleHome .reality-econ-grid article{min-width:0;display:flex;flex-direction:column;gap:6px;padding:11px 0}
+#realitySimpleHome .reality-econ-label{font-size:13px;line-height:1.45;font-weight:650;color:#b4c8da}
+#realitySimpleHome .reality-econ-grid strong{font-size:clamp(19px,4vw,32px);font-weight:750;color:#fff;line-height:1.2;overflow-wrap:anywhere}
+#realitySimpleHome .reality-econ-grid small{font-size:11px;line-height:1.5;color:#9cb2c8}
+#realitySimpleHome .reality-econ-values{border-top:1px solid #314256;border-bottom:1px solid #314256;padding:12px 0;display:grid;gap:14px}
+#realitySimpleHome .reality-econ-values>div{display:flex;justify-content:space-between;align-items:start;gap:14px;font-size:13px;line-height:1.5}
+#realitySimpleHome .reality-econ-values span{color:#aebfd0;max-width:60%}
+#realitySimpleHome .reality-econ-values strong{color:#f5f9fd;text-align:right;font-size:13px;font-weight:700;overflow-wrap:anywhere}
+#realitySimpleHome .reality-econ-proof{padding-top:14px}
+#realitySimpleHome .reality-econ-proof h3{font-size:16px;color:#f5f9fd;margin:0 0 10px}
+#realitySimpleHome .reality-econ-proof p{font-size:12px;line-height:1.6;color:#b8cbdc;margin:5px 0}
+#realitySimpleHome .reality-econ-record{border-top:1px solid #2e4256;padding:9px 0;font-size:12px;line-height:1.5}
+#realitySimpleHome .reality-econ-record strong{color:#e9f4ff;font-size:13px}
+#realitySimpleHome .reality-econ-record a{color:#b8e7ff;display:inline-block;margin-top:4px;text-decoration:underline}
+#realitySimpleHome .reality-econ-footnote{color:#9eb7c8;font-size:11px;line-height:1.6;margin:13px 0 0}
+@media(max-width:420px){#realitySimpleHome .reality-econ-grid{gap:6px 12px}#realitySimpleHome .reality-econ-grid strong{font-size:21px}}
 #realitySimpleHome .simple-actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
 #realitySimpleHome button{min-height:46px;padding:10px 16px;border-radius:12px;font-size:15px;font-weight:680}
 #realitySimpleHome .simple-primary{background:#98d5f2;color:#091826;border:0}
@@ -378,6 +400,33 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <span class="simple-info" id="simpleLoginState" role="status">Checking your account…</span>
   <span class="simple-info" id="simpleResearchCount">Loading assessed upgrades…</span>
  </div>
+ <section id="simpleEconomicEvidenceDashboard" class="reality-economic-evidence" aria-labelledby="realityEconomicTitle">
+  <div class="reality-econ-heading">
+   <div>
+    <div class="simple-kicker">REALITY · ECONOMIC EVIDENCE</div>
+    <h2 id="realityEconomicTitle">Business value, with the evidence attached</h2>
+   </div>
+   <span class="reality-econ-scope">Isolated preview · Read only</span>
+  </div>
+  <p id="realityEconomicStatus" role="status" aria-live="polite">Sign in to read your independent work and value records.</p>
+  <div class="reality-econ-grid" aria-label="Economic evidence scorecard">
+   <article><div class="reality-econ-label">Source-backed work signals</div><strong id="realityEconSignals">—</strong><small id="realityEconSignalsNote">Observations, not validated jobs</small></article>
+   <article><div class="reality-econ-label">Jobs independently settled</div><strong id="realityEconSettled">—</strong><small>Verified isolated original jobs only</small></article>
+   <article><div class="reality-econ-label">Comparable human effort</div><strong id="realityEconHuman">Not measured</strong><small>Independent task-level baseline required</small></article>
+   <article><div class="reality-econ-label">Verified net capacity returned</div><strong id="realityEconCapacity">Not measured</strong><small>Cannot infer labor saved from runtime</small></article>
+  </div>
+  <div class="reality-econ-values" aria-label="Economic verification states">
+   <div><span>Realized cash savings</span><strong id="realityEconCash">Not established</strong></div>
+   <div><span>Modeled risk exposure reduced</span><strong id="realityEconRisk">Not established</strong></div>
+   <div><span>Recorded economic inputs</span><strong id="realityEconInputs">Unverified</strong></div>
+   <div><span>Independent final-loop receipts</span><strong id="realityEconReceipts">Unverified</strong></div>
+  </div>
+  <div class="reality-econ-proof">
+   <h3>Original-job evidence</h3>
+   <div id="realityEconWorkHistory" aria-live="polite"><p>Sign in to inspect verified receipts and unfinished jobs.</p></div>
+  </div>
+  <p class="reality-econ-footnote">Technical settlement and verified business value are different. A signed receipt proves source integrity, not automatically savings, avoided losses, or a whole employee workday. Current observations are limited to connected Reality sources.</p>
+ </section>
  <div class="simple-actions">
   <button type="button" id="simpleRunFullLoop" class="simple-primary">Run Full Loop</button>
   <button type="button" id="simpleReviewFirst" class="simple-secondary">Review first opportunity</button>
@@ -5799,6 +5848,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
+<script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
 </body>
 </html>
