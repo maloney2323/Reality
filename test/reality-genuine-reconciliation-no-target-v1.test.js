@@ -25,7 +25,7 @@ test('no target needs one exact same-provider historical repair with BOTH immuta
  assert.match(migration,/RECONCILIATION_TARGET_CHAIN_TAIL_AMBIGUOUS/);
  assert.match(migration,/RECONCILIATION_TARGET_ORIGINAL_CHAIN_ANCESTRY_MISSING/);
  assert.match(migration,/current_user<>'service_role'/);
- assert.match(migration,/security invoker/);
+ assert.match(migration,/SECURITY INVOKER/i);
  assert.match(migration,/original_job_completed',false/);
  assert.match(migration,/new_reconciliation_proposed',false/);
  assert.match(migration,/revoke all on function public.reality_read_genuine_reconciliation_target_v1/);
