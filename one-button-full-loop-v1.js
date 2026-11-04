@@ -224,7 +224,9 @@ async function start(){
    Number.isSafeInteger(x.issue_number)&&x.issue_number>0&&
    Number.isSafeInteger(x.original_provider_failed_run_id)&&x.original_provider_failed_run_id>0&&
    SOURCE.test(String(x.source_sha||''))&&
-   /^src\/reality-extensions\//.test(String(x.source_path||'')));
+   /^src\/reality-extensions\//.test(String(x.source_path||''))&&
+   !previousOriginalFailures.has(exactFailureKey(x.issue_number,
+    x.original_provider_failed_run_id,x.source_sha)));
   if(candidate){
    const conversationId=currentConversation();
    if(!UUID.test(String(conversationId||'')))
