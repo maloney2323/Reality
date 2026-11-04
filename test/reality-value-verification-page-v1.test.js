@@ -113,3 +113,93 @@ test('route remains inactive on Home and Chat and leaves source modules untouche
   assert.equal(page.hidden,true);
  }
 });
+
+test('five focused sections replace full-page scrolling without removing any evidence IDs',()=>{
+ const views=['Overview','Opportunities','Potential','Results','Governance'];
+ const panels=['rvPanelOverview','rvPanelOpportunities','rvPanelPotential','rvPanelResults','rvPanelGovernance'];
+ for(const id of views.map(x=>'rvTab'+x).concat(panels)){
+  assert.equal(count(id),1,'missing focused navigation or content: '+id);
+ }
+ assert.match(html,/id="rvViewNav"[^>]*role="tablist"/);
+ assert.match(html,/id="rvTabOverview"[^>]*aria-selected="true"/);
+ assert.match(html,/id="rvPanelOverview"[^>]*role="tabpanel"/);
+ for(const id of panels.slice(1))
+  assert.match(html,new RegExp('id="'+id+'"[^>]*role="tabpanel"[^>]*hidden'));
+ for(const id of ['rvPanelResults','rvPanelPotential','rvPanelOpportunities'])
+  assert.match(html,new RegExp('id="'+id+'"'));
+ assert.match(html,/class="rv-deep-dive"/);
+ assert.match(client,/event\.key==='ArrowRight'/);
+ assert.match(client,/event\.key==='ArrowLeft'/);
+ assert.match(client,/event\.key==='Home'/);
+ assert.match(client,/event\.key==='End'/);
+ assert.match(html,/#realityValueVerification \.rv-tabpanel\[hidden\]\{display:none!important\}/);
+ assert.match(html,/@media\(max-width:600px\)/);
+});
+test('mobile evidence navigator is interactive, keyboard accessible and preserves signed-in sources',()=>{
+ const nodes=new Map();
+ const mk=(id,tagName='DIV')=>{
+  const el={id,tagName,children:[],handlers:{},style:{display:''},
+   textContent:'',hidden:tagName==='SECTION',open:true,attributes:{},
+   appendChild(n){this.children.push(n)},
+   removeAttribute(n){delete this.attributes[n]},
+   addEventListener(name,fn){this.handlers[name]=fn},
+   setAttribute(name,value){this.attributes[name]=value},
+   getAttribute(name){return this.attributes[name]},
+   querySelector(){return null},
+   focus(){this.focused=true},
+   scrollIntoView(){this.scrolled=true}};
+  nodes.set(id,el);return el;
+ };
+ for(const id of ['realityValueVerification','rvCategories','rvPublishedSource',
+  'rvPotentialPlanning','rvReceiptEvidence','rvMeasuredInputs','rvSourceStatus',
+  'rvSignals','rvSettled','rvReceipts','rvCapacity','rvFindings','rvCandidates',
+  'realityEconSignals','realityEconSettled','realityEconReceipts','realityEconCapacity',
+  'privateReady','realityCategoryOwnerStatus','realityCategoryOwnerCount',
+  'realityCategoryVerifiedRepairs','rvViewNav'])mk(id);
+ const names=['Overview','Opportunities','Potential','Results','Governance'];
+ for(const name of names){mk('rvTab'+name,'BUTTON');mk('rvPanel'+name,'SECTION')}
+ for(const [id,tag] of [
+  ['realityHomeCategories','DETAILS'],['realityPublishedRepairEvidence','SECTION'],
+  ['realityHomePlanning','DETAILS'],['realityHomeFinance','DETAILS'],
+  ['proofElement','DIV']])mk(id,tag);
+ nodes.get('privateReady').style.display='block';
+ nodes.get('realityEconSignals').textContent='122';
+ nodes.get('realityEconSettled').textContent='3';
+ nodes.get('realityEconReceipts').textContent='1 independently reconciled';
+ nodes.get('realityEconCapacity').textContent='Not measured';
+ nodes.get('realityCategoryOwnerStatus').textContent='6 saved current owner intake record(s) · 1 independently tested existing-code repair(s)';
+ nodes.get('realityCategoryOwnerCount').textContent='6';
+ nodes.get('realityCategoryVerifiedRepairs').textContent='1';
+ const shortcut=mk('overviewToResults','BUTTON');
+ shortcut.getAttribute=name=>name==='data-rv-show'?'results':null;
+ const doc={body:{dataset:{realityRoute:'value'}},
+  getElementById:id=>nodes.get(id),
+  querySelector:q=>q==='.reality-home-proof'?nodes.get('proofElement'):null,
+  querySelectorAll:q=>q==='#realityValueVerification [data-rv-show]'?[shortcut]:[]};
+ vm.runInNewContext(client,{document:doc,Promise,window:{addEventListener(){}}});
+ assert.equal(nodes.get('rvPanelOverview').hidden,false);
+ for(const n of names.slice(1))assert.equal(nodes.get('rvPanel'+n).hidden,true);
+ assert.equal(nodes.get('rvFindings').textContent,'6');
+ assert.equal(nodes.get('rvCandidates').textContent,'1');
+ assert.equal(nodes.get('rvSignals').textContent,'122');
+ assert.equal(nodes.get('realityHomeCategories').open,false);
+ assert.equal(nodes.get('realityHomePlanning').open,false);
+ assert.equal(nodes.get('realityHomeFinance').open,false);
+ const button=nodes.get('rvTabOpportunities');
+ button.handlers.click();
+ assert.equal(nodes.get('rvPanelOverview').hidden,true);
+ assert.equal(nodes.get('rvPanelOpportunities').hidden,false);
+ assert.equal(button.attributes['aria-selected'],'true');
+ assert.equal(nodes.get('rvTabOverview').tabIndex,-1);
+ let prevented=false;
+ button.handlers.keydown({key:'ArrowRight',preventDefault(){prevented=true}});
+ assert.equal(prevented,true);
+ assert.equal(nodes.get('rvPanelPotential').hidden,false);
+ assert.equal(nodes.get('rvPanelOpportunities').hidden,true);
+ assert.equal(nodes.get('rvTabPotential').focused,true);
+ shortcut.handlers.click();
+ assert.equal(nodes.get('rvPanelResults').hidden,false);
+ assert.equal(nodes.get('rvPanelPotential').hidden,true);
+ assert.equal(nodes.get('rvViewNav').scrolled,true);
+ assert.equal(nodes.get('realityHomeFinance').open,false);
+});
