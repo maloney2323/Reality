@@ -19,6 +19,105 @@ const stageNames={
  EVIDENCE_AND_VALUE_REPORT:'End-of-shift evidence & value report'
 };
 const stages=Object.keys(stageNames);
+const approvalPanel=$('realityEmployeeShiftAuthorization'),
+ approvalButton=$('realityAuthorizeEmployeeShift'),
+ approvalScope=$('realityEmployeeShiftAuthorizationScope'),
+ approvalStatus=$('realityEmployeeShiftApprovalStatus'),
+ shiftChatHandoff=$('realityChatShiftHandoff');
+let approvedShiftId=null,lastDraft=null,observingShift=false;
+function plannedStart(){
+ const time=/^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(String(start.value||'09:00'));
+ if(!time)throw Error('SHIFT_LOCAL_TIME_INVALID');
+ const local=new Date();
+ local.setHours(Number(time[1]),Number(time[2]),0,0);
+ if(local.getTime()<Date.now()-60000)local.setDate(local.getDate()+1);
+ if(!Number.isFinite(local.getTime()))throw Error('SHIFT_LOCAL_TIME_INVALID');
+ return local;
+}
+function refreshScope(){
+ if(!lastDraft||!approvalScope)return;
+ const date=plannedStart();
+ approvalScope.textContent='Proposed local shift: '+date.toLocaleString()+
+  ' for 8 hours. Your first approval permits Reality to investigate the exact listed source observations. '+
+  'Only a separately verified, original-job-bound capability request can trigger your second, exact installation approval in Reality Chat. No general installation authority is granted.';
+}
+function validApprovalReceipt(x){
+ return x?.ok===true&&
+  ['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(x.status)&&
+  /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(x.shift_id||'')&&
+  x.initial_authorization_recorded===true&&x.installation_authorized===false&&
+  x.existing_chat_approval_required_for_exact_capabilities===true&&
+  x.worker_dispatch_verified===false&&x.production_changed===false;
+}
+async function observeShift(){
+ if(observingShift||!approvedShiftId)return;
+ observingShift=true;
+ try{
+  const res=await fetch('/api/reality/personal-governed-employee-shift',{
+   method:'GET',credentials:'same-origin',cache:'no-store'});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true||
+   data.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+   data.production_changed!==false||
+   data.shift_approval_does_not_authorize_installation!==true||
+   !Array.isArray(data.shifts)||!Array.isArray(data.capability_approval_handoffs))
+   throw Error('SHIFT_READBACK_UNAVAILABLE');
+  const shift=data.shifts.find(x=>x.shift_id===approvedShiftId);
+  if(!shift)throw Error('SHIFT_OWNER_SCOPE_NOT_FOUND');
+  if(shift.status==='AWAITING_EXACT_ORIGINAL_WORK')
+   approvalStatus.textContent='Shift has reached a governed execution gate. Only existing, individually authorized work may proceed; outstanding work remains blocked.';
+  else if(shift.status==='ENDED_WITH_BLOCKED_WORK')
+   approvalStatus.textContent='Shift ended with a durable evidence report and blocked/unqualified work. This is not an eight-hour savings receipt.';
+  else approvalStatus.textContent='Shift state: '+shift.status.replaceAll('_',' ').toLowerCase()+
+    '. Plan and source validation are distinct from real-job execution.';
+  const handoffs=data.capability_approval_handoffs.filter(x=>x.shift_id===approvedShiftId&&
+   x.status==='EXACT_VERIFIED_CAPABILITY_APPROVAL_READY_IN_REALITY_CHAT'&&
+   x.installation_approved===false);
+  if(handoffs.length){
+   if(shiftChatHandoff){
+    shiftChatHandoff.hidden=false;
+    shiftChatHandoff.textContent='This authorized shift encountered '+handoffs.length+
+     ' independently verified capability candidate(s). Review the exact artifact and original job in the approval below. Your approval is required before installation; authorized work can then resume through the governed worker.';
+   }
+   approvalStatus.textContent='Exact upgrade approval is ready in Reality Chat. No installation has been authorized by the shift.';
+   if(typeof window.homeOwnerRefresh==='function')window.homeOwnerRefresh();
+  }else if(shiftChatHandoff){
+   shiftChatHandoff.hidden=true;
+   shiftChatHandoff.textContent='';
+  }
+ }catch{
+  approvalStatus.textContent='Shift readback could not be verified. No approval or job completion is inferred.';
+ }finally{observingShift=false}
+}
+if(approvalButton)approvalButton.onclick=async()=>{
+ if(!lastDraft||!/^sha256:[a-f0-9]{64}$/.test(lastDraft.plan_fingerprint||'')){
+  approvalStatus.textContent='Rebuild the exact source-backed plan before authorizing.';return;
+ }
+ approvalButton.disabled=true;
+ approvalStatus.textContent='Recording one owner-bound eight-hour shift authorization...';
+ try{
+  const startAt=plannedStart().toISOString();
+  const r=await fetch('/api/reality/personal-governed-employee-shift',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+    expected_fingerprint:lastDraft.plan_fingerprint,planned_start_at:startAt})
+  });
+  const data=await r.json().catch(()=>null);
+  if(!r.ok||!validApprovalReceipt(data))throw Error('SHIFT_RECEIPT_UNVERIFIED');
+  approvedShiftId=data.shift_id;
+  approvalButton.hidden=true;
+  approvalStatus.textContent='Exact shift authorization recorded and independently read back. '+ 
+   'No worker dispatch has been verified yet. Verified capability requests will appear in Reality Chat with a separate approval.';
+  await observeShift();
+ }catch{
+  approvalStatus.textContent='Shift authorization was not independently verified. No installation or job execution is claimed; rebuild the plan before retrying.';
+  lastDraft=null;approvalButton.hidden=true;
+ }finally{approvalButton.disabled=false}
+};
+if(start)start.addEventListener('change',()=>{if(lastDraft)refreshScope()});
+setInterval(()=>{if(approvedShiftId)void observeShift()},30000);
+
 const expected=[45,60,60,60,60,90,60,45];
 const valid=x=>Number.isSafeInteger(x)&&x>=0;
 function validPlan(d){
@@ -93,6 +192,13 @@ function toClock(offset){
  return stamp+(minutes>=1440?' (+1 day)':'');
 }
 function render(d){
+ lastDraft=/^sha256:[a-f0-9]{64}$/.test(d.plan_fingerprint||'')?d:null;
+ if(approvalPanel&&approvalButton){
+  approvalPanel.hidden=!lastDraft;
+  approvalButton.hidden=!lastDraft;
+  if(lastDraft)refreshScope();
+ }
+
  view.replaceChildren();
  const info=el('p',d.counts.source_backed_opportunities+
    ' source-backed observations examined · '+d.counts.selected_distinct_source_records+
@@ -121,7 +227,7 @@ function render(d){
   li.append(time,body);list.append(li);
  }
  const note=el('p',
-   'The agenda does not create a calendar event or a worker queue. Run Full Loop remains an independent, governed original-job action; it does not execute all eight shift slots. '+d.overlap_note,
+   'This is a planning agenda until your exact shift authorization is durably recorded. The existing governed worker still requires independent current-work qualification. A missing capability is presented as a separate exact approval in Reality Chat; shift authority never installs code. '+d.overlap_note,
    'reality-employee-shift-note');
  const source=el('a','NASA-hosted repair-effort study · comparison source only');
  source.href=d.benchmark_source_url;source.target='_blank';
@@ -134,6 +240,7 @@ function render(d){
   'Eight-hour draft prepared from source observations. No job started, approval created, or worker shift scheduled.';
 }
 btn.onclick=async()=>{
+ lastDraft=null;if(approvalPanel)approvalPanel.hidden=true;
  btn.disabled=true;view.hidden=true;view.replaceChildren();
  status.textContent='Checking current work, selecting distinct items and arranging the shift...';
  try{
