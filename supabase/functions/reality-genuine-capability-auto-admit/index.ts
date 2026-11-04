@@ -1023,6 +1023,32 @@ async function continueOriginalPrepare(sha:string,run:number,token:string){
  if(o.source_path==='src/reality-extensions/reality-continuity-settlement-reconciler.mjs'){
   const target=await database('rpc/reality_read_genuine_reconciliation_target_v1',{
    method:'POST',body:{p_repairing_trigger_id:s.trigger_id}});
+  // When the original source-identical historical repair already settled
+  // both prior jobs, there must be no arbitrary new target or duplicate write.
+  // This signed readback does not settle or claim the CURRENT original.
+  if(target?.status==='RECONCILIATION_ALREADY_SATISFIED_BY_VERIFIED_UNIVERSE'){
+   if(target.repairing_original_work_id!==s.original_work_id||
+      !WORK.test(target.previous_repairing_original_work_id)||
+      target.previous_repairing_original_work_id===s.original_work_id||
+      !WORK.test(target.previous_reconciliation_target_work_id)||
+      !UUID.test(target.previous_original_universe_event_id)||
+      !UUID.test(target.previous_target_universe_event_id)||
+      target.independent_database_readback!==true||
+      target.unresolved_reconciliation_targets!==0||
+      target.new_reconciliation_proposed!==false||
+      target.original_job_completed!==false||
+      target.production_changed!==false)
+    deny('NO_TARGET_HISTORICAL_VERIFIED_WITNESS_INVALID');
+   return {status:'HISTORICAL_RECONCILIATION_ALREADY_SATISFIED',
+     original_work_id:s.original_work_id,
+     previous_repairing_original_work_id:target.previous_repairing_original_work_id,
+     previous_reconciliation_target_work_id:target.previous_reconciliation_target_work_id,
+     previous_original_universe_event_id:target.previous_original_universe_event_id,
+     previous_target_universe_event_id:target.previous_target_universe_event_id,
+     independent_database_readback:true,
+     current_job_execution_claimed:false,original_job_completed:false,
+     installation_replay_authorized:false,production_changed:false};
+  }
   if(target?.status!=='TARGET_SETTLED_SIDE_CAR_UNIVERSE_MISSING'||
     !WORK.test(target.reconciliation_target_work_id)||
     target.reconciliation_target_work_id===s.original_work_id||
