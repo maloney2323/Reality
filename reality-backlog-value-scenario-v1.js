@@ -148,6 +148,10 @@
     status.textContent='Use quarter-hour increments from 0 to 80 hours for each issue.';
     resetAmounts();return;
    }
+   if(discovery+execution>4800){
+    status.textContent='Total assumed discovery and execution time must be at most 80 hours per issue.';
+    resetAmounts();return;
+   }
    if(discovery+execution>0)assumptions.push({
     finding_id:candidate.id,assumed_discovery_minutes:discovery,
     assumed_execution_minutes:execution});
