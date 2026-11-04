@@ -178,6 +178,8 @@ async function observe(){
     ' has no matching current continuity entry. Do not replay or claim settlement.');
    return {kind:'NEEDS_RECONCILIATION'};
   }
+  if(historicalNoOpIds.size)
+   setStatus('HISTORICAL SETTLEMENT VERIFIED · Prior installed repair already satisfied; searching only new original failures, without any replay.');
   return {kind:'NO_ACTIVE'};
  }catch(error){
   setStatus('Reality cannot verify the current job ledger: '+String(error.message||'UNKNOWN')+
@@ -205,7 +207,8 @@ async function start(){
    if(String(error?.message)!=='GOVERNED_BUILD_FRESH_ELIGIBILITY_REQUIRED')
     throw error;
   }
-  if(known?.queued===true&&exactWork(known.original_work_id)){
+  if(known?.queued===true&&exactWork(known.original_work_id)&&
+   !historicalNoOpIds.has(known.original_work_id)){
    startedWork=known.original_work_id;
    setStatus('Existing original job found: '+startedWork+
     '. Reality will continue this queue without creating another authorization.');
@@ -252,7 +255,8 @@ async function start(){
   // identified original job; do not invent a customer work item.
   setStatus('No new source-qualified issue. Checking previously authorized unfinished work…');
   if(known?.phase==='NOT_QUEUED'&&known.eligible_for_investigation===true&&
-   exactWork(known.original_work_id)){
+   exactWork(known.original_work_id)&&
+   !historicalNoOpIds.has(known.original_work_id)){
    setStatus('Queuing your verified unfinished original job with the existing autonomous worker…');
    const result=await write('/api/reality/personal-governed-build',{
     intent:'QUEUE_SAFE_AUTONOMOUS_DISCOVERY',
@@ -268,7 +272,8 @@ async function start(){
      '. No second job was created.');
    return;
   }
-  setStatus('No independently qualified new gap or eligible unfinished original job exists. Reality stopped safely rather than inventing an upgrade or receipt.');
+  setStatus((historicalNoOpIds.size?'HISTORICAL SETTLEMENT VERIFIED · Previous original already satisfied. ':'')+
+   'No independently qualified NEW gap or eligible unfinished original job exists. Reality stopped safely rather than inventing an upgrade or receipt.');
  }catch(error){
   setStatus('Full-loop start blocked: '+String(error?.message||'UNKNOWN')+
    '. Reality cannot claim installation or settlement; reconcile this job before trying again.');
