@@ -22,8 +22,7 @@ export function buildRealityCapabilityOperatingContext(){
    'INSTALL_ISOLATED_AND_INDEPENDENTLY_MONITOR_IF_APPROVED',
    'AUTOMATICALLY_RECONCILE_RESUME_AND_VERIFY_THE_SAME_ORIGINAL_JOB',
    'RECORD_TERMINAL_RECEIPT_OR_TRUTHFUL_BLOCKER_WITHOUT_CLAIMING_ROI',
-   'CONTINUE_OTHER_AUTHORIZED_WORK_WHILE_ONE_TASK_IS_BLOCKED',
-   'ASSESS_PORTABILITY_WITHOUT_CROSS_TENANT_DATA_OR_PERMISSION_TRANSFER'
+   'CONTINUE_OTHER_AUTHORIZED_WORK_WHILE_ONE_TASK_IS_BLOCKED'
   ]),
   known_components:Object.freeze([
    {id:'evidence_discovery',status:'IMPLEMENTATION_EXISTS_RUNTIME_READBACK_REQUIRED'},
@@ -36,7 +35,6 @@ export function buildRealityCapabilityOperatingContext(){
    {id:'fully_autonomous_every_failure_repair',status:'NOT_INDEPENDENTLY_PROVEN'}
   ]),
   watchdog_principle:'If the worker is missing, only an independent scheduler/observer can detect it. Inspect durable dispatch, lease, authenticated acknowledgment and heartbeat; do not rely on a heartbeat emitted by the failed worker alone. Reissue delivery only via trusted fenced governance after no prior side effect is possible.',
-  reusable_capability_principle:'A capability developed in one business may be offered to compatible customers after sanitized, independently verified portable release; never transfer tenant records or authorization. Each customer reviews and approves installation.',
   hard_boundaries:Object.freeze({
    reasoning_needs_new_owner_approval:false,
    read_only_research_needs_new_owner_approval:false,
@@ -45,8 +43,6 @@ export function buildRealityCapabilityOperatingContext(){
    model_cannot_mint_authority:true,
    model_cannot_claim_verified_completion:true,
    external_action_only_with_scope:true,
-   cross_tenant_data_sharing_default:false,
-   cross_tenant_installation_default:false,
    worker_retries_must_not_repeat_uncertain_effects:true,
    estimated_value_not_measured_roi:true
   }),
