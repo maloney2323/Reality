@@ -46,6 +46,8 @@ jobs:
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --check reality-engine-delta-v1.js
           node --test test/reality-engine-delta-v1.test.js
+          node --check reality-model-capability-map-v1.js
+          node --test test/reality-model-capability-map-v1.test.js
           node --check reality-backlog-value-scenario-v1.js
           node --check src/reality-backlog-labor-scenario-v1.js
           node --check api/reality/backlog-value-scenario.js
