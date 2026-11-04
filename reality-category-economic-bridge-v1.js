@@ -127,35 +127,6 @@ function validPortfolio(d){
   Math.abs(low-d.human_review_what_if.conditional_low_gross_wage_usd)<0.1&&
   Math.abs(high-d.human_review_what_if.conditional_high_gross_wage_usd)<0.1;
 }
-function validOwner(d){
- if(d?.ok!==true||d.status!=='OWNER_GAP_INTAKE_RECONCILED'||
-  d.source_basis!=='PERSISTED_OWNER_EVIDENCE_NO_PROVIDER_LIVE_REFRESH'||
-  d.read_only!==true||d.installation_authorized!==false||
-  d.work_started!==false||d.production_changed!==false||
-  !Array.isArray(d.items)||d.items.length>30||
-  !Array.isArray(d.settled_history)||d.settled_history.length>12||
-  !number(d.counts?.current_candidates)||d.counts.current_candidates!==d.items.length||
-  !number(d.counts.historical_completed)||
-  d.counts.historical_completed!==d.settled_history.length||
-  !number(d.counts.verified_current_gaps)||
-  !number(d.counts.verified_implementation_defects)||
-  !number(d.counts.independently_tested_research_repairs)||
-  d.counts.verified_implementation_defects!==
-   d.counts.independently_tested_research_repairs||
-  d.counts.verified_current_gaps!==
-   d.items.filter(x=>x.verified_missing_capability===true).length||
-  d.counts.verified_implementation_defects!==
-   d.items.filter(x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED').length||
-  new Set(d.items.map(x=>x.key)).size!==d.items.length)
-  return false;
- return d.items.every(x=>
-  Object.hasOwn(kinds,x?.kind)&&
-  key.test(String(x.key||''))&&
-  statuses.has(x.stage)&&
-  typeof x.title==='string'&&x.title.length>=5&&x.title.length<=220&&
-  typeof x.next_proof==='string'&&x.next_proof.length>=20&&
-  x.verified_missing_capability===true||false /* repaired below */);
-}
 function validateOwnerRecords(d){
  if(!validOwnerBase(d))return false;
  return d.items.every(x=>
