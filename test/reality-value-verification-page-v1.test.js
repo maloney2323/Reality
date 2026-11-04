@@ -257,6 +257,6 @@ test('every value tab shows significant source-backed figures immediately, witho
  assert.match(client,/realityAutoBacklogHours/);
  assert.match(client,/realityEconCapacity/);
  assert.match(client,/financialRange/);
- assert.match(client,/No dollar range above is verified savings/);
+ assert.match(html,/No dollar range above is verified savings/);
  assert.doesNotMatch(client,/\b(?:revenue|savings)=\d+\b|97\.3% Saved/);
 });
