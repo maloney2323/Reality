@@ -13,7 +13,6 @@ const STEPS=[
  'Independent original-job acceptance',
  'End-of-shift evidence report'
 ];
-const OFFSETS=[0,45,105,165,225,285,375,435];
 const SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/;
 const isTime=x=>typeof x==='string'&&Number.isFinite(Date.parse(x));
 const safeDate=x=>isTime(x)?new Date(x).toISOString():null;
@@ -79,7 +78,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
  }).slice(0,5);
  const firstPending=s.steps.find(t=>t.state==='QUEUED'||t.state==='CLAIMED'||
   t.state==='AWAITING_EXACT_WORK'||t.state==='BLOCKED_PROVIDER');
- const timeNext=firstPending?new Date(start+OFFSETS[firstPending.step_index-1]*60000).toISOString():null;
+ const timeNext=now.getTime()<start?safeDate(s.planned_start_at):null;
  const exact=handoffs.filter(h=>h?.shift_id===s.shift_id&&
   h.status==='EXACT_VERIFIED_CAPABILITY_APPROVAL_READY_IN_REALITY_CHAT'&&
   h.installation_approved===false&&
@@ -94,11 +93,11 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='Scheduled start has passed. No completed source check is recorded yet.';
   next='Await the next trusted worker wake and an actual source-check receipt.';
  }else if(s.status==='AWAITING_EXACT_ORIGINAL_WORK'){
-  current='The exact original-job action awaits authorization; other scheduled read-only checks may continue.';
+  current='The exact original-job action awaits independent qualification or authorization. Other eligible read-only work proceeds without artificial delays.';
   next=pending?'Review the exact verified upgrade in Reality Chat. After your approval, the existing governed installer handles continuation.':
    'Reality must independently qualify and bind an eligible original job before execution can continue.';
  }else if(s.status==='ESCALATED'){
-  current='Escalated: source-check or lease recovery needs investigation.';
+  current='A prior source-check or lease problem needs investigation; independent wake/recovery continues within this authorization.';
   next='Review blocked provider evidence. Do not assume that the scheduled workload completed.';
  }else if(s.status.startsWith('ENDED_')){
   current='The scheduled shift window has ended; the database recorded its final state.';
@@ -107,11 +106,11 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='Worker claimed '+STEPS[firstPending.step_index-1]+'. A provider receipt is still pending.';
   next='Wait for an independently recorded evidence result; a claim alone is not completion.';
  }else if(firstPending){
-  current=recorded+' source checks recorded. Waiting for the next scheduled step.';
-  next='Next: '+STEPS[firstPending.step_index-1]+' at its planned slot. No extra “Next” button is required.';
+  current=recorded+' source checks recorded. Eligible work is claimable on the next trusted worker wake, without scheduled gaps.';
+  next='Next: '+STEPS[firstPending.step_index-1]+'. No separate start or “Next” button is required.';
  }else{
   current='No further source-validation steps are currently claimable.';
-  next='Wait for independently verified original-job settlement or the final shift report.';
+  next='No further authorized source checks remain. The independent worker continues checking for exact original-job receipts and closes the shift at its approved end; it cannot invent additional work.';
  }
  const whatFinished=recent.length?
   (recorded+' recorded source/preflight checks; '+
