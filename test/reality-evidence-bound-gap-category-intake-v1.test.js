@@ -71,7 +71,7 @@ test('full homepage and category handler parse without changing existing governo
  assert.match(inline,/setInterval\(\(\)=>\{if\(homeOwnerSignedIn\(\)\)void wcLoadGapFeed\(\);\},60000\)/);
  assert.match(inline,/wcInvestigateMarket\(\{restore:true\}\);void wcLoadGapFeed\(\)/);
 });
-test('six owner-scoped candidate categories and three separated historical receipts display',async()=>{
+test('active category displays only current evidence and keeps settled history out of its cards',async()=>{
  const x=mount();
  await vm.runInContext('wcLoadGapFeed()',x.context);
  assert.equal(x.reads.length,1);
@@ -80,13 +80,14 @@ test('six owner-scoped candidate categories and three separated historical recei
  assert.equal(x.reads[0].opt.credentials,'same-origin');
  assert.match(x.nodes.simpleGapFeedStatus.textContent,/6 tracked/);
  assert.match(x.nodes.simpleGapFeedStatus.textContent,/0 proven current gaps/);
- assert.match(x.nodes.simpleGapFeedStatus.textContent,/3 previous completed upgrades/);
+ assert.match(x.nodes.simpleGapFeedStatus.textContent,/3 past records in Past Jobs & Receipts/);
  const html=vm.runInContext('wcGapEvidenceCards()',x.context);
  assert.match(html,/6 tracked · 0 proven current gaps/);
  assert.match(html,/TESTED CANDIDATE/);
  assert.match(html,/PROVIDER FAILURE OBSERVED/);
  assert.match(html,/ASSESSED RESEARCH/);
- assert.match(html,/3 prior completed upgrades · Not new gaps/);
+ assert.doesNotMatch(html,/3 prior completed upgrades · Not new gaps/);
+ assert.match(html,/Past Jobs &amp; Receipts/);
  assert.doesNotMatch(html,/data-wc-start|data-recovery-run|data-owner-approve/);
  assert.equal(x.renders,1);
 });
