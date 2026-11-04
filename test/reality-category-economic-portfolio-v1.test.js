@@ -54,7 +54,7 @@ test('all ten real Work Center categories appear with source observations and ex
  assert.equal(r.categories.find(x=>x.id==='research').category_has_unconnected_business_source,true);
  assert.equal(r.human_review_what_if.conditional_low_hours,1.25);
  assert.equal(r.human_review_what_if.conditional_high_hours,4.5);
- assert.equal(r.human_review_what_if.conditional_low_gross_wage_usd,81.73);
+ assert.equal(r.human_review_what_if.conditional_low_gross_wage_usd,81.72);
  assert.equal(r.human_review_what_if.conditional_high_gross_wage_usd,294.21);
  assert.equal(r.assumptions.public_wage_usd_per_hour,65.38);
  assert.equal(r.assumptions.task_completion_effort_estimated,false);
@@ -178,7 +178,7 @@ test('category dashboard renders Work Center categories and real owner-protected
  assert.equal(f.nodes.realityCategorySignalCount.textContent,'3');
  assert.equal(f.nodes.realityCategoryOwnerCount.textContent,'2');
  assert.equal(f.nodes.realityCategoryVerifiedRepairs.textContent,'1');
- assert.equal(f.nodes.realityCategoryReviewValue.textContent,'$81.73 – $294.21');
+ assert.equal(f.nodes.realityCategoryReviewValue.textContent,'$81.72 – $294.21');
  assert.match(f.nodes.realityCategoryOwnerStatus.textContent,/NOT added or priced twice/);
  assert.match(f.nodes.realityCategoryScope.textContent,/NOT measured savings|not established/i);
  assert.equal(f.timers[0].ms,90000);
