@@ -57,6 +57,8 @@ jobs:
           node --check src/reality-employee-shift-chat-context-v1.js
           node --check reality-shift-conversation-v1.js
           node --test test/reality-chat-page-shift-brief-v1.test.js
+          node --check reality-value-verification-v1.js
+          node --test test/reality-value-verification-page-v1.test.js
           node --check reality-economic-evidence-dashboard-v1.js
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --check reality-engine-delta-v1.js

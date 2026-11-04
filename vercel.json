@@ -18,6 +18,10 @@
     {
       "source": "/chat",
       "destination": "/index.html"
+    },
+    {
+      "source": "/value",
+      "destination": "/index.html"
     }
   ]
 }
