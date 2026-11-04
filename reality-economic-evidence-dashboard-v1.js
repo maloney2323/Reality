@@ -202,9 +202,12 @@
      const historical = j.historical_reconciliation?.status ===
       'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT' &&
       j.historical_reconciliation?.current_job_settled === false;
+     const ledgerShowsSettlement = j.phase === 'SETTLED_ISOLATED';
      const phase = completed ? 'Independently settled · isolated preview' :
       historical ? 'Historical outcome recognized · this job unsettled' :
-      'Unsettled · ' + j.phase.replaceAll('_',' ').slice(0,72);
+      ledgerShowsSettlement ?
+       'Ledger phase settled in isolation · independent completion not verified' :
+       'Original job pending · ' + j.phase.replaceAll('_',' ').slice(0,72);
      const title = String(j.capability_id || 'Original job').replaceAll('-',' ') +
       ' · ' + j.original_work_id.slice(5,13);
      const detail = phase +
