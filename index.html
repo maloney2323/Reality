@@ -336,6 +336,21 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-econ-label{font-size:13px;line-height:1.45;font-weight:650;color:#b4c8da}
 #realitySimpleHome .reality-econ-grid strong{font-size:clamp(19px,4vw,32px);font-weight:750;color:#fff;line-height:1.2;overflow-wrap:anywhere}
 #realitySimpleHome .reality-econ-grid small{font-size:11px;line-height:1.5;color:#9cb2c8}
+#realitySimpleHome .reality-econ-backlog{border-top:1px solid #314256;padding:15px 0 17px}
+#realitySimpleHome .reality-econ-backlog-head{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:9px}
+#realitySimpleHome .reality-econ-backlog h3{font-size:17px;color:#fff;margin:0 0 8px}
+#realitySimpleHome #realityBacklogValueStatus{font-size:12px;color:#b2c7db;margin:8px 0}
+#realitySimpleHome .reality-econ-backlog-details{border:1px solid #354f68;border-radius:12px;padding:11px;margin:5px 0 10px;background:#0b1828}
+#realitySimpleHome .reality-econ-backlog-details summary{cursor:pointer;font-size:13px;color:#cce9fd;font-weight:700}
+#realitySimpleHome .reality-econ-backlog-details p{font-size:12px;line-height:1.5;color:#afc3d4}
+#realitySimpleHome .reality-econ-input-list{display:grid;gap:11px;margin:12px 0}
+#realitySimpleHome .reality-econ-input-list article{border-top:1px solid #324558;padding-top:9px;display:grid;gap:7px}
+#realitySimpleHome .reality-econ-input-list strong{font-size:12px;color:#f0f5fd;overflow-wrap:anywhere}
+#realitySimpleHome .reality-econ-input-list a{font-size:12px;color:#b6e5ff;text-decoration:underline}
+#realitySimpleHome .reality-econ-input-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#realitySimpleHome .reality-econ-input-pair label{font-size:12px;line-height:1.5;color:#b8cedd;display:grid;gap:5px}
+#realitySimpleHome .reality-econ-input-pair input{min-width:0;width:100%;height:41px;box-sizing:border-box;background:#152942;color:#f5fbff;border:1px solid #68829a;border-radius:9px;font-size:14px;padding:6px 8px}
+#realitySimpleHome #realityBacklogCompute{width:100%;margin-top:6px;font-size:12px;white-space:normal}
 #realitySimpleHome .reality-econ-values{border-top:1px solid #314256;border-bottom:1px solid #314256;padding:12px 0;display:grid;gap:14px}
 #realitySimpleHome .reality-econ-values>div{display:flex;justify-content:space-between;align-items:start;gap:14px;font-size:13px;line-height:1.5}
 #realitySimpleHome .reality-econ-values span{color:#aebfd0;max-width:60%}
@@ -415,6 +430,27 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <article><div class="reality-econ-label">Comparable human effort</div><strong id="realityEconHuman">Not measured</strong><small>Independent task-level baseline required</small></article>
    <article><div class="reality-econ-label">Verified net capacity returned</div><strong id="realityEconCapacity">Not measured</strong><small>Cannot infer labor saved from runtime</small></article>
   </div>
+  <section id="realityBacklogValuePanel" class="reality-econ-backlog" aria-labelledby="realityBacklogValueTitle">
+   <div class="reality-econ-backlog-head">
+    <h3 id="realityBacklogValueTitle">Potential backlog value</h3>
+    <span class="reality-econ-scope">Illustrative · Not verified savings</span>
+   </div>
+   <p id="realityBacklogValueStatus" role="status" aria-live="polite">Checking source-linked open issues and labor benchmark…</p>
+   <div class="reality-econ-grid" aria-label="Assumption-based backlog labor scenario">
+    <article><div class="reality-econ-label">Potential discovery labor equivalent</div><strong id="realityBacklogDiscoveryValue">Not estimated</strong><small>Owner-estimated hours to find and assess work</small></article>
+    <article><div class="reality-econ-label">Potential execution labor equivalent</div><strong id="realityBacklogExecutionValue">Not estimated</strong><small>Owner-estimated hours to finish the work</small></article>
+    <article><div class="reality-econ-label">Combined gross workload equivalent</div><strong id="realityBacklogTotalValue">Not estimated</strong><small>Not cash saved or a recurring daily figure</small></article>
+    <article><div class="reality-econ-label">Assumed human workload</div><strong id="realityBacklogTotalHours">Not estimated</strong><small>Task-specific inputs, not confirmed hours</small></article>
+   </div>
+   <details id="realityBacklogInputs" class="reality-econ-backlog-details">
+    <summary>Estimate the human work behind the discovered issues</summary>
+    <p>For each source-linked issue, enter estimated human investigation and completion hours. No hours are assigned automatically from titles, issue counts, or pull requests. Values are session-only assumptions and are not recorded as receipts.</p>
+    <p id="realityBacklogWageContext" class="reality-econ-footnote">Reference occupational rate: awaiting source readback.</p>
+    <div id="realityBacklogInputItems" class="reality-econ-input-list"></div>
+    <button type="button" id="realityBacklogCompute" class="simple-secondary" disabled>Calculate illustrative labor value · no work started</button>
+   </details>
+   <p id="realityBacklogValueFootnote" class="reality-econ-footnote">No independently measured human comparator or confirmed backlog hours yet. Only separately validated work can later count toward verified savings.</p>
+  </section>
   <div class="reality-econ-values" aria-label="Economic verification states">
    <div><span>Realized cash savings</span><strong id="realityEconCash">Not established</strong></div>
    <div><span>Modeled risk exposure reduced</span><strong id="realityEconRisk">Not established</strong></div>
@@ -5849,6 +5885,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
+<script defer src="/reality-backlog-value-scenario-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
 </body>
 </html>
