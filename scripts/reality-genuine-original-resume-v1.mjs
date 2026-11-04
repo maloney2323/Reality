@@ -42,6 +42,26 @@ async function broker(action,scope,proof){
  return result;
 }
 const ready=await broker('original_prepare');
+// An exact, historically verified Universe witness is a safe no-effect
+// terminal observation, NOT proof that this newly approved job settled.
+if(ready.status==='HISTORICAL_RECONCILIATION_ALREADY_SATISFIED'){
+ if(!/^work:[a-f0-9]{32}$/.test(ready.original_work_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(ready.previous_repairing_original_work_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(ready.previous_reconciliation_target_work_id||'')||
+    ready.independent_database_readback!==true||
+    ready.current_job_execution_claimed!==false||
+    ready.original_job_completed!==false||
+    ready.installation_replay_authorized!==false||
+    ready.production_changed!==false)
+  fail('HISTORICAL_NO_TARGET_WITNESS_INVALID');
+ console.log('REALITY_HISTORICAL_UNIVERSE_ALREADY_SATISFIED',JSON.stringify({
+  current_original_work_id:ready.original_work_id,
+  historical_repairing_original_work_id:ready.previous_repairing_original_work_id,
+  historical_target_work_id:ready.previous_reconciliation_target_work_id,
+  previously_verified:true,current_original_job_completed:false,
+  original_execution_replayed:false,production_changed:false}));
+ output('false');process.exit(0);
+}
 if(['NO_ELIGIBLE_ORIGINAL','ALREADY_SETTLED','RESUMPTION_ALREADY_CLAIMED_NO_REPLAY'].includes(ready.status)){
  console.log('REALITY_ORIGINAL_RESUME_NO_NEW_WORK',ready.status);
  output('false');process.exit(0);
