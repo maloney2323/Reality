@@ -45,14 +45,14 @@ test('source IDs remain single-owner; no duplicated receipts, models or value wi
 });
 test('value proof separates opportunity signals, historical assumptions and accepted original jobs',()=>{
  assert.match(html,/VALUE BEFORE AUTOMATION/);
- assert.match(html,/POTENTIAL VALUE · NOT REALIZED SAVINGS/);
- assert.match(html,/REALIZED VALUE · INDEPENDENT EVIDENCE/);
+ assert.match(html,/ILLUSTRATIVE · NOT REALIZED SAVINGS/);
+ assert.match(html,/INDEPENDENTLY VERIFIED · REALIZED OUTCOMES/);
  assert.match(html,/Historical benchmark models, potential revenue or avoided cost/);
  assert.match(html,/A pipeline stage is not marked complete for any specific job/);
- assert.match(html,/not yet proof the work was completed or time saved/);
- assert.match(html,/Net human capacity returned/);
+ assert.match(html,/Provider observations aren't completed jobs or verified capability gaps/);
+ assert.match(html,/Verified net human capacity returned/);
  assert.match(html,/Not measured/);
- assert.match(html,/Only independently linked original-job outcomes/);
+ assert.match(html,/Review the exact original-job evidence/);
  assert.doesNotMatch(html.slice(html.indexOf('id="realityValueVerification"'),
   html.indexOf('id="realitySimpleHome"')),/\$\d{3,}|97\.3% Saved|6\.8 hrs|9\.4 hrs|413 jobs/);
 });
@@ -60,9 +60,9 @@ test('browser code is valid, read-only, owner-gated, and recalculates on source 
  assert.doesNotThrow(()=>new vm.Script(client));
  assert.match(client,/MutationObserver/);
  assert.match(client,/privateReady/);
- assert.match(client,/isSignedIn&&findings/);
- assert.match(client,/isSignedIn&&candidates/);
- assert.match(client,/No cash savings inferred/);
+ assert.match(client,/const findings=isSignedIn/);
+ assert.match(client,/const candidates=isSignedIn/);
+ assert.match(client,/Cash savings not measured/);
  assert.doesNotMatch(client,/fetch\(|localStorage|sessionStorage|OWNER_APPROVE/);
 });
 test('Value page projects existing signed-in evidence without inventing additional savings',()=>{
@@ -102,8 +102,8 @@ test('Value page projects existing signed-in evidence without inventing addition
  assert.equal(nodes.get('rvCategories').children[0].id,'realityHomeCategories');
  assert.equal(nodes.get('rvReceiptEvidence').children[0].id,'proofElement');
  assert.equal(nodes.get('rvMeasuredInputs').children[0].id,'realityHomeFinance');
- assert.equal(nodes.get('realityHomeFinance').open,true);
- assert.match(nodes.get('rvSourceStatus').textContent,/Owner evidence received/);
+ assert.equal(nodes.get('realityHomeFinance').open,false);
+ assert.match(nodes.get('rvSourceStatus').textContent,/Evidence verified for this view/);
 });
 test('route remains inactive on Home and Chat and leaves source modules untouched',()=>{
  for(const route of ['home','chat']){
