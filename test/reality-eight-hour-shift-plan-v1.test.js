@@ -160,7 +160,7 @@ test('one click requests ONLY draft via GET, renders an evidence-linked eight-ho
  assert.match(slots.realityEmployeeShiftStatus.textContent,/No job started/);
  assert.equal(slots.realityEmployeeShiftSchedule.children[2].children.length,8);
  const first=slots.realityEmployeeShiftSchedule.children[2].children[0];
- assert.match(first.children[0].textContent,/09:00/);
+ assert.match(first.children[0].textContent,/Planning estimate.*No required wait/);
  const conditional=slots.realityEmployeeShiftSchedule.children[2].children[5];
  assert.match(conditional.children[1].children[0].textContent,/Governed execution/);
  assert.match(slots.realityEmployeeShiftSchedule.children[1].textContent,/NOT eight measured/);
