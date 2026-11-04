@@ -31,7 +31,7 @@ export default async function handler(req,res){
   const [catalog,liveIssues]=await Promise.all([
    buildRealityWorkCatalog(),fetchCatalogGitHub('issues')]);
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
-  const assessment=deriveAutomaticBacklogPlanning({brief,liveIssues});
+  const assessment=deriveAutomaticBacklogPlanning({brief,liveIssues,sourceCatalog:catalog});
   return res.status(200).json({ok:true,...assessment});
  }catch(e){
   console.warn('AUTOMATIC_BACKLOG_READBACK_UNAVAILABLE',
