@@ -15,7 +15,7 @@ function el(tag='div'){
 function fixture({signed=true,conv=UUID,routes={}}={}){
  const nodes={simpleRunFullLoop:el('button'),simpleFullLoopStatus:el(),
  simpleFullLoopReceipt:el()};
- const calls=[],timers=[],chat={opened:0,refreshed:0};
+ const calls=[],timers=[],chat={opened:0,refreshed:0},handoffs=[];
  const fakeFetch=async(url,options)=>{
   calls.push({url,options});
   const value=routes[url];
@@ -28,10 +28,11 @@ function fixture({signed=true,conv=UUID,routes={}}={}){
   homeOwnerSignedIn:()=>signed,
   realityActiveConversationId:()=>conv,
   realityOpenChatDock:()=>{chat.opened++},
-  homeOwnerRefresh:()=>{chat.refreshed++}
+  homeOwnerRefresh:()=>{chat.refreshed++},
+  realityHandoffFullLoopFailure:async detail=>{handoffs.push(detail)}
  },fetch:fakeFetch,encodeURIComponent,setInterval:fn=>{timers.push(fn);return 1}};
  vm.runInNewContext(browser,ctx,{filename:'one-button-full-loop-v1.js'});
- return {nodes,calls,timers,chat,click:async()=>await nodes.simpleRunFullLoop.listeners.click()};
+ return {nodes,calls,timers,chat,handoffs,click:async()=>await nodes.simpleRunFullLoop.listeners.click()};
 }
 const noActive={ok:true,jobs:[],independent_final_receipts:[],production_changed:false,
  external_action_performed:false};
@@ -331,4 +332,30 @@ test('current installed historical no-op never becomes a queued original for rep
  await f.click();
  assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
  assert.match(f.nodes.simpleFullLoopStatus.textContent,/HISTORICAL SETTLEMENT VERIFIED/);
+});
+
+test('no eligible new provider job triggers delegated diagnosis instead of forging a job',async()=>{
+ const f=fixture({routes:base});
+ await f.click();
+ assert.equal(f.handoffs.length,1);
+ assert.equal(f.handoffs[0].stage,'NO_ELIGIBLE_NEW_WORK');
+ assert.equal(f.handoffs[0].code,'NO_QUALIFIED_NEW_WORK');
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
+});
+test('unqualified installation preflight is handed to diagnostics, never the approval route',async()=>{
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,
+   jobs:[{original_work_id:WORK,phase:'AWAITING_OWNER_APPROVAL',
+     independently_settled:false,candidate_verified:true}]},
+  '/api/reality/personal-qualified-capabilities':{ok:true,entries:[{
+   original_work_id:WORK,full_loop_preflight:{
+    status:'MANDATORY_HOLDOUT_NOT_VERIFIED',approval_gate_open:false}
+  }]}
+ }});
+ await f.click();
+ assert.equal(f.handoffs.length,1);
+ assert.equal(f.handoffs[0].stage,'OWNER_INSTALL_PREFLIGHT');
+ assert.equal(f.handoffs[0].original_work_id,WORK);
+ assert.equal(f.handoffs[0].code,'MANDATORY_HOLDOUT_NOT_VERIFIED');
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
 });
