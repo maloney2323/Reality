@@ -163,7 +163,8 @@ test('anonymous client never calls economic source and displays no estimates',as
 
 test('automatic value scans source catalog beyond the 25 highlighted workday cards',()=>{
  const many=Array.from({length:40},(_,i)=>({
-  ...issue(i+100,(i+2).toString(16).padStart(32,'0')),
+  ...issue(i+100,'a'),
+  finding_id:'catalog:'+(i+2).toString(16).padStart(32,'0'),
   value_assessment:{
    score_definition:'HEURISTIC_TRIAGE_REVIEW_ORDER_ONLY_NOT_BUSINESS_IMPACT',
    business_impact:{status:'UNMEASURED'},
