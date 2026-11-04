@@ -60,6 +60,48 @@ function update(){
   /^([1-9][0-9]{0,6}) independently reconciled$/.exec(sourceReceiptText)?.[1]||null;
  const settled=strictCount($('realityEconSettled')?.textContent);
  const authenticatedEvidence=isSignedIn&&!!receipts&&!!settled;
+ // Mirror only current source-backed evidence; never infer or add gross dollar scenarios.
+ const trustedText=(id,pattern)=> {
+  const value=String($(id)?.textContent||'').trim();
+  return isSignedIn&&value.length<=75&&pattern.test(value)?value:null;
+ };
+ const financialRange=/^\$[0-9,]+(?:\.[0-9]{2})?\s*[–-]\s*\$[0-9,]+(?:\.[0-9]{2})?$/;
+ const hourRange=/^[0-9,]+(?:\.[0-9]{1,2})?\s*[–-]\s*[0-9,]+(?:\.[0-9]{1,2})?\s*hrs?$/i;
+ const reviewWhatIf=trustedText('realityCategoryReviewValue',financialRange);
+ const issueWhatIf=trustedText('realityAutoBacklogDollars',financialRange);
+ const assumedHours=trustedText('realityAutoBacklogHours',hourRange);
+ const modeledIssues=trustedText('realityAutoBacklogCount',/^(?:0|[1-9][0-9]{0,5})$/);
+ const baselineText=String($('realityAutoBacklogCalibrated')?.textContent||'').trim();
+ const modeledBaseline=/^0 accepted baselines$/i.test(baselineText)?'0 accepted task baselines':'no independently calibrated task count confirmed';
+ // This receipt count is extracted from the original source, not from a pre-rendered badge.
+ const finalizedReceipts=receipts||null;
+ const present=(id,value,fallback='Not verified')=>{
+  const node=$(id);if(node)node.textContent=value||fallback;
+ };
+ present('rvOverviewSignals',isSignedIn?observations:null);
+ present('rvOverviewReviewWhatIf',reviewWhatIf,'Not available');
+ present('rvOverviewReceipts',isSignedIn?finalizedReceipts:null);
+ present('rvOpportunitySignals',isSignedIn?observations:null);
+ present('rvOpportunityFindings',findings);
+ present('rvOpportunityCandidates',candidates);
+ present('rvPotentialReviewValue',reviewWhatIf,'Not available');
+ present('rvPotentialIssueValue',issueWhatIf,'Not available');
+ present('rvPotentialHours',assumedHours,'Not available');
+ present('rvPotentialCoverage',modeledIssues&&isSignedIn?
+  modeledIssues+' source-linked open issue(s) modeled · '+modeledBaseline+'. Assumptions only, not a commitment to execute.':
+  'Open-issue scenario is unavailable until its source-backed model loads.');
+ present('rvResultsSettled',isSignedIn?settled:null);
+ present('rvResultsReceipts',isSignedIn?finalizedReceipts:null);
+ present('rvResultsHours',isSignedIn?$('realityEconCapacity')?.textContent?.trim():null,'Not measured');
+ present('rvResultsMeaning',isSignedIn&&settled&&finalizedReceipts?
+  settled+' original-job settlement(s) recorded in isolation; '+finalizedReceipts+
+  ' independently reconciled final receipt(s). These totals are not necessarily the same jobs, and no verified human labor reduction has been established.':
+  'Owner-scoped original-job results are not yet independently available.');
+ present('rvGovernanceSignals',isSignedIn?observations:null);
+ present('rvGovernanceCandidates',candidates);
+ present('rvGovernanceReceipts',isSignedIn?finalizedReceipts:null);
+ // KPI remains compact on phones; the verified status is in its own label.
+ present('rvReceipts',isSignedIn?finalizedReceipts:null);
  $('rvSourceStatus').textContent=authenticatedEvidence?
   'Evidence verified for this view · '+(observations||'Unverified')+
    ' signals · '+settled+' isolated settlements · '+receipts+
@@ -118,7 +160,9 @@ selectView('overview');
 
 const watched=['realityEconSignals','realityEconSettled','realityEconReceipts',
  'realityEconCapacity','privateReady','realityCategoryOwnerStatus',
- 'realityCategoryOwnerCount','realityCategoryVerifiedRepairs'];
+ 'realityCategoryOwnerCount','realityCategoryVerifiedRepairs',
+ 'realityCategoryReviewValue','realityAutoBacklogDollars',
+ 'realityAutoBacklogHours','realityAutoBacklogCount','realityAutoBacklogCalibrated'];
 let queued=false;
 function schedule(){
  if(queued)return;queued=true;
