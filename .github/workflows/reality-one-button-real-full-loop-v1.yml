@@ -30,6 +30,7 @@ jobs:
           node --test test/reality-governed-original-continuity-v1.0.test.js
           node --test test/reality-original-repair-worker-handoff-v1.0.test.js
           node --test test/reality-one-button-real-full-loop-v1.test.js
+          node --test test/reality-capability-value-report-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js
           node --test test/reality-verified-budget-gap-owner-review-v1.test.js
