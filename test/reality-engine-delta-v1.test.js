@@ -101,8 +101,10 @@ test('Engine Delta makes the OpenAI-plus-Reality distinction clear without exclu
  assert.ok(html.indexOf('id="realityEngineDelta"')>0);
  assert.ok(html.indexOf('id="realityEngineDelta"')<
   html.indexOf('id="realityCategoryEconomics"'));
- assert.ok(html.indexOf('id="realityEngineDelta"')<
+ assert.ok(html.indexOf('id="realityEngineDelta"')>
   html.indexOf('id="simpleRunFullLoop"'));
+ assert.ok(html.indexOf('id="realityEngineDelta"')>
+  html.indexOf('id="realityPublishedRepairEvidence"'));
  assert.match(html,/OpenAI intelligence\. Reality operational control\./);
  assert.match(html,/Architecture \+ actual evidence/);
  assert.match(html,/Separate evidence sets · Not a conversion funnel/);

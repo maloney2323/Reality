@@ -7,7 +7,9 @@ const sql=readFileSync(new URL('../supabase/migrations/20261103_autonomous_preho
 const script=page.match(/<script>([\s\S]*?)<\/script>/)?.[1]||'';
 test('browser parses with visible automatic assessment and retains existing auth/chat',()=>{
  assert.doesNotThrow(()=>new vm.Script(script));
- assert.match(page,/Upgrades Reality has inspected/);
+ assert.match(page,/Upgrades Reality has already inspected/);
+ assert.ok(page.indexOf('id="simpleResearchList"')>page.indexOf('id="realityPublishedRepairEvidence"'));
+ assert.ok(page.indexOf('id="simpleResearchList"')<page.indexOf('id="realityHomeGovernance"'));
  assert.match(page,/Potential customer value/);
  assert.match(page,/Costs, time saved and ROI/);
  assert.match(page,/What Reality must prove next/);

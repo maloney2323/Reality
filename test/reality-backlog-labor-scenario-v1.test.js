@@ -114,8 +114,10 @@ test('dashboard includes potential value as a non-approved hypothetical scenario
  assert.match(html,/id="realityBacklogTotalValue">Not estimated/);
  assert.match(html,/id="realityBacklogDiscoveryValue">Not estimated/);
  assert.match(html,/id="realityBacklogExecutionValue">Not estimated/);
- assert.ok(html.indexOf('id="realityBacklogValuePanel"')<
+ assert.ok(html.indexOf('id="realityBacklogValuePanel"')>
   html.indexOf('id="simpleRunFullLoop"'));
+ assert.ok(html.indexOf('id="realityBacklogValuePanel"')>
+  html.indexOf('id="realityHomePlanning"'));
  assert.match(html,/src="\/reality-backlog-value-scenario-v1\.js"/);
  assert.doesNotMatch(script,/localStorage|OWNER_APPROVE_EXACT_VERIFIED|INSTALL_CAPABILITY|githubWrite/);
  assert.doesNotThrow(()=>new vm.Script(script));

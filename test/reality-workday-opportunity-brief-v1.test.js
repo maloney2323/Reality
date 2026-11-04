@@ -75,10 +75,11 @@ test('duplicate provider item IDs count once; partial source coverage is not rep
  assert.equal(result.status,'SOURCE_BACKED_DISCOVERY_PARTIAL');
  assert.equal(result.counts.source_backed_opportunities,2);
 });
-test('home renders an auto-loading preview-only discovery panel before research, without any buttons or writes',()=>{
+test('home keeps auto-loading read-only workday discovery below priority research inside its expandable evidence panel',()=>{
  const ix=html.indexOf('id="simpleWorkdayBrief"');
  assert.ok(ix>0);
- assert.ok(ix<html.indexOf('id="simpleResearchList"'));
+ assert.ok(ix>html.indexOf('id="simpleResearchList"'));
+ assert.ok(ix>html.indexOf('id="realityHomeWorkday"'));
  assert.match(html,/src="\/reality-workday-brief-v1\.js"/);
  assert.doesNotMatch(browser,/method:\s*'POST'|personal-qualified-capability-approve|OWNER_APPROVE_EXACT_VERIFIED/);
  assert.doesNotThrow(()=>new vm.Script(browser));

@@ -63,7 +63,7 @@ test('dashboard explicitly displays source links and separate hypothetical repai
  assert.match(html,/https:\/\/www\.bls\.gov\/news\.release\/ocwage\.t01\.htm/);
  assert.match(html,/Hamill & Goseva-Popstojanova \(2017\)/);
  assert.match(html,/NASA endorsement of Reality/);
- assert.ok(html.indexOf('id="realityPublishedRepairEvidence"')>
+ assert.ok(html.indexOf('id="realityPublishedRepairEvidence"')<
   html.indexOf('id="realityCategoryEconomics"'));
  assert.ok(html.indexOf('id="realityPublishedRepairEvidence"')<
   html.indexOf('id="realityBacklogValuePanel"'));

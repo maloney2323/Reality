@@ -92,8 +92,10 @@ test('UI shows uncalibrated assumption range above manual inputs and requires no
  assert.ok(html.indexOf('id="realityAutoBacklogComparison"')>0);
  assert.ok(html.indexOf('id="realityAutoBacklogComparison"')<
   html.indexOf('id="realityBacklogInputs"'));
- assert.ok(html.indexOf('id="realityAutoBacklogComparison"')<
+ assert.ok(html.indexOf('id="realityAutoBacklogComparison"')>
   html.indexOf('id="simpleRunFullLoop"'));
+ assert.ok(html.indexOf('id="realityAutoBacklogComparison"')>
+  html.indexOf('id="realityHomePlanning"'));
  assert.match(html,/id="realityAutoBacklogDollars">Unknown/);
  assert.match(html,/src="\/reality-automatic-backlog-value-v1\.js"/);
  assert.doesNotMatch(src,/method:\s*['"]POST|INSTALL_CAPABILITY|OWNER_APPROVE_EXACT_VERIFIED|localStorage/);
