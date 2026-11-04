@@ -35,7 +35,7 @@ test('homepage has durable automation diagnostic surface wired to the actual Cha
  assert.match(home,/id="realityChatAutomationDiagnostics"/);
  assert.match(home,/id="realityChatAutomationDiagnosticStatus"/);
  assert.match(home,/realityChatRefreshTranscript=async/);
- assert.match(home,/src="\\/reality-full-loop-chat-diagnostic-v1\\.js"/);
+ assert.ok(home.includes('src="/reality-full-loop-chat-diagnostic-v1.js"'));
  assert.doesNotThrow(()=>new vm.Script(diagnostic));
 });
 test('one failed click starts the authorized read-only audit and saved Chat diagnosis once',async()=>{
