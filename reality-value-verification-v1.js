@@ -17,6 +17,11 @@ function relocate(source,target){
 }
 try{
  relocate('#realityHomeCategories','rvCategories');
+ const categorySummary=$('realityCategoryEconomics')?.querySelector?.('.reality-econ-grid[hidden]');
+ if(categorySummary){
+  categorySummary.hidden=false;
+  categorySummary.removeAttribute('aria-hidden');
+ }
  relocate('#realityPublishedRepairEvidence','rvPublishedSource');
  relocate('#realityHomePlanning','rvPotentialPlanning');
  relocate('.reality-home-proof','rvReceiptEvidence');
