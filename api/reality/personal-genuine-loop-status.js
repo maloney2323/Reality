@@ -65,9 +65,53 @@ export default async function handler(req,res){
        !Number.isSafeInteger(r.provider_run_id)||r.provider_run_id<1||
        r.production_changed!==false))
    return res.status(503).json({ok:false,error:'FINAL_RECEIPT_TRUSTED_OWNER_READBACK_UNAVAILABLE'});
+  // A signed owner approval can outlive the historical deficit it was
+  // intended to repair. Check the exact owner-bound trigger through the
+  // service-only reconciliation readback. Never infer that this NEW
+  // original job settled from a PREVIOUS job's verified Universe event.
+  const historical=new Map();
+  const candidates=v.jobs.filter(j=>
+   j.capability_id==='reality-continuity-settlement-reconciler'&&
+   j.phase==='ISOLATED_INSTALLED_PROBATION'&&
+   j.owner_install_approved===true&&
+   j.isolated_installed===true&&
+   j.independently_settled!==true).slice(0,3);
+  for(const job of candidates){
+   try{
+    const r=await fetch(db.url+
+      '/rest/v1/rpc/reality_read_genuine_reconciliation_target_v1',{
+       method:'POST',redirect:'error',cache:'no-store',
+       headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+        accept:'application/json','content-type':'application/json'},
+       body:JSON.stringify({p_repairing_trigger_id:job.trigger_id}),
+      });
+    if(!r.ok)continue;
+    const proof=await r.json().catch(()=>null);
+    if(proof?.status==='RECONCILIATION_ALREADY_SATISFIED_BY_VERIFIED_UNIVERSE'&&
+      proof.repairing_original_work_id===job.original_work_id&&
+      WORK.test(proof.previous_repairing_original_work_id)&&
+      WORK.test(proof.previous_reconciliation_target_work_id)&&
+      UUID.test(proof.previous_original_universe_event_id)&&
+      UUID.test(proof.previous_target_universe_event_id)&&
+      proof.independent_database_readback===true&&
+      proof.unresolved_reconciliation_targets===0&&
+      proof.new_reconciliation_proposed===false&&
+      proof.original_job_completed===false&&
+      proof.production_changed===false)
+     historical.set(job.original_work_id,{
+      status:'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT',
+      previous_repairing_original_work_id:proof.previous_repairing_original_work_id,
+      previous_reconciliation_target_work_id:proof.previous_reconciliation_target_work_id,
+      previous_original_universe_event_id:proof.previous_original_universe_event_id,
+      previous_target_universe_event_id:proof.previous_target_universe_event_id,
+      independent_database_readback:true,current_job_settled:false,
+      new_execution_authorized:false,production_changed:false});
+   }catch{/* Fail closed: missing readback never produces a completion claim. */}
+  }
   const jobs=v.jobs.map(j=>{
     const receipt=final.receipts.find(r=>r.original_work_id===j.original_work_id);
     return {...j,
+      historical_reconciliation:historical.get(j.original_work_id)||null,
       owner_install_approved:j.owner_install_approved===true,
       candidate_verified:j.candidate_verified===true,
       independently_settled:j.independently_settled===true,
