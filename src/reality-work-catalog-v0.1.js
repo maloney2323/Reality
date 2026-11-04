@@ -109,6 +109,12 @@ export async function buildRealityWorkCatalog({
  try{
   const s=await steward();
   coverage.actions='checked';coverage.pull_requests='checked';
+  sourceScans.actions=Object.freeze({
+   kind:'actions',scope:'RECENT_30_WORKFLOW_RUNS_AND_STALE_PR_DIAGNOSTIC',
+   pages_scanned:1,items_fetched:null,complete:false,
+   reached_safe_page_limit:false,query_scope_fully_reconciled:false,
+   recent_history_is_not_outstanding_work:true
+  });
   for(const w of s.work||[]){
    const urls=(w.evidence_refs||[]).filter(x=>typeof x==='string'&&
     x.startsWith(BASE+'/'));
