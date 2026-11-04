@@ -85,6 +85,11 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
  if(claimed.step_index===1){
   if(claimed.source_ref!=null)throw Error('SHIFT_PREFLIGHT_SOURCE_MUST_BE_EMPTY');
   proof=await readPreflight({...db,_claimed_owner_id:claimed.owner_id},{fetchImpl});
+ }else if(claimed.source_ref===null){
+  proof={kind:'NO_SOURCE_AVAILABLE',source_available:false,
+   source_url:null,provider_status:'UNASSIGNED_NO_SOURCE',
+   provider_checked:false,read_only:true,
+   production_changed:false,observed_at:new Date().toISOString()};
  }else proof=await readProviderSource(claimed.source_ref,{fetchImpl});
  const settled=await shiftRpc(db,'reality_settle_employee_shift_step_v1',{
   p_shift_id:claimed.shift_id,p_step_index:claimed.step_index,
