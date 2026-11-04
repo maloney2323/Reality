@@ -109,7 +109,11 @@ function el(tag='div'){
 const ids=['realityCategoryEconomics','privateReady','realityCategoryEconomicsStatus',
  'realityCategoryList','realityCategoryOwnerList','realityCategoryOwnerStatus',
  'realityCategorySignalCount','realityCategoryOwnerCount',
- 'realityCategoryVerifiedRepairs','realityCategoryReviewValue','realityCategoryScope'];
+ 'realityCategoryVerifiedRepairs','realityCategoryReviewValue','realityCategoryScope',
+ 'realityPublishedInvestigationHours','realityPublishedFixHours',
+ 'realityPublishedCombinedHours','realityPublishedPerRepairValue',
+ 'realityPublishedRepairStatus','realityPublishedRepairGroups',
+ 'realityPublishedOwnerComparison'];
 const ownerItem=(kind,key,proof=false)=>({
  key,title:'Original owner verified work '+key.slice(0,8),
  kind,stage:proof?'IMPLEMENTATION_DEFECT_REPRODUCED_REPAIR_TESTED_OWNER_REVIEW':
@@ -179,9 +183,31 @@ test('category dashboard renders Work Center categories and real owner-protected
  assert.equal(f.nodes.realityCategoryOwnerCount.textContent,'2');
  assert.equal(f.nodes.realityCategoryVerifiedRepairs.textContent,'1');
  assert.equal(f.nodes.realityCategoryReviewValue.textContent,'$81.72 – $294.21');
+ assert.equal(f.nodes.realityPublishedInvestigationHours.textContent,'2 hrs');
+ assert.equal(f.nodes.realityPublishedFixHours.textContent,'3 hrs');
+ assert.equal(f.nodes.realityPublishedCombinedHours.textContent,'5 hrs');
+ assert.equal(f.nodes.realityPublishedPerRepairValue.textContent,'$326.90');
+ assert.equal(f.nodes.realityPublishedRepairGroups.children.length,3);
+ assert.match(f.nodes.realityPublishedOwnerComparison.textContent,
+  /1 independently tested implementation-defect candidate/);
+ assert.match(f.nodes.realityPublishedOwnerComparison.textContent,/\$326\.90/);
+ assert.match(f.nodes.realityPublishedOwnerComparison.textContent,/NOT actual time saved/);
  assert.match(f.nodes.realityCategoryOwnerStatus.textContent,/NOT added or priced twice/);
  assert.match(f.nodes.realityCategoryScope.textContent,/NOT measured savings|not established/i);
  assert.equal(f.timers[0].ms,90000);
+});
+test('tampered published research cannot become a human-repair value claim',async()=>{
+ const invalid={ok:true,...buildCategoryEconomicPortfolio(catalog())};
+ invalid.published_repair_reference={
+  ...invalid.published_repair_reference,
+  per_comparable_repair_gross_wage_equivalent_usd:1000000
+ };
+ const f=fixture({source:invalid});await f.flush();
+ assert.equal(f.nodes.realityPublishedPerRepairValue.textContent,'Unverified');
+ assert.equal(f.nodes.realityPublishedRepairGroups.children.length,0);
+ assert.equal(f.nodes.realityCategorySignalCount.textContent,'Unknown');
+ assert.equal(f.nodes.realityCategoryOwnerCount.textContent,'2');
+ assert.match(f.nodes.realityPublishedOwnerComparison.textContent,/awaiting independent ledger readback/);
 });
 test('partial readback does not invent owner counts or erase provider source evidence',async()=>{
  const f=fixture({ownerSource:new Error('offline')});await f.flush();
@@ -206,6 +232,8 @@ test('sign out clears all private owner data; anonymous users never fetch provid
  await f.toggle(false);
  assert.equal(f.nodes.realityCategoryOwnerCount.textContent,'Unknown');
  assert.equal(f.nodes.realityCategoryOwnerList.children.length,0);
+ assert.equal(f.nodes.realityPublishedPerRepairValue.textContent,'Unverified');
+ assert.equal(f.nodes.realityPublishedRepairGroups.children.length,0);
  f.timers[0].fn();await f.flush();
  assert.equal(f.calls.length,2);
 });
