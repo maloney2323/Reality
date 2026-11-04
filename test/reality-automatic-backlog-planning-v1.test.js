@@ -160,3 +160,32 @@ test('anonymous client never calls economic source and displays no estimates',as
  assert.equal(f.calls.length,1);
  assert.equal(f.dom.realityAutoBacklogCount.textContent,'2');
 });
+
+test('automatic value scans source catalog beyond the 25 highlighted workday cards',()=>{
+ const many=Array.from({length:40},(_,i)=>({
+  ...issue(i+100,(i+2).toString(16).padStart(32,'0')),
+  value_assessment:{
+   score_definition:'HEURISTIC_TRIAGE_REVIEW_ORDER_ONLY_NOT_BUSINESS_IMPACT',
+   business_impact:{status:'UNMEASURED'},
+   execution_authorized:false
+  }
+ }));
+ const full={...catalog(many),total_findings:many.length};
+ const short=buildRealityWorkdayOpportunityBrief(full);
+ assert.equal(short.items.length,25);
+ const fresh=many.map((x,i)=>({
+  number:i+100,html_url:repo+'/issues/'+(i+100),
+  state:'open',body:'Independently tracked issue '+i
+ }));
+ const result=deriveAutomaticBacklogPlanning({
+  brief:short,liveIssues:fresh,sourceCatalog:full
+ });
+ assert.equal(result.counts.open_provider_issues_seen,40);
+ assert.equal(result.counts.included_distinct_leaf_issues,40);
+ assert.equal(result.counts.unrepresented_provider_issues,0);
+ assert.equal(result.source_coverage,'COMPLETE_FOR_OPEN_ISSUE_WINDOW');
+ assert.equal(result.conditional_conservative.conditional_total_hours,100);
+ assert.equal(result.conditional_conservative.conditional_total_labor_equivalent_usd,6538);
+ assert.equal(result.measured_human_backlog_hours,null);
+ assert.equal(result.verified_financial_savings_usd,null);
+});
