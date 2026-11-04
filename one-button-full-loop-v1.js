@@ -70,7 +70,12 @@ async function observe(){
    state.jobs.find(activeJob);
   if(work&&activeJob(work)){
    startedWork=work.original_work_id;
-   if(work.owner_install_approved===true)
+   if(work.owner_install_approved===true&&
+      work.historical_reconciliation?.status==='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT'&&
+      work.historical_reconciliation?.independent_database_readback===true&&
+      work.historical_reconciliation?.current_job_settled===false)
+    setStatus('HISTORICAL SETTLEMENT VERIFIED · Reality independently confirmed the earlier original job is already settled. No replay or additional approval. The current repair job did not execute a new settlement and does not have a final full-loop receipt.');
+   else if(work.owner_install_approved===true)
     setStatus('Owner approval already recorded. Reality is continuing installation, original-job recovery and independent settlement verification. Do not approve twice.');
    else if(work.candidate_verified===true){
     setStatus('Real repair independently tested. Checking the in-chat installation approval gate.');
