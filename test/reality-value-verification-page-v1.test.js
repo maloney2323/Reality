@@ -12,7 +12,7 @@ test('Value Verification is a real, standalone, direct-linkable tab',()=>{
  assert.ok(config.rewrites.some(r=>r.source==='/chat'&&r.destination==='/index.html'));
  assert.match(html,/<a id="realityValueTab" href="\/value">Value Verification<\/a>/);
  assert.match(html,/id="realityValueVerification"[^>]*hidden aria-labelledby="realityValueTitle"/);
- assert.match(html,/body\.reality-simple-home\[data-reality-route="value"\] main > :not\(\.top\):not\(#realityValueVerification\)/);
+ assert.ok(html.includes('body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification)'));
  assert.match(html,/\$\('realityValueTab'\)\.setAttribute\('aria-current',realityIsValuePage\(\)\?'page':'false'\)/);
  assert.match(html,/src="\/reality-value-verification-v1\.js"/);
  assert.match(html,/<a href="\/value">View detailed business evidence<\/a>/);
