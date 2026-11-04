@@ -13,7 +13,7 @@ if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
 const proposal=JSON.parse(readFileSync('candidate/genuine-capability-model-proposal.json','utf8'));
 const proof=JSON.parse(readFileSync('proof/genuine-capability-sandbox-verification.json','utf8'));
 if(proposal?.source!=='REAL_OPENAI_MODEL_GENERATION'||
- proposal?.candidate?.original_work_id!=='work:d90acd41ed1b1116ee74086846d61d42'||
+ proposal?.candidate?.original_work_id!=='work:bf17f1716f7c9550680d761e64f8b591'||
  proposal?.installation_authorized!==false||
  proof?.passed!==true||proof?.artifact_sha256!==proposal?.candidate?.artifact_sha256||
  proof?.workflow_run_id!==env.GITHUB_RUN_ID||
@@ -33,7 +33,7 @@ const response=await fetch(endpoint,{method:'POST',redirect:'error',cache:'no-st
   'x-reality-github-provider-token':env.GH_TOKEN},
  body:JSON.stringify({action:'requalify',scope:{
   repository_sha:env.GITHUB_SHA,
-  trigger_id:'f715d906-5e39-4503-a64f-611af062f3b3'
+  trigger_id:'c074d3d1-adab-4291-b3ce-88d02d8bfe5a'
  },proposal,proof})});
 const result=await response.json().catch(()=>null);
 if(!response.ok||result?.ok!==true)
