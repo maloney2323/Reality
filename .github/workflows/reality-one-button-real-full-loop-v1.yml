@@ -52,6 +52,7 @@ jobs:
           node --check api/reality/personal-governed-employee-shift.js
           node --check api/reality/governed-employee-shift-worker.js
           node --test test/reality-governed-employee-shift-v1.test.js
+          node --test test/reality-shift-existing-supabase-wake-v1.test.js
           node --check reality-economic-evidence-dashboard-v1.js
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --check reality-engine-delta-v1.js
