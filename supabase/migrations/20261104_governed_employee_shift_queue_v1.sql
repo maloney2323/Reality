@@ -9,7 +9,7 @@ create table if not exists reality_internal.governed_employee_shifts_v1 (
  planned_start_at timestamptz not null,
  planned_end_at timestamptz not null,
  status text not null default 'QUEUED' check(status in
-  ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK','ENDED_WITH_BLOCKED_WORK','ENDED_READ_ONLY','ESCALATED')),
+  ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK','ENDED_WITH_BLOCKED_WORK','ENDED_WITH_VERIFIED_JOB','ENDED_READ_ONLY','ESCALATED')),
  created_at timestamptz not null default clock_timestamp(),
  authorized_at timestamptz not null default clock_timestamp(),
  last_progress_at timestamptz,
@@ -28,7 +28,7 @@ create table if not exists reality_internal.governed_employee_shift_steps_v1 (
  offset_start_minutes integer not null check(offset_start_minutes between 0 and 479),
  offset_end_minutes integer not null check(offset_end_minutes between 1 and 480),
  state text not null default 'QUEUED' check(state in
-  ('QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','BLOCKED_PROVIDER','REPORTED')),
+  ('QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','ORIGINAL_JOB_RECEIPT_VERIFIED','BLOCKED_PROVIDER','REPORTED')),
  claim_id uuid,
  claimed_at timestamptz,
  claim_expires_at timestamptz,
@@ -182,6 +182,10 @@ begin
   update reality_internal.governed_employee_shifts_v1
     set status='ESCALATED',last_progress_at=v_now where shift_id=v_shift.shift_id;
   return jsonb_build_object('status','LEASE_EXHAUSTED_ESCALATED');end if;
+ if v_step.step_index=8 then
+  return jsonb_build_object('status','SHIFT_FINAL_REPORT_NOT_DUE',
+   'shift_id',v_shift.shift_id);
+ end if;
  if v_step.step_index>=6 then
   update reality_internal.governed_employee_shift_steps_v1
     set state='AWAITING_EXACT_WORK'
@@ -230,7 +234,7 @@ begin
  elsif p_step_index between 2 and 5 then
   if p_proof->>'kind'<>'GITHUB_SOURCE_READBACK' or
    p_proof->>'source_url' is distinct from v_row.source_ref or
-   p_proof->>'provider_status' not in ('OPEN_ISSUE','OPEN_PULL_REQUEST','CLOSED','NOT_FOUND')
+   p_proof->>'provider_status' not in ('OPEN_ISSUE','OPEN_PULL_REQUEST','CLOSED','NOT_FOUND','FAILED_WORKFLOW','COMPLETED_WORKFLOW')
   then raise exception 'SHIFT_SOURCE_PROOF_MISMATCH';end if;
  else raise exception 'SHIFT_WRITER_NOT_PERMITTED';end if;
  v_sha:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
@@ -266,8 +270,8 @@ begin
    'source_checks_recorded',(select count(*) from
      reality_internal.governed_employee_shift_steps_v1 t
      where t.shift_id=s.shift_id and t.state='SOURCE_CHECKED'),
-   'original_jobs_independently_settled_in_this_shift',0,
-   'exact_original_job_binding_verified',false,
+   'original_jobs_independently_settled_in_this_shift',(select count(*) from reality_internal.governed_employee_shift_steps_v1 t where t.shift_id=s.shift_id and t.step_index=6 and t.state='ORIGINAL_JOB_RECEIPT_VERIFIED'),
+   'exact_original_job_binding_verified',(select count(*)=1 from reality_internal.governed_employee_shift_steps_v1 t where t.shift_id=s.shift_id and t.step_index=6 and t.state='ORIGINAL_JOB_RECEIPT_VERIFIED'),
    'work_installation_authorized',false,
    'net_human_equivalent_hours_returned',null,
    'realized_cash_savings_usd',null,
@@ -280,7 +284,7 @@ begin
    completed_at=v_now
   where shift_id=s.shift_id and step_index=8 and state='QUEUED';
  update reality_internal.governed_employee_shifts_v1
-   set status='ENDED_WITH_BLOCKED_WORK',closed_at=v_now,
+   set status=case when exists(select 1 from reality_internal.governed_employee_shift_steps_v1 t where t.shift_id=s.shift_id and t.step_index=6 and t.state='ORIGINAL_JOB_RECEIPT_VERIFIED') then 'ENDED_WITH_VERIFIED_JOB' else 'ENDED_WITH_BLOCKED_WORK' end,closed_at=v_now,
     close_report=v_report,last_progress_at=v_now where shift_id=s.shift_id;
  return v_report;
 end $fn$;
