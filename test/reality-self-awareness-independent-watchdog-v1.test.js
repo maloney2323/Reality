@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {buildModelInput} from '../src/reality-model-gateway-v0.1.js';
 import {buildRealityCapabilityOperatingContext} from '../src/reality-capability-operating-context-v1.js';
 import {diagnoseIndependentWorkerWake} from '../src/reality-independent-worker-watchdog-v1.js';
+import {readVerifiedIndependentWorkerForChat} from '../src/reality-independent-worker-chat-context-v1.js';
 
 const now=Date.parse('2026-11-04T23:35:00Z');
 const watch={source:'POSTGRES_CRON_AND_SIGNED_EDGE_HTTP_READBACK',
@@ -92,4 +93,58 @@ test('read-only authenticated owner route surfaces diagnosis, not an installer',
  assert.match(model,/buildRealityCapabilityOperatingContext/);
  assert.match(model,/SELF-CAPABILITY RESEARCH CONTRACT/);
  assert.doesNotMatch(route,/method:'PUT'|method:'PATCH'|method:'DELETE'/);
+});
+
+test('owner-authenticated Reality Chat receives independent failure evidence rather than guessed health',async()=>{
+ const uid='11111111-2222-4333-8444-555555555555';
+ const db={url:'https://hvkfreoagbrphwghjajw.supabase.co',
+  project:'hvkfreoagbrphwghjajw',strictSecrets:true,secretKey:'test-service-key'};
+ let calls=0;
+ const entries=await readVerifiedIndependentWorkerForChat({
+  session:{user_id:uid,config:{url:db.url}},message:'Why did my worker stop waking?',
+  env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project},
+  db,now,
+  fetchImpl:async(url,options)=>{
+   calls++;
+   assert.equal(url,db.url+'/rest/v1/rpc/reality_read_owner_governed_wakes_v1');
+   assert.deepEqual(JSON.parse(options.body),{p_owner_id:uid});
+   assert.equal(options.method,'POST');
+   return {ok:true,json:async()=>({
+    status:'OWNER_GOVERNED_WAKE_READBACK',
+    read_only:true,production_changed:false,execution_authorized_by_read:false,
+    watchdog:watch,wakes:[wake]
+   })};
+  }
+ });
+ assert.equal(calls,1);
+ assert.equal(entries.length,1);
+ assert.equal(entries[0].diagnosis_status,'WORKER_WOKE_THEN_ESCALATED');
+ assert.equal(entries[0].repair_verified,false);
+ assert.equal(entries[0].installation_authorized,false);
+ assert.equal(entries[0].external_execution_authorized,false);
+ assert.match(entries[0].summary,/not a verified repair/);
+});
+test('worker context refuses unsigned or cross-environment observations',async()=>{
+ const db={url:'https://hvkfreoagbrphwghjajw.supabase.co',
+  project:'hvkfreoagbrphwghjajw',strictSecrets:true,secretKey:'test-service-key'};
+ const session={user_id:'11111111-2222-4333-8444-555555555555',
+  config:{url:db.url}};
+ const base={session,message:'wake failed',db,
+  env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project},
+  now,fetchImpl:async()=>({ok:true,json:async()=>({
+   status:'OWNER_GOVERNED_WAKE_READBACK',read_only:true,
+   execution_authorized_by_read:true,production_changed:false,
+   watchdog:watch,wakes:[wake]})})};
+ assert.deepEqual(await readVerifiedIndependentWorkerForChat(base),[]);
+ assert.deepEqual(await readVerifiedIndependentWorkerForChat({...base,
+  env:{...base.env,VERCEL_ENV:'production'}}),[]);
+ assert.deepEqual(await readVerifiedIndependentWorkerForChat({...base,
+  message:'How are you?'}),[]);
+});
+test('Reality Chat actually incorporates authenticated watchdog observations into model context',()=>{
+ const route=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.match(route,/readVerifiedIndependentWorkerForChat/);
+ assert.match(route,/workerWakeObservations/);
+ assert.match(route,/\.\.\.workerWakeObservations/);
+ assert.match(route,/action_authorized:false,execution_authorized:false/);
 });
