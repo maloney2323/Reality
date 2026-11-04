@@ -25,6 +25,14 @@ const signedIn=()=>typeof window.homeOwnerSignedIn==='function'&&
 const exactWork=x=>WORK.test(String(x||''));
 const currentConversation=()=>typeof window.realityActiveConversationId==='function'?
  window.realityActiveConversationId():null;
+function reportFailure(stage,code,originalWorkId=startedWork){
+ // A failure initiates only investigation. The separate governed owner
+ // installation approval remains unavailable to this controller.
+ if(typeof window.realityHandoffFullLoopFailure==='function')
+  void window.realityHandoffFullLoopFailure({
+   stage,code,original_work_id:exactWork(originalWorkId)?originalWorkId:null
+  }).catch(()=>setStatus('Reality Chat diagnostic handoff is unavailable. No automatic replay or installation occurred.'));
+}
 function setReceipt(workId){
  receiptBox.replaceChildren();
  if(!exactWork(workId))return;
@@ -130,9 +138,11 @@ async function observe(){
       const note=reasons[gate?.status]||
        ('Installation preflight blocked: '+String(gate?.status||'EVIDENCE_UNAVAILABLE').slice(0,90));
       setStatus(note+' No installation or final settlement is claimed.');
+      reportFailure('OWNER_INSTALL_PREFLIGHT',String(gate?.status||'INSTALL_PREFLIGHT_UNVERIFIED'));
      }
     }catch{
      setStatus('Upgrade tested, but approval readiness readback is unavailable. No install permission inferred.');
+     reportFailure('OWNER_INSTALL_PREFLIGHT','OWNER_APPROVAL_READBACK_UNAVAILABLE');
     }
    }else setStatus('Reality is working on the original job · '+work.phase.replaceAll('_',' ').toLowerCase()+
     '. No installation or settlement claimed yet.');
@@ -172,10 +182,12 @@ async function observe(){
    }catch{
     setStatus('Original job '+startedWork+
      ' · independent continuity readback is unavailable. No duplicate job will be started.');
+    reportFailure('ORIGINAL_CONTINUITY','ORIGINAL_CONTINUITY_READBACK_UNAVAILABLE');
     return {kind:'UNAVAILABLE'};
    }
    setStatus('Original job '+startedWork+
     ' has no matching current continuity entry. Do not replay or claim settlement.');
+   reportFailure('ORIGINAL_CONTINUITY','ORIGINAL_CONTINUITY_ENTRY_MISSING');
    return {kind:'NEEDS_RECONCILIATION'};
   }
   if(historicalNoOpIds.size)
@@ -184,6 +196,7 @@ async function observe(){
  }catch(error){
   setStatus('Reality cannot verify the current job ledger: '+String(error.message||'UNKNOWN')+
    '. No duplicate job or false completion will be created.');
+  if(startedWork)reportFailure('OWNER_LEDGER_READBACK',String(error.message||'OWNER_READBACK_FAILED'));
   return {kind:'UNAVAILABLE'};
  }finally{observing=false}
 }
@@ -198,6 +211,8 @@ async function start(){
  try{
   setStatus('Checking current jobs and final receipts to avoid duplicate execution…');
   const current=await observe();
+  if(current.kind==='UNAVAILABLE'&&!startedWork)
+   reportFailure('OWNER_LEDGER_READBACK','OWNER_READBACK_UNAVAILABLE');
   if(current.kind!=='NO_ACTIVE')return;
   // Check the exact owner-goal queue first. Never adopt a new issue while
   // an existing original-job discovery request may already be dispatched.
@@ -251,6 +266,8 @@ async function start(){
      'Original job saved. Worker blocked: '+String(joined.worker_dispatch_error).slice(0,100)+'.':
      'Original job saved; independent worker acknowledgment is still pending.');
    if(typeof window.homeOwnerRefresh==='function')void window.homeOwnerRefresh();
+   if(joined.worker_dispatch_error)
+    reportFailure('WORKER_DISPATCH',String(joined.worker_dispatch_error));
    return;
   }
   // If none of the current provider issues qualifies, resume an ALREADY
@@ -272,13 +289,17 @@ async function start(){
     'Original job queued and worker dispatched. Reality is running independent discovery and repair verification.':
     'Original job queued, but worker wake is blocked: '+String(result.dispatch_error||'UNKNOWN')+
      '. No second job was created.');
+   if(result.worker_dispatch_started!==true)
+    reportFailure('WORKER_DISPATCH',String(result.dispatch_error||'WORKER_DISPATCH_UNCONFIRMED'));
    return;
   }
   setStatus((historicalNoOpIds.size?'HISTORICAL SETTLEMENT VERIFIED · Previous original already satisfied; Reality did not execute a new settlement. ':'')+
    'No independently qualified NEW gap or eligible unfinished original job exists. Reality stopped safely rather than inventing an upgrade or receipt.');
+  reportFailure('NO_ELIGIBLE_NEW_WORK','NO_QUALIFIED_NEW_WORK');
  }catch(error){
   setStatus('Full-loop start blocked: '+String(error?.message||'UNKNOWN')+
    '. Reality cannot claim installation or settlement; reconcile this job before trying again.');
+  reportFailure('LOOP_START',String(error?.message||'FULL_LOOP_START_FAILED'));
  }finally{requesting=false;button.disabled=false;}
 }
 button.addEventListener('click',start);
