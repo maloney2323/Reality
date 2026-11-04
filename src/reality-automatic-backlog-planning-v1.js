@@ -14,12 +14,18 @@ const scenarios=Object.freeze({
  extended:Object.freeze({discovery_minutes:120,execution_minutes:480})
 });
 const round=n=>Number(n.toFixed(2));
-const amount=(minutes,rate)=>minutes<=0?0:
- projectHypotheticalWorkValue({
-  manual_minutes_per_occurrence:minutes,
-  occurrences_per_month:1,automatable_fraction:1,
+const amount=(minutes,rate)=>{
+ if(minutes<=0)return 0;
+ // Existing value-arithmetic contract caps minutes per occurrence at 60k.
+ // Split the *same one-off assumed workload* into mathematical chunks only;
+ // chunking does NOT create monthly recurring savings or additional jobs.
+ const chunks=Math.ceil(minutes/60000);
+ return projectHypotheticalWorkValue({
+  manual_minutes_per_occurrence:minutes/chunks,
+  occurrences_per_month:chunks,automatable_fraction:1,
   hourly_labor_value_usd:rate
  }).labor_value_equivalent_usd_per_month;
+};
 const ID=/^catalog:[a-f0-9]{32}$/;
 function currentOpenIssuesFromFullCatalog(catalog){
  if(catalog?.version!=='reality-work-catalog-v0.1'||
