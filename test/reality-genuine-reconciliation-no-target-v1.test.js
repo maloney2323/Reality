@@ -12,7 +12,7 @@ const broker=readFileSync(join(root,
 const script=readFileSync(join(root,'scripts/reality-genuine-original-resume-v1.mjs'),'utf8');
 test('no target needs one exact same-provider historical repair with BOTH immutable Universe settlements',()=>{
  assert.match(migration,/if n=0 then/);
- assert.match(migration,/if resolved_witnesses<>1 then/);
+ assert.match(migration,/if matched_count<>1 or matched_work is null then/);
  for(const field of ['issue_number','original_source_sha',
   'original_provider_failed_run_id','original_provider_failed_job_id',
   'source_path','frozen_test_sha256','original_work_id']){
@@ -21,7 +21,7 @@ test('no target needs one exact same-provider historical repair with BOTH immuta
  assert.match(migration,/previous_repairing_original_work_id/);
  assert.match(migration,/previous_target_universe_event_id/);
  assert.match(migration,/previous_original_universe_event_id/);
- assert.match(migration,/RECONCILIATION_NO_TARGET_EXACT_HISTORICAL_PROOF_REQUIRED/);
+ assert.match(migration,/RECONCILIATION_NO_TARGET_UNIQUE_HISTORICAL_PROOF_REQUIRED/);
  assert.match(migration,/RECONCILIATION_TARGET_CHAIN_TAIL_AMBIGUOUS/);
  assert.match(migration,/RECONCILIATION_TARGET_ORIGINAL_CHAIN_ANCESTRY_MISSING/);
  assert.match(migration,/current_user<>'service_role'/);
