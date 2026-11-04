@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const edge=read('supabase/functions/reality-governed-employee-shift-wake-v1/index.ts');
+const timebox=read('supabase/migrations/20261104_employee_shift_existing_supabase_wake_v1.sql');
+const cron=read('supabase/migrations/20261104_employee_shift_existing_cron_trigger_v1.sql');
+test('shift broker is a separate authenticated read-only service, not a capability installer',()=>{
+ assert.match(edge,/reality_authenticate_employee_shift_wake_v1/);
+ assert.match(edge,/req\.method!=='POST'/);
+ assert.match(edge,/SHIFT_WAKE_AUTH_REQUIRED/);
+ assert.match(edge,/reality_claim_employee_shift_step_v1/);
+ assert.match(edge,/reality_settle_employee_shift_step_v1/);
+ assert.match(edge,/reality_reconcile_employee_shift_original_v1/);
+ assert.match(edge,/no_external_write_authority!==true/);
+ assert.match(edge,/installation_authorized:false/);
+ assert.match(edge,/production_changed:false/);
+ assert.doesNotMatch(edge,/method:'(?:PUT|DELETE|PATCH)'|vercel\.app|REALITY_GITHUB_BROKER_TOKEN/);
+});
+test('existing isolated Supabase transport uses Vault and keeps exact shift timeboxes',()=>{
+ assert.match(timebox,/current_user<>'service_role'/);
+ assert.match(timebox,/reality_employee_shift_worker_token_v1/);
+ assert.match(timebox,/SHIFT_STEP_NOT_YET_DUE/);
+ assert.match(timebox,/v_shift\.planned_start_at/);
+ assert.match(timebox,/v_step\.offset_start_minutes/);
+ assert.match(timebox,/for update skip locked/);
+ assert.match(cron,/cron\.schedule/);
+ assert.match(cron,/net\.http_post/);
+ assert.match(cron,/vault\.decrypted_secrets/);
+ assert.match(cron,/reality-governed-employee-shift-wake-v1/);
+ assert.match(cron,/hvkfreoagbrphwghjajw\.supabase\.co/);
+ assert.doesNotMatch(cron,/vercel\.app|CREATE\s+JOB|INSERT\s+INTO.*(?:shift|approval)/i);
+});
