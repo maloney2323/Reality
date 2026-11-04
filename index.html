@@ -376,6 +376,113 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
 @media(max-width:980px){.rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.rv-layout{grid-template-columns:1fr}.rv-wide{grid-column:auto}.rv-differences{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.rv-kpis article{padding:12px}.rv-kpis strong{font-size:24px}.rv-kpis small{font-size:10px}.rv-pipeline{grid-template-columns:1fr;gap:5px}.rv-pipeline li{display:flex;gap:14px;align-items:center;padding:9px 11px}.rv-pipeline li>*{flex:1}.rv-differences{grid-template-columns:1fr}.rv-panel{padding:14px}.rv-reused-source .reality-econ-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rv-reused-source .reality-econ-grid strong{font-size:17px}.rv-hero{padding:17px}.reality-page-tabs{max-width:70%;overflow-x:auto;gap:4px}.reality-page-tabs a{padding:7px 9px;font-size:12px}.top .brand{font-size:13px}.top .state{display:none}}
 
+/* Value Verification v2: compact executive view with one evidence section at a time. */
+#realityValueVerification .rv-tabpanel[hidden]{display:none!important}
+#realityValueVerification .rv-tabpanel:not([hidden]){display:block}
+#realityValueVerification .rv-hero{padding:19px 22px;margin-bottom:11px}
+#realityValueVerification .rv-hero h1{font-size:clamp(24px,3.4vw,35px);margin:6px 0}
+#realityValueVerification .rv-hero>p{max-width:66ch;margin:4px 0 10px;line-height:1.45}
+#realityValueVerification .rv-hero-tools{font-size:12px;justify-content:space-between;gap:8px 16px}
+#realityValueVerification .rv-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:10px 0}
+#realityValueVerification .rv-kpis article{padding:13px 15px;min-height:106px}
+#realityValueVerification .rv-kpis strong{font-size:clamp(22px,2.6vw,30px);margin:5px 0}
+#realityValueVerification .rv-kpis span{font-size:12px;line-height:1.35}
+#realityValueVerification .rv-kpis small{font-size:11px}
+#realityValueVerification .rv-receipt-kpi{border-color:#358978;background:linear-gradient(135deg,#11352f,#14283b)}
+#realityValueVerification .rv-measured-strip{display:flex;align-items:center;gap:9px 21px;flex-wrap:wrap;padding:9px 16px;margin:0 0 13px;background:#111e2c;border:1px solid #304759;border-radius:13px}
+#realityValueVerification .rv-measured-strip>div{display:flex;gap:8px;align-items:center}
+#realityValueVerification .rv-measured-strip span{font-size:12px;color:#abc4d3}
+#realityValueVerification .rv-measured-strip strong{font-size:13px;color:#f0f6fb}
+#realityValueVerification .rv-measured-strip p{color:#9fb8c9;font-size:11px;margin:0}
+#realityValueVerification .rv-section-nav{position:sticky;top:0;z-index:7;display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding:9px 7px;margin-bottom:11px;background:rgba(9,18,29,.97);border:1px solid #34546a;border-radius:12px;box-shadow:0 8px 20px rgba(4,8,17,.18)}
+#realityValueVerification .rv-section-nav button{appearance:none;flex:0 0 auto;padding:10px 15px;border-radius:9px;border:1px solid transparent;background:transparent;color:#bccee0;font-size:13px;line-height:1.2;font-weight:700;white-space:nowrap;cursor:pointer}
+#realityValueVerification .rv-section-nav button[aria-selected="true"]{background:#d9effb;color:#0b2535;border-color:#add3eb}
+#realityValueVerification .rv-section-nav button:focus-visible,
+#realityValueVerification [data-rv-show]:focus-visible{outline:3px solid #91d7ff;outline-offset:2px}
+#realityValueVerification .rv-layout{display:block}
+#realityValueVerification .rv-panel{border:1px solid #35546c;border-radius:17px;padding:20px 22px;min-height:240px}
+#realityValueVerification .rv-panel h2{margin:7px 0;font-size:21px}
+#realityValueVerification .rv-panel>p{max-width:82ch;margin:6px 0 16px}
+#realityValueVerification .rv-overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:14px}
+#realityValueVerification .rv-overview-grid article{display:flex;flex-direction:column;align-items:start;min-height:218px;padding:17px 16px;border:1px solid #375c75;border-radius:14px;background:#12283a}
+#realityValueVerification .rv-overview-index{font-size:11px;font-weight:800;letter-spacing:.065em;color:#7ed3e4}
+#realityValueVerification .rv-overview-grid h3{margin:12px 0 6px;font-size:17px}
+#realityValueVerification .rv-overview-grid p{font-size:12px;line-height:1.55;color:#b9ccda;margin:0 0 16px}
+#realityValueVerification .rv-overview-grid button,
+#realityValueVerification .rv-proof-principle button{appearance:none;cursor:pointer;border:1px solid #6fa9bc;border-radius:10px;background:#1e4860;color:#f1fbff;font-weight:750;font-size:12px;padding:9px 12px;margin-top:auto;min-height:39px}
+#realityValueVerification .rv-proof-principle{display:flex;gap:9px 16px;align-items:center;flex-wrap:wrap;padding:13px 15px;margin-top:13px;border:1px solid #325466;border-radius:12px;background:#112333}
+#realityValueVerification .rv-proof-principle strong{font-size:13px;white-space:nowrap}
+#realityValueVerification .rv-proof-principle span{flex:1 1 280px;color:#b7cfde;font-size:12px;line-height:1.5}
+#realityValueVerification .rv-proof-principle button{margin:0}
+#realityValueVerification .rv-info-row{display:flex;gap:6px 15px;align-items:center;flex-wrap:wrap;border:1px solid #385169;background:#162738;border-radius:11px;padding:12px 14px;margin:8px 0 15px}
+#realityValueVerification .rv-info-row strong{font-size:12px;color:#e7f5fb}
+#realityValueVerification .rv-info-row span{font-size:12px;color:#bfd0dc}
+#realityValueVerification .rv-deep-dive,
+#realityValueVerification .rv-reused-source>details{border:1px solid #3c5e76;border-radius:12px;background:#102337;margin:11px 0;overflow:hidden}
+#realityValueVerification .rv-deep-dive summary,
+#realityValueVerification .rv-reused-source>details>summary{cursor:pointer;padding:15px;font-size:14px;font-weight:750;color:#e7f5ff;list-style-position:inside}
+#realityValueVerification .rv-deep-dive[open]>summary,
+#realityValueVerification .rv-reused-source>details[open]>summary{background:#173349;border-bottom:1px solid #35566e}
+#realityValueVerification .rv-deep-dive>div{padding:13px}
+#realityValueVerification .rv-reused-source>details>section,
+#realityValueVerification .rv-reused-source>details>div{padding:14px}
+#realityValueVerification .rv-reused-source .reality-home-expand{display:block;margin:0!important}
+#realityValueVerification .reality-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+#realityValueVerification .reality-category-card{background:#142b3f;border:1px solid #345570;border-radius:12px;padding:13px;min-width:0}
+#realityValueVerification .reality-category-card h4{font-size:14px;color:#f5faff;margin:0 0 7px}
+#realityValueVerification .reality-category-card p{font-size:12px;color:#b9cddd;line-height:1.5;margin:5px 0}
+#realityValueVerification .reality-category-card a,
+#realityValueVerification .reality-category-owner a{display:inline-block;font-size:12px;color:#a9e2fb;margin:6px 9px 0 0;max-width:100%;overflow-wrap:anywhere}
+#realityValueVerification .reality-category-owner{border-top:1px solid #34556c;margin-top:15px;padding-top:13px}
+#realityValueVerification .reality-category-owner>strong{font-size:14px}
+#realityValueVerification .reality-category-owner article{padding:12px 13px;margin:9px 0;border:1px solid #355167;border-radius:11px;background:#12283b}
+#realityValueVerification .reality-category-owner article p{font-size:12px;line-height:1.55;color:#bad0dd}
+#realityValueVerification .reality-category-owner article strong{font-size:13px;color:#edf7ff}
+#realityValueVerification .reality-econ-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#realityValueVerification .reality-econ-grid article{min-width:0;padding:13px;border:1px solid #35516a;border-radius:11px;background:#122a3d}
+#realityValueVerification .reality-econ-grid strong{display:block;font-size:21px;overflow-wrap:anywhere}
+#realityValueVerification .reality-econ-grid small{display:block;font-size:11px;color:#a8c1d2}
+#realityValueVerification .reality-econ-footnote{font-size:12px;line-height:1.58;color:#abc4d5}
+#realityValueVerification .reality-econ-backlog,
+#realityValueVerification .reality-published-repair-reference{max-width:100%;padding:12px;background:#102337;border-radius:11px}
+#realityValueVerification .reality-auto-backlog{background:#142c40;border:1px solid #3d617b;border-radius:11px;padding:13px;margin:11px 0}
+#realityValueVerification .reality-auto-heading{display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap}
+#realityValueVerification .reality-auto-source-links{display:flex;flex-wrap:wrap;gap:7px}
+#realityValueVerification .reality-auto-source-links a{font-size:12px;overflow-wrap:anywhere}
+#realityValueVerification #realityEconWorkHistory{overflow-wrap:anywhere;max-width:100%}
+#realityValueVerification .rv-measure-heading{font-size:16px;margin:17px 0 8px}
+#realityValueVerification .rv-pipeline{grid-template-columns:repeat(5,minmax(0,1fr))}
+#realityValueVerification .rv-differences{grid-template-columns:repeat(2,minmax(0,1fr))}
+#realityValueVerification .rv-foot{margin-top:7px}
+@media(max-width:900px){
+ #realityValueVerification .rv-overview-grid{grid-template-columns:1fr}
+ #realityValueVerification .rv-overview-grid article{min-height:0}
+ #realityValueVerification .rv-overview-grid p{margin-bottom:10px}
+ #realityValueVerification .rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ #realityValueVerification .rv-hero{padding:16px;margin-bottom:9px}
+ #realityValueVerification .rv-hero>p{font-size:13px}
+ #realityValueVerification .rv-hero-tools{font-size:11px}
+ #realityValueVerification .rv-kpis{gap:7px}
+ #realityValueVerification .rv-kpis article{padding:12px;min-height:97px}
+ #realityValueVerification .rv-kpis strong{font-size:23px}
+ #realityValueVerification .rv-measured-strip{padding:10px 12px;gap:7px 12px}
+ #realityValueVerification .rv-measured-strip>div{flex-wrap:wrap;gap:5px}
+ #realityValueVerification .rv-section-nav{margin:0 -4px 9px;border-radius:9px;padding:7px 5px}
+ #realityValueVerification .rv-section-nav button{padding:10px 12px;font-size:12px}
+ #realityValueVerification .rv-panel{padding:15px 13px;min-height:215px}
+ #realityValueVerification .rv-panel h2{font-size:19px}
+ #realityValueVerification .rv-overview-grid{gap:8px}
+ #realityValueVerification .rv-overview-grid article{padding:13px;min-height:0}
+ #realityValueVerification .rv-overview-grid h3{font-size:15px;margin:5px 0}
+ #realityValueVerification .rv-proof-principle{gap:8px;margin-top:10px}
+ #realityValueVerification .reality-category-grid{grid-template-columns:1fr}
+ #realityValueVerification .reality-econ-grid strong{font-size:17px}
+ #realityValueVerification .rv-differences{grid-template-columns:1fr}
+ #realityValueVerification .rv-pipeline{grid-template-columns:1fr}
+}
+
 body[data-reality-route="chat"] main > :not(.top):not(#privateChat){display:none!important}
 body[data-reality-route="chat"] #privateChat{
  display:block!important;position:relative!important;z-index:auto!important;
@@ -661,69 +768,116 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 
 <section id="realityValueVerification" class="reality-value-verification" hidden aria-labelledby="realityValueTitle">
  <header class="rv-hero">
-  <div class="rv-eyebrow">REALITY · PROOF OF BUSINESS VALUE</div>
-  <h1 id="realityValueTitle">Value Verification Center</h1>
-  <p>Discover useful work before automation. Distinguish estimated potential from independently verified outcomes and measured savings.</p>
+  <div class="rv-eyebrow">REALITY · BUSINESS PROOF CENTER</div>
+  <h1 id="realityValueTitle">Value Verification</h1>
+  <p>Your discoveries, economic opportunities and independently verified outcomes—in one clear view.</p>
   <div class="rv-hero-tools">
-   <span id="rvSourceStatus" role="status" aria-live="polite">Checking current source-backed evidence…</span>
+   <span id="rvSourceStatus" role="status" aria-live="polite">Checking the latest owner-scoped evidence…</span>
    <a class="rv-link" href="/chat">Ask Reality about this evidence</a>
   </div>
  </header>
- <div class="rv-kpis" aria-label="Actual current evidence, not savings">
-  <article><span>Work observations</span><strong id="rvSignals">Checking…</strong><small>Source-backed signals; not confirmed defects</small></article>
-  <article><span>Owner findings</span><strong id="rvFindings">Unverified</strong><small>Saved capability opportunities; not installed</small></article>
-  <article><span>Independently tested defect candidates</span><strong id="rvCandidates">Unverified</strong><small>Not necessarily active repair jobs</small></article>
-  <article><span>Original jobs settled</span><strong id="rvSettled">Checking…</strong><small>Isolated settlement, not automatically final receipts</small></article>
-  <article><span>Independently verified final receipts</span><strong id="rvReceipts">Checking…</strong><small>Exact original-job evidence</small></article>
-  <article><span>Net human capacity returned</span><strong id="rvCapacity">Not measured</strong><small>Only accepted work with supported labor inputs counts</small></article>
+ <div class="rv-kpis" aria-label="Current source-backed evidence, not realized savings">
+  <article><span>Work opportunities observed</span><strong id="rvSignals">Checking…</strong><small>Signals, not verified current jobs</small></article>
+  <article><span>Owner capability findings</span><strong id="rvFindings">Not verified</strong><small>Inspected discoveries, not installations</small></article>
+  <article><span>Original jobs settled</span><strong id="rvSettled">Checking…</strong><small>Isolated settlement evidence</small></article>
+  <article class="rv-receipt-kpi"><span>Independently verified receipts</span><strong id="rvReceipts">Checking…</strong><small>Exact original-job proof</small></article>
  </div>
+ <div class="rv-measured-strip" aria-label="Additional verified evidence states">
+  <div><span>Tested implementation-defect candidates</span><strong id="rvCandidates">Not verified</strong></div>
+  <div><span>Verified net human capacity returned</span><strong id="rvCapacity">Not measured</strong></div>
+  <p>Potential value is not realized savings. Financial results require accepted work, actual human effort and operating costs.</p>
+ </div>
+ <nav id="rvViewNav" class="rv-section-nav" role="tablist" aria-label="Value Verification sections">
+  <button type="button" id="rvTabOverview" role="tab" aria-controls="rvPanelOverview" aria-selected="true" tabindex="0" data-rv-view="overview">Overview</button>
+  <button type="button" id="rvTabOpportunities" role="tab" aria-controls="rvPanelOpportunities" aria-selected="false" tabindex="-1" data-rv-view="opportunities">Opportunities</button>
+  <button type="button" id="rvTabPotential" role="tab" aria-controls="rvPanelPotential" aria-selected="false" tabindex="-1" data-rv-view="potential">Potential value</button>
+  <button type="button" id="rvTabResults" role="tab" aria-controls="rvPanelResults" aria-selected="false" tabindex="-1" data-rv-view="results">Verified results</button>
+  <button type="button" id="rvTabGovernance" role="tab" aria-controls="rvPanelGovernance" aria-selected="false" tabindex="-1" data-rv-view="governance">Governance</button>
+ </nav>
  <div class="rv-layout">
-  <section class="rv-panel">
+  <section id="rvPanelOverview" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabOverview" tabindex="0">
+   <div class="rv-section-label">EXECUTIVE SUMMARY</div>
+   <h2>How Reality proves business value</h2>
+   <p>See what Reality has found before automating—and what has independently passed settlement afterward.</p>
+   <div class="rv-overview-grid">
+    <article>
+     <span class="rv-overview-index">01 · BEFORE AUTOMATION</span>
+     <h3>Identify useful work</h3>
+     <p>Review current source-backed observations and owner capability findings. A discovery is not automatically a verified deficiency.</p>
+     <button type="button" data-rv-show="opportunities">Review opportunities <span aria-hidden="true">→</span></button>
+    </article>
+    <article>
+     <span class="rv-overview-index">02 · ECONOMIC POTENTIAL</span>
+     <h3>Compare possible effort</h3>
+     <p>Explore conditional labor scenarios and published benchmarks, clearly separated from measured company savings.</p>
+     <button type="button" data-rv-show="potential">Explore scenarios <span aria-hidden="true">→</span></button>
+    </article>
+    <article>
+     <span class="rv-overview-index">03 · AFTER EXECUTION</span>
+     <h3>Verify actual outcomes</h3>
+     <p>Inspect original-job settlements, final receipts, and the evidence required before claiming returned human capacity.</p>
+     <button type="button" data-rv-show="results">Inspect final receipts <span aria-hidden="true">→</span></button>
+    </article>
+   </div>
+   <div class="rv-proof-principle">
+    <strong>Proof standard</strong>
+    <span>Observed → independently validated → tested → exactly authorized → independently settled.</span>
+    <button type="button" data-rv-show="governance">Examine the verification gates</button>
+   </div>
+  </section>
+  <section id="rvPanelOpportunities" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabOpportunities" tabindex="0" hidden>
    <div class="rv-section-label">VALUE BEFORE AUTOMATION</div>
-   <h2>Discovery and qualification</h2>
-   <p>Reality can organize source-backed opportunities immediately. This is operational intelligence—not yet proof the work was completed or time saved.</p>
+   <h2>Discovered work and capabilities</h2>
+   <p>Signals are useful for prioritization, but source observations and saved owner findings can overlap. Expand the evidence to inspect categories and individual records.</p>
+   <div class="rv-info-row"><strong>Current-work verification required</strong><span>Provider observations aren't completed jobs or verified capability gaps.</span></div>
    <div id="rvCategories" class="rv-reused-source"></div>
   </section>
-  <section class="rv-panel">
-   <div class="rv-section-label">HOW VALUE BECOMES PROOF</div>
-   <h2>Verification journey</h2>
-   <ol class="rv-pipeline" aria-label="Required evidence gates, not proof that every job passed">
-    <li><strong>Observed</strong><span>Provider-linked work signal</span></li>
-    <li><strong>Validated</strong><span>Current need and overlapping work checked</span></li>
-    <li><strong>Tested</strong><span>Independent acceptance criteria</span></li>
-    <li><strong>Approved</strong><span>Owner authorizes consequential installation</span></li>
-    <li><strong>Settled</strong><span>Exact original job and final receipt reconciled</span></li>
-   </ol>
-   <p class="rv-warning">A pipeline stage is not marked complete for any specific job without its matching evidence. The aggregate counts above may belong to different original jobs.</p>
-  </section>
-  <section class="rv-panel">
-   <div class="rv-section-label">POTENTIAL VALUE · NOT REALIZED SAVINGS</div>
-   <h2>Economic evidence and scenarios</h2>
-   <p>Published labor studies and wage data can illustrate comparable human work, but are not proof of savings. A full repair duration cannot be inferred by treating the sum of separate medians as a measured median.</p>
-   <div id="rvPublishedSource" class="rv-reused-source"></div>
+  <section id="rvPanelPotential" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabPotential" tabindex="0" hidden>
+   <div class="rv-section-label">ILLUSTRATIVE · NOT REALIZED SAVINGS</div>
+   <h2>Potential business value</h2>
+   <p>Compare conditional human-work scenarios without confusing an illustrative gross labor equivalent with actual money or time saved.</p>
+   <div class="rv-info-row"><strong>Uncalibrated assumptions</strong><span>Published defect medians, wages and scenario presets do not prove the workload remains outstanding.</span></div>
+   <details class="rv-deep-dive">
+    <summary>Research benchmark · software defect repair effort</summary>
+    <div id="rvPublishedSource" class="rv-reused-source"></div>
+   </details>
    <div id="rvPotentialPlanning" class="rv-reused-source"></div>
   </section>
-  <section class="rv-panel">
-   <div class="rv-section-label">REALIZED VALUE · INDEPENDENT EVIDENCE</div>
-   <h2>Completed work and final receipts</h2>
-   <p>Only independently linked original-job outcomes appear as verified work. A receipt by itself does not establish avoided labor or cash savings.</p>
-   <div id="rvReceiptEvidence" class="rv-reused-source"></div>
-   <h3>Actual measured value</h3>
+  <section id="rvPanelResults" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabResults" tabindex="0" hidden>
+   <div class="rv-section-label">INDEPENDENTLY VERIFIED · REALIZED OUTCOMES</div>
+   <h2>Completed work and receipts</h2>
+   <p>Review the exact original-job evidence. A signed settlement receipt is not automatically proof of human labor or cash saved.</p>
+   <div class="rv-info-row"><strong>Actual savings require measurement</strong><span>Comparable human effort, intervention time and automation costs are needed.</span></div>
+   <details class="rv-deep-dive">
+    <summary>Individual original jobs and final receipts</summary>
+    <div id="rvReceiptEvidence" class="rv-reused-source"></div>
+   </details>
+   <h3 class="rv-measure-heading">Business-value measurements</h3>
    <div id="rvMeasuredInputs" class="rv-reused-source"></div>
   </section>
-  <section class="rv-panel rv-wide">
-   <div class="rv-section-label">REALITY'S OPERATIONAL DIFFERENTIATION</div>
-   <h2>Evidence, authority and continuity</h2>
+  <section id="rvPanelGovernance" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabGovernance" tabindex="0" hidden>
+   <div class="rv-section-label">HOW AN OPPORTUNITY BECOMES PROOF</div>
+   <h2>Verification and authority gates</h2>
+   <p>The stages below are the required process, not a claim that every source observation passed them.</p>
+   <ol class="rv-pipeline" aria-label="Required evidence gates, not proof that every job passed">
+    <li><strong>Observed</strong><span>Provider-linked work signal</span></li>
+    <li><strong>Validated</strong><span>Current need and overlap checked</span></li>
+    <li><strong>Tested</strong><span>Independent acceptance criteria</span></li>
+    <li><strong>Approved</strong><span>Owner authorizes exact installation</span></li>
+    <li><strong>Settled</strong><span>Original-job outcome independently reconciled</span></li>
+   </ol>
+   <p class="rv-warning">A pipeline stage is not marked complete for any specific job without its matching evidence. The aggregate counts above may belong to different original jobs.</p>
+   <h3>Reality's operational evidence boundaries</h3>
    <div class="rv-differences">
     <div><strong>Evidence-bound discovery</strong><p>Source observations are separated from proven current deficiencies.</p></div>
-    <div><strong>Independent verification</strong><p>Outcomes are checked separately from the generator or executor.</p></div>
-    <div><strong>Exact owner approval</strong><p>Installation requires scoped authorization; planning alone never installs.</p></div>
-    <div><strong>Original-job settlement</strong><p>Final receipts must reconcile to the same job, not just a similar success.</p></div>
+    <div><strong>Independent verification</strong><p>Outcomes are checked separately from the executor.</p></div>
+    <div><strong>Exact owner approval</strong><p>Installation requires scoped consent; a shift approval never installs code.</p></div>
+    <div><strong>Original-job settlement</strong><p>Final receipts must match the same original job.</p></div>
    </div>
   </section>
  </div>
  <footer class="rv-foot">
-  <p>Evidence status is source-specific. Historical benchmark models, potential revenue or avoided cost, and aggregate work observations are never added to realized savings without validated inputs.</p>
+  <p>Historical benchmark models, potential revenue or avoided cost, and aggregate work observations are never added to realized savings without validated inputs. Each section preserves its underlying evidence.</p>
   <a href="/chat">Discuss the evidence with Reality Chat</a>
  </footer>
 </section>
