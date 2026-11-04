@@ -483,6 +483,22 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
  #realityValueVerification .rv-pipeline{grid-template-columns:1fr}
 }
 
+/* Value Verification: source-backed figures first, optional technical detail second */
+#realityValueVerification .rv-proof-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 17px}
+#realityValueVerification .rv-proof-highlights article{display:flex;flex-direction:column;align-items:start;min-width:0;border:1px solid #3d647b;border-radius:13px;padding:15px;background:linear-gradient(145deg,#16334a,#102638)}
+#realityValueVerification .rv-proof-highlights article.rv-potential-highlight{border-color:#5579a1;background:linear-gradient(135deg,#172e4b,#13283e)}
+#realityValueVerification .rv-proof-highlights article.rv-verified-highlight{border-color:#348f7a;background:linear-gradient(145deg,#113c36,#102b38)}
+#realityValueVerification .rv-proof-highlights span{font-weight:700;color:#bdd6e5;font-size:12px;line-height:1.4}
+#realityValueVerification .rv-proof-highlights strong{font-size:clamp(22px,2.6vw,30px);line-height:1.12;font-variant-numeric:tabular-nums;margin:10px 0;overflow-wrap:anywhere;max-width:100%}
+#realityValueVerification .rv-proof-highlights small{font-size:11px;color:#a9c3d4;line-height:1.55}
+#realityValueVerification .rv-proof-highlights .rv-verified-highlight strong{color:#b1ffe2}
+#realityValueVerification .rv-proof-highlights .rv-potential-highlight strong{color:#c5e7ff}
+#realityValueVerification .rv-source-context{font-size:12px;color:#a5c1d5;line-height:1.5;margin:5px 0 13px}
+#realityValueVerification .rv-category-detail-hint{margin:9px 0 8px;font-size:12px;color:#9bc2d9}
+#realityValueVerification .rv-receipt-kpi strong{font-size:clamp(25px,3vw,36px)}
+@media(max-width:850px){#realityValueVerification .rv-proof-highlights{grid-template-columns:1fr 1fr}#realityValueVerification .rv-proof-highlights article:last-child:nth-child(odd){grid-column:1/-1}}
+@media(max-width:600px){#realityValueVerification .rv-proof-highlights{grid-template-columns:1fr;gap:8px}#realityValueVerification .rv-proof-highlights article:last-child:nth-child(odd){grid-column:auto}#realityValueVerification .rv-proof-highlights article{padding:13px 14px}#realityValueVerification .rv-proof-highlights strong{font-size:25px;margin:7px 0}#realityValueVerification .rv-proof-highlights small{font-size:11px}}
+
 body[data-reality-route="chat"] main > :not(.top):not(#privateChat){display:none!important}
 body[data-reality-route="chat"] #privateChat{
  display:block!important;position:relative!important;z-index:auto!important;
@@ -799,6 +815,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <div class="rv-section-label">EXECUTIVE SUMMARY</div>
    <h2>How Reality proves business value</h2>
    <p>See what Reality has found before automating—and what has independently passed settlement afterward.</p>
+
+   <div class="rv-proof-highlights" aria-label="Actual sources and illustrative planning values">
+    <article><span>Discovery inventory</span><strong id="rvOverviewSignals">Not verified</strong><small>Current source-backed observations. Not completed jobs.</small></article>
+    <article class="rv-potential-highlight"><span>Human review effort · illustrative only</span><strong id="rvOverviewReviewWhatIf">Not available</strong><small>Gross labor equivalent from source data, not money Reality saved.</small></article>
+    <article class="rv-verified-highlight"><span>Verified final original-job receipts</span><strong id="rvOverviewReceipts">Not verified</strong><small>Independent completion evidence; labor savings still unmeasured.</small></article>
+   </div>
    <div class="rv-overview-grid">
     <article>
      <span class="rv-overview-index">01 · BEFORE AUTOMATION</span>
@@ -829,14 +851,28 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <div class="rv-section-label">VALUE BEFORE AUTOMATION</div>
    <h2>Discovered work and capabilities</h2>
    <p>Signals are useful for prioritization, but source observations and saved owner findings can overlap. Expand the evidence to inspect categories and individual records.</p>
-   <div class="rv-info-row"><strong>Current-work verification required</strong><span>Provider observations aren't completed jobs or verified capability gaps.</span></div>
+
+   <div class="rv-proof-highlights rv-section-highlights">
+    <article><span>Source-backed work observations</span><strong id="rvOpportunitySignals">Not verified</strong><small>Potential work to investigate</small></article>
+    <article><span>Owner capability findings</span><strong id="rvOpportunityFindings">Not verified</strong><small>Separately inspected, may overlap</small></article>
+    <article><span>Tested existing-code repair candidates</span><strong id="rvOpportunityCandidates">Not verified</strong><small>Evidence of a tested candidate, not an installed upgrade</small></article>
+   </div>
+   <div class="rv-info-row"><strong>Value today</strong><span>A prioritized evidence-backed backlog; each observation still needs current-work qualification.</span></div>
+   <p class="rv-category-detail-hint">Open the source categories to inspect actual issue, PR and owner-finding details.</p>
    <div id="rvCategories" class="rv-reused-source"></div>
   </section>
   <section id="rvPanelPotential" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabPotential" tabindex="0" hidden>
    <div class="rv-section-label">ILLUSTRATIVE · NOT REALIZED SAVINGS</div>
    <h2>Potential business value</h2>
    <p>Compare conditional human-work scenarios without confusing an illustrative gross labor equivalent with actual money or time saved.</p>
-   <div class="rv-info-row"><strong>Uncalibrated assumptions</strong><span>Published defect medians, wages and scenario presets do not prove the workload remains outstanding.</span></div>
+
+   <div class="rv-proof-highlights rv-section-highlights">
+    <article class="rv-potential-highlight"><span>Source observation review · gross labor what-if</span><strong id="rvPotentialReviewValue">Not available</strong><small>Uncalibrated review/triage wage equivalent. Not a saving.</small></article>
+    <article class="rv-potential-highlight"><span>Open-issue completion · gross labor what-if</span><strong id="rvPotentialIssueValue">Not available</strong><small>Conditional issue-work scenario; not additive to review range.</small></article>
+    <article><span>Open-issue human work effort · what-if</span><strong id="rvPotentialHours">Not available</strong><small>Assumptions for candidate source-linked issues only</small></article>
+   </div>
+   <p class="rv-source-context" id="rvPotentialCoverage">Checking existing source-linked scenario inputs…</p>
+   <div class="rv-info-row"><strong>Potential, not realized</strong><span>These model different work sets and can overlap. No dollar range above is verified savings or expected ROI.</span></div>
    <details class="rv-deep-dive">
     <summary>Research benchmark · software defect repair effort</summary>
     <div id="rvPublishedSource" class="rv-reused-source"></div>
@@ -847,7 +883,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <div class="rv-section-label">INDEPENDENTLY VERIFIED · REALIZED OUTCOMES</div>
    <h2>Completed work and receipts</h2>
    <p>Review the exact original-job evidence. A signed settlement receipt is not automatically proof of human labor or cash saved.</p>
-   <div class="rv-info-row"><strong>Actual savings require measurement</strong><span>Comparable human effort, intervention time and automation costs are needed.</span></div>
+
+   <div class="rv-proof-highlights rv-section-highlights">
+    <article><span>Isolated original-job settlements</span><strong id="rvResultsSettled">Not verified</strong><small>Technical settlement evidence, not all independent final receipts</small></article>
+    <article class="rv-verified-highlight"><span>Independently verified final receipts</span><strong id="rvResultsReceipts">Not verified</strong><small>Exact original-job reconciliation</small></article>
+    <article><span>Verified net human hours returned</span><strong id="rvResultsHours">Not measured</strong><small>Requires comparable effort, supervision and operating cost evidence</small></article>
+   </div>
+   <div class="rv-info-row"><strong>What Reality has demonstrably achieved</strong><span id="rvResultsMeaning">Checking final-job receipts for this owner…</span></div>
    <details class="rv-deep-dive">
     <summary>Individual original jobs and final receipts</summary>
     <div id="rvReceiptEvidence" class="rv-reused-source"></div>
@@ -859,6 +901,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <div class="rv-section-label">HOW AN OPPORTUNITY BECOMES PROOF</div>
    <h2>Verification and authority gates</h2>
    <p>The stages below are the required process, not a claim that every source observation passed them.</p>
+
+   <div class="rv-proof-highlights rv-section-highlights">
+    <article><span>Observed provider work signals</span><strong id="rvGovernanceSignals">Not verified</strong><small>Source inventory only</small></article>
+    <article><span>Independently tested repair candidates</span><strong id="rvGovernanceCandidates">Not verified</strong><small>Not proof of installation</small></article>
+    <article class="rv-verified-highlight"><span>Independently verified final receipts</span><strong id="rvGovernanceReceipts">Not verified</strong><small>May involve entirely different original jobs</small></article>
+   </div>
    <ol class="rv-pipeline" aria-label="Required evidence gates, not proof that every job passed">
     <li><strong>Observed</strong><span>Provider-linked work signal</span></li>
     <li><strong>Validated</strong><span>Current need and overlap checked</span></li>
