@@ -37,7 +37,7 @@
     guard:'A model guess, GitHub issue or generic feature idea cannot on its own authorize synthesis, promotion or installation.',
     source:'src/reality-genuine-capability-engine-v1.js',test:'test/reality-genuine-capability-engine-v1.test.js',
     boundary:'Code and tests available · general full-loop automation remains under validation'},
-   {name:'Business-specific capability acquisition',adds:'Lets a real customer job surface a missing ability, so model-generated candidates can be developed for that customer's goal rather than a fixed one-size-fits-all workflow.',
+   {name:'Business-specific capability acquisition',adds:'Lets a real customer job surface a missing ability, so model-generated candidates can be developed for that customer’s goal rather than a fixed one-size-fits-all workflow.',
     guard:'The original owner, goal and job are read from trusted server adapters; the model cannot change that scope, authorize installation, or settle the job by its own assertion.',
     source:'src/reality-genuine-capability-execution-runtime-v1.js',test:'test/reality-genuine-capability-execution-runtime-v1.test.js',
     boundary:'Code and tests available · cross-business self-adaptation not yet independently certified'},
