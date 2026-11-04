@@ -13,7 +13,7 @@ function node(tag='div'){
   textContent:'',listeners:{},classList:{add(){},remove(){}},
   append(...args){this.children.push(...args)},
   replaceChildren(...args){this.children=args},
-  before(){},scrollIntoView(){},
+  before(){},scrollIntoView(){},setAttribute(){},
   addEventListener(name,fn){this.listeners[name]=fn},
   click(){this.listeners.click?.()}};
 }
