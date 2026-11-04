@@ -12,16 +12,11 @@ function relocate(source,target){
  const destination=$(target);
  if(!original||!destination)throw Error('VALUE_SOURCE_NODE_UNAVAILABLE');
  destination.appendChild(original);
- if(original.tagName==='DETAILS')original.open=true;
+ if(original.tagName==='DETAILS')original.open=false; // Detailed source records are an explicit user drill-down.
  return original;
 }
 try{
  relocate('#realityHomeCategories','rvCategories');
- const categorySummary=$('realityCategoryEconomics')?.querySelector?.('.reality-econ-grid[hidden]');
- if(categorySummary){
-  categorySummary.hidden=false;
-  categorySummary.removeAttribute('aria-hidden');
- }
  relocate('#realityPublishedRepairEvidence','rvPublishedSource');
  relocate('#realityHomePlanning','rvPotentialPlanning');
  relocate('.reality-home-proof','rvReceiptEvidence');
@@ -51,10 +46,14 @@ function update(){
  for(const [source,target] of sources)copyEvidence(source,target);
  const isSignedIn=$('privateReady')?.style?.display==='block';
  const ownerText=$('realityCategoryOwnerStatus')?.textContent||'';
- const findings=/\b([0-9]{1,5})\s+tracked\b/i.exec(ownerText);
- const candidates=/\b([0-9]{1,5})\s+verified implementation defect/i.exec(ownerText);
- $('rvFindings').textContent=isSignedIn&&findings?findings[1]:'Not verified';
- $('rvCandidates').textContent=isSignedIn&&candidates?candidates[1]:'Not verified';
+ // These owner-only values come from the existing category readbacks.
+ // An owner status message can use either the old or current wording.
+ const findings=isSignedIn?(strictCount($('realityCategoryOwnerCount')?.textContent)||
+  /\b([0-9]{1,5})\s+(?:tracked|saved current owner intake record)/i.exec(ownerText)?.[1]):null;
+ const candidates=isSignedIn?(strictCount($('realityCategoryVerifiedRepairs')?.textContent)||
+  /\b([0-9]{1,5})\s+(?:verified implementation defect|independently tested existing-code repair)/i.exec(ownerText)?.[1]):null;
+ $('rvFindings').textContent=findings||'Not verified';
+ $('rvCandidates').textContent=candidates||'Not verified';
  const observations=strictCount($('realityEconSignals')?.textContent);
  const sourceReceiptText=String($('realityEconReceipts')?.textContent||'').trim();
  const receipts=strictCount(sourceReceiptText)||
@@ -62,14 +61,64 @@ function update(){
  const settled=strictCount($('realityEconSettled')?.textContent);
  const authenticatedEvidence=isSignedIn&&!!receipts&&!!settled;
  $('rvSourceStatus').textContent=authenticatedEvidence?
-  'Owner evidence received. '+(observations||'Unverified')+
-   ' source-backed observations; '+settled+' isolated settlements and '+
-   receipts+' independently verified final receipts. No cash savings inferred.':
+  'Evidence verified for this view · '+(observations||'Unverified')+
+   ' signals · '+settled+' isolated settlements · '+receipts+
+   ' final receipts. Cash savings not measured.':
   isSignedIn?'Evidence still loading or incomplete. Unknown values remain unverified.':
-  'Source observations are read-only. Sign in to see owner-protected jobs, receipts, and economic evidence.';
+  'Read-only evidence · Sign in for owner-protected results.';
 }
+// One focused evidence section is visible at a time; original source nodes
+// remain mounted and continue receiving authenticated readback updates.
+const VIEWS=[
+ ['overview','rvTabOverview','rvPanelOverview'],
+ ['opportunities','rvTabOpportunities','rvPanelOpportunities'],
+ ['potential','rvTabPotential','rvPanelPotential'],
+ ['results','rvTabResults','rvPanelResults'],
+ ['governance','rvTabGovernance','rvPanelGovernance']
+];
+function selectView(view,{focus=false}={}){
+ if(!VIEWS.some(([name])=>name===view))return false;
+ for(const [name,tabId,panelId] of VIEWS){
+  const tab=$(tabId),panel=$(panelId),selected=name===view;
+  if(tab){
+   tab.setAttribute('aria-selected',String(selected));
+   tab.tabIndex=selected?0:-1;
+  }
+  if(panel)panel.hidden=!selected;
+ }
+ const active=VIEWS.find(([name])=>name===view);
+ const tab=$(active[1]);
+ if(focus&&tab?.focus)tab.focus({preventScroll:true});
+ return true;
+}
+for(let i=0;i<VIEWS.length;i++){
+ const [view,tabId]=VIEWS[i],tab=$(tabId);
+ if(!tab?.addEventListener)continue;
+ tab.addEventListener('click',()=>selectView(view));
+ tab.addEventListener('keydown',event=>{
+  let next=null;
+  if(event.key==='ArrowRight')next=(i+1)%VIEWS.length;
+  else if(event.key==='ArrowLeft')next=(i+VIEWS.length-1)%VIEWS.length;
+  else if(event.key==='Home')next=0;
+  else if(event.key==='End')next=VIEWS.length-1;
+  if(next===null)return;
+  event.preventDefault();
+  selectView(VIEWS[next][0],{focus:true});
+ });
+}
+if(typeof document.querySelectorAll==='function')
+ for(const shortcut of document.querySelectorAll('#realityValueVerification [data-rv-show]')){
+  shortcut.addEventListener('click',()=>{
+   const target=shortcut.getAttribute('data-rv-show');
+   if(selectView(target,{focus:true}))
+    $('rvViewNav')?.scrollIntoView?.({block:'nearest',behavior:'smooth'});
+  });
+ }
+selectView('overview');
+
 const watched=['realityEconSignals','realityEconSettled','realityEconReceipts',
- 'realityEconCapacity','privateReady','realityCategoryOwnerStatus'];
+ 'realityEconCapacity','privateReady','realityCategoryOwnerStatus',
+ 'realityCategoryOwnerCount','realityCategoryVerifiedRepairs'];
 let queued=false;
 function schedule(){
  if(queued)return;queued=true;
