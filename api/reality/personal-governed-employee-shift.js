@@ -11,6 +11,8 @@ import {computeShiftFingerprint,shiftDatabase,shiftRpc,
  from '../../src/reality-governed-shift-boundary-v1.js';
 import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
+import {buildRealityShiftConversationBrief}
+ from '../../src/reality-shift-conversation-brief-v1.js';
 export const maxDuration=60;
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -45,7 +47,8 @@ export default async function handler(req,res){
      if(handoffs.length)handoff_status='EXACT_CAPABILITY_APPROVAL_REQUESTED_IN_CHAT';
     }catch{handoff_status='EXACT_CAPABILITY_READBACK_UNAVAILABLE_FAIL_CLOSED';}
    }
-   return res.status(200).json({ok:true,...read,
+   const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
+   return res.status(200).json({ok:true,...read,shift_briefing,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
