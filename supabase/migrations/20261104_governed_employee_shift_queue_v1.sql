@@ -290,3 +290,71 @@ begin
 end $fn$;
 revoke all on function public.reality_close_employee_shift_v1() from public,anon,authenticated;
 grant execute on function public.reality_close_employee_shift_v1() to service_role;
+
+-- This checkpoint is driven by the shift worker after the owner's exact
+-- capability installation approval has already activated the original job
+-- continuation. It never approves, dispatches, or installs a capability.
+create or replace function public.reality_reconcile_employee_shift_original_v1()
+returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare
+ s record; v record; v_proof jsonb;
+ v_digest text;v_now timestamptz:=clock_timestamp();
+begin
+ if current_user<>'service_role' then raise exception 'SHIFT_SERVICE_ONLY';end if;
+ select * into s from reality_internal.governed_employee_shifts_v1
+ where status='AWAITING_EXACT_ORIGINAL_WORK' and
+  planned_start_at<=v_now and planned_end_at>v_now
+ order by planned_start_at,created_at for update skip locked limit 1;
+ if not found then return jsonb_build_object('status','NO_SHIFT_AWAITING_EXACT_WORK');end if;
+ select q.original_work_id,r.artifact_sha256,
+  r.verified_settlement_event_id,r.verified_at,t.source_ref into v
+ from reality_internal.governed_employee_shift_steps_v1 t
+ join public.universe_events e
+   on e.epistemic_status='VERIFIED' and
+    e.payload->>'owner_id'=s.owner_id::text and
+    e.provenance->>'principal_id'=s.owner_id::text and
+    e.payload->>'owner_authorized_investigation'='true' and
+    e.payload->>'issue_number'=pg_catalog.split_part(t.source_ref,'/issues/',2)
+ join reality_internal.genuine_capability_queue_v1 q
+   on q.original_work_event_id=e.event_id and
+      q.owner_id=s.owner_id and
+      q.original_work_id=e.payload->>'original_work_id'
+ join reality_internal.genuine_independent_final_receipts_v1 r
+   on r.owner_id=s.owner_id and r.original_work_id=q.original_work_id
+      and r.production_changed=false and
+      r.artifact_sha256=q.qualified_candidate->>'artifact_sha256'
+ where t.shift_id=s.shift_id and t.source_ref ~
+  '^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*$'
+  and r.verified_at>=s.authorized_at and r.verified_at<=v_now
+  and q.phase='SETTLED_ISOLATED'
+ order by r.verified_at desc limit 1;
+ if not found then return jsonb_build_object(
+  'status','EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED',
+  'shift_id',s.shift_id,'installation_authorized',false);
+ end if;
+ v_proof:=jsonb_build_object('kind','EXACT_ORIGINAL_JOB_FINAL_RECEIPT_MATCH',
+  'original_work_id',v.original_work_id,'source_ref',v.source_ref,
+  'artifact_sha256',v.artifact_sha256,
+  'verified_settlement_event_id',v.verified_settlement_event_id,
+  'verified_at',v.verified_at,'read_only',true,
+  'independently_reconciled',true,
+  'production_changed',false,'human_hours_saved',null);
+ v_digest:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(v_proof::text,'UTF8')),'hex');
+ update reality_internal.governed_employee_shift_steps_v1
+   set state='ORIGINAL_JOB_RECEIPT_VERIFIED',proof=v_proof,
+   proof_sha256=v_digest,completed_at=v_now
+   where shift_id=s.shift_id and step_index in (6,7)
+   and state in ('QUEUED','AWAITING_EXACT_WORK');
+ update reality_internal.governed_employee_shifts_v1
+   set status='RUNNING',last_progress_at=v_now
+   where shift_id=s.shift_id;
+ return jsonb_build_object('status','EXACT_SHIFT_ORIGINAL_RECEIPT_RECONCILED',
+  'shift_id',s.shift_id,'original_work_id',v.original_work_id,
+  'proof_sha256',v_digest,'installation_authorized',false,
+  'production_changed',false,'human_hours_saved',null);
+end $fn$;
+revoke all on function public.reality_reconcile_employee_shift_original_v1()
+ from public,anon,authenticated;
+grant execute on function public.reality_reconcile_employee_shift_original_v1()
+ to service_role;
