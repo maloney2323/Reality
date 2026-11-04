@@ -284,3 +284,51 @@ test('unverified historical hint never upgrades a current job to complete',async
  assert.match(f.nodes.simpleFullLoopStatus.textContent,/Owner approval already recorded/);
  assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
 });
+
+test('previously authorized source/run/issue is not re-admitted as a fresh upgrade',async()=>{
+ const previous={original_work_id:WORK,capability_id:'reality-example-repair',
+  phase:'SETTLED_ISOLATED',independently_settled:true,
+  source_issue_number:207,source_failed_run_id:41512345678,
+  source_commit_sha:'c'.repeat(40)};
+ const source={independently_verified:true,issue_number:207,
+  original_provider_failed_run_id:41512345678,source_sha:'c'.repeat(40),
+  source_path:'src/reality-extensions/reality-example-repair.mjs'};
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,jobs:[previous]},
+  '/api/reality/personal-real-repair-opportunities':{ok:true,opportunities:[source]}}});
+ await f.click();
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/No independently qualified NEW gap/i);
+ assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
+});
+test('a genuinely new provider failure for the same issue remains eligible',async()=>{
+ const previous={original_work_id:WORK,capability_id:'reality-example-repair',
+  phase:'SETTLED_ISOLATED',independently_settled:true,
+  source_issue_number:207,source_failed_run_id:41512345678,
+  source_commit_sha:'c'.repeat(40)};
+ const next={independently_verified:true,issue_number:207,
+  original_provider_failed_run_id:41999999999,source_sha:'d'.repeat(40),
+  source_path:'src/reality-extensions/reality-example-repair.mjs'};
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,jobs:[previous]},
+  '/api/reality/personal-real-repair-opportunities':{ok:true,opportunities:[next]}}});
+ await f.click();
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,1);
+ assert.equal(f.calls.at(-1).url,'/api/reality/personal-real-repair-opportunities');
+ assert.equal(JSON.parse(f.calls.at(-1).options.body).expected_failed_run_id,
+  41999999999);
+});
+test('current installed historical no-op never becomes a queued original for replay',async()=>{
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,jobs:[{
+   original_work_id:WORK,capability_id:'reality-continuity-settlement-reconciler',
+   phase:'ISOLATED_INSTALLED_PROBATION',owner_install_approved:true,
+   historical_reconciliation:{
+    status:'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT',
+    independent_database_readback:true,current_job_settled:false}}]},
+  '/api/reality/personal-governed-build':{
+   ok:true,queued:true,original_work_id:WORK,phase:'DISPATCHED_TO_ISOLATED_WORKER'}}});
+ await f.click();
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/HISTORICAL SETTLEMENT VERIFIED/);
+});
