@@ -83,7 +83,27 @@ async function observe(){
        approvalPrompted=true;window.realityOpenChatDock(false);
        if(typeof window.homeOwnerRefresh==='function')void window.homeOwnerRefresh();
       }
-     }else setStatus('Upgrade verified. Reality is checking installation → same-job resumption → settlement. Approval is not available until that path passes.');
+     }else{
+      // An independently green sandbox is not equivalent to a qualifying
+      // provider-backed holdout or a complete install-to-settlement protocol.
+      // Show the specific owner's read-only preflight, never a false approval.
+      const gate=exact?.full_loop_preflight;
+      const reasons={
+       MANDATORY_HOLDOUT_NOT_VERIFIED:
+        'Candidate sandbox passed, but the mandatory independent real-provider holdout has not qualified this exact artifact. Installation approval is locked until signed requalification succeeds.',
+       EXACT_INSTALL_TO_SETTLEMENT_PROTOCOL_MISSING:
+        'Candidate passed isolated checks, but no verified same-job installation, resumption and settlement protocol is established. Installation approval remains locked.',
+       SIGNED_SOURCE_AND_COMPLETE_EXECUTION_PRECHECK_NOT_VERIFIED:
+        'Signed source and full execution prechecks are incomplete. Installation approval is locked.',
+       NOT_VERIFIED_OR_NOT_PENDING:
+        'The candidate is not currently independently qualified for installation approval.',
+       ALREADY_OWNER_APPROVED_DO_NOT_REAPPROVE:
+        'The exact approval was already recorded. Reality must continue from its durable worker receipt; do not approve again.'
+      };
+      const note=reasons[gate?.status]||
+       ('Installation preflight blocked: '+String(gate?.status||'EVIDENCE_UNAVAILABLE').slice(0,90));
+      setStatus(note+' No installation or final settlement is claimed.');
+     }
     }catch{
      setStatus('Upgrade tested, but approval readiness readback is unavailable. No install permission inferred.');
     }
