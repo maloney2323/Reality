@@ -14,16 +14,58 @@ const scenarios=Object.freeze({
  extended:Object.freeze({discovery_minutes:120,execution_minutes:480})
 });
 const round=n=>Number(n.toFixed(2));
-const amount=(minutes,rate)=>minutes<=0?0:
- projectHypotheticalWorkValue({
-  manual_minutes_per_occurrence:minutes,
-  occurrences_per_month:1,automatable_fraction:1,
+const amount=(minutes,rate)=>{
+ if(minutes<=0)return 0;
+ // Existing value-arithmetic contract caps minutes per occurrence at 60k.
+ // Split the *same one-off assumed workload* into mathematical chunks only;
+ // chunking does NOT create monthly recurring savings or additional jobs.
+ const chunks=Math.ceil(minutes/60000);
+ return projectHypotheticalWorkValue({
+  manual_minutes_per_occurrence:minutes/chunks,
+  occurrences_per_month:chunks,automatable_fraction:1,
   hourly_labor_value_usd:rate
  }).labor_value_equivalent_usd_per_month;
-export function deriveAutomaticBacklogPlanning({brief,liveIssues}={}){
- const candidates=summarizeSourceBackedIssueCandidates(brief);
- if(!Array.isArray(liveIssues)||liveIssues.length>100||
-   brief.source_coverage?.issues!=='checked')
+};
+const ID=/^catalog:[a-f0-9]{32}$/;
+function currentOpenIssuesFromFullCatalog(catalog){
+ if(catalog?.version!=='reality-work-catalog-v0.1'||
+   !['OBSERVED','PARTIAL'].includes(catalog.status)||
+   catalog.authority!=='NONE_GRANTED'||catalog.execution_enabled!==false||
+   !Array.isArray(catalog.items)||catalog.items.length>1200||
+   catalog.source_coverage?.issues!=='checked')
+  fail('FULL_CATALOG_SOURCE_SCOPE_UNVERIFIED');
+ const result=[],seen=new Set(),ids=new Set();
+ for(const issue of catalog.items){
+  if(issue?.finding_type!=='OPEN_ISSUE')continue;
+  const ref=issue.evidence_refs?.[0];
+  if(!ID.test(String(issue.finding_id||''))||
+    issue.source!=='github_issues'||issue.state!=='TRACKED_NEEDS_REVIEW'||
+    !url.test(String(ref||''))||
+    issue.value_assessment?.score_definition!==
+     'HEURISTIC_TRIAGE_REVIEW_ORDER_ONLY_NOT_BUSINESS_IMPACT'||
+    issue.value_assessment?.business_impact?.status!=='UNMEASURED'||
+    issue.value_assessment?.execution_authorized!==false||
+    ids.has(issue.finding_id))
+   fail('FULL_CATALOG_ISSUE_EVIDENCE_INVALID');
+  ids.add(issue.finding_id);
+  if(seen.has(ref))continue;
+  seen.add(ref);
+  result.push(Object.freeze({
+   finding_id:issue.finding_id,issue_url:ref,
+   title:String(issue.title||'Open provider issue').slice(0,260),
+   issue_status:'TRACKED_OPEN_ISSUE_NOT_INDEPENDENTLY_REPRODUCED',
+   job_validated:false,independent_baseline_verified:false
+  }));
+ }
+ return Object.freeze(result);
+}
+export function deriveAutomaticBacklogPlanning({brief,liveIssues,sourceCatalog=null}={}){
+ const candidates=sourceCatalog?
+  currentOpenIssuesFromFullCatalog(sourceCatalog):
+  summarizeSourceBackedIssueCandidates(brief);
+ if(!Array.isArray(liveIssues)||liveIssues.length>1200||
+   brief.source_coverage?.issues!=='checked'||
+   liveIssues.source_scan?.query_scope_fully_reconciled===false)
   fail('FRESH_ISSUE_PROVIDER_COVERAGE_REQUIRED');
  const byUrl=new Map();
  for(const entry of liveIssues){
@@ -73,6 +115,9 @@ export function deriveAutomaticBacklogPlanning({brief,liveIssues}={}){
    amount(n*(plan.discovery_minutes+plan.execution_minutes),rate)
  });
  const coverageComplete=brief.status==='SOURCE_BACKED_DISCOVERY_OBSERVED'&&
+  sourceCatalog?.status!=='PARTIAL'&&
+  (sourceCatalog?.total_findings==null||
+   sourceCatalog.total_findings===sourceCatalog.items.length)&&
   candidates.length===totalOpenUnique;
  return Object.freeze({
   version:AUTO_BACKLOG_VALUE_VERSION,

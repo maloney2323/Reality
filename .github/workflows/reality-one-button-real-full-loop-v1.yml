@@ -37,6 +37,8 @@ jobs:
           node --check reality-full-loop-chat-diagnostic-v1.js
           node --test test/reality-full-loop-chat-diagnostic-v1.test.js
           node --check reality-workday-brief-v1.js
+          node --check src/reality-work-catalog-v0.1.js
+          node --test test/reality-work-catalog-v0.1.test.js
           node --check src/reality-workday-opportunity-brief-v1.js
           node --check api/reality/workday-opportunities.js
           node --test test/reality-workday-opportunity-brief-v1.test.js

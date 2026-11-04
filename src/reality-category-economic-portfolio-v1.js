@@ -46,16 +46,23 @@ const types=Object.freeze({
 const validCount=(x,max)=>Number.isSafeInteger(x)&&x>=0&&x<=max;
 const fail=x=>{throw Error('REALITY_CATEGORY_ECONOMICS_'+x)};
 const round=x=>Number(x.toFixed(2));
-const money=(minutes,rate)=>minutes===0?0:
- projectHypotheticalWorkValue({
-  manual_minutes_per_occurrence:minutes,occurrences_per_month:1,
-  automatable_fraction:1,hourly_labor_value_usd:rate
+const money=(minutes,rate)=>{
+ if(minutes<=0)return 0;
+ // Existing value-arithmetic contract caps minutes per occurrence at 60k.
+ // Split the *same one-off assumed workload* into mathematical chunks only;
+ // chunking does NOT create monthly recurring savings or additional jobs.
+ const chunks=Math.ceil(minutes/60000);
+ return projectHypotheticalWorkValue({
+  manual_minutes_per_occurrence:minutes/chunks,
+  occurrences_per_month:chunks,automatable_fraction:1,
+  hourly_labor_value_usd:rate
  }).labor_value_equivalent_usd_per_month;
+};
 export function buildCategoryEconomicPortfolio(catalog){
  if(catalog?.version!=='reality-work-catalog-v0.1'||
     !['OBSERVED','PARTIAL'].includes(catalog.status)||
     catalog.authority!=='NONE_GRANTED'||catalog.execution_enabled!==false||
-    !Array.isArray(catalog.items)||catalog.items.length>90||
+    !Array.isArray(catalog.items)||catalog.items.length>1200||
     !validCount(catalog.total_findings,10000)||
     catalog.total_findings<catalog.items.length||
     !catalog.source_coverage||typeof catalog.source_coverage!=='object')
@@ -155,6 +162,7 @@ export function buildCategoryEconomicPortfolio(catalog){
     'PARTIAL_CATEGORY_SOURCE_COVERAGE':'SOURCE_BACKED_CATEGORIES_OBSERVED',
   source_scope:'REALITY_GITHUB_WORK_CENTER_TEN_CATEGORIES',
   source_coverage:catalog.source_coverage,
+  source_pagination:catalog.source_scans||null,
   source_catalog_truncated:catalog.total_findings>catalog.items.length,
   source_evidence_stages:'GITHUB_SOURCE_OBSERVATIONS_NOT_ALL_VERIFIED_GAPS',
   original_work_independent_settlements_included:false,

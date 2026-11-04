@@ -56,7 +56,7 @@ test('fail closed on unknown authority, unknown contract, excessive items, or un
  assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),authority:'OWNER_AUTHORIZED'}));
  assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),execution_enabled:true}));
  assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),version:'fake-v2'}));
- assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),items:Array(91).fill(issue)}));
+ assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),items:Array(1201).fill(issue)}));
  assert.throws(()=>buildRealityWorkdayOpportunityBrief({...catalog(),status:'DONE'}));
 });
 test('tampered evidence, source mismatch and completed-state records never appear as verified work',()=>{

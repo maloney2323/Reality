@@ -60,7 +60,7 @@ export function buildRealityWorkdayOpportunityBrief(catalog){
  if(!catalog||!['OBSERVED','PARTIAL'].includes(catalog.status)||
    !['reality-work-catalog-v0.1'].includes(catalog.version)||
    catalog.authority!=='NONE_GRANTED'||catalog.execution_enabled!==false||
-   !Array.isArray(catalog.items)||catalog.items.length>90||
+   !Array.isArray(catalog.items)||catalog.items.length>1200||
    !catalog.source_coverage||typeof catalog.source_coverage!=='object')
   throw Error('WORKDAY_CATALOG_CONTRACT_UNVERIFIED');
  const seen=new Set(),candidates=[];
@@ -91,7 +91,7 @@ export function buildRealityWorkdayOpportunityBrief(catalog){
  };
  const coverage=Object.fromEntries(['issues','pull_requests','actions','commits',
   'customer_feedback','business_operations','external_research'].map(k=>[
-    k,['checked','not_connected','unavailable'].includes(catalog.source_coverage[k])?
+    k,['checked','partial','not_connected','unavailable'].includes(catalog.source_coverage[k])?
       catalog.source_coverage[k]:'unavailable'
    ]));
  const partial=catalog.status==='PARTIAL'||
@@ -104,6 +104,8 @@ export function buildRealityWorkdayOpportunityBrief(catalog){
   source_coverage:coverage,
   counts,items:candidates.slice(0,25),
   truncated:candidates.length>25,
+  source_catalog_truncated:catalog.total_findings!=null&&catalog.total_findings>catalog.items.length,
+  source_pagination:catalog.source_scans||null,
   illustrative_labor_reference:(()=>{
    const wage=humanLaborBenchmarkCatalog().BLS_SOFTWARE_WAGE;
    const hourly=wage.wage_by_occupation['15-1252'];
