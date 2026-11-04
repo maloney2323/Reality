@@ -253,3 +253,34 @@ test('mandatory real-provider holdout blocks installation visibly rather than ca
  assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
  assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
 });
+
+test('verified historical no-op is visible without replay, approval, or false final settlement',async()=>{
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,
+   jobs:[{original_work_id:WORK,phase:'ISOLATED_INSTALLED_PROBATION',
+    independently_settled:false,candidate_verified:true,owner_install_approved:true,
+    isolated_installed:true,historical_reconciliation:{
+     status:'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT',
+     independent_database_readback:true,current_job_settled:false}}]}
+ }});
+ await f.click();
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/HISTORICAL SETTLEMENT VERIFIED/);
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/did not execute a new settlement/);
+ assert.equal(f.calls.filter(c=>c.options.method==='POST').length,0);
+ assert.equal(f.chat.opened,0);
+ assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
+});
+test('unverified historical hint never upgrades a current job to complete',async()=>{
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,
+   jobs:[{original_work_id:WORK,phase:'ISOLATED_INSTALLED_PROBATION',
+    independently_settled:false,candidate_verified:true,owner_install_approved:true,
+    isolated_installed:true,historical_reconciliation:{
+     status:'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT',
+     independent_database_readback:false,current_job_settled:false}}]}
+ }});
+ await f.click();
+ assert.doesNotMatch(f.nodes.simpleFullLoopStatus.textContent,/HISTORICAL SETTLEMENT VERIFIED/);
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/Owner approval already recorded/);
+ assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
+});
