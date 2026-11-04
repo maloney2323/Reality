@@ -1106,7 +1106,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p previous
-          gh run download 41399383154 --repo maloney2323/Reality --name reality-uninstalled-model-proposal-41399383154 --dir previous
+          gh run download 41728570367 --repo maloney2323/Reality --name reality-uninstalled-model-proposal-41728570367 --dir previous
           test -s previous/genuine-capability-model-proposal.json
       - name: Reality proposes fresh corrected source without installation
         env:
