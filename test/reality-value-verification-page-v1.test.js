@@ -49,7 +49,7 @@ test('value proof separates opportunity signals, historical assumptions and acce
  assert.match(html,/INDEPENDENTLY VERIFIED · REALIZED OUTCOMES/);
  assert.match(html,/Historical benchmark models, potential revenue or avoided cost/);
  assert.match(html,/A pipeline stage is not marked complete for any specific job/);
- assert.match(html,/Provider observations aren't completed jobs or verified capability gaps/);
+ assert.match(html,/each observation still needs current-work qualification/);
  assert.match(html,/Verified net human capacity returned/);
  assert.match(html,/Not measured/);
  assert.match(html,/Review the exact original-job evidence/);
