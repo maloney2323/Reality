@@ -46,6 +46,10 @@ jobs:
           node --check src/reality-backlog-labor-scenario-v1.js
           node --check api/reality/backlog-value-scenario.js
           node --test test/reality-backlog-labor-scenario-v1.test.js
+          node --check reality-automatic-backlog-value-v1.js
+          node --check api/reality/automatic-backlog-value.js
+          node --check src/reality-automatic-backlog-planning-v1.js
+          node --test test/reality-automatic-backlog-planning-v1.test.js
           node --test test/reality-capability-value-report-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js
