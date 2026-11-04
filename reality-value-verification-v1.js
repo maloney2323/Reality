@@ -56,7 +56,9 @@ function update(){
  $('rvFindings').textContent=isSignedIn&&findings?findings[1]:'Not verified';
  $('rvCandidates').textContent=isSignedIn&&candidates?candidates[1]:'Not verified';
  const observations=strictCount($('realityEconSignals')?.textContent);
- const receipts=strictCount($('realityEconReceipts')?.textContent);
+ const sourceReceiptText=String($('realityEconReceipts')?.textContent||'').trim();
+ const receipts=strictCount(sourceReceiptText)||
+  /^([1-9][0-9]{0,6}) independently reconciled$/.exec(sourceReceiptText)?.[1]||null;
  const settled=strictCount($('realityEconSettled')?.textContent);
  const authenticatedEvidence=isSignedIn&&!!receipts&&!!settled;
  $('rvSourceStatus').textContent=authenticatedEvidence?
