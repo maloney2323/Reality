@@ -83,6 +83,7 @@
    ]);
    if (epoch !== serial || !signedIn()) return;
    let completed = 0, historical = 0, downloads = 0;
+   let jobReadbackVerified = false, upgradeReadbackVerified = false;
    if (jobsResult.status === 'fulfilled') {
     const data = jobsResult.value;
     if (data.status !== 'OWNER_GOVERNED_LOOP_READBACK' ||
@@ -92,6 +93,7 @@
         data.independent_final_receipts.length > 12) {
      empty(original, 'Trusted job readback failed validation. No completion inferred.');
     } else {
+     jobReadbackVerified = true;
      const receipts = new Map(data.independent_final_receipts.filter(r =>
       r.status === 'FULL_LOOP_INDEPENDENTLY_VERIFIED' && WORK.test(String(r.original_work_id || '')))
       .map(r => [r.original_work_id, r]));
@@ -143,6 +145,7 @@
         h.read_only === true && h.work_started === false &&
         h.installation_authorized === false && h.production_changed === false &&
         Array.isArray(h.settled_history) && h.settled_history.length <= 12) {
+     upgradeReadbackVerified = true;
      const seenCommits = new Set();
      for (const item of h.settled_history) {
       if (item.stage !== 'SETTLED_ISOLATED' ||
@@ -160,10 +163,15 @@
      if (!seenCommits.size) empty(upgrades, 'No verified historical installations were returned.');
     } else empty(upgrades, 'Historical intake readback was not independently verified.');
    } else empty(upgrades, 'Historical upgrade records are temporarily unavailable.');
-   status.textContent = completed + ' independently settled original job(s) · ' +
+   status.textContent = (jobReadbackVerified ?
+    completed + ' independently settled original job(s) · ' +
     downloads + ' verified final PDF receipt(s) · ' +
-    historical + ' historical duplicate observation(s). ' +
-    'Incomplete jobs are not marked finished. Nothing was queued, approved or restarted.';
+    historical + ' historical duplicate observation(s).' :
+    'Original-job readback unavailable; completion counts are unknown.') +
+    (upgradeReadbackVerified ?
+     ' Earlier installation history loaded.' :
+     ' Historical installation readback unavailable.') +
+    ' Incomplete jobs are not marked finished. Nothing was queued, approved or restarted.';
   } catch {
    if (epoch !== serial) return;
    empty(original, 'Saved history could not be verified. No completion claim made.');
