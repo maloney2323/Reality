@@ -55,7 +55,7 @@ export function buildCategoryEconomicPortfolio(catalog){
  if(catalog?.version!=='reality-work-catalog-v0.1'||
     !['OBSERVED','PARTIAL'].includes(catalog.status)||
     catalog.authority!=='NONE_GRANTED'||catalog.execution_enabled!==false||
-    !Array.isArray(catalog.items)||catalog.items.length>90||
+    !Array.isArray(catalog.items)||catalog.items.length>1200||
     !validCount(catalog.total_findings,10000)||
     catalog.total_findings<catalog.items.length||
     !catalog.source_coverage||typeof catalog.source_coverage!=='object')
@@ -155,6 +155,7 @@ export function buildCategoryEconomicPortfolio(catalog){
     'PARTIAL_CATEGORY_SOURCE_COVERAGE':'SOURCE_BACKED_CATEGORIES_OBSERVED',
   source_scope:'REALITY_GITHUB_WORK_CENTER_TEN_CATEGORIES',
   source_coverage:catalog.source_coverage,
+  source_pagination:catalog.source_scans||null,
   source_catalog_truncated:catalog.total_findings>catalog.items.length,
   source_evidence_stages:'GITHUB_SOURCE_OBSERVATIONS_NOT_ALL_VERIFIED_GAPS',
   original_work_independent_settlements_included:false,
