@@ -1732,13 +1732,18 @@ Deno.serve(async request=>{
      receipt,snapshot,production_changed:false,production_release_authorized:false});
   }
   if((input?.action==='final_receipt_prepare'||
-      input?.action==='final_receipt_record')&&
+      input?.action==='final_receipt_record'||
+      input?.action==='final_receipt_historical_prepare'||
+      input?.action==='final_receipt_historical_record')&&
     SHA40.test(input?.scope?.repository_sha||'')){
-   if(input.action==='final_receipt_prepare'&&
+   const historical=input.action.startsWith('final_receipt_historical_');
+   const preparing=input.action==='final_receipt_prepare'||
+     input.action==='final_receipt_historical_prepare';
+   if(preparing&&
       (Object.keys(input).sort().join(',')!=='action,scope'||
        Object.keys(input.scope||{}).sort().join(',')!=='original_work_id,repository_sha'))
      deny('FINAL_RECEIPT_PREPARE_ENVELOPE_INVALID');
-   if(input.action==='final_receipt_record'&&
+   if(!preparing&&
       (Object.keys(input).sort().join(',')!=='action,proof,scope'||
        Object.keys(input.scope||{}).sort().join(',')!=='original_work_id,repository_sha'))
      deny('FINAL_RECEIPT_RECORD_ENVELOPE_INVALID');
@@ -1749,7 +1754,8 @@ Deno.serve(async request=>{
     method:'POST',body:{p_work:input.scope.original_work_id}});
    if(source?.status!=='AUTHORITATIVE_SETTLED_SOURCE_FOR_INDEPENDENT_RECEIPT'||
       source.original_work_id!==input.scope.original_work_id||
-      source.provider_run_id!==run.id||
+      !Number.isSafeInteger(source.provider_run_id)||source.provider_run_id<1||
+      (historical?source.provider_run_id>=run.id:source.provider_run_id!==run.id)||
       source.final_receipt_verified!==false||
       source.installation_reservation_consumed!==true||
       source.production_changed!==false||
@@ -1760,32 +1766,44 @@ Deno.serve(async request=>{
       !UUID.test(source.settlement_event_id)||
       source.source_path!=='src/reality-extensions/reality-general-execution-receipt.mjs')
     deny('FINAL_RECEIPT_SETTLED_OWNER_SOURCE_NOT_VERIFIED');
+   const originalRunId=source.provider_run_id;
+   if(historical){
+    const historicalRun=await api('/actions/runs/'+originalRunId,ghProviderToken);
+    if(historicalRun?.id!==originalRunId||
+       historicalRun.status!=='completed'||
+       historicalRun.event!=='push'||
+       historicalRun.path!==WORKFLOW||
+       historicalRun.head_branch!==BRANCH.slice('refs/heads/'.length)||
+       historicalRun.head_repository?.full_name!==REPO||
+       !SHA40.test(historicalRun.head_sha))
+      deny('FINAL_RECEIPT_HISTORICAL_SIGNED_SOURCE_UNVERIFIED');
+   }
    // Independently re-read actual live job graph and preserved artifact
    // BEFORE offering the source to a model-generated completion verifier.
    const [jobs,artifacts,installed]=await Promise.all([
-    api('/actions/runs/'+run.id+'/jobs?per_page=100',ghProviderToken),
-    api('/actions/runs/'+run.id+'/artifacts?per_page=100',ghProviderToken),
+    api('/actions/runs/'+originalRunId+'/jobs?per_page=100',ghProviderToken),
+    api('/actions/runs/'+originalRunId+'/artifacts?per_page=100',ghProviderToken),
     api('/git/ref/heads/'+source.installed_branch,ghProviderToken)
    ]);
    const jobList=Array.isArray(jobs?.jobs)?jobs.jobs:[];
    const resume=jobList.filter((j:Record<string,unknown>)=>
-     j.name==='resume_original_job'&&j.run_id===run.id&&
+     j.name==='resume_original_job'&&j.run_id===originalRunId&&
      j.status==='completed'&&j.conclusion==='success'&&
      j.steps?.some((st:Record<string,unknown>)=>
       st.name==='Execute original frozen acceptance against installed source'&&
       st.conclusion==='success'));
    const settled=jobList.filter((j:Record<string,unknown>)=>
      j.name==='record_independent_original_settlement'&&
-     j.run_id===run.id&&j.status==='completed'&&j.conclusion==='success');
+     j.run_id===originalRunId&&j.status==='completed'&&j.conclusion==='success');
    const finalArtifact=(artifacts?.artifacts||[]).filter((a:Record<string,unknown>)=>
-     a.name==='reality-original-final-settlement-'+run.id&&
+     a.name==='reality-original-final-settlement-'+originalRunId&&
      a.expired===false&&/^sha256:[a-f0-9]{64}$/.test(String(a.digest||'')));
    if(resume.length!==1||settled.length!==1||finalArtifact.length!==1||
       installed?.object?.sha!==source.installed_commit_sha||
       !Number.isSafeInteger(resume[0].id))
     deny('FINAL_RECEIPT_INDEPENDENT_PROVIDER_GRAPH_NOT_SETTLED');
-   if(input.action==='final_receipt_prepare')
-    return respond({ok:true,...source,provider_run_id:run.id,
+   if(preparing)
+    return respond({ok:true,...source,provider_run_id:originalRunId,
       original_resume_job_id:resume[0].id,
       verified_provider_job_graph:true,
       signed_run_id:run.id,
@@ -1798,7 +1816,7 @@ Deno.serve(async request=>{
       proof.original_work_id!==source.original_work_id||
       proof.artifact_sha256!==source.artifact_sha256||
       proof.installed_commit_sha!==source.installed_commit_sha||
-      proof.provider_run_id!==run.id||
+      proof.provider_run_id!==originalRunId||
       proof.settlement_event_id!==source.settlement_event_id||
       proof.result?.verified!==true||proof.result?.status!=='VERIFIED_SETTLED'||
       proof.result?.original_work_id!==source.original_work_id||
@@ -1807,28 +1825,36 @@ Deno.serve(async request=>{
     deny('FINAL_RECEIPT_EXACT_POSITIVE_EVIDENCE_REQUIRED');
    // The independent job must finish and upload its immutable proof BEFORE
    // this separately signed recorder can claim the final customer receipt.
-   const verifier=jobList.filter((j:Record<string,unknown>)=>
-     j.name==='independently_verify_final_customer_receipt'&&
+   const checkRunId=historical?run.id:originalRunId;
+   const checked=historical?await api('/actions/runs/'+checkRunId+'/jobs?per_page=100',ghProviderToken):jobs;
+   const checkedArtifacts=historical?
+     await api('/actions/runs/'+checkRunId+'/artifacts?per_page=100',ghProviderToken):artifacts;
+   const verifier=(Array.isArray(checked?.jobs)?checked.jobs:[]).filter((j:Record<string,unknown>)=>
+     j.run_id===checkRunId&&
+     j.name===(historical?'independently_verify_historical_final_customer_receipt':
+      'independently_verify_final_customer_receipt')&&
      j.status==='completed'&&j.conclusion==='success'&&
      j.steps?.some((st:Record<string,unknown>)=>
-       st.name==='Independently execute installed completion verifier against final provider receipts'&&
+       st.name===(historical?'Independently verify historical installed completion without replay':
+       'Independently execute installed completion verifier against final provider receipts')&&
        st.conclusion==='success'));
-   const archive=(artifacts?.artifacts||[]).filter((a:Record<string,unknown>)=>
-     a.name==='reality-independent-final-completion-verifier-'+run.id&&
+   const archive=(checkedArtifacts?.artifacts||[]).filter((a:Record<string,unknown>)=>
+     a.name===(historical?'reality-independent-historical-final-completion-verifier-':
+      'reality-independent-final-completion-verifier-')+checkRunId&&
      a.expired===false&&a.digest===proof.verifier_artifact_digest);
    if(verifier.length!==1||archive.length!==1)
     deny('FINAL_RECEIPT_INDEPENDENT_JOB_AND_ARTIFACT_NOT_VERIFIED');
    const record=await database('rpc/reality_record_genuine_final_receipt_v1',{
     method:'POST',body:{
      p_work:source.original_work_id,
-     p_provider_run_id:run.id,
+     p_provider_run_id:originalRunId,
      p_artifact_digest:proof.verifier_artifact_digest,
      p_verified_result:proof.result}});
    if(record?.status!=='FULL_LOOP_INDEPENDENTLY_VERIFIED'||
       record?.original_work_id!==source.original_work_id||
       record?.artifact_sha256!==source.artifact_sha256||
       record?.installed_commit_sha!==source.installed_commit_sha||
-      record?.provider_run_id!==run.id||
+      record?.provider_run_id!==originalRunId||
       record?.settlement_event_id!==source.settlement_event_id||
       record?.verifier_artifact_digest!==proof.verifier_artifact_digest||
       record?.independent_readback_verified!==true||
