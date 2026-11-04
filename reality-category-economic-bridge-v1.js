@@ -40,17 +40,104 @@ const fmt=x=>'$'+x.toLocaleString('en-US',{
  minimumFractionDigits:2,maximumFractionDigits:2});
 const signed=()=>auth.style.display==='block';
 const set=(id,s)=>{if($(id))$(id).textContent=s};
-let epoch=0;
+let epoch=0, currentRepairReference=null;
 function reset(note){
  set('realityCategorySignalCount','Unknown');
  set('realityCategoryOwnerCount','Unknown');
  set('realityCategoryVerifiedRepairs','Unknown');
  set('realityCategoryReviewValue','Unknown');
+ set('realityPublishedInvestigationHours','Unverified');
+ set('realityPublishedFixHours','Unverified');
+ set('realityPublishedCombinedHours','Unverified');
+ set('realityPublishedPerRepairValue','Unverified');
+ set('realityPublishedOwnerComparison',
+  'Owner confirmed repair candidates: awaiting independent ledger readback. No value inferred.');
+ set('realityPublishedRepairStatus',
+  'Published external repair-effort reference not yet reconciled with Reality wage model.');
+ const group=$('realityPublishedRepairGroups');if(group)group.replaceChildren();
+ currentRepairReference=null;
  set('realityCategoryScope',
   'Review-labor scenarios are not verified business impact. Different categories may refer to the same original problem; savings, completed work, and actual repair hours require separate receipts.');
  grid.replaceChildren();owner.replaceChildren();
  ownerStatus.textContent='Private owner upgrade intake not independently read back.';
  status.textContent=note;
+}
+function validPublishedReference(r,rate){
+ if(r?.version!=='reality-published-human-repair-effort-v1'||
+  r.status!=='PUBLISHED_EXTERNAL_HUMAN_EFFORT_REFERENCE_NOT_REALITY_CALIBRATED'||
+  r.reference_scope!=='HUMAN_SOFTWARE_FAULT_REPAIR_NOT_GENERAL_UPGRADE_OR_PR_WORK'||
+  r.combined_reference_interpretation!==
+   'SUM_OF_TWO_SEPARATE_STUDY_MEDIANS_NOT_MEDIAN_OF_SUMS'||
+  r.calibrated_to_reality_task_durations!==false||
+  r.verified_human_work_hours!==null||
+  r.verified_actual_cash_savings_usd!==null||
+  r.original_job_verified_completed_by_reference!==false||
+  r.covers_capability_feature_builds!==false||
+  r.financial_roi_verified!==false||
+  r.read_only!==true||
+  r.study?.source_url!==
+   'https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf'||
+  r.study?.doi_url!=='https://doi.org/10.1016/j.infsof.2017.01.002'||
+  r.study?.published_year!==2017||
+  r.study?.setting!=='SINGLE_NASA_MISSION_NOT_ALL_SOFTWARE_PROJECTS'||
+  r.study?.failures_investigated!==1257||
+  r.study?.failures_with_fix_effort_recorded!==1153||
+  r.study?.median_investigation_hours!==2||
+  r.study?.median_implementation_hours!==3||
+  r.study?.effort_heavily_skewed!==true||
+  r.combined_reference_hours!==5||
+  r.public_median_developer_wage_usd_per_hour!==rate||
+  Math.abs(r.per_comparable_repair_gross_wage_equivalent_usd-5*rate)>0.011||
+  !Array.isArray(r.examples)||r.examples.length!==3)
+  return false;
+ return [1,5,10].every((n,i)=>{
+  const ex=r.examples[i];
+  return ex?.comparable_confirmed_repairs_assumed===n&&
+   ex.illustrative_human_hours===5*n&&
+   ex.not_confirmed_backlog_or_verified_savings===true&&
+   Math.abs(ex.illustrative_gross_wage_equivalent_usd-n*5*rate)<0.011;
+ });
+}
+function renderPublishedReference(r){
+ currentRepairReference=r;
+ set('realityPublishedInvestigationHours','2 hrs');
+ set('realityPublishedFixHours','3 hrs');
+ set('realityPublishedCombinedHours','5 hrs');
+ set('realityPublishedPerRepairValue',fmt(r.per_comparable_repair_gross_wage_equivalent_usd));
+ set('realityPublishedRepairStatus',
+  'Hamill & Goseva-Popstojanova (2017), study of one NASA mission · 1,257 failures investigated; 1,153 recorded fix effort. '+
+  'Published median investigation 2 hours and median implementation 3 hours. '+
+  'Their 5-hour sum is an illustrative planning reference, NOT a median end-to-end job duration.');
+ const group=$('realityPublishedRepairGroups');
+ if(group){
+  group.replaceChildren();
+  for(const example of r.examples){
+   const card=document.createElement('article');
+   const label=document.createElement('p');
+   label.textContent=example.comparable_confirmed_repairs_assumed+
+    ' comparable genuine repair(s) · what-if';
+   const value=document.createElement('strong');
+   value.textContent=fmt(example.illustrative_gross_wage_equivalent_usd);
+   const detail=document.createElement('p');
+   detail.textContent=example.illustrative_human_hours+
+    ' human hours assuming the separate study medians · gross wage equivalent, NOT savings';
+   card.append(label,value,detail);group.append(card);
+  }
+ }
+}
+function renderOwnerRepairComparison(n){
+ if(!currentRepairReference)return;
+ const per=currentRepairReference.per_comparable_repair_gross_wage_equivalent_usd;
+ const rate=currentRepairReference.public_median_developer_wage_usd_per_hour;
+ const amount=n*5*rate;
+ if(!number(n)||n>30||Math.abs(per-5*rate)>0.011)return;
+ set('realityPublishedOwnerComparison',
+  'Reality owner intake: '+n+' independently tested implementation-defect candidate(s). '+
+  (n? 'If each were a distinct unresolved defect comparable to the historical study: '+
+   (n*5)+' hypothetical human hours ≈ '+fmt(amount)+
+   ' gross wage equivalent. ':'No confirmed repair candidate workload value inferred. ')+
+  'This is NOT actual time saved, cash saved, proof the fixes are still outstanding, or additional value to add to GitHub category totals. '+
+  'Missing capabilities and general upgrades are excluded from this software-fault comparison.');
 }
 function validPortfolio(d){
  const c=d?.counts,a=d?.assumptions;
@@ -88,6 +175,8 @@ function validPortfolio(d){
    d.source_pagination.pulls.items_fetched>500||
    d.source_pagination.pulls.query_scope_fully_reconciled!==
     (d.source_coverage?.pull_requests==='checked')))||
+  !validPublishedReference(d.published_repair_reference,
+    a?.public_wage_usd_per_hour)||
   a?.provenance!=='TRANSPARENT_EDITORIAL_ASSUMPTIONS_UNCALIBRATED_VERY_LOW_CONFIDENCE'||
   a.task_completion_effort_estimated!==false||
   a.source_links_do_not_prove_business_impact!==true||
@@ -190,6 +279,7 @@ function paragraph(target,value){
 }
 function providerRender(data){
  grid.replaceChildren();
+ renderPublishedReference(data.published_repair_reference);
  set('realityCategorySignalCount',String(data.counts.provider_observations));
  set('realityCategoryReviewValue',
   fmt(data.human_review_what_if.conditional_low_gross_wage_usd)+
@@ -240,6 +330,7 @@ function providerRender(data){
  }
 }
 function ownerRender(data){
+ renderOwnerRepairComparison(data.counts.verified_implementation_defects);
  set('realityCategoryOwnerCount',String(data.counts.current_candidates));
  set('realityCategoryVerifiedRepairs',
   String(data.counts.verified_implementation_defects));
