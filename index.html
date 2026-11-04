@@ -348,6 +348,16 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .simple-aspect ul{margin:3px 0 0;padding-left:21px;color:#e2edf7;font-size:14px;line-height:1.52}
 #realitySimpleHome .simple-aspect li{margin:4px 0}
 #realitySimpleHome .simple-priority{color:#b8e5d4;font-size:13px}
+#simpleArchivePanel[hidden]{display:none!important}
+body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display:none!important}
+#simpleArchivePanel .archive-head{display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap}
+#simpleArchivePanel .archive-record{background:#102235;border:1px solid #38566e;border-radius:14px;padding:15px;margin:12px 0;overflow-wrap:anywhere}
+#simpleArchivePanel .archive-record h3{font-size:16px;margin:8px 0}
+#simpleArchivePanel .archive-record p,#simpleArchivePanel .archive-note{color:#bdd2e0;font-size:13px;line-height:1.6}
+#simpleArchivePanel .archive-record a{color:#b9e4ff}
+#simpleArchivePanel .archive-section{border-top:1px solid #38566e;margin-top:23px;padding-top:20px}
+#simpleArchivePanel .archive-section h3{margin-top:0}
+@media(max-width:600px){#simpleArchivePanel .archive-head button{width:100%}}
 
 #realitySimpleHome .simple-finding a{display:inline-block;overflow-wrap:anywhere;font-size:13px;color:#a5ddff;margin-top:8px}
 #realitySimpleHome .simple-status{font-size:14px;line-height:1.5;color:#bfd3e5;margin:15px 0 0}
@@ -373,6 +383,7 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
   <button type="button" id="simpleReviewFirst" class="simple-secondary">Review first opportunity</button>
   <button type="button" id="simpleChat" class="simple-secondary">Talk to Reality</button>
   <button type="button" id="simpleViewGapCategory" class="simple-secondary">View all capability candidates</button>
+   <button type="button" id="simpleArchiveOpen" class="simple-secondary">Past Jobs &amp; Receipts</button>
  </div>
  <section id="simpleFullLoopPanel" aria-label="Run Reality full loop">
   <p id="simpleFullLoopStatus" class="simple-status" role="status" aria-live="polite">One click starts the existing real-job worker. Reality then tests, builds and verifies, requests your exact installation approval in Chat when ready, and continues to the final receipt automatically.</p>
@@ -387,6 +398,18 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
   <span class="simple-note">Research ideas aren't approved jobs. Reality must prove a missing capability before proposing installation.</span>
   <button type="button" id="simpleAdvancedToggle" class="simple-secondary" aria-expanded="false">Show full dashboard & technical controls</button>
  </div>
+
+ <section id="simpleArchivePanel" hidden aria-labelledby="archiveTitle" role="region">
+  <div class="archive-head"><div><div class="simple-kicker">READ-ONLY · HISTORICAL RECORDS</div>
+   <h2 id="archiveTitle">Past Jobs &amp; Receipts</h2>
+   <p class="archive-note">Completed jobs and verified final receipts are separated from new opportunities. Historical installations and action receipts carry their own evidence labels. Opening this archive never authorizes work.</p></div>
+   <button type="button" id="simpleArchiveClose" class="simple-secondary">Back to new opportunities</button></div>
+  <p id="archiveReadback" class="archive-note" role="status" aria-live="polite">Sign in to view saved history.</p>
+  <button type="button" id="archiveRefresh" class="simple-secondary">Refresh history · Read only</button>
+  <section class="archive-section"><h3>Original jobs &amp; verified settlements</h3><div id="archiveJobs" aria-live="polite"></div></section>
+  <section class="archive-section"><h3>Previously installed upgrades</h3><p class="archive-note">Prior installations are not current gaps or new job receipts.</p><div id="archivePriorUpgrades" aria-live="polite"></div></section>
+  <section class="archive-section"><h3>Earlier action receipts</h3><p class="archive-note">An action receipt is not proof the whole original job completed.</p><div id="archivePriorActions"></div></section>
+ </section>
 </section>
 
   <section class="business-home-actions" id="homeChatApprovalShortcut" aria-label="Reality chat and approvals">
@@ -668,7 +691,7 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
   <span id="wcCredentialResult" role="status" aria-live="polite">GitHub Issue write access has not been proven by read-only checks. Earlier attempts stay locked.</span>
  </div>
  <div class="wc-completion" id="wcCompletionCenter" role="region" aria-label="Reality end-of-work receipts">
-  <div class="wc-completion-head"><h3>Reality · Work results & ending receipts</h3>
+  <div class="wc-completion-head"><h3>Saved action receipts · Not necessarily completed jobs</h3>
    <button type="button" id="wcRefreshCompletion">Refresh saved receipts · Read only</button></div>
   <p id="wcCompletionStatus" class="wc-note" role="status" aria-live="polite">Sign in to view saved, source-backed job outcomes. Discovery is not completion.</p>
   <div id="wcCompletionList"><p class="muted">No completed-job claim has been established in this view.</p></div>
@@ -3011,7 +3034,10 @@ async function realityChatRefreshEvents(){
    container.textContent='No live governed self-repair job was returned for this account.';
    return;
   }
-  for(const j of data.jobs.slice(0,6)){
+  for(const j of data.jobs.filter(x=>
+    !(x.independently_settled===true&&x.universe_settlement_verified===true&&
+     (x.capability_id!=='reality-general-execution-receipt'||x.full_loop_independently_verified===true))&&
+    x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT').slice(0,6)){
    if(!/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')))continue;
    const bubble=document.createElement('div');bubble.className='reality-chat-progress';
    const title=document.createElement('strong');
@@ -3906,7 +3932,7 @@ async function wcLoadCompletionReports({focus=false}={}){
    '<p class="muted">No verified work results yet for this conversation.</p>';
   if(data.reports.length)await wcHydrateRecoveryCheckpoints(conv);
   if(focus&&data.reports.length&&data.reports[0].action_completed===true)
-   $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
+   $('simpleArchiveOpen').click();
  }catch{
   status.textContent='Completion receipts could not be restored. No completion claim is being made.';
   out.textContent='Reconnect and refresh the saved receipts. Do not retry any previously dispatched task.';
@@ -4286,16 +4312,10 @@ function wcGapEvidenceCards(){
    '<p><strong>Next proof:</strong> '+esc(x.next_proof)+'</p>'+
    '<p>Actual cost, time saved and ROI: NOT MEASURED. No new installation authorized.</p></article>';
  }).join('');
- const hist=wcGapHistory.slice(0,12).map(x=>
-   '<li><strong>'+esc(x.title)+'</strong> · Settled previously in isolated Preview · '+
-   '<a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Installed source</a></li>').join('');
  return '<section class="wc-market-research-brief"><strong>Capability gap pipeline · '+
   wcGapFeed.length+' tracked · '+wcGapCounts.verified_current_gaps+' proven current gaps</strong>'+
-  '<p>Four research findings, stored provider observations, independently tested candidates and actual governed jobs are separated by evidence stage. Stored evidence is not a fresh provider scan.</p>'+
-  '<p>'+esc(wcGapFeedStatus)+'</p>'+cards+
-  (wcGapHistory.length?'<details><summary>'+wcGapHistory.length+
-   ' prior completed upgrades · Not new gaps</summary><ul>'+hist+'</ul></details>':'')+
-  '</section>';
+  '<p>Past settlements and receipts are stored separately under Past Jobs &amp; Receipts.</p>'+
+  '<p>'+esc(wcGapFeedStatus)+'</p>'+cards+'</section>';
 }
 async function wcLoadGapFeed(){
  const serial=++wcGapFeedSerial;
@@ -4335,7 +4355,7 @@ async function wcLoadGapFeed(){
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
-   data.counts.historical_completed+' previous completed upgrades. No new install approved.';
+   ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.';
   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
   wcRender();
  }catch{
@@ -4361,12 +4381,14 @@ function wcRender(){
   return '<button class="wc-category" type="button" data-wc-cat="'+id+
     '" aria-pressed="'+(id===wcCurrent)+'" data-active="'+(id===wcCurrent)+'">'+
     '<strong>'+esc(label)+'</strong><span class="wc-num">'+esc(id==='upgrades'?(wcGapFeedReady?
-     wcGapFeed.length+' tracked · '+wcGapHistory.length+' completed':
+     wcGapFeed.length+' tracked':
      wcMarketReviewFindings.length+' inspected ideas · '+wcUpgradeReviews.length+' earlier reviews'):
      id==='research'?wcMarketReviewFindings.filter(f=>f.prehome_assessment?.status==='PREHOME_INSPECTED_NEEDS_INDEPENDENT_TEST').length+' assessed · '+wcMarketReviewFindings.length+' findings':String(n))+
     '</span><small>'+esc(unavailable?'Additional business source not connected':
      id==='upgrades'?'Proposed improvements · value and risks inspected · approval separate':desc)+'</small></button>';
- }).join('');
+ }).join('')+
+  '<button type="button" class="wc-category" data-archive-open="1"><strong>Past Jobs &amp; Receipts</strong><span class="wc-num">View</span>'+
+  '<small>Completed jobs · Receipts · Historical records</small></button>';
  $('wcCategories').querySelectorAll('[data-wc-cat]').forEach(b=>b.onclick=()=>{
   wcCurrent=b.dataset.wcCat;wcRender()
  });
@@ -4387,7 +4409,7 @@ function wcRender(){
  $('wcSelectedTitle').textContent=category?.[1]||'View all';
  $('wcSelectedCount').textContent=wcCurrent==='upgrades'?
   (wcGapFeedReady?wcGapFeed.length+' tracked · '+wcGapCounts.verified_current_gaps+
-   ' proven gaps · '+wcGapHistory.length+' completed':
+   ' proven gaps':
    shown.length+' findings · '+wcUpgradeReviews.length+' jobs to review'):
   wcCurrent==='research'?wcMarketReviewFindings.length+' source-backed assessments · Not executable':
   shown.length+' found';
@@ -5758,5 +5780,6 @@ setInterval(refreshSavedShiftHome,300000);
 
 </script>
 <script defer src="/one-button-full-loop-v1.js"></script>
+<script defer src="/reality-past-jobs-receipts-v1.js"></script>
 </body>
 </html>
