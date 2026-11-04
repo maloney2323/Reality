@@ -72,7 +72,7 @@ begin
   'stage',v_step.stage,'source_ref',v_step.source_ref,
   'claim_id',v_claim,'owner_id',v_shift.owner_id,
   'no_external_write_authority',true);
-end $fn$
+end $fn$;
 
 revoke all on function public.reality_claim_employee_shift_step_v1() from public,anon,authenticated;
 grant execute on function public.reality_claim_employee_shift_step_v1() to service_role;
