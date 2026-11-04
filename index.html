@@ -348,6 +348,30 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-engine-layers strong{display:block;color:#f6fbff;font-size:14px;line-height:1.42}
 #realitySimpleHome .reality-engine-layers p{font-size:11.5px;color:#b9cbdc;line-height:1.55;margin:7px 0 0}
 #realitySimpleHome .reality-engine-arrow{color:#69cae6;font-size:21px;display:flex;align-items:center;justify-content:center}
+#realitySimpleHome .reality-model-capability-map{margin:20px 0 22px;padding:18px 0;border-top:1px solid #344d63;border-bottom:1px solid #344d63}
+#realitySimpleHome .reality-capability-head{display:flex;align-items:start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+#realitySimpleHome .reality-capability-head h4{font-size:clamp(17px,3vw,20px);color:#f5fbff;margin:5px 0 7px}
+#realitySimpleHome .reality-capability-head p{color:#b1c9da;font-size:12px;line-height:1.6;margin:0;max-width:710px}
+#realitySimpleHome .reality-model-capabilities{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#realitySimpleHome .reality-model-cap-group{min-width:0;border:1px solid #38536d;border-radius:15px;padding:14px;background:linear-gradient(155deg,#102437,#0c1e2d)}
+#realitySimpleHome .reality-model-cap-group h5{color:#cff0ff;font-size:14px;line-height:1.3;margin:0 0 4px}
+#realitySimpleHome .reality-model-cap-group>p{color:#97b6ca;font-size:11.5px;line-height:1.5;margin:0 0 12px}
+#realitySimpleHome .reality-model-cap-item{border-top:1px solid #314b60;padding:11px 0 9px}
+#realitySimpleHome .reality-model-cap-item summary{display:flex;gap:11px;align-items:start;justify-content:space-between;cursor:pointer;list-style:none}
+#realitySimpleHome .reality-model-cap-item summary::-webkit-details-marker{display:none}
+#realitySimpleHome .reality-model-cap-item summary>div{min-width:0}
+#realitySimpleHome .reality-model-cap-item summary strong{display:block;font-size:13px;color:#f1f9ff;line-height:1.42}
+#realitySimpleHome .reality-model-cap-item summary small{display:block;font-size:11.5px;color:#b5cedb;line-height:1.5;margin-top:4px}
+#realitySimpleHome .reality-model-cap-item .reality-model-cap-expand{flex:0 0 auto;font-size:11px;color:#93cee4;padding-top:3px}
+#realitySimpleHome .reality-model-cap-item[open] .reality-model-cap-expand{color:#d9f5ff}
+#realitySimpleHome .reality-model-cap-item .reality-model-cap-inside{background:#0d2233;border:1px solid #2d485e;border-radius:10px;padding:11px 12px;margin:11px 0 0}
+#realitySimpleHome .reality-model-cap-item .reality-model-cap-inside p{font-size:11.5px;line-height:1.58;color:#b9cedd;margin:5px 0 8px}
+#realitySimpleHome .reality-model-cap-item .reality-model-cap-inside b{color:#d9eefb}
+#realitySimpleHome .reality-model-cap-links{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px}
+#realitySimpleHome .reality-model-cap-links a{font-size:11.5px;color:#9adcf3;text-decoration:underline}
+#realitySimpleHome .reality-model-cap-maturity{display:inline-block;margin-top:6px;color:#c0dbed;font-size:10px;letter-spacing:.02em}
+#realitySimpleHome .reality-capability-disclaimer{font-size:11.5px;color:#97b4c9;line-height:1.65;margin:15px 0 0}
+@media(max-width:680px){#realitySimpleHome .reality-model-capabilities{grid-template-columns:minmax(0,1fr)}#realitySimpleHome .reality-model-cap-group{padding:13px}}
 #realitySimpleHome .reality-engine-evidence-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:21px 0 5px}
 #realitySimpleHome .reality-engine-evidence-head h4{font-size:15px;color:#f5fbff;margin:0}
 #realitySimpleHome .reality-engine-evidence-head span{color:#9fbacf;font-size:11px}
@@ -512,6 +536,18 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
      <p>Original-work settlement and independently reconciled final receipts where the complete evidence exists.</p>
     </article>
    </div>
+   <section id="realityModelCapabilityMap" class="reality-model-capability-map" aria-labelledby="realityModelCapabilityTitle">
+    <div class="reality-capability-head">
+     <div>
+      <div class="simple-kicker">THE ABILITIES REALITY ADDS</div>
+      <h4 id="realityModelCapabilityTitle">Capabilities and governance behind the intelligence</h4>
+      <p>See exactly what Reality's software adds around an underlying model, what boundaries it enforces, and the code and tests behind those capabilities.</p>
+     </div>
+     <span class="reality-engine-qualifier">Software evidence · Not a universal certification</span>
+    </div>
+    <div class="reality-model-capabilities" id="realityModelCapabilities" aria-label="Reality implemented model-augmentation capability inventory"></div>
+    <p class="reality-capability-disclaimer">Source files and automated test suites demonstrate implemented engineering controls, not that every scenario is production-ready. Live owner-specific outcomes appear in the verified evidence section below. Capability synthesis, installation, and post-install acceptance remain governed and must be independently proven for the exact job.</p>
+   </section>
    <div class="reality-engine-evidence-head">
     <h4>What Reality can show right now</h4>
     <span>Separate evidence sets · Not a conversion funnel</span>
@@ -6053,6 +6089,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
+<script defer src="/reality-model-capability-map-v1.js"></script>
 <script defer src="/reality-backlog-value-scenario-v1.js"></script>
 <script defer src="/reality-automatic-backlog-value-v1.js"></script>
 <script defer src="/reality-category-economic-bridge-v1.js"></script>
