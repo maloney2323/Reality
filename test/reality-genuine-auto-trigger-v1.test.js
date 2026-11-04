@@ -52,3 +52,9 @@ test('signed discovery readback preserves already installed exact original witho
  assert.match(broker,/else alreadyClaimed\.push\(item\);/);
  assert.doesNotMatch(broker,/case ['"]ISOLATED_INSTALLED_PROBATION['"]:\s*queued\.push/);
 });
+
+test('installed probation is not eligible to generate a second model candidate',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/reality-genuine-capability-auto-trigger-v1.yml',import.meta.url),'utf8');
+ assert.match(workflow,/PENDING_FROZEN_REPRODUCTION','LEASED_FOR_INDEPENDENT_REPRODUCTION','FROZEN_REPRODUCED_AWAITING_CANDIDATE/);
+ assert.doesNotMatch(workflow,/build_ready=.*ISOLATED_INSTALLED_PROBATION/);
+});
