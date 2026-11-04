@@ -66,6 +66,17 @@ async function observe(){
     !Array.isArray(state.independent_final_receipts)||state.independent_final_receipts.length>12||
     state.production_changed!==false||state.external_action_performed!==false)
    throw Error('OWNER_LOOP_RECEIPTS_NOT_VERIFIED');
+  for(const job of state.jobs){
+   const k=exactFailureKey(job.source_issue_number,job.source_failed_run_id,
+    job.source_commit_sha);
+   if(k)previousOriginalFailures.add(k);
+   if(job.owner_install_approved===true&&
+      job.historical_reconciliation?.status==='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT'&&
+      job.historical_reconciliation?.independent_database_readback===true&&
+      job.historical_reconciliation?.current_job_settled===false)
+    historicalNoOpIds.add(job.original_work_id);
+  }
+  if(startedWork&&historicalNoOpIds.has(startedWork))startedWork=null;
   if(startedWork){
    const receipt=state.independent_final_receipts.find(r=>
     r.original_work_id===startedWork&&
