@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {deriveFrozenFailureSignals} from '../src/reality-genuine-auto-detect-v1.js';
 const SHA='a'.repeat(40);
 const sample=({path='test/reality-frozen-regressions/general-gap.test.js',
@@ -39,4 +40,15 @@ test('unsafe provider path, foreign source and ambiguous imports cannot be silen
   sample({path:'../../private.test.js'})]}),/FROZEN_SOURCE_INPUT_INVALID/);
  assert.throws(()=>deriveFrozenFailureSignals({repositorySha:'wrong',tests:[]}),
   /PINNED_REPOSITORY_AND_TESTS_REQUIRED/);
+});
+
+test('signed discovery readback preserves already installed exact original without re-enqueuing',()=>{
+ const broker=readFileSync(new URL('../supabase/functions/reality-genuine-capability-auto-admit/index.ts',import.meta.url),'utf8');
+ // Both the real check and its diagnostic must accept the existing
+ // probationary installation returned by the atomic queue RPC.
+ assert.match(broker,/'ISOLATED_INSTALLED_PROBATION'\]\.includes\(receipt\.phase\)/);
+ assert.match(broker,/'ISOLATED_INSTALLED_PROBATION'\]\.includes\(receipt\?\.phase\)/);
+ assert.match(broker,/if\(receipt\.phase==='PENDING_FROZEN_REPRODUCTION'\)queued\.push\(item\);/);
+ assert.match(broker,/else alreadyClaimed\.push\(item\);/);
+ assert.doesNotMatch(broker,/case ['"]ISOLATED_INSTALLED_PROBATION['"]:\s*queued\.push/);
 });
