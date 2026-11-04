@@ -1,10 +1,11 @@
 // Signed, unattended one-pass settlement repair + idempotence proof.
+// Allows only pinned-branch push or OIDC-authenticated workflow_dispatch.
 // No claimed original execution or installation is replayed.
 import {mkdirSync,writeFileSync} from 'node:fs';
 const e=process.env,fail=x=>{throw Error('REALITY_UNIVERSE_AUTO_FINALIZE_'+x)};
 const REPO='maloney2323/Reality';
 const BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
-if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_EVENT_NAME!=='push'||
+if(e.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(e.GITHUB_EVENT_NAME)||
  e.GITHUB_REPOSITORY!==REPO||e.GITHUB_REF!==BRANCH||
  !/^[a-f0-9]{40}$/.test(e.GITHUB_SHA||'')||
  !e.GH_TOKEN||!e.ACTIONS_ID_TOKEN_REQUEST_URL||!e.ACTIONS_ID_TOKEN_REQUEST_TOKEN)
