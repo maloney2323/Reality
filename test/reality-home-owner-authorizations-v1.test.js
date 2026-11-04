@@ -152,17 +152,20 @@ test('chat live work progress relies on authenticated read-only worker evidence'
  assert.doesNotMatch(method,/method:'POST'/);
 });
 
-test('saved conversation, work updates and chat approvals precede composer and settings',()=>{
+test('full-page chat prioritizes shift briefing, history, composer and exact approvals ahead of technical evidence',()=>{
  const ready=html.indexOf('<div id="privateReady"');
- const transcript=html.indexOf('id="privateTranscript"',ready);
- const progress=html.indexOf('id="realityChatActivityEntries"',transcript);
- const approvals=html.indexOf('id="realityChatApprovalInbox"',progress);
- const prompt=html.indexOf('id="privatePrompt"',approvals);
+ const briefing=html.indexOf('id="realityChatShiftBrief"',ready);
+ const transcript=html.indexOf('id="privateTranscript"',briefing);
+ const composer=html.indexOf('id="realityChatComposer"',transcript);
+ const prompt=html.indexOf('id="privatePrompt"',composer);
  const send=html.indexOf('id="privateSend"',prompt);
+ const approvals=html.indexOf('id="realityChatApprovalInbox"',send);
+ const progress=html.indexOf('id="realityChatActivityEntries"',approvals);
  const extras=html.indexOf('id="realityChatSettings"',send);
  const goal=html.indexOf('id="privateGoalText"',extras);
- assert.ok(ready>=0&&ready<transcript&&transcript<progress&&
-  progress<approvals&&approvals<prompt&&prompt<send&&send<extras&&extras<goal);
+ assert.ok(ready>=0&&ready<briefing&&briefing<transcript&&
+  transcript<composer&&composer<prompt&&prompt<send&&send<approvals&&
+  approvals<progress&&send<extras&&extras<goal);
  assert.match(inlineScript,/\$\('realityChatSettings'\)\.open=true/);
 });
 test('Business Reality money and verified value lead the customer home',()=>{
@@ -211,7 +214,9 @@ test('Reality Chat is one tap from any part of the dashboard without losing the 
  assert.match(inlineScript,/function realityCloseChatDock\(\)/);
  assert.match(inlineScript,/businessAskReality'\)\.addEventListener\('click'/);
  assert.match(inlineScript,/accountShortcut'\)\.addEventListener\('click'/);
- assert.match(inlineScript,/e.key==='Escape'/);
+ assert.match(html,/id="realityChatTab" href="\/chat"/);
+ assert.match(inlineScript,/window\.location\.assign\('\/chat'\)/);
+ assert.match(inlineScript,/window\.location\.assign\('\/'\)/);
 });
 
 test('after one approval the chat reports actual worker wake or recovery, never an invented execution',()=>{
