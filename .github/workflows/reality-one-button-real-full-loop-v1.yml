@@ -42,6 +42,10 @@ jobs:
           node --check src/reality-workday-opportunity-brief-v1.js
           node --check api/reality/workday-opportunities.js
           node --test test/reality-workday-opportunity-brief-v1.test.js
+          node --check src/reality-eight-hour-shift-plan-v1.js
+          node --check api/reality/eight-hour-employee-shift-plan.js
+          node --check reality-eight-hour-shift-plan-v1.js
+          node --test test/reality-eight-hour-shift-plan-v1.test.js
           node --check reality-economic-evidence-dashboard-v1.js
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --check reality-engine-delta-v1.js
