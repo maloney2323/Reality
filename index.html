@@ -339,6 +339,15 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-category-economics{border-top:1px solid #314256;padding:17px 0 23px;margin-top:9px}
 #realitySimpleHome .reality-category-economics h3{font-size:17px;color:#fff;margin:0 0 7px}
 #realitySimpleHome #realityCategoryEconomicsStatus{font-size:12px;line-height:1.55;color:#b8cbdc}
+#realitySimpleHome .reality-published-repair-reference{margin:17px 0 16px;padding:16px 15px;border:1px solid #476680;border-radius:15px;background:#10253a}
+#realitySimpleHome .reality-published-repair-reference h4{font-size:15px;color:#f1f8ff;margin:0 0 10px}
+#realitySimpleHome .reality-published-repair-reference .reality-econ-grid{margin-top:8px;padding:3px 0 11px}
+#realitySimpleHome .reality-published-repair-groups{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 13px}
+#realitySimpleHome .reality-published-repair-groups article{flex:1 1 115px;min-width:0;border:1px solid #3a566d;border-radius:11px;padding:10px 11px;background:#0a1a2c}
+#realitySimpleHome .reality-published-repair-groups article strong{display:block;font-size:17px;color:#f4f9ff;margin:6px 0}
+#realitySimpleHome .reality-published-repair-groups article p{font-size:11px;line-height:1.5;color:#aac3d5;margin:4px 0}
+#realitySimpleHome .reality-published-source-links{display:flex;flex-wrap:wrap;gap:13px;margin-top:14px}
+#realitySimpleHome .reality-published-source-links a{color:#b8e5ff;text-decoration:underline;font-size:12px}
 #realitySimpleHome .reality-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px;margin:14px 0}
 #realitySimpleHome .reality-category-card{min-width:0;border:1px solid #334960;background:#0e2031;border-radius:13px;padding:13px 14px}
 #realitySimpleHome .reality-category-card h4{font-size:13px;color:#f0f7fd;margin:0 0 7px}
@@ -465,6 +474,23 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <article><div class="reality-econ-label">Human review workload · What-if only</div><strong id="realityCategoryReviewValue">Unknown</strong><small>Uncalibrated gross wage equivalent, not savings</small></article>
    </div>
    <p id="realityCategoryScope" class="reality-econ-footnote">Actual task-completion value cannot be calculated from category counts. Existing verified original-job receipts remain in the technical evidence section.</p>
+   <section id="realityPublishedRepairEvidence" class="reality-published-repair-reference" aria-labelledby="realityPublishedRepairTitle">
+    <h4 id="realityPublishedRepairTitle">Published human labor benchmark · Software defect repairs</h4>
+    <p id="realityPublishedRepairStatus" class="reality-econ-footnote" role="status" aria-live="polite">Checking peer-reviewed human repair effort and public wage references…</p>
+    <div class="reality-econ-grid" aria-label="External historical software repair effort">
+     <article><div class="reality-econ-label">Historical median investigation effort</div><strong id="realityPublishedInvestigationHours">Unverified</strong></article>
+     <article><div class="reality-econ-label">Historical median implementation effort</div><strong id="realityPublishedFixHours">Unverified</strong></article>
+     <article><div class="reality-econ-label">Illustrative combined reference</div><strong id="realityPublishedCombinedHours">Unverified</strong><small>Sum of two separate medians—not a measured median total</small></article>
+     <article><div class="reality-econ-label">Wage equivalent per comparable defect</div><strong id="realityPublishedPerRepairValue">Unverified</strong><small>Gross wage equivalent—not company savings</small></article>
+    </div>
+    <div id="realityPublishedRepairGroups" class="reality-published-repair-groups" aria-live="polite"></div>
+    <p id="realityPublishedOwnerComparison" class="reality-econ-footnote">Owner's independently tested defects: awaiting verified private intake. No cost inferred.</p>
+    <p class="reality-econ-footnote">Research was based on software faults from one NASA mission, not Reality. It cannot establish the time required for upgrades, features, or every present-day repair. Complex faults can require far more labor.</p>
+    <div class="reality-published-source-links">
+     <a href="https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf" target="_blank" rel="noopener noreferrer">NASA-hosted published human-effort study</a>
+     <a href="https://www.bls.gov/news.release/ocwage.t01.htm" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics · Software developers</a>
+    </div>
+   </section>
    <div id="realityCategoryList" class="reality-category-grid" aria-live="polite"></div>
    <div class="reality-category-owner">
     <strong>Owner's previously discovered capability work</strong>
