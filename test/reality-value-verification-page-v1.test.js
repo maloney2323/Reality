@@ -50,7 +50,7 @@ test('value proof separates opportunity signals, historical assumptions and acce
  assert.match(html,/Historical benchmark models, potential revenue or avoided cost/);
  assert.match(html,/A pipeline stage is not marked complete for any specific job/);
  assert.match(html,/each observation still needs current-work qualification/);
- assert.match(html,/Verified net human capacity returned/);
+ assert.match(html,/Verified human capacity returned/);
  assert.match(html,/Not measured/);
  assert.match(html,/Review the exact original-job evidence/);
  assert.doesNotMatch(html.slice(html.indexOf('id="realityValueVerification"'),
@@ -80,6 +80,7 @@ test('Value page projects existing signed-in evidence without inventing addition
  'rvSignals','rvSettled','rvReceipts','rvCapacity','rvFindings','rvCandidates',
  'realityEconSignals','realityEconSettled','realityEconReceipts','realityEconCapacity',
  'privateReady','realityCategoryOwnerStatus',
+ 'rvPreShiftPotential','rvPreShiftNarrative','rvPreShiftReviewValue','rvPreShiftIssueHours',
  'rvOverviewSignals','rvOverviewReviewWhatIf','rvOverviewReceipts',
  'rvOpportunitySignals','rvOpportunityFindings','rvOpportunityCandidates',
  'rvPotentialReviewValue','rvPotentialIssueValue','rvPotentialHours','rvPotentialCoverage',
@@ -111,6 +112,11 @@ test('Value page projects existing signed-in evidence without inventing addition
  assert.equal(nodes.get('rvCapacity').textContent,'Not measured');
  assert.equal(nodes.get('rvFindings').textContent,'6');
  assert.equal(nodes.get('rvCandidates').textContent,'1');
+ assert.match(nodes.get('rvPreShiftPotential').textContent,/123 observations available to investigate/);
+ assert.equal(nodes.get('rvPreShiftReviewValue').textContent,'$3,890.11 – $15,560.44');
+ assert.equal(nodes.get('rvPreShiftIssueHours').textContent,'12.50 – 50.00 hrs');
+ assert.match(nodes.get('rvPreShiftNarrative').textContent,/6 separately recorded owner capability findings/);
+ assert.match(nodes.get('rvPreShiftNarrative').textContent,/No missing capabilities, projected cost savings, or human hours saved/);
  assert.equal(nodes.get('rvOverviewSignals').textContent,'123');
  assert.equal(nodes.get('rvOverviewReviewWhatIf').textContent,'$3,890.11 – $15,560.44');
  assert.equal(nodes.get('rvOverviewReceipts').textContent,'1');
@@ -259,4 +265,24 @@ test('every value tab shows significant source-backed figures immediately, witho
  assert.match(client,/financialRange/);
  assert.match(html,/No dollar range above is verified savings/);
  assert.doesNotMatch(client,/\b(?:revenue|savings)=\d+\b|97\.3% Saved/);
+});
+
+test('before any employee shift, the Value page displays potential first, grounded in existing source readings',()=>{
+ const panel=html.slice(html.indexOf('<section id="realityValueVerification"'),
+  html.indexOf('<section id="realitySimpleHome"'));
+ const firstVerification=panel.indexOf('id="rvSettled"');
+ const potentialHeadline=panel.indexOf('id="rvPreShiftPotential"');
+ const reviewRange=panel.indexOf('id="rvPreShiftReviewValue"');
+ const workHours=panel.indexOf('id="rvPreShiftIssueHours"');
+ assert.ok(potentialHeadline>0&&reviewRange>potentialHeadline&&workHours>reviewRange);
+ assert.ok(firstVerification>workHours,'potential must be above the historical jobs on mobile');
+ assert.ok(panel.indexOf('id="rvPanelResults"')>potentialHeadline);
+ for(const id of ['rvPreShiftPotential','rvPreShiftReviewValue','rvPreShiftIssueHours',
+   'rvPreShiftNarrative'])assert.equal(count(id),1);
+ assert.match(panel,/PRE-AUTOMATION OPPORTUNITY INTELLIGENCE/);
+ assert.match(panel,/POTENTIAL IDENTIFIED BEFORE AUTOMATION/);
+ assert.match(panel,/NOT savings/);
+ assert.match(client,/present\('rvPreShiftReviewValue',reviewWhatIf,'Not available'\)/);
+ assert.match(client,/present\('rvPreShiftIssueHours',assumedHours,'Not available'\)/);
+ assert.doesNotMatch(panel,/\$3,890|\$15,560|\b122\b/);
 });
