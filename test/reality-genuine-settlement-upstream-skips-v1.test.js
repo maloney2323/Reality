@@ -19,9 +19,11 @@ test('independent settlement runs after successful performed original job despit
 });
 test('normal job continuation remains gated by verified activation or recovery not unrelated approval',()=>{
  const segment=section('resume_original_job','record_independent_original_settlement');
- assert.match(segment,/needs: \[record_owner_approved_activation, record_consumed_preview_recovery\]/);
+ assert.match(segment,/needs: \[record_owner_approved_activation, recover_consumed_preview_install, record_consumed_preview_recovery, reconcile_all_settled_outcomes\]/);
  assert.match(segment,/always\(\)/);
  assert.match(segment,/needs.record_owner_approved_activation.result == 'success'/);
  assert.match(segment,/needs.record_consumed_preview_recovery.result == 'success'/);
+ assert.match(segment,/needs.reconcile_all_settled_outcomes.result == 'success'/);
+ assert.match(segment,/needs.recover_consumed_preview_install.result == 'success'/);
  assert.match(segment,/node scripts\/reality-genuine-original-resume-v1\.mjs/);
 });
