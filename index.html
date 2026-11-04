@@ -3034,7 +3034,9 @@ async function realityChatRefreshEvents(){
    container.textContent='No live governed self-repair job was returned for this account.';
    return;
   }
-  for(const j of data.jobs.filter(x=>x.independently_settled!==true&&
+  for(const j of data.jobs.filter(x=>
+    !(x.independently_settled===true&&x.universe_settlement_verified===true&&
+     (x.capability_id!=='reality-general-execution-receipt'||x.full_loop_independently_verified===true))&&
     x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT').slice(0,6)){
    if(!/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')))continue;
    const bubble=document.createElement('div');bubble.className='reality-chat-progress';
@@ -3930,7 +3932,7 @@ async function wcLoadCompletionReports({focus=false}={}){
    '<p class="muted">No verified work results yet for this conversation.</p>';
   if(data.reports.length)await wcHydrateRecoveryCheckpoints(conv);
   if(focus&&data.reports.length&&data.reports[0].action_completed===true)
-   $('wcCompletionCenter').scrollIntoView({behavior:'smooth',block:'start'});
+   $('simpleArchiveOpen').click();
  }catch{
   status.textContent='Completion receipts could not be restored. No completion claim is being made.';
   out.textContent='Reconnect and refresh the saved receipts. Do not retry any previously dispatched task.';
