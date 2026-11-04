@@ -36,6 +36,10 @@ jobs:
           node --test test/reality-one-button-real-full-loop-v1.test.js
           node --check reality-full-loop-chat-diagnostic-v1.js
           node --test test/reality-full-loop-chat-diagnostic-v1.test.js
+          node --check reality-workday-brief-v1.js
+          node --check src/reality-workday-opportunity-brief-v1.js
+          node --check api/reality/workday-opportunities.js
+          node --test test/reality-workday-opportunity-brief-v1.test.js
           node --test test/reality-capability-value-report-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js

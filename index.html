@@ -389,6 +389,15 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <p id="simpleFullLoopStatus" class="simple-status" role="status" aria-live="polite">One click starts the existing real-job worker. Reality then tests, builds and verifies, requests your exact installation approval in Chat when ready, and continues to the final receipt automatically.</p>
   <div id="simpleFullLoopReceipt" aria-live="polite"></div>
  </section>
+ <section id="simpleWorkdayBrief" aria-label="Reality proactive source-backed work discovery" style="margin:18px 0 25px;padding:18px;border:1px solid #4c6984;border-radius:16px;background:#132338">
+  <div class="simple-kicker">REALITY · AUTOMATIC WORKDAY DISCOVERY</div>
+  <h2 style="font-size:21px;margin:8px 0">Meaningful work Reality has identified for validation</h2>
+  <p class="simple-lead" style="font-size:14px">Reality inspects connected source evidence before you ask. It separates tracked issues, pending changes, and prior failures. Human investigation time and business savings are not counted without measurements.</p>
+  <p id="simpleWorkdayStatus" class="simple-status" role="status" aria-live="polite">Checking actual source-backed opportunities…</p>
+  <div id="simpleWorkdayMetrics" class="simple-bar" aria-label="Provider-backed work discovery counts"></div>
+  <div id="simpleWorkdayCandidates" class="simple-list" aria-live="polite"></div>
+  <p class="simple-note" style="margin-top:12px">These observations are not approved jobs, verified current defects, or completed shifts. The Work Center provides category details; Run Full Loop remains the separate governed execution path.</p>
+ </section>
  <div id="simpleResearchList" class="simple-list" aria-live="polite">
   <div class="simple-finding"><p>Loading completed background assessments; no new search or job will start.</p></div>
  </div>
@@ -5789,6 +5798,7 @@ setInterval(refreshSavedShiftHome,300000);
 </script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
+<script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
 </body>
 </html>
