@@ -26,7 +26,7 @@ const approvalPanel=$('realityEmployeeShiftAuthorization'),
  shiftChatHandoff=$('realityChatShiftHandoff');
 let approvedShiftId=null,lastDraft=null,observingShift=false;
 function plannedStart(){
- const time=/^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(String(start.value||'09:00'));
+ const time=/^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(String(start.value||'09:00'));
  if(!time)throw Error('SHIFT_LOCAL_TIME_INVALID');
  const local=new Date();
  local.setHours(Number(time[1]),Number(time[2]),0,0);
