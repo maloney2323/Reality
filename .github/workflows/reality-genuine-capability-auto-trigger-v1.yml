@@ -23,6 +23,7 @@ jobs:
           node --check src/reality-genuine-auto-detect-v1.js
           node --check scripts/reality-genuine-auto-trigger-v1.mjs
           node --test test/reality-genuine-auto-trigger-v1.test.js
+          node --test test/reality-original-reconciliation-barrier-v1.test.js
       - name: Discover actual missing capabilities from frozen customer acceptance tests
         run: node scripts/reality-genuine-auto-trigger-v1.mjs
       - name: Persist source-hashed discovery observations for independent owner-gap admission
@@ -426,11 +427,12 @@ jobs:
           retention-days: 14
 
   resume_original_job:
-    needs: [record_owner_approved_activation, record_consumed_preview_recovery]
-    # Wait for BOTH governed activation paths, then let the signed broker
-    # check whether a previously accepted original job can be resumed.
-    # Any upstream failure blocks continuation. Skipped paths cannot grant work.
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
+    needs: [record_owner_approved_activation, record_consumed_preview_recovery, reconcile_all_settled_outcomes]
+    # Governed repair of the Nov 4 broker 400: the historical sidecars must
+    # first receive independent, idempotent Universe reconciliation. Without
+    # this barrier an original resume races a different settlement worker.
+    # Keep both installation/activation paths and the exact owner scope.
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.reconcile_all_settled_outcomes.result == 'success' && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
     permissions:
       contents: read
       actions: read
@@ -675,8 +677,9 @@ jobs:
           retention-days: 30
 
   reconcile_all_settled_outcomes:
-    # Runs independently of discovery failures, without any replay or owner click.
-    if: github.event_name == 'push'
+    # Signed isolation-only preflight for push AND trusted worker_dispatch.
+    # It reconciles only already-settled work, never reinstalls or reclaims.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       actions: read
