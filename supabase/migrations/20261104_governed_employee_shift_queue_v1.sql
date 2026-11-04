@@ -225,17 +225,28 @@ begin
  if jsonb_typeof(p_proof)<>'object' or
     (p_proof->>'read_only')::boolean is distinct from true or
     (p_proof->>'production_changed')::boolean is distinct from false or
-    (p_proof->>'provider_checked')::boolean is distinct from true
+    ((p_proof->>'provider_checked')::boolean is distinct from true and
+     not (p_step_index between 2 and 5 and v_row.source_ref is null and
+     p_proof->>'kind'='NO_SOURCE_AVAILABLE' and
+     p_proof->>'provider_status'='UNASSIGNED_NO_SOURCE' and
+     (p_proof->>'source_available')::boolean is distinct from true))
    then raise exception 'SHIFT_PROVIDER_PROOF_INVALID';end if;
  if p_step_index=1 then
   if p_proof->>'kind'<>'ORIGINAL_LEDGER_READBACK' or
      (p_proof->>'owner_scope_verified')::boolean is distinct from true
    then raise exception 'SHIFT_PREFLIGHT_PROOF_INVALID';end if;
  elsif p_step_index between 2 and 5 then
-  if p_proof->>'kind'<>'GITHUB_SOURCE_READBACK' or
-   p_proof->>'source_url' is distinct from v_row.source_ref or
-   p_proof->>'provider_status' not in ('OPEN_ISSUE','OPEN_PULL_REQUEST','CLOSED','NOT_FOUND','FAILED_WORKFLOW','COMPLETED_WORKFLOW')
-  then raise exception 'SHIFT_SOURCE_PROOF_MISMATCH';end if;
+  if v_row.source_ref is null then
+   if p_proof->>'kind'<>'NO_SOURCE_AVAILABLE' or
+      p_proof->>'provider_status'<>'UNASSIGNED_NO_SOURCE' or
+      (p_proof->>'source_available')::boolean is distinct from false
+     then raise exception 'SHIFT_UNASSIGNED_SOURCE_PROOF_INVALID';end if;
+  elsif p_proof->>'kind'<>'GITHUB_SOURCE_READBACK' or
+     p_proof->>'source_url' is distinct from v_row.source_ref or
+     p_proof->>'provider_status' not in
+     ('OPEN_ISSUE','OPEN_PULL_REQUEST','CLOSED','NOT_FOUND',
+      'FAILED_WORKFLOW','COMPLETED_WORKFLOW')
+   then raise exception 'SHIFT_SOURCE_PROOF_MISMATCH';end if;
  else raise exception 'SHIFT_WRITER_NOT_PERMITTED';end if;
  v_sha:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
   pg_catalog.convert_to(p_proof::text,'UTF8')),'hex');
