@@ -30,7 +30,7 @@ export function shiftDatabase(env=process.env){
  return db;
 }
 export async function shiftRpc(db,rpc,payload,{fetchImpl=fetch}={}){
- if(!/^reality_(?:authorize_employee_shift_v1|read_owner_employee_shifts_v1|claim_employee_shift_step_v1|settle_employee_shift_step_v1|close_employee_shift_v1|read_owner_final_receipts_v1|read_owner_genuine_loop_v1|read_owner_qualified_capabilities_v1)$/.test(rpc))
+ if(!/^reality_(?:authorize_employee_shift_v1|read_owner_employee_shifts_v1|claim_employee_shift_step_v1|settle_employee_shift_step_v1|close_employee_shift_v1|reconcile_employee_shift_original_v1|read_owner_final_receipts_v1|read_owner_genuine_loop_v1|read_owner_qualified_capabilities_v1)$/.test(rpc))
   throw Error('SHIFT_RPC_NOT_ALLOWLISTED');
  const r=await fetchImpl(db.url+'/rest/v1/rpc/'+rpc,{
   method:'POST',redirect:'error',cache:'no-store',
@@ -56,10 +56,10 @@ export function assertShiftReadback(x){
   x.production_changed!==false||x.verified_human_hours_saved!==null||
   !Array.isArray(x.shifts)||x.shifts.length>5||
   x.shifts.some(s=>!UUID.test(s.shift_id)||!/^sha256:[a-f0-9]{64}$/.test(s.plan_fingerprint)||
-    !['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK','ENDED_WITH_BLOCKED_WORK','ENDED_READ_ONLY','ESCALATED'].includes(s.status)||
+    !['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK','ENDED_WITH_BLOCKED_WORK','ENDED_WITH_VERIFIED_JOB','ENDED_READ_ONLY','ESCALATED'].includes(s.status)||
     !Array.isArray(s.steps)||s.steps.length!==8||
     s.steps.some((t,i)=>t.step_index!==i+1||
-     !['QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','BLOCKED_PROVIDER','REPORTED'].includes(t.state)||
+     !['QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','ORIGINAL_JOB_RECEIPT_VERIFIED','BLOCKED_PROVIDER','REPORTED'].includes(t.state)||
      (t.proof_sha256!=null&&!/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256)))))
   throw Error('SHIFT_INDEPENDENT_READBACK_INVALID');
  return x;
