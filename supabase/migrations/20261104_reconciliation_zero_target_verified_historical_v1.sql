@@ -2,6 +2,7 @@
 CREATE OR REPLACE FUNCTION public.reality_read_genuine_reconciliation_target_v1(p_repairing_trigger_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
+ SECURITY INVOKER
  SET search_path TO ''
 AS $function$
 declare repair reality_internal.genuine_capability_queue_v1%rowtype;
@@ -432,3 +433,9 @@ end $function$
     'head_lineage_hash',tail.lineage_hash,'verified_completion_events','[]'::jsonb),
   'production_changed',false);
 end $function$
+
+-- Explicitly preserve the trusted service-only readback boundary.
+revoke all on function public.reality_read_genuine_reconciliation_target_v1(uuid)
+ from public,anon,authenticated;
+grant execute on function public.reality_read_genuine_reconciliation_target_v1(uuid)
+ to service_role;
