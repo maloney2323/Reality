@@ -82,7 +82,7 @@ test('owner can see exact checked work and what happens next, but no fabricated 
 test('shift cannot treat installation approval or blocked work as completed shift',()=>{
  const ss=steps();ss[5]={...ss[5],state:'AWAITING_EXACT_WORK'};
  const pending=buildRealityShiftConversationBrief([shift('AWAITING_EXACT_ORIGINAL_WORK',ss)],[],new Date('2026-11-05T13:20:00.000Z'));
- assert.match(pending.current,/original-job action awaits authorization; other scheduled read-only checks may continue/);
+ assert.match(pending.current,/original-job action awaits independent qualification or authorization/);
  assert.match(pending.next,/independently qualify/);
  assert.equal(pending.approval_pending,false);
  assert.equal(pending.verified_human_hours_saved,null);
