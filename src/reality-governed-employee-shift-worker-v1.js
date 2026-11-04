@@ -70,7 +70,8 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
   throw Error('SHIFT_FINAL_RECEIPT_RECONCILIATION_UNTRUSTED');
  const claimed=await shiftRpc(db,'reality_claim_employee_shift_step_v1',{}, {fetchImpl});
  if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP','INFLIGHT_LEASE_UNEXPIRED',
-   'LEASE_EXHAUSTED_ESCALATED','SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
+   'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
+   'SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
    'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status))
   return {ok:true,status:claimed.status,
    shift_id:claimed.shift_id||null,
