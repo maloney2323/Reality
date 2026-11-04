@@ -336,6 +336,38 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-econ-label{font-size:13px;line-height:1.45;font-weight:650;color:#b4c8da}
 #realitySimpleHome .reality-econ-grid strong{font-size:clamp(19px,4vw,32px);font-weight:750;color:#fff;line-height:1.2;overflow-wrap:anywhere}
 #realitySimpleHome .reality-econ-grid small{font-size:11px;line-height:1.5;color:#9cb2c8}
+#realitySimpleHome .reality-engine-delta{padding:20px 0 22px;border-top:1px solid #31465d;border-bottom:1px solid #31465d;margin:4px 0 17px;color:#e9f3fc}
+#realitySimpleHome .reality-engine-head{display:flex;align-items:start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+#realitySimpleHome .reality-engine-head h3{font-size:clamp(19px,3.3vw,24px);line-height:1.25;color:#fff;margin:6px 0 9px}
+#realitySimpleHome .reality-engine-head p{font-size:13px;line-height:1.55;color:#bbcede;max-width:760px;margin:0 0 16px}
+#realitySimpleHome .reality-engine-qualifier{border:1px solid #42627d;background:#11283d;color:#c4e6f7;font-size:11px;padding:7px 10px;border-radius:100px}
+#realitySimpleHome .reality-engine-layers{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1.2fr) 18px minmax(0,1fr);gap:8px;align-items:stretch}
+#realitySimpleHome .reality-engine-layers article{min-width:0;border:1px solid #38516a;background:linear-gradient(145deg,#0d1e30,#14263a);padding:14px 13px;border-radius:13px}
+#realitySimpleHome .reality-engine-layers .reality-engine-focus{border-color:#4c93aa;background:linear-gradient(150deg,#10344a,#122739)}
+#realitySimpleHome .reality-engine-step{display:block;color:#9fcce2;font-size:10px;font-weight:750;letter-spacing:.035em;margin-bottom:9px}
+#realitySimpleHome .reality-engine-layers strong{display:block;color:#f6fbff;font-size:14px;line-height:1.42}
+#realitySimpleHome .reality-engine-layers p{font-size:11.5px;color:#b9cbdc;line-height:1.55;margin:7px 0 0}
+#realitySimpleHome .reality-engine-arrow{color:#69cae6;font-size:21px;display:flex;align-items:center;justify-content:center}
+#realitySimpleHome .reality-engine-evidence-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:21px 0 5px}
+#realitySimpleHome .reality-engine-evidence-head h4{font-size:15px;color:#f5fbff;margin:0}
+#realitySimpleHome .reality-engine-evidence-head span{color:#9fbacf;font-size:11px}
+#realitySimpleHome #realityEngineDeltaStatus{font-size:12px;color:#abc4d6;line-height:1.5;margin:7px 0 11px}
+#realitySimpleHome .reality-engine-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#realitySimpleHome .reality-engine-metrics article{background:#0b2030;border:1px solid #304f66;border-radius:12px;padding:13px 11px;display:flex;min-width:0;flex-direction:column;gap:8px}
+#realitySimpleHome .reality-engine-metrics span{font-size:12px;color:#b6d0df;line-height:1.45}
+#realitySimpleHome .reality-engine-metrics strong{font-size:clamp(22px,3.4vw,30px);font-weight:750;color:#fff}
+#realitySimpleHome .reality-engine-metrics small{font-size:10.5px;line-height:1.5;color:#99b6c9}
+#realitySimpleHome .reality-engine-pillars{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:14px 0}
+#realitySimpleHome .reality-engine-pillars article{min-width:0;border-left:2px solid #53a9c5;padding:8px 11px;background:#102235}
+#realitySimpleHome .reality-engine-pillars strong{color:#e8f7ff;font-size:12px}
+#realitySimpleHome .reality-engine-pillars p{color:#a9c4d6;font-size:11.5px;line-height:1.5;margin:5px 0 0}
+#realitySimpleHome .reality-engine-foot{border-top:1px solid #345067;padding-top:12px}
+#realitySimpleHome .reality-engine-foot p{font-size:11.5px;line-height:1.65;color:#a9c3d6;margin:6px 0}
+#realitySimpleHome .reality-engine-foot strong{color:#d7edf9}
+#realitySimpleHome .reality-engine-links{display:flex;gap:10px 18px;flex-wrap:wrap;margin-top:12px}
+#realitySimpleHome .reality-engine-links a{font-size:12px;color:#9cddf8;text-decoration:underline}
+@media(max-width:700px){#realitySimpleHome .reality-engine-layers{grid-template-columns:minmax(0,1fr);gap:7px}#realitySimpleHome .reality-engine-arrow{height:14px;transform:rotate(90deg)}#realitySimpleHome .reality-engine-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:360px){#realitySimpleHome .reality-engine-metrics{grid-template-columns:minmax(0,1fr)}#realitySimpleHome .reality-engine-pillars{grid-template-columns:minmax(0,1fr)}}
 #realitySimpleHome .reality-category-economics{border-top:1px solid #314256;padding:17px 0 23px;margin-top:9px}
 #realitySimpleHome .reality-category-economics h3{font-size:17px;color:#fff;margin:0 0 7px}
 #realitySimpleHome #realityCategoryEconomicsStatus{font-size:12px;line-height:1.55;color:#b8cbdc}
@@ -452,6 +484,77 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <article><div class="reality-econ-label">Comparable human effort</div><strong id="realityEconHuman">Not measured</strong><small>Independent task-level baseline required</small></article>
    <article><div class="reality-econ-label">Verified net capacity returned</div><strong id="realityEconCapacity">Not measured</strong><small>Cannot infer labor saved from runtime</small></article>
   </div>
+  <section id="realityEngineDelta" class="reality-engine-delta" aria-labelledby="realityEngineDeltaTitle">
+   <div class="reality-engine-head">
+    <div>
+     <div class="simple-kicker">REALITY · ENGINE DELTA</div>
+     <h3 id="realityEngineDeltaTitle">OpenAI intelligence. Reality operational control.</h3>
+     <p>Foundation models provide reasoning. Reality is built to carry that intelligence through governed work, independent testing, continuity, and proof of results.</p>
+    </div>
+    <span class="reality-engine-qualifier">Architecture + actual evidence</span>
+   </div>
+   <div class="reality-engine-layers" aria-label="What Reality adds around OpenAI">
+    <article>
+     <span class="reality-engine-step">01 · FOUNDATION INTELLIGENCE</span>
+     <strong>Reason, generate, investigate</strong>
+     <p>OpenAI supplies language understanding, reasoning, code generation, and tool-oriented intelligence.</p>
+    </article>
+    <div class="reality-engine-arrow" aria-hidden="true">→</div>
+    <article class="reality-engine-focus">
+     <span class="reality-engine-step">02 · REALITY CONTROL PLANE</span>
+     <strong>Remember, govern, test, recover</strong>
+     <p>Durable work identity, source-linked discovery, authority boundaries, independent acceptance, and original-job continuity.</p>
+    </article>
+    <div class="reality-engine-arrow" aria-hidden="true">→</div>
+    <article>
+     <span class="reality-engine-step">03 · VERIFIED CUSTOMER OUTCOME</span>
+     <strong>Inspect what actually happened</strong>
+     <p>Original-work settlement and independently reconciled final receipts where the complete evidence exists.</p>
+    </article>
+   </div>
+   <div class="reality-engine-evidence-head">
+    <h4>What Reality can show right now</h4>
+    <span>Separate evidence sets · Not a conversion funnel</span>
+   </div>
+   <p id="realityEngineDeltaStatus" role="status" aria-live="polite">Sign in to see the current evidence behind Reality's operational intelligence.</p>
+   <div class="reality-engine-metrics" aria-label="Owner-scoped control plane evidence">
+    <article>
+     <span>Observed source signals</span>
+     <strong id="realityEngineSignals">—</strong>
+     <small id="realityEngineSignalsNote">Provider observations · not verified defects</small>
+    </article>
+    <article>
+     <span>Owner capability findings</span>
+     <strong id="realityEngineOwnerFindings">—</strong>
+     <small>Persistent owner scope · may overlap provider records</small>
+    </article>
+    <article>
+     <span>Independently tested repair candidates</span>
+     <strong id="realityEngineTestedRepairs">—</strong>
+     <small>Isolated proof · not necessarily installed</small>
+    </article>
+    <article>
+     <span>Independently reconciled final receipts</span>
+     <strong id="realityEngineFinalReceipts">—</strong>
+     <small>Exact original-job matching · isolated evidence</small>
+    </article>
+   </div>
+   <div class="reality-engine-pillars">
+    <article><strong>Evidence-bound discovery</strong><p>Observations need a verified current gap before being actionable.</p></article>
+    <article><strong>Governed installation</strong><p>An inspected proposal is never permission to install or change production.</p></article>
+    <article><strong>Independent testing</strong><p>Frozen acceptance evidence must establish the repair before owner review.</p></article>
+    <article><strong>Continuity and settlement</strong><p>Technical completion and a matching independent final receipt remain separate.</p></article>
+   </div>
+   <div class="reality-engine-foot">
+    <p><strong>What makes the difference:</strong> a continuous operational system around the model, not a claim that a model cannot use tools. OpenAI is the intelligence layer; Reality adds the governed business execution architecture.</p>
+    <p>Live facts are read-only and owner scoped. Zero failures, full autonomous readiness, 100% safety, and verified cash savings are <strong>not claimed</strong> without measurement. <span id="realityEngineDeltaProofNote">Evidence links appear after verified readback.</span></p>
+    <div class="reality-engine-links">
+     <a href="#realityCategoryEconomics">Examine source-backed discoveries</a>
+     <a href="#realityEconWorkHistory">Inspect original jobs and receipts</a>
+     <span id="realityEngineReceiptLink"></span>
+    </div>
+   </div>
+  </section>
   <section id="realityCategoryEconomics" class="reality-category-economics" aria-labelledby="realityCategoryEconomicsTitle">
    <div class="reality-econ-backlog-head">
     <h3 id="realityCategoryEconomicsTitle">Value opportunities Reality already discovered</h3>
@@ -5949,6 +6052,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
+<script defer src="/reality-engine-delta-v1.js"></script>
 <script defer src="/reality-backlog-value-scenario-v1.js"></script>
 <script defer src="/reality-automatic-backlog-value-v1.js"></script>
 <script defer src="/reality-category-economic-bridge-v1.js"></script>
