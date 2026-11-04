@@ -65,7 +65,7 @@ window.realityHandoffFullLoopFailure=async function(detail){
   'Do not assume a missing capability, claim a repair, create work, change a goal or authorize installation.',
   'A separate read-only governed discovery audit was requested. Its outcome is not yet verified here.',
   'If new code or execution authority is needed, it must go through Reality’s exact governed worker and Chat approval gate.'
- ].join('\\n');
+ ].join('\n');
  const chatPromise=(async()=>{
   try{
    const r=await fetch('/api/reality/personal-chat',{
