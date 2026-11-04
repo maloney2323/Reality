@@ -9,6 +9,8 @@ import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
 import {readVerifiedEmployeeShiftForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
+import {readVerifiedIndependentWorkerForChat}
+ from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
@@ -133,10 +135,11 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
-   readVerifiedEmployeeShiftForChat({session,message:text,db:isolated})
+   readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
+   readVerifiedIndependentWorkerForChat({session,message:text,db:isolated})
   ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
@@ -147,7 +150,8 @@ export default async function handler(req,res){
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
     connected_world_observations:[
-     ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations
+     ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
+     ...workerWakeObservations
     ],
     action_authorized:false,execution_authorized:false,
    },
