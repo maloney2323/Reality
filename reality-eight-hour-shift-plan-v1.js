@@ -115,8 +115,8 @@ if(approvalButton)approvalButton.onclick=async()=>{
   lastDraft=null;approvalButton.hidden=true;
  }finally{approvalButton.disabled=false}
 };
-if(start)start.addEventListener('change',()=>{if(lastDraft)refreshScope()});
-setInterval(()=>{if(approvedShiftId)void observeShift()},30000);
+if(typeof start?.addEventListener==='function')start.addEventListener('change',()=>{if(lastDraft)refreshScope()});
+if(typeof setInterval==='function')setInterval(()=>{if(approvedShiftId)void observeShift()},30000);
 
 const expected=[45,60,60,60,60,90,60,45];
 const valid=x=>Number.isSafeInteger(x)&&x>=0;
