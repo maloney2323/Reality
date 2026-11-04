@@ -177,3 +177,18 @@ test('fake discovery verification claims are rejected and no claimed savings app
  assert.equal(f.elements.realityEconSettled.textContent,'1');
  assert.equal(f.elements.realityEconHuman.textContent,'Not measured');
 });
+
+test('isolated database phase without matching independent flags cannot be displayed as verified settlement',async()=>{
+ const incomplete=loop();
+ incomplete.jobs[0].independently_settled=false;
+ incomplete.jobs[0].universe_settlement_verified=false;
+ incomplete.jobs[0].full_loop_independently_verified=false;
+ const f=fixture({routes:{'/api/reality/personal-genuine-loop-status':incomplete}});
+ await f.flush();
+ assert.equal(f.elements.realityEconReceipts.textContent,'0 independently reconciled');
+ const detail=f.elements.realityEconWorkHistory.children[0].children[1].textContent;
+ assert.match(detail,/Ledger phase settled in isolation/);
+ assert.match(detail,/independent completion not verified/);
+ assert.doesNotMatch(detail,/Independently settled/);
+ assert.doesNotMatch(detail,/Unsettled · SETTLED ISOLATED/);
+});

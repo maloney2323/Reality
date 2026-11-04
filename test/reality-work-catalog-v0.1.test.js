@@ -182,3 +182,58 @@ test('GitHub commits are explicitly a bounded recent-history window, never outst
  assert.equal(read.source_scan.recent_history_is_not_outstanding_work,true);
  assert.equal(read.source_scan.complete,false);
 });
+
+test('stale PR stewardship follow-ups do not become recurring CI failures or duplicate PR backlog',async()=>{
+ const steward=async()=>({work:[
+  {kind:'FOLLOW_UP',work_key:'stale-pr:152',
+   work_id:'work:'+'a'.repeat(32),
+   objective:'Review stale pull request #152',
+   evidence_refs:[root+'/pull/152'],authorization_required:false},
+  {kind:'FOLLOW_UP',work_key:'stale-pr:154',
+   work_id:'work:'+'b'.repeat(32),
+   objective:'Review stale pull request #154',
+   evidence_refs:[root+'/pull/154'],authorization_required:false},
+  {kind:'SYSTEM_MAINTENANCE',
+   work_key:'workflow-failure:Reality acceptance CI',
+   work_id:'work:'+'c'.repeat(32),
+   objective:'Investigate repeated Reality acceptance CI failures',
+   evidence_refs:[root+'/actions/runs/9001'],
+   authorization_required:true},
+ ]});
+ const readCatalog=async kind=>{
+  if(kind==='issues')return [];
+  if(kind==='commits')return [];
+  if(kind==='pulls')return [
+   {number:152,title:'Owner review: exact estimate gate',
+    html_url:root+'/pull/152'},
+   {number:154,title:'Historical repair follow-up',
+    html_url:root+'/pull/154',draft:true}];
+  throw Error('not allowlisted');
+ };
+ const result=await buildRealityWorkCatalog({steward,readCatalog});
+ const failures=result.items.filter(i=>i.finding_type==='RECURRING_FAILURE');
+ const prs=result.items.filter(i=>i.finding_type==='OPEN_PULL_REQUEST');
+ assert.equal(result.status,'OBSERVED');
+ assert.equal(failures.length,1);
+ assert.equal(prs.length,2);
+ assert.equal(result.total_findings,3);
+ assert.equal(failures[0].source,'github_actions');
+ assert.deepEqual(failures[0].evidence_refs,[root+'/actions/runs/9001']);
+ assert.ok(prs.every(x=>x.source==='github_pull_requests'));
+ assert.equal(result.items.filter(x=>x.title.includes('stale pull request')).length,0);
+ assert.equal(result.authority,'NONE_GRANTED');
+ assert.equal(result.execution_enabled,false);
+});
+test('a stale PR with a fabricated Actions link never becomes an authenticated recurring failure',async()=>{
+ const result=await buildRealityWorkCatalog({
+  steward:async()=>({work:[{
+   kind:'FOLLOW_UP',work_key:'stale-pr:150',
+   work_id:'work:'+'a'.repeat(32),
+   objective:'Review stale pull request #150',
+   evidence_refs:[root+'/actions/runs/9876']
+  }]}),
+  readCatalog:async()=>[]
+ });
+ assert.equal(result.items.filter(x=>x.finding_type==='RECURRING_FAILURE').length,0);
+ assert.equal(result.total_findings,0);
+});
