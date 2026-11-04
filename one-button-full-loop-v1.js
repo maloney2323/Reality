@@ -42,7 +42,11 @@ async function write(path,body){
  return result;
 }
 function activeJob(j){
- return exactWork(j?.original_work_id)&&typeof j.phase==='string'&&
+ return exactWork(j?.original_work_id)&&
+  !(j?.historical_reconciliation?.status==='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT'&&
+    j?.historical_reconciliation?.independent_database_readback===true&&
+    j?.historical_reconciliation?.current_job_settled===false)&&
+  typeof j.phase==='string'&&
   !['SETTLED_ISOLATED','SETTLED','ESCALATED','CANCELLED','REJECTED'].includes(j.phase)&&
   j.independently_settled!==true;
 }
