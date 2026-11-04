@@ -97,7 +97,7 @@ test('browser renders only independently checked source observations; adversaria
  fetch:async(path,opts)=>{calls++;
   assert.equal(path,'/api/reality/workday-opportunities');
   assert.equal(opts.method,'GET');
-  return {ok:true,json:async()=>valid}};
+  return {ok:true,json:async()=>valid};}
  };
  vm.runInNewContext(browser,sandbox);
  await new Promise(resolve=>setImmediate(resolve));
