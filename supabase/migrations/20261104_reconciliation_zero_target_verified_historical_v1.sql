@@ -216,7 +216,7 @@ begin
     'original_event_in_chain_verified',true,
     'head_lineage_hash',tail.lineage_hash,'verified_completion_events','[]'::jsonb),
   'production_changed',false);
-end $function$
+end $function$;
 
 revoke all on function public.reality_read_genuine_reconciliation_target_v1(uuid)
  from public,anon,authenticated;
