@@ -64,7 +64,8 @@ export function projectBacklogLaborScenario({brief,assumptions}={}){
    seen.has(record.finding_id)||!byId.has(record.finding_id)||
    !whole(record.assumed_discovery_minutes,4800)||
    !whole(record.assumed_execution_minutes,4800)||
-   (record.assumed_discovery_minutes===0&&record.assumed_execution_minutes===0))
+   (record.assumed_discovery_minutes===0&&record.assumed_execution_minutes===0)||
+   record.assumed_discovery_minutes+record.assumed_execution_minutes>4800)
    fail('LABOR_ASSUMPTION_INVALID_OR_NOT_SOURCE_BOUND');
   seen.add(record.finding_id);
   const item=byId.get(record.finding_id);
