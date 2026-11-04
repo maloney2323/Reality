@@ -116,8 +116,15 @@ export async function buildRealityWorkCatalog({
    recent_history_is_not_outstanding_work:true
   });
   for(const w of s.work||[]){
+   // Stewardship reports BOTH real recurring workflow failures and stale PR
+   // review follow-ups. A stale PR is already represented by the paginated
+   // open-PR census; it is NOT another failed CI execution or separate job.
+   // Admit a failure only from the explicit workflow recurrence identity.
+   if(w.kind!=='SYSTEM_MAINTENANCE'||
+     typeof w.work_key!=='string'||
+     !w.work_key.startsWith('workflow-failure:'))continue;
    const urls=(w.evidence_refs||[]).filter(x=>typeof x==='string'&&
-    x.startsWith(BASE+'/'));
+    /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(x));
    if(!urls.length)continue;
    findings.push({
     finding_id:id('steward',w.work_key),kind:'SYSTEM_MAINTENANCE',
