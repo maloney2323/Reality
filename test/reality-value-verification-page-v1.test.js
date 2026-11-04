@@ -18,6 +18,17 @@ test('Value Verification is a real, standalone, direct-linkable tab',()=>{
  assert.match(html,/<a href="\/value">View detailed business evidence<\/a>/);
  assert.match(html,/href="\/chat">Ask Reality about this evidence/);
 });
+test('mobile and desktop Value page cannot be concealed by legacy Home-only CSS',()=>{
+ const css=html.match(/<style>([\\s\\S]*?)<\\/style>/)?.[1]||'';
+ const legacy='body.reality-simple-home:not(.reality-details-open) main >';
+ assert.ok(!css.includes(legacy),'legacy selector hides the entire /value page when Home details are collapsed');
+ assert.ok(css.includes('body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) main >'));
+ assert.ok(css.includes('body[data-reality-route="value"] main > #realityValueVerification{display:block!important}'));
+ assert.ok(css.includes('body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification){display:none!important}'));
+ assert.match(html,/const realityIsValuePage=\(\)=>\/\^\\\/value/);
+ assert.match(html,/document\.body\.dataset\.realityRoute=realityIsChatPage\(\)\?'chat':realityIsValuePage\(\)\?'value':'home'/);
+ assert.match(html,/@media\(max-width:600px\)/);
+});
 test('source IDs remain single-owner; no duplicated receipts, models or value widgets',()=>{
  for(const id of ['realityEconSignals','realityEconSettled','realityEconReceipts',
   'realityEconCapacity','realityPublishedRepairEvidence','realityHomeCategories',
