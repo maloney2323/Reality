@@ -337,6 +337,13 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-econ-grid strong{font-size:clamp(19px,4vw,32px);font-weight:750;color:#fff;line-height:1.2;overflow-wrap:anywhere}
 #realitySimpleHome .reality-econ-grid small{font-size:11px;line-height:1.5;color:#9cb2c8}
 #realitySimpleHome .reality-econ-backlog{border-top:1px solid #314256;padding:15px 0 17px}
+#realitySimpleHome .reality-auto-backlog{background:#0d2233;border:1px solid #355c70;border-radius:14px;padding:13px 14px;margin:12px 0 16px}
+#realitySimpleHome .reality-auto-heading{display:flex;gap:9px;justify-content:space-between;align-items:start;flex-wrap:wrap}
+#realitySimpleHome .reality-auto-heading strong{font-size:14px;color:#f6fbff}
+#realitySimpleHome .reality-auto-heading small{font-size:11px;color:#a2c1d2}
+#realitySimpleHome .reality-auto-source-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+#realitySimpleHome .reality-auto-source-links a{font-size:12px;color:#bde4ff;text-decoration:underline}
+#realitySimpleHome .reality-auto-backlog .reality-econ-grid{padding-bottom:2px}
 #realitySimpleHome .reality-econ-backlog-head{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:9px}
 #realitySimpleHome .reality-econ-backlog h3{font-size:17px;color:#fff;margin:0 0 8px}
 #realitySimpleHome #realityBacklogValueStatus{font-size:12px;color:#b2c7db;margin:8px 0}
@@ -436,6 +443,28 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <span class="reality-econ-scope">Illustrative · Not verified savings</span>
    </div>
    <p id="realityBacklogValueStatus" role="status" aria-live="polite">Checking source-linked open issues and labor benchmark…</p>
+   <div id="realityAutoBacklogComparison" class="reality-auto-backlog" aria-label="Automatic labor planning scenario, uncalibrated">
+    <div class="reality-auto-heading">
+     <strong>Automatic conditional planning range</strong>
+     <small>Uncalibrated · Not expected savings</small>
+    </div>
+    <div class="reality-econ-grid">
+     <article><div class="reality-econ-label">Gross wage equivalent · What-if range</div>
+      <strong id="realityAutoBacklogDollars">Unknown</strong>
+      <small>Not projected business savings or daily revenue</small></article>
+     <article><div class="reality-econ-label">Human work hours · What-if range</div>
+      <strong id="realityAutoBacklogHours">Unknown</strong>
+      <small>Unmeasured time assumptions for open issues only</small></article>
+     <article><div class="reality-econ-label">Distinct open issues modeled</div>
+      <strong id="realityAutoBacklogCount">Unknown</strong>
+      <small>Explicit parent objectives excluded when linked</small></article>
+     <article><div class="reality-econ-label">Human benchmarks independently calibrated</div>
+      <strong id="realityAutoBacklogCalibrated">Not verified</strong>
+      <small>Zero accepted means zero measured in this model, not none anywhere</small></article>
+    </div>
+    <p id="realityAutoBacklogExplanation" class="reality-econ-footnote" aria-live="polite">Checking live issue links and human labor benchmark…</p>
+    <div id="realityAutoBacklogSourceLinks" class="reality-auto-source-links"></div>
+   </div>
    <div class="reality-econ-grid" aria-label="Assumption-based backlog labor scenario">
     <article><div class="reality-econ-label">Potential discovery labor equivalent</div><strong id="realityBacklogDiscoveryValue">Not estimated</strong><small>Owner-estimated hours to find and assess work</small></article>
     <article><div class="reality-econ-label">Potential execution labor equivalent</div><strong id="realityBacklogExecutionValue">Not estimated</strong><small>Owner-estimated hours to finish the work</small></article>
@@ -5886,6 +5915,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-backlog-value-scenario-v1.js"></script>
+<script defer src="/reality-automatic-backlog-value-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
 </body>
 </html>
