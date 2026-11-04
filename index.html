@@ -405,6 +405,21 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-engine-links a{font-size:12px;color:#9cddf8;text-decoration:underline}
 @media(max-width:700px){#realitySimpleHome .reality-engine-layers{grid-template-columns:minmax(0,1fr);gap:7px}#realitySimpleHome .reality-engine-arrow{height:14px;transform:rotate(90deg)}#realitySimpleHome .reality-engine-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:360px){#realitySimpleHome .reality-engine-metrics{grid-template-columns:minmax(0,1fr)}#realitySimpleHome .reality-engine-pillars{grid-template-columns:minmax(0,1fr)}}
+#realitySimpleHome .reality-employee-shift-planner{margin:13px 0 16px;padding:17px;border:1px solid #476785;border-radius:16px;background:#102338;color:#eaf2fc}
+#realitySimpleHome .reality-employee-shift-planner h3{font-size:19px;margin:5px 0 8px}
+#realitySimpleHome .reality-employee-shift-planner p{font-size:12px;line-height:1.65;color:#bed0e2}
+#realitySimpleHome .reality-employee-shift-inputs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#realitySimpleHome .reality-employee-shift-inputs label{font-size:12px;color:#d7e5f4}
+#realitySimpleHome .reality-employee-shift-inputs input{display:block;margin-top:6px;padding:10px;color:#eaf2fc;background:#0e1c2c;border:1px solid #45617b;border-radius:10px}
+#realitySimpleHome #realityBuildEmployeeShift{min-height:47px;background:#e4edf8;color:#102238}
+#realitySimpleHome .reality-employee-shift-list{list-style:none;padding:0;margin:14px 0}
+#realitySimpleHome .reality-employee-shift-item{display:grid;grid-template-columns:minmax(94px,120px) 1fr;gap:10px;border-top:1px solid #365067;padding:12px 0}
+#realitySimpleHome .reality-employee-shift-time{font-size:12px;font-weight:700;color:#b8dffd;padding-top:2px}
+#realitySimpleHome .reality-employee-shift-item strong{font-size:13px;color:#f0f7ff}
+#realitySimpleHome .reality-employee-shift-item p{margin:5px 0}
+#realitySimpleHome .reality-employee-shift-item small{display:block;color:#a9bfd2;margin:6px 0}
+#realitySimpleHome .reality-employee-shift-item a,#realitySimpleHome #realityEmployeeShiftSchedule>a{color:#bde8ff;text-decoration:underline;overflow-wrap:anywhere;font-size:12px}
+@media(max-width:600px){#realitySimpleHome .reality-employee-shift-item{grid-template-columns:1fr;gap:3px}}
 #realitySimpleHome .reality-home-scorecard{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 24px}
 #realitySimpleHome .reality-home-scorecard article{min-width:0}
 #realitySimpleHome .reality-home-primary-actions{margin:14px 0 8px;align-items:center;gap:9px}
@@ -557,6 +572,19 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   
   
   <div class="reality-home-value-layout">
+ <section id="realityEmployeeShiftPlanner" class="reality-employee-shift-planner" aria-labelledby="realityEmployeeShiftTitle">
+  <div class="simple-kicker">REALITY · PLAN BEFORE EXECUTION</div>
+  <h3 id="realityEmployeeShiftTitle">Build an employee's 8-hour workday</h3>
+  <p>Reality checks its current source-backed backlog, avoids identical records, orders investigation ahead of governed execution, and prepares an eight-hour schedule for your review. Planning is not authorization.</p>
+  <div class="reality-employee-shift-inputs">
+   <label>Proposed start time · your device's local time
+    <input type="time" id="realityEmployeeShiftStart" value="09:00">
+   </label>
+   <button type="button" id="realityBuildEmployeeShift">Build My 8-Hour Employee Shift</button>
+  </div>
+  <p id="realityEmployeeShiftStatus" role="status" aria-live="polite">No shift planned yet. This button only prepares a draft; it does not start or schedule an autonomous worker.</p>
+  <div id="realityEmployeeShiftSchedule" hidden aria-label="Eight-hour source-backed shift proposal"></div>
+ </section>
  <div class="simple-actions reality-home-primary-actions" aria-label="Start and inspect governed work">
   <button type="button" id="simpleRunFullLoop" class="simple-primary">Run Full Loop</button>
   <button type="button" id="simpleChat" class="simple-secondary">Talk to Reality</button>
@@ -6193,6 +6221,7 @@ setInterval(refreshSavedShiftHome,300000);
 </script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
+<script defer src="/reality-eight-hour-shift-plan-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
