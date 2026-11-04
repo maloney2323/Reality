@@ -3,6 +3,8 @@ import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {diagnoseIndependentWorkerWake}
+ from '../../src/reality-independent-worker-watchdog-v1.js';
 const WORK=/^work:[a-f0-9]{32}$/;
 const STATES=new Set(['WAKE_PENDING','DISPATCH_CLAIMED','DISPATCH_ACCEPTED',
  'WORKER_ALIVE','GOVERNANCE_READY','EXECUTING','RETRY_PENDING',
@@ -51,7 +53,10 @@ export default async function handler(req,res){
      typeof data.watchdog.delivery_ready_proven!=='boolean'||
      data.watchdog.source!=='POSTGRES_CRON_AND_SIGNED_EDGE_HTTP_READBACK')
    throw Error('WAKE_OWNER_READBACK_NOT_TRUSTED');
-  return res.status(200).json({ok:true,...data});
+  const diagnosis=diagnoseIndependentWorkerWake({
+   watchdog:data.watchdog,wakes:data.wakes,now:Date.now()});
+  return res.status(200).json({ok:true,...data,
+   independent_worker_diagnosis:diagnosis});
  }catch{
   return res.status(503).json({ok:false,error:'OWNER_WAKE_READBACK_UNAVAILABLE',
    worker_started:false,installation_performed:false,production_changed:false});
