@@ -79,7 +79,14 @@ test('Value page projects existing signed-in evidence without inventing addition
  'rvPotentialPlanning','rvReceiptEvidence','rvMeasuredInputs','rvSourceStatus',
  'rvSignals','rvSettled','rvReceipts','rvCapacity','rvFindings','rvCandidates',
  'realityEconSignals','realityEconSettled','realityEconReceipts','realityEconCapacity',
- 'privateReady','realityCategoryOwnerStatus'])el(id);
+ 'privateReady','realityCategoryOwnerStatus',
+ 'rvOverviewSignals','rvOverviewReviewWhatIf','rvOverviewReceipts',
+ 'rvOpportunitySignals','rvOpportunityFindings','rvOpportunityCandidates',
+ 'rvPotentialReviewValue','rvPotentialIssueValue','rvPotentialHours','rvPotentialCoverage',
+ 'rvResultsSettled','rvResultsReceipts','rvResultsHours','rvResultsMeaning',
+ 'rvGovernanceSignals','rvGovernanceCandidates','rvGovernanceReceipts',
+ 'realityCategoryReviewValue','realityAutoBacklogDollars',
+ 'realityAutoBacklogHours','realityAutoBacklogCount','realityAutoBacklogCalibrated'])el(id);
  el('realityHomeCategories','','DETAILS');el('realityPublishedRepairEvidence','','SECTION');
  el('realityHomePlanning','','DETAILS');el('realityHomeFinance','','DETAILS');
  el('proofElement','','DIV');
@@ -88,6 +95,11 @@ test('Value page projects existing signed-in evidence without inventing addition
  nodes.get('realityEconReceipts').textContent='1 independently reconciled';
  nodes.get('realityEconCapacity').textContent='Not measured';
  nodes.get('privateReady').style.display='block';
+ nodes.get('realityCategoryReviewValue').textContent='$3,890.11 – $15,560.44';
+ nodes.get('realityAutoBacklogDollars').textContent='$817.25 – $3,269.00';
+ nodes.get('realityAutoBacklogHours').textContent='12.50 – 50.00 hrs';
+ nodes.get('realityAutoBacklogCount').textContent='5';
+ nodes.get('realityAutoBacklogCalibrated').textContent='0 accepted baselines';
  nodes.get('realityCategoryOwnerStatus').textContent='6 tracked · 1 verified implementation defect(s) · No new install approved';
  const doc={body:{dataset:{realityRoute:'value'}},getElementById:id=>nodes.get(id),
   querySelector:selector=>selector==='.reality-home-proof'?nodes.get('proofElement'):null};
@@ -95,10 +107,21 @@ test('Value page projects existing signed-in evidence without inventing addition
  assert.equal(nodes.get('realityValueVerification').hidden,false);
  assert.equal(nodes.get('rvSignals').textContent,'123');
  assert.equal(nodes.get('rvSettled').textContent,'3');
- assert.equal(nodes.get('rvReceipts').textContent,'1 independently reconciled');
+ assert.equal(nodes.get('rvReceipts').textContent,'1');
  assert.equal(nodes.get('rvCapacity').textContent,'Not measured');
  assert.equal(nodes.get('rvFindings').textContent,'6');
  assert.equal(nodes.get('rvCandidates').textContent,'1');
+ assert.equal(nodes.get('rvOverviewSignals').textContent,'123');
+ assert.equal(nodes.get('rvOverviewReviewWhatIf').textContent,'$3,890.11 – $15,560.44');
+ assert.equal(nodes.get('rvOverviewReceipts').textContent,'1');
+ assert.equal(nodes.get('rvPotentialReviewValue').textContent,'$3,890.11 – $15,560.44');
+ assert.equal(nodes.get('rvPotentialIssueValue').textContent,'$817.25 – $3,269.00');
+ assert.equal(nodes.get('rvPotentialHours').textContent,'12.50 – 50.00 hrs');
+ assert.equal(nodes.get('rvResultsSettled').textContent,'3');
+ assert.equal(nodes.get('rvResultsReceipts').textContent,'1');
+ assert.equal(nodes.get('rvResultsHours').textContent,'Not measured');
+ assert.match(nodes.get('rvResultsMeaning').textContent,/no verified human labor reduction/);
+ assert.match(nodes.get('rvPotentialCoverage').textContent,/5 source-linked open issue/);
  assert.equal(nodes.get('rvCategories').children[0].id,'realityHomeCategories');
  assert.equal(nodes.get('rvReceiptEvidence').children[0].id,'proofElement');
  assert.equal(nodes.get('rvMeasuredInputs').children[0].id,'realityHomeFinance');
@@ -202,4 +225,38 @@ test('mobile evidence navigator is interactive, keyboard accessible and preserve
  assert.equal(nodes.get('rvPanelPotential').hidden,true);
  assert.equal(nodes.get('rvViewNav').scrolled,true);
  assert.equal(nodes.get('realityHomeFinance').open,false);
+});
+
+test('every value tab shows significant source-backed figures immediately, without requiring accordion expansion',()=>{
+ const source=html.slice(html.indexOf('<section id="realityValueVerification"'),
+  html.indexOf('<section id="realitySimpleHome"'));
+ const required={
+  rvPanelOverview:['rvOverviewSignals','rvOverviewReviewWhatIf','rvOverviewReceipts'],
+  rvPanelOpportunities:['rvOpportunitySignals','rvOpportunityFindings','rvOpportunityCandidates'],
+  rvPanelPotential:['rvPotentialReviewValue','rvPotentialIssueValue','rvPotentialHours'],
+  rvPanelResults:['rvResultsSettled','rvResultsReceipts','rvResultsHours'],
+  rvPanelGovernance:['rvGovernanceSignals','rvGovernanceCandidates','rvGovernanceReceipts']
+ };
+ const panelIds=Object.keys(required);
+ for(let i=0;i<panelIds.length;i++){
+  const id=panelIds[i];
+  const start=source.indexOf('id="'+id+'"');
+  const end=i+1<panelIds.length?source.indexOf('id="'+panelIds[i+1]+'"'):source.length;
+  assert.ok(start>=0&&end>start,id+' has no visible section');
+  const chunk=source.slice(start,end);
+  for(const metric of required[id]){
+   assert.equal(count(metric),1,metric+' missing');
+   const metricPos=chunk.indexOf('id="'+metric+'"');
+   const firstDetails=chunk.indexOf('<details');
+   assert.ok(metricPos>=0&&(firstDetails<0||metricPos<firstDetails),
+    metric+' hidden behind a details control');
+  }
+ }
+ assert.match(client,/realityCategoryReviewValue/);
+ assert.match(client,/realityAutoBacklogDollars/);
+ assert.match(client,/realityAutoBacklogHours/);
+ assert.match(client,/realityEconCapacity/);
+ assert.match(client,/financialRange/);
+ assert.match(client,/No dollar range above is verified savings/);
+ assert.doesNotMatch(client,/\b(?:revenue|savings)=\d+\b|97\.3% Saved/);
 });
