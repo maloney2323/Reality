@@ -1,0 +1,10 @@
+{
+  "approval_id": "944608f2-3892-43cf-8ccc-727ac342bf01",
+  "trigger_id": "c074d3d1-adab-4291-b3ce-88d02d8bfe5a",
+  "dispatch_fence": 1,
+  "original_work_id": "work:bf17f1716f7c9550680d761e64f8b591",
+  "pre_state_hash": "dcc036e89b8944de258680a67e1051e392c3f35380f546ecdd6212fcf4b1cd54",
+  "artifact_sha256": "af218c01b8102f750384288d85109f7933330b99c936e00183f85e158912668c",
+  "target_environment": "ISOLATED_PREVIEW",
+  "authorization_source": "DURABLE_OWNER_RECEIPT_READBACK_REQUIRED"
+}
