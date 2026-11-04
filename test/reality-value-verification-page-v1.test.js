@@ -38,7 +38,7 @@ test('value proof separates opportunity signals, historical assumptions and acce
  assert.match(html,/REALIZED VALUE · INDEPENDENT EVIDENCE/);
  assert.match(html,/Historical benchmark models, potential revenue or avoided cost/);
  assert.match(html,/A pipeline stage is not marked complete for any specific job/);
- assert.match(html,/not proof the work was completed or time saved/);
+ assert.match(html,/not yet proof the work was completed or time saved/);
  assert.match(html,/Net human capacity returned/);
  assert.match(html,/Not measured/);
  assert.match(html,/Only independently linked original-job outcomes/);
@@ -92,7 +92,7 @@ test('Value page projects existing signed-in evidence without inventing addition
  assert.equal(nodes.get('rvReceiptEvidence').children[0].id,'proofElement');
  assert.equal(nodes.get('rvMeasuredInputs').children[0].id,'realityHomeFinance');
  assert.equal(nodes.get('realityHomeFinance').open,true);
- assert.match(nodes.get('rvSourceStatus').textContent,/incomplete/);
+ assert.match(nodes.get('rvSourceStatus').textContent,/Owner evidence received/);
 });
 test('route remains inactive on Home and Chat and leaves source modules untouched',()=>{
  for(const route of ['home','chat']){
