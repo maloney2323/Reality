@@ -4,6 +4,7 @@
 // Strictly illustrative human triage/review cost, not value of repairs,
 // avoided wages, revenue, independently measured time or saved cash.
 import {evaluateHumanLaborBenchmark} from './reality-human-labor-benchmark-v1.js';
+import {publishedRepairEffortReference} from './reality-published-repair-effort-v1.js';
 import {projectHypotheticalWorkValue} from './reality-work-value-assessment-v0.1.js';
 export const CATEGORY_ECONOMICS_VERSION='reality-category-evidence-economics-v1';
 const CATEGORIES=Object.freeze([
@@ -179,6 +180,7 @@ export function buildCategoryEconomicPortfolio(catalog){
    invalid_untrusted_source_observations_excluded:invalid
   },
   human_review_what_if:totalMinutes(),
+  published_repair_reference:publishedRepairEffortReference(),
   assumptions:{
    open_issue_review_minutes:[15,60],
    pending_pr_review_minutes:[30,120],
