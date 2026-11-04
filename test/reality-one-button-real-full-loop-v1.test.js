@@ -235,3 +235,21 @@ test('one-button follows same source-backed original through independent continu
  assert.equal(nodes.simpleFullLoopReceipt.children.length,0,
   'worker acknowledgment is not a final settlement receipt');
 });
+
+test('mandatory real-provider holdout blocks installation visibly rather than calling upgrade complete',async()=>{
+ const f=fixture({routes:{...base,
+  '/api/reality/personal-genuine-loop-status':{...noActive,
+   jobs:[{original_work_id:WORK,phase:'AWAITING_OWNER_APPROVAL',
+    independently_settled:false,candidate_verified:true,owner_install_approved:false}]},
+  '/api/reality/personal-qualified-capabilities':{ok:true,entries:[{
+   original_work_id:WORK,capability_id:'reality-continuity-settlement-reconciler',
+   full_loop_preflight:{status:'MANDATORY_HOLDOUT_NOT_VERIFIED',approval_gate_open:false}
+  }]}
+ }});
+ await f.click();
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/mandatory independent real-provider holdout/i);
+ assert.match(f.nodes.simpleFullLoopStatus.textContent,/approval is locked/i);
+ assert.equal(f.chat.opened,0,'unqualified candidate never requests install approval');
+ assert.equal(f.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.equal(f.nodes.simpleFullLoopReceipt.children.length,0);
+});
