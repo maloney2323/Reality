@@ -483,6 +483,21 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
  #realityValueVerification .rv-pipeline{grid-template-columns:1fr}
 }
 
+/* Prioritize actual source-backed potential before the shift, not a stale execution KPI. */
+#realityValueVerification .rv-pre-shift-intel{padding:19px 21px;border:1px solid #38879c;border-radius:17px;background:linear-gradient(120deg,#11364a,#11283b);margin:12px 0 15px}
+#realityValueVerification .rv-pre-shift-label{font-size:11px;letter-spacing:.08em;font-weight:800;color:#7bd5ea}
+#realityValueVerification .rv-pre-shift-intel>strong{display:block;font-size:clamp(20px,2.7vw,29px);margin:8px 0;color:#f2faff;line-height:1.26}
+#realityValueVerification .rv-pre-shift-intel>p{margin:3px 0 15px;font-size:12px;line-height:1.55;color:#b9d4e3}
+#realityValueVerification .rv-pre-shift-range{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#realityValueVerification .rv-pre-shift-range>div{min-width:0;padding:12px 14px;border:1px solid #487b99;border-radius:12px;background:#142d43}
+#realityValueVerification .rv-pre-shift-range span,#realityValueVerification .rv-pre-shift-range small{display:block;font-size:12px;line-height:1.5;color:#c0d6e2}
+#realityValueVerification .rv-pre-shift-range strong{display:block;margin:6px 0;font-size:clamp(21px,3vw,30px);color:#d3efff;overflow-wrap:anywhere}
+#realityValueVerification .rv-pre-shift-range small{font-size:11px;color:#a8c7d8}
+#realityValueVerification .rv-kpis{margin:7px 0 9px}
+#realityValueVerification .rv-measured-strip{font-size:12px}
+#realityValueVerification .rv-measured-strip strong{color:#cafbea}
+@media(max-width:600px){#realityValueVerification .rv-pre-shift-intel{padding:15px 13px}#realityValueVerification .rv-pre-shift-range{grid-template-columns:1fr}#realityValueVerification .rv-pre-shift-range>div{padding:10px 12px}#realityValueVerification .rv-pre-shift-range strong{font-size:24px}#realityValueVerification .rv-pre-shift-intel>strong{font-size:21px}}
+
 /* Value Verification: source-backed figures first, optional technical detail second */
 #realityValueVerification .rv-proof-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 17px}
 #realityValueVerification .rv-proof-highlights article{display:flex;flex-direction:column;align-items:start;min-width:0;border:1px solid #3d647b;border-radius:13px;padding:15px;background:linear-gradient(145deg,#16334a,#102638)}
@@ -784,24 +799,33 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 
 <section id="realityValueVerification" class="reality-value-verification" hidden aria-labelledby="realityValueTitle">
  <header class="rv-hero">
-  <div class="rv-eyebrow">REALITY · BUSINESS PROOF CENTER</div>
-  <h1 id="realityValueTitle">Value Verification</h1>
-  <p>Your discoveries, economic opportunities and independently verified outcomes—in one clear view.</p>
+  <div class="rv-eyebrow">REALITY · PRE-AUTOMATION OPPORTUNITY INTELLIGENCE</div>
+  <h1 id="realityValueTitle">See Your Business Potential</h1>
+  <p>Before a single shift runs, see what Reality has discovered, the human work those opportunities might represent, and which evidence still needs qualification.</p>
   <div class="rv-hero-tools">
    <span id="rvSourceStatus" role="status" aria-live="polite">Checking the latest owner-scoped evidence…</span>
    <a class="rv-link" href="/chat">Ask Reality about this evidence</a>
   </div>
  </header>
- <div class="rv-kpis" aria-label="Current source-backed evidence, not realized savings">
-  <article><span>Work opportunities observed</span><strong id="rvSignals">Checking…</strong><small>Signals, not verified current jobs</small></article>
-  <article><span>Owner capability findings</span><strong id="rvFindings">Not verified</strong><small>Inspected discoveries, not installations</small></article>
-  <article><span>Original jobs settled</span><strong id="rvSettled">Checking…</strong><small>Isolated settlement evidence</small></article>
-  <article class="rv-receipt-kpi"><span>Independently verified receipts</span><strong id="rvReceipts">Checking…</strong><small>Exact original-job proof</small></article>
+ <div class="rv-pre-shift-intel">
+  <div class="rv-pre-shift-label">POTENTIAL IDENTIFIED BEFORE AUTOMATION</div>
+  <strong id="rvPreShiftPotential" aria-live="polite">Calculating source-backed opportunity scope…</strong>
+  <p id="rvPreShiftNarrative">Reality can find and organize possible work before running a shift. Estimates are conditional—not time or cash already saved.</p>
+  <div class="rv-pre-shift-range">
+   <div><span>Manual review workload · gross wage equivalent</span><strong id="rvPreShiftReviewValue">Not available</strong><small>Illustrative 15–120-minute triage assumptions. NOT savings.</small></div>
+   <div><span>Possible issue-work effort · separate what-if</span><strong id="rvPreShiftIssueHours">Not available</strong><small>Uncalibrated, possibly overlapping work. Do not add to review scenario.</small></div>
+  </div>
  </div>
- <div class="rv-measured-strip" aria-label="Additional verified evidence states">
-  <div><span>Tested implementation-defect candidates</span><strong id="rvCandidates">Not verified</strong></div>
-  <div><span>Verified net human capacity returned</span><strong id="rvCapacity">Not measured</strong></div>
-  <p>Potential value is not realized savings. Financial results require accepted work, actual human effort and operating costs.</p>
+ <div class="rv-kpis" aria-label="Source-backed opportunities, not completed work">
+  <article><span>Work signals identified</span><strong id="rvSignals">Checking…</strong><small>Observations, not confirmed defects</small></article>
+  <article><span>Owner capability findings</span><strong id="rvFindings">Not verified</strong><small>Inspected discoveries; overlapping work possible</small></article>
+  <article><span>Tested repair candidates</span><strong id="rvCandidates">Not verified</strong><small>Independently tested, not yet installed</small></article>
+  <article class="rv-receipt-kpi"><span>Verified human capacity returned</span><strong id="rvCapacity">Not measured</strong><small>Only accepted and measured work counts</small></article>
+ </div>
+ <div class="rv-measured-strip" aria-label="Verified post-automation evidence kept separate">
+  <div><span>Isolated jobs settled</span><strong id="rvSettled">Checking…</strong></div>
+  <div><span>Independently verified receipts</span><strong id="rvReceipts">Checking…</strong></div>
+  <p>Those are historical execution outcomes, not additional potential value or demonstrated cash savings.</p>
  </div>
  <nav id="rvViewNav" class="rv-section-nav" role="tablist" aria-label="Value Verification sections">
   <button type="button" id="rvTabOverview" role="tab" aria-controls="rvPanelOverview" aria-selected="true" tabindex="0" data-rv-view="overview">Overview</button>
@@ -812,9 +836,9 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
  </nav>
  <div class="rv-layout">
   <section id="rvPanelOverview" class="rv-panel rv-tabpanel" role="tabpanel" aria-labelledby="rvTabOverview" tabindex="0">
-   <div class="rv-section-label">EXECUTIVE SUMMARY</div>
-   <h2>How Reality proves business value</h2>
-   <p>See what Reality has found before automating—and what has independently passed settlement afterward.</p>
+   <div class="rv-section-label">VALUE YOU CAN SEE BEFORE AUTOMATION</div>
+   <h2>What Reality could help your business accomplish</h2>
+   <p>Reality discovers and organizes potential work first. The next step is qualification—not a promise that every signal is actionable or worth the estimated cost.</p>
 
    <div class="rv-proof-highlights" aria-label="Actual sources and illustrative planning values">
     <article><span>Discovery inventory</span><strong id="rvOverviewSignals">Not verified</strong><small>Current source-backed observations. Not completed jobs.</small></article>
