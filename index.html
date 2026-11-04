@@ -320,6 +320,9 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
 .reality-page-tabs a[aria-current="page"]{color:#102439;background:#e5f2fc;border-color:#accfdd}
 .reality-page-tabs a:focus-visible{outline:3px solid #98d8ff;outline-offset:2px}
 /* Separate source-backed Value Verification Center. Homepage stays concise. */
+body[data-reality-route="home"] #realityPublishedRepairEvidence,
+body[data-reality-route="home"] .reality-home-proof{display:none!important}
+
 #realityValueVerification{display:none}
 body.reality-simple-home[data-reality-route="value"] main > :not(.top):not(#realityValueVerification){display:none!important}
 body.reality-simple-home[data-reality-route="value"] main > #realityValueVerification{display:block!important}
