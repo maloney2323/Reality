@@ -15,11 +15,17 @@ function job(name){
 }
 test('one reconciliation barrier precedes each governed original-job resume',()=>{
  const resume=job('resume_original_job');
- assert.match(resume,/needs: \[record_owner_approved_activation, record_consumed_preview_recovery, reconcile_all_settled_outcomes\]/);
+ assert.match(resume,/needs: \[record_owner_approved_activation, recover_consumed_preview_install, record_consumed_preview_recovery, reconcile_all_settled_outcomes\]/);
+ assert.match(resume,/needs\.recover_consumed_preview_install\.result == 'success'/);
  assert.match(resume,/needs\.reconcile_all_settled_outcomes\.result == 'success'/);
  assert.match(resume,/needs\.record_owner_approved_activation\.result/);
  assert.match(resume,/needs\.record_consumed_preview_recovery\.result/);
  assert.doesNotMatch(resume,/installation_authorized:\s*true/);
+});
+test('consumed installation recovery waits for completed activation and blocks ambiguous continuation',()=>{
+ const recovery=job('recover_consumed_preview_install');
+ assert.match(recovery,/needs: \[record_owner_approved_activation\]/);
+ assert.match(recovery,/always\(\) && !cancelled\(\) && github\.event_name == 'push'/);
 });
 test('reconciliation runs for both signed wake types without claiming execution',()=>{
  const reconcile=job('reconcile_all_settled_outcomes');
