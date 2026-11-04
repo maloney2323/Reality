@@ -332,7 +332,10 @@ jobs:
           retention-days: 14
 
   recover_consumed_preview_install:
-    if: github.event_name == 'push'
+    # Never race the current installation and activation chain. Only read the
+    # consumed-approval recovery state after its first path is concluded.
+    needs: [record_owner_approved_activation]
+    if: ${{ always() && !cancelled() && github.event_name == 'push' }}
     permissions:
       contents: read
       actions: read
@@ -427,12 +430,12 @@ jobs:
           retention-days: 14
 
   resume_original_job:
-    needs: [record_owner_approved_activation, record_consumed_preview_recovery, reconcile_all_settled_outcomes]
+    needs: [record_owner_approved_activation, recover_consumed_preview_install, record_consumed_preview_recovery, reconcile_all_settled_outcomes]
     # Governed repair of the Nov 4 broker 400: the historical sidecars must
     # first receive independent, idempotent Universe reconciliation. Without
     # this barrier an original resume races a different settlement worker.
     # Keep both installation/activation paths and the exact owner scope.
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.reconcile_all_settled_outcomes.result == 'success' && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.reconcile_all_settled_outcomes.result == 'success' && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.recover_consumed_preview_install.result == 'success' || needs.recover_consumed_preview_install.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
     permissions:
       contents: read
       actions: read
