@@ -412,6 +412,9 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-employee-shift-inputs label{font-size:12px;color:#d7e5f4}
 #realitySimpleHome .reality-employee-shift-inputs input{display:block;margin-top:6px;padding:10px;color:#eaf2fc;background:#0e1c2c;border:1px solid #45617b;border-radius:10px}
 #realitySimpleHome #realityBuildEmployeeShift{min-height:47px;background:#e4edf8;color:#102238}
+#realitySimpleHome #realityEmployeeShiftAuthorization{border:1px solid #487a6f;padding:12px;margin:12px 0;border-radius:12px;background:#102b2c}
+#realitySimpleHome #realityAuthorizeEmployeeShift{font-size:16px;min-height:50px}
+#realitySimpleHome #realityEmployeeShiftApprovalStatus{font-size:12px}
 #realitySimpleHome .reality-employee-shift-list{list-style:none;padding:0;margin:14px 0}
 #realitySimpleHome .reality-employee-shift-item{display:grid;grid-template-columns:minmax(94px,120px) 1fr;gap:10px;border-top:1px solid #365067;padding:12px 0}
 #realitySimpleHome .reality-employee-shift-time{font-size:12px;font-weight:700;color:#b8dffd;padding-top:2px}
@@ -582,7 +585,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    </label>
    <button type="button" id="realityBuildEmployeeShift">Build My 8-Hour Employee Shift</button>
   </div>
-  <p id="realityEmployeeShiftStatus" role="status" aria-live="polite">No shift planned yet. This button only prepares a draft; it does not start or schedule an autonomous worker.</p>
+  <p id="realityEmployeeShiftStatus" role="status" aria-live="polite">No shift planned yet. The plan is read-only until you authorize its exact work scope.</p>
+  <div id="realityEmployeeShiftAuthorization" hidden>
+   <p id="realityEmployeeShiftAuthorizationScope" class="reality-employee-shift-note">Review the work and authorization boundary first.</p>
+   <button type="button" id="realityAuthorizeEmployeeShift" class="simple-primary">Approve This 8-Hour Shift</button>
+   <p id="realityEmployeeShiftApprovalStatus" role="status" aria-live="polite">Installation of any capability will require your separate exact approval in Reality Chat.</p>
+  </div>
   <div id="realityEmployeeShiftSchedule" hidden aria-label="Eight-hour source-backed shift proposal"></div>
  </section>
  <div class="simple-actions reality-home-primary-actions" aria-label="Start and inspect governed work">
