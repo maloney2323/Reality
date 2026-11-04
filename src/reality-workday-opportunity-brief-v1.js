@@ -1,3 +1,4 @@
+import {humanLaborBenchmarkCatalog} from './reality-human-labor-benchmark-v1.js';
 // Reality first-customer workday opportunity brief.
 // Source-backed backlog discovery is valuable work, but a GitHub issue, PR
 // or historical CI failure does NOT prove an outstanding defect, human hours,
@@ -103,6 +104,26 @@ export function buildRealityWorkdayOpportunityBrief(catalog){
   source_coverage:coverage,
   counts,items:candidates.slice(0,25),
   truncated:candidates.length>25,
+  illustrative_labor_reference:(()=>{
+   const wage=humanLaborBenchmarkCatalog().BLS_SOFTWARE_WAGE;
+   const hourly=wage.wage_by_occupation['15-1252'];
+   if(wage.provider!=='BLS'||
+     wage.measure!=='MEDIAN_HOURLY_WAGE_NOT_EMPLOYER_TOTAL_COST'||
+     !/^https:\/\/www\.bls\.gov\//.test(wage.url)||
+     !Number.isFinite(hourly)||hourly<=0)
+    throw Error('WORKDAY_LABOR_REFERENCE_INVALID');
+   return Object.freeze({
+    version:'HUMAN_LABOR_BENCHMARK_V1_STATIC_SOURCE',
+    occupation:'Software Developers',occupation_soc:'15-1252',
+    source_provider:'BLS',source_url:wage.url,
+    observation_period:wage.observation_period,
+    hourly_usd:hourly,
+    status:'PUBLIC_MEDIAN_WAGE_NOT_A_TASK_DURATION_OR_LOADED_COST',
+    calibrated_for_this_business:false,
+    estimates_owner_entered_only:true,
+    verified_hours_saved:null,verified_cash_savings_usd:null
+   });
+  })(),
   value_measurement:{
    human_discovery_baseline_minutes:null,
    measured_discovery_time_saved_minutes:null,
