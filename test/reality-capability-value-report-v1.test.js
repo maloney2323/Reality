@@ -82,3 +82,54 @@ test('authenticated read-only endpoint provides the report, never grants executi
  assert.ok(source.includes("req.method!=='GET'"));
  assert.ok(!source.includes('reality_owner_approve_qualified_preview_v1'));
 });
+
+test('live #201 signed real-provider supersession displays approval value without inventing totals',()=>{
+ const newer={...sample,capability_id:'reality-continuity-settlement-reconciler',
+  source_paths:['src/reality-extensions/reality-continuity-settlement-reconciler.mjs',
+   'test/reality-extensions/reality-continuity-settlement-reconciler.test.js'],
+  qualification:{
+   schema:'reality-genuine-requalification-supersession-v1',
+   status:'AWAITING_OWNER_APPROVAL',original_work_id:work,
+   artifact_sha256:'d'.repeat(64),prior_artifact_sha256:'a'.repeat(64),
+   post_state_hash:'c'.repeat(64),
+   attestation_source:'SIGNED_GITHUB_WORKFLOW_INDEPENDENT_PROVIDER_AND_OFFLINE_SANDBOX',
+   provider_run_id:'41761816779',trigger_id:'c074d3d1-adab-4291-b3ce-88d02d8bfe5a',
+   model_response_id:'resp_0033c648848a7f1b006aea9a23d65c87d1916482a2c4deee9c',
+   verification_artifact_digest:'sha256:'+'e'.repeat(64),
+   real_provider_holdout_verified:true,
+   real_provider_holdout_artifact_sha256:'d'.repeat(64),
+   valid_time:'2026-11-03T21:49:52Z',
+   transaction_time:'2026-11-04T02:37:39Z',
+   frozen_pass:39,candidate_pass:4,holdout_pass:5,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,
+  }};
+ const qualified=report(newer),summary=summarize([qualified]);
+ assert.equal(qualified.readiness.stage,'QUALIFIED_AWAITING_EXPLICIT_OWNER_APPROVAL');
+ assert.equal(qualified.technical_stats.combined_passed,43);
+ assert.equal(qualified.technical_stats.combined_total,null,'missing denominator not invented');
+ assert.equal(qualified.technical_stats.frozen_acceptance.total,null);
+ assert.equal(qualified.technical_stats.candidate_checks.pass_rate_percent,null);
+ assert.equal(summary.checked_tests_total,null);
+ assert.equal(summary.checked_tests_passed,43);
+ assert.equal(qualified.technical_stats.independent_verification_record,
+  'DURABLE_SIGNED_SUPERSESSION_AND_PROVIDER_HOLDOUT');
+ assert.equal(qualified.permission_effects.owner_installation_authorized,false);
+ assert.equal(qualified.business_value.verified_savings_usd.value,null);
+ for(const changed of [
+  {real_provider_holdout_verified:false},
+  {real_provider_holdout_artifact_sha256:'f'.repeat(64)},
+  {prior_artifact_sha256:'d'.repeat(64)},
+  {verification_artifact_digest:'MISSING'},
+  {attestation_source:'MODEL_ASSERTION'},
+  {trigger_id:'forged'},
+  {model_response_id:'forged'},
+  {holdout_pass:0},
+  {installation_authorized:true},
+  {original_job_completed:true},
+  {production_changed:true}
+ ]){
+  assert.throws(()=>report({...newer,qualification:{...newer.qualification,...changed}}),
+   /REALITY_CAPABILITY_VALUE_REPORT_/,JSON.stringify(changed));
+ }
+});
