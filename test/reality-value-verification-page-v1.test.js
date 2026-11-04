@@ -12,11 +12,22 @@ test('Value Verification is a real, standalone, direct-linkable tab',()=>{
  assert.ok(config.rewrites.some(r=>r.source==='/chat'&&r.destination==='/index.html'));
  assert.match(html,/<a id="realityValueTab" href="\/value">Value Verification<\/a>/);
  assert.match(html,/id="realityValueVerification"[^>]*hidden aria-labelledby="realityValueTitle"/);
- assert.match(html,/body\.reality-simple-home\[data-reality-route="value"\] main > :not\(\.top\):not\(#realityValueVerification\)/);
+ assert.ok(html.includes('body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification)'));
  assert.match(html,/\$\('realityValueTab'\)\.setAttribute\('aria-current',realityIsValuePage\(\)\?'page':'false'\)/);
  assert.match(html,/src="\/reality-value-verification-v1\.js"/);
  assert.match(html,/<a href="\/value">View detailed business evidence<\/a>/);
  assert.match(html,/href="\/chat">Ask Reality about this evidence/);
+});
+test('mobile and desktop Value page cannot be concealed by legacy Home-only CSS',()=>{
+ const css=html.slice(html.indexOf('<style>')+7,html.indexOf('</style>'));
+ const legacy='body.reality-simple-home:not(.reality-details-open) main >';
+ assert.ok(!css.includes(legacy),'legacy selector hides the entire /value page when Home details are collapsed');
+ assert.ok(css.includes('body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) main >'));
+ assert.ok(css.includes('body[data-reality-route="value"] main > #realityValueVerification{display:block!important}'));
+ assert.ok(css.includes('body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification){display:none!important}'));
+ assert.ok(html.includes('const realityIsValuePage=()=>'));
+ assert.match(html,/document\.body\.dataset\.realityRoute=realityIsChatPage\(\)\?'chat':realityIsValuePage\(\)\?'value':'home'/);
+ assert.match(html,/@media\(max-width:600px\)/);
 });
 test('source IDs remain single-owner; no duplicated receipts, models or value widgets',()=>{
  for(const id of ['realityEconSignals','realityEconSettled','realityEconReceipts',
