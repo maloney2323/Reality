@@ -62,6 +62,7 @@ jobs:
           node --test test/reality-category-economic-portfolio-v1.test.js
           node --check src/reality-published-repair-effort-v1.js
           node --test test/reality-published-repair-effort-v1.test.js
+          node --test test/reality-home-value-first-v1.test.js
           node --test test/reality-capability-value-report-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-home-owner-authorizations-v1.test.js
