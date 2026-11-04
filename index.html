@@ -314,6 +314,35 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .reality-chat-close{position:sticky;top:0;float:right;z-index:2;background:#243e52;color:#f0f7ff;border:1px solid #42627b;border-radius:50%;font-size:23px;padding:0;width:38px;height:38px;margin:0}
 .reality-chat-dock-open{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:98;display:flex;gap:9px;align-items:center;min-height:56px;padding:11px 18px;background:#e7f3fb;color:#0e2438;border:2px solid #5884a1;box-shadow:0 8px 28px #0008;border-radius:999px;font-size:15px}
 body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;background:#030912ac}
+/* A real, direct-linkable Chat page; not a floating dialog. */
+.reality-page-tabs{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 auto}
+.reality-page-tabs a{color:#d8eaf6;text-decoration:none;padding:10px 19px;border-radius:12px;font-weight:750;font-size:14px;border:1px solid #3e5870;background:#122238}
+.reality-page-tabs a[aria-current="page"]{color:#102439;background:#e5f2fc;border-color:#accfdd}
+.reality-page-tabs a:focus-visible{outline:3px solid #98d8ff;outline-offset:2px}
+body[data-reality-route="chat"] main > :not(.top):not(#privateChat){display:none!important}
+body[data-reality-route="chat"] #privateChat{
+ display:block!important;position:relative!important;z-index:auto!important;
+ top:auto!important;bottom:auto!important;left:auto!important;right:auto!important;
+ transform:none!important;width:100%!important;max-width:1100px!important;
+ min-height:calc(100dvh - 165px);overflow:visible!important;
+ margin:18px auto 30px!important;border-radius:19px!important;
+ padding:clamp(16px,3vw,26px)!important;box-shadow:none!important;
+}
+body[data-reality-route="chat"] #realityChatDockOpen{display:none!important}
+body[data-reality-route="chat"] .reality-chat-close{
+ position:static;float:none;width:auto;height:auto;border-radius:10px;
+ padding:9px 14px;margin:0 0 15px;font-size:13px;
+}
+body[data-reality-route="chat"] #privateTranscript{max-height:min(60vh,720px)!important}
+body[data-reality-route="chat"] .reality-chat-composer{position:relative}
+body[data-reality-route="chat"] main{max-width:1200px}
+@media(max-width:700px){
+ .reality-page-tabs{gap:5px;margin:0}
+ .reality-page-tabs a{padding:9px 12px;font-size:13px}
+ body[data-reality-route="chat"] #privateChat{min-height:calc(100dvh - 120px);padding:12px!important;border-radius:12px!important}
+ body[data-reality-route="chat"] #privateTranscript{max-height:42vh!important}
+}
+
 @media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
 @media(max-width:600px){.business-home{padding:15px;margin:14px 0 20px}.business-home-insights{grid-template-columns:1fr}.business-home-stat{min-height:155px;padding:12px}.business-home-source{white-space:normal}.business-operations-list strong{font-size:22px}#privateChat{top:0!important;right:0!important;bottom:0!important;left:0!important;width:100vw;max-width:none;border-radius:0!important;padding:16px!important}.reality-chat-dock-open{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}}
 
@@ -563,7 +592,14 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 </head>
 <body class="reality-simple-home">
 <main>
-  <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
+  <div class="top">
+  <div class="brand">REALITY</div>
+  <nav id="realityPageTabs" class="reality-page-tabs" aria-label="Reality pages">
+    <a id="realityHomeTab" href="/" aria-current="page">Home</a>
+    <a id="realityChatTab" href="/chat">Chat</a>
+  </nav>
+  <a href="/chat" id="accountShortcut" class="state account-shortcut" aria-label="Open Reality Chat and account">Account · Sign in</a>
+ </div>
 
 <section id="realitySimpleHome" aria-labelledby="simpleRealityTitle">
  <div class="simple-kicker">REALITY · BUSINESS VALUE FIRST</div>
@@ -973,10 +1009,10 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <p>Reality can discuss priorities now. Financial conclusions require connected, authorized records.</p>
   </div>
 </section>
-<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation" role="dialog" aria-modal="false" aria-labelledby="realityChatTitle" data-open="false" tabindex="-1">
- <button type="button" id="realityChatDockClose" class="reality-chat-close" aria-label="Close Reality chat">×</button>
- <div class="label">REALITY · CONVERSATION & CONTINUOUS WORK</div>
- <h3 id="realityChatTitle">Talk to Reality</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
+<section id="privateChat" class="console-card" aria-label="Reality Chat page — continuous work and approvals" role="region" aria-labelledby="realityChatTitle" data-open="false" tabindex="-1">
+ <button type="button" id="realityChatDockClose" class="reality-chat-close" aria-label="Return to Reality Home">← Home</button>
+ <div class="label">REALITY · CHAT PAGE · CONTINUOUS WORK</div>
+ <h3 id="realityChatTitle">Reality Chat</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
  <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
  <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
@@ -1446,49 +1482,41 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   </div>
 </details>
 </main>
-<button type="button" id="realityChatDockOpen" class="reality-chat-dock-open" aria-controls="privateChat" aria-expanded="false" title="Ask Reality about anything">
+<button type="button" id="realityChatDockOpen" class="reality-chat-dock-open" aria-controls="privateChat" aria-expanded="false" title="Open Reality Chat page">
  <span aria-hidden="true">✦</span><span>Ask Reality</span>
 </button>
 <script>
 const $=id=>document.getElementById(id);
 
 let realityChatPreviousFocus=null;
+const realityIsChatPage=()=>/^\/chat\/?$/.test(window.location.pathname);
+document.body.dataset.realityRoute=realityIsChatPage()?'chat':'home';
+$('realityHomeTab').setAttribute('aria-current',realityIsChatPage()?'false':'page');
+$('realityChatTab').setAttribute('aria-current',realityIsChatPage()?'page':'false');
 function realityOpenChatDock(focusPrompt=false){
- realityChatPreviousFocus=document.activeElement;
- const panel=$('privateChat');
- panel.dataset.open='true';
- panel.setAttribute('aria-modal','true');
- document.body.classList.add('reality-chat-is-open');
- $('realityChatDockOpen').setAttribute('aria-expanded','true');
- const target=focusPrompt&&$('privateReady').style.display==='block'?
-   $('privatePrompt'):$('privateLogin').style.display==='block'?
-   $('privateEmail'):$('realityChatDockClose');
- target?.focus({preventScroll:true});
+ if(!realityIsChatPage()){
+  window.location.assign('/chat');
+  return;
+ }
+ // The conversation occupies a standalone page. Focus without launching a modal.
  if($('privateReady')?.style.display==='block'){
   void homeOwnerRefresh();
   void realityChatRefreshEvents();
  }
+ const focus=focusPrompt&&$('privateReady')?.style.display==='block'?
+  $('privatePrompt'):$('privateLogin')?.style.display==='block'?
+  $('privateEmail'):$('realityChatTitle');
+ if(focus?.focus)focus.focus({preventScroll:true});
 }
 function realityCloseChatDock(){
- const panel=$('privateChat');
- panel.dataset.open='false';
- panel.setAttribute('aria-modal','false');
- document.body.classList.remove('reality-chat-is-open');
- $('realityChatDockOpen').setAttribute('aria-expanded','false');
- const prior=realityChatPreviousFocus;
- if(prior?.isConnected&&typeof prior.focus==='function')prior.focus({preventScroll:true});
- else $('realityChatDockOpen').focus({preventScroll:true});
+ window.location.assign('/');
 }
 $('realityChatDockOpen').addEventListener('click',()=>realityOpenChatDock(true));
 $('realityChatDockClose').addEventListener('click',realityCloseChatDock);
 $('businessAskReality').addEventListener('click',()=>realityOpenChatDock(true));
 $('homeOpenApprovalChat').addEventListener('click',()=>homeOwnerFocus());
 $('accountShortcut').addEventListener('click',e=>{e.preventDefault();realityOpenChatDock(false)});
-document.addEventListener('keydown',e=>{
- if(e.key==='Escape'&&$('privateChat').dataset.open==='true'){
-  e.preventDefault();realityCloseChatDock();
- }
-});
+// Escape must never navigate away from a full conversation page.
 let realityBusinessReadEpoch=0;
 function realityBusinessResetMoney(){
  // No finance connector is authorized yet: never substitute modeled ROI, tests or invented figures.
