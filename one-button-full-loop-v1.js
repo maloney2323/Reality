@@ -274,7 +274,7 @@ async function start(){
      '. No second job was created.');
    return;
   }
-  setStatus((historicalNoOpIds.size?'HISTORICAL SETTLEMENT VERIFIED · Previous original already satisfied. ':'')+
+  setStatus((historicalNoOpIds.size?'HISTORICAL SETTLEMENT VERIFIED · Previous original already satisfied; Reality did not execute a new settlement. ':'')+
    'No independently qualified NEW gap or eligible unfinished original job exists. Reality stopped safely rather than inventing an upgrade or receipt.');
  }catch(error){
   setStatus('Full-loop start blocked: '+String(error?.message||'UNKNOWN')+
