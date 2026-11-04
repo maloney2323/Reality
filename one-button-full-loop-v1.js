@@ -12,6 +12,13 @@ const SOURCE=/^[a-f0-9]{40}$/;
 const button=$('simpleRunFullLoop'),status=$('simpleFullLoopStatus'),receiptBox=$('simpleFullLoopReceipt');
 if(!button||!status||!receiptBox)return;
 let startedWork=null,requesting=false,observing=false,approvalPrompted=false;
+const historicalNoOpIds=new Set(),previousOriginalFailures=new Set();
+function exactFailureKey(issue,run,sha){
+ if(!Number.isSafeInteger(Number(issue))||Number(issue)<1||
+    !Number.isSafeInteger(Number(run))||Number(run)<1||
+    !SOURCE.test(String(sha||'')))return null;
+ return String(issue)+':'+String(run)+':'+String(sha);
+}
 const setStatus=text=>{status.textContent=text};
 const signedIn=()=>typeof window.homeOwnerSignedIn==='function'&&
  window.homeOwnerSignedIn()===true;
