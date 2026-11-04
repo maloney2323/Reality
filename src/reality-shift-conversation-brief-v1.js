@@ -36,7 +36,7 @@ function eventFor(t){
    proof_sha256:/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||'')?t.proof_sha256:null};
  if(t.state==='BLOCKED_PROVIDER')
   return {code:'STEP_BLOCKED',step_index:t.step_index,
-   text:'Provider evidence could not be completed safely; the shift escalated.',
+   text:'Provider evidence could not be completed safely. Reality preserved the blocked observation and continues other authorized work.',
    observed_at:safeDate(t.completed_at),source_url:null,proof_sha256:null};
  if(t.state==='REPORTED')
   return {code:'SHIFT_REPORT_RECORDED',step_index:t.step_index,
@@ -94,7 +94,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='Scheduled start has passed. No completed source check is recorded yet.';
   next='Await the next trusted worker wake and an actual source-check receipt.';
  }else if(s.status==='AWAITING_EXACT_ORIGINAL_WORK'){
-  current='Paused at the governed original-job execution gate. No automatic installation is authorized.';
+  current='The exact original-job action awaits authorization; other scheduled read-only checks may continue.';
   next=pending?'Review the exact verified upgrade in Reality Chat. After your approval, the existing governed installer handles continuation.':
    'Reality must independently qualify and bind an eligible original job before execution can continue.';
  }else if(s.status==='ESCALATED'){
@@ -127,7 +127,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   headline:s.status==='QUEUED'&&now.getTime()<start?
    'Your eight-hour shift is queued, not running yet.':
    s.status.startsWith('ENDED_')?'Your scheduled shift has ended.':
-   s.status==='AWAITING_EXACT_ORIGINAL_WORK'?'Your shift is waiting at the original-job gate.':
+   s.status==='AWAITING_EXACT_ORIGINAL_WORK'?'Your shift is continuing safely around the original-job gate.':
    s.status==='ESCALATED'?'Your shift needs recovery attention.':
    'Your shift has recorded an activity state.',
   what_finished:whatFinished,current,next,needs_you:needs,
