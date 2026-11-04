@@ -13,5 +13,11 @@
       "path": "/api/reality/stewardship",
       "schedule": "0 * * * *"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/chat",
+      "destination": "/index.html"
+    }
   ]
 }

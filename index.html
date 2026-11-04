@@ -290,10 +290,59 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .business-home-actions p{font-size:11px;color:#adbfd1;max-width:560px;line-height:1.5}
 .business-ask-reality{margin-top:0;background:#cfeaf4;color:#092334;min-height:45px}
 #privateChat{display:none!important;position:fixed!important;z-index:100;top:14px;right:14px;left:auto;bottom:14px;margin:0!important;max-width:540px;width:min(540px,calc(100vw - 28px));overflow-y:auto;overflow-x:hidden;box-shadow:0 20px 75px #000b;background:linear-gradient(165deg,#17283b,#0b1320)!important;border:1px solid #507893!important;border-radius:20px;padding:20px!important;scroll-margin-top:0}
+#privateChat{right:50%!important;left:auto!important;transform:translateX(50%);max-width:900px!important;width:min(900px,calc(100vw - 22px))!important}
+#realitySimpleHome .reality-shift-home-brief{margin:0 0 16px;padding:17px;border:1px solid #62819a;border-radius:17px;background:#13283b}
+#realitySimpleHome .reality-shift-home-brief h3{font-size:20px;margin:6px 0 10px;color:#eaf3ff}
+#realitySimpleHome .reality-shift-home-brief p{font-size:14px;line-height:1.65;margin:9px 0;color:#d5e5f0}
+#realitySimpleHome #realityShiftOpenConversation{min-height:50px;margin-top:8px}
+.reality-chat-shift-brief{border:1px solid #4c8698;border-radius:16px;padding:15px;margin:15px 0;background:#112b3a}
+.reality-chat-shift-brief h4{font-size:18px;line-height:1.35;margin:7px 0 13px;color:#f0faff}
+.reality-chat-shift-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.reality-chat-shift-facts>div{border:1px solid #37586d;padding:12px;border-radius:12px;background:#0e2131}
+.reality-chat-shift-facts strong{display:block;color:#f0faff;font-size:13px}
+.reality-chat-shift-facts p{margin:5px 0 0;color:#c9dce9;font-size:13px;line-height:1.5}
+.reality-chat-shift-evidence{margin:12px 0}
+.reality-chat-shift-evidence summary{cursor:pointer;color:#c0e6f9;font-size:13px}
+.reality-chat-shift-evidence li{margin:9px 0;font-size:12px;line-height:1.5;color:#d6e5f0}
+.reality-chat-shift-evidence a{color:#c0e8ff}
+.reality-chat-composer{border:1px solid #47637d;padding:14px;border-radius:15px;margin:10px 0 14px;background:#122338}
+.reality-chat-composer textarea{width:100%;min-height:90px}
+.reality-chat-composer label{font-size:12px}
+#realityChatApprovalInbox{border-color:#457b77}
+@media(max-width:600px){#privateChat{inset:0!important;width:100vw!important;max-width:none!important;transform:none!important;border-radius:0!important;padding:14px!important;padding-top:max(14px,env(safe-area-inset-top))!important;padding-bottom:max(14px,env(safe-area-inset-bottom))!important}.reality-chat-shift-facts{grid-template-columns:1fr}#privateTranscript{max-height:35vh!important}}
 #privateChat[data-open="true"]{display:block!important}
 .reality-chat-close{position:sticky;top:0;float:right;z-index:2;background:#243e52;color:#f0f7ff;border:1px solid #42627b;border-radius:50%;font-size:23px;padding:0;width:38px;height:38px;margin:0}
 .reality-chat-dock-open{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:98;display:flex;gap:9px;align-items:center;min-height:56px;padding:11px 18px;background:#e7f3fb;color:#0e2438;border:2px solid #5884a1;box-shadow:0 8px 28px #0008;border-radius:999px;font-size:15px}
 body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;background:#030912ac}
+/* A real, direct-linkable Chat page; not a floating dialog. */
+.reality-page-tabs{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 auto}
+.reality-page-tabs a{color:#d8eaf6;text-decoration:none;padding:10px 19px;border-radius:12px;font-weight:750;font-size:14px;border:1px solid #3e5870;background:#122238}
+.reality-page-tabs a[aria-current="page"]{color:#102439;background:#e5f2fc;border-color:#accfdd}
+.reality-page-tabs a:focus-visible{outline:3px solid #98d8ff;outline-offset:2px}
+body[data-reality-route="chat"] main > :not(.top):not(#privateChat){display:none!important}
+body[data-reality-route="chat"] #privateChat{
+ display:block!important;position:relative!important;z-index:auto!important;
+ top:auto!important;bottom:auto!important;left:auto!important;right:auto!important;
+ transform:none!important;width:100%!important;max-width:1100px!important;
+ min-height:calc(100dvh - 165px);overflow:visible!important;
+ margin:18px auto 30px!important;border-radius:19px!important;
+ padding:clamp(16px,3vw,26px)!important;box-shadow:none!important;
+}
+body[data-reality-route="chat"] #realityChatDockOpen{display:none!important}
+body[data-reality-route="chat"] .reality-chat-close{
+ position:static;float:none;width:auto;height:auto;border-radius:10px;
+ padding:9px 14px;margin:0 0 15px;font-size:13px;
+}
+body[data-reality-route="chat"] #privateTranscript{max-height:min(60vh,720px)!important}
+body[data-reality-route="chat"] .reality-chat-composer{position:relative}
+body[data-reality-route="chat"] main{max-width:1200px}
+@media(max-width:700px){
+ .reality-page-tabs{gap:5px;margin:0}
+ .reality-page-tabs a{padding:9px 12px;font-size:13px}
+ body[data-reality-route="chat"] #privateChat{min-height:calc(100dvh - 120px);padding:12px!important;border-radius:12px!important}
+ body[data-reality-route="chat"] #privateTranscript{max-height:42vh!important}
+}
+
 @media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
 @media(max-width:600px){.business-home{padding:15px;margin:14px 0 20px}.business-home-insights{grid-template-columns:1fr}.business-home-stat{min-height:155px;padding:12px}.business-home-source{white-space:normal}.business-operations-list strong{font-size:22px}#privateChat{top:0!important;right:0!important;bottom:0!important;left:0!important;width:100vw;max-width:none;border-radius:0!important;padding:16px!important}.reality-chat-dock-open{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}}
 
@@ -543,7 +592,14 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 </head>
 <body class="reality-simple-home">
 <main>
-  <div class="top"><div class="brand">REALITY</div><a href="#privateChat" id="accountShortcut" class="state account-shortcut" aria-label="Go to Reality account sign-in">Account · Sign in</a></div>
+  <div class="top">
+  <div class="brand">REALITY</div>
+  <nav id="realityPageTabs" class="reality-page-tabs" aria-label="Reality pages">
+    <a id="realityHomeTab" href="/" aria-current="page">Home</a>
+    <a id="realityChatTab" href="/chat">Chat</a>
+  </nav>
+  <a href="/chat" id="accountShortcut" class="state account-shortcut" aria-label="Open Reality Chat and account">Account · Sign in</a>
+ </div>
 
 <section id="realitySimpleHome" aria-labelledby="simpleRealityTitle">
  <div class="simple-kicker">REALITY · BUSINESS VALUE FIRST</div>
@@ -575,6 +631,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   
   
   <div class="reality-home-value-layout">
+ <section id="realityShiftHomeBrief" class="reality-shift-home-brief" aria-labelledby="realityShiftHomeTitle">
+  <div class="simple-kicker">REALITY CHAT · YOUR WORKDAY</div>
+  <h3 id="realityShiftHomeTitle">What I've done. What I'm doing. What's next.</h3>
+  <p id="realityShiftHomeNow" role="status" aria-live="polite">Checking your saved, owner-authorized shift…</p>
+  <p id="realityShiftHomeNext">Reality will show its next verified step here, rather than making you interpret the work schedule.</p>
+  <button type="button" id="realityShiftOpenConversation" class="simple-primary">Open Reality Chat · Live Workday</button>
+ </section>
  <section id="realityEmployeeShiftPlanner" class="reality-employee-shift-planner" aria-labelledby="realityEmployeeShiftTitle">
   <div class="simple-kicker">REALITY · PLAN BEFORE EXECUTION</div>
   <h3 id="realityEmployeeShiftTitle">Build an employee's 8-hour workday</h3>
@@ -946,10 +1009,10 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <p>Reality can discuss priorities now. Financial conclusions require connected, authorized records.</p>
   </div>
 </section>
-<section id="privateChat" class="console-card" aria-label="Persistent private Reality conversation" role="dialog" aria-modal="false" aria-labelledby="realityChatTitle" data-open="false" tabindex="-1">
- <button type="button" id="realityChatDockClose" class="reality-chat-close" aria-label="Close Reality chat">×</button>
- <div class="label">REALITY · CONVERSATION & CONTINUOUS WORK</div>
- <h3 id="realityChatTitle">Talk to Reality</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
+<section id="privateChat" class="console-card" aria-label="Reality Chat page — continuous work and approvals" role="region" aria-labelledby="realityChatTitle" data-open="false" tabindex="-1">
+ <button type="button" id="realityChatDockClose" class="reality-chat-close" aria-label="Return to Reality Home">← Home</button>
+ <div class="label">REALITY · CHAT PAGE · CONTINUOUS WORK</div>
+ <h3 id="realityChatTitle">Reality Chat</h3><p class="muted">Your conversation is the workspace. Reality can identify useful work, verify upgrades and show progress here. Consequential actions still require your approval.</p>
  <p id="privateAccountState" class="muted" role="status" aria-live="polite">Checking secure account session…</p>
  <button id="privateRetrySession" type="button" hidden>Retry account connection</button>
  <p class="muted">Your conversation is saved to your signed-in account. Reality uses earlier messages for continuity; it does not treat old AI replies as proof or authorize external actions.</p>
@@ -961,7 +1024,50 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
+  <section id="realityChatShiftBrief" class="reality-chat-shift-brief" aria-label="Realtime verified eight-hour workday briefing">
+    <div class="label">REALITY · EMPLOYEE WORKDAY · LIVE EVIDENCE</div>
+    <h4 id="realityChatShiftHeadline" role="status" aria-live="polite">Checking your latest shift…</h4>
+    <div class="reality-chat-shift-facts">
+      <div><strong>What I did</strong><p id="realityChatShiftDid">Waiting for a verified owner-scoped source readback.</p></div>
+      <div><strong>What I'm doing now</strong><p id="realityChatShiftNow">Checking whether work has begun.</p></div>
+      <div><strong>What's next</strong><p id="realityChatShiftNext">The next scheduled step will appear here.</p></div>
+      <div><strong>Do I need your approval?</strong><p id="realityChatShiftNeed">No installation decision is inferred.</p></div>
+    </div>
+    <details class="reality-chat-shift-evidence">
+      <summary>See verified work receipts and timestamps</summary>
+      <ol id="realityChatShiftTimeline" aria-label="Verified shift event timeline"></ol>
+      <p>Provider observations are not completed repairs. Net human-equivalent time saved remains unmeasured until independently established.</p>
+    </details>
+    <button type="button" id="realityChatAskShift" class="simple-secondary">Ask Reality to explain this shift</button>
+    <p class="muted" id="realityChatShiftReadbackNotice">Only authenticated database receipts are used for these updates. No model-generated action is assumed.</p>
+  </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <div id="realityChatComposer" class="reality-chat-composer" aria-label="Talk to Reality">
+      <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
+  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
+   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
+   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
+   <option value="START_DETOUR">Temporarily detour from my active objective</option>
+  </select>
+  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
+  <button id="privateSend" type="button">Send to Reality</button>
+  </div>
+
+  <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
+   <div class="label">REALITY · DECISIONS FOR YOU</div>
+   <h4>Approvals in this conversation</h4>
+   <p class="muted">Review the exact repair, test evidence and installation scope. An ordinary chat message never grants execution authority.</p>
+   <p id="realityChatShiftHandoff" role="status" aria-live="polite" hidden></p>
+   <p id="realityChatApprovalStatus" role="status" aria-live="polite">Checking your saved decisions…</p>
+   <div id="realityChatApprovalItems" aria-live="polite"></div>
+   <details id="realityChatApprovalEvidence" class="reality-chat-settings">
+    <summary>Detailed evidence and older repair records</summary>
+    <div id="realityChatApprovalLegacyContainer"></div>
+   </details>
+   <div id="realityChatApprovalDialogs"></div>
+  </section>
+
   <section class="reality-chat-activity" id="realityChatActivity" aria-label="Reality live work updates">
     <div class="label">REALITY · WORK UPDATES</div>
     <h4>What Reality is doing</h4>
@@ -981,19 +1087,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityChatRepairReviewStatus" role="status" aria-live="polite">Checking verified upgrades and approval readiness…</p>
    <div id="realityChatRepairReviewItems" aria-live="polite"></div>
   </section>
-  <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
-   <div class="label">REALITY · DECISIONS FOR YOU</div>
-   <h4>Approvals in this conversation</h4>
-   <p class="muted">Review the exact repair, test evidence and installation scope. An ordinary chat message never grants execution authority.</p>
-   <p id="realityChatShiftHandoff" role="status" aria-live="polite" hidden></p>
-   <p id="realityChatApprovalStatus" role="status" aria-live="polite">Checking your saved decisions…</p>
-   <div id="realityChatApprovalItems" aria-live="polite"></div>
-   <details id="realityChatApprovalEvidence" class="reality-chat-settings">
-    <summary>Detailed evidence and older repair records</summary>
-    <div id="realityChatApprovalLegacyContainer"></div>
-   </details>
-   <div id="realityChatApprovalDialogs"></div>
-  </section>
+
   <section class="reality-chat-activity" id="realityChatAutomationDiagnostics"
    aria-label="Automated full-loop investigation" hidden>
    <div class="label">REALITY · AUTOMATION DIAGNOSTICS</div>
@@ -1001,15 +1095,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityChatAutomationDiagnosticStatus" role="status" aria-live="polite">Waiting for verified diagnostic evidence.</p>
    <p class="muted">A system-generated diagnostic is not an owner instruction or installation approval. Reality must independently verify the failure before any governed repair.</p>
   </section>
-  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
-  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
-  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
-   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
-   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
-   <option value="START_DETOUR">Temporarily detour from my active objective</option>
-  </select>
-  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
-  <button id="privateSend" type="button">Send to Reality</button>
+
   <details class="reality-chat-settings" id="realityChatSettings"><summary>Saved conversations, business goal and account settings</summary>
   <label for="privateConversations">Saved conversations</label>
   <select id="privateConversations" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"><option value="">Current conversation</option></select>
@@ -1396,49 +1482,41 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   </div>
 </details>
 </main>
-<button type="button" id="realityChatDockOpen" class="reality-chat-dock-open" aria-controls="privateChat" aria-expanded="false" title="Ask Reality about anything">
+<button type="button" id="realityChatDockOpen" class="reality-chat-dock-open" aria-controls="privateChat" aria-expanded="false" title="Open Reality Chat page">
  <span aria-hidden="true">✦</span><span>Ask Reality</span>
 </button>
 <script>
 const $=id=>document.getElementById(id);
 
 let realityChatPreviousFocus=null;
+const realityIsChatPage=()=>/^\/chat\/?$/.test(window.location.pathname);
+document.body.dataset.realityRoute=realityIsChatPage()?'chat':'home';
+$('realityHomeTab').setAttribute('aria-current',realityIsChatPage()?'false':'page');
+$('realityChatTab').setAttribute('aria-current',realityIsChatPage()?'page':'false');
 function realityOpenChatDock(focusPrompt=false){
- realityChatPreviousFocus=document.activeElement;
- const panel=$('privateChat');
- panel.dataset.open='true';
- panel.setAttribute('aria-modal','true');
- document.body.classList.add('reality-chat-is-open');
- $('realityChatDockOpen').setAttribute('aria-expanded','true');
- const target=focusPrompt&&$('privateReady').style.display==='block'?
-   $('privatePrompt'):$('privateLogin').style.display==='block'?
-   $('privateEmail'):$('realityChatDockClose');
- target?.focus({preventScroll:true});
+ if(!realityIsChatPage()){
+  window.location.assign('/chat');
+  return;
+ }
+ // The conversation occupies a standalone page. Focus without launching a modal.
  if($('privateReady')?.style.display==='block'){
   void homeOwnerRefresh();
   void realityChatRefreshEvents();
  }
+ const focus=focusPrompt&&$('privateReady')?.style.display==='block'?
+  $('privatePrompt'):$('privateLogin')?.style.display==='block'?
+  $('privateEmail'):$('realityChatTitle');
+ if(focus?.focus)focus.focus({preventScroll:true});
 }
 function realityCloseChatDock(){
- const panel=$('privateChat');
- panel.dataset.open='false';
- panel.setAttribute('aria-modal','false');
- document.body.classList.remove('reality-chat-is-open');
- $('realityChatDockOpen').setAttribute('aria-expanded','false');
- const prior=realityChatPreviousFocus;
- if(prior?.isConnected&&typeof prior.focus==='function')prior.focus({preventScroll:true});
- else $('realityChatDockOpen').focus({preventScroll:true});
+ window.location.assign('/');
 }
 $('realityChatDockOpen').addEventListener('click',()=>realityOpenChatDock(true));
 $('realityChatDockClose').addEventListener('click',realityCloseChatDock);
 $('businessAskReality').addEventListener('click',()=>realityOpenChatDock(true));
 $('homeOpenApprovalChat').addEventListener('click',()=>homeOwnerFocus());
 $('accountShortcut').addEventListener('click',e=>{e.preventDefault();realityOpenChatDock(false)});
-document.addEventListener('keydown',e=>{
- if(e.key==='Escape'&&$('privateChat').dataset.open==='true'){
-  e.preventDefault();realityCloseChatDock();
- }
-});
+// Escape must never navigate away from a full conversation page.
 let realityBusinessReadEpoch=0;
 function realityBusinessResetMoney(){
  // No finance connector is authorized yet: never substitute modeled ROI, tests or invented figures.
@@ -6231,6 +6309,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-eight-hour-shift-plan-v1.js"></script>
+<script defer src="/reality-shift-conversation-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
