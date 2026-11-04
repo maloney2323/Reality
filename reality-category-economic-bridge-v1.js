@@ -74,6 +74,20 @@ function validPortfolio(d){
   !number(c?.recent_commits_excluded)||
   c.provider_observations!==(c.open_issues+c.pending_pr_review+
     c.previous_failure_signals)||
+  (d.source_pagination?.issues&&(
+   !number(d.source_pagination.issues.pages_scanned)||
+   d.source_pagination.issues.pages_scanned>5||
+   !number(d.source_pagination.issues.items_fetched)||
+   d.source_pagination.issues.items_fetched>500||
+   d.source_pagination.issues.query_scope_fully_reconciled!==
+    (d.source_coverage?.issues==='checked')))||
+  (d.source_pagination?.pulls&&(
+   !number(d.source_pagination.pulls.pages_scanned)||
+   d.source_pagination.pulls.pages_scanned>5||
+   !number(d.source_pagination.pulls.items_fetched)||
+   d.source_pagination.pulls.items_fetched>500||
+   d.source_pagination.pulls.query_scope_fully_reconciled!==
+    (d.source_coverage?.pull_requests==='checked')))||
   a?.provenance!=='TRANSPARENT_EDITORIAL_ASSUMPTIONS_UNCALIBRATED_VERY_LOW_CONFIDENCE'||
   a.task_completion_effort_estimated!==false||
   a.source_links_do_not_prove_business_impact!==true||
@@ -186,7 +200,17 @@ function providerRender(data){
   data.counts.duplicate_source_observations_excluded+
   ' duplicate provider records filtered. Distinct records can still overlap. '+
   (data.source_catalog_truncated?'Catalog truncated: count not exhaustive. ':'')+
-  'Actual repair hours, customer outcome value, human time saved and dollars saved are not established.');
+  'Actual repair hours, customer outcome value, human time saved and dollars saved are not established. '+
+  (data.source_pagination?.issues?
+    'GitHub open issues: '+data.source_coverage.issues+
+     ' ('+data.source_pagination.issues.pages_scanned+' page(s)). ': 
+    'GitHub issue pagination depth unverified. ')+
+  (data.source_pagination?.pulls?
+    'GitHub open PRs: '+data.source_coverage.pull_requests+
+     ' ('+data.source_pagination.pulls.pages_scanned+' page(s)). ':
+    'GitHub PR pagination depth unverified. ')+
+  'Workflow failures use a recent bounded window; historical commits are not new jobs. '+
+  'Customer and business operations connectors remain separately unconnected.');
  for(const item of data.categories){
   const el=document.createElement('article');el.className='reality-category-card';
   const header=document.createElement('h4');header.textContent=item.label;
