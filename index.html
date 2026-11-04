@@ -348,6 +348,19 @@ body.reality-simple-home:not(.reality-details-open) main > :not(.top):not(#reali
 #realitySimpleHome .reality-engine-layers strong{display:block;color:#f6fbff;font-size:14px;line-height:1.42}
 #realitySimpleHome .reality-engine-layers p{font-size:11.5px;color:#b9cbdc;line-height:1.55;margin:7px 0 0}
 #realitySimpleHome .reality-engine-arrow{color:#69cae6;font-size:21px;display:flex;align-items:center;justify-content:center}
+#realitySimpleHome .reality-customer-adaptation{margin:20px 0 8px;border:1px solid #395c73;border-radius:16px;background:linear-gradient(125deg,#0e293b,#102034);padding:18px 17px}
+#realitySimpleHome .reality-customer-adaptation-header{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:14px}
+#realitySimpleHome .reality-customer-adaptation-header h4{font-size:clamp(17px,3vw,21px);color:#f4fbff;margin:6px 0 8px}
+#realitySimpleHome .reality-customer-adaptation-header p{color:#b2cedd;font-size:12.5px;line-height:1.65;max-width:720px;margin:0 0 16px}
+#realitySimpleHome .reality-customer-journey{list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:0;margin:0}
+#realitySimpleHome .reality-customer-journey li{min-width:0;position:relative;border:1px solid #3b576e;border-radius:12px;background:#0c1f30;padding:14px 10px 11px}
+#realitySimpleHome .reality-customer-journey li::before{content:counter(list-item,decimal-leading-zero);display:block;color:#8cd7ed;font-weight:750;font-size:12px;margin:0 0 9px}
+#realitySimpleHome .reality-customer-journey li strong{display:block;font-size:12px;line-height:1.4;color:#f5fbff;margin-bottom:6px}
+#realitySimpleHome .reality-customer-journey li span{display:block;color:#b3c9d8;font-size:11px;line-height:1.6}
+#realitySimpleHome .reality-customer-adaptation-note{border-top:1px solid #385567;margin:15px 0 0;padding:12px 0 0;color:#b1cbda;font-size:11.5px;line-height:1.65}
+#realitySimpleHome .reality-customer-adaptation-note strong{color:#e6f5fc}
+@media(max-width:860px){#realitySimpleHome .reality-customer-journey{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){#realitySimpleHome .reality-customer-journey{grid-template-columns:minmax(0,1fr)}#realitySimpleHome .reality-customer-adaptation{padding:15px 13px}}
 #realitySimpleHome .reality-model-capability-map{margin:20px 0 22px;padding:18px 0;border-top:1px solid #344d63;border-bottom:1px solid #344d63}
 #realitySimpleHome .reality-capability-head{display:flex;align-items:start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px}
 #realitySimpleHome .reality-capability-head h4{font-size:clamp(17px,3vw,20px);color:#f5fbff;margin:5px 0 7px}
@@ -536,6 +549,24 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
      <p>Original-work settlement and independently reconciled final receipts where the complete evidence exists.</p>
     </article>
    </div>
+   <section id="realityCustomerAdaptation" class="reality-customer-adaptation" aria-labelledby="realityCustomerAdaptationTitle">
+    <div class="reality-customer-adaptation-header">
+     <div>
+      <div class="simple-kicker">THE CUSTOMER ADAPTATION ADVANTAGE</div>
+      <h4 id="realityCustomerAdaptationTitle">Reality adapts to the business—not just the prompt.</h4>
+      <p>A customer's real work reveals a missing ability. The model can propose and build that ability; Reality independently governs every transition, proves it before installation, and verifies the original job afterward.</p>
+     </div>
+     <span class="reality-engine-qualifier">Cross-business architecture · Live generality not yet certified</span>
+    </div>
+    <ol class="reality-customer-journey" aria-label="Governed customer-specific capability acquisition">
+     <li><strong>Understand the business</strong><span>Connect its authorized workflows, sources, goals, and operating boundaries.</span></li>
+     <li><strong>Discover the actual gap</strong><span>Observe a real blocked job; distinguish missing capability from failure or redundant change.</span></li>
+     <li><strong>Generate and independently test</strong><span>Use model intelligence to build a candidate against frozen acceptance and safety requirements.</span></li>
+     <li><strong>Approve and safely install</strong><span>The customer approves the exact verified upgrade. The model cannot grant itself authority.</span></li>
+     <li><strong>Resume, verify, and receipt</strong><span>Continue the same original job, check installed behavior, and issue a final receipt only after independent settlement.</span></li>
+    </ol>
+    <p class="reality-customer-adaptation-note"><strong>Why it matters:</strong> customers do not need the same predefined automation library. Reality's architecture is intended to acquire the missing abilities each business genuinely needs—while preserving an independent governance foundation. <strong>Current proof boundary:</strong> the owner preview demonstrates source-backed discovery, tested repair candidates and isolated final receipts; multi-industry autonomous adaptation and routine end-to-end production operation remain to be independently demonstrated.</p>
+   </section>
    <section id="realityModelCapabilityMap" class="reality-model-capability-map" aria-labelledby="realityModelCapabilityTitle">
     <div class="reality-capability-head">
      <div>
