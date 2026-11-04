@@ -78,6 +78,20 @@ function update(){
  const present=(id,value,fallback='Not verified')=>{
   const node=$(id);if(node)node.textContent=value||fallback;
  };
+ // A PRE-automation brief mirrors existing source readbacks. No claim of
+ // accepted jobs, actual avoided effort, or probable company savings.
+ present('rvPreShiftPotential',isSignedIn&&observations?
+  observations+' observations available to investigate':
+  'Source-backed opportunity scope is not yet verified',
+  'Source-backed opportunity scope is not yet verified');
+ present('rvPreShiftReviewValue',reviewWhatIf,'Not available');
+ present('rvPreShiftIssueHours',assumedHours,'Not available');
+ present('rvPreShiftNarrative',isSignedIn&&observations?
+  'Reality has identified work signals'+
+  (findings?' and '+findings+' separately recorded owner capability findings':'')+
+  (candidates?', including '+candidates+' tested repair candidate(s)':'')+
+  '. These records can overlap. No missing capabilities, projected cost savings, or human hours saved are inferred from this inventory.':
+  'Sign in to inspect source-backed work signals. Automation is not required to see discovery evidence.');
  present('rvOverviewSignals',isSignedIn?observations:null);
  present('rvOverviewReviewWhatIf',reviewWhatIf,'Not available');
  present('rvOverviewReceipts',isSignedIn?finalizedReceipts:null);
