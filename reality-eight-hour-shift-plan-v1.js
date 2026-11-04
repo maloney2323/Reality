@@ -205,14 +205,15 @@ function render(d){
    ' distinct records assigned for validation · 0 verified execution-ready jobs.',
    'reality-employee-shift-note');
  const risk=el('p',
-   'Eight hours is the proposed shift window, NOT eight measured human labor-hours. '+
+   'Eight hours is the approved outer work window, NOT eight measured human labor-hours. '+
+   'The allocations below are planning estimates, not mandatory waits between tasks. '+
    'Items still require fresh validation, original-work authorization and separate exact upgrade approval if needed.',
    'reality-employee-shift-note');
  const list=el('ol',undefined,'reality-employee-shift-list');
  for(const item of d.slots){
   const li=el('li',undefined,'reality-employee-shift-item');
-  const time=el('span',toClock(item.offset_start_minutes)+' – '+
-    toClock(item.offset_end_minutes),'reality-employee-shift-time');
+  const time=el('span','Planning estimate · '+item.planning_minutes+
+    ' min · No required wait','reality-employee-shift-time');
   const body=el('div');
   body.append(el('strong',stageNames[item.stage]),
     el('p',item.action));
