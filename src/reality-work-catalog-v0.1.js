@@ -57,16 +57,24 @@ export async function fetchCatalogGitHub(kind,{env=process.env,fetchImpl=fetch}=
   // Never follow arbitrary GitHub Link headers or client-supplied URLs.
   // Only construct narrowly allowlisted public read paths for this repository.
   const providerPath=paths[kind]+(paginated?'&page='+page:'');
-  const response=await fetchImpl(API+providerPath,{
-   method:'GET',cache:'no-store',redirect:'error',
-   headers:{Accept:'application/vnd.github+json',
-    'User-Agent':'Reality-ReadOnly-Work-Catalog',
-    'X-GitHub-Api-Version':'2022-11-28'},
-  });
-  if(!response.ok)throw Error('CATALOG_GITHUB_READ_'+response.status);
-  const body=await response.json().catch(()=>null);
-  if(!Array.isArray(body)||body.length>(paginated?PROVIDER_PAGE_SIZE:30))
-   throw Error('CATALOG_GITHUB_ARRAY_INVALID');
+  let body;
+  try{
+   const response=await fetchImpl(API+providerPath,{
+    method:'GET',cache:'no-store',redirect:'error',
+    headers:{Accept:'application/vnd.github+json',
+     'User-Agent':'Reality-ReadOnly-Work-Catalog',
+     'X-GitHub-Api-Version':'2022-11-28'},
+   });
+   if(!response.ok)throw Error('CATALOG_GITHUB_READ_'+response.status);
+   body=await response.json().catch(()=>null);
+   if(!Array.isArray(body)||body.length>(paginated?PROVIDER_PAGE_SIZE:30))
+    throw Error('CATALOG_GITHUB_ARRAY_INVALID');
+  }catch(err){
+   // Preserve independently observed first pages, but mark incomplete.
+   // Never silently claim checked when a later provider read fails.
+   if(scanned===0||!paginated)throw err;
+   break;
+  }
   observed.push(...body);scanned++;
   if(!paginated||body.length<PROVIDER_PAGE_SIZE){
    complete=true;break;
