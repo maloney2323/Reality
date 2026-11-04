@@ -44,6 +44,6 @@ test('source, labor reference and governor are kept while repeated summary cards
  assert.match(html,/id="realityPublishedRepairEvidence"/);
  assert.match(html,/id="realityPublishedRepairGroups"/);
  assert.match(html,/Reality adapts to the business—not just the prompt/);
- assert.match(html,/Original-job continuation safeguards/);
+ assert.match(html,/id="realityModelCapabilityMap"/);
  assert.match(html,/FINANCIAL_VALUE_UNKNOWN|Not established/);
 });
