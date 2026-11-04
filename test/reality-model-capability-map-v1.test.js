@@ -38,10 +38,10 @@ test('Engine Delta includes a specific model-augmentation capability map',()=>{
  assert.match(html,/@media\(max-width:680px\)/);
  assert.doesNotThrow(()=>new vm.Script(src));
 });
-test('ten concrete capabilities appear in four operational groups',()=>{
+test('eleven concrete capabilities appear in four operational groups',()=>{
  const host=render(),groups=host.children;
  assert.equal(groups.length,4);
- assert.equal(groups.reduce((n,g)=>n+descendants(g,'details').length,0),10);
+ assert.equal(groups.reduce((n,g)=>n+descendants(g,'details').length,0),11);
  const headings=groups.map(g=>textOnly(g.children[0]));
  assert.match(headings[0],/Understand and remember/);
  assert.match(headings[1],/Enforce permission and safety/);
@@ -52,6 +52,7 @@ test('ten concrete capabilities appear in four operational groups',()=>{
   'Durable original-work continuity','Source-backed opportunity discovery',
   'Failure versus capability-gap diagnosis','Exact-work execution authority',
   'Two explicit authorization boundaries','Evidence-gated self-upgrade orchestration',
+  'Business-specific capability acquisition',
   'Original-job continuation safeguards','Independent post-install acceptance',
   'Durable final settlement receipts','Evidence-scoped business value',
   'What the model gains:','What Reality enforces:'
@@ -74,10 +75,10 @@ test('each capability links to an existing implementation and automated test',()
    refs.push(rel);
   }
  }
- assert.equal(refs.length,20);
- assert.equal(refs.filter(x=>x.startsWith('src/')).length,10);
- assert.equal(refs.filter(x=>x.startsWith('test/')).length,10);
- assert.equal(new Set(refs).size,20);
+ assert.equal(refs.length,22);
+ assert.equal(refs.filter(x=>x.startsWith('src/')).length,11);
+ assert.equal(refs.filter(x=>x.startsWith('test/')).length,11);
+ assert.equal(new Set(refs).size,22);
 });
 test('no manufactured statistics, action authority or general production readiness claims',()=>{
  assert.doesNotMatch(src,/100% safety|0\.0%|zero hallucinations|no competitors|fully autonomous workday proven|all repairs guaranteed/i);
@@ -86,4 +87,22 @@ test('no manufactured statistics, action authority or general production readine
  assert.match(src,/verified net savings not yet established/);
  assert.match(html,/not that every scenario is production-ready/);
  assert.equal(descendants(render(),'button').length,0);
+});
+
+test('customer-adaptation story binds model generation to authentic customer work and independent governance',()=>{
+ const segment=html.slice(html.indexOf('id="realityCustomerAdaptation"'),
+  html.indexOf('id="realityModelCapabilityMap"'));
+ assert.ok(segment.length>200);
+ assert.match(segment,/Reality adapts to the business—not just the prompt/);
+ assert.match(segment,/Cross-business architecture · Live generality not yet certified/);
+ assert.match(segment,/underlying model|model intelligence|model can propose and build/i);
+ assert.match(segment,/The model cannot grant itself authority/);
+ assert.match(segment,/final receipt only after independent settlement/);
+ assert.match(segment,/multi-industry autonomous adaptation .* remain to be independently demonstrated/);
+ const stages=(segment.match(/<li>/g)||[]).length;
+ assert.equal(stages,5);
+ const fullText=textOnly(render());
+ assert.match(fullText,/Business-specific capability acquisition/);
+ assert.match(fullText,/cross-business self-adaptation not yet independently certified/);
+ assert.match(fullText,/trusted server adapters/);
 });
