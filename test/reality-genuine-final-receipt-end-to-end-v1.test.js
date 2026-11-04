@@ -50,7 +50,7 @@ test('signed broker, database and final confirmation do not accept a model-only 
  assert.match(receipt,/FINAL_RECEIPT_UNIQUE_VERIFIED_SETTLEMENT_REQUIRED/);
  assert.match(receipt,/c.outcome_receipt->>'independent_outcome_verified'<>'true'/);
  assert.match(receipt,/FINAL_RECEIPT_INDEPENDENT_VERIFIER_PROOF_REQUIRED/);
- assert.match(broker,/j.name==='independently_verify_final_customer_receipt'/);
+ assert.match(broker,/'independently_verify_final_customer_receipt'/);
  assert.match(broker,/j.name==='record_independent_original_settlement'/);
  assert.match(broker,/FINAL_RECEIPT_INDEPENDENT_JOB_AND_ARTIFACT_NOT_VERIFIED/);
 });
@@ -84,4 +84,32 @@ test('owner UI and read-only API may display only independently verified final r
  assert.match(html,/full_loop_independently_verified===true/);
  assert.match(html,/Download verified final customer receipt \(PDF\)/);
  assert.match(html,/Final independent completion check pending/);
+});
+
+test('historical #188 final receipt recovery binds original provider run and current signed verifier without replay',()=>{
+ const broker=read('supabase/functions/reality-genuine-capability-auto-admit/index.ts');
+ const workflow=read('.github/workflows/reality-genuine-capability-auto-trigger-v1.yml');
+ const verifier=read('scripts/reality-genuine-final-completion-historical-v1.mjs');
+ const recorder=read('scripts/reality-genuine-final-completion-historical-record-v1.mjs');
+ assert.match(broker,/source.provider_run_id>=run.id/);
+ assert.match(broker,/FINAL_RECEIPT_HISTORICAL_SIGNED_SOURCE_UNVERIFIED/);
+ assert.match(broker,/historicalRun.status!=='completed'/);
+ assert.match(broker,/historicalRun.head_repository\?\.full_name!==REPO/);
+ assert.match(broker,/source.installed_commit_sha/);
+ assert.match(broker,/FINAL_RECEIPT_INDEPENDENT_PROVIDER_GRAPH_NOT_SETTLED/);
+ assert.match(broker,/independently_verify_historical_final_customer_receipt/);
+ assert.match(broker,/reality-independent-historical-final-completion-verifier-/);
+ assert.match(broker,/FINAL_RECEIPT_INDEPENDENT_JOB_AND_ARTIFACT_NOT_VERIFIED/);
+ assert.match(workflow,/contains\(github.event.head_commit.message, '\[recover-final-188\]'\)/);
+ assert.match(workflow,/run-id: 41639811554/);
+ assert.match(workflow,/needs: independently_verify_historical_final_customer_receipt/);
+ assert.match(verifier,/const HISTORICAL_RUN=41639811554/);
+ assert.match(verifier,/action:'final_receipt_historical_prepare'/);
+ assert.match(verifier,/--network','none'/);
+ assert.match(verifier,/negative_cases_rejected:5/);
+ assert.match(verifier,/historical_recovery_run_id:Number\(e.GITHUB_RUN_ID\)/);
+ assert.match(recorder,/action:'final_receipt_historical_record'/);
+ assert.match(recorder,/report.historical_recovery_run_id!==Number\(e.GITHUB_RUN_ID\)/);
+ assert.match(recorder,/report.provider_run_id!==HISTORICAL_RUN/);
+ assert.match(recorder,/FULL_LOOP_INDEPENDENTLY_VERIFIED/);
 });
