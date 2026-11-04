@@ -290,6 +290,26 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .business-home-actions p{font-size:11px;color:#adbfd1;max-width:560px;line-height:1.5}
 .business-ask-reality{margin-top:0;background:#cfeaf4;color:#092334;min-height:45px}
 #privateChat{display:none!important;position:fixed!important;z-index:100;top:14px;right:14px;left:auto;bottom:14px;margin:0!important;max-width:540px;width:min(540px,calc(100vw - 28px));overflow-y:auto;overflow-x:hidden;box-shadow:0 20px 75px #000b;background:linear-gradient(165deg,#17283b,#0b1320)!important;border:1px solid #507893!important;border-radius:20px;padding:20px!important;scroll-margin-top:0}
+#privateChat{right:50%!important;left:auto!important;transform:translateX(50%);max-width:900px!important;width:min(900px,calc(100vw - 22px))!important}
+#realitySimpleHome .reality-shift-home-brief{margin:0 0 16px;padding:17px;border:1px solid #62819a;border-radius:17px;background:#13283b}
+#realitySimpleHome .reality-shift-home-brief h3{font-size:20px;margin:6px 0 10px;color:#eaf3ff}
+#realitySimpleHome .reality-shift-home-brief p{font-size:14px;line-height:1.65;margin:9px 0;color:#d5e5f0}
+#realitySimpleHome #realityShiftOpenConversation{min-height:50px;margin-top:8px}
+.reality-chat-shift-brief{border:1px solid #4c8698;border-radius:16px;padding:15px;margin:15px 0;background:#112b3a}
+.reality-chat-shift-brief h4{font-size:18px;line-height:1.35;margin:7px 0 13px;color:#f0faff}
+.reality-chat-shift-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.reality-chat-shift-facts>div{border:1px solid #37586d;padding:12px;border-radius:12px;background:#0e2131}
+.reality-chat-shift-facts strong{display:block;color:#f0faff;font-size:13px}
+.reality-chat-shift-facts p{margin:5px 0 0;color:#c9dce9;font-size:13px;line-height:1.5}
+.reality-chat-shift-evidence{margin:12px 0}
+.reality-chat-shift-evidence summary{cursor:pointer;color:#c0e6f9;font-size:13px}
+.reality-chat-shift-evidence li{margin:9px 0;font-size:12px;line-height:1.5;color:#d6e5f0}
+.reality-chat-shift-evidence a{color:#c0e8ff}
+.reality-chat-composer{border:1px solid #47637d;padding:14px;border-radius:15px;margin:10px 0 14px;background:#122338}
+.reality-chat-composer textarea{width:100%;min-height:90px}
+.reality-chat-composer label{font-size:12px}
+#realityChatApprovalInbox{border-color:#457b77}
+@media(max-width:600px){#privateChat{inset:0!important;width:100vw!important;max-width:none!important;transform:none!important;border-radius:0!important;padding:14px!important;padding-top:max(14px,env(safe-area-inset-top))!important;padding-bottom:max(14px,env(safe-area-inset-bottom))!important}.reality-chat-shift-facts{grid-template-columns:1fr}#privateTranscript{max-height:35vh!important}}
 #privateChat[data-open="true"]{display:block!important}
 .reality-chat-close{position:sticky;top:0;float:right;z-index:2;background:#243e52;color:#f0f7ff;border:1px solid #42627b;border-radius:50%;font-size:23px;padding:0;width:38px;height:38px;margin:0}
 .reality-chat-dock-open{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:98;display:flex;gap:9px;align-items:center;min-height:56px;padding:11px 18px;background:#e7f3fb;color:#0e2438;border:2px solid #5884a1;box-shadow:0 8px 28px #0008;border-radius:999px;font-size:15px}
@@ -575,6 +595,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   
   
   <div class="reality-home-value-layout">
+ <section id="realityShiftHomeBrief" class="reality-shift-home-brief" aria-labelledby="realityShiftHomeTitle">
+  <div class="simple-kicker">REALITY CHAT · YOUR WORKDAY</div>
+  <h3 id="realityShiftHomeTitle">What I've done. What I'm doing. What's next.</h3>
+  <p id="realityShiftHomeNow" role="status" aria-live="polite">Checking your saved, owner-authorized shift…</p>
+  <p id="realityShiftHomeNext">Reality will show its next verified step here, rather than making you interpret the work schedule.</p>
+  <button type="button" id="realityShiftOpenConversation" class="simple-primary">Open Reality Chat · Live Workday</button>
+ </section>
  <section id="realityEmployeeShiftPlanner" class="reality-employee-shift-planner" aria-labelledby="realityEmployeeShiftTitle">
   <div class="simple-kicker">REALITY · PLAN BEFORE EXECUTION</div>
   <h3 id="realityEmployeeShiftTitle">Build an employee's 8-hour workday</h3>
@@ -961,7 +988,50 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
+  <section id="realityChatShiftBrief" class="reality-chat-shift-brief" aria-label="Realtime verified eight-hour workday briefing">
+    <div class="label">REALITY · EMPLOYEE WORKDAY · LIVE EVIDENCE</div>
+    <h4 id="realityChatShiftHeadline" role="status" aria-live="polite">Checking your latest shift…</h4>
+    <div class="reality-chat-shift-facts">
+      <div><strong>What I did</strong><p id="realityChatShiftDid">Waiting for a verified owner-scoped source readback.</p></div>
+      <div><strong>What I'm doing now</strong><p id="realityChatShiftNow">Checking whether work has begun.</p></div>
+      <div><strong>What's next</strong><p id="realityChatShiftNext">The next scheduled step will appear here.</p></div>
+      <div><strong>Do I need your approval?</strong><p id="realityChatShiftNeed">No installation decision is inferred.</p></div>
+    </div>
+    <details class="reality-chat-shift-evidence">
+      <summary>See verified work receipts and timestamps</summary>
+      <ol id="realityChatShiftTimeline" aria-label="Verified shift event timeline"></ol>
+      <p>Provider observations are not completed repairs. Net human-equivalent time saved remains unmeasured until independently established.</p>
+    </details>
+    <button type="button" id="realityChatAskShift" class="simple-secondary">Ask Reality to explain this shift</button>
+    <p class="muted" id="realityChatShiftReadbackNotice">Only authenticated database receipts are used for these updates. No model-generated action is assumed.</p>
+  </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <div id="realityChatComposer" class="reality-chat-composer" aria-label="Talk to Reality">
+      <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
+  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
+  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
+   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
+   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
+   <option value="START_DETOUR">Temporarily detour from my active objective</option>
+  </select>
+  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
+  <button id="privateSend" type="button">Send to Reality</button>
+  </div>
+
+  <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
+   <div class="label">REALITY · DECISIONS FOR YOU</div>
+   <h4>Approvals in this conversation</h4>
+   <p class="muted">Review the exact repair, test evidence and installation scope. An ordinary chat message never grants execution authority.</p>
+   <p id="realityChatShiftHandoff" role="status" aria-live="polite" hidden></p>
+   <p id="realityChatApprovalStatus" role="status" aria-live="polite">Checking your saved decisions…</p>
+   <div id="realityChatApprovalItems" aria-live="polite"></div>
+   <details id="realityChatApprovalEvidence" class="reality-chat-settings">
+    <summary>Detailed evidence and older repair records</summary>
+    <div id="realityChatApprovalLegacyContainer"></div>
+   </details>
+   <div id="realityChatApprovalDialogs"></div>
+  </section>
+
   <section class="reality-chat-activity" id="realityChatActivity" aria-label="Reality live work updates">
     <div class="label">REALITY · WORK UPDATES</div>
     <h4>What Reality is doing</h4>
@@ -981,19 +1051,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityChatRepairReviewStatus" role="status" aria-live="polite">Checking verified upgrades and approval readiness…</p>
    <div id="realityChatRepairReviewItems" aria-live="polite"></div>
   </section>
-  <section class="reality-chat-activity reality-chat-decision-inbox" id="realityChatApprovalInbox" aria-label="Owner approval requests in this conversation">
-   <div class="label">REALITY · DECISIONS FOR YOU</div>
-   <h4>Approvals in this conversation</h4>
-   <p class="muted">Review the exact repair, test evidence and installation scope. An ordinary chat message never grants execution authority.</p>
-   <p id="realityChatShiftHandoff" role="status" aria-live="polite" hidden></p>
-   <p id="realityChatApprovalStatus" role="status" aria-live="polite">Checking your saved decisions…</p>
-   <div id="realityChatApprovalItems" aria-live="polite"></div>
-   <details id="realityChatApprovalEvidence" class="reality-chat-settings">
-    <summary>Detailed evidence and older repair records</summary>
-    <div id="realityChatApprovalLegacyContainer"></div>
-   </details>
-   <div id="realityChatApprovalDialogs"></div>
-  </section>
+
   <section class="reality-chat-activity" id="realityChatAutomationDiagnostics"
    aria-label="Automated full-loop investigation" hidden>
    <div class="label">REALITY · AUTOMATION DIAGNOSTICS</div>
@@ -1001,15 +1059,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityChatAutomationDiagnosticStatus" role="status" aria-live="polite">Waiting for verified diagnostic evidence.</p>
    <p class="muted">A system-generated diagnostic is not an owner instruction or installation approval. Reality must independently verify the failure before any governed repair.</p>
   </section>
-  <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
-  <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
-  <select id="privateGoalCommand" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px">
-   <option value="">Ordinary conversation (do not change my ongoing goal)</option>
-   <option value="SET_ACTIVE">Set this message as my ongoing objective</option>
-   <option value="START_DETOUR">Temporarily detour from my active objective</option>
-  </select>
-  <p class="muted">An ongoing goal is changed only when you explicitly select it. Assistant suggestions cannot change it. This never authorizes external actions.</p>
-  <button id="privateSend" type="button">Send to Reality</button>
+
   <details class="reality-chat-settings" id="realityChatSettings"><summary>Saved conversations, business goal and account settings</summary>
   <label for="privateConversations">Saved conversations</label>
   <select id="privateConversations" style="width:100%;background:#0b0e14;color:#eef1f7;padding:10px;border:1px solid #303847;border-radius:10px"><option value="">Current conversation</option></select>
@@ -6231,6 +6281,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-eight-hour-shift-plan-v1.js"></script>
+<script defer src="/reality-shift-conversation-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
