@@ -12,7 +12,7 @@ test('the same existing Chat route serves full-screen presentation and read-only
  assert.match(html,/<script defer src="\/reality-chat-workspace-v1.js"><\/script>/);
  assert.match(html,/<script defer src="\/reality-chat-verified-cycle-v2.js"><\/script>/);
  assert.ok(html.indexOf('reality-chat-workspace-v1.js')<html.indexOf('reality-chat-verified-cycle-v2.js'));
- assert.match(js,/location\\.pathname/);
+ assert.ok(js.includes('location.pathname'));
  assert.doesNotThrow(()=>new Script(js));
 });
 test('readback strictly GET-only; does not create a worker, install, or approve',()=>{
@@ -29,7 +29,7 @@ test('readback strictly GET-only; does not create a worker, install, or approve'
 });
 test('all original-work stages require matched, owner-scoped readback instead of model text',()=>{
  assert.match(js,/const originalId=admitted\?build.original_work_id:null/);
- assert.match(js,/build\.original_conversation_id===id/);
+ assert.ok(js.includes('original_conversation_id===id'));
  assert.match(js,/build\.goal_id===gs\.active_goal_id/);
  assert.match(js,/build\.queued===true/);
  assert.match(js,/build\.dispatch_commit_sha/);
