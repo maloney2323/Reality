@@ -1,9 +1,6 @@
--- Reality's shift worker is not a second AI agent.
--- Reuse the ALREADY owner-authorized Genuine Capability Engine queue.
--- Independently validate the exact owner/goal/original source/shift proof.
--- This is a read-only original-job linkage when final settlement is still absent.
--- Never create a job, call a model, initiate new research or grant installation.
--- Previous independent-final-receipt matching below is preserved unchanged.
+-- Read-only authenticated employee-shift observation -> EXISTING governed original queue.
+-- This routine does not dispatch an agent, create an original job, modify authorization,
+-- bypass frozen regression or claim original-job success without a final receipt.
 create or replace function public.reality_reconcile_employee_shift_original_v1()
 returns jsonb language plpgsql security invoker set search_path='' as $fn$
 declare
@@ -76,32 +73,7 @@ begin
     and t.source_status='OPEN_ISSUE'
     and t.source_ref ~
        '^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*
- v_proof:=jsonb_build_object('kind','EXACT_ORIGINAL_JOB_FINAL_RECEIPT_MATCH',
-  'original_work_id',v.original_work_id,'source_ref',v.source_ref,
-  'artifact_sha256',v.artifact_sha256,
-  'verified_settlement_event_id',v.verified_settlement_event_id,
-  'verified_at',v.verified_at,'read_only',true,
-  'independently_reconciled',true,
-  'production_changed',false,'human_hours_saved',null);
- v_digest:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-  pg_catalog.convert_to(v_proof::text,'UTF8')),'hex');
- update reality_internal.governed_employee_shift_steps_v1
-   set state='ORIGINAL_JOB_RECEIPT_VERIFIED',proof=v_proof,
-   proof_sha256=v_digest,completed_at=v_now
-   where shift_id=s.shift_id and step_index in (6,7)
-   and state in ('QUEUED','AWAITING_EXACT_WORK');
- update reality_internal.governed_employee_shifts_v1
-   set status='RUNNING',last_progress_at=v_now
-   where shift_id=s.shift_id;
- return jsonb_build_object('status','EXACT_SHIFT_ORIGINAL_RECEIPT_RECONCILED',
-  'shift_id',s.shift_id,'original_work_id',v.original_work_id,
-  'proof_sha256',v_digest,'installation_authorized',false,
-  'production_changed',false,'human_hours_saved',null);
-end $fn$;
-revoke all on function public.reality_reconcile_employee_shift_original_v1()
- from public,anon,authenticated;
-grant execute on function public.reality_reconcile_employee_shift_original_v1()
- to service_role;
+$'
     and t.proof->>'kind'='GITHUB_SOURCE_READBACK'
     and t.proof->>'source_url'=t.source_ref
     and t.proof->>'provider_status'=t.source_status
@@ -146,6 +118,7 @@ grant execute on function public.reality_reconcile_employee_shift_original_v1()
    'model_invoked_by_shift',false,'new_customer_job_created',false,
    'installation_authorized',false,'production_changed',false);
  end if;
+
  v_proof:=jsonb_build_object('kind','EXACT_ORIGINAL_JOB_FINAL_RECEIPT_MATCH',
   'original_work_id',v.original_work_id,'source_ref',v.source_ref,
   'artifact_sha256',v.artifact_sha256,
