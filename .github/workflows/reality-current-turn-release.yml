@@ -1,0 +1,35 @@
+name: Reality current-turn release guard
+on:
+  push:
+    branches: [fix/reality-chat-fullscreen-verified-cycle-20261105]
+    paths:
+      - src/reality-current-turn-release-v1.js
+      - src/reality-model-gateway-v0.1.js
+      - src/reality-chat-research-bridge-v1.js
+      - api/reality/personal-chat.js
+      - test/reality-current-turn-release-v1.test.js
+      - test/reality-chat-public-research-v1.test.js
+      - .github/workflows/reality-current-turn-release.yml
+  pull_request:
+    paths:
+      - src/reality-current-turn-release-v1.js
+      - src/reality-model-gateway-v0.1.js
+      - src/reality-chat-research-bridge-v1.js
+      - api/reality/personal-chat.js
+      - test/reality-current-turn-release-v1.test.js
+      - test/reality-chat-public-research-v1.test.js
+      - .github/workflows/reality-current-turn-release.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guarded-response-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify response relevance and work-claim boundary
+        run: node --test test/reality-current-turn-release-v1.test.js test/reality-chat-public-research-v1.test.js test/reality-model-gateway-v0.1.test.js
