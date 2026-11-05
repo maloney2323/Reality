@@ -38,16 +38,18 @@ declare
  v_claim uuid;
 begin
  if current_user<>'service_role' then raise exception 'CONTINUATION_SERVICE_ONLY'; end if;
- -- Only a currently running authorized shift, after its first seven
- -- approved slots are terminal, while its final report remains queued.
+ -- Only an authorized shift after its first five source checks are terminal.
+ -- Step 6/7 may be waiting for EXACT original-job authority; monitor does
+ -- not consume, change, or impersonate those execution/approval gates.
+ -- The approved final report remains queued until the original end time.
  select s.* into v_shift
  from reality_internal.governed_employee_shifts_v1 s
- where s.status='RUNNING'
+ where s.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
    and s.planned_start_at<=v_now and s.planned_end_at>v_now
    and exists (select 1 from reality_internal.governed_employee_shift_steps_v1 e
      where e.shift_id=s.shift_id and e.step_index=8 and e.state='QUEUED')
    and not exists (select 1 from reality_internal.governed_employee_shift_steps_v1 p
-     where p.shift_id=s.shift_id and p.step_index between 1 and 7
+     where p.shift_id=s.shift_id and p.step_index between 1 and 5
        and p.state in ('QUEUED','CLAIMED','AWAITING_EXACT_WORK'))
  order by s.planned_start_at,s.created_at
  for update of s skip locked limit 1;
@@ -138,7 +140,7 @@ begin
   where m.shift_id=p_shift_id and m.monitor_bucket=p_monitor_bucket
   for update of m;
  if not found or v.state<>'CLAIMED' or v.claim_id<>p_claim_id or
-  v.lease_expires_at<=v_now or v.shift_status<>'RUNNING' or
+  v.lease_expires_at<=v_now or v.shift_status not in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK') or
   v_now>=v.planned_end_at or v_now<v.planned_start_at then
   raise exception 'CONTINUATION_FENCED_OR_SHIFT_ENDED';
  end if;
