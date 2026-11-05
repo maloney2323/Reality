@@ -7,6 +7,7 @@ import {createContinuitySpine,continuityUuidFromSource,computeContinuityLineageH
  from '../src/reality-continuity-spine-v2.0.js';
 
 const origin='personal:chat:'+'a'.repeat(64);
+const principal='11111111-1111-4111-8111-111111111111';
 const spine=createContinuitySpine({
  continuityRootId:origin,worldlineId:origin,subjectId:'test'
 });
@@ -81,7 +82,8 @@ test('already-linear continuity is not reset and fork is never reported as clean
   return {ok:true,text:async()=>JSON.stringify([raw,transformation,observation])};
  };
  const resolved=await resolvePrivateChatContinuity({
-  scopedRoot:origin,db:{url:'https://example.supabase.co',secretKey:'secret-key'},
+  scopedRoot:origin,principalId:principal,
+  db:{url:'https://example.supabase.co',secretKey:'secret-key'},
   fetchImpl
  });
  assert.equal(resolved.scopedRoot,origin);
@@ -95,13 +97,17 @@ test('fork recovery uses stable distinct root and independently verifies future 
   const root=new URL(url).searchParams.get('continuity_root_id');
   return {ok:true,text:async()=>JSON.stringify(root==='eq.'+spine.continuity_root_id?history:[])};
  };
- const p={scopedRoot:origin,db:{url:'https://example.supabase.co',secretKey:'secret-key'},fetchImpl};
+ const p={scopedRoot:origin,principalId:principal,
+   db:{url:'https://example.supabase.co',secretKey:'secret-key'},fetchImpl};
  const r1=await resolvePrivateChatContinuity(p);
  const r2=await resolvePrivateChatContinuity(p);
  assert.equal(r1.scopedRoot,r2.scopedRoot);
  assert.notEqual(r1.scopedRoot,origin);
  assert.match(r1.scopedRoot,/fork-recovery-v1:/);
  assert.equal(r1.fork_recovery.verified_event_count,5);
+ assert.equal(r1.verified_prior_goal_cas.expected_revision,0);
+ assert.equal(r1.verified_prior_goal_cas.expected_last_goal_event_id,null);
+ assert.equal(r1.verified_prior_goal_cas.recovery_grants_execution_authority,false);
  assert.equal(calls.length,4);
 });
 test('Chat resolves fork before saving the next user message and blocks goal mutation',()=>{
@@ -111,6 +117,8 @@ test('Chat resolves fork before saving the next user message and blocks goal mut
  assert.ok(api.indexOf('resolvePrivateChatContinuity(')<api.indexOf('recordPrivateMessage(session'));
  assert.match(api,/CHAT_FORK_GOAL_MUTATION_REQUIRES_INDEPENDENT_RECONCILIATION/);
  assert.match(api,/fork_recovery_audit:continuity.fork_recovery/);
+ assert.match(api,/expectedRevision:continuity.verified_prior_goal_cas\?/);
+ assert.match(api,/expectedLastEventId:continuity.verified_prior_goal_cas\?/);
  assert.match(runtime,/recoveryAudit.independent_tip_hashes.map\(x=>x.event_id\)/);
  assert.match(runtime,/orderContinuityHistory\(rows\)/);
  assert.match(runtime,/\['RAW_SIGNAL','TRANSFORMATION','OBSERVATION'\]/);
