@@ -108,7 +108,10 @@ test('existing owner feed incorporates historical and fresh source evidence with
   "x.verified_missing_capability!==false",
   "unboundCoverage='SOURCE_REVIEW_UNAVAILABLE'",
   "current_candidates:items.length",
-  'frozen_source_discoveries:unboundItems.length'
+  'frozen_source_discoveries:currentUnbound.length',
+  'reality_read_genuine_historical_no_work_v1',
+  "proof.independent_database_readback===true",
+  'const currentUnbound=noWorkClosed?unboundItems.filter'
  ])assert.ok(server.includes(piece),piece);
 });
 test('refresh re-reads category after audit; source observations are distinguished from a build-ready gap',()=>{
