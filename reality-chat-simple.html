@@ -59,17 +59,21 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="send" type="submit">Send</button>
 </form>
 </div>
+<p id="shiftStatus" class="status" role="status" hidden aria-live="polite"></p>
 <p id="startup" class="status" role="status">Checking your Reality session…</p>
 </div>
-<script>
+<script type="module">
+import {interpretSignedInChatShiftCommand,safeShiftReadbackState}
+ from '/reality-owner-chat-shift-command-v1.js';
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
 const KEY='reality.private.chat.conversation.v1';
 const SESSION='/api/reality/personal-session';
 const API='/api/reality/personal-chat';
+const SHIFT='/api/reality/personal-governed-employee-shift';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
-let active=null,pending=false,sequence=0,elapsed=null;
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false;
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
   if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
@@ -90,6 +94,88 @@ async function json(url,options={}){
   const data=await response.json().catch(()=>null);
   if(!response.ok||!data)throw Error(data?.error||'Request unavailable ('+response.status+')');
   return data;
+}
+async function refreshShiftStatus(){
+  if(shiftLoading)return;
+  shiftLoading=true;
+  try{
+    const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+    const activeState=safeShiftReadbackState(data);
+    const node=$('shiftStatus');
+    if(activeState.hasActive){
+      const briefing=data.shift_briefing||{};
+      const current=String(briefing.current||activeState.status);
+      node.textContent='Authorized '+activeState.duration_hours+'-hour shift · '+activeState.shift_id+
+        ' · '+current+
+        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.';
+      node.hidden=false;
+    }else node.hidden=true;
+  }catch{
+    // A failed readback must not show an invented shift status.
+    $('shiftStatus').hidden=true;
+  }finally{shiftLoading=false}
+}
+async function authorizeShiftFromChat(command){
+  // Use exactly the existing authenticated owner shift controller; no model
+  // text is ever execution authority. The browser user already pressed Send.
+  const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+  const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
+  if(existing.hasActive){
+    return {
+      acknowledged:true,
+      text:existing.matching_requested_hours?
+       'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
+       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.':
+       'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
+       '). I did not start another concurrent shift or override its authorization.',
+    };
+  }
+  const draftRead=await json(SHIFT+'?hours='+command.duration_hours,{
+    signal:AbortSignal.timeout(30000)
+  });
+  const draft=draftRead.requested_shift_draft;
+  if(draft?.shift_duration_hours!==command.duration_hours||
+     draft?.shift_duration_minutes!==command.duration_hours*60||
+     draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
+     draft?.installation_authorized!==false||draft?.job_started!==false||
+     draft?.read_only!==true||
+     !/^sha256:[a-f0-9]{64}$/.test(draft?.expected_fingerprint||''))
+    throw Error('SHIFT_DRAFT_EXACT_SCOPE_NOT_VERIFIED');
+  const start=new Date(Date.now()+10000).toISOString();
+  const created=await json(SHIFT,{
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+      requested_hours:command.duration_hours,
+      expected_fingerprint:draft.expected_fingerprint,
+      planned_start_at:start
+    }),signal:AbortSignal.timeout(50000)
+  });
+  if(created.ok!==true||
+     !['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(created.status)||
+     !/^[a-f0-9-]{36}$/i.test(created.shift_id||'')||
+     created.initial_authorization_recorded!==true||
+     created.installation_authorized!==false||
+     created.production_changed!==false||
+     created.worker_dispatch_verified!==false)
+    throw Error('SHIFT_OWNER_AUTHORIZATION_RECEIPT_UNVERIFIED');
+  // Check the exact persisted shift and duration before saying it exists.
+  const verified=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+  const match=(verified.shifts||[]).find(x=>x.shift_id===created.shift_id);
+  if(!match||!/^sha256:[a-f0-9]{64}$/.test(match.plan_fingerprint||'')||
+     match.plan_fingerprint!==draft.expected_fingerprint||
+     (Date.parse(match.planned_end_at)-Date.parse(match.planned_start_at))!==
+      command.duration_hours*3600000)
+    throw Error('SHIFT_CREATED_BUT_READBACK_UNVERIFIED_DO_NOT_REPEAT');
+  return {
+    acknowledged:true,
+    text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
+      created.shift_id+'. Status: '+match.status+
+      '. The existing trusted worker scheduler must independently claim work. '+
+      'A worker acknowledgment and completed original-job results are NOT yet proven. '+
+      'The current shift engine performs source validation and awaits exact governed '+
+      'original-job admission for consequential repairs. No installation or production change was authorized.'
+  };
 }
 async function refreshHistory(id=active){
   if(pending)return;
@@ -126,6 +212,7 @@ function showAuth(authenticated){
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
+    void refreshShiftStatus();
     $('prompt').focus({preventScroll:true});
   }
 }
@@ -172,7 +259,7 @@ $('conversations').onchange=()=>{
   if(!uuid(id))return;
   setConversation(id);void refreshHistory(id);
 };
-$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations()}};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
     e.preventDefault();$('composer').requestSubmit();
@@ -195,6 +282,16 @@ $('composer').onsubmit=async(e)=>{
   elapsed=setInterval(showTime,1000);
   status('Message submitted. Waiting for a reply…');
   try{
+    const command=interpretSignedInChatShiftCommand(value);
+    if(command){
+      const receipt=await authorizeShiftFromChat(command);
+      optimistic.classList.remove('pending');
+      waiting.classList.remove('pending');
+      waiting.lastChild.textContent=receipt.text;
+      status('Verified shift command receipt displayed. This action is not a model answer.');
+      void refreshShiftStatus();
+      return;
+    }
     const data=await json(API,{method:'POST',
       headers:{'content-type':'application/json'},
       body:JSON.stringify({conversation_id:id,request_id:requestId,message:value}),
@@ -215,6 +312,7 @@ $('composer').onsubmit=async(e)=>{
     $('prompt').focus({preventScroll:true});
   }
 };
+setInterval(()=>{if(!$('chat').hidden&&!pending)void refreshShiftStatus()},30000);
 void init();
 })();
 </script>
