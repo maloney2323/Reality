@@ -14,7 +14,6 @@ on:
       - 'src/reality-genuine-capability-*.js'
       - 'test/reality-genuine-capability-*.test.js'
       - 'supabase/migrations/20261101_genuine_capability_*.sql'
-  workflow_dispatch:
 permissions:
   contents: read
 
