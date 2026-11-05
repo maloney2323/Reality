@@ -18,6 +18,8 @@ export async function startContinuityRuntime({
   worldlineSource = 'reality:primary',
   subjectId,
   signal,
+  // Server-attested prior fork; it is an observation, never inherited authority.
+  recoveryAudit = null,
   observedAt = new Date().toISOString(),
   fetchImpl = fetch,
 } = {}) {
@@ -113,12 +115,15 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'RAW_SIGNAL',
     entityId: signal.packet.packet_id,
+    evidenceRefs: recoveryAudit?.status==='TWO_IMMUTABLE_TERMINAL_SIBLINGS_INDEPENDENTLY_VERIFIED'?
+      recoveryAudit.independent_tip_hashes.map(x=>x.event_id):[], 
     eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:raw:${signal.packet.packet_id}`,
     payload: {
       packet_id: signal.packet.packet_id,
       source: signal.packet.source,
       observed_at: signal.packet.observed_at,
       raw_content_digest: signal.packet.raw_content_digest,
+      fork_recovery_audit: recoveryAudit || null,
     },
     provenance: { source: 'reality_governed_raw_signal' },
   });
