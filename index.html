@@ -6654,6 +6654,7 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateSend').disabled=true;status('Reality is working with saved context…');
   try{
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
+    signal:AbortSignal.timeout(95000),
     headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
