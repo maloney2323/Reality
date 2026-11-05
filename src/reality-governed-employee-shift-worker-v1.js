@@ -60,7 +60,7 @@ async function readPreflight(db,{fetchImpl=fetch}={}){
 export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
- if(closed.status!=='NO_SHIFT_DUE_FOR_CLOSE'&&closed.status!=='EIGHT_HOUR_SHIFT_EVIDENCE_REPORT')
+ if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
   throw Error('SHIFT_CLOSE_READBACK_UNVERIFIED');
  const reconciled=await shiftRpc(db,'reality_reconcile_employee_shift_original_v1',
   {},{fetchImpl});
