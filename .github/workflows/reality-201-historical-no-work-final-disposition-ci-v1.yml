@@ -1,0 +1,30 @@
+name: Reality #201 historical no-new-work disposition — isolated verification
+on:
+  push:
+    branches:
+      - fix/reality-201-historical-no-work-final-disposition-20261104
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+    paths:
+      - '.github/workflows/reality-genuine-capability-auto-trigger-v1.yml'
+      - '.github/workflows/reality-201-historical-no-work-final-disposition-ci-v1.yml'
+      - 'supabase/migrations/20261104_reality_201_signed_historical_no_work_final_disposition_v1.sql'
+      - 'supabase/functions/reality-genuine-capability-auto-admit/index.ts'
+      - 'scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs'
+      - 'test/reality-201-historical-no-work-final-disposition-v1.test.js'
+permissions:
+  contents: read
+jobs:
+  prove-no-new-execution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: No authority or customer execution in regression fixtures
+        run: |
+          node --check scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs
+          node --test test/reality-201-historical-no-work-final-disposition-v1.test.js

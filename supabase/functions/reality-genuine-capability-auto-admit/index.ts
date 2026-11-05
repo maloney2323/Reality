@@ -1593,6 +1593,62 @@ Deno.serve(async request=>{
        verified.id,ghProviderToken,finish?input.proof:undefined);
     return respond({ok:true,...result});
   }
+  // #201: record an independently witnessed no-new-work disposition,
+  // never a new customer execution or Universe settlement.
+  if(input?.action==='historical_no_work_final_record'&&
+    SHA40.test(input?.scope?.repository_sha||'')){
+   if(Object.keys(input).sort().join(',')!=='action,scope'||
+     Object.keys(input.scope).sort().join(',')!=='original_work_id,repository_sha'||
+     input.scope.original_work_id!=='work:bf17f1716f7c9550680d761e64f8b591'||
+     typeof ghProviderToken!=='string'||ghProviderToken.length<20)
+     deny('HISTORICAL_DISPOSITION_EXACT_SIGNED_ENVELOPE_REQUIRED');
+   const signed=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const work=input.scope.original_work_id;
+   const source=await database('rpc/reality_prepare_genuine_historical_no_work_v1',{
+     method:'POST',body:{p_work:work}});
+   if(source?.status!=='HISTORICAL_NO_NEW_WORK_PREPARED'||
+     source.original_work_id!==work||
+     !UUID.test(source.trigger_id)||
+     !UUID.test(source.previous_original_universe_event_id)||
+     !UUID.test(source.previous_target_universe_event_id)||
+     source.previous_original_universe_event_id===source.previous_target_universe_event_id||
+     !SHA64.test(source.previous_original_event_content_hash)||
+     !SHA64.test(source.previous_target_event_content_hash)||
+     source.unresolved_reconciliation_targets!==0||
+     source.original_job_completed!==false||
+     source.original_execution_replayed!==false||
+     source.new_universe_settlement_written!==false||
+     source.production_changed!==false)
+     deny('HISTORICAL_DISPOSITION_TWO_LEDGER_PROOFS_REQUIRED');
+   const recorded=await database('rpc/reality_record_genuine_historical_no_work_v1',{
+     method:'POST',body:{p_work:work,p_signed_run_id:signed.id,
+      p_repository_sha:input.scope.repository_sha}});
+   const reread=await database('rpc/reality_read_genuine_historical_no_work_v1',{
+     method:'POST',body:{p_work:work}});
+   if(recorded?.status!=='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'||
+     reread?.status!==recorded.status||
+     !UUID.test(reread.receipt_id)||
+     reread.receipt_id!==recorded.receipt_id||
+     reread.original_work_id!==work||
+     reread.previous_original_universe_event_id!==source.previous_original_universe_event_id||
+     reread.previous_target_universe_event_id!==source.previous_target_universe_event_id||
+     reread.previous_original_event_content_hash!==source.previous_original_event_content_hash||
+     reread.previous_target_event_content_hash!==source.previous_target_event_content_hash||
+     reread.independent_database_readback!==true||
+     reread.unresolved_reconciliation_targets!==0||
+     reread.original_job_completed!==false||
+     reread.original_execution_replayed!==false||
+     reread.new_universe_settlement_written!==false||
+     reread.new_execution_claim_consumed!==false||
+     reread.measured_roi_claimed!==false||
+     reread.installation_replay_authorized!==false||
+     reread.production_changed!==false)
+     deny('HISTORICAL_DISPOSITION_PERSISTED_INDEPENDENT_READBACK_REQUIRED');
+   return respond({ok:true,status:'HISTORICAL_NO_NEW_WORK_FINAL_RECEIPT_VERIFIED',
+     receipt:reread,signed_worker_run_id:signed.id,
+     original_execution_replayed:false,new_universe_settlement_written:false,
+     production_changed:false});
+  }
   if(['original_prepare','original_claim','original_settle'].includes(input?.action)&&
     SHA40.test(input?.scope?.repository_sha||'')){
    const names=Object.keys(input).sort().join(',');
