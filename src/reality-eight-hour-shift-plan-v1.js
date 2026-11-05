@@ -1,4 +1,4 @@
-// An evidence-first eight-hour WORKDAY DRAFT. All timings are provisional shift
+// An evidence-first configurable WORKDAY DRAFT. All timings are provisional shift
 // timeboxes, NOT measured human-equivalent labor or a worker dispatch schedule.
 // The plan MUST NOT act as job, tool, installation or shift authorization.
 export const EIGHT_HOUR_SHIFT_PLAN_VERSION='reality-eight-hour-employee-shift-draft-v1';
@@ -22,7 +22,11 @@ function acceptedSource(item){
   return false;
  return true;
 }
-export function buildRealityEightHourShiftDraft(brief){
+export function buildRealityEightHourShiftDraft(brief,{durationHours=8}={}){
+ if(![8,10,12].includes(durationHours))fail('DURATION_NOT_SUPPORTED');
+ // Each pair of extra shift hours increases eight existing bounded windows by
+ // 15 minutes. None may exceed the worker's 120-minute per-step database cap.
+ const addedMinutesPerWindow=(durationHours-8)/2*15;
  const c=brief?.counts;
  if(!brief||!['SOURCE_BACKED_DISCOVERY_OBSERVED',
      'SOURCE_BACKED_DISCOVERY_PARTIAL'].includes(brief.status)||
@@ -68,9 +72,11 @@ export function buildRealityEightHourShiftDraft(brief){
  const slots=[];
  function add(id,mins,stage,action,candidate=null,requiredGate=null){
    if(!isNum(mins)||mins===0)fail('INVALID_TIMEBOX');
+   const boundedMinutes=mins+addedMinutesPerWindow;
+   if(boundedMinutes>120)fail('INVALID_TIMEBOX');
    const step=freeze({
     sequence:slots.length+1,id,offset_start_minutes:cursor,
-    offset_end_minutes:cursor+mins,planning_minutes:mins,
+    offset_end_minutes:cursor+boundedMinutes,planning_minutes:boundedMinutes,
     stage,action,candidate: candidate?freeze({
       finding_id:candidate.finding_id,
       title:candidate.title,
@@ -85,7 +91,7 @@ export function buildRealityEightHourShiftDraft(brief){
     required_gate:requiredGate,
     elapsed_minutes_not_human_labor:true
    });
-   slots.push(step);cursor+=mins;
+   slots.push(step);cursor+=boundedMinutes;
  }
  add('preflight',45,'SOURCE_RECONCILIATION',
    'Recheck connected sources, previously settled work, duplicated issues and PRs, and unresolved original-job state.');
@@ -105,7 +111,7 @@ export function buildRealityEightHourShiftDraft(brief){
    null,'ACCEPTED_ORIGINAL_JOB_AND_INDEPENDENT_SETTLEMENT');
  add('shift_close',45,'EVIDENCE_AND_VALUE_REPORT',
    'Reconcile accepted outcomes and blocked work; record measured costs, human interventions and task-scoped comparable labor only when supported.');
- if(cursor!==480||slots.length!==8)fail('EIGHT_HOUR_ALLOCATION_INVALID');
+ if(cursor!==durationHours*60||slots.length!==8)fail('SHIFT_ALLOCATION_INVALID');
  const allocated=chosen.filter(Boolean);
  return freeze({
   version:EIGHT_HOUR_SHIFT_PLAN_VERSION,
@@ -113,7 +119,7 @@ export function buildRealityEightHourShiftDraft(brief){
   source_status:brief.status,
   source_scope:brief.source_scope,
   observed_at:brief.observed_at,
-  shift_duration_minutes:480,shift_duration_hours:8,
+  shift_duration_minutes:durationHours*60,shift_duration_hours:durationHours,
   timing:'RELATIVE_START_TIMEBOXES_NOT_MEASURED_TASK_DURATIONS',
   scheduling_state:'PROPOSED_AGENDA_NOT_PERSISTED_TO_WORKER_OR_CALENDAR',
   allocation:'EVIDENCE_FIRST_THEN_CONDITIONAL_GOVERNED_EXECUTION',
