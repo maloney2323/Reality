@@ -10,7 +10,7 @@ on:
       - test/reality-governed-flexible-shift-v2.test.js
       - reality-owner-chat-shift-command-v1.js
       - reality-chat-simple.html
-      - test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js
+      - test/reality-owner-chat-shift-command-v1.test.js
       - src/reality-workday-team-assessment-v1.js
       - src/reality-employee-shift-chat-context-v1.js
       - test/reality-workday-team-assessment-v1.test.js
@@ -42,4 +42,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify all existing and flexible employee shift contracts
-        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js
+        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js
