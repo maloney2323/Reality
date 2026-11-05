@@ -85,7 +85,7 @@ test('Chat uses signed-in Send event and the real authenticated shift endpoint',
 test('no new owner worker, governor, ledger, or model-based shift authority created',()=>{
  const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
  assert.match(ui,/Shift authorization is not a verified worker dispatch/);
- assert.match(ui,/the existing trusted worker scheduler/);
+ assert.match(ui,/[Tt]he existing trusted worker scheduler/);
  assert.match(ui,/The current shift engine performs source validation/);
  assert.doesNotMatch(ui,/REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN/);
  assert.doesNotMatch(ui,/new Worker\(/);
