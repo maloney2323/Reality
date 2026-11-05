@@ -148,7 +148,7 @@ body[data-reality-route="chat"] .reality-chat-status-bar{
  border-top:1px solid #27435a;padding:7px 13px;display:flex;align-items:flex-start;gap:10px;
  background:#0e2030;min-height:34px;
 }
-body[data-reality-route="chat"] .reality-chat-status-bar #privateStatus{
+body[data-reality-route="chat"] .reality-chat-status-bar #realityChatStatusSummary{
  min-width:0;flex:1;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
  line-clamp:2;overflow:hidden;margin:0;font-size:11px;line-height:1.45;color:#b7ccdc;
  overflow-wrap:anywhere;
@@ -261,4 +261,10 @@ body[data-reality-route="chat"].reality-chat-focus .reality-chat-inspector{displ
 @media(prefers-reduced-motion:no-preference){
  body[data-reality-route="chat"] .reality-chat-inspector-nav button,
  body[data-reality-route="chat"] #privateSend{transition:background .14s ease,border-color .14s ease}
+}
+
+/* Preserve signed-out error text; the authenticated pane gets a compact mirror. */
+body[data-reality-route="chat"].reality-chat-signed-in #privateChat > #privateStatus{display:none}
+body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateChat > #privateStatus{
+ display:block;margin:10px auto;max-width:520px;font-size:12px;color:#b6d1e3;
 }
