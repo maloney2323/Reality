@@ -8,10 +8,11 @@ import {buildRealityShiftConversationBrief}
  from './reality-shift-conversation-brief-v1.js';
 import {buildRealityWorkCatalog} from './reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from './reality-workday-opportunity-brief-v1.js';
-import {assessRealityWorkdayTeam} from './reality-workday-team-assessment-v1.js';
+import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce} from './reality-workday-team-assessment-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
-const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|workload|hours saved)\b/i.test(String(text||''));
-const teamRequested=text=>/\b(employees|employee|staff|staffing|team|headcount|roles|responsibilit(?:y|ies)|workers)\b/i.test(String(text||''));
+const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
+const teamRequested=text=>/(?:\b(?:shift|workday|work day)\b.{0,80}\b(?:staff|staffing|team|headcount|roles|workers)\b|\b(?:staff|staffing|team|headcount|roles|workers)\b.{0,80}\b(?:shift|workday|work day)\b)/i.test(String(text||''));
+const companyRequested=text=>/(?:\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b.{0,120}\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b|\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b.{0,120}\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b)/i.test(String(text||''));
 export async function readVerifiedEmployeeShiftForChat({
  session,message,env=process.env,
  db=resolveReliabilityBenchmarkDb(env),fetchImpl=fetch,now=new Date()
@@ -48,11 +49,13 @@ export async function readVerifiedEmployeeShiftForChat({
    installation_authorized:false,external_execution_authorized:false,
    production_changed:false
   })];
-  if(teamRequested(message)){
-   // Work catalog is trusted read-only discovery. It does not run a worker.
+  if(teamRequested(message)||companyRequested(message)){
+   // Existing work catalog supplies read-only verified-source observations.
+   // Neither proposed role counts nor AI staffing estimates are worker receipts.
    try{
     const catalog=await buildRealityWorkCatalog();
     const workday=buildRealityWorkdayOpportunityBrief(catalog);
+    if(teamRequested(message)){
     const staffing=assessRealityWorkdayTeam(workday);
     observations.push(Object.freeze({
      entry_id:'employee-shift:role-needs:'+String(workday.observed_at||brief.as_of),
@@ -77,6 +80,41 @@ export async function readVerifiedEmployeeShiftForChat({
      external_execution_authorized:false,
      production_changed:false,
     }));
+    }
+    if(companyRequested(message)){
+     const company=assessRealityCompanyWorkforce(workday);
+     observations.push(Object.freeze({
+      entry_id:'reality-company:launch-workforce:'+String(workday.observed_at||brief.as_of),
+      event_kind:'company_launch_workforce_evidence_assessment',
+      source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
+      source_ref:'reality:company:launch-workforce-assessment',
+      assertion_time:workday.observed_at||brief.as_of,
+      epistemic_status:company.status,
+      summary:'BUSINESS BUILD, LAUNCH, MARKET AND OPERATE ASSESSMENT: '+
+       'Reality needs to cover '+company.functional_areas_count+
+       ' distinct business FUNCTIONS (not '+company.functional_areas_count+
+       ' individual employees). Functions and candidates for safe automation: '+
+       company.required_business_functions.map(x=>x.title+
+        ': '+x.candidate_ai_automation.join('; ')+
+        '. HUMAN ACCOUNTABILITY: '+x.human_accountability+
+        '. EVIDENCE LIMIT: '+x.evidence_status).join(' | ')+
+       '. Actual human headcount and virtual AI worker count cannot yet be calculated without verified workload hours, customer/sales evidence and measured automation throughput. '+
+       'Next: '+company.priority_work.join('; ')+
+       '. This is an assessment, not a completed marketing, launch or autonomous worker result.',
+      business_objective:company.objective,
+      functional_areas_count:company.functional_areas_count,
+      required_business_functions:company.required_business_functions,
+      staffing_method:company.staffing_method,
+      exact_human_employee_count_required:null,
+      exact_ai_employee_count_required:null,
+      measured_human_staffing_fte:null,
+      actual_company_launch_verified:false,
+      work_started:false,
+      installation_authorized:false,
+      external_execution_authorized:false,
+      production_changed:false
+     }));
+    }
    }catch{/* No invented staffing when source discovery is unavailable. */}
   }
   return observations;
