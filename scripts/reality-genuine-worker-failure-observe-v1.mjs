@@ -39,7 +39,13 @@ if(data.status==='SIGNED_WORKER_FAILURE_RECORDED'&&(
      'SIGNED_FAILED_WORKER_NEEDS_INDEPENDENT_DIAGNOSIS'].includes(data.finding)||
    data.frozen_missing_capability_verified!==false||
    data.new_customer_job_created!==false||
-   data.retry_external_effects_authorized!==false))
+   data.retry_external_effects_authorized!==false||
+   data.original_job_obligation_preserved!==true||
+   !/^[a-f0-9-]{36}$/.test(String(data.recovery_id||''))||
+   !['RECONCILE_ALREADY_SATISFIED_PRIOR_WORK',
+     'INDEPENDENT_DIAGNOSIS_REQUIRED'].includes(data.recovery_status)||
+   !['INDEPENDENT_ORIGINAL_OBJECTIVE_DISPOSITION',
+     'VERIFY_EXTERNAL_EFFECTS_AND_CLASSIFY_FAILURE'].includes(data.next_evidence_action)))
  fail('IMMUTABLE_FAILURE_RECEIPT_INVALID');
 const output={
  schema:'reality-genuine-worker-failure-evidence-v1',
@@ -52,6 +58,10 @@ const output={
  provider_evidence_sha256:data.provider_evidence_sha256||null,
  finding:data.finding||null,
  investigation_lifecycle:data.investigation_lifecycle||null,
+ recovery_id:data.recovery_id||null,
+ recovery_status:data.recovery_status||null,
+ next_evidence_action:data.next_evidence_action||null,
+ original_job_obligation_preserved:data.original_job_obligation_preserved===true,
  independent_github_readback:data.independent_github_readback===true,
  already_recorded:data.already_recorded===true,
  model_findings_are_hypotheses:true,

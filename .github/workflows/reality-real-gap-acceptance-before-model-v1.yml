@@ -1,7 +1,10 @@
-name: Reality verified missing capability — frozen original acceptance
+name: Reality verified missing capability - frozen original acceptance
 on:
   push:
-    branches: [feature/reality-live-general-repair-bridge-20261031, feature/reality-install-to-settlement-20261031, feature/reality-general-capability-engine-20261101]
+    branches:
+      - feature/reality-live-general-repair-bridge-20261031
+      - feature/reality-install-to-settlement-20261031
+      - feature/reality-general-capability-engine-20261101
     paths:
       - 'test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js'
       - 'test/reality-frozen-regressions/general-execution-receipt-v1.json'
@@ -13,6 +16,7 @@ on:
       - 'supabase/migrations/20261101_genuine_capability_*.sql'
 permissions:
   contents: read
+
 jobs:
   independent-original-customer-acceptance:
     runs-on: ubuntu-latest
@@ -24,13 +28,39 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Record exact original source sha
-        run: git rev-parse HEAD
-      - name: Print immutable frozen acceptance SHA-256
-        run: sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
-      - name: Frozen same-work missing capability acceptance
-        run: node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
-      - name: Regression: governance and exact-owner installation gates
+      - name: "Record exact original source and frozen SHA-256"
+        run: |
+          git rev-parse HEAD
+          sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+      - name: "Independently reproduce frozen RED before model generation"
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing="src/reality-extensions/reality-general-execution-receipt.mjs"
+          frozen="test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js"
+          if test -e "$missing"; then
+            echo "::error::The missing capability already exists; do not invent a frozen failure."
+            exit 1
+          fi
+          set +e
+          node --test "$frozen" > "$RUNNER_TEMP/reality-frozen-red.log" 2>&1
+          result=$?
+          set -e
+          cat "$RUNNER_TEMP/reality-frozen-red.log"
+          if test "$result" -eq 0; then
+            echo "::error::Frozen acceptance unexpectedly passed without a capability."
+            exit 1
+          fi
+          if ! grep -Fq "ERR_MODULE_NOT_FOUND" "$RUNNER_TEMP/reality-frozen-red.log" ||
+             ! grep -Fq "reality-general-execution-receipt.mjs" "$RUNNER_TEMP/reality-frozen-red.log"; then
+            echo "::error::Failed for an unrelated reason, not the independently frozen missing module."
+            exit 1
+          fi
+          echo "REALITY_FROZEN_RED_REPRODUCED"
+          echo "FROZEN_MODULE_ABSENT_IN_SOURCE"
+          echo "NO_OWNER_BOUND_INSTALL_AUTHORIZATION"
+          echo "NO_CUSTOMER_JOB_COMPLETION"
+      - name: "Regression: governance and exact-owner installation gates"
         run: |
           node --test test/reality-governed-self-improvement-spine-v1.0.test.js
           node --test test/reality-general-isolated-install-v1.0.test.js

@@ -60,6 +60,7 @@ jobs:
           node --test test/reality-shift-governed-historical-noop-recovery-v1.test.js
           node --test test/reality-genuine-worker-failure-feedback-v1.test.js
           node --test test/reality-original-job-never-abandon-v1.test.js
+          node --test test/reality-automatic-original-recovery-and-frozen-red-v1.test.js
           node --test test/reality-shift-existing-supabase-wake-v1.test.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check src/reality-employee-shift-chat-context-v1.js
