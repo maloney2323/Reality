@@ -1,3 +1,4 @@
+import {selectNextGovernedWork} from '../../../src/reality-governed-next-work-decision-v1.js';
 // Reality isolated eight-hour shift wake.
 // Reuses the EXISTING Supabase cron + pg_net scheduling infrastructure.
 // The *existing* signed governed wake broker remains exclusively responsible
@@ -17,6 +18,7 @@ const allowed=new Set([
  'reality_claim_shift_continuation_monitor_v1',
  'reality_settle_shift_continuation_monitor_v1',
  'reality_read_owner_genuine_loop_v1',
+ 'reality_read_owner_qualified_capabilities_v1',
  'reality_read_owner_final_receipts_v1'
 ]);
 function send(status:number,obj:Record<string,unknown>){
@@ -271,6 +273,9 @@ Deno.serve(async req=>{
      production_changed:false});
    if(!UUID.test(String(monitor.shift_id||''))||
      monitor.shift_id!==claimed.shift_id||
+     !UUID.test(String(monitor.owner_id||''))||
+     !['RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
+       .includes(String(monitor.shift_status||''))||
      !UUID.test(String(monitor.claim_id||''))||
      !ISSUE.test(String(monitor.source_ref||''))||
      !Number.isSafeInteger(monitor.source_step_index)||
@@ -284,10 +289,35 @@ Deno.serve(async req=>{
      !Number.isFinite(Date.parse(String(monitor.planned_end_at||'')))||
      Date.now()>=Date.parse(String(monitor.planned_end_at)))
     deny('CONTINUATION_ORIGINAL_AUTHORITY_INVALID');
+   // Re-read the existing constitutional owner queue BEFORE deciding what
+   // authorized original work is next. This is one deterministic selection
+   // pass, never an authorization or duplicate execution claim.
+   const [loop,qualified]=await Promise.all([
+     rpc('reality_read_owner_genuine_loop_v1',
+       {p_owner_id:monitor.owner_id}),
+     rpc('reality_read_owner_qualified_capabilities_v1',
+       {p_owner_id:monitor.owner_id})
+   ]);
+   const next=selectNextGovernedWork({
+     loop,qualified,
+     shift:{authorized:true,status:monitor.shift_status,
+       read_only_sources_available:true,production_changed:false}
+   });
+   if(next.installation_authorized!==false||
+      next.original_job_completed!==false||
+      next.external_effect_replay_authorized!==false||
+      next.next_worker_must_revalidate_provider!==true)
+     deny('CONTINUATION_SUPERVISOR_SOURCE_UNTRUSTED');
    // Provider GET only. A fresh source observation is not a new execution
    // warrant, capability gap, approval, acceptance or settled customer job.
    let proof=await githubSource(String(monitor.source_ref));
    proof=await researchSourceWithoutStopping(proof);
+   // Persist an honest decision beside real source readback so a frozen worker
+   // can recover it; model text cannot mint the decision or its authority.
+   proof={...proof,governed_next_work:{
+      ...next,kind:'READ_ONLY_SIGNED_OWNER_QUEUE_DECISION',
+      original_source_monitor_ref:monitor.source_ref
+   }};
    const recorded=await rpc('reality_settle_shift_continuation_monitor_v1',{
      p_shift_id:monitor.shift_id,
      p_monitor_bucket:monitor.monitor_bucket,
@@ -307,6 +337,10 @@ Deno.serve(async req=>{
      shift_id:monitor.shift_id,
      source_step_index:monitor.source_step_index,
      source_status:proof.provider_status||null,
+     next_governed_action:next.next_action,
+     next_existing_original_work_id:next.original_work_id,
+     concurrent_read_only_action:next.source_continuation,
+     no_new_executable_original_job:next.no_new_executable_work,
      monitoring_interval_minutes:15,
      durable_observation_sha256:recorded.proof_sha256,
      original_customer_job_completed:false,
