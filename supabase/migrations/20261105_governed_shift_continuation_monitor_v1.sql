@@ -120,7 +120,7 @@ begin
  return pg_catalog.jsonb_build_object(
   'status','CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
   'shift_id',v_shift.shift_id,'owner_id',v_shift.owner_id,
-  'monitor_bucket',v_bucket,
+  'shift_status',v_shift.status,'monitor_bucket',v_bucket,
   'source_step_index',v_indices[v_pos],'source_ref',v_refs[v_pos],
   'claim_id',v_claim,'planned_end_at',v_shift.planned_end_at,
   'only_originally_approved_sources',true,
