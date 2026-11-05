@@ -163,6 +163,17 @@ export default async function handler(req,res){
     fork_recovery_audit:continuity.fork_recovery,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
+    // This authenticated endpoint handles cognition and optional explicit goal
+    // recording. It does not run /personal-governed-build or /real-repair...
+    // Merely saying "starting" must never impersonate worker dispatch.
+    chat_work_execution_bridge:{
+      plain_chat_can_dispatch_workers:false,
+      original_job_queued_by_this_chat_turn:false,
+      worker_acknowledgment_verified_by_this_chat_turn:false,
+      existing_owner_action:'RUN_FULL_LOOP_ON_REALITY_HOME',
+      existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
+      installed_capabilities_require_separate_exact_authorization:true,
+    },
     // Static published references already shown on Reality's homepage.
     // These are references, not evidence of measured business savings.
     published_research_references:publishedReferencesForChat(text),
