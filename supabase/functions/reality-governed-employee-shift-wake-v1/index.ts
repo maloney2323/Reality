@@ -1,4 +1,3 @@
-import {selectNextGovernedWork} from '../../../src/reality-governed-next-work-decision-v1.js';
 // Reality isolated eight-hour shift wake.
 // Reuses the EXISTING Supabase cron + pg_net scheduling infrastructure.
 // The *existing* signed governed wake broker remains exclusively responsible
@@ -15,10 +14,9 @@ const allowed=new Set([
  'reality_reconcile_employee_shift_historical_noop_v1',
  'reality_claim_employee_shift_step_v1',
  'reality_settle_employee_shift_step_v1',
- 'reality_claim_shift_continuation_monitor_v1',
+ 'reality_govern_shift_continuation_cycle_v1',
  'reality_settle_shift_continuation_monitor_v1',
  'reality_read_owner_genuine_loop_v1',
- 'reality_read_owner_qualified_capabilities_v1',
  'reality_read_owner_final_receipts_v1'
 ]);
 function send(status:number,obj:Record<string,unknown>){
@@ -289,35 +287,24 @@ Deno.serve(async req=>{
      !Number.isFinite(Date.parse(String(monitor.planned_end_at||'')))||
      Date.now()>=Date.parse(String(monitor.planned_end_at)))
     deny('CONTINUATION_ORIGINAL_AUTHORITY_INVALID');
-   // Re-read the existing constitutional owner queue BEFORE deciding what
-   // authorized original work is next. This is one deterministic selection
-   // pass, never an authorization or duplicate execution claim.
-   const [loop,qualified]=await Promise.all([
-     rpc('reality_read_owner_genuine_loop_v1',
-       {p_owner_id:monitor.owner_id}),
-     rpc('reality_read_owner_qualified_capabilities_v1',
-       {p_owner_id:monitor.owner_id})
-   ]);
-   const next=selectNextGovernedWork({
-     loop,qualified,
-     shift:{authorized:true,status:monitor.shift_status,
-       read_only_sources_available:true,production_changed:false}
-   });
-   if(next.installation_authorized!==false||
-      next.original_job_completed!==false||
-      next.external_effect_replay_authorized!==false||
-      next.next_worker_must_revalidate_provider!==true)
-     deny('CONTINUATION_SUPERVISOR_SOURCE_UNTRUSTED');
+   // Reality already chose this read-only action in the governed
+   // service-role RPC. The worker cannot choose another source or original
+   // job; it only verifies the returned fenced work order before execution.
+   const order=monitor.governed_work_order;
+   if(order?.kind!=='REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK'||
+      order.source_ref!==monitor.source_ref||
+      !HASH.test(String(order.decision_sha256||''))||
+      order.original_job_action!=='NONE'||
+      order.external_write_authority!==false||
+      order.worker_must_return_evidence!==true)
+      deny('CONTINUATION_GOVERNED_WORK_ORDER_UNTRUSTED');
    // Provider GET only. A fresh source observation is not a new execution
    // warrant, capability gap, approval, acceptance or settled customer job.
    let proof=await githubSource(String(monitor.source_ref));
    proof=await researchSourceWithoutStopping(proof);
-   // Persist an honest decision beside real source readback so a frozen worker
-   // can recover it; model text cannot mint the decision or its authority.
-   proof={...proof,governed_next_work:{
-      ...next,kind:'READ_ONLY_SIGNED_OWNER_QUEUE_DECISION',
-      original_source_monitor_ref:monitor.source_ref
-   }};
+   // Evidence travels back to Reality's durable governor. Its receipt
+   // is checked against the source + lease + exact work-order digest.
+   proof={...proof,governed_work_order_sha256:order.decision_sha256};
    const recorded=await rpc('reality_settle_shift_continuation_monitor_v1',{
      p_shift_id:monitor.shift_id,
      p_monitor_bucket:monitor.monitor_bucket,
@@ -337,10 +324,8 @@ Deno.serve(async req=>{
      shift_id:monitor.shift_id,
      source_step_index:monitor.source_step_index,
      source_status:proof.provider_status||null,
-     next_governed_action:next.next_action,
-     next_existing_original_work_id:next.original_work_id,
-     concurrent_read_only_action:next.source_continuation,
-     no_new_executable_original_job:next.no_new_executable_work,
+     reality_governed_work_order_sha256:order.decision_sha256,
+     next_job_selected_by_worker:false,
      monitoring_interval_minutes:15,
      durable_observation_sha256:recorded.proof_sha256,
      original_customer_job_completed:false,
