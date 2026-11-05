@@ -58,6 +58,7 @@ jobs:
           node --test test/reality-shift-fail-forward-research-v1.test.js
           node --test test/reality-shift-existing-governed-original-handoff-v1.test.js
           node --test test/reality-shift-governed-historical-noop-recovery-v1.test.js
+          node --test test/reality-genuine-worker-failure-feedback-v1.test.js
           node --test test/reality-shift-existing-supabase-wake-v1.test.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check src/reality-employee-shift-chat-context-v1.js
