@@ -20,9 +20,12 @@ test('all authenticated read-only refreshes have a finite deadline',()=>{
   "/api/reality/personal-chat?conversation_id=",
   "/api/reality/personal-goals?conversation_id="
  ]){
-  const i=html.indexOf(endpoint);
-  assert.ok(i>0,endpoint);
-  assert.ok(html.slice(i,i+220).includes("AbortSignal.timeout(12000)"),endpoint);
+  const refreshStart=html.indexOf('async function loadConversations(){');
+  const refreshEnd=html.indexOf('async function init(){',refreshStart);
+  const refreshFns=html.slice(refreshStart,refreshEnd);
+  const i=refreshFns.indexOf(endpoint);
+  assert.ok(i>=0,endpoint);
+  assert.ok(refreshFns.slice(i,i+235).includes('AbortSignal.timeout(12000)'),endpoint);
  }
 });
 test('send preserves exact request identity and existing authorization boundaries',()=>{
