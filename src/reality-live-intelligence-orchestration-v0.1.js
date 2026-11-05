@@ -213,6 +213,7 @@ export async function runLiveIntelligenceOrchestration({
     worldlineSource: systemContext?.worldline_id || 'reality:primary',
     subjectId: systemContext?.work_item_id || systemContext?.conversation_id || systemContext?.thought_id || governedSignal.packet.packet_id,
     signal: governedSignal,
+    recoveryAudit:systemContext?.fork_recovery_audit||null,
     observedAt: observedAt || new Date().toISOString(),
     fetchImpl,
   });
