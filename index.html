@@ -5276,6 +5276,21 @@ async function wcLoadGapFeed(){
     !Array.isArray(data.settled_history)||data.settled_history.length>12||
     data.counts?.current_candidates!==data.items.length||
     data.counts?.historical_completed!==data.settled_history.length||
+    !Number.isSafeInteger(data.counts?.historical_no_new_work_closed??0)||
+    !Array.isArray(data.historical_no_work_final_dispositions)||
+    data.historical_no_work_final_dispositions.length!==
+     (data.counts?.historical_no_new_work_closed??0)||
+    data.historical_no_work_final_dispositions.some(x=>
+      x.status!=='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'||
+      x.independent_database_readback!==true||
+      x.original_execution_replayed!==false||
+      x.production_changed!==false)||
+    (data.next_qualification!=null&&(
+      data.next_qualification.status!=='CANDIDATE_REQUIRES_CURRENT_ORIGINAL_JOB_VERIFICATION'||
+      data.next_qualification.owner_approval_granted!==false||
+      data.next_qualification.execution_started!==false||
+      data.next_qualification.installation_authorized!==false||
+      data.next_qualification.production_changed!==false))||
     !Number.isSafeInteger(data.counts?.verified_implementation_defects??0)||
     (data.counts?.verified_implementation_defects??0)!==
      data.items.filter(x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED').length||
@@ -5323,12 +5338,16 @@ async function wcLoadGapFeed(){
    (data.counts.frozen_source_discoveries??0)+' frozen source discovery/discoveries · '+
    (data.counts.current_source_absence_confirmed??0)+' current source absence check(s) · '+
    (data.counts.existing_original_recovery_links??0)+' existing recovery-job link(s) · '+
+   (data.counts.historical_no_new_work_closed??0)+' signed no-new-work closures moved to history · '+
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
    (data.unbound_source_coverage==='SOURCE_REVIEW_UNAVAILABLE'?
      ' Frozen-source coverage unavailable, not zero. ':'')+
-   ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.';
+   ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.'+
+   (data.next_qualification?.status==='CANDIDATE_REQUIRES_CURRENT_ORIGINAL_JOB_VERIFICATION'?
+    ' Next qualification to review: '+String(data.next_qualification.title||'').slice(0,145)+
+    '. Requires a fresh owner-bound original-job verification; no new work started.':'');
   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
   wcRender();
  }catch{
