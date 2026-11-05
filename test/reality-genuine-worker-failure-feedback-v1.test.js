@@ -5,6 +5,7 @@ import {verifyGenuineOriginalWorkerFailure} from '../src/reality-genuine-worker-
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const sql=read('supabase/migrations/20261104_genuine_worker_failure_feedback_v1.sql');
 const broker=read('supabase/functions/reality-genuine-capability-auto-admit/index.ts');
+const sqlAliasFix=read('supabase/migrations/20261104_genuine_worker_failure_scope_alias_fix_v1.sql');
 const workflow=read('.github/workflows/reality-genuine-capability-auto-trigger-v1.yml');
 const observer=read('scripts/reality-genuine-worker-failure-observe-v1.mjs');
 const research=read('scripts/reality-genuine-worker-failure-research-v1.mjs');
@@ -117,4 +118,16 @@ test('immutable observation cannot be mistaken for an independent final original
  assert.ok(sql.includes("retry_external_effects_authorized',false"));
  assert.equal((sql.match(/create or replace function public.reality_/g)||[]).length,2);
  assert.equal((sql.match(/end \$fn\$;/g)||[]).length,2);
+});
+
+test('live Postgres failure readback uses an unambiguous record variable without table alias shadowing',()=>{
+ assert.ok(sqlAliasFix.includes('declare v_scope record;'));
+ assert.ok(sqlAliasFix.includes('into v_scope'));
+ assert.ok(sqlAliasFix.includes('from reality_internal.governed_execution_wake_outbox_v1 w'));
+ assert.ok(sqlAliasFix.includes("s.owner_id=v_scope.owner_id"));
+ assert.ok(sqlAliasFix.includes("w.wake_state='ESCALATED'"));
+ assert.ok(!sqlAliasFix.includes('declare w record;'));
+ assert.ok(!sqlAliasFix.includes(' into w\\n'));
+ assert.ok(sqlAliasFix.includes("current_user<>'service_role'"));
+ assert.ok(sqlAliasFix.includes("original_job_completed',false"));
 });
