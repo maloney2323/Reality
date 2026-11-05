@@ -170,14 +170,20 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     x=>x?.type==='web_search_call'&&x?.status==='completed'))
    throw new Error('PUBLIC_WEB_RESEARCH_NOT_VERIFIED');
   const sources=publicResearchEnabled===true?extractWebSourceLinks(body):[];
-  const sourceSummary=sources.length?
+  const release=releaseCurrentTurnAnswer({
+   question:currentQuestion,answer:rawAnswer,
+   publicResearchEnabled:publicResearchEnabled===true,sourceUrls:sources,
+   chatWorkDispatches:systemContext?.chat_work_execution_bridge?.plain_chat_can_dispatch_workers!==false,
+  });
+  const sourceSummary=sources.length&&release.disposition==='ORIGINAL_ANSWER_WITHIN_BOUNDED_CHECK'?
    '\n\nPublic sources consulted:\n'+sources.map(x=>'- '+x.title+': '+x.url).join('\n'):'';
   return {
     gateway_version: REALITY_MODEL_GATEWAY_VERSION,
     transport_authority: MODEL_TRANSPORT_AUTHORITY,
     model,
     response_id: body.id || null,
-    answer: rawAnswer+sourceSummary,
+    answer: release.answer+sourceSummary,
+    current_turn_release_disposition:release.disposition,
     materiality: input.materiality,
     signal_lineage: input.governed_signal.lineage,
     transformation_receipt_id: input.governed_signal.transformation_receipt.receipt_id,
