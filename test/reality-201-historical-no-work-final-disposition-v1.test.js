@@ -44,7 +44,7 @@ test('database disposition is separate, terminal, immutable and never changes Un
   "c.claim_run_id is not null",
   "c.claimed_at is not null",
   "c.settled_at is not null",
-  "c.state<>'ACCEPTED_FOR_ISOLATED_RESUMPTION'",
+  "c.state is distinct from 'ACCEPTED_FOR_ISOLATED_RESUMPTION'",
   'new_universe_settlement_written',
   'new_execution_claim_consumed',
   'previous_original_universe_event_id',
@@ -61,7 +61,7 @@ test('database disposition is separate, terminal, immutable and never changes Un
  ])assert.ok(sql.includes('grant execute on function public.'+fn+'\n to service_role'));
  assert.match(sql,/security invoker/);
  assert.match(sql,/enable row level security/);
- assert.match(sql,/if current_user<>'service_role'/);
+ assert.match(sql,/if current_user is distinct from 'service_role'/);
  assert.ok(sql.includes(WORK));
 });
 test('signed broker independently reads after recording and returns no original settlement',()=>{
