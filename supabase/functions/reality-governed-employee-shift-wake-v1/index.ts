@@ -11,6 +11,7 @@ const allowed=new Set([
  'reality_authenticate_employee_shift_wake_v1',
  'reality_close_employee_shift_v1',
  'reality_reconcile_employee_shift_original_v1',
+ 'reality_reconcile_employee_shift_historical_noop_v1',
  'reality_claim_employee_shift_step_v1',
  'reality_settle_employee_shift_step_v1',
  'reality_read_owner_genuine_loop_v1',
