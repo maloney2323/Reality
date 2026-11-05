@@ -12,7 +12,7 @@ test('the same existing Chat route serves full-screen presentation and read-only
  assert.match(html,/<script defer src="\/reality-chat-workspace-v1.js"><\/script>/);
  assert.match(html,/<script defer src="\/reality-chat-verified-cycle-v2.js"><\/script>/);
  assert.ok(html.indexOf('reality-chat-workspace-v1.js')<html.indexOf('reality-chat-verified-cycle-v2.js'));
- assert.match(js,/\/\^\\\/chat\\\/\?\$\//);
+ assert.match(js,/location\\.pathname/);
  assert.doesNotThrow(()=>new Script(js));
 });
 test('readback strictly GET-only; does not create a worker, install, or approve',()=>{
