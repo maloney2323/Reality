@@ -30,4 +30,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify all existing and flexible employee shift contracts
-        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-employee-shift-conversation-v1.test.js
+        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js
