@@ -28,7 +28,7 @@ export async function readVerifiedEmployeeShiftForChat({
    ' NEXT: '+brief.next+
    ' APPROVAL STATUS: '+brief.needs_you+
    (brief.planned_start_at?' Scheduled start in UTC: '+brief.planned_start_at+'.':'')+
-   ' This is an owner-authenticated database readback. Do NOT claim source observation is an executed repair. No measured net human-hours saved, no implied installation authority, and no completed eight-hour shift have been proven by this report. Existing independently verified install requests must be approved in the exact Reality Chat controls, never by ordinary model text.';
+   ' This is an owner-authenticated database readback. Do NOT claim source observation is an executed repair. No measured net human-hours saved, no implied installation authority, and no completed autonomous shift has been proven by this report. Existing independently verified install requests must be approved in the exact Reality Chat controls, never by ordinary model text.';
   return [Object.freeze({
    entry_id:'employee-shift:'+(brief.shift_id||'no-shift'),
    event_kind:'owner_governed_employee_shift_briefing',
