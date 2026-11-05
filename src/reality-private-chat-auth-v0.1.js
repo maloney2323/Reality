@@ -73,6 +73,23 @@ export async function loginChat(req,res,{fetchImpl=fetch,env=process.env}={}){
   expires:now+Math.min(86400,Number(signed.body.expires_in)||3600)*1000},c.seal);
  return {authenticated:true,user_id:user.body.id};
 }
+// Only Supabase Auth's verified passkey assertion may supply these new tokens.
+// Never accept credentials or user claims directly from a browser as session proof.
+export async function establishVerifiedPasskeySession(res,signed,{fetchImpl=fetch,env=process.env}={}){
+ const c=privateChatConfig(env);
+ if(typeof signed?.access_token!=='string'||typeof signed?.refresh_token!=='string'||
+    signed.access_token.length<20||signed.refresh_token.length<16)
+  fail('PASSKEY_SESSION_TOKENS_REQUIRED',503);
+ const user=await provider(c,'user',{token:signed.access_token,fetchImpl});
+ if(!user.ok||typeof user.body?.id!=='string'||!user.body.id)
+  fail('PASSKEY_SESSION_IDENTITY_UNVERIFIED',503);
+ const seconds=Number(signed.expires_in);
+ if(!Number.isFinite(seconds)||seconds<=0)fail('PASSKEY_SESSION_EXPIRY_INVALID',503);
+ setCookie(res,{access:signed.access_token,refresh:signed.refresh_token,
+  expires:Date.now()+Math.min(86400,seconds)*1000},c.seal);
+ return {user_id:user.body.id};
+}
+
 export async function authenticatedChatSession(req,res,{fetchImpl=fetch,env=process.env}={}){
  const c=privateChatConfig(env);
  const state=decrypt(tokenCookie(req),c.seal);
