@@ -193,3 +193,115 @@ export function assessRealityCompanyWorkforce(brief){
   production_changed:false,
  });
 }
+
+
+// Work Center category names are taken from the existing repository work
+// catalog. This is a read-only assignment PROPOSAL, not a new employee queue.
+// One source-backed finding has one primary owner; independent verification
+// remains a distinct responsibility and no job is admitted by this mapping.
+const WORK_CATEGORY_EMPLOYEE_OWNER=Object.freeze({
+ bugs:'software_engineering',
+ reliability:'software_engineering',
+ upgrades:'software_engineering',
+ features:'software_engineering',
+ security:'quality_security_reliability',
+ integrations:'infrastructure_operations',
+ automation:'infrastructure_operations',
+ research:'product_strategy',
+ customer:'experience_onboarding',
+ operations:'infrastructure_operations',
+});
+const REALITY_SOURCE_URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/;
+export function routeRealityWorkCategoriesToEmployees(brief,{
+ pilotEmployee='software_engineering'
+}={}){
+ const workforce=assessRealityCompanyWorkforce(brief);
+ const employeeIds=new Set(workforce.required_business_functions.map(x=>x.function_id));
+ if(!employeeIds.has(pilotEmployee))throw Error('REALITY_EMPLOYEE_PILOT_ROLE_UNVERIFIED');
+ const byRole=new Map(workforce.required_business_functions.map(x=>[x.function_id,[]]));
+ const seenIds=new Set(),seenSources=new Set(),unassigned=[];
+ for(const finding of brief.items){
+  const id=String(finding?.finding_id||'');
+  const url=finding?.evidence_refs?.[0];
+  const category=String(finding?.category||'').toLowerCase();
+  if(!/^catalog:[a-f0-9]{32}$/.test(id)||!REALITY_SOURCE_URL.test(String(url||''))||
+    typeof finding?.title!=='string'||!finding.title.trim()||
+    !['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE'].includes(finding.finding_type)||
+    finding.authorized_execution!==false||
+    finding.customer_job_approved!==false||
+    finding.verified_current_defect!==false||
+    finding.human_baseline_minutes!==null||
+    finding.verified_time_saved_minutes!==null)
+   throw Error('REALITY_EMPLOYEE_CATEGORY_SOURCE_UNVERIFIED');
+  if(seenIds.has(id)||seenSources.has(url))continue;
+  seenIds.add(id);seenSources.add(url);
+  let owner=WORK_CATEGORY_EMPLOYEE_OWNER[category];
+  if(category==='research'&&/\b(competitor|competitive|market positioning)\b/i.test(finding.title))
+   owner='marketing_competitive';
+  if(category==='customer'&&/\b(support|retention|renewal|sales)\b/i.test(finding.title))
+   owner='sales_customer_success';
+  if(!owner||!byRole.has(owner)){
+   unassigned.push(Object.freeze({finding_id:id,category,reason:'UNRECOGNIZED_CATEGORY_REQUIRES_OWNER_CLASSIFICATION'}));
+   continue;
+  }
+  const nasaApplicable=owner==='software_engineering'&&
+    (category==='bugs'||category==='reliability');
+  byRole.get(owner).push(Object.freeze({
+   finding_id:id,
+   title:finding.title.slice(0,260),
+   source_url:url,
+   source_category:category,
+   finding_type:finding.finding_type,
+   priority_heuristic:Number.isFinite(finding.priority_heuristic)?
+     finding.priority_heuristic:null,
+   proposed_employee_function_id:owner,
+   original_job_id:null,
+   current_source_proof:'PROVIDER_OBSERVATION_REQUIRES_INDEPENDENT_VALIDATION',
+   scheduled_shift_id:null,
+   authorized_execution:false,
+   execution_started:false,
+   independently_verified_done:false,
+   measurable_time_saved_minutes:null,
+   nasa_software_fault_reference:nasaApplicable?
+    'APPLICABLE_ONLY_AFTER_SOFTWARE_FAULT_AND_COMPARATOR_VALIDATED':null,
+   nasa_source_url:nasaApplicable?
+    'https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf':null,
+   next_gate:'VALIDATE_CURRENT_SOURCE_AND_CHECK_EXISTING_JOB_ID_BEFORE_ANY_ADMISSION',
+  }));
+ }
+ const assignments=workforce.required_business_functions.map(functionRole=>Object.freeze({
+  employee_function_id:functionRole.function_id,
+  employee_title:functionRole.title,
+  candidate_count:byRole.get(functionRole.function_id).length,
+  candidate_jobs:Object.freeze(byRole.get(functionRole.function_id)),
+  active_employee_instantiated:false,
+  eight_hour_shift_activated:false,
+  real_original_jobs_admitted:0,
+  independently_settled_jobs:0,
+ }));
+ const pilot=assignments.find(x=>x.employee_function_id===pilotEmployee);
+ return Object.freeze({
+  version:'reality-category-to-employee-work-routing-v1',
+  status:'READ_ONLY_CATEGORY_ASSIGNMENT_NOT_GOVERNED_JOB_DISPATCH',
+  source_scope:brief.source_scope,
+  source_observed_at:brief.observed_at||null,
+  existing_work_center_category_source:'REALITY_WORK_CATALOG_V0_1',
+  one_primary_owner_per_finding:true,
+  proposed_company_functions:assignments.length,
+  assigned_category_candidates:assignments.reduce((n,x)=>n+x.candidate_count,0),
+  unassigned_category_candidates:Object.freeze(unassigned),
+  employee_assignments:Object.freeze(assignments),
+  first_pilot_employee:pilot,
+  current_shift_duration_hours:8,
+  daily_recurrence_authorized:false,
+  daily_recurrence_activated:false,
+  employee_workers_deployed:0,
+  actual_work_shift_started:false,
+  category_items_are_not_capability_gap_proof:true,
+  baseline_comparison_not_realized_savings:true,
+  exact_authorization_required_for_consequential_work:true,
+  next_step:'Independently qualify pilot category findings, bind validated original-job IDs to the existing employee shift worker, then obtain the exact owner approval required for any installation. Repeat for another function only after measured outcomes.',
+  installation_authorized:false,
+  production_changed:false
+ });
+}
