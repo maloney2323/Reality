@@ -29,7 +29,7 @@ test('request status starts promptly, clears its timer on reply and survives fai
  assert.match(js,/pollInterval=setInterval/);
  assert.match(js,/button\.disabled/);
  assert.match(js,/MutationObserver/);
- assert.match(js,/state\.complete=true/);
+ assert.match(js,/current\.complete=true/);
  assert.match(js,/clearInterval\(pollInterval\)/);
  assert.match(js,/block\.hidden=false/);
 });
