@@ -150,6 +150,8 @@ export async function runLiveIntelligenceOrchestration({
   // This parameter is supplied ONLY by a trusted server-side history adapter.
   // Client-provided systemContext cannot impersonate authenticated past turns.
   verifiedConversationTurns = null,
+  // Trusted server-only opt-in; never inferred from model statements.
+  publicResearchEnabled = false,
   model,
   apiKey,
   fetchImpl,
@@ -488,6 +490,7 @@ export async function runLiveIntelligenceOrchestration({
     governedSignal,
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
+    publicResearchEnabled: publicResearchEnabled === true,
     model:resolvedModel,
     apiKey:resolvedApiKey,
     fetchImpl,
