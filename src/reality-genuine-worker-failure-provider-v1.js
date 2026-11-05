@@ -51,7 +51,8 @@ export function verifyGenuineOriginalWorkerFailure({
   original_job_completed:false,production_changed:false
  };
  const provider_evidence_sha256=createHash('sha256')
-   .update(JSON.stringify(pinned)).digest('hex');
+   .update(JSON.stringify(Object.fromEntries(Object.entries(pinned).sort(
+      ([a],[b])=>a.localeCompare(b))))).digest('hex');
  return Object.freeze({...pinned,
   provider_evidence_sha256,read_only:true,independently_verified:true,
   retry_external_effects_authorized:false,
