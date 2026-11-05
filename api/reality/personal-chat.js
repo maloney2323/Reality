@@ -93,7 +93,7 @@ export default async function handler(req,res){
   // start a new, explicitly linked read-only recovery segment.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
   const continuity=await resolvePrivateChatContinuity({
-   scopedRoot:'personal:chat:'+scope,db:isolated
+   scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
   });
   const scopedRoot=continuity.scopedRoot;
   if(continuity.fork_recovery&&goalCommand)
@@ -219,8 +219,14 @@ export default async function handler(req,res){
   // the EXACT answer checked by the final Integrity publication decision.
   const publication=await publishPrivateAssistantAtomically(session,{
     conversationId,requestId,text:answer,isolatedDb:isolated,
-    expectedRevision:goalAtGeneration.transition_count,
-    expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
+    // On a recovered fork, keep the *original* independently verified goal
+    // epoch for the existing DB transaction's CAS. The new read-only segment
+    // never invents a new owner goal or resets the original goal revision.
+    expectedRevision:continuity.verified_prior_goal_cas?
+      continuity.verified_prior_goal_cas.expected_revision:goalAtGeneration.transition_count,
+    expectedLastEventId:continuity.verified_prior_goal_cas?
+      continuity.verified_prior_goal_cas.expected_last_goal_event_id:
+      goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
   });
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
