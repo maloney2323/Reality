@@ -34,6 +34,7 @@ export function createUniversePostgresPersistence({
     let lastFailure = null;
     for (const key of keys) {
       const response = await fetchImpl(baseUrl + '/rest/v1/' + path, {
+        signal:AbortSignal.timeout(18000),
         method,
         headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...headers },
         body: body === undefined ? undefined : JSON.stringify(body),
