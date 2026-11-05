@@ -193,3 +193,25 @@ body[data-reality-route="chat"] .reality-cycle-checked{font-size:10px;color:#a6c
  body[data-reality-route="chat"] .reality-page-tabs a{font-size:10px!important;padding:8px 6px!important}
  body[data-reality-route="chat"] .reality-chat-thread-heading strong{font-size:12px}
 }
+
+/* Signed-out / temporary-auth-outage screen must never be blank.
+   #privateAccountState was previously mislabeled as intro and hidden. */
+body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateChat>#privateAccountState{
+ display:block!important;align-self:center!important;width:min(100% - 22px,540px);
+ max-width:540px;margin:clamp(18px,5vh,50px) auto 12px!important;
+ padding:15px 17px!important;line-height:1.6!important;font-size:13px!important;
+ border:1px solid #5d839a;border-radius:13px;background:#132b3e;
+ color:#e5f4fc!important;overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] #privateRetrySession:not([hidden]){
+ display:block!important;align-self:center!important;width:auto!important;
+ max-width:calc(100vw - 38px)!important;min-height:46px!important;
+ margin:5px auto 12px!important;padding:10px 22px!important;
+ border-radius:12px!important;font-size:14px!important;
+ color:#062133!important;background:#e1f2fc!important;
+}
+body[data-reality-route="chat"] #privateRetrySession[hidden]{display:none!important}
+body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateLogin[style*="block"]{
+ display:block!important;flex:0 0 auto;min-height:0;
+ max-height:calc(100dvh - 210px);overflow-y:auto;
+}
