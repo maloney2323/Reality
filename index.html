@@ -1914,7 +1914,14 @@ async function realityBusinessRefresh(){
   $('businessTrackedJobs').textContent=String(jobs.length);
   $('businessPendingApprovals').textContent=String(pending);
   $('businessVerifiedCompletions').textContent=String(settled);
-  $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. Counts cover only returned repair jobs; they are not financial results.';
+  const verifiedNoWork=jobs.filter(j=>j.terminal_no_new_work_verified===true&&
+   j.historical_no_work_final_disposition?.status===
+    'HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+   j.historical_no_work_final_disposition.independent_database_readback===true&&
+   j.historical_no_work_final_disposition.original_execution_replayed===false).length;
+  $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. '+
+   'Counts cover only returned repair jobs; they are not financial results. '+
+   (verifiedNoWork?verifiedNoWork+' original job(s) independently closed because the objective was already satisfied; no new execution or settlement counted.':'');
   const finalJob=jobs.find(j=>j.capability_id==='reality-general-execution-receipt'&&
     j.full_loop_independently_verified===true);
   const finalReceipt=(data.independent_final_receipts||[]).find(r=>
@@ -3919,11 +3926,33 @@ async function realityChatRefreshEvents(){
   for(const j of data.jobs.filter(x=>
     !(x.independently_settled===true&&x.universe_settlement_verified===true&&
      (x.capability_id!=='reality-general-execution-receipt'||x.full_loop_independently_verified===true))&&
-    x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT').slice(0,6)){
+    (x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT'||
+     x.terminal_no_new_work_verified===true)).slice(0,6)){
    if(!/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')))continue;
    const bubble=document.createElement('div');bubble.className='reality-chat-progress';
    const title=document.createElement('strong');
    const note=document.createElement('small');
+   const noWork=j.historical_no_work_final_disposition;
+   if(j.terminal_no_new_work_verified===true&&
+      noWork?.status==='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+      noWork.independent_database_readback===true&&
+      noWork.original_execution_replayed===false&&
+      noWork.new_universe_settlement_written===false&&
+      noWork.original_job_completed===false){
+    title.textContent='Original #201 closed · Objective already satisfied';
+    note.textContent='Final no-new-work receipt '+noWork.receipt_id+
+      ' independently recorded. The existing historical Universe settlements were verified; '+
+      'this original job was not executed, reinstalled or settled again. No ROI inferred.';
+    bubble.append(title,note);
+    if(Number.isSafeInteger(noWork.signed_github_run_id)&&noWork.signed_github_run_id>0){
+     const link=document.createElement('a');
+     link.href='https://github.com/maloney2323/Reality/actions/runs/'+noWork.signed_github_run_id;
+     link.target='_blank';link.rel='noopener noreferrer';
+     link.textContent='View signed no-new-work evidence';bubble.appendChild(link);
+    }
+    container.appendChild(bubble);
+    continue;
+   }
    const fullVerified=j.independently_settled===true&&
     j.universe_settlement_verified===true&&
     (j.capability_id!=='reality-general-execution-receipt'||
@@ -5247,6 +5276,21 @@ async function wcLoadGapFeed(){
     !Array.isArray(data.settled_history)||data.settled_history.length>12||
     data.counts?.current_candidates!==data.items.length||
     data.counts?.historical_completed!==data.settled_history.length||
+    !Number.isSafeInteger(data.counts?.historical_no_new_work_closed??0)||
+    !Array.isArray(data.historical_no_work_final_dispositions??[])||
+    (data.historical_no_work_final_dispositions??[]).length!==
+     (data.counts?.historical_no_new_work_closed??0)||
+    (data.historical_no_work_final_dispositions??[]).some(x=>
+      x.status!=='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'||
+      x.independent_database_readback!==true||
+      x.original_execution_replayed!==false||
+      x.production_changed!==false)||
+    (data.next_qualification!=null&&(
+      data.next_qualification.status!=='CANDIDATE_REQUIRES_CURRENT_ORIGINAL_JOB_VERIFICATION'||
+      data.next_qualification.owner_approval_granted!==false||
+      data.next_qualification.execution_started!==false||
+      data.next_qualification.installation_authorized!==false||
+      data.next_qualification.production_changed!==false))||
     !Number.isSafeInteger(data.counts?.verified_implementation_defects??0)||
     (data.counts?.verified_implementation_defects??0)!==
      data.items.filter(x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED').length||
@@ -5294,12 +5338,16 @@ async function wcLoadGapFeed(){
    (data.counts.frozen_source_discoveries??0)+' frozen source discovery/discoveries · '+
    (data.counts.current_source_absence_confirmed??0)+' current source absence check(s) · '+
    (data.counts.existing_original_recovery_links??0)+' existing recovery-job link(s) · '+
+   (data.counts.historical_no_new_work_closed??0)+' signed no-new-work closures moved to history · '+
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
    (data.unbound_source_coverage==='SOURCE_REVIEW_UNAVAILABLE'?
      ' Frozen-source coverage unavailable, not zero. ':'')+
-   ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.';
+   ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.'+
+   (data.next_qualification?.status==='CANDIDATE_REQUIRES_CURRENT_ORIGINAL_JOB_VERIFICATION'?
+    ' Next qualification to review: '+String(data.next_qualification.title||'').slice(0,145)+
+    '. Requires a fresh owner-bound original-job verification; no new work started.':'');
   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
   wcRender();
  }catch{

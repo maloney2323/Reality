@@ -82,7 +82,7 @@
     get('/api/reality/personal-gap-intake')
    ]);
    if (epoch !== serial || !signedIn()) return;
-   let completed = 0, historical = 0, downloads = 0;
+   let completed = 0, historical = 0, closedNoWork = 0, downloads = 0;
    let jobReadbackVerified = false, upgradeReadbackVerified = false;
    if (jobsResult.status === 'fulfilled') {
     const data = jobsResult.value;
@@ -110,10 +110,32 @@
       const previouslySatisfied = job.historical_reconciliation?.status ===
        'HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT' &&
        job.historical_reconciliation?.current_job_settled === false;
-      if (!fullySettled && !previouslySatisfied) continue;
+      const disposition = job.historical_no_work_final_disposition;
+      const closedWithoutExecution = job.terminal_no_new_work_verified === true &&
+       disposition?.status === 'HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION' &&
+       disposition.independent_database_readback === true &&
+       disposition.original_job_completed === false &&
+       disposition.original_execution_replayed === false &&
+       disposition.new_universe_settlement_written === false &&
+       disposition.new_execution_claim_consumed === false &&
+       disposition.production_changed === false &&
+       Number.isSafeInteger(disposition.signed_github_run_id) &&
+       disposition.signed_github_run_id > 0;
+      if (!fullySettled && !previouslySatisfied && !closedWithoutExecution) continue;
       const name = String(job.capability_id || 'Reality capability')
        .replace(/^reality-/, '').replaceAll('-', ' ');
-      if (fullySettled) {
+      if (closedWithoutExecution) {
+       closedNoWork++;
+       record(original, name + ' · ' + id.slice(5, 13),
+        'VERIFIED CLOSED · OBJECTIVE ALREADY SATISFIED · NO NEW EXECUTION',
+        'Reality independently read back the immutable final no-work disposition ' +
+        String(disposition.receipt_id || '') + '. Two earlier Universe settlements ' +
+        'satisfied the same objective. This original job was not executed or settled again; ' +
+        'no additional work, PDF completion receipt or labor savings are claimed.',
+        'https://github.com/maloney2323/Reality/actions/runs/' +
+         disposition.signed_github_run_id,
+        'View signed disposition worker evidence');
+      } else if (fullySettled) {
        completed++;
        if (receipt) downloads++;
        record(original, name + ' · ' + id.slice(5, 13),
@@ -132,7 +154,7 @@
         'This particular job has NOT independently settled and no second receipt was generated.');
       }
      }
-     if (!completed && !historical) empty(original,
+     if (!completed && !historical && !closedNoWork) empty(original,
       'No verified completed original jobs or historical reconciliations were returned. Active jobs remain in the separate work queue.');
     }
    } else {
@@ -166,7 +188,8 @@
    status.textContent = (jobReadbackVerified ?
     completed + ' independently settled original job(s) · ' +
     downloads + ' verified final PDF receipt(s) · ' +
-    historical + ' historical duplicate observation(s).' :
+    closedNoWork + ' verified no-new-work final disposition(s) · ' +
+    historical + ' historical observations without a final disposition.' :
     'Original-job readback unavailable; completion counts are unknown.') +
     (upgradeReadbackVerified ?
      ' Earlier installation history loaded.' :

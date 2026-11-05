@@ -7,6 +7,8 @@ import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {qualifyUnboundSourceBatch}
  from '../../src/reality-owner-unbound-capability-qualification-v1.js';
+import {chooseNextOwnerQualification}
+ from '../../src/reality-next-qualification-v1.js';
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/;
 const KINDS=new Set(['RESEARCH_OPPORTUNITY','CI_FAILURE_INVESTIGATION',
@@ -202,22 +204,70 @@ export default async function handler(req,res){
   }catch{
    unboundItems=[];
   }
-  const items=[...merged,...unboundItems];
+  // A frozen discovery linked to #201 is no longer an active opportunity
+  // once the independently signed no-new-work final record is present.
+  // Never suppress an observation from only a passing test or claimed state.
+  let noWorkClosed=null;
+  if(unboundItems.some(x=>
+    x.linked_original_work_id==='work:bf17f1716f7c9550680d761e64f8b591'&&
+    x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED')){
+   try{
+    const response=await fetch(db.url+
+      '/rest/v1/rpc/reality_read_genuine_historical_no_work_v1',{
+      method:'POST',cache:'no-store',redirect:'error',
+      headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+       accept:'application/json','content-type':'application/json'},
+      body:JSON.stringify({p_work:'work:bf17f1716f7c9550680d761e64f8b591'})
+     });
+    const proof=await response.json().catch(()=>null);
+    if(response.ok&&
+      proof?.status==='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+      proof.original_work_id==='work:bf17f1716f7c9550680d761e64f8b591'&&
+      UUID.test(proof.receipt_id)&&
+      /^[a-f0-9]{64}$/.test(proof.previous_original_event_content_hash||'')&&
+      /^[a-f0-9]{64}$/.test(proof.previous_target_event_content_hash||'')&&
+      proof.independent_database_readback===true&&
+      proof.unresolved_reconciliation_targets===0&&
+      proof.original_job_completed===false&&
+      proof.original_execution_replayed===false&&
+      proof.new_execution_claim_consumed===false&&
+      proof.new_universe_settlement_written===false&&
+      proof.production_changed===false)
+     noWorkClosed={
+      original_work_id:proof.original_work_id,
+      receipt_id:proof.receipt_id,
+      status:proof.status,
+      independent_database_readback:true,
+      original_execution_replayed:false,
+      production_changed:false};
+   }catch{/* A missing readback must never silently close a gap. */}
+  }
+  const currentUnbound=noWorkClosed?unboundItems.filter(x=>
+    x.linked_original_work_id!==noWorkClosed.original_work_id):unboundItems;
+  const items=[...merged,...currentUnbound];
+  // The source-backed next review must not rank an already-closed work item
+  // above a currently verified owner gap, or turn a historical test into
+  // a new executable job. The ranking helper remains read-only.
+  const nextQualification=chooseNextOwnerQualification(items,{
+    closedWorkIds:noWorkClosed?[noWorkClosed.original_work_id]:[]});
   // Strictly bound to authenticated server session; no browser role or
   // model instruction can change eligibility, findings, or work authority.
   return res.status(200).json({
    ok:true,status:payload.status,
    counts:{...payload.counts,
     current_candidates:items.length,
-    frozen_source_discoveries:unboundItems.length,
-    current_source_absence_confirmed:unboundItems.filter(x=>
+    frozen_source_discoveries:currentUnbound.length,
+    current_source_absence_confirmed:currentUnbound.filter(x=>
       x.verified_current_source_absence===true).length,
-    existing_original_recovery_links:unboundItems.filter(x=>
+    existing_original_recovery_links:currentUnbound.filter(x=>
       x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'&&
       /^work:[a-f0-9]{32}$/.test(x.linked_original_work_id||'')).length,
+    historical_no_new_work_closed:noWorkClosed?1:0,
     verified_implementation_defects:proofs.items.length,
     independently_tested_research_repairs:proofs.items.length},
    items,settled_history:payload.settled_history,
+   historical_no_work_final_dispositions:noWorkClosed?[noWorkClosed]:[],
+   next_qualification:nextQualification,
    source_basis:payload.source_basis,
    unbound_source_coverage:unboundCoverage,
    read_only:true,installation_authorized:false,
