@@ -1441,10 +1441,114 @@ Deno.serve(async request=>{
   if(raw.length>290000)deny('REQUEST_TOO_LARGE');
   const input=JSON.parse(raw);
   const ghProviderToken=request.headers.get('x-reality-github-provider-token');
-  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest'||input?.action==='reconcile'||input?.action==='prepare'||input?.action==='qualify')&&
+  if((input?.action?.startsWith('installer_')||input?.action?.startsWith('original_')||input?.action==='owner_source_attest'||input?.action==='observe_worker_failure'||input?.action==='reconcile'||input?.action==='prepare'||input?.action==='qualify')&&
      (typeof ghProviderToken!=='string'||
       !/^[\x21-\x7e]{20,4000}$/.test(ghProviderToken)))
     deny('SIGNED_PROVIDER_GITHUB_READ_CREDENTIAL_REQUIRED');
+
+  // Independent failure observation feeds back into Reality's existing
+  // owner-governed capability engine. This does not launch another agent,
+  // re-execute the original, approve installation or create a capability gap.
+  if(input?.action==='observe_worker_failure'){
+   if(Object.keys(input).sort().join(',')!=='action,scope'||
+      Object.keys(input.scope||{}).sort().join(',')!=='repository_sha'||
+      !SHA40.test(String(input.scope.repository_sha||'')))
+    deny('WORKER_FAILURE_EXACT_SIGNED_REQUEST_REQUIRED');
+   const observer=await verify(bearer,input.scope.repository_sha,ghProviderToken);
+   const scope=await database('rpc/reality_read_genuine_worker_failure_scope_v1',{
+    method:'POST',body:{}});
+   if(scope?.status==='NO_VERIFIED_ESCALATED_ORIGINAL_WORK'&&
+      scope.record_allowed===false&&
+      scope.model_invocation_authorized===false&&
+      scope.installation_authorized===false&&
+      scope.original_job_completed===false&&
+      scope.production_changed===false)
+    return respond({ok:true,status:'NO_VERIFIED_ESCALATED_ORIGINAL_WORK',
+     model_invoked:false,new_customer_job_created:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false});
+   if(scope?.status!=='ESCALATED_OWNER_ORIGINAL_WORK_VERIFIED'||
+      scope.record_allowed!==true||
+      !WORK.test(String(scope.original_work_id||''))||
+      !UUID.test(String(scope.trigger_id||''))||
+      !Number.isSafeInteger(scope.failed_run_id)||
+      scope.failed_run_id<1||
+      scope.model_invocation_authorized!==false||
+      scope.installation_authorized!==false||
+      scope.original_job_completed!==false||
+      scope.production_changed!==false)
+    deny('ESCALATED_ORIGINAL_SCOPE_NOT_AUTHENTICATED');
+   const provider=await api('/actions/runs/'+scope.failed_run_id,ghProviderToken);
+   const jobs=await api('/actions/runs/'+scope.failed_run_id+'/jobs?per_page=100',
+     ghProviderToken);
+   if(provider?.id!==scope.failed_run_id||
+      provider.status!=='completed'||provider.conclusion!=='failure'||
+      provider.path!==WORKFLOW||
+      provider.head_branch!==BRANCH.slice('refs/heads/'.length)||
+      provider.head_repository?.full_name!==REPO||
+      !SHA40.test(provider.head_sha)||
+      !Array.isArray(jobs?.jobs)||jobs.jobs.length<1||
+      jobs.jobs.length>100)
+    deny('FAILED_GITHUB_WORKER_PROVIDER_READBACK_INVALID');
+   const matching=jobs.jobs.filter((job:Record<string,unknown>)=>
+      job.name==='resume_original_job'&&
+      job.status==='completed'&&job.conclusion==='failure'&&
+      job.run_id===provider.id&&
+      Array.isArray(job.steps)&&job.steps.some((step:Record<string,unknown>)=>
+       step.name==='Execute original frozen acceptance against installed source'&&
+       step.conclusion==='failure'));
+   if(matching.length!==1||!Number.isSafeInteger(matching[0].id)||
+      Number(matching[0].id)<1)
+    deny('FAILED_ORIGINAL_RESUME_JOB_NOT_INDEPENDENTLY_VERIFIED');
+   const pinned={
+    source:'INDEPENDENT_GITHUB_ACTIONS_PROVIDER_READBACK',
+    repository:REPO,workflow_path:WORKFLOW,
+    original_work_id:scope.original_work_id,
+    trigger_id:scope.trigger_id,
+    failed_run_id:provider.id,failed_job_id:matching[0].id,
+    failed_run_sha:provider.head_sha,
+    stage:'resume_original_job',
+    failed_step:'Execute original frozen acceptance against installed source',
+    provider_run_conclusion:'failure',
+    provider_job_conclusion:'failure',
+    model_gap_verified:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   };
+   const evidenceSha=await digest(pinned);
+   const saved=await database('rpc/reality_record_genuine_worker_failure_v1',{
+    method:'POST',body:{
+     p_verifier_run_id:observer.id,
+     p_failed_run_id:provider.id,
+     p_failed_job_id:matching[0].id,
+     p_failed_run_sha:provider.head_sha,
+     p_provider_evidence_sha256:evidenceSha
+    }});
+   if(saved?.status!=='SIGNED_WORKER_FAILURE_RECORDED'||
+      !UUID.test(String(saved.observation_id||''))||
+      saved.original_work_id!==scope.original_work_id||
+      saved.trigger_id!==scope.trigger_id||
+      saved.failed_run_id!==provider.id||
+      saved.failed_job_id!==matching[0].id||
+      saved.provider_evidence_sha256!==evidenceSha||
+      !['HISTORICAL_RECONCILIATION_ALREADY_VERIFIED',
+        'SIGNED_FAILED_WORKER_NEEDS_INDEPENDENT_DIAGNOSIS'].includes(
+          String(saved.finding||''))||
+      saved.frozen_missing_capability_verified!==false||
+      saved.model_generated!==false||
+      saved.new_customer_job_created!==false||
+      saved.retry_external_effects_authorized!==false||
+      saved.installation_authorized!==false||
+      saved.original_job_completed!==false||
+      saved.production_changed!==false)
+    deny('GOVERNED_WORKER_FAILURE_PERSISTED_PROOF_UNVERIFIED');
+   return respond({ok:true,...saved,
+     signed_observer_run_id:observer.id,
+     independent_github_readback:true,
+     verified_root_cause:false,
+     model_invoked:false,execution_replayed:false,
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false});
+  }
 
   if(input?.action==='owner_source_attest'){
    if(Object.keys(input).sort().join(',')!=='action,proof,scope'||
