@@ -5245,14 +5245,14 @@ async function wcLoadGapFeed(){
       x.repair_proof.owner_install_authorized!==false||
       x.repair_proof.fresh_original_work_verified!==false||
       x.verified_missing_capability!==false))||
-    data.counts?.frozen_source_discoveries!==
+    (data.counts?.frozen_source_discoveries??0)!==
      data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY').length||
-    data.counts?.current_source_absence_confirmed!==
+    (data.counts?.current_source_absence_confirmed??0)!==
      data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&
        x.verified_current_source_absence===true).length||
     !['ALL_UNBOUND_SOURCES_REOBSERVED',
       'PARTIAL_UNBOUND_SOURCE_REOBSERVATION',
-      'SOURCE_REVIEW_UNAVAILABLE'].includes(data.unbound_source_coverage)||
+      'SOURCE_REVIEW_UNAVAILABLE'].includes(data.unbound_source_coverage??'SOURCE_REVIEW_UNAVAILABLE')||
     data.items.some(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&(
       !/^unbound:[a-f0-9]{64}$/.test(x.key||'')||
       x.verified_missing_capability!==false||
@@ -5270,8 +5270,8 @@ async function wcLoadGapFeed(){
   wcGapFeed=data.items;wcGapHistory=data.settled_history;
   wcGapCounts=data.counts;wcGapFeedReady=true;
   wcGapFeedStatus=data.counts.current_candidates+' tracked · '+
-   data.counts.frozen_source_discoveries+' frozen source discovery/discoveries · '+
-   data.counts.current_source_absence_confirmed+' current source absence check(s) · '+
+   (data.counts.frozen_source_discoveries??0)+' frozen source discovery/discoveries · '+
+   (data.counts.current_source_absence_confirmed??0)+' current source absence check(s) · '+
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
