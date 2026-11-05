@@ -19,13 +19,16 @@ create table if not exists reality_internal.governed_shift_continuation_monitor_
  observed_at timestamptz,
  proof jsonb,
  proof_sha256 text,
+ governance_decision_sha256 text,
  primary key (shift_id,monitor_bucket)
 );
 alter table reality_internal.governed_shift_continuation_monitor_v1 enable row level security;
 revoke all on reality_internal.governed_shift_continuation_monitor_v1 from public,anon,authenticated;
 grant select,insert,update on reality_internal.governed_shift_continuation_monitor_v1 to service_role;
 
-create or replace function public.reality_claim_shift_continuation_monitor_v1()
+-- This function IS the Reality governor for bounded source continuations.
+-- The worker receives a fenced work order; it never chooses the work itself.
+create or replace function public.reality_govern_shift_continuation_cycle_v1()
 returns jsonb language plpgsql security invoker set search_path='' as $fn$
 declare
  v_shift record;
@@ -36,6 +39,7 @@ declare
  v_indices smallint[];
  v_pos integer;
  v_claim uuid;
+ v_decision_hash text;
 begin
  if current_user<>'service_role' then raise exception 'CONTINUATION_SERVICE_ONLY'; end if;
  -- Only an authorized shift after its first five source checks are terminal.
@@ -117,6 +121,22 @@ begin
     and lease_expires_at<=v_now;
   if not found then raise exception 'CONTINUATION_CLAIM_RACE'; end if;
  end if;
+ -- Independent immutable selection receipt from Reality's authenticated
+ -- database governance cycle, not worker text or model-generated instructions.
+ v_decision_hash:='sha256:'||
+  pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+   pg_catalog.jsonb_build_object(
+    'kind','REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK',
+    'shift_id',v_shift.shift_id,'owner_id',v_shift.owner_id,
+    'source_ref',v_refs[v_pos],'source_step_index',v_indices[v_pos],
+    'monitor_bucket',v_bucket,'claim_id',v_claim,
+    'planned_end_at',v_shift.planned_end_at,
+    'external_write_authority',false)::text,'UTF8')),'hex');
+ update reality_internal.governed_shift_continuation_monitor_v1
+  set governance_decision_sha256=v_decision_hash
+  where shift_id=v_shift.shift_id and monitor_bucket=v_bucket
+    and claim_id=v_claim and state='CLAIMED';
+ if not found then raise exception 'CONTINUATION_GOVERNED_DECISION_LOST'; end if;
  return pg_catalog.jsonb_build_object(
   'status','CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
   'shift_id',v_shift.shift_id,'owner_id',v_shift.owner_id,
@@ -124,6 +144,13 @@ begin
   'source_step_index',v_indices[v_pos],'source_ref',v_refs[v_pos],
   'claim_id',v_claim,'planned_end_at',v_shift.planned_end_at,
   'only_originally_approved_sources',true,
+  'governed_work_order',pg_catalog.jsonb_build_object(
+    'kind','REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK',
+    'decision_sha256',v_decision_hash,
+    'source_ref',v_refs[v_pos],
+    'original_job_action','NONE',
+    'external_write_authority',false,
+    'worker_must_return_evidence',true),
   'read_only',true,'no_external_write_authority',true,
   'installation_authorized',false,'original_job_completed',false,
   'production_changed',false);
@@ -149,6 +176,8 @@ begin
   pg_catalog.octet_length(p_proof::text)>16000 or
   p_proof->>'kind' is distinct from 'GITHUB_SOURCE_READBACK' or
   p_proof->>'source_url' is distinct from v.source_ref or
+  p_proof->>'governed_work_order_sha256' is distinct from
+   v.governance_decision_sha256 or
   p_proof->>'provider_checked' is distinct from 'true' or
   p_proof->>'read_only' is distinct from 'true' or
   p_proof->>'production_changed' is distinct from 'false' or
@@ -181,11 +210,11 @@ begin
   'installation_authorized',false,'production_changed',false);
 end $fn$;
 
-revoke all on function public.reality_claim_shift_continuation_monitor_v1()
+revoke all on function public.reality_govern_shift_continuation_cycle_v1()
  from public,anon,authenticated;
 revoke all on function public.reality_settle_shift_continuation_monitor_v1(
  uuid,timestamptz,uuid,jsonb) from public,anon,authenticated;
-grant execute on function public.reality_claim_shift_continuation_monitor_v1()
+grant execute on function public.reality_govern_shift_continuation_cycle_v1()
  to service_role;
 grant execute on function public.reality_settle_shift_continuation_monitor_v1(
  uuid,timestamptz,uuid,jsonb) to service_role;
