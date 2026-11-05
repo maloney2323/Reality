@@ -5,7 +5,7 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
-import {assessRealityWorkdayTeam} from '../../src/reality-workday-team-assessment-v1.js';
+import {assessRealityWorkdayTeam,routeRealityWorkCategoriesToEmployees} from '../../src/reality-workday-team-assessment-v1.js';
 import {buildRealityEightHourShiftDraft} from '../../src/reality-eight-hour-shift-plan-v1.js';
 import {computeShiftFingerprint,shiftDatabase,shiftRpc,
  assertShiftReceipt,assertShiftReadback}
@@ -63,7 +63,8 @@ export default async function handler(req,res){
      const brief=buildRealityWorkdayOpportunityBrief(catalog);
      const plan=buildRealityEightHourShiftDraft(brief,{durationHours:hours});
      draft={...plan,expected_fingerprint:computeShiftFingerprint(plan),
-       proposed_team:assessRealityWorkdayTeam(brief)};
+       proposed_team:assessRealityWorkdayTeam(brief),
+       employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief)};
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
