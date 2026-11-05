@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d1017">
+<title>Reality — Chat</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0d1017;color:#f1f4f8}
+*{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;background:#e8eef8;color:#111b29;font-weight:650;padding:10px 14px}
+button:disabled{opacity:.48;cursor:wait}a{color:#c2dbff}
+.shell{min-height:100dvh;max-width:860px;margin:auto;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #293140}
+header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #293140}
+.toolbar select{flex:1;min-width:120px;max-width:420px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px}
+.toolbar button{background:#253247;color:#eef5ff;font-size:13px}
+#thread{flex:1;min-height:40vh;overflow:auto;padding:16px 14px 24px;display:flex;flex-direction:column;gap:14px}
+.message{max-width:90%;padding:12px 15px;border:1px solid #2d3645;border-radius:15px;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.5}
+.message.user{align-self:flex-end;background:#23344c;border-color:#3a5271}
+.message.assistant{align-self:flex-start;background:#171e29}
+.message.pending{opacity:.76}.message.error{border-color:#a6665e}
+.message small{display:block;font-size:11px;opacity:.75;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.status{padding:8px 16px;font-size:13px;min-height:34px;color:#aebed4}
+.composer{display:flex;align-items:flex-end;gap:9px;border-top:1px solid #293140;padding:12px 14px 20px;background:#0d1017}
+.composer textarea{flex:1;min-height:54px;max-height:180px;resize:vertical;padding:12px 14px;background:#171e29;color:#fff;border:1px solid #3a465a;border-radius:12px}
+.composer button{min-height:50px}
+#auth{padding:28px 18px;max-width:450px;width:100%;margin:auto}
+#auth label{display:block;margin:18px 0 6px;font-size:13px}
+#auth input{width:100%;padding:12px;border:1px solid #41506a;background:#151d29;color:#fff;border-radius:10px}
+#auth button{margin-top:16px}
+[hidden]{display:none!important}
+@media(max-width:550px){header{padding:12px}.toolbar{padding:8px 12px}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header><strong>Reality · Chat</strong><a href="/" title="Open Reality work and approvals">Work &amp; approvals</a></header>
+<section id="auth" hidden>
+<h2>Sign in to Reality</h2>
+<p>Your saved conversations remain private to your account.</p>
+<label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+<button id="login" type="button">Sign in</button>
+<p id="authMessage" role="status"></p>
+</section>
+<div id="chat" hidden style="flex:1;display:flex;flex-direction:column">
+<div class="toolbar">
+<select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
+<button id="newChat" type="button">New chat</button>
+<button id="refresh" type="button">Refresh</button>
+<button id="logout" type="button">Log out</button>
+</div>
+<div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
+<p id="status" class="status" role="status" aria-live="polite">Ready.</p>
+<form id="composer" class="composer">
+<textarea id="prompt" maxlength="6000" placeholder="Message Reality…" aria-label="Message Reality"></textarea>
+<button id="send" type="submit">Send</button>
+</form>
+</div>
+<p id="startup" class="status" role="status">Checking your Reality session…</p>
+</div>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const KEY='reality.private.chat.conversation.v1';
+const SESSION='/api/reality/personal-session';
+const API='/api/reality/personal-chat';
+const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
+let active=null,pending=false,sequence=0,elapsed=null;
+function conversation(){
+  let id;try{id=localStorage.getItem(KEY)}catch{}
+  if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
+  return id;
+}
+function setConversation(id){active=id;try{localStorage.setItem(KEY,id)}catch{}}
+function status(message){$('status').textContent=message}
+function bubble(role,text,cls=''){
+  const el=document.createElement('div');el.className='message '+role+' '+cls;
+  const label=document.createElement('small');label.textContent=role==='user'?'You':'Reality';
+  const body=document.createElement('div');body.textContent=String(text||'');
+  el.append(label,body);$('thread').append(el);
+  $('thread').scrollTop=$('thread').scrollHeight;
+  return el;
+}
+async function json(url,options={}){
+  const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
+  const data=await response.json().catch(()=>null);
+  if(!response.ok||!data)throw Error(data?.error||'Request unavailable ('+response.status+')');
+  return data;
+}
+async function refreshHistory(id=active){
+  if(pending)return;
+  const seq=++sequence;
+  try{
+    const data=await json(API+'?conversation_id='+encodeURIComponent(id),{signal:AbortSignal.timeout(10000)});
+    if(seq!==sequence||id!==active)return;
+    $('thread').replaceChildren();
+    for(const m of data.messages||[])bubble(m.role==='user'?'user':'assistant',m.text);
+    status('Ready.');
+  }catch(e){if(seq===sequence&&id===active)status('History unavailable. You can still type a message. '+e.message)}
+}
+async function listConversations(){
+  try{
+    const data=await json(API+'?list=1',{signal:AbortSignal.timeout(10000)});
+    const select=$('conversations');
+    select.replaceChildren();
+    const here=document.createElement('option');here.value=active;here.textContent='Current conversation';
+    select.append(here);
+    for(const c of data.conversations||[]){
+      if(!uuid(c.conversation_id)||c.conversation_id===active)continue;
+      const option=document.createElement('option');option.value=c.conversation_id;
+      option.textContent=String(c.last_message||'Previous conversation').slice(0,60);
+      select.append(option);
+    }
+    select.value=active;
+  }catch{/* Conversation list is optional; never block Chat. */}
+}
+function showAuth(authenticated){
+  $('startup').hidden=true;
+  $('auth').hidden=authenticated;
+  $('chat').hidden=!authenticated;
+  if(authenticated){
+    setConversation(conversation());
+    void refreshHistory();
+    void listConversations();
+    $('prompt').focus({preventScroll:true});
+  }
+}
+async function init(){
+  try{
+    const data=await json(SESSION,{signal:AbortSignal.timeout(10000)});
+    showAuth(data.authenticated===true);
+  }catch(e){
+    $('startup').hidden=true;
+    $('auth').hidden=false;
+    $('authMessage').textContent='Unable to check your session: '+e.message+'. Retry by reloading.';
+  }
+}
+$('login').onclick=async()=>{
+  $('login').disabled=true;$('authMessage').textContent='Signing in…';
+  try{
+    const data=await json(SESSION,{method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:$('email').value,password:$('password').value}),
+      signal:AbortSignal.timeout(15000)});
+    if(!data.authenticated)throw Error('Sign-in not confirmed');
+    $('password').value='';$('authMessage').textContent='';
+    showAuth(true);
+  }catch(e){$('authMessage').textContent='Sign-in failed: '+e.message}
+  finally{$('login').disabled=false}
+};
+$('logout').onclick=async()=>{
+  if(pending)return;
+  try{await json(SESSION,{method:'DELETE',signal:AbortSignal.timeout(10000)})}
+  catch(e){status('Log out could not be confirmed: '+e.message);return}
+  $('thread').replaceChildren();
+  $('authMessage').textContent='Signed out.';
+  showAuth(false);
+};
+$('newChat').onclick=()=>{
+  if(pending)return;
+  setConversation(crypto.randomUUID());
+  $('thread').replaceChildren();status('New conversation ready.');
+  void listConversations();
+};
+$('conversations').onchange=()=>{
+  if(pending)return;
+  const id=$('conversations').value;
+  if(!uuid(id))return;
+  setConversation(id);void refreshHistory(id);
+};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations()}};
+$('prompt').onkeydown=e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+    e.preventDefault();$('composer').requestSubmit();
+  }
+};
+$('composer').onsubmit=async(e)=>{
+  e.preventDefault();if(pending)return;
+  const value=$('prompt').value.trim();if(!value)return;
+  // Never wait for a server round-trip before showing the user's own message.
+  const id=active,requestId=crypto.randomUUID();
+  pending=true;$('send').disabled=true;
+  const optimistic=bubble('user',value,'pending');
+  $('prompt').value='';
+  const waiting=bubble('assistant','Waiting for Reality…','pending');
+  const started=Date.now();
+  const showTime=()=>{if(pending&&id===active){
+    const seconds=Math.floor((Date.now()-started)/1000);
+    waiting.lastChild.textContent=seconds<4?'Waiting for Reality…':'Waiting for Reality… '+seconds+'s';
+  }};
+  elapsed=setInterval(showTime,1000);
+  status('Message submitted. Waiting for a reply…');
+  try{
+    const data=await json(API,{method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({conversation_id:id,request_id:requestId,message:value}),
+      signal:AbortSignal.timeout(75000)});
+    if(!data.ok||typeof data.answer!=='string'||!data.answer.trim())throw Error('No confirmed answer returned');
+    optimistic.classList.remove('pending');
+    waiting.classList.remove('pending');
+    waiting.lastChild.textContent=data.answer;
+    status('Reply received.');
+    // History and work readbacks are not required to show a received answer.
+  }catch(err){
+    optimistic.classList.remove('pending');
+    waiting.className='message assistant error';
+    waiting.lastChild.textContent='Reply not confirmed. Your message may have been saved. Use Refresh to check the conversation before sending it again. ('+err.message+')';
+    status('Response failed or timed out. Check saved history to avoid duplicates.');
+  }finally{
+    clearInterval(elapsed);elapsed=null;pending=false;$('send').disabled=false;
+    $('prompt').focus({preventScroll:true});
+  }
+};
+void init();
+})();
+</script>
+</body>
+</html>
