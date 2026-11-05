@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce}
+import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce,routeRealityWorkCategoriesToEmployees}
  from '../src/reality-workday-team-assessment-v1.js';
 
 const fixture=(kinds=[],coverage='not_connected')=>({
@@ -14,7 +14,12 @@ const fixture=(kinds=[],coverage='not_connected')=>({
  items:kinds.map((finding_type,i)=>({
   finding_type,finding_id:'catalog:'+String(i+1).repeat(32),
   title:'Existing source record',evidence_refs:[
-   'https://github.com/maloney2323/Reality/issues/'+(101+i)]
+   'https://github.com/maloney2323/Reality/issues/'+(101+i)],
+  category:finding_type==='OPEN_PULL_REQUEST'?'upgrades':'bugs',
+  priority_heuristic:80-i,
+  authorized_execution:false,customer_job_approved:false,
+  verified_current_defect:false,verified_time_saved_minutes:null,
+  human_baseline_minutes:null
  }))
 });
 test('assess required functions from source-backed work instead of a fixed employee count',()=>{
@@ -122,4 +127,80 @@ test('company workforce questions use a dedicated non-shift read-only Chat path'
  assert.match(functionBody,/exact_human_employee_count_required:null/);
  assert.match(context,/if\(teamRequested\(message\)\)/);
  assert.doesNotMatch(api,/companyWorkforceObservations[^\n]*execution_authorized:true/);
+});
+
+
+test('Work Center categories supply one employee owner per source-backed candidate',()=>{
+ const data=fixture(['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE']);
+ data.observed_at='2026-11-05T22:00:00.000Z';
+ const routes=routeRealityWorkCategoriesToEmployees(data);
+ assert.equal(routes.status,'READ_ONLY_CATEGORY_ASSIGNMENT_NOT_GOVERNED_JOB_DISPATCH');
+ assert.equal(routes.proposed_company_functions,8);
+ assert.equal(routes.assigned_category_candidates,3);
+ assert.equal(routes.first_pilot_employee.employee_function_id,'software_engineering');
+ assert.equal(routes.first_pilot_employee.candidate_count,3);
+ assert.equal(routes.current_shift_duration_hours,8);
+ assert.equal(routes.daily_recurrence_authorized,false);
+ assert.equal(routes.employee_workers_deployed,0);
+ assert.equal(routes.actual_work_shift_started,false);
+ assert.equal(routes.installation_authorized,false);
+ assert.equal(routes.production_changed,false);
+ for(const candidate of routes.first_pilot_employee.candidate_jobs){
+  assert.equal(candidate.proposed_employee_function_id,'software_engineering');
+  assert.equal(candidate.original_job_id,null);
+  assert.equal(candidate.authorized_execution,false);
+  assert.equal(candidate.execution_started,false);
+  assert.equal(candidate.independently_verified_done,false);
+  assert.equal(candidate.measurable_time_saved_minutes,null);
+  assert.equal(candidate.nasa_software_fault_reference,
+   candidate.source_category==='bugs'?
+    'APPLICABLE_ONLY_AFTER_SOFTWARE_FAULT_AND_COMPARATOR_VALIDATED':null);
+ }
+ assert.equal(new Set(routes.employee_assignments.flatMap(x=>
+  x.candidate_jobs.map(c=>c.finding_id))).size,3);
+});
+test('categories route across employees without manufacturing competitor jobs',()=>{
+ const d=fixture(Array(6).fill('OPEN_ISSUE'));
+ d.items.forEach((x,i)=>{
+  x.category=['bugs','security','integrations','research','customer','research'][i];
+  x.title=i===5?'Competitor capability analysis request':'Existing issue '+i;
+ });
+ const routed=routeRealityWorkCategoriesToEmployees(d);
+ const expected={
+  software_engineering:1,quality_security_reliability:1,
+  infrastructure_operations:1,product_strategy:1,
+  experience_onboarding:1,marketing_competitive:1,
+ };
+ for(const r of routed.employee_assignments)
+  assert.equal(r.candidate_count,expected[r.employee_function_id]||0,r.employee_function_id);
+ assert.equal(routed.first_pilot_employee.candidate_count,1);
+ assert.equal(routed.assigned_category_candidates,6);
+ const marketer=routed.employee_assignments.find(x=>x.employee_function_id==='marketing_competitive');
+ assert.equal(marketer.candidate_jobs[0].current_source_proof,
+  'PROVIDER_OBSERVATION_REQUIRES_INDEPENDENT_VALIDATION');
+ assert.equal(marketer.candidate_jobs[0].nasa_software_fault_reference,null);
+ assert.equal(marketer.candidate_jobs[0].authorized_execution,false);
+});
+test('duplicate source IDs and unknown categories are never double-dispatched',()=>{
+ const d=fixture(['OPEN_ISSUE','OPEN_ISSUE','OPEN_ISSUE']);
+ d.items[1].finding_id=d.items[0].finding_id;
+ d.items[2].category='unknown-business-type';
+ const r=routeRealityWorkCategoriesToEmployees(d);
+ assert.equal(r.assigned_category_candidates,1);
+ assert.equal(r.unassigned_category_candidates.length,1);
+ assert.equal(r.unassigned_category_candidates[0].reason,
+  'UNRECOGNIZED_CATEGORY_REQUIRES_OWNER_CLASSIFICATION');
+ assert.throws(()=>routeRealityWorkCategoriesToEmployees({
+  ...fixture(['OPEN_ISSUE']),items:[{
+   ...fixture(['OPEN_ISSUE']).items[0],authorized_execution:true
+  }]
+ }),/REALITY_EMPLOYEE_CATEGORY_SOURCE_UNVERIFIED/);
+});
+test('existing authenticated shift draft and company Chat reuse the same category routing',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
+ const chat=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ assert.match(api,/employee_category_assignments:routeRealityWorkCategoriesToEmployees\(brief\)/);
+ assert.match(chat,/const categorized=routeRealityWorkCategoriesToEmployees\(workday\)/);
+ assert.match(chat,/category_employee_work_routing:categorized/);
+ assert.doesNotMatch(api,/employee_category_assignments[^;]*executeOriginalWork/);
 });
