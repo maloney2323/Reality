@@ -5,6 +5,8 @@ import {authenticatedChatSession,privateChatConfig}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {qualifyUnboundSourceBatch}
+ from '../../src/reality-owner-unbound-capability-qualification-v1.js';
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/;
 const KINDS=new Set(['RESEARCH_OPPORTUNITY','CI_FAILURE_INVESTIGATION',
@@ -138,16 +140,71 @@ export default async function handler(req,res){
     owner_approval_needed:true,
     installation_authorized:false,executable_job:false}:item;
   });
+  // Previously hidden signed frozen discoveries are reviewable evidence,
+  // not owner-authorized jobs. Independently re-check the pinned test bytes
+  // and the current isolated preview extension before showing readiness.
+  // Failure to read this optional source must NOT erase the proven old feed.
+  let unboundItems=[],unboundCoverage='SOURCE_REVIEW_UNAVAILABLE';
+  try{
+   const response=await fetch(db.url+
+     '/rest/v1/rpc/reality_read_owner_unbound_capability_sources_v1',{
+    method:'POST',cache:'no-store',redirect:'error',
+    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+     accept:'application/json','content-type':'application/json'},
+    body:JSON.stringify({p_owner_id:session.user_id})
+   });
+   const source=await response.json().catch(()=>null);
+   if(!response.ok||
+      source?.status!=='OWNER_UNBOUND_SOURCE_OBSERVATIONS_READ_ONLY'||
+      source.source_basis!=='PERSISTED_SIGNED_DISCOVERY_NOT_EXECUTABLE'||
+      source.owner_goal_present!==true||
+      source.coverage_complete!==true||
+      source.source_reverified_now!==false||
+      source.owner_authorized_new_job!==false||
+      source.verified_missing_capability!==false||
+      source.read_only!==true||
+      source.installation_authorized!==false||
+      source.original_job_completed!==false||
+      source.production_changed!==false||
+      !Array.isArray(source.observations)||source.observations.length>8)
+    throw Error('UNBOUND_SOURCE_OWNER_SCOPE_NOT_VERIFIED');
+   unboundItems=await qualifyUnboundSourceBatch(source.observations,{
+    currentCommit:process.env.VERCEL_GIT_COMMIT_SHA,
+    githubToken:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null
+   });
+   if(unboundItems.some(x=>x.kind!=='UNBOUND_FROZEN_DISCOVERY'||
+      x.installation_authorized!==false||
+      x.verified_missing_capability!==false||
+      x.owner_authorized_new_job!==false||
+      x.executable_job!==false||x.production_changed!==false||
+      x.candidate_independently_tested!==false||
+      !/^unbound:[a-f0-9]{64}$/.test(x.key)||!Number.isSafeInteger(x.priority)||
+      !Array.isArray(x.pros)||!Array.isArray(x.cons))||
+      unboundItems.length+merged.length>30||
+      new Set([...merged,...unboundItems].map(x=>x.key)).size!==
+       merged.length+unboundItems.length)
+    throw Error('UNBOUND_SOURCE_CLASSIFICATION_UNTRUSTED');
+   unboundCoverage=unboundItems.every(x=>x.source_check_completed)?
+      'ALL_UNBOUND_SOURCES_REOBSERVED':
+      'PARTIAL_UNBOUND_SOURCE_REOBSERVATION';
+  }catch{
+   unboundItems=[];
+  }
+  const items=[...merged,...unboundItems];
   // Strictly bound to authenticated server session; no browser role or
   // model instruction can change eligibility, findings, or work authority.
   return res.status(200).json({
    ok:true,status:payload.status,
    counts:{...payload.counts,
+    current_candidates:items.length,
+    frozen_source_discoveries:unboundItems.length,
+    current_source_absence_confirmed:unboundItems.filter(x=>
+      x.verified_current_source_absence===true).length,
     verified_implementation_defects:proofs.items.length,
     independently_tested_research_repairs:proofs.items.length},
-   items:merged,
-   settled_history:payload.settled_history,
+   items,settled_history:payload.settled_history,
    source_basis:payload.source_basis,
+   unbound_source_coverage:unboundCoverage,
    read_only:true,installation_authorized:false,
    work_started:false,production_changed:false});
  }catch(error){
