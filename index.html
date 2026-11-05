@@ -5147,7 +5147,8 @@ function wcGapEvidenceCards(){
   '<p>'+esc(wcGapFeedStatus)+'</p></section>';
  // Evidence quality and owner-readiness outrank speculative value scores.
  // This is a review order, not permission to start an unbound upgrade.
- const rank=x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'?0:
+ const rank=x=>x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'?0:
+  x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'?1:
   x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?1:
   x.kind==='GOVERNED_ORIGINAL_JOB_GAP'&&x.verified_missing_capability===true?2:
   x.kind==='UNBOUND_FROZEN_DISCOVERY'&&x.verified_current_source_absence===true?3:
@@ -5166,7 +5167,9 @@ function wcGapEvidenceCards(){
    x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?
    'TESTED CANDIDATE · NEEDS CURRENT OWNER WORK':
    x.kind==='UNBOUND_FROZEN_DISCOVERY'?
-    (x.verified_current_source_absence===true?
+    (x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'?
+     'EXISTING ORIGINAL JOB FOUND · RECOVERY DISPOSITION PENDING':
+     x.verified_current_source_absence===true?
      'FROZEN SOURCE RECHECKED · NEEDS AUTHORIZED ORIGINAL JOB':
      x.stage==='CAPABILITY_PRESENT_RECONCILE_HISTORICAL_WORK'?
       'HISTORICAL DISCOVERY · CAPABILITY NOW PRESENT':
@@ -5193,6 +5196,14 @@ function wcGapEvidenceCards(){
     '<a href="https://github.com/maloney2323/Reality/actions/runs/'+
     proof.green_run_id+'" target="_blank" rel="noopener noreferrer">Passed repair tests</a></p>'+
    '<p><strong>Next:</strong> Owner approval of exact candidate; then isolated install, automatic original-job continuation and independently recorded settlement. None of those completion stages is claimed.</p></div>':'';
+  const originalLink=x.kind==='UNBOUND_FROZEN_DISCOVERY'&&
+   x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'&&
+   /^work:[a-f0-9]{32}$/.test(x.linked_original_work_id||'')?
+    '<p><strong>Original job already exists:</strong> '+esc(x.linked_original_work_id)+
+    ' · '+esc(x.existing_original_queue_phase||'Readback pending')+
+    ' · '+esc(x.existing_recovery_status||'Recovery evidence pending')+
+    '. <strong>Next:</strong> independently verify that SAME job’s final disposition.'+
+    ' No second job, repeat install, or execution replay.</p>':'';
   const frozenEvidence=x.kind==='UNBOUND_FROZEN_DISCOVERY'?
    '<p><strong>Source check:</strong> '+(x.source_check_completed?
      'Read from GitHub now':'Provider check unavailable · historical evidence only')+
@@ -5205,7 +5216,7 @@ function wcGapEvidenceCards(){
    '<h4>'+esc(x.title)+'</h4>'+
    '<p><strong>What it could change:</strong> '+esc(x.what_it_does||'Unknown')+'</p>'+
    '<p><strong>Potential value:</strong> '+esc(x.potential_value||'Not yet measured')+'</p>'+
-   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+evidence+frozenEvidence+
+   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+evidence+originalLink+frozenEvidence+
    '<details><summary>Pros · Cons · Risk · Evidence</summary>'+
    bullet('Pros',x.pros)+bullet('Cons',x.cons)+
    '<p><strong>Risk:</strong> '+esc(x.risk||'Not assessed')+'</p>'+
@@ -5250,6 +5261,10 @@ async function wcLoadGapFeed(){
     (data.counts?.current_source_absence_confirmed??0)!==
      data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&
        x.verified_current_source_absence===true).length||
+    (data.counts?.existing_original_recovery_links??0)!==
+     data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&
+       x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'&&
+       /^work:[a-f0-9]{32}$/.test(x.linked_original_work_id||'')).length||
     !['ALL_UNBOUND_SOURCES_REOBSERVED',
       'PARTIAL_UNBOUND_SOURCE_REOBSERVATION',
       'SOURCE_REVIEW_UNAVAILABLE'].includes(data.unbound_source_coverage??'SOURCE_REVIEW_UNAVAILABLE')||
@@ -5260,7 +5275,13 @@ async function wcLoadGapFeed(){
       x.owner_authorized_new_job!==false||
       x.installation_authorized!==false||
       x.candidate_independently_tested!==false||
-      typeof x.source_check_completed!=='boolean'))||
+      typeof x.source_check_completed!=='boolean'||
+      x.linked_original_work_id!=null&&(
+        !/^work:[a-f0-9]{32}$/.test(x.linked_original_work_id)||
+        x.stage!=='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'||
+        x.existing_original_source_verified!==true||
+        x.existing_original_final_receipt_recorded!==false||
+        x.owner_authorized_existing_investigation!==true)))||
     data.counts?.verified_current_gaps!==
      data.items.filter(x=>x.verified_missing_capability===true).length||
     data.items.some(x=>x.installation_authorized!==false||
@@ -5272,6 +5293,7 @@ async function wcLoadGapFeed(){
   wcGapFeedStatus=data.counts.current_candidates+' tracked · '+
    (data.counts.frozen_source_discoveries??0)+' frozen source discovery/discoveries · '+
    (data.counts.current_source_absence_confirmed??0)+' current source absence check(s) · '+
+   (data.counts.existing_original_recovery_links??0)+' existing recovery-job link(s) · '+
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+

@@ -97,5 +97,6 @@ jobs:
           node --test test/reality-market-research-restoration-v1.test.js
           node --test test/reality-evidence-bound-gap-category-intake-v1.test.js
           node --test test/reality-owner-unbound-capability-qualification-v1.test.js
+          node --test test/reality-frozen-source-existing-original-recovery-link-v1.test.js
           node --check reality-past-jobs-receipts-v1.js
           node --test test/reality-past-jobs-receipts-v1.test.js

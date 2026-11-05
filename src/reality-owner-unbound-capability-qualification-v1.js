@@ -21,6 +21,54 @@ function validateSource(v){
   typeof v.last_observed_at==='string'&&
   Number.isFinite(Date.parse(v.last_observed_at));
 }
+const WORK=/^work:[a-f0-9]{32}$/;
+const PHASES=new Set(['ISOLATED_INSTALLED_PROBATION',
+ 'FROZEN_REPRODUCED_AWAITING_CANDIDATE','AWAITING_OWNER_APPROVAL']);
+function validExistingOriginalMatch(x){
+ return x?.status==='EXISTING_UNSETTLED_OWNER_ORIGINAL_MATCHED'&&
+  WORK.test(x.original_work_id)&&PHASES.has(x.queue_phase)&&
+  typeof x.continuation_state==='string'&&
+  x.continuation_state.length>=8&&x.continuation_state.length<=80&&
+  (x.recovery_status===null||
+   ['RECONCILE_ALREADY_SATISFIED_PRIOR_WORK',
+    'INDEPENDENT_DIAGNOSIS_REQUIRED'].includes(x.recovery_status))&&
+  (x.next_evidence_action===null||
+   ['INDEPENDENT_ORIGINAL_OBJECTIVE_DISPOSITION',
+    'VERIFY_EXTERNAL_EFFECTS_AND_CLASSIFY_FAILURE'].includes(x.next_evidence_action))&&
+  x.original_source_frozen_red_verified===true&&
+  x.same_owner_active_goal_verified===true&&
+  x.existing_original_reused===true&&
+  x.fresh_job_required===false&&
+  x.fresh_capability_generation_authorized===false&&
+  x.replay_external_effects_authorized===false&&
+  x.independent_final_receipt_recorded===false&&
+  x.installation_authorized_by_discovery===false&&
+  x.production_changed===false;
+}
+function linkExistingOriginal(v,existing,sourceChecked){
+ const result=stableFinding(v,'EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED',
+  existing.next_evidence_action==='INDEPENDENT_ORIGINAL_OBJECTIVE_DISPOSITION'?
+   'Reality already reproduced and installed the exact original-job capability in isolation. The prior target was independently satisfied, but this SAME original job remains unsettled. Verify its terminal disposition against the durable ledger; do not create a job, replay work, or build the same capability again.':
+   'The existing owner-authorized original job has the exact frozen source and is unsettled. Independently classify its unresolved effects and continue the original recovery before any new candidate or installation.',sourceChecked);
+ return Object.freeze({...result,
+  linked_original_work_id:existing.original_work_id,
+  existing_original_queue_phase:existing.queue_phase,
+  existing_recovery_status:existing.recovery_status,
+  existing_next_evidence_action:existing.next_evidence_action,
+  existing_original_source_verified:true,
+  existing_original_final_receipt_recorded:false,
+  owner_authorized_existing_investigation:true,
+  owner_authorized_new_job:false,
+  candidate_independently_tested:false,
+  executable_job:false,installation_authorized:false,
+  verified_missing_capability:false,
+  risk:'The historical target may be satisfied without this original work being settled. A false final receipt or replay would violate continuity.',
+  pros:['Existing original job and owner authorization were independently matched',
+    'Exact frozen test and source hash match its previously reproduced failure'],
+  cons:['This original job still has no independent final receipt',
+    'A historical no-op is not a settlement of the current job']
+ });
+}
 function stableFinding(v,status,detail,checked=false){
  const name=v.missing_module_path.split('/').at(-1).replace('.mjs','').replaceAll('-',' ');
  return Object.freeze({
@@ -74,6 +122,9 @@ export async function qualifyUnboundSourceForReview(v,{
  currentCommit,fetchImpl=fetch,githubToken=null,
 }={}){
  if(!validateSource(v))fail('MALFORMED_SIGNED_OBSERVATION');
+ if(v.existing_original_match!=null&&
+   !validExistingOriginalMatch(v.existing_original_match))
+  fail('FORGED_OR_UNVERIFIED_EXISTING_ORIGINAL_MATCH');
  const pending='The frozen source has only been observed historically. Recheck it against the current preview commit, prove an actual job failure independently, and bind the exact owner/goal/original work before model generation.';
  if(!SHA40.test(String(currentCommit||'')))
   return stableFinding(v,'SOURCE_CHECK_UNAVAILABLE',pending);
@@ -89,6 +140,12 @@ export async function qualifyUnboundSourceForReview(v,{
   if(!current.bytes||digest(current.bytes)!==v.frozen_sha256)
    return stableFinding(v,'FROZEN_SOURCE_CHANGED_NEEDS_REQUALIFICATION',
     'The current preview frozen suite differs from the signed observation. Reproduce the exact current failure before any upgrade.',true);
+  // A service-role SQL join has ALREADY verified the same owner, active
+  // goal, exact immutable original event, frozen RED and absence of final
+  // receipt. The current preview source check confirms no test drift.
+  // Missing source in preview is not a second missing owner capability.
+  if(v.existing_original_match)
+   return linkExistingOriginal(v,v.existing_original_match,true);
   if(!module.missing)
    return stableFinding(v,'CAPABILITY_PRESENT_RECONCILE_HISTORICAL_WORK',
     'The extension is present in current preview source. Check whether the work was previously satisfied; do not replay or install duplicates.',true);
@@ -101,7 +158,9 @@ export async function qualifyUnboundSourceForReview(v,{
 export async function qualifyUnboundSourceBatch(observations,options={}){
  if(!Array.isArray(observations)||observations.length>8)
   fail('BOUNDED_SIGNED_OBSERVATIONS_REQUIRED');
- if(observations.some(x=>!validateSource(x)))
+ if(observations.some(x=>!validateSource(x)||
+   x.existing_original_match!=null&&
+   !validExistingOriginalMatch(x.existing_original_match)))
   fail('UNTRUSTED_OBSERVATION');
  if(new Set(observations.map(x=>x.frozen_sha256)).size!==observations.length)
   fail('DUPLICATE_FROZEN_SOURCE');
