@@ -167,11 +167,22 @@ async function authorizeShiftFromChat(command){
      (Date.parse(match.planned_end_at)-Date.parse(match.planned_start_at))!==
       command.duration_hours*3600000)
     throw Error('SHIFT_CREATED_BUT_READBACK_UNVERIFIED_DO_NOT_REPEAT');
+  // Show proposed functional roles from a trusted read-only catalog. Never
+  // report them as active employees or separate worker instances.
+  const team=draft.proposed_team;
+  const proposed=team?.status==='EVIDENCE_SCOPED_ROLE_REQUIREMENTS_NOT_DEPLOYED_EMPLOYEES'&&
+    Number.isInteger(team.proposed_role_slots)&&team.proposed_role_slots>=1&&
+    team.proposed_role_slots<=4&&Array.isArray(team.proposed_roles)&&
+    team.proposed_roles.length===team.proposed_role_slots&&
+    team.proposed_roles.every(r=>r.work_execution_verified===false&&
+      r.active_worker_id===null)?
+    ' Proposed work functions ('+team.proposed_role_slots+', not active employees): '+
+      team.proposed_roles.map(r=>r.title).join(', ')+'.': '';
   return {
     acknowledged:true,
     text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
-      created.shift_id+'. Status: '+match.status+
-      '. The existing trusted worker scheduler must independently claim work. '+
+      created.shift_id+'. Status: '+match.status+'.'+proposed+
+      ' The existing trusted worker scheduler must independently claim work. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
       'original-job admission for consequential repairs. No installation or production change was authorized.'
