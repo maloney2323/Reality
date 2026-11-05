@@ -76,7 +76,11 @@ export async function invokeRealityModel({ governedSignal, systemContext = null,
   requireField(apiKey, 'OPENAI_API_KEY_REQUIRED');
   const input = buildModelInput({ governedSignal, systemContext });
 
+  // A stalled model provider must not hold an authenticated Chat request
+  // until Vercel terminates the function. Preserve fail-closed governance:
+  // timeout is an error, never a fabricated answer or execution receipt.
   const response = await fetchImpl('https://api.openai.com/v1/responses', {
+    signal:AbortSignal.timeout(25000),
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
