@@ -9,6 +9,8 @@ const client=read('reality-shift-conversation-v1.js');
 
 test('existing signed shift worker invokes governing reconciler, not a new agent',()=>{
  assert.match(edge,/reality_reconcile_employee_shift_historical_noop_v1/);
+ assert.match(edge,/const allowed=new Set/);
+ assert.ok(edge.includes("'reality_reconcile_employee_shift_historical_noop_v1',"));
  assert.match(edge,/SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED/);
  assert.match(edge,/GOVERNED_HISTORICAL_NOOP_READBACK_UNTRUSTED/);
  assert.match(edge,/new_research_agent_started:false/);
