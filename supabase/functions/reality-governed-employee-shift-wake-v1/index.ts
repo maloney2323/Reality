@@ -190,6 +190,33 @@ Deno.serve(async req=>{
        'EXACT_SHIFT_ORIGINAL_RECEIPT_RECONCILED']
        .includes(String(original.status)))
    deny('ORIGINAL_JOB_MATCH_UNVERIFIED');
+  // The existing Genuine Capability Engine owns model research and repair.
+  // Reconciliation may read back ONE already owner-authorized original job,
+  // but a source observation cannot create a new job or start an agent.
+  const observedWork=String(original.governed_existing_work_status||'');
+  if(original.status==='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'){
+   if(!['EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY',
+        'AMBIGUOUS_ORIGINAL_SCOPE_NO_AUTOMATIC_SELECTION',
+        'NO_ELIGIBLE_ORIGINAL_JOB_FROM_SHIFT_OBSERVATION'].includes(observedWork)||
+      original.governed_cycle_dispatched_by_shift!==false||
+      original.model_invoked_by_shift!==false||
+      original.new_customer_job_created!==false||
+      original.installation_authorized!==false||
+      original.production_changed!==false)
+    deny('GOVERNED_ORIGINAL_LINK_PROOF_UNTRUSTED');
+   if(observedWork==='EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'&&(
+      !/^work:[a-f0-9]{32}$/.test(String(original.governed_original_work_id||''))||
+      !UUID.test(String(original.governed_trigger_id||''))||
+      !HASH.test(String(original.shift_observation_proof_sha256||''))||
+      !ISSUE.test(String(original.shift_observation_source_ref||''))||
+      !['PENDING_FROZEN_REPRODUCTION',
+        'LEASED_FOR_INDEPENDENT_REPRODUCTION',
+        'EVIDENCE_RECONCILIATION_REQUIRED',
+        'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
+        'AWAITING_OWNER_APPROVAL','ISOLATED_INSTALLED_PROBATION']
+        .includes(String(original.governed_queue_phase||''))))
+    deny('GOVERNED_ORIGINAL_QUEUE_SCOPE_UNTRUSTED');
+  }
   const claimed=await rpc('reality_claim_employee_shift_step_v1',{});
   if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP',
       'SHIFT_STEP_NOT_YET_DUE','INFLIGHT_LEASE_UNEXPIRED',
@@ -199,6 +226,11 @@ Deno.serve(async req=>{
    return send(200,{ok:true,status:claimed.status,
     shift_id:claimed.shift_id||null,
     source_check_completed:false,
+    governed_existing_work_status:observedWork||null,
+    governed_original_work_id:observedWork==='EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'?
+     original.governed_original_work_id:null,
+    existing_governed_queue_reused:observedWork==='EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY',
+    new_research_agent_started:false,
     installation_authorized:false,original_job_completed:false,
     verified_human_hours_saved:null,production_changed:false});
   if(claimed.status!=='READ_ONLY_STEP_CLAIMED'||
