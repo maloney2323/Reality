@@ -12,6 +12,7 @@ import {readVerifiedEmployeeShiftForChat}
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
+import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
@@ -87,6 +88,16 @@ export default async function handler(req,res){
       recovered_messages:history.messages.length,older_messages_may_be_missing:history.older_missing}});
    fail('CHAT_REQUEST_ALREADY_IN_HISTORY',409);
   }
+  // Inspect the actual immutable scoped ledger before saving another user
+  // message. Only a fully hash-verified non-consequential terminal fork may
+  // start a new, explicitly linked read-only recovery segment.
+  const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
+  const continuity=await resolvePrivateChatContinuity({
+   scopedRoot:'personal:chat:'+scope,db:isolated
+  });
+  const scopedRoot=continuity.scopedRoot;
+  if(continuity.fork_recovery&&goalCommand)
+   fail('CHAT_FORK_GOAL_MUTATION_REQUIRES_INDEPENDENT_RECONCILIATION',409);
   const key=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||process.env.OPENAI_API_KEY||'');
   if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
@@ -108,8 +119,6 @@ export default async function handler(req,res){
     request_id:requestId};
   }
   // Root/world scope cannot be forged by the browser or shared across users.
-  const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
-  const scopedRoot='personal:chat:'+scope;
   let goalCommandReceipt=null;
   if(verifiedUserGoalCommand){
    // Commit an authoritative CONVERSATIONAL GOAL only through existing
@@ -149,8 +158,9 @@ export default async function handler(req,res){
    publicResearchEnabled:isPublicResearchRequest(text),
    model:'gpt-4.1-mini',apiKey:key,
    systemContext:{conversation_id:conversationId,
-    worldline_id:'personal:chat:'+scope,world_id:'personal:chat:'+scope,
-    continuity_root_id:'personal:chat:'+scope,
+    worldline_id:scopedRoot,world_id:scopedRoot,
+    continuity_root_id:scopedRoot,
+    fork_recovery_audit:continuity.fork_recovery,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
     // Static published references already shown on Reality's homepage.
