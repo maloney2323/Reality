@@ -85,6 +85,11 @@ begin
      'shift_id',v_shift.shift_id,'monitor_bucket',v_bucket,
      'proof_sha256',v_row.proof_sha256,'production_changed',false);
   end if;
+  if v_row.state='CLAIMED' and v_row.lease_expires_at>v_now then
+   return pg_catalog.jsonb_build_object('status','CONTINUATION_SOURCE_INFLIGHT',
+     'shift_id',v_shift.shift_id,'monitor_bucket',v_bucket,
+     'production_changed',false);
+  end if;
   if v_row.state='BLOCKED' or v_row.attempt_count>=2 then
    update reality_internal.governed_shift_continuation_monitor_v1
     set state='BLOCKED',lease_expires_at=v_now
@@ -93,11 +98,6 @@ begin
    return pg_catalog.jsonb_build_object('status','CONTINUATION_SOURCE_RETRY_BOUNDED',
      'shift_id',v_shift.shift_id,'monitor_bucket',v_bucket,
      'next_slot_remains_eligible',true,'production_changed',false);
-  end if;
-  if v_row.lease_expires_at>v_now then
-   return pg_catalog.jsonb_build_object('status','CONTINUATION_SOURCE_INFLIGHT',
-     'shift_id',v_shift.shift_id,'monitor_bucket',v_bucket,
-     'production_changed',false);
   end if;
  end if;
  v_claim:=pg_catalog.gen_random_uuid();
@@ -144,12 +144,12 @@ begin
  end if;
  if pg_catalog.jsonb_typeof(p_proof)<>'object' or
   pg_catalog.octet_length(p_proof::text)>16000 or
-  p_proof->>'kind'<>'GITHUB_SOURCE_READBACK' or
-  p_proof->>'source_url'<>v.source_ref or
-  p_proof->>'provider_checked'<>'true' or
-  p_proof->>'read_only'<>'true' or
-  p_proof->>'production_changed'<>'false' or
-  p_proof->>'provider_status' not in
+  p_proof->>'kind' is distinct from 'GITHUB_SOURCE_READBACK' or
+  p_proof->>'source_url' is distinct from v.source_ref or
+  p_proof->>'provider_checked' is distinct from 'true' or
+  p_proof->>'read_only' is distinct from 'true' or
+  p_proof->>'production_changed' is distinct from 'false' or
+  pg_catalog.coalesce(p_proof->>'provider_status','') not in
     ('NOT_FOUND','OPEN_ISSUE','CLOSED','OPEN_PULL_REQUEST',
      'FAILED_WORKFLOW','COMPLETED_WORKFLOW') or
   p_proof ? 'installation_authorized' or
