@@ -23,6 +23,8 @@ export function verifyReadOnlyChatFork(history,{rootId,worldlineId}={}){
   byId.set(e.event_id,e);
   if(e.parent_event_id)parents.add(e.parent_event_id);
  }
+ // Reject missing historical parents before classifying the fork shape.
+ for(const parent of parents)if(!byId.has(parent))fail('CHAT_FORK_AUDIT_MISSING_PARENT');
  const tips=history.filter(e=>!parents.has(e.event_id));
  if(tips.length!==2)fail('CHAT_FORK_AUDIT_REQUIRES_TWO_TIPS');
  const ancestry=tips.map(tip=>{
