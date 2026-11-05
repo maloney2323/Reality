@@ -96,7 +96,7 @@ async function refreshHistory(id=active){
   const seq=++sequence;
   try{
     const data=await json(API+'?conversation_id='+encodeURIComponent(id),{signal:AbortSignal.timeout(10000)});
-    if(seq!==sequence||id!==active)return;
+    if(seq!==sequence||id!==active||pending)return;
     $('thread').replaceChildren();
     for(const m of data.messages||[])bubble(m.role==='user'?'user':'assistant',m.text);
     status('Ready.');
