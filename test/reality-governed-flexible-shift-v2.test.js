@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {buildRealityEightHourShiftDraft}
  from '../src/reality-eight-hour-shift-plan-v1.js';
 import {buildRealityWorkdayOpportunityBrief}
@@ -57,6 +58,22 @@ test('existing planner admits 8-, 10-, and 12-hour owner timeboxes without inven
  assert.equal(computeShiftFingerprint(buildRealityEightHourShiftDraft(brief)),
   computeShiftFingerprint(plans[0]));
 });
+test('existing eight-hour authorizations retain the original exact SHA256 fingerprint',()=>{
+ const plan=buildRealityEightHourShiftDraft(buildRealityWorkdayOpportunityBrief(catalog()));
+ const source=plan.slots.map(x=>({
+  i:x.sequence,id:x.id,stage:x.stage,
+  begin:x.offset_start_minutes,end:x.offset_end_minutes,
+  source:x.candidate?.source_url||null,
+  finding:x.candidate?.finding_id||null,
+  gate:x.required_gate||null
+ }));
+ const oldHash='sha256:'+createHash('sha256').update(JSON.stringify({
+  version:'reality-exact-eight-hour-shift-v1',source_scope:plan.source_scope,
+  timebox:480,slots:source
+ })).digest('hex');
+ assert.equal(computeShiftFingerprint(plan),oldHash);
+});
+
 test('duration cannot be manipulated after exact scope fingerprinted',()=>{
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
  assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:9}),
