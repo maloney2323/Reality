@@ -114,7 +114,10 @@ test('signed-in Reality Chat receives owner-scoped shift status without instruct
   env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'},
   db:{url:'https://hvkfreoagbrphwghjajw.supabase.co',
     project:'hvkfreoagbrphwghjajw',secretKey:'test-only-not-real',
-    strictSecrets:true},fetchImpl
+    strictSecrets:true},fetchImpl,
+  // Stable pre-start fixture: do not let wall-clock time silently turn
+  // an authorized future shift into an already-started shift in CI.
+  now:new Date('2026-11-04T22:00:00.000Z')
  });
  assert.equal(entries.length,1);
  assert.equal(entries[0].event_kind,'owner_governed_employee_shift_briefing');

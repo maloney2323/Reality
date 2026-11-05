@@ -14,6 +14,8 @@ const allowed=new Set([
  'reality_reconcile_employee_shift_historical_noop_v1',
  'reality_claim_employee_shift_step_v1',
  'reality_settle_employee_shift_step_v1',
+ 'reality_govern_shift_continuation_cycle_v1',
+ 'reality_settle_shift_continuation_monitor_v1',
  'reality_read_owner_genuine_loop_v1',
  'reality_read_owner_final_receipts_v1'
 ]);
@@ -243,6 +245,93 @@ Deno.serve(async req=>{
       noOp.new_customer_job_created!==false))
     deny('GOVERNED_HISTORICAL_NOOP_SOURCE_CHANGED');
   const claimed=await rpc('reality_claim_employee_shift_step_v1',{});
+  // One-time approved source checks have finished, but the already
+  // authorized shift is still open. Instead of idling for hours until the
+  // final report, monitor *only its same originally approved source refs*.
+  // The database fences each 15-minute slot, retries at most twice and
+  // prevents overlap with a claimed step, installation, or expired shift.
+  if(claimed.status==='SHIFT_FINAL_REPORT_NOT_DUE'){
+   const monitor=await rpc('reality_claim_shift_continuation_monitor_v1',{});
+   const state=String(monitor.status||'');
+   const allowedMonitor=new Set([
+    'NO_AUTHORIZED_CONTINUATION_DUE','NO_APPROVED_SOURCES_TO_MONITOR',
+    'CONTINUATION_SOURCE_ALREADY_VERIFIED',
+    'CONTINUATION_SOURCE_INFLIGHT','CONTINUATION_SOURCE_RETRY_BOUNDED',
+    'CONTINUATION_SOURCE_READ_ONLY_CLAIMED']);
+   if(!allowedMonitor.has(state)||monitor.production_changed!==false)
+    deny('CONTINUATION_CLAIM_UNTRUSTED');
+   if(state!=='CONTINUATION_SOURCE_READ_ONLY_CLAIMED')
+    return send(200,{ok:true,status:state,
+     original_shift_state:'SHIFT_FINAL_REPORT_NOT_DUE',
+     shift_id:claimed.shift_id||null,
+     active_shift_authorization_reused:true,
+     no_new_original_job_started:true,
+     external_effects_executed:false,
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false});
+   if(!UUID.test(String(monitor.shift_id||''))||
+     monitor.shift_id!==claimed.shift_id||
+     !UUID.test(String(monitor.owner_id||''))||
+     !['RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
+       .includes(String(monitor.shift_status||''))||
+     !UUID.test(String(monitor.claim_id||''))||
+     !ISSUE.test(String(monitor.source_ref||''))||
+     !Number.isSafeInteger(monitor.source_step_index)||
+     monitor.source_step_index<2||monitor.source_step_index>5||
+     monitor.only_originally_approved_sources!==true||
+     monitor.no_external_write_authority!==true||
+     monitor.installation_authorized!==false||
+     monitor.original_job_completed!==false||
+     monitor.read_only!==true||
+     !Number.isFinite(Date.parse(String(monitor.monitor_bucket||'')))||
+     !Number.isFinite(Date.parse(String(monitor.planned_end_at||'')))||
+     Date.now()>=Date.parse(String(monitor.planned_end_at)))
+    deny('CONTINUATION_ORIGINAL_AUTHORITY_INVALID');
+   // Reality already chose this read-only action in the governed
+   // service-role RPC. The worker cannot choose another source or original
+   // job; it only verifies the returned fenced work order before execution.
+   const order=monitor.governed_work_order;
+   if(order?.kind!=='REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK'||
+      order.source_ref!==monitor.source_ref||
+      !HASH.test(String(order.decision_sha256||''))||
+      order.original_job_action!=='NONE'||
+      order.external_write_authority!==false||
+      order.worker_must_return_evidence!==true)
+      deny('CONTINUATION_GOVERNED_WORK_ORDER_UNTRUSTED');
+   // Provider GET only. A fresh source observation is not a new execution
+   // warrant, capability gap, approval, acceptance or settled customer job.
+   let proof=await githubSource(String(monitor.source_ref));
+   proof=await researchSourceWithoutStopping(proof);
+   // Evidence travels back to Reality's durable governor. Its receipt
+   // is checked against the source + lease + exact work-order digest.
+   proof={...proof,governed_work_order_sha256:order.decision_sha256};
+   const recorded=await rpc('reality_settle_shift_continuation_monitor_v1',{
+     p_shift_id:monitor.shift_id,
+     p_monitor_bucket:monitor.monitor_bucket,
+     p_claim_id:monitor.claim_id,
+     p_proof:proof});
+   if(recorded.status!=='CONTINUATION_SOURCE_OBSERVATION_RECORDED'||
+      recorded.shift_id!==monitor.shift_id||
+      recorded.source_step_index!==monitor.source_step_index||
+      !HASH.test(String(recorded.proof_sha256||''))||
+      recorded.customer_work_completed!==false||
+      recorded.human_hours_saved!==null||
+      recorded.installation_authorized!==false||
+      recorded.production_changed!==false)
+    deny('CONTINUATION_DURABLE_PROOF_UNTRUSTED');
+   return send(200,{
+     ok:true,status:'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE',
+     shift_id:monitor.shift_id,
+     source_step_index:monitor.source_step_index,
+     source_status:proof.provider_status||null,
+     reality_governed_work_order_sha256:order.decision_sha256,
+     next_job_selected_by_worker:false,
+     monitoring_interval_minutes:15,
+     durable_observation_sha256:recorded.proof_sha256,
+     original_customer_job_completed:false,
+     installation_authorized:false,verified_human_hours_saved:null,
+     production_changed:false});
+  }
   if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP',
       'SHIFT_STEP_NOT_YET_DUE','INFLIGHT_LEASE_UNEXPIRED',
       'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',

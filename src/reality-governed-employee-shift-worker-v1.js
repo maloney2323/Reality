@@ -69,6 +69,76 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
       'EXACT_SHIFT_ORIGINAL_RECEIPT_RECONCILED'].includes(reconciled.status))
   throw Error('SHIFT_FINAL_RECEIPT_RECONCILIATION_UNTRUSTED');
  const claimed=await shiftRpc(db,'reality_claim_employee_shift_step_v1',{}, {fetchImpl});
+ // The initial source checks were completed, but the approved timebox
+ // has hours remaining. Keep observing ONLY its explicitly selected sources
+ // through the same service-role, fenced 15-minute continuation ledger.
+ if(claimed.status==='SHIFT_FINAL_REPORT_NOT_DUE'){
+  const monitor=await shiftRpc(db,'reality_govern_shift_continuation_cycle_v1',
+   {},{fetchImpl});
+  const statuses=new Set([
+   'NO_AUTHORIZED_CONTINUATION_DUE','NO_APPROVED_SOURCES_TO_MONITOR',
+   'CONTINUATION_SOURCE_ALREADY_VERIFIED',
+   'CONTINUATION_SOURCE_INFLIGHT','CONTINUATION_SOURCE_RETRY_BOUNDED',
+   'CONTINUATION_SOURCE_READ_ONLY_CLAIMED']);
+  if(!statuses.has(monitor.status)||monitor.production_changed!==false)
+   throw Error('SHIFT_CONTINUATION_CLAIM_UNTRUSTED');
+  if(monitor.status!=='CONTINUATION_SOURCE_READ_ONLY_CLAIMED')
+   return {ok:true,status:monitor.status,shift_id:claimed.shift_id||null,
+    authorized_shift_continuation_checked:true,
+    installation_authorized:false,job_completed:false,
+    production_changed:false};
+  if(!UUID.test(monitor.shift_id||'')||
+     monitor.shift_id!==claimed.shift_id||
+     !UUID.test(monitor.owner_id||'')||
+     !['RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(monitor.shift_status)||
+     !UUID.test(monitor.claim_id||'')||
+     !URL.test(monitor.source_ref||'')||
+     !Number.isSafeInteger(monitor.source_step_index)||
+     monitor.source_step_index<2||monitor.source_step_index>5||
+     monitor.only_originally_approved_sources!==true||
+     monitor.no_external_write_authority!==true||
+     monitor.installation_authorized!==false||
+     monitor.original_job_completed!==false||
+     monitor.read_only!==true||
+     !Number.isFinite(Date.parse(monitor.monitor_bucket||''))||
+     !Number.isFinite(Date.parse(monitor.planned_end_at||''))||
+     Date.now()>=Date.parse(monitor.planned_end_at))
+   throw Error('SHIFT_CONTINUATION_SCOPE_UNTRUSTED');
+  // A fenced Reality governance receipt selects the ONLY permissible
+  // next read-only source. Worker may not choose a job, action or upgrade.
+  const order=monitor.governed_work_order;
+  if(order?.kind!=='REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK'||
+     order.source_ref!==monitor.source_ref||
+     !/^sha256:[a-f0-9]{64}$/.test(order.decision_sha256||'')||
+     order.original_job_action!=='NONE'||
+     order.external_write_authority!==false||
+     order.worker_must_return_evidence!==true)
+    throw Error('SHIFT_GOVERNED_WORK_ORDER_UNTRUSTED');
+  const source=await readProviderSource(monitor.source_ref,{fetchImpl});
+  const proof={...source,governed_work_order_sha256:order.decision_sha256};
+  const settled=await shiftRpc(db,
+   'reality_settle_shift_continuation_monitor_v1',{
+    p_shift_id:monitor.shift_id,p_monitor_bucket:monitor.monitor_bucket,
+    p_claim_id:monitor.claim_id,p_proof:proof},{fetchImpl});
+  if(settled.status!=='CONTINUATION_SOURCE_OBSERVATION_RECORDED'||
+     settled.shift_id!==monitor.shift_id||
+     settled.source_step_index!==monitor.source_step_index||
+     !/^sha256:[a-f0-9]{64}$/.test(settled.proof_sha256||'')||
+     settled.customer_work_completed!==false||
+     settled.human_hours_saved!==null||
+     settled.installation_authorized!==false||
+     settled.production_changed!==false)
+   throw Error('SHIFT_CONTINUATION_RECEIPT_UNVERIFIED');
+  return {ok:true,status:'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE',
+   shift_id:monitor.shift_id,source_step_index:monitor.source_step_index,
+   source_status:proof.provider_status,
+   reality_governed_work_order_sha256:order.decision_sha256,
+   next_job_selected_by_worker:false,
+   evidence_digest:settled.proof_sha256,
+   monitoring_interval_minutes:15,
+   installation_authorized:false,job_completed:false,
+   verified_human_hours_saved:null,production_changed:false};
+ }
  if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP','INFLIGHT_LEASE_UNEXPIRED',
    'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
    'SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
