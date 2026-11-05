@@ -26,12 +26,19 @@ function fixture({monitorPatch={},state='CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
    return respond({status:'SHIFT_FINAL_REPORT_NOT_DUE',shift_id:SHIFT});
   if(url.endsWith('/rpc/reality_claim_shift_continuation_monitor_v1'))
    return respond({status:state,shift_id:SHIFT,claim_id:CLAIM,
+    owner_id:SHIFT,shift_status:'RUNNING',
     monitor_bucket:BUCKET,source_step_index:2,source_ref:SRC,
     only_originally_approved_sources:true,
     no_external_write_authority:true,read_only:true,
     installation_authorized:false,original_job_completed:false,
     planned_end_at:'2099-11-05T16:28:00Z',
     production_changed:false,...monitorPatch});
+  if(url.endsWith('/rpc/reality_read_owner_genuine_loop_v1'))
+   return respond({status:'OWNER_GOVERNED_LOOP_READBACK',jobs:[],
+    owner_installation_authorized_by_read:false,
+    external_action_performed:false,production_changed:false});
+  if(url.endsWith('/rpc/reality_read_owner_qualified_capabilities_v1'))
+   return respond([]);
   if(url==='https://api.github.com/repos/maloney2323/Reality/issues/201'){
    assert.equal(options.method,'GET');
    if(providerFailure)return {ok:false,status:503,json:async()=>null};
@@ -48,6 +55,10 @@ function fixture({monitorPatch={},state='CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
    assert.equal(data.p_proof.production_changed,false);
    assert.equal(data.p_proof.provider_status,'OPEN_ISSUE');
    assert.equal(data.p_proof.original_job_completed,undefined);
+   assert.equal(data.p_proof.governed_next_work.next_action,'NO_ELIGIBLE_JOB');
+   assert.equal(data.p_proof.governed_next_work.installation_authorized,false);
+   assert.equal(data.p_proof.governed_next_work.source_continuation,
+      'MONITOR_AND_INVESTIGATE_ALREADY_AUTHORIZED_SOURCES');
    return respond({status:'CONTINUATION_SOURCE_OBSERVATION_RECORDED',
     shift_id:SHIFT,source_step_index:2,proof_sha256:HASH,
     customer_work_completed:false,human_hours_saved:null,
@@ -62,12 +73,14 @@ test('a signed shift worker monitors one previously authorized source while wait
  const out=await processGovernedEmployeeShiftTick(database,{fetchImpl});
  assert.equal(out.status,'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE');
  assert.equal(out.monitoring_interval_minutes,15);
+ assert.equal(out.next_governed_action,'NO_ELIGIBLE_JOB');
+ assert.equal(out.no_new_executable_original_job,true);
  assert.equal(out.evidence_digest,HASH);
  assert.equal(out.installation_authorized,false);
  assert.equal(out.job_completed,false);
  assert.equal(out.verified_human_hours_saved,null);
  assert.equal(out.production_changed,false);
- assert.equal(calls.length,6);
+ assert.equal(calls.length,8);
  assert.equal(calls.filter(x=>x.url.startsWith('https://api.github.com/')).length,1);
  assert.equal(calls.filter(x=>x.options.method==='GET').length,1);
  assert.ok(calls.every(x=>!x.url.includes('owner_approve')&&!x.url.includes('/install')));
@@ -118,6 +131,8 @@ test('SQL enforces approved scope, bounded retries, lease fencing and durable pr
   /s\.status in \('RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\)/,
   /p\.state in \('QUEUED','CLAIMED','AWAITING_EXACT_WORK'\)/,
   /p\.step_index between 1 and 5/,
+  /'owner_id',v_shift.owner_id/,
+  /'shift_status',v_shift.status/,
   /e\.step_index=8 and e\.state='QUEUED'/,
   /t\.state='SOURCE_CHECKED'/,
   /t\.step_index between 2 and 5/,
