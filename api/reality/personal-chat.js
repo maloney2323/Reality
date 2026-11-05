@@ -7,7 +7,7 @@ import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
 import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
-import {readVerifiedEmployeeShiftForChat}
+import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
@@ -145,11 +145,12 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
    readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
-   readVerifiedIndependentWorkerForChat({session,message:text,db:isolated})
+   readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),
+   readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated})
   ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
@@ -179,7 +180,7 @@ export default async function handler(req,res){
     published_research_references:publishedReferencesForChat(text),
     connected_world_observations:[
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
-     ...workerWakeObservations
+     ...workerWakeObservations,...companyWorkforceObservations
     ],
     action_authorized:false,execution_authorized:false,
    },
