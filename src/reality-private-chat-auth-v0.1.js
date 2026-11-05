@@ -82,15 +82,21 @@ export async function authenticatedChatSession(req,res,{fetchImpl=fetch,env=proc
  if(expires<=Date.now()+60000){
   const next=await provider(c,'token?grant_type=refresh_token',
    {method:'POST',body:{refresh_token:refresh},fetchImpl});
-  if(!next.ok||!next.body?.access_token||!next.body?.refresh_token){
-   clearChatCookie(res);return null;
-  }
+  // Retryable provider errors must not destroy an existing signed-in cookie.
+   if(!next.ok&&(next.status===429||next.status>=500))
+    fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+   if(!next.ok){clearChatCookie(res);return null}
+   if(!next.body?.access_token||!next.body?.refresh_token)
+    fail('CHAT_AUTH_REFRESH_RESPONSE_UNVERIFIED',503);
   token=next.body.access_token;refresh=next.body.refresh_token;
   expires=Date.now()+Math.min(86400,Number(next.body.expires_in)||3600)*1000;
   setCookie(res,{access:token,refresh,expires},c.seal);
  }
  const user=await provider(c,'user',{token,fetchImpl});
- if(!user.ok||!user.body?.id){clearChatCookie(res);return null}
+ if(!user.ok&&(user.status===429||user.status>=500))
+   fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+  if(!user.ok){clearChatCookie(res);return null}
+  if(!user.body?.id)fail('CHAT_AUTH_USER_READBACK_UNVERIFIED',503);
  return {user_id:user.body.id,access_token:token,config:c};
 }
 export async function logoutChat(req,res,{fetchImpl=fetch,env=process.env}={}){
