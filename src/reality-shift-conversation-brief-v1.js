@@ -60,7 +60,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
  if(!shifts.length)return Object.freeze({
   version:'reality-shift-conversation-v1',status:'NO_SHIFT_AUTHORIZED',
   shift_id:null,headline:'No employee shift has been authorized yet.',
-  what_finished:'The planner can prepare an eight-hour draft, but no shift work has been recorded.',
+  what_finished:'The planner can prepare an 8-, 10-, or 12-hour draft, but no shift work has been recorded.',
   current:'Not running.',next:'Build and review a shift, then approve its exact scope.',
   needs_you:'No capability installation approval is pending for a shift.',
   planned_start_at:null,as_of:now.toISOString(),
@@ -78,6 +78,8 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
     (t.proof_sha256!==null&&!/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||''))))
   throw Error('SHIFT_CHAT_SOURCE_UNTRUSTED');
  const start=new Date(s.planned_start_at).getTime();
+ const durationHours=(new Date(s.planned_end_at).getTime()-start)/3600000;
+ if(![8,10,12].includes(durationHours))throw Error('SHIFT_CHAT_DURATION_INVALID');
  const originalReceipt=s.steps.some(t=>t.step_index===6&&t.state==='ORIGINAL_JOB_RECEIPT_VERIFIED');
  const eventItems=s.steps.map(eventFor).filter(Boolean);
  const recorded=eventItems.filter(x=>x.code==='SOURCE_VALIDATED').length;
@@ -141,12 +143,13 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
  return Object.freeze({
   version:'reality-shift-conversation-v1',status:s.status,shift_id:s.shift_id,
   headline:s.status==='QUEUED'&&now.getTime()<start?
-   'Your eight-hour shift is queued, not running yet.':
+   'Your '+durationHours+'-hour shift is queued, not running yet.':
    s.status.startsWith('ENDED_')?'Your scheduled shift has ended.':
    s.status==='AWAITING_EXACT_ORIGINAL_WORK'?'Your shift is continuing safely around the original-job gate.':
    s.status==='ESCALATED'?'Your shift needs recovery attention.':
    'Your shift has recorded an activity state.',
   what_finished:whatFinished,current,next,needs_you:needs,
+  shift_duration_hours:durationHours,
   planned_start_at:safeDate(s.planned_start_at),
   next_planned_step_at:timeNext,
   as_of:now.toISOString(),
