@@ -1,0 +1,41 @@
+name: Reality authorized shift must continue safe work — isolated proof
+on:
+  push:
+    branches: [fix/reality-continuous-authorized-shift-monitor-20261105]
+  pull_request:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'supabase/migrations/20261105_governed_shift_continuation_monitor_v1.sql'
+      - 'supabase/functions/reality-governed-employee-shift-wake-v1/index.ts'
+      - 'src/reality-governed-employee-shift-worker-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'test/reality-continuous-authorized-shift-monitor-v1.test.js'
+      - '.github/workflows/reality-continuous-authorized-shift-monitor-v1.yml'
+permissions:
+  contents: read
+jobs:
+  monitor-original-authority-no-new-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify source and independently test continuation edge cases
+        run: |
+          node --check src/reality-governed-employee-shift-worker-v1.js
+          node --check src/reality-governed-shift-boundary-v1.js
+          node --test test/reality-continuous-authorized-shift-monitor-v1.test.js
+      - name: Protect original shift tests and existing work-conservation gate
+        run: |
+          node --test test/reality-governed-employee-shift-v1.test.js
+          node --test test/reality-work-conserving-employee-shift-v1.test.js
+          node --test test/reality-shift-fail-forward-research-v1.test.js
+      - name: Explicit approval and ROI boundaries
+        run: |
+          echo 'This PR only proves a SOURCE CANDIDATE. No migration deployed.'
+          echo 'No edge function deployed; no worker installed; no production change.'
+          echo 'Monitoring retains the exact originally approved source list and timebox.'
+          echo 'One service-role, fenced 15-minute source observation; no job replay.'
+          echo 'A successful read is not original-job completion or human hours saved.'
