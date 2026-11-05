@@ -15,21 +15,21 @@ begin
     raise exception 'SHIFT_GOVERNED_NOOP_SERVICE_ROLE_ONLY';
   end if;
   v_link:=public.reality_reconcile_employee_shift_original_v1();
-  if v_link->>'status'<>'EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED' or
-     v_link->>'governed_existing_work_status'<>'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'
+  if coalesce(v_link->>'status','')<>'EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED' or
+     coalesce(v_link->>'governed_existing_work_status','')<>'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'
   then
     return jsonb_build_object('status','NO_ELIGIBLE_EXISTING_GOVERNED_NOOP',
       'original_job_completed',false,'installation_authorized',false,
       'production_changed',false);
   end if;
-  if v_link->>'governed_cycle_dispatched_by_shift'<>'false' or
-     v_link->>'model_invoked_by_shift'<>'false' or
-     v_link->>'new_customer_job_created'<>'false' or
-     v_link->>'installation_authorized'<>'false' or
-     v_link->>'production_changed'<>'false' or
-     v_link->>'governed_original_work_id' !~ '^work:[a-f0-9]{32}$' or
-     v_link->>'shift_observation_proof_sha256' !~ '^sha256:[a-f0-9]{64}$' or
-     v_link->>'governed_queue_phase'<>'ISOLATED_INSTALLED_PROBATION'
+  if coalesce(v_link->>'governed_cycle_dispatched_by_shift','')<>'false' or
+     coalesce(v_link->>'model_invoked_by_shift','')<>'false' or
+     coalesce(v_link->>'new_customer_job_created','')<>'false' or
+     coalesce(v_link->>'installation_authorized','')<>'false' or
+     coalesce(v_link->>'production_changed','')<>'false' or
+     coalesce(v_link->>'governed_original_work_id','') !~ '^work:[a-f0-9]{32}$' or
+     coalesce(v_link->>'shift_observation_proof_sha256','') !~ '^sha256:[a-f0-9]{64}$' or
+     coalesce(v_link->>'governed_queue_phase','')<>'ISOLATED_INSTALLED_PROBATION'
   then raise exception 'SHIFT_GOVERNED_NOOP_OWNER_SCOPE_NOT_VERIFIED';end if;
   -- Use the SAME existing independently gated original-job target readback.
   -- It inspects exactly one source-identical prior repair and two immutable
@@ -42,19 +42,19 @@ begin
       'original_job_completed',false,'installation_authorized',false,
       'production_changed',false);
   end;
-  if v_target->>'status'<>'RECONCILIATION_ALREADY_SATISFIED_BY_VERIFIED_UNIVERSE' or
-     v_target->>'repairing_original_work_id'<>v_link->>'governed_original_work_id' or
-     v_target->>'independent_database_readback'<>'true' or
-     v_target->>'unresolved_reconciliation_targets'<>'0' or
-     v_target->>'new_reconciliation_proposed'<>'false' or
-     v_target->>'original_job_completed'<>'false' or
-     v_target->>'production_changed'<>'false' or
-     v_target->>'previous_original_universe_event_id' !~
+  if coalesce(v_target->>'status','')<>'RECONCILIATION_ALREADY_SATISFIED_BY_VERIFIED_UNIVERSE' or
+     coalesce(v_target->>'repairing_original_work_id','')<>v_link->>'governed_original_work_id' or
+     coalesce(v_target->>'independent_database_readback','')<>'true' or
+     coalesce(v_target->>'unresolved_reconciliation_targets','')<>'0' or
+     coalesce(v_target->>'new_reconciliation_proposed','')<>'false' or
+     coalesce(v_target->>'original_job_completed','')<>'false' or
+     coalesce(v_target->>'production_changed','')<>'false' or
+     coalesce(v_target->>'previous_original_universe_event_id','') !~
        '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$' or
-     v_target->>'previous_target_universe_event_id' !~
+     coalesce(v_target->>'previous_target_universe_event_id','') !~
        '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$' or
-     v_target->>'previous_repairing_original_work_id' !~ '^work:[a-f0-9]{32}$' or
-     v_target->>'previous_reconciliation_target_work_id' !~ '^work:[a-f0-9]{32}$'
+     coalesce(v_target->>'previous_repairing_original_work_id','') !~ '^work:[a-f0-9]{32}$' or
+     coalesce(v_target->>'previous_reconciliation_target_work_id','') !~ '^work:[a-f0-9]{32}$'
   then
     return jsonb_build_object('status','GOVERNED_NOOP_HISTORICAL_PROOF_UNAVAILABLE',
       'original_job_completed',false,'installation_authorized',false,
@@ -167,7 +167,10 @@ begin
    'net_human_equivalent_hours_returned',null,
    'realized_cash_savings_usd',null,
    'ended_at',v_now,'production_changed',false,
-   'blocked_work_included',not v_historical_noop);
+   'blocked_work_included',exists(
+     select 1 from reality_internal.governed_employee_shift_steps_v1 bx
+     where bx.shift_id=s.shift_id and bx.state='BLOCKED_PROVIDER'
+       and bx.source_status is distinct from 'VERIFIED_HISTORICAL_NOOP'));
  update reality_internal.governed_employee_shift_steps_v1
   set state='REPORTED',proof=v_report,
    proof_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
@@ -176,7 +179,11 @@ begin
   where shift_id=s.shift_id and step_index=8 and state='QUEUED';
  update reality_internal.governed_employee_shifts_v1
    set status=case when exists(select 1 from reality_internal.governed_employee_shift_steps_v1 t where t.shift_id=s.shift_id and t.step_index=6 and t.state='ORIGINAL_JOB_RECEIPT_VERIFIED') then 'ENDED_WITH_VERIFIED_JOB'
-    when v_historical_noop then 'ENDED_READ_ONLY'
+    when v_historical_noop and not exists(
+       select 1 from reality_internal.governed_employee_shift_steps_v1 bx
+       where bx.shift_id=s.shift_id and bx.state='BLOCKED_PROVIDER'
+         and bx.source_status is distinct from 'VERIFIED_HISTORICAL_NOOP')
+     then 'ENDED_READ_ONLY'
     else 'ENDED_WITH_BLOCKED_WORK' end,closed_at=v_now,
     close_report=v_report,last_progress_at=v_now where shift_id=s.shift_id;
  return v_report;
