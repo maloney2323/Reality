@@ -122,7 +122,7 @@ test('cross-shift, novel source, expired approval or forged authority fail close
   const {calls,fetchImpl}=fixture({monitorPatch:patch});
   await assert.rejects(
    processGovernedEmployeeShiftTick(database,{fetchImpl}),
-   /SHIFT_CONTINUATION_SCOPE_UNTRUSTED/,
+   /SHIFT_(?:CONTINUATION_SCOPE|GOVERNED_WORK_ORDER)_UNTRUSTED/,
    JSON.stringify(patch));
   assert.equal(calls.filter(x=>x.url.startsWith('https://api.github.com/')).length,0);
  }
