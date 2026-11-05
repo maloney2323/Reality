@@ -723,6 +723,38 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  record_201_historical_no_work_final_disposition:
+    needs: [resume_original_job, reconcile_all_settled_outcomes]
+    # After signed original_prepare found two previously VERIFIED Universe
+    # settlements, persist a DIFFERENT terminal no-work disposition. Never
+    # use the original settlement path or consume an execution claim.
+    if: ${{ always() && github.event_name == 'push' && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'false' && needs.reconcile_all_settled_outcomes.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Enforce no-replay, trusted two-event evidence, and readback contract
+        run: |
+          node --test test/reality-201-historical-no-work-final-disposition-v1.test.js
+          node --check scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs
+      - name: Record exact #201 no-work disposition via signed isolated broker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-historical-no-work-final-disposition-${{ github.run_id }}
+          path: artifact/out/reality-201-historical-no-work-final-disposition.json
+          if-no-files-found: error
+          retention-days: 90
+
   reconcile_all_settled_outcomes:
     # Signed isolation-only preflight for push AND trusted worker_dispatch.
     # It reconciles only already-settled work, never reinstalls or reclaims.
