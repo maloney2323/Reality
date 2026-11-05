@@ -7,6 +7,8 @@ import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {qualifyUnboundSourceBatch}
  from '../../src/reality-owner-unbound-capability-qualification-v1.js';
+import {chooseNextOwnerQualification}
+ from '../../src/reality-next-qualification-v1.js';
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/;
 const KINDS=new Set(['RESEARCH_OPPORTUNITY','CI_FAILURE_INVESTIGATION',
@@ -243,26 +245,11 @@ export default async function handler(req,res){
   const currentUnbound=noWorkClosed?unboundItems.filter(x=>
     x.linked_original_work_id!==noWorkClosed.original_work_id):unboundItems;
   const items=[...merged,...currentUnbound];
-  // Independent testing of a previous candidate is *not* current owner
-  // authorization. This is a read-only qualification target, not queued work.
-  const next=items.slice().sort((a,b)=>
-    Number(b.candidate_independently_tested===true)-
-      Number(a.candidate_independently_tested===true)||
-    Number(b.verified_missing_capability===true)-
-      Number(a.verified_missing_capability===true)||
-    a.priority-b.priority).find(x=>
-      x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'||
-      x.verified_missing_capability===true||
-      x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED')||null;
-  const nextQualification=next?{
-    key:next.key,title:next.title,kind:next.kind,
-    source_url:next.source_url||null,
-    status:'CANDIDATE_REQUIRES_CURRENT_ORIGINAL_JOB_VERIFICATION',
-    next_proof:next.next_proof,
-    verified_current_gap:next.verified_missing_capability===true,
-    owner_approval_granted:false,execution_started:false,
-    installation_authorized:false,production_changed:false
-  }:null;
+  // The source-backed next review must not rank an already-closed work item
+  // above a currently verified owner gap, or turn a historical test into
+  // a new executable job. The ranking helper remains read-only.
+  const nextQualification=chooseNextOwnerQualification(items,{
+    closedWorkIds:noWorkClosed?[noWorkClosed.original_work_id]:[]});
   // Strictly bound to authenticated server session; no browser role or
   // model instruction can change eligibility, findings, or work authority.
   return res.status(200).json({
