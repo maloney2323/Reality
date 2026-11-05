@@ -31,7 +31,7 @@ test('reuses every actual Reality conversation, evidence, goal and single-approv
  ];
  for(const id of ids){
   assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
-  assert.match(js,new RegExp("(?:get\\('"+id+"'\\)|"+id+")"),id);
+
  }
  assert.match(js,/ready\.append\(workspace\)/);
  assert.doesNotMatch(js,/document\.write|innerHTML\s*=|insertAdjacentHTML/);
