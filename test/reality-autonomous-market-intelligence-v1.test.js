@@ -143,7 +143,8 @@ test('preview API preserves same-origin, sign-in and owner review gates',()=>{
  assert.match(api,/persistOwnerMarketResearch/);
  assert.match(html,/id="wcResearchMarket"/);
  assert.match(html,/wcInvestigateMarket/);
- assert.match(html,/void wcRefreshCapabilities\(\);void wcInvestigateMarket\(\)/);
+ assert.match(html,/await Promise\.allSettled\(\[wcRefreshCapabilities\(\),wcInvestigateMarket\(\)\]\)/);
+ assert.match(html,/await wcLoadGapFeed\(\)/);
  assert.match(api,/reality_reserve_owner_market_research_v1/);
  assert.match(api,/reality_finalize_owner_market_research_v1/);
  assert.match(api,/p_phase:'COMPLETE'/);

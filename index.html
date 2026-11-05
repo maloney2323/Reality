@@ -5145,7 +5145,16 @@ function wcUpgradeReviewHTML(){
 function wcGapEvidenceCards(){
  if(!wcGapFeedReady)return '<section class="wc-market-research-brief"><strong>Capability gap intake</strong>'+
   '<p>'+esc(wcGapFeedStatus)+'</p></section>';
- const cards=wcGapFeed.slice().sort((a,b)=>a.priority-b.priority).map(x=>{
+ // Evidence quality and owner-readiness outrank speculative value scores.
+ // This is a review order, not permission to start an unbound upgrade.
+ const rank=x=>x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'?0:
+  x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?1:
+  x.kind==='GOVERNED_ORIGINAL_JOB_GAP'&&x.verified_missing_capability===true?2:
+  x.kind==='UNBOUND_FROZEN_DISCOVERY'&&x.verified_current_source_absence===true?3:
+  x.kind==='UNBOUND_FROZEN_DISCOVERY'?4:
+  x.kind==='CI_FAILURE_INVESTIGATION'?5:6;
+ const cards=wcGapFeed.slice().sort((a,b)=>rank(a)-rank(b)||
+  a.priority-b.priority||a.title.localeCompare(b.title)).map(x=>{
   const proof=x.repair_proof;
   const verifiedRepair=proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'&&
    proof.installed===false&&proof.owner_install_authorized===false&&
@@ -5156,6 +5165,12 @@ function wcGapEvidenceCards(){
    'IMPLEMENTATION DEFECT PROVEN · REPAIR TESTED · INSTALLATION REQUIRES APPROVAL':
    x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'?
    'TESTED CANDIDATE · NEEDS CURRENT OWNER WORK':
+   x.kind==='UNBOUND_FROZEN_DISCOVERY'?
+    (x.verified_current_source_absence===true?
+     'FROZEN SOURCE RECHECKED · NEEDS AUTHORIZED ORIGINAL JOB':
+     x.stage==='CAPABILITY_PRESENT_RECONCILE_HISTORICAL_WORK'?
+      'HISTORICAL DISCOVERY · CAPABILITY NOW PRESENT':
+      'FROZEN OBSERVATION · FRESH SOURCE PROOF NEEDED'):
    x.kind==='GOVERNED_ORIGINAL_JOB_GAP'?
     (x.verified_missing_capability?'PROVEN GAP · GOVERNED QUEUE':'ORIGINAL JOB · FROZEN VERIFICATION PENDING'):
    x.kind==='CI_FAILURE_INVESTIGATION'?
@@ -5178,6 +5193,11 @@ function wcGapEvidenceCards(){
     '<a href="https://github.com/maloney2323/Reality/actions/runs/'+
     proof.green_run_id+'" target="_blank" rel="noopener noreferrer">Passed repair tests</a></p>'+
    '<p><strong>Next:</strong> Owner approval of exact candidate; then isolated install, automatic original-job continuation and independently recorded settlement. None of those completion stages is claimed.</p></div>':'';
+  const frozenEvidence=x.kind==='UNBOUND_FROZEN_DISCOVERY'?
+   '<p><strong>Source check:</strong> '+(x.source_check_completed?
+     'Read from GitHub now':'Provider check unavailable · historical evidence only')+
+   ' · '+Number(x.observed_count||0)+' prior signed observation(s).'+
+   ' This is NOT an owner-approved job, independently reproduced model gap, or installation-ready candidate.</p>':'';
   const link=typeof x.source_url==='string'&&
    /^https:\/\//.test(x.source_url)&&!/[<>"'\s]/.test(x.source_url)?
     '<a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Review original evidence</a>':'';
@@ -5185,7 +5205,7 @@ function wcGapEvidenceCards(){
    '<h4>'+esc(x.title)+'</h4>'+
    '<p><strong>What it could change:</strong> '+esc(x.what_it_does||'Unknown')+'</p>'+
    '<p><strong>Potential value:</strong> '+esc(x.potential_value||'Not yet measured')+'</p>'+
-   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+evidence+
+   '<p><strong>Stage:</strong> '+esc(x.stage.replaceAll('_',' '))+'</p>'+evidence+frozenEvidence+
    '<details><summary>Pros · Cons · Risk · Evidence</summary>'+
    bullet('Pros',x.pros)+bullet('Cons',x.cons)+
    '<p><strong>Risk:</strong> '+esc(x.risk||'Not assessed')+'</p>'+
@@ -5225,6 +5245,22 @@ async function wcLoadGapFeed(){
       x.repair_proof.owner_install_authorized!==false||
       x.repair_proof.fresh_original_work_verified!==false||
       x.verified_missing_capability!==false))||
+    (data.counts?.frozen_source_discoveries??0)!==
+     data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY').length||
+    (data.counts?.current_source_absence_confirmed??0)!==
+     data.items.filter(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&
+       x.verified_current_source_absence===true).length||
+    !['ALL_UNBOUND_SOURCES_REOBSERVED',
+      'PARTIAL_UNBOUND_SOURCE_REOBSERVATION',
+      'SOURCE_REVIEW_UNAVAILABLE'].includes(data.unbound_source_coverage??'SOURCE_REVIEW_UNAVAILABLE')||
+    data.items.some(x=>x.kind==='UNBOUND_FROZEN_DISCOVERY'&&(
+      !/^unbound:[a-f0-9]{64}$/.test(x.key||'')||
+      x.verified_missing_capability!==false||
+      x.executable_job!==false||
+      x.owner_authorized_new_job!==false||
+      x.installation_authorized!==false||
+      x.candidate_independently_tested!==false||
+      typeof x.source_check_completed!=='boolean'))||
     data.counts?.verified_current_gaps!==
      data.items.filter(x=>x.verified_missing_capability===true).length||
     data.items.some(x=>x.installation_authorized!==false||
@@ -5234,9 +5270,13 @@ async function wcLoadGapFeed(){
   wcGapFeed=data.items;wcGapHistory=data.settled_history;
   wcGapCounts=data.counts;wcGapFeedReady=true;
   wcGapFeedStatus=data.counts.current_candidates+' tracked · '+
+   (data.counts.frozen_source_discoveries??0)+' frozen source discovery/discoveries · '+
+   (data.counts.current_source_absence_confirmed??0)+' current source absence check(s) · '+
    (data.counts.verified_implementation_defects||0)+' verified implementation defect(s) · '+
    data.counts.independently_tested_candidates+' other independently tested candidate(s) · '+
    data.counts.verified_current_gaps+' proven current gaps · '+
+   (data.unbound_source_coverage==='SOURCE_REVIEW_UNAVAILABLE'?
+     ' Frozen-source coverage unavailable, not zero. ':'')+
    ' Historical records are filed separately in Past Jobs & Receipts. No new install approved.';
   $('simpleGapFeedStatus').textContent=wcGapFeedStatus;
   wcRender();
@@ -5610,7 +5650,13 @@ async function wcRefreshCapabilities(){
   status.textContent='Capability discovery unavailable. Existing implementation only. No work started.';
  }finally{button.disabled=false;}
 }
-$('wcRefreshCapabilities').onclick=()=>{void wcRefreshCapabilities();void wcInvestigateMarket()};
+$('wcRefreshCapabilities').onclick=()=>{void (async()=>{
+ // Audit, research and owner intake are separate read-only/assessment stages.
+ // Refresh the category AFTER the signed audit/research settles, not only
+ // when a user signs in or manually changes tabs.
+ await Promise.allSettled([wcRefreshCapabilities(),wcInvestigateMarket()]);
+ if($('privateReady')?.style.display==='block')await wcLoadGapFeed();
+})();};
 
 
 /* Customer homepage: saved findings only. No approvals, restarts or paid search. */
