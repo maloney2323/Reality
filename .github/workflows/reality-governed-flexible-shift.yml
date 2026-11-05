@@ -10,7 +10,10 @@ on:
       - test/reality-governed-flexible-shift-v2.test.js
       - reality-owner-chat-shift-command-v1.js
       - reality-chat-simple.html
-      - test/reality-owner-chat-shift-command-v1.test.js
+      - test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js
+      - src/reality-workday-team-assessment-v1.js
+      - src/reality-employee-shift-chat-context-v1.js
+      - test/reality-workday-team-assessment-v1.test.js
       - .github/workflows/reality-governed-flexible-shift.yml
   pull_request:
     paths:
@@ -22,6 +25,9 @@ on:
       - reality-owner-chat-shift-command-v1.js
       - reality-chat-simple.html
       - test/reality-owner-chat-shift-command-v1.test.js
+      - src/reality-workday-team-assessment-v1.js
+      - src/reality-employee-shift-chat-context-v1.js
+      - test/reality-workday-team-assessment-v1.test.js
       - .github/workflows/reality-governed-flexible-shift.yml
   workflow_dispatch:
 permissions:
