@@ -861,6 +861,7 @@ export async function runLiveIntelligenceOrchestration({
             ].join(' '),
           },
           model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
+          publicResearchEnabled:publicResearchEnabled===true,
         });
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
@@ -1032,7 +1033,7 @@ export async function runLiveIntelligenceOrchestration({
       retryResult=await invokeRealityModel({
         governedSignal,systemContext:contextForRetry,
         model:resolvedModel,apiKey:resolvedApiKey,
-        fetchImpl,
+        fetchImpl,publicResearchEnabled:publicResearchEnabled===true,
       });
       retryFocus=assessCurrentTurnFocusV02({
         capsule:preCognitionAlignment.capsule,
