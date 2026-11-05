@@ -59,7 +59,7 @@ test('mobile conversation has explicit accessible panel controls and Escape clos
  assert.match(js,/aria-controls','realityChatInspector'/);
  assert.match(js,/aria-expanded/);
  assert.match(js,/event\.key==='Escape'/);
- assert.match(js,/setAttribute\('role','tablist'\)/);
+ assert.match(js,/setAttribute\('role',\s*'tablist'\)/);
  assert.match(js,/setAttribute\('role','tabpanel'\)/);
  assert.match(js,/setAttribute\('role','tab'\)/);
  assert.match(js,/ArrowLeft','ArrowRight','Home','End'/);
