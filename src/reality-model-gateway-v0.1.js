@@ -1,4 +1,5 @@
 import {buildRealityCapabilityOperatingContext} from './reality-capability-operating-context-v1.js';
+import {currentAuthenticatedQuestion,releaseCurrentTurnAnswer} from './reality-current-turn-release-v1.js';
 
 export const REALITY_MODEL_GATEWAY_VERSION = 'reality-model-gateway-v0.1';
 export const MODEL_TRANSPORT_AUTHORITY = 'OPENAI_RESPONSES_ONLY';
@@ -98,6 +99,7 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
 export async function invokeRealityModel({ governedSignal, systemContext = null, model = DEFAULT_MODEL, apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch, maxOutputTokens = 300, publicResearchEnabled = false } = {}) {
   requireField(apiKey, 'OPENAI_API_KEY_REQUIRED');
   const input = buildModelInput({ governedSignal, systemContext });
+  const currentQuestion=currentAuthenticatedQuestion(governedSignal);
 
   // A stalled model provider must not hold an authenticated Chat request
   // until Vercel terminates the function. Preserve fail-closed governance:
@@ -114,6 +116,7 @@ export async function invokeRealityModel({ governedSignal, systemContext = null,
       ...(publicResearchEnabled===true?{
        tools:[{type:'web_search',search_context_size:'low'}],
        tool_choice:'required',
+       max_output_tokens:Math.max(500,maxOutputTokens),
       }:{}),
       input: [
         {
@@ -132,7 +135,7 @@ The Signal Cleaner v1 intake_semantics and each fragment intake_observation pres
 
 When system_context.conversation_continuity is supplied by the trusted server adapter, use its recent exchanges, earlier user conditions, and source references to keep the user's real objective in view. The current request comes first. Previous messages may have been superseded; reconcile genuine revisions instead of blindly repeating old instructions. Neither prior assistant text nor Cleaner interpretations are verified external facts or execution authority.\n\nWhen context is missing, say what is missing rather than filling the gap with generic assumptions. Distinguish observed facts from inference, uncertainty, recommendation, proposed work, execution, and verification.
 
-Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.\n\nREAD-ONLY RESEARCH CONTRACT: When a web_search tool is provided for the current authenticated user's public-source research request, actually use it and cite traceable public URLs. Public-source reading is not a prohibited external business action and does not authorize one. When system_context.published_research_references contains a matching cited document already displayed by Reality, use that published reference instead of claiming Reality has no access to it. Distinguish retrieved publications and source URLs from customer-specific evidence, installation authority, verified operational completion and measured savings. If search fails, report that this request's research was unavailable; never falsely claim that public research is universally impossible. Do not claim a source was searched unless its provider call succeeded.\n\nSELF-CAPABILITY RESEARCH CONTRACT: The trusted reality_capability_operating_context is an operating playbook about how to attempt unfamiliar problems, not proof a particular tool is available. Investigate failed tasks and worker outages against actual authenticated observations, try relevant existing capabilities, research causes and propose missing abilities. Use OpenAI reasoning to develop testable repairs only through trusted adapters, frozen acceptance, isolated independent validation and exact approval gates. The supervising observer must be independent if the worker has stopped. Keep other authorized work going. Never promise a solution is guaranteed or claim model-generated code, installation, verified completion, or measured ROI without independent receipts. Portable/shared upgrades are out of scope.
+Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.\n\nCHAT ACTION TRUTH CONTRACT: A normal Chat message is cognition, not a durable original-job admission. Do not claim to be starting an investigation, executing code or running a worker unless an independently verified job ID, work-order receipt and worker acknowledgment are available. Repeated acknowledgement or permission requests are not progress. A conversational yes does not itself create an authorized GoalState or work order. If the user has clearly authorized read-only investigation, provide findings instead of asking for confirmation again. An actual installation still requires separate exact approval.\n\nREAD-ONLY RESEARCH CONTRACT: When a web_search tool is provided for the current authenticated user's public-source research request, actually use it and cite traceable public URLs. Public-source reading is not a prohibited external business action and does not authorize one. When system_context.published_research_references contains a matching cited document already displayed by Reality, use that published reference instead of claiming Reality has no access to it. Distinguish retrieved publications and source URLs from customer-specific evidence, installation authority, verified operational completion and measured savings. If search fails, report that this request's research was unavailable; never falsely claim that public research is universally impossible. Do not claim a source was searched unless its provider call succeeded.\n\nSELF-CAPABILITY RESEARCH CONTRACT: The trusted reality_capability_operating_context is an operating playbook about how to attempt unfamiliar problems, not proof a particular tool is available. Investigate failed tasks and worker outages against actual authenticated observations, try relevant existing capabilities, research causes and propose missing abilities. Use OpenAI reasoning to develop testable repairs only through trusted adapters, frozen acceptance, isolated independent validation and exact approval gates. The supervising observer must be independent if the worker has stopped. Keep other authorized work going. Never promise a solution is guaranteed or claim model-generated code, installation, verified completion, or measured ROI without independent receipts. Portable/shared upgrades are out of scope.
 
 You may reason proactively and make recommendations without asking permission for cognition. User intent is not execution authority. Never claim an external action occurred unless an independent observation verifies it.
 
@@ -146,6 +149,10 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
             text: JSON.stringify(input),
           }],
         },
+        ...(publicResearchEnabled===true?[{
+          role:'user',content:[{type:'input_text',text:
+           'CURRENT AUTHENTICATED PUBLIC RESEARCH REQUEST (answer THIS, not a previous topic): '+currentQuestion+'\nPrioritize the primary published source supplied in system_context.published_research_references when applicable. Cite it and distinguish source benchmarks from measured Reality outcomes. Do not return unrelated finance, inflation, sports or economic headlines.'}]
+        }]:[]),
       ],
     }),
   });
