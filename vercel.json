@@ -16,6 +16,10 @@
   ],
   "rewrites": [
     {
+      "source": "/chat-simple",
+      "destination": "/reality-chat-simple.html"
+    },
+    {
       "source": "/chat",
       "destination": "/index.html"
     },
