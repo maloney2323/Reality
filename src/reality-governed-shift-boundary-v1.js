@@ -1,13 +1,20 @@
 import crypto from 'node:crypto';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
-export const SHIFT_FINGERPRINT_VERSION='reality-exact-eight-hour-shift-v1';
+export const SHIFT_FINGERPRINT_VERSION='reality-exact-shift-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export function computeShiftFingerprint(plan){
  if(!plan||plan.version!=='reality-eight-hour-employee-shift-draft-v1'||
   plan.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
-  plan.shift_duration_minutes!==480||plan.read_only!==true||
+  ![480,600,720].includes(plan.shift_duration_minutes)||
+  plan.shift_duration_minutes!==plan.shift_duration_hours*60||
+  plan.read_only!==true||
   plan.ready_to_execute_batch!==false||plan.job_started!==false||
-  !Array.isArray(plan.slots)||plan.slots.length!==8)
+  !Array.isArray(plan.slots)||plan.slots.length!==8||
+  plan.slots.some((x,i)=>x.sequence!==i+1||
+    !Number.isSafeInteger(x.planning_minutes)||x.planning_minutes<1||
+    x.planning_minutes>120||x.offset_end_minutes-x.offset_start_minutes!==x.planning_minutes||
+    x.offset_start_minutes!==(i?plan.slots[i-1].offset_end_minutes:0))||
+  plan.slots.at(-1)?.offset_end_minutes!==plan.shift_duration_minutes)
   throw Error('SHIFT_FINGERPRINT_UNVERIFIED_PLAN');
  const source=plan.slots.map(x=>({
   i:x.sequence,id:x.id,stage:x.stage,
@@ -18,7 +25,7 @@ export function computeShiftFingerprint(plan){
  }));
  const hash=crypto.createHash('sha256').update(JSON.stringify({
   version:SHIFT_FINGERPRINT_VERSION,source_scope:plan.source_scope,
-  timebox:480,slots:source
+  timebox:plan.shift_duration_minutes,slots:source
  })).digest('hex');
  return 'sha256:'+hash;
 }
