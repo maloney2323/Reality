@@ -49,7 +49,7 @@ export async function readVerifiedEmployeeShiftForChat({
    installation_authorized:false,external_execution_authorized:false,
    production_changed:false
   })];
-  if(teamRequested(message)||companyRequested(message)){
+  if(teamRequested(message)){
    // Existing work catalog supplies read-only verified-source observations.
    // Neither proposed role counts nor AI staffing estimates are worker receipts.
    try{
@@ -81,42 +81,61 @@ export async function readVerifiedEmployeeShiftForChat({
      production_changed:false,
     }));
     }
-    if(companyRequested(message)){
-     const company=assessRealityCompanyWorkforce(workday);
-     observations.push(Object.freeze({
-      entry_id:'reality-company:launch-workforce:'+String(workday.observed_at||brief.as_of),
-      event_kind:'company_launch_workforce_evidence_assessment',
-      source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
-      source_ref:'reality:company:launch-workforce-assessment',
-      assertion_time:workday.observed_at||brief.as_of,
-      epistemic_status:company.status,
-      summary:'BUSINESS BUILD, LAUNCH, MARKET AND OPERATE ASSESSMENT: '+
-       'Reality needs to cover '+company.functional_areas_count+
-       ' distinct business FUNCTIONS (not '+company.functional_areas_count+
-       ' individual employees). Functions and candidates for safe automation: '+
-       company.required_business_functions.map(x=>x.title+
-        ': '+x.candidate_ai_automation.join('; ')+
-        '. HUMAN ACCOUNTABILITY: '+x.human_accountability+
-        '. EVIDENCE LIMIT: '+x.evidence_status).join(' | ')+
-       '. Actual human headcount and virtual AI worker count cannot yet be calculated without verified workload hours, customer/sales evidence and measured automation throughput. '+
-       'Next: '+company.priority_work.join('; ')+
-       '. This is an assessment, not a completed marketing, launch or autonomous worker result.',
-      business_objective:company.objective,
-      functional_areas_count:company.functional_areas_count,
-      required_business_functions:company.required_business_functions,
-      staffing_method:company.staffing_method,
-      exact_human_employee_count_required:null,
-      exact_ai_employee_count_required:null,
-      measured_human_staffing_fte:null,
-      actual_company_launch_verified:false,
-      work_started:false,
-      installation_authorized:false,
-      external_execution_authorized:false,
-      production_changed:false
-     }));
-    }
    }catch{/* No invented staffing when source discovery is unavailable. */}
   }
   return observations;
+ }catch{return []}
+}
+
+/**
+ * Company staffing is deliberately independent of scheduled shifts.
+ * A founder may ask for business functions and automation priorities without
+ * creating, inspecting or authorizing an employee-shift work order.
+ */
+export async function readVerifiedRealityCompanyWorkforceForChat({
+ session,message,env=process.env,
+ db=resolveReliabilityBenchmarkDb(env),
+ now=new Date()
+}={}){
+ if(!companyRequested(message)||env.VERCEL_ENV!=='preview'||
+  !UUID.test(session?.user_id)||!db?.strictSecrets||!db.secretKey||
+  db.url!==session?.config?.url||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+  db.project!=='hvkfreoagbrphwghjajw')return [];
+ try{
+  const catalog=await buildRealityWorkCatalog();
+  const workday=buildRealityWorkdayOpportunityBrief(catalog);
+  const company=assessRealityCompanyWorkforce(workday);
+  return [Object.freeze({
+   entry_id:'reality-company:launch-workforce:'+String(workday.observed_at||now.toISOString()),
+   event_kind:'company_launch_workforce_evidence_assessment',
+   source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
+   source_ref:'reality:company:launch-workforce-assessment',
+   assertion_time:workday.observed_at||now.toISOString(),
+   epistemic_status:company.status,
+   summary:'COMPANY LAUNCH AND OPERATIONS WORKFORCE ANALYSIS: Reality must cover '+
+    company.functional_areas_count+' different BUSINESS FUNCTIONS, not necessarily '+
+    company.functional_areas_count+' individual employees. '+
+    company.required_business_functions.map(x=>x.title+
+     ' — AUTOMATION CANDIDATES: '+x.candidate_ai_automation.join('; ')+
+     ' — HUMAN ACCOUNTABILITY: '+x.human_accountability+
+     ' — EVIDENCE STATUS: '+x.evidence_status).join(' | ')+
+    '. Exact human employee headcount and actual AI worker count cannot be verified without measured weekly workload, '+
+    'existing worker throughput, human oversight time, sales/customer data and launch readiness evidence. '+
+    'Priorities: '+company.priority_work.join('; ')+
+    '. This is NOT an executed or completed launch plan, worker deployment or measured labor saving.',
+   business_objective:company.objective,
+   functional_areas_count:company.functional_areas_count,
+   required_business_functions:company.required_business_functions,
+   staffing_method:company.staffing_method,
+   measured_human_staffing_fte:null,
+   exact_human_employee_count_required:null,
+   exact_ai_employee_count_required:null,
+   actual_company_launch_verified:false,
+   work_started:false,
+   installation_authorized:false,
+   external_execution_authorized:false,
+   production_changed:false,
+  })];
  }catch{return []}
 }
