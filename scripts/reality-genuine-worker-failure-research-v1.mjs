@@ -3,6 +3,7 @@
 // are advisory. The Genuine Capability Engine alone may build after frozen RED.
 import {readFileSync,writeFileSync} from 'node:fs';
 import {invokeRealityModel} from '../src/reality-model-gateway-v0.1.js';
+import {planOriginalJobRecovery} from '../src/reality-original-job-never-abandon-v1.js';
 const evidence=JSON.parse(readFileSync('artifact/genuine-worker-failure-evidence.json','utf8'));
 const modelHandoff={
  schema:'reality-genuine-worker-failure-governed-research-v1',
@@ -25,6 +26,11 @@ if(evidence.schema!=='reality-genuine-worker-failure-evidence-v1'||
  evidence.original_job_completed!==false||
  evidence.installation_authorized!==false)
  throw Error('GENUINE_RESEARCH_SIGNED_SOURCE_RECEIPT_INVALID');
+// The diagnosis keeps the existing original-job responsibility visible.
+ // A stored failure is never permission to create another customer job.
+if(evidence.status==='SIGNED_WORKER_FAILURE_RECORDED'){
+ modelHandoff.recovery_plan=planOriginalJobRecovery({observation:evidence});
+}
 if(evidence.status==='SIGNED_WORKER_FAILURE_RECORDED'&&
  evidence.finding==='SIGNED_FAILED_WORKER_NEEDS_INDEPENDENT_DIAGNOSIS'){
  if(!/^work:[a-f0-9]{32}$/.test(String(evidence.original_work_id||''))||
