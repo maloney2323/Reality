@@ -12,6 +12,7 @@ import {readVerifiedEmployeeShiftForChat}
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
+import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
@@ -143,12 +144,18 @@ export default async function handler(req,res){
   ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
+   // The signed-in user's current request can permit read-only public search;
+   // model text cannot authorize installation, worker execution or any account action.
+   publicResearchEnabled:isPublicResearchRequest(text),
    model:'gpt-4.1-mini',apiKey:key,
    systemContext:{conversation_id:conversationId,
     worldline_id:'personal:chat:'+scope,world_id:'personal:chat:'+scope,
     continuity_root_id:'personal:chat:'+scope,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
+    // Static published references already shown on Reality's homepage.
+    // These are references, not evidence of measured business savings.
+    published_research_references:publishedReferencesForChat(text),
     connected_world_observations:[
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations
