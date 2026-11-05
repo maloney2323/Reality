@@ -1541,7 +1541,29 @@ Deno.serve(async request=>{
       saved.original_job_completed!==false||
       saved.production_changed!==false)
     deny('GOVERNED_WORKER_FAILURE_PERSISTED_PROOF_UNVERIFIED');
+   // Signed source-backed failure must also retain a durable obligation to
+   // investigate or dispose of the SAME original job. No execution authority.
+   const recovery=await database('rpc/reality_commit_genuine_original_recovery_v1',{
+     method:'POST',body:{p_observation_id:saved.observation_id}});
+   if(recovery?.status!=='EXISTING_ORIGINAL_RECOVERY_OBLIGATION_PRESERVED'||
+      !UUID.test(String(recovery.recovery_id||''))||
+      recovery.observation_id!==saved.observation_id||
+      recovery.original_work_id!==saved.original_work_id||
+      recovery.trigger_id!==saved.trigger_id||
+      recovery.provider_evidence_sha256!==evidenceSha||
+      recovery.must_preserve_original_job!==true||
+      recovery.retry_external_effects_authorized!==false||
+      recovery.model_generation_authorized!==false||
+      recovery.owner_approval_for_new_install_still_required!==true||
+      recovery.original_job_completed!==false||
+      recovery.installation_authorized!==false||
+      recovery.production_changed!==false)
+     deny('SIGNED_ORIGINAL_RECOVERY_CHECKPOINT_NOT_PERSISTED');
    return respond({ok:true,...saved,
+     recovery_id:recovery.recovery_id,
+     recovery_status:recovery.recovery_status,
+     next_evidence_action:recovery.next_evidence_action,
+     original_job_obligation_preserved:true,
      signed_observer_run_id:observer.id,
      independent_github_readback:true,
      verified_root_cause:false,
