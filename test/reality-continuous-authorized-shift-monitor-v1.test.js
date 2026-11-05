@@ -11,6 +11,7 @@ const CLAIM='99999999-2222-4333-8444-555555555555';
 const SRC='https://github.com/maloney2323/Reality/issues/201';
 const BUCKET='2026-11-05T12:15:00Z';
 const HASH='sha256:'+'a'.repeat(64);
+const ORDER_HASH='sha256:'+'b'.repeat(64);
 const database={url:'https://example.supabase.co',secretKey:'isolated-test-only'};
 const respond=x=>({ok:true,json:async()=>x});
 function fixture({monitorPatch={},state='CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
@@ -24,21 +25,20 @@ function fixture({monitorPatch={},state='CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
    return respond({status:'NO_SHIFT_AWAITING_EXACT_WORK'});
   if(url.endsWith('/rpc/reality_claim_employee_shift_step_v1'))
    return respond({status:'SHIFT_FINAL_REPORT_NOT_DUE',shift_id:SHIFT});
-  if(url.endsWith('/rpc/reality_claim_shift_continuation_monitor_v1'))
+  if(url.endsWith('/rpc/reality_govern_shift_continuation_cycle_v1'))
    return respond({status:state,shift_id:SHIFT,claim_id:CLAIM,
     owner_id:SHIFT,shift_status:'RUNNING',
+    governed_work_order:{
+     kind:'REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK',
+     decision_sha256:ORDER_HASH,source_ref:SRC,
+     original_job_action:'NONE',external_write_authority:false,
+     worker_must_return_evidence:true},
     monitor_bucket:BUCKET,source_step_index:2,source_ref:SRC,
     only_originally_approved_sources:true,
     no_external_write_authority:true,read_only:true,
     installation_authorized:false,original_job_completed:false,
     planned_end_at:'2099-11-05T16:28:00Z',
     production_changed:false,...monitorPatch});
-  if(url.endsWith('/rpc/reality_read_owner_genuine_loop_v1'))
-   return respond({status:'OWNER_GOVERNED_LOOP_READBACK',jobs:[],
-    owner_installation_authorized_by_read:false,
-    external_action_performed:false,production_changed:false});
-  if(url.endsWith('/rpc/reality_read_owner_qualified_capabilities_v1'))
-   return respond([]);
   if(url==='https://api.github.com/repos/maloney2323/Reality/issues/201'){
    assert.equal(options.method,'GET');
    if(providerFailure)return {ok:false,status:503,json:async()=>null};
@@ -55,10 +55,8 @@ function fixture({monitorPatch={},state='CONTINUATION_SOURCE_READ_ONLY_CLAIMED',
    assert.equal(data.p_proof.production_changed,false);
    assert.equal(data.p_proof.provider_status,'OPEN_ISSUE');
    assert.equal(data.p_proof.original_job_completed,undefined);
-   assert.equal(data.p_proof.governed_next_work.next_action,'NO_ELIGIBLE_JOB');
-   assert.equal(data.p_proof.governed_next_work.installation_authorized,false);
-   assert.equal(data.p_proof.governed_next_work.source_continuation,
-      'MONITOR_AND_INVESTIGATE_ALREADY_AUTHORIZED_SOURCES');
+   assert.equal(data.p_proof.governed_work_order_sha256,ORDER_HASH);
+   assert.equal(data.p_proof.governed_next_work,undefined);
    return respond({status:'CONTINUATION_SOURCE_OBSERVATION_RECORDED',
     shift_id:SHIFT,source_step_index:2,proof_sha256:HASH,
     customer_work_completed:false,human_hours_saved:null,
@@ -73,14 +71,14 @@ test('a signed shift worker monitors one previously authorized source while wait
  const out=await processGovernedEmployeeShiftTick(database,{fetchImpl});
  assert.equal(out.status,'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE');
  assert.equal(out.monitoring_interval_minutes,15);
- assert.equal(out.next_governed_action,'NO_ELIGIBLE_JOB');
- assert.equal(out.no_new_executable_original_job,true);
+ assert.equal(out.reality_governed_work_order_sha256,ORDER_HASH);
+ assert.equal(out.next_job_selected_by_worker,false);
  assert.equal(out.evidence_digest,HASH);
  assert.equal(out.installation_authorized,false);
  assert.equal(out.job_completed,false);
  assert.equal(out.verified_human_hours_saved,null);
  assert.equal(out.production_changed,false);
- assert.equal(calls.length,8);
+ assert.equal(calls.length,6);
  assert.equal(calls.filter(x=>x.url.startsWith('https://api.github.com/')).length,1);
  assert.equal(calls.filter(x=>x.options.method==='GET').length,1);
  assert.ok(calls.every(x=>!x.url.includes('owner_approve')&&!x.url.includes('/install')));
@@ -104,6 +102,17 @@ test('cross-shift, novel source, expired approval or forged authority fail close
   {shift_id:CLAIM},
   {source_ref:'https://github.com/other/repo/issues/201'},
   {source_step_index:6},
+  {governed_work_order:{
+   kind:'REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK',
+   decision_sha256:ORDER_HASH,
+   source_ref:'https://github.com/maloney2323/Reality/issues/202',
+   original_job_action:'NONE',external_write_authority:false,
+   worker_must_return_evidence:true}},
+  {governed_work_order:{
+   kind:'REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK',
+   decision_sha256:ORDER_HASH,source_ref:SRC,
+   original_job_action:'MERGE_PULL_REQUEST',external_write_authority:true,
+   worker_must_return_evidence:true}},
   {only_originally_approved_sources:false},
   {no_external_write_authority:false},
   {installation_authorized:true},
@@ -132,6 +141,9 @@ test('SQL enforces approved scope, bounded retries, lease fencing and durable pr
   /p\.state in \('QUEUED','CLAIMED','AWAITING_EXACT_WORK'\)/,
   /p\.step_index between 1 and 5/,
   /'owner_id',v_shift.owner_id/,
+  /'governed_work_order',pg_catalog.jsonb_build_object/,
+  /governance_decision_sha256=v_decision_hash/,
+  /p_proof->>'governed_work_order_sha256' is distinct from/,
   /'shift_status',v_shift.status/,
   /e\.step_index=8 and e\.state='QUEUED'/,
   /t\.state='SOURCE_CHECKED'/,
@@ -146,7 +158,7 @@ test('SQL enforces approved scope, bounded retries, lease fencing and durable pr
   /p_proof->>'provider_checked' is distinct from 'true'/,
   /pg_catalog\.sha256/,
   /enable row level security/,
-  /revoke all on function public\.reality_claim_shift_continuation_monitor_v1/,
+  /revoke all on function public\.reality_govern_shift_continuation_cycle_v1/,
   /customer_work_completed',false/,
   /human_hours_saved',null/,
   /production_changed',false/
@@ -155,8 +167,11 @@ test('SQL enforces approved scope, bounded retries, lease fencing and durable pr
 });
 test('signed active edge wake follows same fenced monitoring contract, never model or new grant',()=>{
  assert.match(EDGE,/if\(claimed\.status==='SHIFT_FINAL_REPORT_NOT_DUE'\)/);
- assert.match(EDGE,/reality_claim_shift_continuation_monitor_v1/);
+ assert.match(EDGE,/reality_govern_shift_continuation_cycle_v1/);
+ assert.doesNotMatch(EDGE,/selectNextGovernedWork|reality_read_owner_qualified_capabilities_v1/);
+ assert.match(EDGE,/worker_must_return_evidence!==true/);
  assert.match(EDGE,/reality_settle_shift_continuation_monitor_v1/);
+ assert.match(EDGE,/governed_work_order_sha256:order.decision_sha256/);
  assert.match(EDGE,/proof=await researchSourceWithoutStopping\(proof\)/);
  assert.match(EDGE,/only_originally_approved_sources!==true/);
  assert.match(EDGE,/no_external_write_authority!==true/);
