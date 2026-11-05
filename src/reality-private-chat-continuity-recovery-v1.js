@@ -5,6 +5,7 @@
 import {createHash} from 'node:crypto';
 import {createContinuitySpine} from './reality-continuity-spine-v2.0.js';
 import {orderContinuityHistory} from './reality-continuous-reliability-v0.1.js';
+import {projectAuthoritativeUserGoals} from './reality-authoritative-user-goal-ledger-v0.1.js';
 import {createUniversePostgresPersistence} from './reality-universe-postgres-persistence-v0.1.js';
 
 export const PRIVATE_CHAT_FORK_RECOVERY_VERSION='private-chat-fork-recovery-v1';
@@ -78,10 +79,10 @@ export function verifyReadOnlyChatFork(history,{rootId,worldlineId}={}){
  });
 }
 export async function resolvePrivateChatContinuity({
- scopedRoot,db,fetchImpl=fetch
+ scopedRoot,principalId,db,fetchImpl=fetch
 }={}){
- if(typeof scopedRoot!=='string'||!/^personal:chat:[a-f0-9]{64}$/.test(scopedRoot))
-  fail('CHAT_CONTINUITY_SCOPE_INVALID');
+ if(typeof scopedRoot!=='string'||!/^personal:chat:[a-f0-9]{64}$/.test(scopedRoot)||
+   !isId(principalId))fail('CHAT_CONTINUITY_SCOPE_INVALID');
  const persistence=createUniversePostgresPersistence({...db,fetchImpl,strictSecrets:true});
  const original=createContinuitySpine({
    continuityRootId:scopedRoot,worldlineId:scopedRoot,subjectId:'private-chat'
@@ -91,12 +92,35 @@ export async function resolvePrivateChatContinuity({
  });
  try{
   orderContinuityHistory(prior);
-  return Object.freeze({scopedRoot,fork_recovery:null});
+  return Object.freeze({scopedRoot,fork_recovery:null,verified_prior_goal_cas:null});
  }catch(e){
   if(e?.message!=='RELIABILITY_HISTORY_FORKED')throw e;
  }
  const audit=verifyReadOnlyChatFork(prior,{
    rootId:original.continuity_root_id,worldlineId:original.worldline_id
+ });
+ // Preserve the original authenticated goal revision ONLY as an atomic
+ // answer-publication compare-and-swap condition. Verify it from the common
+ // pre-fork chain; do not mint goal authority in the recovery epoch.
+ const byId=new Map(prior.map(x=>[x.event_id,x]));
+ const common=[];
+ let cursor=byId.get(audit.parent_event_id);
+ while(cursor){
+   common.push(cursor);
+   cursor=cursor.parent_event_id?byId.get(cursor.parent_event_id):null;
+ }
+ const originalGoal=projectAuthoritativeUserGoals({
+   continuityHistory:common,
+   continuityRootId:original.continuity_root_id,
+   worldId:scopedRoot,
+   principalId,
+ });
+ const verifiedPriorGoalCas=Object.freeze({
+   expected_revision:originalGoal.transition_count,
+   expected_last_goal_event_id:
+     originalGoal.recent_transition_receipts.at(-1)?.event_id||null,
+   verified_source:'AUTHENTICATED_SHARED_ANCESTOR_HASH_CHAIN',
+   recovery_grants_execution_authority:false,
  });
  // Stable across requests; no user input, no missing-history reset.
  const recoveredRoot=scopedRoot+':fork-recovery-v1:'+audit.fork_fingerprint.slice(0,24);
@@ -108,5 +132,6 @@ export async function resolvePrivateChatContinuity({
  });
  // A second fork in the recovery epoch is NOT silently re-recovered.
  orderContinuityHistory(recovered);
- return Object.freeze({scopedRoot:recoveredRoot,fork_recovery:audit});
+ return Object.freeze({scopedRoot:recoveredRoot,fork_recovery:audit,
+   verified_prior_goal_cas:verifiedPriorGoalCas});
 }
