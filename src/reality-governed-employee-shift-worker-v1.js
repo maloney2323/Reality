@@ -1,6 +1,4 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
-import {selectNextGovernedWork}
- from './reality-governed-next-work-decision-v1.js';
 const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -75,7 +73,7 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
  // has hours remaining. Keep observing ONLY its explicitly selected sources
  // through the same service-role, fenced 15-minute continuation ledger.
  if(claimed.status==='SHIFT_FINAL_REPORT_NOT_DUE'){
-  const monitor=await shiftRpc(db,'reality_claim_shift_continuation_monitor_v1',
+  const monitor=await shiftRpc(db,'reality_govern_shift_continuation_cycle_v1',
    {},{fetchImpl});
   const statuses=new Set([
    'NO_AUTHORIZED_CONTINUATION_DUE','NO_APPROVED_SOURCES_TO_MONITOR',
@@ -106,23 +104,18 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
      !Number.isFinite(Date.parse(monitor.planned_end_at||''))||
      Date.now()>=Date.parse(monitor.planned_end_at))
    throw Error('SHIFT_CONTINUATION_SCOPE_UNTRUSTED');
-  const [loop,qualified]=await Promise.all([
-   shiftRpc(db,'reality_read_owner_genuine_loop_v1',
-    {p_owner_id:monitor.owner_id},{fetchImpl}),
-   shiftRpc(db,'reality_read_owner_qualified_capabilities_v1',
-    {p_owner_id:monitor.owner_id},{fetchImpl})
-  ]);
-  const next=selectNextGovernedWork({loop,qualified,shift:{
-    authorized:true,status:monitor.shift_status,
-    read_only_sources_available:true,production_changed:false}});
-  if(next.next_worker_must_revalidate_provider!==true||
-      next.installation_authorized!==false||
-      next.external_effect_replay_authorized!==false)
-   throw Error('SHIFT_CONTINUATION_SUPERVISOR_UNTRUSTED');
+  // A fenced Reality governance receipt selects the ONLY permissible
+  // next read-only source. Worker may not choose a job, action or upgrade.
+  const order=monitor.governed_work_order;
+  if(order?.kind!=='REALITY_GOVERNED_AUTHORIZED_SOURCE_READBACK'||
+     order.source_ref!==monitor.source_ref||
+     !/^sha256:[a-f0-9]{64}$/.test(order.decision_sha256||'')||
+     order.original_job_action!=='NONE'||
+     order.external_write_authority!==false||
+     order.worker_must_return_evidence!==true)
+    throw Error('SHIFT_GOVERNED_WORK_ORDER_UNTRUSTED');
   const source=await readProviderSource(monitor.source_ref,{fetchImpl});
-  const proof={...source,governed_next_work:{...next,
-   kind:'READ_ONLY_SIGNED_OWNER_QUEUE_DECISION',
-   original_source_monitor_ref:monitor.source_ref}};
+  const proof={...source,governed_work_order_sha256:order.decision_sha256};
   const settled=await shiftRpc(db,
    'reality_settle_shift_continuation_monitor_v1',{
     p_shift_id:monitor.shift_id,p_monitor_bucket:monitor.monitor_bucket,
@@ -139,10 +132,8 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
   return {ok:true,status:'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE',
    shift_id:monitor.shift_id,source_step_index:monitor.source_step_index,
    source_status:proof.provider_status,
-   next_governed_action:next.next_action,
-   next_existing_original_work_id:next.original_work_id,
-   concurrent_read_only_action:next.source_continuation,
-   no_new_executable_original_job:next.no_new_executable_work,
+   reality_governed_work_order_sha256:order.decision_sha256,
+   next_job_selected_by_worker:false,
    evidence_digest:settled.proof_sha256,
    monitoring_interval_minutes:15,
    installation_authorized:false,job_completed:false,
