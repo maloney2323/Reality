@@ -5277,10 +5277,10 @@ async function wcLoadGapFeed(){
     data.counts?.current_candidates!==data.items.length||
     data.counts?.historical_completed!==data.settled_history.length||
     !Number.isSafeInteger(data.counts?.historical_no_new_work_closed??0)||
-    !Array.isArray(data.historical_no_work_final_dispositions)||
-    data.historical_no_work_final_dispositions.length!==
+    !Array.isArray(data.historical_no_work_final_dispositions??[])||
+    (data.historical_no_work_final_dispositions??[]).length!==
      (data.counts?.historical_no_new_work_closed??0)||
-    data.historical_no_work_final_dispositions.some(x=>
+    (data.historical_no_work_final_dispositions??[]).some(x=>
       x.status!=='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'||
       x.independent_database_readback!==true||
       x.original_execution_replayed!==false||
