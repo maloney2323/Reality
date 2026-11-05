@@ -6,6 +6,14 @@ const sql=read('supabase/migrations/20261104_shift_existing_governed_original_re
 const edge=read('supabase/functions/reality-governed-employee-shift-wake-v1/index.ts');
 const genuine=read('src/reality-genuine-capability-generation-bridge-v1.js');
 
+test('the SQL migration is one complete function with an intact pinned GitHub source',()=>{
+ assert.equal(sql.split('create or replace function public.reality_reconcile_employee_shift_original_v1()').length-1,1);
+ assert.equal(sql.split('end $fn$;').length-1,1);
+ assert.equal(sql.split('EXACT_ORIGINAL_JOB_FINAL_RECEIPT_MATCH').length-1,1);
+ assert.ok(sql.includes("issues/[1-9][0-9]*$'"));
+ assert.ok(!sql.includes('to service_role;\n    and '));
+});
+
 test('shift links only independently hashed source evidence to existing, current-owner original job',()=>{
  for(const x of [
   /reality_internal\.governed_employee_shift_steps_v1/,
