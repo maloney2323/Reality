@@ -1,4 +1,4 @@
-// Owner-authenticated eight-hour shift creation and independent progress.
+// Owner-authenticated 8/10/12-hour shift creation and independent progress.
 // First approval authorizes source checks, NOT arbitrary new original jobs or
 // installs. Exact upgrades are presented in EXISTING Reality Chat.
 import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
@@ -20,7 +20,12 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  if(!['GET','POST'].includes(req.method))
   return res.status(405).setHeader('Allow','GET, POST').json({ok:false,error:'SHIFT_METHOD_DENIED'});
- if(Object.keys(req.query||{}).length)
+ // Only the duration selector is accepted; owner and scope remain derived
+ // from the signed-in session. Draft lookup is read-only.
+ const queryKeys=Object.keys(req.query||{});
+ if(queryKeys.some(k=>k!=='hours')||queryKeys.length>1)
+  return res.status(400).json({ok:false,error:'SHIFT_CLIENT_SCOPE_REJECTED'});
+ if(req.method==='POST'&&queryKeys.length)
   return res.status(400).json({ok:false,error:'SHIFT_CLIENT_SCOPE_REJECTED'});
  try{
   privateChatConfig();
@@ -31,6 +36,9 @@ export default async function handler(req,res){
   if(db.url!==session.config?.url)
    return res.status(403).json({ok:false,error:'SHIFT_OWNER_PROJECT_MISMATCH'});
   if(req.method==='GET'){
+   const hours=req.query?.hours===undefined?null:Number(req.query.hours);
+   if(hours!==null&&![8,10,12].includes(hours))
+    return res.status(400).json({ok:false,error:'SHIFT_DURATION_NOT_SUPPORTED'});
    const read=assertShiftReadback(await shiftRpc(db,'reality_read_owner_employee_shifts_v1',
     {p_owner_id:session.user_id}));
    let handoffs=[],handoff_status='NO_VERIFIED_SHIFT_BOUND_CAPABILITY_REQUEST';
@@ -48,7 +56,15 @@ export default async function handler(req,res){
     }catch{handoff_status='EXACT_CAPABILITY_READBACK_UNAVAILABLE_FAIL_CLOSED';}
    }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
+   let draft=null;
+   if(hours!==null){
+     const catalog=await buildRealityWorkCatalog();
+     const brief=buildRealityWorkdayOpportunityBrief(catalog);
+     const plan=buildRealityEightHourShiftDraft(brief,{durationHours:hours});
+     draft={...plan,expected_fingerprint:computeShiftFingerprint(plan)};
+   }
    return res.status(200).json({ok:true,...read,shift_briefing,
+    requested_shift_draft:draft,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
@@ -61,7 +77,11 @@ export default async function handler(req,res){
    return res.status(415).json({ok:false,error:'SHIFT_JSON_REQUIRED'});
   const b=req.body||{},keys=Object.keys(b);
   if(!b||typeof b!=='object'||Array.isArray(b)||
-   keys.length!==3||keys.some(x=>!['action','expected_fingerprint','planned_start_at'].includes(x))||
+   ![3,4].includes(keys.length)||
+   keys.some(x=>!['action','expected_fingerprint','planned_start_at','requested_hours'].includes(x))||
+   (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
+   (keys.length===3&&Object.hasOwn(b,'requested_hours'))||
+   ![8,10,12].includes(b.requested_hours??8)||
    b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
   const start=new Date(b.planned_start_at);
@@ -71,7 +91,7 @@ export default async function handler(req,res){
    return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
-  const plan=buildRealityEightHourShiftDraft(brief);
+  const plan=buildRealityEightHourShiftDraft(brief,{durationHours:b.requested_hours??8});
   const fingerprint=computeShiftFingerprint(plan);
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
@@ -85,7 +105,8 @@ export default async function handler(req,res){
    'reality_read_owner_employee_shifts_v1',
    {p_owner_id:session.user_id}));
   const exact=read.shifts.find(s=>s.shift_id===receipt.shift_id&&
-   s.plan_fingerprint===fingerprint&&s.steps.length===8);
+   s.plan_fingerprint===fingerprint&&s.steps.length===8&&
+   Number(new Date(s.planned_end_at))-Number(start)===plan.shift_duration_minutes*60000);
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
   return res.status(202).json({ok:true,...receipt,shift:exact,
    initial_authorization_recorded:true,
