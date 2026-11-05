@@ -1914,7 +1914,14 @@ async function realityBusinessRefresh(){
   $('businessTrackedJobs').textContent=String(jobs.length);
   $('businessPendingApprovals').textContent=String(pending);
   $('businessVerifiedCompletions').textContent=String(settled);
-  $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. Counts cover only returned repair jobs; they are not financial results.';
+  const verifiedNoWork=jobs.filter(j=>j.terminal_no_new_work_verified===true&&
+   j.historical_no_work_final_disposition?.status===
+    'HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+   j.historical_no_work_final_disposition.independent_database_readback===true&&
+   j.historical_no_work_final_disposition.original_execution_replayed===false).length;
+  $('businessOperationsStatus').textContent='Source: Reality’s owner-authenticated, read-only work ledger. '+
+   'Counts cover only returned repair jobs; they are not financial results. '+
+   (verifiedNoWork?verifiedNoWork+' original job(s) independently closed because the objective was already satisfied; no new execution or settlement counted.':'');
   const finalJob=jobs.find(j=>j.capability_id==='reality-general-execution-receipt'&&
     j.full_loop_independently_verified===true);
   const finalReceipt=(data.independent_final_receipts||[]).find(r=>
@@ -3919,11 +3926,33 @@ async function realityChatRefreshEvents(){
   for(const j of data.jobs.filter(x=>
     !(x.independently_settled===true&&x.universe_settlement_verified===true&&
      (x.capability_id!=='reality-general-execution-receipt'||x.full_loop_independently_verified===true))&&
-    x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT').slice(0,6)){
+    (x.historical_reconciliation?.status!=='HISTORICAL_RECONCILIATION_ALREADY_VERIFIED_NO_NEW_EFFECT'||
+     x.terminal_no_new_work_verified===true)).slice(0,6)){
    if(!/^work:[a-f0-9]{32}$/.test(String(j.original_work_id||'')))continue;
    const bubble=document.createElement('div');bubble.className='reality-chat-progress';
    const title=document.createElement('strong');
    const note=document.createElement('small');
+   const noWork=j.historical_no_work_final_disposition;
+   if(j.terminal_no_new_work_verified===true&&
+      noWork?.status==='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+      noWork.independent_database_readback===true&&
+      noWork.original_execution_replayed===false&&
+      noWork.new_universe_settlement_written===false&&
+      noWork.original_job_completed===false){
+    title.textContent='Original #201 closed · Objective already satisfied';
+    note.textContent='Final no-new-work receipt '+noWork.receipt_id+
+      ' independently recorded. The existing historical Universe settlements were verified; '+
+      'this original job was not executed, reinstalled or settled again. No ROI inferred.';
+    bubble.append(title,note);
+    if(Number.isSafeInteger(noWork.signed_github_run_id)&&noWork.signed_github_run_id>0){
+     const link=document.createElement('a');
+     link.href='https://github.com/maloney2323/Reality/actions/runs/'+noWork.signed_github_run_id;
+     link.target='_blank';link.rel='noopener noreferrer';
+     link.textContent='View signed no-new-work evidence';bubble.appendChild(link);
+    }
+    container.appendChild(bubble);
+    continue;
+   }
    const fullVerified=j.independently_settled===true&&
     j.universe_settlement_verified===true&&
     (j.capability_id!=='reality-general-execution-receipt'||
