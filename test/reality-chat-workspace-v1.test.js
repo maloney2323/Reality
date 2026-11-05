@@ -59,9 +59,9 @@ test('mobile conversation has explicit accessible panel controls and Escape clos
  assert.match(js,/aria-controls','realityChatInspector'/);
  assert.match(js,/aria-expanded/);
  assert.match(js,/event\.key==='Escape'/);
- assert.match(js,/role','tablist'/);
- assert.match(js,/role','tabpanel'/);
- assert.match(js,/role','tab'/);
+ assert.match(js,/setAttribute\('role','tablist'\)/);
+ assert.match(js,/setAttribute\('role','tabpanel'\)/);
+ assert.match(js,/setAttribute\('role','tab'\)/);
  assert.match(js,/ArrowLeft','ArrowRight','Home','End'/);
 });
 test('the entire conversation remains accessible, no fake verification or new authority',()=>{
