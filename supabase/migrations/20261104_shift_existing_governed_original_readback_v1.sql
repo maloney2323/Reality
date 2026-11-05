@@ -72,8 +72,7 @@ begin
   where t.shift_id=s.shift_id and t.state='SOURCE_CHECKED'
     and t.source_status='OPEN_ISSUE'
     and t.source_ref ~
-       '^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*
-$'
+       '^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*$'
     and t.proof->>'kind'='GITHUB_SOURCE_READBACK'
     and t.proof->>'source_url'=t.source_ref
     and t.proof->>'provider_status'=t.source_status
