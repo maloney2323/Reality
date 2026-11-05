@@ -108,10 +108,71 @@ export default async function handler(req,res){
       new_execution_authorized:false,production_changed:false});
    }catch{/* Fail closed: missing readback never produces a completion claim. */}
   }
+  // The final no-new-work disposition is a DIFFERENT kind of terminal
+  // receipt from a settled customer job. Read it from the restricted RPC,
+  // only for original work already independently scoped to this owner.
+  const noWorkDispositions=new Map();
+  const noWorkJob=v.jobs.find(j=>
+   j.original_work_id==='work:bf17f1716f7c9550680d761e64f8b591'&&
+   j.capability_id==='reality-continuity-settlement-reconciler'&&
+   j.owner_install_approved===true&&j.independently_settled!==true);
+  if(noWorkJob){
+   try{
+    const response=await fetch(db.url+
+     '/rest/v1/rpc/reality_read_genuine_historical_no_work_v1',{
+      method:'POST',redirect:'error',cache:'no-store',
+      headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+       accept:'application/json','content-type':'application/json'},
+      body:JSON.stringify({p_work:noWorkJob.original_work_id})
+     });
+    if(response.ok){
+     const proof=await response.json().catch(()=>null);
+     if(proof?.status==='HISTORICAL_OBJECTIVE_SATISFIED_NO_NEW_EXECUTION'&&
+       proof.original_work_id===noWorkJob.original_work_id&&
+       UUID.test(proof.receipt_id)&&
+       UUID.test(proof.original_work_event_id)&&
+       UUID.test(proof.previous_original_universe_event_id)&&
+       UUID.test(proof.previous_target_universe_event_id)&&
+       proof.previous_original_universe_event_id!==
+        proof.previous_target_universe_event_id&&
+       /^[a-f0-9]{64}$/.test(proof.previous_original_event_content_hash||'')&&
+       /^[a-f0-9]{64}$/.test(proof.previous_target_event_content_hash||'')&&
+       /^[a-f0-9]{40}$/.test(proof.signed_repository_sha||'')&&
+       Number.isSafeInteger(proof.signed_github_run_id)&&
+       proof.signed_github_run_id>0&&
+       proof.independent_database_readback===true&&
+       proof.unresolved_reconciliation_targets===0&&
+       proof.original_job_completed===false&&
+       proof.original_execution_replayed===false&&
+       proof.new_execution_claim_consumed===false&&
+       proof.new_universe_settlement_written===false&&
+       proof.measured_roi_claimed===false&&
+       proof.installation_replay_authorized===false&&
+       proof.production_changed===false)
+       noWorkDispositions.set(noWorkJob.original_work_id,{
+        status:proof.status,
+        receipt_id:proof.receipt_id,
+        recorded_at:proof.recorded_at,
+        signed_github_run_id:proof.signed_github_run_id,
+        previous_original_universe_event_id:proof.previous_original_universe_event_id,
+        previous_target_universe_event_id:proof.previous_target_universe_event_id,
+        independent_database_readback:true,
+        original_job_completed:false,
+        original_execution_replayed:false,
+        new_universe_settlement_written:false,
+        new_execution_claim_consumed:false,
+        measured_roi_claimed:false,
+        installation_replay_authorized:false,
+        production_changed:false});
+    }
+   }catch{/* Unavailable verification keeps the job pending, never closed. */}
+  }
   const jobs=v.jobs.map(j=>{
     const receipt=final.receipts.find(r=>r.original_work_id===j.original_work_id);
     return {...j,
       historical_reconciliation:historical.get(j.original_work_id)||null,
+      historical_no_work_final_disposition:noWorkDispositions.get(j.original_work_id)||null,
+      terminal_no_new_work_verified:noWorkDispositions.has(j.original_work_id),
       owner_install_approved:j.owner_install_approved===true,
       candidate_verified:j.candidate_verified===true,
       independently_settled:j.independently_settled===true,
