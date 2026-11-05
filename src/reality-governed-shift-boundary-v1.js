@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
-export const SHIFT_FINGERPRINT_VERSION='reality-exact-shift-v1';
+export const SHIFT_FINGERPRINT_VERSION='reality-exact-eight-hour-shift-v1';
+const FLEXIBLE_SHIFT_FINGERPRINT_VERSION='reality-exact-flexible-shift-v2';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export function computeShiftFingerprint(plan){
  if(!plan||plan.version!=='reality-eight-hour-employee-shift-draft-v1'||
@@ -24,7 +25,9 @@ export function computeShiftFingerprint(plan){
   gate:x.required_gate||null
  }));
  const hash=crypto.createHash('sha256').update(JSON.stringify({
-  version:SHIFT_FINGERPRINT_VERSION,source_scope:plan.source_scope,
+  version:plan.shift_duration_minutes===480?
+   SHIFT_FINGERPRINT_VERSION:FLEXIBLE_SHIFT_FINGERPRINT_VERSION,
+  source_scope:plan.source_scope,
   timebox:plan.shift_duration_minutes,slots:source
  })).digest('hex');
  return 'sha256:'+hash;
