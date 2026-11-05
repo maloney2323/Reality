@@ -42,7 +42,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <p>Your saved conversations remain private to your account.</p>
 <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
 <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
-<button id="login" type="button">Sign in</button>
+<button id="login" type="button">Sign in</button> <button id="passkeyLogin" type="button" style="background:#253247;color:#eef5ff">Use fingerprint / passkey</button>
 <p id="authMessage" role="status"></p>
 </section>
 <div id="chat" hidden style="flex:1;display:flex;flex-direction:column">
@@ -50,7 +50,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
-<button id="logout" type="button">Log out</button>
+<button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
 <div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
 <p id="status" class="status" role="status" aria-live="polite">Ready.</p>
@@ -216,6 +216,91 @@ $('composer').onsubmit=async(e)=>{
   }
 };
 void init();
+})();
+</script>
+
+<script>
+(()=>{
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const login=$('passkeyLogin'),enroll=$('passkeyEnroll');
+ const message=(text)=>{const node=$('auth').hidden?$('status'):$('authMessage');node.textContent=text;};
+ const fromUrl64=value=>{
+   let s=String(value).replace(/-/g,'+').replace(/_/g,'/');
+   s+='='.repeat((4-s.length%4)%4);
+   return Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+ };
+ const toUrl64=value=>{
+   const bytes=new Uint8Array(value||new ArrayBuffer(0));
+   let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+ };
+ function credentialJSON(value){
+   if(typeof value.toJSON==='function')return value.toJSON();
+   const r=value.response;
+   return {
+     id:value.id,type:value.type,rawId:toUrl64(value.rawId),
+     response:r.attestationObject?{
+       clientDataJSON:toUrl64(r.clientDataJSON),
+       attestationObject:toUrl64(r.attestationObject),
+       transports:typeof r.getTransports==='function'?r.getTransports():[]
+     }:{
+       clientDataJSON:toUrl64(r.clientDataJSON),
+       authenticatorData:toUrl64(r.authenticatorData),
+       signature:toUrl64(r.signature),
+       userHandle:r.userHandle?toUrl64(r.userHandle):null
+     },
+     clientExtensionResults:value.getClientExtensionResults?.()||{}
+   };
+ }
+ async function call(action,extras={}){
+   const response=await fetch('/api/reality/personal-passkey',{
+     method:'POST',credentials:'same-origin',cache:'no-store',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({action,...extras}),signal:AbortSignal.timeout(18000)
+   });
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true)throw Error(data?.error||'Passkey service unavailable');
+   return data;
+ }
+ async function start(register){
+   const button=register?enroll:login;
+   if(!window.PublicKeyCredential||!navigator.credentials)
+     return message('This browser does not support passkeys. Password sign-in is still available.');
+   button.disabled=true;
+   try{
+     message(register?'Starting secure fingerprint setup…':'Waiting for your phone to verify your passkey…');
+     const action=register?'register':'login';
+     const challenge=await call(action+'-options');
+     const options={...challenge.options,challenge:fromUrl64(challenge.options.challenge)};
+     if(register){
+       options.user={...options.user,id:fromUrl64(options.user.id)};
+       if(Array.isArray(options.excludeCredentials))
+         options.excludeCredentials=options.excludeCredentials.map(x=>({...x,id:fromUrl64(x.id)}));
+     }else{
+       if(Array.isArray(options.allowCredentials))
+         options.allowCredentials=options.allowCredentials.map(x=>({...x,id:fromUrl64(x.id)}));
+     }
+     const credential=await navigator.credentials[register?'create':'get']({publicKey:options});
+     if(!credential)throw Error('No passkey was selected');
+     const saved=await call(action+'-verify',{
+       challenge_id:challenge.challenge_id,credential:credentialJSON(credential)
+     });
+     if(register){
+       if(!saved.passkey_registered)throw Error('Passkey was not confirmed');
+       message('Fingerprint/passkey setup complete. You can use it to sign in next time.');
+     }else if(saved.authenticated){
+       message('Passkey sign-in successful.');
+       location.reload(); // The existing HttpOnly session endpoint restores Chat.
+     }else throw Error('Passkey sign-in was not confirmed');
+   }catch(e){
+     message(e?.name==='NotAllowedError'
+       ?'Fingerprint request cancelled. Password sign-in remains available.'
+       :'Passkey unavailable: '+String(e.message||e));
+   }finally{button.disabled=false}
+ }
+ login.addEventListener('click',()=>{void start(false)});
+ enroll.addEventListener('click',()=>{void start(true)});
 })();
 </script>
 </body>
