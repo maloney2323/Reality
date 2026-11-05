@@ -79,6 +79,35 @@ test('historical #188 is a review target, not newly owner authorized',()=>{
  assert.equal(result.execution_started,false);
  assert.equal(result.production_changed,false);
 });
+test('live independently verified budget defect ranks ahead of historical #188 candidate',()=>{
+ const historical={...base,key:'candidate:'+'a'.repeat(64),
+  kind:'INDEPENDENTLY_TESTED_CANDIDATE',priority:1,
+  candidate_independently_tested:true};
+ const repaired={...base,key:'research:'+'b'.repeat(64),
+  kind:'RESEARCH_OPPORTUNITY',priority:5,
+  next_proof:'Verify the exact tested implementation defect against a fresh owner-bound original job.',
+  repair_proof:{
+   status:'FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED',
+   owner_install_authorized:false,fresh_original_work_verified:false,
+   installed:false,repair_commit_sha:'8368c5db6d5d5e3546b69ab2b86b022e40a00ed9',
+   independent_red_assertion_failures:1,independent_green_assertion_passes:5}};
+ const result=chooseNextOwnerQualification([historical,repaired]);
+ assert.equal(result.key,repaired.key);
+ assert.equal(result.kind,'RESEARCH_OPPORTUNITY');
+ assert.equal(result.verified_current_gap,false);
+ assert.equal(result.owner_approval_granted,false);
+ assert.equal(result.execution_started,false);
+ assert.equal(result.installation_authorized,false);
+ for(const patch of [
+  {installed:true},{owner_install_authorized:true},
+  {fresh_original_work_verified:true},
+  {independent_red_assertion_failures:0},
+  {repair_commit_sha:'forged'}
+ ]){
+  const unavailable={...repaired,repair_proof:{...repaired.repair_proof,...patch}};
+  assert.equal(chooseNextOwnerQualification([historical,unavailable]).key,historical.key);
+ }
+});
 test('signed-closed original never reappears as a next qualification',()=>{
  const closed={...base,kind:'GOVERNED_ORIGINAL_JOB_GAP',verified_missing_capability:true,
   key:'queue:'+'a'.repeat(32),original_work_id:WORK};
