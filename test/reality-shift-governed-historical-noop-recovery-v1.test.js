@@ -42,6 +42,15 @@ test('historical no-op requires original owner-scoped queue, hashed live source 
  ])assert.match(sql,pattern);
  assert.doesNotMatch(sql,/api\.openai\.com|github\.com\/repos\/maloney2323\/Reality\/dispatches|insert into reality_internal\.genuine_capability_queue/);
 });
+test('missing JSON evidence fails closed; other blocked work is not erased by a historical no-op',()=>{
+ assert.match(sql,/coalesce\(v_link->>'governed_existing_work_status',''\)/);
+ assert.match(sql,/coalesce\(v_link->>'governed_original_work_id',''\) !~/);
+ assert.match(sql,/coalesce\(v_target->>'independent_database_readback',''\)/);
+ assert.match(sql,/coalesce\(v_target->>'previous_original_universe_event_id',''\) !~/);
+ assert.match(sql,/source_status is distinct from 'VERIFIED_HISTORICAL_NOOP'/);
+ assert.match(sql,/when v_historical_noop and not exists\(/);
+});
+
 test('no-op is not a final original-job receipt and preserves the approved shift boundary',()=>{
  assert.match(sql,/status='RUNNING',last_progress_at=v_at/);
  assert.match(sql,/END[ED_]+READ_ONLY/);
