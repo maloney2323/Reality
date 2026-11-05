@@ -19,7 +19,7 @@ const observedSearch=()=>({
   {type:'web_search_call',status:'completed',id:'call_web_1'},
   {type:'message',content:[{
    type:'output_text',
-   text:'The published study reports a median of 2 hours investigating faults and 3 hours implementing repairs. These are separate medians, not Reality savings.',
+   text:'NASA-hosted university research by Hamill and Goseva-Popstojanova studies software faults and repair effort. The published study reports separate medians of 2 hours investigating faults and 3 hours implementing repairs. These are not measured Reality savings.',
    annotations:[{type:'url_citation',title:'NASA technical report',url:nasa,start_index:0,end_index:26}]
   }]}
  ]
