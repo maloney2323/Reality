@@ -136,8 +136,20 @@
   composer.append(node('p','reality-chat-typing-note','Enter to send on desktop · Shift+Enter for a new line · No message grants installation permission.'));
 
   const statusBar = node('div', 'reality-chat-status-bar');
-  const status = get('privateStatus');
-  if (status) statusBar.append(status);
+  // Mirror the existing response/verification status into the conversation.
+  // Keep its original live-region outside the authenticated panel so login
+  // and session errors remain visible even before sign-in.
+  const originalStatus = get('privateStatus');
+  const statusCopy = node('p', 'muted');
+  statusCopy.id = 'realityChatStatusSummary';
+  if (originalStatus) {
+    const syncStatus = () => { statusCopy.textContent = originalStatus.textContent; };
+    new MutationObserver(syncStatus).observe(originalStatus, {
+      childList:true, characterData:true, subtree:true
+    });
+    syncStatus();
+  }
+  statusBar.append(statusCopy);
   const statusExpand = node('button', '', 'Details');
   statusExpand.type = 'button';
   statusExpand.setAttribute('aria-expanded', 'false');
@@ -210,6 +222,13 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  const refreshReadyDisplay = () => document.body.classList.toggle(
+    'reality-chat-signed-in', ready.style.display === 'block'
+  );
+  new MutationObserver(refreshReadyDisplay).observe(ready, {
+    attributes:true,attributeFilter:['style']
+  });
+  refreshReadyDisplay();
 
   // On smaller screens the conversation fills the page. The side panels
   // overlay it only when explicitly opened, and remain available to screen readers.
