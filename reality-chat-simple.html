@@ -178,10 +178,24 @@ async function authorizeShiftFromChat(command){
       r.active_worker_id===null)?
     ' Proposed work functions ('+team.proposed_role_slots+', not active employees): '+
       team.proposed_roles.map(r=>r.title).join(', ')+'.': '';
+  const routing=draft.employee_category_assignments;
+  const grouped=routing?.status==='READ_ONLY_CATEGORY_ASSIGNMENT_NOT_GOVERNED_JOB_DISPATCH'&&
+    routing.first_pilot_employee?.employee_function_id==='software_engineering'&&
+    routing.daily_recurrence_activated===false&&
+    routing.employee_workers_deployed===0&&
+    Array.isArray(routing.employee_assignments)&&
+    routing.employee_assignments.length===8&&
+    routing.employee_assignments.every(x=>x.active_employee_instantiated===false&&
+      Array.isArray(x.candidate_jobs)&&x.candidate_count===x.candidate_jobs.length)?
+    ' Category candidates by employee: '+
+      routing.employee_assignments.filter(x=>x.candidate_count>0)
+       .map(x=>x.employee_title+' ('+x.candidate_count+')').join(' · ')+
+    '. FIRST PILOT: '+routing.first_pilot_employee.employee_title+
+    '. These are source observations awaiting qualification, not executed jobs or a daily recurring shift.':'';
   return {
     acknowledged:true,
     text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
-      created.shift_id+'. Status: '+match.status+'.'+proposed+
+      created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
       ' The existing trusted worker scheduler must independently claim work. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
