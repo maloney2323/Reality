@@ -78,8 +78,9 @@ async function githubSource(source:string){
   read_only:true,production_changed:false};
 }
 /**
- * The shift observes source evidence and forwards its exact identity to the
- * EXISTING governed capability cycle. No direct model, model key, second
+ * The shift records source evidence that the EXISTING governed capability
+ * cycle must independently qualify. It does not yet launch that cycle.
+ * No direct model, model key, second
  * research service or arbitrary capability-gap admission lives here.
  *
  * A GitHub failure is not an independently verified missing capability.
