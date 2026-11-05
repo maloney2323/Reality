@@ -33,6 +33,15 @@ function eventFor(t){
    text:'An original-job final receipt was independently matched to this shift. Human-hours saved remain unmeasured.',
    observed_at:safeDate(t.completed_at),source_url:null,
    proof_sha256:/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||'')?t.proof_sha256:null};
+ if(t.state==='BLOCKED_PROVIDER'&&t.source_status==='VERIFIED_HISTORICAL_NOOP'){
+  // A historical verified no-op is not a provider outage, a new original
+  // settlement, or completed customer labor. Both gated steps share one proof.
+  if(t.step_index!==6)return null;
+  return {code:'HISTORICAL_NOOP_VERIFIED',step_index:t.step_index,
+   text:'Reality independently verified that the historical reconciliation was already complete. It did not replay the current original job or claim a new final receipt.',
+   observed_at:safeDate(t.completed_at),source_url:null,
+   proof_sha256:/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||'')?t.proof_sha256:null};
+ }
  if(t.state==='BLOCKED_PROVIDER')
   return {code:'STEP_BLOCKED',step_index:t.step_index,
    text:'Provider evidence could not be completed safely. Reality preserved the blocked observation and continues other authorized work.',
@@ -76,8 +85,13 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   const ta=Date.parse(a.observed_at||'')||0,tb=Date.parse(b.observed_at||'')||0;
   return tb-ta||b.step_index-a.step_index;
  }).slice(0,5);
+ const historicalNoop=s.steps[5]?.state==='BLOCKED_PROVIDER'&&
+  s.steps[5]?.source_status==='VERIFIED_HISTORICAL_NOOP'&&
+  s.steps[6]?.state==='BLOCKED_PROVIDER'&&
+  s.steps[6]?.source_status==='VERIFIED_HISTORICAL_NOOP';
  const firstPending=s.steps.find(t=>t.state==='QUEUED'||t.state==='CLAIMED'||
-  t.state==='AWAITING_EXACT_WORK'||t.state==='BLOCKED_PROVIDER');
+  t.state==='AWAITING_EXACT_WORK'||
+  (t.state==='BLOCKED_PROVIDER'&&t.source_status!=='VERIFIED_HISTORICAL_NOOP'));
  const timeNext=now.getTime()<start?safeDate(s.planned_start_at):null;
  const exact=handoffs.filter(h=>h?.shift_id===s.shift_id&&
   h.status==='EXACT_VERIFIED_CAPABILITY_APPROVAL_READY_IN_REALITY_CHAT'&&
@@ -96,6 +110,9 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='The exact original-job action awaits independent qualification or authorization. Other eligible read-only work proceeds without artificial delays.';
   next=pending?'Review the exact verified upgrade in Reality Chat. After your approval, the existing governed installer handles continuation.':
    'Reality must independently qualify and bind an eligible original job before execution can continue.';
+ }else if(historicalNoop&&s.status==='RUNNING'){
+  current='Governed recovery verified the historical reconciliation was already completed. Reality safely cleared the conditional execution gate without replaying or settling this original job.';
+  next='Continue any remaining authorized work. If no eligible work remains, the signed worker retains the shift boundary and records an honest report at the approved end.';
  }else if(s.status==='ESCALATED'){
   current='A prior source-check or lease problem needs investigation; independent wake/recovery continues within this authorization.';
   next='Review blocked provider evidence. Do not assume that the scheduled workload completed.';
