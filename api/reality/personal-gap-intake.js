@@ -166,7 +166,13 @@ export default async function handler(req,res){
       source.installation_authorized!==false||
       source.original_job_completed!==false||
       source.production_changed!==false||
-      !Array.isArray(source.observations)||source.observations.length>8)
+      !Array.isArray(source.observations)||source.observations.length>8||
+      source.observations.some(v=>v.existing_original_match!=null&&
+        (v.existing_original_match.status!=='EXISTING_UNSETTLED_OWNER_ORIGINAL_MATCHED'||
+         v.existing_original_match.existing_original_reused!==true||
+         v.existing_original_match.fresh_job_required!==false||
+         v.existing_original_match.independent_final_receipt_recorded!==false||
+         v.existing_original_match.installation_authorized_by_discovery!==false)))
     throw Error('UNBOUND_SOURCE_OWNER_SCOPE_NOT_VERIFIED');
    unboundItems=await qualifyUnboundSourceBatch(source.observations,{
     currentCommit:process.env.VERCEL_GIT_COMMIT_SHA,
@@ -179,6 +185,12 @@ export default async function handler(req,res){
       x.executable_job!==false||x.production_changed!==false||
       x.candidate_independently_tested!==false||
       !/^unbound:[a-f0-9]{64}$/.test(x.key)||!Number.isSafeInteger(x.priority)||
+      x.linked_original_work_id!=null&&(
+        !/^work:[a-f0-9]{32}$/.test(x.linked_original_work_id)||
+        x.stage!=='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'||
+        x.existing_original_source_verified!==true||
+        x.existing_original_final_receipt_recorded!==false||
+        x.owner_authorized_existing_investigation!==true)||
       !Array.isArray(x.pros)||!Array.isArray(x.cons))||
       unboundItems.length+merged.length>30||
       new Set([...merged,...unboundItems].map(x=>x.key)).size!==
@@ -200,6 +212,9 @@ export default async function handler(req,res){
     frozen_source_discoveries:unboundItems.length,
     current_source_absence_confirmed:unboundItems.filter(x=>
       x.verified_current_source_absence===true).length,
+    existing_original_recovery_links:unboundItems.filter(x=>
+      x.stage==='EXISTING_ORIGINAL_RECOVERY_DISPOSITION_REQUIRED'&&
+      /^work:[a-f0-9]{32}$/.test(x.linked_original_work_id||'')).length,
     verified_implementation_defects:proofs.items.length,
     independently_tested_research_repairs:proofs.items.length},
    items,settled_history:payload.settled_history,
