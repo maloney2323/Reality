@@ -8,6 +8,9 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA256=/^[a-f0-9]{64}$/;
 const CAP=/^[a-z][a-z0-9._-]{2,90}$/;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+const OWNER=/^owner:[a-zA-Z0-9_-]{6,100}$/;
+const GOAL=/^(?:user-goal|goal):[a-zA-Z0-9._-]{6,100}$/;
 const REPOSITORY='maloney2323/Reality';
 const SOURCE='GITHUB_ACTIONS_INDEPENDENT_PROVIDER_READBACK';
 const AUTHORITY_ERRORS=new Set([
@@ -36,7 +39,9 @@ function result(p,decision,canGenerate=false){
 }
 function exactProviderEvidence(p){
  if(!p||typeof p!=='object'||Array.isArray(p))return false;
- if(!string(p.owner_id)||!string(p.goal_id)||!WORK.test(p.original_work_id||'')||
+ if(!(OWNER.test(p.owner_id||'')||UUID.test(p.owner_id||''))||
+  !(GOAL.test(p.goal_id||'')||UUID.test(p.goal_id||''))||
+  !WORK.test(p.original_work_id||'')||
   p.repository!==REPOSITORY||p.source!==SOURCE||
   p.provider_readback_verified!==true||
   p.original_goal_verified!==true||
