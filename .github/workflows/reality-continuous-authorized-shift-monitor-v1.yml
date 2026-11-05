@@ -10,6 +10,8 @@ on:
       - 'src/reality-governed-employee-shift-worker-v1.js'
       - 'src/reality-governed-shift-boundary-v1.js'
       - 'test/reality-continuous-authorized-shift-monitor-v1.test.js'
+      - 'test/reality-governed-next-work-decision-v1.test.js'
+      - 'src/reality-governed-next-work-decision-v1.js'
       - '.github/workflows/reality-continuous-authorized-shift-monitor-v1.yml'
 permissions:
   contents: read
@@ -26,7 +28,9 @@ jobs:
         run: |
           node --check src/reality-governed-employee-shift-worker-v1.js
           node --check src/reality-governed-shift-boundary-v1.js
+          node --check src/reality-governed-next-work-decision-v1.js
           node --test test/reality-continuous-authorized-shift-monitor-v1.test.js
+          node --test test/reality-governed-next-work-decision-v1.test.js
       - name: Protect original shift tests and existing work-conservation gate
         run: |
           node --test test/reality-governed-employee-shift-v1.test.js
