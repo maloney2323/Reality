@@ -3,10 +3,21 @@
 const GOOD_KINDS=new Set(['GOVERNED_ORIGINAL_JOB_GAP',
  'INDEPENDENTLY_TESTED_CANDIDATE','RESEARCH_OPPORTUNITY']);
 const WORK=/^work:[a-f0-9]{32}$/;
+// Rank actual independently reproduced implementation defects ahead of a
+// historically tested but not owner-bound candidate. Neither is executable.
 const stageRank=x=>
  x.kind==='GOVERNED_ORIGINAL_JOB_GAP'&&x.verified_missing_capability===true?0:
- x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'&&x.candidate_independently_tested===true?1:
- x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'?2:99;
+ x.kind==='RESEARCH_OPPORTUNITY'&&
+  x.repair_proof?.status==='FROZEN_RED_TO_GREEN_CANDIDATE_VERIFIED'&&
+  x.repair_proof?.owner_install_authorized===false&&
+  x.repair_proof?.fresh_original_work_verified===false&&
+  x.repair_proof?.installed===false&&
+  /^[a-f0-9]{40}$/.test(x.repair_proof?.repair_commit_sha||'')&&
+  Number.isSafeInteger(x.repair_proof?.independent_red_assertion_failures)&&
+  x.repair_proof.independent_red_assertion_failures>0&&
+  Number.isSafeInteger(x.repair_proof?.independent_green_assertion_passes)&&
+  x.repair_proof.independent_green_assertion_passes>0?1:
+ x.kind==='INDEPENDENTLY_TESTED_CANDIDATE'&&x.candidate_independently_tested===true?2:99;
 
 export function chooseNextOwnerQualification(items,{closedWorkIds=[]}={}){
  if(!Array.isArray(items)||items.length>30||
