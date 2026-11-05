@@ -217,6 +217,30 @@ Deno.serve(async req=>{
         .includes(String(original.governed_queue_phase||''))))
     deny('GOVERNED_ORIGINAL_QUEUE_SCOPE_UNTRUSTED');
   }
+  // An old exact reconciliation target may already be independently settled.
+  // Treat it as a verified NO-REPLAY outcome and release the shift gate,
+  // never as proof of this new original-job completion.
+  const noOp=await rpc('reality_reconcile_employee_shift_historical_noop_v1',{});
+  const permittedNoOp=new Set([
+    'NO_ELIGIBLE_EXISTING_GOVERNED_NOOP',
+    'GOVERNED_NOOP_HISTORICAL_PROOF_UNAVAILABLE',
+    'GOVERNED_NOOP_SHIFT_WINDOW_CHANGED',
+    'GOVERNED_NOOP_STEP_STATE_CHANGED',
+    'SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED']);
+  if(!permittedNoOp.has(String(noOp.status))||
+     noOp.original_job_completed!==false||
+     noOp.installation_authorized!==false||
+     noOp.production_changed!==false)
+    deny('GOVERNED_HISTORICAL_NOOP_READBACK_UNTRUSTED');
+  if(noOp.status==='SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED'&&(
+      !UUID.test(String(noOp.shift_id||''))||
+      !/^work:[a-f0-9]{32}$/.test(String(noOp.original_work_id||''))||
+      noOp.original_work_id!==original.governed_original_work_id||
+      !HASH.test(String(noOp.source_proof_sha256||''))||
+      noOp.historical_reconciliation_verified!==true||
+      noOp.original_job_execution_replayed!==false||
+      noOp.new_customer_job_created!==false))
+    deny('GOVERNED_HISTORICAL_NOOP_SOURCE_CHANGED');
   const claimed=await rpc('reality_claim_employee_shift_step_v1',{});
   if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP',
       'SHIFT_STEP_NOT_YET_DUE','INFLIGHT_LEASE_UNEXPIRED',
@@ -226,6 +250,8 @@ Deno.serve(async req=>{
    return send(200,{ok:true,status:claimed.status,
     shift_id:claimed.shift_id||null,
     source_check_completed:false,
+    no_replay_recovery_status:noOp.status,
+    historical_reconciliation_verified:noOp.status==='SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED',
     governed_existing_work_status:observedWork||null,
     governed_original_work_id:observedWork==='EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'?
      original.governed_original_work_id:null,
