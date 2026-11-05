@@ -1,4 +1,6 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {selectNextGovernedWork}
+ from './reality-governed-next-work-decision-v1.js';
 const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -89,6 +91,8 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
     production_changed:false};
   if(!UUID.test(monitor.shift_id||'')||
      monitor.shift_id!==claimed.shift_id||
+     !UUID.test(monitor.owner_id||'')||
+     !['RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(monitor.shift_status)||
      !UUID.test(monitor.claim_id||'')||
      !URL.test(monitor.source_ref||'')||
      !Number.isSafeInteger(monitor.source_step_index)||
@@ -102,7 +106,23 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
      !Number.isFinite(Date.parse(monitor.planned_end_at||''))||
      Date.now()>=Date.parse(monitor.planned_end_at))
    throw Error('SHIFT_CONTINUATION_SCOPE_UNTRUSTED');
-  const proof=await readProviderSource(monitor.source_ref,{fetchImpl});
+  const [loop,qualified]=await Promise.all([
+   shiftRpc(db,'reality_read_owner_genuine_loop_v1',
+    {p_owner_id:monitor.owner_id},{fetchImpl}),
+   shiftRpc(db,'reality_read_owner_qualified_capabilities_v1',
+    {p_owner_id:monitor.owner_id},{fetchImpl})
+  ]);
+  const next=selectNextGovernedWork({loop,qualified,shift:{
+    authorized:true,status:monitor.shift_status,
+    read_only_sources_available:true,production_changed:false}});
+  if(next.next_worker_must_revalidate_provider!==true||
+      next.installation_authorized!==false||
+      next.external_effect_replay_authorized!==false)
+   throw Error('SHIFT_CONTINUATION_SUPERVISOR_UNTRUSTED');
+  const source=await readProviderSource(monitor.source_ref,{fetchImpl});
+  const proof={...source,governed_next_work:{...next,
+   kind:'READ_ONLY_SIGNED_OWNER_QUEUE_DECISION',
+   original_source_monitor_ref:monitor.source_ref}};
   const settled=await shiftRpc(db,
    'reality_settle_shift_continuation_monitor_v1',{
     p_shift_id:monitor.shift_id,p_monitor_bucket:monitor.monitor_bucket,
@@ -119,6 +139,10 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
   return {ok:true,status:'AUTHORIZED_SHIFT_CONTINUES_WITH_NEW_READ_ONLY_EVIDENCE',
    shift_id:monitor.shift_id,source_step_index:monitor.source_step_index,
    source_status:proof.provider_status,
+   next_governed_action:next.next_action,
+   next_existing_original_work_id:next.original_work_id,
+   concurrent_read_only_action:next.source_continuation,
+   no_new_executable_original_job:next.no_new_executable_work,
    evidence_digest:settled.proof_sha256,
    monitoring_interval_minutes:15,
    installation_authorized:false,job_completed:false,
