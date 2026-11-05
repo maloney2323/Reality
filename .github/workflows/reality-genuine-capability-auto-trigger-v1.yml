@@ -70,6 +70,50 @@ jobs:
           echo 'Existing Reality Continuity, independent provider, owner-goal and atomic queue gates remain mandatory.' >> "$GITHUB_STEP_SUMMARY"
           echo 'No install, model-generated capability or original job settlement claimed.' >> "$GITHUB_STEP_SUMMARY"
 
+  observe_governed_original_worker_failure:
+    # Existing constitutional capability worker supervises its OWN failed
+    # signed original-job runs, without a separate AI agent.
+    # This job only observes evidence and optionally asks Reality's existing
+    # OpenAI gateway for non-authoritative hypotheses.
+    needs: [resume_original_job]
+    if: ${{ always() && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Enforce existing owner-governed worker failure feedback boundaries
+        run: |
+          node --check scripts/reality-genuine-worker-failure-observe-v1.mjs
+          node --check scripts/reality-genuine-worker-failure-research-v1.mjs
+          node --test test/reality-genuine-worker-failure-feedback-v1.test.js
+      - name: Independently observe and durably record actual escalated original worker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-genuine-worker-failure-observe-v1.mjs
+      - name: Research unresolved verified worker failure with Reality's governed OpenAI gateway
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: node scripts/reality-genuine-worker-failure-research-v1.mjs
+      - name: Preserve independent failure and advisory research evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-governed-worker-failure-feedback-${{ github.run_id }}
+          path: |
+            artifact/genuine-worker-failure-evidence.json
+            artifact/genuine-worker-failure-model-diagnosis.json
+          if-no-files-found: error
+          retention-days: 30
+
   generate_missing_capability:
     needs: detect-real-frozen-capability-deficits
     if: ${{ github.event_name == 'push' && needs['detect-real-frozen-capability-deficits'].outputs.build_ready == 'true' }}
