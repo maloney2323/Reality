@@ -11,7 +11,7 @@ const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SRC=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/;
 const STATES=['NO_SHIFT_AUTHORIZED','QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK',
  'ENDED_WITH_BLOCKED_WORK','ENDED_WITH_VERIFIED_JOB','ENDED_READ_ONLY','ESCALATED'];
-const EVENTS=['SOURCE_VALIDATED','ORIGINAL_RECEIPT_MATCHED','STEP_BLOCKED','SHIFT_REPORT_RECORDED'];
+const EVENTS=['SOURCE_VALIDATED','ORIGINAL_RECEIPT_MATCHED','STEP_BLOCKED','HISTORICAL_NOOP_VERIFIED','SHIFT_REPORT_RECORDED'];
 let busy=false,last=null,loggedIn=false;
 function valid(d){
  const b=d?.shift_briefing;
