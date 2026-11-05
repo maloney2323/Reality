@@ -202,5 +202,9 @@ test('existing authenticated shift draft and company Chat reuse the same categor
  assert.match(api,/employee_category_assignments:routeRealityWorkCategoriesToEmployees\(brief\)/);
  assert.match(chat,/const categorized=routeRealityWorkCategoriesToEmployees\(workday\)/);
  assert.match(chat,/category_employee_work_routing:categorized/);
+ const html=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ assert.match(html,/routing\.employee_assignments\.filter/);
+ assert.match(html,/Category candidates by employee/);
+ assert.match(html,/These are source observations awaiting qualification/);
  assert.doesNotMatch(api,/employee_category_assignments[^;]*executeOriginalWork/);
 });
