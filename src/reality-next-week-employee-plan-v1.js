@@ -1,5 +1,6 @@
 // Deterministic NEXT-WEEK role coverage plan. Existing Work Center findings
-// become draft review assignments, NEVER duration, authority, execution or ROI.
+// become draft review assignments and PROVISIONAL review timeboxes,
+// NEVER proven task duration, authority, execution or ROI.
 // Week boundaries follow the owner's business calendar (America/New_York).
 export const NEXT_WEEK_EMPLOYEE_PLAN_VERSION='reality-next-week-employee-plan-v1';
 const ID=/^catalog:[a-f0-9]{32}$/;
@@ -21,7 +22,7 @@ export function nextWeekStartDate(now=new Date()){
  return ymd(upcomingMonday(now));
 }
 export function prepareNextWeekEmployeePlan(roster,{
- now=new Date(),preparedSource=null
+ now=new Date(),preparedSource=null,workloadHints=[]
 }={}){
  if(roster?.version!=='reality-proposed-ai-employee-roster-v1'||
   roster.status!=='READ_ONLY_PROPOSED_AI_EMPLOYEES'||
@@ -37,14 +38,28 @@ export function prepareNextWeekEmployeePlan(roster,{
   roster.production_changed!==false||
   !Number.isSafeInteger(roster.existing_work_center_candidates)||
   roster.existing_work_center_candidates<0||roster.existing_work_center_candidates>1000||
-  !(now instanceof Date)||!Number.isFinite(now.getTime()))
+  !(now instanceof Date)||!Number.isFinite(now.getTime())||
+  !Array.isArray(workloadHints)||workloadHints.length>100)
   fail('CURRENT_READ_ONLY_OWNER_WORKFORCE_REQUIRED');
+ // Explicit, per-source owner planning assumptions (if supplied later) take
+ // priority over an uncalibrated one-hour SOURCE TRIAGE timebox.
+ // Neither type is an accepted human baseline or approved execution.
+ const timeboxes=new Map();
+ for(const hint of workloadHints){
+  const hours=hint?.proposed_review_hours;
+  if(!ID.test(hint?.finding_id||'')||timeboxes.has(hint.finding_id)||
+   hint.basis!=='OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'||
+   !Number.isFinite(hours)||hours<0.5||hours>12||
+   hours*2!==Math.floor(hours*2))
+   fail('EXACT_PER_SOURCE_TIMEBOX_ASSUMPTION_REQUIRED');
+  timeboxes.set(hint.finding_id,hours);
+ }
  const first=upcomingMonday(now);
  const days=Array.from({length:5},(_,i)=>{
   const date=new Date(first.getTime());date.setUTCDate(date.getUTCDate()+i);
   return Object.freeze({date:ymd(date),
    weekday:['Monday','Tuesday','Wednesday','Thursday','Friday'][i],
-   assumed_ai_role_hours_available:8,
+   daily_planning_upper_limit_hours:12,
    shifts_authorized:false,actual_work_hours_verified:null});
  });
  const seenIds=new Set(),seenRoles=new Set(),rolePlans=[];
@@ -59,10 +74,12 @@ export function prepareNextWeekEmployeePlan(roster,{
    role.candidate_jobs.length>25)
    fail('SOURCE_ROLE_CANDIDATE_IDENTITY_UNVERIFIED');
   seenRoles.add(role.function_id);
-  const assigned=days.map((day,i)=>({
-   ...day,assignments:[],work_status:'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'
+  const assigned=days.map(day=>({
+   ...day,assignments:[],provisional_review_timebox_hours:0,
+   work_status:'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'
   }));
-  role.candidate_jobs.forEach((work,i)=>{
+  const deferred=[];
+  role.candidate_jobs.forEach(work=>{
    if(!ID.test(work?.finding_id||'')||seenIds.has(work.finding_id)||
     typeof work.title!=='string'||!work.title||
     typeof work.source_url!=='string'||
@@ -71,13 +88,31 @@ export function prepareNextWeekEmployeePlan(roster,{
     work.independently_verified_done!==false)
     fail('DUPLICATE_OR_UNVERIFIED_SOURCE_FINDING');
    seenIds.add(work.finding_id);
-   assigned[i%5].assignments.push(Object.freeze({
+   const hours=timeboxes.get(work.finding_id)??1;
+   // Balance source review timeboxes across the workweek instead of filling
+   // eight hours per role/day. Nothing here starts an employee shift.
+   const eligible=assigned.filter(day=>
+    day.provisional_review_timebox_hours+hours<=12);
+   const task=Object.freeze({
     finding_id:work.finding_id,source_url:work.source_url,
     title:work.title,category:work.source_category,
     status:'SOURCE_OBSERVATION_REQUIRES_INDEPENDENT_QUALIFICATION',
+    proposed_review_timebox_hours:hours,
+    timebox_basis:timeboxes.has(work.finding_id)?
+     'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED':
+     'UNCALIBRATED_ONE_HOUR_SOURCE_TRIAGE_PLACEHOLDER',
+    accepted_task_duration_hours:null,
     owner_execution_authorized:false,
     human_effort_hours_verified:null,ai_execution_hours_verified:null
-   }));
+   });
+   if(!eligible.length){
+    deferred.push(task);return;
+   }
+   eligible.sort((a,b)=>a.provisional_review_timebox_hours-
+     b.provisional_review_timebox_hours||a.date.localeCompare(b.date));
+   const day=eligible[0];
+   day.assignments.push(task);
+   day.provisional_review_timebox_hours+=hours;
   });
   const plan=Object.freeze({
    employee_id:role.employee_id,
@@ -87,8 +122,14 @@ export function prepareNextWeekEmployeePlan(roster,{
    candidate_finding_count:role.candidate_count,
    covered_source_candidates:role.candidate_count,
    active_worker_verified:false,
+   deferred_source_findings:Object.freeze(deferred),
+   deferred_source_count:deferred.length,
+   provisional_weekly_review_timebox_hours:assigned.reduce(
+    (n,day)=>n+day.provisional_review_timebox_hours,0),
    week_days:Object.freeze(assigned.map(x=>Object.freeze({
     ...x,assignments:Object.freeze(x.assignments),
+    proposed_execution_shift_hours:null,
+    timebox_is_verified_task_duration:false,
     work_status:x.assignments.length?
      'PROPOSED_SOURCE_REVIEW_NOT_EXECUTION_AUTHORIZATION':
      'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'
@@ -99,7 +140,8 @@ export function prepareNextWeekEmployeePlan(roster,{
   });
   rolePlans.push(plan);
  }
- if(seenIds.size!==roster.existing_work_center_candidates)
+ if(seenIds.size!==roster.existing_work_center_candidates||
+  [...timeboxes.keys()].some(id=>!seenIds.has(id)))
   fail('CATALOG_COVERAGE_NOT_RECONCILED');
  let snapshot='BACKGROUND_SOURCE_SNAPSHOT_NOT_YET_VERIFIED';
  let lastPrepared=null;
@@ -129,10 +171,19 @@ export function prepareNextWeekEmployeePlan(roster,{
   employee_role_count:rolePlans.length,
   employee_roles:Object.freeze(rolePlans),
   proposed_work_findings:seenIds.size,
-  proposed_daily_ai_role_hours:8,
+  proposed_daily_ai_role_hours:null,
+  proposed_review_timebox_hours_total:rolePlans.reduce(
+   (n,role)=>n+role.provisional_weekly_review_timebox_hours,0),
+  source_items_deferred_beyond_timebox_capacity:rolePlans.reduce(
+   (n,role)=>n+role.deferred_source_count,0),
+  minimum_daily_review_timebox_hours:0,
+  maximum_daily_review_timebox_hours:12,
+  timebox_allocation_basis:
+   'SOURCE_TRIAGE_PLACEHOLDER_OR_EXPLICIT_OWNER_UNVERIFIED_REVIEW_ASSUMPTION',
+  daily_hours_follow_source_workload_not_a_fixed_eight_hour_quota:true,
   four_day_week_capacity_hours:rolePlans.length*8*4,
   five_day_week_capacity_hours:rolePlans.length*8*5,
-  capacity_unit:'HYPOTHETICAL_AI_ROLE_SCHEDULE_HOURS_NOT_HUMAN_SAVINGS',
+  capacity_unit:'HYPOTHETICAL_EIGHT_HOUR_ROLE_SCENARIO_NOT_A_SCHEDULE_OR_HUMAN_SAVINGS',
   candidate_source_review_assignments_not_jobs:true,
   next_week_prepared_without_executing_jobs:true,
   recurring_weekly_workload_proven:false,
