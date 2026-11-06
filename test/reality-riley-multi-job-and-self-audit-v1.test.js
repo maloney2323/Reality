@@ -145,7 +145,12 @@ test('existing or forbidden claimed work is not executed again',async()=>{
  const result=await runRileyGovernedMultiJobShiftTick({
   db:{},ownerId:OWNER,shiftId:SHIFT,now:()=>now,
   loadShiftReadback:async()=>shift(),loadOwnerLedgerReadback:async()=>loop(),
-  loadTrustedAuthorizedOriginal:async()=>{loaded++;throw Error('NOT_ALLOWED')},
+  loadTrustedAuthorizedOriginal:async x=>{loaded++;return {
+   qualifiedOriginal:{owner_id:OWNER,original_work_id:x.original_work_id,
+    source_issue_number:x.original_work_id===W1?263:185},
+   scope:{owner_id:OWNER,original_work_id:x.original_work_id},
+   workItem:{work_item_id:x.original_work_id}
+  }},
   callRpc:async({name,args})=>{
    if(name==='reality_read_eligible_shift_originals_v1')return eligibility();
    if(name==='reality_claim_exact_shift_original_v1')return {
@@ -153,16 +158,42 @@ test('existing or forbidden claimed work is not executed again',async()=>{
    throw Error('UNEXPECTED_RPC');
   }
  });
- assert.equal(loaded,0);
+ assert.equal(loaded,2); // trusted read-only preflight without execution
  assert.equal(result.attempted,0);
  assert.deepEqual(result.outcomes.map(x=>x.status),
   ['ORIGINAL_NOT_REEXECUTED','ORIGINAL_NOT_REEXECUTED']);
+});
+test('missing trusted executor never consumes a real original-work claim',async()=>{
+ let claims=0;
+ const result=await runRileyGovernedMultiJobShiftTick({
+  db:{},ownerId:OWNER,shiftId:SHIFT,now:()=>now,
+  loadShiftReadback:async()=>shift(),loadOwnerLedgerReadback:async()=>loop(),
+  loadTrustedAuthorizedOriginal:async()=>{throw Error('TRUSTED_ADAPTER_NOT_CONFIGURED')},
+  callRpc:async({name})=>{
+   if(name==='reality_read_eligible_shift_originals_v1')return eligibility();
+   if(name==='reality_claim_exact_shift_original_v1')claims++;
+   throw Error('NO_CLAIM_PERMITTED');
+  }
+ });
+ assert.equal(claims,0);
+ assert.equal(result.attempted,0);
+ assert.deepEqual(result.outcomes.map(x=>x.status),[
+  'ORIGINAL_TRUSTED_PREFLIGHT_BLOCKED_NO_CLAIM',
+  'ORIGINAL_TRUSTED_PREFLIGHT_BLOCKED_NO_CLAIM']);
+ assert.equal(result.shift_finished,false);
+ assert.equal(result.production_changed,false);
 });
 test('provider uncertainty is marked durable; loss of readback stops tick',async()=>{
  const base={
   db:{},ownerId:OWNER,shiftId:SHIFT,now:()=>now,maxJobs:1,
   loadShiftReadback:async()=>shift(),loadOwnerLedgerReadback:async()=>loop(),
-  loadTrustedAuthorizedOriginal:async()=>{throw Error('PROVIDER_UNCERTAIN')},
+  loadTrustedAuthorizedOriginal:async x=>({
+   qualifiedOriginal:{owner_id:OWNER,original_work_id:x.original_work_id,
+    source_issue_number:x.original_work_id===W1?263:185},
+   scope:{owner_id:OWNER,original_work_id:x.original_work_id},
+   workItem:{work_item_id:x.original_work_id}
+  }),
+  runOriginal:async()=>{throw Error('PROVIDER_UNCERTAIN')},
   callRpc:async({name,args})=>{
    if(name==='reality_read_eligible_shift_originals_v1')return eligibility();
    if(name==='reality_claim_exact_shift_original_v1')return {
