@@ -200,3 +200,104 @@ revoke all on function public.reality_claim_exact_shift_original_v1(uuid,text,uu
  from public,anon,authenticated;
 grant execute on function public.reality_claim_exact_shift_original_v1(uuid,text,uuid)
  to service_role;
+
+-- Persist the truthful outcome; never let an employee claim success. The
+-- only way to mark independent settlement is the separate provider receipt
+-- reconciliation below.
+create or replace function public.reality_record_exact_shift_original_outcome_v1(
+ p_shift_id uuid,p_original_work_id text,p_claim_id uuid,p_status text)
+returns jsonb language plpgsql security invoker set search_path=pg_catalog as $$
+declare v record;v_phase text;
+begin
+ if current_user<>'service_role' then
+   raise exception 'SHIFT_MULTI_JOB_OUTCOME_SERVICE_ROLE_REQUIRED';
+ end if;
+ if p_status not in ('ORIGINAL_JOB_AUTHORIZATION_BLOCKED',
+  'ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT',
+  'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF',
+  'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY',
+  'EXECUTION_PROVIDER_EFFECT_UNKNOWN') then
+   raise exception 'SHIFT_MULTI_JOB_OUTCOME_NOT_ALLOWED';
+ end if;
+ select * into v from reality_internal.governed_employee_original_claims_v1
+  where shift_id=p_shift_id and original_work_id=p_original_work_id
+    and claim_id=p_claim_id for update;
+ if not found then
+   raise exception 'SHIFT_MULTI_JOB_CLAIM_IDENTITY_UNVERIFIED';
+ end if;
+ if v.phase<>'LEASED_FOR_GOVERNED_EXECUTOR' then
+  if v.last_execution_status=p_status then
+    return jsonb_build_object('status','SHIFT_ORIGINAL_OUTCOME_DURABLY_RECORDED',
+     'shift_id',p_shift_id,'original_work_id',p_original_work_id,
+     'claim_id',p_claim_id,'last_execution_status',p_status,
+     'original_job_settled',false,'installation_authorized',false,
+     'production_changed',false);
+  end if;
+  raise exception 'SHIFT_MULTI_JOB_EFFECT_ALREADY_UNCERTAIN_NO_REPLAY';
+ end if;
+ v_phase:=case when p_status='ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT'
+   then 'AWAITING_INDEPENDENT_FINAL_SETTLEMENT'
+  when p_status='SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF'
+   then 'AWAITING_EXACT_OWNER_APPROVAL'
+  else 'PROVIDER_OUTCOME_RECONCILIATION_REQUIRED' end;
+ update reality_internal.governed_employee_original_claims_v1
+  set phase=v_phase,last_execution_status=p_status,
+   updated_at=clock_timestamp()
+  where shift_id=p_shift_id and original_work_id=p_original_work_id
+   and claim_id=p_claim_id;
+ return jsonb_build_object('status','SHIFT_ORIGINAL_OUTCOME_DURABLY_RECORDED',
+  'shift_id',p_shift_id,'original_work_id',p_original_work_id,
+  'claim_id',p_claim_id,'last_execution_status',p_status,
+  'original_job_settled',false,'installation_authorized',false,
+  'production_changed',false);
+end
+$$;
+create or replace function public.reality_reconcile_exact_shift_original_receipt_v1(
+ p_shift_id uuid,p_original_work_id text)
+returns jsonb language plpgsql security invoker set search_path=pg_catalog as $$
+declare v record;v_final record;
+begin
+ if current_user<>'service_role' then
+  raise exception 'SHIFT_MULTI_JOB_RECEIPT_SERVICE_ROLE_REQUIRED';
+ end if;
+ select * into v from reality_internal.governed_employee_original_claims_v1
+ where shift_id=p_shift_id and original_work_id=p_original_work_id
+  for update;
+ if not found then
+  raise exception 'SHIFT_MULTI_JOB_NO_PRIOR_CLAIM';
+ end if;
+ select r.verified_settlement_event_id,r.verified_at,
+   r.artifact_sha256 into v_final
+ from reality_internal.genuine_independent_final_receipts_v1 r
+ join reality_internal.genuine_capability_queue_v1 q
+   on q.original_work_id=r.original_work_id and q.owner_id=r.owner_id
+   and q.phase='SETTLED_ISOLATED'
+   and q.qualified_candidate->>'artifact_sha256'=r.artifact_sha256
+ where r.original_work_id=v.original_work_id and r.owner_id=v.owner_id
+  and r.production_changed=false and r.verified_at>=v.created_at
+ order by r.verified_at desc limit 1;
+ if not found then
+  return jsonb_build_object('status','NO_INDEPENDENT_ORIGINAL_RECEIPT_YET',
+   'shift_id',p_shift_id,'original_work_id',p_original_work_id,
+   'installation_authorized',false,'production_changed',false);
+ end if;
+ update reality_internal.governed_employee_original_claims_v1
+  set phase='RECEIPT_INDEPENDENTLY_RECONCILED',
+   independent_receipt_event_id=v_final.verified_settlement_event_id,
+   updated_at=clock_timestamp()
+ where shift_id=p_shift_id and original_work_id=p_original_work_id;
+ return jsonb_build_object(
+  'status','EXACT_ORIGINAL_RECEIPT_INDEPENDENTLY_RECONCILED',
+  'shift_id',p_shift_id,'original_work_id',p_original_work_id,
+  'settlement_event_id',v_final.verified_settlement_event_id,
+  'installation_authorized',false,'production_changed',false);
+end
+$$;
+revoke all on function public.reality_record_exact_shift_original_outcome_v1(
+ uuid,text,uuid,text) from public,anon,authenticated;
+grant execute on function public.reality_record_exact_shift_original_outcome_v1(
+ uuid,text,uuid,text) to service_role;
+revoke all on function public.reality_reconcile_exact_shift_original_receipt_v1(
+ uuid,text) from public,anon,authenticated;
+grant execute on function public.reality_reconcile_exact_shift_original_receipt_v1(
+ uuid,text) to service_role;
