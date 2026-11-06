@@ -16,7 +16,7 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/([1-9]\d*)$/;
 const fail=code=>{throw Error('RILEY_ORIGINAL_'+code)};
 export function establishRileyExistingJobScope({
- shiftReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem
+ shiftReadback,ownerLedgerReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem
 }={}){
  assertShiftReadback(shiftReadback);
  if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
@@ -29,6 +29,21 @@ export function establishRileyExistingJobScope({
   shift.steps[5].state!=='AWAITING_EXACT_WORK'||shift.steps[6].state==='ORIGINAL_JOB_RECEIPT_VERIFIED')
   fail('NO_ACTIVE_ORIGINAL_JOB_GATE');
  const original=qualifiedOriginal;
+ const ledger=ownerLedgerReadback;
+ if(!ledger||ledger.status!=='OWNER_GOVERNED_LOOP_READBACK'||
+  ledger.owner_installation_authorized_by_read!==false||
+  ledger.external_action_performed!==false||
+  ledger.production_changed!==false||
+  !Array.isArray(ledger.jobs)||ledger.jobs.length>12)
+  fail('OWNER_GOVERNED_LOOP_READBACK_REQUIRED');
+ const ledgerMatches=ledger.jobs.filter(j=>j.original_work_id===original?.original_work_id);
+ if(ledgerMatches.length!==1||
+  ledgerMatches[0].source_issue_number!==original?.source_issue_number||
+  ledgerMatches[0].environment!=='ISOLATED_PREVIEW'||
+  ledgerMatches[0].independently_settled!==false||
+  ledgerMatches[0].owner_install_approved!==false||
+  ledgerMatches[0].original_work_id!==scope?.original_work_id)
+  fail('EXACT_LEDGER_JOB_NOT_ELIGIBLE');
  if(!original||typeof original!=='object'||
   !WORK.test(original.original_work_id||'')||
   original.owner_id!==ownerId||
@@ -81,14 +96,14 @@ export function establishRileyExistingJobScope({
  });
 }
 export async function runRileyOriginalJobViaReality({
- shiftReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem,
+ shiftReadback,ownerLedgerReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem,
  authorization,connector,independentVerifier,engine,persistAndReadback,
  serverApprovalProof=null,serverFreshGoalAdmission=null,
  serverSingleUseReservation=null,reservationStore=null,
  execute=executeAuthorizedWork
 }={}){
  const bound=establishRileyExistingJobScope({
-  shiftReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem
+  shiftReadback,ownerLedgerReadback,ownerId,shiftId,qualifiedOriginal,scope,workItem
  });
  if(typeof execute!=='function'||typeof engine?.run!=='function'||
   typeof persistAndReadback!=='function'||
