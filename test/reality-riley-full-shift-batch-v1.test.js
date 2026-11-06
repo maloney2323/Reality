@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {selectRileyFullShiftOriginals}
  from '../src/reality-riley-full-shift-batch-intake-v1.js';
 const OWNER='11111111-2222-4333-8444-555555555555';
@@ -108,4 +110,17 @@ test('API requires same owner session, current shift, real provider and durable 
  assert.match(ui,/intakeVerifiedRileyShiftJobs/);
  assert.match(ui,/ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT/);
  assert.doesNotMatch(api,/owner_approve_qualified_preview|merge_pull_request|installRiley/);
+});
+
+test('actual deployed Riley batch endpoint parses as JavaScript before any customer clicks Run',()=>{
+ const file=fileURLToPath(new URL(
+  '../api/reality/personal-riley-full-shift-batch.js',import.meta.url));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,['--check',file],{
+  timeout:10000,stdio:'pipe'
+ }));
+ const api=readFileSync(file,'utf8');
+ assert.match(api,/Promise\.all\(verified\.map\(async x=>\(\{/);
+ assert.match(api,/record:await shiftRpc\(db,'reality_read_owner_existing_original_issue_v1'/);
+ assert.match(api,/SHIFT_NOT_OWNER_APPROVED_FOR_THIS_EXACT_SOURCE/);
+ assert.match(api,/NO_NEW_VERIFIED_WORK_IN_EXACT_AUTHORIZED_SHIFT/);
 });
