@@ -494,7 +494,15 @@ function renderNextWeekWorkPlan(roster){
     !/^\d{4}-\d\d-\d\d$/.test(plan.week_end||'')||
     plan.four_day_week_capacity_hours!==256||
     plan.five_day_week_capacity_hours!==320||
-    plan.capacity_unit!=='HYPOTHETICAL_AI_ROLE_SCHEDULE_HOURS_NOT_HUMAN_SAVINGS'||
+    plan.capacity_unit!=='HYPOTHETICAL_EIGHT_HOUR_ROLE_SCENARIO_NOT_A_SCHEDULE_OR_HUMAN_SAVINGS'||
+    plan.proposed_daily_ai_role_hours!==null||
+    plan.minimum_daily_review_timebox_hours!==0||
+    plan.maximum_daily_review_timebox_hours!==12||
+    plan.daily_hours_follow_source_workload_not_a_fixed_eight_hour_quota!==true||
+    !Number.isFinite(plan.proposed_review_timebox_hours_total)||
+    plan.proposed_review_timebox_hours_total<0||
+    !Number.isSafeInteger(plan.source_items_deferred_beyond_timebox_capacity)||
+    plan.source_items_deferred_beyond_timebox_capacity<0||
     plan.candidate_source_review_assignments_not_jobs!==true||
     plan.read_only!==true||
     plan.owner_shift_authorization_recorded!==false||
@@ -519,12 +527,21 @@ function renderNextWeekWorkPlan(roster){
   plan.proposed_work_findings+' distinct source-backed findings already routed for review.'+
   (prepared?' Unattended scheduler checked '+
    roster.next_week_background_open_issue_count+' open issues before this page was opened.':'')+
-  ' Remaining slots explicitly need new qualified work. Four/five-day capacity is 256–320 proposed AI-role hours, not productive hours or people replaced.';
+  ' Draft timeboxes total '+plan.proposed_review_timebox_hours_total+
+  'h across all roles, based on provisional source review assumptions. Each day can be 0–12h. '+
+  plan.source_items_deferred_beyond_timebox_capacity+' source findings exceed this planning capacity. '+
+  'There is NO eight-hour quota or proof of executed work. The 256–320h scenario is only a theoretical illustration, not this schedule.';
  const holder=document.createDocumentFragment(),seen=new Set();
+ let totalHours=0,deferredCount=0;
  for(const role of plan.employee_roles){
   if(typeof role.employee_name!=='string'||!role.employee_name||
      typeof role.role_title!=='string'||!role.role_title||
      !Array.isArray(role.week_days)||role.week_days.length!==5||
+     !Array.isArray(role.deferred_source_findings)||
+     !Number.isSafeInteger(role.deferred_source_count)||
+     role.deferred_source_count!==role.deferred_source_findings.length||
+     !Number.isFinite(role.provisional_weekly_review_timebox_hours)||
+     role.provisional_weekly_review_timebox_hours<0||
      role.active_worker_verified!==false||
      role.approved_execution_hours!==0||
      role.completed_productive_hours_verified!==null)
@@ -532,41 +549,86 @@ function renderNextWeekWorkPlan(roster){
   const panel=document.createElement('details');panel.className='week-role';
   const summary=document.createElement('summary');
   summary.textContent=role.employee_name+' · '+role.role_title+' · '+
-   role.candidate_finding_count+' current source finding(s)';
+   role.candidate_finding_count+' current source finding(s) · '+
+   role.provisional_weekly_review_timebox_hours+'h proposed review';
   panel.append(summary);
+  let roleHours=0;
   for(const day of role.week_days){
    if(!/^\d{4}-\d\d-\d\d$/.test(day.date||'')||
     !Array.isArray(day.assignments)||day.assignments.length>25||
     day.shifts_authorized!==false||
     day.actual_work_hours_verified!==null||
+    day.proposed_execution_shift_hours!==null||
+    day.timebox_is_verified_task_duration!==false||
+    day.daily_planning_upper_limit_hours!==12||
+    !Number.isFinite(day.provisional_review_timebox_hours)||
+    day.provisional_review_timebox_hours<0||
+    day.provisional_review_timebox_hours>12||
     !['PROPOSED_SOURCE_REVIEW_NOT_EXECUTION_AUTHORIZATION',
       'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'].includes(day.work_status))
     throw Error('NEXT_WEEK_DAY_EXECUTION_NOT_AUTHORIZED');
    const line=document.createElement('div');line.className='week-day';
    line.textContent=day.weekday+' · '+day.date+' · '+
-    (day.assignments.length?day.assignments.length+' finding(s) to review':
-     'Find and qualify useful work');
+    day.provisional_review_timebox_hours+'h provisional review · '+
+    (day.assignments.length?day.assignments.length+' source finding(s)':
+     'Unscheduled: find and qualify useful work');
    panel.append(line);
    if(day.assignments.length){
     const ul=document.createElement('ul');
+    let dayHours=0;
     for(const work of day.assignments){
      if(!/^catalog:[a-f0-9]{32}$/.test(work.finding_id||'')||
       seen.has(work.finding_id)||
       !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(work.source_url||'')||
-      work.owner_execution_authorized!==false)
+      work.owner_execution_authorized!==false||
+      !Number.isFinite(work.proposed_review_timebox_hours)||
+      work.proposed_review_timebox_hours<0.5||
+      work.proposed_review_timebox_hours>12||
+      work.proposed_review_timebox_hours*2!==
+       Math.floor(work.proposed_review_timebox_hours*2)||
+      work.accepted_task_duration_hours!==null||
+      !['OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED',
+       'UNCALIBRATED_ONE_HOUR_SOURCE_TRIAGE_PLACEHOLDER'].includes(
+        work.timebox_basis))
       throw Error('NEXT_WEEK_SOURCE_ASSIGNMENT_NOT_VERIFIED');
      seen.add(work.finding_id);
+     dayHours+=work.proposed_review_timebox_hours;
      const li=document.createElement('li'),a=document.createElement('a');
-     a.href=work.source_url;a.textContent=work.title;
+     a.href=work.source_url;a.textContent=work.title+
+      ' · '+work.proposed_review_timebox_hours+'h review timebox';
      a.rel='noopener noreferrer';a.target='_blank';
      li.append(a);ul.append(li);
     }
+    if(dayHours!==day.provisional_review_timebox_hours)
+      throw Error('NEXT_WEEK_TIMEBOX_SUM_MISMATCH');
     panel.append(ul);
+   }else if(day.provisional_review_timebox_hours!==0){
+    throw Error('NEXT_WEEK_EMPTY_DAY_CANNOT_HAVE_HOURS');
    }
+   roleHours+=day.provisional_review_timebox_hours;
+  }
+  if(roleHours!==role.provisional_weekly_review_timebox_hours)
+    throw Error('NEXT_WEEK_ROLE_TIMEBOX_SUM_MISMATCH');
+  totalHours+=roleHours;
+  for(const item of role.deferred_source_findings){
+   if(!/^catalog:[a-f0-9]{32}$/.test(item.finding_id||'')||
+     seen.has(item.finding_id)||
+     item.owner_execution_authorized!==false)
+     throw Error('NEXT_WEEK_DEFERRED_ITEM_NOT_VERIFIED');
+   seen.add(item.finding_id);
+   deferredCount++;
+  }
+  if(role.deferred_source_count){
+   const missing=document.createElement('p');
+   missing.textContent=role.deferred_source_count+
+    ' additional source finding(s) deferred; no time or execution invented.';
+   panel.append(missing);
   }
   holder.append(panel);
  }
- if(seen.size!==plan.proposed_work_findings)
+ if(seen.size!==plan.proposed_work_findings||
+   totalHours!==plan.proposed_review_timebox_hours_total||
+   deferredCount!==plan.source_items_deferred_beyond_timebox_capacity)
   throw Error('NEXT_WEEK_UNIQUE_SOURCE_COVERAGE_MISMATCH');
  $('nextWeekEmployeeRoles').replaceChildren(holder);
 }
