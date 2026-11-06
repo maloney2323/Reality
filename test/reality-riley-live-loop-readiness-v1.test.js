@@ -151,5 +151,7 @@ test('owner-authenticated API and Reality Chat expose proof but never admit job'
  assert.doesNotMatch(api,/enqueueExactGap|dispatchGenuineCapabilityWake|authorize_employee_shift_v1/);
  assert.match(ui,/rileyLoopReadiness/);
  assert.match(ui,/refreshRileyLoopReadiness/);
+ assert.match(ui,/EXACT_AUTHORIZED_EXISTING_JOBS_ELIGIBLE_FOR_WAKE/);
+ assert.match(ui,/RILEY_MULTI_JOB_PROVIDER_READBACK_UNVERIFIED/);
  assert.match(ui,/const RILEY_LOOP='\/api\/reality\/personal-riley-loop-readiness'/);
 });
