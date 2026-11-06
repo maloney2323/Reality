@@ -11,6 +11,7 @@ on:
       - supabase/migrations/20261106020000_riley_shift_capability_wake_gate_v1.sql
       - test/reality-employee-shared-capability-wake-v1.test.js
       - supabase/functions/reality-governed-employee-shift-wake-v1/index.ts
+      - supabase/functions/reality-employee-capability-wake-broker-v1/index.ts
       - test/reality-employee-edge-governed-wake-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js
@@ -46,6 +47,7 @@ on:
       - supabase/migrations/20261106020000_riley_shift_capability_wake_gate_v1.sql
       - test/reality-employee-shared-capability-wake-v1.test.js
       - supabase/functions/reality-governed-employee-shift-wake-v1/index.ts
+      - supabase/functions/reality-employee-capability-wake-broker-v1/index.ts
       - test/reality-employee-edge-governed-wake-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js
