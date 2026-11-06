@@ -1,4 +1,4 @@
-// Owner-authenticated 8/10/12-hour shift creation and independent progress.
+// Owner-authenticated 1–12-hour shift creation and independent progress.
 // First approval authorizes source checks, NOT arbitrary new original jobs or
 // installs. Exact upgrades are presented in EXISTING Reality Chat.
 import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
@@ -88,7 +88,7 @@ export default async function handler(req,res){
    return res.status(403).json({ok:false,error:'SHIFT_OWNER_PROJECT_MISMATCH'});
   if(req.method==='GET'){
    const hours=req.query?.hours===undefined?null:Number(req.query.hours);
-   if(hours!==null&&![8,10,12].includes(hours))
+   if(hours!==null&&(!Number.isSafeInteger(hours)||hours<1||hours>12))
     return res.status(400).json({ok:false,error:'SHIFT_DURATION_NOT_SUPPORTED'});
    const read=assertShiftReadback(await shiftRpc(db,'reality_read_owner_employee_shifts_v1',
     {p_owner_id:session.user_id}));
@@ -142,7 +142,8 @@ export default async function handler(req,res){
    keys.some(x=>!['action','expected_fingerprint','planned_start_at','requested_hours'].includes(x))||
    (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
    (keys.length===3&&Object.hasOwn(b,'requested_hours'))||
-   ![8,10,12].includes(b.requested_hours??8)||
+   (!Number.isSafeInteger(b.requested_hours??8)||
+   (b.requested_hours??8)<1||(b.requested_hours??8)>12)||
    b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
   const start=new Date(b.planned_start_at);
