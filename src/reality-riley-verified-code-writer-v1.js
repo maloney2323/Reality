@@ -12,6 +12,8 @@ const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SOURCE_BRANCH='feature/reality-general-capability-engine-20261101';
 const REPO='maloney2323/Reality';
 const deny=reason=>{throw Error('RILEY_VERIFIED_WRITER_'+reason)};
+// Never accept a caller-forged 'verified:true' plan in a credentialed stage.
+const authenticatedPlans=new WeakSet();
 const stageBranch=(work,artifact)=>
  'reality/riley/verified-'+work.slice(5,17)+'-'+artifact.slice(0,12);
 
@@ -52,6 +54,7 @@ export function authorizeRileyCandidateStage({
  const candidate=validateFoundationalCandidate(ticket,proposal.candidate);
  if(candidate.artifact_sha256!==proposal.candidate?.artifact_sha256||
     !HEX.test(candidate.artifact_sha256)||
+    !/^resp_[A-Za-z0-9_-]{4,144}$/.test(candidate.model_response_id||'')||
     proof.original_work_id!==ticket.original_work_id||
     proof.artifact_sha256!==candidate.artifact_sha256||
     proof.ticket_hash!==ticket.ticket_hash||
@@ -78,7 +81,7 @@ export function authorizeRileyCandidateStage({
     !candidate.files.some(f=>f.path===ticket.source_entrypoint)||
     candidate.files.some(f=>!/^((src|test)\/reality-extensions\/)[A-Za-z0-9._/-]+$/.test(f.path)))
   deny('SOURCE_AND_TEST_ISOLATION_REQUIRED');
- return Object.freeze({
+ const plan=Object.freeze({
   version:RILEY_VERIFIED_CODE_WRITER_VERSION,
   base_commit_sha:baseCommitSha,base_branch:baseBranch,
   branch:stageBranch(ticket.original_work_id,candidate.artifact_sha256),
@@ -88,7 +91,7 @@ export function authorizeRileyCandidateStage({
   artifact_sha256:candidate.artifact_sha256,
   model_response_id:candidate.model_response_id,
   run_id:runId,
-  files:candidate.files.map(f=>Object.freeze({path:f.path,content:f.content})),
+  files:Object.freeze(candidate.files.map(f=>Object.freeze({path:f.path,content:f.content}))),
   independent_verification_passed:true,
   model_generated:true,
   code_staging_permitted:true,
@@ -96,12 +99,15 @@ export function authorizeRileyCandidateStage({
   installation_performed:false,
   original_job_settled:false,production_changed:false
  });
+ authenticatedPlans.add(plan);
+ return plan;
 }
 
 export async function stageRileyVerifiedCandidate({
  plan,token,fetchImpl=fetch
 }={}){
- if(plan?.version!==RILEY_VERIFIED_CODE_WRITER_VERSION||
+ if(!plan||typeof plan!=='object'||!authenticatedPlans.has(plan)||
+    plan.version!==RILEY_VERIFIED_CODE_WRITER_VERSION||
     !SHA.test(plan.base_commit_sha||'')||
     plan.base_branch!==SOURCE_BRANCH||
     !WORK.test(plan.original_work_id||'')||
@@ -135,6 +141,7 @@ export async function stageRileyVerifiedCandidate({
     'content-type':'application/json',
     'x-github-api-version':'2022-11-28',
     'user-agent':'Reality-Riley-Independent-Code-Stage-v1'},
+   signal:AbortSignal.timeout(15000),
    body:body===undefined?undefined:JSON.stringify(body),
   });
   if(response.status===404&&missing)return null;
