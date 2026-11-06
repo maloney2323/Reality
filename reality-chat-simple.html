@@ -77,8 +77,10 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
+<button id="runFullShift" type="button" title="One signed-in owner authorization for an 8-hour governed Riley workday">Run Riley's Full Shift · 8h</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
+<p class="team-intro" id="fullShiftScope">One signed-in authorization starts the existing 8-hour background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
@@ -563,6 +565,35 @@ $('conversations').onchange=()=>{
   const id=$('conversations').value;
   if(!uuid(id))return;
   setConversation(id);void refreshHistory(id);
+};
+$('runFullShift').onclick=async()=>{
+ // Direct owner click is the sole trigger. The model and passive page load
+ // cannot authorize the shift. Reuses the existing signed-in endpoint.
+ if(pending)return;
+ const command=interpretSignedInChatShiftCommand("Run Riley's full shift");
+ if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
+    command.duration_hours!==8||command.installation_authorized!==false)
+  return status('Full-shift owner command could not be validated.');
+ pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
+ const pendingResult=bubble('assistant',
+  'Checking your existing shift and exact owner-scoped backlog…','pending');
+ status('Checking signed-in owner authorization and original shift readback…');
+ try{
+  const receipt=await authorizeShiftFromChat(command);
+  pendingResult.classList.remove('pending');
+  pendingResult.lastChild.textContent=receipt.text;
+  status('Full-shift authorization read back. Worker results are verified separately.');
+  void refreshShiftStatus();void refreshEmployeeBoard();
+ }catch(err){
+  pendingResult.className='message assistant error';
+  pendingResult.lastChild.textContent=
+   'Shift authorization not confirmed. Use Refresh to check for an existing shift before retrying. ('+
+   String(err?.message||'Unknown').slice(0,180)+')';
+  status('Full-shift authorization uncertain. Do not create a duplicate shift.');
+  void refreshShiftStatus();
+ }finally{
+  pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
+ }
 };
 $('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard()}};
 $('prompt').onkeydown=e=>{
