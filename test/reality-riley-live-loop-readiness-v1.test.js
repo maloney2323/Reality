@@ -74,6 +74,39 @@ test('only exact one original owner job and independent DB eligibility can open 
  assert.equal(approved.worker_wake_dispatched_by_read,false);
  assert.equal(approved.original_job_settled_by_read,false);
 });
+test('two distinct eligible jobs in one shift are independently checked, never auto-executed',()=>{
+ const next='work:'+'f'.repeat(32);
+ const trigger2='88888888-8888-4888-8888-888888888888';
+ const source2='https://github.com/maloney2323/Reality/issues/185';
+ const second={...job,source_issue_number:185,
+  original_work_id:next,trigger_id:trigger2};
+ const s=shifts();
+ s.shifts[0].steps[2]={step_index:3,state:'SOURCE_CHECKED',
+  source_ref:source2,proof_sha256:PROOF};
+ const selected=identifyExactRileyOriginalCandidates({
+  shiftReadback:s,loop:loop([job,second])});
+ assert.equal(selected.candidates.length,2);
+ const secondGate={...eligible,original_work_id:next,trigger_id:trigger2,
+  source_ref:source2};
+ const partial=renderRileyLoopReadiness({
+  activeShiftCount:1,candidates:selected.candidates,
+  verified:[eligible,{...secondGate,source_proof_sha256:'sha256:'+'c'.repeat(64)}]});
+ assert.equal(partial.status,'EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE');
+ const all=renderRileyLoopReadiness({
+  activeShiftCount:1,candidates:selected.candidates,
+  verified:[eligible,secondGate]});
+ assert.equal(all.status,'EXACT_AUTHORIZED_EXISTING_JOBS_ELIGIBLE_FOR_WAKE');
+ assert.deepEqual(all.original_work_ids,[WORK,next]);
+ assert.equal(all.eligible_original_count,2);
+ assert.equal(all.worker_claim_acknowledged,false);
+ assert.equal(all.original_job_started_by_read,false);
+ assert.equal(all.installation_authorized,false);
+ assert.equal(all.production_changed,false);
+ const duplicate=renderRileyLoopReadiness({
+  activeShiftCount:1,candidates:selected.candidates,
+  verified:[eligible,eligible]});
+ assert.equal(duplicate.status,'EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE');
+});
 test('settled, installed, unproven, foreign issue or invalid source never matches',()=>{
  const variants=[
   {...job,phase:'SETTLED_ISOLATED'},
