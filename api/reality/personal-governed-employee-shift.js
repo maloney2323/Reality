@@ -16,7 +16,55 @@ import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
+import {projectRileyExistingBacklog}
+ from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
+// An owner-authorized shift must begin with the work Reality already knows.
+// These are read-only source priorities; no issue, legacy queue or model
+// proposal is an original-job admission or installation approval.
+export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db,
+ call=shiftRpc}={}){
+ if(!UUID.test(ownerId||'')||!Array.isArray(catalog?.items)||
+  !Array.isArray(brief?.items))
+  throw Error('SHIFT_OWNER_BACKLOG_INPUT_UNVERIFIED');
+ const issues=[],seen=new Set();
+ for(const finding of catalog.items){
+  if(finding?.finding_type!=='OPEN_ISSUE'||finding.source!=='github_issues')
+   continue;
+  const m=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/([1-9]\d{0,6})$/.exec(
+   String(finding.evidence_refs?.[0]||''));
+  if(!m||seen.has(Number(m[1])))continue;
+  seen.add(Number(m[1]));
+  issues.push({number:Number(m[1]),state:'open',
+   html_url:finding.evidence_refs[0],
+   title:String(finding.title||'').slice(0,210)});
+  if(issues.length===30)break;
+ }
+ if(!issues.length)return Object.freeze({
+  refs:[],ranked:0,source_coverage_complete:false});
+ const loop=await call(db,'reality_read_owner_genuine_loop_v1',
+  {p_owner_id:ownerId});
+ const prior=await Promise.all(issues.map(async x=>({
+  issue_number:x.number,
+  record:await call(db,'reality_read_owner_existing_original_issue_v1',{
+   p_owner_id:ownerId,p_issue_number:x.number})
+ })));
+ const reconciled=projectRileyExistingBacklog({
+  issues,ownerLoop:loop,priorOriginals:prior,
+  coverageComplete:catalog.source_scans?.issues?.query_scope_fully_reconciled===true&&
+   seen.size===issues.length,
+  activeShiftCount:0
+ });
+ const candidateURLs=new Set(brief.items.flatMap(x=>
+  x.finding_type==='OPEN_ISSUE'?x.evidence_refs.slice(0,1):[]));
+ const refs=reconciled.rows.filter(row=>
+  ['OPEN_SOURCE_WORK_AWAITING_ORIGINAL_JOB_QUALIFICATION',
+   'EXISTING_CAPABILITY_JOB_REQUIRES_LIVE_AUTHORITY_GATE'].includes(row.status)&&
+  candidateURLs.has(row.source_url)).map(row=>row.source_url);
+ return Object.freeze({refs,ranked:reconciled.rows.length,
+  source_coverage_complete:reconciled.source_coverage_complete});
+}
+
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -64,10 +112,16 @@ export default async function handler(req,res){
    if(hours!==null){
      const catalog=await buildRealityWorkCatalog();
      const brief=buildRealityWorkdayOpportunityBrief(catalog);
-     const plan=buildRealityEightHourShiftDraft(brief,{durationHours:hours});
+     const priority=await ownerExistingRileySourcePriority({
+      catalog,brief,ownerId:session.user_id,db});
+     const plan=buildRealityEightHourShiftDraft(brief,{
+      durationHours:hours,prioritySourceRefs:priority.refs});
      draft={...plan,expected_fingerprint:computeShiftFingerprint(plan),
        proposed_team:assessRealityWorkdayTeam(brief),
-       employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief)};
+       employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief),
+       existing_owner_backlog_priorities:priority.refs,
+       owner_backlog_issue_records_reconciled:priority.ranked,
+       owner_backlog_coverage_complete:priority.source_coverage_complete};
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
@@ -98,7 +152,10 @@ export default async function handler(req,res){
    return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
-  const plan=buildRealityEightHourShiftDraft(brief,{durationHours:b.requested_hours??8});
+  const priority=await ownerExistingRileySourcePriority({
+   catalog,brief,ownerId:session.user_id,db});
+  const plan=buildRealityEightHourShiftDraft(brief,{
+   durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs});
   const fingerprint=computeShiftFingerprint(plan);
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
