@@ -57,6 +57,16 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .team-card .evidence{font-size:11px;color:#a7bbd2}
 #teamToggle{background:#29415c}
 .team-proof{margin-top:9px;padding:8px;border:1px solid #35506c;border-radius:9px;color:#c6daf4;font-size:12px;line-height:1.45}
+.team-value{margin:10px 0;padding:13px 11px;border:1px solid #446888;border-radius:13px;background:#102638}
+.team-value h3{font-size:15px;margin:0 0 8px;color:#eff8ff}
+.team-value p{color:#c5d9e9;font-size:12px;line-height:1.45;margin:7px 0}
+.team-value-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.team-value-metrics>div{padding:10px;min-width:0;background:#142e43;border:1px solid #395b73;border-radius:10px}
+.team-value-metrics small,.team-value-metrics span{font-size:11px;line-height:1.4;color:#bbd2e4;display:block}
+.team-value-metrics strong{display:block;margin:5px 0;font-size:19px;color:#f0f7ff;overflow-wrap:anywhere}
+.team-value a{color:#bde2fb}
+@media(max-width:550px){.team-value-metrics{grid-template-columns:1fr}}
+
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
 </style>
 </head>
@@ -84,6 +94,18 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <section class="team-value" aria-label="Reality source-backed business value">
+  <h3>Potential business value · before the shift</h3>
+  <p>What Reality discovers, what comparable human work might cost, and what Reality has actually verified. Scheduled AI role-hours are not automatically human hours saved.</p>
+  <div class="team-value-metrics" aria-live="polite">
+   <div><small>Potential AI business functions</small><strong id="teamValueRoles">Checking…</strong><span>Proposed roles, not human staff replaced</span></div>
+   <div><small>Existing work findings</small><strong id="teamValueFindings">Checking…</strong><span id="teamValueRileyFindings">Source signals needing qualification</span></div>
+   <div><small>4–5-day weekly role capacity, if all 8 work</small><strong id="teamValueWeekly">Checking…</strong><span>Planned AI-role hours; useful work not yet demonstrated</span></div>
+  </div>
+  <p id="teamValueNASA">Calculating a comparable human software-repair wage example…</p>
+  <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
+  <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
+ </section>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
 <details class="team-proof" id="realitySelfAwareness">
  <summary>Reality's verified self-understanding</summary>
@@ -381,6 +403,71 @@ async function refreshRileyExistingBacklog(){
   node.textContent='Existing backlog readback unavailable. This is not evidence that Riley has no work.';
  }
 }
+function showShiftValueEvidence(roster){
+ const value=roster?.value_preview,team=value?.team,
+  schedule=value?.illustrative_shift_capacity,
+  ref=value?.comparable_software_repair,one=ref?.one_fault_example;
+ if(value?.version!=='reality-source-backed-shift-value-preview-v1'||
+    value.status!=='SOURCE_BACKED_WORKFORCE_POTENTIAL_NOT_MEASURED_ROI'||
+    value.job_started!==false||value.installation_authorized!==false||
+    team?.proposed_virtual_role_count!==roster.proposed_employee_count||
+    team?.source_backed_work_center_findings!==roster.existing_work_center_candidates||
+    team?.active_verified_employee_workers!==0||
+    team?.independently_measured_human_fte_replaced!==null||
+    schedule?.proposed_roles!==8||
+    schedule?.illustrative_role_schedule_hours_per_week_min!==256||
+    schedule?.illustrative_role_schedule_hours_per_week_max!==320||
+    schedule?.every_role_has_eight_hours_of_work_unverified!==true||
+    schedule?.financial_roi_verified!==false||
+    schedule?.live_roles_verified!==0||
+    schedule?.equivalent_human_hours_saved_verified!==null||
+    ref?.sum_of_medians_not_median_total!==true||
+    ref?.illustrative_sum_of_medians_hours!==5||
+    ref?.scenario_not_cash_savings!==true||
+    !Number.isFinite(one?.illustrative_gross_human_wage_equivalent_usd)||
+    one?.sum_of_separate_median_effort_hours!==5||
+    one?.realized_cash_savings_usd!==null||
+    value.evidence?.verified_net_roi_usd!==null||
+    value.evidence?.actual_automation_cost_usd!==null||
+    !/^https:\/\/ntrs\.nasa\.gov\//.test(ref.study_source_url||'')||
+    !/^https:\/\/www\.bls\.gov\//.test(ref.wage_source_url||''))
+   throw Error('EMPLOYEE_VALUE_SOURCE_OR_ASSUMPTION_UNVERIFIED');
+ const usd=n=>new Intl.NumberFormat('en-US',{
+  style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
+ $('teamValueRoles').textContent=String(team.proposed_virtual_role_count);
+ $('teamValueFindings').textContent=String(team.source_backed_work_center_findings);
+ $('teamValueWeekly').textContent=schedule.illustrative_role_schedule_hours_per_week_min+
+  '–'+schedule.illustrative_role_schedule_hours_per_week_max+' h';
+ $('teamValueRileyFindings').textContent=team.software_engineering_findings+
+  ' assigned to Riley (not verified completed)';
+ $('teamValueNASA').textContent='Comparable software-fault example: NASA-hosted study reports separate medians of 2h investigation and 3h implementation (illustrative sum: 5h). '+
+  'At the dated BLS software-developer median of '+
+  usd(ref.developer_median_wage_usd_per_hour)+'/hour, gross human wage equivalent is '+
+  usd(one.illustrative_gross_human_wage_equivalent_usd)+
+  ' for ONE comparable repair if that effort truly applies. Not saved money, not Riley throughput.';
+ $('teamValueProof').textContent='Weekly role capacity assumes 8 proposed AI functions × 8 hours × 4–5 days, each consistently supplied with useful authorized work. '+
+  'Verified human hours saved: not measured · Cash savings: not measured · '+
+  'Actual automation costs: not measured · Net ROI: not verified · People replaced: not measured.';
+ const source=$('teamValueSources');
+ source.replaceChildren(document.createTextNode('Human-work references: '));
+ const nasa=document.createElement('a');
+ nasa.href=ref.study_source_url;nasa.textContent='NASA-hosted repair study (2017)';
+ nasa.rel='noopener noreferrer';
+ const bls=document.createElement('a');
+ bls.href=ref.wage_source_url;bls.textContent='BLS national developer median (May 2025)';
+ bls.rel='noopener noreferrer';
+ source.append(nasa,document.createTextNode(' · '),bls,
+  document.createTextNode('. Separate research medians are not a measured total. Business roles need occupation-matched, company-specific comparisons.'));
+}
+function clearShiftValueEvidence(){
+ $('teamValueRoles').textContent='Unverified';
+ $('teamValueFindings').textContent='Unverified';
+ $('teamValueRileyFindings').textContent='No source readback';
+ $('teamValueWeekly').textContent='Hypothetical';
+ $('teamValueNASA').textContent='Published reference or current source evidence unavailable; no wage equivalent calculated.';
+ $('teamValueProof').textContent='Verified human work returned and net ROI: not measured.';
+ $('teamValueSources').textContent='Source readback unavailable; no financial impact inferred.';
+}
 async function refreshEmployeeBoard(){
   if(teamLoading)return;
   teamLoading=true;
@@ -404,6 +491,7 @@ async function refreshEmployeeBoard(){
     for(const employee of roster.proposed_employees)
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
+    showShiftValueEvidence(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
     void refreshRileyExistingBacklog();
@@ -414,6 +502,7 @@ async function refreshEmployeeBoard(){
       'No verified cash savings. NASA benchmark applies only to comparable, verified software fault repairs.';
   }catch(e){
     $('teamCards').replaceChildren();
+    clearShiftValueEvidence();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
       String(e?.message||'Unknown').slice(0,180)+
