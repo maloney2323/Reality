@@ -2,7 +2,8 @@
 // Reuses the EXISTING Supabase cron + pg_net scheduling infrastructure.
 // The *existing* signed governed wake broker remains exclusively responsible
 // for owner-approved capability installation/original-job continuation.
-// No GitHub writes, installation, job creation or fabricated ROI here.
+// Only an idempotent preauthorized capability wake may write a fixed
+// isolated trigger file. No new job, installation or fabricated ROI.
 const PROJECT='hvkfreoagbrphwghjajw';
 const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -11,6 +12,7 @@ const allowed=new Set([
  'reality_authenticate_employee_shift_wake_v1',
  'reality_close_employee_shift_v1',
  'reality_reconcile_employee_shift_original_v1',
+ 'reality_read_shift_capability_wake_v1',
  'reality_reconcile_employee_shift_historical_noop_v1',
  'reality_claim_employee_shift_step_v1',
  'reality_settle_employee_shift_step_v1',
@@ -160,6 +162,85 @@ async function originalLedgerRead(owner_id:string){
   no_new_authority_granted:true,observed_at:new Date().toISOString(),
   production_changed:false};
 }
+const CAP_BRANCH='feature/reality-general-capability-engine-20261101';
+const CAP_WORK=/^work:[a-f0-9]{32}$/;
+const COMMIT=/^[a-f0-9]{40}$/;
+async function capGit(path:string,method='GET',body:unknown=undefined):Promise<any>{
+ const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
+ if(token.length<25)deny('CAPABILITY_TRANSPORT_CREDENTIAL_UNAVAILABLE');
+ const r=await fetch('https://api.github.com/repos/maloney2323/Reality'+path,{
+  method,cache:'no-store',redirect:'error',headers:{
+   authorization:'Bearer '+token,accept:'application/vnd.github+json',
+   'x-github-api-version':'2022-11-28','content-type':'application/json',
+   'user-agent':'Reality-Existing-Governed-Capability-Wake'},
+  body:body===undefined?undefined:JSON.stringify(body),
+  signal:AbortSignal.timeout(12000)});
+ if(r.status===404&&method==='GET')return null;
+ if(!r.ok)deny('CAPABILITY_TRANSPORT_PROVIDER_UNCERTAIN');
+ return await r.json().catch(()=>deny('CAPABILITY_TRANSPORT_JSON_UNVERIFIED'));
+}
+async function wakeExactCapability(original:Record<string,unknown>){
+ const empty={status:'NO_ELIGIBLE_CAPABILITY_WAKE',
+  worker_acknowledged:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+ if(original.status!=='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'||
+  original.governed_existing_work_status!==
+   'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY')return empty;
+ if(!UUID.test(String(original.shift_id||''))||
+  !UUID.test(String(original.governed_trigger_id||''))||
+  !CAP_WORK.test(String(original.governed_original_work_id||''))||
+  !HASH.test(String(original.shift_observation_proof_sha256||''))||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(
+   String(original.shift_observation_source_ref||''))||
+  original.governed_cycle_dispatched_by_shift!==false||
+  original.model_invoked_by_shift!==false||
+  original.new_customer_job_created!==false||
+  original.installation_authorized!==false||
+  original.production_changed!==false)
+   deny('EXACT_ORIGINAL_WAKE_RECONCILIATION_INVALID');
+ const q=await rpc('reality_read_shift_capability_wake_v1',{
+  p_shift_id:original.shift_id,
+  p_original_work_id:original.governed_original_work_id,
+  p_trigger_id:original.governed_trigger_id});
+ if(q.status==='NO_ELIGIBLE_SHIFT_CAPABILITY_WAKE')return empty;
+ if(q.status!=='EXACT_SHIFT_CAPABILITY_WAKE_ELIGIBLE'||
+  q.shift_id!==original.shift_id||
+  q.trigger_id!==original.governed_trigger_id||
+  q.original_work_id!==original.governed_original_work_id||
+  q.source_ref!==original.shift_observation_source_ref||
+  q.source_proof_sha256!==original.shift_observation_proof_sha256||
+  !UUID.test(String(q.source_event_id||''))||
+  q.existing_job_only!==true||q.original_job_completed!==false||
+  q.installation_authorized!==false||q.production_changed!==false)
+   deny('EXACT_ORIGINAL_WAKE_INDEPENDENT_READBACK_INVALID');
+ const trigger=String(q.trigger_id);
+ const path='reality-genuine-triggers/'+trigger+'.json';
+ const bytes=JSON.stringify({
+  trigger_id:trigger,source_event_id:q.source_event_id,
+  original_work_id:q.original_work_id},null,2)+'\n';
+ const branch=await capGit('/git/ref/heads/'+CAP_BRANCH);
+ if(!COMMIT.test(String(branch?.object?.sha||'')))
+  deny('EXACT_CAPABILITY_WORKER_BRANCH_INVALID');
+ const read=()=>capGit('/contents/'+path+'?ref='+encodeURIComponent(CAP_BRANCH));
+ const check=async()=>{const got=await read();if(!got)return false;
+  if(got.path!==path||atob(String(got.content||'').replace(/\s/g,''))!==bytes)
+   deny('EXISTING_WAKE_SOURCE_BYTES_CHANGED');
+  return true;};
+ const existing=await check();
+ if(!existing){
+  const created=await capGit('/contents/'+path,'PUT',{
+   branch:CAP_BRANCH,message:'Reality: existing capability wake '+trigger,
+   content:btoa(bytes)});
+  if(!COMMIT.test(String(created?.commit?.sha||''))||
+   created?.content?.path!==path)
+   deny('EXACT_CAPABILITY_WAKE_COMMIT_UNVERIFIED');
+ }
+ if(!(await check()))deny('EXACT_CAPABILITY_WAKE_READBACK_MISSING');
+ return {status:'EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED',
+  existing_delivery_reused:existing,
+  worker_acknowledged:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+}
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')
@@ -242,6 +323,19 @@ Deno.serve(async req=>{
       noOp.original_job_execution_replayed!==false||
       noOp.new_customer_job_created!==false))
     deny('GOVERNED_HISTORICAL_NOOP_SOURCE_CHANGED');
+  let capabilityWake:Record<string,unknown>={
+   status:'NO_ELIGIBLE_CAPABILITY_WAKE',worker_acknowledged:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false};
+  try{capabilityWake=await wakeExactCapability(original)}
+  catch(error){
+   const reason=error instanceof Error?error.message:'UNKNOWN';
+   if(/^SHIFT_WAKE_[A-Z0-9_]{4,120}$/.test(reason))
+    console.warn('REALITY_EXACT_CAPABILITY_WAKE',reason);
+   capabilityWake={status:'CAPABILITY_WAKE_REQUIRES_RECONCILIATION',
+    worker_acknowledged:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false};
+  }
   const claimed=await rpc('reality_claim_employee_shift_step_v1',{});
   if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP',
       'SHIFT_STEP_NOT_YET_DUE','INFLIGHT_LEASE_UNEXPIRED',
@@ -251,6 +345,7 @@ Deno.serve(async req=>{
    return send(200,{ok:true,status:claimed.status,
     shift_id:claimed.shift_id||null,
     source_check_completed:false,
+    capability_wake:capabilityWake,
     no_replay_recovery_status:noOp.status,
     historical_reconciliation_verified:noOp.status==='SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED',
     governed_existing_work_status:observedWork||null,
@@ -297,6 +392,7 @@ Deno.serve(async req=>{
    evidence_digest:settled.proof_sha256,
    source_status:proof.provider_status||'OWNER_LEDGER_CHECKED',
    research_status:(proof.research as Record<string,unknown>|undefined)?.status||null,
+   capability_wake:capabilityWake,
    installation_authorized:false,original_job_completed:false,
    verified_human_hours_saved:null,production_changed:false});
  }catch(err){
