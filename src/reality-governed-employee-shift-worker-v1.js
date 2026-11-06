@@ -1,4 +1,6 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {wakeExistingRileyCapabilityJob}
+ from './reality-employee-shared-capability-wake-v1.js';
 const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -57,7 +59,9 @@ async function readPreflight(db,{fetchImpl=fetch}={}){
   independent_final_receipts_read:receipts.receipts.length,
   no_new_authority_granted:true};
 }
-export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
+export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
+ wakeCapability=wakeExistingRileyCapabilityJob}={}){
+ if(typeof wakeCapability!=='function')throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
  if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
@@ -68,6 +72,26 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
       'EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED',
       'EXACT_SHIFT_ORIGINAL_RECEIPT_RECONCILED'].includes(reconciled.status))
   throw Error('SHIFT_FINAL_RECEIPT_RECONCILIATION_UNTRUSTED');
+ // The reconciler identifies already-approved, still-unsettled original
+ // work. A second service-only DB prewake readback checks that exact source
+ // and capability queue before sending an idempotent wake. The existing
+ // worker remains the ONLY capability executor and install authority is never
+ // minted by the employee shift.
+ let capabilityWake=null;
+ if(reconciled.status==='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'){
+  try{
+   capabilityWake=await wakeCapability({db,reconciliation:reconciled,fetchImpl});
+  }catch(e){
+   const raw=String(e?.message||'');
+   capabilityWake={
+    status:'EXACT_CAPABILITY_WAKE_REQUIRES_RECONCILIATION',
+    reason_code:/^(?:RILEY_SHARED_WAKE_|SHIFT_DATABASE_RPC_|GENUINE_WAKE_DISPATCH_)[A-Z0-9_]{3,110}$/.test(raw)?
+     raw:'TRUSTED_WAKE_READBACK_UNAVAILABLE',
+    worker_execution_acknowledged:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   };
+  }
+ }
  const claimed=await shiftRpc(db,'reality_claim_employee_shift_step_v1',{}, {fetchImpl});
  if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP','INFLIGHT_LEASE_UNEXPIRED',
    'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
@@ -76,6 +100,7 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
   return {ok:true,status:claimed.status,
    shift_id:claimed.shift_id||null,
    upgrade_approval_channel:'EXISTING_REALITY_CHAT_ONLY',
+   capability_wake:capabilityWake,
    installation_authorized:false,job_completed:false,production_changed:false};
  if(claimed.status!=='READ_ONLY_STEP_CLAIMED'||!UUID.test(claimed.shift_id||'')||
   !UUID.test(claimed.claim_id||'')||!UUID.test(claimed.owner_id||'')||
@@ -105,6 +130,7 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch}={}){
   shift_id:claimed.shift_id,step_index:claimed.step_index,
   source_status:proof.provider_status||'OWNER_LEDGER_CHECKED',
   evidence_digest:settled.proof_sha256,
+  capability_wake:capabilityWake,
   installation_authorized:false,job_completed:false,
   verified_human_hours_saved:null,production_changed:false};
 }
