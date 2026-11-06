@@ -12,7 +12,14 @@ test('light Chat is on an isolated route without replacing the existing approval
   assert.ok(route.rewrites.some(r=>r.source==='/chat-simple'&&r.destination==='/reality-chat-simple.html'));
   assert.ok(route.rewrites.some(r=>r.source==='/chat'&&r.destination==='/index.html'));
   assert.doesNotMatch(html,/<script[^>]+src=/);
-  assert.match(html,/Reality · Chat/);
+  assert.match(html,/Reality · Riley shift/);
+  assert.match(html,/<nav class="reality-page-nav" aria-label="Reality pages">/);
+  assert.match(html,/<a id="rileyNavHome" href="\/">Home<\/a>/);
+  assert.match(html,/<a id="rileyNavChat" href="\/chat">Chat<\/a>/);
+  assert.match(html,/<a id="rileyNavEvaluation" href="\/value#pre-automation">Evaluation<\/a>/);
+  assert.match(html,/id="teamToggle" type="button" aria-expanded="false"/);
+  assert.match(html,/id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden/);
+  assert.match(html,/Sending a chat message is not authorization/);
 });
 test('light Chat preserves existing private session and scoped saved conversation',()=>{
   assert.match(html,/\/api\/reality\/personal-session/);
