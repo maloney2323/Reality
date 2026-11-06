@@ -233,8 +233,17 @@ async function refreshShiftStatus(){
     if(activeState.hasActive){
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
+      const route=data.recovery_diagnosis;
+      const explain=route?.version==='reality-employee-recovery-route-v1'&&
+       route.shift_id===activeState.shift_id&&route.diagnostic_only===true&&
+       route.worker_has_direct_original_job_execution_connection===false&&
+       route.eligible_for_auto_install===false&&
+       route.model_generation_started_by_diagnosis===false&&
+       route.production_changed===false?
+       ' Recovery gate: '+String(route.status).replaceAll('_',' ')+
+       '. Next: '+String(route.next_verified_action).slice(0,500):'';
       node.textContent='Authorized '+activeState.duration_hours+'-hour shift · '+activeState.shift_id+
-        ' · '+current+
+        ' · '+current+explain+
         ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.';
       node.hidden=false;
     }else node.hidden=true;
