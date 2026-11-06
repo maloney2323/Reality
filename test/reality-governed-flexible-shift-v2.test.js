@@ -76,7 +76,7 @@ test('existing eight-hour authorizations retain the original exact SHA256 finger
 
 test('duration cannot be manipulated after exact scope fingerprinted',()=>{
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
- assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:9}),
+ assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:0}),
   /REALITY_EIGHT_HOUR_SHIFT_DURATION_NOT_SUPPORTED/);
  assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:24}),
   /REALITY_EIGHT_HOUR_SHIFT_DURATION_NOT_SUPPORTED/);
