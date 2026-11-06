@@ -18,8 +18,12 @@ on:
       - api/reality/personal-employee-roster.js
       - test/reality-named-employee-roster-v1.test.js
       - src/reality-employee-recovery-route-v1.js
-      - test/reality-employee-recovery-route-v1.test.js
+      - test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js
       - .github/workflows/reality-governed-flexible-shift.yml
+      - src/reality-riley-engineering-pilot-v1.js
+      - scripts/reality-riley-engineering-pilot-v1.mjs
+      - scripts/reality-riley-verify-audit-v1.mjs
+      - test/reality-riley-engineering-pilot-v1.test.js
   pull_request:
     paths:
       - src/reality-eight-hour-shift-plan-v1.js
@@ -39,9 +43,15 @@ on:
       - src/reality-employee-recovery-route-v1.js
       - test/reality-employee-recovery-route-v1.test.js
       - .github/workflows/reality-governed-flexible-shift.yml
+      - src/reality-riley-engineering-pilot-v1.js
+      - scripts/reality-riley-engineering-pilot-v1.mjs
+      - scripts/reality-riley-verify-audit-v1.mjs
+      - test/reality-riley-engineering-pilot-v1.test.js
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
+  issues: read
 jobs:
   verify-duration-and-authority:
     runs-on: ubuntu-latest
@@ -53,3 +63,44 @@ jobs:
           node-version: '22'
       - name: Verify all existing and flexible employee shift contracts
         run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js
+
+  riley-live-investigation:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Riley verifies a real tracked engineering problem
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RILEY_SOURCE_ISSUE: '143'
+          RILEY_TARGET_WORKFLOW_NAME: Reality Governed Execution Engine v0.1
+        run: node scripts/reality-riley-engineering-pilot-v1.mjs
+      - name: Archive source observation
+        uses: actions/upload-artifact@v4
+        with:
+          name: riley-verifiable-engineering-investigation
+          path: riley-pilot-evidence/investigation.json
+          if-no-files-found: error
+          retention-days: 14
+  riley-independent-verification:
+    if: github.event_name == 'push'
+    needs: riley-live-investigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: riley-verifiable-engineering-investigation
+          path: riley-pilot-evidence
+      - name: Verify the original provider evidence independently
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/reality-riley-verify-audit-v1.mjs
