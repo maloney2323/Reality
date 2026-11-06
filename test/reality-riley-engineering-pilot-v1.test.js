@@ -61,6 +61,32 @@ test('Riley investigates actual source observations without replaying old repair
  assert.equal(verifier.original_job_completed,false);
  assert.equal(verifier.production_changed,false);
 });
+test('Riley recovers a workflow omitted from the first 100 GitHub workflow definitions',async()=>{
+ const withLink={...issue,body:'Observed prior failure: '+
+  'https://github.com/maloney2323/Reality/actions/runs/4101'};
+ const p=provider({issueData:withLink,workflows:[]});
+ const result=await auditRealityEngineeringIssue({...params,fetchImpl:p.fetchImpl});
+ assert.equal(result.workflow_id,73);
+ assert.equal(result.workflow_resolution_source,
+  'ISSUE_LINK_RECONFIRMED_BY_GITHUB_ACTIONS_PROVIDER');
+ assert.equal(result.provider_verified_issue_nominated_run,
+  'https://github.com/maloney2323/Reality/actions/runs/4101');
+ assert.equal(result.finding,'RECENT_SUCCESS_AFTER_HISTORICAL_FAILURES');
+ assert.equal(result.model_generation_performed,false);
+ assert.equal(p.calls.some(x=>x.url.includes('/actions/workflows?per_page=')),false);
+ const verified=await independentlyVerifyRileyProviderAudit(result,{
+  fetchImpl:p.fetchImpl
+ });
+ assert.equal(verified.status,'INDEPENDENT_PROVIDER_READBACK_PASSED');
+});
+test('untrusted issue-linked run cannot forge workflow identity or trigger repair',async()=>{
+ const linked={...issue,body:'https://github.com/maloney2323/Reality/actions/runs/4101'};
+ const bad=provider({issueData:linked,workflows:[],
+  runs:[{...old[0],head_repository:{full_name:'other/Reality'}}]});
+ await assert.rejects(
+  auditRealityEngineeringIssue({...params,fetchImpl:bad.fetchImpl}),
+  /RILEY_AUDIT_WORKFLOW_NOT_FOUND_IN_BOUNDED_SCAN/);
+});
 test('new repeated failures after success require fresh reproduction, never automatic installation',async()=>{
  const p=provider({runs:[...old,run(4104,'failure',4),run(4105,'failure',5)]});
  const e=await auditRealityEngineeringIssue({...params,fetchImpl:p.fetchImpl});
