@@ -64,10 +64,24 @@ test('prepares 8 business functions and 40 prospective weekdays with distinct so
  assert.equal(plan.proposed_work_findings,4);
  assert.equal(plan.four_day_week_capacity_hours,256);
  assert.equal(plan.five_day_week_capacity_hours,320);
+ assert.equal(plan.proposed_daily_ai_role_hours,null);
+ assert.equal(plan.minimum_daily_review_timebox_hours,0);
+ assert.equal(plan.maximum_daily_review_timebox_hours,12);
+ assert.equal(plan.proposed_review_timebox_hours_total,4);
+ assert.equal(plan.daily_hours_follow_source_workload_not_a_fixed_eight_hour_quota,true);
+ assert.equal(plan.source_items_deferred_beyond_timebox_capacity,0);
+ assert.equal(plan.capacity_unit,
+  'HYPOTHETICAL_EIGHT_HOUR_ROLE_SCENARIO_NOT_A_SCHEDULE_OR_HUMAN_SAVINGS');
  const assignments=plan.employee_roles.flatMap(r=>r.week_days.flatMap(day=>day.assignments));
  assert.equal(assignments.length,4);
  assert.equal(new Set(assignments.map(x=>x.finding_id)).size,4);
  assert.ok(assignments.every(a=>a.owner_execution_authorized===false));
+ assert.ok(assignments.every(a=>a.proposed_review_timebox_hours===1));
+ assert.ok(plan.employee_roles.every(role=>
+  role.week_days.every(day=>day.provisional_review_timebox_hours>=0&&
+   day.provisional_review_timebox_hours<=12&&
+   day.proposed_execution_shift_hours===null&&
+   day.timebox_is_verified_task_duration===false)));
  assert.equal(plan.candidate_source_review_assignments_not_jobs,true);
  assert.equal(plan.owner_shift_authorization_recorded,false);
  assert.equal(plan.installation_authorized,false);
@@ -75,6 +89,45 @@ test('prepares 8 business functions and 40 prospective weekdays with distinct so
  assert.equal(plan.verified_human_hours_saved,null);
  assert.equal(plan.production_changed,false);
  assert.equal(plan.preparation_source,'BACKGROUND_SOURCE_SNAPSHOT_NOT_YET_VERIFIED');
+});
+test('a 12-hour and a 3-hour review can coexist without assuming a full workweek',()=>{
+ const r=roster();
+ const plan=prepareNextWeekEmployeePlan(r,{now:NOW,workloadHints:[
+  {finding_id:'catalog:'+'a'.repeat(32),proposed_review_hours:12,
+   basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'},
+  {finding_id:'catalog:'+'b'.repeat(32),proposed_review_hours:3,
+   basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}
+ ]});
+ const riley=plan.employee_roles.find(x=>x.function_id==='software_engineering');
+ assert.equal(riley.provisional_weekly_review_timebox_hours,15);
+ assert.deepEqual(riley.week_days.map(d=>d.provisional_review_timebox_hours),
+  [12,3,0,0,0]);
+ assert.equal(riley.week_days[0].assignments[0].accepted_task_duration_hours,null);
+ assert.equal(riley.week_days[0].assignments[0].timebox_basis,
+  'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED');
+ assert.equal(plan.proposed_review_timebox_hours_total,17);
+ assert.equal(plan.owner_shift_authorization_recorded,false);
+ assert.equal(plan.verified_human_hours_saved,null);
+ assert.equal(plan.verified_financial_roi_usd,null);
+});
+test('bad, duplicated, over-capacity and unknown workload hints fail closed',()=>{
+ const r=roster(),id='catalog:'+'a'.repeat(32);
+ for(const hints of [
+  [{finding_id:id,proposed_review_hours:13,
+    basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}],
+  [{finding_id:id,proposed_review_hours:1.25,
+    basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}],
+  [{finding_id:id,proposed_review_hours:0,
+    basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}],
+  [{finding_id:id,proposed_review_hours:3,basis:'MODEL_ESTIMATE_PROVEN'}],
+  [{finding_id:'catalog:'+'f'.repeat(32),proposed_review_hours:3,
+    basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}],
+  Array.from({length:2},()=>({finding_id:id,proposed_review_hours:3,
+    basis:'OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED'}))
+ ]){
+  assert.throws(()=>prepareNextWeekEmployeePlan(r,{now:NOW,workloadHints:hints}),
+   /REALITY_NEXT_WEEK_PLAN_/);
+ }
 });
 test('server-prepared source evidence makes background status visible without executing a job',()=>{
  const plan=prepareNextWeekEmployeePlan(roster(),{
