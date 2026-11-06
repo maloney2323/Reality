@@ -5,15 +5,19 @@
 export const CHAT_SHIFT_COMMAND_VERSION='reality-owner-chat-shift-command-v1';
 const HOUR_WORDS=Object.freeze({eight:8,ten:10,twelve:12});
 const IMMEDIATE=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch|schedule)\s+(?:(?:me\s+)?(?:an?\s+))?(eight|ten|twelve|8|10|12)(?:\s|-)+(?:hours?|hrs?)(?:\s|-)+(?:autonomous\s+|governed\s+|development\s+|employee\s+|work\s+|research\s+|software\s+){0,4}(?:shift|workday|work\s+day)\b/i;
+// Explicit one-time full shift means the existing 8-hour owner shift,
+// never indefinite, recurring or authority over unapproved original jobs.
+const FULL_SHIFT=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:'s|’s)?\s+))?(?:(?:the|an?)\s+)?(?:full|entire|complete)\s+(?:engineering\s+)?(?:shift|workday|work\s+day)(?:\s+now)?[.!]?$/i;
 const RECURRENCE=/\b(?:every\s+(?:day|weekday|week|month)|daily|weekly|monthly|recurring|repeat\s+(?:every|daily|weekly)|each\s+(?:day|week|month))\b/i;
 const CONDITION=/\b(?:don't|do\s+not|never|without\s+starting|hypothetical|hypothetically|simulate|simulation|pretend|example|what\s+if)\b/i;
 export function interpretSignedInChatShiftCommand(message){
  if(typeof message!=='string'||!message||message.length>6000)return null;
  const text=message.trim();
  if(RECURRENCE.test(text)||CONDITION.test(text))return null;
- const match=IMMEDIATE.exec(text);
- if(!match)return null;
- const value=match[1].toLowerCase();
+ const full=FULL_SHIFT.test(text);
+ const match=full?null:IMMEDIATE.exec(text);
+ if(!full&&!match)return null;
+ const value=full?'eight':match[1].toLowerCase();
  const hours=/^\d+$/.test(value)?Number(value):HOUR_WORDS[value];
  if(![8,10,12].includes(hours))return null;
  return Object.freeze({
