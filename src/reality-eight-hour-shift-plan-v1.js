@@ -22,7 +22,11 @@ function acceptedSource(item){
   return false;
  return true;
 }
-export function buildRealityEightHourShiftDraft(brief,{durationHours=8}={}){
+export function buildRealityEightHourShiftDraft(brief,{durationHours=8,prioritySourceRefs=[]}={}){
+ if(!Array.isArray(prioritySourceRefs)||prioritySourceRefs.length>25||
+    prioritySourceRefs.some(x=>typeof x!=='string'||!URL.test(x))||
+    new Set(prioritySourceRefs).size!==prioritySourceRefs.length)
+  fail('OWNER_SOURCE_PRIORITY_INVALID');
  if(![8,10,12].includes(durationHours))fail('DURATION_NOT_SUPPORTED');
  // Each pair of extra shift hours increases eight existing bounded windows by
  // 15 minutes. None may exceed the worker's 120-minute per-step database cap.
@@ -57,6 +61,15 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8}={}){
    seenIds.add(item.finding_id);seenLinks.add(key);
    unique.push(item);
  }
+ // Owner-reconciled, source-backed priorities only reorder validation
+ // windows. A preferred open issue is NOT an executable job or new grant.
+ const sourceOrder=new Map(prioritySourceRefs.map((url,i)=>[url,i]));
+ const allowedUrls=new Set(unique.map(x=>x.evidence_refs[0]));
+ if(prioritySourceRefs.some(url=>!allowedUrls.has(url)))
+  fail('OWNER_PRIORITY_SOURCE_NOT_IN_REVIEWED_BRIEF');
+ unique.sort((a,b)=>
+  (sourceOrder.get(a.evidence_refs[0])??999)-
+   (sourceOrder.get(b.evidence_refs[0])??999));
  const take=(kind)=>{
    const i=unique.findIndex(x=>x.finding_type===kind);
    return i<0?null:unique.splice(i,1)[0];
