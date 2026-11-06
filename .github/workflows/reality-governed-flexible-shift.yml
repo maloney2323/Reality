@@ -65,7 +65,6 @@ jobs:
         run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js
 
   riley-live-investigation:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -87,7 +86,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   riley-independent-verification:
-    if: github.event_name == 'push'
     needs: riley-live-investigation
     runs-on: ubuntu-latest
     timeout-minutes: 8
