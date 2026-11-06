@@ -56,6 +56,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .team-card a{font-size:12px}
 .team-card .evidence{font-size:11px;color:#a7bbd2}
 #teamToggle{background:#29415c}
+.team-proof{margin-top:9px;padding:8px;border:1px solid #35506c;border-radius:9px;color:#c6daf4;font-size:12px;line-height:1.45}
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
 </style>
 </head>
@@ -105,6 +106,7 @@ const SESSION='/api/reality/personal-session';
 const API='/api/reality/personal-chat';
 const SHIFT='/api/reality/personal-governed-employee-shift';
 const ROSTER='/api/reality/personal-employee-roster';
+const RILEY_PROOF='/api/reality/personal-riley-proof';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
 let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
 function conversation(){
@@ -185,7 +187,45 @@ function employeeCard(employee){
   detail.append(list);
   detail.append(textNode('div','Human accountability: '+employee.human_accountability,
     'evidence'));
-  card.append(detail);return card;
+  card.append(detail);
+  if(employee.pilot){
+    const proof=textNode('div','Checking independent evidence for Riley’s first task…','team-proof');
+    proof.id='rileyPilotProof';card.append(proof);
+  }
+  return card;
+}
+async function refreshRileyProof(){
+ const node=$('rileyPilotProof');
+ if(!node)return;
+ try{
+  const result=await json(RILEY_PROOF,{signal:AbortSignal.timeout(30000)});
+  if(result.ok!==true||result.owner_scope_verified!==true||
+   result.worker_execution_authorized_by_read!==false||
+   result.version!=='reality-riley-pilot-provider-proof-v1'||
+   result.status!=='RILEY_FIRST_REAL_INVESTIGATION_INDEPENDENTLY_VERIFIED'||
+   result.independent_provider_verification_passed!==true||
+   result.employee_name!=='Riley'||
+   result.actual_work_kind!=='BOUNDED_READ_ONLY_CI_FAILURE_INVESTIGATION'||
+   result.original_job_completed!==false||
+   result.autonomous_eight_hour_shift_verified!==false||
+   result.capability_installed!==false||
+   result.production_changed!==false||
+   result.verified_human_hours_saved!==null||
+   !/^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(result.source_run_url)||
+   !/^[a-f0-9]{40}$/.test(result.source_commit_sha)||
+   !Number.isSafeInteger(result.independently_verified_job_id))
+   throw Error('PILOT_WORK_NOT_INDEPENDENTLY_VERIFIED');
+  node.replaceChildren(
+   textNode('div','First real engineering investigation · independently verified'),
+   textNode('div','Provider source checking completed. Not an eight-hour shift, code repair, or measured savings.')
+  );
+  const link=document.createElement('a');
+  link.href=result.source_run_url;link.target='_blank';link.rel='noopener noreferrer';
+  link.textContent='View signed provider-run evidence';
+  node.append(link);
+ }catch{
+  node.textContent='Riley’s first work proof is currently unavailable or unverified. No completed repair is claimed.';
+ }
 }
 async function refreshEmployeeBoard(){
   if(teamLoading)return;
@@ -210,6 +250,7 @@ async function refreshEmployeeBoard(){
     for(const employee of roster.proposed_employees)
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
+    void refreshRileyProof();
     summary.textContent='8 proposed · '+roster.existing_work_center_candidates+
      ' categorized findings · 0 active workers';
     $('teamEvidenceNote').textContent=
