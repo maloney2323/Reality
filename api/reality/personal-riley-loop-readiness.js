@@ -34,12 +34,16 @@ export default async function handler(req,res){
   const valid=assertShiftReadback(shifts);
   const {active_shifts,candidates}=identifyExactRileyOriginalCandidates({
    shiftReadback:valid,loop});
+  // Read each distinct existing original's service-only gate. Never pick
+  // the first candidate and silently ignore the other owner jobs.
   let verified=[];
-  if(candidates.length===1){
-   const c=candidates[0];
-   verified=[await shiftRpc(db,'reality_read_shift_capability_wake_v1',{
-    p_shift_id:c.shift_id,p_original_work_id:c.original_work_id,
-    p_trigger_id:c.trigger_id})];
+  if(active_shifts===1&&candidates.length>=1&&candidates.length<=4&&
+     new Set(candidates.map(c=>c.original_work_id)).size===candidates.length){
+   verified=await Promise.all(candidates.map(c=>shiftRpc(db,
+    'reality_read_shift_capability_wake_v1',{
+     p_shift_id:c.shift_id,p_original_work_id:c.original_work_id,
+     p_trigger_id:c.trigger_id
+    })));
   }
   const proof=renderRileyLoopReadiness({
    activeShiftCount:active_shifts,candidates,verified
