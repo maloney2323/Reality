@@ -4,9 +4,14 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 import {auditRealityEngineeringIssue,verifyRileyAuditReceipt}
  from '../src/reality-riley-engineering-pilot-v1.js';
 const err=code=>{throw Error('RILEY_PILOT_'+code)};
+const branch='fix/reality-chat-fullscreen-verified-cycle-20261105';
+const allowedPush=process.env.GITHUB_EVENT_NAME==='push'&&
+ process.env.GITHUB_REF==='refs/heads/'+branch;
+const allowedReview=process.env.GITHUB_EVENT_NAME==='pull_request'&&
+ /^refs\/pull\/[1-9]\d*\/merge$/.test(process.env.GITHUB_REF||'')&&
+ process.env.GITHUB_HEAD_REF===branch;
 if(process.env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- process.env.GITHUB_REF!=='refs/heads/fix/reality-chat-fullscreen-verified-cycle-20261105'||
- process.env.GITHUB_EVENT_NAME!=='push'||
+ !(allowedPush||allowedReview)||
  !/^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA||'')||
  !/^[1-9]\d{0,15}$/.test(process.env.GITHUB_RUN_ID||''))
  err('SIGNED_PREVIEW_SOURCE_REQUIRED');
