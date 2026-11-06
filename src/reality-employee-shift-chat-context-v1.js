@@ -111,66 +111,6 @@ export async function readVerifiedEmployeeShiftForChat({
 }
 
 /**
- * Company staffing is deliberately independent of scheduled shifts.
- * A founder may ask for business functions and automation priorities without
- * creating, inspecting or authorizing an employee-shift work order.
- */
-export async function readVerifiedRealityCompanyWorkforceForChat({
- session,message,env=process.env,
- db=resolveReliabilityBenchmarkDb(env),
- now=new Date()
-}={}){
- if(!companyRequested(message)||env.VERCEL_ENV!=='preview'||
-  !UUID.test(session?.user_id)||!db?.strictSecrets||!db.secretKey||
-  db.url!==session?.config?.url||
-  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
-  db.project!=='hvkfreoagbrphwghjajw')return [];
- try{
-  const catalog=await buildRealityWorkCatalog();
-  const workday=buildRealityWorkdayOpportunityBrief(catalog);
-  const company=assessRealityCompanyWorkforce(workday);
-  const categorized=routeRealityWorkCategoriesToEmployees(workday);
-  return [Object.freeze({
-   entry_id:'reality-company:launch-workforce:'+String(workday.observed_at||now.toISOString()),
-   event_kind:'company_launch_workforce_evidence_assessment',
-   source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
-   source_ref:'reality:company:launch-workforce-assessment',
-   assertion_time:workday.observed_at||now.toISOString(),
-   epistemic_status:company.status,
-   summary:'COMPANY LAUNCH AND OPERATIONS WORKFORCE ANALYSIS: Reality must cover '+
-    company.functional_areas_count+' different BUSINESS FUNCTIONS, not necessarily '+
-    company.functional_areas_count+' individual employees. '+
-    company.required_business_functions.map(x=>x.title+
-     ' — AUTOMATION CANDIDATES: '+x.candidate_ai_automation.join('; ')+
-     ' — HUMAN ACCOUNTABILITY: '+x.human_accountability+
-     ' — EVIDENCE STATUS: '+x.evidence_status).join(' | ')+
-    '. Exact human employee headcount and actual AI worker count cannot be verified without measured weekly workload, '+
-    'existing worker throughput, human oversight time, sales/customer data and launch readiness evidence. '+
-    'Priorities: '+company.priority_work.join('; ')+
-    '. CATEGORY ROUTING: '+categorized.assigned_category_candidates+
-     ' read-only source findings assigned across '+categorized.proposed_company_functions+
-     ' business functions. FIRST PILOT: '+categorized.first_pilot_employee.employee_title+
-     ' with '+categorized.first_pilot_employee.candidate_count+
-     ' candidate findings, not verified executable jobs. ' +
-     'This is NOT an executed or completed launch plan, worker deployment or measured labor saving.',
-   business_objective:company.objective,
-   functional_areas_count:company.functional_areas_count,
-   required_business_functions:company.required_business_functions,
-   staffing_method:company.staffing_method,
-   category_employee_work_routing:categorized,
-   measured_human_staffing_fte:null,
-   exact_human_employee_count_required:null,
-   exact_ai_employee_count_required:null,
-   actual_company_launch_verified:false,
-   work_started:false,
-   installation_authorized:false,
-   external_execution_authorized:false,
-   production_changed:false,
-  })];
- }catch{return []}
-}
-
-/**
  * The planner already prepares a signed service-only source inventory.
  * Unlike an employee-shift claim, reading that inventory must be possible
  * BEFORE the owner starts a shift. Source titles are untrusted data,
@@ -273,3 +213,64 @@ export async function readVerifiedRileySourceWorkForChat({
   production_changed:false
  })];
 }
+
+/**
+ * Company staffing is deliberately independent of scheduled shifts.
+ * A founder may ask for business functions and automation priorities without
+ * creating, inspecting or authorizing an employee-shift work order.
+ */
+export async function readVerifiedRealityCompanyWorkforceForChat({
+ session,message,env=process.env,
+ db=resolveReliabilityBenchmarkDb(env),
+ now=new Date()
+}={}){
+ if(!companyRequested(message)||env.VERCEL_ENV!=='preview'||
+  !UUID.test(session?.user_id)||!db?.strictSecrets||!db.secretKey||
+  db.url!==session?.config?.url||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+  db.project!=='hvkfreoagbrphwghjajw')return [];
+ try{
+  const catalog=await buildRealityWorkCatalog();
+  const workday=buildRealityWorkdayOpportunityBrief(catalog);
+  const company=assessRealityCompanyWorkforce(workday);
+  const categorized=routeRealityWorkCategoriesToEmployees(workday);
+  return [Object.freeze({
+   entry_id:'reality-company:launch-workforce:'+String(workday.observed_at||now.toISOString()),
+   event_kind:'company_launch_workforce_evidence_assessment',
+   source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
+   source_ref:'reality:company:launch-workforce-assessment',
+   assertion_time:workday.observed_at||now.toISOString(),
+   epistemic_status:company.status,
+   summary:'COMPANY LAUNCH AND OPERATIONS WORKFORCE ANALYSIS: Reality must cover '+
+    company.functional_areas_count+' different BUSINESS FUNCTIONS, not necessarily '+
+    company.functional_areas_count+' individual employees. '+
+    company.required_business_functions.map(x=>x.title+
+     ' — AUTOMATION CANDIDATES: '+x.candidate_ai_automation.join('; ')+
+     ' — HUMAN ACCOUNTABILITY: '+x.human_accountability+
+     ' — EVIDENCE STATUS: '+x.evidence_status).join(' | ')+
+    '. Exact human employee headcount and actual AI worker count cannot be verified without measured weekly workload, '+
+    'existing worker throughput, human oversight time, sales/customer data and launch readiness evidence. '+
+    'Priorities: '+company.priority_work.join('; ')+
+    '. CATEGORY ROUTING: '+categorized.assigned_category_candidates+
+     ' read-only source findings assigned across '+categorized.proposed_company_functions+
+     ' business functions. FIRST PILOT: '+categorized.first_pilot_employee.employee_title+
+     ' with '+categorized.first_pilot_employee.candidate_count+
+     ' candidate findings, not verified executable jobs. ' +
+     'This is NOT an executed or completed launch plan, worker deployment or measured labor saving.',
+   business_objective:company.objective,
+   functional_areas_count:company.functional_areas_count,
+   required_business_functions:company.required_business_functions,
+   staffing_method:company.staffing_method,
+   category_employee_work_routing:categorized,
+   measured_human_staffing_fte:null,
+   exact_human_employee_count_required:null,
+   exact_ai_employee_count_required:null,
+   actual_company_launch_verified:false,
+   work_started:false,
+   installation_authorized:false,
+   external_execution_authorized:false,
+   production_changed:false,
+  })];
+ }catch{return []}
+}
+
