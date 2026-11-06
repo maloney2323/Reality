@@ -109,10 +109,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
 <label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
-<button id="runFullShift" type="button" title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Run Riley's Shift</button>
+<button id="runFullShift" type="button" disabled title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Checking existing shift…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
 <p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
+<p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
@@ -147,7 +148,6 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="send" type="submit">Send</button>
 </form>
 </div>
-<p id="shiftStatus" class="status" role="status" hidden aria-live="polite"></p>
 <p id="startup" class="status" role="status">Checking your Reality session…</p>
 </div>
 <script type="module">
@@ -700,6 +700,9 @@ async function refreshShiftStatus(){
     const activeState=safeShiftReadbackState(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
+      $('runFullShift').disabled=true;
+      $('runFullShift').textContent='Existing shift authorized';
+      $('fullShiftScope').textContent='Your shift has already been authorized. Do NOT press Run Riley\'s Shift again. The live status below is read directly from the database every 30 seconds. Source checks do not prove an executable original job or a final receipt.';
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
       const route=data.recovery_diagnosis;
@@ -711,14 +714,30 @@ async function refreshShiftStatus(){
        route.production_changed===false?
        ' Recovery gate: '+String(route.status).replaceAll('_',' ')+
        '. Next: '+String(route.next_verified_action).slice(0,500):'';
-      node.textContent='Authorized '+activeState.duration_hours+'-hour shift · '+activeState.shift_id+
-        ' · '+current+explain+
-        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.';
+      const checked=Number.isSafeInteger(briefing.verified_source_checks)&&
+        briefing.verified_source_checks>=0&&briefing.verified_source_checks<=5?
+        briefing.verified_source_checks:null;
+      const block=activeState.status==='AWAITING_EXACT_ORIGINAL_WORK'?
+        ' QUALIFICATION BLOCKER: source checks are complete, but an exact owner-scoped original engineering job is not yet independently admitted. This is NOT a running code repair. Worker wake alone cannot bypass the original-job gate. Do not retry an uncertain intake or start another shift.':'';
+      node.textContent='Existing '+activeState.duration_hours+'h shift · '+activeState.status+
+        ' · '+activeState.shift_id+' · '+
+        (checked===null?'Source progress unavailable.':checked+' of 5 source checks verified.')+
+        block+' '+current+explain+
+        ' No completed repair, final receipt, or measured savings is claimed for this shift.'+
+        ' Status refreshed '+new Date().toLocaleTimeString()+'.';
       node.hidden=false;
-    }else node.hidden=true;
+    }else{
+      $('runFullShift').disabled=false;
+      $('runFullShift').textContent="Run Riley's Shift";
+      node.textContent='No currently authorized shift found in the owner-scoped readback. Starting a new shift still requires your exact approval.';
+      node.hidden=false;
+    }
   }catch{
-    // A failed readback must not show an invented shift status.
-    $('shiftStatus').hidden=true;
+    // Fail closed: a connection problem MUST NOT unlock a second shift.
+    $('runFullShift').disabled=true;
+    $('runFullShift').textContent='Shift status unavailable';
+    $('shiftStatus').textContent='Shift status readback unavailable. An existing shift may still be active. Use Refresh to check before attempting any new authorization; no duplicate shift should be created.';
+    $('shiftStatus').hidden=false;
   }finally{shiftLoading=false}
 }
 const RILEY_BATCH='/api/reality/personal-riley-full-shift-batch';
