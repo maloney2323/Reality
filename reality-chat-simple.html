@@ -880,6 +880,13 @@ function showAuth(authenticated){
   $('auth').hidden=authenticated;
   $('chat').hidden=!authenticated;
   if(authenticated){
+    // A link from the main conversation preselects a safe three-hour draft.
+    // This never POSTs, starts a worker, or grants execution authority.
+    if(window.location.hash==='#riley-shift'){
+      $('runShiftHours').value='3';
+      $('fullShiftScope').textContent=
+       'Riley 3-hour pilot selected. Tap Run Riley\'s Shift to authorize this exact source-bounded shift. Nothing started by opening this page; verified repairs and installations have separate gates.';
+    }
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
