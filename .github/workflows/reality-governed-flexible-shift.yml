@@ -132,6 +132,9 @@ jobs:
           node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js test/reality-riley-pilot-provider-proof-v1.test.js test/reality-riley-governed-original-job-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-employee-edge-governed-wake-v1.test.js test/reality-riley-live-loop-readiness-v1.test.js test/reality-riley-existing-backlog-v1.test.js test/reality-riley-existing-shift-source-priority-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-riley-verified-code-writer-v1.test.js
 
   riley-live-investigation:
+    # The investigation script cryptographically binds to the canonical
+    # preview branch. PR merge refs must never masquerade as that source.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/fix/reality-chat-fullscreen-verified-cycle-20261105'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
