@@ -31,8 +31,8 @@ create or replace function public.reality_store_next_week_source_snapshot_v1(
 language plpgsql security invoker set search_path=''
 as $$
 declare v_week date;
- declare v_count integer;
- declare v_record reality_internal.next_week_employee_source_snapshots_v1%rowtype;
+ v_count integer;
+ v_record reality_internal.next_week_employee_source_snapshots_v1%rowtype;
 begin
  if current_user<>'service_role' then
   raise exception 'NEXT_WEEK_SERVICE_ONLY';
@@ -95,7 +95,7 @@ create or replace function public.reality_read_next_week_source_snapshot_v1()
 returns jsonb language plpgsql security invoker set search_path=''
 as $$
 declare v_week date;
- declare v_record reality_internal.next_week_employee_source_snapshots_v1%rowtype;
+ v_record reality_internal.next_week_employee_source_snapshots_v1%rowtype;
 begin
  if current_user<>'service_role' then
   raise exception 'NEXT_WEEK_SERVICE_ONLY';
