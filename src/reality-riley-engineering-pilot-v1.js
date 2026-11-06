@@ -58,15 +58,44 @@ export async function auditRealityEngineeringIssue({
   !ISSUE.test(String(issue.html_url||''))||Number(ISSUE.exec(issue.html_url)[1])!==issueNumber||
   typeof issue.title!=='string'||!issue.title.trim())
   fail('ISSUE_IDENTITY_UNVERIFIED');
- const listing=await get('/actions/workflows?per_page=100',{fetchImpl,token});
- if(!Array.isArray(listing.workflows)||listing.workflows.length>100||
-   !Number.isSafeInteger(listing.total_count)||listing.total_count<listing.workflows.length)
-  fail('WORKFLOW_LIST_UNVERIFIED');
- const matches=listing.workflows.filter(x=>x.name===workflowName&&
-  Number.isSafeInteger(x.id)&&x.id>0);
- if(matches.length!==1)
-  fail(matches.length?'DUPLICATE_WORKFLOW_NAMES':'WORKFLOW_NOT_FOUND_IN_BOUNDED_SCAN');
- const workflow=matches[0];
+ // A tracked issue may nominate historic workflow runs. Issue prose grants NO
+ // authority, but a provider-verified run can identify the exact workflow even
+ // when the repo has >100 workflows and the first listing page omits it.
+ const nominated=[...new Set(
+  [...String(issue.body||'').matchAll(
+   /https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/([1-9]\d{0,15})\b/g)]
+   .map(x=>Number(x[1])).filter(Number.isSafeInteger)
+ )].slice(0,8);
+ let workflow=null,workflowResolution=null,providerNominatedRun=null;
+ for(const runId of nominated){
+  let raw;
+  try{raw=await get('/actions/runs/'+runId,{fetchImpl,token})}
+  catch{continue}
+  if(raw?.name!==workflowName||
+     !Number.isSafeInteger(raw.workflow_id)||raw.workflow_id<1)
+   continue;
+  try{
+   const trusted=proveRun(raw,raw.workflow_id,workflowName);
+   workflow={id:raw.workflow_id,name:workflowName};
+   workflowResolution='ISSUE_LINK_RECONFIRMED_BY_GITHUB_ACTIONS_PROVIDER';
+   providerNominatedRun=trusted.url;
+   break;
+  }catch{}
+ }
+ if(!workflow){
+  const listing=await get('/actions/workflows?per_page=100',{fetchImpl,token});
+  if(!Array.isArray(listing.workflows)||listing.workflows.length>100||
+    !Number.isSafeInteger(listing.total_count)||
+    listing.total_count<listing.workflows.length)
+   fail('WORKFLOW_LIST_UNVERIFIED');
+  const matches=listing.workflows.filter(x=>x.name===workflowName&&
+   Number.isSafeInteger(x.id)&&x.id>0);
+  if(matches.length!==1)
+   fail(matches.length?'DUPLICATE_WORKFLOW_NAMES':'WORKFLOW_NOT_FOUND_IN_BOUNDED_SCAN');
+  workflow=matches[0];
+  workflowResolution='GITHUB_ACTIONS_WORKFLOW_CATALOG_MATCH';
+ }
+
  const runsResponse=await get('/actions/workflows/'+workflow.id+'/runs?per_page=50',
   {fetchImpl,token});
  if(!Array.isArray(runsResponse.workflow_runs)||runsResponse.workflow_runs.length>50||
@@ -100,6 +129,8 @@ export async function auditRealityEngineeringIssue({
   issue_number:issueNumber,issue_title:issue.title.slice(0,250),
   issue_url:issue.html_url,issue_provider_state:issue.state,
   workflow_name:workflowName,workflow_id:workflow.id,
+  workflow_resolution_source:workflowResolution,
+  provider_verified_issue_nominated_run:providerNominatedRun,
   workflow_runs_observed:observed.length,
   incomplete_workflow_runs_in_sample:runsResponse.workflow_runs.length-observed.length,
   workflow_runs_total_provider:runsResponse.total_count,
