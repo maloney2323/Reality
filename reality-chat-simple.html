@@ -107,6 +107,7 @@ const API='/api/reality/personal-chat';
 const SHIFT='/api/reality/personal-governed-employee-shift';
 const ROSTER='/api/reality/personal-employee-roster';
 const RILEY_PROOF='/api/reality/personal-riley-proof';
+const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
 let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
 function conversation(){
@@ -191,6 +192,8 @@ function employeeCard(employee){
   if(employee.pilot){
     const proof=textNode('div','Checking independent evidence for Riley’s first task…','team-proof');
     proof.id='rileyPilotProof';card.append(proof);
+    const loop=textNode('div','Checking live full-loop job readiness…','team-proof');
+    loop.id='rileyLoopReadiness';card.append(loop);
   }
   return card;
 }
@@ -227,6 +230,43 @@ async function refreshRileyProof(){
   node.textContent='Riley’s first work proof is currently unavailable or unverified. No completed repair is claimed.';
  }
 }
+async function refreshRileyLoopReadiness(){
+ const node=$('rileyLoopReadiness');
+ if(!node)return;
+ try{
+  const result=await json(RILEY_LOOP,{signal:AbortSignal.timeout(30000)});
+  if(result.ok!==true||result.owner_scope_verified!==true||
+   result.read_only!==true||
+   result.version!=='reality-riley-live-loop-readiness-v1'||
+   result.diagnostic_only!==true||
+   result.worker_execution_authorized_by_read!==false||
+   result.worker_wake_dispatched_by_read!==false||
+   result.original_job_started_by_read!==false||
+   result.installation_authorized!==false||
+   result.original_job_settled_by_read!==false||
+   result.independent_final_receipt_recorded_by_read!==false||
+   result.production_changed!==false||
+   result.verified_human_hours_saved!==null)
+   throw Error('RILEY_ORIGINAL_READBACK_UNVERIFIED');
+  const options={
+   NO_ACTIVE_AUTHORIZED_RILEY_SHIFT:
+    'Full-loop readiness: no active owner-authorized shift. A fresh original job must also be independently qualified.',
+   NO_NEW_QUALIFIED_SHIFT_BOUND_ORIGINAL_JOB:
+    'Full-loop readiness: active shift found, but no new qualified, authorized original Riley job is attached.',
+   AMBIGUOUS_ORIGINAL_JOB_NO_AUTO_SELECTION:
+    'Full-loop readiness: more than one possible original job. Reality will not guess or replay work.',
+   EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE:
+    'Full-loop readiness: an original job is matched, but Reality’s independent authorization gate does not allow a wake.',
+   EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE:
+    'Full-loop readiness: the exact original job is eligible for a governed wake. Worker claim and settlement are NOT yet proven.'
+  };
+  const text=options[result.status];
+  if(!text)throw Error('RILEY_UNRECOGNIZED_READINESS');
+  node.textContent=text;
+ }catch{
+  node.textContent='Full-loop readiness unavailable. No original-job execution or settlement is claimed.';
+ }
+}
 async function refreshEmployeeBoard(){
   if(teamLoading)return;
   teamLoading=true;
@@ -251,6 +291,7 @@ async function refreshEmployeeBoard(){
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
     void refreshRileyProof();
+    void refreshRileyLoopReadiness();
     summary.textContent='8 proposed · '+roster.existing_work_center_candidates+
      ' categorized findings · 0 active workers';
     $('teamEvidenceNote').textContent=
