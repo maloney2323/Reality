@@ -232,7 +232,7 @@ test('self-audit distinguishes source-implemented from current runtime proof',()
  assert.equal(audit.capabilities.find(x=>x.id==='employee_capability_wake').proof_level,
   'TRIGGER_INSPECTION_ONLY_NO_PROVIDER_REPAIR_EXECUTION');
  assert.equal(audit.capabilities.find(x=>x.id==='multi_job_shift_controller').proof_level,
-  'CONTRACT_PREPARED_NOT_LIVE_WORKER_CONNECTED');
+  'EXISTING_MULTI_JOB_WAKE_CONNECTED_NO_GENERAL_REPAIR_EXECUTION_PROVEN');
  assert.equal(audit.all_problems_solvable_guaranteed,false);
  assert.match(summarizeRealitySelfAuditForModel(audit),/not claim unlimited problem solving/);
  const chat=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',
