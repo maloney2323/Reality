@@ -1,0 +1,34 @@
+name: Reality private Chat fork recovery proof
+on:
+  push:
+    branches:
+      - fix/reality-chat-fullscreen-verified-cycle-20261105
+    paths:
+      - src/reality-private-chat-continuity-recovery-v1.js
+      - src/reality-continuity-spine-runtime-v0.1.js
+      - src/reality-live-intelligence-orchestration-v0.1.js
+      - api/reality/personal-chat.js
+      - test/reality-private-chat-continuity-recovery-v1.test.js
+      - .github/workflows/reality-private-chat-fork-recovery.yml
+  pull_request:
+    paths:
+      - src/reality-private-chat-continuity-recovery-v1.js
+      - src/reality-continuity-spine-runtime-v0.1.js
+      - src/reality-live-intelligence-orchestration-v0.1.js
+      - api/reality/personal-chat.js
+      - test/reality-private-chat-continuity-recovery-v1.test.js
+      - .github/workflows/reality-private-chat-fork-recovery.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-fork-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify strict cryptographic fork recovery and existing continuity
+        run: node --test test/reality-private-chat-continuity-recovery-v1.test.js test/reality-continuity-runtime-v0.1.test.js test/reality-universe-postgres-continuity-v0.2.test.js

@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const edge=read('supabase/functions/reality-governed-employee-shift-wake-v1/index.ts');
+const broker=read('supabase/functions/reality-employee-capability-wake-broker-v1/index.ts');
+const sql=read('supabase/migrations/20261106020000_riley_shift_capability_wake_gate_v1.sql');
+const server=read('src/reality-governed-employee-shift-worker-v1.js');
+test('independent employee scheduler delegates wake; it never holds GitHub write credentials',()=>{
+ assert.match(edge,/reality_reconcile_employee_shift_original_v1/);
+ assert.match(edge,/brokerExistingCapabilityWake\(original\)/);
+ assert.match(edge,/reality-employee-capability-wake-broker-v1/);
+ assert.match(edge,/CAPABILITY_WAKE_REQUIRES_RECONCILIATION/);
+ assert.match(edge,/EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY/);
+ assert.match(edge,/original\.new_customer_job_created!==false/);
+ assert.match(edge,/worker_acknowledged:false/);
+ assert.doesNotMatch(edge,/REALITY_GITHUB_BROKER_TOKEN/);
+ assert.doesNotMatch(edge,/method:'(?:PUT|DELETE|PATCH)'|vercel\.app/);
+ assert.match(server,/wakeExistingRileyCapabilityJob/);
+});
+test('separate service broker independently rechecks exact owner original and gap event',()=>{
+ assert.match(broker,/reality_read_shift_capability_wake_v1/);
+ assert.match(broker,/SUPABASE_SERVICE_ROLE_KEY/);
+ assert.match(broker,/same\(a,configValue\.key\)/);
+ assert.match(broker,/same\(b,'Bearer '\+configValue\.key\)/);
+ assert.match(broker,/source_proof_sha256/);
+ assert.match(broker,/item\.existing_job_only!==true/);
+ assert.match(broker,/item\.installation_authorized!==false/);
+ assert.match(broker,/item\.original_job_completed!==false/);
+ assert.match(broker,/source_event_id:item\.source_event_id/);
+ assert.match(broker,/no_new_job_created:true/);
+ assert.match(broker,/worker_acknowledged:false/);
+ assert.match(broker,/REALITY_GITHUB_BROKER_TOKEN/);
+ assert.doesNotMatch(broker,/OWNER_APPROVE_EXACT|approve_install|original_job_settled:true/);
+});
+test('only broker may write fixed isolated idempotent Reality trigger, never an installation',()=>{
+ assert.match(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
+ assert.match(broker,/reality-genuine-triggers\//);
+ assert.match(broker,/source_event_id:item\.source_event_id/);
+ assert.match(broker,/atob\(String\(x\.content/);
+ assert.match(broker,/existing=await check\(\)/);
+ assert.match(broker,/if\(!existing\)/);
+ assert.match(broker,/content:btoa\(bytes\)/);
+ assert.match(broker,/GITHUB_DELIVERY_EFFECT_OR_READBACK_UNCERTAIN/);
+ assert.match(broker,/BROKER_DELIVERY_REQUIRES_RECONCILIATION/);
+ assert.doesNotMatch(broker,/vercel\.app/);
+});
+test('service-role-only SQL refuses settled jobs and stale shift source readbacks',()=>{
+ assert.match(sql,/security invoker/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/grant execute on function public\.reality_read_shift_capability_wake_v1/);
+ assert.match(sql,/from public,anon,authenticated/);
+ assert.match(sql,/q\.claim_id is null/);
+ assert.match(sql,/q\.phase in/);
+ assert.match(sql,/genuine_independent_final_receipts_v1/);
+ assert.match(sql,/goal_publication_epochs/);
+ assert.match(sql,/not exists\(/);
+ assert.match(sql,/owner_authorized_investigation/);
+ assert.match(sql,/owner_authorized_installation/);
+ assert.doesNotMatch(sql,/\b(insert|update|delete)\s+(?:into|reality_internal|public)/i);
+});
+
+test('cron sees multiple independent owner-original records without running a second engine',()=>{
+ assert.match(edge,/reality_read_eligible_shift_originals_v1/);
+ assert.match(edge,/candidate_count!==candidates\.candidates\.length/);
+ assert.match(edge,/seen\.has\(String\(c\.original_work_id\|\|''\)\)/);
+ assert.match(edge,/Promise\.allSettled\(/);
+ assert.match(edge,/work\.map\(x=>brokerExistingCapabilityWake\(x\)\)/);
+ assert.match(edge,/worker_execution_acknowledged:false/);
+ assert.match(edge,/multi_job_wakes:multiJobWakes/);
+ assert.match(edge,/MULTI_JOB_WAKE_EFFECT_REQUIRES_RECONCILIATION/);
+ assert.doesNotMatch(edge,/REALITY_GITHUB_BROKER_TOKEN|Github.*PUT/);
+});

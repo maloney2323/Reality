@@ -18,6 +18,8 @@ export async function startContinuityRuntime({
   worldlineSource = 'reality:primary',
   subjectId,
   signal,
+  // Server-attested prior fork; it is an observation, never inherited authority.
+  recoveryAudit = null,
   observedAt = new Date().toISOString(),
   fetchImpl = fetch,
 } = {}) {
@@ -98,10 +100,50 @@ export async function startContinuityRuntime({
       try {
         committed = await persistence.appendEvent(node);
       } catch (error) {
-        const failure = new Error('CONTINUITY_PERSISTENCE_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
-        failure.code = 'CONTINUITY_PERSISTENCE_REQUIRED';
-        failure.cause = error;
-        throw failure;
+        // The isolated DB now enforces one successor per parent and one
+        // genesis event per scope. Two concurrent readers can pass a stale
+        // tail check, but the second INSERT fails atomically (no new fork).
+        // For ordinary intake only, recheck the entire integrity chain and
+        // retry once against its freshly verified tail. Never silently
+        // rebase authority, execution, installed outcomes or approvals.
+        const collision=/UNIVERSE_POSTGRES_HTTP_409/.test(String(error?.message||'')) &&
+          /reality_universe_single_(successor|genesis)_preview_v1/.test(String(error?.message||''));
+        const canRebase=['RAW_SIGNAL','TRANSFORMATION','OBSERVATION'].includes(stage);
+        if(collision&&canRebase){
+          try{
+            const rows=await persistence.reconstruct({
+              continuityRootId:spine.continuity_root_id,
+              worldlineId:spine.worldline_id,
+            });
+            const verified=orderContinuityHistory(rows);
+            const tail=verified.at(-1);
+            if(!tail||tail.event_id===node.parent_event_id)
+              throw Error('CONTINUITY_ATOMIC_APPEND_COLLISION_NOT_ADVANCED');
+            const rebased=appendContinuityNode({
+              spine,stage,entityId,eventId,
+              parentEventId:tail.event_id,
+              evidenceRefs,transformationReceiptId,
+              effectiveTime,assertionTime,epistemicStatus,
+              payload,priorLineageHash:tail.lineage_hash,
+              provenance:{
+                ...provenance,
+                continuity_runtime_version:REALITY_CONTINUITY_RUNTIME_VERSION,
+              },
+            });
+            committed=await persistence.appendEvent(rebased);
+          }catch(retryError){
+            const failure=new Error('CONTINUITY_ATOMIC_APPEND_RETRY_UNVERIFIED:'+
+              (retryError?.message||'UNKNOWN'));
+            failure.code='CONTINUITY_ATOMIC_APPEND_RETRY_UNVERIFIED';
+            failure.cause=retryError;
+            throw failure;
+          }
+        }else{
+          const failure = new Error('CONTINUITY_PERSISTENCE_REQUIRED:' + (error?.message || error?.code || 'UNKNOWN'));
+          failure.code = 'CONTINUITY_PERSISTENCE_REQUIRED';
+          failure.cause = error;
+          throw failure;
+        }
       }
     }
 
@@ -113,12 +155,15 @@ export async function startContinuityRuntime({
   await appendStage({
     stage: 'RAW_SIGNAL',
     entityId: signal.packet.packet_id,
+    evidenceRefs: recoveryAudit?.status==='TWO_IMMUTABLE_TERMINAL_SIBLINGS_INDEPENDENTLY_VERIFIED'?
+      recoveryAudit.independent_tip_hashes.map(x=>x.event_id):[], 
     eventId: `root:${spine.continuity_root_id}:world:${spine.worldline_id}:raw:${signal.packet.packet_id}`,
     payload: {
       packet_id: signal.packet.packet_id,
       source: signal.packet.source,
       observed_at: signal.packet.observed_at,
       raw_content_digest: signal.packet.raw_content_digest,
+      fork_recovery_audit: recoveryAudit || null,
     },
     provenance: { source: 'reality_governed_raw_signal' },
   });

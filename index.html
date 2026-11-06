@@ -785,6 +785,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 @media(max-width:600px){#realitySimpleHome{margin:14px 0 24px;padding:18px;border-radius:16px}#realitySimpleHome .simple-actions{flex-direction:column}#realitySimpleHome .simple-actions button{width:100%}#realitySimpleHome .simple-list{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
+<link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
 </head>
 <body class="reality-simple-home">
 <main>
@@ -6430,7 +6431,7 @@ setInterval(refreshSavedShiftHome,300000);
   node.append(head,body);el('privateTranscript').append(node);
  }
  async function loadConversations(){
-  const r=await fetch('/api/reality/personal-chat?list=1',{cache:'no-store'});
+  const r=await fetch('/api/reality/personal-chat?list=1',{cache:'no-store',signal:AbortSignal.timeout(12000)});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Unable to list saved conversations');
   const select=el('privateConversations');select.replaceChildren();
   const active=conversationId(),existing=(data.conversations||[]);
@@ -6455,7 +6456,7 @@ setInterval(refreshSavedShiftHome,300000);
  async function loadGoals(){
   const label=el('privateGoalStatus');
   try{
-   const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+   const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Goal ledger unavailable');
    const state=data.goal_state||{};
    confirmedActiveGoal=state.active_goal?.goal_id&&state.active_goal_id===state.active_goal.goal_id&&
@@ -6572,7 +6573,7 @@ setInterval(refreshSavedShiftHome,300000);
  el('privateReportGoal').onclick=()=>changeActiveGoal('REPORT_COMPLETE','privateReportGoal');
 
  async function loadSaved(){
-  const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store'});
+  const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
   el('privateTranscript').replaceChildren();
   for(const message of data.messages||[])bubble(message.role,message.text);
@@ -6646,16 +6647,26 @@ setInterval(refreshSavedShiftHome,300000);
  el('privateSend').onclick=async()=>{
   const value=el('privatePrompt').value.trim();if(!value)return;
   const goalCommand=el('privateGoalCommand').value||null;
+  const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
+  window.dispatchEvent(new CustomEvent('reality:chat-request-started',{
+   detail:{conversation_id:sentConversation,request_id:sentRequest}
+  }));
   el('privateSend').disabled=true;status('Reality is working with saved context…');
   try{
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
+    signal:AbortSignal.timeout(95000),
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({conversation_id:conversationId(),request_id:crypto.randomUUID(),
+    body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
    el('privatePrompt').value='';
    el('privateGoalCommand').value='';
-   await loadSaved();await loadConversations();
+   // The server's completed reply must not be held hostage by UI readbacks.
+   // These are read-only refreshes, with their own deadlines.
+   void Promise.allSettled([loadSaved(),loadConversations()]).then(results=>{
+    if(results.some(x=>x.status==='rejected'))
+     status('Answer returned; saved history refresh was unavailable. You can retry refreshing without resending.');
+   });
    // Refresh Reality's independently observed improvement queue after chat.
    // This request remains GET-only and cannot start a model or authorize work.
    void refreshRealitySelfImprovement();
@@ -6780,6 +6791,8 @@ setInterval(refreshSavedShiftHome,300000);
 
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
+<script defer src="/reality-chat-verified-cycle-v2.js"></script>
+<script defer src="/reality-chat-request-status-v1.js"></script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-eight-hour-shift-plan-v1.js"></script>

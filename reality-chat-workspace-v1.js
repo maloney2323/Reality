@@ -26,7 +26,7 @@
     return wrap;
   };
   // This is a page, not the previous center-screen floating console.
-  const intro = [...chat.children].filter(el => el.tagName === 'P' && el.classList.contains('muted'));
+  const intro = [...chat.children].filter(el => el.tagName === 'P' && el.classList.contains('muted') && el.id !== 'privateAccountState' && el.id !== 'privateStatus');
   if (intro[0]) intro[0].classList.add('reality-chat-intro');
   for (const p of intro.slice(1)) p.classList.add('reality-chat-secondary-intro');
   const title = get('realityChatTitle');

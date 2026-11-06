@@ -1,0 +1,56 @@
+name: Reality Riley first real engineering investigation
+on:
+  push:
+    branches: [fix/reality-chat-fullscreen-verified-cycle-20261105]
+    paths:
+      - src/reality-riley-engineering-pilot-v1.js
+      - scripts/reality-riley-engineering-pilot-v1.mjs
+      - scripts/reality-riley-verify-audit-v1.mjs
+      - test/reality-riley-engineering-pilot-v1.test.js
+      - .github/workflows/reality-riley-engineering-pilot-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  issues: read
+jobs:
+  riley-provider-investigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Riley audit contract
+        run: node --test test/reality-riley-engineering-pilot-v1.test.js
+      - name: Riley investigates one real category source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RILEY_SOURCE_ISSUE: '143'
+          RILEY_TARGET_WORKFLOW_NAME: Reality Governed Execution Engine v0.1
+        run: node scripts/reality-riley-engineering-pilot-v1.mjs
+      - name: Preserve provider-backed pilot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: riley-read-only-investigation
+          path: riley-pilot-evidence/investigation.json
+          retention-days: 14
+          if-no-files-found: error
+  riley-independent-evidence-verification:
+    needs: riley-provider-investigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: riley-read-only-investigation
+          path: riley-pilot-evidence
+      - name: Independently recheck live provider identities and receipt SHA
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/reality-riley-verify-audit-v1.mjs

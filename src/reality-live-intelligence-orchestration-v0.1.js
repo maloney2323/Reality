@@ -150,6 +150,8 @@ export async function runLiveIntelligenceOrchestration({
   // This parameter is supplied ONLY by a trusted server-side history adapter.
   // Client-provided systemContext cannot impersonate authenticated past turns.
   verifiedConversationTurns = null,
+  // Trusted server-only opt-in; never inferred from model statements.
+  publicResearchEnabled = false,
   model,
   apiKey,
   fetchImpl,
@@ -211,6 +213,7 @@ export async function runLiveIntelligenceOrchestration({
     worldlineSource: systemContext?.worldline_id || 'reality:primary',
     subjectId: systemContext?.work_item_id || systemContext?.conversation_id || systemContext?.thought_id || governedSignal.packet.packet_id,
     signal: governedSignal,
+    recoveryAudit:systemContext?.fork_recovery_audit||null,
     observedAt: observedAt || new Date().toISOString(),
     fetchImpl,
   });
@@ -488,6 +491,7 @@ export async function runLiveIntelligenceOrchestration({
     governedSignal,
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
+    publicResearchEnabled: publicResearchEnabled === true,
     model:resolvedModel,
     apiKey:resolvedApiKey,
     fetchImpl,
@@ -858,6 +862,7 @@ export async function runLiveIntelligenceOrchestration({
             ].join(' '),
           },
           model:resolvedModel,apiKey:resolvedApiKey,fetchImpl,
+          publicResearchEnabled:publicResearchEnabled===true,
         });
         retryReview=await reviewRealityAnswer({
           cleanerConversationContext,
@@ -1029,7 +1034,7 @@ export async function runLiveIntelligenceOrchestration({
       retryResult=await invokeRealityModel({
         governedSignal,systemContext:contextForRetry,
         model:resolvedModel,apiKey:resolvedApiKey,
-        fetchImpl,
+        fetchImpl,publicResearchEnabled:publicResearchEnabled===true,
       });
       retryFocus=assessCurrentTurnFocusV02({
         capsule:preCognitionAlignment.capsule,

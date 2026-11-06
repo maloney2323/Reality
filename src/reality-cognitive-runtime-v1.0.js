@@ -90,15 +90,19 @@ export async function runRealityCognitiveRuntime({
   apiKey,
   fetchImpl = fetch,
   governedSignal,
+  publicResearchEnabled = false,
 } = {}) {
   if (!textOf(message)) throw new Error('MESSAGE_REQUIRED');
 
   const cognitionContext = buildCognitionContext(systemContext, universeEntries);
 
-  if (!needsDeepReasoning(message)) {
+  // A signed-in public-source lookup is one provider search, not three speculative
+  // analysis lanes plus synthesis. Keep ordinary deep cognition unchanged.
+  if (!needsDeepReasoning(message) || publicResearchEnabled === true) {
     const result = await invokeRealityModel({
       governedSignal,
       systemContext: cognitionContext,
+      publicResearchEnabled: publicResearchEnabled === true,
       model,
       apiKey,
       fetchImpl,

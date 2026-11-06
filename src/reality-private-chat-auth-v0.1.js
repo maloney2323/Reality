@@ -73,6 +73,23 @@ export async function loginChat(req,res,{fetchImpl=fetch,env=process.env}={}){
   expires:now+Math.min(86400,Number(signed.body.expires_in)||3600)*1000},c.seal);
  return {authenticated:true,user_id:user.body.id};
 }
+// Only Supabase Auth's verified passkey assertion may supply these new tokens.
+// Never accept credentials or user claims directly from a browser as session proof.
+export async function establishVerifiedPasskeySession(res,signed,{fetchImpl=fetch,env=process.env}={}){
+ const c=privateChatConfig(env);
+ if(typeof signed?.access_token!=='string'||typeof signed?.refresh_token!=='string'||
+    signed.access_token.length<20||signed.refresh_token.length<16)
+  fail('PASSKEY_SESSION_TOKENS_REQUIRED',503);
+ const user=await provider(c,'user',{token:signed.access_token,fetchImpl});
+ if(!user.ok||typeof user.body?.id!=='string'||!user.body.id)
+  fail('PASSKEY_SESSION_IDENTITY_UNVERIFIED',503);
+ const seconds=Number(signed.expires_in);
+ if(!Number.isFinite(seconds)||seconds<=0)fail('PASSKEY_SESSION_EXPIRY_INVALID',503);
+ setCookie(res,{access:signed.access_token,refresh:signed.refresh_token,
+  expires:Date.now()+Math.min(86400,seconds)*1000},c.seal);
+ return {user_id:user.body.id};
+}
+
 export async function authenticatedChatSession(req,res,{fetchImpl=fetch,env=process.env}={}){
  const c=privateChatConfig(env);
  const state=decrypt(tokenCookie(req),c.seal);
@@ -82,15 +99,21 @@ export async function authenticatedChatSession(req,res,{fetchImpl=fetch,env=proc
  if(expires<=Date.now()+60000){
   const next=await provider(c,'token?grant_type=refresh_token',
    {method:'POST',body:{refresh_token:refresh},fetchImpl});
-  if(!next.ok||!next.body?.access_token||!next.body?.refresh_token){
-   clearChatCookie(res);return null;
-  }
+  // Retryable provider errors must not destroy an existing signed-in cookie.
+   if(!next.ok&&(next.status===429||next.status>=500))
+    fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+   if(!next.ok){clearChatCookie(res);return null}
+   if(!next.body?.access_token||!next.body?.refresh_token)
+    fail('CHAT_AUTH_REFRESH_RESPONSE_UNVERIFIED',503);
   token=next.body.access_token;refresh=next.body.refresh_token;
   expires=Date.now()+Math.min(86400,Number(next.body.expires_in)||3600)*1000;
   setCookie(res,{access:token,refresh,expires},c.seal);
  }
  const user=await provider(c,'user',{token,fetchImpl});
- if(!user.ok||!user.body?.id){clearChatCookie(res);return null}
+ if(!user.ok&&(user.status===429||user.status>=500))
+   fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+  if(!user.ok){clearChatCookie(res);return null}
+  if(!user.body?.id)fail('CHAT_AUTH_USER_READBACK_UNVERIFIED',503);
  return {user_id:user.body.id,access_token:token,config:c};
 }
 export async function logoutChat(req,res,{fetchImpl=fetch,env=process.env}={}){

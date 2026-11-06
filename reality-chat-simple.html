@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d1017">
+<title>Reality — Chat</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0d1017;color:#f1f4f8}
+*{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;background:#e8eef8;color:#111b29;font-weight:650;padding:10px 14px}
+button:disabled{opacity:.48;cursor:wait}a{color:#c2dbff}
+.shell{min-height:100dvh;max-width:860px;margin:auto;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #293140}
+header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #293140}
+.toolbar select{flex:1;min-width:120px;max-width:420px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px}
+.toolbar button{background:#253247;color:#eef5ff;font-size:13px}
+#thread{flex:1;min-height:40vh;overflow:auto;padding:16px 14px 24px;display:flex;flex-direction:column;gap:14px}
+.message{max-width:90%;padding:12px 15px;border:1px solid #2d3645;border-radius:15px;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.5}
+.message.user{align-self:flex-end;background:#23344c;border-color:#3a5271}
+.message.assistant{align-self:flex-start;background:#171e29}
+.message.pending{opacity:.76}.message.error{border-color:#a6665e}
+.message small{display:block;font-size:11px;opacity:.75;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.status{padding:8px 16px;font-size:13px;min-height:34px;color:#aebed4}
+.composer{display:flex;align-items:flex-end;gap:9px;border-top:1px solid #293140;padding:12px 14px 20px;background:#0d1017}
+.composer textarea{flex:1;min-height:54px;max-height:180px;resize:vertical;padding:12px 14px;background:#171e29;color:#fff;border:1px solid #3a465a;border-radius:12px}
+.composer button{min-height:50px}
+#auth{padding:28px 18px;max-width:450px;width:100%;margin:auto}
+#auth label{display:block;margin:18px 0 6px;font-size:13px}
+#auth input{width:100%;padding:12px;border:1px solid #41506a;background:#151d29;color:#fff;border-radius:10px}
+#auth button{margin-top:16px}
+[hidden]{display:none!important}
+@media(max-width:550px){header{padding:12px}.toolbar{padding:8px 12px}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
+
+/* Named, read-only team preview. Cards represent proposed roles, not live agents. */
+.team-board{border-bottom:1px solid #334053;background:#111a26;padding:12px 14px}
+.team-board[hidden],.team-panel[hidden]{display:none!important}
+.team-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.team-head strong{font-size:15px}
+.team-intro{font-size:12px;color:#b2c3da;margin:6px 0 11px}
+.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-height:48vh;overflow:auto;padding-right:3px}
+.team-card{background:#182337;border:1px solid #384c67;border-radius:12px;padding:11px;min-width:0}
+.team-card.pilot{border-color:#759dc9}
+.team-card-top{display:flex;align-items:center;gap:10px}
+.team-avatar{width:42px;height:42px;min-width:42px;display:grid;place-items:center;border-radius:50%;color:#f3f7ff;background:#284562;font-size:17px;font-weight:750}
+.team-name{font-weight:750;font-size:15px}
+.team-role{font-size:12px;color:#aec7e7}
+.team-card p{font-size:12px;color:#d1deed;margin:8px 0 6px;line-height:1.4}
+.team-tags{font-size:11px;color:#b7c7dd;line-height:1.5}
+.team-status{font-size:11px;display:inline-block;border-radius:12px;background:#2c3444;color:#d9e5f6;padding:4px 8px;margin-top:8px}
+.team-card details{margin-top:9px;font-size:12px;color:#d9e5f6}
+.team-card summary{cursor:pointer}
+.team-card ul{padding-left:19px;margin:7px 0}
+.team-card li{margin-bottom:5px;overflow-wrap:anywhere}
+.team-card a{font-size:12px}
+.team-card .evidence{font-size:11px;color:#a7bbd2}
+#teamToggle{background:#29415c}
+.team-proof{margin-top:9px;padding:8px;border:1px solid #35506c;border-radius:9px;color:#c6daf4;font-size:12px;line-height:1.45}
+@media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header><strong>Reality · Chat</strong><a href="/" title="Open Reality work and approvals">Work &amp; approvals</a></header>
+<section id="auth" hidden>
+<h2>Sign in to Reality</h2>
+<p>Your saved conversations remain private to your account.</p>
+<label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+<button id="login" type="button">Sign in</button> <button id="passkeyLogin" type="button" style="background:#253247;color:#eef5ff">Use fingerprint / passkey</button>
+<p id="authMessage" role="status"></p>
+</section>
+<div id="chat" hidden style="flex:1;display:flex;flex-direction:column">
+<div class="toolbar">
+<select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
+<button id="newChat" type="button">New chat</button>
+<button id="refresh" type="button">Refresh</button>
+<button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
+<button id="runFullShift" type="button" title="One signed-in owner authorization for an 8-hour governed Riley workday">Run Riley's Full Shift · 8h</button>
+<button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
+</div>
+<p class="team-intro" id="fullShiftScope">One signed-in authorization starts the existing 8-hour background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
+<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
+ <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
+ <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <div id="teamCards" class="team-grid" aria-live="polite"></div>
+<details class="team-proof" id="realitySelfAwareness">
+ <summary>Reality's verified self-understanding</summary>
+ <div id="realitySelfAudit" aria-live="polite">Checking current Reality capabilities…</div>
+</details>
+ <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
+</section>
+<div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
+<p id="status" class="status" role="status" aria-live="polite">Ready.</p>
+<form id="composer" class="composer">
+<textarea id="prompt" maxlength="6000" placeholder="Message Reality…" aria-label="Message Reality"></textarea>
+<button id="send" type="submit">Send</button>
+</form>
+</div>
+<p id="shiftStatus" class="status" role="status" hidden aria-live="polite"></p>
+<p id="startup" class="status" role="status">Checking your Reality session…</p>
+</div>
+<script type="module">
+import {interpretSignedInChatShiftCommand,safeShiftReadbackState}
+ from '/reality-owner-chat-shift-command-v1.js';
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const KEY='reality.private.chat.conversation.v1';
+const SESSION='/api/reality/personal-session';
+const API='/api/reality/personal-chat';
+const SHIFT='/api/reality/personal-governed-employee-shift';
+const ROSTER='/api/reality/personal-employee-roster';
+const RILEY_PROOF='/api/reality/personal-riley-proof';
+const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
+const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
+const SELF_AUDIT='/api/reality/personal-capability-self-audit';
+const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
+function conversation(){
+  let id;try{id=localStorage.getItem(KEY)}catch{}
+  if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
+  return id;
+}
+function setConversation(id){active=id;try{localStorage.setItem(KEY,id)}catch{}}
+function status(message){$('status').textContent=message}
+function bubble(role,text,cls=''){
+  const el=document.createElement('div');el.className='message '+role+' '+cls;
+  const label=document.createElement('small');label.textContent=role==='user'?'You':'Reality';
+  const body=document.createElement('div');body.textContent=String(text||'');
+  el.append(label,body);$('thread').append(el);
+  $('thread').scrollTop=$('thread').scrollHeight;
+  return el;
+}
+async function json(url,options={}){
+  const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
+  const data=await response.json().catch(()=>null);
+  if(!response.ok||!data)throw Error(data?.error||'Request unavailable ('+response.status+')');
+  return data;
+}
+function textNode(tag,content,cls=''){
+  const node=document.createElement(tag);node.textContent=String(content??'');
+  if(cls)node.className=cls;
+  return node;
+}
+function employeeCard(employee){
+  if(!employee||typeof employee.display_name!=='string'||
+    typeof employee.role!=='string'||typeof employee.role_summary!=='string'||
+    employee.activation_status!=='PROPOSED_NOT_DEPLOYED'||
+    employee.active_worker_id!==null||
+    employee.worker_shift_id!==null||
+    employee.independently_completed_jobs!==0||
+    !Array.isArray(employee.categories)||!Array.isArray(employee.responsibilities)||
+    !Array.isArray(employee.candidate_jobs)||employee.candidate_jobs.length>25||
+    employee.candidate_jobs.length!==employee.candidate_count)
+    throw Error('EMPLOYEE_TEAM_SOURCE_UNVERIFIED');
+  const card=document.createElement('article');card.className='team-card'+(employee.pilot?' pilot':'');
+  const top=document.createElement('div');top.className='team-card-top';
+  const avatar=textNode('div',employee.display_name.trim().slice(0,1).toUpperCase(),'team-avatar');
+  avatar.setAttribute('aria-hidden','true');
+  const title=document.createElement('div');
+  title.append(textNode('div',employee.display_name,'team-name'),
+   textNode('div',employee.role,'team-role'));
+  top.append(avatar,title);card.append(top);
+  card.append(textNode('p',employee.role_summary));
+  card.append(textNode('div','Categories: '+employee.categories.join(' · '),'team-tags'));
+  card.append(textNode('div',
+    (employee.pilot?'First pilot · ':'')+'Proposed, not active · '+
+    employee.candidate_count+' source finding'+(employee.candidate_count===1?'':'s'),
+    'team-status'));
+  const detail=document.createElement('details');
+  detail.append(textNode('summary','Responsibilities and assigned work'));
+  const duties=document.createElement('ul');
+  for(const d of employee.responsibilities.slice(0,5))
+   duties.append(textNode('li',d));
+  detail.append(duties);
+  const jobs=textNode('div',employee.candidate_count?
+    'Work Center findings (need independent verification):':
+    'No source-backed category findings currently assigned. This does not mean the role is unnecessary.',
+    'evidence');
+  detail.append(jobs);
+  const list=document.createElement('ul');
+  for(const job of employee.candidate_jobs.slice(0,5)){
+    if(job.authorized_execution!==false||job.independently_verified_done!==false||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(job.source_url))
+      throw Error('EMPLOYEE_TEAM_JOB_SOURCE_UNVERIFIED');
+    const li=document.createElement('li');
+    const a=document.createElement('a');
+    a.href=job.source_url;a.target='_blank';a.rel='noopener noreferrer';
+    a.textContent=job.title.slice(0,140);
+    li.append(a);list.append(li);
+  }
+  if(employee.candidate_count>5)list.append(textNode('li',
+    'Additional '+(employee.candidate_count-5)+' findings in existing Work Center'));
+  detail.append(list);
+  detail.append(textNode('div','Human accountability: '+employee.human_accountability,
+    'evidence'));
+  card.append(detail);
+  if(employee.pilot){
+    const proof=textNode('div','Checking independent evidence for Riley’s first task…','team-proof');
+    proof.id='rileyPilotProof';card.append(proof);
+    const loop=textNode('div','Checking live full-loop job readiness…','team-proof');
+    loop.id='rileyLoopReadiness';card.append(loop);
+    const backlog=textNode('div','Reconciling Riley’s existing unfinished backlog…','team-proof');
+    backlog.id='rileyExistingBacklog';card.append(backlog);
+  }
+  return card;
+}
+async function refreshRileyProof(){
+ const node=$('rileyPilotProof');
+ if(!node)return;
+ try{
+  const result=await json(RILEY_PROOF,{signal:AbortSignal.timeout(30000)});
+  if(result.ok!==true||result.owner_scope_verified!==true||
+   result.worker_execution_authorized_by_read!==false||
+   result.version!=='reality-riley-pilot-provider-proof-v1'||
+   result.status!=='RILEY_FIRST_REAL_INVESTIGATION_INDEPENDENTLY_VERIFIED'||
+   result.independent_provider_verification_passed!==true||
+   result.employee_name!=='Riley'||
+   result.actual_work_kind!=='BOUNDED_READ_ONLY_CI_FAILURE_INVESTIGATION'||
+   result.original_job_completed!==false||
+   result.autonomous_eight_hour_shift_verified!==false||
+   result.capability_installed!==false||
+   result.production_changed!==false||
+   result.verified_human_hours_saved!==null||
+   !/^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(result.source_run_url)||
+   !/^[a-f0-9]{40}$/.test(result.source_commit_sha)||
+   !Number.isSafeInteger(result.independently_verified_job_id))
+   throw Error('PILOT_WORK_NOT_INDEPENDENTLY_VERIFIED');
+  node.replaceChildren(
+   textNode('div','First real engineering investigation · independently verified'),
+   textNode('div','Provider source checking completed. Not an eight-hour shift, code repair, or measured savings.')
+  );
+  const link=document.createElement('a');
+  link.href=result.source_run_url;link.target='_blank';link.rel='noopener noreferrer';
+  link.textContent='View signed provider-run evidence';
+  node.append(link);
+ }catch{
+  node.textContent='Riley’s first work proof is currently unavailable or unverified. No completed repair is claimed.';
+ }
+}
+async function refreshRileyLoopReadiness(){
+ const node=$('rileyLoopReadiness');
+ if(!node)return;
+ try{
+  const result=await json(RILEY_LOOP,{signal:AbortSignal.timeout(30000)});
+  if(result.ok!==true||result.owner_scope_verified!==true||
+   result.read_only!==true||
+   result.version!=='reality-riley-live-loop-readiness-v1'||
+   result.diagnostic_only!==true||
+   result.worker_execution_authorized_by_read!==false||
+   result.worker_wake_dispatched_by_read!==false||
+   result.original_job_started_by_read!==false||
+   result.installation_authorized!==false||
+   result.original_job_settled_by_read!==false||
+   result.independent_final_receipt_recorded_by_read!==false||
+   result.production_changed!==false||
+   result.verified_human_hours_saved!==null)
+   throw Error('RILEY_ORIGINAL_READBACK_UNVERIFIED');
+  const options={
+   NO_ACTIVE_AUTHORIZED_RILEY_SHIFT:
+    'Full-loop readiness: no active owner-authorized shift. An existing unfinished job must be independently qualified before execution.',
+   NO_NEW_QUALIFIED_SHIFT_BOUND_ORIGINAL_JOB:
+    'Full-loop readiness: active shift found, but no qualified, authorized original Riley job is attached.',
+   AMBIGUOUS_ORIGINAL_JOB_NO_AUTO_SELECTION:
+    'Full-loop readiness: more than one possible original job. Reality will not guess or replay work.',
+   EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE:
+    'Full-loop readiness: an original job is matched, but Reality’s independent authorization gate does not allow a wake.',
+   EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE:
+    'Full-loop readiness: the exact original job is eligible for a governed wake. Worker claim and settlement are NOT yet proven.'
+  };
+  const text=options[result.status];
+  if(!text)throw Error('RILEY_UNRECOGNIZED_READINESS');
+  node.textContent=text;
+ }catch{
+  node.textContent='Full-loop readiness unavailable. No original-job execution or settlement is claimed.';
+ }
+}
+async function refreshRealitySelfAudit(){
+ const node=$('realitySelfAudit');
+ if(!node)return;
+ try{
+  const data=await json(SELF_AUDIT,{signal:AbortSignal.timeout(25000)});
+  if(data.ok!==true||data.owner_scope_verified!==true||
+    data.read_only!==true||
+    data.version!=='reality-evidence-grounded-self-audit-v1'||
+    data.evidence_kind!=='OWNER_SCOPED_DATABASE_AND_SOURCE_CAPABILITY_CONTRACT'||
+    data.execution_authorized_by_read!==false||
+    data.model_self_authorization!==false||
+    data.installation_authorized!==false||
+    data.full_shift_automation_proven!==false||
+    data.production_changed!==false||
+    data.measured_net_labor_hours_saved!==null||
+    !Array.isArray(data.capabilities)||data.capabilities.length!==10)
+   throw Error('REALITY_SELF_AUDIT_PROVIDER_UNVERIFIED');
+  node.replaceChildren(textNode('div',
+    'Evidence-based current state: '+data.exact_current_owner_shift_count+
+    ' active authorized shift(s), '+
+    data.historical_read_only_shifts+' historical read-only shift(s), '+
+    data.historical_settled_originals_in_owner_readback+
+    ' historical independently settled original(s).'));
+  const selected=new Set(['openai_reasoning_gateway',
+   'central_genuine_capability_engine',
+   'employee_capability_wake','multi_job_shift_controller',
+   'automated_full_shift_self_repair']);
+  for(const entry of data.capabilities){
+   if(!selected.has(entry.id))continue;
+   if(typeof entry.proof_level!=='string'||entry.proof_level.length>120)
+    throw Error('REALITY_SELF_AUDIT_LEVEL_NOT_VERIFIED');
+   const line=textNode('div',entry.id.replaceAll('_',' ')+' — '+
+    entry.proof_level.replaceAll('_',' ').toLowerCase());
+   line.style.marginTop='6px';node.append(line);
+  }
+  node.append(textNode('div',
+   'Reality can investigate and pursue governed repairs, but cannot claim that every capability is live or every engineering problem can be solved.'));
+ }catch{
+  node.textContent='Independent capability self-audit unavailable. No unverified live capability is claimed.';
+ }
+}
+async function refreshRileyExistingBacklog(){
+ const node=$('rileyExistingBacklog');
+ if(!node)return;
+ try{
+  const x=await json(RILEY_BACKLOG,{signal:AbortSignal.timeout(50000)});
+  if(x.ok!==true||x.owner_scope_verified!==true||
+    x.worker_execution_authorized_by_read!==false||
+    x.version!=='reality-riley-existing-backlog-v1'||
+    x.read_only!==true||x.execution_authorized_by_read!==false||
+    x.starts_original_job!==false||
+    x.installation_authorized!==false||
+    x.final_receipt_recorded_by_read!==false||
+    x.production_changed!==false||
+    x.human_hours_saved_verified!==null||
+    !Array.isArray(x.rows)||x.rows.length>25)
+    throw Error('RILEY_BACKLOG_UNVERIFIED');
+  const header=textNode('div',
+   'Existing Riley backlog · '+x.total_open_provider_issues_reviewed+
+   ' open issues reconciled'+(x.source_coverage_complete?'':' (partial source coverage)'));
+  node.replaceChildren(header);
+  const statuses={
+   PREVIOUS_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED:'Previously settled — do not replay',
+   HISTORICAL_INSTALL_OR_PROBATION_NEEDS_RECONCILIATION:'Historical installation — reconcile receipts',
+   EXISTING_CAPABILITY_JOB_REQUIRES_LIVE_AUTHORITY_GATE:'Existing job — requires current execution gate',
+   AMBIGUOUS_HISTORICAL_ORIGINALS_REVIEW:'Historical originals — review duplicates',
+   LEGACY_DISCOVERY_QUEUE_REQUIRES_RECONCILIATION:'Old discovery queue — reconcile before action',
+   OPEN_SOURCE_WORK_AWAITING_ORIGINAL_JOB_QUALIFICATION:'Open issue — qualify before execution'
+  };
+  for(const entry of x.rows.slice(0,5)){
+   if(!Number.isSafeInteger(entry.issue_number)||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(entry.source_url)||
+      !statuses[entry.status]||
+      entry.installation_authorized!==false||
+      entry.original_job_completed_by_read!==false||
+      entry.exact_worker_wake_authorized_by_read!==false)
+    throw Error('RILEY_BACKLOG_ENTRY_UNVERIFIED');
+   const line=document.createElement('div');
+   line.style.marginTop='8px';
+   const a=document.createElement('a');
+   a.href=entry.source_url;a.rel='noopener noreferrer';
+   a.target='_blank';a.textContent='#'+entry.issue_number+' · '+entry.title;
+   line.append(a,textNode('div',statuses[entry.status]));
+   node.append(line);
+  }
+  node.append(textNode('div',
+   'Tracked issues are work candidates, not permission to repair. Reality preserves the original approval and does not replay settled work.'));
+ }catch{
+  node.textContent='Existing backlog readback unavailable. This is not evidence that Riley has no work.';
+ }
+}
+async function refreshEmployeeBoard(){
+  if(teamLoading)return;
+  teamLoading=true;
+  const summary=$('teamBoardSummary');
+  summary.textContent='Checking existing work categories…';
+  try{
+    const roster=await json(ROSTER,{signal:AbortSignal.timeout(40000)});
+    if(roster.ok!==true||roster.status!=='READ_ONLY_PROPOSED_AI_EMPLOYEES'||
+       roster.owner_scope_verified!==true||
+       roster.worker_execution_authorized!==false||
+       roster.proposed_employee_count!==8||
+       !Array.isArray(roster.proposed_employees)||roster.proposed_employees.length!==8||
+       roster.active_ai_employee_count!==0||
+       roster.original_job_admitted!==false||
+       roster.production_changed!==false||
+       roster.installation_authorized!==false)
+      throw Error('EMPLOYEE_TEAM_READBACK_UNVERIFIED');
+    const ids=new Set(roster.proposed_employees.map(x=>x.employee_id));
+    if(ids.size!==8)throw Error('EMPLOYEE_TEAM_DUPLICATE_IDENTITIES');
+    const holder=document.createDocumentFragment();
+    for(const employee of roster.proposed_employees)
+      holder.append(employeeCard(employee));
+    $('teamCards').replaceChildren(holder);
+    void refreshRileyProof();
+    void refreshRileyLoopReadiness();
+    void refreshRileyExistingBacklog();
+    summary.textContent='8 proposed · '+roster.existing_work_center_candidates+
+     ' categorized findings · 0 active workers';
+    $('teamEvidenceNote').textContent=
+      'Names are virtual employee labels. Work assignments are review candidates, not job executions. '+
+      'No verified cash savings. NASA benchmark applies only to comparable, verified software fault repairs.';
+  }catch(e){
+    $('teamCards').replaceChildren();
+    summary.textContent='Employee evidence unavailable';
+    $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
+      String(e?.message||'Unknown').slice(0,180)+
+      '. No workers or completed work are being claimed.';
+  }finally{teamLoading=false}
+}
+async function refreshShiftStatus(){
+  if(shiftLoading)return;
+  shiftLoading=true;
+  try{
+    const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+    const activeState=safeShiftReadbackState(data);
+    const node=$('shiftStatus');
+    if(activeState.hasActive){
+      const briefing=data.shift_briefing||{};
+      const current=String(briefing.current||activeState.status);
+      const route=data.recovery_diagnosis;
+      const explain=route?.version==='reality-employee-recovery-route-v1'&&
+       route.shift_id===activeState.shift_id&&route.diagnostic_only===true&&
+       route.worker_has_direct_original_job_execution_connection===false&&
+       route.eligible_for_auto_install===false&&
+       route.model_generation_started_by_diagnosis===false&&
+       route.production_changed===false?
+       ' Recovery gate: '+String(route.status).replaceAll('_',' ')+
+       '. Next: '+String(route.next_verified_action).slice(0,500):'';
+      node.textContent='Authorized '+activeState.duration_hours+'-hour shift · '+activeState.shift_id+
+        ' · '+current+explain+
+        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.';
+      node.hidden=false;
+    }else node.hidden=true;
+  }catch{
+    // A failed readback must not show an invented shift status.
+    $('shiftStatus').hidden=true;
+  }finally{shiftLoading=false}
+}
+async function authorizeShiftFromChat(command){
+  // Use exactly the existing authenticated owner shift controller; no model
+  // text is ever execution authority. The browser user already pressed Send.
+  const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+  const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
+  if(existing.hasActive){
+    return {
+      acknowledged:true,
+      text:existing.matching_requested_hours?
+       'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
+       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.':
+       'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
+       '). I did not start another concurrent shift or override its authorization.',
+    };
+  }
+  const draftRead=await json(SHIFT+'?hours='+command.duration_hours,{
+    signal:AbortSignal.timeout(30000)
+  });
+  const draft=draftRead.requested_shift_draft;
+  if(draft?.shift_duration_hours!==command.duration_hours||
+     draft?.shift_duration_minutes!==command.duration_hours*60||
+     draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
+     draft?.installation_authorized!==false||draft?.job_started!==false||
+     draft?.read_only!==true||
+     !/^sha256:[a-f0-9]{64}$/.test(draft?.expected_fingerprint||''))
+    throw Error('SHIFT_DRAFT_EXACT_SCOPE_NOT_VERIFIED');
+  const start=new Date(Date.now()+10000).toISOString();
+  const created=await json(SHIFT,{
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+      requested_hours:command.duration_hours,
+      expected_fingerprint:draft.expected_fingerprint,
+      planned_start_at:start
+    }),signal:AbortSignal.timeout(50000)
+  });
+  if(created.ok!==true||
+     !['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(created.status)||
+     !/^[a-f0-9-]{36}$/i.test(created.shift_id||'')||
+     created.initial_authorization_recorded!==true||
+     created.installation_authorized!==false||
+     created.production_changed!==false||
+     created.worker_dispatch_verified!==false)
+    throw Error('SHIFT_OWNER_AUTHORIZATION_RECEIPT_UNVERIFIED');
+  // Check the exact persisted shift and duration before saying it exists.
+  const verified=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
+  const match=(verified.shifts||[]).find(x=>x.shift_id===created.shift_id);
+  if(!match||!/^sha256:[a-f0-9]{64}$/.test(match.plan_fingerprint||'')||
+     match.plan_fingerprint!==draft.expected_fingerprint||
+     (Date.parse(match.planned_end_at)-Date.parse(match.planned_start_at))!==
+      command.duration_hours*3600000)
+    throw Error('SHIFT_CREATED_BUT_READBACK_UNVERIFIED_DO_NOT_REPEAT');
+  // Show proposed functional roles from a trusted read-only catalog. Never
+  // report them as active employees or separate worker instances.
+  const team=draft.proposed_team;
+  const proposed=team?.status==='EVIDENCE_SCOPED_ROLE_REQUIREMENTS_NOT_DEPLOYED_EMPLOYEES'&&
+    Number.isInteger(team.proposed_role_slots)&&team.proposed_role_slots>=1&&
+    team.proposed_role_slots<=4&&Array.isArray(team.proposed_roles)&&
+    team.proposed_roles.length===team.proposed_role_slots&&
+    team.proposed_roles.every(r=>r.work_execution_verified===false&&
+      r.active_worker_id===null)?
+    ' Proposed work functions ('+team.proposed_role_slots+', not active employees): '+
+      team.proposed_roles.map(r=>r.title).join(', ')+'.': '';
+  const routing=draft.employee_category_assignments;
+  const grouped=routing?.status==='READ_ONLY_CATEGORY_ASSIGNMENT_NOT_GOVERNED_JOB_DISPATCH'&&
+    routing.first_pilot_employee?.employee_function_id==='software_engineering'&&
+    routing.daily_recurrence_activated===false&&
+    routing.employee_workers_deployed===0&&
+    Array.isArray(routing.employee_assignments)&&
+    routing.employee_assignments.length===8&&
+    routing.employee_assignments.every(x=>x.active_employee_instantiated===false&&
+      Array.isArray(x.candidate_jobs)&&x.candidate_count===x.candidate_jobs.length)?
+    ' Category candidates by employee: '+
+      routing.employee_assignments.filter(x=>x.candidate_count>0)
+       .map(x=>x.employee_title+' ('+x.candidate_count+')').join(' · ')+
+    '. FIRST PILOT: '+routing.first_pilot_employee.employee_title+
+    '. These are source observations awaiting qualification, not executed jobs or a daily recurring shift.':'';
+  return {
+    acknowledged:true,
+    text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
+      created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
+      ' The existing trusted worker scheduler must independently claim work. '+
+      'A worker acknowledgment and completed original-job results are NOT yet proven. '+
+      'The current shift engine performs source validation and awaits exact governed '+
+      'original-job admission for consequential repairs. No installation or production change was authorized.'
+  };
+}
+async function refreshHistory(id=active){
+  if(pending)return;
+  const seq=++sequence;
+  try{
+    const data=await json(API+'?conversation_id='+encodeURIComponent(id),{signal:AbortSignal.timeout(10000)});
+    if(seq!==sequence||id!==active||pending)return;
+    $('thread').replaceChildren();
+    for(const m of data.messages||[])bubble(m.role==='user'?'user':'assistant',m.text);
+    status('Ready.');
+  }catch(e){if(seq===sequence&&id===active)status('History unavailable. You can still type a message. '+e.message)}
+}
+async function listConversations(){
+  try{
+    const data=await json(API+'?list=1',{signal:AbortSignal.timeout(10000)});
+    const select=$('conversations');
+    select.replaceChildren();
+    const here=document.createElement('option');here.value=active;here.textContent='Current conversation';
+    select.append(here);
+    for(const c of data.conversations||[]){
+      if(!uuid(c.conversation_id)||c.conversation_id===active)continue;
+      const option=document.createElement('option');option.value=c.conversation_id;
+      option.textContent=String(c.last_message||'Previous conversation').slice(0,60);
+      select.append(option);
+    }
+    select.value=active;
+  }catch{/* Conversation list is optional; never block Chat. */}
+}
+function showAuth(authenticated){
+  $('startup').hidden=true;
+  $('auth').hidden=authenticated;
+  $('chat').hidden=!authenticated;
+  if(authenticated){
+    setConversation(conversation());
+    void refreshHistory();
+    void listConversations();
+    void refreshShiftStatus();
+    void refreshEmployeeBoard();
+    void refreshRealitySelfAudit();
+    $('prompt').focus({preventScroll:true});
+  }
+}
+async function init(){
+  try{
+    const data=await json(SESSION,{signal:AbortSignal.timeout(10000)});
+    showAuth(data.authenticated===true);
+  }catch(e){
+    $('startup').hidden=true;
+    $('auth').hidden=false;
+    $('authMessage').textContent='Unable to check your session: '+e.message+'. Retry by reloading.';
+  }
+}
+$('login').onclick=async()=>{
+  $('login').disabled=true;$('authMessage').textContent='Signing in…';
+  try{
+    const data=await json(SESSION,{method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:$('email').value,password:$('password').value}),
+      signal:AbortSignal.timeout(15000)});
+    if(!data.authenticated)throw Error('Sign-in not confirmed');
+    $('password').value='';$('authMessage').textContent='';
+    showAuth(true);
+  }catch(e){$('authMessage').textContent='Sign-in failed: '+e.message}
+  finally{$('login').disabled=false}
+};
+$('logout').onclick=async()=>{
+  if(pending)return;
+  try{await json(SESSION,{method:'DELETE',signal:AbortSignal.timeout(10000)})}
+  catch(e){status('Log out could not be confirmed: '+e.message);return}
+  $('thread').replaceChildren();
+  $('authMessage').textContent='Signed out.';
+  showAuth(false);
+};
+$('teamToggle').onclick=()=>{
+ const panel=$('employeeBoardPanel');
+ panel.hidden=!panel.hidden;
+ $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
+ if(!panel.hidden){void refreshEmployeeBoard();void refreshRealitySelfAudit();}
+};
+$('newChat').onclick=()=>{
+  if(pending)return;
+  setConversation(crypto.randomUUID());
+  $('thread').replaceChildren();status('New conversation ready.');
+  void listConversations();
+};
+$('conversations').onchange=()=>{
+  if(pending)return;
+  const id=$('conversations').value;
+  if(!uuid(id))return;
+  setConversation(id);void refreshHistory(id);
+};
+$('runFullShift').onclick=async()=>{
+ // Direct owner click is the sole trigger. The model and passive page load
+ // cannot authorize the shift. Reuses the existing signed-in endpoint.
+ if(pending)return;
+ const command=interpretSignedInChatShiftCommand("Run Riley's full shift");
+ if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
+    command.duration_hours!==8||command.installation_authorized!==false)
+  return status('Full-shift owner command could not be validated.');
+ pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
+ const pendingResult=bubble('assistant',
+  'Checking your existing shift and exact owner-scoped backlog…','pending');
+ status('Checking signed-in owner authorization and original shift readback…');
+ try{
+  const receipt=await authorizeShiftFromChat(command);
+  pendingResult.classList.remove('pending');
+  pendingResult.lastChild.textContent=receipt.text;
+  status('Full-shift authorization read back. Worker results are verified separately.');
+  void refreshShiftStatus();void refreshEmployeeBoard();
+ }catch(err){
+  pendingResult.className='message assistant error';
+  pendingResult.lastChild.textContent=
+   'Shift authorization not confirmed. Use Refresh to check for an existing shift before retrying. ('+
+   String(err?.message||'Unknown').slice(0,180)+')';
+  status('Full-shift authorization uncertain. Do not create a duplicate shift.');
+  void refreshShiftStatus();
+ }finally{
+  pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
+ }
+};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
+$('prompt').onkeydown=e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+    e.preventDefault();$('composer').requestSubmit();
+  }
+};
+$('composer').onsubmit=async(e)=>{
+  e.preventDefault();if(pending)return;
+  const value=$('prompt').value.trim();if(!value)return;
+  // Never wait for a server round-trip before showing the user's own message.
+  const id=active,requestId=crypto.randomUUID();
+  pending=true;$('send').disabled=true;
+  const optimistic=bubble('user',value,'pending');
+  $('prompt').value='';
+  const waiting=bubble('assistant','Waiting for Reality…','pending');
+  const started=Date.now();
+  const showTime=()=>{if(pending&&id===active){
+    const seconds=Math.floor((Date.now()-started)/1000);
+    waiting.lastChild.textContent=seconds<4?'Waiting for Reality…':'Waiting for Reality… '+seconds+'s';
+  }};
+  elapsed=setInterval(showTime,1000);
+  status('Message submitted. Waiting for a reply…');
+  try{
+    const command=interpretSignedInChatShiftCommand(value);
+    if(command){
+      const receipt=await authorizeShiftFromChat(command);
+      optimistic.classList.remove('pending');
+      waiting.classList.remove('pending');
+      waiting.lastChild.textContent=receipt.text;
+      status('Verified shift command receipt displayed. This action is not a model answer.');
+      void refreshShiftStatus();
+      return;
+    }
+    const data=await json(API,{method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({conversation_id:id,request_id:requestId,message:value}),
+      signal:AbortSignal.timeout(75000)});
+    if(!data.ok||typeof data.answer!=='string'||!data.answer.trim())throw Error('No confirmed answer returned');
+    optimistic.classList.remove('pending');
+    waiting.classList.remove('pending');
+    waiting.lastChild.textContent=data.answer;
+    status('Reply received.');
+    // History and work readbacks are not required to show a received answer.
+  }catch(err){
+    optimistic.classList.remove('pending');
+    waiting.className='message assistant error';
+    waiting.lastChild.textContent='Reply not confirmed. Your message may have been saved. Use Refresh to check the conversation before sending it again. ('+err.message+')';
+    status('Response failed or timed out. Check saved history to avoid duplicates.');
+  }finally{
+    clearInterval(elapsed);elapsed=null;pending=false;$('send').disabled=false;
+    $('prompt').focus({preventScroll:true});
+  }
+};
+setInterval(()=>{if(!$('chat').hidden&&!pending)void refreshShiftStatus()},30000);
+void init();
+})();
+</script>
+
+<script>
+(()=>{
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const login=$('passkeyLogin'),enroll=$('passkeyEnroll');
+ const message=(text)=>{const node=$('auth').hidden?$('status'):$('authMessage');node.textContent=text;};
+ const fromUrl64=value=>{
+   let s=String(value).replace(/-/g,'+').replace(/_/g,'/');
+   s+='='.repeat((4-s.length%4)%4);
+   return Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+ };
+ const toUrl64=value=>{
+   const bytes=new Uint8Array(value||new ArrayBuffer(0));
+   let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+ };
+ function credentialJSON(value){
+   if(typeof value.toJSON==='function')return value.toJSON();
+   const r=value.response;
+   return {
+     id:value.id,type:value.type,rawId:toUrl64(value.rawId),
+     response:r.attestationObject?{
+       clientDataJSON:toUrl64(r.clientDataJSON),
+       attestationObject:toUrl64(r.attestationObject),
+       transports:typeof r.getTransports==='function'?r.getTransports():[]
+     }:{
+       clientDataJSON:toUrl64(r.clientDataJSON),
+       authenticatorData:toUrl64(r.authenticatorData),
+       signature:toUrl64(r.signature),
+       userHandle:r.userHandle?toUrl64(r.userHandle):null
+     },
+     clientExtensionResults:value.getClientExtensionResults?.()||{}
+   };
+ }
+ async function call(action,extras={}){
+   const response=await fetch('/api/reality/personal-passkey',{
+     method:'POST',credentials:'same-origin',cache:'no-store',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({action,...extras}),signal:AbortSignal.timeout(18000)
+   });
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true)throw Error(data?.error||'Passkey service unavailable');
+   return data;
+ }
+ async function start(register){
+   const button=register?enroll:login;
+   if(!window.PublicKeyCredential||!navigator.credentials)
+     return message('This browser does not support passkeys. Password sign-in is still available.');
+   button.disabled=true;
+   try{
+     message(register?'Starting secure fingerprint setup…':'Waiting for your phone to verify your passkey…');
+     const action=register?'register':'login';
+     const challenge=await call(action+'-options');
+     const options={...challenge.options,challenge:fromUrl64(challenge.options.challenge)};
+     if(register){
+       options.user={...options.user,id:fromUrl64(options.user.id)};
+       if(Array.isArray(options.excludeCredentials))
+         options.excludeCredentials=options.excludeCredentials.map(x=>({...x,id:fromUrl64(x.id)}));
+     }else{
+       if(Array.isArray(options.allowCredentials))
+         options.allowCredentials=options.allowCredentials.map(x=>({...x,id:fromUrl64(x.id)}));
+     }
+     const credential=await navigator.credentials[register?'create':'get']({publicKey:options});
+     if(!credential)throw Error('No passkey was selected');
+     const saved=await call(action+'-verify',{
+       challenge_id:challenge.challenge_id,credential:credentialJSON(credential)
+     });
+     if(register){
+       if(!saved.passkey_registered)throw Error('Passkey was not confirmed');
+       message('Fingerprint/passkey setup complete. You can use it to sign in next time.');
+     }else if(saved.authenticated){
+       message('Passkey sign-in successful.');
+       location.reload(); // The existing HttpOnly session endpoint restores Chat.
+     }else throw Error('Passkey sign-in was not confirmed');
+   }catch(e){
+     message(e?.name==='NotAllowedError'
+       ?'Fingerprint request cancelled. Password sign-in remains available.'
+       :'Passkey unavailable: '+String(e.message||e));
+   }finally{button.disabled=false}
+ }
+ login.addEventListener('click',()=>{void start(false)});
+ enroll.addEventListener('click',()=>{void start(true)});
+})();
+</script>
+</body>
+</html>

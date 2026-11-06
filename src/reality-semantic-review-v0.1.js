@@ -563,6 +563,7 @@ export async function reviewRealityAnswer({
    evidence_coverage:actualFacts.length?'SOURCE_ATTESTED_RECORDS_ONLY':'NO_GROUNDED_FACTS_AVAILABLE',
  };
  const response=await fetchImpl('https://api.openai.com/v1/responses',{
+   signal:AbortSignal.timeout(25000),
    method:'POST',headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
    body:JSON.stringify({model,store:false,input:[
      {role:'system',content:[{type:'input_text',text:instructions}]},

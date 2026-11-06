@@ -1,7 +1,9 @@
-// Trusted server-to-server shift pulse. It can consume only an existing,
-// owner-authorized READ-ONLY queue step or reconcile a pre-existing independent
-// final receipt. It cannot approve upgrades, install, start original work,
-// issue an execution warrant, or alter production systems.
+// Trusted server-to-server shift pulse. It reads authorized source steps,
+// reconciles existing original-job receipts, and can request an idempotent wake
+// for one already-authorized original job only after a separate service-role
+// database readback. The existing capability worker independently claims work.
+// This endpoint cannot admit new jobs, authorize installation, bypass owner
+// approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
 import {shiftDatabase} from '../../src/reality-governed-shift-boundary-v1.js';
 import {processGovernedEmployeeShiftTick}

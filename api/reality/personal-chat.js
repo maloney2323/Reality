@@ -7,11 +7,13 @@ import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
 import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
-import {readVerifiedEmployeeShiftForChat}
+import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
+import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
+import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
 import {assertFinalChatPublicationProof}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
@@ -86,6 +88,16 @@ export default async function handler(req,res){
       recovered_messages:history.messages.length,older_messages_may_be_missing:history.older_missing}});
    fail('CHAT_REQUEST_ALREADY_IN_HISTORY',409);
   }
+  // Inspect the actual immutable scoped ledger before saving another user
+  // message. Only a fully hash-verified non-consequential terminal fork may
+  // start a new, explicitly linked read-only recovery segment.
+  const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
+  const continuity=await resolvePrivateChatContinuity({
+   scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
+  });
+  const scopedRoot=continuity.scopedRoot;
+  if(continuity.fork_recovery&&goalCommand)
+   fail('CHAT_FORK_GOAL_MUTATION_REQUIRES_INDEPENDENT_RECONCILIATION',409);
   const key=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||process.env.OPENAI_API_KEY||'');
   if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
@@ -107,8 +119,6 @@ export default async function handler(req,res){
     request_id:requestId};
   }
   // Root/world scope cannot be forged by the browser or shared across users.
-  const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
-  const scopedRoot='personal:chat:'+scope;
   let goalCommandReceipt=null;
   if(verifiedUserGoalCommand){
    // Commit an authoritative CONVERSATIONAL GOAL only through existing
@@ -135,23 +145,42 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
    readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
-   readVerifiedIndependentWorkerForChat({session,message:text,db:isolated})
+   readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),
+   readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated})
   ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
+   // The signed-in user's current request can permit read-only public search;
+   // model text cannot authorize installation, worker execution or any account action.
+   publicResearchEnabled:isPublicResearchRequest(text),
    model:'gpt-4.1-mini',apiKey:key,
    systemContext:{conversation_id:conversationId,
-    worldline_id:'personal:chat:'+scope,world_id:'personal:chat:'+scope,
-    continuity_root_id:'personal:chat:'+scope,
+    worldline_id:scopedRoot,world_id:scopedRoot,
+    continuity_root_id:scopedRoot,
+    fork_recovery_audit:continuity.fork_recovery,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
+    // This authenticated endpoint handles cognition and optional explicit goal
+    // recording. It does not run /personal-governed-build or /real-repair...
+    // Merely saying "starting" must never impersonate worker dispatch.
+    chat_work_execution_bridge:{
+      plain_chat_can_dispatch_workers:false,
+      original_job_queued_by_this_chat_turn:false,
+      worker_acknowledgment_verified_by_this_chat_turn:false,
+      existing_owner_action:'RUN_FULL_LOOP_ON_REALITY_HOME',
+      existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
+      installed_capabilities_require_separate_exact_authorization:true,
+    },
+    // Static published references already shown on Reality's homepage.
+    // These are references, not evidence of measured business savings.
+    published_research_references:publishedReferencesForChat(text),
     connected_world_observations:[
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
-     ...workerWakeObservations
+     ...workerWakeObservations,...companyWorkforceObservations
     ],
     action_authorized:false,execution_authorized:false,
    },
@@ -202,8 +231,14 @@ export default async function handler(req,res){
   // the EXACT answer checked by the final Integrity publication decision.
   const publication=await publishPrivateAssistantAtomically(session,{
     conversationId,requestId,text:answer,isolatedDb:isolated,
-    expectedRevision:goalAtGeneration.transition_count,
-    expectedLastEventId:goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
+    // On a recovered fork, keep the *original* independently verified goal
+    // epoch for the existing DB transaction's CAS. The new read-only segment
+    // never invents a new owner goal or resets the original goal revision.
+    expectedRevision:continuity.verified_prior_goal_cas?
+      continuity.verified_prior_goal_cas.expected_revision:goalAtGeneration.transition_count,
+    expectedLastEventId:continuity.verified_prior_goal_cas?
+      continuity.verified_prior_goal_cas.expected_last_goal_event_id:
+      goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
   });
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))

@@ -1,0 +1,52 @@
+name: Reality Chat verified-cycle UI v2
+on:
+  push:
+    branches:
+      - fix/reality-chat-fullscreen-verified-cycle-20261105
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'reality-chat-verified-cycle-v2.js'
+      - 'reality-chat-fullscreen-v2.css'
+      - 'test/reality-chat-fullscreen-v2.test.js'
+      - 'test/reality-chat-session-continuity-v2.test.js'
+      - 'test/reality-chat-live-response-v1.test.js'
+      - 'test/reality-provider-timeout-v1.test.js'
+      - 'test/reality-chat-send-nonblocking-v1.test.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'src/reality-semantic-review-v0.1.js'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'reality-chat-request-status-v1.js'
+      - 'src/reality-private-chat-auth-v0.1.js'
+      - 'reality-chat-workspace-v1.js'
+      - '.github/workflows/reality-chat-verified-cycle-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify Chat presentation and existing governed contracts
+        run: |
+          node --check reality-chat-workspace-v1.js
+          node --check reality-chat-verified-cycle-v2.js
+          node --test test/reality-chat-fullscreen-v2.test.js
+          node --test test/reality-chat-session-continuity-v2.test.js
+          node --check reality-chat-request-status-v1.js
+          node --test test/reality-chat-live-response-v1.test.js
+          node --test test/reality-provider-timeout-v1.test.js
+          node --test test/reality-chat-send-nonblocking-v1.test.js
+          node --test test/reality-model-gateway-v0.1.test.js
+          node --test test/reality-unified-semantic-review-v0.1.test.js
+          node --test test/reality-universe-postgres-continuity-v0.2.test.js
+          node --test test/reality-chat-workspace-v1.test.js
+          node --test test/reality-chat-page-shift-brief-v1.test.js
+          node --test test/reality-business-chat.test.js
+          node --test test/reality-business-chat-v2.test.js
+          node --test test/reality-private-chat-preview-v0.1.test.js

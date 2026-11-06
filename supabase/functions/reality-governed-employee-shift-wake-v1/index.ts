@@ -11,6 +11,7 @@ const allowed=new Set([
  'reality_authenticate_employee_shift_wake_v1',
  'reality_close_employee_shift_v1',
  'reality_reconcile_employee_shift_original_v1',
+ 'reality_read_eligible_shift_originals_v1',
  'reality_reconcile_employee_shift_historical_noop_v1',
  'reality_claim_employee_shift_step_v1',
  'reality_settle_employee_shift_step_v1',
@@ -160,6 +161,53 @@ async function originalLedgerRead(owner_id:string){
   no_new_authority_granted:true,observed_at:new Date().toISOString(),
   production_changed:false};
 }
+// The employee scheduler never holds GitHub write authority. It may ask
+// Reality's separate service-authenticated delivery broker to recheck the
+// exact existing original job; the broker alone sends the idempotent wake.
+async function brokerExistingCapabilityWake(original:Record<string,unknown>){
+ const empty={status:'NO_ELIGIBLE_CAPABILITY_WAKE',
+  worker_acknowledged:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+ if(original.status!=='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'||
+  original.governed_existing_work_status!==
+   'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY')return empty;
+ if(!UUID.test(String(original.shift_id||''))||
+  !UUID.test(String(original.governed_trigger_id||''))||
+  !/^work:[a-f0-9]{32}$/.test(String(original.governed_original_work_id||''))||
+  !HASH.test(String(original.shift_observation_proof_sha256||''))||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(
+    String(original.shift_observation_source_ref||''))||
+  original.governed_cycle_dispatched_by_shift!==false||
+  original.model_invoked_by_shift!==false||
+  original.new_customer_job_created!==false||
+  original.installation_authorized!==false||
+  original.production_changed!==false)
+   deny('EXACT_ORIGINAL_WAKE_SOURCE_UNTRUSTED');
+ const {url,key}=secrets();
+ const r=await fetch(url+'/functions/v1/reality-employee-capability-wake-broker-v1',{
+  method:'POST',cache:'no-store',redirect:'error',
+  headers:{'content-type':'application/json',
+   apikey:key,authorization:'Bearer '+key},
+  body:JSON.stringify({
+   shift_id:original.shift_id,
+   original_work_id:original.governed_original_work_id,
+   trigger_id:original.governed_trigger_id,
+   source_ref:original.shift_observation_source_ref,
+   source_proof_sha256:original.shift_observation_proof_sha256
+  }),signal:AbortSignal.timeout(18000)
+ });
+ const x=await r.json().catch(()=>null);
+ if(!r.ok||!x||typeof x!=='object'||
+  x.installation_authorized!==false||
+  x.original_job_completed!==false||x.production_changed!==false||
+  x.worker_acknowledged!==false||
+  !['EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED',
+    'NO_ELIGIBLE_CAPABILITY_WAKE'].includes(x.status))
+   deny('SEPARATE_BROKER_DELIVERY_UNVERIFIED');
+ return {status:x.status,
+  worker_acknowledged:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false};
+}
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')
@@ -242,6 +290,92 @@ Deno.serve(async req=>{
       noOp.original_job_execution_replayed!==false||
       noOp.new_customer_job_created!==false))
     deny('GOVERNED_HISTORICAL_NOOP_SOURCE_CHANGED');
+  let capabilityWake:Record<string,unknown>={
+   status:'NO_ELIGIBLE_CAPABILITY_WAKE',worker_acknowledged:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false};
+  try{capabilityWake=await brokerExistingCapabilityWake(original)}
+  catch(error){
+   const label=error instanceof Error?error.message:'UNKNOWN';
+   if(/^SHIFT_WAKE_[A-Z0-9_]{4,120}$/.test(label))
+    console.warn('REALITY_CAPABILITY_BROKER_DELIVERY',label);
+   capabilityWake={status:'CAPABILITY_WAKE_REQUIRES_RECONCILIATION',
+    worker_acknowledged:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false};
+  }
+  // One shift can contain MULTIPLE distinct authorized originals. Each
+  // candidate is independently checked by the existing capability broker
+  // before an idempotent trigger. No model code, original execution or
+  // installation happens inside this scheduler. Repeated calls cannot
+  // re-execute a claimed job: the database gate excludes durable claims.
+  let multiJobWakes:Record<string,unknown>={
+   status:'NO_MULTI_JOB_SHIFT_ORIGINALS_ELIGIBLE',eligible:0,
+   wake_deliveries_requested:0,worker_execution_acknowledged:false,
+   installation_authorized:false,production_changed:false};
+  if(original.status==='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'&&
+     UUID.test(String(original.shift_id||''))){
+   try{
+    const candidates=await rpc('reality_read_eligible_shift_originals_v1',{
+     p_shift_id:original.shift_id});
+    if(candidates.status!=='EXISTING_SHIFT_ORIGINALS_INDEPENDENTLY_RECONCILED'||
+       candidates.shift_id!==original.shift_id||
+       !Array.isArray(candidates.candidates)||
+       candidates.candidates.length>4||
+       candidates.candidate_count!==candidates.candidates.length||
+       candidates.execution_authorized!==false||
+       candidates.installation_authorized!==false||
+       candidates.production_changed!==false)
+       deny('MULTI_ORIGINAL_INDEPENDENT_PROVIDER_READBACK_CHANGED');
+    const seen=new Set<string>();
+    const work=candidates.candidates.map((c:Record<string,unknown>)=>{
+     if(!UUID.test(String(c.trigger_id||''))||
+        !UUID.test(String(c.owner_id||''))||
+        !UUID.test(String(c.source_event_id||''))||
+        !/^work:[a-f0-9]{32}$/.test(String(c.original_work_id||''))||
+        !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(
+         String(c.source_ref||''))||
+        !HASH.test(String(c.source_proof_sha256||''))||
+        c.shift_id!==original.shift_id||
+        c.current_owner_scope_verified!==true||
+        c.independently_settled!==false||
+        c.installation_authorized!==false||
+        c.production_changed!==false||
+        seen.has(String(c.original_work_id||'')))
+       deny('MULTI_ORIGINAL_SCOPE_NOT_EXACT');
+     seen.add(String(c.original_work_id));
+     return {
+      status:'EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED',
+      governed_existing_work_status:'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY',
+      shift_id:original.shift_id,
+      governed_trigger_id:c.trigger_id,
+      governed_original_work_id:c.original_work_id,
+      shift_observation_source_ref:c.source_ref,
+      shift_observation_proof_sha256:c.source_proof_sha256,
+      governed_cycle_dispatched_by_shift:false,
+      model_invoked_by_shift:false,new_customer_job_created:false,
+      installation_authorized:false,production_changed:false
+     };
+    });
+    const deliveries=await Promise.allSettled(
+     work.map(x=>brokerExistingCapabilityWake(x)));
+    multiJobWakes={
+     status:deliveries.some(x=>x.status==='rejected')?
+      'MULTI_JOB_WAKE_EFFECT_REQUIRES_RECONCILIATION':
+      'EXISTING_MULTI_JOB_WAKE_REQUESTS_RECORDED',
+     eligible:work.length,
+     wake_deliveries_requested:deliveries.filter(x=>
+      x.status==='fulfilled'&&
+      x.value.status==='EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED').length,
+     worker_execution_acknowledged:false,
+     installation_authorized:false,production_changed:false
+    };
+   }catch{
+    multiJobWakes={status:'MULTI_JOB_SOURCE_OR_WAKE_RECONCILIATION_REQUIRED',
+     eligible:0,wake_deliveries_requested:0,
+     worker_execution_acknowledged:false,
+     installation_authorized:false,production_changed:false};
+   }
+  }
   const claimed=await rpc('reality_claim_employee_shift_step_v1',{});
   if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP',
       'SHIFT_STEP_NOT_YET_DUE','INFLIGHT_LEASE_UNEXPIRED',
@@ -251,6 +385,8 @@ Deno.serve(async req=>{
    return send(200,{ok:true,status:claimed.status,
     shift_id:claimed.shift_id||null,
     source_check_completed:false,
+    capability_wake:capabilityWake,
+    multi_job_wakes:multiJobWakes,
     no_replay_recovery_status:noOp.status,
     historical_reconciliation_verified:noOp.status==='SHIFT_GOVERNED_HISTORICAL_NOOP_RECONCILED',
     governed_existing_work_status:observedWork||null,
@@ -297,6 +433,8 @@ Deno.serve(async req=>{
    evidence_digest:settled.proof_sha256,
    source_status:proof.provider_status||'OWNER_LEDGER_CHECKED',
    research_status:(proof.research as Record<string,unknown>|undefined)?.status||null,
+   capability_wake:capabilityWake,
+   multi_job_wakes:multiJobWakes,
    installation_authorized:false,original_job_completed:false,
    verified_human_hours_saved:null,production_changed:false});
  }catch(err){
