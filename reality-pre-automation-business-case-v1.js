@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const root=document.getElementById('realityBeforeAutomationValue');
-if(!root)return;
+if(!root||document.body?.dataset?.realityRoute!=='value')return;
 const el=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',
  minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
