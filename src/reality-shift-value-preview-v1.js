@@ -75,6 +75,24 @@ export function buildRealityShiftValuePreview(roster,{humanDayHours=8}={}){
  return Object.freeze({
   version:SHIFT_VALUE_PREVIEW_VERSION,
   status:'SOURCE_BACKED_WORKFORCE_POTENTIAL_NOT_MEASURED_ROI',
+  illustrative_shift_capacity:{
+   proposed_roles:roster.proposed_employee_count,
+   assumed_hours_per_role_per_day:humanDayHours,
+   assumed_days_per_week_min:4,
+   assumed_days_per_week_max:5,
+   illustrative_role_schedule_hours_per_week_min:roster.proposed_employee_count*humanDayHours*4,
+   illustrative_role_schedule_hours_per_week_max:roster.proposed_employee_count*humanDayHours*5,
+   unit:'AI_ROLE_SCHEDULE_HOURS_NOT_HUMAN_HOURS_REPLACED',
+   live_roles_verified:0,
+   executed_productive_hours_verified:null,
+   equivalent_human_hours_saved_verified:null,
+   estimated_gross_payroll_avoided_usd:null,
+   recurring_net_revenue_or_savings_verified:null,
+   provider_costs_unmeasured:true,
+   every_role_has_eight_hours_of_work_unverified:true,
+   workload_recurs_four_or_five_days_unverified:true,
+   financial_roi_verified:false
+  },
   team:{
    proposed_virtual_role_count:roster.proposed_employee_count,
    proposed_roles_are_employed_people:false,
