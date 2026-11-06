@@ -169,3 +169,107 @@ export async function readVerifiedRealityCompanyWorkforceForChat({
   })];
  }catch{return []}
 }
+
+/**
+ * The planner already prepares a signed service-only source inventory.
+ * Unlike an employee-shift claim, reading that inventory must be possible
+ * BEFORE the owner starts a shift. Source titles are untrusted data,
+ * not model instructions or original-job execution warrants.
+ */
+const RILEY_ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/([1-9][0-9]{0,7})$/;
+const rileyWorkRequested=message=>/\briley\b|\bbacklog\b|\b(?:known|current|existing|available|open)\s+(?:issues|work|jobs)\b|\bengineering\s+(?:work|tasks|issues)\b/i.test(String(message||''));
+export function verifyRileySourceWorkSnapshot(raw,{now=new Date()}={}){
+ if(!raw||raw.version!=='reality-riley-source-work-v1'||
+    raw.status!=='RILEY_CURRENT_SOURCE_BACKLOG_UNQUALIFIED'||
+    raw.source_scope!=='maloney2323/Reality'||
+    !/^[a-f0-9]{64}$/.test(raw.source_sha256||'')||
+    !Number.isSafeInteger(raw.open_issue_count)||
+    raw.open_issue_count<0||raw.open_issue_count>150||
+    !Array.isArray(raw.source_issues)||raw.source_issues.length>12||
+    !Number.isSafeInteger(raw.omitted_source_issue_count)||
+    raw.omitted_source_issue_count<0||
+    raw.source_issues.length+raw.omitted_source_issue_count!==raw.open_issue_count||
+    raw.original_job_qualified!==false||
+    raw.shift_execution_authorized!==false||
+    raw.installation_authorized!==false||
+    raw.production_changed!==false||
+    typeof raw.source_prepared_at!=='string'||
+    !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(raw.source_prepared_at)||
+    !Number.isFinite(new Date(raw.source_prepared_at).valueOf())||
+    !(now instanceof Date)||!Number.isFinite(now.getTime())||
+    now.getTime()-new Date(raw.source_prepared_at).getTime()>36*3600000||
+    new Date(raw.source_prepared_at).getTime()-now.getTime()>5*60000)
+  throw Error('RILEY_SOURCE_SNAPSHOT_INVALID_OR_STALE');
+ const seen=new Set();
+ const items=raw.source_issues.map(item=>{
+  const url=String(item?.issue_url||''),m=RILEY_ISSUE.exec(url);
+  if(!m||!Number.isSafeInteger(item.issue_number)||
+    item.issue_number!==Number(m[1])||seen.has(item.issue_number)||
+    typeof item.title!=='string'||!item.title.trim()||
+    item.title.length>200||/[\u0000-\u001f\u007f]/.test(item.title))
+    throw Error('RILEY_SOURCE_ISSUE_NOT_VERIFIED');
+  seen.add(item.issue_number);
+  return Object.freeze({
+   issue_number:item.issue_number,title:item.title,
+   issue_url:url,source_status:'OPEN_PROVIDER_OBSERVATION_UNQUALIFIED',
+   executable_original_job_verified:false,owner_approval_recorded:false,
+   measured_business_value_usd:null
+  });
+ });
+ return Object.freeze({
+  ...raw,source_issues:Object.freeze(items),
+  current_open_issue_count_is_not_authorized_job_count:true,
+  original_job_qualified:false,shift_execution_authorized:false
+ });
+}
+export async function readRileySourceWorkSnapshot({
+ session,env=process.env,db=resolveReliabilityBenchmarkDb(env),
+ fetchImpl=fetch,now=new Date()
+}={}){
+ if(env.VERCEL_ENV!=='preview'||!UUID.test(session?.user_id)||
+   !db?.strictSecrets||!db.secretKey||
+   db.url!==session?.config?.url||
+   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+   db.project!=='hvkfreoagbrphwghjajw')
+  throw Error('RILEY_SOURCE_OWNER_SESSION_REQUIRED');
+ const raw=await shiftRpc(db,'reality_read_current_riley_source_work_v1',
+  {},{fetchImpl});
+ return verifyRileySourceWorkSnapshot(raw,{now});
+}
+export async function readVerifiedRileySourceWorkForChat({
+ session,message,env=process.env,db=resolveReliabilityBenchmarkDb(env),
+ fetchImpl=fetch,now=new Date()
+}={}){
+ if(!rileyWorkRequested(message))return [];
+ let snapshot;
+ try{snapshot=await readRileySourceWorkSnapshot({
+  session,env,db,fetchImpl,now
+ });}
+ catch{return [];} // A failed provider read must never become a false no-work claim.
+ const details=snapshot.source_issues.map(i=>
+  'Issue #'+i.issue_number+' (untrusted provider title: '+
+  JSON.stringify(i.title)+', source URL '+i.issue_url+')').join(' | ');
+ const summary='RILEY HAS A READ-ONLY SOURCE BACKLOG IN REALITY even without an active shift: '+
+  snapshot.open_issue_count+' GitHub open-issue OBSERVATIONS as of '+
+  snapshot.source_prepared_at+'. '+details+
+  (snapshot.omitted_source_issue_count?
+   ' Additional '+snapshot.omitted_source_issue_count+' source observations omitted from this bounded preview.':'')+
+  '. IMPORTANT: OPEN ISSUES ARE NOT QUALIFIED ORIGINAL JOBS. Previously settled or rejected original work must NOT be retried. A source-backed issue, a goal, or the owner saying "I am ready" in ordinary Chat DOES NOT authorize a shift or installation. To authorize a 3-hour Riley pilot, use the signed-in shift control at /chat-simple#riley-shift and click "Run Riley\'s Shift"; the control must record and independently read back exact owner authorization. Riley\'s autonomous repair-to-final-receipt pipeline on a fresh original job remains to be verified. Do NOT say there is no known work merely because no employee shift is active.';
+ return [Object.freeze({
+  entry_id:'riley:source-work:'+snapshot.source_sha256,
+  event_kind:'riley_discovered_source_work_readback_before_shift',
+  source_kind:'SERVICE_ONLY_SCHEDULED_GITHUB_SOURCE_SNAPSHOT',
+  source_ref:'reality:next-week-employee-source:'+snapshot.source_sha256,
+  assertion_time:snapshot.source_prepared_at,
+  epistemic_status:'OPEN_GITHUB_ISSUES_NOT_QUALIFIED_OR_OWNER_AUTHORIZED',
+  summary,
+  observed_open_issue_count:snapshot.open_issue_count,
+  source_issues:snapshot.source_issues,
+  shift_execution_authorized:false,
+  external_execution_authorized:false,
+  installation_authorized:false,
+  independently_settled_job_from_this_read:false,
+  verified_financial_roi_usd:null,
+  production_changed:false
+ })];
+}
