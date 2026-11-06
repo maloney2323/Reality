@@ -80,7 +80,10 @@ begin
    return jsonb_build_object('status','NO_ELIGIBLE_SHIFT_CAPABILITY_WAKE');
   end if;
  end loop;
- if v_count<>1 or v.gap_event_id is null then
+ if v_count<>1 then
+  return jsonb_build_object('status','NO_ELIGIBLE_SHIFT_CAPABILITY_WAKE');
+ end if;
+ if v.gap_event_id is null then
   return jsonb_build_object('status','NO_ELIGIBLE_SHIFT_CAPABILITY_WAKE');
  end if;
  return jsonb_build_object(
