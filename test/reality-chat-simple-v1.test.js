@@ -6,7 +6,9 @@ import {Script} from 'node:vm';
 const get=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const html=get('reality-chat-simple.html');
 const route=JSON.parse(get('vercel.json'));
-const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+// The app uses a module script; the later plain script is only the passkey helper.
+const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+const browserScript=script?.replace(/^\s*import\s+\{[^}]+\}\s*from\s*'[^']+';\s*/,'');
 
 test('light Chat is on an isolated route without replacing the existing approvals view',()=>{
   assert.ok(route.rewrites.some(r=>r.source==='/chat-simple'&&r.destination==='/reality-chat-simple.html'));
@@ -30,7 +32,7 @@ test('light Chat preserves existing private session and scoped saved conversatio
 });
 test('user message appears before network wait and answer appears without history refresh',()=>{
   assert.ok(script);
-  assert.doesNotThrow(()=>new Script(script));
+  assert.doesNotThrow(()=>new Script(browserScript));
   const optimistic=script.indexOf("bubble('user',value,'pending')");
   const request=script.indexOf("const data=await json(API,{method:'POST'");
   const reply=script.indexOf('waiting.lastChild.textContent=data.answer;');
