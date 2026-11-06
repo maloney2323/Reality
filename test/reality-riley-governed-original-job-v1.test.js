@@ -38,7 +38,15 @@ function shifts(status='AWAITING_EXACT_ORIGINAL_WORK'){
    }))}]
  };
 }
-const props=()=>({shiftReadback:shifts(),ownerId:OWNER,shiftId:SHIFT,
+const ledger=()=>({
+ status:'OWNER_GOVERNED_LOOP_READBACK',
+ owner_installation_authorized_by_read:false,
+ external_action_performed:false,production_changed:false,
+ jobs:[{original_work_id:WORK,source_issue_number:349,
+  environment:'ISOLATED_PREVIEW',independently_settled:false,
+  owner_install_approved:false}]
+});
+const props=()=>({shiftReadback:shifts(),ownerLedgerReadback:ledger(),ownerId:OWNER,shiftId:SHIFT,
  qualifiedOriginal:original,scope,workItem:item});
 test('Riley inherits trusted Reality original-job identity and zero new authority',()=>{
  const bound=establishRileyExistingJobScope(props());
@@ -54,6 +62,9 @@ test('Riley inherits trusted Reality original-job identity and zero new authorit
 test('settled, unqualified, foreign and unbound source work is rejected BEFORE executing',()=>{
  const cases=[
   {qualifiedOriginal:{...original,independently_settled:true}},
+  {ownerLedgerReadback:{...ledger(),jobs:[{...ledger().jobs[0],independently_settled:true}]}},
+  {ownerLedgerReadback:{...ledger(),jobs:[]}},
+  {ownerLedgerReadback:{...ledger(),owner_installation_authorized_by_read:true}},
   {qualifiedOriginal:{...original,original_job_authorized:false}},
   {qualifiedOriginal:{...original,independently_qualified:false}},
   {qualifiedOriginal:{...original,installation_authorized:true}},
@@ -153,6 +164,8 @@ test('employee handoff composes EXISTING foundational execution and capability e
  assert.match(bridge,/import \{executeAuthorizedWork\}/);
  assert.match(bridge,/createGenuineCapabilityExecutionHandoff/);
  assert.match(bridge,/assertShiftReadback/);
+ assert.match(bridge,/OWNER_GOVERNED_LOOP_READBACK/);
+ assert.match(bridge,/EXACT_LEDGER_JOB_NOT_ELIGIBLE/);
  assert.match(bridge,/original_job_authorized!==true/);
  assert.match(bridge,/independently_settled!==false/);
  assert.doesNotMatch(bridge,/process\.env\.OPENAI_API_KEY/);
