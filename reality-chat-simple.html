@@ -32,6 +32,31 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 #auth button{margin-top:16px}
 [hidden]{display:none!important}
 @media(max-width:550px){header{padding:12px}.toolbar{padding:8px 12px}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
+
+/* Named, read-only team preview. Cards represent proposed roles, not live agents. */
+.team-board{border-bottom:1px solid #334053;background:#111a26;padding:12px 14px}
+.team-board[hidden],.team-panel[hidden]{display:none!important}
+.team-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.team-head strong{font-size:15px}
+.team-intro{font-size:12px;color:#b2c3da;margin:6px 0 11px}
+.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-height:48vh;overflow:auto;padding-right:3px}
+.team-card{background:#182337;border:1px solid #384c67;border-radius:12px;padding:11px;min-width:0}
+.team-card.pilot{border-color:#759dc9}
+.team-card-top{display:flex;align-items:center;gap:10px}
+.team-avatar{width:42px;height:42px;min-width:42px;display:grid;place-items:center;border-radius:50%;color:#f3f7ff;background:#284562;font-size:17px;font-weight:750}
+.team-name{font-weight:750;font-size:15px}
+.team-role{font-size:12px;color:#aec7e7}
+.team-card p{font-size:12px;color:#d1deed;margin:8px 0 6px;line-height:1.4}
+.team-tags{font-size:11px;color:#b7c7dd;line-height:1.5}
+.team-status{font-size:11px;display:inline-block;border-radius:12px;background:#2c3444;color:#d9e5f6;padding:4px 8px;margin-top:8px}
+.team-card details{margin-top:9px;font-size:12px;color:#d9e5f6}
+.team-card summary{cursor:pointer}
+.team-card ul{padding-left:19px;margin:7px 0}
+.team-card li{margin-bottom:5px;overflow-wrap:anywhere}
+.team-card a{font-size:12px}
+.team-card .evidence{font-size:11px;color:#a7bbd2}
+#teamToggle{background:#29415c}
+@media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
 </style>
 </head>
 <body>
@@ -50,8 +75,15 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
+<button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
+<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
+ <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
+ <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <div id="teamCards" class="team-grid" aria-live="polite"></div>
+ <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
+</section>
 <div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
 <p id="status" class="status" role="status" aria-live="polite">Ready.</p>
 <form id="composer" class="composer">
@@ -72,8 +104,9 @@ const KEY='reality.private.chat.conversation.v1';
 const SESSION='/api/reality/personal-session';
 const API='/api/reality/personal-chat';
 const SHIFT='/api/reality/personal-governed-employee-shift';
+const ROSTER='/api/reality/personal-employee-roster';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
-let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false;
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
   if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
@@ -94,6 +127,101 @@ async function json(url,options={}){
   const data=await response.json().catch(()=>null);
   if(!response.ok||!data)throw Error(data?.error||'Request unavailable ('+response.status+')');
   return data;
+}
+function textNode(tag,content,cls=''){
+  const node=document.createElement(tag);node.textContent=String(content??'');
+  if(cls)node.className=cls;
+  return node;
+}
+function employeeCard(employee){
+  if(!employee||typeof employee.display_name!=='string'||
+    typeof employee.role!=='string'||typeof employee.role_summary!=='string'||
+    employee.activation_status!=='PROPOSED_NOT_DEPLOYED'||
+    employee.active_worker_id!==null||
+    employee.worker_shift_id!==null||
+    employee.independently_completed_jobs!==0||
+    !Array.isArray(employee.categories)||!Array.isArray(employee.responsibilities)||
+    !Array.isArray(employee.candidate_jobs)||employee.candidate_jobs.length>25||
+    employee.candidate_jobs.length!==employee.candidate_count)
+    throw Error('EMPLOYEE_TEAM_SOURCE_UNVERIFIED');
+  const card=document.createElement('article');card.className='team-card'+(employee.pilot?' pilot':'');
+  const top=document.createElement('div');top.className='team-card-top';
+  const avatar=textNode('div',employee.display_name.trim().slice(0,1).toUpperCase(),'team-avatar');
+  avatar.setAttribute('aria-hidden','true');
+  const title=document.createElement('div');
+  title.append(textNode('div',employee.display_name,'team-name'),
+   textNode('div',employee.role,'team-role'));
+  top.append(avatar,title);card.append(top);
+  card.append(textNode('p',employee.role_summary));
+  card.append(textNode('div','Categories: '+employee.categories.join(' · '),'team-tags'));
+  card.append(textNode('div',
+    (employee.pilot?'First pilot · ':'')+'Proposed, not active · '+
+    employee.candidate_count+' source finding'+(employee.candidate_count===1?'':'s'),
+    'team-status'));
+  const detail=document.createElement('details');
+  detail.append(textNode('summary','Responsibilities and assigned work'));
+  const duties=document.createElement('ul');
+  for(const d of employee.responsibilities.slice(0,5))
+   duties.append(textNode('li',d));
+  detail.append(duties);
+  const jobs=textNode('div',employee.candidate_count?
+    'Work Center findings (need independent verification):':
+    'No source-backed category findings currently assigned. This does not mean the role is unnecessary.',
+    'evidence');
+  detail.append(jobs);
+  const list=document.createElement('ul');
+  for(const job of employee.candidate_jobs.slice(0,5)){
+    if(job.authorized_execution!==false||job.independently_verified_done!==false||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(job.source_url))
+      throw Error('EMPLOYEE_TEAM_JOB_SOURCE_UNVERIFIED');
+    const li=document.createElement('li');
+    const a=document.createElement('a');
+    a.href=job.source_url;a.target='_blank';a.rel='noopener noreferrer';
+    a.textContent=job.title.slice(0,140);
+    li.append(a);list.append(li);
+  }
+  if(employee.candidate_count>5)list.append(textNode('li',
+    'Additional '+(employee.candidate_count-5)+' findings in existing Work Center'));
+  detail.append(list);
+  detail.append(textNode('div','Human accountability: '+employee.human_accountability,
+    'evidence'));
+  card.append(detail);return card;
+}
+async function refreshEmployeeBoard(){
+  if(teamLoading)return;
+  teamLoading=true;
+  const summary=$('teamBoardSummary');
+  summary.textContent='Checking existing work categories…';
+  try{
+    const roster=await json(ROSTER,{signal:AbortSignal.timeout(40000)});
+    if(roster.ok!==true||roster.status!=='READ_ONLY_PROPOSED_AI_EMPLOYEES'||
+       roster.owner_scope_verified!==true||
+       roster.worker_execution_authorized!==false||
+       roster.proposed_employee_count!==8||
+       !Array.isArray(roster.proposed_employees)||roster.proposed_employees.length!==8||
+       roster.active_ai_employee_count!==0||
+       roster.original_job_admitted!==false||
+       roster.production_changed!==false||
+       roster.installation_authorized!==false)
+      throw Error('EMPLOYEE_TEAM_READBACK_UNVERIFIED');
+    const ids=new Set(roster.proposed_employees.map(x=>x.employee_id));
+    if(ids.size!==8)throw Error('EMPLOYEE_TEAM_DUPLICATE_IDENTITIES');
+    const holder=document.createDocumentFragment();
+    for(const employee of roster.proposed_employees)
+      holder.append(employeeCard(employee));
+    $('teamCards').replaceChildren(holder);
+    summary.textContent='8 proposed · '+roster.existing_work_center_candidates+
+     ' categorized findings · 0 active workers';
+    $('teamEvidenceNote').textContent=
+      'Names are virtual employee labels. Work assignments are review candidates, not job executions. '+
+      'No verified cash savings. NASA benchmark applies only to comparable, verified software fault repairs.';
+  }catch(e){
+    $('teamCards').replaceChildren();
+    summary.textContent='Employee evidence unavailable';
+    $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
+      String(e?.message||'Unknown').slice(0,180)+
+      '. No workers or completed work are being claimed.';
+  }finally{teamLoading=false}
 }
 async function refreshShiftStatus(){
   if(shiftLoading)return;
@@ -238,6 +366,7 @@ function showAuth(authenticated){
     void refreshHistory();
     void listConversations();
     void refreshShiftStatus();
+    void refreshEmployeeBoard();
     $('prompt').focus({preventScroll:true});
   }
 }
@@ -272,6 +401,12 @@ $('logout').onclick=async()=>{
   $('authMessage').textContent='Signed out.';
   showAuth(false);
 };
+$('teamToggle').onclick=()=>{
+ const panel=$('employeeBoardPanel');
+ panel.hidden=!panel.hidden;
+ $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
+ if(!panel.hidden)void refreshEmployeeBoard();
+};
 $('newChat').onclick=()=>{
   if(pending)return;
   setConversation(crypto.randomUUID());
@@ -284,7 +419,7 @@ $('conversations').onchange=()=>{
   if(!uuid(id))return;
   setConversation(id);void refreshHistory(id);
 };
-$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus()}};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
     e.preventDefault();$('composer').requestSubmit();
