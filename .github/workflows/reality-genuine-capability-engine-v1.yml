@@ -1,0 +1,100 @@
+name: Reality genuine capability engine — original job evidence gate
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'index.html'
+      - 'test/reality-unfinished-work-freeze-resilience-v1.test.js'
+      - 'src/reality-genuine-capability-engine-v1.js'
+      - 'src/reality-genuine-capability-failure-classifier-v1.js'
+      - 'test/reality-genuine-capability-failure-classifier-v1.test.js'
+      - 'src/reality-genuine-capability-live-intake-v1.js'
+      - 'src/reality-genuine-capability-value-passport-v1.js'
+      - 'test/reality-genuine-capability-value-passport-v1.test.js'
+      - 'src/reality-genuine-capability-github-wakeup-v1.js'
+      - 'src/reality-genuine-approved-install-wake-v1.js'
+      - 'test/reality-genuine-approved-install-wake-v1.test.js'
+      - 'src/reality-genuine-original-resume-contract-v1.js'
+      - 'test/reality-genuine-original-resume-contract-v1.test.js'
+      - 'scripts/reality-genuine-original-resume-v1.mjs'
+      - 'supabase/migrations/20261102_genuine_universe_settlement_atomic_reconciliation_v1.sql'
+      - 'api/reality/personal-qualified-capability-approve.js'
+      - 'scripts/reality-genuine-capability-worker-v1.mjs'
+      - 'test/reality-genuine-capability-worker-v1.test.js'
+      - 'supabase/functions/reality-genuine-capability-wake/index.ts'
+      - 'supabase/migrations/20261101_genuine_capability_wake_readback_v1.sql'
+      - '.github/workflows/reality-genuine-capability-worker-v1.yml'
+      - 'test/reality-genuine-capability-github-wakeup-v1.test.js'
+      - 'src/reality-genuine-capability-preview-intake-v1.js'
+      - 'src/reality-genuine-capability-execution-runtime-v1.js'
+      - 'src/reality-genuine-source-backed-job-v1.js'
+      - 'api/reality/personal-genuine-original-investigate.js'
+      - 'test/reality-genuine-source-backed-job-v1.test.js'
+      - 'test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js'
+      - 'test/reality-genuine-capability-execution-runtime-v1.test.js'
+      - 'src/reality-universe-postgres-persistence-v0.1.js'
+      - 'test/reality-continuity-actual-tail-append-v1.test.js'
+      - 'test/reality-genuine-capability-live-intake-v1.test.js'
+      - 'supabase/migrations/20261101_genuine_capability_queue_v1.sql'
+      - 'src/reality-foundational-build-loop-v1.0.js'
+      - 'src/reality-foundational-verified-regression-context-v1.0.js'
+      - 'src/reality-foundational-vercel-sandbox-adapter-v1.0.js'
+      - 'test/reality-foundational-verified-regression-context-v1.0.test.js'
+      - 'test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js'
+      - 'src/reality-genuine-capability-generation-bridge-v1.js'
+      - 'test/reality-genuine-capability-generation-bridge-v1.test.js'
+      - 'test/reality-genuine-capability-engine-v1.test.js'
+      - 'src/reality-execution-self-repair-handoff-v1.0.js'
+      - 'src/reality-governed-self-improvement-driver-v1.0.js'
+      - 'src/reality-governed-execution-engine-v0.1.js'
+      - '.github/workflows/reality-genuine-capability-engine-v1.yml'
+permissions:
+  contents: read
+jobs:
+  real-original-job-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify code and source-backed original job handoff
+        run: |
+          node --check src/reality-genuine-capability-engine-v1.js
+          node --test test/reality-genuine-capability-failure-classifier-v1.test.js
+          node --test test/reality-genuine-capability-engine-v1.test.js
+          node --test test/reality-genuine-capability-live-intake-v1.test.js
+          node --test test/reality-genuine-capability-value-passport-v1.test.js
+          node --test test/reality-genuine-capability-github-wakeup-v1.test.js
+          node --test test/reality-genuine-approved-install-wake-v1.test.js
+          node --test test/reality-genuine-original-resume-contract-v1.test.js
+          node --check scripts/reality-genuine-original-resume-v1.mjs
+          node --test test/reality-genuine-capability-worker-v1.test.js
+          node --test test/reality-unfinished-work-freeze-resilience-v1.test.js
+          node --test test/reality-genuine-capability-execution-runtime-v1.test.js
+          node --test test/reality-genuine-source-backed-job-v1.test.js
+          node --test test/reality-continuity-actual-tail-append-v1.test.js
+          node --test test/reality-foundational-verified-regression-context-v1.0.test.js
+          node --test test/reality-foundational-vercel-sandbox-adapter-v1.0.test.js
+          node --test test/reality-genuine-capability-generation-bridge-v1.test.js
+          node --test test/reality-job-triggered-self-repair-v1.0.test.js
+          node --test test/reality-governed-self-improvement-spine-v1.0.test.js
+          node --test test/reality-governed-execution-engine-v0.1.test.js
+
+      - name: BREAK-FIRST — re-run frozen acceptance from current unfinished source-backed Reality customer job
+        run: |
+          echo 'REALITY_ORIGINAL_SOURCE_BACKED_JOB=UNFINISHED'
+          echo 'REALITY_PROVIDER_HISTORICAL_FAILED_RUN=40962921090'
+          echo 'REALITY_INSTALLATION_AUTHORIZED=false'
+          echo 'REALITY_PRODUCTION_CHANGED=false'
+          test "$(sha256sum test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js | cut -d' ' -f1)" = "b42935d7300333ac7f1ecfce0aded8d2c7698bb88a55cbd413a96ebe0d73afdd"
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js
+
+      - name: BREAK-FIRST — execute original customer frozen acceptance on isolated source
+        run: |
+          echo 'REALITY_FULL_CYCLE_STAGE=ORIGINAL_JOB_ACCEPTANCE'
+          echo 'REALITY_PRODUCTION_CHANGED=false'
+          echo 'REALITY_INSTALLATION_AUTHORIZED=false'
+          sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+          node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js

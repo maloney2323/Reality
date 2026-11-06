@@ -1,0 +1,30 @@
+name: Reality #201 closed UI and next qualification — regression
+on:
+  push:
+    branches: [fix/reality-201-terminal-ui-next-qualified-work-20261104]
+  pull_request:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'index.html'
+      - 'reality-past-jobs-receipts-v1.js'
+      - 'api/reality/personal-genuine-loop-status.js'
+      - 'api/reality/personal-gap-intake.js'
+      - 'src/reality-next-qualification-v1.js'
+      - 'test/reality-past-jobs-receipts-v1.test.js'
+      - 'test/reality-next-qualification-and-terminal-projection-v1.test.js'
+      - '.github/workflows/reality-201-terminal-next-qualified-work-ci-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-terminal-projection-and-next-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify no duplicate execution, owner-only readback and archival status
+        run: |
+          node --test test/reality-past-jobs-receipts-v1.test.js test/reality-next-qualification-and-terminal-projection-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js

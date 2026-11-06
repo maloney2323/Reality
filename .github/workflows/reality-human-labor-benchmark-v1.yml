@@ -1,0 +1,28 @@
+name: Reality Human Labor Benchmark — independent ROI integrity
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'src/reality-human-labor-benchmark-v1.js'
+      - 'src/reality-original-job-roi-evidence-v1.js'
+      - 'test/reality-human-labor-benchmark-v1.test.js'
+      - 'test/reality-original-job-roi-evidence-v1.test.js'
+      - 'api/reality/personal-job-roi-evidence.js'
+      - '.github/workflows/reality-human-labor-benchmark-v1.yml'
+permissions:
+  contents: read
+jobs:
+  independent-labor-roi-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify read-only backend and evidence projections
+        run: |
+          node --check src/reality-original-job-roi-evidence-v1.js
+          node --check src/reality-human-labor-benchmark-v1.js
+          node --check api/reality/personal-job-roi-evidence.js
+          node --test test/reality-original-job-roi-evidence-v1.test.js test/reality-human-labor-benchmark-v1.test.js

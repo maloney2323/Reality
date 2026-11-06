@@ -1,0 +1,102 @@
+name: Reality single Run Full Loop button — real worker contract
+on:
+  push:
+    branches:
+      - feature/reality-one-button-real-full-loop-20261103
+      - feature/reality-general-capability-engine-20261101
+  pull_request:
+    branches:
+      - feature/reality-general-capability-engine-20261101
+permissions:
+  contents: read
+jobs:
+  one-button:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify button, exact owner route, duplicate protection and final receipt
+        run: |
+          node --check one-button-full-loop-v1.js
+          node --check src/reality-real-repair-opportunity-intake-v1.0.js
+          node --test test/reality-real-repair-opportunity-intake-v1.0.test.js
+          node --check src/reality-governed-original-continuity-v1.0.js
+          node --check api/reality/personal-original-continuity-status.js
+          node --test test/reality-governed-original-continuity-v1.0.test.js
+          node --test test/reality-genuine-reconciliation-no-target-v1.test.js
+          node --check scripts/reality-genuine-final-completion-historical-v1.mjs
+          node --check scripts/reality-genuine-final-completion-historical-record-v1.mjs
+          node --test test/reality-genuine-final-receipt-end-to-end-v1.test.js
+          node --test test/reality-original-repair-worker-handoff-v1.0.test.js
+          node --test test/reality-one-button-real-full-loop-v1.test.js
+          node --check reality-full-loop-chat-diagnostic-v1.js
+          node --test test/reality-full-loop-chat-diagnostic-v1.test.js
+          node --check reality-workday-brief-v1.js
+          node --check src/reality-work-catalog-v0.1.js
+          node --test test/reality-work-catalog-v0.1.test.js
+          node --check src/reality-workday-opportunity-brief-v1.js
+          node --check api/reality/workday-opportunities.js
+          node --test test/reality-workday-opportunity-brief-v1.test.js
+          node --check src/reality-eight-hour-shift-plan-v1.js
+          node --check api/reality/eight-hour-employee-shift-plan.js
+          node --check reality-eight-hour-shift-plan-v1.js
+          node --test test/reality-eight-hour-shift-plan-v1.test.js
+          node --check src/reality-governed-shift-boundary-v1.js
+          node --check src/reality-employee-shift-capability-handoff-v1.js
+          node --check src/reality-governed-employee-shift-worker-v1.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-governed-employee-shift-v1.test.js
+          node --test test/reality-work-conserving-employee-shift-v1.test.js
+          node --test test/reality-self-awareness-independent-watchdog-v1.test.js
+          node --test test/reality-model-gateway-v0.1.test.js
+          node --test test/reality-shift-fail-forward-research-v1.test.js
+          node --test test/reality-shift-existing-governed-original-handoff-v1.test.js
+          node --test test/reality-shift-governed-historical-noop-recovery-v1.test.js
+          node --test test/reality-genuine-worker-failure-feedback-v1.test.js
+          node --test test/reality-original-job-never-abandon-v1.test.js
+          node --test test/reality-automatic-original-recovery-and-frozen-red-v1.test.js
+          node --test test/reality-shift-existing-supabase-wake-v1.test.js
+          node --check src/reality-shift-conversation-brief-v1.js
+          node --check src/reality-employee-shift-chat-context-v1.js
+          node --check reality-shift-conversation-v1.js
+          node --test test/reality-chat-page-shift-brief-v1.test.js
+          node --check reality-value-verification-v1.js
+          node --test test/reality-value-verification-page-v1.test.js
+          node --check reality-economic-evidence-dashboard-v1.js
+          node --test test/reality-economic-evidence-dashboard-v1.test.js
+          node --check reality-engine-delta-v1.js
+          node --test test/reality-engine-delta-v1.test.js
+          node --check reality-model-capability-map-v1.js
+          node --test test/reality-model-capability-map-v1.test.js
+          node --check reality-backlog-value-scenario-v1.js
+          node --check src/reality-backlog-labor-scenario-v1.js
+          node --check api/reality/backlog-value-scenario.js
+          node --test test/reality-backlog-labor-scenario-v1.test.js
+          node --check reality-automatic-backlog-value-v1.js
+          node --check api/reality/automatic-backlog-value.js
+          node --check src/reality-automatic-backlog-planning-v1.js
+          node --test test/reality-automatic-backlog-planning-v1.test.js
+          node --check src/reality-category-economic-portfolio-v1.js
+          node --check api/reality/personal-category-economics.js
+          node --check reality-category-economic-bridge-v1.js
+          node --test test/reality-category-economic-portfolio-v1.test.js
+          node --check src/reality-published-repair-effort-v1.js
+          node --test test/reality-published-repair-effort-v1.test.js
+          node --test test/reality-home-value-first-v1.test.js
+          node --test test/reality-capability-value-report-v1.test.js
+          node --test test/reality-simple-customer-home-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js
+          node --test test/reality-verified-budget-gap-owner-review-v1.test.js
+          node --test test/reality-conversational-upgrade-review-v1.test.js
+          node --test test/reality-market-research-restoration-v1.test.js
+          node --test test/reality-evidence-bound-gap-category-intake-v1.test.js
+          node --test test/reality-owner-unbound-capability-qualification-v1.test.js
+          node --test test/reality-frozen-source-existing-original-recovery-link-v1.test.js
+          node --check reality-past-jobs-receipts-v1.js
+          node --test test/reality-past-jobs-receipts-v1.test.js

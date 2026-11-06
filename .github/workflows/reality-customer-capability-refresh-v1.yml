@@ -1,0 +1,32 @@
+name: Reality governed customer capability audit — preview proof
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'api/reality/personal-capability-discovery-audit.js'
+      - 'src/reality-customer-capability-discovery-audit-v1.js'
+      - 'test/reality-customer-capability-refresh-v1.test.js'
+      - 'test/reality-governed-capability-discovery-audit-v1.test.js'
+      - '.github/workflows/reality-customer-capability-refresh-v1.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'api/reality/personal-capability-discovery-audit.js'
+      - 'src/reality-customer-capability-discovery-audit-v1.js'
+      - 'test/reality-customer-capability-refresh-v1.test.js'
+      - 'test/reality-governed-capability-discovery-audit-v1.test.js'
+      - '.github/workflows/reality-customer-capability-refresh-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Verify real discovery, source provenance, novelty reconciliation and strict owner authority
+        run: node --test test/reality-customer-capability-refresh-v1.test.js test/reality-governed-capability-discovery-audit-v1.test.js

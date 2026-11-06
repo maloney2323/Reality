@@ -357,15 +357,17 @@ test('Home checks signed-in goal before preparing source work and never silently
  assert.doesNotThrow(()=>new Function(script));
 });
 
-test('top-level three-step flow is the first task and optional tools are out of the way',()=>{
+test('conversational Reality is the first task; governed three-step setup remains accessible',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const start=html.indexOf('id="startFlow"'),account=html.indexOf('id="privateChat"'),
+ const chat=html.indexOf('id="privateChat"'),start=html.indexOf('id="startFlow"'),
   matrix=html.indexOf('class="reality-matrix"'),
   work=html.indexOf('id="attentionQueue"'),advanced=html.indexOf('id="advancedShift"'),
   prompt=html.indexOf('id="optionalPrompt"');
- assert.ok(start>0&&start<account&&account<matrix&&matrix<work&&work<advanced&&advanced<prompt);
- assert.ok(html.includes('3 steps. That\'s it.'));
- assert.ok(html.includes('You do <strong>not</strong> need to type a Request'));
+ assert.ok(chat>0&&chat<start&&start<matrix&&matrix<work&&work<advanced&&advanced<prompt);
+ assert.ok(html.includes("3 steps. That's it."));
+ assert.ok(html.includes('Your Business Reality'));
+ assert.ok(html.indexOf('id="businessHome"')<chat);
+ assert.ok(html.includes('id="realityChatActivityEntries"'));
  for(const id of ['startStep1','startStep2','startStep3',
    'startAction1','startAction2','startAction3',
    'startStatus1','startStatus2','startStatus3','startNext'])

@@ -10,8 +10,9 @@ test('Upgrade Discovery renders inside Upgrades & improvements category without 
  assert.match(script,/\['upgrades','Upgrades & improvements','Proposed changes'\]/);
  assert.doesNotMatch(script,/\['upgrade-discovery',/);
  assert.match(script,/\(wcCurrent==='upgrades'\?wcUpgradeReviewHTML\(\):''\)/);
- assert.match(script,/wcCurrent==='upgrades'\?\s*shown\.length\+' findings · '\+wcUpgradeReviews\.length\+' jobs to review'/);
- assert.match(script,/n\+' found · '\+wcUpgradeReviews\.length\+' review'/);
+ assert.match(script,/shown\.length\+' findings · '\+wcUpgradeReviews\.length\+' jobs to review'/);
+ assert.match(script,/wcMarketReviewFindings\.length\+' inspected ideas/);
+ assert.match(script,/const marketBrief=\(wcCurrent==='research'\|\|\(wcCurrent==='upgrades'&&!wcGapFeedReady\)\)/);
  assert.match(script,/wcUpgradeReviews=safe/);
  assert.match(script,/wcUpgradeReviews=\[\];wcRender\(\)/);
 });

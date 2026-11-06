@@ -1,0 +1,57 @@
+name: Reality fresh owner-followon work creation / preview acceptance
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+permissions:
+  contents: read
+jobs:
+  prove_authenticated_source_bound_followon:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-owner-followon]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Parse new secure authenticated original-work entrypoints
+        run: |
+          node --check src/reality-issue188-owner-followon-binding-v1.js
+          node --check api/reality/personal-issue188-followon-work.js
+          node --check api/reality/personal-issue188-candidate-review.js
+          node --check src/reality-automatic-candidate-receipt-v1.js
+          node --check src/reality-job-receipt-pdf-v1.js
+          node --check src/reality-discovery-value-v1.js
+          node --check src/reality-two-authorization-execution-preflight-v1.js
+          node --check api/reality/personal-qualified-capabilities.js
+          node --check api/reality/personal-qualified-capability-approve.js
+          node --check api/reality/personal-genuine-loop-status.js
+          node --check src/reality-genuine-activation-suite-v1.js
+          node --check src/reality-genuine-original-resume-contract-v1.js
+          node --check scripts/reality-genuine-original-resume-v1.mjs
+          node --check scripts/reality-genuine-final-completion-verifier-v1.mjs
+          node --check scripts/reality-genuine-final-completion-record-v1.mjs
+          node --check scripts/reality-genuine-original-settle-v1.mjs
+          node --check src/reality-genuine-completed-receipt-pdf-v1.js
+          node --check src/reality-two-authorization-execution-preflight-v1.js
+          node --check api/reality/personal-genuine-final-receipt-pdf.js
+          node --check api/reality/personal-receipt-pdf.js
+      - name: Verify exact owner original-work lineage, anti-replay, read-only intake and frontend
+        env:
+          REALITY_PDF_SMOKE_OUT: artifact/reality-synthetic-receipt-render-check.pdf
+          REALITY_FINAL_RECEIPT_PDF_SMOKE_OUT: artifact/reality-final-synthetic-smoke.pdf
+        run: node --test test/reality-issue188-owner-followon-connection-v1.test.js test/reality-issue188-unbound-owner-review-v1.test.js test/reality-automatic-candidate-receipt-v1.test.js test/reality-verified-candidate-receipt-release-v1.test.js test/reality-job-receipt-pdf-v1.test.js test/reality-discovery-value-v1.test.js test/reality-two-authorization-execution-preflight-v1.test.js test/reality-home-owner-authorizations-v1.test.js test/reality-genuine-final-receipt-end-to-end-v1.test.js test/reality-genuine-activation-suite-v1.test.js test/reality-genuine-original-resume-contract-v1.test.js test/reality-genuine-completed-receipt-pdf-v1.test.js
+      - name: Retain synthetic PDF rendering smoke fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-receipt-pdf-synthetic-smoke-${{ github.run_id }}
+          path: artifact/reality-synthetic-receipt-render-check.pdf
+          if-no-files-found: error
+          retention-days: 1
+      - name: Retain synthetic final PDF rendering test fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-final-customer-pdf-synthetic-smoke-${{ github.run_id }}
+          path: artifact/reality-final-synthetic-smoke.pdf
+          if-no-files-found: error
+          retention-days: 1

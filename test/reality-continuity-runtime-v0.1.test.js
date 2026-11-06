@@ -30,6 +30,11 @@ test('live continuity runtime persists RAW -> TRANSFORMATION -> OBSERVATION on o
     const root = u.searchParams.get('continuity_root_id')?.replace(/^eq\./, '') || null;
     const worldline = u.searchParams.get('worldline_id')?.replace(/^eq\./, '') || null;
     const matching = rows.filter((row) => row.continuity_root_id === root && row.worldline_id === worldline);
+    if (u.searchParams.has('select')) {
+      const offset=Number(u.searchParams.get('offset')||0);
+      const limit=Number(u.searchParams.get('limit')||400);
+      return new Response(JSON.stringify(matching.slice(offset,offset+limit)),{status:200});
+    }
     const latest = matching[matching.length - 1];
     return new Response(JSON.stringify(latest ? [latest] : []), { status: 200 });
   };

@@ -39,6 +39,69 @@ function pathSafe(path,prefix){
   /^[a-z0-9._/-]+$/.test(path)&&!path.includes('//')&&
   !path.split('/').includes('..');
 }
+// Explicit isolated fallback for preview GitHub API rate/permission failure.
+// Only a recent, independently re-read, signed Github Actions OIDC witness
+// may stand in for the blocked API GET. It is never owner authorization.
+export async function readSignedOwnerIssueWitness({
+ issueNumber,env=process.env,fetchImpl=fetch,
+}={}){
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1||
+    env.VERCEL_ENV!=='preview'||
+    env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+  fail('SIGNED_OWNER_WITNESS_ISOLATED_SCOPE_REQUIRED');
+ const db=resolveReliabilityBenchmarkDb(env);
+ if(!db?.strictSecrets||
+    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    !db.secretKey)
+  fail('SIGNED_OWNER_WITNESS_PROJECT_SCOPE_NOT_VERIFIED');
+ const resp=await fetchImpl(db.url+'/rest/v1/rpc/reality_read_genuine_owner_issue_witness_v1',{
+  method:'POST',cache:'no-store',redirect:'error',
+  headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    accept:'application/json','content-type':'application/json'},
+  body:JSON.stringify({p_issue_number:issueNumber})
+ });
+ const v=await resp.json().catch(()=>null);
+ if(!resp.ok||v?.status!=='SOURCE_PINNED_MISSING_EXTENSION_READY_FOR_OWNER_REVIEW'||
+    v.issue_number!==issueNumber||
+    v.issue_url!=='https://github.com/maloney2323/Reality/issues/'+issueNumber||
+    v.source!=='SIGNED_GITHUB_OIDC_PROVIDER_REVERIFY_READBACK'||
+    !pathSafe(v.source_path,'src/reality-extensions/')||
+    !pathSafe(v.frozen_test_path,'test/reality-frozen-regressions/')||
+    !/^[a-f0-9]{64}$/.test(v.frozen_test_sha256||'')||
+    !/^[a-f0-9]{64}$/.test(v.actual_provider_failure_hash||'')||
+    !/^[a-f0-9]{40}$/.test(v.source_sha||'')||
+    !Number.isSafeInteger(Number(v.original_provider_failed_run_id))||
+    Number(v.original_provider_failed_run_id)<10000||
+    !Number.isSafeInteger(Number(v.original_provider_failed_job_id))||
+    Number(v.original_provider_failed_job_id)<10000||
+    !Number.isSafeInteger(Number(v.signed_witness_run_id))||
+    Number(v.signed_witness_run_id)<10000||
+    v.original_work_id_for_provider_observation!==
+      'work:'+hash('reality:issue:'+issueNumber).slice(0,32)||
+    v.owner_goal_bound!==false||
+    v.installation_authorized!==false||
+    v.job_completed!==false||
+    v.production_changed!==false)
+  fail('SIGNED_OWNER_WITNESS_FRESH_PROVIDER_READBACK_REQUIRED');
+ const age=Date.now()-Date.parse(v.witnessed_at||'');
+ if(!Number.isFinite(age)||age< -30000||age>3600000)
+  fail('SIGNED_OWNER_WITNESS_FRESH_PROVIDER_READBACK_REQUIRED');
+ return Object.freeze({
+  status:v.status,issue_number:v.issue_number,issue_title:v.issue_title,
+  issue_url:v.issue_url,
+  original_provider_failed_run_id:Number(v.original_provider_failed_run_id),
+  original_provider_failed_job_id:Number(v.original_provider_failed_job_id),
+  source_sha:v.source_sha,source_path:v.source_path,
+  frozen_test_path:v.frozen_test_path,frozen_test_sha256:v.frozen_test_sha256,
+  actual_provider_failure_hash:v.actual_provider_failure_hash,
+  original_work_id_for_provider_observation:v.original_work_id_for_provider_observation,
+  independently_verified:true,owner_goal_bound:false,
+  installation_authorized:false,job_completed:false,production_changed:false,
+  signed_witness_run_id:Number(v.signed_witness_run_id),
+  source:'SIGNED_GITHUB_OIDC_PROVIDER_REVERIFY_READBACK'
+ });
+}
+
 export async function verifyRealMissingRepairIssue({
  issueNumber,env=process.env,fetchImpl=fetch,
  observe=observeRealityIssueFailure,
@@ -46,6 +109,7 @@ export async function verifyRealMissingRepairIssue({
  if(!Number.isSafeInteger(issueNumber)||issueNumber<1||issueNumber>100000)
   fail('GITHUB_ISSUE_ID_REQUIRED');
  const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||env.GITHUB_TOKEN||null;
+ try{
  const issue=await provider('issues/'+issueNumber,{token,fetchImpl});
  if(issue.number!==issueNumber||issue.state!=='open'||issue.pull_request||
   issue.repository_url!==ROOT.slice(0,-1))
@@ -91,6 +155,18 @@ export async function verifyRealMissingRepairIssue({
   owner_goal_bound:false,installation_authorized:false,
   job_completed:false,production_changed:false,
  });
+ }catch(error){
+  // GitHub GET is frequently unauthenticated in preview: production's
+  // credential is intentionally NOT available here. Never treat an
+  // arbitrary 403 as permission to skip independent source verification.
+  // A signed GitHub Actions witness, bound to the exact historical run,
+  // frozen hash and original issue, is required and separately re-read.
+  if(String(error?.message||'')==='REALITY_REAL_REPAIR_GITHUB_PROVIDER_SOURCE_READBACK_403'&&
+     env.VERCEL_ENV==='preview')
+   return readSignedOwnerIssueWitness({issueNumber,env,fetchImpl});
+  throw error;
+ }
+
 }
 export async function discoverRealRepairOpportunities({
  env=process.env,fetchImpl=fetch,maxIssues=20,
@@ -99,8 +175,36 @@ export async function discoverRealRepairOpportunities({
  if(!Number.isInteger(maxIssues)||maxIssues<1||maxIssues>40)
   fail('BOUNDED_PROVIDER_DISCOVERY_REQUIRED');
  const token=env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||null;
- const issues=await provider('issues?state=open&per_page='+maxIssues,
-  {token,fetchImpl});
+ let issues;
+ try{
+  issues=await provider('issues?state=open&per_page='+maxIssues,
+   {token,fetchImpl});
+ }catch(error){
+  if(String(error?.message||'')!=='REALITY_REAL_REPAIR_GITHUB_PROVIDER_SOURCE_READBACK_403'||
+     env.VERCEL_ENV!=='preview')throw error;
+  const db=resolveReliabilityBenchmarkDb(env);
+  if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+   fail('SIGNED_OWNER_WITNESS_PROJECT_SCOPE_NOT_VERIFIED');
+  const response=await fetchImpl(db.url+'/rest/v1/rpc/reality_list_genuine_owner_issue_witnesses_v1',{
+   method:'POST',cache:'no-store',redirect:'error',
+   headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+    accept:'application/json','content-type':'application/json'},body:'{}'});
+  const numbers=await response.json().catch(()=>null);
+  if(!response.ok||!Array.isArray(numbers)||numbers.length>8||
+     numbers.some(x=>!Number.isInteger(x)||x<1||x>100000))
+   fail('SIGNED_OWNER_WITNESS_LIST_UNVERIFIED');
+  const opportunities=[];
+  for(const issueNumber of numbers){
+   try{opportunities.push(await readSignedOwnerIssueWitness({issueNumber,env,fetchImpl}));}
+   catch{/* Only fresh matching signed provider evidence is eligible. */}
+  }
+  if(!opportunities.length)fail('SIGNED_OWNER_WITNESS_LIST_UNAVAILABLE');
+  return Object.freeze({
+   status:'INDEPENDENT_SOURCE_BACKED_REPAIR_OPPORTUNITIES',
+   opportunities,examined:opportunities.length,
+   owner_installation_authorized:false,external_action_performed:false
+  });
+ }
  if(!Array.isArray(issues)||issues.length>maxIssues)
   fail('ISSUE_PROVIDER_PAGINATION_UNVERIFIED');
  const candidates=[];
@@ -139,14 +243,95 @@ export async function authorizeExistingRealRepairWork({
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail('TRUSTED_OWNER_DATABASE_REQUIRED');
  const own=await listConversations(session);
- if(!Array.isArray(own)||!own.some(c=>c?.conversation_id===conversationId))
-  fail('EXISTING_OWNER_CONVERSATION_REQUIRED');
+ if(!Array.isArray(own)||own.length>50||
+    own.some(c=>!validUuid(c?.conversation_id)))
+  fail('OWNER_CONVERSATION_COVERAGE_UNVERIFIED');
  const evidence=await discoverIssue({issueNumber,env});
  if(evidence.independently_verified!==true||
   evidence.original_provider_failed_run_id!==expectedFailedRunId||
   evidence.source_sha!==expectedSourceSha)
   fail('ISSUE_CHANGED_SINCE_OWNER_REVIEW');
- const goal=await readGoal({session,conversationId,env});
+ // The homepage may be opened on a new Vercel preview origin. Its browser
+ // conversation ID is not an owner-verified job identity. Reconcile against
+ // saved owner conversations and their verified Continuity histories FIRST.
+ // Never create a second job for an issue already tied to an original.
+ const contexts=[];
+ const store=createPersistence({...db});
+ for(const saved of own){
+  const id=saved.conversation_id;
+  let foundGoal;
+  try{foundGoal=await readGoal({session,conversationId:id,env});}
+  catch{continue;} // Not every saved chat has a confirmed authoritative goal.
+  if(foundGoal?.principal_id!==session.user_id||
+     foundGoal.conversation_id!==id||
+     foundGoal.persisted_source!=='ISOLATED_CONTINUITY_VERIFIED_READBACK'||
+     foundGoal.state?.active_goal?.status!=='ACTIVE'||
+     foundGoal.state.active_goal.user_confirmed!==true||
+     foundGoal.state.active_goal_id!==foundGoal.state.active_goal.goal_id||
+     !validUuid(foundGoal.state.active_goal.last_transition_receipt_id))
+   continue;
+  const candidateSpine=createContinuitySpine({
+   continuityRootId:foundGoal.scope.root,
+   worldlineId:foundGoal.scope.worldline,subjectId:session.user_id,
+  });
+  if(candidateSpine.continuity_root_id!==foundGoal.state.continuity_root_id)
+   fail('OWNER_GOAL_SCOPE_RECONCILIATION_FAILED');
+  // Do not skip a failed integrity read and mistakenly conclude there is no
+  // earlier source-bound original work.
+  const candidateHistory=orderContinuityHistory(await store.reconstruct({
+   continuityRootId:candidateSpine.continuity_root_id,
+   worldlineId:candidateSpine.worldline_id,
+  }));
+  contexts.push({id,goal:foundGoal,spine:candidateSpine,
+   history:candidateHistory});
+ }
+ const previouslyBound=[];
+ for(const ctx of contexts){
+  for(const event of ctx.history){
+   const p=event.payload||{};
+   if(event.entity_type!=='reality_original_source_backed_repair_work'||
+      p.issue_number!==issueNumber||p.owner_id!==session.user_id)
+    continue;
+   if(p.original_source_sha!==evidence.source_sha||
+      p.original_provider_failed_run_id!==evidence.original_provider_failed_run_id)
+    fail('PRIOR_ORIGINAL_SOURCE_IDENTITY_CHANGED');
+   if(!WORK.test(p.original_work_id)||
+      !validUuid(event.event_id)||
+      p.goal_id!==ctx.goal.state.active_goal_id||
+      event.provenance?.conversation_id!==ctx.id)
+    fail('PRIOR_ORIGINAL_OWNER_LINEAGE_UNVERIFIED');
+   previouslyBound.push({ctx,event});
+  }
+ }
+ if(previouslyBound.length){
+  // The newest independently reconstructed original stays the canonical
+  // recovery target. Older duplicates are NEVER replayed or reminted here.
+  previouslyBound.sort((a,b)=>String(b.event.assertion_time||'')
+   .localeCompare(String(a.event.assertion_time||'')));
+  const chosen=previouslyBound[0],p=chosen.event.payload;
+  return Object.freeze({
+   status:'REAL_OWNER_EXISTING_ORIGINAL_WORK_RECOVERED',
+   original_work_id:p.original_work_id,
+   original_conversation_id:chosen.ctx.id,
+   source_receipt_id:chosen.event.event_id,
+   goal_id:p.goal_id,
+   issue_url:evidence.issue_url,
+   original_provider_failed_run_id:evidence.original_provider_failed_run_id,
+   original_source_sha:evidence.source_sha,
+   governed_auto_trigger:null,
+   previous_originals_preserved:previouslyBound.length,
+   investigation_authorized:true,installation_authorized:false,
+   original_job_completed:false,production_changed:false,
+  });
+ }
+ // Only an authenticated, explicitly confirmed and still-active saved goal
+ // may receive NEW investigation work. Prefer the current verified
+ // conversation; otherwise use the latest saved confirmed owner goal.
+ const selected=contexts.find(x=>x.id===conversationId)||contexts[0];
+ if(!selected||own.length===50)
+  fail('EXISTING_OWNER_CONVERSATION_REQUIRED');
+ conversationId=selected.id;
+ const goal=selected.goal;
  if(goal.principal_id!==session.user_id||
   goal.conversation_id!==conversationId||
   goal.persisted_source!=='ISOLATED_CONTINUITY_VERIFIED_READBACK'||
@@ -189,7 +374,7 @@ export async function authorizeExistingRealRepairWork({
   owner_authorized_installation:false,
   original_job_completed:false,production_changed:false,
  };
- const store=createPersistence({...db});
+
  const fetchHistory=()=>store.reconstruct({
   continuityRootId:spine.continuity_root_id,worldlineId:spine.worldline_id});
  const history=orderContinuityHistory(await fetchHistory());

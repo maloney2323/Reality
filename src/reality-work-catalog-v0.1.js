@@ -7,10 +7,15 @@ import {prioritizeEvidenceBackedFindings,VALUE_ASSESSMENT_VERSION} from './reali
 const API='https://api.github.com';
 const BASE='https://github.com/maloney2323/Reality';
 const paths=Object.freeze({
- issues:'/repos/maloney2323/Reality/issues?state=open&per_page=30',
+ issues:'/repos/maloney2323/Reality/issues?state=open&per_page=100',
  commits:'/repos/maloney2323/Reality/commits?per_page=30',
- pulls:'/repos/maloney2323/Reality/pulls?state=open&per_page=30',
+ pulls:'/repos/maloney2323/Reality/pulls?state=open&per_page=100',
 });
+// Fixed, explicit resource bounds. When a provider has more entries than these
+// limits, keep observed work and expose PARTIAL coverage; never claim a full scan.
+const PROVIDER_PAGE_SIZE=100;
+const PROVIDER_MAX_PAGES=5;
+const CATALOG_MAX_VISIBLE_FINDINGS=1200;
 const safeString=(v,max=220)=>String(v||'').slice(0,max);
 const id=(type,v)=>'catalog:'+crypto.createHash('sha256').update(type+':'+v).digest('hex').slice(0,32);
 const category=(label,defaultCategory)=>{
@@ -44,15 +49,52 @@ export async function fetchCatalogGitHub(kind,{env=process.env,fetchImpl=fetch}=
  if(!Object.hasOwn(paths,kind))throw Error('CATALOG_PROVIDER_PATH_DENIED');
  if(env.VERCEL_ENV!=='preview')
   throw Error('CATALOG_PREVIEW_READ_ONLY_ONLY');
- const response=await fetchImpl(API+paths[kind],{
-  method:'GET',headers:{Accept:'application/vnd.github+json',
-   'User-Agent':'Reality-ReadOnly-Work-Catalog','X-GitHub-Api-Version':'2022-11-28'},
+ const paginated=kind==='issues'||kind==='pulls';
+ const pages=paginated?PROVIDER_MAX_PAGES:1;
+ const observed=[];
+ let complete=false,scanned=0;
+ for(let page=1;page<=pages;page++){
+  // Never follow arbitrary GitHub Link headers or client-supplied URLs.
+  // Only construct narrowly allowlisted public read paths for this repository.
+  const providerPath=paths[kind]+(paginated?'&page='+page:'');
+  let body;
+  try{
+   const response=await fetchImpl(API+providerPath,{
+    method:'GET',cache:'no-store',redirect:'error',
+    headers:{Accept:'application/vnd.github+json',
+     'User-Agent':'Reality-ReadOnly-Work-Catalog',
+     'X-GitHub-Api-Version':'2022-11-28'},
+   });
+   if(!response.ok)throw Error('CATALOG_GITHUB_READ_'+response.status);
+   body=await response.json().catch(()=>null);
+   if(!Array.isArray(body)||body.length>(paginated?PROVIDER_PAGE_SIZE:30))
+    throw Error('CATALOG_GITHUB_ARRAY_INVALID');
+  }catch(err){
+   // Preserve independently observed first pages, but mark incomplete.
+   // Never silently claim checked when a later provider read fails.
+   if(scanned===0||!paginated)throw err;
+   break;
+  }
+  observed.push(...body);scanned++;
+  if(!paginated||body.length<PROVIDER_PAGE_SIZE){
+   complete=true;break;
+  }
+ }
+ // Commits are an explicitly bounded recency context, never a census of
+ // historical defects. "complete" here describes the requested scan window.
+ Object.defineProperty(observed,'source_scan',{enumerable:false,
+  value:Object.freeze({
+   kind,scope:paginated?'OPEN_PROVIDER_RECORDS':'RECENT_CHANGE_CONTEXT_ONLY',
+   pages_scanned:scanned,items_fetched:observed.length,
+   complete:complete && paginated,
+   reached_safe_page_limit:paginated&&!complete,
+   query_scope_fully_reconciled:paginated&&complete,
+   recent_history_is_not_outstanding_work:kind==='commits'
+  })
  });
- if(!response.ok)throw Error('CATALOG_GITHUB_READ_'+response.status);
- const body=await response.json().catch(()=>null);
- if(!Array.isArray(body))throw Error('CATALOG_GITHUB_ARRAY_INVALID');
- return body;
+ return observed;
 }
+
 export async function buildRealityWorkCatalog({
  steward=runRealityStewardshipPass,
  readCatalog=fetchCatalogGitHub,
@@ -63,12 +105,26 @@ export async function buildRealityWorkCatalog({
   external_research:'not_connected'};
  const findings=[];
  const failures=[];
+ const sourceScans={};
  try{
   const s=await steward();
   coverage.actions='checked';coverage.pull_requests='checked';
+  sourceScans.actions=Object.freeze({
+   kind:'actions',scope:'RECENT_30_WORKFLOW_RUNS_AND_STALE_PR_DIAGNOSTIC',
+   pages_scanned:1,items_fetched:null,complete:false,
+   reached_safe_page_limit:false,query_scope_fully_reconciled:false,
+   recent_history_is_not_outstanding_work:true
+  });
   for(const w of s.work||[]){
+   // Stewardship reports BOTH real recurring workflow failures and stale PR
+   // review follow-ups. A stale PR is already represented by the paginated
+   // open-PR census; it is NOT another failed CI execution or separate job.
+   // Admit a failure only from the explicit workflow recurrence identity.
+   if(w.kind!=='SYSTEM_MAINTENANCE'||
+     typeof w.work_key!=='string'||
+     !w.work_key.startsWith('workflow-failure:'))continue;
    const urls=(w.evidence_refs||[]).filter(x=>typeof x==='string'&&
-    x.startsWith(BASE+'/'));
+    /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/.test(x));
    if(!urls.length)continue;
    findings.push({
     finding_id:id('steward',w.work_key),kind:'SYSTEM_MAINTENANCE',
@@ -85,8 +141,22 @@ export async function buildRealityWorkCatalog({
  }catch{failures.push('Actions or pull-request discovery unavailable');}
  const results=await Promise.allSettled([readCatalog('issues'),readCatalog('commits'),readCatalog('pulls')]);
  const [issues,commits,pulls]=results.map(x=>x.status==='fulfilled'?x.value:null);
+ for(const [kind,entries] of [['issues',issues],['commits',commits],['pulls',pulls]]){
+  if(!entries)continue;
+  const details=entries.source_scan;
+  sourceScans[kind]=details&&details.kind===kind?details:
+   {kind,scope:kind==='commits'?'RECENT_CHANGE_CONTEXT_ONLY':
+    'PROVIDER_RECORDS_WITHOUT_PAGINATION_METADATA',
+    pages_scanned:null,items_fetched:entries.length,
+    complete:kind!=='commits',reached_safe_page_limit:false,
+    query_scope_fully_reconciled:kind!=='commits',
+    recent_history_is_not_outstanding_work:kind==='commits'};
+ }
  if(issues){
-  coverage.issues='checked';
+  coverage.issues=sourceScans.issues?.query_scope_fully_reconciled?
+   'checked':'partial';
+  if(coverage.issues==='partial')
+   failures.push('GitHub open issues scanned only to bounded source limit');
   for(const issue of issues){
    if(issue.pull_request)continue;
    const url=ghURL(issue.html_url,'issue');
@@ -102,7 +172,10 @@ export async function buildRealityWorkCatalog({
   }
  }else failures.push('GitHub issues unavailable');
  if(pulls){
-  coverage.pull_requests='checked';
+  coverage.pull_requests=sourceScans.pulls?.query_scope_fully_reconciled?
+   'checked':'partial';
+  if(coverage.pull_requests==='partial')
+   failures.push('GitHub open pull requests scanned only to bounded source limit');
   for(const pr of pulls){
    const url=ghURL(pr.html_url,'pr');
    if(!url||!Number.isSafeInteger(pr.number))continue;
@@ -138,6 +211,8 @@ export async function buildRealityWorkCatalog({
   }
  }else failures.push('GitHub recent changes unavailable');
  const ranked=prioritizeEvidenceBackedFindings(findings);
+ if(ranked.length>CATALOG_MAX_VISIBLE_FINDINGS)
+  failures.push('Work Center display bound reached; more provider records exist');
  const groups=Object.fromEntries([
   'customer','bugs','upgrades','features','reliability','integrations',
   'security','operations','research','automation',
@@ -146,12 +221,14 @@ export async function buildRealityWorkCatalog({
   version:'reality-work-catalog-v0.1',
   status:failures.length?'PARTIAL':'OBSERVED',
   observed_at:new Date().toISOString(),
-  source_coverage:coverage,source_failures:failures,
-  counts:groups,items:ranked.slice(0,90),
+  source_coverage:coverage,source_scans:sourceScans,
+  display_bound:CATALOG_MAX_VISIBLE_FINDINGS,
+  source_failures:failures,
+  counts:groups,items:ranked.slice(0,CATALOG_MAX_VISIBLE_FINDINGS),
   ranking_version:VALUE_ASSESSMENT_VERSION,
   ranked_by:'EVIDENCE_BASED_TRIAGE_ONLY_NOT_VERIFIED_BUSINESS_IMPACT',
   total_findings:findings.length,
   authority:'NONE_GRANTED',execution_enabled:false,credit_metering_verified:false,
-  description:'Read-only source observations and review opportunities. Findings are not automatically verified defects or executable business jobs.',
+  description:'Read-only source observations and review opportunities. GitHub issues and PRs are paginated to a bounded complete-open-record census when available; workflow failures remain a recent-window diagnostic and commits are contextual history. Findings are not automatically verified defects or executable business jobs.',
  });
 }

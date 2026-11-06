@@ -1,0 +1,46 @@
+name: Reality exact owner review hardening — existing settled job #188
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent_source_approval_gate:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-owner-final-gate]') }}
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-issue188-model-research-41530142180
+          run-id: 41530142180
+          github-token: ${{ github.token }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-customer-issue188-independent-sandbox-41530142180
+          run-id: 41530142180
+          github-token: ${{ github.token }}
+          path: verification
+      - name: Independently compare approved historical #188 source to the newer model proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-issue188-owner-approval-regression-v1.mjs
+          node scripts/reality-issue188-owner-approval-regression-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-owner-exact-source-review-${{ github.run_id }}
+          path: artifact/out/reality-188-owner-approval-regression-gate.json
+          if-no-files-found: error
+          retention-days: 30

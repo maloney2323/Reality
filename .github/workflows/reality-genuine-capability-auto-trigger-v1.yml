@@ -1,0 +1,1384 @@
+name: Reality governed automatic capability discovery — original frozen failures
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  detect-real-frozen-capability-deficits:
+    outputs:
+      build_ready: ${{ steps.eligibility.outputs.build_ready }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Assert detector never grants owner or installation authority
+        run: |
+          node --check src/reality-genuine-auto-detect-v1.js
+          node --check scripts/reality-genuine-auto-trigger-v1.mjs
+          node --test test/reality-genuine-auto-trigger-v1.test.js
+          node --test test/reality-original-reconciliation-barrier-v1.test.js
+      - name: Discover actual missing capabilities from frozen customer acceptance tests
+        run: node scripts/reality-genuine-auto-trigger-v1.mjs
+      - name: Persist source-hashed discovery observations for independent owner-gap admission
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-auto-capability-discovery-${{ github.run_id }}
+          path: artifact/genuine-capability-auto-trigger.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Signed automatic owner-evidence admission into the existing durable queue
+        if: github.event_name == 'push'
+        run: node scripts/reality-genuine-auto-admit-v1.mjs
+      - name: Wake frozen-test worker for the admitted original job
+        if: github.event_name == 'push'
+        run: node scripts/reality-genuine-frozen-worker-claim-v1.mjs
+      - name: Reconcile signed original frozen failure in isolated Docker
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-frozen-reconcile-v1.mjs
+          node scripts/reality-genuine-frozen-reconcile-v1.mjs
+      - name: Save original-job queue receipt for Reality capability engine
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: artifact/genuine-capability-admitted-queue.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Only request OpenAI if a real original job still needs a capability
+        id: eligibility
+        if: github.event_name == 'push'
+        run: |
+          node -e "const fs=require('node:fs');const q=JSON.parse(fs.readFileSync('artifact/genuine-capability-admitted-queue.json'));const ready=[...(q.queued||[]),...(q.previously_claimed||[])].some(x=>['PENDING_FROZEN_REPRODUCTION','LEASED_FOR_INDEPENDENT_REPRODUCTION','FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(x.queue_phase));fs.appendFileSync(process.env.GITHUB_OUTPUT,'build_ready='+ready+'\\n');"
+      - name: Show exact authorization boundary
+        if: github.event_name == 'push'
+        run: |
+          echo 'Queue admission verifies signed GitHub identity, original customer goal, provider failure and frozen source.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No model output authorizes installation. Owner approval is a separate action.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Do not silently convert an observation into an authorized queue claim
+        run: |
+          echo 'A failing frozen test is an unverified discovery candidate, not owner-approved work.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Existing Reality Continuity, independent provider, owner-goal and atomic queue gates remain mandatory.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No install, model-generated capability or original job settlement claimed.' >> "$GITHUB_STEP_SUMMARY"
+
+  observe_governed_original_worker_failure:
+    # Existing constitutional capability worker supervises its OWN failed
+    # signed original-job runs, without a separate AI agent.
+    # This job only observes evidence and optionally asks Reality's existing
+    # OpenAI gateway for non-authoritative hypotheses.
+    needs: [resume_original_job]
+    if: ${{ always() && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Enforce existing owner-governed worker failure feedback boundaries
+        run: |
+          node --check scripts/reality-genuine-worker-failure-observe-v1.mjs
+          node --check scripts/reality-genuine-worker-failure-research-v1.mjs
+          node --test test/reality-genuine-worker-failure-feedback-v1.test.js
+      - name: Independently observe and durably record actual escalated original worker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-genuine-worker-failure-observe-v1.mjs
+      - name: Research unresolved verified worker failure with Reality's governed OpenAI gateway
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: node scripts/reality-genuine-worker-failure-research-v1.mjs
+      - name: Preserve independent failure and advisory research evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-governed-worker-failure-feedback-${{ github.run_id }}
+          path: |
+            artifact/genuine-worker-failure-evidence.json
+            artifact/genuine-worker-failure-model-diagnosis.json
+          if-no-files-found: error
+          retention-days: 30
+
+  generate_missing_capability:
+    needs: detect-real-frozen-capability-deficits
+    if: ${{ github.event_name == 'push' && needs['detect-real-frozen-capability-deficits'].outputs.build_ready == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: artifact
+      - name: Reality proposes the original missing capability using OpenAI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: |
+          node --check scripts/reality-genuine-openai-propose-v1.mjs
+          node scripts/reality-genuine-openai-propose-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: artifact/genuine-capability-model-proposal.json
+          if-no-files-found: error
+          retention-days: 7
+
+  verify_missing_capability:
+    needs: generate_missing_capability
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - name: Independently run original frozen acceptance and candidate tests
+        run: |
+          node --check scripts/reality-genuine-sandbox-verify-v1.mjs
+          node scripts/reality-genuine-sandbox-verify-v1.mjs
+      - name: Preserve independent verifier evidence, whether passed or failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: artifact/genuine-capability-sandbox-verification.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  correct_failed_capability:
+    needs: verify_missing_capability
+    if: ${{ always() && needs.verify_missing_capability.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: previous
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: failed
+      - name: Reality uses independently failed tests to correct its capability
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: |
+          node --check scripts/reality-genuine-openai-correct-v1.mjs
+          node scripts/reality-genuine-openai-correct-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-corrected-candidate-${{ github.run_id }}
+          path: artifact/genuine-capability-model-proposal.json
+          if-no-files-found: error
+          retention-days: 7
+
+  verify_corrected_capability:
+    needs: correct_failed_capability
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-corrected-candidate-${{ github.run_id }}
+          path: candidate
+      - name: Independently verify OpenAI's corrected capability
+        run: |
+          node --check scripts/reality-genuine-sandbox-verify-v1.mjs
+          node scripts/reality-genuine-sandbox-verify-v1.mjs
+      - name: Preserve corrected independent verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-corrected-independent-proof-${{ github.run_id }}
+          path: artifact/genuine-capability-sandbox-verification.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  qualify_verified_capability:
+    needs: verify_missing_capability
+    if: needs.verify_missing_capability.result == 'success'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: proof
+      - name: Reality records signed owner-reviewable capability after independent GREEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-qualify-v1.mjs
+          node scripts/reality-genuine-qualify-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-owner-review-receipt-${{ github.run_id }}
+          path: artifact/genuine-capability-owner-review.json
+          if-no-files-found: error
+          retention-days: 7
+
+  stage_riley_verified_source:
+    # Actual CODE WRITING, never production installation. Model generation
+    # and independent tests have completed in distinct least-privilege jobs.
+    needs: qualify_verified_capability
+    if: ${{ github.event_name == 'push' && needs.qualify_verified_capability.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently check the isolated verified-code writer boundary
+        run: |
+          node --check scripts/reality-riley-stage-verified-code-v1.mjs
+          node --test test/reality-riley-verified-code-writer-v1.test.js
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: proof
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-review-receipt-${{ github.run_id }}
+          path: qualified
+      - name: Riley writes independently verified model source on NEW isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-riley-stage-verified-code-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-riley-verified-source-${{ github.run_id }}
+          path: artifact/riley-staged-verified-code.json
+          if-no-files-found: error
+          retention-days: 30
+
+  activate_owner_approved_preview:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      installed: ${{ steps.isolated_install.outputs.installed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently record signed worker life and current governance
+        id: worker_life
+        env:
+          REALITY_INSTALL_JOB_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-governed-worker-proof-of-life-v1.mjs
+          node scripts/reality-governed-worker-proof-of-life-v1.mjs
+      - name: Only after exact owner approval install on new isolated branch
+        if: steps.worker_life.outputs.ready == 'true'
+        id: isolated_install
+        env:
+          REALITY_INSTALL_JOB_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-install-approved-preview-v1.mjs
+          node scripts/reality-genuine-install-approved-preview-v1.mjs
+      - name: Retain owner-approved installed-source proof
+        if: steps.isolated_install.outputs.installed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-${{ github.run_id }}
+          path: artifact/reality-owner-approved-preview-install.json
+          if-no-files-found: error
+          retention-days: 14
+
+  monitor_owner_approved_preview:
+    needs: activate_owner_approved_preview
+    if: ${{ needs.activate_owner_approved_preview.outputs.installed == 'true' }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-${{ github.run_id }}
+          path: artifact/install
+      - name: Independently reobserve installed bytes and monitor five sandbox activations
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-monitor-installed-preview-v1.mjs
+          node scripts/reality-genuine-monitor-installed-preview-v1.mjs
+      - name: Preserve independent activation and quarantine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-approved-preview-activation-proof-${{ github.run_id }}
+          path: artifact/out/reality-independent-installed-preview-activation.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  record_owner_approved_activation:
+    needs: monitor_owner_approved_preview
+    if: ${{ needs.monitor_owner_approved_preview.result == 'success' }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-${{ github.run_id }}
+          path: artifact/install
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-approved-preview-activation-proof-${{ github.run_id }}
+          path: artifact/monitor
+      - name: Independently reconcile preview activation and monitor into original Continuity
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-record-activation-v1.mjs
+          node scripts/reality-genuine-record-activation-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-durable-owner-activation-${{ github.run_id }}
+          path: artifact/out/reality-durable-preview-activation.json
+          if-no-files-found: error
+          retention-days: 14
+
+  recover_consumed_preview_install:
+    # Never race the current installation and activation chain. Only read the
+    # consumed-approval recovery state after its first path is concluded.
+    needs: [record_owner_approved_activation]
+    if: ${{ always() && !cancelled() && github.event_name == 'push' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      recovered: ${{ steps.complete.outputs.recovered }}
+      installer_run_id: ${{ steps.scope.outputs.installer_run_id }}
+      installer_source_sha: ${{ steps.scope.outputs.installer_source_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Resolve already-consumed owner approval without a new installation
+        id: scope
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-recovery-prepare-v1.mjs
+          node scripts/reality-genuine-recovery-prepare-v1.mjs
+      - name: Retrieve immutable artifact from original successful installation
+        if: steps.scope.outputs.recover == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_RUN: ${{ steps.scope.outputs.installer_run_id }}
+        run: |
+          mkdir -p artifact/install
+          gh run download "$INSTALL_RUN" --repo maloney2323/Reality --name "reality-owner-approved-isolated-install-$INSTALL_RUN" --dir artifact/install
+      - name: Independently monitor installed original capability without reinstallation
+        if: steps.scope.outputs.recover == 'true'
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+          REALITY_RECOVERY_SOURCE_SHA: ${{ steps.scope.outputs.installer_source_sha }}
+          REALITY_RECOVERY_INSTALL_RUN_ID: ${{ steps.scope.outputs.installer_run_id }}
+        run: |
+          node --check scripts/reality-genuine-monitor-installed-preview-v1.mjs
+          node scripts/reality-genuine-monitor-installed-preview-v1.mjs
+      - name: Preserve new independent recovery monitor receipt
+        if: steps.scope.outputs.recover == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-recovery-activation-${{ github.run_id }}
+          path: artifact/out/reality-independent-installed-preview-activation.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Confirm monitoring has independently completed
+        id: complete
+        if: steps.scope.outputs.recover == 'true'
+        run: echo "recovered=true" >> "$GITHUB_OUTPUT"
+
+  record_consumed_preview_recovery:
+    needs: recover_consumed_preview_install
+    if: needs.recover_consumed_preview_install.outputs.recovered == 'true'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Re-read original exact approved install evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_RUN: ${{ needs.recover_consumed_preview_install.outputs.installer_run_id }}
+        run: |
+          mkdir -p artifact/install
+          gh run download "$INSTALL_RUN" --repo maloney2323/Reality --name "reality-owner-approved-isolated-install-$INSTALL_RUN" --dir artifact/install
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-recovery-activation-${{ github.run_id }}
+          path: artifact/monitor
+      - name: Reconcile two independently verified runs into existing original job
+        env:
+          REALITY_INSTALL_READ_TOKEN: ${{ github.token }}
+          REALITY_RECOVERY_MODE: 'true'
+          REALITY_RECOVERY_INSTALL_RUN_ID: ${{ needs.recover_consumed_preview_install.outputs.installer_run_id }}
+          REALITY_RECOVERY_SOURCE_SHA: ${{ needs.recover_consumed_preview_install.outputs.installer_source_sha }}
+        run: |
+          node --check scripts/reality-genuine-record-activation-v1.mjs
+          node scripts/reality-genuine-record-activation-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-durable-recovered-activation-${{ github.run_id }}
+          path: artifact/out/reality-durable-preview-activation.json
+          if-no-files-found: error
+          retention-days: 14
+
+  resume_original_job:
+    needs: [record_owner_approved_activation, recover_consumed_preview_install, record_consumed_preview_recovery, reconcile_all_settled_outcomes]
+    # Governed repair of the Nov 4 broker 400: the historical sidecars must
+    # first receive independent, idempotent Universe reconciliation. Without
+    # this barrier an original resume races a different settlement worker.
+    # Keep both installation/activation paths and the exact owner scope.
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.reconcile_all_settled_outcomes.result == 'success' && (needs.record_owner_approved_activation.result == 'success' || needs.record_owner_approved_activation.result == 'skipped') && (needs.recover_consumed_preview_install.result == 'success' || needs.recover_consumed_preview_install.result == 'skipped') && (needs.record_consumed_preview_recovery.result == 'success' || needs.record_consumed_preview_recovery.result == 'skipped') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      performed: ${{ steps.resume.outputs.performed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Execute original frozen acceptance against installed source
+        id: resume
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-resume-v1.mjs
+          node scripts/reality-genuine-original-resume-v1.mjs
+      - name: Preserve original provider work proof
+        if: steps.resume.outputs.performed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-resumption-${{ github.run_id }}
+          path: artifact/out/reality-original-resumption.json
+          if-no-files-found: error
+          retention-days: 14
+
+  record_independent_original_settlement:
+    needs: resume_original_job
+    if: ${{ always() && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'true' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-original-resumption-${{ github.run_id }}
+          path: artifact/resume
+      - name: Independently verify original provider outcome and write final settlement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-settle-v1.mjs
+          node scripts/reality-genuine-original-settle-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-final-settlement-${{ github.run_id }}
+          path: artifact/out/reality-original-final-settlement.json
+          if-no-files-found: error
+          retention-days: 14
+
+
+  independently_verify_final_customer_receipt:
+    needs: record_independent_original_settlement
+    # Explicit status check prevents an unrelated skipped ancestor from suppressing the final verifier.
+    if: ${{ always() && needs.record_independent_original_settlement.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      performed: ${{ steps.final_verifier.outputs.performed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-original-final-settlement-${{ github.run_id }}
+          path: artifact/final
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-${{ github.run_id }}
+          path: artifact/install
+      - name: Independently execute installed completion verifier against final provider receipts
+        id: final_verifier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-final-completion-verifier-v1.mjs
+          node scripts/reality-genuine-final-completion-verifier-v1.mjs
+      - name: Preserve immutable independent final-verifier result
+        if: steps.final_verifier.outputs.performed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-independent-final-completion-verifier-${{ github.run_id }}
+          path: artifact/out/reality-independent-final-completion-verifier.json
+          if-no-files-found: error
+          retention-days: 30
+
+  record_independent_final_receipt:
+    needs: independently_verify_final_customer_receipt
+    # The recorder requires an actual successful verifier and immutable artifact.
+    if: ${{ always() && needs.independently_verify_final_customer_receipt.result == 'success' && needs.independently_verify_final_customer_receipt.outputs.performed == 'true' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-final-completion-verifier-${{ github.run_id }}
+          path: artifact/verify
+      - name: Independently record one provider-backed final customer receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-final-completion-record-v1.mjs
+          node scripts/reality-genuine-final-completion-record-v1.mjs
+      - name: Retain customer final receipt without another button
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-final-original-customer-receipt-${{ github.run_id }}
+          path: artifact/out/reality-final-original-customer-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+  independently_verify_historical_final_customer_receipt:
+    # Evidence-only recovery for the already settled original #188.
+    # Explicit source-commit trigger, never a new execution/installation.
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[recover-final-188]') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-original-final-settlement-41639811554
+          run-id: 41639811554
+          github-token: ${{ github.token }}
+          path: artifact/final
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-approved-isolated-install-41639811554
+          run-id: 41639811554
+          github-token: ${{ github.token }}
+          path: artifact/install
+      - name: Independently verify historical installed completion without replay
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-final-completion-historical-v1.mjs
+          node scripts/reality-genuine-final-completion-historical-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-independent-historical-final-completion-verifier-${{ github.run_id }}
+          path: artifact/out/reality-independent-final-completion-verifier.json
+          if-no-files-found: error
+          retention-days: 30
+
+  record_independent_historical_final_receipt:
+    needs: independently_verify_historical_final_customer_receipt
+    if: ${{ always() && needs.independently_verify_historical_final_customer_receipt.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-historical-final-completion-verifier-${{ github.run_id }}
+          path: artifact/verify
+      - name: Independently record historical customer final receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-final-completion-historical-record-v1.mjs
+          node scripts/reality-genuine-final-completion-historical-record-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-final-historical-original-customer-receipt-${{ github.run_id }}
+          path: artifact/out/reality-final-original-customer-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+  recover_claimed_original_settlement:
+    needs: resume_original_job
+    # A prior run may have consumed the one-time execution claim and saved a
+    # successful immutable artifact before downstream settlement was skipped.
+    # Recover only that result. Never dispatch or repeat original execution.
+    if: ${{ always() && github.event_name == 'push' && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed != 'true' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently recover original successful provider artifact and atomically settle once
+        id: recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-original-settlement-recover-v1.mjs
+          node scripts/reality-genuine-original-settlement-recover-v1.mjs
+      - name: Preserve independently verified historical settlement and Universe readback
+        if: steps.recovery.outputs.performed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-original-recovered-final-settlement-${{ github.run_id }}
+          path: artifact/out/reality-original-final-settlement.json
+          if-no-files-found: error
+          retention-days: 30
+
+  record_201_historical_no_work_final_disposition:
+    needs: [resume_original_job, reconcile_all_settled_outcomes]
+    # After signed original_prepare found two previously VERIFIED Universe
+    # settlements, persist a DIFFERENT terminal no-work disposition. Never
+    # use the original settlement path or consume an execution claim.
+    if: ${{ always() && github.event_name == 'push' && needs.resume_original_job.result == 'success' && needs.resume_original_job.outputs.performed == 'false' && needs.reconcile_all_settled_outcomes.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Enforce no-replay, trusted two-event evidence, and readback contract
+        run: |
+          node --test test/reality-201-historical-no-work-final-disposition-v1.test.js
+          node --check scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs
+      - name: Record exact #201 no-work disposition via signed isolated broker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-genuine-historical-no-work-final-disposition-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-historical-no-work-final-disposition-${{ github.run_id }}
+          path: artifact/out/reality-201-historical-no-work-final-disposition.json
+          if-no-files-found: error
+          retention-days: 90
+
+  reconcile_all_settled_outcomes:
+    # Signed isolation-only preflight for push AND trusted worker_dispatch.
+    # It reconciles only already-settled work, never reinstalls or reclaims.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Reconcile every already-settled job into Universe and prove idempotent repeat
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-universe-outcome-auto-finalize-v2.mjs
+          node scripts/reality-genuine-universe-outcome-auto-finalize-v2.mjs
+      - name: Preserve independently verified settlement and no-duplicate receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-universe-outcome-auto-finalize-${{ github.run_id }}
+          path: artifact/out/reality-all-settled-universe-outcomes.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_isolated_emergency_stop_and_rollback:
+    # Explicit one-shot safety drill; never automatically roll back a customer install.
+    # The actual source is reverted only on a newly created drill branch.
+    needs: [resume_original_job, recover_claimed_original_settlement, reconcile_all_settled_outcomes]
+    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-safety]') }}
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Prove real isolated HALT, denied installer and original claims, and source rollback commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-genuine-isolated-stop-and-rollback-drill-v1.mjs
+          node scripts/reality-genuine-isolated-stop-and-rollback-drill-v1.mjs
+      - name: Persist signed source-verified rollback and emergency stop receipt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-isolated-stop-rollback-${{ github.run_id }}
+          path: artifact/out/reality-real-isolated-stop-rollback.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_live_inflight_continuity_recovery:
+    # Independent evidence-only audit. Preflight checks original source is already settled.
+    # It cannot claim, replay or modify the original customer job.
+    if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-inflight-v4]') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Stop an alive worker and recover its real provider audit from Universe checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-real-inflight-continuity-drill-v1.mjs
+          node scripts/reality-real-inflight-continuity-drill-v1.mjs
+      - name: Preserve independent signed interruption recovery and Universe proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-inflight-continuity-proof-${{ github.run_id }}
+          path: artifact/out/reality-actual-interruption-recovery.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_real_work_portfolio_first_half:
+    # Real user-repository source-backed review tasks only.
+    # Does not claim, execute, authorize, or settle customer jobs.
+    if: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[prove-portfolio]') || contains(github.event.head_commit.message, '[prove-mega]')) }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Review first 15 independently read GitHub PR/issue sources
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-30-real-work-portfolio-continuity-v1.mjs
+          node scripts/reality-30-real-work-portfolio-continuity-v1.mjs first
+      - name: Preserve durable halfway work receipt across GitHub worker shutdown
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-portfolio-halfway-${{ github.run_id }}
+          path: artifact/out/reality-portfolio-halfway.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_real_work_portfolio_resume_second_half:
+    needs: [prove_real_work_portfolio_first_half]
+    if: ${{ needs.prove_real_work_portfolio_first_half.result == 'success' }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Restore source-backed halfway checkpoint from previous GitHub worker
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-portfolio-halfway-${{ github.run_id }}
+          path: artifact/in
+      - name: Independently verify first 15 and continue the same 30 work cases
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-30-real-work-portfolio-continuity-v1.mjs
+          node scripts/reality-30-real-work-portfolio-continuity-v1.mjs resume
+      - name: Preserve 30 source-backed work-review continuity and capability-gap receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-30-real-work-portfolio-${{ github.run_id }}
+          path: artifact/out/reality-30-work-batch-readonly-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prove_existing_vs_missing_capability_on_real_work:
+    # Real original issue #188, unchanged frozen test. Contrasts two already
+    # installed owner-approved isolated controls, with no owner consent inferred.
+    if: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[prove-portfolio-gaps]') || contains(github.event.head_commit.message, '[prove-mega]')) }}
+    permissions:
+      contents: read
+      issues: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Reproduce actual issue 188 missing extension, reject installed historical gap repeats
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-verify-portfolio-real-gap-discrimination-v1.mjs
+          node scripts/reality-verify-portfolio-real-gap-discrimination-v1.mjs
+      - name: Preserve independently pinned real gap and negative controls
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-gap-discrimination-${{ github.run_id }}
+          path: artifact/out/reality-gap-discrimination.json
+          if-no-files-found: error
+          retention-days: 30
+
+  mega_prove_12_live_ci_operations:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') }}
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Perform 12 real workflow health and actionable diagnostics with current GitHub provider readbacks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-mega-12-current-ci-operations-v1.mjs
+          node scripts/reality-mega-12-current-ci-operations-v1.mjs
+      - name: Save independently sourced CI operational job receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-mega-12-ci-operations-${{ github.run_id }}
+          path: artifact/out/reality-mega-current-ci-operations.json
+          if-no-files-found: error
+          retention-days: 30
+
+  mega_prove_live_interruption_after_42_source_jobs:
+    needs:
+      - prove_real_work_portfolio_resume_second_half
+      - prove_existing_vs_missing_capability_on_real_work
+      - mega_prove_12_live_ci_operations
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') && needs.prove_real_work_portfolio_resume_second_half.result == 'success' && needs.prove_existing_vs_missing_capability_on_real_work.result == 'success' && needs.mega_prove_12_live_ci_operations.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Interrupt live audit after a durable Universe checkpoint and recover in a fresh worker process
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-real-inflight-continuity-drill-v1.mjs
+          node scripts/reality-real-inflight-continuity-drill-v1.mjs
+      - name: Preserve independent post-interruption recovered-source continuity receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-mega-universe-interruption-proof-${{ github.run_id }}
+          path: artifact/out/reality-actual-interruption-recovery.json
+          if-no-files-found: error
+          retention-days: 30
+
+  mega_independent_release_readiness:
+    # Never withhold the read-only readiness audit merely because an unrelated
+    # reconciliation job failed, timed out, or was skipped.
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently inspect release gates even if upstream settlement automation fails
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-independent-production-readiness-v1.mjs
+          node scripts/reality-independent-production-readiness-v1.mjs
+      - name: Preserve release blockers without promoting production
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-mega-independent-readiness-${{ github.run_id }}
+          path: artifact/out/reality-production-readiness.json
+          if-no-files-found: error
+          retention-days: 30
+
+  mega_independent_final_business_value_scorecard:
+    needs:
+      - prove_real_work_portfolio_resume_second_half
+      - prove_existing_vs_missing_capability_on_real_work
+      - mega_prove_12_live_ci_operations
+      - mega_prove_live_interruption_after_42_source_jobs
+      - mega_independent_release_readiness
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-mega]') && needs.prove_real_work_portfolio_resume_second_half.result == 'success' && needs.prove_existing_vs_missing_capability_on_real_work.result == 'success' && needs.mega_prove_12_live_ci_operations.result == 'success' && needs.mega_prove_live_interruption_after_42_source_jobs.result == 'success' && needs.mega_independent_release_readiness.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Restore first and second worker 30-item portfolio evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-30-real-work-portfolio-${{ github.run_id }}
+          path: artifact/portfolio
+      - name: Restore real missing-capability and installed-negative-controls evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-real-gap-discrimination-${{ github.run_id }}
+          path: artifact/gap
+      - name: Restore twelve live CI operating investigation receipts
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-mega-12-ci-operations-${{ github.run_id }}
+          path: artifact/ci
+      - name: Restore real worker interruption and recovered Universe checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-mega-universe-interruption-proof-${{ github.run_id }}
+          path: artifact/recovery
+      - name: Restore independent signed production release-readiness evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: reality-mega-independent-readiness-${{ github.run_id }}
+          path: artifact/readiness
+      - name: Reject forged completion claims, reconcile every source and compute meaningful measured results
+        run: |
+          node --check scripts/reality-integrated-business-megatest-gate-v1.mjs
+          node scripts/reality-integrated-business-megatest-gate-v1.mjs
+      - name: Persist independent full-value scorecard and explicit owner-approval boundaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-integrated-megatest-scorecard-${{ github.run_id }}
+          path: artifact/out/reality-business-operations-megatest-scorecard.json
+          if-no-files-found: error
+          retention-days: 30
+
+  independently_measure_production_readiness:
+    needs: reconcile_all_settled_outcomes
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Read signed independent readiness evidence and enforce no release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-independent-production-readiness-v1.mjs
+          node scripts/reality-independent-production-readiness-v1.mjs
+      - name: Retain immutable readiness report, including missing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-independent-production-readiness-${{ github.run_id }}
+          path: artifact/out/reality-production-readiness.json
+          if-no-files-found: error
+          retention-days: 30
+
+  independently_attest_owner_repair_issues:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently verify issue and frozen provider source, then store signed witness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/reality-signed-owner-issue-witness-v1.mjs
+          node scripts/reality-signed-owner-issue-witness-v1.mjs
+      - name: Preserve signed provider evidence without granting owner authority
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-signed-owner-issue-witnesses-${{ github.run_id }}
+          path: artifact/out/reality-owner-issue-witnesses.json
+          if-no-files-found: error
+          retention-days: 14
+
+  prove-corrected-reconciler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independently verify the original live GitHub provider run and specific successful jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const repo='maloney2323/Reality', runId=41390537103;
+          const get=async(path)=>{
+            const r=await fetch('https://api.github.com/repos/'+repo+path,{
+              headers:{authorization:'Bearer '+process.env.GH_TOKEN,
+                accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
+            assert.equal(r.status,200,'Provider readback required: '+path);
+            return r.json();
+          };
+          const run=await get('/actions/runs/'+runId);
+          const jobs=await get('/actions/runs/'+runId+'/jobs?per_page=100');
+          const artifacts=await get('/actions/runs/'+runId+'/artifacts?per_page=100');
+          assert.equal(run.id,runId);
+          assert.equal(run.status,'completed');
+          assert.equal(run.conclusion,'failure'); // Never alter provider's actual conclusion.
+          assert.equal(run.head_repository.full_name,repo);
+          assert.equal(jobs.jobs.filter(j=>j.name==='resume_original_job'&&j.conclusion==='success').length,1);
+          assert.equal(jobs.jobs.filter(j=>j.name==='record_independent_original_settlement'&&j.conclusion==='success').length,1);
+          assert.ok(jobs.jobs.some(j=>j.conclusion==='failure'));
+          assert.ok(artifacts.artifacts.some(a=>
+            a.name==='reality-original-final-settlement-'+runId&&
+            !a.expired&&/^sha256:[a-f0-9]{64}$/.test(a.digest||'')));
+          console.log('REALITY_201_LIVE_PROVIDER_HOLDOUT',JSON.stringify({
+            run_id:runId,conclusion:run.conclusion,
+            resume_job:'success',independent_settlement_job:'success',
+            unrelated_failure_present:true,
+            verified_artifact_present:true,
+            production_change_claimed:false}));
+          NODE
+      - name: Independently test proposed corrected source in secret-free offline sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f src/reality-extensions/reality-continuity-settlement-reconciler.mjs
+          mkdir -p src/reality-extensions test/reality-extensions
+          cp evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.mjs src/reality-extensions/reality-continuity-settlement-reconciler.mjs
+          cp evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.test.js test/reality-extensions/reality-continuity-settlement-reconciler.test.js
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory 512m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            -v "${PWD}:/work:ro" -w /work node:22 \
+            node --test --test-reporter=tap \
+              test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js \
+              test/reality-extensions/reality-continuity-settlement-reconciler.test.js \
+              test/reality-201-provider-backed-relationship-holdout-v1.test.js | tee /tmp/reality-201-corrected-holdout.tap
+
+      - name: Publish immutable corrected holdout evidence receipt without installation
+        if: success()
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const tap=fs.readFileSync('/tmp/reality-201-corrected-holdout.tap','utf8');
+          const count=(key)=>Number([...tap.matchAll(new RegExp('^# '+key+' (\\d+)$','gm'))].at(-1)?.[1]||0);
+          assert.equal(count('tests'),19);
+          assert.equal(count('pass'),19);
+          assert.equal(count('fail'),0);
+          const sha=path=>crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+          const candidate='evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.mjs';
+          const frozen='test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js';
+          const receipt={
+            schema:'reality-201-independent-corrected-holdout-v1',
+            original_repair_work_id:'work:d90acd41ed1b1116ee74086846d61d42',
+            unchanged_frozen_sha256:sha(frozen),
+            corrected_source_sha256:sha(candidate),
+            corrected_source_path:candidate,
+            real_provider_run_id:41390537103,
+            independent_live_provider_jobs_verified:true,
+            original_frozen_and_candidate_holdout_tests:19,
+            passed:19,failed:0,
+            source:'GITHUB_SIGNED_WORKFLOW_PROVIDER_READBACK_AND_NETWORK_DISABLED_DOCKER',
+            github_run_id:process.env.GITHUB_RUN_ID,
+            github_source_sha:process.env.GITHUB_SHA,
+            corrected_candidate_qualified_in_database:false,
+            installation_authorized:false,
+            universe_settlement_recorded:false,
+            production_changed:false
+          };
+          fs.mkdirSync('artifact/out',{recursive:true});
+          fs.writeFileSync('artifact/out/reality-201-corrected-holdout.json',JSON.stringify(receipt,null,2)+'\\n');
+          console.log('REALITY_201_CORRECTED_HOLDOUT_PROOF',JSON.stringify(receipt));
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: reality-201-independent-corrected-holdout-${{ github.run_id }}
+          path: artifact/out/reality-201-corrected-holdout.json
+          if-no-files-found: error
+          retention-days: 30
+
+  requalify_201_model_candidate:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[requalify-201]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Retrieve earlier genuine model response
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p previous
+          gh run download 41728570367 --repo maloney2323/Reality --name reality-uninstalled-model-proposal-41728570367 --dir previous
+          test -s previous/genuine-capability-model-proposal.json
+      - name: Reality proposes fresh corrected source without installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_REPAIR_MODEL: ${{ vars.REALITY_REPAIR_MODEL || 'gpt-5.6' }}
+        run: node scripts/reality-201-model-requalify-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: artifact/genuine-capability-model-proposal.json
+          if-no-files-found: error
+          retention-days: 14
+
+  verify_201_new_model_candidate:
+    needs: requalify_201_model_candidate
+    if: needs.requalify_201_model_candidate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: candidate
+      - name: Verify frozen contract in isolated Docker
+        run: node scripts/reality-genuine-sandbox-verify-v1.mjs
+      - name: Hold out historical provider evidence in isolated Docker
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --memory 512m --cpus 1 --tmpfs /tmp:rw,noexec,nosuid,size=16m -v "${PWD}:/work:ro" -w /work node:22 node --test test/reality-201-provider-backed-relationship-holdout-v1.test.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-new-model-verification-${{ github.run_id }}
+          path: artifact/genuine-capability-sandbox-verification.json
+          if-no-files-found: error
+          retention-days: 14
+
+  durably_requalify_201_candidate:
+    needs: verify_201_new_model_candidate
+    if: needs.verify_201_new_model_candidate.result == 'success'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-model-correction-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-201-new-model-verification-${{ github.run_id }}
+          path: proof
+      - name: Verify signed provider results and atomically supersede previous qualified candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-201-record-model-requalification-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-201-durable-qualified-for-owner-review-${{ github.run_id }}
+          path: artifact/out/reality-201-durable-requalification.json
+          if-no-files-found: error
+          retention-days: 30

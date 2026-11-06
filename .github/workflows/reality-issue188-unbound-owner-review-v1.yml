@@ -1,0 +1,22 @@
+name: Reality owner follow-on review — independent non-authorization verification
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+permissions:
+  contents: read
+jobs:
+  prove_review_without_approval_or_replay:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prove-owner-unbound]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Parse authenticated route without running it
+        run: node --check api/reality/personal-issue188-candidate-review.js
+      - name: Verify source-pinned but unbound review and homepage JavaScript
+        run: node --test test/reality-issue188-unbound-owner-review-v1.test.js

@@ -1,4 +1,5 @@
 import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
+export const maxDuration=60;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','public, max-age=30, s-maxage=90');
  if(req.method!=='GET')return res.status(405).json({ok:false,error:'CATALOG_READ_ONLY_GET_REQUIRED'});

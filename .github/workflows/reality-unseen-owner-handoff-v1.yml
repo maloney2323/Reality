@@ -1,0 +1,35 @@
+name: Reality independent unseen gap — authentic owner handoff
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - '.github/workflows/reality-unseen-owner-handoff-v1.yml'
+      - 'scripts/reality-unseen-owner-handoff-verify-v1.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify_unseen_real_gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independently verify provider failure, frozen source and owner-approval boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REALITY_READINESS_ISSUE_NUMBER: '201'
+        run: |
+          node --check scripts/reality-unseen-owner-handoff-verify-v1.mjs
+          node scripts/reality-unseen-owner-handoff-verify-v1.mjs
+      - name: Retain signed evidence for Reality's owner review
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-unseen-owner-handoff-${{ github.run_id }}
+          path: artifact/out/reality-unseen-owner-handoff.json
+          if-no-files-found: error
+          retention-days: 30

@@ -28,6 +28,10 @@ function freshMock(){
    if(id)rows=rows.filter(e=>e.event_id===id);
    if(root)rows=rows.filter(e=>e.continuity_root_id===root);
    if(world)rows=rows.filter(e=>e.worldline_id===world);
+   if(q.has('select')){
+     const offset=Number(q.get('offset')||0),limit=Number(q.get('limit')||400);
+     return new Response(JSON.stringify(rows.slice(offset,offset+limit)),{status:200});
+   }
    return new Response(JSON.stringify(q.get('limit')==='1'?rows.slice(-1):rows.reverse()),
      {status:200});
  }};

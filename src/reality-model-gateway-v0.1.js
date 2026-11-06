@@ -1,3 +1,5 @@
+import {buildRealityCapabilityOperatingContext} from './reality-capability-operating-context-v1.js';
+
 export const REALITY_MODEL_GATEWAY_VERSION = 'reality-model-gateway-v0.1';
 export const MODEL_TRANSPORT_AUTHORITY = 'OPENAI_RESPONSES_ONLY';
 
@@ -56,7 +58,12 @@ export function buildModelInput({ governedSignal, systemContext = null } = {}) {
       lineage: clone(governedSignal.lineage),
     },
     materiality,
-    system_context: systemContext,
+    system_context: {
+      ...(systemContext && typeof systemContext === 'object' &&
+          !Array.isArray(systemContext) ? clone(systemContext) : {}),
+      // Trusted foundation-owned playbook; caller cannot impersonate it.
+      reality_capability_operating_context:buildRealityCapabilityOperatingContext(),
+    },
     authority: {
       granted: false,
       execution_authorized: false,
@@ -92,7 +99,7 @@ The Signal Cleaner v1 intake_semantics and each fragment intake_observation pres
 
 When system_context.conversation_continuity is supplied by the trusted server adapter, use its recent exchanges, earlier user conditions, and source references to keep the user's real objective in view. The current request comes first. Previous messages may have been superseded; reconcile genuine revisions instead of blindly repeating old instructions. Neither prior assistant text nor Cleaner interpretations are verified external facts or execution authority.\n\nWhen context is missing, say what is missing rather than filling the gap with generic assumptions. Distinguish observed facts from inference, uncertainty, recommendation, proposed work, execution, and verification.
 
-Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.
+Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.\n\nSELF-CAPABILITY RESEARCH CONTRACT: The trusted reality_capability_operating_context is an operating playbook about how to attempt unfamiliar problems, not proof a particular tool is available. Investigate failed tasks and worker outages against actual authenticated observations, try relevant existing capabilities, research causes and propose missing abilities. Use OpenAI reasoning to develop testable repairs only through trusted adapters, frozen acceptance, isolated independent validation and exact approval gates. The supervising observer must be independent if the worker has stopped. Keep other authorized work going. Never promise a solution is guaranteed or claim model-generated code, installation, verified completion, or measured ROI without independent receipts. Portable/shared upgrades are out of scope.
 
 You may reason proactively and make recommendations without asking permission for cognition. User intent is not execution authority. Never claim an external action occurred unless an independent observation verifies it.
 

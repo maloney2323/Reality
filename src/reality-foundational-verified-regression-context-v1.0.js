@@ -42,6 +42,24 @@ export function createVerifiedFrozenRegressionReader({
    if(Buffer.byteLength(raw,'utf8')!==bytes.length)fail('SOURCE_ENCODING_INVALID');
    return raw;
   }
+  if(ticket.frozen_regression_contract_kind==='PINNED_SINGLE_TEST'){
+   const path=ticket.frozen_test_path;
+   if(!safePath(path)||!/^test\/reality-frozen-regressions\/[A-Za-z0-9._-]+\.test\.js$/.test(path))
+    fail('SOURCE_BACKED_FROZEN_PATH_INVALID');
+   const content=await read(path);
+   if(hash(content)!==ticket.frozen_regression_sha256)
+    fail('SOURCE_BACKED_FROZEN_BYTES_CHANGED');
+   return Object.freeze({
+    source:'GITHUB_PINNED_READ_ONLY_TEST_FILES',
+    repository_base_sha:ticket.repository_base_sha,
+    frozen_regression_manifest_ref:ticket.frozen_regression_manifest_ref,
+    frozen_regression_sha256:ticket.frozen_regression_sha256,
+    files:Object.freeze([Object.freeze({
+     path,sha256:hash(content),content,
+    })]),
+    model_execution_authority:false,installation_authorized:false,
+   });
+  }
   const manifestPath='test/reality-frozen-regressions/'+
     ticket.frozen_regression_manifest_ref+'.json';
   const raw=await read(manifestPath);

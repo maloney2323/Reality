@@ -1,0 +1,72 @@
+name: Reality #201 independent corrected-candidate real-evidence holdout
+on:
+  push:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'evidence/reality-201-corrected-candidate/**'
+      - 'test/reality-201-provider-backed-relationship-holdout-v1.test.js'
+      - '.github/workflows/reality-201-corrected-candidate-holdout-v1.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prove-corrected-reconciler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independently verify the original live GitHub provider run and specific successful jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const repo='maloney2323/Reality', runId=41390537103;
+          const get=async(path)=>{
+            const r=await fetch('https://api.github.com/repos/'+repo+path,{
+              headers:{authorization:'Bearer '+process.env.GH_TOKEN,
+                accept:'application/vnd.github+json','x-github-api-version':'2022-11-28'}});
+            assert.equal(r.status,200,'Provider readback required: '+path);
+            return r.json();
+          };
+          const run=await get('/actions/runs/'+runId);
+          const jobs=await get('/actions/runs/'+runId+'/jobs?per_page=100');
+          const artifacts=await get('/actions/runs/'+runId+'/artifacts?per_page=100');
+          assert.equal(run.id,runId);
+          assert.equal(run.status,'completed');
+          assert.equal(run.conclusion,'failure'); // Never alter provider's actual conclusion.
+          assert.equal(run.head_repository.full_name,repo);
+          assert.equal(jobs.jobs.filter(j=>j.name==='resume_original_job'&&j.conclusion==='success').length,1);
+          assert.equal(jobs.jobs.filter(j=>j.name==='record_independent_original_settlement'&&j.conclusion==='success').length,1);
+          assert.ok(jobs.jobs.some(j=>j.conclusion==='failure'));
+          assert.ok(artifacts.artifacts.some(a=>
+            a.name==='reality-original-final-settlement-'+runId&&
+            !a.expired&&/^sha256:[a-f0-9]{64}$/.test(a.digest||'')));
+          console.log('REALITY_201_LIVE_PROVIDER_HOLDOUT',JSON.stringify({
+            run_id:runId,conclusion:run.conclusion,
+            resume_job:'success',independent_settlement_job:'success',
+            unrelated_failure_present:true,
+            verified_artifact_present:true,
+            production_change_claimed:false}));
+          NODE
+      - name: Independently test proposed corrected source in secret-free offline sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f src/reality-extensions/reality-continuity-settlement-reconciler.mjs
+          mkdir -p src/reality-extensions test/reality-extensions
+          cp evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.mjs src/reality-extensions/reality-continuity-settlement-reconciler.mjs
+          cp evidence/reality-201-corrected-candidate/reality-continuity-settlement-reconciler.test.js test/reality-extensions/reality-continuity-settlement-reconciler.test.js
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory 512m --cpus 1 \
+            --user 65534:65534 --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            -v "${PWD}:/work:ro" -w /work node:22 \
+            node --test --test-reporter=tap \
+              test/reality-frozen-regressions/reality-continuity-settlement-reconciler-v1.test.js \
+              test/reality-extensions/reality-continuity-settlement-reconciler.test.js \
+              test/reality-201-provider-backed-relationship-holdout-v1.test.js

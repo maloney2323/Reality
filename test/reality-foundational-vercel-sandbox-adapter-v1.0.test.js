@@ -194,3 +194,88 @@ test('invalid external CI auth must fail before creating a sandbox',()=>{
  }),/FOUNDATION_EXTERNAL_SANDBOX_AUTH_INVALID/);
  assert.equal(h.calls.length,0);
 });
+
+test('source-backed original frozen test and governance suite run in sealed sandbox without a manifest',async()=>{
+ const originalPath='test/reality-frozen-regressions/owner-job-original.test.js';
+ const frozenBytes=Buffer.from('import test from "node:test";test("original proof",()=>{});\n');
+ const {ticket_hash,version,...plain}=ticket;
+ const direct=createFoundationalBuildTicket({
+  ...plain,
+  frozen_regression_contract_kind:'PINNED_SINGLE_TEST',
+  frozen_test_path:originalPath,
+  frozen_regression_manifest_ref:'owner-job-original',
+  frozen_regression_sha256:sha(frozenBytes),
+  source_entrypoint:'src/reality-extensions/business-verified.mjs',
+ });
+ const model={
+  ticket_hash:direct.ticket_hash,original_work_id:direct.original_work_id,
+  rationale:'Verified source-backed original repair proposal',
+  files:[
+   {path:direct.source_entrypoint,content:'export const fixed=true;'},
+   {path:'test/reality-extensions/business-verified.test.js',
+    content:'import test from "node:test";test("valid",()=>{});'},
+  ],
+ };
+ const candidate=validateFoundationalCandidate(direct,model);
+ const h=fake(),oldCreate=h.Client.create;
+ let frozenRun=null,observedPaths=[];
+ h.Client.create=async opts=>{
+  const sbx=await oldCreate(opts);
+  sbx.readFileToBuffer=async ({path})=>{
+   observedPaths.push(path);
+   assert.equal(path,'/vercel/Reality/'+originalPath);
+   return frozenBytes;
+  };
+  const run=sbx.runCommand;
+  sbx.runCommand=async args=>{
+   if(args.args[0]==='--test'&&args.args.includes(originalPath))
+    frozenRun=args.args;
+   return run(args);
+  };
+  return sbx;
+ };
+ const adapter=createIsolatedVercelSandbox({SandboxClient:h.Client});
+ const report=await adapter.isolatedSandbox({
+  ticket:direct,candidate,attempt:1,
+  frozen_suite_ref:direct.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false,
+ });
+ assert.equal(report.frozen_suite_sha256,sha(frozenBytes));
+ assert.ok(frozenRun.includes(originalPath));
+ assert.ok(frozenRun.includes('test/reality-governed-self-improvement-spine-v1.0.test.js'));
+ assert.equal(observedPaths.length,1);
+ assert.ok(h.calls.indexOf('deny:deny-all')<h.calls.indexOf('write'));
+ await independentlyVerifySandbox(direct,candidate,
+  createSandboxEvidenceCandidate(direct,candidate,report),
+  {readback:adapter.independentReadback});
+ assert.equal(h.stopped,true);
+});
+test('isolated sandbox refuses changed original frozen test bytes before model source is written',async()=>{
+ const originalPath='test/reality-frozen-regressions/owner-job-original.test.js';
+ const {ticket_hash,version,...plain}=ticket;
+ const direct=createFoundationalBuildTicket({
+  ...plain,frozen_regression_contract_kind:'PINNED_SINGLE_TEST',
+  frozen_test_path:originalPath,
+  frozen_regression_manifest_ref:'owner-job-original',
+  frozen_regression_sha256:'f'.repeat(64),
+ });
+ const h=fake(),oldCreate=h.Client.create;
+ h.Client.create=async opts=>{
+  const sbx=await oldCreate(opts);
+  sbx.readFileToBuffer=async()=>Buffer.from('wrong source');
+  return sbx;
+ };
+ const adapter=createIsolatedVercelSandbox({SandboxClient:h.Client});
+ await assert.rejects(adapter.isolatedSandbox({
+  ticket:direct,candidate:validateFoundationalCandidate(direct,{
+   ticket_hash:direct.ticket_hash,original_work_id:direct.original_work_id,
+   rationale:'Proposal only',files:[
+    {path:'src/reality-extensions/example.mjs',content:'export const a=1'},
+    {path:'test/reality-extensions/example.test.js',content:'import test from "node:test";test("test",()=>{})'},
+   ],
+  }),attempt:1,frozen_suite_ref:direct.frozen_regression_manifest_ref,
+  network_permitted:false,secrets_permitted:false,
+ }),/FOUNDATION_SANDBOX_SOURCE_BACKED_FROZEN_BYTES_CHANGED/);
+ assert.equal(h.calls.includes('write'),false);
+ assert.equal(h.stopped,true);
+});

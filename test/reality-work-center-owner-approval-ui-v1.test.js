@@ -18,6 +18,13 @@ function setup({reply,authenticated=true}={}){
     children:[],href:'',target:'',rel:'',
     replaceChildren(...args){this.children=args},
     appendChild(value){this.children.push(value)},
+    append(...values){this.children.push(...values)},
+    addEventListener(event,handler){this['on'+event]=handler},
+    insertBefore(value,reference){
+     const i=this.children.indexOf(reference);
+     if(i<0)this.children.push(value);else this.children.splice(i,0,value);
+     return value;
+    },
     showModal(){this.open=true},
     close(){this.open=false},
     scrollIntoView(){this.scrolled=true},
@@ -42,6 +49,8 @@ function setup({reply,authenticated=true}={}){
  };
  const $=node;
  const context={document,$,console,
+  window:{},setTimeout:()=>0,setInterval:()=>0,
+  localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
   fetch:async(url,options={})=>{
    requests.push({url,method:options.method||'GET',body:options.body});
    const data=(options.method==='POST'?post:get);

@@ -1,0 +1,30 @@
+name: Reality genuine capability — signed source-triggered worker
+on:
+  push:
+    branches:
+      - feature/reality-genuine-capability-worker-20261101
+    paths:
+      - 'reality-genuine-triggers/*.json'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: genuine-capability-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  independent-original-gap-readback:
+    if: github.repository == 'maloney2323/Reality' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact isolated worker
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Setup pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Observe signed owner-scoped missing capability without consuming claim
+        run: node scripts/reality-genuine-capability-worker-v1.mjs

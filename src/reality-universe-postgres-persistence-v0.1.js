@@ -54,14 +54,41 @@ export function createUniversePostgresPersistence({
   }
 
   async function latestEvent({ continuityRootId, worldlineId }) {
-    const params = new URLSearchParams({
-      continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
-      worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      order: 'assertion_time.desc,created_at.desc,event_id.desc',
-      limit: '1',
-    });
-    const rows = await request('universe_events?' + params.toString());
-    return rows[0] || null;
+    // Never infer the tail of a cryptographic lineage from timestamps.
+    // A child can be written later with an EARLIER assertion_time than its
+    // parent. This exact case broke original repair #188 pre-approval writes.
+    // Page the scoped chain; server-side PostgREST row caps would otherwise
+    // silently omit old parents and misidentify a tip after 1,000 events.
+    const root=required('CONTINUITY_ROOT_ID',continuityRootId);
+    const worldline=required('WORLDLINE_ID',worldlineId);
+    const byId=new Map(),referenced=new Set();
+    const pageSize=400;
+    for(let offset=0;;offset+=pageSize){
+      const params=new URLSearchParams({
+        continuity_root_id:'eq.'+root,
+        worldline_id:'eq.'+worldline,
+        select:'event_id,parent_event_id,lineage_hash',
+        order:'created_at.asc,event_id.asc',
+        limit:String(pageSize),
+        offset:String(offset),
+      });
+      const page=await request('universe_events?'+params.toString());
+      if(!Array.isArray(page))throw Error('CONTINUITY_TAIL_READBACK_INVALID');
+      for(const row of page){
+        if(!row?.event_id||!row.lineage_hash||byId.has(row.event_id))
+          throw Error('CONTINUITY_TAIL_DUPLICATE_OR_INVALID');
+        byId.set(row.event_id,row);
+        if(row.parent_event_id)referenced.add(row.parent_event_id);
+      }
+      if(page.length<pageSize)break;
+    }
+    if(!byId.size)return null;
+    for(const parent of referenced){
+      if(!byId.has(parent))throw Error('CONTINUITY_TAIL_PARENT_MISSING');
+    }
+    const tips=[...byId.values()].filter(row=>!referenced.has(row.event_id));
+    if(tips.length!==1)throw Error('CONTINUITY_TAIL_FORKED');
+    return tips[0];
   }
 
   async function appendEvent(event) {

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reality · Verified Capability</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080d20;color:#f1f4ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse 90% 50% at 70% 0%,#28327499,transparent),radial-gradient(circle at 10% 45%,#153c5366,transparent),#080d20}
+main{max-width:970px;margin:0 auto;padding:32px 22px 60px}
+nav{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:48px}
+a{color:#b5c7ff;text-decoration:none}a:hover{text-decoration:underline}
+.brand{font-weight:800;letter-spacing:.18em;font-size:18px}
+.eyebrow{color:#93a5d6;font-size:12px;text-transform:uppercase;letter-spacing:.16em;font-weight:700}
+h1{font-size:clamp(31px,5vw,56px);letter-spacing:-.045em;line-height:1.07;margin:12px 0 16px}
+.lede{color:#b7c5e0;max-width:730px;line-height:1.65;margin:0 0 30px}
+.panel{border:1px solid #4c5680aa;border-radius:20px;background:#121a32df;padding:26px;box-shadow:0 18px 45px #02061655}
+.badge{display:inline-block;background:#36355f;color:#e5e5ff;border:1px solid #8781d355;border-radius:100px;padding:6px 12px;font-weight:700;font-size:12px;letter-spacing:.045em}
+.green{color:#85e8bc}.muted{color:#b8c5dd}.status{font-size:23px;font-weight:770;letter-spacing:-.025em;margin:20px 0 16px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:18px 0 20px}
+.metric{background:#1c2744;border:1px solid #3d4d76;border-radius:13px;padding:17px}
+.metric strong{display:block;font-size:30px;letter-spacing:-.04em}.metric small{display:block;margin-top:4px;color:#b5c4df;font-size:12px}
+dl{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px 18px;margin-top:25px}
+dt{color:#a5b7d9}dd{margin:0;word-break:break-word;font-weight:520}
+code{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#bfcbf1}
+ul{padding-left:19px;color:#cbd5ea;line-height:1.8}
+.approve{border:0;border-radius:11px;background:#7ca6fd;color:#08122b;font-weight:800;padding:14px 18px;cursor:pointer;width:100%;font-size:14px;margin:14px 0 4px}
+.approve[disabled]{cursor:default;opacity:.55}.approved{color:#8aeabf;font-weight:700}.statusline{padding:12px 0;color:#ccd5f3;font-size:14px}
+.note{border-top:1px solid #455271;margin-top:24px;padding-top:17px;color:#b6c1d9;font-size:14px;line-height:1.6}
+#message{color:#c7d4f1;line-height:1.6}
+footer{margin-top:30px;color:#8496b9;font-size:12px}
+@media(max-width:620px){.metrics{grid-template-columns:1fr}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:12px}main{padding:20px 14px 45px}.panel{padding:19px}nav{margin-bottom:28px}}
+</style></head>
+<body><main>
+<nav><div class="brand">REALITY</div><a href="/">Return to Reality</a></nav>
+<div class="eyebrow">Continuity · Capability engine · Evidence</div>
+<h1>From missing ability<br>to verified upgrade.</h1>
+<p class="lede">Reality detected that an existing customer job could not finish, independently reproduced the failure, used OpenAI to generate a new ability, and verified the candidate in an isolated environment. Owner authorization and original-job settlement remain separate.</p>
+<div class="panel" id="panel" aria-live="polite"><div id="message">Reading the signed-in owner's durable capability receipts…</div></div>
+<footer>Read-only customer evidence view. Source: Reality's owner-governed private queue and signed independent verifier. No capability is installed by opening this page.</footer>
+</main>
+<script>
+const panel=document.getElementById('panel');
+const message=document.getElementById('message');
+const fmt=v=>{if(!v)return 'Not recorded';const d=new Date(v);return Number.isFinite(d.valueOf())?d.toLocaleString(undefined,{dateStyle:'medium',timeStyle:'medium'}):String(v)};
+function element(tag,className,text){const e=document.createElement(tag);if(className)e.className=className;if(text!==undefined)e.textContent=String(text);return e}
+function render(entry){
+ panel.replaceChildren();
+ const r=entry.qualification||{};
+ panel.append(element('span','badge',entry.approval?'EXACT OWNER APPROVAL RECORDED':'VERIFIED · AWAITING OWNER APPROVAL'));
+ panel.append(element('div','status','Capability generated. Independent acceptance passed.'));
+ const metrics=element('div','metrics');
+ for(const [value,label] of [
+  [(Number(r.frozen_pass)||0)+' / '+(Number(r.frozen_tests)||0),'Original frozen + governance tests'],
+  [(Number(r.candidate_pass)||0)+' / '+(Number(r.candidate_tests)||0),'Model-authored capability tests'],
+  [(Number(r.frozen_pass)||0)+(Number(r.candidate_pass)||0)+' / '+((Number(r.frozen_tests)||0)+(Number(r.candidate_tests)||0)),'Total independent test assertions']
+ ]){
+  const box=element('div','metric');box.append(element('strong','green',value),element('small',null,label));metrics.append(box);
+ }
+ panel.append(metrics);
+ const dl=element('dl');
+ const details=[
+ ['Original work',r.original_work_id],
+ ['Capability',entry.capability_id],
+ ['Current phase',entry.phase],
+ ['Artifact SHA-256',r.artifact_sha256],
+ ['Valid time',fmt(r.valid_time)],
+ ['Transaction time',fmt(r.transaction_time)],
+ ['Pre-state hash',r.pre_state_hash],
+ ['Post-state hash',r.post_state_hash],
+ ['Installation',r.installation_authorized===false?'Not authorized':'Unverified'],
+ ['Original job',r.original_job_completed===false?'Not yet completed':'Unverified']
+ ];
+ for(const [key,value] of details)dl.append(element('dt',null,key),element('dd',null,value||'Not recorded'));
+ panel.append(dl);
+ const files=Array.isArray(entry.source_paths)?entry.source_paths:[];
+ if(files.length){panel.append(element('p','muted','Verified candidate files'));const ul=element('ul');
+  for(const f of files.slice(0,16))ul.append(element('li',null,f));panel.append(ul);}
+ if(/^\d+$/.test(String(r.provider_run_id||''))){const link=element('a',null,'View signed GitHub Actions verification');link.href='https://github.com/maloney2323/Reality/actions/runs/'+r.provider_run_id;link.rel='noopener noreferrer';link.target='_blank';panel.append(link)}
+ if(entry.approval&&entry.approval.approval_origin==='AUTHENTICATED_OWNER_EXPLICIT_ACTION'){
+  const a=entry.approval;
+  panel.append(element('p','approved','Owner approval recorded for this exact artifact.'));
+  panel.append(element('p','statusline','Approval ID: '+a.approval_id+' · Installation not yet verified · Production unchanged.'));
+ }else{
+  panel.append(element('p','muted','Only you can authorize installation. This approval applies to the exact hash displayed above and only to an isolated preview—not production.'));
+  const button=element('button','approve','Approve exact verified upgrade · isolated preview only');
+  button.type='button';button.addEventListener('click',async()=>{
+   button.disabled=true;button.textContent='Verifying owner approval…';
+   try{
+    const response=await fetch('/api/reality/personal-qualified-capability-approve',{
+     method:'POST',credentials:'same-origin',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({
+      intent:'OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY',
+      confirmation:'APPROVE EXACT VERIFIED UPGRADE IN ISOLATED PREVIEW',
+      original_work_id:r.original_work_id,
+      artifact_sha256:r.artifact_sha256,
+     })});
+    const result=await response.json();
+    if(!response.ok||result?.ok!==true||
+       result?.original_work_id!==r.original_work_id||
+       result?.artifact_sha256!==r.artifact_sha256||
+       result?.source_installation_completed!==false)
+     throw Error(result?.error||'OWNER_APPROVAL_RECONCILIATION_REQUIRED');
+    entry.approval=result;render(entry);
+   }catch(error){
+    button.disabled=false;button.textContent='Retry exact owner approval';
+    const previous=panel.querySelector('#ownerApproveFailure');
+    if(previous)previous.remove();
+    const failed=element('p','statusline','Approval not confirmed: '+String(error?.message||'UNAVAILABLE'));
+    failed.id='ownerApproveFailure';panel.append(failed);
+   }
+  });
+  panel.append(button);
+ }
+ panel.append(element('p','note','Approval does not itself prove installation, probation, or completion. Reality must independently activate the exact candidate, resume this same original job, and record final settlement.'));
+}
+(async()=>{
+ try{
+  const response=await fetch('/api/reality/personal-qualified-capabilities',{credentials:'same-origin',cache:'no-store'});
+  const body=await response.json();
+  if(!response.ok||body?.ok!==true){
+   message.replaceChildren();
+   message.append(element('div',null,body?.error==='CHAT_SIGN_IN_REQUIRED'?'Sign in to your existing Reality account, then reopen this page.':'The owner-bound qualification receipt could not be read from this preview.'));
+   const link=element('a',null,'Open Reality sign-in');link.href='/';message.append(link);return;
+  }
+  if(!Array.isArray(body.entries)||!body.entries.length){message.textContent='No verified capabilities are awaiting approval in this account.';return}
+  render(body.entries[0]);
+ }catch{message.textContent='Evidence readback unavailable. No action or installation occurred.'}
+})();
+</script></body></html>

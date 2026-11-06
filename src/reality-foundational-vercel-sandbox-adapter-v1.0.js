@@ -108,10 +108,26 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000,
    const env=await sandbox.runCommand({cmd:'node',cwd:BASE,args:['-e',
     'const keys=Object.keys(process.env).filter(k=>/OPENAI|SUPABASE|GITHUB_TOKEN|VERCEL_OIDC_TOKEN|VERCEL_TOKEN|SECRET_KEY/.test(k));if(keys.length){process.exit(45)}']});
    if(env.exitCode!==0)die('FOUNDATION_SANDBOX_ENVIRONMENT_CREDENTIAL_PRESENT');
-   const mf=await sandbox.readFileToBuffer({path:BASE+'/test/reality-frozen-regressions/'+
-    ticket.frozen_regression_manifest_ref+'.json'});
-   if(!mf)die('FOUNDATION_SANDBOX_FROZEN_MANIFEST_MISSING');
-   const manifest=secureManifest({raw:mf.toString('utf8'),ticket});
+   // Preserve original-job frozen acceptance directly when the owner-sourced
+   // contract is a hash-pinned test rather than a separate manifest. Run the
+   // foundational governance regression alongside it in the same sealed VM.
+   let frozenTests;
+   if(ticket.frozen_regression_contract_kind==='PINNED_SINGLE_TEST'){
+    const path=ticket.frozen_test_path;
+    if(typeof path!=='string'||
+      !/^test\/reality-frozen-regressions\/[A-Za-z0-9._-]+\.test\.js$/.test(path))
+     die('FOUNDATION_SANDBOX_SOURCE_BACKED_FROZEN_PATH_INVALID');
+    const bytes=await sandbox.readFileToBuffer({path:BASE+'/'+path});
+    if(!bytes||hash(bytes)!==ticket.frozen_regression_sha256)
+     die('FOUNDATION_SANDBOX_SOURCE_BACKED_FROZEN_BYTES_CHANGED');
+    frozenTests=[path,'test/reality-governed-self-improvement-spine-v1.0.test.js'];
+   }else{
+    const mf=await sandbox.readFileToBuffer({path:BASE+'/test/reality-frozen-regressions/'+
+     ticket.frozen_regression_manifest_ref+'.json'});
+    if(!mf)die('FOUNDATION_SANDBOX_FROZEN_MANIFEST_MISSING');
+    const manifest=secureManifest({raw:mf.toString('utf8'),ticket});
+    frozenTests=manifest.tests;
+   }
    const written=candidate.files.filter(f=>!f.path.startsWith('docs/'));
    if(written.length<2)die('FOUNDATION_SANDBOX_SOURCE_AND_TEST_REQUIRED');
    // Check BEFORE writing; models cannot override base, policy, or fixtures.
@@ -130,7 +146,7 @@ export function createIsolatedVercelSandbox({SandboxClient,timeout=180000,
     const output=(asString(await cmd.stdout())+'\n'+asString(await cmd.stderr())).slice(-12000);
     return {cmd,output,counts:counts(output)};
    };
-   const frozen=await run(manifest.tests);
+   const frozen=await run(frozenTests);
    const model=await run(tests);
    const session=sandbox.currentSession?.();
    const sessionId=session?.sessionId||session?.id;

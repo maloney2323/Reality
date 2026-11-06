@@ -205,7 +205,7 @@ test('owner-confirmed real source automatically queues one governed trigger unde
  assert.equal(first.governed_auto_trigger.original_work_id,first.original_work_id);
  assert.equal(first.installation_authorized,false);
  assert.equal(first.original_job_completed,false);
- assert.equal(calls,2,'idempotent DB upsert, never a new job');
+ assert.equal(calls,1,'recovered original does not re-register or dispatch a duplicate trigger');
  assert.equal(h.calls.append,1,'original customer work persisted only once');
 });
 test('failed trigger enqueue never invents a successful upgrade, settlement, or second job',async()=>{
@@ -236,4 +236,50 @@ test('an earlier unresolved customer job prevents a duplicate original event bef
  }),/PRIOR_ORIGINAL_ISSUE_WORK_ID_MUST_BE_RECONCILED/);
  assert.equal(h.calls.append,0,'no duplicate original Continuity event');
  assert.equal(triggerCalls,0,'no new trigger or queue');
+});
+
+test('one-button recovers saved owner goal when preview browser has a fresh unsaved conversation',async()=>{
+ const h=setup(),browserOnly=randomUUID();
+ const args={session,issueNumber,
+  expectedFailedRunId:runId,expectedSourceSha:sha,env,
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:h.readGoal,createPersistence:h.createPersistence};
+ const first=await authorizeExistingRealRepairWork({...args,conversationId});
+ assert.equal(h.calls.append,1);
+ const recovered=await authorizeExistingRealRepairWork({...args,
+  conversationId:browserOnly});
+ assert.equal(recovered.status,'REAL_OWNER_EXISTING_ORIGINAL_WORK_RECOVERED');
+ assert.equal(recovered.original_work_id,first.original_work_id);
+ assert.equal(recovered.original_conversation_id,conversationId);
+ assert.equal(recovered.source_receipt_id,first.source_receipt_id);
+ assert.equal(recovered.investigation_authorized,true);
+ assert.equal(recovered.installation_authorized,false);
+ assert.equal(recovered.original_job_completed,false);
+ assert.equal(h.calls.append,1,'no second original work was created');
+});
+test('a new preview session uses only a previously confirmed owner goal for fresh source work',async()=>{
+ const h=setup(),browserOnly=randomUUID();
+ const out=await authorizeExistingRealRepairWork({
+  session,conversationId:browserOnly,issueNumber,
+  expectedFailedRunId:runId,expectedSourceSha:sha,env,
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:h.readGoal,createPersistence:h.createPersistence,
+ });
+ assert.equal(out.status,'REAL_OWNER_ORIGINAL_WORK_CONFIRMED');
+ assert.equal(out.original_conversation_id,conversationId);
+ assert.equal(out.installation_authorized,false);
+ assert.equal(h.calls.append,1);
+});
+test('unverified saved goal never becomes an implicit owner authorization',async()=>{
+ const h=setup();
+ await assert.rejects(authorizeExistingRealRepairWork({
+  session,conversationId:randomUUID(),issueNumber,
+  expectedFailedRunId:runId,expectedSourceSha:sha,env,
+  discoverIssue:h.issue,listConversations:async()=>[{conversation_id:conversationId}],
+  readGoal:async()=>({...await h.readGoal(),state:{
+   ...(await h.readGoal()).state,active_goal:{
+    ...(await h.readGoal()).state.active_goal,user_confirmed:false}}}),
+  createPersistence:h.createPersistence,
+ }),/REALITY_REAL_REPAIR_EXISTING_OWNER_CONVERSATION_REQUIRED/);
+ assert.equal(h.calls.append,0);
 });
