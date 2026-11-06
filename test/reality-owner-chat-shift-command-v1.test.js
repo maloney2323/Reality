@@ -36,7 +36,7 @@ test('passive questions, simulated shifts, unsupported durations and recurring w
   'Can we plan a 10-hour shift?',
   "Don't run a 12 hour shift",
   'Please simulate an 8 hour shift',
-  'Run a 7 hour shift',
+  'Run a 13 hour shift',
   'Run a 24 hour shift',
   'Run an eight hour shift every day',
   'Schedule a 10 hour shift daily',
