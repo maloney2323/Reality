@@ -33,8 +33,16 @@ async function rpc(name:string,args:Record<string,unknown>,
    'content-type':'application/json',accept:'application/json'},
   body:JSON.stringify(args),signal:AbortSignal.timeout(12000)});
  const x=await r.json().catch(()=>null);
- if(!r.ok||!x||Array.isArray(x)||typeof x!=='object')
-  deny('DB_SERVICE_READBACK_UNAVAILABLE');
+ if(!r.ok||!x||Array.isArray(x)||typeof x!=='object'){
+  const phase=name==='reality_authenticate_employee_shift_wake_v1'?'AUTH':
+   name==='reality_store_next_week_source_snapshot_v1'?'STORE':'READ';
+  // Only stable RPC stage, HTTP code and PostgREST error class; no tokens,
+  // raw provider responses or user data ever appear in logs.
+  const errorClass=typeof x?.code==='string'&&/^[A-Z0-9_]{3,10}$/.test(x.code)?
+   x.code:'UNKNOWN';
+  console.warn('REALITY_NEXT_WEEK_RPC',phase,r.status,errorClass);
+  deny('DB_'+phase+'_READBACK_UNAVAILABLE');
+ }
  return x as Record<string,unknown>;
 }
 function nextMonday(now:Date){
