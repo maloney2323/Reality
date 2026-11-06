@@ -54,6 +54,7 @@ function fakeUI(payload,ok=true){
  get('realityPreROICost').value='';
  const calls=[];
  const document={
+  body:{dataset:{realityRoute:'value'}},
   getElementById:get,createElement:node,
   createDocumentFragment:()=>node('fragment')
  };
@@ -69,17 +70,23 @@ function fakeUI(payload,ok=true){
 }
 const tick=async()=>new Promise(resolve=>setImmediate(resolve));
 
-test('before any first automation homepage shows source-backed business case ahead of execution',()=>{
+test('Value Verification owns the source-backed business case; Home only links before execution',()=>{
  for(const id of ['realityBeforeAutomationValue','realityPreROIStatus',
   'realityPreROIRolesCount','realityPreROIFindings',
   'realityPreROIRepair','realityPreROIRepairs','realityPreROICost',
   'realityPreROIManual','realityPreROINet','realityPreROIPercent',
   'realityPreROIAssumptions','realityPreROIRefresh','realityPreROIRoles'])
   assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+ assert.ok(html.indexOf('id="rvPanelPotential"')<
+  html.indexOf('id="realityBeforeAutomationValue"'));
  assert.ok(html.indexOf('id="realityBeforeAutomationValue"')<
-  html.indexOf('id="realityEmployeeShiftPlanner"'));
- assert.ok(html.indexOf('id="realityBeforeAutomationValue"')<
-  html.indexOf('id="simpleRunFullLoop"'));
+  html.indexOf('<section id="realitySimpleHome"'));
+ assert.ok(html.indexOf('id="realityEmployeeShiftPlanner"')>
+  html.indexOf('<section id="realitySimpleHome"'));
+ assert.match(html,/href="\/value#pre-automation">Review business case in Value Verification/);
+ assert.match(client,/document\.body\?\.dataset\?\.realityRoute!=='value'/);
+ const nav=readFileSync(new URL('../reality-value-verification-v1.js',import.meta.url),'utf8');
+ assert.match(nav,/window\.location\?\.hash==='#pre-automation'\?'potential':'overview'/);
  assert.match(html,/src="\/reality-pre-automation-business-case-v1\.js"/);
  assert.match(html,/BEFORE YOUR FIRST AUTOMATION/);
  assert.match(html,/PROJECTED COST-BENEFIT SCENARIO · NOT VERIFIED ROI/);
