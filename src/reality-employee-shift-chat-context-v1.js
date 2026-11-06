@@ -6,11 +6,13 @@ import {shiftRpc,assertShiftReadback}
  from './reality-governed-shift-boundary-v1.js';
 import {buildRealityShiftConversationBrief}
  from './reality-shift-conversation-brief-v1.js';
+import {buildRealityEvidenceGroundedSelfAudit,summarizeRealitySelfAuditForModel}
+ from './reality-evidence-grounded-self-audit-v1.js';
 import {buildRealityWorkCatalog} from './reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from './reality-workday-opportunity-brief-v1.js';
 import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce,routeRealityWorkCategoriesToEmployees} from './reality-workday-team-assessment-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
-const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
+const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|self.aware|self.understand|know itself|own abilities|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
 const teamRequested=text=>/(?:\b(?:shift|workday|work day)\b.{0,80}\b(?:staff|staffing|team|headcount|roles|workers)\b|\b(?:staff|staffing|team|headcount|roles|workers)\b.{0,80}\b(?:shift|workday|work day)\b)/i.test(String(text||''));
 const companyRequested=text=>/(?:\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b.{0,120}\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b|\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b.{0,120}\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b)/i.test(String(text||''));
 export async function readVerifiedEmployeeShiftForChat({
@@ -49,6 +51,27 @@ export async function readVerifiedEmployeeShiftForChat({
    installation_authorized:false,external_execution_authorized:false,
    production_changed:false
   })];
+  // Live owner-scoped self-audit: source existence is not execution proof.
+  try{
+   const ownerLoop=await shiftRpc(db,'reality_read_owner_genuine_loop_v1',
+    {p_owner_id:session.user_id},{fetchImpl});
+   const audit=buildRealityEvidenceGroundedSelfAudit({
+    shiftReadback:read,ownerLoopReadback:ownerLoop,
+    sourceVerifiedAt:now.toISOString()});
+   observations.push(Object.freeze({
+    entry_id:'reality:self-audit:'+String(brief.shift_id||'none')+':'+audit.observed_at,
+    event_kind:'reality_evidence_grounded_self_capability_inventory',
+    source_kind:'OWNER_SCOPED_DATABASE_READBACK_AND_CODE_INVENTORY',
+    source_ref:'reality:capabilities:live-self-audit',
+    assertion_time:audit.observed_at,
+    epistemic_status:'SOURCE_IMPLEMENTATION_SEPARATE_FROM_LIVE_PROOF',
+    summary:summarizeRealitySelfAuditForModel(audit),
+    self_audit:audit,
+    full_shift_execution_verified:false,
+    model_self_authorized:false,installation_authorized:false,
+    production_changed:false
+   }));
+  }catch{/* Evidence unavailable is NOT an authorized self-capability. */}
   if(teamRequested(message)){
    // Existing work catalog supplies read-only verified-source observations.
    // Neither proposed role counts nor AI staffing estimates are worker receipts.
