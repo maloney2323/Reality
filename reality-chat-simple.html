@@ -85,6 +85,10 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
+<details class="team-proof" id="realitySelfAwareness">
+ <summary>Reality's verified self-understanding</summary>
+ <div id="realitySelfAudit" aria-live="polite">Checking current Reality capabilities…</div>
+</details>
  <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
 </section>
 <div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
@@ -111,6 +115,7 @@ const ROSTER='/api/reality/personal-employee-roster';
 const RILEY_PROOF='/api/reality/personal-riley-proof';
 const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
+const SELF_AUDIT='/api/reality/personal-capability-self-audit';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
 let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
 function conversation(){
@@ -270,6 +275,47 @@ async function refreshRileyLoopReadiness(){
   node.textContent=text;
  }catch{
   node.textContent='Full-loop readiness unavailable. No original-job execution or settlement is claimed.';
+ }
+}
+async function refreshRealitySelfAudit(){
+ const node=$('realitySelfAudit');
+ if(!node)return;
+ try{
+  const data=await json(SELF_AUDIT,{signal:AbortSignal.timeout(25000)});
+  if(data.ok!==true||data.owner_scope_verified!==true||
+    data.read_only!==true||
+    data.version!=='reality-evidence-grounded-self-audit-v1'||
+    data.evidence_kind!=='OWNER_SCOPED_DATABASE_AND_SOURCE_CAPABILITY_CONTRACT'||
+    data.execution_authorized_by_read!==false||
+    data.model_self_authorization!==false||
+    data.installation_authorized!==false||
+    data.full_shift_automation_proven!==false||
+    data.production_changed!==false||
+    data.measured_net_labor_hours_saved!==null||
+    !Array.isArray(data.capabilities)||data.capabilities.length!==10)
+   throw Error('REALITY_SELF_AUDIT_PROVIDER_UNVERIFIED');
+  node.replaceChildren(textNode('div',
+    'Evidence-based current state: '+data.exact_current_owner_shift_count+
+    ' active authorized shift(s), '+
+    data.historical_read_only_shifts+' historical read-only shift(s), '+
+    data.historical_settled_originals_in_owner_readback+
+    ' historical independently settled original(s).'));
+  const selected=new Set(['openai_reasoning_gateway',
+   'central_genuine_capability_engine',
+   'employee_capability_wake','multi_job_shift_controller',
+   'automated_full_shift_self_repair']);
+  for(const entry of data.capabilities){
+   if(!selected.has(entry.id))continue;
+   if(typeof entry.proof_level!=='string'||entry.proof_level.length>120)
+    throw Error('REALITY_SELF_AUDIT_LEVEL_NOT_VERIFIED');
+   const line=textNode('div',entry.id.replaceAll('_',' ')+' — '+
+    entry.proof_level.replaceAll('_',' ').toLowerCase());
+   line.style.marginTop='6px';node.append(line);
+  }
+  node.append(textNode('div',
+   'Reality can investigate and pursue governed repairs, but cannot claim that every capability is live or every engineering problem can be solved.'));
+ }catch{
+  node.textContent='Independent capability self-audit unavailable. No unverified live capability is claimed.';
  }
 }
 async function refreshRileyExistingBacklog(){
@@ -514,6 +560,7 @@ function showAuth(authenticated){
     void listConversations();
     void refreshShiftStatus();
     void refreshEmployeeBoard();
+    void refreshRealitySelfAudit();
     $('prompt').focus({preventScroll:true});
   }
 }
@@ -552,7 +599,7 @@ $('teamToggle').onclick=()=>{
  const panel=$('employeeBoardPanel');
  panel.hidden=!panel.hidden;
  $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
- if(!panel.hidden)void refreshEmployeeBoard();
+ if(!panel.hidden){void refreshEmployeeBoard();void refreshRealitySelfAudit();}
 };
 $('newChat').onclick=()=>{
   if(pending)return;
@@ -595,7 +642,7 @@ $('runFullShift').onclick=async()=>{
   pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
  }
 };
-$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard()}};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
     e.preventDefault();$('composer').requestSubmit();
