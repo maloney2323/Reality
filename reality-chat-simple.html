@@ -97,10 +97,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
-<button id="runFullShift" type="button" title="One signed-in owner authorization for an 8-hour governed Riley workday">Run Riley's Full Shift · 8h</button>
+<label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
+<button id="runFullShift" type="button" title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Run Riley's Shift</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="team-intro" id="fullShiftScope">One signed-in authorization starts the existing 8-hour background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
+<p class="team-intro" id="fullShiftScope">Choose 1–12 hours for the next owner-authorized Riley shift, according to validated workload; next-week draft review timeboxes alone never start jobs. One signed-in authorization starts that exact background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
@@ -941,10 +942,13 @@ $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load
  // cannot authorize the shift. Reuses the existing signed-in endpoint.
  if(pending)return;
- const command=interpretSignedInChatShiftCommand("Run Riley's full shift");
+ const hours=Number($('runShiftHours')?.value);
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)
+  return status('Choose an exact shift length from 1 to 12 hours.');
+ const command=interpretSignedInChatShiftCommand('Run a '+hours+' hour shift');
  if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
-    command.duration_hours!==8||command.installation_authorized!==false)
-  return status('Full-shift owner command could not be validated.');
+    command.duration_hours!==hours||command.installation_authorized!==false)
+  return status('Exact shift owner command could not be validated.');
  pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
  const pendingResult=bubble('assistant',
   'Checking your existing shift and exact owner-scoped backlog…','pending');
