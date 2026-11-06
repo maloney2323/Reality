@@ -11,7 +11,7 @@ const SHA=/^[a-f0-9]{40}$/;
 const fail=code=>{throw Error('RILEY_AUDIT_'+code)};
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 async function get(path,{fetchImpl,token}){
- if(!/^\/(?:issues\/[1-9]\d*|actions\/workflows\?per_page=100|actions\/workflows\/[1-9]\d*\/runs\?per_page=50)$/.test(path))
+ if(!/^\/(?:issues\/[1-9]\d*|actions\/workflows\?per_page=100|actions\/workflows\/[1-9]\d*\/runs\?per_page=50|actions\/runs\/[1-9]\d*)$/.test(path))
   fail('PROVIDER_RESOURCE_DENIED');
  const response=await fetchImpl(API+path,{
   method:'GET',cache:'no-store',redirect:'error',
@@ -73,7 +73,8 @@ export async function auditRealityEngineeringIssue({
   !Number.isSafeInteger(runsResponse.total_count)||
   runsResponse.total_count<runsResponse.workflow_runs.length)
   fail('WORKFLOW_RUNS_READBACK_INVALID');
- const observed=runsResponse.workflow_runs.map(x=>proveRun(x,workflow.id,workflowName));
+ const observed=runsResponse.workflow_runs.filter(x=>x.status==='completed')
+  .map(x=>proveRun(x,workflow.id,workflowName));
  if(new Set(observed.map(x=>x.id)).size!==observed.length)
   fail('DUPLICATE_RUNS_IN_READBACK');
  observed.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||b.id-a.id);
@@ -100,6 +101,7 @@ export async function auditRealityEngineeringIssue({
   issue_url:issue.html_url,issue_provider_state:issue.state,
   workflow_name:workflowName,workflow_id:workflow.id,
   workflow_runs_observed:observed.length,
+  incomplete_workflow_runs_in_sample:runsResponse.workflow_runs.length-observed.length,
   workflow_runs_total_provider:runsResponse.total_count,
   workflow_runs_scan_limited:runsResponse.total_count>observed.length||
    listing.total_count>listing.workflows.length,
@@ -148,4 +150,39 @@ export function verifyRileyAuditReceipt(receipt){
   source_run_url:data.work_provenance.run_url,original_job_completed:false,
   implementation_verified:false,installation_authorized:false,
   verified_human_hours_saved:null});
+}
+
+/** An independent worker, not the model, rechecks real source identities.
+ * These are observations, never original-job completion or authorization. */
+export async function independentlyVerifyRileyProviderAudit(receipt,{
+ fetchImpl=fetch,token
+}={}){
+ const digest=verifyRileyAuditReceipt(receipt);
+ const issue=await get('/issues/'+receipt.issue_number,{fetchImpl,token});
+ if(issue.number!==receipt.issue_number||issue.html_url!==receipt.issue_url||
+  issue.repository_url!=='https://api.github.com/repos/'+REPO||
+  issue.pull_request||!['open','closed'].includes(issue.state))
+  fail('INDEPENDENT_ISSUE_READBACK_MISMATCH');
+ // The run can be re-read even when newer runs arrived between workers.
+ if(receipt.latest_run!==null){
+  const raw=await get('/actions/runs/'+receipt.latest_run.id,{fetchImpl,token});
+  const checked=proveRun(raw,receipt.workflow_id,receipt.workflow_name);
+  if(checked.sha!==receipt.latest_run.sha||
+   checked.url!==receipt.latest_run.url||
+   checked.status!==receipt.latest_run.status)
+   fail('INDEPENDENT_RUN_READBACK_MISMATCH');
+ }
+ return Object.freeze({
+  status:'INDEPENDENT_PROVIDER_READBACK_PASSED',
+  work_kind:'READ_ONLY_ENGINEERING_INVESTIGATION',
+  receipt_sha256:digest.receipt_sha256,
+  source_run_url:digest.source_run_url,
+  issue_url:receipt.issue_url,
+  checked_run_url:receipt.latest_run?.url||null,
+  all_external_writes_denied:true,
+  original_job_completed:false,
+  installation_authorized:false,
+  measured_human_hours_saved:null,
+  production_changed:false,
+ });
 }
