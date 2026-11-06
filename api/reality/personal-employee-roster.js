@@ -5,6 +5,7 @@ import {privateChatConfig,authenticatedChatSession} from '../../src/reality-priv
 import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
 import {buildRealityNamedEmployeeRoster} from '../../src/reality-employee-identity-roster-v1.js';
+import {buildRealityShiftValuePreview} from '../../src/reality-shift-value-preview-v1.js';
 export const maxDuration=45;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -23,7 +24,8 @@ export default async function handler(req,res){
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
-  return res.status(200).json({ok:true,...roster,owner_scope_verified:true,
+  const value_preview=buildRealityShiftValuePreview(roster);
+  return res.status(200).json({ok:true,...roster,value_preview,owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
  }catch(e){
