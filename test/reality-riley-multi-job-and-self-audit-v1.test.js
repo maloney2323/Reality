@@ -151,6 +151,7 @@ test('existing or forbidden claimed work is not executed again',async()=>{
    scope:{owner_id:OWNER,original_work_id:x.original_work_id},
    workItem:{work_item_id:x.original_work_id}
   }},
+  runOriginal:async()=>{throw Error('ORIGINAL_ALREADY_CLAIMED_MUST_NOT_RUN')},
   callRpc:async({name,args})=>{
    if(name==='reality_read_eligible_shift_originals_v1')return eligibility();
    if(name==='reality_claim_exact_shift_original_v1')return {
