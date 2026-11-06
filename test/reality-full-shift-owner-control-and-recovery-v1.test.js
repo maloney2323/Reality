@@ -43,7 +43,7 @@ test('one click always uses original authenticated owner shift endpoint',()=>{
  assert.match(html,/safeShiftReadbackState\(before/);
  assert.match(html,/expected_fingerprint:draft.expected_fingerprint/);
  assert.match(html,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
- assert.match(html,/Shift authorization uncertain\. Do not create a duplicate shift/);
+ assert.match(html,/Full-shift authorization uncertain\. Do not create a duplicate shift/);
  assert.match(api,/authenticatedChatSession\(req,res\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
  assert.match(api,/reality_authorize_employee_shift_v1/);
