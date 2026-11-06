@@ -449,17 +449,59 @@ async function refreshShiftStatus(){
     $('shiftStatus').hidden=true;
   }finally{shiftLoading=false}
 }
+const RILEY_BATCH='/api/reality/personal-riley-full-shift-batch';
+async function intakeVerifiedRileyShiftJobs(shiftId,fingerprint){
+ // Same deliberate signed-in Run Full Shift click. Not a second approval,
+ // and not authority to install any particular generated capability.
+ if(!uuid(shiftId)||!/^sha256:[a-f0-9]{64}$/.test(fingerprint||'')||
+    !uuid(active))throw Error('RILEY_BATCH_OWNER_SHIFT_IDENTITY_INVALID');
+ const data=await json(RILEY_BATCH,{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({
+   action:'ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT',
+   conversation_id:active,shift_id:shiftId,expected_fingerprint:fingerprint
+  }),signal:AbortSignal.timeout(110000)
+ });
+ if(data.ok!==true||data.shift_id!==shiftId||
+    data.shift_fingerprint!==fingerprint||
+    data.one_authorization_for_exact_shift!==true||
+    data.no_per_job_buttons_required!==true||
+    data.installation_authorized!==false||
+    data.original_job_completed!==false||
+    data.final_receipt_recorded!==false||
+    data.production_changed!==false||
+    !Array.isArray(data.outcomes)||data.outcomes.length>4)
+  throw Error('RILEY_BATCH_INDEPENDENT_INTAKE_UNVERIFIED');
+ const sent=data.outcomes.filter(x=>x.worker_dispatch_started===true).length;
+ const unresolved=data.outcomes.filter(x=>
+  x.status==='ORIGINAL_INTAKE_OR_DISPATCH_REQUIRES_DURABLE_RECONCILIATION').length;
+ return ' Same authorization: '+data.selected_count+
+  ' source-backed originals selected for governed work; '+sent+
+  ' worker dispatches requested; '+unresolved+' require reconciliation.'+
+  ' The background worker must independently prove execution, tests and final receipts.'+
+  ' Any exact installation approval will appear in Reality Chat, not as a per-job start button.';
+}
 async function authorizeShiftFromChat(command){
   // Use exactly the existing authenticated owner shift controller; no model
   // text is ever execution authority. The browser user already pressed Send.
   const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
   const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
   if(existing.hasActive){
+    let batch='';
+    if(existing.matching_requested_hours){
+      try{
+       const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
+       batch=await intakeVerifiedRileyShiftJobs(existing.shift_id,
+         match?.plan_fingerprint);
+      }catch{
+       batch=' Existing shift preserved. Batch intake needs independent reconciliation; do not retry uncertain jobs.';
+      }
+    }
     return {
       acknowledged:true,
       text:existing.matching_requested_hours?
        'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
-       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.':
+       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.'+batch:
        'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
        '). I did not start another concurrent shift or override its authorization.',
     };
@@ -526,6 +568,15 @@ async function authorizeShiftFromChat(command){
        .map(x=>x.employee_title+' ('+x.candidate_count+')').join(' · ')+
     '. FIRST PILOT: '+routing.first_pilot_employee.employee_title+
     '. These are source observations awaiting qualification, not executed jobs or a daily recurring shift.':'';
+  let batch='';
+  try{
+   batch=await intakeVerifiedRileyShiftJobs(created.shift_id,
+     draft.expected_fingerprint);
+  }catch{
+   // The shift is ALREADY committed; do not erase that fact or attempt
+   // to mint it again because intake delivery may have had an effect.
+   batch=' Batch intake is not independently confirmed. Check existing work before retrying; no additional installation approval was granted.';
+  }
   return {
     acknowledged:true,
     text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
@@ -533,7 +584,7 @@ async function authorizeShiftFromChat(command){
       ' The existing trusted worker scheduler must independently claim work. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
-      'original-job admission for consequential repairs. No installation or production change was authorized.'
+      'original-job admission for consequential repairs. No installation or production change was authorized.'+batch
   };
 }
 async function refreshHistory(id=active){
