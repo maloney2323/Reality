@@ -118,5 +118,5 @@ test('owner-authenticated API and Reality Chat expose proof but never admit job'
  assert.doesNotMatch(api,/enqueueExactGap|dispatchGenuineCapabilityWake|authorize_employee_shift_v1/);
  assert.match(ui,/rileyLoopReadiness/);
  assert.match(ui,/refreshRileyLoopReadiness/);
- assert.match(ui,/FULL_LOOP/gi);
+ assert.match(ui,/const RILEY_LOOP='\/api\/reality\/personal-riley-loop-readiness'/);
 });
