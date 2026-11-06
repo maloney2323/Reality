@@ -723,7 +723,8 @@ async function refreshShiftStatus(){
         ' · '+activeState.shift_id+' · '+
         (checked===null?'Source progress unavailable.':checked+' of 5 source checks verified.')+
         block+' '+current+explain+
-        ' No completed repair, final receipt, or measured savings is claimed for this shift.'+
+        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.'+
+        ' No final original-job receipt is yet proven for this shift.'+
         ' Status refreshed '+new Date().toLocaleTimeString()+'.';
       node.hidden=false;
     }else{
