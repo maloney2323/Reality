@@ -83,7 +83,7 @@ test('Value Verification owns the source-backed business case; Home only links b
   html.indexOf('<section id="realitySimpleHome"'));
  assert.ok(html.indexOf('id="realityEmployeeShiftPlanner"')>
   html.indexOf('<section id="realitySimpleHome"'));
- assert.match(html,/href="\/value#pre-automation">Review business case in Value Verification/);
+ assert.match(html,/href="\/value#pre-automation">Review business case in Evaluation/);
  assert.match(client,/document\.body\?\.dataset\?\.realityRoute!=='value'/);
  const nav=readFileSync(new URL('../reality-value-verification-v1.js',import.meta.url),'utf8');
  assert.match(nav,/window\.location\?\.hash==='#pre-automation'\?'potential':'overview'/);
