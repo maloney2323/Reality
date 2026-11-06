@@ -1463,6 +1463,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <button type="button" id="realityChatAskShift" class="simple-secondary">Ask Reality to explain this shift</button>
     <p class="muted" id="realityChatShiftReadbackNotice">Only authenticated database receipts are used for these updates. No model-generated action is assumed.</p>
   </section>
+  <section id="realityRileySourceWork" aria-label="Riley source-backed existing work, not automatically authorized" style="border:1px solid #385977;border-radius:11px;background:#102437;padding:12px;margin:10px 0">
+   <strong>Riley's known work · available before any shift starts</strong>
+   <p id="realityRileySourceStatus" role="status" aria-live="polite" style="color:#c8dce9;font-size:12px;line-height:1.5">Sign in to inspect the prepared GitHub issue source inventory. No work is started by reading.</p>
+   <ul id="realityRileySourceList" style="padding-left:18px;color:#a6dbff;font-size:12px;line-height:1.55"></ul>
+   <p style="color:#afc2d5;font-size:11px">Open issues are observations, not executable job warrants. Reality must exclude previously settled jobs and independently qualify any new execution.</p>
+  </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
   <div id="realityRileyShiftLaunch" style="border:1px solid #5886a4;border-radius:12px;background:#142c3c;padding:14px;margin:12px 0" aria-label="Authorize Riley's three-hour shift">
     <strong style="font-size:16px">Ready to start Riley?</strong>
@@ -6485,6 +6491,7 @@ setInterval(refreshSavedShiftHome,300000);
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
   if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
+  if(yes&&typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
   if(yes){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
   else{void realityBusinessRefresh();void homeOwnerRefresh();
    realityOriginal143Eligible=false;
@@ -6865,6 +6872,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-chat-workspace-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
+<script defer src="/reality-riley-source-work-v1.js"></script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-eight-hour-shift-plan-v1.js"></script>
