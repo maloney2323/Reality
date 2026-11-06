@@ -190,6 +190,6 @@ test('unattended source preparation, private SQL, owner UI and actual 6-hour cro
  assert.match(ui,/Next week's proposed employee schedule/);
  assert.match(ui,/renderNextWeekWorkPlan\(roster\)/);
  assert.match(ui,/Background source refresh verified/);
- assert.match(ui,/Find and qualify useful work/);
+ assert.match(ui,/Unscheduled: find and qualify useful work/);
  assert.doesNotMatch(edge,/approveInstall|queueVerifiedOriginalRepair|openai\.com|deployProduction/);
 });
