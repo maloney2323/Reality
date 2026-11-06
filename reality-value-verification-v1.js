@@ -170,7 +170,7 @@ if(typeof document.querySelectorAll==='function')
     $('rvViewNav')?.scrollIntoView?.({block:'nearest',behavior:'smooth'});
   });
  }
-selectView('overview');
+selectView(typeof window!=='undefined'&&window.location?.hash==='#pre-automation'?'potential':'overview');
 
 const watched=['realityEconSignals','realityEconSettled','realityEconReceipts',
  'realityEconCapacity','privateReady','realityCategoryOwnerStatus',
