@@ -18,7 +18,7 @@ on:
       - api/reality/personal-employee-roster.js
       - test/reality-named-employee-roster-v1.test.js
       - src/reality-employee-recovery-route-v1.js
-      - test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js
+      - test/reality-employee-recovery-route-v1.test.js
       - .github/workflows/reality-governed-flexible-shift.yml
       - src/reality-riley-engineering-pilot-v1.js
       - scripts/reality-riley-engineering-pilot-v1.mjs
@@ -62,7 +62,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify all existing and flexible employee shift contracts
-        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js
+        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js
 
   riley-live-investigation:
     if: github.event_name == 'push'
