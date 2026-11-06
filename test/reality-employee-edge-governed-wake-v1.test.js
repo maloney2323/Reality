@@ -1,47 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const edge=readFileSync(new URL(
- '../supabase/functions/reality-governed-employee-shift-wake-v1/index.ts',
- import.meta.url),'utf8');
-const sql=readFileSync(new URL(
- '../supabase/migrations/20261106020000_riley_shift_capability_wake_gate_v1.sql',
- import.meta.url),'utf8');
-const server=readFileSync(new URL(
- '../src/reality-governed-employee-shift-worker-v1.js',import.meta.url),'utf8');
-test('independent Supabase employee cron connects existing original work to Reality shared wake',()=>{
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const edge=read('supabase/functions/reality-governed-employee-shift-wake-v1/index.ts');
+const broker=read('supabase/functions/reality-employee-capability-wake-broker-v1/index.ts');
+const sql=read('supabase/migrations/20261106020000_riley_shift_capability_wake_gate_v1.sql');
+const server=read('src/reality-governed-employee-shift-worker-v1.js');
+test('independent employee scheduler delegates wake; it never holds GitHub write credentials',()=>{
  assert.match(edge,/reality_reconcile_employee_shift_original_v1/);
- assert.match(edge,/reality_read_shift_capability_wake_v1/);
- assert.match(edge,/wakeExactCapability\(original\)/);
- assert.match(edge,/EXACT_SHIFT_CAPABILITY_WAKE_ELIGIBLE/);
- assert.match(edge,/EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED/);
+ assert.match(edge,/brokerExistingCapabilityWake\(original\)/);
+ assert.match(edge,/reality-employee-capability-wake-broker-v1/);
  assert.match(edge,/CAPABILITY_WAKE_REQUIRES_RECONCILIATION/);
+ assert.match(edge,/EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY/);
+ assert.match(edge,/original\.new_customer_job_created!==false/);
+ assert.match(edge,/worker_acknowledged:false/);
+ assert.doesNotMatch(edge,/REALITY_GITHUB_BROKER_TOKEN/);
+ assert.doesNotMatch(edge,/method:'(?:PUT|DELETE|PATCH)'|vercel\.app/);
  assert.match(server,/wakeExistingRileyCapabilityJob/);
 });
-test('employee shift source does not create a fresh job or approve an installation',()=>{
- assert.match(edge,/EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY/);
- assert.match(edge,/q\.existing_job_only!==true/);
- assert.match(edge,/q\.installation_authorized!==false/);
- assert.match(edge,/q\.original_job_completed!==false/);
- assert.match(edge,/original\.new_customer_job_created!==false/);
- assert.match(edge,/q\.source_proof_sha256!==original\.shift_observation_proof_sha256/);
- assert.match(edge,/q\.source_event_id/);
- assert.match(edge,/worker_acknowledged:false/);
- assert.match(edge,/REALITY_GITHUB_BROKER_TOKEN/);
- assert.doesNotMatch(edge,/owner_approve_qualified_preview|owner_approve_install|OWNER_APPROVE_EXACT/);
+test('separate service broker independently rechecks exact owner original and gap event',()=>{
+ assert.match(broker,/reality_read_shift_capability_wake_v1/);
+ assert.match(broker,/SUPABASE_SERVICE_ROLE_KEY/);
+ assert.match(broker,/same\(a,configValue\.key\)/);
+ assert.match(broker,/same\(b,'Bearer '\+configValue\.key\)/);
+ assert.match(broker,/source_proof_sha256/);
+ assert.match(broker,/item\.existing_job_only!==true/);
+ assert.match(broker,/item\.installation_authorized!==false/);
+ assert.match(broker,/item\.original_job_completed!==false/);
+ assert.match(broker,/source_event_id:item\.source_event_id/);
+ assert.match(broker,/no_new_job_created:true/);
+ assert.match(broker,/worker_acknowledged:false/);
+ assert.match(broker,/REALITY_GITHUB_BROKER_TOKEN/);
+ assert.doesNotMatch(broker,/OWNER_APPROVE_EXACT|approve_install|original_job_settled:true/);
 });
-test('provider wake may write only deterministic isolated trigger path after readback',()=>{
- assert.match(edge,/const CAP_BRANCH='feature\/reality-general-capability-engine-20261101'/);
- assert.match(edge,/reality-genuine-triggers\//);
- assert.match(edge,/trigger_id:trigger,source_event_id:q\.source_event_id/);
- assert.match(edge,/atob\(String\(got\.content/);
- assert.match(edge,/if\(!\(await check\(\)\)\)/);
- assert.match(edge,/if\(!existing\)/);
- assert.match(edge,/content:btoa\(bytes\)/);
- assert.match(edge,/method='GET'/);
- assert.doesNotMatch(edge,/GitHub.*install.*production/i);
+test('only broker may write fixed isolated idempotent Reality trigger, never an installation',()=>{
+ assert.match(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
+ assert.match(broker,/reality-genuine-triggers\//);
+ assert.match(broker,/source_event_id:item\.source_event_id/);
+ assert.match(broker,/atob\(String\(x\.content/);
+ assert.match(broker,/existing=await check\(\)/);
+ assert.match(broker,/if\(!existing\)/);
+ assert.match(broker,/content:btoa\(bytes\)/);
+ assert.match(broker,/GITHUB_DELIVERY_EFFECT_OR_READBACK_UNCERTAIN/);
+ assert.match(broker,/BROKER_DELIVERY_REQUIRES_RECONCILIATION/);
+ assert.doesNotMatch(broker,/vercel\.app/);
 });
-test('service-only SQL eligibility rejects already settled work and transient claims',()=>{
+test('service-role-only SQL refuses settled jobs and stale shift source readbacks',()=>{
  assert.match(sql,/security invoker/);
  assert.match(sql,/current_user<>'service_role'/);
  assert.match(sql,/grant execute on function public\.reality_read_shift_capability_wake_v1/);
