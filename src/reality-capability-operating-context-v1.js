@@ -39,9 +39,11 @@ export function buildRealityCapabilityOperatingContext(){
    {id:'cross_tenant_capability_delivery',status:'NOT_CONNECTED_FOR_LIVE_CUSTOMERS'},
    {id:'fully_autonomous_every_failure_repair',status:'NOT_INDEPENDENTLY_PROVEN'},
    {id:'multi_job_full_shift_execution',status:'NOT_INDEPENDENTLY_PROVEN'},
-   {id:'riley_existing_backlog_prioritization',status:'IMPLEMENTATION_EXISTS_RUNTIME_READBACK_REQUIRED'}
+   {id:'riley_existing_backlog_prioritization',status:'IMPLEMENTATION_EXISTS_RUNTIME_READBACK_REQUIRED'},
+   {id:'owner_verified_self_capability_audit',status:'IMPLEMENTED_OWNER_SCOPED_READBACK_REQUIRED'}
   ]),
   watchdog_principle:'If the worker is missing, only an independent scheduler/observer can detect it. Inspect durable dispatch, lease, authenticated acknowledgment and heartbeat; do not rely on a heartbeat emitted by the failed worker alone. Reissue delivery only via trusted fenced governance after no prior side effect is possible.',
+  self_understanding_principle:'Reality must distinguish architecture that exists in code, an available connector, a verified current provider observation, a settled original job, and proven full-shift autonomy. Use live owner-scoped capability self-audit and Continuity evidence. Ask what is missing and classify gaps, then act through the existing governed execution system only with a valid job warrant. Never treat reasoning as proof of tool execution or automatically grant capability-installation authority.',
   shift_recovery_principle:'Within the existing owner-approved shift scope, each blocked job is a recovery problem, not a reason to abandon the whole shift. Preserve its exact ledger and original-work identity, investigate the real failure, use the shared Genuine Capability Engine when a missing instrument is independently reproduced, and continue other safe authorized tasks while awaiting exact upgrade approval. Retry only proven side-effect-free operations. Automatic original-job resumption requires the existing worker and independent settlement. Finish at the authorized shift boundary with a truthful per-job report. This is an operational objective, not proof that any specific recovery or full shift succeeded.',
   hard_boundaries:Object.freeze({
    reasoning_needs_new_owner_approval:false,
