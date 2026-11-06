@@ -104,7 +104,7 @@ test('owner-authenticated Reality API and Chat show existing tasks but never sel
  assert.match(api,/reality_read_owner_genuine_loop_v1/);
  assert.match(api,/worker_execution_authorized_by_read:false/);
  assert.match(scope,/read_owner_existing_original_issue_v1/);
- assert.doesNotMatch(api,/enqueue_governed_build|authorize_employee_shift_v1|install/);
+ assert.doesNotMatch(api,/enqueue_governed_build|reality_authorize_employee_shift_v1|dispatchGenuineCapabilityWake|installCapability\(/);
  assert.match(ui,/const RILEY_BACKLOG='\/api\/reality\/personal-riley-existing-backlog'/);
  assert.match(ui,/refreshRileyExistingBacklog/);
  assert.match(ui,/LEGACY_DISCOVERY_QUEUE_REQUIRES_RECONCILIATION/);
