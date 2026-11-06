@@ -40,7 +40,7 @@ export function shiftDatabase(env=process.env){
  return db;
 }
 export async function shiftRpc(db,rpc,payload,{fetchImpl=fetch}={}){
- if(!/^reality_(?:authorize_employee_shift_v1|read_owner_employee_shifts_v1|claim_employee_shift_step_v1|settle_employee_shift_step_v1|close_employee_shift_v1|reconcile_employee_shift_original_v1|read_shift_capability_wake_v1|read_owner_final_receipts_v1|read_owner_genuine_loop_v1|read_owner_qualified_capabilities_v1)$/.test(rpc))
+ if(!/^reality_(?:authorize_employee_shift_v1|read_owner_employee_shifts_v1|claim_employee_shift_step_v1|settle_employee_shift_step_v1|close_employee_shift_v1|reconcile_employee_shift_original_v1|read_shift_capability_wake_v1|read_owner_final_receipts_v1|read_owner_genuine_loop_v1|read_owner_existing_original_issue_v1|read_owner_qualified_capabilities_v1)$/.test(rpc))
   throw Error('SHIFT_RPC_NOT_ALLOWLISTED');
  const r=await fetchImpl(db.url+'/rest/v1/rpc/'+rpc,{
   method:'POST',redirect:'error',cache:'no-store',
