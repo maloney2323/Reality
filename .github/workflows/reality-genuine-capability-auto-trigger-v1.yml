@@ -271,6 +271,52 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  stage_riley_verified_source:
+    # Actual CODE WRITING, never production installation. Model generation
+    # and independent tests have completed in distinct least-privilege jobs.
+    needs: qualify_verified_capability
+    if: ${{ github.event_name == 'push' && needs.qualify_verified_capability.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently check the isolated verified-code writer boundary
+        run: |
+          node --check scripts/reality-riley-stage-verified-code-v1.mjs
+          node --test test/reality-riley-verified-code-writer-v1.test.js
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-capability-queue-${{ github.run_id }}
+          path: admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-uninstalled-model-proposal-${{ github.run_id }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-independent-candidate-proof-${{ github.run_id }}
+          path: proof
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-owner-review-receipt-${{ github.run_id }}
+          path: qualified
+      - name: Riley writes independently verified model source on NEW isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reality-riley-stage-verified-code-v1.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reality-riley-verified-source-${{ github.run_id }}
+          path: artifact/riley-staged-verified-code.json
+          if-no-files-found: error
+          retention-days: 30
+
   activate_owner_approved_preview:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
