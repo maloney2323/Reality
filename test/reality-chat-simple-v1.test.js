@@ -40,3 +40,18 @@ test('user message appears before network wait and answer appears without histor
   assert.ok(script.includes('if(seq!==sequence||id!==active||pending)return;'));
   assert.ok(script.includes('Response failed or timed out. Check saved history to avoid duplicates.'));
 });
+
+test('real shift remains visible and prevents duplicate approval when progress stalls at original-job gate',()=>{
+ assert.equal((html.match(/id="shiftStatus"/g)||[]).length,1);
+ assert.ok(html.indexOf('id="shiftStatus"')<
+  html.indexOf('id="employeeBoardPanel"'));
+ assert.match(html,/id="runFullShift" type="button" disabled/);
+ assert.match(script,/activeState\.status==='AWAITING_EXACT_ORIGINAL_WORK'/);
+ assert.match(script,/QUALIFICATION BLOCKER/);
+ assert.match(script,/\$\('runFullShift'\)\.disabled=true/);
+ assert.match(script,/Existing shift authorized/);
+ assert.match(script,/Do NOT press Run Riley/);
+ assert.match(script,/Shift status readback unavailable/);
+ assert.match(script,/Status refreshed/);
+ assert.doesNotMatch(script,/activeState\.hasActive\)\{[\s\S]{0,500}authorizeShiftFromChat\(/);
+});
