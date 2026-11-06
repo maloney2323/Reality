@@ -77,7 +77,7 @@ export default async function handler(req,res){
      verified.push(source);
    }catch{ /* An open issue alone is never authority to generate. */ }
   }
-  const priorOriginals=await Promise.all(verified.map(x=>({
+  const priorOriginals=await Promise.all(verified.map(async x=>({
    issue_number:x.issue_number,
    record:await shiftRpc(db,'reality_read_owner_existing_original_issue_v1',
     {p_owner_id:session.user_id,p_issue_number:x.issue_number})
