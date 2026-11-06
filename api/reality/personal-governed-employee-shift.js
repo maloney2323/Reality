@@ -14,6 +14,8 @@ import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
 import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
+import {diagnoseRealityEmployeeRecovery}
+ from '../../src/reality-employee-recovery-route-v1.js';
 export const maxDuration=60;
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -57,6 +59,7 @@ export default async function handler(req,res){
     }catch{handoff_status='EXACT_CAPABILITY_READBACK_UNAVAILABLE_FAIL_CLOSED';}
    }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
+   const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
    if(hours!==null){
      const catalog=await buildRealityWorkCatalog();
@@ -68,6 +71,7 @@ export default async function handler(req,res){
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
+    recovery_diagnosis,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
