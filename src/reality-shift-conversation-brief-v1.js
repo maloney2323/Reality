@@ -48,7 +48,7 @@ function eventFor(t){
    observed_at:safeDate(t.completed_at),source_url:null,proof_sha256:null};
  if(t.state==='REPORTED')
   return {code:'SHIFT_REPORT_RECORDED',step_index:t.step_index,
-   text:'The end-of-shift report was recorded. This is not proof of eight hours saved.',
+   text:'The end-of-shift report was recorded. This does not prove a matching amount of human time was saved.',
    observed_at:safeDate(t.completed_at),source_url:null,
    proof_sha256:/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||'')?t.proof_sha256:null};
  return null;
@@ -79,7 +79,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   throw Error('SHIFT_CHAT_SOURCE_UNTRUSTED');
  const start=new Date(s.planned_start_at).getTime();
  const durationHours=(new Date(s.planned_end_at).getTime()-start)/3600000;
- if(![8,10,12].includes(durationHours))throw Error('SHIFT_CHAT_DURATION_INVALID');
+ if(!Number.isSafeInteger(durationHours)||durationHours<1||durationHours>12)throw Error('SHIFT_CHAT_DURATION_INVALID');
  const originalReceipt=s.steps.some(t=>t.step_index===6&&t.state==='ORIGINAL_JOB_RECEIPT_VERIFIED');
  const eventItems=s.steps.map(eventFor).filter(Boolean);
  const recorded=eventItems.filter(x=>x.code==='SOURCE_VALIDATED').length;
