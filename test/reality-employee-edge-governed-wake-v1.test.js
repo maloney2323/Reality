@@ -59,3 +59,15 @@ test('service-role-only SQL refuses settled jobs and stale shift source readback
  assert.match(sql,/owner_authorized_installation/);
  assert.doesNotMatch(sql,/\b(insert|update|delete)\s+(?:into|reality_internal|public)/i);
 });
+
+test('cron sees multiple independent owner-original records without running a second engine',()=>{
+ assert.match(edge,/reality_read_eligible_shift_originals_v1/);
+ assert.match(edge,/candidate_count!==candidates\.candidates\.length/);
+ assert.match(edge,/seen\.has\(String\(c\.original_work_id\|\|''\)\)/);
+ assert.match(edge,/Promise\.allSettled\(/);
+ assert.match(edge,/work\.map\(x=>brokerExistingCapabilityWake\(x\)\)/);
+ assert.match(edge,/worker_execution_acknowledged:false/);
+ assert.match(edge,/multi_job_wakes:multiJobWakes/);
+ assert.match(edge,/MULTI_JOB_WAKE_EFFECT_REQUIRES_RECONCILIATION/);
+ assert.doesNotMatch(edge,/REALITY_GITHUB_BROKER_TOKEN|Github.*PUT/);
+});
