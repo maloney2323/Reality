@@ -221,3 +221,23 @@ test('migration never grants ordinary users original job authority or client wri
  assert.match(sql,/revoke all on function public.reality_claim_exact_shift_original_v1/);
  assert.doesNotMatch(sql,/grant .* to authenticated/);
 });
+
+test('self audit API is owner-authenticated and read-only, linked to real Reality Chat',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-capability-self-audit.js',
+  import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-simple.html',
+  import.meta.url),'utf8');
+ assert.match(api,/authenticatedChatSession\(req,res\)/);
+ assert.match(api,/VERCEL_ENV!=='preview'/);
+ assert.match(api,/req.method!=='GET'/);
+ assert.match(api,/reality_read_owner_employee_shifts_v1/);
+ assert.match(api,/reality_read_owner_genuine_loop_v1/);
+ assert.match(api,/buildRealityEvidenceGroundedSelfAudit/);
+ assert.match(api,/execution_authorized_by_read:false/);
+ assert.doesNotMatch(api,/executeAuthorizedWork|reality_claim_exact_shift_original_v1/);
+ assert.match(ui,/id="realitySelfAwareness"/);
+ assert.match(ui,/Reality's verified self-understanding/);
+ assert.match(ui,/refreshRealitySelfAudit/);
+ assert.match(ui,/REALITY_SELF_AUDIT_PROVIDER_UNVERIFIED/);
+ assert.match(ui,/full_shift_automation_proven!==false/);
+});
