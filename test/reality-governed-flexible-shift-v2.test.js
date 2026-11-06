@@ -91,7 +91,7 @@ test('owner-bound endpoint exposes read-only selection and checks duration on ex
  assert.match(api,/requested_shift_draft:draft/);
  assert.match(api,/computeShiftFingerprint\(plan\)/);
  assert.match(api,/b.requested_hours\?\?8/);
- assert.match(api,/!\[8,10,12\]\.includes/);
+ assert.match(api,/Number.isSafeInteger\(b.requested_hours\?\?8\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
  assert.match(api,/s.plan_fingerprint===fingerprint/);
  assert.doesNotMatch(api,/installation_authorized:true/);
