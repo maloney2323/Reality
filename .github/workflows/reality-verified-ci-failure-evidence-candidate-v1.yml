@@ -1,0 +1,36 @@
+name: Reality verified missing CI failure evidence — frozen acceptance
+on:
+  push:
+    branches: [fix/reality-verified-ci-failure-evidence-candidate-20261104]
+  pull_request:
+    branches: [feature/reality-general-capability-engine-20261101]
+    paths:
+      - 'src/reality-extensions/reality-ci-failure-evidence.mjs'
+      - 'test/reality-verified-ci-failure-evidence-candidate-v1.test.js'
+      - '.github/workflows/reality-verified-ci-failure-evidence-candidate-v1.yml'
+permissions:
+  contents: read
+jobs:
+  frozen-source-and-adversarial-holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22'}
+      - name: Independently verify the ORIGINAL unmodified frozen acceptance bytes
+        run: |
+          test "$(sha256sum test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js | cut -d' ' -f1)" = "b42935d7300333ac7f1ecfce0aded8d2c7698bb88a55cbd413a96ebe0d73afdd"
+      - name: Run frozen original-source acceptance and new adversarial holdout
+        run: |
+          node --check src/reality-extensions/reality-ci-failure-evidence.mjs
+          node --test test/reality-frozen-regressions/first-reality-ci-evidence-gap.test.js test/reality-verified-ci-failure-evidence-candidate-v1.test.js
+      - name: Deny installation, deployment and same-job settlement
+        run: |
+          test ! -f artifact/installation-receipt.json
+          echo "REALITY_VERIFIED_CANDIDATE_ONLY=true"
+          echo "REALITY_OWNER_INSTALL_APPROVED=false"
+          echo "REALITY_ORIGINAL_JOB_RESUMED=false"
+          echo "REALITY_ORIGINAL_JOB_SETTLED=false"
+          echo "REALITY_PRODUCTION_CHANGED=false"
