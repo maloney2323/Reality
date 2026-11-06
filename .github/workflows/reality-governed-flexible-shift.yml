@@ -23,6 +23,7 @@ on:
       - test/reality-riley-existing-shift-source-priority-v1.test.js
       - src/reality-riley-multi-job-shift-controller-v1.js
       - src/reality-evidence-grounded-self-audit-v1.js
+      - api/reality/personal-capability-self-audit.js
       - supabase/migrations/20261106155000_riley_multi_original_shift_claim_v1.sql
       - test/reality-riley-multi-job-and-self-audit-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
@@ -73,6 +74,7 @@ on:
       - test/reality-riley-existing-shift-source-priority-v1.test.js
       - src/reality-riley-multi-job-shift-controller-v1.js
       - src/reality-evidence-grounded-self-audit-v1.js
+      - api/reality/personal-capability-self-audit.js
       - supabase/migrations/20261106155000_riley_multi_original_shift_claim_v1.sql
       - test/reality-riley-multi-job-and-self-audit-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
