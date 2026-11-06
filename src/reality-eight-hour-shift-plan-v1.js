@@ -27,10 +27,26 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
     prioritySourceRefs.some(x=>typeof x!=='string'||!URL.test(x))||
     new Set(prioritySourceRefs).size!==prioritySourceRefs.length)
   fail('OWNER_SOURCE_PRIORITY_INVALID');
- if(![8,10,12].includes(durationHours))fail('DURATION_NOT_SUPPORTED');
- // Each pair of extra shift hours increases eight existing bounded windows by
- // 15 minutes. None may exceed the worker's 120-minute per-step database cap.
- const addedMinutesPerWindow=(durationHours-8)/2*15;
+ if(!Number.isSafeInteger(durationHours)||durationHours<1||durationHours>12)
+  fail('DURATION_NOT_SUPPORTED');
+ // Preserve already-fingerprinted 8/10/12-hour window definitions exactly.
+ // Other owner-requested durations use a bounded proportional allocation of
+ // eight existing control stages. No stage exceeds the DB's 120-minute cap.
+ const legacy=[8,10,12].includes(durationHours);
+ const addedMinutesPerWindow=legacy?(durationHours-8)/2*15:0;
+ const baseWeights=[75,90,90,90,90,120,90,75];
+ const totalMinutes=durationHours*60;
+ const scaled=legacy?null:baseWeights.map(weight=>
+  Math.floor(totalMinutes*weight/720));
+ if(scaled){
+  let remaining=totalMinutes-scaled.reduce((a,b)=>a+b,0);
+  for(let i=0;remaining>0;i=(i+1)%scaled.length){
+   scaled[i]++;remaining--;
+  }
+  if(scaled.reduce((a,b)=>a+b,0)!==totalMinutes||
+   scaled.some((n,i)=>n<1||n>baseWeights[i]))
+   fail('VARIABLE_SHIFT_WINDOW_ALLOCATION_INVALID');
+ }
  const c=brief?.counts;
  if(!brief||!['SOURCE_BACKED_DISCOVERY_OBSERVED',
      'SOURCE_BACKED_DISCOVERY_PARTIAL'].includes(brief.status)||
@@ -85,7 +101,8 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
  const slots=[];
  function add(id,mins,stage,action,candidate=null,requiredGate=null){
    if(!isNum(mins)||mins===0)fail('INVALID_TIMEBOX');
-   const boundedMinutes=mins+addedMinutesPerWindow;
+   const boundedMinutes=scaled?scaled[slots.length]:
+    mins+addedMinutesPerWindow;
    if(boundedMinutes>120)fail('INVALID_TIMEBOX');
    const step=freeze({
     sequence:slots.length+1,id,offset_start_minutes:cursor,
