@@ -67,6 +67,7 @@ export async function auditRealityEngineeringIssue({
    .map(x=>Number(x[1])).filter(Number.isSafeInteger)
  )].slice(0,8);
  let workflow=null,workflowResolution=null,providerNominatedRun=null;
+ let workflowCatalogIncomplete=false;
  for(const runId of nominated){
   let raw;
   try{raw=await get('/actions/runs/'+runId,{fetchImpl,token})}
@@ -93,6 +94,7 @@ export async function auditRealityEngineeringIssue({
   if(matches.length!==1)
    fail(matches.length?'DUPLICATE_WORKFLOW_NAMES':'WORKFLOW_NOT_FOUND_IN_BOUNDED_SCAN');
   workflow=matches[0];
+  workflowCatalogIncomplete=listing.total_count>listing.workflows.length;
   workflowResolution='GITHUB_ACTIONS_WORKFLOW_CATALOG_MATCH';
  }
 
@@ -135,7 +137,7 @@ export async function auditRealityEngineeringIssue({
   incomplete_workflow_runs_in_sample:runsResponse.workflow_runs.length-observed.length,
   workflow_runs_total_provider:runsResponse.total_count,
   workflow_runs_scan_limited:runsResponse.total_count>observed.length||
-   listing.total_count>listing.workflows.length,
+   workflowCatalogIncomplete,
   latest_run:latest,latest_success:success,
   fresh_failure_count:failedAfterSuccess.length,
   fresh_failure_refs:failedAfterSuccess.slice(0,10).map(x=>x.url),
