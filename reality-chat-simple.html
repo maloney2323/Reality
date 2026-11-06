@@ -13,6 +13,12 @@ button:disabled{opacity:.48;cursor:wait}a{color:#c2dbff}
 .shell{min-height:100dvh;max-width:860px;margin:auto;display:flex;flex-direction:column}
 header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #293140}
 header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
+.reality-page-nav{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.reality-page-nav a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 12px;border:1px solid #3b526d;border-radius:12px;background:#1c2b40;color:#e4efff;font-weight:700}
+.reality-page-nav a[aria-current="page"]{background:#e0f2fc;color:#122c40;border-color:#e0f2fc}
+#runFullShift{background:#c9ecff;color:#0b283b;border:1px solid #9adfff;font-size:15px;font-weight:800;min-height:46px}
+.riley-start-guide{padding:10px 15px;background:#132a3b;border-bottom:1px solid #3c617d;color:#d4e9f8;font-size:13px;line-height:1.5}
+.riley-start-guide strong{color:#f0f8ff}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #293140}
 .toolbar select{flex:1;min-width:120px;max-width:420px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px}
 .toolbar button{background:#253247;color:#eef5ff;font-size:13px}
@@ -31,7 +37,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 #auth input{width:100%;padding:12px;border:1px solid #41506a;background:#151d29;color:#fff;border-radius:10px}
 #auth button{margin-top:16px}
 [hidden]{display:none!important}
-@media(max-width:550px){header{padding:12px}.toolbar{padding:8px 12px}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
+@media(max-width:550px){header{padding:12px;flex-wrap:wrap}header strong{font-size:17px}.reality-page-nav{width:100%;justify-content:space-between}.reality-page-nav a{flex:1;min-width:0;padding:9px 7px}.toolbar{padding:8px 12px}#runFullShift{width:100%}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
 
 /* Named, read-only team preview. Cards represent proposed roles, not live agents. */
 .team-board{border-bottom:1px solid #334053;background:#111a26;padding:12px 14px}
@@ -82,7 +88,12 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 </head>
 <body>
 <div class="shell">
-<header><strong>Reality · Chat</strong><a href="/" title="Open Reality work and approvals">Work &amp; approvals</a></header>
+<header><strong>Reality · Riley shift</strong>
+<nav class="reality-page-nav" aria-label="Reality pages">
+ <a id="rileyNavHome" href="/">Home</a>
+ <a id="rileyNavChat" href="/chat">Chat</a>
+ <a id="rileyNavEvaluation" href="/value#pre-automation">Evaluation</a>
+</nav></header>
 <section id="auth" hidden>
 <h2>Sign in to Reality</h2>
 <p>Your saved conversations remain private to your account.</p>
@@ -96,13 +107,13 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
-<button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
+<button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
 <label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
 <button id="runFullShift" type="button" title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Run Riley's Shift</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="team-intro" id="fullShiftScope">Choose 1–12 hours for the next owner-authorized Riley shift, according to validated workload; next-week draft review timeboxes alone never start jobs. One signed-in authorization starts that exact background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
-<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
+<p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
+<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
  <section class="team-value" aria-label="Reality source-backed business value">
@@ -885,7 +896,7 @@ function showAuth(authenticated){
     if(window.location.hash==='#riley-shift'){
       $('runShiftHours').value='3';
       $('fullShiftScope').textContent=
-       'Riley 3-hour pilot selected. Tap Run Riley\'s Shift to authorize this exact source-bounded shift. Nothing started by opening this page; verified repairs and installations have separate gates.';
+       '3h selected. Tap the highlighted Run Riley\'s Shift button above to authorize the exact pilot. Sending a message is NOT authorization. Merely opening this page starts nothing. Verified repairs and installations remain separately governed.';
     }
     setConversation(conversation());
     void refreshHistory();
@@ -931,6 +942,7 @@ $('teamToggle').onclick=()=>{
  const panel=$('employeeBoardPanel');
  panel.hidden=!panel.hidden;
  $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
+ $('teamToggle').textContent=panel.hidden?'Show AI team · 8':'Hide AI team · 8';
  if(!panel.hidden){void refreshEmployeeBoard();void refreshRealitySelfAudit();}
 };
 $('newChat').onclick=()=>{
