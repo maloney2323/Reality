@@ -16,6 +16,9 @@ on:
       - src/reality-riley-live-loop-readiness-v1.js
       - api/reality/personal-riley-loop-readiness.js
       - test/reality-riley-live-loop-readiness-v1.test.js
+      - src/reality-riley-existing-backlog-v1.js
+      - api/reality/personal-riley-existing-backlog.js
+      - test/reality-riley-existing-backlog-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js
       - test/reality-governed-flexible-shift-v2.test.js
@@ -55,6 +58,9 @@ on:
       - src/reality-riley-live-loop-readiness-v1.js
       - api/reality/personal-riley-loop-readiness.js
       - test/reality-riley-live-loop-readiness-v1.test.js
+      - src/reality-riley-existing-backlog-v1.js
+      - api/reality/personal-riley-existing-backlog.js
+      - test/reality-riley-existing-backlog-v1.test.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js
       - test/reality-governed-flexible-shift-v2.test.js
@@ -94,7 +100,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify all existing and flexible employee shift contracts
-        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js test/reality-riley-pilot-provider-proof-v1.test.js test/reality-riley-governed-original-job-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-employee-edge-governed-wake-v1.test.js test/reality-riley-live-loop-readiness-v1.test.js
+        run: node --test test/reality-governed-flexible-shift-v2.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js test/reality-riley-pilot-provider-proof-v1.test.js test/reality-riley-governed-original-job-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-employee-edge-governed-wake-v1.test.js test/reality-riley-live-loop-readiness-v1.test.js test/reality-riley-existing-backlog-v1.test.js
 
   riley-live-investigation:
     runs-on: ubuntu-latest
