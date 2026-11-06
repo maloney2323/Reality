@@ -56,7 +56,7 @@ begin
     or (x->>'issue_number') !~ '^[1-9][0-9]{0,7}$'
     or (x->>'issue_number')::bigint>2147483647
     or x->>'issue_url' is distinct from
-       ('https://github.com/maloney2323/Reality/issues/'||x->>'issue_number')
+       ('https://github.com/maloney2323/Reality/issues/'||(x->>'issue_number'))
     or jsonb_typeof(x->'title') is distinct from 'string'
     or length(x->>'title') not between 1 and 200
  ) or (select count(distinct (x->>'issue_number')) from
