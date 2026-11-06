@@ -135,6 +135,21 @@ test('Riley refuses unfrozen, foreign or unapproved generated code',()=>{
    /RILEY_VERIFIED_WRITER_|FOUNDATION_/);
  }
 });
+test('credentialed writer rejects caller-forged approval flags and immutable file mutation',async()=>{
+ const plan=authorizeRileyCandidateStage(fixture());
+ assert.equal(Object.isFrozen(plan),true);
+ assert.equal(Object.isFrozen(plan.files),true);
+ assert.equal(Object.isFrozen(plan.files[0]),true);
+ assert.throws(()=>plan.files.push({path:'src/reality-extensions/unverified.mjs',
+  content:'unverified'}),TypeError);
+ const forged={...plan,code_staging_permitted:true};
+ let providerCalls=0;
+ await assert.rejects(stageRileyVerifiedCandidate({
+  plan:forged,token:'isolated-gh-token-without-production-install',
+  fetchImpl:async()=>{providerCalls++;throw Error('PROVIDER_NOT_ALLOWED')}
+ }),/RILEY_VERIFIED_WRITER_TRUSTED_VERIFIED_CANDIDATE/);
+ assert.equal(providerCalls,0);
+});
 test('a verified candidate becomes actual Git source on a new isolated branch',async()=>{
  const plan=authorizeRileyCandidateStage(fixture());
  const provider=gitProvider(plan);
