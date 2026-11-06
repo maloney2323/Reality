@@ -65,6 +65,16 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .team-value-metrics small,.team-value-metrics span{font-size:11px;line-height:1.4;color:#bbd2e4;display:block}
 .team-value-metrics strong{display:block;margin:5px 0;font-size:19px;color:#f0f7ff;overflow-wrap:anywhere}
 .team-value a{color:#bde2fb}
+.team-next-week{padding:12px;margin:12px 0;border:1px solid #4b6b79;background:#13232d;border-radius:13px}
+.team-next-week .team-head strong{font-size:14px}
+.team-next-week p{font-size:12px;color:#bfd0df;line-height:1.5}
+.team-next-week .week-role{margin:7px 0;border:1px solid #344d65;border-radius:10px;padding:8px 10px;background:#162a3d}
+.team-next-week .week-role summary{cursor:pointer;font-size:12px;font-weight:650;color:#e5f1ff}
+.team-next-week .week-role ul{padding-left:18px;margin:7px 0;font-size:12px}
+.team-next-week .week-role li{margin:5px 0}
+.team-next-week .week-role a{color:#badcf8}
+.team-next-week .week-day{margin:10px 0 0;font-size:11px;color:#b8d2e6}
+
 @media(max-width:550px){.team-value-metrics{grid-template-columns:1fr}}
 
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
@@ -105,6 +115,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <p id="teamValueNASA">Calculating a comparable human software-repair wage example…</p>
   <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
   <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
+ </section>
+ <section class="team-next-week" aria-label="Next week prepared employee roles">
+  <div class="team-head"><strong>Next week's proposed employee schedule</strong><span class="team-role" id="nextWeekSourceStatus">Checking background preparation…</span></div>
+  <p id="nextWeekSummary">Reality prepares next-week work while the current week runs. These are proposed source inspections, not authorized shifts or promised eight-hour workloads.</p>
+  <div id="nextWeekEmployeeRoles" aria-live="polite"></div>
  </section>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
 <details class="team-proof" id="realitySelfAwareness">
@@ -468,6 +483,98 @@ function clearShiftValueEvidence(){
  $('teamValueProof').textContent='Verified human work returned and net ROI: not measured.';
  $('teamValueSources').textContent='Source readback unavailable; no financial impact inferred.';
 }
+function renderNextWeekWorkPlan(roster){
+ const plan=roster?.next_week_plan;
+ if(plan?.version!=='reality-next-week-employee-plan-v1'||
+    plan.status!=='NEXT_WEEK_DRAFT_PREPARED_AWAITING_OWNER_SHIFT_AUTHORIZATION'||
+    plan.calendar_time_zone!=='America/New_York'||
+    plan.employee_role_count!==roster.proposed_employee_count||
+    !Array.isArray(plan.employee_roles)||plan.employee_roles.length!==8||
+    !/^\d{4}-\d\d-\d\d$/.test(plan.week_start||'')||
+    !/^\d{4}-\d\d-\d\d$/.test(plan.week_end||'')||
+    plan.four_day_week_capacity_hours!==256||
+    plan.five_day_week_capacity_hours!==320||
+    plan.capacity_unit!=='HYPOTHETICAL_AI_ROLE_SCHEDULE_HOURS_NOT_HUMAN_SAVINGS'||
+    plan.candidate_source_review_assignments_not_jobs!==true||
+    plan.read_only!==true||
+    plan.owner_shift_authorization_recorded!==false||
+    plan.installation_authorized!==false||
+    plan.production_changed!==false||
+    plan.verified_human_hours_saved!==null||
+    plan.verified_headcount_reduction!==null||
+    plan.verified_financial_roi_usd!==null||
+    !['BACKGROUND_NEXT_WEEK_SOURCE_REFRESH_VERIFIED',
+     'BACKGROUND_SOURCE_SNAPSHOT_NOT_YET_VERIFIED'].includes(plan.preparation_source))
+  throw Error('NEXT_WEEK_EMPLOYEE_SOURCE_OR_SCOPE_UNVERIFIED');
+ const prepared=plan.preparation_source==='BACKGROUND_NEXT_WEEK_SOURCE_REFRESH_VERIFIED';
+ if(prepared&&(!Number.isSafeInteger(roster.next_week_background_open_issue_count)||
+    roster.next_week_background_open_issue_count<0||
+    roster.next_week_background_open_issue_count>150||
+    !Number.isFinite(Date.parse(plan.background_source_prepared_at||''))))
+   throw Error('NEXT_WEEK_BACKGROUND_READBACK_UNVERIFIED');
+ $('nextWeekSourceStatus').textContent=prepared?'Background source refresh verified':
+  'On-demand draft · background preparation not yet verified';
+ $('nextWeekSummary').textContent='Week of '+plan.week_start+' through '+plan.week_end+
+  '. '+plan.employee_role_count+' proposed business functions; '+
+  plan.proposed_work_findings+' distinct source-backed findings already routed for review.'+
+  (prepared?' Unattended scheduler checked '+
+   roster.next_week_background_open_issue_count+' open issues before this page was opened.':'')+
+  ' Remaining slots explicitly need new qualified work. Four/five-day capacity is 256–320 proposed AI-role hours, not productive hours or people replaced.';
+ const holder=document.createDocumentFragment(),seen=new Set();
+ for(const role of plan.employee_roles){
+  if(typeof role.employee_name!=='string'||!role.employee_name||
+     typeof role.role_title!=='string'||!role.role_title||
+     !Array.isArray(role.week_days)||role.week_days.length!==5||
+     role.active_worker_verified!==false||
+     role.approved_execution_hours!==0||
+     role.completed_productive_hours_verified!==null)
+   throw Error('NEXT_WEEK_ROLE_DRAFT_NOT_VERIFIED');
+  const panel=document.createElement('details');panel.className='week-role';
+  const summary=document.createElement('summary');
+  summary.textContent=role.employee_name+' · '+role.role_title+' · '+
+   role.candidate_finding_count+' current source finding(s)';
+  panel.append(summary);
+  for(const day of role.week_days){
+   if(!/^\d{4}-\d\d-\d\d$/.test(day.date||'')||
+    !Array.isArray(day.assignments)||day.assignments.length>25||
+    day.shifts_authorized!==false||
+    day.actual_work_hours_verified!==null||
+    !['PROPOSED_SOURCE_REVIEW_NOT_EXECUTION_AUTHORIZATION',
+      'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'].includes(day.work_status))
+    throw Error('NEXT_WEEK_DAY_EXECUTION_NOT_AUTHORIZED');
+   const line=document.createElement('div');line.className='week-day';
+   line.textContent=day.weekday+' · '+day.date+' · '+
+    (day.assignments.length?day.assignments.length+' finding(s) to review':
+     'Find and qualify useful work');
+   panel.append(line);
+   if(day.assignments.length){
+    const ul=document.createElement('ul');
+    for(const work of day.assignments){
+     if(!/^catalog:[a-f0-9]{32}$/.test(work.finding_id||'')||
+      seen.has(work.finding_id)||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(work.source_url||'')||
+      work.owner_execution_authorized!==false)
+      throw Error('NEXT_WEEK_SOURCE_ASSIGNMENT_NOT_VERIFIED');
+     seen.add(work.finding_id);
+     const li=document.createElement('li'),a=document.createElement('a');
+     a.href=work.source_url;a.textContent=work.title;
+     a.rel='noopener noreferrer';a.target='_blank';
+     li.append(a);ul.append(li);
+    }
+    panel.append(ul);
+   }
+  }
+  holder.append(panel);
+ }
+ if(seen.size!==plan.proposed_work_findings)
+  throw Error('NEXT_WEEK_UNIQUE_SOURCE_COVERAGE_MISMATCH');
+ $('nextWeekEmployeeRoles').replaceChildren(holder);
+}
+function clearNextWeekWorkPlan(){
+ $('nextWeekSourceStatus').textContent='Preparation unverified';
+ $('nextWeekSummary').textContent='Next-week source or owner evidence could not be verified. No shift, worker execution or business savings is claimed.';
+ $('nextWeekEmployeeRoles').replaceChildren();
+}
 async function refreshEmployeeBoard(){
   if(teamLoading)return;
   teamLoading=true;
@@ -492,6 +599,7 @@ async function refreshEmployeeBoard(){
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
     showShiftValueEvidence(roster);
+    renderNextWeekWorkPlan(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
     void refreshRileyExistingBacklog();
@@ -503,6 +611,7 @@ async function refreshEmployeeBoard(){
   }catch(e){
     $('teamCards').replaceChildren();
     clearShiftValueEvidence();
+    clearNextWeekWorkPlan();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
       String(e?.message||'Unknown').slice(0,180)+
