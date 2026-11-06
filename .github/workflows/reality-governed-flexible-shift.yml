@@ -1,7 +1,7 @@
 name: Reality flexible governed employee shifts
 on:
   push:
-    branches: [fix/reality-chat-fullscreen-verified-cycle-20261105]
+    branches: [fix/riley-multi-job-readiness-preclaim-20261106]
     paths:
       - src/reality-eight-hour-shift-plan-v1.js
       - src/reality-governed-shift-boundary-v1.js
@@ -146,7 +146,7 @@ jobs:
   riley-live-investigation:
     # The investigation script cryptographically binds to the canonical
     # preview branch. PR merge refs must never masquerade as that source.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/fix/reality-chat-fullscreen-verified-cycle-20261105'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/fix/riley-multi-job-readiness-preclaim-20261106'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
