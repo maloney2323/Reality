@@ -108,6 +108,7 @@ const SHIFT='/api/reality/personal-governed-employee-shift';
 const ROSTER='/api/reality/personal-employee-roster';
 const RILEY_PROOF='/api/reality/personal-riley-proof';
 const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
+const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
 let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
 function conversation(){
@@ -194,6 +195,8 @@ function employeeCard(employee){
     proof.id='rileyPilotProof';card.append(proof);
     const loop=textNode('div','Checking live full-loop job readiness…','team-proof');
     loop.id='rileyLoopReadiness';card.append(loop);
+    const backlog=textNode('div','Reconciling Riley’s existing unfinished backlog…','team-proof');
+    backlog.id='rileyExistingBacklog';card.append(backlog);
   }
   return card;
 }
@@ -250,9 +253,9 @@ async function refreshRileyLoopReadiness(){
    throw Error('RILEY_ORIGINAL_READBACK_UNVERIFIED');
   const options={
    NO_ACTIVE_AUTHORIZED_RILEY_SHIFT:
-    'Full-loop readiness: no active owner-authorized shift. A fresh original job must also be independently qualified.',
+    'Full-loop readiness: no active owner-authorized shift. An existing unfinished job must be independently qualified before execution.',
    NO_NEW_QUALIFIED_SHIFT_BOUND_ORIGINAL_JOB:
-    'Full-loop readiness: active shift found, but no new qualified, authorized original Riley job is attached.',
+    'Full-loop readiness: active shift found, but no qualified, authorized original Riley job is attached.',
    AMBIGUOUS_ORIGINAL_JOB_NO_AUTO_SELECTION:
     'Full-loop readiness: more than one possible original job. Reality will not guess or replay work.',
    EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE:
@@ -265,6 +268,56 @@ async function refreshRileyLoopReadiness(){
   node.textContent=text;
  }catch{
   node.textContent='Full-loop readiness unavailable. No original-job execution or settlement is claimed.';
+ }
+}
+async function refreshRileyExistingBacklog(){
+ const node=$('rileyExistingBacklog');
+ if(!node)return;
+ try{
+  const x=await json(RILEY_BACKLOG,{signal:AbortSignal.timeout(50000)});
+  if(x.ok!==true||x.owner_scope_verified!==true||
+    x.worker_execution_authorized_by_read!==false||
+    x.version!=='reality-riley-existing-backlog-v1'||
+    x.read_only!==true||x.execution_authorized_by_read!==false||
+    x.starts_original_job!==false||
+    x.installation_authorized!==false||
+    x.final_receipt_recorded_by_read!==false||
+    x.production_changed!==false||
+    x.human_hours_saved_verified!==null||
+    !Array.isArray(x.rows)||x.rows.length>25)
+    throw Error('RILEY_BACKLOG_UNVERIFIED');
+  const header=textNode('div',
+   'Existing Riley backlog · '+x.total_open_provider_issues_reviewed+
+   ' open issues reconciled'+(x.source_coverage_complete?'':' (partial source coverage)'));
+  node.replaceChildren(header);
+  const statuses={
+   PREVIOUS_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED:'Previously settled — do not replay',
+   HISTORICAL_INSTALL_OR_PROBATION_NEEDS_RECONCILIATION:'Historical installation — reconcile receipts',
+   EXISTING_CAPABILITY_JOB_REQUIRES_LIVE_AUTHORITY_GATE:'Existing job — requires current execution gate',
+   AMBIGUOUS_HISTORICAL_ORIGINALS_REVIEW:'Historical originals — review duplicates',
+   LEGACY_DISCOVERY_QUEUE_REQUIRES_RECONCILIATION:'Old discovery queue — reconcile before action',
+   OPEN_SOURCE_WORK_AWAITING_ORIGINAL_JOB_QUALIFICATION:'Open issue — qualify before execution'
+  };
+  for(const entry of x.rows.slice(0,5)){
+   if(!Number.isSafeInteger(entry.issue_number)||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(entry.source_url)||
+      !statuses[entry.status]||
+      entry.installation_authorized!==false||
+      entry.original_job_completed_by_read!==false||
+      entry.exact_worker_wake_authorized_by_read!==false)
+    throw Error('RILEY_BACKLOG_ENTRY_UNVERIFIED');
+   const line=document.createElement('div');
+   line.style.marginTop='8px';
+   const a=document.createElement('a');
+   a.href=entry.source_url;a.rel='noopener noreferrer';
+   a.target='_blank';a.textContent='#'+entry.issue_number+' · '+entry.title;
+   line.append(a,textNode('div',statuses[entry.status]));
+   node.append(line);
+  }
+  node.append(textNode('div',
+   'Tracked issues are work candidates, not permission to repair. Reality preserves the original approval and does not replay settled work.'));
+ }catch{
+  node.textContent='Existing backlog readback unavailable. This is not evidence that Riley has no work.';
  }
 }
 async function refreshEmployeeBoard(){
@@ -292,6 +345,7 @@ async function refreshEmployeeBoard(){
     $('teamCards').replaceChildren(holder);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
+    void refreshRileyExistingBacklog();
     summary.textContent='8 proposed · '+roster.existing_work_center_candidates+
      ' categorized findings · 0 active workers';
     $('teamEvidenceNote').textContent=
