@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {independentlyVerifyRileyProviderAudit}
  from '../src/reality-riley-engineering-pilot-v1.js';
 const fail=code=>{throw Error('RILEY_PILOT_VERIFY_'+code)};
-const branch='fix/reality-chat-fullscreen-verified-cycle-20261105';
+const branch='fix/riley-multi-job-readiness-preclaim-20261106';
 const allowedPush=process.env.GITHUB_EVENT_NAME==='push'&&
  process.env.GITHUB_REF==='refs/heads/'+branch;
 const allowedReview=process.env.GITHUB_EVENT_NAME==='pull_request'&&
