@@ -270,6 +270,19 @@ async function refreshRileyLoopReadiness(){
    EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE:
     'Full-loop readiness: the exact original job is eligible for a governed wake. Worker claim and settlement are NOT yet proven.'
   };
+  if(result.status==='EXACT_AUTHORIZED_EXISTING_JOBS_ELIGIBLE_FOR_WAKE'){
+   if(!Number.isSafeInteger(result.eligible_original_count)||
+      result.eligible_original_count<2||result.eligible_original_count>4||
+      !Array.isArray(result.original_work_ids)||
+      result.original_work_ids.length!==result.eligible_original_count||
+      new Set(result.original_work_ids).size!==result.eligible_original_count||
+      result.original_work_ids.some(id=>!/^work:[a-f0-9]{32}$/.test(id))||
+      result.worker_claim_acknowledged!==false)
+     throw Error('RILEY_MULTI_JOB_PROVIDER_READBACK_UNVERIFIED');
+   node.textContent='Full-loop readiness: '+result.eligible_original_count+
+    ' distinct existing jobs passed independent wake gates. Worker claims, code repairs and final receipts are NOT yet proven.';
+   return;
+  }
   const text=options[result.status];
   if(!text)throw Error('RILEY_UNRECOGNIZED_READINESS');
   node.textContent=text;
