@@ -71,7 +71,7 @@ test('Chat uses signed-in Send event and the real authenticated shift endpoint',
  const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
  const shift=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
  assert.match(ui,/type="module"/);
- assert.match(ui,/interpretSignedInChatShiftCommand\(value\)/);
+ assert.match(ui,/interpretSignedInChatShiftCommand\(value,\{/);
  assert.match(ui,/const before=await json\(SHIFT/);
  assert.match(ui,/safeShiftReadbackState\(before/);
  assert.match(ui,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
