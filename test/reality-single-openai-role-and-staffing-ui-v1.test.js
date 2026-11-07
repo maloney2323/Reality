@@ -24,7 +24,7 @@ function plan(){
   function_id,employee_id:'reality-proposed:'+function_id,
   employee_name:'Role '+index,active_worker_verified:false,approved_execution_hours:0,
   week_days:Array.from({length:5},(_,day)=>({
-   date:'2026-11-'+(9+day),
+   date:'2026-11-'+String(9+day).padStart(2,'0'),
    assignments:day===0&&index===1?[item]:[],
    shifts_authorized:false,proposed_execution_shift_hours:null,
    timebox_is_verified_task_duration:false
