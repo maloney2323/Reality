@@ -1124,11 +1124,12 @@ async function refreshShiftStatus(){
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
     renderCombinedShiftRoleEvidence(data);
+    renderActiveRileyTaylorQueue(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
       $('runFullShift').disabled=true;
       $('runFullShift').textContent='Existing shift authorized';
-      $('fullShiftScope').textContent='Your shift has already been authorized. Do NOT press Run Riley\'s Shift again. The live status below is read directly from the database every 30 seconds. Source checks do not prove an executable original job or a final receipt.';
+      $('fullShiftScope').textContent='Riley + Taylor combined work already authorized. One governed worker processes the assigned sources and hands off qualifying repairs. Do not start a duplicate; review live source/receipt status below. Original repairs require independently verified final receipts.';
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
       const route=data.recovery_diagnosis;
@@ -1230,6 +1231,15 @@ async function authorizeShiftFromChat(command){
     signal:AbortSignal.timeout(30000)
   });
   const draft=draftRead.requested_shift_draft;
+  const combined=draft?.combined_employee_work_orders;
+  if(combined?.version!=='reality-riley-taylor-combined-work-orders-v1'||
+      combined.plan_fingerprint!==draft?.expected_fingerprint||
+      !Number.isSafeInteger(combined.task_count)||
+      combined.task_count<1||combined.task_count>4||
+      combined.execution_started!==false||
+      combined.installation_authorized!==false||
+      combined.production_changed!==false)
+    throw Error('RILEY_TAYLOR_COMBINED_TASK_PLAN_NOT_READY_NO_IDLE_SHIFT');
   if(draft?.shift_duration_hours!==command.duration_hours||
      draft?.shift_duration_minutes!==command.duration_hours*60||
      draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
@@ -1299,7 +1309,7 @@ async function authorizeShiftFromChat(command){
   }
   return {
     acknowledged:true,
-    text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
+    text:'Riley + Taylor combined shift authorized for '+combined.task_count+' source tasks; '+command.duration_hours+'h is the maximum safety window, not the work target. Shift ID: '+
       created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
       ' The existing trusted worker scheduler must independently claim work. The selected hours are a maximum authorization window, NOT a mandatory work duration; verified completion can stop the shift early. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
@@ -1339,17 +1349,15 @@ function showAuth(authenticated){
   $('auth').hidden=authenticated;
   $('chat').hidden=!authenticated;
   if(authenticated){
-    // A link from the main conversation preselects a safe three-hour draft.
-    // This never POSTs, starts a worker, or grants execution authority.
+    // Deep links never start work or select an arbitrary time target; the owner presses Start once.
     if(window.location.hash==='#riley-shift'){
-      $('runShiftHours').value='3';
-      $('fullShiftScope').textContent=
-       '3h selected. Tap the highlighted Run Riley\'s Shift button above to authorize the exact pilot. Sending a message is NOT authorization. Merely opening this page starts nothing. Verified repairs and installations remain separately governed.';
+      $('fullShiftScope').textContent='Review the combined Riley + Taylor source tasks below. Choose a maximum authorization window, then press Start Riley + Taylor Jobs ONCE. Opening the page does not authorize work or install code.';
     }
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
     void refreshShiftStatus();
+    void refreshRileyTaylorCombinedWorkQueue();
     void refreshEmployeeBoard();
     void refreshRealitySelfAudit();
     $('prompt').focus({preventScroll:true});
@@ -1425,7 +1433,7 @@ $('runFullShift').onclick=async()=>{
   pendingResult.classList.remove('pending');
   pendingResult.lastChild.textContent=receipt.text;
   status('Full-shift authorization read back. Worker results are verified separately.');
-  void refreshShiftStatus();void refreshEmployeeBoard();
+  void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();void refreshEmployeeBoard();
  }catch(err){
   pendingResult.className='message assistant error';
   pendingResult.lastChild.textContent=
@@ -1437,10 +1445,11 @@ $('runFullShift').onclick=async()=>{
   pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
  }
 };
+$('runShiftHours').onchange=()=>{if(!pending)void refreshRileyTaylorCombinedWorkQueue()};
 $('workforceRole').onchange=loadWorkforceRoleInputs;
 $('workforceCalculate').onclick=()=>{void calculateWorkforceSavings()};
 $('workforceReset').onclick=()=>{void calculateWorkforceSavings(true)};
-$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
     e.preventDefault();$('composer').requestSubmit();
