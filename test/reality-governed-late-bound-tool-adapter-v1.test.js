@@ -115,6 +115,7 @@ test('late-bound schema becomes visible via supported Responses additional_tools
  assert.equal(result.additional_tools.type,'additional_tools');
  assert.equal(result.additional_tools.tools[0].name,'inspect_source');
  assert.equal(result.additional_tools.tools[0].strict,true);
+ assert.equal(result.additional_tools.tools[0].defer_loading,undefined);
  assert.equal(result.original_job_completed,false);
 });
 test('client tool-search returns exact verified schema and call ID, no model authority',async()=>{
@@ -124,6 +125,7 @@ test('client tool-search returns exact verified schema and call ID, no model aut
  assert.equal(result.call_id,search.call_id);
  assert.equal(result.execution,'client');
  assert.equal(result.tools[0].name,'inspect_source');
+ assert.equal(result.tools[0].defer_loading,true);
  await assert.rejects(adapter.forToolSearch({searchCall:{...search,execution:'server'},
   executionTime:TIME}),/TRUSTED_PROVIDER_SEARCH_CALL_REQUIRED/);
 });
