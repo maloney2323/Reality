@@ -6,6 +6,8 @@ on:
     paths:
       - src/reality-governed-employee-shift-worker-v1.js
       - src/reality-riley-trusted-original-driver-bridge-v1.js
+      - src/reality-first-shift-economic-scorecard-v1.js
+      - test/reality-first-shift-economic-scorecard-v1.test.js
       - test/reality-riley-trusted-original-driver-bridge-v1.test.js
       - src/reality-universal-governed-recovery-handoff-v1.js
       - src/reality-governed-late-bound-tool-adapter-v1.js
@@ -33,7 +35,7 @@ jobs:
         with:
           node-version: '22'
       - name: Existing worker and exact original handoff
-        run: node --test test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
+        run: node --test test/reality-first-shift-economic-scorecard-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
       - name: Parse live provider proof runners
         run: |
           node --check scripts/reality-prove-live-tool-delivery-v1.mjs
