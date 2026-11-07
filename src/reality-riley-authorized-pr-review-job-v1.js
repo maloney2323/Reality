@@ -40,13 +40,16 @@ function safeFailure(phase,http){
 async function github(relative,{fetchImpl,token,method='GET',body}={}){
  if(!/^\/(?:pulls\/[1-9]\d*(?:\/files\?per_page=100)?|issues\/[1-9]\d*\/comments(?:\?per_page=100&page=[1-5])?|issues\/comments\/[1-9]\d*)$/.test(relative))
   deny('PROVIDER_RESOURCE_NOT_ALLOWED');
- if(typeof token!=='string'||token.length<25)
-  deny('GITHUB_TOKEN_UNAVAILABLE');
+ if(method==='POST'&&
+   (typeof token!=='string'||token.length<25))
+  deny('GITHUB_COMMENT_WRITE_CREDENTIAL_NOT_CONFIGURED');
  const response=await fetchImpl(ROOT+relative,{
   method,redirect:'error',cache:'no-store',
   signal:AbortSignal.timeout(14000),
   headers:{accept:'application/vnd.github+json',
-   authorization:'Bearer '+token,'content-type':'application/json',
+   ...(typeof token==='string'&&token.length>=25?
+     {authorization:'Bearer '+token}:{}),
+   'content-type':'application/json',
    'x-github-api-version':'2022-11-28',
    'user-agent':'Reality-Riley-Taylor-OwnerShift-Review-v1'},
   body:body===undefined?undefined:JSON.stringify(body)
@@ -228,8 +231,9 @@ export async function runAuthorizedRileyPrReview({
   return unavailable('PR_REVIEW_ORIGINAL_ESCALATED_NO_UNSAFE_RETRY');
  verifyClaim(c);
  // One named original, one source snapshot, no arbitrary issue/PR selection.
- if(typeof githubToken!=='string'||githubToken.length<25)
-  return unavailable('PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING');
+ // Public source reads and a private model-generated candidate require
+ // no GitHub writer credential. Never copy production PATs to preview.
+ // Publication still requires a separately fenced, exact-scope write.
  if(c.phase==='CLAIMED'){
   let source,modelResult;
   try{
@@ -269,6 +273,8 @@ export async function runAuthorizedRileyPrReview({
   const existed=await findExistingComment(c,{fetchImpl,token:githubToken});
   if(existed)return independentlySettle(c,existed,{fetchImpl,
     token:githubToken,callRpc,db});
+  if(typeof githubToken!=='string'||githubToken.length<25)
+   return unavailable('PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING_PUBLISH_INTENT_FENCED');
   let published;
   try{
    published=await github('/issues/'+source.number+'/comments',{
