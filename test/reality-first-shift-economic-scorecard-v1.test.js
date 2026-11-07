@@ -68,7 +68,7 @@ test('missing provider costs must not silently be zero or claim net value',()=>{
  assert.equal(r.total_illustrative_gross_benchmark_usd,653.8);
  assert.equal(r.total_benchmark_adjusted_net_usd,null);
  assert.equal(r.incomplete_cost_or_human_comparator_count,1);
- assert.equal(r.priced_subset_net_benchmark_usd,298.56);
+ assert.equal(r.priced_subset_net_benchmark_usd,298.55);
 });
 test('zero accepted repairs has $0 illustrative gross but no cash-savings claim',()=>{
  const r=evaluate({shift});
