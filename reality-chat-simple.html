@@ -84,6 +84,15 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 @media(max-width:550px){.team-value-metrics{grid-template-columns:1fr}}
 
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
+
+.workforce-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}
+.workforce-form-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#d8e6f7}
+.workforce-form-grid input,.workforce-form-grid select{min-height:43px;padding:9px;border-radius:9px;background:#111d2b;border:1px solid #42617d;color:#fff;width:100%}
+.workforce-form-grid label.check{display:flex;flex-direction:row;align-items:center;gap:9px}
+.workforce-form-grid label.check input{width:19px;min-height:19px;height:19px}
+.workforce-output-row{padding:12px 0;border-bottom:1px solid #34485e;line-height:1.55}
+.workforce-output-row strong{display:block}
+#workforceScenarioStatus{color:#dbeafa;line-height:1.6}
 </style>
 </head>
 <body>
@@ -129,6 +138,30 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
   <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
  </section>
+ <details class="team-value" id="workforceSavingsPlanner" open aria-label="Potential workforce consolidation and annual payroll value">
+  <summary><strong>Workforce savings · roles Reality could potentially consolidate</strong></summary>
+  <p>One shared OpenAI model covers business functions, not eight independent workers. Enter your business's positions, actual loaded pay and a proposed workload for each function. This is a scenario, not an instruction to dismiss specific people.</p>
+  <div class="workforce-form-grid">
+   <label>Business role<select id="workforceRole" aria-label="Role to evaluate"></select></label>
+   <label>Current positions<input id="workforcePositions" type="number" min="0" max="5000" step="1" value="1"></label>
+   <label>Annual loaded cost per position ($)<input id="workforceSalary" type="number" min="0" max="10000000" step="1000" value="100000"></label>
+   <label>Hours per human position per month<input id="workforceHumanHours" type="number" min="40" max="260" step="1" value="160"></label>
+   <label>Hours of human work Reality could handle per month<input id="workforceAutomatedHours" type="number" min="0" max="100000" step="1" value="0"></label>
+   <label>Human review hours still needed per month<input id="workforceReviewHours" type="number" min="0" max="100000" step="1" value="0"></label>
+   <label>OpenAI runtime hours this role uses per month<input id="workforceModelHours" type="number" min="0" max="744" step="1" value="0"></label>
+   <label>AI and infrastructure expense per month ($)<input id="workforceMonthlyAI" type="number" min="0" max="10000000" step="1" value="0"></label>
+   <label>Additional human supervision expense per month ($)<input id="workforceExtraSupervision" type="number" min="0" max="10000000" step="1" value="0"></label>
+   <label>Total shared OpenAI runtime budget per month (hours)<input id="workforceSharedCapacity" type="number" min="1" max="744" step="1" value="160"></label>
+   <label class="check"><input type="checkbox" id="workforceCriticalDuties">Assume all critical duties for a full position can be covered</label>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+   <button type="button" id="workforceCalculate">Add/update role · calculate savings</button>
+   <button type="button" id="workforceReset">Clear assumptions</button>
+  </div>
+  <p id="workforceScenarioStatus" role="status" aria-live="polite">Enter company-specific assumptions to estimate potential whole-position consolidation and payroll savings. NASA defect-repair labor value alone cannot prove positions are replaceable.</p>
+  <div id="workforceScenarioRows" aria-live="polite"></div>
+  <p>Important: An FTE-capacity equivalent is not an employee who can safely be removed. Ongoing reliability, uncovered duties, compliance, actual staffing changes and verified payroll expenses must be checked before claiming realized savings. No information entered here is saved.</p>
+ </details>
  <section class="team-next-week" aria-label="Next week prepared employee roles">
   <div class="team-head"><strong>Next week's proposed employee schedule</strong><span class="team-role" id="nextWeekSourceStatus">Checking background preparation…</span></div>
   <p id="nextWeekSummary">Reality prepares next-week work while the current week runs. These are proposed source inspections, not authorized shifts or promised eight-hour workloads.</p>
@@ -161,12 +194,14 @@ const SESSION='/api/reality/personal-session';
 const API='/api/reality/personal-chat';
 const SHIFT='/api/reality/personal-governed-employee-shift';
 const ROSTER='/api/reality/personal-employee-roster';
+const WORKFORCE_SAVINGS='/api/reality/personal-workforce-savings-scenario';
 const RILEY_PROOF='/api/reality/personal-riley-proof';
 const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
 const SELF_AUDIT='/api/reality/personal-capability-self-audit';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
 let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
+const workforceAssumptions=new Map();
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
   if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
@@ -495,6 +530,149 @@ function clearShiftValueEvidence(){
  $('teamValueProof').textContent='Verified human work returned and net ROI: not measured.';
  $('teamValueSources').textContent='Source readback unavailable; no financial impact inferred.';
 }
+
+function configureWorkforceSavingsRoles(roster){
+ const roles=roster?.proposed_employees;
+ if(roster?.status!=='READ_ONLY_PROPOSED_AI_EMPLOYEES'||
+  !Array.isArray(roles)||roles.length!==8)
+  throw Error('WORKFORCE_SCENARIO_ROLE_SOURCE_UNVERIFIED');
+ const select=$('workforceRole'),previous=select.value;
+ select.replaceChildren();
+ for(const role of roles){
+  if(role.employee_id!=='reality-proposed:'+role.function_id||
+   typeof role.role!=='string'||!role.role||
+   role.activation_status!=='PROPOSED_NOT_DEPLOYED')
+   throw Error('WORKFORCE_SCENARIO_ROLE_NOT_VERIFIED');
+  const option=document.createElement('option');
+  option.value=role.function_id;
+  option.textContent=role.role+' · '+role.display_name;
+  select.append(option);
+ }
+ if([...select.options].some(o=>o.value===previous))select.value=previous;
+}
+function loadWorkforceRoleInputs(){
+ const a=workforceAssumptions.get($('workforceRole').value);
+ const defaults={
+  current_employee_positions:1,
+  annual_fully_loaded_cost_per_position_usd:100000,
+  monthly_human_work_hours_per_position:160,
+  assumed_automatable_human_hours_per_month:0,
+  assumed_human_supervision_hours_per_month:0,
+  assumed_shared_model_runtime_hours_per_month:0,
+  estimated_monthly_provider_and_infrastructure_cost_usd:0,
+  extra_monthly_supervision_cash_cost_usd:0,
+  all_critical_duties_assumed_covered:false
+ };
+ const values=a||defaults;
+ for(const [id,key] of [
+  ['workforcePositions','current_employee_positions'],
+  ['workforceSalary','annual_fully_loaded_cost_per_position_usd'],
+  ['workforceHumanHours','monthly_human_work_hours_per_position'],
+  ['workforceAutomatedHours','assumed_automatable_human_hours_per_month'],
+  ['workforceReviewHours','assumed_human_supervision_hours_per_month'],
+  ['workforceModelHours','assumed_shared_model_runtime_hours_per_month'],
+  ['workforceMonthlyAI','estimated_monthly_provider_and_infrastructure_cost_usd'],
+  ['workforceExtraSupervision','extra_monthly_supervision_cash_cost_usd']
+ ])$(id).value=String(values[key]);
+ $('workforceCriticalDuties').checked=values.all_critical_duties_assumed_covered;
+}
+function readWorkforceRoleInputs(){
+ const num=id=>{
+  const input=$(id);
+  if(!input.checkValidity()||!input.value.trim())
+   throw Error('Check the value for '+input.closest('label')?.textContent);
+  return Number(input.value);
+ };
+ return {
+  function_id:$('workforceRole').value,
+  current_employee_positions:num('workforcePositions'),
+  annual_fully_loaded_cost_per_position_usd:num('workforceSalary'),
+  monthly_human_work_hours_per_position:num('workforceHumanHours'),
+  assumed_automatable_human_hours_per_month:num('workforceAutomatedHours'),
+  assumed_human_supervision_hours_per_month:num('workforceReviewHours'),
+  assumed_shared_model_runtime_hours_per_month:num('workforceModelHours'),
+  estimated_monthly_provider_and_infrastructure_cost_usd:num('workforceMonthlyAI'),
+  extra_monthly_supervision_cash_cost_usd:num('workforceExtraSupervision'),
+  all_critical_duties_assumed_covered:$('workforceCriticalDuties').checked,
+ };
+}
+function renderWorkforceSavingsProjection(data){
+ if(data?.ok!==true||
+  data.version!=='reality-role-workforce-consolidation-scenario-v1'||
+  data.endpoint_scope!=='SIGNED_IN_OWNER_PRIVATE_PREVIEW_READ_ONLY'||
+  data.underlying_model_provider!=='OpenAI'||
+  data.shared_model_concurrency_limit!==1||
+  data.independently_active_ai_employees!==0||
+  data.authorized_hr_actions!==false||
+  data.actual_positions_removed_verified!==null||
+  data.realized_payroll_savings_usd!==null||
+  data.positions_terminated!==false||
+  data.inputs_saved!==false||
+  !Array.isArray(data.role_scenarios)||
+  !Number.isFinite(data.annual_net_payroll_scenario_usd))
+  throw Error('WORKFORCE_SCENARIO_EVIDENCE_INVALID');
+ const usd=n=>new Intl.NumberFormat('en-US',{
+  style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
+ $('workforceScenarioStatus').textContent=
+  'HYPOTHETICAL · '+data.potential_whole_positions_scenario+
+  ' whole-position equivalents potentially consolidatable · '+usd(data.annual_gross_payroll_avoidance_scenario_usd)+
+  ' annual gross payroll · '+usd(data.annual_net_payroll_scenario_usd)+
+  ' annual net after assumed AI/supervision cost. Based on YOUR inputs, not verified replacements or realized savings.';
+ const holder=$('workforceScenarioRows');
+ holder.replaceChildren();
+ for(const r of data.role_scenarios){
+  if(r.proof_status!=='OWNER_ENTERED_WHAT_IF_NOT_VALIDATED_EMPLOYEE_REMOVAL'||
+   r.verified_removable_positions!==null||
+   r.verified_actual_cash_savings_usd!==null||
+   r.personnel_decision_authorized!==false)
+   throw Error('WORKFORCE_SCENARIO_ROLE_EVIDENCE_INVALID');
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong',r.role_title+' · '+r.role_label));
+  row.append(textNode('div',
+   'Proposed coverage: '+r.hypothetical_fte_capacity_equivalent+' FTE-equivalent · '+
+   r.hypothetical_whole_positions_potentially_consolidatable+
+   ' conditional whole positions · net annual payroll scenario '+
+   usd(r.illustrative_annual_net_payroll_scenario_usd)));
+  row.append(textNode('small',
+   'Source-backed findings: '+r.source_backed_findings_not_completed_jobs+
+   ' (not completed jobs). Personnel decisions: none authorized.'));
+  holder.append(row);
+ }
+}
+async function calculateWorkforceSavings(clear=false){
+ const button=$('workforceCalculate');
+ const status=$('workforceScenarioStatus');
+ if(button.disabled)return;
+ const previous=new Map(workforceAssumptions);
+ button.disabled=true;
+ try{
+  if(clear)workforceAssumptions.clear();
+  else{
+   const input=readWorkforceRoleInputs();
+   workforceAssumptions.set(input.function_id,input);
+  }
+  const capacityInput=$('workforceSharedCapacity');
+  if(!capacityInput.checkValidity()||!capacityInput.value.trim())
+   throw Error('Enter a valid total shared OpenAI runtime budget.');
+  const body={
+   assumptions:[...workforceAssumptions.values()],
+   shared_monthly_model_runtime_capacity_hours:Number(capacityInput.value)
+  };
+  status.textContent='Calculating company role coverage and annual payroll what-if…';
+  const data=await json(WORKFORCE_SAVINGS,{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify(body),signal:AbortSignal.timeout(22000)
+  });
+  renderWorkforceSavingsProjection(data);
+ }catch(e){
+  workforceAssumptions.clear();
+  for(const [key,val] of previous)workforceAssumptions.set(key,val);
+  status.textContent='Workforce calculation unavailable: '+
+   String(e?.message||'Invalid company scenario').slice(0,220)+
+   '. No verified positions removed or savings claimed.';
+ }finally{button.disabled=false}
+}
+
 function renderNextWeekWorkPlan(roster){
  const plan=roster?.next_week_plan;
  if(plan?.version!=='reality-next-week-employee-plan-v1'||
@@ -673,6 +851,8 @@ async function refreshEmployeeBoard(){
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
     showShiftValueEvidence(roster);
+    configureWorkforceSavingsRoles(roster);
+    loadWorkforceRoleInputs();
     renderNextWeekWorkPlan(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
@@ -1009,6 +1189,9 @@ $('runFullShift').onclick=async()=>{
   pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
  }
 };
+$('workforceRole').onchange=loadWorkforceRoleInputs;
+$('workforceCalculate').onclick=()=>{void calculateWorkforceSavings()};
+$('workforceReset').onclick=()=>{void calculateWorkforceSavings(true)};
 $('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
