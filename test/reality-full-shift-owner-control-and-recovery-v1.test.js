@@ -43,8 +43,9 @@ test('one click always uses original authenticated owner shift endpoint',()=>{
  assert.match(mainChat,/id="realityRileyShiftLaunchLink" href="\/chat-simple#riley-shift"/);
  assert.match(mainChat,/No shift starts when you set a goal or send an ordinary message/);
  assert.match(html,/window\.location\.hash==='#riley-shift'/);
- assert.match(html,/\$\('runShiftHours'\)\.value='3'/);
- assert.match(html,/Merely opening this page starts nothing/);
+ assert.doesNotMatch(html,/\$\('runShiftHours'\)\.value='3'/);
+ assert.match(html,/Start Riley \+ Taylor Jobs/);
+ assert.match(html,/Opening the page does not authorize work or install code/);
  assert.doesNotMatch(mainChat,/realityRileyShiftLaunch[^\n]*onclick/);
  assert.match(html,/interpretSignedInChatShiftCommand\('Run a '\+hours\+' hour shift'\)/);
  assert.match(html,/command.duration_hours!==hours/);
