@@ -213,10 +213,17 @@ export function brokerGovernedRecoveryCapability({
   if(b.failure.blocker_class==='MISSING_INSTRUMENT')
    return verdict({...common,status:'ACTIVE_TOOL_REASSESS_FAILURE_NO_SYNTHESIS',
     tool_manifest:null,can_rehydrate:false});
-  return verdict({...common,status:'EXISTING_CAPABILITY_REBOUND',
-   tool_manifest:tool,ephemeral:false,can_rehydrate:true,
-   new_tool_created:false,installation_authorized:false});
+  if(b.failure.blocker_class==='ENVIRONMENT_CONTEXT_DEFICIT')
+   return verdict({...common,status:'EXISTING_CAPABILITY_REBOUND',
+    tool_manifest:tool,ephemeral:false,can_rehydrate:true,
+    new_tool_created:false,installation_authorized:false});
+  // A verified implementation defect is NOT cured by re-binding the same
+  // buggy tool. Its repair enters the frozen-red / verified-green track.
  }
+ if(b.failure.blocker_class==='IMPLEMENTATION_DEFECT'&&
+  registryReadback.status!=='ACTIVE')
+  return verdict({...common,status:'DEFECT_REGISTRY_RECONCILIATION_REQUIRED',
+   tool_manifest:null,can_rehydrate:false});
  if(b.failure.blocker_class!=='MISSING_INSTRUMENT'&&
   b.failure.blocker_class!=='IMPLEMENTATION_DEFECT')
   return verdict({...common,status:'DIAGNOSE_CONTEXT_BEFORE_TOOL_BUILD',
