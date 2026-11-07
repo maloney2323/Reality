@@ -51,16 +51,7 @@ export function createRileyTrustedOriginalDriver({
    name:'reality_read_eligible_shift_originals_v1',
    args:{p_shift_id:input.shift_id}});
   if(observation?.status==='NO_ACTIVE_OWNER_SHIFT_FOR_MULTI_JOB')
-   return Object.freeze({
-    status:'SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK',
-    shift_id:input.shift_id,attempted:0,independently_settled:0,
-    outcomes:Object.freeze([Object.freeze({
-     original_work_id:input.original_work_id,
-     status:'NO_ACTIVE_SHIFT_NO_EXECUTION',
-     original_job_settled:false
-    })]),shift_finished:false,full_shift_proven:false,
-    installation_authorized:false,production_changed:false
-   });
+   fail('NO_ACTIVE_AUTHORIZED_SHIFT_NO_EXECUTION');
   if(observation?.status!=='EXISTING_SHIFT_ORIGINALS_INDEPENDENTLY_RECONCILED'||
     observation.shift_id!==input.shift_id||
     observation.execution_authorized!==false||
@@ -73,7 +64,7 @@ export function createRileyTrustedOriginalDriver({
   const candidates=observation.candidates;
   const selected=candidates.filter(c=>
    c.original_work_id===input.original_work_id);
-  if(selected.length!==1||
+  if(selected.length!==1||candidates.length!==1||
     candidates.some(c=>c.shift_id!==input.shift_id||
       !UUID.test(c.owner_id||'')||!UUID.test(c.trigger_id||'')||
       !WORK.test(c.original_work_id||'')||
