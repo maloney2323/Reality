@@ -118,11 +118,13 @@ export function createOneOpenAICombinedRoleCoordinator({
      data.output.some(x=>['function_call','tool_search_call'].includes(x?.type))||
      typeof data.id!=='string'||!/^resp_[a-zA-Z0-9_-]{4,160}$/.test(data.id))
     return rejected(input,'OPENAI_PROVIDER_RESULT_UNVERIFIED');
-   const advice=textFromResponse(data).trim();
-   if(!advice)
+   const fullAdvice=textFromResponse(data).trim();
+   if(!fullAdvice)
     return rejected(input,'OPENAI_EMPTY_FINAL_ADVISORY');
-   if(advice.length>2500)
-    return rejected(input,'OPENAI_ADVISORY_EXCEEDS_BOUNDED_LENGTH');
+   // Provider output is UNTRUSTED advisory. Preserve a fixed-length excerpt,
+   // mark truncation and never let long model text overflow a shift receipt.
+   const truncated=fullAdvice.length>1200;
+   const advice=truncated?fullAdvice.slice(0,1200).trimEnd():fullAdvice;
    // Model claims are never evidence of actual verification or settlement.
    const immutable=JSON.stringify({
     shift_id:input.shift_id,claim_id:input.claim_id,
@@ -138,6 +140,7 @@ export function createOneOpenAICombinedRoleCoordinator({
     source_status:input.provider.provider_status,
     roles:rule.roles,
     model_advice:advice,
+    model_advice_truncated:truncated,
     model_response_id:data.id,
     advisory_sha256:'sha256:'+hash(immutable),
     model_invocations_completed:1,
