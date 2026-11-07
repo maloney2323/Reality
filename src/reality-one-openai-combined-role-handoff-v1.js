@@ -11,9 +11,9 @@ const SRC=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\
 const REPO='maloney2323/Reality';
 const ROLE_BY_STEP=Object.freeze({
  2:Object.freeze({stage:'VERIFY_OPEN_ISSUE',roles:['Riley','Taylor'],goal:'Assess software failure and worker continuity; propose only source-backed diagnosis questions.'}),
- 3:Object.freeze({stage:'VERIFY_PROVIDER_EVIDENCE',roles:['Taylor','Quinn'],goal:'Identify operations risk and missing independent provider evidence; do not certify a result.'}),
- 4:Object.freeze({stage:'REVIEW_INDEPENDENT_EVIDENCE',roles:['Quinn','Riley'],goal:'Identify regression and security verification needs; independent verification must be performed by a separate trusted checker.'}),
- 5:Object.freeze({stage:'QUALIFY_NEXT_WORK',roles:['Avery','Riley','Sage'],goal:'Prioritize remaining business work, flag engineering dependencies and cost-evidence needs without assigning money saved.'}),
+ 3:Object.freeze({stage:'VERIFY_PROVIDER_EVIDENCE',roles:['Riley','Taylor'],goal:'Riley checks reproducible engineering failure; Taylor verifies operational impact, worker transport, and safe retry. Neither role certifies completion.'}),
+ 4:Object.freeze({stage:'REVIEW_INDEPENDENT_EVIDENCE',roles:['Riley','Taylor'],goal:'Riley reviews exact changed-file patches and regression tests; Taylor validates deployment, authorization, and rollback risks. Quinn independently verifies through a separate trusted checker.'}),
+ 5:Object.freeze({stage:'QUALIFY_NEXT_WORK',roles:['Riley','Taylor'],goal:'Pair the next unfinished source-backed engineering job with its operational dependencies and objective acceptance checks; do not infer labor savings.'}),
 });
 const fail=x=>{throw Error('REALITY_ONE_MODEL_ROLE_'+x)};
 function hash(value){return createHash('sha256').update(value).digest('hex')}
