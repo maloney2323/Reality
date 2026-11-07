@@ -118,10 +118,16 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
 <label style="font-size:12px;color:#cedfec">Maximum authorized window <select id="runShiftHours" aria-label="Riley authorized safety window maximum in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
-<button id="runFullShift" type="button" disabled title="Owner-authorized safety window; complete and stop after independent receipts, not after an arbitrary duration">Checking existing shift…</button>
+<button id="runFullShift" type="button" disabled title="Authorize one combined Riley + Taylor source-work shift; stop after independent receipts, not arbitrary elapsed time">Checking combined jobs…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="riley-start-guide" id="fullShiftScope"><strong>Run until the jobs are verified, not until a timer runs out.</strong> Choose a maximum authorized safety window and tap <strong>Run Riley's Shift</strong>. Riley and Taylor share the governed work; independent receipts determine successful completion. Reality stops early when every admitted original job is verified. If the safety window expires first, unresolved work is blocked, not completed. <strong>Sending a chat message is not authorization.</strong> Any capability installation still needs your separate exact approval.</p>
+<p class="riley-start-guide" id="fullShiftScope"><strong>One combined work queue. One start.</strong> Review the source-backed Riley + Taylor assignments below, choose a maximum safety window, then tap <strong>Start Riley + Taylor Jobs</strong>. The model investigates each authorized source; proven repair work enters the existing original-job executor. All admitted repairs must have independently verified receipts before successful completion. Expired or blocked work is never counted as completed. Installing new code still needs your separate exact approval.</p>
+<section id="rileyTaylorCombinedQueue" class="team-value" aria-label="Riley and Taylor combined assigned work queue" aria-live="polite" hidden>
+ <h3>Combined work queue · Riley + Taylor · One OpenAI model</h3>
+ <p id="rileyTaylorQueueStatus">Checking unfinished Employee and Work Center assignments…</p>
+ <div id="rileyTaylorQueueRows"></div>
+ <p>Riley investigates the code; Taylor checks reliability and safe continuation. Quinn independently verifies accepted results. An inspected issue or PR is not automatically a completed repair.</p>
+</section>
 <p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
 <section id="combinedShiftRoleHandoffs" class="team-value" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
  <h3>Combined shift · One OpenAI model across relevant business roles</h3>
@@ -206,7 +212,7 @@ const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
 const SELF_AUDIT='/api/reality/personal-capability-self-audit';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
-let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false,combinedQueueLoading=false;
 const workforceAssumptions=new Map();
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
@@ -957,8 +963,8 @@ async function refreshEmployeeBoard(){
 }
 
 const COMBINED_STEP_ROLES=Object.freeze({
- 2:['Riley','Taylor'],3:['Taylor','Quinn'],
- 4:['Quinn','Riley'],5:['Avery','Riley','Sage']
+ 2:['Riley','Taylor'],3:['Riley','Taylor'],
+ 4:['Riley','Taylor'],5:['Riley','Taylor']
 });
 function renderCombinedShiftRoleEvidence(readback){
  const panel=$('combinedShiftRoleHandoffs'),holder=$('combinedShiftRoleRows');
@@ -1045,7 +1051,7 @@ async function refreshShiftStatus(){
       node.hidden=false;
     }else{
       $('runFullShift').disabled=false;
-      $('runFullShift').textContent="Run Riley's Shift";
+      $('runFullShift').textContent='Start Riley + Taylor Jobs';
       node.textContent='No currently authorized shift found in the owner-scoped readback. Starting a new shift still requires your exact approval.';
       node.hidden=false;
     }
