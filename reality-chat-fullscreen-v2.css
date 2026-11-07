@@ -143,12 +143,12 @@ body[data-reality-route="chat"] .reality-cycle-checked{font-size:10px;color:#a6c
  body[data-reality-route="chat"] #privateChat .reality-chat-conversation #privateTranscript{
   flex:1 1 0!important;height:0!important;max-height:none!important;
   min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;
-  padding:12px 10px!important;margin:0!important;
+  padding:16px 13px!important;margin:0!important;
  }
  body[data-reality-route="chat"] #privateTranscript .bubble{
-  max-width:96%!important;padding:11px 13px!important;
-  font-size:14px!important;line-height:1.58!important;
-  border-radius:14px!important;
+  max-width:98%!important;padding:14px 16px!important;
+  font-size:16px!important;line-height:1.68!important;
+  border-radius:16px!important;
  }
  body[data-reality-route="chat"] #realityChatComposer{
   position:relative!important;padding:9px 10px!important;
@@ -157,7 +157,7 @@ body[data-reality-route="chat"] .reality-cycle-checked{font-size:10px;color:#a6c
  }
  body[data-reality-route="chat"] #privatePrompt{
   min-height:54px!important;max-height:125px!important;
-  padding:10px 12px!important;font-size:14px!important;
+  padding:12px 14px!important;font-size:16px!important;
   line-height:1.45!important;resize:none!important;
  }
  body[data-reality-route="chat"] .reality-chat-goal-options,
