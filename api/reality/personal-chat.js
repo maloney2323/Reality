@@ -153,6 +153,19 @@ export default async function handler(req,res){
    readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated}),
    readVerifiedRileySourceWorkForChat({session,message:text,db:isolated})
   ]);
+  // The same signed-in owner already has a durable shift authorization when
+  // the verified owner-bound shift readback reports RUNNING/QUEUED. A chat
+  // model must NEVER turn a missing original-repair admission into a demand
+  // that the owner re-authorize the EXISTING shift.
+  const ownerShiftFacts=employeeShiftObservations.filter(x=>
+   x?.event_kind==='owner_governed_employee_shift_briefing'&&
+   x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&
+   x?.owner_shift_authorization_recorded===true&&
+   x?.shift_start_command_already_satisfied===true&&
+   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(x.shift_status)&&
+   /^reality:employee-shift:[a-f0-9-]{36}$/i.test(x.source_ref||'')&&
+   x.active_owner_shift_id===x.source_ref.slice('reality:employee-shift:'.length));
+  const verifiedOwnerShift=ownerShiftFacts.length===1?ownerShiftFacts[0]:null;
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;
@@ -172,8 +185,16 @@ export default async function handler(req,res){
       plain_chat_can_dispatch_workers:false,
       original_job_queued_by_this_chat_turn:false,
       worker_acknowledgment_verified_by_this_chat_turn:false,
-      existing_owner_action:'USE_SIGNED_IN_RILEY_SHIFT_CONTROL_AT_/chat-simple#riley-shift',
-      shift_owner_authorization_requires_explicit_button_click:true,
+      existing_owner_action:'EXPLICIT_SIGNED_IN_REALITY_CHAT_START_COMMAND_OR_EQUIVALENT_START_BUTTON',
+      shift_owner_authorization_requires_explicit_button_click:false,
+      explicit_signed_in_start_message_is_first_shift_authorization:true,
+      selected_work_is_pinned_to_owner_shift_fingerprint:true,
+      owner_already_authorized_current_shift:verifiedOwnerShift!==null,
+      current_owner_authorized_shift_id:verifiedOwnerShift?.active_owner_shift_id||null,
+      current_owner_shift_status:verifiedOwnerShift?.shift_status||null,
+      another_shift_start_or_approval_required:verifiedOwnerShift===null,
+      existing_shift_is_not_new_original_repair_admission:true,
+      existing_shift_blocked_at_original_admission_is_not_missing_owner_shift_permission:true,
       current_work_inventory_does_not_require_active_shift:true,
       prior_settled_jobs_must_not_be_readmitted:true,
       existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
