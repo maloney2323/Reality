@@ -974,6 +974,126 @@ async function refreshEmployeeBoard(){
 }
 
 
+const RILEY_PROGRESS_STAGES=Object.freeze([
+ 'Verify existing work and receipts',
+ 'Investigate tracked engineering issue',
+ 'Check independent failure evidence',
+ 'Review current code changes',
+ 'Qualify next unfinished work',
+ 'Execute approved original repair',
+ 'Independently verify original-job result',
+ 'Record final settlement and shift outcome'
+]);
+const RILEY_SAFE_MODEL_REASONS=Object.freeze({
+ OPENAI_RESPONSE_UNAVAILABLE:'OpenAI did not return a successful response. The older attempt did not record a more specific cause.',
+ OPENAI_REQUEST_OPTIONS_REJECTED:'OpenAI rejected the model request options.',
+ OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED:'OpenAI rejected access to the configured credential or model.',
+ OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND:'The configured OpenAI model or endpoint was unavailable.',
+ OPENAI_RATE_OR_QUOTA_LIMIT:'The OpenAI rate or quota limit was reached.',
+ OPENAI_PROVIDER_SERVER_FAILURE:'The OpenAI provider reported a server error.',
+ OPENAI_REQUEST_OR_TIMEOUT_UNVERIFIED:'The model request failed or timed out without a verified result.',
+ SHARED_OPENAI_ADAPTER_NOT_CONFIGURED:'The shared OpenAI model connection is not configured.',
+ PROVIDER_SOURCE_NO_LONGER_OPEN:'The GitHub source is no longer open.',
+ OPENAI_PROVIDER_RESULT_UNVERIFIED:'The OpenAI response did not pass result validation.',
+ OPENAI_EMPTY_FINAL_ADVISORY:'The model returned no usable review.'
+});
+function renderRileyLiveProgress(readback){
+ const panel=$('rileyLiveProgressPanel');
+ const shifts=readback?.shifts;
+ if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+    !Array.isArray(shifts)||shifts.length>5){
+  panel.hidden=true;return;
+ }
+ const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
+  .includes(x?.status))||shifts[0];
+ if(!current||!Array.isArray(current.steps)||
+    current.steps.length!==8||
+    current.steps.some((x,i)=>x?.step_index!==i+1)){
+  panel.hidden=true;return;
+ }
+ const steps=current.steps;
+ const status=String(current.status||'UNVERIFIED').replaceAll('_',' ');
+ const sourceDone=steps.slice(0,5).filter(x=>x.state==='SOURCE_CHECKED').length;
+ const modelFailures=steps.slice(1,5).filter(x=>
+  x.role_handoff_status==='ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM');
+ const modelResults=steps.slice(1,5).filter(x=>
+  x.role_handoff_status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK');
+ const admittedRepairOutcome=steps[5].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+ const independentReceipt=steps[6].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+ const originalVerified=admittedRepairOutcome&&independentReceipt;
+ $('rileySourceProgress').value=sourceDone;
+ $('rileySourceProgressLabel').textContent=sourceDone+' of 5';
+ $('rileyLiveHeadline').textContent=
+  'Shift '+status+' · '+sourceDone+' of 5 source checks recorded · '+
+  modelResults.length+' model-assisted reviews · '+
+  modelFailures.length+' model connection failures · '+
+  (originalVerified?'Independent original-job receipt recorded.':
+   'No independent final repair receipt for this shift.')+
+  ' Worker progress refreshes every 30 seconds.';
+ const briefing=readback.shift_briefing;
+ const approval=briefing?.shift_id===current.shift_id&&
+   briefing.approval_pending===true;
+ $('rileyLiveApprovalStatus').textContent=approval?
+  'ACTION NEEDED: an independently verified exact capability upgrade is ready for your review in Reality Chat. Installation is not authorized until you approve that artifact.':
+  'YOU DO NOT NEED TO AUTHORIZE THE SHIFT AGAIN. No independently verified capability installation request is pending. You can leave this page; the server-side worker remains responsible for the authorized shift.';
+ const next=steps.find(x=>['QUEUED','CLAIMED','AWAITING_EXACT_WORK'].includes(x.state));
+ const blocker=$('rileyLiveBlocker');
+ if(current.status==='AWAITING_EXACT_ORIGINAL_WORK'||
+   steps[5].state==='AWAITING_EXACT_WORK'){
+  blocker.textContent='EXECUTION BLOCKER: source inspection is not code repair. No exact eligible original job has reached the execution gate. Reality must qualify an existing-file repair against current failure evidence and bind it to this same shift; no additional start button will fix that.';
+ }else if(current.status==='ENDED_WITH_BLOCKED_WORK'||current.status==='ESCALATED'){
+  blocker.textContent='BLOCKED: this shift did not achieve independent original-job settlement. Inspect recorded failure evidence before any new attempt; do not replay uncertain or previously settled work.';
+ }else if(next?.step_index===6&&!originalVerified){
+  blocker.textContent='NEXT GATE: source checks are complete. Reality must admit a real, independently verified original repair before execution can begin; the current missing-extension-only intake can reject ordinary existing-code defects.';
+ }else if(next){
+  blocker.textContent='CURRENT WORK: '+RILEY_PROGRESS_STAGES[next.step_index-1]+
+   '. The trusted worker claims the next eligible step automatically. A source check by itself does not finish or fix a job.';
+ }else{
+  blocker.textContent=originalVerified?
+   'The independent original-job receipt has been recorded; final shift reconciliation is separate.':
+   'No further source check is queued; final original repair settlement has not been proven. Review the recorded outcome, not the elapsed timer.';
+ }
+ const timeline=$('rileyLiveTimeline'),frag=document.createDocumentFragment();
+ for(let i=0;i<steps.length;i++){
+  const step=steps[i],row=document.createElement('div');
+  row.className='workforce-output-row';
+  const state=String(step.state||'UNKNOWN').replaceAll('_',' ');
+  row.append(textNode('strong',(i+1)+'. '+RILEY_PROGRESS_STAGES[i]+' · '+state));
+  const source=step.source_ref;
+  if(typeof source==='string'&&COMBINED_WORK_SOURCE.test(source))
+   row.append(combinedQueueLink(source,source));
+  let explanation='';
+  if(step.state==='SOURCE_CHECKED'){
+   explanation='Source evidence stored at '+(step.completed_at&&
+    Number.isFinite(Date.parse(step.completed_at))?
+    new Date(step.completed_at).toLocaleTimeString():'verified readback')+
+    '; not an independently completed repair.';
+   if(step.role_handoff_status==='ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'){
+    const reason=Object.hasOwn(RILEY_SAFE_MODEL_REASONS,step.role_handoff_reason)?
+     RILEY_SAFE_MODEL_REASONS[step.role_handoff_reason]:
+     'OpenAI assistance did not complete. The older receipt lacks a safe failure classification.';
+    explanation+=' MODEL CONNECTION BLOCKER: '+reason;
+   }else if(step.role_handoff_status===
+     'SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK')
+    explanation+=' OpenAI review recorded (advice, not an accepted repair).';
+  }else if(step.state==='CLAIMED')
+   explanation='The trusted worker has claimed this step; independent evidence is pending.';
+  else if(step.state==='AWAITING_EXACT_WORK')
+   explanation='Blocked until the exact independently qualified original job is available. No installation approval exists yet.';
+  else if(step.state==='ORIGINAL_JOB_RECEIPT_VERIFIED')
+   explanation='Independent original-job receipt recorded. Verify settlement for this same authorized job.';
+  else if(step.state==='BLOCKED_PROVIDER')
+   explanation='Provider or governance blocker recorded; do not assume the task finished.';
+  else if(step.state==='REPORTED')
+   explanation='Shift report recorded; it is not automatically a completed code repair.';
+  else explanation='Queued. Worker will check when its existing authorization and prerequisites permit.';
+  row.append(textNode('div',explanation));
+  frag.append(row);
+ }
+ timeline.replaceChildren(frag);
+ panel.hidden=false;
+}
+
 const COMBINED_WORK_SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d{0,15}$/;
 function combinedQueueLink(source,title){
  const a=document.createElement('a');a.href=source;
