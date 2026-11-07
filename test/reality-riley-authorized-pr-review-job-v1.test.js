@@ -7,7 +7,7 @@ const SHA='a'.repeat(40),OWNER='11111111-2222-4333-8444-555555555555';
 const SHIFT='22222222-3333-4444-8555-666666666666';
 const CLAIM='33333333-4444-4555-8666-777777777777';
 const WORK='work:'+'a'.repeat(32);
-const URL='https://github.com/maloney2323/Reality/pull/58';
+const REVIEW_URL='https://github.com/maloney2323/Reality/pull/58';
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const env={VERCEL_ENV:'preview',
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'isolated-preview'};
@@ -18,10 +18,10 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
  const calls=[],ghPosts=[];
  const persisted={body:null,head:null,model:null,comment:null,commentUrl:null,digest:null};
  let comment=existing?{id:600,body:'',issue_url:BASE+'/issues/58',
-  html_url:URL+'#issuecomment-600'}:null;
+  html_url:REVIEW_URL+'#issuecomment-600'}:null;
  const claim=()=>({status:'EXACT_OWNER_AUTHORIZED_PR_REVIEW_CLAIMED',
   owner_id:OWNER,shift_id:SHIFT,claim_id:CLAIM,original_work_id:WORK,
-  phase,source_ref:URL,source_proof_sha256:'sha256:'+'f'.repeat(64),
+  phase,source_ref:REVIEW_URL,source_proof_sha256:'sha256:'+'f'.repeat(64),
   source_head_sha:persisted.head,model_response_id:persisted.model,
   review_body:persisted.body,review_digest:persisted.digest,
   installation_authorized:false,production_changed:false});
@@ -62,7 +62,7 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
     status:'completed',output_text:validReview,output:[]})};
   }
   if(url===BASE+'/pulls/58'){
-   return {ok:true,json:async()=>({number:58,html_url:URL,state:'open',
+   return {ok:true,json:async()=>({number:58,html_url:REVIEW_URL,state:'open',
     draft:false,head:{sha:headChanged?'b'.repeat(40):SHA},changed_files:1,
     title:'Clean work console'})};
   }
@@ -75,7 +75,7 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
    const data=JSON.parse(opts.body);
    ghPosts.push(data.body);
    comment={id:600,body:data.body,issue_url:BASE+'/issues/58',
-    html_url:URL+'#issuecomment-600'};
+    html_url:REVIEW_URL+'#issuecomment-600'};
    return {ok:true,json:async()=>comment};
   }
   if(url===BASE+'/issues/comments/600')
@@ -87,7 +87,7 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
    validReview+'\\n<!-- reality-riley-original:'+WORK+' -->';
    persisted.digest=digest(persisted.body);persisted.head=SHA;
    comment={id:600,body:persisted.body,issue_url:BASE+'/issues/58',
-    html_url:URL+'#issuecomment-600'};}
+    html_url:REVIEW_URL+'#issuecomment-600'};}
  };
 }
 const options=f=>({db,env,callRpc:f.callRpc,fetchImpl:f.fetchImpl,
@@ -112,7 +112,7 @@ test('one real owner source-bound model review is posted once and durably settle
   'reality_prepare_authorized_riley_pr_review_v1',
   'reality_mark_authorized_riley_pr_publish_v1',
   'reality_settle_authorized_riley_pr_review_v1']);
- assert.equal(f.calls.at(-1).args.p_comment_url,URL+'#issuecomment-600');
+ assert.equal(f.calls.at(-1).args.p_comment_url,REVIEW_URL+'#issuecomment-600');
 });
 test('model provider failure does not publish, settle, or fake review completion',async()=>{
  const f=fixture({modelStatus:401});
