@@ -15,6 +15,8 @@ on:
       - src/reality-riley-service-original-runtime-v1.js
       - supabase/migrations/20261107_riley_trusted_shift_execution_context_v1.sql
       - supabase/migrations/20261107_riley_preview_original_execution_wake_v1.sql
+      - supabase/migrations/20261107_riley_taylor_model_worker_claims_source_steps_v1.sql
+      - test/reality-riley-one-worker-live-source-shift-v1.test.js
       - supabase/migrations/20261107_riley_finish_when_all_job_receipts_verified_v1.sql
       - supabase/migrations/20261107_riley_deadline_never_means_completed_v1.sql
       - test/reality-riley-completion-based-shift-v1.test.js
@@ -65,7 +67,7 @@ jobs:
         with:
           node-version: '22'
       - name: Existing worker and exact original handoff
-        run: node --test test/reality-riley-category-backlog-bridge-v1.test.js test/reality-riley-existing-backlog-v1.test.js test/reality-riley-completion-based-shift-v1.test.js test/reality-riley-preview-original-wake-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-combined-employee-shift-visibility-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-role-workforce-evidence-v1.test.js test/reality-role-workforce-savings-scenario-v1.test.js test/reality-single-openai-role-and-staffing-ui-v1.test.js test/reality-next-week-employee-plan-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-first-shift-economic-scorecard-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
+        run: node --test test/reality-riley-one-worker-live-source-shift-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-riley-category-backlog-bridge-v1.test.js test/reality-riley-existing-backlog-v1.test.js test/reality-riley-completion-based-shift-v1.test.js test/reality-riley-preview-original-wake-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-combined-employee-shift-visibility-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-role-workforce-evidence-v1.test.js test/reality-role-workforce-savings-scenario-v1.test.js test/reality-single-openai-role-and-staffing-ui-v1.test.js test/reality-next-week-employee-plan-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-first-shift-economic-scorecard-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
       - name: Parse live provider proof runners
         run: |
           node --check scripts/reality-prove-live-tool-delivery-v1.mjs
