@@ -143,12 +143,12 @@ body[data-reality-route="chat"] .reality-cycle-checked{font-size:10px;color:#a6c
  body[data-reality-route="chat"] #privateChat .reality-chat-conversation #privateTranscript{
   flex:1 1 0!important;height:0!important;max-height:none!important;
   min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;
-  padding:12px 10px!important;margin:0!important;
+  padding:16px 13px!important;margin:0!important;
  }
  body[data-reality-route="chat"] #privateTranscript .bubble{
-  max-width:96%!important;padding:11px 13px!important;
-  font-size:14px!important;line-height:1.58!important;
-  border-radius:14px!important;
+  max-width:98%!important;padding:14px 16px!important;
+  font-size:16px!important;line-height:1.68!important;
+  border-radius:16px!important;
  }
  body[data-reality-route="chat"] #realityChatComposer{
   position:relative!important;padding:9px 10px!important;
@@ -157,7 +157,7 @@ body[data-reality-route="chat"] .reality-cycle-checked{font-size:10px;color:#a6c
  }
  body[data-reality-route="chat"] #privatePrompt{
   min-height:54px!important;max-height:125px!important;
-  padding:10px 12px!important;font-size:14px!important;
+  padding:12px 14px!important;font-size:16px!important;
   line-height:1.45!important;resize:none!important;
  }
  body[data-reality-route="chat"] .reality-chat-goal-options,
@@ -264,4 +264,94 @@ body[data-reality-route="chat"] .reality-live-reply-row p{
 }
 @media(prefers-reduced-motion:reduce){
  body[data-reality-route="chat"] .reality-live-reply-spinner{animation:none}
+}
+
+/* Chat connection/recovery bootstrap.
+   An unavailable session must never activate a page-level scroll trap. The
+   signed-in workspace is full-screen; the signed-out screen is a normal,
+   scrollable page with its actual retry/sign-in UI visible. */
+body[data-reality-route="chat"] #privateReady[style*="display: none"]{
+ display:none!important;
+}
+body[data-reality-route="chat"] #realityChatFocusToggle{
+ display:inline-flex!important;align-items:center;justify-content:center;
+ background:#d9eef9;color:#092636;border:1px solid #88bed4;
+ font-weight:750;white-space:nowrap;min-height:38px;
+}
+@media(max-width:600px){
+ /* Keep full-screen conversation as the usable mobile default. */
+ body[data-reality-route="chat"] .reality-chat-thread-heading{
+  flex-wrap:wrap!important;gap:6px!important;align-items:center;
+ }
+ body[data-reality-route="chat"] .reality-chat-thread-buttons{
+  flex:1 1 auto;flex-wrap:wrap!important;justify-content:flex-end;
+ }
+ body[data-reality-route="chat"] #realityChatFocusToggle{
+  min-height:36px!important;padding:7px 9px!important;font-size:11px!important;
+ }
+ /* Compact is reversible without reloading or losing drafts, conversation
+    identity, worker state, or any owner approval. */
+ html:has(body[data-reality-route="chat"].reality-chat-compact){
+  height:auto!important;overflow-y:auto!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact{
+  height:auto!important;min-height:100dvh!important;
+  overflow-y:auto!important;overscroll-behavior:auto!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact main{
+  height:auto!important;min-height:100dvh!important;
+  overflow:visible!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact #privateChat{
+  height:auto!important;min-height:0!important;max-height:none!important;
+  width:calc(100% - 18px)!important;margin:9px auto 18px!important;
+  border:1px solid #45697f!important;border-radius:16px!important;
+  overflow:visible!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact #privateReady{
+  height:auto!important;min-height:0!important;overflow:visible!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact #realityChatWorkspace{
+  height:min(68dvh,690px)!important;min-height:340px!important;
+  overflow:hidden!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact .reality-chat-conversation{
+  height:100%!important;min-height:0!important;overflow:hidden!important;
+ }
+ body[data-reality-route="chat"].reality-chat-compact #privateTranscript{
+  min-height:0!important;overflow-y:auto!important;touch-action:pan-y;
+ }
+ /* Signed-out and failed-session states must not inherit fullscreen's
+    overflow:hidden or conceal the saved conversation behind dashboard cards. */
+ html:has(body[data-reality-route="chat"]:not(.reality-chat-signed-in)),
+ html:has(body[data-reality-route="chat"] #privateRetrySession:not([hidden])){
+  height:auto!important;overflow-y:auto!important;
+ }
+ body[data-reality-route="chat"]:not(.reality-chat-signed-in),
+ body[data-reality-route="chat"]:has(#privateRetrySession:not([hidden])){
+  height:auto!important;min-height:100dvh!important;overflow-y:auto!important;
+  overscroll-behavior:auto!important;
+ }
+ body[data-reality-route="chat"]:not(.reality-chat-signed-in) main,
+ body[data-reality-route="chat"]:has(#privateRetrySession:not([hidden])) main{
+  display:block!important;height:auto!important;min-height:100dvh!important;
+  overflow:visible!important;
+ }
+ body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateChat,
+ body[data-reality-route="chat"]:has(#privateRetrySession:not([hidden])) #privateChat{
+  display:block!important;height:auto!important;min-height:0!important;
+  max-height:none!important;overflow:visible!important;
+  width:calc(100% - 18px)!important;margin:9px auto 18px!important;
+  padding:15px!important;border:1px solid #45697f!important;
+  border-radius:15px!important;
+ }
+ body[data-reality-route="chat"]:has(#privateRetrySession:not([hidden])) #privateReady{
+  display:none!important;
+ }
+ body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateLogin{
+  max-height:none!important;overflow:visible!important;
+ }
+ body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateAccountState{
+  font-size:14px!important;line-height:1.65!important;
+ }
 }

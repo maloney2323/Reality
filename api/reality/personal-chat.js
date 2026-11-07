@@ -7,7 +7,7 @@ import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
 import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
-import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat}
+import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat,readVerifiedRileySourceWorkForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
@@ -145,12 +145,13 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
    readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
    readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),
-   readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated})
+   readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated}),
+   readVerifiedRileySourceWorkForChat({session,message:text,db:isolated})
   ]);
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
@@ -171,7 +172,10 @@ export default async function handler(req,res){
       plain_chat_can_dispatch_workers:false,
       original_job_queued_by_this_chat_turn:false,
       worker_acknowledgment_verified_by_this_chat_turn:false,
-      existing_owner_action:'RUN_FULL_LOOP_ON_REALITY_HOME',
+      existing_owner_action:'USE_SIGNED_IN_RILEY_SHIFT_CONTROL_AT_/chat-simple#riley-shift',
+      shift_owner_authorization_requires_explicit_button_click:true,
+      current_work_inventory_does_not_require_active_shift:true,
+      prior_settled_jobs_must_not_be_readmitted:true,
       existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
       installed_capabilities_require_separate_exact_authorization:true,
     },
@@ -180,7 +184,8 @@ export default async function handler(req,res){
     published_research_references:publishedReferencesForChat(text),
     connected_world_observations:[
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
-     ...workerWakeObservations,...companyWorkforceObservations
+     ...workerWakeObservations,...companyWorkforceObservations,
+     ...rileySourceWorkObservations
     ],
     action_authorized:false,execution_authorized:false,
    },

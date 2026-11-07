@@ -108,7 +108,42 @@ export async function runRileyGovernedMultiJobShiftTick({
  const outcomes=[],count=Math.min(eligible.length,maxJobs);
  for(let i=0;i<count;i++){
   const c=eligible[i];
-  // Before any action get the ONLY service-role claim from durable DB.
+  // Validate the exact trusted, owner-bound original BEFORE taking the
+  // globally unique one-shot DB claim. Missing execution adapters must not
+  // consume a job or leave it permanently stuck as an uncertain effect.
+  let job;
+  try{
+   job=await loadTrustedAuthorizedOriginal(Object.freeze({
+    owner_id:ownerId,shift_id:shiftId,
+    original_work_id:c.original_work_id,
+    trigger_id:c.trigger_id,claim_id:null,
+    source_ref:c.source_ref,read_only:true,preflight_only:true
+   }));
+   if(!job||job.qualifiedOriginal?.original_work_id!==c.original_work_id||
+     job.qualifiedOriginal.owner_id!==ownerId||
+     job.qualifiedOriginal.source_issue_number!==
+      Number(c.source_ref.split('/').at(-1))||
+     job.scope?.original_work_id!==c.original_work_id||
+     job.scope.owner_id!==ownerId||
+     job.workItem?.work_item_id!==c.original_work_id)
+    fail('TRUSTED_ORIGINAL_JOB_LOADER_MISMATCH');
+   if(runOriginal===runRileyOriginalJobViaReality&&
+     (typeof job.engine?.run!=='function'||
+      typeof job.persistAndReadback!=='function'||
+      typeof job.connector?.execute!=='function'||
+      typeof job.independentVerifier?.verify!=='function'||
+      typeof job.authorization!=='object'))
+    fail('REALITY_SHARED_EXECUTION_ADAPTERS_UNAVAILABLE');
+  }catch{
+   outcomes.push(Object.freeze({
+    original_work_id:c.original_work_id,
+    status:'ORIGINAL_TRUSTED_PREFLIGHT_BLOCKED_NO_CLAIM',
+    original_job_settled:false,owner_approval_required:false
+   }));
+   continue;
+  }
+  // Claim must precede ANY consequential executor effect. Provider and
+  // owner readbacks inside that claim recheck eligibility after preflight.
   const claim=await callRpc({db,fetchImpl,
    name:'reality_claim_exact_shift_original_v1',
    args:{p_shift_id:shiftId,p_original_work_id:c.original_work_id,
@@ -133,20 +168,6 @@ export async function runRileyGovernedMultiJobShiftTick({
   // browser, model or GitHub text. The shared executor re-verifies all.
   let status='EXECUTION_PROVIDER_EFFECT_UNKNOWN';
   try{
-   const job=await loadTrustedAuthorizedOriginal(Object.freeze({
-    owner_id:ownerId,shift_id:shiftId,
-    original_work_id:c.original_work_id,
-    trigger_id:c.trigger_id,claim_id:claim.claim_id,
-    source_ref:c.source_ref,read_only:true
-   }));
-   if(!job||job.qualifiedOriginal?.original_work_id!==c.original_work_id||
-     job.qualifiedOriginal.owner_id!==ownerId||
-     job.qualifiedOriginal.source_issue_number!==
-      Number(c.source_ref.split('/').at(-1))||
-     job.scope?.original_work_id!==c.original_work_id||
-     job.scope.owner_id!==ownerId||
-     job.workItem?.work_item_id!==c.original_work_id)
-    fail('TRUSTED_ORIGINAL_JOB_LOADER_MISMATCH');
    const result=await runOriginal({
     ...job,ownerId,shiftId,shiftReadback,ownerLedgerReadback
    });
@@ -200,7 +221,8 @@ export async function runRileyGovernedMultiJobShiftTick({
   version:RILEY_MULTI_JOB_SHIFT_VERSION,
   status:'SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK',
   shift_id:shiftId,candidates_seen:eligible.length,
-  attempted:outcomes.filter(x=>x.status!=='ORIGINAL_NOT_REEXECUTED').length,
+  attempted:outcomes.filter(x=>!['ORIGINAL_NOT_REEXECUTED',
+   'ORIGINAL_TRUSTED_PREFLIGHT_BLOCKED_NO_CLAIM'].includes(x.status)).length,
   independently_settled:outcomes.filter(x=>x.original_job_settled).length,
   outcomes:Object.freeze(outcomes),
   shift_finished:false,full_shift_proven:false,

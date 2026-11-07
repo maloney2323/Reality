@@ -319,7 +319,7 @@ body.reality-chat-is-open::before{content:"";position:fixed;inset:0;z-index:99;b
 .reality-page-tabs a{color:#d8eaf6;text-decoration:none;padding:10px 19px;border-radius:12px;font-weight:750;font-size:14px;border:1px solid #3e5870;background:#122238}
 .reality-page-tabs a[aria-current="page"]{color:#102439;background:#e5f2fc;border-color:#accfdd}
 .reality-page-tabs a:focus-visible{outline:3px solid #98d8ff;outline-offset:2px}
-/* Separate source-backed Value Verification Center. Homepage stays concise. */
+/* Separate source-backed Evaluation Center. Homepage stays concise. */
 body[data-reality-route="home"] #realityPublishedRepairEvidence,
 body[data-reality-route="home"] .reality-home-proof{display:none!important}
 
@@ -376,7 +376,7 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
 @media(max-width:980px){.rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.rv-layout{grid-template-columns:1fr}.rv-wide{grid-column:auto}.rv-differences{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.rv-kpis article{padding:12px}.rv-kpis strong{font-size:24px}.rv-kpis small{font-size:10px}.rv-pipeline{grid-template-columns:1fr;gap:5px}.rv-pipeline li{display:flex;gap:14px;align-items:center;padding:9px 11px}.rv-pipeline li>*{flex:1}.rv-differences{grid-template-columns:1fr}.rv-panel{padding:14px}.rv-reused-source .reality-econ-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rv-reused-source .reality-econ-grid strong{font-size:17px}.rv-hero{padding:17px}.reality-page-tabs{max-width:70%;overflow-x:auto;gap:4px}.reality-page-tabs a{padding:7px 9px;font-size:12px}.top .brand{font-size:13px}.top .state{display:none}}
 
-/* Value Verification v2: compact executive view with one evidence section at a time. */
+/* Evaluation v2: compact executive view with one evidence section at a time. */
 #realityValueVerification .rv-tabpanel[hidden]{display:none!important}
 #realityValueVerification .rv-tabpanel:not([hidden]){display:block}
 #realityValueVerification .rv-hero{padding:19px 22px;margin-bottom:11px}
@@ -483,6 +483,32 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
  #realityValueVerification .rv-pipeline{grid-template-columns:1fr}
 }
 
+/* First-automation business case is visible BEFORE any execution controls. */
+.reality-pre-roi{border:1px solid #5b839e;border-radius:17px;padding:18px 20px;margin:14px 0 20px;background:linear-gradient(155deg,#133047,#102235);color:#eaf3fa}
+.reality-pre-roi h2{font-size:clamp(18px,2.4vw,25px);margin:6px 0 8px}
+.reality-pre-roi>p{font-size:13px;line-height:1.55;color:#c4d6e2;margin:8px 0 14px}
+.reality-pre-roi-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.reality-pre-roi-kpis article{padding:13px;border:1px solid #3d637e;background:#132c43;border-radius:12px;min-width:0}
+.reality-pre-roi-kpis span,.reality-pre-roi-kpis small{display:block;font-size:11px;color:#bdd3e2;line-height:1.5}
+.reality-pre-roi-kpis strong{display:block;margin:6px 0;font-size:clamp(19px,2.4vw,25px);overflow-wrap:anywhere}
+.reality-pre-roi details{border:1px solid #3d6179;border-radius:11px;padding:10px 12px;margin:13px 0}
+.reality-pre-roi summary{cursor:pointer;font-size:13px;font-weight:750}
+.reality-pre-roi-roles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.reality-pre-roi .pre-roi-role{border:1px solid #324e67;border-radius:9px;padding:9px;background:#13283a;min-width:0}
+.reality-pre-roi .pre-roi-role strong{display:block;font-size:12px;line-height:1.4}
+.reality-pre-roi .pre-roi-role p{font-size:11px;color:#b5c8d9;margin:6px 0}
+.reality-pre-roi .pre-roi-role a{display:block;font-size:11px;color:#a9e0ff;margin:5px 0;overflow-wrap:anywhere}
+.reality-pre-roi-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0}
+.reality-pre-roi-controls label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#c3d8e7}
+.reality-pre-roi-controls input,.reality-pre-roi-controls select{border:1px solid #607991;border-radius:9px;background:#172b40;color:#f0f8ff;padding:10px;min-height:42px;font:inherit;min-width:155px}
+.reality-pre-roi-math{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.reality-pre-roi-math div{border-radius:9px;border:1px solid #375f72;padding:10px;background:#112b3b;min-width:0}
+.reality-pre-roi-math small{color:#a9cadd;font-size:11px;display:block}
+.reality-pre-roi-math strong{display:block;font-size:18px;margin:6px 0;overflow-wrap:anywhere}
+.reality-pre-roi-source{font-size:11px!important;color:#b1c9d9!important;line-height:1.6}
+.reality-pre-roi-source a{color:#b4e6ff}
+.reality-pre-roi .pre-roi-status{font-size:12px;color:#d5e6ef}
+@media(max-width:680px){.reality-pre-roi{padding:14px 12px}.reality-pre-roi-kpis,.reality-pre-roi-math{grid-template-columns:1fr}.reality-pre-roi-roles{grid-template-columns:1fr}}
 /* Prioritize actual source-backed potential before the shift, not a stale execution KPI. */
 #realityValueVerification .rv-pre-shift-intel{padding:19px 21px;border:1px solid #38879c;border-radius:17px;background:linear-gradient(120deg,#11364a,#11283b);margin:12px 0 15px}
 #realityValueVerification .rv-pre-shift-label{font-size:11px;letter-spacing:.08em;font-weight:800;color:#7bd5ea}
@@ -498,7 +524,7 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
 #realityValueVerification .rv-measured-strip strong{color:#cafbea}
 @media(max-width:600px){#realityValueVerification .rv-pre-shift-intel{padding:15px 13px}#realityValueVerification .rv-pre-shift-range{grid-template-columns:1fr}#realityValueVerification .rv-pre-shift-range>div{padding:10px 12px}#realityValueVerification .rv-pre-shift-range strong{font-size:24px}#realityValueVerification .rv-pre-shift-intel>strong{font-size:21px}}
 
-/* Value Verification: source-backed figures first, optional technical detail second */
+/* Evaluation: source-backed figures first, optional technical detail second */
 #realityValueVerification .rv-proof-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 17px}
 #realityValueVerification .rv-proof-highlights article{display:flex;flex-direction:column;align-items:start;min-width:0;border:1px solid #3d647b;border-radius:13px;padding:15px;background:linear-gradient(145deg,#16334a,#102638)}
 #realityValueVerification .rv-proof-highlights article.rv-potential-highlight{border-color:#5579a1;background:linear-gradient(135deg,#172e4b,#13283e)}
@@ -794,7 +820,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <nav id="realityPageTabs" class="reality-page-tabs" aria-label="Reality pages">
     <a id="realityHomeTab" href="/" aria-current="page">Home</a>
     <a id="realityChatTab" href="/chat">Chat</a>
-    <a id="realityValueTab" href="/value">Value Verification</a>
+    <a id="realityValueTab" href="/value">Evaluation</a>
   </nav>
   <a href="/chat" id="accountShortcut" class="state account-shortcut" aria-label="Open Reality Chat and account">Account · Sign in</a>
  </div>
@@ -829,7 +855,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <div><span>Independently verified receipts</span><strong id="rvReceipts">Checking…</strong></div>
   <p>Those are historical execution outcomes, not additional potential value or demonstrated cash savings.</p>
  </div>
- <nav id="rvViewNav" class="rv-section-nav" role="tablist" aria-label="Value Verification sections">
+ <nav id="rvViewNav" class="rv-section-nav" role="tablist" aria-label="Evaluation sections">
   <button type="button" id="rvTabOverview" role="tab" aria-controls="rvPanelOverview" aria-selected="true" tabindex="0" data-rv-view="overview">Overview</button>
   <button type="button" id="rvTabOpportunities" role="tab" aria-controls="rvPanelOpportunities" aria-selected="false" tabindex="-1" data-rv-view="opportunities">Opportunities</button>
   <button type="button" id="rvTabPotential" role="tab" aria-controls="rvPanelPotential" aria-selected="false" tabindex="-1" data-rv-view="potential">Potential value</button>
@@ -891,6 +917,45 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <div class="rv-section-label">ILLUSTRATIVE · NOT REALIZED SAVINGS</div>
    <h2>Potential business value</h2>
    <p>Compare conditional human-work scenarios without confusing an illustrative gross labor equivalent with actual money or time saved.</p>
+ <section id="realityBeforeAutomationValue" class="reality-pre-roi" aria-labelledby="realityBeforeAutomationValueTitle">
+  <div class="simple-kicker">VALUE VERIFICATION · BEFORE YOUR FIRST AUTOMATION · READ ONLY</div>
+  <h2 id="realityBeforeAutomationValueTitle">What value could Reality deliver for this work?</h2>
+  <p>See the actual source findings first. Compare a comparable human task with Reality's hypothetical automation cost before deciding to run anything. No eight-hour quotas, invented employee replacements, or unverified cash savings.</p>
+  <p class="pre-roi-status" id="realityPreROIStatus" role="status" aria-live="polite">Checking current source-backed work. No automation has been authorized by opening this report.</p>
+  <div class="reality-pre-roi-kpis" aria-label="What the current catalog supports">
+   <article><span>Business functions Reality can organize</span><strong id="realityPreROIRolesCount">Checking…</strong><small>Proposed AI roles, not employees replaced</small></article>
+   <article><span>Real work records discovered</span><strong id="realityPreROIFindings">Checking…</strong><small>Source-backed observations, still requiring qualification</small></article>
+   <article><span>Human wage equivalent · one comparable fault repair</span><strong id="realityPreROIRepair">Checking…</strong><small>Published research what-if, not realized savings</small></article>
+  </div>
+  <details id="realityPreROIFindingDetails">
+   <summary>What each proposed employee could investigate · show source records</summary>
+   <div class="reality-pre-roi-roles" id="realityPreROIRoles" aria-live="polite"></div>
+  </details>
+  <div class="simple-kicker">PROJECTED COST-BENEFIT SCENARIO · NOT VERIFIED ROI</div>
+  <div class="reality-pre-roi-controls">
+   <label>Assumed comparable software faults
+    <select id="realityPreROIRepairs" aria-label="Hypothetical number of comparable independently confirmed software defects">
+     <option value="1" selected>1 assumed fault</option>
+     <option value="2">2 assumed faults</option>
+     <option value="4">4 assumed faults</option>
+     <option value="5">5 assumed faults</option>
+     <option value="10">10 assumed faults</option>
+    </select>
+   </label>
+   <label>Estimated all-in automation + human review cost (USD)
+    <input id="realityPreROICost" aria-label="Your hypothetical total automation and human review cost in dollars" inputmode="decimal" type="number" min="0" max="1000000" step="0.01" placeholder="Enter estimate">
+   </label>
+   <button type="button" class="simple-secondary" id="realityPreROIRefresh">Refresh Source Evidence</button>
+  </div>
+  <div class="reality-pre-roi-math">
+   <div><small>Illustrative gross human wage equivalent</small><strong id="realityPreROIManual">Not verified</strong></div>
+   <div><small>Conditional difference after your assumed total cost</small><strong id="realityPreROINet">Not calculated</strong></div>
+   <div><small>Hypothetical cost-benefit ratio as ROI</small><strong id="realityPreROIPercent">Not calculated</strong></div>
+  </div>
+  <p class="reality-pre-roi-source" id="realityPreROIAssumptions">A scenario is a comparison of assumptions, not evidence of a saved dollar or a successfully completed job.</p>
+  <p class="reality-pre-roi-source"><strong>Before committing:</strong> Confirm the fault genuinely exists, measure the comparable human baseline, estimate OpenAI/infrastructure and approval costs, and define independent acceptance criteria. <strong>After the pilot:</strong> record actual costs, human review, completed work and receipt; only then claim verified net ROI. The study's 2-hour investigation and 3-hour implementation medians are separate medians from one NASA mission, not a prediction of your work.</p>
+  <p class="reality-pre-roi-source">Sources: <a href="https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf" target="_blank" rel="noopener noreferrer">NASA-hosted Hamill &amp; Goseva-Popstojanova research (2017)</a> · <a href="https://www.bls.gov/news.release/ocwage.t01.htm" target="_blank" rel="noopener noreferrer">BLS May 2025 national software developer median wage ($65.38/hour)</a>. Neither source endorses or measures Reality.</p>
+ </section>
 
    <div class="rv-proof-highlights rv-section-highlights">
     <article class="rv-potential-highlight"><span>Source observation review · gross labor what-if</span><strong id="rvPotentialReviewValue">Not available</strong><small>Uncalibrated review/triage wage equivalent. Not a saving.</small></article>
@@ -985,7 +1050,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   
   
   
-  <div class="rv-home-cta"><div><strong>Value Verification Center</strong><p>See how discoveries become independently verified outcomes, with estimates separated from measured business savings.</p></div><a href="/value">View detailed business evidence</a></div>
+
+  <div class="rv-home-cta"><div><strong>Review value before starting automation</strong><p>Source-backed opportunities, potential costs, ROI assumptions, and verified outcomes belong together in Evaluation.</p></div><a href="/value#pre-automation">Review business case in Evaluation</a></div>
   <div class="reality-home-value-layout">
  <section id="realityShiftHomeBrief" class="reality-shift-home-brief" aria-labelledby="realityShiftHomeTitle">
   <div class="simple-kicker">REALITY CHAT · YOUR WORKDAY</div>
@@ -1397,7 +1463,19 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
     <button type="button" id="realityChatAskShift" class="simple-secondary">Ask Reality to explain this shift</button>
     <p class="muted" id="realityChatShiftReadbackNotice">Only authenticated database receipts are used for these updates. No model-generated action is assumed.</p>
   </section>
+  <section id="realityRileySourceWork" aria-label="Riley source-backed existing work, not automatically authorized" style="border:1px solid #385977;border-radius:11px;background:#102437;padding:12px;margin:10px 0">
+   <strong>Riley's known work · available before any shift starts</strong>
+   <p id="realityRileySourceStatus" role="status" aria-live="polite" style="color:#c8dce9;font-size:12px;line-height:1.5">Sign in to inspect the prepared GitHub issue source inventory. No work is started by reading.</p>
+   <ul id="realityRileySourceList" style="padding-left:18px;color:#a6dbff;font-size:12px;line-height:1.55"></ul>
+   <p style="color:#afc2d5;font-size:11px">Open issues are observations, not executable job warrants. Reality must exclude previously settled jobs and independently qualify any new execution.</p>
+  </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <div id="realityRileyShiftLaunch" style="border:1px solid #5886a4;border-radius:12px;background:#142c3c;padding:14px;margin:12px 0" aria-label="Authorize Riley's three-hour shift">
+    <strong style="font-size:16px">Ready to start Riley?</strong>
+    <p class="muted" style="margin:8px 0">No shift starts when you set a goal or send an ordinary message. Open the signed-in shift control, inspect the exact 3-hour scope, and authorize it once. Independent upgrade installation still requires separate approval.</p>
+    <a id="realityRileyShiftLaunchLink" href="/chat-simple#riley-shift" class="simple-primary" style="display:inline-block;border-radius:10px;padding:12px 16px;text-decoration:none;background:#d6f0fc;color:#0d2430;font-weight:750">Start Riley's 3-hour shift · Review &amp; authorize</a>
+  </div>
+
   <div id="realityChatComposer" class="reality-chat-composer" aria-label="Talk to Reality">
       <textarea id="privatePrompt" placeholder="Continue the conversation. Reality will retrieve your saved history."></textarea>
   <label for="privateGoalCommand" style="display:block;margin-top:8px;font-size:13px">What should Reality do with this message?</label>
@@ -6413,6 +6491,7 @@ setInterval(refreshSavedShiftHome,300000);
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
   if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
+  if(yes&&typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
   if(yes){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
   else{void realityBusinessRefresh();void homeOwnerRefresh();
    realityOriginal143Eligible=false;
@@ -6793,6 +6872,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-chat-workspace-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
+<script defer src="/reality-riley-source-work-v1.js"></script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
 <script defer src="/reality-eight-hour-shift-plan-v1.js"></script>
@@ -6800,6 +6880,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-value-verification-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
+<script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
 <script defer src="/reality-model-capability-map-v1.js"></script>
 <script defer src="/reality-backlog-value-scenario-v1.js"></script>

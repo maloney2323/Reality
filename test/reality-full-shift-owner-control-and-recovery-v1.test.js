@@ -38,7 +38,16 @@ test('one click always uses original authenticated owner shift endpoint',()=>{
  const api=read('api/reality/personal-governed-employee-shift.js');
  assert.match(html,/id="runFullShift" type="button"/);
  assert.match(html,/\$\('runFullShift'\)\.onclick=async\(\)=>/);
- assert.match(html,/interpretSignedInChatShiftCommand\("Run Riley's full shift"\)/);
+ assert.match(html,/id="runShiftHours"/);
+ const mainChat=read('index.html');
+ assert.match(mainChat,/id="realityRileyShiftLaunchLink" href="\/chat-simple#riley-shift"/);
+ assert.match(mainChat,/No shift starts when you set a goal or send an ordinary message/);
+ assert.match(html,/window\.location\.hash==='#riley-shift'/);
+ assert.match(html,/\$\('runShiftHours'\)\.value='3'/);
+ assert.match(html,/Merely opening this page starts nothing/);
+ assert.doesNotMatch(mainChat,/realityRileyShiftLaunch[^\n]*onclick/);
+ assert.match(html,/interpretSignedInChatShiftCommand\('Run a '\+hours\+' hour shift'\)/);
+ assert.match(html,/command.duration_hours!==hours/);
  assert.match(html,/const receipt=await authorizeShiftFromChat\(command\)/);
  assert.match(html,/safeShiftReadbackState\(before/);
  assert.match(html,/expected_fingerprint:draft.expected_fingerprint/);

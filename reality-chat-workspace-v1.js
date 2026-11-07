@@ -104,18 +104,39 @@
   const inspectorToggle = node('button', 'reality-chat-mobile-tool', 'Work & approvals');
   inspectorToggle.type = 'button';
   inspectorToggle.id = 'realityChatOpenInspector';
+  inspectorToggle.setAttribute('aria-label','Open work, approvals and supporting evidence');
   inspectorToggle.setAttribute('aria-controls','realityChatInspector');
   inspectorToggle.setAttribute('aria-expanded','false');
-  const focusToggle = node('button');
+  const focusToggle = node('button', 'reality-chat-size-toggle');
   focusToggle.type = 'button';
   focusToggle.id = 'realityChatFocusToggle';
-  focusToggle.textContent = 'Focus chat';
+  focusToggle.textContent = 'Expand chat';
   focusToggle.setAttribute('aria-pressed','false');
+  const smallScreen = () => window.matchMedia('(max-width:600px)').matches;
+  function updateFocusLabel(){
+    inspectorToggle.textContent = smallScreen() ? 'Work' : 'Work & approvals';
+    if(smallScreen()){
+      const expanded = !document.body.classList.contains('reality-chat-compact');
+      focusToggle.textContent = expanded ? 'Minimize' : 'Expand chat';
+      focusToggle.setAttribute('aria-label', expanded ?
+        'Minimize the full-screen conversation to a scrollable chat card' :
+        'Expand the conversation to full screen');
+      focusToggle.setAttribute('aria-pressed', String(expanded));
+    }else{
+      const focused = document.body.classList.contains('reality-chat-focus');
+      focusToggle.textContent = focused ? 'Show workspace' : 'Focus chat';
+      focusToggle.setAttribute('aria-label', focused ?
+        'Show the full Reality workspace' : 'Focus on the conversation');
+      focusToggle.setAttribute('aria-pressed',String(focused));
+    }
+  }
   focusToggle.addEventListener('click', () => {
-    const focused = document.body.classList.toggle('reality-chat-focus');
-    focusToggle.textContent = focused ? 'Show workspace' : 'Focus chat';
-    focusToggle.setAttribute('aria-pressed',String(focused));
+    if(smallScreen()) document.body.classList.toggle('reality-chat-compact');
+    else document.body.classList.toggle('reality-chat-focus');
+    updateFocusLabel();
   });
+  updateFocusLabel();
+  window.addEventListener('resize', updateFocusLabel);
   threadButtons.append(historyToggle, inspectorToggle, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
@@ -211,6 +232,13 @@
     });
   }
   panels.work.append(get('realityChatShiftBrief'),get('realityChatActivity'),get('realityChatAutomationDiagnostics'));
+  // These large intake and shift-launch cards previously preceded the conversation,
+  // trapping it below the fold on mobile (especially during session recovery).
+  // They remain accessible in Work, but the actual conversation is the first view.
+  for(const id of ['realityRileySourceWork','realityRileyShiftLaunch']){
+    const existing=get(id);
+    if(existing) panels.work.append(existing);
+  }
   panels.approvals.append(get('realityChatApprovalInbox'));
   const proofLead = node('p','reality-chat-proof-note',
     'A passing test, provider observation or model statement is not a completed business job. Review only original-job evidence independently verified by Reality.');

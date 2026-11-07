@@ -13,6 +13,12 @@ button:disabled{opacity:.48;cursor:wait}a{color:#c2dbff}
 .shell{min-height:100dvh;max-width:860px;margin:auto;display:flex;flex-direction:column}
 header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #293140}
 header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
+.reality-page-nav{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.reality-page-nav a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 12px;border:1px solid #3b526d;border-radius:12px;background:#1c2b40;color:#e4efff;font-weight:700}
+.reality-page-nav a[aria-current="page"]{background:#e0f2fc;color:#122c40;border-color:#e0f2fc}
+#runFullShift{background:#c9ecff;color:#0b283b;border:1px solid #9adfff;font-size:15px;font-weight:800;min-height:46px}
+.riley-start-guide{padding:10px 15px;background:#132a3b;border-bottom:1px solid #3c617d;color:#d4e9f8;font-size:13px;line-height:1.5}
+.riley-start-guide strong{color:#f0f8ff}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #293140}
 .toolbar select{flex:1;min-width:120px;max-width:420px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px}
 .toolbar button{background:#253247;color:#eef5ff;font-size:13px}
@@ -31,7 +37,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 #auth input{width:100%;padding:12px;border:1px solid #41506a;background:#151d29;color:#fff;border-radius:10px}
 #auth button{margin-top:16px}
 [hidden]{display:none!important}
-@media(max-width:550px){header{padding:12px}.toolbar{padding:8px 12px}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
+@media(max-width:550px){header{padding:12px;flex-wrap:wrap}header strong{font-size:17px}.reality-page-nav{width:100%;justify-content:space-between}.reality-page-nav a{flex:1;min-width:0;padding:9px 7px}.toolbar{padding:8px 12px}#runFullShift{width:100%}#thread{padding:14px 10px}.message{max-width:94%}.composer{padding:10px 10px 14px}}
 
 /* Named, read-only team preview. Cards represent proposed roles, not live agents. */
 .team-board{border-bottom:1px solid #334053;background:#111a26;padding:12px 14px}
@@ -57,12 +63,37 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .team-card .evidence{font-size:11px;color:#a7bbd2}
 #teamToggle{background:#29415c}
 .team-proof{margin-top:9px;padding:8px;border:1px solid #35506c;border-radius:9px;color:#c6daf4;font-size:12px;line-height:1.45}
+.team-value{margin:10px 0;padding:13px 11px;border:1px solid #446888;border-radius:13px;background:#102638}
+.team-value h3{font-size:15px;margin:0 0 8px;color:#eff8ff}
+.team-value p{color:#c5d9e9;font-size:12px;line-height:1.45;margin:7px 0}
+.team-value-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.team-value-metrics>div{padding:10px;min-width:0;background:#142e43;border:1px solid #395b73;border-radius:10px}
+.team-value-metrics small,.team-value-metrics span{font-size:11px;line-height:1.4;color:#bbd2e4;display:block}
+.team-value-metrics strong{display:block;margin:5px 0;font-size:19px;color:#f0f7ff;overflow-wrap:anywhere}
+.team-value a{color:#bde2fb}
+.team-next-week{padding:12px;margin:12px 0;border:1px solid #4b6b79;background:#13232d;border-radius:13px}
+.team-next-week .team-head strong{font-size:14px}
+.team-next-week p{font-size:12px;color:#bfd0df;line-height:1.5}
+.team-next-week .week-role{margin:7px 0;border:1px solid #344d65;border-radius:10px;padding:8px 10px;background:#162a3d}
+.team-next-week .week-role summary{cursor:pointer;font-size:12px;font-weight:650;color:#e5f1ff}
+.team-next-week .week-role ul{padding-left:18px;margin:7px 0;font-size:12px}
+.team-next-week .week-role li{margin:5px 0}
+.team-next-week .week-role a{color:#badcf8}
+.team-next-week .week-day{margin:10px 0 0;font-size:11px;color:#b8d2e6}
+
+@media(max-width:550px){.team-value-metrics{grid-template-columns:1fr}}
+
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
 </style>
 </head>
 <body>
 <div class="shell">
-<header><strong>Reality · Chat</strong><a href="/" title="Open Reality work and approvals">Work &amp; approvals</a></header>
+<header><strong>Reality · Riley shift</strong>
+<nav class="reality-page-nav" aria-label="Reality pages">
+ <a id="rileyNavHome" href="/">Home</a>
+ <a id="rileyNavChat" href="/chat">Chat</a>
+ <a id="rileyNavEvaluation" href="/value#pre-automation">Evaluation</a>
+</nav></header>
 <section id="auth" hidden>
 <h2>Sign in to Reality</h2>
 <p>Your saved conversations remain private to your account.</p>
@@ -76,14 +107,33 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <select id="conversations" aria-label="Saved conversations"><option value="">Current conversation</option></select>
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
-<button id="teamToggle" type="button" aria-expanded="true" aria-controls="employeeBoardPanel">My AI team · 8</button>
-<button id="runFullShift" type="button" title="One signed-in owner authorization for an 8-hour governed Riley workday">Run Riley's Full Shift · 8h</button>
+<button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
+<label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
+<button id="runFullShift" type="button" disabled title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Checking existing shift…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="team-intro" id="fullShiftScope">One signed-in authorization starts the existing 8-hour background shift across prioritized backlog sources. Real repairs require a separately qualified original-job warrant; exact capability installations still require your approval. A shift is not proof of eight hours of completed engineering.</p>
-<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team">
+<p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
+<p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
+<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <section class="team-value" aria-label="Reality source-backed business value">
+  <h3>Potential business value · before the shift</h3>
+  <p>What Reality discovers, what comparable human work might cost, and what Reality has actually verified. Scheduled AI role-hours are not automatically human hours saved.</p>
+  <div class="team-value-metrics" aria-live="polite">
+   <div><small>Potential AI business functions</small><strong id="teamValueRoles">Checking…</strong><span>Proposed roles, not human staff replaced</span></div>
+   <div><small>Existing work findings</small><strong id="teamValueFindings">Checking…</strong><span id="teamValueRileyFindings">Source signals needing qualification</span></div>
+   <div><small>4–5-day weekly role capacity, if all 8 work</small><strong id="teamValueWeekly">Checking…</strong><span>Planned AI-role hours; useful work not yet demonstrated</span></div>
+  </div>
+  <p id="teamValueNASA">Calculating a comparable human software-repair wage example…</p>
+  <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
+  <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
+ </section>
+ <section class="team-next-week" aria-label="Next week prepared employee roles">
+  <div class="team-head"><strong>Next week's proposed employee schedule</strong><span class="team-role" id="nextWeekSourceStatus">Checking background preparation…</span></div>
+  <p id="nextWeekSummary">Reality prepares next-week work while the current week runs. These are proposed source inspections, not authorized shifts or promised eight-hour workloads.</p>
+  <div id="nextWeekEmployeeRoles" aria-live="polite"></div>
+ </section>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
 <details class="team-proof" id="realitySelfAwareness">
  <summary>Reality's verified self-understanding</summary>
@@ -98,7 +148,6 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="send" type="submit">Send</button>
 </form>
 </div>
-<p id="shiftStatus" class="status" role="status" hidden aria-live="polite"></p>
 <p id="startup" class="status" role="status">Checking your Reality session…</p>
 </div>
 <script type="module">
@@ -270,6 +319,19 @@ async function refreshRileyLoopReadiness(){
    EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE:
     'Full-loop readiness: the exact original job is eligible for a governed wake. Worker claim and settlement are NOT yet proven.'
   };
+  if(result.status==='EXACT_AUTHORIZED_EXISTING_JOBS_ELIGIBLE_FOR_WAKE'){
+   if(!Number.isSafeInteger(result.eligible_original_count)||
+      result.eligible_original_count<2||result.eligible_original_count>4||
+      !Array.isArray(result.original_work_ids)||
+      result.original_work_ids.length!==result.eligible_original_count||
+      new Set(result.original_work_ids).size!==result.eligible_original_count||
+      result.original_work_ids.some(id=>!/^work:[a-f0-9]{32}$/.test(id))||
+      result.worker_claim_acknowledged!==false)
+     throw Error('RILEY_MULTI_JOB_PROVIDER_READBACK_UNVERIFIED');
+   node.textContent='Full-loop readiness: '+result.eligible_original_count+
+    ' distinct existing jobs passed independent wake gates. Worker claims, code repairs and final receipts are NOT yet proven.';
+   return;
+  }
   const text=options[result.status];
   if(!text)throw Error('RILEY_UNRECOGNIZED_READINESS');
   node.textContent=text;
@@ -368,6 +430,225 @@ async function refreshRileyExistingBacklog(){
   node.textContent='Existing backlog readback unavailable. This is not evidence that Riley has no work.';
  }
 }
+function showShiftValueEvidence(roster){
+ const value=roster?.value_preview,team=value?.team,
+  schedule=value?.illustrative_shift_capacity,
+  ref=value?.comparable_software_repair,one=ref?.one_fault_example;
+ if(value?.version!=='reality-source-backed-shift-value-preview-v1'||
+    value.status!=='SOURCE_BACKED_WORKFORCE_POTENTIAL_NOT_MEASURED_ROI'||
+    value.job_started!==false||value.installation_authorized!==false||
+    team?.proposed_virtual_role_count!==roster.proposed_employee_count||
+    team?.source_backed_work_center_findings!==roster.existing_work_center_candidates||
+    team?.active_verified_employee_workers!==0||
+    team?.independently_measured_human_fte_replaced!==null||
+    schedule?.proposed_roles!==8||
+    schedule?.illustrative_role_schedule_hours_per_week_min!==256||
+    schedule?.illustrative_role_schedule_hours_per_week_max!==320||
+    schedule?.every_role_has_eight_hours_of_work_unverified!==true||
+    schedule?.financial_roi_verified!==false||
+    schedule?.live_roles_verified!==0||
+    schedule?.equivalent_human_hours_saved_verified!==null||
+    ref?.sum_of_medians_not_median_total!==true||
+    ref?.illustrative_sum_of_medians_hours!==5||
+    ref?.scenario_not_cash_savings!==true||
+    !Number.isFinite(one?.illustrative_gross_human_wage_equivalent_usd)||
+    one?.sum_of_separate_median_effort_hours!==5||
+    one?.realized_cash_savings_usd!==null||
+    value.evidence?.verified_net_roi_usd!==null||
+    value.evidence?.actual_automation_cost_usd!==null||
+    !/^https:\/\/ntrs\.nasa\.gov\//.test(ref.study_source_url||'')||
+    !/^https:\/\/www\.bls\.gov\//.test(ref.wage_source_url||''))
+   throw Error('EMPLOYEE_VALUE_SOURCE_OR_ASSUMPTION_UNVERIFIED');
+ const usd=n=>new Intl.NumberFormat('en-US',{
+  style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
+ $('teamValueRoles').textContent=String(team.proposed_virtual_role_count);
+ $('teamValueFindings').textContent=String(team.source_backed_work_center_findings);
+ $('teamValueWeekly').textContent=schedule.illustrative_role_schedule_hours_per_week_min+
+  '–'+schedule.illustrative_role_schedule_hours_per_week_max+' h';
+ $('teamValueRileyFindings').textContent=team.software_engineering_findings+
+  ' assigned to Riley (not verified completed)';
+ $('teamValueNASA').textContent='Comparable software-fault example: NASA-hosted study reports separate medians of 2h investigation and 3h implementation (illustrative sum: 5h). '+
+  'At the dated BLS software-developer median of '+
+  usd(ref.developer_median_wage_usd_per_hour)+'/hour, gross human wage equivalent is '+
+  usd(one.illustrative_gross_human_wage_equivalent_usd)+
+  ' for ONE comparable repair if that effort truly applies. Not saved money, not Riley throughput.';
+ $('teamValueProof').textContent='Weekly role capacity assumes 8 proposed AI functions × 8 hours × 4–5 days, each consistently supplied with useful authorized work. '+
+  'Verified human hours saved: not measured · Cash savings: not measured · '+
+  'Actual automation costs: not measured · Net ROI: not verified · People replaced: not measured.';
+ const source=$('teamValueSources');
+ source.replaceChildren(document.createTextNode('Human-work references: '));
+ const nasa=document.createElement('a');
+ nasa.href=ref.study_source_url;nasa.textContent='NASA-hosted repair study (2017)';
+ nasa.rel='noopener noreferrer';
+ const bls=document.createElement('a');
+ bls.href=ref.wage_source_url;bls.textContent='BLS national developer median (May 2025)';
+ bls.rel='noopener noreferrer';
+ source.append(nasa,document.createTextNode(' · '),bls,
+  document.createTextNode('. Separate research medians are not a measured total. Business roles need occupation-matched, company-specific comparisons.'));
+}
+function clearShiftValueEvidence(){
+ $('teamValueRoles').textContent='Unverified';
+ $('teamValueFindings').textContent='Unverified';
+ $('teamValueRileyFindings').textContent='No source readback';
+ $('teamValueWeekly').textContent='Hypothetical';
+ $('teamValueNASA').textContent='Published reference or current source evidence unavailable; no wage equivalent calculated.';
+ $('teamValueProof').textContent='Verified human work returned and net ROI: not measured.';
+ $('teamValueSources').textContent='Source readback unavailable; no financial impact inferred.';
+}
+function renderNextWeekWorkPlan(roster){
+ const plan=roster?.next_week_plan;
+ if(plan?.version!=='reality-next-week-employee-plan-v1'||
+    plan.status!=='NEXT_WEEK_DRAFT_PREPARED_AWAITING_OWNER_SHIFT_AUTHORIZATION'||
+    plan.calendar_time_zone!=='America/New_York'||
+    plan.employee_role_count!==roster.proposed_employee_count||
+    !Array.isArray(plan.employee_roles)||plan.employee_roles.length!==8||
+    !/^\d{4}-\d\d-\d\d$/.test(plan.week_start||'')||
+    !/^\d{4}-\d\d-\d\d$/.test(plan.week_end||'')||
+    plan.four_day_week_capacity_hours!==256||
+    plan.five_day_week_capacity_hours!==320||
+    plan.capacity_unit!=='HYPOTHETICAL_EIGHT_HOUR_ROLE_SCENARIO_NOT_A_SCHEDULE_OR_HUMAN_SAVINGS'||
+    plan.proposed_daily_ai_role_hours!==null||
+    plan.minimum_daily_review_timebox_hours!==0||
+    plan.maximum_daily_review_timebox_hours!==12||
+    plan.daily_hours_follow_source_workload_not_a_fixed_eight_hour_quota!==true||
+    !Number.isFinite(plan.proposed_review_timebox_hours_total)||
+    plan.proposed_review_timebox_hours_total<0||
+    !Number.isSafeInteger(plan.source_items_deferred_beyond_timebox_capacity)||
+    plan.source_items_deferred_beyond_timebox_capacity<0||
+    plan.candidate_source_review_assignments_not_jobs!==true||
+    plan.read_only!==true||
+    plan.owner_shift_authorization_recorded!==false||
+    plan.installation_authorized!==false||
+    plan.production_changed!==false||
+    plan.verified_human_hours_saved!==null||
+    plan.verified_headcount_reduction!==null||
+    plan.verified_financial_roi_usd!==null||
+    !['BACKGROUND_NEXT_WEEK_SOURCE_REFRESH_VERIFIED',
+     'BACKGROUND_SOURCE_SNAPSHOT_NOT_YET_VERIFIED'].includes(plan.preparation_source))
+  throw Error('NEXT_WEEK_EMPLOYEE_SOURCE_OR_SCOPE_UNVERIFIED');
+ const prepared=plan.preparation_source==='BACKGROUND_NEXT_WEEK_SOURCE_REFRESH_VERIFIED';
+ if(prepared&&(!Number.isSafeInteger(roster.next_week_background_open_issue_count)||
+    roster.next_week_background_open_issue_count<0||
+    roster.next_week_background_open_issue_count>150||
+    !Number.isFinite(Date.parse(plan.background_source_prepared_at||''))))
+   throw Error('NEXT_WEEK_BACKGROUND_READBACK_UNVERIFIED');
+ $('nextWeekSourceStatus').textContent=prepared?'Background source refresh verified':
+  'On-demand draft · background preparation not yet verified';
+ $('nextWeekSummary').textContent='Week of '+plan.week_start+' through '+plan.week_end+
+  '. '+plan.employee_role_count+' proposed business functions; '+
+  plan.proposed_work_findings+' distinct source-backed findings already routed for review.'+
+  (prepared?' Unattended scheduler checked '+
+   roster.next_week_background_open_issue_count+' open issues before this page was opened.':'')+
+  ' Draft timeboxes total '+plan.proposed_review_timebox_hours_total+
+  'h across all roles, based on provisional source review assumptions. Each day can be 0–12h. '+
+  plan.source_items_deferred_beyond_timebox_capacity+' source findings exceed this planning capacity. '+
+  'There is NO eight-hour quota or proof of executed work. The 256–320h scenario is only a theoretical illustration, not this schedule.';
+ const holder=document.createDocumentFragment(),seen=new Set();
+ let totalHours=0,deferredCount=0;
+ for(const role of plan.employee_roles){
+  if(typeof role.employee_name!=='string'||!role.employee_name||
+     typeof role.role_title!=='string'||!role.role_title||
+     !Array.isArray(role.week_days)||role.week_days.length!==5||
+     !Array.isArray(role.deferred_source_findings)||
+     !Number.isSafeInteger(role.deferred_source_count)||
+     role.deferred_source_count!==role.deferred_source_findings.length||
+     !Number.isFinite(role.provisional_weekly_review_timebox_hours)||
+     role.provisional_weekly_review_timebox_hours<0||
+     role.active_worker_verified!==false||
+     role.approved_execution_hours!==0||
+     role.completed_productive_hours_verified!==null)
+   throw Error('NEXT_WEEK_ROLE_DRAFT_NOT_VERIFIED');
+  const panel=document.createElement('details');panel.className='week-role';
+  const summary=document.createElement('summary');
+  summary.textContent=role.employee_name+' · '+role.role_title+' · '+
+   role.candidate_finding_count+' current source finding(s) · '+
+   role.provisional_weekly_review_timebox_hours+'h proposed review';
+  panel.append(summary);
+  let roleHours=0;
+  for(const day of role.week_days){
+   if(!/^\d{4}-\d\d-\d\d$/.test(day.date||'')||
+    !Array.isArray(day.assignments)||day.assignments.length>25||
+    day.shifts_authorized!==false||
+    day.actual_work_hours_verified!==null||
+    day.proposed_execution_shift_hours!==null||
+    day.timebox_is_verified_task_duration!==false||
+    day.daily_planning_upper_limit_hours!==12||
+    !Number.isFinite(day.provisional_review_timebox_hours)||
+    day.provisional_review_timebox_hours<0||
+    day.provisional_review_timebox_hours>12||
+    !['PROPOSED_SOURCE_REVIEW_NOT_EXECUTION_AUTHORIZATION',
+      'WORK_GAP_DISCOVERY_OR_REVIEW_NEEDED'].includes(day.work_status))
+    throw Error('NEXT_WEEK_DAY_EXECUTION_NOT_AUTHORIZED');
+   const line=document.createElement('div');line.className='week-day';
+   line.textContent=day.weekday+' · '+day.date+' · '+
+    day.provisional_review_timebox_hours+'h provisional review · '+
+    (day.assignments.length?day.assignments.length+' source finding(s)':
+     'Unscheduled: find and qualify useful work');
+   panel.append(line);
+   if(day.assignments.length){
+    const ul=document.createElement('ul');
+    let dayHours=0;
+    for(const work of day.assignments){
+     if(!/^catalog:[a-f0-9]{32}$/.test(work.finding_id||'')||
+      seen.has(work.finding_id)||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(work.source_url||'')||
+      work.owner_execution_authorized!==false||
+      !Number.isFinite(work.proposed_review_timebox_hours)||
+      work.proposed_review_timebox_hours<0.5||
+      work.proposed_review_timebox_hours>12||
+      work.proposed_review_timebox_hours*2!==
+       Math.floor(work.proposed_review_timebox_hours*2)||
+      work.accepted_task_duration_hours!==null||
+      !['OWNER_REVIEW_TIMEBOX_ASSUMPTION_UNVERIFIED',
+       'UNCALIBRATED_ONE_HOUR_SOURCE_TRIAGE_PLACEHOLDER'].includes(
+        work.timebox_basis))
+      throw Error('NEXT_WEEK_SOURCE_ASSIGNMENT_NOT_VERIFIED');
+     seen.add(work.finding_id);
+     dayHours+=work.proposed_review_timebox_hours;
+     const li=document.createElement('li'),a=document.createElement('a');
+     a.href=work.source_url;a.textContent=work.title+
+      ' · '+work.proposed_review_timebox_hours+'h review timebox';
+     a.rel='noopener noreferrer';a.target='_blank';
+     li.append(a);ul.append(li);
+    }
+    if(dayHours!==day.provisional_review_timebox_hours)
+      throw Error('NEXT_WEEK_TIMEBOX_SUM_MISMATCH');
+    panel.append(ul);
+   }else if(day.provisional_review_timebox_hours!==0){
+    throw Error('NEXT_WEEK_EMPTY_DAY_CANNOT_HAVE_HOURS');
+   }
+   roleHours+=day.provisional_review_timebox_hours;
+  }
+  if(roleHours!==role.provisional_weekly_review_timebox_hours)
+    throw Error('NEXT_WEEK_ROLE_TIMEBOX_SUM_MISMATCH');
+  totalHours+=roleHours;
+  for(const item of role.deferred_source_findings){
+   if(!/^catalog:[a-f0-9]{32}$/.test(item.finding_id||'')||
+     seen.has(item.finding_id)||
+     item.owner_execution_authorized!==false)
+     throw Error('NEXT_WEEK_DEFERRED_ITEM_NOT_VERIFIED');
+   seen.add(item.finding_id);
+   deferredCount++;
+  }
+  if(role.deferred_source_count){
+   const missing=document.createElement('p');
+   missing.textContent=role.deferred_source_count+
+    ' additional source finding(s) deferred; no time or execution invented.';
+   panel.append(missing);
+  }
+  holder.append(panel);
+ }
+ if(seen.size!==plan.proposed_work_findings||
+   totalHours!==plan.proposed_review_timebox_hours_total||
+   deferredCount!==plan.source_items_deferred_beyond_timebox_capacity)
+  throw Error('NEXT_WEEK_UNIQUE_SOURCE_COVERAGE_MISMATCH');
+ $('nextWeekEmployeeRoles').replaceChildren(holder);
+}
+function clearNextWeekWorkPlan(){
+ $('nextWeekSourceStatus').textContent='Preparation unverified';
+ $('nextWeekSummary').textContent='Next-week source or owner evidence could not be verified. No shift, worker execution or business savings is claimed.';
+ $('nextWeekEmployeeRoles').replaceChildren();
+}
 async function refreshEmployeeBoard(){
   if(teamLoading)return;
   teamLoading=true;
@@ -391,6 +672,8 @@ async function refreshEmployeeBoard(){
     for(const employee of roster.proposed_employees)
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
+    showShiftValueEvidence(roster);
+    renderNextWeekWorkPlan(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
     void refreshRileyExistingBacklog();
@@ -401,6 +684,8 @@ async function refreshEmployeeBoard(){
       'No verified cash savings. NASA benchmark applies only to comparable, verified software fault repairs.';
   }catch(e){
     $('teamCards').replaceChildren();
+    clearShiftValueEvidence();
+    clearNextWeekWorkPlan();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
       String(e?.message||'Unknown').slice(0,180)+
@@ -415,6 +700,9 @@ async function refreshShiftStatus(){
     const activeState=safeShiftReadbackState(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
+      $('runFullShift').disabled=true;
+      $('runFullShift').textContent='Existing shift authorized';
+      $('fullShiftScope').textContent='Your shift has already been authorized. Do NOT press Run Riley\'s Shift again. The live status below is read directly from the database every 30 seconds. Source checks do not prove an executable original job or a final receipt.';
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
       const route=data.recovery_diagnosis;
@@ -426,15 +714,64 @@ async function refreshShiftStatus(){
        route.production_changed===false?
        ' Recovery gate: '+String(route.status).replaceAll('_',' ')+
        '. Next: '+String(route.next_verified_action).slice(0,500):'';
-      node.textContent='Authorized '+activeState.duration_hours+'-hour shift · '+activeState.shift_id+
-        ' · '+current+explain+
-        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.';
+      const checked=Number.isSafeInteger(briefing.verified_source_checks)&&
+        briefing.verified_source_checks>=0&&briefing.verified_source_checks<=5?
+        briefing.verified_source_checks:null;
+      const block=activeState.status==='AWAITING_EXACT_ORIGINAL_WORK'?
+        ' QUALIFICATION BLOCKER: source checks are complete, but an exact owner-scoped original engineering job is not yet independently admitted. This is NOT a running code repair. Worker wake alone cannot bypass the original-job gate. Do not retry an uncertain intake or start another shift.':'';
+      node.textContent='Existing '+activeState.duration_hours+'h shift · '+activeState.status+
+        ' · '+activeState.shift_id+' · '+
+        (checked===null?'Source progress unavailable.':checked+' of 5 source checks verified.')+
+        block+' '+current+explain+
+        ' Shift authorization is not a verified worker dispatch, completed repair, or measured savings.'+
+        ' No final original-job receipt is yet proven for this shift.'+
+        ' Status refreshed '+new Date().toLocaleTimeString()+'.';
       node.hidden=false;
-    }else node.hidden=true;
+    }else{
+      $('runFullShift').disabled=false;
+      $('runFullShift').textContent="Run Riley's Shift";
+      node.textContent='No currently authorized shift found in the owner-scoped readback. Starting a new shift still requires your exact approval.';
+      node.hidden=false;
+    }
   }catch{
-    // A failed readback must not show an invented shift status.
-    $('shiftStatus').hidden=true;
+    // Fail closed: a connection problem MUST NOT unlock a second shift.
+    $('runFullShift').disabled=true;
+    $('runFullShift').textContent='Shift status unavailable';
+    $('shiftStatus').textContent='Shift status readback unavailable. An existing shift may still be active. Use Refresh to check before attempting any new authorization; no duplicate shift should be created.';
+    $('shiftStatus').hidden=false;
   }finally{shiftLoading=false}
+}
+const RILEY_BATCH='/api/reality/personal-riley-full-shift-batch';
+async function intakeVerifiedRileyShiftJobs(shiftId,fingerprint){
+ // Same deliberate signed-in Run Full Shift click. Not a second approval,
+ // and not authority to install any particular generated capability.
+ if(!uuid(shiftId)||!/^sha256:[a-f0-9]{64}$/.test(fingerprint||'')||
+    !uuid(active))throw Error('RILEY_BATCH_OWNER_SHIFT_IDENTITY_INVALID');
+ const data=await json(RILEY_BATCH,{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({
+   action:'ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT',
+   conversation_id:active,shift_id:shiftId,expected_fingerprint:fingerprint
+  }),signal:AbortSignal.timeout(110000)
+ });
+ if(data.ok!==true||data.shift_id!==shiftId||
+    data.shift_fingerprint!==fingerprint||
+    data.one_authorization_for_exact_shift!==true||
+    data.no_per_job_buttons_required!==true||
+    data.installation_authorized!==false||
+    data.original_job_completed!==false||
+    data.final_receipt_recorded!==false||
+    data.production_changed!==false||
+    !Array.isArray(data.outcomes)||data.outcomes.length>4)
+  throw Error('RILEY_BATCH_INDEPENDENT_INTAKE_UNVERIFIED');
+ const sent=data.outcomes.filter(x=>x.worker_dispatch_started===true).length;
+ const unresolved=data.outcomes.filter(x=>
+  x.status==='ORIGINAL_INTAKE_OR_DISPATCH_REQUIRES_DURABLE_RECONCILIATION').length;
+ return ' Same authorization: '+data.selected_count+
+  ' source-backed originals selected for governed work; '+sent+
+  ' worker dispatches requested; '+unresolved+' require reconciliation.'+
+  ' The background worker must independently prove execution, tests and final receipts.'+
+  ' Any exact installation approval will appear in Reality Chat, not as a per-job start button.';
 }
 async function authorizeShiftFromChat(command){
   // Use exactly the existing authenticated owner shift controller; no model
@@ -442,11 +779,21 @@ async function authorizeShiftFromChat(command){
   const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
   const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
   if(existing.hasActive){
+    let batch='';
+    if(existing.matching_requested_hours){
+      try{
+       const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
+       batch=await intakeVerifiedRileyShiftJobs(existing.shift_id,
+         match?.plan_fingerprint);
+      }catch{
+       batch=' Existing shift preserved. Batch intake needs independent reconciliation; do not retry uncertain jobs.';
+      }
+    }
     return {
       acknowledged:true,
       text:existing.matching_requested_hours?
        'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
-       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.':
+       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.'+batch:
        'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
        '). I did not start another concurrent shift or override its authorization.',
     };
@@ -513,6 +860,15 @@ async function authorizeShiftFromChat(command){
        .map(x=>x.employee_title+' ('+x.candidate_count+')').join(' · ')+
     '. FIRST PILOT: '+routing.first_pilot_employee.employee_title+
     '. These are source observations awaiting qualification, not executed jobs or a daily recurring shift.':'';
+  let batch='';
+  try{
+   batch=await intakeVerifiedRileyShiftJobs(created.shift_id,
+     draft.expected_fingerprint);
+  }catch{
+   // The shift is ALREADY committed; do not erase that fact or attempt
+   // to mint it again because intake delivery may have had an effect.
+   batch=' Batch intake is not independently confirmed. Check existing work before retrying; no additional installation approval was granted.';
+  }
   return {
     acknowledged:true,
     text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
@@ -520,7 +876,7 @@ async function authorizeShiftFromChat(command){
       ' The existing trusted worker scheduler must independently claim work. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
-      'original-job admission for consequential repairs. No installation or production change was authorized.'
+      'original-job admission for consequential repairs. No installation or production change was authorized.'+batch
   };
 }
 async function refreshHistory(id=active){
@@ -555,6 +911,13 @@ function showAuth(authenticated){
   $('auth').hidden=authenticated;
   $('chat').hidden=!authenticated;
   if(authenticated){
+    // A link from the main conversation preselects a safe three-hour draft.
+    // This never POSTs, starts a worker, or grants execution authority.
+    if(window.location.hash==='#riley-shift'){
+      $('runShiftHours').value='3';
+      $('fullShiftScope').textContent=
+       '3h selected. Tap the highlighted Run Riley\'s Shift button above to authorize the exact pilot. Sending a message is NOT authorization. Merely opening this page starts nothing. Verified repairs and installations remain separately governed.';
+    }
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
@@ -599,6 +962,7 @@ $('teamToggle').onclick=()=>{
  const panel=$('employeeBoardPanel');
  panel.hidden=!panel.hidden;
  $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
+ $('teamToggle').textContent=panel.hidden?'Show AI team · 8':'Hide AI team · 8';
  if(!panel.hidden){void refreshEmployeeBoard();void refreshRealitySelfAudit();}
 };
 $('newChat').onclick=()=>{
@@ -617,10 +981,13 @@ $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load
  // cannot authorize the shift. Reuses the existing signed-in endpoint.
  if(pending)return;
- const command=interpretSignedInChatShiftCommand("Run Riley's full shift");
+ const hours=Number($('runShiftHours')?.value);
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)
+  return status('Choose an exact shift length from 1 to 12 hours.');
+ const command=interpretSignedInChatShiftCommand('Run a '+hours+' hour shift');
  if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
-    command.duration_hours!==8||command.installation_authorized!==false)
-  return status('Full-shift owner command could not be validated.');
+    command.duration_hours!==hours||command.installation_authorized!==false)
+  return status('Exact shift owner command could not be validated.');
  pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
  const pendingResult=bubble('assistant',
   'Checking your existing shift and exact owner-scoped backlog…','pending');

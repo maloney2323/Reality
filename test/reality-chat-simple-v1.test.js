@@ -6,13 +6,22 @@ import {Script} from 'node:vm';
 const get=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const html=get('reality-chat-simple.html');
 const route=JSON.parse(get('vercel.json'));
-const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+// The app uses a module script; the later plain script is only the passkey helper.
+const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+const browserScript=script?.replace(/^\s*import\s+\{[^}]+\}\s*from\s*'[^']+';\s*/,'');
 
 test('light Chat is on an isolated route without replacing the existing approvals view',()=>{
   assert.ok(route.rewrites.some(r=>r.source==='/chat-simple'&&r.destination==='/reality-chat-simple.html'));
   assert.ok(route.rewrites.some(r=>r.source==='/chat'&&r.destination==='/index.html'));
   assert.doesNotMatch(html,/<script[^>]+src=/);
-  assert.match(html,/Reality · Chat/);
+  assert.match(html,/Reality · Riley shift/);
+  assert.match(html,/<nav class="reality-page-nav" aria-label="Reality pages">/);
+  assert.match(html,/<a id="rileyNavHome" href="\/">Home<\/a>/);
+  assert.match(html,/<a id="rileyNavChat" href="\/chat">Chat<\/a>/);
+  assert.match(html,/<a id="rileyNavEvaluation" href="\/value#pre-automation">Evaluation<\/a>/);
+  assert.match(html,/id="teamToggle" type="button" aria-expanded="false"/);
+  assert.match(html,/id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden/);
+  assert.match(html,/Sending a chat message is not authorization/);
 });
 test('light Chat preserves existing private session and scoped saved conversation',()=>{
   assert.match(html,/\/api\/reality\/personal-session/);
@@ -23,11 +32,26 @@ test('light Chat preserves existing private session and scoped saved conversatio
 });
 test('user message appears before network wait and answer appears without history refresh',()=>{
   assert.ok(script);
-  assert.doesNotThrow(()=>new Script(script));
+  assert.doesNotThrow(()=>new Script(browserScript));
   const optimistic=script.indexOf("bubble('user',value,'pending')");
   const request=script.indexOf("const data=await json(API,{method:'POST'");
   const reply=script.indexOf('waiting.lastChild.textContent=data.answer;');
   assert.ok(optimistic>0&&request>optimistic&&reply>request);
   assert.ok(script.includes('if(seq!==sequence||id!==active||pending)return;'));
   assert.ok(script.includes('Response failed or timed out. Check saved history to avoid duplicates.'));
+});
+
+test('real shift remains visible and prevents duplicate approval when progress stalls at original-job gate',()=>{
+ assert.equal((html.match(/id="shiftStatus"/g)||[]).length,1);
+ assert.ok(html.indexOf('id="shiftStatus"')<
+  html.indexOf('id="employeeBoardPanel"'));
+ assert.match(html,/id="runFullShift" type="button" disabled/);
+ assert.match(script,/activeState\.status==='AWAITING_EXACT_ORIGINAL_WORK'/);
+ assert.match(script,/QUALIFICATION BLOCKER/);
+ assert.match(script,/\$\('runFullShift'\)\.disabled=true/);
+ assert.match(script,/Existing shift authorized/);
+ assert.match(script,/Do NOT press Run Riley/);
+ assert.match(script,/Shift status readback unavailable/);
+ assert.match(script,/Status refreshed/);
+ assert.doesNotMatch(script,/activeState\.hasActive\)\{[\s\S]{0,500}authorizeShiftFromChat\(/);
 });

@@ -97,7 +97,9 @@ test('read-only roster endpoint uses existing sources and explicit owner authent
  assert.match(endpoint,/buildRealityNamedEmployeeRoster\(brief\)/);
  assert.match(endpoint,/req\.method!=='GET'/);
  assert.match(endpoint,/process\.env\.VERCEL_ENV!=='preview'/);
- assert.doesNotMatch(endpoint,/shiftRpc\(|reality_authorize_employee_shift_v1|worker_dispatch\(/);
+ assert.match(endpoint,/shiftRpc\(db,'reality_read_next_week_source_snapshot_v1'/);
+ assert.doesNotMatch(endpoint,/reality_authorize_employee_shift_v1|reality_claim_employee_shift_step_v1|worker_dispatch\(/);
+ assert.doesNotMatch(endpoint,/reality_store_next_week_source_snapshot_v1/);
  assert.match(chat,/Meet Reality's AI team/);
  assert.match(chat,/const ROSTER='\/api\/reality\/personal-employee-roster'/);
  assert.match(chat,/employeeCard\(employee\)/);

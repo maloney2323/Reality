@@ -76,7 +76,7 @@ test('existing eight-hour authorizations retain the original exact SHA256 finger
 
 test('duration cannot be manipulated after exact scope fingerprinted',()=>{
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
- assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:9}),
+ assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:0}),
   /REALITY_EIGHT_HOUR_SHIFT_DURATION_NOT_SUPPORTED/);
  assert.throws(()=>buildRealityEightHourShiftDraft(brief,{durationHours:24}),
   /REALITY_EIGHT_HOUR_SHIFT_DURATION_NOT_SUPPORTED/);
@@ -91,7 +91,7 @@ test('owner-bound endpoint exposes read-only selection and checks duration on ex
  assert.match(api,/requested_shift_draft:draft/);
  assert.match(api,/computeShiftFingerprint\(plan\)/);
  assert.match(api,/b.requested_hours\?\?8/);
- assert.match(api,/!\[8,10,12\]\.includes/);
+ assert.match(api,/Number.isSafeInteger\(b.requested_hours\?\?8\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
  assert.match(api,/s.plan_fingerprint===fingerprint/);
  assert.doesNotMatch(api,/installation_authorized:true/);

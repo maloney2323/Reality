@@ -6,6 +6,7 @@ const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const html=read('index.html');
 const js=read('reality-chat-verified-cycle-v2.js');
 const css=read('reality-chat-fullscreen-v2.css');
+const workspace=read('reality-chat-workspace-v1.js');
 test('the same existing Chat route serves full-screen presentation and read-only lifecycle',()=>{
  assert.match(html,/<link rel="stylesheet" href="\/reality-chat-workspace-v1.css">/);
  assert.match(html,/<link rel="stylesheet" href="\/reality-chat-fullscreen-v2.css">/);
@@ -77,4 +78,34 @@ test('existing canonical Chat, goal changes, authorization and evidence controls
  assert.match(html,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
  assert.match(html,/api\/reality\/personal-chat/);
  assert.match(html,/api\/reality\/personal-goals/);
+});
+
+test('a reconnect failure restores page scrolling instead of trapping Chat behind cards',()=>{
+ assert.match(css,/html:has\(body\[data-reality-route="chat"\]:not\(\.reality-chat-signed-in\)\)/);
+ assert.match(css,/html:has\(body\[data-reality-route="chat"\] #privateRetrySession:not\(\[hidden\]\)\)/);
+ assert.match(css,/body\[data-reality-route="chat"\]:has\(#privateRetrySession:not\(\[hidden\]\)\) #privateReady/);
+ assert.match(css,/#privateReady\[style\*="display: none"\]/);
+ assert.match(css,/overflow-y:auto!important/);
+ assert.match(html,/id="privateRetrySession" type="button" hidden/);
+});
+test('the conversation loads first and workcards are moved into the optional inspector',()=>{
+ assert.match(workspace,/ready\.append\(workspace\)/);
+ assert.match(workspace,/for\(const id of \['realityRileySourceWork','realityRileyShiftLaunch'\]\)/);
+ assert.match(workspace,/if\(existing\) panels\.work\.append\(existing\)/);
+ assert.match(workspace,/conversation\.append\(threadHeader, transcript, composer\)/);
+ assert.match(workspace,/panels\.approvals\.append\(get\('realityChatApprovalInbox'\)\)/);
+ assert.doesNotMatch(workspace,/\bfetch\s*\(|\bXMLHttpRequest|\bstartJob\s*\(/);
+});
+test('mobile Chat has visible, reversible, keyboard-safe expand and minimize controls',()=>{
+ assert.match(workspace,/focusToggle\.id = 'realityChatFocusToggle'/);
+ assert.match(workspace,/document\.body\.classList\.toggle\('reality-chat-compact'\)/);
+ assert.match(workspace,/updateFocusLabel\(\)/);
+ assert.match(workspace,/Expand chat/);
+ assert.match(workspace,/Minimize/);
+ assert.match(css,/body\[data-reality-route="chat"\] #realityChatFocusToggle/);
+ assert.match(css,/\.reality-chat-compact #privateTranscript/);
+ assert.match(css,/\.reality-chat-compact #realityChatWorkspace/);
+ assert.match(css,/#privateTranscript\{/);
+ assert.match(css,/#realityChatComposer\{/);
+ assert.doesNotThrow(()=>new Script(workspace));
 });

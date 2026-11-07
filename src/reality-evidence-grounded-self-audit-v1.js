@@ -63,7 +63,7 @@ export function buildRealityEvidenceGroundedSelfAudit({
    'GUARDED_INTEGRATION_EXISTS_NO_LIVE_SHIFT_JOB_EXECUTION'),
   capability('multi_job_shift_controller',
    'src/reality-riley-multi-job-shift-controller-v1.js',
-   'CONTRACT_PREPARED_NOT_LIVE_WORKER_CONNECTED'),
+   'EXISTING_MULTI_JOB_WAKE_CONNECTED_NO_GENERAL_REPAIR_EXECUTION_PROVEN'),
   capability('independent_final_receipt_history',
    'reality_internal.genuine_independent_final_receipts_v1',
    verifiedOutcomes?'ORIGINAL_SHIFT_RECEIPT_OBSERVED':

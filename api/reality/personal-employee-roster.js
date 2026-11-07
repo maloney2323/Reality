@@ -5,6 +5,11 @@ import {privateChatConfig,authenticatedChatSession} from '../../src/reality-priv
 import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
 import {buildRealityNamedEmployeeRoster} from '../../src/reality-employee-identity-roster-v1.js';
+import {buildRealityShiftValuePreview} from '../../src/reality-shift-value-preview-v1.js';
+import {prepareNextWeekEmployeePlan}
+ from '../../src/reality-next-week-employee-plan-v1.js';
+import {shiftDatabase,shiftRpc}
+ from '../../src/reality-governed-shift-boundary-v1.js';
 export const maxDuration=45;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -23,7 +28,32 @@ export default async function handler(req,res){
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
-  return res.status(200).json({ok:true,...roster,owner_scope_verified:true,
+  const value_preview=buildRealityShiftValuePreview(roster);
+  let verifiedSource=null,backgroundSourceIssueCount=null;
+  // Scheduled private Supabase prep is a SOURCE snapshot, never owner job
+  // authority. Losing that readback degrades to an explicitly on-demand draft.
+  try{
+   const db=shiftDatabase(process.env);
+   if(db.url===session.config?.url){
+    const prepared=await shiftRpc(db,'reality_read_next_week_source_snapshot_v1',{});
+    if(prepared?.status==='NEXT_WEEK_SOURCE_SNAPSHOT_PREPARED'&&
+       prepared.shift_execution_authorized===false&&
+       prepared.installation_authorized===false&&
+       prepared.production_changed===false){
+      verifiedSource=prepared;
+      backgroundSourceIssueCount=prepared.open_issue_count;
+    }
+   }
+  }catch{
+   // Never claim the unattended refresh succeeded on readback failure.
+  }
+  const next_week_plan=prepareNextWeekEmployeePlan(roster,{
+   preparedSource:verifiedSource
+  });
+  return res.status(200).json({ok:true,...roster,value_preview,
+   next_week_plan,
+   next_week_background_open_issue_count:backgroundSourceIssueCount,
+   owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
  }catch(e){

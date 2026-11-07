@@ -66,11 +66,15 @@ export function renderRileyLoopReadiness({activeShiftCount,candidates,verified=[
  if(!candidates.length)return result('NO_NEW_QUALIFIED_SHIFT_BOUND_ORIGINAL_JOB',{
   missing_gate:'QUALIFIED_OWNER_AUTHORIZED_ORIGINAL_JOB',
   explanation:'An employee shift alone does not authorize a new original job or capability installation.'});
- if(candidates.length!==1)return result('AMBIGUOUS_ORIGINAL_JOB_NO_AUTO_SELECTION',{
-  missing_gate:'ONE_EXACT_ORIGINAL_JOB',
-  explanation:'Multiple candidate jobs cannot be selected automatically.'});
- const candidate=candidates[0];
- const approved=verified.filter(x=>
+ if(candidates.length>4||new Set(candidates.map(x=>x.shift_id)).size!==1||
+   new Set(candidates.map(x=>x.original_work_id)).size!==candidates.length||
+   candidates.some(x=>!UUID.test(x.shift_id||'')||
+    !WORK.test(x.original_work_id||'')||!UUID.test(x.trigger_id||'')||
+    !ISSUE.test(x.source_ref||'')||!SHA.test(x.proof_sha256||'')))
+  return result('AMBIGUOUS_ORIGINAL_JOB_NO_AUTO_SELECTION',{
+   missing_gate:'DISTINCT_EXACT_AUTHORIZED_ORIGINAL_JOBS',
+   explanation:'More than four, duplicate, cross-shift or invalid originals require independent reconciliation.'});
+ const approved=candidates.every(candidate=>verified.filter(x=>
   x?.status==='EXACT_SHIFT_CAPABILITY_WAKE_ELIGIBLE'&&
   x.shift_id===candidate.shift_id&&
   x.original_work_id===candidate.original_work_id&&
@@ -78,15 +82,21 @@ export function renderRileyLoopReadiness({activeShiftCount,candidates,verified=[
   x.source_ref===candidate.source_ref&&
   x.source_proof_sha256===candidate.proof_sha256&&
   x.existing_job_only===true&&x.installation_authorized===false&&
-  x.original_job_completed===false&&x.production_changed===false);
- if(approved.length!==1)return result('EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE',{
+  x.original_job_completed===false&&x.production_changed===false).length===1);
+ if(!approved)return result('EXACT_ORIGINAL_WAKE_NOT_CURRENTLY_ELIGIBLE',{
   missing_gate:'SERVICE_ROLE_INDEPENDENT_ORIGINAL_WORK_READBACK',
-  explanation:'Current database authority does not permit this candidate to wake.'});
- return result('EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE',{
-  missing_gate:null,
-  original_work_id:candidate.original_work_id,
-  shift_id:candidate.shift_id,
+  explanation:'Every original must independently pass the current DB authority gate; partial eligibility cannot wake a batch.'});
+ if(candidates.length===1)return result('EXACT_AUTHORIZED_EXISTING_JOB_ELIGIBLE_FOR_WAKE',{
+  missing_gate:null,original_work_id:candidates[0].original_work_id,
+  shift_id:candidates[0].shift_id,
   explanation:'Eligibility is verified. Worker dispatch, atomic claim, actual execution and final receipt are separate proofs.',
+  worker_claim_acknowledged:false
+ });
+ return result('EXACT_AUTHORIZED_EXISTING_JOBS_ELIGIBLE_FOR_WAKE',{
+  missing_gate:null,shift_id:candidates[0].shift_id,
+  eligible_original_count:candidates.length,
+  original_work_ids:candidates.map(x=>x.original_work_id),
+  explanation:'Multiple distinct existing owner jobs pass individual wake gates. This is read-only eligibility, not a batch claim or execution.',
   worker_claim_acknowledged:false
  });
 }

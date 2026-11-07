@@ -1,10 +1,10 @@
 // Deterministic, narrow owner-command interpreter for the existing simple Chat.
 // A user pressing Send on an explicit "run a 10-hour shift" is the owner start
 // authorization. No model reply or passive conversation can authorize a shift.
-// This recognizes only an immediate, one-time 8/10/12-hour action.
+// Explicit owner-selected 1–12-hour one-time actions; never recurrence.
 export const CHAT_SHIFT_COMMAND_VERSION='reality-owner-chat-shift-command-v1';
-const HOUR_WORDS=Object.freeze({eight:8,ten:10,twelve:12});
-const IMMEDIATE=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch|schedule)\s+(?:(?:me\s+)?(?:an?\s+))?(eight|ten|twelve|8|10|12)(?:\s|-)+(?:hours?|hrs?)(?:\s|-)+(?:autonomous\s+|governed\s+|development\s+|employee\s+|work\s+|research\s+|software\s+){0,4}(?:shift|workday|work\s+day)\b/i;
+const HOUR_WORDS=Object.freeze({one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12});
+const IMMEDIATE=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch|schedule)\s+(?:(?:me\s+)?(?:an?\s+))?(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})(?:\s|-)+(?:hours?|hrs?)(?:\s|-)+(?:autonomous\s+|governed\s+|development\s+|employee\s+|work\s+|research\s+|software\s+){0,4}(?:shift|workday|work\s+day)\b/i;
 // Explicit one-time full shift means the existing 8-hour owner shift,
 // never indefinite, recurring or authority over unapproved original jobs.
 const FULL_SHIFT=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:'s|’s)?\s+))?(?:(?:the|an?)\s+)?(?:full|entire|complete)\s+(?:engineering\s+)?(?:shift|workday|work\s+day)(?:\s+now)?[.!]?$/i;
@@ -19,7 +19,7 @@ export function interpretSignedInChatShiftCommand(message){
  if(!full&&!match)return null;
  const value=full?'eight':match[1].toLowerCase();
  const hours=/^\d+$/.test(value)?Number(value):HOUR_WORDS[value];
- if(![8,10,12].includes(hours))return null;
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)return null;
  return Object.freeze({
   intent:'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT',
   duration_hours:hours,
@@ -38,7 +38,8 @@ export function safeShiftReadbackState(data,{requestedHours=null}={}){
  if(active.length){
   const s=active[0];
   const start=Date.parse(s.planned_start_at),end=Date.parse(s.planned_end_at);
-  if(!Number.isFinite(start)||!Number.isFinite(end)||!([8,10,12].includes((end-start)/3600000))||
+  if(!Number.isFinite(start)||!Number.isFinite(end)||!(Number.isSafeInteger((end-start)/3600000)&&
+       (end-start)/3600000>=1&&(end-start)/3600000<=12)||
      typeof s.shift_id!=='string'||!(/^[a-f0-9-]{36}$/i.test(s.shift_id)))
     throw Error('SHIFT_CHAT_ACTIVE_IDENTITY_NOT_VERIFIED');
   return Object.freeze({hasActive:true,shift_id:s.shift_id,duration_hours:(end-start)/3600000,

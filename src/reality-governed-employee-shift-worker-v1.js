@@ -1,6 +1,8 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {wakeExistingRileyCapabilityJob}
  from './reality-employee-shared-capability-wake-v1.js';
+import {wakeExistingRileyShiftCapabilityBatch}
+ from './reality-riley-existing-multi-job-wake-v1.js';
 const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -60,8 +62,10 @@ async function readPreflight(db,{fetchImpl=fetch}={}){
   no_new_authority_granted:true};
 }
 export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
- wakeCapability=wakeExistingRileyCapabilityJob}={}){
- if(typeof wakeCapability!=='function')throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
+ wakeCapability=wakeExistingRileyCapabilityJob,
+ wakeMultiple=wakeExistingRileyShiftCapabilityBatch}={}){
+ if(typeof wakeCapability!=='function'||typeof wakeMultiple!=='function')
+  throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
  if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
@@ -80,12 +84,15 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  let capabilityWake=null;
  if(reconciled.status==='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'){
   try{
-   capabilityWake=await wakeCapability({db,reconciliation:reconciled,fetchImpl});
+   capabilityWake=reconciled.governed_existing_work_status===
+    'AMBIGUOUS_ORIGINAL_SCOPE_NO_AUTOMATIC_SELECTION'?
+     await wakeMultiple({db,reconciliation:reconciled,fetchImpl}):
+     await wakeCapability({db,reconciliation:reconciled,fetchImpl});
   }catch(e){
    const raw=String(e?.message||'');
    capabilityWake={
     status:'EXACT_CAPABILITY_WAKE_REQUIRES_RECONCILIATION',
-    reason_code:/^(?:RILEY_SHARED_WAKE_|SHIFT_DATABASE_RPC_|GENUINE_WAKE_DISPATCH_)[A-Z0-9_]{3,110}$/.test(raw)?
+    reason_code:/^(?:RILEY_SHARED_WAKE_|RILEY_MULTI_WAKE_|RILEY_MULTI_JOB_|SHIFT_DATABASE_RPC_|GENUINE_WAKE_DISPATCH_)[A-Z0-9_]{3,110}$/.test(raw)?
      raw:'TRUSTED_WAKE_READBACK_UNAVAILABLE',
     worker_execution_acknowledged:false,installation_authorized:false,
     original_job_completed:false,production_changed:false
