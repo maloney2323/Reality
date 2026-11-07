@@ -78,6 +78,9 @@ export function createOneOpenAICombinedRoleCoordinator({
    provider_status:input.provider.provider_status,
    source_title:String(input.provider.source_title||'').slice(0,180),
    issue_or_run_id:input.provider.provider_id||null,
+   // Evidence is sourced only from the server's bounded GitHub readback.
+   // The model never receives client requests, tools or owner credentials.
+   observed_source_evidence:input.provider.provider_evidence||null,
    step_index:input.step_index,stage:rule.stage,
   });
   // No model-created tool calls or elevated role identity. One authenticated
@@ -93,13 +96,19 @@ export function createOneOpenAICombinedRoleCoordinator({
      'No action authorization, code installation, employee firing, production write, '+
      'final receipt, verified human-hours savings, independent certification or tools are available. '+
      'You are one OpenAI model helping multiple named business functions sequentially. '+
-     'Answer with a concise diagnosis of what to investigate next and the evidence needed. '+
-     'Never claim an issue was fixed or a job settled unless the trusted system independently verifies it.'}]},
+     'Perform a concrete bounded engineering review using the supplied GitHub evidence. '+
+     'For a PR with inspected changed files, identify exact affected file paths, specific risks, '+
+     'regression tests and actionable review recommendations. For an issue, identify the '+
+     'reproduction and repair acceptance checks. Distinguish observed facts from speculation, '+
+     'and explicitly flag incomplete patch or issue coverage. '+
+     'Never claim an issue was fixed, code was reviewed in full, or a job settled '+
+     'unless the trusted system independently verifies it.'}]},
     {role:'user',content:[{type:'input_text',text:
      'Role handoff: '+rule.roles.join(' → ')+
      '\nObjectives: '+rule.goal+
      '\nCurrent owner-authorized read-only shift step and GitHub provider readback:\n'+source+
-     '\nOnly suggest next checks; do not perform or claim an action.'}]}
+     '\nProduce a specific, file-aware review or reproduction plan using only observed source. '+
+     'Do not execute, install, merge or claim independent acceptance.'}]}
    ],
   };
   let response;
@@ -143,6 +152,8 @@ export function createOneOpenAICombinedRoleCoordinator({
     model_advice_truncated:truncated,
     model_response_id:data.id,
     advisory_sha256:'sha256:'+hash(immutable),
+    provider_source_snapshot_sha256:'sha256:'+hash(source),
+    source_details_included:input.provider.provider_evidence!==undefined,
     model_invocations_completed:1,
     provider_usage_input_tokens:Number.isSafeInteger(data.usage?.input_tokens)?
      data.usage.input_tokens:null,
