@@ -150,6 +150,10 @@ test('invalid schema, mismatched hash and elevated registry cannot enter model m
   ...factoryMinimal(),
   tool:{...tool,schema_sha256:'1'.repeat(64)}
  }),/SCHEMA_CONTENT_HASH_MISMATCH/);
+ const optional={...tool,parameters:{...schema,required:[]}};
+ assert.throws(()=>createGovernedLateBoundToolAdapter({
+  ...factoryMinimal(),tool:optional
+ }),/SCHEMA_UNSUPPORTED_OR_UNSAFE/);
  const bad={...tool,parameters:{...schema,additionalProperties:true}};
  assert.throws(()=>createGovernedLateBoundToolAdapter({
   ...factoryMinimal(),tool:bad
