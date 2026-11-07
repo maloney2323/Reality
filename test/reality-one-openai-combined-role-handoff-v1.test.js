@@ -252,3 +252,49 @@ test('Riley and Quinn inspect actual PR change patches in an authorized shift re
  assert.equal(evidence.combined_role_handoff.independent_verification_performed,false);
  assert.equal(calls.filter(c=>c.url.startsWith('https://api.github.com/')).length,2);
 });
+
+test('preview nonreasoning GPT-4.1 model omits reasoning-only request fields',async()=>{
+ const sent=[];
+ const c=createOneOpenAICombinedRoleCoordinator({
+  apiKey:'isolated-not-secret-key',model:'gpt-4.1-mini',
+  fetchImpl:async(url,opt)=>{sent.push(JSON.parse(opt.body));return mockResponse();}
+ });
+ const r=await c(context);
+ assert.equal(r.status,'SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK');
+ assert.equal(sent.length,1);
+ assert.equal(sent[0].model,'gpt-4.1-mini');
+ assert.equal(Object.hasOwn(sent[0],'reasoning'),false);
+ assert.equal(sent[0].tool_choice,'none');
+ assert.equal(r.original_job_completed,false);
+ const advanced=[];
+ const c2=createOneOpenAICombinedRoleCoordinator({
+  apiKey:'isolated-not-secret-key',model:'gpt-5.4',
+  fetchImpl:async(url,opt)=>{advanced.push(JSON.parse(opt.body));return mockResponse();}
+ });
+ await c2(context);
+ assert.deepEqual(advanced[0].reasoning,{effort:'low'});
+});
+test('failed provider returns whitelisted diagnostic class, not raw secret or false completion',async()=>{
+ for(const [http,expected] of [
+  [400,'OPENAI_REQUEST_OPTIONS_REJECTED'],
+  [401,'OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED'],
+  [403,'OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED'],
+  [404,'OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND'],
+  [429,'OPENAI_RATE_OR_QUOTA_LIMIT'],
+  [503,'OPENAI_PROVIDER_SERVER_FAILURE']
+ ]){
+  const c=createOneOpenAICombinedRoleCoordinator({
+   apiKey:'isolated-not-secret-key',model:'gpt-4.1-mini',
+   fetchImpl:async()=>({
+    ok:false,status:http,
+    json:async()=>({error:'leak sensitive provider details never expose'})
+   })
+  });
+  const result=await c(context);
+  assert.equal(result.status,'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM');
+  assert.equal(result.reason,expected);
+  assert.equal(result.model_invocations_completed,0);
+  assert.equal(result.original_job_completed,false);
+  assert.equal(JSON.stringify(result).includes('leak sensitive'),false);
+ }
+});
