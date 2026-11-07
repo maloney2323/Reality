@@ -15,7 +15,8 @@ const NOW='2026-11-06T18:01:00.000Z';
 const LATER='2026-11-06T18:02:00.000Z';
 const S={owner_id:OWNER,shift_id:SHIFT,original_work_id:WORK,
  goal_id:'goal:source-repair',continuity_root_id:ROOT,
- worldline_id:WORLD,ledger_head_hash:'a'.repeat(64),
+ worldline_id:WORLD,source_identity_hash:'9'.repeat(64),
+ ledger_head_hash:'a'.repeat(64),
  authorization_fingerprint:'b'.repeat(64),
  authorization_expires_at:'2026-11-06T20:00:00.000Z',
  target_environment:'ISOLATED_PREVIEW',
@@ -25,7 +26,8 @@ const S={owner_id:OWNER,shift_id:SHIFT,original_work_id:WORK,
  production_changed:false};
 const F={failure_id:'33333333-4444-4555-8666-777777777777',
  owner_id:OWNER,shift_id:SHIFT,original_work_id:WORK,goal_id:S.goal_id,
- continuity_root_id:ROOT,worldline_id:WORLD,ledger_head_hash:S.ledger_head_hash,
+ continuity_root_id:ROOT,worldline_id:WORLD,
+ source_identity_hash:S.source_identity_hash,ledger_head_hash:S.ledger_head_hash,
  failed_valid_at:'2026-11-06T17:59:00.000Z',
  provider_evidence_sha256:'c'.repeat(64),capability_id:'repair_runner',
  blocker_class:'ENVIRONMENT_CONTEXT_DEFICIT',
@@ -57,7 +59,8 @@ const approval={independently_verified:true,original_work_id:WORK,owner_id:OWNER
  approved_environment:'ISOLATED_PREVIEW'};
 const checkpoint={independently_verified:true,
  original_work_id:WORK,owner_id:OWNER,goal_id:S.goal_id,
- failure_id:F.failure_id,checkpoint_sha256:'1'.repeat(64),
+ failure_id:F.failure_id,source_identity_hash:S.source_identity_hash,
+ checkpoint_sha256:'1'.repeat(64),
  provider_effect_may_have_occurred:false,original_job_settled:false};
 test('signed immutable bitemporal envelope includes valid, transaction and execution times',()=>{
  const envelope=make();
@@ -68,6 +71,7 @@ test('signed immutable bitemporal envelope includes valid, transaction and execu
  assert.equal(envelope.body.authorization_granted_by_handoff,false);
  const verified=verifyGovernedRecoveryHandoff(args(envelope));
  assert.equal(verified.status,'HANDOFF_INDEPENDENT_SCOPE_VERIFIED');
+ assert.equal(verified.source_identity_hash,S.source_identity_hash);
  assert.equal(verified.execution_time,NOW);
  assert.equal(verified.installation_authorized,false);
 });
@@ -83,6 +87,8 @@ test('tamper, wrong key, stale authority, foreign owner and uncertain external e
  /DRIFT/);
  assert.throws(()=>verifyGovernedRecoveryHandoff(args(original,{
   ...S,ledger_head_hash:'f'.repeat(64)})),/LEDGER_TIP_CHANGED/);
+ assert.throws(()=>verifyGovernedRecoveryHandoff(args(original,{
+  ...S,source_identity_hash:'f'.repeat(64)})),/DRIFT/);
  assert.throws(()=>verifyGovernedRecoveryHandoff({...args(original),
   executionTime:'2026-11-06T20:00:00.000Z'}),/EXPIRED_OR_BITEMPORAL/);
  assert.throws(()=>verifyGovernedRecoveryHandoff({...args(original),
@@ -105,6 +111,7 @@ test('trusted existing tool is rebound without synthesis, new permissions or ins
  assert.equal(resume.status,'SAME_ORIGINAL_JOB_READY_FOR_GOVERNED_CONTINUATION');
  assert.equal(resume.original_work_id,WORK);
  assert.equal(resume.automatic_resume_completed,false);
+ assert.equal(resume.tool_scope,'EPHEMERAL_ORIGINAL_JOB_ONLY');
  assert.equal(resume.existing_executor_must_acquire_atomic_fenced_claim,true);
  assert.equal(resume.independently_verified_final_receipt,false);
 });
@@ -169,6 +176,23 @@ test('wrong approval artifact and unsafe newly generated permissions cannot be a
   candidate:{...candidate,manifest:{...manifest,required_capabilities:['github:write']}},
   installationApproval:approval}),/TOOL_MANIFEST_OUTSIDE/);
 });
+test('model or transport cannot forge a broker approval or replace the tool manifest',()=>{
+ const result=brokerGovernedRecoveryCapability({...args(),
+  registryReadback:registry('ACTIVE')});
+ const forged={...result,status:'APPROVED_CANDIDATE_REQUIRES_INSTALL_READBACK',
+  staged_artifact_sha256:'f'.repeat(64)};
+ assert.throws(()=>planZeroTouchSameJobContinuation({
+  ...args(),brokerResult:forged,checkpointReadback:checkpoint,
+  installedReadback:{independently_verified:true,original_work_id:WORK,
+   artifact_sha256:'f'.repeat(64),environment:'ISOLATED_PREVIEW',
+   activated:true,provider_effect_may_have_occurred:false}
+ }),/BROKER_DECISION_SIGNATURE_INVALID/);
+ const deleted={...result};delete deleted.decision_signature;
+ assert.throws(()=>planZeroTouchSameJobContinuation({...args(),
+  brokerResult:deleted,checkpointReadback:checkpoint}),
+ /SIGNED_BROKER_DECISION_REQUIRED/);
+});
+
 test('resume requires durable same-job pre-failure checkpoint; no ambiguous replay',()=>{
  const result=brokerGovernedRecoveryCapability({...args(),
   registryReadback:registry('ACTIVE')});
@@ -177,6 +201,7 @@ test('resume requires durable same-job pre-failure checkpoint; no ambiguous repl
   {...checkpoint,original_job_settled:true},
   {...checkpoint,provider_effect_may_have_occurred:true},
   {...checkpoint,checkpoint_sha256:'not-a-hash'},
+  {...checkpoint,source_identity_hash:'0'.repeat(64)},
  ]){
   assert.throws(()=>planZeroTouchSameJobContinuation({
    ...args(),brokerResult:result,checkpointReadback:changed}),/CHECKPOINT_REQUIRED/);
