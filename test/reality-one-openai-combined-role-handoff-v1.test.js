@@ -46,7 +46,7 @@ test('one OpenAI request combines Riley and Taylor, and never receives tools or 
  const msg=body.input[1].content[0].text;
  assert.match(msg,/Riley → Taylor/);
  assert.match(msg,/#263 worker disconnect/);
- assert.match(msg,/Only suggest next checks/);
+ assert.match(msg,/Produce a specific, file-aware review/);
  assert.equal(sent[0].options.method,'POST');
 });
 test('the one-model coordinator changes role context by governed step, no additional model instances',async()=>{
@@ -184,4 +184,71 @@ test('OpenAI unavailable still stores REAL checked provider source with truthful
   '/rpc/reality_settle_employee_shift_step_v1')).opts.body).p_proof;
  assert.equal(proof.provider_status,'OPEN_ISSUE');
  assert.equal(proof.combined_role_handoff.original_job_completed,false);
+});
+
+test('Riley and Quinn inspect actual PR change patches in an authorized shift review step',async()=>{
+ const src='https://github.com/maloney2323/Reality/pull/265';
+ const base='https://api.github.com/repos/maloney2323/Reality/pulls/265';
+ const calls=[],requestBodies=[];
+ const gitResponse=body=>({ok:true,status:200,json:async()=>body});
+ const workerFetch=async(url,opt)=>{
+  calls.push({url,opt});
+  if(url.endsWith('reality_close_employee_shift_v1'))
+   return gitResponse({status:'NO_SHIFT_DUE_FOR_CLOSE'});
+  if(url.endsWith('reality_reconcile_employee_shift_original_v1'))
+   return gitResponse({status:'NO_SHIFT_AWAITING_EXACT_WORK'});
+  if(url.endsWith('reality_claim_employee_shift_step_v1'))
+   return gitResponse({status:'READ_ONLY_STEP_CLAIMED',
+    shift_id:uuid,claim_id:uuid,owner_id:uuid,step_index:4,
+    stage:'REVIEW_INDEPENDENT_EVIDENCE',
+    source_ref:src,no_external_write_authority:true});
+  if(url===base)
+   return gitResponse({
+    id:9987,html_url:src,title:'Riley preview handoff',
+    state:'open',head:{sha:'a'.repeat(40)},base:{sha:'b'.repeat(40)},
+    changed_files:1
+   });
+  if(url===base+'/files?per_page=12')
+   return gitResponse([{
+    filename:'src/reality-riley-service-original-runtime-v1.js',
+    status:'modified',additions:3,deletions:1,
+    patch:'@@ -12,3 +12,5 @@\\n- const oldPath=null;\\n+ const exactOriginal=trustedReadback();'
+   }]);
+  if(url.endsWith('reality_settle_employee_shift_step_v1')){
+   requestBodies.push(JSON.parse(opt.body).p_proof);
+   return gitResponse({status:'READ_ONLY_PROVIDER_EVIDENCE_RECORDED',
+    step_index:4,proof_sha256:'sha256:'+'b'.repeat(64),
+    production_changed:false,original_job_completed:false,human_hours_saved:null});
+  }
+  throw Error('Unexpected PR work request '+url);
+ };
+ const openaiBodies=[];
+ const model=createOneOpenAICombinedRoleCoordinator({
+  apiKey:'isolated-not-secret-key',model:'gpt-test',
+  fetchImpl:async(url,opt)=>{
+   assert.equal(url,'https://api.openai.com/v1/responses');
+   openaiBodies.push(JSON.parse(opt.body));return mockResponse(
+    'Observed exact changed source path and regression tests needed; no code installed.');
+  }
+ });
+ const result=await processGovernedEmployeeShiftTick({
+  url:'https://isolated.example',secretKey:'isolated-no-real-secret'
+ },{fetchImpl:workerFetch,coordinateRoleWork:model});
+ assert.equal(result.status,'READ_ONLY_SHIFT_STEP_SETTLED');
+ assert.equal(result.role_handoff_model_calls,1);
+ assert.equal(openaiBodies.length,1);
+ const delivered=openaiBodies[0].input[1].content[0].text;
+ assert.match(delivered,/reality-riley-service-original-runtime-v1.js/);
+ assert.match(delivered,/trustedReadback/);
+ assert.equal(openaiBodies[0].tool_choice,'none');
+ assert.equal(requestBodies.length,1);
+ const evidence=requestBodies[0];
+ assert.equal(evidence.provider_evidence.kind,'PULL_REQUEST_CHANGESET_OBSERVED');
+ assert.equal(evidence.provider_evidence.review_coverage,'BOUNDED_CHANGED_FILES_READ');
+ assert.equal(evidence.provider_evidence.head_sha,'a'.repeat(40));
+ assert.equal(evidence.combined_role_handoff.source_details_included,true);
+ assert.match(evidence.combined_role_handoff.provider_source_snapshot_sha256,/^sha256:[a-f0-9]{64}$/);
+ assert.equal(evidence.combined_role_handoff.original_job_completed,false);
+ assert.equal(evidence.combined_role_handoff.independent_verification_performed,false);
+ assert.equal(calls.filter(c=>c.url.startsWith('https://api.github.com/')).length,2);
 });
