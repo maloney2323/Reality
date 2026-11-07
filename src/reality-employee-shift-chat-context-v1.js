@@ -29,7 +29,17 @@ export async function readVerifiedEmployeeShiftForChat({
    'reality_read_owner_employee_shifts_v1',
    {p_owner_id:session.user_id},{fetchImpl}));
   const brief=buildRealityShiftConversationBrief(read.shifts,[],now);
+  const alreadyAuthorized=['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
+   .includes(brief.status);
+  const currentShift=read.shifts[0]||null;
+  const briefingAuthority=alreadyAuthorized?
+   ' VERIFIED OWNER START AUTHORITY: This SAME SHIFT was already explicitly authorized and recorded; SHIFT ID '+brief.shift_id+
+   '. Do not ask the owner to repeat approval, repeat a magic command, click Start again, or imply the shift is inactive. '+
+   'A source-check shift can be authorized even though no separate repair original has been admitted. '+
+   'If original code repair remains unqualified, explain that engineering admission/dispatch is blocking execution, not the owner refusing authorization. ':
+   ' No active owner shift is verified in this readback; a signed-in explicit Start message or matching Start button may authorize a new exact source-bound shift without an extra confirmation. ';
   const summary='REALITY CURRENT EMPLOYEE SHIFT: '+brief.headline+
+   briefingAuthority+
    ' WHAT HAS BEEN DONE: '+brief.what_finished+
    ' CURRENT STATE: '+brief.current+
    ' NEXT: '+brief.next+
@@ -45,6 +55,14 @@ export async function readVerifiedEmployeeShiftForChat({
    epistemic_status:'SHIFT_QUEUE_STATE_OBSERVED_NOT_FULL_DAY_VERIFIED',
    summary,
    shift_status:brief.status,
+   owner_shift_authorization_recorded:alreadyAuthorized,
+   active_owner_shift_id:alreadyAuthorized?brief.shift_id:null,
+   source_step_execution_authorized:alreadyAuthorized,
+   shift_start_command_already_satisfied:alreadyAuthorized,
+   exact_original_repair_admission_verified:currentShift?.steps?.[5]?.state===
+     'ORIGINAL_JOB_RECEIPT_VERIFIED'&&currentShift?.steps?.[6]?.state===
+     'ORIGINAL_JOB_RECEIPT_VERIFIED',
+   extra_shift_approval_required:false,
    source_checks_recorded:brief.verified_source_checks,
    original_job_receipts_matched:brief.verified_original_job_receipts,
    complete_shift_proven:false,verified_human_hours_saved:null,
@@ -194,7 +212,7 @@ export async function readVerifiedRileySourceWorkForChat({
   snapshot.source_prepared_at+'. '+details+
   (snapshot.omitted_source_issue_count?
    ' Additional '+snapshot.omitted_source_issue_count+' source observations omitted from this bounded preview.':'')+
-  '. IMPORTANT: OPEN ISSUES ARE NOT QUALIFIED ORIGINAL JOBS. Previously settled or rejected original work must NOT be retried. A source-backed issue, a goal, or the owner saying "I am ready" in ordinary Chat DOES NOT authorize a shift or installation. To authorize a 3-hour Riley pilot, use the signed-in shift control at /chat-simple#riley-shift and click "Run Riley\'s Shift"; the control must record and independently read back exact owner authorization. Riley\'s autonomous repair-to-final-receipt pipeline on a fresh original job remains to be verified. Do NOT say there is no known work merely because no employee shift is active.';
+  '. IMPORTANT: OPEN ISSUES ARE NOT QUALIFIED ORIGINAL JOBS. Previously settled or rejected original work must NOT be retried. This is only a source inventory, NOT a shift authorization readback. CHECK the separate CURRENT OWNER SHIFT readback BEFORE claiming the user needs to authorize a shift; it may already be running. The signed-in explicit chat instruction "start the shift" is itself a first authorization through the existing owner-scoped controller, exactly like the Start button. Never demand a magic authorization phrase or a duplicate shift. Exact capability installation still needs a separately verified artifact-specific approval. An existing-code repair can remain blocked at qualification even when its shift is already authorized. Never claim the absence of qualified originals means Riley has no unfinished work.';
  return [Object.freeze({
   entry_id:'riley:source-work:'+snapshot.source_sha256,
   event_kind:'riley_discovered_source_work_readback_before_shift',
