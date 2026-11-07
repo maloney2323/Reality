@@ -61,11 +61,77 @@ async function readPreflight(db,{fetchImpl=fetch}={}){
   independent_final_receipts_read:receipts.receipts.length,
   no_new_authority_granted:true};
 }
+// A wake is NOT execution authority. This handoff is only eligible after an
+// independently matched source/shift/queue readback, a matching wake receipt,
+// and the shift's exact step-six gate. The injected trusted driver must
+// independently recheck owner, time window, goal, provider effects and make
+// its own globally single-use claim BEFORE invoking the shared executor.
+function qualifiedOriginalDriverScope(reconciled,wake,claimed){
+ if(reconciled?.status!=='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'||
+  reconciled.governed_existing_work_status!==
+   'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'||
+  !UUID.test(reconciled.shift_id||'')||
+  !/^work:[a-f0-9]{32}$/.test(reconciled.governed_original_work_id||'')||
+  !UUID.test(reconciled.governed_trigger_id||'')||
+  !URL.test(reconciled.shift_observation_source_ref||'')||
+  !/^sha256:[a-f0-9]{64}$/.test(reconciled.shift_observation_proof_sha256||'')||
+  reconciled.governed_cycle_dispatched_by_shift!==false||
+  reconciled.model_invoked_by_shift!==false||
+  reconciled.new_customer_job_created!==false||
+  reconciled.installation_authorized!==false||
+  reconciled.production_changed!==false||
+  wake?.status!=='EXISTING_REALITY_CAPABILITY_WAKE_RECORDED'||
+  wake.shift_id!==reconciled.shift_id||
+  wake.original_work_id!==reconciled.governed_original_work_id||
+  wake.worker_execution_acknowledged!==false||
+  wake.installation_authorized!==false||
+  wake.original_job_completed!==false||
+  wake.production_changed!==false||
+  claimed?.status!=='EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED'||
+  claimed.shift_id!==reconciled.shift_id)
+  return null;
+ return Object.freeze({
+  shift_id:reconciled.shift_id,
+  original_work_id:reconciled.governed_original_work_id,
+  trigger_id:reconciled.governed_trigger_id,
+  source_ref:reconciled.shift_observation_source_ref,
+  source_proof_sha256:reconciled.shift_observation_proof_sha256,
+  read_only:false,preflight_only:false,
+  shift_read_does_not_grant_execution_authority:true,
+  exact_trusted_original_preflight_required:true
+ });
+}
+function assertOriginalDriverOutcome(out,scope){
+ if(out?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
+  out.shift_id!==scope.shift_id||
+  !Number.isSafeInteger(out.attempted)||out.attempted<0||out.attempted>4||
+  !Number.isSafeInteger(out.independently_settled)||
+  out.independently_settled<0||out.independently_settled>out.attempted||
+  !Array.isArray(out.outcomes)||out.outcomes.length>4||
+  !out.outcomes.some(x=>x?.original_work_id===scope.original_work_id)||
+  out.installation_authorized!==false||
+  out.production_changed!==false||
+  out.shift_finished!==false||out.full_shift_proven!==false)
+  throw Error('SHIFT_ORIGINAL_DRIVER_INDEPENDENT_OUTCOME_UNVERIFIED');
+ return Object.freeze({
+  status:out.status,shift_id:scope.shift_id,original_work_id:scope.original_work_id,
+  attempted:out.attempted,independently_settled:out.independently_settled,
+  outcomes:out.outcomes.map(x=>({
+   original_work_id:x.original_work_id,status:x.status,
+   original_job_settled:x.original_job_settled===true
+  })),
+  installation_authorized:false,production_changed:false,
+  full_shift_proven:false
+ });
+}
 export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  wakeCapability=wakeExistingRileyCapabilityJob,
- wakeMultiple=wakeExistingRileyShiftCapabilityBatch}={}){
+ wakeMultiple=wakeExistingRileyShiftCapabilityBatch,
+ executeQualifiedOriginals=null}={}){
  if(typeof wakeCapability!=='function'||typeof wakeMultiple!=='function')
   throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
+ if(executeQualifiedOriginals!==null&&typeof executeQualifiedOriginals!=='function')
+  throw Error('SHIFT_ORIGINAL_DRIVER_ADAPTER_INVALID');
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
  if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
@@ -103,12 +169,23 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP','INFLIGHT_LEASE_UNEXPIRED',
    'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
    'SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
-   'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status))
+   'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status)){
+  const scope=qualifiedOriginalDriverScope(reconciled,capabilityWake,claimed);
+  // Absence of a trusted driver is a visible blocker, not a successful shift.
+  // A wake/notification is never mistaken for a real executor result.
+  const originalJobDriver=!scope?null:executeQualifiedOriginals===null?
+   {status:'TRUSTED_ORIGINAL_DRIVER_NOT_CONNECTED',
+    shift_id:scope.shift_id,original_work_id:scope.original_work_id,
+    attempted:0,independently_settled:0,installation_authorized:false,
+    production_changed:false}:
+   assertOriginalDriverOutcome(await executeQualifiedOriginals(scope),scope);
   return {ok:true,status:claimed.status,
    shift_id:claimed.shift_id||null,
    upgrade_approval_channel:'EXISTING_REALITY_CHAT_ONLY',
    capability_wake:capabilityWake,
+   original_job_driver:originalJobDriver,
    installation_authorized:false,job_completed:false,production_changed:false};
+ }
  if(claimed.status!=='READ_ONLY_STEP_CLAIMED'||!UUID.test(claimed.shift_id||'')||
   !UUID.test(claimed.claim_id||'')||!UUID.test(claimed.owner_id||'')||
   !Number.isSafeInteger(claimed.step_index)||claimed.step_index<1||
