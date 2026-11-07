@@ -5,7 +5,9 @@ on:
       - fix/reality-governed-riley-original-driver-20261107
     paths:
       - src/reality-governed-employee-shift-worker-v1.js
+      - src/reality-universal-governed-recovery-handoff-v1.js
       - test/reality-riley-original-driver-security-v1.test.js
+      - test/reality-universal-governed-recovery-handoff-v1.test.js
       - test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js
       - .github/workflows/reality-riley-original-driver-isolated-20261107.yml
   workflow_dispatch:
@@ -23,7 +25,7 @@ jobs:
         with:
           node-version: '22'
       - name: Existing worker and exact original handoff
-        run: node --test test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
+        run: node --test test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
       - name: Compare all existing tests against unchanged development baseline
         shell: bash
         run: |
