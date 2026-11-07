@@ -47,10 +47,14 @@ const registry=(status,tool=manifest)=>({
  capability_id:F.capability_id,manifest:tool});
 const repro={independently_verified:true,
  original_work_id:WORK,capability_id:F.capability_id,
+ source_identity_hash:S.source_identity_hash,
+ provider_evidence_sha256:F.provider_evidence_sha256,
  reproduced_failure:true,frozen_suite_sha256:'e'.repeat(64),
  external_action_performed:false};
 const candidate={independently_verified:true,
  original_work_id:WORK,capability_id:F.capability_id,
+ source_identity_hash:S.source_identity_hash,
+ provider_evidence_sha256:F.provider_evidence_sha256,
  frozen_suite_sha256:repro.frozen_suite_sha256,
  artifact_sha256:'f'.repeat(64),isolation:'NO_NETWORK_NO_SECRETS',
  sandbox_tests_passed:true,production_changed:false,manifest};
@@ -139,11 +143,18 @@ test('missing tool requires independent frozen reproduction, sandbox and exact-a
  assert.equal(brokerGovernedRecoveryCapability(base).status,'FROZEN_REPRODUCTION_REQUIRED');
  assert.equal(brokerGovernedRecoveryCapability({...base,
   frozenReproduction:repro}).status,'ISOLATED_CANDIDATE_VERIFICATION_REQUIRED');
+ assert.equal(brokerGovernedRecoveryCapability({...base,
+  frozenReproduction:{...repro,provider_evidence_sha256:'0'.repeat(64)}})
+  .status,'FROZEN_REPRODUCTION_REQUIRED');
  const staged=brokerGovernedRecoveryCapability({...base,
   frozenReproduction:repro,candidate});
  assert.equal(staged.status,'EXACT_ARTIFACT_APPROVAL_REQUIRED');
  assert.equal(staged.can_rehydrate,false);
  assert.equal(staged.tool_manifest,null);
+ assert.equal(brokerGovernedRecoveryCapability({...base,
+  frozenReproduction:repro,
+  candidate:{...candidate,source_identity_hash:'0'.repeat(64)}})
+  .status,'ISOLATED_CANDIDATE_VERIFICATION_REQUIRED');
  assert.throws(()=>planZeroTouchSameJobContinuation({
   ...args(envelope),brokerResult:staged,checkpointReadback:checkpoint}),
  /CAPABILITY_NOT_INSTALLED_OR_REBOUND/);
