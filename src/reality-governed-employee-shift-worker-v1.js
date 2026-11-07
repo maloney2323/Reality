@@ -1,4 +1,6 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {unavailableRoleHandoff,COMBINED_ROLE_HANDOFF_VERSION}
+ from './reality-one-openai-combined-role-handoff-v1.js';
 import {wakeExistingRileyCapabilityJob}
  from './reality-employee-shared-capability-wake-v1.js';
 import {wakeExistingRileyShiftCapabilityBatch}
@@ -39,7 +41,8 @@ async function readProviderSource(source,{fetchImpl=fetch}={}){
  return {kind:'GITHUB_SOURCE_READBACK',source_url:source,
   provider_status:state,provider_checked:true,read_only:true,
   production_changed:false,observed_at:new Date().toISOString(),
-  provider_id:data.id};
+  provider_id:data.id,
+  source_title:String(data.title||data.name||'').replace(/[\u0000-\u001f]/g,' ').slice(0,180)};
 }
 async function readPreflight(db,{fetchImpl=fetch}={}){
  const claim=await shiftRpc(db,'reality_read_owner_genuine_loop_v1',
@@ -132,11 +135,13 @@ function assertOriginalDriverOutcome(out,scope){
 export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  wakeCapability=wakeExistingRileyCapabilityJob,
  wakeMultiple=wakeExistingRileyShiftCapabilityBatch,
- executeQualifiedOriginals=null}={}){
+ executeQualifiedOriginals=null,coordinateRoleWork=null}={}){
  if(typeof wakeCapability!=='function'||typeof wakeMultiple!=='function')
   throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
  if(executeQualifiedOriginals!==null&&typeof executeQualifiedOriginals!=='function')
   throw Error('SHIFT_ORIGINAL_DRIVER_ADAPTER_INVALID');
+ if(coordinateRoleWork!==null&&typeof coordinateRoleWork!=='function')
+  throw Error('SHIFT_SHARED_MODEL_ROLE_ADAPTER_INVALID');
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
  if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
@@ -206,6 +211,44 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
    provider_checked:false,read_only:true,
    production_changed:false,observed_at:new Date().toISOString()};
  }else proof=await readProviderSource(claimed.source_ref,{fetchImpl});
+ if(claimed.step_index>=2&&claimed.step_index<=5&&
+    proof.kind==='GITHUB_SOURCE_READBACK'){
+  const ctx=Object.freeze({
+   shift_id:claimed.shift_id,claim_id:claimed.claim_id,owner_id:claimed.owner_id,
+   step_index:claimed.step_index,stage:claimed.stage,
+   source_ref:claimed.source_ref,provider:proof,
+   shift_step_claimed:true,read_only:true,
+   installation_authorized:false,production_changed:false
+  });
+  let handoff;
+  try{
+   handoff=coordinateRoleWork?await coordinateRoleWork(ctx):
+    unavailableRoleHandoff(ctx);
+   if(handoff?.version!==COMBINED_ROLE_HANDOFF_VERSION||
+      !['SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK',
+       'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'].includes(handoff.status)||
+      handoff.shift_id!==claimed.shift_id||
+      handoff.step_index!==claimed.step_index||
+      handoff.source_ref!==claimed.source_ref||
+      handoff.one_shared_openai_provider!==true||
+      handoff.independent_verification_performed!==false||
+      handoff.original_job_completed!==false||
+      handoff.installation_authorized!==false||
+      handoff.production_changed!==false||
+      handoff.read_only!==true||
+      !Array.isArray(handoff.roles)||handoff.roles.length<2||
+      handoff.roles.length>3||
+      !Number.isSafeInteger(handoff.model_invocations_completed)||
+      handoff.model_invocations_completed<0||
+      handoff.model_invocations_completed>1)
+     throw Error('SHIFT_MODEL_ROLE_UNTRUSTED');
+  }catch{
+   // A model outage or malformed advisory does not falsify an independently
+   // checked Github source. Record the missing advisory, not a fake success.
+   handoff=unavailableRoleHandoff(ctx);
+  }
+  proof={...proof,combined_role_handoff:handoff};
+ }
  const settled=await shiftRpc(db,'reality_settle_employee_shift_step_v1',{
   p_shift_id:claimed.shift_id,p_step_index:claimed.step_index,
   p_claim_id:claimed.claim_id,p_proof:proof},{fetchImpl});
@@ -219,6 +262,11 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
   shift_id:claimed.shift_id,step_index:claimed.step_index,
   source_status:proof.provider_status||'OWNER_LEDGER_CHECKED',
   evidence_digest:settled.proof_sha256,
+  role_handoff_status:proof.combined_role_handoff?.status||
+   'NO_SOURCE_ROLE_HANDOFF_APPLICABLE',
+  role_handoff_function_labels:proof.combined_role_handoff?.roles||[],
+  role_handoff_model_calls:proof.combined_role_handoff?.model_invocations_completed||0,
+  role_handoff_not_independent_verification:true,
   capability_wake:capabilityWake,
   installation_authorized:false,job_completed:false,
   verified_human_hours_saved:null,production_changed:false};
