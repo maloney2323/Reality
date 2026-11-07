@@ -962,6 +962,110 @@ async function refreshEmployeeBoard(){
   }finally{teamLoading=false}
 }
 
+
+const COMBINED_WORK_SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d{0,15}$/;
+function combinedQueueLink(source,title){
+ const a=document.createElement('a');a.href=source;
+ a.target='_blank';a.rel='noopener noreferrer';a.textContent=title;
+ return a;
+}
+function renderRileyTaylorDraftQueue(draft){
+ const box=$('rileyTaylorCombinedQueue'),rows=$('rileyTaylorQueueRows');
+ const orders=draft?.combined_employee_work_orders;
+ if(draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
+    draft?.read_only!==true||draft?.installation_authorized!==false||
+    draft?.job_started!==false||draft?.production_changed!==false||
+    orders?.version!=='reality-riley-taylor-combined-work-orders-v1'||
+    orders.plan_fingerprint!==draft.expected_fingerprint||
+    orders.execution_started!==false||
+    orders.installation_authorized!==false||
+    orders.production_changed!==false||
+    orders.signed_in_owner_shift_start_required!==true||
+    orders.no_extra_per_task_owner_start_approval!==true||
+    orders.operating_model!=='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'||
+    !Array.isArray(orders.tasks)||orders.tasks.length>4||
+    orders.task_count!==orders.tasks.length)
+  throw Error('RILEY_TAYLOR_COMBINED_WORK_SCOPE_UNVERIFIED');
+ const frag=document.createDocumentFragment();
+ for(const task of orders.tasks){
+  if(!COMBINED_WORK_SOURCE.test(task.source_ref||'')||
+     !/^combined-source-step:[2-5]$/.test(task.assignment_id||'')||
+     !Array.isArray(task.employees)||
+     task.employees.join(',')!=='Riley,Taylor'||
+     typeof task.title!=='string'||task.title.length>210||
+     task.owner_authorization_required!==true||
+     task.accepted_original_repair!==false||
+     task.installation_authorized!==false||
+     task.production_changed!==false)
+   throw Error('RILEY_TAYLOR_SOURCE_WORK_NOT_VERIFIED');
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong','Work '+task.source_step_index+
+   ' · Riley + Taylor · '+task.work_type.replaceAll('_',' ')));
+  row.append(combinedQueueLink(task.source_ref,task.title));
+  row.append(textNode('div','Riley: '+task.riley));
+  row.append(textNode('div','Taylor: '+task.taylor));
+  row.append(textNode('div','Acceptance: '+task.independent_acceptance));
+  frag.append(row);
+ }
+ rows.replaceChildren(frag);
+ $('rileyTaylorQueueStatus').textContent=orders.task_count?
+  orders.task_count+' exact unfinished source assignments prepared for one signed-in owner start. Maximum authorization window: '+
+  orders.maximum_authorized_hours+'h; not a required work duration. No code repair or independent final job receipt is claimed before execution.':
+  'No exact assigned source work in this plan. Reality will not authorize an empty time-only shift.';
+ box.hidden=false;
+}
+function renderActiveRileyTaylorQueue(readback){
+ const active=(readback?.shifts||[]).find(s=>
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+ if(!active||!Array.isArray(active.steps)||active.steps.length!==8)return;
+ const steps=active.steps.filter(s=>s.step_index>=2&&s.step_index<=5&&
+  COMBINED_WORK_SOURCE.test(s.source_ref||''));
+ const holder=$('rileyTaylorQueueRows');
+ const nodes=document.createDocumentFragment();
+ for(const step of steps){
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong','Work '+step.step_index+
+   ' · Riley + Taylor · '+String(step.state||'QUEUED').replaceAll('_',' ')));
+  row.append(combinedQueueLink(step.source_ref,step.source_ref));
+  if(step.state==='SOURCE_CHECKED')
+   row.append(textNode('div','GitHub source evidence recorded. This does not certify a completed code repair.'));
+  else if(step.state==='BLOCKED_PROVIDER')
+   row.append(textNode('div','Provider source blocked; preserve evidence and investigate without unsafe replay.'));
+  else row.append(textNode('div','Awaiting independent source check by the governed worker.'));
+  nodes.append(row);
+ }
+ holder.replaceChildren(nodes);
+ $('rileyTaylorQueueStatus').textContent=
+  'Owner-authorized combined shift '+active.status.replaceAll('_',' ')+
+  ' · '+steps.length+' assigned source tasks · '+
+  steps.filter(x=>x.state==='SOURCE_CHECKED').length+
+  ' source checks recorded. Final original-job repair receipts are independently tracked; no labor savings inferred.';
+ $('rileyTaylorCombinedQueue').hidden=false;
+}
+async function refreshRileyTaylorCombinedWorkQueue(){
+ if(combinedQueueLoading||$('chat').hidden||pending)return;
+ const hours=Number($('runShiftHours').value);
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)return;
+ combinedQueueLoading=true;
+ try{
+  const read=await json(SHIFT+'?hours='+hours,{
+   signal:AbortSignal.timeout(35000)
+  });
+  if(read?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+     !Array.isArray(read.shifts)||read.shifts.length>5)
+    throw Error('OWNER_SHIFT_READBACK_UNAVAILABLE');
+  const current=read.shifts.find(s=>
+   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+  if(current){renderActiveRileyTaylorQueue(read);return;}
+  renderRileyTaylorDraftQueue(read.requested_shift_draft);
+ }catch{
+  $('rileyTaylorCombinedQueue').hidden=false;
+  $('rileyTaylorQueueStatus').textContent=
+   'The owner-scoped combined work plan could not be verified. This does not mean Riley has no unfinished tasks. Check source connection before starting.';
+  $('rileyTaylorQueueRows').replaceChildren();
+ }finally{combinedQueueLoading=false}
+}
+
 const COMBINED_STEP_ROLES=Object.freeze({
  2:['Riley','Taylor'],3:['Riley','Taylor'],
  4:['Riley','Taylor'],5:['Riley','Taylor']
