@@ -83,7 +83,7 @@ export function createOneOpenAICombinedRoleCoordinator({
   // No model-created tool calls or elevated role identity. One authenticated
   // shift claim can produce at most one bounded model advisory per step.
   const payload={
-   model,max_output_tokens:340,
+   model,max_output_tokens:800,
    tool_choice:'none',
    input:[
     {role:'system',content:[{type:'input_text',text:
