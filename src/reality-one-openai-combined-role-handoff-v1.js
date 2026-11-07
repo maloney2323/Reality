@@ -83,7 +83,8 @@ export function createOneOpenAICombinedRoleCoordinator({
   // No model-created tool calls or elevated role identity. One authenticated
   // shift claim can produce at most one bounded model advisory per step.
   const payload={
-   model,max_output_tokens:800,
+   model,max_output_tokens:1200,
+   reasoning:{effort:'low'},
    tool_choice:'none',
    input:[
     {role:'system',content:[{type:'input_text',text:
@@ -118,8 +119,10 @@ export function createOneOpenAICombinedRoleCoordinator({
      typeof data.id!=='string'||!/^resp_[a-zA-Z0-9_-]{4,160}$/.test(data.id))
     return rejected(input,'OPENAI_PROVIDER_RESULT_UNVERIFIED');
    const advice=textFromResponse(data).trim();
-   if(!advice||advice.length>2500)
-    return rejected(input,'OPENAI_BOUNDED_ADVISORY_INVALID');
+   if(!advice)
+    return rejected(input,'OPENAI_EMPTY_FINAL_ADVISORY');
+   if(advice.length>2500)
+    return rejected(input,'OPENAI_ADVISORY_EXCEEDS_BOUNDED_LENGTH');
    // Model claims are never evidence of actual verification or settlement.
    const immutable=JSON.stringify({
     shift_id:input.shift_id,claim_id:input.claim_id,
