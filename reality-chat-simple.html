@@ -1255,12 +1255,13 @@ async function refreshShiftStatus(){
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
     renderCombinedShiftRoleEvidence(data);
+    renderRileyLiveProgress(data);
     renderActiveRileyTaylorQueue(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
       $('runFullShift').disabled=true;
       $('runFullShift').textContent='Existing shift authorized';
-      $('fullShiftScope').textContent='Riley + Taylor combined work already authorized. One governed worker processes the assigned sources and hands off qualifying repairs. Do not start a duplicate; review live source/receipt status below. Original repairs require independently verified final receipts.';
+      $('fullShiftScope').textContent='Your combined shift is ALREADY AUTHORIZED. Do not approve or start it again. Watch live activity below: source reviews, OpenAI model connection, original-job execution, independent receipts and real blockers. If an exact verified installation is needed, Reality Chat must present that artifact separately.';
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
       const route=data.recovery_diagnosis;
@@ -1292,6 +1293,7 @@ async function refreshShiftStatus(){
       node.hidden=false;
     }
   }catch{
+    $('rileyLiveProgressPanel').hidden=true;
     $('combinedShiftRoleHandoffs').hidden=true;
     $('combinedShiftRoleRows').replaceChildren();
     // Fail closed: a connection problem MUST NOT unlock a second shift.
