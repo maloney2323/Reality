@@ -117,11 +117,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
-<label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
-<button id="runFullShift" type="button" disabled title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Checking existing shift…</button>
+<label style="font-size:12px;color:#cedfec">Maximum authorized window <select id="runShiftHours" aria-label="Riley authorized safety window maximum in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
+<button id="runFullShift" type="button" disabled title="Owner-authorized safety window; complete and stop after independent receipts, not after an arbitrary duration">Checking existing shift…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
+<p class="riley-start-guide" id="fullShiftScope"><strong>Run until the jobs are verified, not until a timer runs out.</strong> Choose a maximum authorized safety window and tap <strong>Run Riley's Shift</strong>. Riley and Taylor share the governed work; independent receipts determine successful completion. Reality stops early when every admitted original job is verified. If the safety window expires first, unresolved work is blocked, not completed. <strong>Sending a chat message is not authorization.</strong> Any capability installation still needs your separate exact approval.</p>
 <p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
 <section id="combinedShiftRoleHandoffs" class="team-value" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
  <h3>Combined shift · One OpenAI model across relevant business roles</h3>
@@ -1142,7 +1142,7 @@ async function authorizeShiftFromChat(command){
     acknowledged:true,
     text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
       created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
-      ' The existing trusted worker scheduler must independently claim work. '+
+      ' The existing trusted worker scheduler must independently claim work. The selected hours are a maximum authorization window, NOT a mandatory work duration; verified completion can stop the shift early. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
       'original-job admission for consequential repairs. No installation or production change was authorized.'+batch
