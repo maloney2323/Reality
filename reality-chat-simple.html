@@ -129,6 +129,8 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <progress id="rileySourceProgress" max="5" value="0" style="width:100%;height:13px"></progress>
  <p id="rileyLiveApprovalStatus">Checking whether anything needs your approval…</p>
  <p id="rileyLiveBlocker" role="status"></p>
+ <h4>Real original jobs · independently settled</h4>
+ <div id="rileyVerifiedOriginalJobRows">No completed original-job receipt recorded for this shift.</div>
  <h4>Recorded activity · not hidden model thoughts</h4>
  <div id="rileyLiveTimeline"></div>
  <p style="font-size:12px">Updates automatically from Reality's owner-scoped worker receipts. A source check, model suggestion, or timer is not a completed repair.</p>
@@ -997,6 +999,48 @@ const RILEY_SAFE_MODEL_REASONS=Object.freeze({
  OPENAI_PROVIDER_RESULT_UNVERIFIED:'The OpenAI response did not pass result validation.',
  OPENAI_EMPTY_FINAL_ADVISORY:'The model returned no usable review.'
 });
+function renderRileyVerifiedOriginalJobs(readback,shiftId){
+ const target=$('rileyVerifiedOriginalJobRows');
+ const bound=readback?.riley_pr_review_jobs;
+ target.replaceChildren();
+ if(bound?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
+  !Array.isArray(bound.jobs)||bound.jobs.length>10){
+  target.textContent='Original-job receipt readback unavailable. No completion inferred.';
+  return 0;
+ }
+ let count=0;
+ for(const job of bound.jobs.filter(j=>j.shift_id===shiftId)){
+  const row=document.createElement('div');
+  row.className='workforce-output-row';
+  const settled=job.phase==='SETTLED'&&job.original_job_completed===true&&
+   job.source_review_job_only===true&&job.source_code_repaired===false&&
+   job.installation_authorized===false&&
+   /^work:[a-f0-9]{32}$/.test(job.original_work_id||'')&&
+   /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(
+    job.settlement_receipt_ref||'')&&
+   /^https:\/\/github\.com\/maloney2323\/Reality\/(?:pull|issues)\/[1-9]\d*#issuecomment-\d+$/.test(
+    job.provider_comment_url||'');
+  row.append(textNode('strong',settled?
+   'COMPLETED — Riley + Taylor engineering PR review':
+   'IN PROGRESS — Riley + Taylor engineering PR review · '+job.phase));
+  if(settled){
+   const link=combinedQueueLink(job.provider_comment_url,
+     'Open published review · independently read back from GitHub');
+   row.append(link);
+   row.append(textNode('div','Original job: '+job.original_work_id+
+    ' · Durable receipt: '+job.settlement_receipt_ref+
+    ' · Code review completed, NOT a code repair, capability installation or full-shift settlement.'));
+   count++;
+  }else{
+   row.append(textNode('div','Original job '+job.original_work_id+
+    ' is not settled. Reality must verify the exact provider effect before reporting completion.'));
+  }
+  target.append(row);
+ }
+ if(!target.children.length)
+  target.textContent='No independently settled original PR review job in this shift yet.';
+ return count;
+}
 function renderRileyLiveProgress(readback){
  const panel=$('rileyLiveProgressPanel');
  const shifts=readback?.shifts;
@@ -1021,12 +1065,14 @@ function renderRileyLiveProgress(readback){
  const admittedRepairOutcome=steps[5].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
  const independentReceipt=steps[6].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
  const originalVerified=admittedRepairOutcome&&independentReceipt;
+ const realReviewJobs=renderRileyVerifiedOriginalJobs(readback,current.shift_id);
  $('rileySourceProgress').value=sourceDone;
  $('rileySourceProgressLabel').textContent=sourceDone+' of 5';
  $('rileyLiveHeadline').textContent=
   'Shift '+status+' · '+sourceDone+' of 5 source checks recorded · '+
   modelResults.length+' model-assisted reviews · '+
   modelFailures.length+' model connection failures · '+
+  realReviewJobs+' independently settled PR review jobs · '+
   (originalVerified?'Independent original-job receipt recorded.':
    'No independent final repair receipt for this shift.')+
   ' Worker progress refreshes every 30 seconds.';
@@ -1155,10 +1201,17 @@ function renderActiveRileyTaylorQueue(readback){
  const nodes=document.createDocumentFragment();
  for(const step of steps){
   const row=document.createElement('div');row.className='workforce-output-row';
+  const published=(readback?.riley_pr_review_jobs?.jobs||[]).find(j=>
+   j?.shift_id===active.shift_id&&j.source_ref===step.source_ref&&
+   j.phase==='SETTLED'&&j.original_job_completed===true&&
+   /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(j.settlement_receipt_ref||''));
   row.append(textNode('strong','Work '+step.step_index+
-   ' · Riley + Taylor · '+String(step.state||'QUEUED').replaceAll('_',' ')));
+   ' · Riley + Taylor · '+(published?'REVIEW JOB SETTLED':String(step.state||'QUEUED').replaceAll('_',' '))));
   row.append(combinedQueueLink(step.source_ref,step.source_ref));
-  if(step.state==='SOURCE_CHECKED')
+  if(published){
+   row.append(combinedQueueLink(published.provider_comment_url,'Read completed GitHub review'));
+   row.append(textNode('div','Independent original-job receipt recorded for this real PR review. No code fix or installation claimed.'));
+  }else if(step.state==='SOURCE_CHECKED')
    row.append(textNode('div','GitHub source evidence recorded. This does not certify a completed code repair.'));
   else if(step.state==='BLOCKED_PROVIDER')
    row.append(textNode('div','Provider source blocked; preserve evidence and investigate without unsafe replay.'));
