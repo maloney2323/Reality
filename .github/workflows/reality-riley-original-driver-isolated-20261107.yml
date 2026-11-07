@@ -60,6 +60,7 @@ on:
       - src/reality-governed-tool-session-v1.js
       - scripts/reality-prove-live-tool-delivery-v1.mjs
       - scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - scripts/reality-prove-263-repair-baseline-differential-v1.mjs
       - test/reality-riley-original-driver-security-v1.test.js
       - test/reality-universal-governed-recovery-handoff-v1.test.js
       - test/reality-governed-late-bound-tool-adapter-v1.test.js
@@ -108,6 +109,35 @@ jobs:
           },null,2));
           if(introduced.length)process.exit(1);
           NODE
+
+  pinned-issue-263-repair-differential:
+    # Real original Reality source and frozen regression, independently
+    # checked against historical baseline and candidate. It is NOT a customer
+    # original execution claim or final settlement receipt.
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source-pinned differential proof runner
+        run: node --check scripts/reality-prove-263-repair-baseline-differential-v1.mjs
+      - name: Reproduce baseline bug and independently test patched source
+        run: node scripts/reality-prove-263-repair-baseline-differential-v1.mjs
+      - name: Keep proof for reviewer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-issue-263-frozen-failure-to-repair-differential
+          path: benchmark-results/reality-riley-263-differential-repair-proof-v1.json
+          retention-days: 14
+          if-no-files-found: error
 
   bounded-live-openai-tool-delivery:
     # Only an explicitly tagged commit invokes a paid provider probe.
