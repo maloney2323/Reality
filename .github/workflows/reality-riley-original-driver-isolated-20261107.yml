@@ -168,6 +168,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,6 +190,7 @@ jobs:
       - name: Real OpenAI one-provider multi-role response to source-backed Riley blocker
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/reality-prove-one-openai-combined-role-v1.mjs
       - name: Preserve real model and independent source readback evidence
         if: always()
