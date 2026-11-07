@@ -159,6 +159,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
    <button type="button" id="workforceReset">Clear assumptions</button>
   </div>
   <p id="workforceScenarioStatus" role="status" aria-live="polite">Enter company-specific assumptions to estimate potential whole-position consolidation and payroll savings. NASA defect-repair labor value alone cannot prove positions are replaceable.</p>
+  <p id="workforceEvidenceStatus" role="status" aria-live="polite">Independent Reality job evidence has not yet been read. Even a completed isolated repair does not establish recurring employee replacement.</p>
   <div id="workforceScenarioRows" aria-live="polite"></div>
   <p>Important: An FTE-capacity equivalent is not an employee who can safely be removed. Ongoing reliability, uncovered duties, compliance, actual staffing changes and verified payroll expenses must be checked before claiming realized savings. No information entered here is saved.</p>
  </details>
@@ -618,6 +619,33 @@ function renderWorkforceSavingsProjection(data){
   ' whole-position equivalents potentially consolidatable · '+usd(data.annual_gross_payroll_avoidance_scenario_usd)+
   ' annual gross payroll · '+usd(data.annual_net_payroll_scenario_usd)+
   ' annual net after assumed AI/supervision cost. Based on YOUR inputs, not verified replacements or realized savings.';
+ const evidence=data.workforce_evidence;
+ if(evidence?.version!=='reality-role-workforce-evidence-v1'||
+  evidence.read_only!==true||evidence.owner_execution_authorized!==false||
+  evidence.production_changed!==false||
+  evidence.verified_cash_savings_usd!==null||
+  evidence.verified_positions_eliminated!==null)
+  throw Error('WORKFORCE_OWNER_EVIDENCE_UNVERIFIED');
+ const evidenceNode=$('workforceEvidenceStatus');
+ if(evidence.status==='ISOLATED_TECHNICAL_WORK_PROOF_NO_RECURRING_STAFF_COVERAGE'){
+  if(!Number.isSafeInteger(evidence.isolated_original_jobs_independently_settled)||
+   evidence.isolated_original_jobs_independently_settled<0||
+   evidence.verified_recurring_role_task_coverage_count!==0||
+   evidence.independently_proven_replacement_ready_role_count!==0||
+   !Array.isArray(evidence.role_work_proof)||
+   evidence.role_work_proof.length!==8)
+   throw Error('WORKFORCE_RECURRING_ROLE_EVIDENCE_NOT_VERIFIED');
+  evidenceNode.textContent='REALITY VERIFIED SOURCE: '+
+   evidence.isolated_original_jobs_independently_settled+
+   ' isolated original jobs independently settled; '+ 
+   evidence.isolated_jobs_with_source_recorded_economic_inputs+
+   ' with recorded economic observations. No recurring business-role workload coverage, removable positions, or cash savings verified. Technical repair is not workforce replacement.';
+ }else if(evidence.status==='OWNER_ROI_READBACK_UNAVAILABLE_NO_CLAIMS'){
+  if(evidence.isolated_original_jobs_independently_settled!==null||
+   evidence.role_work_proof!==null)
+   throw Error('WORKFORCE_UNAVAILABLE_EVIDENCE_CANNOT_BE_ZERO');
+  evidenceNode.textContent='Independent Reality job and economic readback unavailable. Verified staffing coverage and realized payroll savings remain unknown.';
+ }else throw Error('WORKFORCE_EVIDENCE_STATUS_UNKNOWN');
  const holder=$('workforceScenarioRows');
  holder.replaceChildren();
  for(const r of data.role_scenarios){
@@ -670,6 +698,7 @@ async function calculateWorkforceSavings(clear=false){
   status.textContent='Workforce calculation unavailable: '+
    String(e?.message||'Invalid company scenario').slice(0,220)+
    '. No verified positions removed or savings claimed.';
+  $('workforceEvidenceStatus').textContent='Independent workforce evidence could not be read; no verified staffing savings claimed.';
  }finally{button.disabled=false}
 }
 
