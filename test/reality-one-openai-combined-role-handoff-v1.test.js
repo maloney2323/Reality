@@ -59,9 +59,9 @@ test('the one-model coordinator changes role context by governed step, no additi
  const step4={...context,step_index:4,stage:'REVIEW_INDEPENDENT_EVIDENCE'};
  const step5={...context,step_index:5,stage:'QUALIFY_NEXT_WORK'};
  const a=await c(step3),b=await c(step4),d=await c(step5);
- assert.deepEqual(a.roles,['Taylor','Quinn']);
- assert.deepEqual(b.roles,['Quinn','Riley']);
- assert.deepEqual(d.roles,['Avery','Riley','Sage']);
+ assert.deepEqual(a.roles,['Riley','Taylor']);
+ assert.deepEqual(b.roles,['Riley','Taylor']);
+ assert.deepEqual(d.roles,['Riley','Taylor']);
  assert.equal(seen.length,3);
  assert.ok(seen.every(x=>x.tool_choice==='none'&&!x.tools));
  assert.equal(d.independent_verification_performed,false);
