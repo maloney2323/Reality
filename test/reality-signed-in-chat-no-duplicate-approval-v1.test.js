@@ -8,20 +8,20 @@ const api=read('api/reality/personal-chat.js');
 const context=read('src/reality-employee-shift-chat-context-v1.js');
 const model=read('src/reality-model-gateway-v0.1.js');
 const ownerAPI=read('api/reality/personal-governed-employee-shift.js');
-const script=page.match(/<script type="module">([\\s\\S]*?)<\\/script>/)?.[1]||'';
+const script=page.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1]||'';
 
 test('signed-in direct Start utterance uses one owner shift controller and selected source scope',()=>{
- assert.match(script,/interpretSignedInChatShiftCommand\\(value,\\{/);
- assert.match(script,/selectedHours:Number\\(\\$\\('runShiftHours'\\)\\.value\\)/);
- assert.match(script,/const receipt=await authorizeShiftFromChat\\(command\\)/);
- assert.match(script,/const before=await json\\(SHIFT/);
- assert.match(script,/safeShiftReadbackState\\(before/);
+ assert.match(script,/interpretSignedInChatShiftCommand\(value,\{/);
+ assert.match(script,/selectedHours:Number\(\$\('runShiftHours'\)\.value\)/);
+ assert.match(script,/const receipt=await authorizeShiftFromChat\(command\)/);
+ assert.match(script,/const before=await json\(SHIFT/);
+ assert.match(script,/safeShiftReadbackState\(before/);
  assert.match(script,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
  assert.match(script,/expected_fingerprint:draft.expected_fingerprint/);
- assert.match(ownerAPI,/authenticatedChatSession\\(req,res\\)/);
- assert.match(ownerAPI,/assertSameOrigin\\(req\\)/);
+ assert.match(ownerAPI,/authenticatedChatSession\(req,res\)/);
+ assert.match(ownerAPI,/assertSameOrigin\(req\)/);
  assert.doesNotMatch(script,/installation_authorized:true|production_changed:true/);
- const js=script.replace(/^\\s*import\\s+\\{[^}]+\\}\\s*from\\s*'[^']+';\\s*/,'');
+ const js=script.replace(/^\s*import\s+\{[^}]+\}\s*from\s*'[^']+';\s*/,'');
  assert.doesNotThrow(()=>new Script(js));
 });
 test('second Start means existing shift state, not a repeat intake, duplicate shift or new approval',()=>{
@@ -34,16 +34,16 @@ test('second Start means existing shift state, not a repeat intake, duplicate sh
  assert.match(block,/No second authorization and no duplicate shift/);
  assert.match(block,/Current blocker: Reality must independently qualify and admit/);
  assert.match(block,/No exact verified capability installation is pending/);
- assert.doesNotMatch(block,/await intakeVerifiedRileyShiftJobs\\(/);
+ assert.doesNotMatch(block,/await intakeVerifiedRileyShiftJobs\(/);
  assert.doesNotMatch(block,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
- assert.match(script,/const created=await json\\(SHIFT/);
- assert.match(script,/await intakeVerifiedRileyShiftJobs\\(created.shift_id/);
+ assert.match(script,/const created=await json\(SHIFT/);
+ assert.match(script,/await intakeVerifiedRileyShiftJobs\(created.shift_id/);
 });
 test('model receives trusted CURRENT authorization state, no obsolete button-only requirement',()=>{
  assert.match(context,/owner_shift_authorization_recorded:alreadyAuthorized/);
- assert.match(context,/active_owner_shift_id:alreadyAuthorized\\?brief.shift_id:null/);
+ assert.match(context,/active_owner_shift_id:alreadyAuthorized\?brief.shift_id:null/);
  assert.match(context,/Do not ask the owner to repeat approval/);
- assert.match(context,/engineer(?:ing)? admission\\/dispatch is blocking execution/i);
+ assert.match(context,/engineer(?:ing)? admission\/dispatch is blocking execution/i);
  assert.match(context,/Never demand a magic authorization phrase/);
  assert.match(api,/const verifiedOwnerShift=ownerShiftFacts.length===1/);
  assert.match(api,/source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'/);
