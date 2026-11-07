@@ -106,7 +106,7 @@ export function createGovernedLateBoundToolAdapter({
   fail('SCHEMA_CONTENT_HASH_MISMATCH');
  const definition=frozen({
   type:'function',name:tool.name,description:tool.description,
-  defer_loading:true,strict:true,parameters:structuredClone(schema)
+  strict:true,parameters:structuredClone(schema)
  });
  const job=envelope.body.scope.original_work_id;
  async function ready(at){
@@ -143,7 +143,7 @@ export function createGovernedLateBoundToolAdapter({
   await ready(executionTime);
   return frozen({type:'tool_search_output',execution:'client',
    call_id:searchCall.call_id,status:'completed',
-   tools:[structuredClone(definition)]});
+   tools:[{...structuredClone(definition),defer_loading:true}]});
  }
  async function dispatch({
   functionCall,executionTime,providerResponseId
