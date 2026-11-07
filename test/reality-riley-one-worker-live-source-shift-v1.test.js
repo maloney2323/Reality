@@ -8,6 +8,9 @@ const worker=read('src/reality-governed-employee-shift-worker-v1.js');
 const model=read('src/reality-one-openai-combined-role-handoff-v1.js');
 
 test('one isolated Vercel model worker claims already-authorized issue/PR source steps',()=>{
+ assert.equal((sql.match(/select cron\\.schedule\\(/g)||[]).length,1);
+ assert.equal((sql.match(/\\) as permitted/g)||[]).length,1);
+ assert.equal((sql.match(/source_step\\.source_ref~/g)||[]).length,1);
  assert.match(sql,/s\.status in \('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\)/);
  assert.match(sql,/step\.step_index between 1 and 5/);
  assert.match(sql,/step\.state in \('QUEUED','CLAIMED'\)/);
