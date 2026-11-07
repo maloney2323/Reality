@@ -162,8 +162,12 @@ begin
   where original_work_id=p_original_work_id and claim_id=p_claim_id for update;
  if not found or j.phase not in ('PUBLISHING','SETTLED') or
    p_comment_id is null or p_comment_id<1 or
-   p_comment_url <> 'https://github.com/maloney2323/Reality/issues/'||
-    split_part(j.source_ref,'/pull/',2)||'#issuecomment-'||p_comment_id::text or
+   p_comment_url not in (
+    'https://github.com/maloney2323/Reality/issues/'||
+      split_part(j.source_ref,'/pull/',2)||'#issuecomment-'||p_comment_id::text,
+    'https://github.com/maloney2323/Reality/pull/'||
+      split_part(j.source_ref,'/pull/',2)||'#issuecomment-'||p_comment_id::text
+   ) or
    p_independent_body_sha256<>j.review_digest or
    p_head_sha<>j.source_head_sha
  then raise exception 'RILEY_REVIEW_INDEPENDENT_PROVIDER_READBACK_REQUIRED';end if;
