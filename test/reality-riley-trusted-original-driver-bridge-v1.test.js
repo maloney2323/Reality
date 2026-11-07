@@ -104,13 +104,16 @@ test('ended shift, no eligible originals and unknown readbacks never make execut
   assert.equal(observations.run.length,0);
  }
 });
-test('multiple eligible original jobs must not silently claim a different original',async()=>{
+test('multiple eligible original jobs select only the requested original, never another',async()=>{
  const other={...candidate,original_work_id:'work:'+'b'.repeat(32),
   trigger_id:'44444444-5555-4666-8777-888888888888'};
  const {adapter,observations}=ready({readback:{...eligible,
   candidate_count:2,candidates:[other,candidate]}});
- await assert.rejects(adapter(scope),/EXACT_ORIGINAL_NOT_IN_CURRENT_OWNER_SCOPE/);
- assert.equal(observations.run.length,0);
+ const result=await adapter(scope);
+ assert.equal(result.status,'SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK');
+ assert.equal(observations.run.length,1);
+ assert.equal(observations.run[0].onlyOriginalWorkId,original);
+ assert.equal(observations.run[0].maxJobs,1);
 });
 test('shared executor fabricated settlement and wrong scope are not returned to worker',async()=>{
  for(const bad of [
