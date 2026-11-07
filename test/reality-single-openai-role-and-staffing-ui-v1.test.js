@@ -64,6 +64,10 @@ test('private workforce API is authenticated, never executes layoffs or persists
  assert.match(api,/process\.env\.VERCEL_ENV!=='preview'/);
  assert.match(api,/buildRealityNamedEmployeeRoster\(brief\)/);
  assert.match(api,/projectRoleWorkforceConsolidation\(/);
+ assert.match(api,/projectOperationalRoiEvidenceV2\(raw\)/);
+ assert.match(api,/projectOwnerRoleWorkforceEvidence\(\{roster,roi:trusted\}\)/);
+ assert.match(api,/unavailableOwnerRoleWorkforceEvidence\(\)/);
+ assert.match(api,/reality_read_owner_job_roi_evidence_v2/);
  assert.match(api,/inputs_saved:false/);
  assert.match(api,/positions_terminated:false/);
  assert.doesNotMatch(api,/executeAuthorizedWork|worker_dispatch|installCapability|githubWrite|insert into/i);
@@ -77,6 +81,8 @@ test('company scenario UI displays possible consolidated whole positions only as
  assert.match(ui,/workforceSharedCapacity/);
  assert.match(ui,/WORKFORCE_SAVINGS='\/api\/reality\/personal-workforce-savings-scenario'/);
  assert.match(ui,/renderWorkforceSavingsProjection\(data\)/);
+ assert.match(ui,/workforceEvidenceStatus/);
+ assert.match(ui,/technical repair is not workforce replacement/i);
  assert.match(ui,/data\.realized_payroll_savings_usd!==null/);
  assert.match(ui,/data\.positions_terminated!==false/);
  assert.match(ui,/One shared OpenAI model covers business functions/);
