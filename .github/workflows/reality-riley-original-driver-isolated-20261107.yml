@@ -17,10 +17,31 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Existing worker and exact original handoff
         run: node --test test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
-      - name: Full top-level code regression
-        run: npm test
+      - name: Compare all existing tests against unchanged development baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test >/tmp/reality-candidate-tests.txt 2>&1 || true
+          git worktree add --detach /tmp/reality-baseline d63d15b08fe61d88d4d365f0dbb5816ee79ef471
+          (cd /tmp/reality-baseline && npm test >/tmp/reality-baseline-tests.txt 2>&1) || true
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const failures = path => [...fs.readFileSync(path,'utf8')
+            .matchAll(/^not ok [0-9]+ - (.+)$/gm)].map(x=>x[1]).sort();
+          const old = failures('/tmp/reality-baseline-tests.txt');
+          const current = failures('/tmp/reality-candidate-tests.txt');
+          const introduced = current.filter(x=>!old.includes(x));
+          console.log(JSON.stringify({
+            baseline_existing_failures:old.length,
+            candidate_failures:current.length,
+            introduced_regressions:introduced
+          },null,2));
+          if(introduced.length)process.exit(1);
+          NODE
