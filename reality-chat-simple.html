@@ -1341,23 +1341,36 @@ async function authorizeShiftFromChat(command){
   const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
   const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
   if(existing.hasActive){
-    let batch='';
-    if(existing.matching_requested_hours){
-      try{
-       const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
-       batch=await intakeVerifiedRileyShiftJobs(existing.shift_id,
-         match?.plan_fingerprint);
-      }catch{
-       batch=' Existing shift preserved. Batch intake needs independent reconciliation; do not retry uncertain jobs.';
-      }
-    }
+    // A real owner shift is already authorized. Treat a repeated "start"
+    // as a current-job STATUS request, not a second approval or a retry of
+    // uncertain-effect original intake/dispatch.
+    const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
+    const recorded=Array.isArray(match?.steps)?
+     match.steps.slice(0,5).filter(x=>x.state==='SOURCE_CHECKED').length:null;
+    const step6=match?.steps?.[5];
+    const step7=match?.steps?.[6];
+    const receipt=step6?.state==='ORIGINAL_JOB_RECEIPT_VERIFIED'&&
+      step7?.state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+    const approval=Array.isArray(before.capability_approval_handoffs)&&
+     before.capability_approval_handoffs.some(x=>
+      x.shift_id===existing.shift_id&&
+      x.status==='EXACT_VERIFIED_CAPABILITY_APPROVAL_READY_IN_REALITY_CHAT'&&
+      x.installation_approved===false);
     return {
       acknowledged:true,
-      text:existing.matching_requested_hours?
-       'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
-       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.'+batch:
-       'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
-       '). I did not start another concurrent shift or override its authorization.',
+      text:'Your instruction is recognized. Riley + Taylor shift '+existing.shift_id+
+       ' was ALREADY AUTHORIZED through your signed-in Reality session and remains '+
+       existing.status+'. No second authorization and no duplicate shift are needed. '+
+       (recorded===null?'Source-check progress is currently unavailable.':
+        recorded+' of 5 source checks have been recorded. ')+
+       (receipt?'The original repair has independent receipt evidence in steps 6 and 7. ':
+        'The original code repair has NOT yet been independently verified. ')+
+       (step6?.state==='AWAITING_EXACT_WORK'||step6?.state==='QUEUED'?
+        'Current blocker: Reality must independently qualify and admit an exact source-backed original repair into step 6. This is an execution integration issue, not missing permission from you. ':'')+
+       (approval?
+        'One exact verified capability installation is pending in the existing Reality approval interface.':
+        'No exact verified capability installation is pending for your approval.')+
+       ' The existing worker keeps checking under the ORIGINAL shift; repeating Start cannot bypass an execution gate.'
     };
   }
   const draftRead=await json(SHIFT+'?hours='+command.duration_hours,{
@@ -1605,7 +1618,9 @@ $('composer').onsubmit=async(e)=>{
   elapsed=setInterval(showTime,1000);
   status('Message submitted. Waiting for a reply…');
   try{
-    const command=interpretSignedInChatShiftCommand(value);
+    const command=interpretSignedInChatShiftCommand(value,{
+      selectedHours:Number($('runShiftHours').value)
+    });
     if(command){
       const receipt=await authorizeShiftFromChat(command);
       optimistic.classList.remove('pending');
