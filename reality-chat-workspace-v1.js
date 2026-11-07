@@ -114,6 +114,7 @@
   focusToggle.setAttribute('aria-pressed','false');
   const smallScreen = () => window.matchMedia('(max-width:600px)').matches;
   function updateFocusLabel(){
+    inspectorToggle.textContent = smallScreen() ? 'Work' : 'Work & approvals';
     if(smallScreen()){
       const expanded = !document.body.classList.contains('reality-chat-compact');
       focusToggle.textContent = expanded ? 'Minimize' : 'Expand chat';
