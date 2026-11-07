@@ -42,6 +42,8 @@ const adapter=createOneOpenAICombinedRoleCoordinator({
  apiKey:process.env.OPENAI_API_KEY,model
 });
 const advisory=await adapter(ctx);
+if(advisory.status!=='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK')
+ console.error('COMBINED_ROLE_MODEL_ADVISORY_REJECTED',advisory.reason||'UNSPECIFIED');
 assert.equal(advisory.status,'SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK');
 assert.deepEqual(advisory.roles,['Riley','Taylor']);
 assert.equal(advisory.model_invocations_completed,1);
