@@ -465,6 +465,55 @@ async function refreshRileyExistingBacklog(){
    line.append(a,textNode('div',statuses[entry.status]));
    node.append(line);
   }
+  // Basic Work Center categories and Employee category are two VIEWS of
+  // the same source observations, not two job queues or worker approvals.
+  const category=x.assigned_category_backlog;
+  if(category!==null){
+   if(category?.version!=='reality-riley-category-backlog-bridge-v1'||
+      category.status!=='EXISTING_RILEY_CATEGORY_FINDINGS_RECONCILED_NOT_EXECUTED'||
+      category.execution_authorized!==false||
+      category.installation_authorized!==false||
+      category.worker_shift_dispatched!==false||
+      category.production_changed!==false||
+      !Array.isArray(category.assignments)||category.assignments.length>25||
+      category.category_findings!==category.assignments.length||
+      category.remaining_or_reconciliation_findings<0||
+      category.remaining_or_reconciliation_findings>category.category_findings)
+    throw Error('RILEY_CROSS_CATEGORY_SOURCE_UNVERIFIED');
+   node.append(textNode('div',
+    'Riley’s existing Employee + Work Center assignments: '+
+    category.category_findings+' categorized source findings · '+
+    category.open_implementation_review_items+' open PR review candidates · '+
+    category.remaining_or_reconciliation_findings+
+    ' not independently confirmed settled by the category bridge.'));
+   const shownIssues=new Set(x.rows.slice(0,5).map(z=>z.source_url));
+   const examples=category.assignments.filter(z=>
+    !shownIssues.has(z.source_url)).slice(0,5);
+   for(const work of examples){
+    if(!/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(work.source_url)||
+       !['ISSUE','PULL_REQUEST','FAILURE_SIGNAL'].includes(work.source_kind)||
+       work.original_execution_authorized!==false||
+       work.independently_accepted_outcome!==false||
+       work.installation_authorized!==false)
+     throw Error('RILEY_CATEGORY_ITEM_UNVERIFIED');
+    const line=document.createElement('div');
+    line.style.marginTop='8px';
+    const a=document.createElement('a');a.href=work.source_url;
+    a.rel='noopener noreferrer';a.target='_blank';
+    a.textContent=work.title;
+    const hint=work.source_kind==='PULL_REQUEST'?
+     'Open code review — independently test before any installation':
+     work.source_kind==='FAILURE_SIGNAL'?
+      'Historical provider failure — check current reproduction':
+      'Source-backed issue — verify exact existing owner work first';
+    line.append(a,textNode('div',hint));node.append(line);
+   }
+   node.append(textNode('div',
+    'Why these are not all executing yet: the current original-job intake requires a narrow, independently proven missing-extension defect. Existing-file repairs and PR reviews need their corresponding verified admission path. An assigned category is not an execution warrant.'));
+  }else{
+   node.append(textNode('div',
+    'Employee/Work Center category cross-check unavailable. This does NOT mean Riley has no unfinished work.'));
+  }
   node.append(textNode('div',
    'Tracked issues are work candidates, not permission to repair. Reality preserves the original approval and does not replay settled work.'));
  }catch{
