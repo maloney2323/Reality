@@ -41,7 +41,11 @@ export default async function handler(req,res){
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
   // inspection and final receipts remain independently governed.
-  const key=process.env.OPENAI_API_KEY;
+  // Isolated-preview model credential is named REALITY_STANDALONE_OPENAI_API_KEY.
+  // A production-only OPENAI_API_KEY must not be necessary for a preview worker.
+  // No secret goes into browser output, role evidence or database receipts.
+  const key=process.env.REALITY_STANDALONE_OPENAI_API_KEY||
+   process.env.OPENAI_API_KEY;
   const coordinateRoleWork=typeof key==='string'&&key.length>=12?
    createOneOpenAICombinedRoleCoordinator({
     apiKey:key,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.4'
