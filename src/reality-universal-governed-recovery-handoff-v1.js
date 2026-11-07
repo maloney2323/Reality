@@ -194,21 +194,26 @@ export function brokerGovernedRecoveryCapability({
   DENY('INDEPENDENT_CAPABILITY_REGISTRY_REQUIRED');
  const common={original_work_id:work,capability_id:id,model_may_grant_authority:false,
   original_job_completed:false,production_changed:false};
+ // Broker decisions are also authenticated. Signed envelope scope alone
+ // cannot protect against a forged 'approved' model or transport verdict.
+ const verdict=x=>lock({...x,decision_signature:signature({
+  envelope_signature:envelope.signature,decision:x
+ },signingKey)});
  if(b.failure.blocker_class==='AUTH_SCOPE_DEFICIT')
-  return lock({...common,status:'EXACT_AUTHORITY_REQUIRED_NOT_A_TOOL_GAP',
+  return verdict({...common,status:'EXACT_AUTHORITY_REQUIRED_NOT_A_TOOL_GAP',
    tool_manifest:null,can_rehydrate:false});
  if(registryReadback.status==='ACTIVE'){
   const tool=toolManifest(registryReadback.manifest,b.scope,id);
   if(b.failure.blocker_class==='MISSING_INSTRUMENT')
-   return lock({...common,status:'ACTIVE_TOOL_REASSESS_FAILURE_NO_SYNTHESIS',
+   return verdict({...common,status:'ACTIVE_TOOL_REASSESS_FAILURE_NO_SYNTHESIS',
     tool_manifest:null,can_rehydrate:false});
-  return lock({...common,status:'EXISTING_CAPABILITY_REBOUND',
+  return verdict({...common,status:'EXISTING_CAPABILITY_REBOUND',
    tool_manifest:tool,ephemeral:false,can_rehydrate:true,
    new_tool_created:false,installation_authorized:false});
  }
  if(b.failure.blocker_class!=='MISSING_INSTRUMENT'&&
   b.failure.blocker_class!=='IMPLEMENTATION_DEFECT')
-  return lock({...common,status:'DIAGNOSE_CONTEXT_BEFORE_TOOL_BUILD',
+  return verdict({...common,status:'DIAGNOSE_CONTEXT_BEFORE_TOOL_BUILD',
    tool_manifest:null,can_rehydrate:false});
  if(frozenReproduction?.independently_verified!==true||
   frozenReproduction.original_work_id!==work||
@@ -216,7 +221,7 @@ export function brokerGovernedRecoveryCapability({
   frozenReproduction.reproduced_failure!==true||
   !SHA.test(frozenReproduction.frozen_suite_sha256||'')||
   frozenReproduction.external_action_performed!==false)
-  return lock({...common,status:'FROZEN_REPRODUCTION_REQUIRED',
+  return verdict({...common,status:'FROZEN_REPRODUCTION_REQUIRED',
    tool_manifest:null,can_rehydrate:false});
  if(candidate?.independently_verified!==true||
   candidate.original_work_id!==work||candidate.capability_id!==id||
@@ -225,7 +230,7 @@ export function brokerGovernedRecoveryCapability({
   candidate.isolation!=='NO_NETWORK_NO_SECRETS'||
   candidate.sandbox_tests_passed!==true||
   candidate.production_changed!==false)
-  return lock({...common,status:'ISOLATED_CANDIDATE_VERIFICATION_REQUIRED',
+  return verdict({...common,status:'ISOLATED_CANDIDATE_VERIFICATION_REQUIRED',
    tool_manifest:null,can_rehydrate:false});
  const tool=toolManifest(candidate.manifest,b.scope,id);
  if(installationApproval?.independently_verified!==true||
@@ -234,12 +239,12 @@ export function brokerGovernedRecoveryCapability({
   installationApproval.artifact_sha256!==candidate.artifact_sha256||
   installationApproval.exact_owner_approval!==true||
   installationApproval.approved_environment!=='ISOLATED_PREVIEW')
-  return lock({...common,status:'EXACT_ARTIFACT_APPROVAL_REQUIRED',
+  return verdict({...common,status:'EXACT_ARTIFACT_APPROVAL_REQUIRED',
    staged_artifact_sha256:candidate.artifact_sha256,
    tool_manifest:null,can_rehydrate:false,installation_authorized:false});
  // This result ONLY makes the isolated tool eligible for the separately
  // governed installer, not proof of installation or permission to execute.
- return lock({...common,status:'APPROVED_CANDIDATE_REQUIRES_INSTALL_READBACK',
+ return verdict({...common,status:'APPROVED_CANDIDATE_REQUIRES_INSTALL_READBACK',
   staged_artifact_sha256:candidate.artifact_sha256,
   tool_manifest:tool,can_rehydrate:false,
   installation_authorized_by_handoff:false,
@@ -269,6 +274,14 @@ export function planZeroTouchSameJobContinuation({
   brokerResult.model_may_grant_authority!==false||
   brokerResult.production_changed!==false)
   DENY('BROKER_IDENTITY_CHANGED');
+ const signed=brokerResult.decision_signature;
+ if(!SHA.test(signed||''))DENY('SIGNED_BROKER_DECISION_REQUIRED');
+ const {decision_signature:unused,...decision}=brokerResult;
+ const expectedDecision=signature({envelope_signature:envelope.signature,
+  decision},signingKey);
+ if(!timingSafeEqual(Buffer.from(signed,'hex'),
+  Buffer.from(expectedDecision,'hex')))
+  DENY('BROKER_DECISION_SIGNATURE_INVALID');
  let manifest;
  if(brokerResult.status==='EXISTING_CAPABILITY_REBOUND'&&
   brokerResult.can_rehydrate===true)
