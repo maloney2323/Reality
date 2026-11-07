@@ -94,3 +94,31 @@ test('no new owner worker, governor, ledger, or model-based shift authority crea
  assert.doesNotMatch(ui,/REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN/);
  assert.doesNotMatch(ui,/new Worker\(/);
 });
+
+test('ordinary signed-in Start the shift/job commands authorize the existing exact work scope without a magic phrase',()=>{
+ for(const message of [
+  'Start the shift','Start the job','Start the jobs',
+  'Run the shift','Begin the job now','Reality, start the shift',
+  'Start Riley and Taylor\'s shift now','Start Riley\'s shift',
+  'Start the automation jobshift','I authorize your automation jobshift',
+  'I authorize Reality to start the shift','I authorize the current jobs'
+ ]){
+  const command=interpretSignedInChatShiftCommand(message,{selectedHours:8});
+  assert.equal(command?.intent,'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT',message);
+  assert.equal(command?.duration_hours,8,message);
+  assert.equal(command?.authorization_source,'EXPLICIT_SIGNED_IN_CHAT_SEND_ACTION',message);
+  assert.equal(command?.installation_authorized,false,message);
+  assert.equal(command?.repeated_confirmations_required,false,message);
+ }
+ assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).duration_hours,10);
+ assert.equal(interpretSignedInChatShiftCommand('Start the shift',{selectedHours:13}),null);
+ for(const message of [
+  'What if I start the shift?','I am ready to approve',
+  'Do not start the job','Start the job tomorrow',
+  'Start the job after the tests','Start the shift every day',
+  'Can you start the shift?','Pretend to start the job',
+  'Example: start the shift','Start work',
+  'I authorize everyone to deploy production'
+ ])
+  assert.equal(interpretSignedInChatShiftCommand(message),null,message);
+});
