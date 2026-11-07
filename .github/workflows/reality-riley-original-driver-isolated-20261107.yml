@@ -6,6 +6,8 @@ on:
     paths:
       - src/reality-governed-employee-shift-worker-v1.js
       - src/reality-one-openai-combined-role-handoff-v1.js
+      - scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - supabase/migrations/20261107_combined_employee_role_readback_v1.sql
       - api/reality/governed-employee-shift-worker.js
       - test/reality-one-openai-combined-role-handoff-v1.test.js
       - src/reality-riley-trusted-original-driver-bridge-v1.js
@@ -53,6 +55,7 @@ jobs:
         run: |
           node --check scripts/reality-prove-live-tool-delivery-v1.mjs
           node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
+          node --check scripts/reality-prove-one-openai-combined-role-v1.mjs
       - name: Compare all existing tests against unchanged development baseline
         shell: bash
         run: |
@@ -154,5 +157,44 @@ jobs:
         with:
           name: reality-real-riley-source-openai-governance-proof
           path: benchmark-results/reality-real-source-openai-governance-v1.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  real-openai-combined-role-provider-proof:
+    # One bounded, real OpenAI call against current public issue #263.
+    # Synthetic isolated shift; no authorized DB claim, original job or installation.
+    if: contains(github.event.head_commit.message, '[combined-role-provider-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify bounded role proof runner
+        run: node --check scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - name: Independently check provider credential
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo 'ONE_OPENAI_COMBINED_ROLE_PROOF_NOT_EXECUTED_NO_CREDENTIAL'
+            exit 1
+          fi
+      - name: Real OpenAI one-provider multi-role response to source-backed Riley blocker
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - name: Preserve real model and independent source readback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-combined-one-openai-model-source-proof
+          path: benchmark-results/reality-real-openai-combined-role-proof-v1.json
           retention-days: 14
           if-no-files-found: ignore
