@@ -73,7 +73,7 @@ function qualifiedOriginalDriverScope(reconciled,wake,claimed){
   !UUID.test(reconciled.shift_id||'')||
   !/^work:[a-f0-9]{32}$/.test(reconciled.governed_original_work_id||'')||
   !UUID.test(reconciled.governed_trigger_id||'')||
-  !URL.test(reconciled.shift_observation_source_ref||'')||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(reconciled.shift_observation_source_ref||'')||
   !/^sha256:[a-f0-9]{64}$/.test(reconciled.shift_observation_proof_sha256||'')||
   reconciled.governed_cycle_dispatched_by_shift!==false||
   reconciled.model_invoked_by_shift!==false||
@@ -109,6 +109,11 @@ function assertOriginalDriverOutcome(out,scope){
   out.independently_settled<0||out.independently_settled>out.attempted||
   !Array.isArray(out.outcomes)||out.outcomes.length>4||
   !out.outcomes.some(x=>x?.original_work_id===scope.original_work_id)||
+  out.outcomes.some(x=>!/^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')||
+   typeof x.status!=='string'||x.status.length>110||
+   typeof x.original_job_settled!=='boolean')||
+  new Set(out.outcomes.map(x=>x.original_work_id)).size!==out.outcomes.length||
+  out.outcomes.filter(x=>x.original_job_settled).length!==out.independently_settled||
   out.installation_authorized!==false||
   out.production_changed!==false||
   out.shift_finished!==false||out.full_shift_proven!==false)
