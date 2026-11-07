@@ -16,6 +16,7 @@ on:
       - supabase/migrations/20261107_riley_trusted_shift_execution_context_v1.sql
       - supabase/migrations/20261107_riley_preview_original_execution_wake_v1.sql
       - supabase/migrations/20261107_riley_finish_when_all_job_receipts_verified_v1.sql
+      - supabase/migrations/20261107_riley_deadline_never_means_completed_v1.sql
       - test/reality-riley-completion-based-shift-v1.test.js
       - test/reality-riley-preview-original-wake-v1.test.js
       - src/reality-riley-multi-job-shift-controller-v1.js
