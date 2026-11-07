@@ -12,7 +12,7 @@ const FULL_SHIFT=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:
 // not need to memorize a rigid "run an eight-hour..." phrase. These explicit
 // imperative forms are ONLY interpreted following a signed-in Send action.
 const CURRENT_WORK=/^(?:(?:hey\s+)?reality\s*[,.:!]\s*)?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:['’]s)?(?:\s+and\s+taylor(?:['’]s)?)?\s+)|(?:the\s+|my\s+|our\s+|your\s+|current\s+|this\s+))*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|workday|work\s+day|jobs?|automation)(?:\s+now)?[.!]?$/i;
-const OWNER_AUTHORIZATION=/^i\s+authorize\s+(?:(?:reality|riley\s+and\s+taylor)\s+to\s+)?(?:(?:start|run|begin|launch)\s+)?(?:(?:the|my|our|your|current|this)\s+)?(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|jobs?)(?:\s+now)?[.!]?$/i;
+const OWNER_AUTHORIZATION=/^i\s+authorize\s+(?:(?:reality|riley\s+and\s+taylor)\s+to\s+)?(?:(?:start|run|begin|launch)\s+)?(?:(?:the|my|our|your|current|this)\s+)*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|jobs?)(?:\s+now)?[.!]?$/i;
 const FUTURE=/\b(?:tomorrow|next\s+(?:week|month|day)|later|after\s+|when\s+|if\s+|only\s+if|once\s+)\b/i;
 const RECURRENCE=/\b(?:every\s+(?:day|weekday|week|month)|daily|weekly|monthly|recurring|repeat\s+(?:every|daily|weekly)|each\s+(?:day|week|month))\b/i;
 const CONDITION=/\b(?:don't|do\s+not|never|without\s+starting|hypothetical|hypothetically|simulate|simulation|pretend|example|what\s+if)\b/i;
