@@ -88,7 +88,7 @@ export function createOneOpenAICombinedRoleCoordinator({
   // Reasoning-effort options are only valid for reasoning-model families.
   // The isolated preview currently selects gpt-4.1-mini, which cannot be
   // assumed to support the same request options as a GPT-5/6 reasoning model.
-  const reasoningModel=/^gpt-(?:5(?:\\.[0-9]+)?|6(?:\\.[0-9]+)?)(?:$|[-._])/i.test(model);
+  const reasoningModel=/^gpt-[56](?:$|[._-])/i.test(model);
   const payload={
    model,max_output_tokens:1200,
    ...(reasoningModel?{reasoning:{effort:'low'}}:{}),
