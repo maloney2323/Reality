@@ -35,6 +35,7 @@ function checkScope(s){
   !WORK.test(s.original_work_id||'')||!s.goal_id||
   typeof s.goal_id!=='string'||s.goal_id.length>150||
   !s.continuity_root_id||!s.worldline_id||
+  !SHA.test(s.source_identity_hash||'')||
   !SHA.test(s.ledger_head_hash||'')||
   !SHA.test(s.authorization_fingerprint||'')||
   !exactIso(s.authorization_expires_at)||
@@ -53,6 +54,7 @@ function checkFailure(f,s){
   f.original_work_id!==s.original_work_id||f.goal_id!==s.goal_id||
   f.continuity_root_id!==s.continuity_root_id||
   f.worldline_id!==s.worldline_id||
+  f.source_identity_hash!==s.source_identity_hash||
   f.ledger_head_hash!==s.ledger_head_hash||
   !exactIso(f.failed_valid_at)||
   !SHA.test(f.provider_evidence_sha256||'')||
@@ -68,7 +70,8 @@ function checkFailure(f,s){
 function compareScope(current,original){
  checkScope(current);
  const fields=['owner_id','shift_id','original_work_id','goal_id',
-  'continuity_root_id','worldline_id','authorization_fingerprint',
+  'continuity_root_id','worldline_id','source_identity_hash',
+  'authorization_fingerprint',
   'authorization_expires_at','target_environment'];
  if(fields.some(k=>current[k]!==original[k])||
    serialized(current.allowed_capabilities)!==serialized(original.allowed_capabilities))
@@ -122,6 +125,7 @@ export function sealGovernedRecoveryHandoff({
    original_work_id:currentScope.original_work_id,goal_id:currentScope.goal_id,
    continuity_root_id:currentScope.continuity_root_id,
    worldline_id:currentScope.worldline_id,
+   source_identity_hash:currentScope.source_identity_hash,
    ledger_head_hash:currentScope.ledger_head_hash,
    authorization_fingerprint:currentScope.authorization_fingerprint,
    authorization_expires_at:currentScope.authorization_expires_at,
@@ -137,6 +141,7 @@ export function sealGovernedRecoveryHandoff({
    goal_id:failure.goal_id,
    continuity_root_id:failure.continuity_root_id,
    worldline_id:failure.worldline_id,
+   source_identity_hash:failure.source_identity_hash,
    ledger_head_hash:failure.ledger_head_hash,
    failed_valid_at:failure.failed_valid_at,
    provider_evidence_sha256:failure.provider_evidence_sha256,
@@ -158,6 +163,7 @@ export function verifyGovernedRecoveryHandoff(args){
  return lock({status:'HANDOFF_INDEPENDENT_SCOPE_VERIFIED',
   original_work_id:b.scope.original_work_id,
   failed_valid_at:b.failure.failed_valid_at,
+  source_identity_hash:b.scope.source_identity_hash,
   recorded_transaction_time:b.transaction_time,
   execution_time:args.executionTime,
   same_job:true,authorization_granted:false,installation_authorized:false});
@@ -265,6 +271,7 @@ export function planZeroTouchSameJobContinuation({
   checkpointReadback.owner_id!==b.scope.owner_id||
   checkpointReadback.goal_id!==b.scope.goal_id||
   checkpointReadback.failure_id!==b.failure.failure_id||
+  checkpointReadback.source_identity_hash!==b.scope.source_identity_hash||
   !SHA.test(checkpointReadback.checkpoint_sha256||'')||
   checkpointReadback.provider_effect_may_have_occurred!==false||
   checkpointReadback.original_job_settled!==false)
@@ -300,8 +307,10 @@ export function planZeroTouchSameJobContinuation({
   original_work_id:work,owner_id:b.scope.owner_id,goal_id:b.scope.goal_id,
   source_failure_id:b.failure.failure_id,
   checkpoint_sha256:checkpointReadback.checkpoint_sha256,
+  source_identity_hash:b.scope.source_identity_hash,
   envelope_signature:envelope.signature,
   verified_tool_manifest:allowedTool,
+  tool_scope:'EPHEMERAL_ORIGINAL_JOB_ONLY',
   authorize_rehydrate_only:true,
   existing_executor_must_acquire_atomic_fenced_claim:true,
   execution_side_effect_performed:false,
