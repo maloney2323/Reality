@@ -117,4 +117,4 @@ begin
     else 'ENDED_WITH_BLOCKED_WORK' end,closed_at=v_now,
     close_report=v_report,last_progress_at=v_now where shift_id=s.shift_id;
  return v_report;
-end $function$
+end $function$;
