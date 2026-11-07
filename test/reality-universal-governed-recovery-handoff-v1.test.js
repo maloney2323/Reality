@@ -164,6 +164,22 @@ test('missing tool requires independent frozen reproduction, sandbox and exact-a
  assert.equal(ready.persistent_promotion_authorized,false);
  assert.equal(ready.execution_side_effect_performed,false);
 });
+test('a broken existing tool is repaired, never silently rebound; absent defect must reconcile',()=>{
+ const envelope=make(S,{...F,blocker_class:'IMPLEMENTATION_DEFECT'});
+ const base={...args(envelope),registryReadback:registry('ACTIVE')};
+ const noRebind=brokerGovernedRecoveryCapability(base);
+ assert.equal(noRebind.status,'FROZEN_REPRODUCTION_REQUIRED');
+ assert.equal(noRebind.can_rehydrate,false);
+ const noRegistry=brokerGovernedRecoveryCapability({...base,
+  registryReadback:registry('ABSENT')});
+ assert.equal(noRegistry.status,'DEFECT_REGISTRY_RECONCILIATION_REQUIRED');
+ assert.equal(noRegistry.can_rehydrate,false);
+ const staged=brokerGovernedRecoveryCapability({...base,
+  frozenReproduction:repro,candidate});
+ assert.equal(staged.status,'EXACT_ARTIFACT_APPROVAL_REQUIRED');
+ assert.equal(staged.tool_manifest,null);
+});
+
 test('wrong approval artifact and unsafe newly generated permissions cannot be attached',()=>{
  const envelope=make(S,{...F,blocker_class:'MISSING_INSTRUMENT'});
  const base={...args(envelope),registryReadback:registry('ABSENT'),
