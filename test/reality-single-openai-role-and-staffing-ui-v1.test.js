@@ -81,4 +81,8 @@ test('company scenario UI displays possible consolidated whole positions only as
  assert.match(ui,/data\.positions_terminated!==false/);
  assert.match(ui,/One shared OpenAI model covers business functions/);
  assert.doesNotMatch(ui,/8 employees replaced|guaranteed payroll savings/i);
+ const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(home,/Explore workforce savings by business function/);
+ assert.match(home,/\x2fchat-simple#workforceSavingsPlanner/);
+ assert.match(home,/Potential only — no verified staff reductions or payroll savings claimed/);
 });
