@@ -231,6 +231,8 @@ export function brokerGovernedRecoveryCapability({
  if(frozenReproduction?.independently_verified!==true||
   frozenReproduction.original_work_id!==work||
   frozenReproduction.capability_id!==id||
+  frozenReproduction.provider_evidence_sha256!==b.failure.provider_evidence_sha256||
+  frozenReproduction.source_identity_hash!==b.scope.source_identity_hash||
   frozenReproduction.reproduced_failure!==true||
   !SHA.test(frozenReproduction.frozen_suite_sha256||'')||
   frozenReproduction.external_action_performed!==false)
@@ -238,6 +240,8 @@ export function brokerGovernedRecoveryCapability({
    tool_manifest:null,can_rehydrate:false});
  if(candidate?.independently_verified!==true||
   candidate.original_work_id!==work||candidate.capability_id!==id||
+  candidate.source_identity_hash!==b.scope.source_identity_hash||
+  candidate.provider_evidence_sha256!==b.failure.provider_evidence_sha256||
   candidate.frozen_suite_sha256!==frozenReproduction.frozen_suite_sha256||
   !SHA.test(candidate.artifact_sha256||'')||
   candidate.isolation!=='NO_NETWORK_NO_SECRETS'||
