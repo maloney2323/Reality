@@ -7,6 +7,7 @@ import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
 import {assessRealityWorkdayTeam,routeRealityWorkCategoriesToEmployees} from '../../src/reality-workday-team-assessment-v1.js';
 import {buildRealityEightHourShiftDraft} from '../../src/reality-eight-hour-shift-plan-v1.js';
+import {buildRileyTaylorCombinedWorkOrders} from '../../src/reality-riley-taylor-combined-work-orders-v1.js';
 import {computeShiftFingerprint,shiftDatabase,shiftRpc,
  assertShiftReceipt,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
@@ -116,7 +117,10 @@ export default async function handler(req,res){
       catalog,brief,ownerId:session.user_id,db});
      const plan=buildRealityEightHourShiftDraft(brief,{
       durationHours:hours,prioritySourceRefs:priority.refs});
-     draft={...plan,expected_fingerprint:computeShiftFingerprint(plan),
+     const fingerprint=computeShiftFingerprint(plan);
+     const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
+     draft={...plan,expected_fingerprint:fingerprint,
+       combined_employee_work_orders:combined,
        proposed_team:assessRealityWorkdayTeam(brief),
        employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief),
        existing_owner_backlog_priorities:priority.refs,
@@ -158,6 +162,13 @@ export default async function handler(req,res){
   const plan=buildRealityEightHourShiftDraft(brief,{
    durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs});
   const fingerprint=computeShiftFingerprint(plan);
+  const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
+  // Do not create a timer-only idle shift when no paired source task was
+  // actually nominated in the exact, already-pinned owner scope.
+  if(combined.task_count===0)
+   return res.status(409).json({ok:false,
+    error:'NO_COMBINED_RILEY_TAYLOR_SOURCE_WORK_IN_APPROVED_PLAN',
+    job_started:false,installation_authorized:false,production_changed:false});
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
   const receipt=assertShiftReceipt(await shiftRpc(db,
@@ -174,6 +185,7 @@ export default async function handler(req,res){
    Number(new Date(s.planned_end_at))-Number(start)===plan.shift_duration_minutes*60000);
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
   return res.status(202).json({ok:true,...receipt,shift:exact,
+   combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
    installation_authorized:false,
    existing_chat_approval_required_for_exact_capabilities:true,
