@@ -81,6 +81,10 @@ test('company scenario UI displays possible consolidated whole positions only as
  assert.match(ui,/data\.positions_terminated!==false/);
  assert.match(ui,/One shared OpenAI model covers business functions/);
  assert.doesNotMatch(ui,/8 employees replaced|guaranteed payroll savings/i);
+ const moduleMatch=ui.match(/<script type="module">([\s\S]*?)<\/script>/);
+ assert.ok(moduleMatch,'find the actual Chat module script');
+ const script=moduleMatch[1].replace(/^\s*import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];\s*/,'');
+ assert.doesNotThrow(()=>new Function(script),'mobile chat and workforce planner script must parse');
  const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.match(home,/Explore workforce savings by business function/);
  assert.match(home,/\x2fchat-simple#workforceSavingsPlanner/);
