@@ -53,7 +53,7 @@ test('model receives trusted CURRENT authorization state, no obsolete button-onl
  assert.match(api,/existing_shift_blocked_at_original_admission_is_not_missing_owner_shift_permission:true/);
  assert.doesNotMatch(api,/shift_owner_authorization_requires_explicit_button_click:true/);
  assert.match(model,/OWNER SHIFT AUTHORIZATION TRUTH CONTRACT/);
- assert.match(model,/do NOT demand a special wording/);
+ assert.match(model,/do NOT demand a special wording/i);
  assert.match(model,/If system_context.chat_work_execution_bridge.owner_already_authorized_current_shift is true/);
  assert.match(model,/never request a duplicate shift authorization/);
 });
