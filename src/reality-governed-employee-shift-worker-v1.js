@@ -9,7 +9,7 @@ const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const noProduction=x=>x?.production_changed===false;
-async function readProviderSource(source,{fetchImpl=fetch}={}){
+async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
  const parsed=URL.exec(String(source||''));
  if(!parsed)throw Error('SHIFT_SOURCE_REF_NOT_ALLOWED');
  const category=parsed[1],id=parsed[2],endpoint=
@@ -38,10 +38,60 @@ async function readProviderSource(source,{fetchImpl=fetch}={}){
  }else state=data.status==='completed'?
    (data.conclusion==='failure'?'FAILED_WORKFLOW':'COMPLETED_WORKFLOW'):null;
  if(!state)throw Error('SHIFT_GITHUB_STATUS_UNRECOGNIZED');
+ // A PR review must have actual change evidence, not just a title.
+ // Source content is untrusted, truncated, and never gives execution authority.
+ let provider_evidence={kind:'SOURCE_METADATA_ONLY',review_coverage:'PARTIAL'};
+ if(category==='issues'){
+  provider_evidence={
+   kind:'ISSUE_CONTENT_OBSERVED',
+   body_excerpt:String(data.body||'').slice(0,2200),
+   labels:Array.isArray(data.labels)?data.labels.slice(0,8)
+    .map(x=>String(x?.name||'').slice(0,60)):[],
+   review_coverage:'SOURCE_DESCRIPTION_ONLY'
+  };
+ }else if(category==='pull'){
+  const sha=x=>/^[a-f0-9]{40}$/.test(String(x||''))?x:null;
+  const headSha=sha(data.head?.sha),baseSha=sha(data.base?.sha);
+  const total=Number.isSafeInteger(data.changed_files)&&data.changed_files>=0?
+   data.changed_files:null;
+  const evidence={
+   kind:'PULL_REQUEST_CHANGESET_OBSERVED',
+   head_sha:headSha,base_sha:baseSha,changed_file_count:total,
+   files:[],review_coverage:'PATCH_UNAVAILABLE'
+  };
+  if(includePatch&&state==='OPEN_PULL_REQUEST'&&headSha){
+   try{
+    const filesResp=await fetchImpl(target+'/files?per_page=12',{
+     method:'GET',redirect:'error',cache:'no-store',
+     headers:{accept:'application/vnd.github+json',
+      'user-agent':'Reality-Riley-Taylor-PR-Evidence/1.0',
+      'x-github-api-version':'2022-11-28'},
+     signal:AbortSignal.timeout(10000)
+    });
+    const files=filesResp.ok?await filesResp.json():null;
+    if(Array.isArray(files)&&files.length<=12&&files.every(x=>
+      typeof x?.filename==='string'&&x.filename.length<=260&&
+      !x.filename.includes('..')&&
+      ['modified','added','removed','renamed','copied','changed',
+       'unchanged'].includes(x.status)&&
+      Number.isSafeInteger(x.additions)&&Number.isSafeInteger(x.deletions))){
+     evidence.files=files.slice(0,8).map(x=>({
+      path:x.filename,
+      status:x.status,
+      additions:x.additions,deletions:x.deletions,
+      patch_excerpt:typeof x.patch==='string'?x.patch.slice(0,700):null
+     }));
+     evidence.review_coverage=total!==null&&total<=8&&files.length===total?
+      'BOUNDED_CHANGED_FILES_READ':'PARTIAL_CHANGED_FILES_READ';
+    }
+   }catch{/* GitHub file readback unavailable: source is still observed, patch is not. */}
+  }
+  provider_evidence=evidence;
+ }
  return {kind:'GITHUB_SOURCE_READBACK',source_url:source,
   provider_status:state,provider_checked:true,read_only:true,
   production_changed:false,observed_at:new Date().toISOString(),
-  provider_id:data.id,
+  provider_id:data.id,provider_evidence,
   source_title:String(data.title||data.name||'').replace(/[\u0000-\u001f]/g,' ').slice(0,180)};
 }
 async function readPreflight(db,{fetchImpl=fetch}={}){
@@ -210,7 +260,9 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
    source_url:null,provider_status:'UNASSIGNED_NO_SOURCE',
    provider_checked:false,read_only:true,
    production_changed:false,observed_at:new Date().toISOString()};
- }else proof=await readProviderSource(claimed.source_ref,{fetchImpl});
+ }else proof=await readProviderSource(claimed.source_ref,{
+  fetchImpl,includePatch:claimed.step_index>=2&&claimed.step_index<=5
+ });
  if(claimed.step_index>=2&&claimed.step_index<=5&&
     proof.kind==='GITHUB_SOURCE_READBACK'){
   const ctx=Object.freeze({
