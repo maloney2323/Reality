@@ -34,7 +34,8 @@ function schemaCheck(schema){
   new Set(schema.required).size!==schema.required.length)
   fail('SCHEMA_NOT_BOUNDED');
  const names=Object.keys(schema.properties);
- if(names.some(n=>!/^[a-z][a-z0-9_]{0,50}$/.test(n))||
+ if(schema.required.length!==names.length||
+  names.some(n=>!/^[a-z][a-z0-9_]{0,50}$/.test(n))||
   schema.required.some(n=>!names.includes(n))||
   names.some(n=>{
    const p=schema.properties[n];
