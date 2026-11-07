@@ -64,7 +64,7 @@ export function createRileyTrustedOriginalDriver({
   const candidates=observation.candidates;
   const selected=candidates.filter(c=>
    c.original_work_id===input.original_work_id);
-  if(selected.length!==1||candidates.length!==1||
+  if(selected.length!==1||
     candidates.some(c=>c.shift_id!==input.shift_id||
       !UUID.test(c.owner_id||'')||!UUID.test(c.trigger_id||'')||
       !WORK.test(c.original_work_id||'')||
@@ -86,7 +86,8 @@ export function createRileyTrustedOriginalDriver({
   const result=await runTick({
    db,ownerId:owner,shiftId:input.shift_id,fetchImpl,
    loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal,
-   callRpc:rpc,runOriginal,now,maxJobs:1
+   callRpc:rpc,runOriginal,now,maxJobs:1,
+   onlyOriginalWorkId:input.original_work_id
   });
   if(result?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
     result.shift_id!==input.shift_id||
