@@ -85,9 +85,13 @@ export function createOneOpenAICombinedRoleCoordinator({
   });
   // No model-created tool calls or elevated role identity. One authenticated
   // shift claim can produce at most one bounded model advisory per step.
+  // Reasoning-effort options are only valid for reasoning-model families.
+  // The isolated preview currently selects gpt-4.1-mini, which cannot be
+  // assumed to support the same request options as a GPT-5/6 reasoning model.
+  const reasoningModel=/^gpt-(?:5(?:\\.[0-9]+)?|6(?:\\.[0-9]+)?)(?:$|[-._])/i.test(model);
   const payload={
    model,max_output_tokens:1200,
-   reasoning:{effort:'low'},
+   ...(reasoningModel?{reasoning:{effort:'low'}}:{}),
    tool_choice:'none',
    input:[
     {role:'system',content:[{type:'input_text',text:
@@ -120,7 +124,18 @@ export function createOneOpenAICombinedRoleCoordinator({
      'content-type':'application/json'},
     body:JSON.stringify(payload),
    });
-   if(!response.ok)return rejected(input,'OPENAI_RESPONSE_UNAVAILABLE');
+   if(!response.ok){
+    // Persist only a bounded HTTP class; NEVER expose provider body,
+    // authorization headers, prompt, token or untrusted error strings.
+    const status=Number(response.status);
+    const reason=status===400||status===422?'OPENAI_REQUEST_OPTIONS_REJECTED':
+      status===401||status===403?'OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED':
+      status===404?'OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND':
+      status===429?'OPENAI_RATE_OR_QUOTA_LIMIT':
+      status>=500&&status<=599?'OPENAI_PROVIDER_SERVER_FAILURE':
+      'OPENAI_RESPONSE_UNAVAILABLE';
+    return rejected(input,reason);
+   }
    const data=await response.json();
    if(data.status!=='completed'||
      !Array.isArray(data.output)||
