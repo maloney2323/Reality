@@ -70,8 +70,10 @@ test('the worker rejects fabricated executor receipts and never relabels unverif
   {...outcome,shift_id:'33333333-4444-4555-8666-777777777777'},
   {...outcome,installation_authorized:true},
   {...outcome,independently_settled:2},
+  {...outcome,outcomes:[{...outcome.outcomes[0],original_job_settled:true}]},
   {...outcome,shift_finished:true},
   {...outcome,outcomes:[{original_work_id:'work:'+'b'.repeat(32)}]},
+  {...outcome,outcomes:[outcome.outcomes[0],outcome.outcomes[0]]},
   {...outcome,status:'REPAIR_INSTALLED'},
  ]){
   await assert.rejects(processGovernedEmployeeShiftTick(db,{
