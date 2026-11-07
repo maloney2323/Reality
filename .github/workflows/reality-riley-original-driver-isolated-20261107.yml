@@ -12,6 +12,7 @@ on:
       - api/reality/personal-workforce-savings-scenario.js
       - api/reality/personal-employee-roster.js
       - reality-chat-simple.html
+      - index.html
       - test/reality-role-workforce-savings-scenario-v1.test.js
       - test/reality-single-openai-role-and-staffing-ui-v1.test.js
       - test/reality-first-shift-economic-scorecard-v1.test.js
