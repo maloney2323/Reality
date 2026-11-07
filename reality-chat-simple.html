@@ -123,6 +123,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 </div>
 <p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
 <p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
+<section id="combinedShiftRoleHandoffs" class="team-value" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
+ <h3>Combined shift · One OpenAI model across relevant business roles</h3>
+ <p>Roles share a source-backed, owner-authorized shift. Model suggestions are never independent verification or completed work.</p>
+ <div id="combinedShiftRoleRows"></div>
+</section>
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
@@ -901,12 +906,65 @@ async function refreshEmployeeBoard(){
       '. No workers or completed work are being claimed.';
   }finally{teamLoading=false}
 }
+
+const COMBINED_STEP_ROLES=Object.freeze({
+ 2:['Riley','Taylor'],3:['Taylor','Quinn'],
+ 4:['Quinn','Riley'],5:['Avery','Riley','Sage']
+});
+function renderCombinedShiftRoleEvidence(readback){
+ const panel=$('combinedShiftRoleHandoffs'),holder=$('combinedShiftRoleRows');
+ holder.replaceChildren();
+ const shifts=readback?.shifts;
+ if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+  !Array.isArray(shifts)||shifts.length>5){
+  panel.hidden=true;return;
+ }
+ const latest=shifts[0];
+ if(!latest||!Array.isArray(latest.steps)||latest.steps.length!==8){
+  panel.hidden=true;return;
+ }
+ let shown=0;
+ for(const step of latest.steps){
+  const expected=COMBINED_STEP_ROLES[step?.step_index];
+  if(!expected||step.state!=='SOURCE_CHECKED'||
+    !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(step.source_ref||''))
+   continue;
+  const status=step.role_handoff_status;
+  if(!['SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK',
+    'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'].includes(status))
+   continue;
+  if(!Array.isArray(step.role_handoff_labels)||
+    step.role_handoff_labels.length!==expected.length||
+    step.role_handoff_labels.some((label,i)=>label!==expected[i]))
+   continue;
+  const row=document.createElement('div');
+  row.className='workforce-output-row';
+  row.append(textNode('strong',
+   'Step '+step.step_index+' · '+expected.join(' + ')+' · Shared OpenAI'));
+  const a=document.createElement('a');
+  a.href=step.source_ref;
+  a.rel='noopener noreferrer';a.target='_blank';
+  a.textContent=step.source_ref;
+  row.append(a);
+  row.append(textNode('div',status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK'?
+   'Source checked; model role advice recorded. NOT a completed repair or independent receipt.':
+   'Source checked; shared model role advice unavailable. No completed work claimed.'));
+  if(status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK'&&
+    typeof step.role_handoff_advisory==='string'&&
+    step.role_handoff_advisory.length<=1200)
+   row.append(textNode('p',step.role_handoff_advisory));
+  holder.append(row);shown++;
+ }
+ panel.hidden=shown===0;
+}
+
 async function refreshShiftStatus(){
   if(shiftLoading)return;
   shiftLoading=true;
   try{
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
+    renderCombinedShiftRoleEvidence(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
       $('runFullShift').disabled=true;
@@ -943,6 +1001,8 @@ async function refreshShiftStatus(){
       node.hidden=false;
     }
   }catch{
+    $('combinedShiftRoleHandoffs').hidden=true;
+    $('combinedShiftRoleRows').replaceChildren();
     // Fail closed: a connection problem MUST NOT unlock a second shift.
     $('runFullShift').disabled=true;
     $('runFullShift').textContent='Shift status unavailable';
