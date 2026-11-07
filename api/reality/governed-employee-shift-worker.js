@@ -10,6 +10,10 @@ import {processGovernedEmployeeShiftTick}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
  from '../../src/reality-one-openai-combined-role-handoff-v1.js';
+import {createRileyServiceOriginalRuntime}
+ from '../../src/reality-riley-service-original-runtime-v1.js';
+import {createRileyTrustedOriginalDriver}
+ from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -42,8 +46,22 @@ export default async function handler(req,res){
    createOneOpenAICombinedRoleCoordinator({
     apiKey:key,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.4'
    }):null;
+  // An eligible step-six original enters Reality's EXISTING governed
+  // source-backed executor only after service-role owner/goal readback and
+  // independent provider preflight, before the global single-use DB claim.
+  // The same worker token covers this already-authorized shift; no model,
+  // browser or employee can mint new scope or installation approval.
+  const originalAdapters=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED==='true'?
+   createRileyServiceOriginalRuntime({db,env:process.env}):null;
+  const executeQualifiedOriginals=originalAdapters?
+   createRileyTrustedOriginalDriver({
+    db,loadShiftReadback:originalAdapters.loadShiftReadback,
+    loadOwnerLedgerReadback:originalAdapters.loadOwnerLedgerReadback,
+    loadTrustedAuthorizedOriginal:originalAdapters.loadTrustedAuthorizedOriginal,
+    runOriginal:originalAdapters.runOriginal,
+   }):null;
   const result=await processGovernedEmployeeShiftTick(db,{
-   coordinateRoleWork
+   coordinateRoleWork,executeQualifiedOriginals
   });
   return res.status(200).json(result);
  }catch{
