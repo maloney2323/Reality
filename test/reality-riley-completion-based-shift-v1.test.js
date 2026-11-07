@@ -46,3 +46,17 @@ test('supervisor never mints a new original, model permission, money saved, or i
  assert.match(src,/'production_changed',false/);
  assert.match(src,/'original_job_completed',false/);
 });
+
+const deadline=readFileSync(new URL(
+ '../supabase/migrations/20261107_riley_deadline_never_means_completed_v1.sql',
+ import.meta.url),'utf8');
+test('authorization deadline is a truthful unfinished-work report, not a success receipt',()=>{
+ assert.match(deadline,/v_claims between 1 and 4/);
+ assert.match(deadline,/v_claims=v_verified and v_unclaimed=0/);
+ assert.match(deadline,/v_all_verified then 'ENDED_WITH_VERIFIED_JOB'/);
+ assert.match(deadline,/SHIFT_AUTHORIZATION_WINDOW_EXPIRED_WITH_UNFINISHED_OR_UNVERIFIED_WORK/);
+ assert.match(deadline,/r.verified_settlement_event_id=c.independent_receipt_event_id/);
+ assert.match(deadline,/q.phase='SETTLED_ISOLATED'/);
+ assert.match(deadline,/v_historical_noop/);
+ assert.doesNotMatch(deadline,/set status=case when exists\(select 1 from reality_internal\.governed_employee_shift_steps_v1 t/);
+});
