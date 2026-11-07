@@ -102,8 +102,7 @@ test('closed sources skip model calls; unknown OpenAI output is never a verified
  for(const response of [
   {ok:false}, {ok:true,json:async()=>({id:'resp_1234567',status:'in_progress',output:[]})},
   {ok:true,json:async()=>({id:'resp_1234567',status:'completed',
-   output:[{type:'function_call',name:'install'}]})},
-  mockResponse('x'.repeat(2600))
+   output:[{type:'function_call',name:'install'}]})}
  ]){
   const ca=createOneOpenAICombinedRoleCoordinator({
    apiKey:'isolated-not-secret-key',fetchImpl:async()=>response});
@@ -112,6 +111,16 @@ test('closed sources skip model calls; unknown OpenAI output is never a verified
   assert.equal(result.model_invocations_completed,0);
   assert.equal(result.original_job_completed,false);
  }
+ const longModel=createOneOpenAICombinedRoleCoordinator({
+  apiKey:'isolated-not-secret-key',
+  fetchImpl:async()=>mockResponse('x'.repeat(2600))
+ });
+ const truncated=await longModel(context);
+ assert.equal(truncated.status,'SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK');
+ assert.equal(truncated.model_advice.length,1200);
+ assert.equal(truncated.model_advice_truncated,true);
+ assert.equal(truncated.independent_verification_performed,false);
+ assert.equal(truncated.original_job_completed,false);
  assert.equal(unavailableRoleHandoff(context).reason,'SHARED_OPENAI_ADAPTER_NOT_CONFIGURED');
 });
 function fakeShiftStep({coordinator=null,source=issue,step=2,stage='VERIFY_OPEN_ISSUE'}={}){
