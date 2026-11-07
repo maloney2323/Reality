@@ -122,7 +122,14 @@ export function projectFirstShiftEconomicValue({
  const priced=rows.filter(x=>x.net_benchmark_adjusted_value_usd!==null);
  const unpriced=rows.filter(x=>x.net_benchmark_adjusted_value_usd===null);
  const gross=usd(grossKnown.reduce((n,x)=>n+x.gross_illustrative_labor_equivalent_usd,0));
- const net=usd(priced.reduce((n,x)=>n+x.net_benchmark_adjusted_value_usd,0));
+ // Aggregate unrounded evidence before the final cent rounding. Rounding
+ // quarter-hour review costs separately can otherwise skew a full shift.
+ const net=usd(priced.reduce((total,x)=>{
+  const c=costs.get(x.original_work_id);
+  return total+x.benchmark_hours*rate-
+   c.model_provider_cost_usd-c.infrastructure_cost_usd-
+   c.owner_review_minutes/60*rate;
+ },0));
  return freeze({
   version:FIRST_SHIFT_ECONOMIC_VALUE_VERSION,
   status:rows.length?'INDEPENDENT_WORK_RECEIPTS_WITH_ILLUSTRATIVE_ECONOMICS':
