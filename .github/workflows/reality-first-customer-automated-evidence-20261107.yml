@@ -1,0 +1,142 @@
+name: Reality first-customer automated evidence jobs
+on:
+  push:
+    branches: [fix/reality-governed-riley-original-driver-20261107]
+    paths:
+      - .github/workflows/reality-first-customer-automated-evidence-20261107.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  issues: read
+jobs:
+  riley-source-backed-engineering-work:
+    name: Riley investigates current issue ${{ matrix.issue }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - issue: 263
+            target_workflow: Reality flexible governed employee shifts
+          - issue: 143
+            target_workflow: Reality Governed Execution Engine v0.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual provider-backed Riley maintenance investigation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ matrix.issue }}
+          WORKFLOW: ${{ matrix.target_workflow }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {auditRealityEngineeringIssue,verifyRileyAuditReceipt}
+            from './src/reality-riley-engineering-pilot-v1.js';
+          const issueNumber=Number(process.env.ISSUE);
+          const receipt=await auditRealityEngineeringIssue({
+            issueNumber,workflowName:process.env.WORKFLOW,
+            sourceCommitSha:process.env.GITHUB_SHA,
+            sourceRunId:Number(process.env.GITHUB_RUN_ID),
+            token:process.env.GH_TOKEN
+          });
+          verifyRileyAuditReceipt(receipt);
+          await mkdir('riley-pilot-evidence',{recursive:true});
+          await writeFile('riley-pilot-evidence/issue-'+issueNumber+'.json',
+            JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
+          console.log('REALITY_RILEY_AUTOMATED_REAL_WORK',JSON.stringify({
+            issue:issueNumber,finding:receipt.finding,
+            current_failures:receipt.fresh_failure_count,
+            provider_runs_checked:receipt.workflow_runs_observed,
+            receipt_sha256:receipt.evidence_sha256,
+            original_customer_job_settled:false,
+            production_changed:false
+          }));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riley-real-issue-${{ matrix.issue }}-source-evidence
+          path: riley-pilot-evidence/issue-${{ matrix.issue }}.json
+          retention-days: 14
+          if-no-files-found: error
+
+  riley-independent-provider-readback:
+    name: Independently verify Riley issue ${{ matrix.issue }}
+    needs: riley-source-backed-engineering-work
+    if: always() && needs.riley-source-backed-engineering-work.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - issue: 263
+          - issue: 143
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: riley-real-issue-${{ matrix.issue }}-source-evidence
+          path: riley-pilot-evidence
+      - name: Independent provider re-read and source receipt verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ matrix.issue }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          import {independentlyVerifyRileyProviderAudit}
+            from './src/reality-riley-engineering-pilot-v1.js';
+          const issue=Number(process.env.ISSUE);
+          const receipt=JSON.parse(await readFile('riley-pilot-evidence/issue-'+issue+'.json','utf8'));
+          if(receipt.issue_number!==issue)throw Error('EXACT_ISSUE_MISMATCH');
+          const result=await independentlyVerifyRileyProviderAudit(receipt,{
+            token:process.env.GH_TOKEN
+          });
+          if(result.status!=='INDEPENDENT_PROVIDER_READBACK_PASSED'||
+            result.production_changed!==false||result.original_job_completed!==false)
+            throw Error('REAL_PROVIDER_INDEPENDENT_VERIFICATION_FAILED');
+          console.log('REALITY_RILEY_INDEPENDENT_WORK_RECEIPT',JSON.stringify({
+            issue,status:result.status,
+            receipt_sha256:result.receipt_sha256,
+            original_job_completed:false,
+            production_changed:false
+          }));
+          NODE
+
+  automatic-frozen-capability-discovery:
+    name: Reality discovers actual frozen test capability gaps
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Scan real frozen acceptance tests and identify genuine new candidate signals
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-genuine-auto-trigger-v1.mjs
+          node scripts/reality-genuine-auto-trigger-v1.mjs
+      - name: Preserve capability discovery evidence without admitting or installing work
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-first-customer-automatic-capability-discovery
+          path: artifact/genuine-capability-auto-trigger.json
+          retention-days: 14
+          if-no-files-found: error

@@ -1,0 +1,211 @@
+name: Riley isolated original-job driver regression
+on:
+  push:
+    branches:
+      - fix/reality-governed-riley-original-driver-20261107
+    paths:
+      - src/reality-governed-employee-shift-worker-v1.js
+      - src/reality-one-openai-combined-role-handoff-v1.js
+      - scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - supabase/migrations/20261107_combined_employee_role_readback_v1.sql
+      - api/reality/governed-employee-shift-worker.js
+      - test/reality-one-openai-combined-role-handoff-v1.test.js
+      - test/reality-combined-employee-shift-visibility-v1.test.js
+      - src/reality-riley-trusted-original-driver-bridge-v1.js
+      - src/reality-riley-service-original-runtime-v1.js
+      - supabase/migrations/20261107_riley_trusted_shift_execution_context_v1.sql
+      - supabase/migrations/20261107_riley_preview_original_execution_wake_v1.sql
+      - test/reality-riley-preview-original-wake-v1.test.js
+      - src/reality-riley-multi-job-shift-controller-v1.js
+      - src/reality-governed-shift-boundary-v1.js
+      - test/reality-riley-service-original-runtime-v1.test.js
+      - test/reality-riley-full-execution-path-v1.test.js
+      - src/reality-first-shift-economic-scorecard-v1.js
+      - src/reality-single-model-role-work-router-v1.js
+      - src/reality-role-workforce-savings-scenario-v1.js
+      - src/reality-role-workforce-evidence-v1.js
+      - test/reality-role-workforce-evidence-v1.test.js
+      - api/reality/personal-workforce-savings-scenario.js
+      - api/reality/personal-employee-roster.js
+      - reality-chat-simple.html
+      - index.html
+      - test/reality-role-workforce-savings-scenario-v1.test.js
+      - test/reality-single-openai-role-and-staffing-ui-v1.test.js
+      - test/reality-first-shift-economic-scorecard-v1.test.js
+      - test/reality-riley-trusted-original-driver-bridge-v1.test.js
+      - src/reality-universal-governed-recovery-handoff-v1.js
+      - src/reality-governed-late-bound-tool-adapter-v1.js
+      - src/reality-governed-tool-session-v1.js
+      - scripts/reality-prove-live-tool-delivery-v1.mjs
+      - scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - test/reality-riley-original-driver-security-v1.test.js
+      - test/reality-universal-governed-recovery-handoff-v1.test.js
+      - test/reality-governed-late-bound-tool-adapter-v1.test.js
+      - test/reality-governed-tool-session-v1.test.js
+      - test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js
+      - .github/workflows/reality-riley-original-driver-isolated-20261107.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing worker and exact original handoff
+        run: node --test test/reality-riley-preview-original-wake-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-combined-employee-shift-visibility-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-role-workforce-evidence-v1.test.js test/reality-role-workforce-savings-scenario-v1.test.js test/reality-single-openai-role-and-staffing-ui-v1.test.js test/reality-next-week-employee-plan-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-first-shift-economic-scorecard-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
+      - name: Parse live provider proof runners
+        run: |
+          node --check scripts/reality-prove-live-tool-delivery-v1.mjs
+          node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
+          node --check scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - name: Compare all existing tests against unchanged development baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test >/tmp/reality-candidate-tests.txt 2>&1 || true
+          git worktree add --detach /tmp/reality-baseline d63d15b08fe61d88d4d365f0dbb5816ee79ef471
+          (cd /tmp/reality-baseline && npm test >/tmp/reality-baseline-tests.txt 2>&1) || true
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const failures = path => [...fs.readFileSync(path,'utf8')
+            .matchAll(/^not ok [0-9]+ - (.+)$/gm)].map(x=>x[1]).sort();
+          const old = failures('/tmp/reality-baseline-tests.txt');
+          const current = failures('/tmp/reality-candidate-tests.txt');
+          const introduced = current.filter(x=>!old.includes(x));
+          console.log(JSON.stringify({
+            baseline_existing_failures:old.length,
+            candidate_failures:current.length,
+            introduced_regressions:introduced
+          },null,2));
+          if(introduced.length)process.exit(1);
+          NODE
+
+  bounded-live-openai-tool-delivery:
+    # Only an explicitly tagged commit invokes a paid provider probe.
+    # Synthetic and isolated; not a customer job or installation.
+    if: contains(github.event.head_commit.message, '[live-tool-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate bounded isolated runner
+        run: node --check scripts/reality-prove-live-tool-delivery-v1.mjs
+      - name: Check provider credential availability without disclosure
+        id: credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'PROVIDER_PROOF_NOT_RUN: isolated workflow has no OPENAI_API_KEY'
+          fi
+      - name: Exercise real OpenAI tool search and fenced isolated proxy
+        if: steps.credentials.outputs.available == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/reality-prove-live-tool-delivery-v1.mjs
+      - name: Upload isolated evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-openai-governed-tool-delivery-isolated
+          path: benchmark-results/reality-live-late-bound-tool-proof-v1.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  live-real-repository-openai-governance:
+    # Real repository code and real OpenAI, but NO customer execution claim,
+    # installation, or original-job settlement. Scope is test-only.
+    if: contains(github.event.head_commit.message, '[real-source-governance-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check real source-backed proof runner
+        run: node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - name: Reject missing provider secret without disclosing it
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo 'REAL_OPENAI_PROOF_NOT_EXECUTED_NO_CREDENTIAL'
+            exit 1
+          fi
+      - name: Real OpenAI model diagnoses actual Riley worker under governed tool permission and negative replay tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - name: Preserve real source diagnosis, tool call and security verdicts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-riley-source-openai-governance-proof
+          path: benchmark-results/reality-real-source-openai-governance-v1.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  real-openai-combined-role-provider-proof:
+    # One bounded, real OpenAI call against current public issue #263.
+    # Synthetic isolated shift; no authorized DB claim, original job or installation.
+    if: contains(github.event.head_commit.message, '[combined-role-provider-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify bounded role proof runner
+        run: node --check scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - name: Independently check provider credential
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo 'ONE_OPENAI_COMBINED_ROLE_PROOF_NOT_EXECUTED_NO_CREDENTIAL'
+            exit 1
+          fi
+      - name: Real OpenAI one-provider multi-role response to source-backed Riley blocker
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/reality-prove-one-openai-combined-role-v1.mjs
+      - name: Preserve real model and independent source readback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-combined-one-openai-model-source-proof
+          path: benchmark-results/reality-real-openai-combined-role-proof-v1.json
+          retention-days: 14
+          if-no-files-found: ignore

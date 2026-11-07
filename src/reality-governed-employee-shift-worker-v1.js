@@ -1,4 +1,6 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {unavailableRoleHandoff,COMBINED_ROLE_HANDOFF_VERSION}
+ from './reality-one-openai-combined-role-handoff-v1.js';
 import {wakeExistingRileyCapabilityJob}
  from './reality-employee-shared-capability-wake-v1.js';
 import {wakeExistingRileyShiftCapabilityBatch}
@@ -39,7 +41,8 @@ async function readProviderSource(source,{fetchImpl=fetch}={}){
  return {kind:'GITHUB_SOURCE_READBACK',source_url:source,
   provider_status:state,provider_checked:true,read_only:true,
   production_changed:false,observed_at:new Date().toISOString(),
-  provider_id:data.id};
+  provider_id:data.id,
+  source_title:String(data.title||data.name||'').replace(/[\u0000-\u001f]/g,' ').slice(0,180)};
 }
 async function readPreflight(db,{fetchImpl=fetch}={}){
  const claim=await shiftRpc(db,'reality_read_owner_genuine_loop_v1',
@@ -61,11 +64,84 @@ async function readPreflight(db,{fetchImpl=fetch}={}){
   independent_final_receipts_read:receipts.receipts.length,
   no_new_authority_granted:true};
 }
+// A wake is NOT execution authority. This handoff is only eligible after an
+// independently matched source/shift/queue readback, a matching wake receipt,
+// and the shift's exact step-six gate. The injected trusted driver must
+// independently recheck owner, time window, goal, provider effects and make
+// its own globally single-use claim BEFORE invoking the shared executor.
+function qualifiedOriginalDriverScope(reconciled,wake,claimed){
+ if(reconciled?.status!=='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'||
+  reconciled.governed_existing_work_status!==
+   'EXISTING_AUTHORIZED_ORIGINAL_REUSED_READ_ONLY'||
+  !UUID.test(reconciled.shift_id||'')||
+  !/^work:[a-f0-9]{32}$/.test(reconciled.governed_original_work_id||'')||
+  !UUID.test(reconciled.governed_trigger_id||'')||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(reconciled.shift_observation_source_ref||'')||
+  !/^sha256:[a-f0-9]{64}$/.test(reconciled.shift_observation_proof_sha256||'')||
+  reconciled.governed_cycle_dispatched_by_shift!==false||
+  reconciled.model_invoked_by_shift!==false||
+  reconciled.new_customer_job_created!==false||
+  reconciled.installation_authorized!==false||
+  reconciled.production_changed!==false||
+  wake?.status!=='EXISTING_REALITY_CAPABILITY_WAKE_RECORDED'||
+  wake.shift_id!==reconciled.shift_id||
+  wake.original_work_id!==reconciled.governed_original_work_id||
+  wake.worker_execution_acknowledged!==false||
+  wake.installation_authorized!==false||
+  wake.original_job_completed!==false||
+  wake.production_changed!==false||
+  claimed?.status!=='EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED'||
+  claimed.shift_id!==reconciled.shift_id)
+  return null;
+ return Object.freeze({
+  shift_id:reconciled.shift_id,
+  original_work_id:reconciled.governed_original_work_id,
+  trigger_id:reconciled.governed_trigger_id,
+  source_ref:reconciled.shift_observation_source_ref,
+  source_proof_sha256:reconciled.shift_observation_proof_sha256,
+  read_only:false,preflight_only:false,
+  shift_read_does_not_grant_execution_authority:true,
+  exact_trusted_original_preflight_required:true
+ });
+}
+function assertOriginalDriverOutcome(out,scope){
+ if(out?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
+  out.shift_id!==scope.shift_id||
+  !Number.isSafeInteger(out.attempted)||out.attempted<0||out.attempted>4||
+  !Number.isSafeInteger(out.independently_settled)||
+  out.independently_settled<0||out.independently_settled>out.attempted||
+  !Array.isArray(out.outcomes)||out.outcomes.length>4||
+  !out.outcomes.some(x=>x?.original_work_id===scope.original_work_id)||
+  out.outcomes.some(x=>!/^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')||
+   typeof x.status!=='string'||x.status.length>110||
+   typeof x.original_job_settled!=='boolean')||
+  new Set(out.outcomes.map(x=>x.original_work_id)).size!==out.outcomes.length||
+  out.outcomes.filter(x=>x.original_job_settled).length!==out.independently_settled||
+  out.installation_authorized!==false||
+  out.production_changed!==false||
+  out.shift_finished!==false||out.full_shift_proven!==false)
+  throw Error('SHIFT_ORIGINAL_DRIVER_INDEPENDENT_OUTCOME_UNVERIFIED');
+ return Object.freeze({
+  status:out.status,shift_id:scope.shift_id,original_work_id:scope.original_work_id,
+  attempted:out.attempted,independently_settled:out.independently_settled,
+  outcomes:out.outcomes.map(x=>({
+   original_work_id:x.original_work_id,status:x.status,
+   original_job_settled:x.original_job_settled===true
+  })),
+  installation_authorized:false,production_changed:false,
+  full_shift_proven:false
+ });
+}
 export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  wakeCapability=wakeExistingRileyCapabilityJob,
- wakeMultiple=wakeExistingRileyShiftCapabilityBatch}={}){
+ wakeMultiple=wakeExistingRileyShiftCapabilityBatch,
+ executeQualifiedOriginals=null,coordinateRoleWork=null}={}){
  if(typeof wakeCapability!=='function'||typeof wakeMultiple!=='function')
   throw Error('SHIFT_CAPABILITY_WAKE_ADAPTER_REQUIRED');
+ if(executeQualifiedOriginals!==null&&typeof executeQualifiedOriginals!=='function')
+  throw Error('SHIFT_ORIGINAL_DRIVER_ADAPTER_INVALID');
+ if(coordinateRoleWork!==null&&typeof coordinateRoleWork!=='function')
+  throw Error('SHIFT_SHARED_MODEL_ROLE_ADAPTER_INVALID');
  // An isolated one-step invocation; no arbitrary scheduling or execution.
  const closed=await shiftRpc(db,'reality_close_employee_shift_v1',{}, {fetchImpl});
  if(!['NO_SHIFT_DUE_FOR_CLOSE','EIGHT_HOUR_SHIFT_EVIDENCE_REPORT','EMPLOYEE_SHIFT_EVIDENCE_REPORT'].includes(closed.status))
@@ -103,12 +179,23 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
  if(['NO_DUE_AUTHORIZED_SHIFT','NO_CLAIMABLE_STEP','INFLIGHT_LEASE_UNEXPIRED',
    'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
    'SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
-   'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status))
+   'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status)){
+  const scope=qualifiedOriginalDriverScope(reconciled,capabilityWake,claimed);
+  // Absence of a trusted driver is a visible blocker, not a successful shift.
+  // A wake/notification is never mistaken for a real executor result.
+  const originalJobDriver=!scope?null:executeQualifiedOriginals===null?
+   {status:'TRUSTED_ORIGINAL_DRIVER_NOT_CONNECTED',
+    shift_id:scope.shift_id,original_work_id:scope.original_work_id,
+    attempted:0,independently_settled:0,installation_authorized:false,
+    production_changed:false}:
+   assertOriginalDriverOutcome(await executeQualifiedOriginals(scope),scope);
   return {ok:true,status:claimed.status,
    shift_id:claimed.shift_id||null,
    upgrade_approval_channel:'EXISTING_REALITY_CHAT_ONLY',
    capability_wake:capabilityWake,
+   original_job_driver:originalJobDriver,
    installation_authorized:false,job_completed:false,production_changed:false};
+ }
  if(claimed.status!=='READ_ONLY_STEP_CLAIMED'||!UUID.test(claimed.shift_id||'')||
   !UUID.test(claimed.claim_id||'')||!UUID.test(claimed.owner_id||'')||
   !Number.isSafeInteger(claimed.step_index)||claimed.step_index<1||
@@ -124,6 +211,44 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
    provider_checked:false,read_only:true,
    production_changed:false,observed_at:new Date().toISOString()};
  }else proof=await readProviderSource(claimed.source_ref,{fetchImpl});
+ if(claimed.step_index>=2&&claimed.step_index<=5&&
+    proof.kind==='GITHUB_SOURCE_READBACK'){
+  const ctx=Object.freeze({
+   shift_id:claimed.shift_id,claim_id:claimed.claim_id,owner_id:claimed.owner_id,
+   step_index:claimed.step_index,stage:claimed.stage,
+   source_ref:claimed.source_ref,provider:proof,
+   shift_step_claimed:true,read_only:true,
+   installation_authorized:false,production_changed:false
+  });
+  let handoff;
+  try{
+   handoff=coordinateRoleWork?await coordinateRoleWork(ctx):
+    unavailableRoleHandoff(ctx);
+   if(handoff?.version!==COMBINED_ROLE_HANDOFF_VERSION||
+      !['SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK',
+       'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'].includes(handoff.status)||
+      handoff.shift_id!==claimed.shift_id||
+      handoff.step_index!==claimed.step_index||
+      handoff.source_ref!==claimed.source_ref||
+      handoff.one_shared_openai_provider!==true||
+      handoff.independent_verification_performed!==false||
+      handoff.original_job_completed!==false||
+      handoff.installation_authorized!==false||
+      handoff.production_changed!==false||
+      handoff.read_only!==true||
+      !Array.isArray(handoff.roles)||handoff.roles.length<2||
+      handoff.roles.length>3||
+      !Number.isSafeInteger(handoff.model_invocations_completed)||
+      handoff.model_invocations_completed<0||
+      handoff.model_invocations_completed>1)
+     throw Error('SHIFT_MODEL_ROLE_UNTRUSTED');
+  }catch{
+   // A model outage or malformed advisory does not falsify an independently
+   // checked Github source. Record the missing advisory, not a fake success.
+   handoff=unavailableRoleHandoff(ctx);
+  }
+  proof={...proof,combined_role_handoff:handoff};
+ }
  const settled=await shiftRpc(db,'reality_settle_employee_shift_step_v1',{
   p_shift_id:claimed.shift_id,p_step_index:claimed.step_index,
   p_claim_id:claimed.claim_id,p_proof:proof},{fetchImpl});
@@ -137,6 +262,11 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
   shift_id:claimed.shift_id,step_index:claimed.step_index,
   source_status:proof.provider_status||'OWNER_LEDGER_CHECKED',
   evidence_digest:settled.proof_sha256,
+  role_handoff_status:proof.combined_role_handoff?.status||
+   'NO_SOURCE_ROLE_HANDOFF_APPLICABLE',
+  role_handoff_function_labels:proof.combined_role_handoff?.roles||[],
+  role_handoff_model_calls:proof.combined_role_handoff?.model_invocations_completed||0,
+  role_handoff_not_independent_verification:true,
   capability_wake:capabilityWake,
   installation_authorized:false,job_completed:false,
   verified_human_hours_saved:null,production_changed:false};

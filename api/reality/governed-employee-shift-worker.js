@@ -8,6 +8,12 @@ import crypto from 'node:crypto';
 import {shiftDatabase} from '../../src/reality-governed-shift-boundary-v1.js';
 import {processGovernedEmployeeShiftTick}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
+import {createOneOpenAICombinedRoleCoordinator}
+ from '../../src/reality-one-openai-combined-role-handoff-v1.js';
+import {createRileyServiceOriginalRuntime}
+ from '../../src/reality-riley-service-original-runtime-v1.js';
+import {createRileyTrustedOriginalDriver}
+ from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -31,7 +37,32 @@ export default async function handler(req,res){
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  try{
   const db=shiftDatabase(process.env);
-  const result=await processGovernedEmployeeShiftTick(db);
+  // The signed shift step is already a DB-fenced, owner-authorized read.
+  // One shared model offers bounded read-only role context on that same step.
+  // A missing API key leaves an explicit unavailable role advisory; source
+  // inspection and final receipts remain independently governed.
+  const key=process.env.OPENAI_API_KEY;
+  const coordinateRoleWork=typeof key==='string'&&key.length>=12?
+   createOneOpenAICombinedRoleCoordinator({
+    apiKey:key,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.4'
+   }):null;
+  // An eligible step-six original enters Reality's EXISTING governed
+  // source-backed executor only after service-role owner/goal readback and
+  // independent provider preflight, before the global single-use DB claim.
+  // The same worker token covers this already-authorized shift; no model,
+  // browser or employee can mint new scope or installation approval.
+  const originalAdapters=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED==='true'?
+   createRileyServiceOriginalRuntime({db,env:process.env}):null;
+  const executeQualifiedOriginals=originalAdapters?
+   createRileyTrustedOriginalDriver({
+    db,loadShiftReadback:originalAdapters.loadShiftReadback,
+    loadOwnerLedgerReadback:originalAdapters.loadOwnerLedgerReadback,
+    loadTrustedAuthorizedOriginal:originalAdapters.loadTrustedAuthorizedOriginal,
+    runOriginal:originalAdapters.runOriginal,
+   }):null;
+  const result=await processGovernedEmployeeShiftTick(db,{
+   coordinateRoleWork,executeQualifiedOriginals
+  });
   return res.status(200).json(result);
  }catch{
   return res.status(503).json({
