@@ -11,6 +11,12 @@ import {buildRealityNamedEmployeeRoster}
  from '../../src/reality-employee-identity-roster-v1.js';
 import {projectRoleWorkforceConsolidation}
  from '../../src/reality-role-workforce-savings-scenario-v1.js';
+import {resolveReliabilityBenchmarkDb}
+ from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {projectOperationalRoiEvidenceV2}
+ from '../../src/reality-operational-roi-v2.js';
+import {projectOwnerRoleWorkforceEvidence,unavailableOwnerRoleWorkforceEvidence}
+ from '../../src/reality-role-workforce-evidence-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export const maxDuration=35;
 export default async function handler(req,res){
@@ -46,7 +52,35 @@ export default async function handler(req,res){
    shared_monthly_model_runtime_capacity_hours:
     body.shared_monthly_model_runtime_capacity_hours,
   });
+  let workforce_evidence=unavailableOwnerRoleWorkforceEvidence();
+  // Independent owner-scoped job readback; never derive economic evidence from
+  // owner-submitted salary estimates or a generic Github issue list.
+  // Unavailable -> UNKNOWN. A failed source must not zero-out true results.
+  try{
+   const env=process.env;
+   const db=resolveReliabilityBenchmarkDb(env);
+   if(!db?.strictSecrets||!db.secretKey||
+     db.url!==session.config?.url||
+     db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+    throw Error('WORKFORCE_OWNER_ROI_CONFIG_NOT_MATCHED');
+   const response=await fetch(db.url+
+    '/rest/v1/rpc/reality_read_owner_job_roi_evidence_v2',{
+     method:'POST',redirect:'error',cache:'no-store',
+     headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+      'content-type':'application/json',accept:'application/json'},
+     body:JSON.stringify({p_owner_id:session.user_id}),
+     signal:AbortSignal.timeout(12000)
+    });
+   if(!response.ok)throw Error('WORKFORCE_ROI_RECEIPT_NOT_AVAILABLE');
+   const raw=await response.json();
+   const trusted=projectOperationalRoiEvidenceV2(raw);
+   workforce_evidence=projectOwnerRoleWorkforceEvidence({roster,roi:trusted});
+  }catch{
+   // No false '0 settlements', payroll savings, or role replacement
+   // when independent provider receipts cannot be read.
+  }
   return res.status(200).json({ok:true,...projection,
+   workforce_evidence,
    endpoint_scope:'SIGNED_IN_OWNER_PRIVATE_PREVIEW_READ_ONLY',
    inputs_saved:false,individual_employees_evaluated:false,
    positions_terminated:false,
