@@ -9,6 +9,7 @@ on:
       - src/reality-governed-late-bound-tool-adapter-v1.js
       - src/reality-governed-tool-session-v1.js
       - scripts/reality-prove-live-tool-delivery-v1.mjs
+      - scripts/reality-prove-real-source-openai-governance-v1.mjs
       - test/reality-riley-original-driver-security-v1.test.js
       - test/reality-universal-governed-recovery-handoff-v1.test.js
       - test/reality-governed-late-bound-tool-adapter-v1.test.js
@@ -31,8 +32,10 @@ jobs:
           node-version: '22'
       - name: Existing worker and exact original handoff
         run: node --test test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-governed-tool-session-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-governed-employee-shift-v1.test.js
-      - name: Parse real provider fixture proof runner
-        run: node --check scripts/reality-prove-live-tool-delivery-v1.mjs
+      - name: Parse live provider proof runners
+        run: |
+          node --check scripts/reality-prove-live-tool-delivery-v1.mjs
+          node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
       - name: Compare all existing tests against unchanged development baseline
         shell: bash
         run: |
@@ -95,5 +98,44 @@ jobs:
         with:
           name: reality-real-openai-governed-tool-delivery-isolated
           path: benchmark-results/reality-live-late-bound-tool-proof-v1.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  live-real-repository-openai-governance:
+    # Real repository code and real OpenAI, but NO customer execution claim,
+    # installation, or original-job settlement. Scope is test-only.
+    if: contains(github.event.head_commit.message, '[real-source-governance-proof]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check real source-backed proof runner
+        run: node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - name: Reject missing provider secret without disclosing it
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo 'REAL_OPENAI_PROOF_NOT_EXECUTED_NO_CREDENTIAL'
+            exit 1
+          fi
+      - name: Real OpenAI model diagnoses actual Riley worker under governed tool permission and negative replay tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/reality-prove-real-source-openai-governance-v1.mjs
+      - name: Preserve real source diagnosis, tool call and security verdicts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-real-riley-source-openai-governance-proof
+          path: benchmark-results/reality-real-source-openai-governance-v1.json
           retention-days: 14
           if-no-files-found: ignore
