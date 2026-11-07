@@ -55,6 +55,11 @@ on:
       - reality-chat-simple.html
       - test/reality-owner-chat-shift-command-v1.test.js
       - test/reality-chat-simple-v1.test.js
+      - test/reality-chat-workspace-v1.test.js
+      - test/reality-chat-fullscreen-v2.test.js
+      - reality-chat-workspace-v1.js
+      - reality-chat-fullscreen-v2.css
+      - reality-chat-workspace-v1.css
       - src/reality-capability-operating-context-v1.js
       - test/reality-full-shift-owner-control-and-recovery-v1.test.js
       - src/reality-employee-shift-chat-context-v1.js
@@ -140,6 +145,11 @@ on:
       - reality-chat-simple.html
       - test/reality-owner-chat-shift-command-v1.test.js
       - test/reality-chat-simple-v1.test.js
+      - test/reality-chat-workspace-v1.test.js
+      - test/reality-chat-fullscreen-v2.test.js
+      - reality-chat-workspace-v1.js
+      - reality-chat-fullscreen-v2.css
+      - reality-chat-workspace-v1.css
       - src/reality-capability-operating-context-v1.js
       - test/reality-full-shift-owner-control-and-recovery-v1.test.js
       - src/reality-employee-shift-chat-context-v1.js
@@ -191,7 +201,7 @@ jobs:
           node --check src/reality-riley-verified-code-writer-v1.js
           node --check src/reality-riley-existing-file-repair-writer-v1.js
           node --check scripts/reality-riley-stage-existing-repair-v1.mjs
-          node --test test/reality-governed-flexible-shift-v2.test.js test/reality-adaptive-one-to-twelve-hour-shift-v3.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-chat-simple-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js test/reality-riley-pilot-provider-proof-v1.test.js test/reality-riley-governed-original-job-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-employee-edge-governed-wake-v1.test.js test/reality-riley-live-loop-readiness-v1.test.js test/reality-riley-existing-backlog-v1.test.js test/reality-riley-existing-shift-source-priority-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-riley-source-work-chat-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-existing-file-repair-writer-v1.test.js test/reality-riley-full-shift-batch-v1.test.js test/reality-shift-value-preview-v1.test.js test/reality-pre-automation-business-case-v1.test.js test/reality-next-week-employee-plan-v1.test.js test/reality-riley-verified-code-writer-v1.test.js
+          node --test test/reality-governed-flexible-shift-v2.test.js test/reality-adaptive-one-to-twelve-hour-shift-v3.test.js test/reality-governed-employee-shift-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-chat-simple-v1.test.js test/reality-workday-team-assessment-v1.test.js test/reality-named-employee-roster-v1.test.js test/reality-employee-recovery-route-v1.test.js test/reality-riley-engineering-pilot-v1.test.js test/reality-riley-pilot-provider-proof-v1.test.js test/reality-riley-governed-original-job-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-employee-edge-governed-wake-v1.test.js test/reality-riley-live-loop-readiness-v1.test.js test/reality-riley-existing-backlog-v1.test.js test/reality-riley-existing-shift-source-priority-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-riley-source-work-chat-v1.test.js test/reality-riley-multi-job-and-self-audit-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-existing-file-repair-writer-v1.test.js test/reality-riley-full-shift-batch-v1.test.js test/reality-shift-value-preview-v1.test.js test/reality-pre-automation-business-case-v1.test.js test/reality-next-week-employee-plan-v1.test.js test/reality-riley-verified-code-writer-v1.test.js test/reality-chat-fullscreen-v2.test.js test/reality-chat-workspace-v1.test.js
 
   riley-live-investigation:
     # The investigation script cryptographically binds to the canonical
