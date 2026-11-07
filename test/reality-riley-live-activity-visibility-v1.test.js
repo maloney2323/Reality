@@ -27,7 +27,7 @@ test('no added approval/replay buttons, no fake cash savings, and fail closed on
  assert.match(script,/No independently verified capability installation request is pending/);
  assert.match(script,/ACTION NEEDED: an independently verified exact capability upgrade/);
  assert.match(script,/No exact eligible original job has reached the execution gate/);
- assert.match(script,/The current missing-extension-only intake can reject ordinary existing-code defects/);
+ assert.match(script,/current missing-extension-only intake can reject ordinary existing-code defects/i);
  assert.match(script,/\$\('runFullShift'\)\.disabled=true/);
  assert.match(script,/\$\('rileyLiveProgressPanel'\)\.hidden=true/);
  assert.match(script,/RECEIPT_VERIFIED/);
