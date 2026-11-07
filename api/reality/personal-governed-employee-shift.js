@@ -107,6 +107,30 @@ export default async function handler(req,res){
      if(handoffs.length)handoff_status='EXACT_CAPABILITY_APPROVAL_REQUESTED_IN_CHAT';
     }catch{handoff_status='EXACT_CAPABILITY_READBACK_UNAVAILABLE_FAIL_CLOSED';}
    }
+   let riley_pr_review_jobs={
+    status:'OWNER_PR_REVIEW_READBACK_UNAVAILABLE',jobs:[],
+    production_changed:false,verified_human_hours_saved:null
+   };
+   try{
+    const verified=await shiftRpc(db,'reality_read_owner_riley_pr_review_v1',
+      {p_owner_id:session.user_id});
+    if(verified?.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'&&
+      verified.production_changed===false&&
+      verified.verified_human_hours_saved===null&&
+      Array.isArray(verified.jobs)&&verified.jobs.length<=10&&
+      verified.jobs.every(j=>j.source_review_job_only===true&&
+        j.installation_authorized===false&&j.production_changed===false&&
+        /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+        /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(j.source_ref||'')&&
+        (j.phase!=='SETTLED'||(
+          j.original_job_completed===true&&
+          /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(
+            j.settlement_receipt_ref||'')&&
+          /^https:\/\/github\.com\/maloney2323\/Reality\/(?:pull|issues)\/[1-9]\d*#issuecomment-\d+$/.test(
+            j.provider_comment_url||'')
+        ))))
+     riley_pr_review_jobs=verified;
+   }catch{/* Never represent missing durable original receipt as settlement. */}
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -130,6 +154,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
     recovery_diagnosis,
+    riley_pr_review_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
