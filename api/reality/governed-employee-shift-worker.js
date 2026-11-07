@@ -14,6 +14,8 @@ import {createRileyServiceOriginalRuntime}
  from '../../src/reality-riley-service-original-runtime-v1.js';
 import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
+import {runAuthorizedRileyPrReview}
+ from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -67,7 +69,24 @@ export default async function handler(req,res){
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
-  return res.status(200).json(result);
+  // Complete ONE source-backed assigned PR review as a REAL original job:
+  // OpenAI authors the review, GitHub receives it, an independent provider
+  // GET proves the exact effect, and the owner-scoped service ledger settles.
+  // No installation or code repair is inferred from this kind of job.
+  // Any uncertain GitHub write is fenced in the database and never re-POSTed.
+  let rileyOriginalReview;
+  try{
+   rileyOriginalReview=await runAuthorizedRileyPrReview({db,env:process.env});
+  }catch(e){
+   const code=String(e?.message||'');
+   rileyOriginalReview={
+    status:/^RILEY_PR_REVIEW_[A-Z0-9_]{5,115}$/.test(code)?
+     code:'RILEY_PR_REVIEW_PROVIDER_OR_RECEIPT_UNAVAILABLE',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false
+   };
+  }
+  return res.status(200).json({...result,riley_original_review:rileyOriginalReview});
  }catch{
   return res.status(503).json({
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
