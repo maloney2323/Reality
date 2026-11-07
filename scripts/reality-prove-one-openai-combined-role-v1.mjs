@@ -15,10 +15,11 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const provider=await fetch(API,{
  headers:{accept:'application/vnd.github+json',
   'user-agent':'Reality-Isolated-Combined-Role-Proof/1.0',
-  'x-github-api-version':'2022-11-28'},
+  'x-github-api-version':'2022-11-28',
+  ...(process.env.GITHUB_TOKEN?{authorization:'Bearer '+process.env.GITHUB_TOKEN}:{})},
  signal:AbortSignal.timeout(12000),redirect:'error',cache:'no-store'
 });
-assert.equal(provider.status,200,'real issue provider GET must succeed');
+if(provider.status!==200)throw Error('REAL_GITHUB_SOURCE_READBACK_HTTP_'+provider.status);
 const issue=await provider.json();
 assert.equal(issue.html_url,ISSUE_URL);
 assert.equal(issue.state,'open');
@@ -52,10 +53,11 @@ assert.match(advisory.advisory_sha256,/^sha256:[a-f0-9]{64}$/);
 // Independent source readback; model text cannot become verification.
 const reread=await fetch(API,{
  headers:{accept:'application/vnd.github+json',
-  'user-agent':'Reality-Isolated-Combined-Role-Proof-Readback/1.0'},
+  'user-agent':'Reality-Isolated-Combined-Role-Proof-Readback/1.0',
+  ...(process.env.GITHUB_TOKEN?{authorization:'Bearer '+process.env.GITHUB_TOKEN}:{})},
  signal:AbortSignal.timeout(12000),redirect:'error',cache:'no-store'
 });
-assert.equal(reread.status,200);
+if(reread.status!==200)throw Error('REAL_GITHUB_INDEPENDENT_READBACK_HTTP_'+reread.status);
 const current=await reread.json();
 assert.equal(current.html_url,ISSUE_URL);
 assert.equal(current.state,'open');
