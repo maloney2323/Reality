@@ -63,6 +63,8 @@ export function createRileyTrustedOriginalDriver({
     observation.candidate_count!==observation.candidates.length)
    fail('CURRENT_SERVICE_ONLY_ELIGIBILITY_READBACK_REQUIRED');
   const candidates=observation.candidates;
+  if(new Set(candidates.map(c=>c.original_work_id)).size!==candidates.length)
+   fail('DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH');
   const selected=candidates.filter(c=>
    c.original_work_id===input.original_work_id);
   if(selected.length!==1||
@@ -80,8 +82,6 @@ export function createRileyTrustedOriginalDriver({
   const owner=selected[0].owner_id;
   if(candidates.some(c=>c.owner_id!==owner))
    fail('MULTI_OWNER_SCOPE_NOT_ALLOWED');
-  if(new Set(candidates.map(c=>c.original_work_id)).size!==candidates.length)
-   fail('DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH');
   const eligibleIds=new Set(candidates.map(c=>c.original_work_id));
   // The existing runner does the independent owner/shift/ledger readbacks,
   // takes the global single-use database claim, invokes the shared executor,
