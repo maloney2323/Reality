@@ -1,0 +1,9 @@
+{
+  "version": "reality-riley-shift-current-failure-recheck-v1",
+  "shift_id": "21dff8db-6f46-444d-a149-ab15f1caf8fe",
+  "original_work_id": "work:00020e9c00928938c99ad525a33ebe1c",
+  "issue_number": 143,
+  "source_ref": "https://github.com/maloney2323/Reality/issues/143",
+  "source_proof_sha256": "sha256:69f8425fd1e056097a2d6db88eb6559bdfa0f88f2e92cc45183fb4df0027dcc7",
+  "historical_failed_run_id": 40591283500
+}
