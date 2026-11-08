@@ -1670,7 +1670,15 @@ async function refreshShiftStatus(){
        'VERIFIED_CURRENT_OWNER_EXECUTION'&&
        data.shift_execution_graph?.shift_id===activeState.shift_id?
         data.shift_execution_graph:null;
-      if(unified?.next_action==='GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR'){
+      if(currentBlocker==='RILEY_CORRECTED_CODE_OWNER_SCOPE_TEST_FAILED'){
+       showRileyNextAction('REPAIR REJECTED · Independent owner-scope test failed',
+        'Reality generated and tested a revised candidate for issue #263. '+
+        'The independent original-job suite rejected it because an owner-identity mismatch '+
+        'was not rejected correctly. No code was installed, and no final job receipt exists. '+
+        'The failed test is durably attached to the same original job. '+
+        'Reality must correct the security regression and retest under the existing shift; '+
+        'you do not need to authorize another batch.');
+      }else if(unified?.next_action==='GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR'){
        showRileyNextAction('NEXT EXECUTION · Generate and independently test issue #263',
         'The same owner-authorized shift has a real admitted repair and a prepared PR review. '+
         'The unified system identifies code synthesis and frozen acceptance tests as the next work. '+
