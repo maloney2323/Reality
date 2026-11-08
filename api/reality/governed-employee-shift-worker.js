@@ -103,6 +103,10 @@ export default async function handler(req,res){
     loadOwnerLedgerReadback:originalAdapters.loadOwnerLedgerReadback,
     loadTrustedAuthorizedOriginal:originalAdapters.loadTrustedAuthorizedOriginal,
     runOriginal:originalAdapters.runOriginal,
+    // One signed wake may cover up to four distinct CURRENT original jobs
+    // only if every job independently survives the existing service-role
+    // authorization, Continuity and atomic fenced-claim path.
+    batchEligibleOriginals:true,
    }):null;
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
