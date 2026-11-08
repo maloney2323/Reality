@@ -273,7 +273,12 @@ export async function runAuthorizedRileyPrReview({
   }catch(e){
    const code=String(e?.message||'');
    return unavailable(/^RILEY_PR_REVIEW_[A-Z0-9_]{5,100}$/.test(code)?
-    code:'PR_REVIEW_SOURCE_OR_MODEL_UNAVAILABLE');
+    code:
+    code.startsWith('REALITY_OPENAI_GATEWAY_ORIGINAL_REVIEW_')?
+     'PR_REVIEW_REALITY_SCOPE_OR_SOURCE_CHANGED_NO_MODEL_EFFECT':
+    code.startsWith('REALITY_OPENAI_GATEWAY_')?
+     'PR_REVIEW_REALITY_GATEWAY_PREFLIGHT_REJECTED':
+     'PR_REVIEW_SOURCE_OR_MODEL_UNAVAILABLE');
   }
   const body=makeComment(c,source,modelResult);
   const prepared=await callRpc(db,'reality_prepare_authorized_riley_pr_review_v1',{
