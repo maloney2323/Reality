@@ -135,7 +135,19 @@ export async function draftCurrentRileyNativeRepair({
     'content-type':'application/json',
     'x-client-request-id':claim.request_id},
    body:JSON.stringify({
-    model,store:false,max_output_tokens:4000,
+    model,store:false,max_output_tokens:6000,
+    text:{format:{
+     type:'json_schema',name:'reality_riley_native_source_patch',
+     strict:true,
+     schema:{
+      type:'object',additionalProperties:false,
+      properties:{
+       find:{type:'string',description:'Exact original contiguous source text copied verbatim.'},
+       replace:{type:'string',description:'Replacement source code for that exact single block.'},
+       reason:{type:'string',description:'What observed failure this code change addresses.'}
+      },required:['find','replace','reason']
+     }
+    }},
     input:[
      {role:'system',content:[{type:'input_text',text:
       'You are Riley, one software-engineering ROLE in the governed Reality employee shift. '+
