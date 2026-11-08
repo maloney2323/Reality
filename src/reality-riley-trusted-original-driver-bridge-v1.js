@@ -48,6 +48,14 @@ export function createRileyTrustedOriginalDriver({
     !SHA.test(input.source_proof_sha256||''))
    fail('EXACT_SOURCE_BOUNDED_SHIFT_SCOPE_REQUIRED');
 
+  const hasBatch=Object.hasOwn(input,'batch_original_work_ids');
+  const batchIds=hasBatch?input.batch_original_work_ids:null;
+  if(hasBatch&&(!batchEligibleOriginals||!Array.isArray(batchIds)||
+      batchIds.length<2||batchIds.length>4||
+      batchIds[0]!==input.original_work_id||
+      batchIds.some(id=>!WORK.test(id||''))||
+      new Set(batchIds).size!==batchIds.length))
+   fail('INDEPENDENT_MULTI_ORIGINAL_WAKE_SCOPE_REQUIRED');
   const observation=await rpc({db,fetchImpl,
    name:'reality_read_eligible_shift_originals_v1',
    args:{p_shift_id:input.shift_id}});
@@ -83,6 +91,12 @@ export function createRileyTrustedOriginalDriver({
   if(candidates.some(c=>c.owner_id!==owner))
    fail('MULTI_OWNER_SCOPE_NOT_ALLOWED');
   const eligibleIds=new Set(candidates.map(c=>c.original_work_id));
+  // Every member of a multi-job execution batch must have a separate
+  // independently verified wake in THIS shift. A newly arrived candidate
+  // cannot quietly piggyback on a previous job's authorization.
+  if(hasBatch&&(eligibleIds.size!==batchIds.length||
+     batchIds.some(id=>!eligibleIds.has(id))))
+   fail('BATCH_WAKE_AND_CURRENT_OWNER_ORIGINALS_DIVERGED');
   // The existing runner does the independent owner/shift/ledger readbacks,
   // takes the global single-use database claim, invokes the shared executor,
   // records the result and reconciles final original-job receipts.
@@ -91,12 +105,12 @@ export function createRileyTrustedOriginalDriver({
   // must independently survive service-only owner/shift, source digest,
   // current Continuity, atomic claim and settlement checks in runTick.
   // A wake alone cannot mint execution authority for any candidate.
-  const batchLimit=batchEligibleOriginals?Math.min(candidates.length,4):1;
+  const batchLimit=hasBatch?batchIds.length:1;
   const result=await runTick({
    db,ownerId:owner,shiftId:input.shift_id,fetchImpl,
    loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal,
    callRpc:rpc,runOriginal,now,maxJobs:batchLimit,
-   onlyOriginalWorkId:batchEligibleOriginals?null:input.original_work_id
+   onlyOriginalWorkId:hasBatch?null:input.original_work_id
   });
   if(result?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
     result.shift_id!==input.shift_id||
