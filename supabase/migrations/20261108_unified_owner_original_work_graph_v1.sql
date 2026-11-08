@@ -132,3 +132,34 @@ revoke all on function public.reality_read_owner_shift_execution_graph_v1(uuid,u
  from public,anon,authenticated;
 grant execute on function public.reality_read_owner_shift_execution_graph_v1(uuid,uuid)
  to service_role;
+-- The signed preview worker cannot supply a browser/model-provided owner ID.
+-- It derives the sole active authorized shift from the service database.
+create or replace function public.reality_read_current_shift_execution_graph_v1()
+returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare v_count int;v_shift uuid;v_owner uuid;
+begin
+ if current_user<>'service_role' then
+  raise exception 'UNIFIED_ACTIVE_EXECUTION_SERVICE_ONLY';end if;
+ select count(*),min(s.shift_id::text)::uuid,min(s.owner_id::text)::uuid
+ into v_count,v_shift,v_owner
+ from reality_internal.governed_employee_shifts_v1 s
+ join reality_internal.governed_employee_completion_warrants_v1 w
+  on w.shift_id=s.shift_id and w.owner_id=s.owner_id
+   and w.plan_fingerprint=s.plan_fingerprint
+ where s.authorized_at is not null and s.closed_at is null
+  and s.planned_start_at<=clock_timestamp()
+  and s.planned_end_at='infinity'::timestamptz
+  and s.status in ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  and w.state='ACTIVE';
+ if v_count=0 then return jsonb_build_object(
+  'status','NO_CURRENT_OWNER_SHIFT_EXECUTION_GRAPH',
+  'jobs','[]'::jsonb,'installation_authorized',false,
+  'production_changed',false);end if;
+ if v_count<>1 then
+  raise exception 'UNIFIED_OWNER_EXECUTION_MULTIPLE_SHIFT_AMBIGUITY';end if;
+ return public.reality_read_owner_shift_execution_graph_v1(v_owner,v_shift);
+end $fn$;
+revoke all on function public.reality_read_current_shift_execution_graph_v1()
+ from public,anon,authenticated;
+grant execute on function public.reality_read_current_shift_execution_graph_v1()
+ to service_role;
