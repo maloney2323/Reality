@@ -1717,7 +1717,14 @@ async function authorizeShiftFromChat(command){
      created.initial_authorization_recorded!==true||
      created.installation_authorized!==false||
      created.production_changed!==false||
-     created.worker_dispatch_verified!==false)
+     created.worker_dispatch_verified!==false||
+     created.start_confirmation?.status!==
+       'OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED'||
+     created.start_confirmation.shift_id!==created.shift_id||
+     created.start_confirmation.worker_execution_verified!==false||
+     created.start_confirmation.original_job_completed!==false||
+     !verifiedLocalTimestamp(created.start_confirmation.authorized_at)||
+     !Array.isArray(created.start_confirmation.selected_sources))
     throw Error('SHIFT_OWNER_AUTHORIZATION_RECEIPT_UNVERIFIED');
   // Check the exact persisted shift and duration before saying it exists.
   const verified=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
@@ -1765,6 +1772,7 @@ async function authorizeShiftFromChat(command){
   }
   return {
     acknowledged:true,
+    start_confirmation:created.start_confirmation,
     text:'Riley + Taylor '+(command.completion_bound?
      'completion-bound job batch':'timed shift')+
      ' authorized for '+combined.task_count+' selected source tasks. '+
@@ -1885,17 +1893,22 @@ $('runFullShift').onclick=async()=>{
     command.completion_bound!==true||command.installation_authorized!==false)
   return status('Exact completion-bound owner command could not be validated.');
  pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
+ showPendingStartRequest();
  const pendingResult=bubble('assistant',
   'Checking your existing shift and exact owner-scoped backlog…','pending');
  status('Checking signed-in owner authorization and original shift readback…');
  try{
   const receipt=await authorizeShiftFromChat(command);
+  if(receipt.start_confirmation)
+   showDurableStartConfirmation(receipt.start_confirmation);
   pendingResult.classList.remove('pending');
   pendingResult.lastChild.textContent=receipt.text;
   status('Full-shift authorization read back. Worker results are verified separately.');
   void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();void refreshEmployeeBoard();
  }catch(err){
   pendingResult.className='message assistant error';
+  $('rileyStartConfirmationHeadline').textContent=
+   'START NOT YET CONFIRMED · Check the durable owner readback before retrying';
   pendingResult.lastChild.textContent=
    'Shift authorization not confirmed. Use Refresh to check for an existing shift before retrying. ('+
    String(err?.message||'Unknown').slice(0,180)+')';
@@ -1937,6 +1950,8 @@ $('composer').onsubmit=async(e)=>{
     });
     if(command){
       const receipt=await authorizeShiftFromChat(command);
+      if(receipt.start_confirmation)
+       showDurableStartConfirmation(receipt.start_confirmation);
       optimistic.classList.remove('pending');
       waiting.classList.remove('pending');
       waiting.lastChild.textContent=receipt.text;
