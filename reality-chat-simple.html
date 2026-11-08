@@ -1137,9 +1137,12 @@ function renderShiftStartProof(readback){
   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s?.status)&&
   (s.planned_end_at==='infinity'||
    (Number.isFinite(Date.parse(s.planned_end_at))&&
-    Date.parse(s.planned_end_at)>Date.now())))||shifts[0];
+    Date.parse(s.planned_end_at)>Date.now())))||
+    (showHistoricalEvidence?shifts[0]:null);
  if(!/^[a-f0-9-]{36}$/i.test(shift?.shift_id||'')||
-    !verifiedLocalTimestamp(shift.authorized_at))return;
+    !verifiedLocalTimestamp(shift.authorized_at)){
+   $('rileyStartConfirmation').hidden=true;return;
+ }
  const proof=readback.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
   readback.shift_activity?.shift_id===shift.shift_id&&
   readback.shift_activity?.owner_bound===true?
@@ -1290,7 +1293,8 @@ function renderRileyLiveProgress(readback){
  const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
   .includes(x?.status)&&(x.planned_end_at==='infinity'||
    (Number.isFinite(Date.parse(x.planned_end_at))&&
-    Date.parse(x.planned_end_at)>Date.now())))||shifts[0];
+    Date.parse(x.planned_end_at)>Date.now())))||
+    (showHistoricalEvidence?shifts[0]:null);
  if(!current||!Array.isArray(current.steps)||
     current.steps.length!==8||
     current.steps.some((x,i)=>x?.step_index!==i+1)){
@@ -1550,6 +1554,12 @@ function renderCombinedShiftRoleEvidence(readback){
   !Array.isArray(shifts)||shifts.length>5){
   panel.hidden=true;return;
  }
+ const activelyAuthorized=shifts.some(s=>
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s?.status)&&
+  (s.planned_end_at==='infinity'||
+   (Number.isFinite(Date.parse(s.planned_end_at))&&
+    Date.parse(s.planned_end_at)>Date.now())));
+ if(!activelyAuthorized&&!showHistoricalEvidence){panel.hidden=true;return;}
  const latest=shifts[0];
  if(!latest||!Array.isArray(latest.steps)||latest.steps.length!==8){
   panel.hidden=true;return;
