@@ -67,6 +67,43 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
   source_coverage_complete:reconciled.source_coverage_complete});
 }
 
+// Never offer a previously independently settled owner's original-job
+// source as a fresh source assignment simply to fill a four-slot work plan.
+// These receipts are CURRENT owner-scoped service-role DB readbacks, not
+// old UI strings, model advice or an inference from an issue being open.
+export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
+ if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
+ const [reviews,triage]=await Promise.all([
+  call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId})
+ ]);
+ if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
+    reviews.production_changed!==false||
+    !Array.isArray(reviews.jobs)||reviews.jobs.length>10||
+    triage?.status!=='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'||
+    triage.production_changed!==false||
+    !Array.isArray(triage.jobs)||triage.jobs.length>5)
+  throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
+ const refs=new Set();
+ for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
+  for(const j of data){
+   if(j?.phase!=='SETTLED')continue;
+   const source=String(j.source_ref||'');
+   const receipt=String(j.settlement_receipt_ref||'');
+   if(j.original_job_completed!==true||
+      !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
+      (kind==='PR_REVIEW'?
+       !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(source)||
+       !/^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(receipt):
+       source!=='https://github.com/maloney2323/Reality/issues/143'||
+       !/^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(receipt))
+   )throw Error('SHIFT_SETTLED_JOB_INDEPENDENT_RECEIPT_INVALID');
+   refs.add(source);
+  }
+ }
+ return Object.freeze([...refs].sort());
+}
+
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -206,8 +243,11 @@ export default async function handler(req,res){
      const brief=buildRealityWorkdayOpportunityBrief(catalog);
      const priority=await ownerExistingRileySourcePriority({
       catalog,brief,ownerId:session.user_id,db});
+     const settledRefs=await ownerSettledOriginalSourceRefs({
+      ownerId:session.user_id,db});
      const plan=buildRealityEightHourShiftDraft(brief,{
-      durationHours:hours,prioritySourceRefs:priority.refs});
+      durationHours:hours,prioritySourceRefs:priority.refs,
+      excludedSettledSourceRefs:settledRefs});
      const fingerprint=computeShiftFingerprint(plan);
      const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
      draft={...plan,expected_fingerprint:fingerprint,
@@ -216,7 +256,8 @@ export default async function handler(req,res){
        employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief),
        existing_owner_backlog_priorities:priority.refs,
        owner_backlog_issue_records_reconciled:priority.ranked,
-       owner_backlog_coverage_complete:priority.source_coverage_complete};
+       owner_backlog_coverage_complete:priority.source_coverage_complete,
+       previously_settled_original_source_refs_excluded:settledRefs};
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
@@ -258,8 +299,11 @@ export default async function handler(req,res){
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const priority=await ownerExistingRileySourcePriority({
    catalog,brief,ownerId:session.user_id,db});
+  const settledRefs=await ownerSettledOriginalSourceRefs({
+   ownerId:session.user_id,db});
   const plan=buildRealityEightHourShiftDraft(brief,{
-   durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs});
+   durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs,
+   excludedSettledSourceRefs:settledRefs});
   const fingerprint=computeShiftFingerprint(plan);
   const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
   // Do not create a timer-only idle shift when no paired source task was
