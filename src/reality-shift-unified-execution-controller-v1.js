@@ -94,14 +94,14 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
   x.independent_source_proof_verified===true&&x.phase==='SOURCE_ADMITTED');
  const prReady=pr.some(x=>
   x.independent_source_proof_verified===true&&x.phase==='PREPARED');
- const installPending=engineering.some(x=>
+ const testedNativeCandidate=engineering.some(x=>
   x.phase==='CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL');
  const unverified=all.some(x=>x.independent_source_proof_verified!==true);
  // Do not infer "settled" from source checks, worker wakes or model advice.
  // Whole shift completion remains the independent DB receipt closer's job.
  const next=unverified?'VERIFY_EXACT_SOURCE_EVIDENCE':
   engineeringReady?'GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR':
-  installPending?'AWAIT_EXACT_ARTIFACT_INSTALL_APPROVAL':
+  testedNativeCandidate?'VERIFY_NATIVE_INSTALL_AND_RESUME_PATH_BEFORE_OWNER_APPROVAL':
   prReady?'CONTINUE_INDEPENDENT_PR_REVIEW':
   waiting.length?'QUALIFY_UNADMITTED_ORIGINAL_WORK':
   'RECONCILE_FINAL_INDEPENDENT_RECEIPTS';
@@ -112,7 +112,9 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
   jobs:Object.freeze(all),
   engineering_ready:engineeringReady,
   pr_ready:prReady,
-  install_approval_pending:installPending,
+  // A tested patch is NOT a verified install-to-settlement capability.
+  install_approval_pending:false,
+  tested_native_candidate_present:testedNativeCandidate,
   all_selected_settled:false,
   next_action:next,
   installation_authorized:false,
