@@ -96,8 +96,9 @@ export default async function handler(req,res){
     {p_owner_id:session.user_id}));
    let handoffs=[],handoff_status='NO_VERIFIED_SHIFT_BOUND_CAPABILITY_REQUEST';
    const active=read.shifts.some(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
-       Number.isFinite(Date.parse(s.planned_end_at))&&
-       Date.parse(s.planned_end_at)>Date.now());
+       (s.planned_end_at==='infinity'||(
+        Number.isFinite(Date.parse(s.planned_end_at))&&
+        Date.parse(s.planned_end_at)>Date.now())));
    if(active){
     try{
      const [qualified,loop]=await Promise.all([
@@ -174,6 +175,29 @@ export default async function handler(req,res){
         ))))
       riley_code_repair_jobs=x;
    }catch{/* Do not mistake missing readback for completed repair. */}
+   // Owner-scoped database records distinguish permission from work:
+   // authorization, actual server pulse, step claim, verification and receipt.
+   let shift_activity=null,shift_activity_status='NO_SHIFT_ACTIVITY_YET';
+   const chosen=read.shifts.find(s=>
+    ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+     (s.planned_end_at==='infinity'||(
+      Number.isFinite(Date.parse(s.planned_end_at))&&
+      Date.parse(s.planned_end_at)>Date.now())))||read.shifts[0];
+   if(chosen){
+    try{
+     const activity=await shiftRpc(db,'reality_read_owner_shift_live_activity_v1',{
+      p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(activity?.status==='OWNER_SHIFT_LIVE_ACTIVITY_INDEPENDENT_READBACK'&&
+        activity.shift_id===chosen.shift_id&&
+        activity.owner_bound===true&&activity.installation_authorized===false&&
+        activity.production_changed===false&&
+        activity.original_job_completed_by_readback===false&&
+        Array.isArray(activity.source_events)&&activity.source_events.length<=20&&
+        Array.isArray(activity.original_jobs)&&activity.original_jobs.length<=20){
+      shift_activity=activity;shift_activity_status='VERIFIED_OWNER_ACTIVITY';
+     }else shift_activity_status='ACTIVITY_READBACK_SCOPE_UNVERIFIED';
+    }catch{shift_activity_status='ACTIVITY_READBACK_UNAVAILABLE';}
+   }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -195,6 +219,7 @@ export default async function handler(req,res){
        owner_backlog_coverage_complete:priority.source_coverage_complete};
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
+    shift_activity,shift_activity_status,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
@@ -263,7 +288,20 @@ export default async function handler(req,res){
      Number(new Date(s.planned_end_at))-Number(start)===
       plan.shift_duration_minutes*60000));
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
+  const start_confirmation=Object.freeze({
+   status:'OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED',
+   shift_id:exact.shift_id,authorized_at:exact.authorized_at,
+   planned_start_at:exact.planned_start_at,
+   completion_bound:b.completion_bound===true,
+   exact_job_count:exact.steps.slice(1,5).filter(t=>t.source_ref).length,
+   selected_sources:exact.steps.slice(1,5).filter(t=>t.source_ref)
+    .map(t=>({step_index:t.step_index,source_ref:t.source_ref})),
+   worker_execution_verified:false,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  });
   return res.status(202).json({ok:true,...receipt,shift:exact,
+   start_confirmation,
    combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
    completion_bound:b.completion_bound===true,
