@@ -1535,6 +1535,12 @@ async function refreshRileyTaylorCombinedWorkQueue(){
   if(current){renderActiveRileyTaylorQueue(read);return;}
   renderRileyTaylorDraftQueue(read.requested_shift_draft);
  }catch{
+  verifiedFreshBatchReady=false;
+  $('runFullShift').disabled=true;
+  $('runFullShift').textContent='Work verification unavailable';
+  showRileyNextAction('BLOCKED · Fresh work verification unavailable',
+   'The signed-in source draft cannot be verified. Do NOT press Start or repeat an old job. '+
+   'Existing settled receipts remain preserved. Check Reality worker/source readback.');
   $('rileyTaylorCombinedQueue').hidden=false;
   $('rileyTaylorQueueStatus').textContent=
    'The owner-scoped combined work plan could not be verified. This does not mean Riley has no unfinished tasks. Check source connection before starting.';
@@ -1611,6 +1617,11 @@ async function refreshShiftStatus(){
     renderActiveRileyTaylorQueue(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
+      verifiedFreshBatchReady=false;
+      showRileyNextAction('WORK IN PROGRESS · No second Start needed',
+       'An authorized job batch is active. Watch the timestamped worker events and per-job evidence below. '+
+       'If Reality produces a verified capability requiring installation, approve that exact artifact once in Chat; '+ 
+       'the same job should resume automatically. Do not start a second batch.');
       $('runFullShift').disabled=true;
       $('runFullShift').textContent='Existing shift authorized';
       $('fullShiftScope').textContent='Your combined shift is ALREADY AUTHORIZED. Do not start a duplicate shift or approve it again. Watch live activity below: source reviews, OpenAI model connection, original-job execution, independent receipts and real blockers. If an exact verified installation is needed, Reality Chat must present that artifact separately.';
@@ -1640,12 +1651,19 @@ async function refreshShiftStatus(){
         ' Status refreshed '+new Date().toLocaleTimeString()+'.';
       node.hidden=false;
     }else{
-      $('runFullShift').disabled=false;
-      $('runFullShift').textContent='Start Riley + Taylor Jobs';
-      node.textContent='No CURRENT owner-authorized shift remains in its allowed time window. '+
+      $('runFullShift').disabled=pending||!verifiedFreshBatchReady;
+      $('runFullShift').textContent=verifiedFreshBatchReady?
+       'Start Fresh Riley + Taylor Jobs':'Checking Fresh Work';
+      if(!verifiedFreshBatchReady)
+       showRileyNextAction('NO TEST RUNNING · Checking fresh work eligibility',
+        'The earlier time-boxed shift closed with two settled original jobs and an unfinished repair. '+
+        'Reality is validating a distinct new batch and excluding settled sources. '+
+        'Do not authorize a repeat of the historical work.');
+      node.textContent='NO ACTIVE WORKER SHIFT. Previous time-boxed shift has ended. '+
+       'Its verified receipts remain archived under Show previous shift. '+
        (activeState.expired_unclosed_shifts>0?
-        'There is an expired historical shift requiring independent reconciliation; do not retry its claimed original job. ':'')+
-       'Starting a DIFFERENT shift still requires your signed-in explicit start authorization.';
+        'An earlier unresolved shift still requires reconciliation; its old claims cannot be replayed. ':'')+
+       'The next step is shown above after checking fresh assignments.';
       node.hidden=false;
     }
   }catch{
@@ -1870,7 +1888,7 @@ function showAuth(authenticated){
   if(authenticated){
     // Deep links never start work or select an arbitrary time target; the owner presses Start once.
     if(window.location.hash==='#riley-shift'){
-      $('fullShiftScope').textContent='Review the combined Riley + Taylor source tasks below. Choose a maximum authorization window, then press Start Riley + Taylor Jobs ONCE. Opening the page does not authorize work or install code.';
+      $('fullShiftScope').textContent='This page shows what is running now and what you should do next. Historical receipts are available separately. Reality must exclude already settled work before a new Start becomes available. One start authorizes a frozen, completion-bound batch. A new capability installation always requires exact approval in Chat.';
     }
     setConversation(conversation());
     void refreshHistory();
@@ -1931,6 +1949,13 @@ $('conversations').onchange=()=>{
   const id=$('conversations').value;
   if(!uuid(id))return;
   setConversation(id);void refreshHistory(id);
+};
+$('rileyHistoryToggle').onclick=()=>{
+ showHistoricalEvidence=!showHistoricalEvidence;
+ $('rileyHistoryToggle').setAttribute('aria-expanded',String(showHistoricalEvidence));
+ $('rileyHistoryToggle').textContent=showHistoricalEvidence?
+  'Hide previous shift evidence':'Show previous shift receipts and investigation';
+ void refreshShiftStatus();
 };
 $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load
