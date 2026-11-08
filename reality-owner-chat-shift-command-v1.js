@@ -39,21 +39,36 @@ export function interpretSignedInChatShiftCommand(message,{selectedHours=8}={}){
   production_changed:false,
  });
 }
-export function safeShiftReadbackState(data,{requestedHours=null}={}){
- if(!data||data.ok!==true||!Array.isArray(data.shifts)||data.shifts.length>5)
+export function safeShiftReadbackState(data,{requestedHours=null,now=Date.now()}={}){
+ if(!data||data.ok!==true||!Array.isArray(data.shifts)||
+    data.shifts.length>5||!Number.isFinite(now))
   throw Error('SHIFT_CHAT_READBACK_UNVERIFIED');
- const active=data.shifts.filter(s=>
+ // Status may remain AWAITING_EXACT_ORIGINAL_WORK after the exact shift
+ // authorization timebox ends. That is historical unresolved evidence,
+ // NOT permission to execute and NOT a reason to reject a different future
+ // owner-authorized shift. Never resume an old globally claimed job here.
+ const candidates=data.shifts.filter(s=>
   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s?.status));
- if(active.length>1)throw Error('SHIFT_CHAT_MULTIPLE_ACTIVE_SHIFTS_REQUIRE_REVIEW');
- if(active.length){
-  const s=active[0];
+ const verified=candidates.map(s=>{
   const start=Date.parse(s.planned_start_at),end=Date.parse(s.planned_end_at);
-  if(!Number.isFinite(start)||!Number.isFinite(end)||!(Number.isSafeInteger((end-start)/3600000)&&
-       (end-start)/3600000>=1&&(end-start)/3600000<=12)||
-     typeof s.shift_id!=='string'||!(/^[a-f0-9-]{36}$/i.test(s.shift_id)))
+  if(!Number.isFinite(start)||!Number.isFinite(end)||
+     !Number.isSafeInteger((end-start)/3600000)||
+     (end-start)/3600000<1||(end-start)/3600000>12||
+     typeof s.shift_id!=='string'||
+     !/^[a-f0-9-]{36}$/i.test(s.shift_id))
     throw Error('SHIFT_CHAT_ACTIVE_IDENTITY_NOT_VERIFIED');
-  return Object.freeze({hasActive:true,shift_id:s.shift_id,duration_hours:(end-start)/3600000,
-    status:s.status,matching_requested_hours:requestedHours===(end-start)/3600000});
+  return {shift:s,start,end};
+ });
+ const active=verified.filter(x=>x.end>now);
+ if(active.length>1)throw Error('SHIFT_CHAT_MULTIPLE_ACTIVE_SHIFTS_REQUIRE_REVIEW');
+ const expired_unclosed_shifts=verified.filter(x=>x.end<=now).length;
+ if(active.length){
+  const {shift:s,start,end}=active[0];
+  return Object.freeze({hasActive:true,shift_id:s.shift_id,
+   duration_hours:(end-start)/3600000,
+   status:s.status,
+   matching_requested_hours:requestedHours===(end-start)/3600000,
+   expired_unclosed_shifts});
  }
- return Object.freeze({hasActive:false});
+ return Object.freeze({hasActive:false,expired_unclosed_shifts});
 }
