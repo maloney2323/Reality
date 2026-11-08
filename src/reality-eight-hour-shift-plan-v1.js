@@ -22,11 +22,17 @@ function acceptedSource(item){
   return false;
  return true;
 }
-export function buildRealityEightHourShiftDraft(brief,{durationHours=8,prioritySourceRefs=[]}={}){
+export function buildRealityEightHourShiftDraft(brief,{durationHours=8,prioritySourceRefs=[],excludedSettledSourceRefs=[]}={}){
  if(!Array.isArray(prioritySourceRefs)||prioritySourceRefs.length>25||
     prioritySourceRefs.some(x=>typeof x!=='string'||!URL.test(x))||
     new Set(prioritySourceRefs).size!==prioritySourceRefs.length)
   fail('OWNER_SOURCE_PRIORITY_INVALID');
+ if(!Array.isArray(excludedSettledSourceRefs)||
+     excludedSettledSourceRefs.length>25||
+     excludedSettledSourceRefs.some(url=>
+      typeof url!=='string'||!URL.test(url))||
+     new Set(excludedSettledSourceRefs).size!==excludedSettledSourceRefs.length)
+  fail('EXACT_SETTLED_SOURCE_EXCLUSIONS_UNVERIFIED');
  if(!Number.isSafeInteger(durationHours)||durationHours<1||durationHours>12)
   fail('DURATION_NOT_SUPPORTED');
  // Preserve already-fingerprinted 8/10/12-hour window definitions exactly.
@@ -77,10 +83,19 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
    seenIds.add(item.finding_id);seenLinks.add(key);
    unique.push(item);
  }
+ // The already-settled source list comes ONLY from service-role readbacks
+ // of exact owner-scoped independent original-job receipts. A settled PR
+ // review/triage must not be returned as a "new job" filler in this batch.
+ // A separate new objective from a shared source requires independent proof.
+ const finished=new Set(excludedSettledSourceRefs);
+ const beforeSettledFilter=unique.length;
+ const fresh=unique.filter(item=>!finished.has(item.evidence_refs[0]));
+ const settledSourceCount=beforeSettledFilter-fresh.length;
+ unique.length=0;unique.push(...fresh);
  // Owner-reconciled, source-backed priorities only reorder validation
  // windows. A preferred open issue is NOT an executable job or new grant.
  const sourceOrder=new Map(prioritySourceRefs.map((url,i)=>[url,i]));
- const allowedUrls=new Set(unique.map(x=>x.evidence_refs[0]));
+ const allowedUrls=new Set(brief.items.map(x=>x.evidence_refs[0]));
  if(prioritySourceRefs.some(url=>!allowedUrls.has(url)))
   fail('OWNER_PRIORITY_SOURCE_NOT_IN_REVIEWED_BRIEF');
  unique.sort((a,b)=>
@@ -157,13 +172,14 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
     source_backed_opportunities:c.source_backed_opportunities,
     selected_distinct_source_records:allocated.length,
     dropped_duplicate_source_records:duplicates,
+    already_settled_source_records_excluded:settledSourceCount,
     unassigned_validation_slots:4-allocated.length,
     qualified_executable_jobs:0,
     validated_human_equivalent_hours:0
   }),
   source_coverage:brief.source_coverage,
   slots:freeze(slots),
-  overlap_note:'Unique provider URLs do not prove distinct underlying work. Reconcile issues, PRs, previous settlements and parent objectives before execution or valuation.',
+  overlap_note:'Already-settled owner original sources are excluded from this draft; unique provider URLs still do not prove distinct underlying work. Require independent original-job eligibility and proof before execution.',
   benchmark_note:'NASA software repair medians can inform a later task-matched comparison; scheduling eight hours does not establish eight hours of human work saved.',
   benchmark_source_url:'https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf',
   human_equivalent_hours_verified:null,
