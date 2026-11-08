@@ -42,8 +42,10 @@ export default async function handler(req,res){
   (req.body&&(Object.getPrototypeOf(req.body)!==Object.prototype||
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
+ let activePulseDb=null,activePulseShiftId=null;
  try{
   const db=shiftDatabase(process.env);
+  activePulseDb=db;
   // The ACTUAL server wake is durably timestamped, separate from the
   // signed-in owner authorization and from any original-job claim.
   // No HTTP user-supplied owner or shift ID is ever accepted.
@@ -54,6 +56,8 @@ export default async function handler(req,res){
     'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(wakeReceipt?.status)||
      wakeReceipt.installation_authorized!==false)
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
+   activePulseShiftId=wakeReceipt.shift_id;
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
@@ -243,6 +247,17 @@ export default async function handler(req,res){
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate});
  }catch{
+  // Best-effort independent failure timestamp; never claim a model/tool
+  // succeeded, never take another job claim and never leak provider secrets.
+  if(activePulseDb&&/^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
+   try{
+    await shiftRpc(activePulseDb,
+     'reality_record_employee_shift_worker_pulse_v1',{
+      p_shift_id:activePulseShiftId,p_status:'WAKE_FAILED',
+      p_safe_result:'WORKER_PROVIDER_OR_DATABASE_UNVERIFIED'
+     });
+   }catch{/* Failed heartbeat is not a substitute for work evidence. */}
+  }
   return res.status(503).json({
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
    work_completed:false,installation_authorized:false,
