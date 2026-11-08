@@ -107,3 +107,17 @@ test('source-authenticated worker uses one unified graph before and after the or
  assert.match(sql,/revoke all on function public.reality_read_current_shift_execution_graph_v1/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
 });
+test('signed-in owner Chat and real worker share exact graph identity and display the next executable action',()=>{
+ const api=readFileSync(new URL(
+  '../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ assert.match(api,/reality_read_owner_shift_execution_graph_v1/);
+ assert.match(api,/p_owner_id:session\.user_id,p_shift_id:chosen\.shift_id/);
+ assert.match(api,/shift_execution_graph_status='VERIFIED_CURRENT_OWNER_EXECUTION'/);
+ assert.match(api,/assertRealityUnifiedShiftGraph/);
+ assert.match(ui,/id="rileyUnifiedOriginalGraph"/);
+ assert.match(ui,/renderUnifiedOriginalGraph\(readback,current\)/);
+ assert.match(ui,/GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR/);
+ assert.match(ui,/It has NOT produced a verified candidate/);
+ assert.match(ui,/No new shift or duplicate job should be started/);
+});
