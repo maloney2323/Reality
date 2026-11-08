@@ -287,6 +287,27 @@ export default async function handler(req,res){
    independent_tests_passed:false,installation_authorized:false,
    original_job_completed:false,production_changed:false
   };
+  // The same worker independently reads the exact failed frozen result.
+  // A generated candidate is NOT "pending tests" once provider-backed CI
+  // has rejected it for a real owner-governance regression.
+  let rileyCorrectionTest;
+  try{
+   rileyCorrectionTest=await shiftRpc(db,
+    'reality_read_current_riley_revision_test_outcome_v1',{});
+   if(![
+    'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED',
+    'NO_CURRENT_RILEY_REVISION_TEST_SCOPE',
+    'NO_INDEPENDENT_CURRENT_REVISION_FAILURE_RECORDED'
+   ].includes(rileyCorrectionTest?.status)||
+   rileyCorrectionTest.installation_authorized!==false||
+   rileyCorrectionTest.original_job_completed!==false||
+   rileyCorrectionTest.production_changed!==false)
+    throw Error('RILEY_REVISION_FROZEN_READBACK_INVALID');
+  }catch{
+   rileyCorrectionTest={status:'RILEY_REVISION_FROZEN_TEST_READBACK_UNAVAILABLE',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false};
+  }
   // This is a trusted read-only candidate verifier. It can mark a
   // real source candidate as independently tested, but NEVER approve,
   // install, or settle an original job.
@@ -319,7 +340,10 @@ export default async function handler(req,res){
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
-   const outcomeCode=rileyCorrectedDraft?.status===
+   const outcomeCode=rileyCorrectionTest?.status===
+    'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED'?
+     'RILEY_CORRECTED_CODE_OWNER_SCOPE_TEST_FAILED':
+    rileyCorrectedDraft?.status===
     'SAME_ORIGINAL_CORRECTED_MODEL_DRAFT_AWAITING_FROZEN_TEST'?
      'RILEY_CORRECTED_CODE_DRAFT_PENDING_INDEPENDENT_TEST':
     rileyCorrectedDraft?.revision_phase==='MODEL_REVISION_RECORDED'?
@@ -366,6 +390,7 @@ export default async function handler(req,res){
     riley_code_repair_original:rileyCodeRepair,
     riley_model_draft:rileyModelDraft,
     riley_corrected_model_draft:rileyCorrectedDraft,
+    riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate});
  }catch{
