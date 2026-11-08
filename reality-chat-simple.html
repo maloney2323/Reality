@@ -1246,8 +1246,10 @@ function renderUnifiedOriginalGraph(readback,current){
    'Source inspected; not yet a separately qualified original job',
   VERIFY_SOURCE_BEFORE_ANY_EXECUTION:
    'Verify the source and frozen authority before execution',
+  VERIFY_NATIVE_INSTALL_AND_RESUME_PATH_BEFORE_OWNER_APPROVAL:
+   'Independently tested patch; installer credential and same-job resumption must be proven BEFORE any approval is requested',
   AWAIT_EXACT_ARTIFACT_INSTALL_APPROVAL:
-   'A separately verified candidate requires one exact installation approval'
+   'Verified capability awaits an exact installation approval'
  };
  el.append(textNode('p','Whole-shift next action: '+
   (pretty[graph.next_action]||String(graph.next_action||'UNVERIFIED')
