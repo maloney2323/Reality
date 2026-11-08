@@ -18,6 +18,8 @@ import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {assessRealityNativeBatchReadiness}
+ from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
 import {projectRileyExistingBacklog}
@@ -253,13 +255,18 @@ export default async function handler(req,res){
         graph.owner_id===session.user_id&&graph.jobs.length<=4){
       shift_execution_graph={
        status:graph.status,shift_id:graph.shift_id,
+       owner_id:graph.owner_id,plan_fingerprint:graph.plan_fingerprint,
        next_action:graph.next_action,
        jobs:graph.jobs.map(x=>({
+        source_step_index:x.source_step_index,
         source_ref:x.source_ref,original_kind:x.original_kind,
         original_work_id:x.original_work_id,phase:x.phase,
+        source_proof_sha256:x.source_proof_sha256,
+        independent_source_proof_verified:x.independent_source_proof_verified,
         next_governed_action:x.next_governed_action
        })),
-       installation_authorized:false,original_job_completed:false
+       installation_authorized:false,original_job_completed:false,
+       production_changed:false
       };
       shift_execution_graph_status='VERIFIED_CURRENT_OWNER_EXECUTION';
      }else shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNVERIFIED';
@@ -290,7 +297,11 @@ export default async function handler(req,res){
         shift_execution_graph.jobs.some(j=>j.original_work_id===patch.original_work_id)){
       riley_native_reviewed_patch={
        status:patch.status,original_work_id:patch.original_work_id,
-       shift_id:patch.shift_id,candidate_commit_sha:patch.candidate_commit_sha,
+       shift_id:patch.shift_id,owner_id:patch.owner_id,
+       source_ref:patch.source_ref,
+       source_proof_sha256:patch.source_proof_sha256,
+       native_install_to_settlement_accepted:false,
+       candidate_commit_sha:patch.candidate_commit_sha,
        candidate_artifact_sha256:patch.candidate_artifact_sha256,
        independent_passing_run_id:patch.independent_passing_run_id,
        provenance:patch.provenance,owner_approval_ready:false,
@@ -302,6 +313,26 @@ export default async function handler(req,res){
       riley_native_reviewed_patch_status='NO_OWNER_TESTED_PATCH_YET';
      else riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNVERIFIED';
     }catch{riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNAVAILABLE';}
+   }
+   // No new authorization or installation can be inferred from a test run.
+   // The exact owner graph and artifact are evaluated together with the
+   // PREVIEW-only provider setup; unresolved execution gates stay closed.
+   let riley_native_batch_readiness=null;
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     riley_native_batch_readiness=assessRealityNativeBatchReadiness({
+      graph:shift_execution_graph,reviewedPatch:riley_native_reviewed_patch,
+      env:process.env,expectedProject:db.project
+     });
+    }catch{
+     riley_native_batch_readiness={
+      status:'NATIVE_BATCH_READINESS_UNVERIFIED',
+      ready_for_new_install_approval:false,
+      new_shift_required:false,installation_authorized:false,
+      original_job_completed:false,production_changed:false,
+      blockers:['OWNER_SOURCE_OR_ARTIFACT_READBACK_UNVERIFIED']
+     };
+    }
    }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -331,6 +362,7 @@ export default async function handler(req,res){
     shift_activity,shift_activity_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
+    riley_native_batch_readiness,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
