@@ -1000,45 +1000,76 @@ const RILEY_SAFE_MODEL_REASONS=Object.freeze({
  OPENAI_EMPTY_FINAL_ADVISORY:'The model returned no usable review.'
 });
 function renderRileyVerifiedOriginalJobs(readback,shiftId){
- const target=$('rileyVerifiedOriginalJobRows');
- const bound=readback?.riley_pr_review_jobs;
- target.replaceChildren();
- if(bound?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
-  !Array.isArray(bound.jobs)||bound.jobs.length>10){
-  target.textContent='Original-job receipt readback unavailable. No completion inferred.';
-  return 0;
- }
+ const target=$('rileyVerifiedOriginalJobRows'),frag=document.createDocumentFragment();
  let count=0;
- for(const job of bound.jobs.filter(j=>j.shift_id===shiftId)){
-  const row=document.createElement('div');
-  row.className='workforce-output-row';
-  const settled=job.phase==='SETTLED'&&job.original_job_completed===true&&
-   job.source_review_job_only===true&&job.source_code_repaired===false&&
-   job.installation_authorized===false&&
-   /^work:[a-f0-9]{32}$/.test(job.original_work_id||'')&&
-   /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(
-    job.settlement_receipt_ref||'')&&
-   /^https:\/\/github\.com\/maloney2323\/Reality\/(?:pull|issues)\/[1-9]\d*#issuecomment-\d+$/.test(
-    job.provider_comment_url||'');
-  row.append(textNode('strong',settled?
-   'COMPLETED — Riley + Taylor engineering PR review':
-   'IN PROGRESS — Riley + Taylor engineering PR review · '+job.phase));
-  if(settled){
-   const link=combinedQueueLink(job.provider_comment_url,
-     'Open published review · independently read back from GitHub');
-   row.append(link);
-   row.append(textNode('div','Original job: '+job.original_work_id+
-    ' · Durable receipt: '+job.settlement_receipt_ref+
-    ' · Code review completed, NOT a code repair, capability installation or full-shift settlement.'));
-   count++;
-  }else{
-   row.append(textNode('div','Original job '+job.original_work_id+
-    ' is not settled. Reality must verify the exact provider effect before reporting completion.'));
+ const rowFor=(title,detail,url=null,linkLabel='Open independent GitHub evidence')=>{
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong',title));
+  if(url&&/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*#issuecomment-\d+$/.test(url))
+   row.append(combinedQueueLink(url,linkLabel));
+  row.append(textNode('div',detail));frag.append(row);
+ };
+ const pr=readback?.riley_pr_review_jobs;
+ if(pr?.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'&&Array.isArray(pr.jobs)&&pr.jobs.length<=10){
+  for(const j of pr.jobs.filter(x=>x.shift_id===shiftId)){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    j.source_review_job_only===true&&j.source_code_repaired===false&&
+    j.installation_authorized===false&&
+    /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+    /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(j.settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Riley/Taylor PR review · #58':'PR review · '+j.phase,
+    settled?'Original '+j.original_work_id+' · Receipt '+j.settlement_receipt_ref+
+      '. Real review published, no code repair or installation claimed.':
+      'Review not independently settled.',
+    settled?j.provider_comment_url:null);
+   if(settled)count++;
   }
-  target.append(row);
  }
- if(!target.children.length)
-  target.textContent='No independently settled original PR review job in this shift yet.';
+ const triage=readback?.riley_failure_triage_jobs;
+ if(triage?.status==='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'&&
+  Array.isArray(triage.jobs)&&triage.jobs.length<=5){
+  for(const j of triage.jobs.filter(x=>x.shift_id===shiftId&&
+   x.source_ref==='https://github.com/maloney2323/Reality/issues/143'&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||''))){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    j.code_repair_completed===false&&j.production_changed===false&&
+    /^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(
+     j.settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Riley/Taylor recurring-failure investigation · #143':
+    'CURRENTLY INVESTIGATING · recurring execution-engine failures · #143',
+    settled?'Independent latest-run evidence: historical failure, current successes. '+
+      'Original '+j.original_work_id+' · Receipt '+j.settlement_receipt_ref+
+      '. No unproven historical fix or cash savings claimed.':
+      'Checking latest and historical execution-engine runs. No repaired defect claimed yet.',
+    settled?j.provider_comment_url:null,'Open verified issue investigation');
+   if(settled)count++;
+  }
+ }
+ const repairs=readback?.riley_code_repair_jobs;
+ if(repairs?.status==='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'&&
+  Array.isArray(repairs.jobs)&&repairs.jobs.length<=6){
+  for(const j of repairs.jobs.filter(x=>x.shift_id===shiftId&&
+   x.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||''))){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    /^supabase:[a-z0-9_]+:[a-f0-9-]{36}$/.test(
+     j.original_settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Original code repair · #263':
+    'ACTIVE · Original code repair · #263 · '+String(j.phase||'NOT VERIFIED').replaceAll('_',' '),
+    settled?'Original '+j.original_work_id+' · Independent settlement '+
+      j.original_settlement_receipt_ref:
+      'Original '+j.original_work_id+' · The model/test worker must produce a '+
+      'verified code candidate and Reality must obtain exact artifact approval '+
+      'before installation and original-job settlement. Not completed.',
+    null);
+   if(settled)count++;
+  }
+ }
+ rowFor('DEPENDENT · Full-loop acceptance · issue #185',
+  'This acceptance job requires the same issue #263 code repair to be independently '+
+  'verified, approved if installation is necessary, resumed and finally settled. '+
+  'It is not counted as completed just because the worker is active.');
+ target.replaceChildren(frag);
  return count;
 }
 function renderRileyLiveProgress(readback){
@@ -1072,7 +1103,7 @@ function renderRileyLiveProgress(readback){
   'Shift '+status+' · '+sourceDone+' of 5 source checks recorded · '+
   modelResults.length+' model-assisted reviews · '+
   modelFailures.length+' model connection failures · '+
-  realReviewJobs+' independently settled PR review jobs · '+
+  realReviewJobs+' independently settled assigned jobs · '+
   (originalVerified?'Independent original-job receipt recorded.':
    'No independent final repair receipt for this shift.')+
   ' Worker progress refreshes every 30 seconds.';
@@ -1082,6 +1113,10 @@ function renderRileyLiveProgress(readback){
  $('rileyLiveApprovalStatus').textContent=approval?
   'ACTION NEEDED: an independently verified exact capability upgrade is ready for your review in Reality Chat. Installation is not authorized until you approve that artifact.':
   'YOU DO NOT NEED TO AUTHORIZE THE SHIFT AGAIN. No independently verified capability installation request is pending. You can leave this page; the server-side worker remains responsible for the authorized shift.';
+ const exactRepair=(readback?.riley_code_repair_jobs?.jobs||[]).find(j=>
+  j?.shift_id===current.shift_id&&j.source_ref===
+   'https://github.com/maloney2323/Reality/issues/263'&&
+  /^work:[a-f0-9]{32}$/.test(j.original_work_id||''));
  const next=steps.find(x=>['QUEUED','CLAIMED','AWAITING_EXACT_WORK'].includes(x.state));
  const blocker=$('rileyLiveBlocker');
  if(current.status==='AWAITING_EXACT_ORIGINAL_WORK'||
@@ -1089,8 +1124,14 @@ function renderRileyLiveProgress(readback){
   blocker.textContent='EXECUTION BLOCKER: source inspection is not code repair. No exact eligible original job has reached the execution gate. Reality must qualify an existing-file repair against current failure evidence and bind it to this same shift; no additional start button will fix that.';
  }else if(current.status==='ENDED_WITH_BLOCKED_WORK'||current.status==='ESCALATED'){
   blocker.textContent='BLOCKED: this shift did not achieve independent original-job settlement. Inspect recorded failure evidence before any new attempt; do not replay uncertain or previously settled work.';
+ }else if(exactRepair&&!originalVerified){
+  blocker.textContent='CURRENT EXECUTION: owner-authorized code-repair original '+
+   exactRepair.original_work_id+' is '+String(exactRepair.phase||'unverified').replaceAll('_',' ')+
+   '. Reality must finish genuine code generation, independent frozen acceptance, '+
+   'exact upgrade approval if required, same-job resumption and final receipt. '+
+   'No shift reauthorization needed.';
  }else if(next?.step_index===6&&!originalVerified){
-  blocker.textContent='NEXT GATE: source checks are complete. Reality must admit a real, independently verified original repair before execution can begin; the current missing-extension-only intake can reject ordinary existing-code defects.';
+  blocker.textContent='NEXT GATE: source checks are complete, but no independently admitted original repair has been read back. The execution admission path needs repair, not another owner permission.';
  }else if(next){
   blocker.textContent='CURRENT WORK: '+RILEY_PROGRESS_STAGES[next.step_index-1]+
    '. The trusted worker claims the next eligible step automatically. A source check by itself does not finish or fix a job.';
