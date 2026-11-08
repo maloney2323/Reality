@@ -22,7 +22,7 @@ export function createRileyTrustedOriginalDriver({
  loadTrustedAuthorizedOriginal,
  callRpc=null,runOriginal=runRileyOriginalJobViaReality,
  runTick=runRileyGovernedMultiJobShiftTick,
- now=()=>new Date(),
+ now=()=>new Date(),batchEligibleOriginals=false,
 }={}){
  if(!db||typeof db.secretKey!=='string'||db.secretKey.length<8||
   typeof db.url!=='string'||!db.url.startsWith('https://')||
@@ -30,7 +30,8 @@ export function createRileyTrustedOriginalDriver({
   typeof runOriginal!=='function'||typeof now!=='function'||
   [loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal]
    .some(x=>typeof x!=='function')||
-  (callRpc!==null&&typeof callRpc!=='function'))
+  (callRpc!==null&&typeof callRpc!=='function')||
+  typeof batchEligibleOriginals!=='boolean')
   fail('ALL_TRUSTED_SERVER_ADAPTERS_REQUIRED');
  const rpc=callRpc|| (async({db,name,args,fetchImpl})=>
   shiftRpc(db,name,args,{fetchImpl}));
@@ -82,19 +83,24 @@ export function createRileyTrustedOriginalDriver({
   // The existing runner does the independent owner/shift/ledger readbacks,
   // takes the global single-use database claim, invokes the shared executor,
   // records the result and reconciles final original-job receipts.
-  // Only one exact original may be attempted for this shift pulse.
+  // The previously verified root original anchors this pulse. When the
+  // trusted preview worker elects shift batching, all other original jobs
+  // must independently survive service-only owner/shift, source digest,
+  // current Continuity, atomic claim and settlement checks in runTick.
+  // A wake alone cannot mint execution authority for any candidate.
+  const batchLimit=batchEligibleOriginals?Math.min(candidates.length,4):1;
   const result=await runTick({
    db,ownerId:owner,shiftId:input.shift_id,fetchImpl,
    loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal,
-   callRpc:rpc,runOriginal,now,maxJobs:1,
-   onlyOriginalWorkId:input.original_work_id
+   callRpc:rpc,runOriginal,now,maxJobs:batchLimit,
+   onlyOriginalWorkId:batchEligibleOriginals?null:input.original_work_id
   });
   if(result?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
     result.shift_id!==input.shift_id||
     !Array.isArray(result.outcomes)||
     !result.outcomes.some(x=>x.original_work_id===input.original_work_id)||
-    result.outcomes.length>1||
-    result.attempted>1||
+    result.outcomes.length>batchLimit||
+    result.attempted>batchLimit||
     result.installation_authorized!==false||
     result.production_changed!==false||
     result.shift_finished!==false||
