@@ -21,8 +21,8 @@ test('light Chat is on an isolated route without replacing the existing approval
   assert.match(html,/<a id="rileyNavEvaluation" href="\/value#pre-automation">Evaluation<\/a>/);
   assert.match(html,/id="teamToggle" type="button" aria-expanded="false"/);
   assert.match(html,/id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden/);
-  assert.match(html,/Start Riley \+ Taylor Jobs/);
-  assert.match(html,/One combined work queue\. One start/);
+  assert.match(html,/Start Fresh Riley \+ Taylor Jobs/);
+  assert.match(html,/One authorization starts a verified fresh work batch/);
 });
 test('light Chat preserves existing private session and scoped saved conversation',()=>{
   assert.match(html,/\/api\/reality\/personal-session/);
