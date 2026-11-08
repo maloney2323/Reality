@@ -166,16 +166,15 @@ test('service-only SQL original-job contract refuses browser or model-made appro
  assert.doesNotMatch(sql,/grant execute[^;]*authenticated/i);
 });
 
-test('without a preview writer token the real model review is prepared and fenced, but no Github write is attempted',async()=>{
+test('without a preview writer token the real model review stays prepared and does not consume publish intent',async()=>{
  const f=fixture();
  const result=await runAuthorizedRileyPrReview({...options(f),githubToken:null});
- assert.equal(result.status,'PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING_PUBLISH_INTENT_FENCED');
+ assert.equal(result.status,'PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING');
  assert.equal(result.original_job_completed,false);
  assert.equal(f.ghPosts.length,0);
  assert.ok(f.persisted.review_body===undefined||f.persisted.body?.includes('reality-riley-original:'));
  assert.deepEqual(f.calls.map(x=>x.name),[
   'reality_claim_authorized_riley_pr_review_v1',
-  'reality_prepare_authorized_riley_pr_review_v1',
-  'reality_mark_authorized_riley_pr_publish_v1'
+  'reality_prepare_authorized_riley_pr_review_v1'
  ]);
 });
