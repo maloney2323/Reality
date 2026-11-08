@@ -16,6 +16,8 @@ import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
 import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
+import {assertRealityUnifiedShiftGraph}
+ from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
 import {projectRileyExistingBacklog}
@@ -235,6 +237,34 @@ export default async function handler(req,res){
      }else shift_activity_status='ACTIVITY_READBACK_SCOPE_UNVERIFIED';
     }catch{shift_activity_status='ACTIVITY_READBACK_UNAVAILABLE';}
    }
+   // One independently checked execution graph is shared by the worker
+   // and signed-in owner Chat. Source-native and Universe originals have
+   // the SAME owner/shift/source identity; no synthetic job or authority.
+   let shift_execution_graph=null;
+   let shift_execution_graph_status='NO_CURRENT_EXECUTION_GRAPH';
+   if(chosen?.planned_end_at==='infinity'&&
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(chosen.status)){
+    try{
+     const graph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+      'reality_read_owner_shift_execution_graph_v1',{
+       p_owner_id:session.user_id,p_shift_id:chosen.shift_id
+      }),{expectedShiftId:chosen.shift_id});
+     if(graph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+        graph.owner_id===session.user_id&&graph.jobs.length<=4){
+      shift_execution_graph={
+       status:graph.status,shift_id:graph.shift_id,
+       next_action:graph.next_action,
+       jobs:graph.jobs.map(x=>({
+        source_ref:x.source_ref,original_kind:x.original_kind,
+        original_work_id:x.original_work_id,phase:x.phase,
+        next_governed_action:x.next_governed_action
+       })),
+       installation_authorized:false,original_job_completed:false
+      };
+      shift_execution_graph_status='VERIFIED_CURRENT_OWNER_EXECUTION';
+     }else shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNVERIFIED';
+    }catch{shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNAVAILABLE';}
+   }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -261,6 +291,7 @@ export default async function handler(req,res){
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
+    shift_execution_graph,shift_execution_graph_status,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
