@@ -105,7 +105,8 @@ test('Chat uses signed-in Send event and the real authenticated shift endpoint',
  assert.match(ui,/void refreshShiftStatus\(\)/);
  assert.match(shift,/await authenticatedChatSession\(req,res\)/);
  assert.match(shift,/assertSameOrigin\(req\)/);
- assert.match(shift,/shiftRpc\(db,\s*'reality_authorize_employee_shift_v1'/);
+ assert.match(shift,/reality_authorize_employee_completion_shift_v1/);
+ assert.match(shift,/reality_authorize_employee_shift_v1/);
  assert.match(shift,/worker_dispatch_verified:false/);
  assert.doesNotMatch(ui,/installation_authorized:true|production_changed:true/);
 });
@@ -133,7 +134,8 @@ test('ordinary signed-in Start the shift/job commands authorize the existing exa
   assert.equal(command?.installation_authorized,false,message);
   assert.equal(command?.repeated_confirmations_required,false,message);
  }
- assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).duration_hours,10);
+ assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).duration_hours,8);
+ assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).completion_bound,true);
  assert.equal(interpretSignedInChatShiftCommand('Start the shift',{selectedHours:13}),null);
  for(const message of [
   'What if I start the shift?','I am ready to approve',
