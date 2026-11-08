@@ -24,6 +24,9 @@ on:
       - test/reality-riley-current-shift-candidate-verifier-v2.test.js
       - test/reality-unified-shift-execution-controller-v1.test.js
       - test/reality-riley-native-model-draft-v1.test.js
+      - test/reality-riley-native-corrective-model-v1.test.js
+      - src/reality-riley-native-corrective-model-v1.js
+      - supabase/migrations/20261108_riley_native_frozen_fail_same_job_model_revision_v1.sql
       - src/reality-riley-native-model-draft-v1.js
       - src/reality-riley-service-original-runtime-v1.js
       - test/reality-riley-service-original-runtime-v1.test.js
@@ -70,6 +73,7 @@ jobs:
           node --check src/reality-riley-current-shift-candidate-verifier-v2.js
           node --check src/reality-shift-unified-execution-controller-v1.js
           node --check src/reality-riley-native-model-draft-v1.js
+          node --check src/reality-riley-native-corrective-model-v1.js
           node --check src/reality-riley-service-original-runtime-v1.js
           node --check reality-owner-chat-shift-command-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
@@ -80,4 +84,4 @@ jobs:
           node --check src/reality-genuine-capability-github-wakeup-v1.js
           node --check src/reality-governed-employee-shift-worker-v1.js
           node --check api/reality/governed-employee-shift-worker.js
-          node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-native-model-draft-v1.test.js test/reality-unified-shift-execution-controller-v1.test.js test/reality-riley-current-shift-candidate-verifier-v2.test.js test/reality-owner-fresh-shift-queue-v1.test.js test/reality-eight-hour-shift-plan-v1.test.js test/reality-owner-shift-live-confirmation-v1.test.js test/reality-completion-bound-employee-shift-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-genuine-capability-github-wakeup-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
+          node --test test/reality-riley-native-corrective-model-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-native-model-draft-v1.test.js test/reality-unified-shift-execution-controller-v1.test.js test/reality-riley-current-shift-candidate-verifier-v2.test.js test/reality-owner-fresh-shift-queue-v1.test.js test/reality-eight-hour-shift-plan-v1.test.js test/reality-owner-shift-live-confirmation-v1.test.js test/reality-completion-bound-employee-shift-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-genuine-capability-github-wakeup-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
