@@ -19,8 +19,8 @@ import {runAuthorizedRileyPrReview}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
-import {attestExactRileyCandidate263}
- from '../../src/reality-riley-candidate-independent-verifier-v1.js';
+import {attestCurrentRileyCandidate263}
+ from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -212,7 +212,7 @@ export default async function handler(req,res){
   // install, or settle an original job.
   let rileyVerifiedCandidate;
   try{
-   rileyVerifiedCandidate=await attestExactRileyCandidate263({
+   rileyVerifiedCandidate=await attestCurrentRileyCandidate263({
     db,ownerId:rileyCodeRepair?.owner_id,env:process.env
    });
   }catch(e){
