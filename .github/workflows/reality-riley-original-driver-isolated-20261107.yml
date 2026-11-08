@@ -66,6 +66,8 @@ on:
       - scripts/reality-prove-live-tool-delivery-v1.mjs
       - scripts/reality-prove-real-source-openai-governance-v1.mjs
       - scripts/reality-prove-263-repair-baseline-differential-v1.mjs
+      - scripts/reality-riley-unattended-source-repair-v1.mjs
+      - .github/workflows/reality-riley-unattended-model-repair-v1.yml
       - test/reality-riley-original-driver-security-v1.test.js
       - test/reality-universal-governed-recovery-handoff-v1.test.js
       - test/reality-governed-late-bound-tool-adapter-v1.test.js
@@ -93,6 +95,7 @@ jobs:
           node --check scripts/reality-prove-live-tool-delivery-v1.mjs
           node --check scripts/reality-prove-real-source-openai-governance-v1.mjs
           node --check scripts/reality-prove-one-openai-combined-role-v1.mjs
+          node --check scripts/reality-riley-unattended-source-repair-v1.mjs
       - name: Compare all existing tests against unchanged development baseline
         shell: bash
         run: |
