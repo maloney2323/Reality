@@ -117,11 +117,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
-<label style="font-size:12px;color:#cedfec">Maximum authorized window <select id="runShiftHours" aria-label="Riley authorized safety window maximum in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
-<button id="runFullShift" type="button" disabled title="Authorize one combined Riley + Taylor source-work shift; stop after independent receipts, not arbitrary elapsed time">Checking combined jobs…</button>
+<label style="font-size:12px;color:#cedfec">Work until every selected job has a verified final receipt <select id="runShiftHours" aria-label="Internal planning estimate, not an authorization deadline" style="display:none"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
+<button id="runFullShift" type="button" disabled title="Authorize one exact job batch until all independent final receipts; no arbitrary eight-hour cutoff">Checking combined jobs…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="riley-start-guide" id="fullShiftScope"><strong>One combined work queue. One start.</strong> Review the source-backed Riley + Taylor assignments below, choose a maximum safety window, then tap <strong>Start Riley + Taylor Jobs</strong>. The model investigates each authorized source; proven repair work enters the existing original-job executor. All admitted repairs must have independently verified receipts before successful completion. Expired or blocked work is never counted as completed. Installing new code still needs your separate exact approval.</p>
+<p class="riley-start-guide" id="fullShiftScope"><strong>One combined work queue. One start.</strong> Review the source-backed Riley + Taylor assignments below, then tap <strong>Start Riley + Taylor Jobs</strong>. The model investigates each authorized source; proven repair work enters the existing original-job executor. All admitted repairs must have independently verified receipts before successful completion. Blocked work remains visible and never counts as completed. Installing new code still needs your separate exact approval.</p>
 <section id="rileyLiveProgressPanel" class="team-value" aria-label="Riley and Taylor live work activity" aria-live="polite" hidden>
  <h3>Live activity · What Reality is doing</h3>
  <p id="rileyLiveHeadline" role="status">Reading verified worker state…</p>
@@ -1080,8 +1080,9 @@ function renderRileyLiveProgress(readback){
   panel.hidden=true;return;
  }
  const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
-  .includes(x?.status)&&Number.isFinite(Date.parse(x.planned_end_at))&&
-   Date.parse(x.planned_end_at)>Date.now())||shifts[0];
+  .includes(x?.status)&&(x.planned_end_at==='infinity'||
+   (Number.isFinite(Date.parse(x.planned_end_at))&&
+    Date.parse(x.planned_end_at)>Date.now())))||shifts[0];
  if(!current||!Array.isArray(current.steps)||
     current.steps.length!==8||
     current.steps.some((x,i)=>x?.step_index!==i+1)){
@@ -1228,16 +1229,16 @@ function renderRileyTaylorDraftQueue(draft){
  }
  rows.replaceChildren(frag);
  $('rileyTaylorQueueStatus').textContent=orders.task_count?
-  orders.task_count+' exact unfinished source assignments prepared for one signed-in owner start. Maximum authorization window: '+
-  orders.maximum_authorized_hours+'h; not a required work duration. No code repair or independent final job receipt is claimed before execution.':
+  orders.task_count+' exact unfinished source assignments prepared for one signed-in owner start. Completion-bound authorization: continue until every selected job has independent final receipts, with finite per-job execution leases. No code repair or independent final job receipt is claimed before execution.':
   'No exact assigned source work in this plan. Reality will not authorize an empty time-only shift.';
  box.hidden=false;
 }
 function renderActiveRileyTaylorQueue(readback){
  const active=(readback?.shifts||[]).find(s=>
   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
-   Number.isFinite(Date.parse(s.planned_end_at))&&
-   Date.parse(s.planned_end_at)>Date.now());
+   (s.planned_end_at==='infinity'||
+    (Number.isFinite(Date.parse(s.planned_end_at))&&
+     Date.parse(s.planned_end_at)>Date.now())));
  if(!active||!Array.isArray(active.steps)||active.steps.length!==8)return;
  const steps=active.steps.filter(s=>s.step_index>=2&&s.step_index<=5&&
   COMBINED_WORK_SOURCE.test(s.source_ref||''));
@@ -1284,8 +1285,9 @@ async function refreshRileyTaylorCombinedWorkQueue(){
     throw Error('OWNER_SHIFT_READBACK_UNAVAILABLE');
   const current=read.shifts.find(s=>
    ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
-   Number.isFinite(Date.parse(s.planned_end_at))&&
-   Date.parse(s.planned_end_at)>Date.now());
+   (s.planned_end_at==='infinity'||
+    (Number.isFinite(Date.parse(s.planned_end_at))&&
+     Date.parse(s.planned_end_at)>Date.now())));
   if(current){renderActiveRileyTaylorQueue(read);return;}
   renderRileyTaylorDraftQueue(read.requested_shift_draft);
  }catch{
@@ -1377,7 +1379,8 @@ async function refreshShiftStatus(){
         briefing.verified_source_checks:null;
       const block=activeState.status==='AWAITING_EXACT_ORIGINAL_WORK'?
         ' QUALIFICATION BLOCKER: source checks are complete, but an exact owner-scoped original engineering job is not yet independently admitted. This is NOT a running code repair. Worker wake alone cannot bypass the original-job gate. Do not retry an uncertain intake or start another shift.':'';
-      node.textContent='Existing '+activeState.duration_hours+'h shift · '+activeState.status+
+      node.textContent='Existing '+(activeState.completion_bound?
+       'completion-bound job batch':'time-boxed '+activeState.duration_hours+'h shift')+' · '+activeState.status+
         ' · '+activeState.shift_id+' · '+
         (checked===null?'Source progress unavailable.':checked+' of 5 source checks verified.')+
         block+' '+current+explain+
@@ -1501,6 +1504,7 @@ async function authorizeShiftFromChat(command){
     body:JSON.stringify({
       action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
       requested_hours:command.duration_hours,
+      ...(command.completion_bound===true?{completion_bound:true}:{}),
       expected_fingerprint:draft.expected_fingerprint,
       planned_start_at:start
     }),signal:AbortSignal.timeout(50000)
@@ -1518,8 +1522,10 @@ async function authorizeShiftFromChat(command){
   const match=(verified.shifts||[]).find(x=>x.shift_id===created.shift_id);
   if(!match||!/^sha256:[a-f0-9]{64}$/.test(match.plan_fingerprint||'')||
      match.plan_fingerprint!==draft.expected_fingerprint||
-     (Date.parse(match.planned_end_at)-Date.parse(match.planned_start_at))!==
-      command.duration_hours*3600000)
+     (command.completion_bound===true?
+      match.planned_end_at!=='infinity'||created.completion_bound!==true:
+      (Date.parse(match.planned_end_at)-Date.parse(match.planned_start_at))!==
+       command.duration_hours*3600000))
     throw Error('SHIFT_CREATED_BUT_READBACK_UNVERIFIED_DO_NOT_REPEAT');
   // Show proposed functional roles from a trusted read-only catalog. Never
   // report them as active employees or separate worker instances.
@@ -1557,9 +1563,15 @@ async function authorizeShiftFromChat(command){
   }
   return {
     acknowledged:true,
-    text:'Riley + Taylor combined shift authorized for '+combined.task_count+' source tasks; '+command.duration_hours+'h is the maximum safety window, not the work target. Shift ID: '+
+    text:'Riley + Taylor '+(command.completion_bound?
+     'completion-bound job batch':'timed shift')+
+     ' authorized for '+combined.task_count+' selected source tasks. '+
+     (command.completion_bound?
+      'Reality continues until each job is tested, independently verified and durably receipted.':
+      command.duration_hours+'h is the maximum authorization window.')+
+     ' Shift ID: '+
       created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
-      ' The existing trusted worker scheduler must independently claim work. The selected hours are a maximum authorization window, NOT a mandatory work duration; verified completion can stop the shift early. '+
+      ' The existing trusted worker scheduler must independently claim each job. Completion means every selected job has a valid independent final receipt; no model answer or elapsed timer counts. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
       'original-job admission for consequential repairs. No installation or production change was authorized.'+batch
@@ -1665,13 +1677,11 @@ $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load
  // cannot authorize the shift. Reuses the existing signed-in endpoint.
  if(pending)return;
- const hours=Number($('runShiftHours')?.value);
- if(!Number.isSafeInteger(hours)||hours<1||hours>12)
-  return status('Choose an exact shift length from 1 to 12 hours.');
- const command=interpretSignedInChatShiftCommand('Run a '+hours+' hour shift');
+ const command=interpretSignedInChatShiftCommand(
+  'Start the jobs until complete');
  if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
-    command.duration_hours!==hours||command.installation_authorized!==false)
-  return status('Exact shift owner command could not be validated.');
+    command.completion_bound!==true||command.installation_authorized!==false)
+  return status('Exact completion-bound owner command could not be validated.');
  pending=true;$('runFullShift').disabled=true;$('send').disabled=true;
  const pendingResult=bubble('assistant',
   'Checking your existing shift and exact owner-scoped backlog…','pending');
