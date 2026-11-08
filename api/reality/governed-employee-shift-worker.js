@@ -226,8 +226,21 @@ export default async function handler(req,res){
   }
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
-   const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(result?.status||'')?
-    result.status:'RESULT_READBACK_UNVERIFIED';
+   // A successful worker wake is NOT a completed repair. Surface the
+   // exact latest proof-backed execution blocker to the owner timeline.
+   const activeRepairUnstaged=
+    rileyCodeRepair?.phase==='SOURCE_ADMITTED'&&
+    rileyVerifiedCandidate?.status===
+     'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
+   const executionGateEmpty=activeRepairUnstaged&&
+    result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
+   const outcomeCode=executionGateEmpty?
+    'RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY':
+    activeRepairUnstaged?
+     'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED':
+     result?.status;
+   const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
+    outcomeCode:'RESULT_READBACK_UNVERIFIED';
    completedPulse=await shiftRpc(db,
     'reality_record_employee_shift_worker_pulse_v1',{
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
