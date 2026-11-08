@@ -44,6 +44,16 @@ export default async function handler(req,res){
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  try{
   const db=shiftDatabase(process.env);
+  // The ACTUAL server wake is durably timestamped, separate from the
+  // signed-in owner authorization and from any original-job claim.
+  // No HTTP user-supplied owner or shift ID is ever accepted.
+  const wakeReceipt=await shiftRpc(db,
+   'reality_record_current_shift_worker_pulse_v1',
+   {p_status:'WAKE_RECEIVED',p_safe_result:null});
+  if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
+    'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(wakeReceipt?.status)||
+     wakeReceipt.installation_authorized!==false)
+   throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
@@ -70,7 +80,6 @@ export default async function handler(req,res){
      const now=Date.now();
      if(!shift||shift.status!=='RUNNING'||
       !Number.isFinite(Date.parse(shift.planned_start_at))||
-      !Number.isFinite(Date.parse(shift.planned_end_at))||
       Date.parse(shift.planned_start_at)>now||
       (shift.planned_end_at!=='infinity'&&
        (!Number.isFinite(Date.parse(shift.planned_end_at))||
@@ -211,7 +220,23 @@ export default async function handler(req,res){
     production_changed:false
    };
   }
+  let completedPulse=null;
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(result?.status||'')?
+    result.status:'RESULT_READBACK_UNVERIFIED';
+   completedPulse=await shiftRpc(db,
+    'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+     p_safe_result:safeOutcome
+    });
+   if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
+     'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(completedPulse?.status)||
+     completedPulse.installation_authorized!==false)
+    throw Error('WORKER_COMPLETION_PULSE_UNVERIFIED');
+  }
   return res.status(200).json({...result,
+    actual_worker_wake_receipt:wakeReceipt,
+    actual_worker_completion_receipt:completedPulse,
     completion_bound_work:completionClose,
     riley_original_review:rileyOriginalReview,
     riley_code_repair_original:rileyCodeRepair,
