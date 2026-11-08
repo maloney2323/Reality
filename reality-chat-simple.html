@@ -1179,6 +1179,99 @@ function renderShiftStartProof(readback){
  else if(shift.status.startsWith('ENDED_'))
   details.append(textNode('p','Closed with recorded evidence; not all original jobs were verified as completed.'));
 }
+function renderRileyAuditedActivity(readback,current,timeline){
+ const work=$('rileyOriginalActivityRows'),heartbeat=$('rileyActualWorkerReceipt');
+ work.replaceChildren();
+ const activity=readback?.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
+  readback.shift_activity?.shift_id===current.shift_id&&
+  readback.shift_activity?.owner_bound===true&&
+  readback.shift_activity?.installation_authorized===false&&
+  readback.shift_activity?.production_changed===false?
+   readback.shift_activity:null;
+ if(!activity){
+  heartbeat.textContent='Worker proof unavailable: the owner-scoped activity readback has not been verified.';
+  work.append(textNode('div','Per-job evidence unavailable. This is not confirmation of an idle or completed worker.'));
+  return;
+ }
+ const seen=verifiedLocalTimestamp(activity.first_worker_seen_at);
+ const last=verifiedLocalTimestamp(activity.last_worker_seen_at);
+ const lastDone=verifiedLocalTimestamp(activity.last_worker_completed_at);
+ const readAt=verifiedLocalTimestamp(activity.as_of);
+ heartbeat.textContent=seen?
+  'ACTUAL WORKER WAKE VERIFIED · First: '+seen+
+  ' · Latest contact: '+(last||'not recorded')+
+  ' · Latest returned pulse: '+(lastDone||'pending')+
+  ' · Wake count: '+(Number.isSafeInteger(activity.worker_wake_count)?
+     activity.worker_wake_count:'unavailable')+
+  ' · Worker state: '+String(activity.last_worker_status||'UNVERIFIED').replaceAll('_',' ')+
+  ' · Database checked: '+(readAt||'unavailable'):
+  'WORKER HAS NOT YET BEEN CONFIRMED · No actual authenticated wake recorded for this batch. '+
+  'Database checked: '+(readAt||'unavailable');
+ const jobs=Array.isArray(activity.original_jobs)?activity.original_jobs:[];
+ if(!jobs.length)work.append(textNode('div',
+  'No original-job admission recorded yet; source checks and worker wakes are not completed jobs.'));
+ else for(const j of jobs.slice(0,20)){
+  if(!/^work:[a-f0-9]{32}$/.test(j?.original_work_id||''))continue;
+  const row=document.createElement('div');row.className='workforce-output-row';
+  const kind=({
+   PR_REVIEW:'PR review · Riley',
+   CODE_REPAIR:'Engineering repair · Riley',
+   FAILURE_TRIAGE:'Reliability triage · Taylor',
+   GOVERNED_CAPABILITY:'Capability repair · Reality governance'
+  })[j.kind]||'Original job';
+  row.append(textNode('strong',kind+' · '+j.original_work_id));
+  row.append(textNode('div',
+   'Recorded '+(verifiedLocalTimestamp(j.recorded_at)||'time unavailable')+
+   ' · Actual phase '+String(j.phase||'UNVERIFIED').replaceAll('_',' ')+
+   (j.verified_final_receipt===true?
+    ' · INDEPENDENT FINAL RECEIPT VERIFIED':
+    ' · No verified final receipt from this job record')));
+  if(j.completed_at)
+   row.append(textNode('div','Completion evidence at '+
+    (verifiedLocalTimestamp(j.completed_at)||'unverified timestamp')));
+  if(COMBINED_WORK_SOURCE.test(j.source_ref||''))
+   row.append(combinedQueueLink(j.source_ref,'View original source'));
+  if(/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*#issuecomment-\d+$/.test(j.provider_link||''))
+   row.append(combinedQueueLink(j.provider_link,'View verified provider result'));
+  work.append(row);
+ }
+ // Existing eight-stage panel is a plan plus readback states. These rows
+ // are the dated independent claims/checks actually stored in Supabase.
+ const events=Array.isArray(activity.source_events)?
+  activity.source_events.filter(e=>
+   ['SOURCE_STEP_CLAIMED','SOURCE_STEP_VERIFIED','ORIGINAL_RECEIPT_MATCHED',
+    'STEP_BLOCKED','FINAL_REPORT_RECORDED'].includes(e?.event_kind)&&
+   verifiedLocalTimestamp(e.observed_at)).sort((a,b)=>
+    Date.parse(b.observed_at)-Date.parse(a.observed_at)).slice(0,20):[];
+ const evidence=document.createDocumentFragment();
+ evidence.append(textNode('h4','Database-confirmed actions · Most recent first'));
+ if(!events.length)evidence.append(textNode('div',
+  'No independently dated source claim, check or receipt has been recorded yet.'));
+ else for(const e of events){
+  const row=document.createElement('div');row.className='workforce-output-row';
+  const labels={
+   SOURCE_STEP_CLAIMED:'Worker claimed source step',
+   SOURCE_STEP_VERIFIED:'Provider source evidence recorded',
+   ORIGINAL_RECEIPT_MATCHED:'Independent original receipt matched',
+   STEP_BLOCKED:'Blocked execution evidence recorded',
+   FINAL_REPORT_RECORDED:'Final shift report recorded'
+  };
+  row.append(textNode('strong',
+   verifiedLocalTimestamp(e.observed_at)+' · '+labels[e.event_kind]));
+  const stage=Number.isInteger(e.step_index)&&e.step_index>=1&&e.step_index<=8?
+   RILEY_PROGRESS_STAGES[e.step_index-1]:'Stage unknown';
+  row.append(textNode('div','Stage '+e.step_index+': '+stage+
+   ' · '+String(e.state||'UNVERIFIED').replaceAll('_',' ')));
+  if(COMBINED_WORK_SOURCE.test(e.source_ref||''))
+   row.append(combinedQueueLink(e.source_ref,'Source inspected'));
+  if(e.event_kind==='SOURCE_STEP_VERIFIED')
+   row.append(textNode('div',
+    'Evidence only. This event is not proof of repair or customer-job settlement.'));
+  evidence.append(row);
+ }
+ evidence.append(textNode('h4','Current eight-stage plan · Recorded states'));
+ timeline.prepend(evidence);
+}
 function renderRileyLiveProgress(readback){
  const panel=$('rileyLiveProgressPanel');
  const shifts=readback?.shifts;
@@ -1215,7 +1308,7 @@ function renderRileyLiveProgress(readback){
   realReviewJobs+' independently settled assigned jobs · '+
   (originalVerified?'Independent original-job receipt recorded.':
    'No independent final repair receipt for this shift.')+
-  ' Worker progress refreshes every 30 seconds.';
+  ' Owner evidence refreshes every 15 seconds; the worker runs independently.';
  const briefing=readback.shift_briefing;
  const approval=briefing?.shift_id===current.shift_id&&
    briefing.approval_pending===true;
@@ -1287,6 +1380,7 @@ function renderRileyLiveProgress(readback){
   frag.append(row);
  }
  timeline.replaceChildren(frag);
+ renderRileyAuditedActivity(readback,current,timeline);
  panel.hidden=false;
 }
 
@@ -1464,6 +1558,7 @@ async function refreshShiftStatus(){
     const activeState=safeShiftReadbackState(data);
     renderCombinedShiftRoleEvidence(data);
     renderRileyLiveProgress(data);
+    renderShiftStartProof(data);
     renderActiveRileyTaylorQueue(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
@@ -1869,7 +1964,7 @@ $('composer').onsubmit=async(e)=>{
     $('prompt').focus({preventScroll:true});
   }
 };
-setInterval(()=>{if(!$('chat').hidden&&!pending)void refreshShiftStatus()},30000);
+setInterval(()=>{if(!$('chat').hidden&&!pending)void refreshShiftStatus()},15000);
 void init();
 })();
 </script>
