@@ -80,6 +80,9 @@ export function createRileyTrustedOriginalDriver({
   const owner=selected[0].owner_id;
   if(candidates.some(c=>c.owner_id!==owner))
    fail('MULTI_OWNER_SCOPE_NOT_ALLOWED');
+  if(new Set(candidates.map(c=>c.original_work_id)).size!==candidates.length)
+   fail('DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH');
+  const eligibleIds=new Set(candidates.map(c=>c.original_work_id));
   // The existing runner does the independent owner/shift/ledger readbacks,
   // takes the global single-use database claim, invokes the shared executor,
   // records the result and reconciles final original-job receipts.
@@ -101,6 +104,7 @@ export function createRileyTrustedOriginalDriver({
     !result.outcomes.some(x=>x.original_work_id===input.original_work_id)||
     result.outcomes.length>batchLimit||
     result.attempted>batchLimit||
+    result.outcomes.some(x=>!eligibleIds.has(x.original_work_id))||
     result.installation_authorized!==false||
     result.production_changed!==false||
     result.shift_finished!==false||
