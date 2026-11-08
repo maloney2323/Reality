@@ -95,105 +95,35 @@ begin
     and j.settlement_receipt_id is not null
    limit 2;
   elsif v_source='https://github.com/maloney2323/Reality/issues/263'
-    and exists(
-     select 1 from reality_internal.riley_unattended_repair_originals_v1 native
+    and exists(select 1 from reality_internal.riley_unattended_repair_originals_v1 native
      where native.shift_id=v_shift.shift_id and native.owner_id=v_shift.owner_id
-       and native.issue_url=v_source
-       and native.shift_source_proof_sha256=v_proof
-    ) then
-   -- The actual Riley-native original has its OWN independent final receipt,
-   -- not a fabricated Universe original. A source review or CI-only patch
-   -- cannot satisfy this branch; the exact approved+installed code and
-   -- resumed-original verification must already be independently settled.
+      and native.issue_url=v_source and native.shift_source_proof_sha256=v_proof) then
+   -- Admit only the exact original's independently receipted install and
+   -- independently observed resumed execution; never a source-only review.
    select j.original_work_id into v_work
    from reality_internal.riley_unattended_repair_originals_v1 j
    join reality_internal.riley_native_independent_final_receipts_v1 n
-     on n.original_work_id=j.original_work_id
-     and n.shift_id=j.shift_id and n.owner_id=j.owner_id
-     and n.source_proof_sha256=j.shift_source_proof_sha256
-     and n.candidate_artifact_sha256=j.candidate_artifact_sha256
-     and n.candidate_commit_sha=j.candidate_commit_sha
-     and n.frozen_verifier_run_id=j.independent_proof_run_id
-     and n.approval_receipt_ref=j.exact_approval_receipt_ref
-     and j.original_settlement_receipt_ref=
-       'supabase:riley_native_independent_final_receipts_v1:'||n.receipt_id::text
+    on n.original_work_id=j.original_work_id
+    and n.shift_id=j.shift_id and n.owner_id=j.owner_id
+    and n.source_ref=j.issue_url
+    and n.source_proof_sha256=j.shift_source_proof_sha256
+    and n.candidate_artifact_sha256=j.candidate_artifact_sha256
+    and n.candidate_commit_sha=j.candidate_commit_sha
+    and n.frozen_verifier_run_id=j.independent_proof_run_id
+    and n.approval_receipt_ref=j.exact_approval_receipt_ref
+    and j.original_settlement_receipt_ref=
+     'supabase:riley_native_independent_final_receipts_v1:'||n.receipt_id::text
    where j.shift_id=v_shift.shift_id and j.owner_id=v_shift.owner_id
-     and j.issue_url=v_source and j.shift_source_proof_sha256=v_proof
-     and j.phase='SETTLED' and j.installed=true
-     and j.production_changed=false
-     and n.installed_provider_readback_verified=true
-     and n.original_execution_independently_verified=true
-     and n.final_outcome='SUCCEEDED'
-     and n.production_changed=false
-     and n.settled_at>=v_shift.authorized_at
+    and j.issue_url=v_source and j.shift_source_proof_sha256=v_proof
+    and j.phase='SETTLED' and j.installed=true
+    and j.production_changed=false
+    and n.installed_provider_readback_verified=true
+    and n.original_execution_independently_verified=true
+    and n.final_outcome='SUCCEEDED'
+    and n.production_changed=false
+    and n.settled_at>=v_shift.authorized_at
    limit 2;
-  elsif v_source~'^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*
-   select c.original_work_id into v_work
-   from reality_internal.governed_employee_original_claims_v1 c
-   join reality_internal.genuine_independent_final_receipts_v1 r
-    on r.owner_id=c.owner_id and r.original_work_id=c.original_work_id
-    and r.verified_settlement_event_id=c.independent_receipt_event_id
-    and r.verified_at>=c.created_at and r.production_changed=false
-   join reality_internal.genuine_capability_queue_v1 q
-    on q.owner_id=c.owner_id and q.original_work_id=c.original_work_id
-    and q.original_work_event_id=c.source_event_id
-    and q.phase='SETTLED_ISOLATED'
-    and q.qualified_candidate->>'artifact_sha256'=r.artifact_sha256
-   where c.shift_id=v_shift.shift_id and c.owner_id=v_shift.owner_id
-    and c.source_ref=v_source and c.source_proof_sha256=v_proof
-    and c.phase='RECEIPT_INDEPENDENTLY_RECONCILED'
-    and c.independent_receipt_event_id is not null
-   limit 2;
-  end if;
-  if v_work is null or v_work=any(v_work_ids) then
-   return jsonb_build_object('status','COMPLETION_WAITING_FOR_FINAL_JOB_RECEIPTS',
-    'shift_id',v_shift.shift_id,
-    'original_jobs_independently_settled',v_verified,
-    'selected_job_count',v_total,
-    'installation_authorized',false,'production_changed',false);
-  end if;
-  v_work_ids:=array_append(v_work_ids,v_work);
-  v_verified:=v_verified+1;
-  v_events:=v_events||jsonb_build_array(jsonb_build_object(
-   'original_work_id',v_work,'source_ref',v_source,
-   'source_proof_sha256',v_proof,'independent_final_receipt_verified',true));
- end loop;
- if v_verified<>v_total then raise exception 'COMPLETION_VERIFICATION_COUNT_MISMATCH';end if;
- v_receipt:=jsonb_build_object(
-  'status','EMPLOYEE_SHIFT_EVIDENCE_REPORT',
-  'shift_id',v_shift.shift_id,'completion_bound',true,
-  'completion_condition','ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED',
-  'completion_reason','ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED',
-  'authorized_source_job_count',v_total,
-  'original_jobs_independently_settled_in_this_shift',v_verified,
-  'verified_original_receipts',v_events,
-  'human_hours_saved',null,'realized_cash_savings_usd',null,
-  'work_installation_authorized',false,'production_changed',false,
-  'ended_at',v_now);
- v_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-  pg_catalog.convert_to(v_receipt::text,'UTF8')),'hex');
- update reality_internal.governed_employee_shift_steps_v1 t
-  set state='ORIGINAL_JOB_RECEIPT_VERIFIED',proof=v_receipt,
-   proof_sha256=v_hash,completed_at=v_now
-  where t.shift_id=v_shift.shift_id and t.step_index in (6,7)
-   and t.state in ('QUEUED','AWAITING_EXACT_WORK');
- update reality_internal.governed_employee_shift_steps_v1 t
-  set state='REPORTED',proof=v_receipt,
-   proof_sha256=v_hash,completed_at=v_now
-  where t.shift_id=v_shift.shift_id and t.step_index=8
-   and t.state='QUEUED';
- update reality_internal.governed_employee_shifts_v1 s
-  set status='ENDED_WITH_VERIFIED_JOB',closed_at=v_now,
-   close_report=v_receipt,last_progress_at=v_now
-  where s.shift_id=v_shift.shift_id and s.owner_id=v_shift.owner_id
-   and s.closed_at is null;
- update reality_internal.governed_employee_completion_warrants_v1 w
-  set state='SETTLED',settled_at=v_now,completion_receipt=v_receipt
-  where w.shift_id=v_shift.shift_id and w.owner_id=v_shift.owner_id
-   and w.state='ACTIVE';
- return v_receipt;
-end $fn$;
- then
+  elsif v_source~'^https://github[.]com/maloney2323/Reality/issues/[1-9][0-9]*$' then
    select c.original_work_id into v_work
    from reality_internal.governed_employee_original_claims_v1 c
    join reality_internal.genuine_independent_final_receipts_v1 r
@@ -261,5 +191,4 @@ end $fn$;
 end $fn$;
 revoke all on function public.reality_close_employee_completion_shift_v1()
  from public,anon,authenticated;
-grant execute on function public.reality_close_employee_completion_shift_v1()
- to service_role;
+grant execute on function public.reality_close_employee_completion_shift_v1() to service_role;
