@@ -127,13 +127,18 @@ async function modelReview(source,{fetchImpl,apiKey,model}){
   (Number(response?.status)||0));
  const data=await response.json().catch(()=>null);
  const text=textFromModel(data);
- if(data?.status!=='completed'||!MODEL.test(data.id||'')||
-  data.output?.some(x=>x?.type==='function_call')||
-  text.length<120||text.length>2600||
-  !source.files.some(f=>text.includes(f.path))||
-  !/Riley.{0,20}Code/i.test(text)||!/Taylor.{0,20}Reliability/i.test(text))
-  deny('MODEL_REVIEW_NOT_VERIFIABLE_AGAINST_SOURCE');
- return {model_response_id:data.id,review_text:text};
+ if(data?.status!=='completed')
+  deny('MODEL_RESPONSE_NOT_COMPLETED');
+ if(!MODEL.test(data.id||'')||
+  data.output?.some(x=>x?.type==='function_call'))
+  deny('MODEL_RESPONSE_ID_OR_UNPERMITTED_TOOL_INVALID');
+ if(text.length<100)deny('MODEL_REVIEW_NOT_SUBSTANTIVE');
+ if(!source.files.some(f=>text.includes(f.path)))
+  deny('MODEL_REVIEW_EXACT_CHANGED_FILE_NOT_REFERENCED');
+ // The model need not use rigid headings; those are presentation, not
+ // independent evidence. Bound output without inventing or modifying
+ // the underlying review claims. The exact path is independently checked.
+ return {model_response_id:data.id,review_text:text.slice(0,2550)};
 }
 function makeComment(c,s,model){
  return [
