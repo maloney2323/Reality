@@ -54,18 +54,41 @@ test('shift readback accepts exact one active owner shift and rejects ambiguity'
  const start='2026-11-06T08:00:00.000Z',end='2026-11-06T18:00:00.000Z';
  const x={shift_id:'11111111-2222-4333-8444-555555555555',
   status:'QUEUED',planned_start_at:start,planned_end_at:end};
- const r=safeShiftReadbackState({ok:true,shifts:[x]},{requestedHours:10});
+ const clock=Date.parse('2026-11-06T09:00:00.000Z');
+ const r=safeShiftReadbackState({ok:true,shifts:[x]},{requestedHours:10,now:clock});
  assert.equal(r.hasActive,true);
  assert.equal(r.duration_hours,10);
  assert.equal(r.matching_requested_hours,true);
  assert.equal(safeShiftReadbackState({ok:true,shifts:[x]},
-  {requestedHours:12}).matching_requested_hours,false);
+  {requestedHours:12,now:clock}).matching_requested_hours,false);
  assert.equal(safeShiftReadbackState({ok:true,shifts:[]}).hasActive,false);
- assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[x,x]}),
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[x,x]},{now:clock}),
   /MULTIPLE_ACTIVE/);
  assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[{
-  ...x,planned_end_at:'2026-11-07T08:00:00.000Z'}]}),
+  ...x,planned_end_at:'2026-11-07T08:00:00.000Z'}]},{now:clock}),
   /ACTIVE_IDENTITY/);
+});
+test('expired unclosed original shift does not hold the new owner shift hostage',()=>{
+ const past={shift_id:'11111111-2222-4333-8444-555555555555',
+  status:'AWAITING_EXACT_ORIGINAL_WORK',
+  planned_start_at:'2026-11-07T22:58:08.286Z',
+  planned_end_at:'2026-11-08T06:58:08.286Z'};
+ const now=Date.parse('2026-11-08T09:00:00.000Z');
+ const r=safeShiftReadbackState({ok:true,shifts:[past]},{now});
+ assert.equal(r.hasActive,false);
+ assert.equal(r.expired_unclosed_shifts,1);
+ const next={...past,shift_id:'22222222-3333-4444-8555-666666666666',
+  status:'QUEUED',planned_start_at:'2026-11-08T09:10:00.000Z',
+  planned_end_at:'2026-11-08T17:10:00.000Z'};
+ const shared=safeShiftReadbackState({ok:true,shifts:[past,next]},{now});
+ assert.equal(shared.hasActive,true);
+ assert.equal(shared.shift_id,next.shift_id);
+ assert.equal(shared.expired_unclosed_shifts,1);
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[
+  {...past,planned_end_at:'garbled'},next]},{now}),/ACTIVE_IDENTITY/);
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[next,
+  {...next,shift_id:'33333333-4444-4555-8666-777777777777'}]},{now}),
+  /MULTIPLE_ACTIVE/);
 });
 test('Chat uses signed-in Send event and the real authenticated shift endpoint',()=>{
  const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
