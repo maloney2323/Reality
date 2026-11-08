@@ -205,3 +205,24 @@ test('trusted original runtime refuses production or missing durable goal state'
   db,env:bad,loadSourceAdapters:()=>({})
  }),/PREVIEW_SERVICE_DATABASE_BOUNDARY_REQUIRED/);
 });
+
+test('frozen #263: settlement may change after source admission but before original-job execution',async()=>{
+ const {factory}=configured();
+ const admitted=await factory.loadTrustedAuthorizedOriginal(args);
+ const changed={...admitted,
+  source_context:{...admitted.source_context,original_job_settled:true}};
+ await assert.rejects(
+  factory.runOriginal({...changed,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()}),
+  /RILEY_SERVICE_ORIGINAL_CURRENT_TRUSTED_ORIGINAL_POSTCLAIM_SCOPE_REQUIRED/);
+});
+test('frozen #263: changed source owner execution authority cannot be reused at handoff',async()=>{
+ const {factory}=configured();
+ const admitted=await factory.loadTrustedAuthorizedOriginal(args);
+ const changed={...admitted,source_context:{
+  ...admitted.source_context,installation_authorized:true}};
+ await assert.rejects(
+  factory.runOriginal({...changed,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()}),
+  /RILEY_SERVICE_ORIGINAL_CURRENT_TRUSTED_ORIGINAL_POSTCLAIM_SCOPE_REQUIRED/);
+});
