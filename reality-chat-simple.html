@@ -1618,10 +1618,23 @@ async function refreshShiftStatus(){
     const node=$('shiftStatus');
     if(activeState.hasActive){
       verifiedFreshBatchReady=false;
-      showRileyNextAction('WORK IN PROGRESS · No second Start needed',
-       'An authorized job batch is active. Watch the timestamped worker events and per-job evidence below. '+
-       'If Reality produces a verified capability requiring installation, approve that exact artifact once in Chat; '+ 
-       'the same job should resume automatically. Do not start a second batch.');
+      const currentBlocker=data.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
+       data.shift_activity?.shift_id===activeState.shift_id?
+       data.shift_activity.last_worker_safe_result:null;
+      if(currentBlocker==='RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY'){
+       showRileyNextAction('BLOCKED AT REPAIR EXECUTION · Your shift remains authorized',
+        'Reality has admitted issue #263 but has not staged an independently tested repair, '+
+        'and no exact original is eligible for its canonical capability worker. '+
+        'The scheduler is still waking successfully; source checks and model advice are not enough. '+
+        'Reality must connect the existing original to the current governed capability queue, '+
+        'then generate and independently test its candidate. '+
+        'Do not start a duplicate shift or approve an unverified installation.');
+      }else{
+       showRileyNextAction('WORK IN PROGRESS · No second Start needed',
+        'An authorized job batch is active. Watch the timestamped worker events and per-job evidence below. '+
+        'If Reality produces a verified capability requiring installation, approve that exact artifact once in Chat; '+
+        'the same job should resume automatically. Do not start a second batch.');
+      }
       $('runFullShift').disabled=true;
       $('runFullShift').textContent='Existing shift authorized';
       $('fullShiftScope').textContent='Your combined shift is ALREADY AUTHORIZED. Do not start a duplicate shift or approve it again. Watch live activity below: source reviews, OpenAI model connection, original-job execution, independent receipts and real blockers. If an exact verified installation is needed, Reality Chat must present that artifact separately.';
@@ -1640,7 +1653,9 @@ async function refreshShiftStatus(){
         briefing.verified_source_checks>=0&&briefing.verified_source_checks<=5?
         briefing.verified_source_checks:null;
       const block=activeState.status==='AWAITING_EXACT_ORIGINAL_WORK'?
-        ' QUALIFICATION BLOCKER: source checks are complete, but an exact owner-scoped original engineering job is not yet independently admitted. This is NOT a running code repair. Worker wake alone cannot bypass the original-job gate. Do not retry an uncertain intake or start another shift.':'';
+        (currentBlocker==='RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY'?
+         ' REPAIR EXECUTION BLOCKER: original #263 is admitted, but no tested model-written candidate is staged and no canonical capability job is eligible. This is not a verified code repair. The existing shift must continue without duplicate authorization.':
+         ' QUALIFICATION BLOCKER: source checks are complete but the exact canonical original-job execution is not yet independently eligible. This is NOT a completed repair. Do not start another shift.') :'';
       node.textContent='Existing '+(activeState.completion_bound?
        'completion-bound job batch':'time-boxed '+activeState.duration_hours+'h shift')+' · '+activeState.status+
         ' · '+activeState.shift_id+' · '+
