@@ -52,7 +52,10 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
        'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL','CANDIDATE_TESTING',
        'PENDING_FROZEN_REPRODUCTION',
        'EVIDENCE_RECONCILIATION_REQUIRED',
-       'FROZEN_REPRODUCED_AWAITING_CANDIDATE'].includes(item.phase)||
+       'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
+       'PUBLISHING','BLOCKED',
+       'LEASED_FOR_INDEPENDENT_REPRODUCTION','AWAITING_OWNER_APPROVAL',
+       'ISOLATED_INSTALLED_PROBATION','SETTLED_ISOLATED'].includes(item.phase)||
      !/^[A-Z0-9_]{8,100}$/.test(item.next_governed_action||'')||
      item.capability_installation_authorized!==false||
      item.original_job_completed_by_graph!==false||
