@@ -47,8 +47,8 @@ test('one click always uses original authenticated owner shift endpoint',()=>{
  assert.match(html,/Start Riley \+ Taylor Jobs/);
  assert.match(html,/Opening the page does not authorize work or install code/);
  assert.doesNotMatch(mainChat,/realityRileyShiftLaunch[^\n]*onclick/);
- assert.match(html,/interpretSignedInChatShiftCommand\('Run a '\+hours\+' hour shift'\)/);
- assert.match(html,/command.duration_hours!==hours/);
+ assert.match(html,/Start the jobs until complete/);
+ assert.match(html,/command.completion_bound!==true/);
  assert.match(html,/const receipt=await authorizeShiftFromChat\(command\)/);
  assert.match(html,/safeShiftReadbackState\(before/);
  assert.match(html,/expected_fingerprint:draft.expected_fingerprint/);
