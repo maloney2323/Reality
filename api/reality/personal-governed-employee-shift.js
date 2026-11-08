@@ -265,6 +265,44 @@ export default async function handler(req,res){
      }else shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNVERIFIED';
     }catch{shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNAVAILABLE';}
    }
+   // Exact reviewed source patch is owner-private informational evidence;
+   // it is NOT a verified autonomous upgrade nor permission to install.
+   let riley_native_reviewed_patch=null;
+   let riley_native_reviewed_patch_status='NO_NATIVE_PATCH_REVIEW';
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     const patch=await shiftRpc(db,'reality_read_owner_native_reviewed_patch_v1',{
+      p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(patch?.status==='EXACT_NATIVE_ENGINEERING_PATCH_INDEPENDENTLY_TESTED_REVIEW_ONLY'&&
+        patch.owner_id===session.user_id&&
+        patch.shift_id===chosen.shift_id&&
+        /^work:[a-f0-9]{32}$/.test(patch.original_work_id||'')&&
+        /^sha256:[a-f0-9]{64}$/.test(patch.candidate_artifact_sha256||'')&&
+        /^[a-f0-9]{40}$/.test(patch.candidate_commit_sha||'')&&
+        Number.isSafeInteger(patch.independent_passing_run_id)&&
+        patch.independent_passing_run_id>10000&&
+        patch.provenance==='CHATGPT_REVIEWED_ENGINEERING_PATCH_AFTER_REJECTED_MODEL_DRAFT'&&
+        patch.owner_approval_ready===false&&
+        patch.native_install_to_settlement_accepted===false&&
+        patch.installation_authorized===false&&
+        patch.original_job_completed===false&&
+        patch.production_changed===false&&
+        shift_execution_graph.jobs.some(j=>j.original_work_id===patch.original_work_id)){
+      riley_native_reviewed_patch={
+       status:patch.status,original_work_id:patch.original_work_id,
+       shift_id:patch.shift_id,candidate_commit_sha:patch.candidate_commit_sha,
+       candidate_artifact_sha256:patch.candidate_artifact_sha256,
+       independent_passing_run_id:patch.independent_passing_run_id,
+       provenance:patch.provenance,owner_approval_ready:false,
+       installation_authorized:false,original_job_completed:false,
+       production_changed:false
+      };
+      riley_native_reviewed_patch_status='VERIFIED_OWNER_SOURCE_PATCH_NOT_INSTALLABLE';
+     }else if(patch?.status==='NO_CURRENT_OWNER_NATIVE_REVIEWED_PATCH')
+      riley_native_reviewed_patch_status='NO_OWNER_TESTED_PATCH_YET';
+     else riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNVERIFIED';
+    }catch{riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNAVAILABLE';}
+   }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -292,6 +330,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
     shift_execution_graph,shift_execution_graph_status,
+    riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
