@@ -23,6 +23,8 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {draftCurrentRileyNativeRepair}
+ from '../../src/reality-riley-native-model-draft-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -235,6 +237,31 @@ export default async function handler(req,res){
     installation_authorized:false,production_changed:false
    };
   }
+  // Owner-governed OpenAI may propose ONE exact file edit for the EXISTING
+  // Riley native original. A service-role singleflight lease stops repeated
+  // model requests; output is stored ONLY as an unexecuted private draft.
+  // GitHub staging, frozen acceptance, installation and final settlement are
+  // separate independent effects and never inferred from this advisory.
+  let rileyModelDraft;
+  if(unifiedGraph.engineering_ready===true){
+   try{
+    rileyModelDraft=await draftCurrentRileyNativeRepair({
+     db,graph:unifiedGraph,env:process.env,fetchImpl:fetch
+    });
+   }catch(e){
+    const msg=String(e?.message||'');
+    rileyModelDraft={
+     status:/^RILEY_NATIVE_MODEL_[A-Z0-9_]{5,112}$/.test(msg)?
+      msg:'RILEY_NATIVE_MODEL_PROVIDER_OR_AUTHORITY_UNVERIFIED',
+     independent_tests_passed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }else rileyModelDraft={
+   status:'NO_CURRENT_OWNER_AUTHORIZED_NATIVE_REPAIR_TO_DRAFT',
+   independent_tests_passed:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false
+  };
   // This is a trusted read-only candidate verifier. It can mark a
   // real source candidate as independently tested, but NEVER approve,
   // install, or settle an original job.
@@ -267,8 +294,15 @@ export default async function handler(req,res){
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
-   const outcomeCode=executionGateEmpty?
-    'RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY':
+   const outcomeCode=rileyModelDraft?.status===
+    'MODEL_WRITTEN_REPAIR_DRAFT_RECORDED_AWAITING_INDEPENDENT_TEST'?
+     'RILEY_MODEL_DRAFT_RECORDED_PENDING_FROZEN_TEST':
+    rileyModelDraft?.draft_phase==='MODEL_DRAFT_RECORDED'?
+     'RILEY_MODEL_DRAFT_RECORDED_PENDING_FROZEN_TEST':
+    rileyModelDraft?.draft_phase==='MODEL_REQUEST_UNVERIFIED'?
+     'RILEY_MODEL_REQUEST_UNCERTAIN_RECONCILIATION_REQUIRED':
+    executionGateEmpty?
+     'RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY':
     activeRepairUnstaged?
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED':
      result?.status;
@@ -300,6 +334,7 @@ export default async function handler(req,res){
     },
     riley_original_review:rileyOriginalReview,
     riley_code_repair_original:rileyCodeRepair,
+    riley_model_draft:rileyModelDraft,
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate});
  }catch{
