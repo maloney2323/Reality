@@ -72,6 +72,10 @@ function rig({dupe=false,patch={find,replace,reason:'Connect genuine current ori
    const obj=JSON.parse(opts.body);
    assert.equal(obj.store,false);
    assert.equal(obj.model,env.REALITY_OPENAI_MODEL);
+   assert.equal(obj.text?.format?.type,'json_schema');
+   assert.equal(obj.text?.format?.strict,true);
+   assert.equal(obj.text?.format?.schema?.additionalProperties,false);
+   assert.deepEqual(obj.text?.format?.schema?.required,['find','replace','reason']);
    assert.equal(opts.headers['x-client-request-id'],req);
    return {ok:modelOk,json:async()=>({
     status:'completed',id:'resp_frozen_test_1234',
