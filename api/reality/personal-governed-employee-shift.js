@@ -131,6 +131,46 @@ export default async function handler(req,res){
         ))))
      riley_pr_review_jobs=verified;
    }catch{/* Never represent missing durable original receipt as settlement. */}
+   let riley_failure_triage_jobs={status:'OWNER_TRIAGE_READBACK_UNAVAILABLE',jobs:[]};
+   let riley_code_repair_jobs={status:'OWNER_REPAIR_READBACK_UNAVAILABLE',jobs:[]};
+   try{
+    const x=await shiftRpc(db,'reality_read_owner_shift_failure_triage_143_v1',
+     {p_owner_id:session.user_id});
+    if(x?.status==='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'&&
+       x.installation_authorized===false&&x.production_changed===false&&
+       Array.isArray(x.jobs)&&x.jobs.length<=5&&
+       x.jobs.every(j=>j.code_repair_completed===false&&
+         j.production_changed===false&&
+         j.source_ref==='https://github.com/maloney2323/Reality/issues/143'&&
+         /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+         (j.phase!=='SETTLED'||(
+           j.original_job_completed===true&&
+           /^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(
+            j.settlement_receipt_ref||'')&&
+           /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/143#issuecomment-\d+$/.test(
+            j.provider_comment_url||'')
+         ))))
+      riley_failure_triage_jobs=x;
+   }catch{/* Explicit no independent disposition readback. */}
+   try{
+    const x=await shiftRpc(db,'reality_read_owner_riley_repair_original_v1',
+     {p_owner_id:session.user_id});
+    if(x?.status==='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'&&
+       x.does_not_authorize_new_work===true&&
+       x.production_changed===false&&
+       Array.isArray(x.jobs)&&x.jobs.length<=6&&
+       x.jobs.every(j=>
+        j.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+        /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+        /^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')&&
+        j.production_changed===false&&
+        (j.phase!=='SETTLED'||(
+         j.original_job_completed===true&&
+         /^supabase:[a-z0-9_]+:[a-f0-9-]{36}$/.test(
+          j.original_settlement_receipt_ref||'')
+        ))))
+      riley_code_repair_jobs=x;
+   }catch{/* Do not mistake missing readback for completed repair. */}
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -154,7 +194,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
     recovery_diagnosis,
-    riley_pr_review_jobs,
+    riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
