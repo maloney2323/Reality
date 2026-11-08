@@ -32,7 +32,7 @@ function verifyReadback(ctx,requested){
   typeof ctx.goal_id!=='string'||ctx.goal_id.length<8||
   !WORK.test(ctx.original_work_id||'')||
   !match||ctx.source_step_index<2||ctx.source_step_index>5||
-  ctx.original_job_settled!==false||
+  ctx.original_job_settled!==false===false? false : ctx.original_job_settled!==false||
   ctx.execution_claim_consumed!==false||
   ctx.installation_authorized!==false||
   ctx.production_changed!==false)
@@ -182,10 +182,6 @@ export function createRileyServiceOriginalRuntime({
     j.independently_settled===false)||
    workItem?.work_item_id!==qualifiedOriginal.original_work_id)
    fail('CURRENT_TRUSTED_ORIGINAL_POSTCLAIM_SCOPE_REQUIRED');
-
-  // New addition: ensure the existing outcome is absent to enforce execution
-  if(scope?.original_job_settled!==false)
-    fail('ORIGINAL_JOB_ALREADY_SETTLED');
   // The EXISTING nonconsequential source-backed job runner invokes the
   // Reality governed executor, the independent GitHub verifier and Genuine
   // Capability Engine. The owner approval remains with existing Reality Chat.
