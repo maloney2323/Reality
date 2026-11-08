@@ -21,6 +21,8 @@ import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
+import {assertRealityUnifiedShiftGraph}
+ from '../../src/reality-shift-unified-execution-controller-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -143,9 +145,24 @@ export default async function handler(req,res){
        completionClose.authorized_source_job_count||
       completionClose.production_changed!==false)))
    throw Error('COMPLETION_BOUND_SHIFT_INDEPENDENT_RECEIPT_UNVERIFIED');
+  const initialGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+   'reality_read_current_shift_execution_graph_v1',{}));
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
+  // SAME frozen shift and source identities across all real employee roles.
+  const unifiedGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+   'reality_read_current_shift_execution_graph_v1',{}),{
+    expectedShiftId:initialGraph.shift_id
+  });
+  if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+     unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
+   throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  const hasVerifiedSource=(url)=>unifiedGraph.jobs.some(x=>
+   x.source_ref===url&&x.independent_source_proof_verified===true);
+  const hasReview=unifiedGraph.jobs.some(x=>
+   x.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+   x.independent_source_proof_verified===true&&x.phase!=='SETTLED');
   // Complete ONE source-backed assigned PR review as a REAL original job:
   // OpenAI authors the review, GitHub receives it, an independent provider
   // GET proves the exact effect, and the owner-scoped service ledger settles.
@@ -153,7 +170,11 @@ export default async function handler(req,res){
   // Any uncertain GitHub write is fenced in the database and never re-POSTed.
   let rileyOriginalReview;
   try{
-   rileyOriginalReview=await runAuthorizedRileyPrReview({db,env:process.env});
+   rileyOriginalReview=hasReview?
+    await runAuthorizedRileyPrReview({db,env:process.env}):
+    {status:'NO_CURRENT_UNSETTLED_OWNER_PR_REVIEW',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   }catch(e){
    const code=String(e?.message||'');
    rileyOriginalReview={
@@ -168,7 +189,11 @@ export default async function handler(req,res){
   // Admission creates a durable original ID, NOT a fix or installation.
   let rileyCodeRepair;
   try{
-   const ticket=await shiftRpc(db,'reality_admit_exact_riley_263_repair_v1',{});
+   const ticket=hasVerifiedSource(
+    'https://github.com/maloney2323/Reality/issues/263')?
+     await shiftRpc(db,'reality_admit_exact_riley_263_repair_v1',{}):
+     {status:'NO_OWNER_AUTHORIZED_263_SOURCE_TO_ADMIT',
+      installation_authorized:false,production_changed:false};
    if(!['NO_OWNER_AUTHORIZED_263_SOURCE_TO_ADMIT',
      'EXACT_OWNER_SHIFT_REPAIR_SOURCE_ADMITTED',
      'ALREADY_SETTLED_NO_REPLAY'].includes(ticket?.status)||
@@ -195,9 +220,12 @@ export default async function handler(req,res){
   // still running. No historical defect is declared fixed without evidence.
   let rileyFailureTriage;
   try{
-   rileyFailureTriage=await reconcileOwnerShiftFailureTriage143({
-    db,fetchImpl:fetch
-   });
+   rileyFailureTriage=hasVerifiedSource(
+    'https://github.com/maloney2323/Reality/issues/143')?
+    await reconcileOwnerShiftFailureTriage143({db,fetchImpl:fetch}):
+    {status:'NO_CURRENT_OWNER_AUTHORIZED_TRIAGE_143_SOURCE',
+     original_job_completed:false,code_repair_completed:false,
+     installation_authorized:false,production_changed:false};
   }catch(e){
    const code=String(e?.message||'');
    rileyFailureTriage={
@@ -212,9 +240,14 @@ export default async function handler(req,res){
   // install, or settle an original job.
   let rileyVerifiedCandidate;
   try{
-   rileyVerifiedCandidate=await attestCurrentRileyCandidate263({
-    db,ownerId:rileyCodeRepair?.owner_id,env:process.env
-   });
+   rileyVerifiedCandidate=hasVerifiedSource(
+    'https://github.com/maloney2323/Reality/issues/263')?
+    await attestCurrentRileyCandidate263({
+     db,ownerId:rileyCodeRepair?.owner_id,env:process.env
+    }):
+    {status:'NO_CURRENT_OWNER_REPAIR_CANDIDATE_TO_VERIFY',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   }catch(e){
    const safe=String(e?.message||'');
    rileyVerifiedCandidate={
@@ -255,6 +288,16 @@ export default async function handler(req,res){
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
     completion_bound_work:completionClose,
+    unified_execution_graph:{
+     status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
+     next_action:unifiedGraph.next_action,
+     jobs:unifiedGraph.jobs.map(x=>({
+      original_work_id:x.original_work_id,source_ref:x.source_ref,
+      original_kind:x.original_kind,phase:x.phase,
+      next_governed_action:x.next_governed_action
+     })),
+     installation_authorized:false,original_job_completed:false
+    },
     riley_original_review:rileyOriginalReview,
     riley_code_repair_original:rileyCodeRepair,
     riley_failure_triage_original:rileyFailureTriage,
