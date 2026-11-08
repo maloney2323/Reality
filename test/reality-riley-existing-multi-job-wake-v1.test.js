@@ -167,3 +167,79 @@ test('worker and source cannot claim that a GitHub trigger is a finished repair'
  assert.doesNotMatch(source,/reality_claim_exact_shift_original_v1/);
  assert.doesNotMatch(source,/installRiley|merge_pull_request/);
 });
+
+test('real shift worker routes validated two-original wake batch into the trusted driver with no fabricated settlement',async()=>{
+ const f=fixture();
+ let driverCalls=0;
+ const r=await processGovernedEmployeeShiftTick({url:'mock',secretKey:'mock'},{
+  wakeMultiple:async args=>wakeExistingRileyShiftCapabilityBatch({
+   ...args,callRpc:f.callRpc,dispatch:f.dispatch,now:()=>NOW
+  }),
+  wakeCapability:async()=>{throw Error('SINGLE_WAKE_FORBIDDEN')},
+  executeQualifiedOriginals:async requested=>{
+   driverCalls++;
+   assert.equal(requested.shift_id,SHIFT);
+   assert.deepEqual(requested.batch_original_work_ids,[WORK1,WORK2]);
+   assert.equal(requested.original_work_id,WORK1);
+   assert.equal(requested.trigger_id,TRIGGER1);
+   assert.equal(requested.source_ref,SOURCE1);
+   assert.equal(requested.source_proof_sha256,SHA);
+   assert.equal(requested.exact_trusted_original_preflight_required,true);
+   assert.equal(requested.shift_read_does_not_grant_execution_authority,true);
+   assert.equal(requested.read_only,false);
+   return {status:'SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK',
+    shift_id:SHIFT,attempted:2,independently_settled:0,
+    outcomes:[{original_work_id:WORK1,
+     status:'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF',
+     original_job_settled:false},
+    {original_work_id:WORK2,
+     status:'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY',
+     original_job_settled:false}],
+    shift_finished:false,full_shift_proven:false,
+    installation_authorized:false,production_changed:false};
+  },
+  fetchImpl:async url=>({ok:true,json:async()=>{
+   const name=url.split('/rpc/')[1];
+   return name==='reality_close_employee_shift_v1'?
+    {status:'NO_SHIFT_DUE_FOR_CLOSE'}:
+    name==='reality_reconcile_employee_shift_original_v1'?reconciled:
+    {status:'EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',shift_id:SHIFT};
+  }})
+ });
+ assert.equal(driverCalls,1);
+ assert.equal(f.wakes.length,2);
+ assert.equal(r.original_job_driver.attempted,2);
+ assert.equal(r.original_job_driver.outcomes.length,2);
+ assert.equal(r.original_job_driver.full_shift_proven,false);
+ assert.equal(r.job_completed,false);
+ assert.equal(r.installation_authorized,false);
+});
+test('fabricated multi-original wake cannot reach the trusted original executor',async()=>{
+ let calls=0;
+ const r=await processGovernedEmployeeShiftTick({url:'mock',secretKey:'mock'},{
+  wakeMultiple:async()=>({
+   status:'EXISTING_MULTI_JOB_CAPABILITY_WAKES_RECORDED',
+   shift_id:SHIFT,eligible_count:2,dispatched_count:2,
+   worker_execution_acknowledged:false,original_job_completed:false,
+   installation_authorized:false,production_changed:false,
+   full_shift_proven:false,
+   dispatches:[{original_work_id:WORK1,trigger_id:TRIGGER1,
+    source_ref:SOURCE1,source_proof_sha256:SHA,
+    status:'EXISTING_CAPABILITY_WAKE_DISPATCHED_NOT_EXECUTED'},
+   {original_work_id:WORK1,trigger_id:TRIGGER2,
+    source_ref:SOURCE2,source_proof_sha256:SHA,
+    status:'EXISTING_CAPABILITY_WAKE_DISPATCHED_NOT_EXECUTED'}]
+  }),
+  executeQualifiedOriginals:async()=>{calls++;throw Error('MUST_NOT_RUN')},
+  fetchImpl:async url=>({ok:true,json:async()=>{
+   const n=url.split('/rpc/')[1];
+   return n==='reality_close_employee_shift_v1'?
+    {status:'NO_SHIFT_DUE_FOR_CLOSE'}:
+    n==='reality_reconcile_employee_shift_original_v1'?reconciled:
+    {status:'EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',shift_id:SHIFT};
+  }})
+ });
+ assert.equal(calls,0);
+ assert.equal(r.original_job_driver,null);
+ assert.equal(r.job_completed,false);
+});
