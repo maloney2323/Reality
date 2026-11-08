@@ -16,13 +16,13 @@ const fail=x=>{throw Error('RILEY_NATIVE_MODEL_'+x)};
 const sha256=buf=>'sha256:'+createHash('sha256').update(buf).digest('hex');
 const blobSha=buf=>createHash('sha1').update('blob '+buf.length+'\0')
  .update(buf).digest('hex');
-function outputText(response){
+export function outputText(response){
  return typeof response?.output_text==='string'?response.output_text:
   (response?.output||[]).flatMap(p=>p?.content||[])
    .filter(p=>p?.type==='output_text'&&typeof p.text==='string')
    .map(p=>p.text).join('\n');
 }
-function validateCandidate(output,source){
+export function validateCandidate(output,source){
  let patch;
  try{patch=JSON.parse(output)}catch{fail('MODEL_JSON_NOT_VALID')}
  if(!patch||Array.isArray(patch)||
@@ -44,7 +44,7 @@ function validateCandidate(output,source){
  // record. No model output is a command, authorization, or independent test.
  return Object.freeze({patch,proposed});
 }
-async function sourceFromGitHub({commit,fetchImpl}){
+export async function sourceFromGitHub({commit,fetchImpl}){
  const url=BASE+'/contents/'+TARGET+'?ref='+commit;
  let reply;
  try{reply=await fetchImpl(url,{
@@ -67,7 +67,7 @@ async function sourceFromGitHub({commit,fetchImpl}){
  return Object.freeze({text:bytes.toString('utf8'),blob:value.sha,
   file_hash:sha256(bytes)});
 }
-function expectedGraph(graph){
+export function expectedGraph(graph){
  const native=graph?.jobs?.filter(x=>
   x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
   x.source_ref===ISSUE_URL&&x.phase==='SOURCE_ADMITTED'&&
