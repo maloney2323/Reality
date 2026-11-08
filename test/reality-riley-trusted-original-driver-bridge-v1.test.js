@@ -147,7 +147,8 @@ test('one signed shift wake can batch multiple verified distinct original jobs w
   readback:{...eligible,candidate_count:2,candidates:[candidate,other]},
   runnerResult:multi,batchEligibleOriginals:true
  });
- const actual=await adapter(scope);
+ const actual=await adapter({...scope,
+  batch_original_work_ids:[original,other.original_work_id]});
  assert.equal(actual.attempted,2);
  assert.equal(actual.outcomes.length,2);
  assert.equal(observations.run.length,1);
@@ -162,7 +163,9 @@ test('batch mode blocks duplicated work identities and fabricated third-job rece
  const duplicated=ready({batchEligibleOriginals:true,
   readback:{...eligible,candidate_count:2,
    candidates:[candidate,candidate]}});
- await assert.rejects(duplicated.adapter(scope),/DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH/);
+ await assert.rejects(duplicated.adapter({...scope,
+  batch_original_work_ids:[original,other.original_work_id]}),
+  /DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH/);
  assert.equal(duplicated.observations.run.length,0);
  const fake={...result,attempted:2,outcomes:[result.outcomes[0],{
   original_work_id:'work:'+'c'.repeat(32),
@@ -171,5 +174,23 @@ test('batch mode blocks duplicated work identities and fabricated third-job rece
  const invalid=ready({batchEligibleOriginals:true,
   readback:{...eligible,candidate_count:2,candidates:[candidate,other]},
   runnerResult:fake});
- await assert.rejects(invalid.adapter(scope),/SHARED_EXECUTOR_OUTCOME_READBACK_INVALID/);
+ await assert.rejects(invalid.adapter({...scope,
+  batch_original_work_ids:[original,other.original_work_id]}),
+  /SHARED_EXECUTOR_OUTCOME_READBACK_INVALID/);
+});
+
+test('an additional eligible original cannot piggyback on an unwoken single-source execution',async()=>{
+ const other={...candidate,original_work_id:'work:'+'b'.repeat(32),
+  trigger_id:'44444444-5555-4666-8777-888888888888'};
+ const {adapter,observations}=ready({batchEligibleOriginals:true,
+  readback:{...eligible,candidate_count:2,candidates:[candidate,other]}});
+ await adapter(scope);
+ assert.equal(observations.run[0].maxJobs,1);
+ assert.equal(observations.run[0].onlyOriginalWorkId,original);
+ const mismatched=ready({batchEligibleOriginals:true,
+  readback:{...eligible,candidate_count:2,candidates:[candidate,other]}});
+ await assert.rejects(mismatched.adapter({...scope,
+  batch_original_work_ids:[original,'work:'+'c'.repeat(32)]}),
+  /BATCH_WAKE_AND_CURRENT_OWNER_ORIGINALS_DIVERGED/);
+ assert.equal(mismatched.observations.run.length,0);
 });
