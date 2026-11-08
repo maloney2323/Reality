@@ -1081,6 +1081,104 @@ function renderRileyVerifiedOriginalJobs(readback,shiftId){
  target.replaceChildren(frag);
  return count;
 }
+// Database timestamps, NOT browser guesses or invisible model thoughts.
+function verifiedLocalTimestamp(raw){
+ if(typeof raw!=='string'||!Number.isFinite(Date.parse(raw)))return null;
+ return new Date(raw).toLocaleString(undefined,{
+  year:'numeric',month:'short',day:'numeric',
+  hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'
+ });
+}
+function showPendingStartRequest(){
+ $('rileyStartConfirmation').hidden=false;
+ $('rileyStartConfirmationHeadline').textContent=
+  'Start requested · awaiting signed-in database authorization';
+ $('rileyStartConfirmationDetails').textContent=
+  'Request submitted at '+new Date().toLocaleString()+
+  '. This is NOT a worker start or completed job. Checking the durable owner receipt.';
+}
+function showDurableStartConfirmation(confirmation){
+ if(confirmation?.status!=='OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED'||
+    !/^[a-f0-9-]{36}$/i.test(confirmation.shift_id||'')||
+    !verifiedLocalTimestamp(confirmation.authorized_at)||
+    confirmation.worker_execution_verified!==false||
+    confirmation.installation_authorized!==false||
+    confirmation.original_job_completed!==false)return;
+ $('rileyStartConfirmation').hidden=false;
+ $('rileyStartConfirmationHeadline').textContent=
+  'OWNER AUTHORIZATION CONFIRMED · Worker confirmation pending';
+ const details=$('rileyStartConfirmationDetails');
+ details.replaceChildren();
+ details.append(textNode('p','Authorized '+verifiedLocalTimestamp(
+  confirmation.authorized_at)+' · Batch '+confirmation.shift_id+
+  ' · '+confirmation.exact_job_count+' source-backed assignments.' ));
+ if(Array.isArray(confirmation.selected_sources))
+  for(const selected of confirmation.selected_sources){
+   if(!COMBINED_WORK_SOURCE.test(selected?.source_ref||''))continue;
+   const row=document.createElement('div');row.className='workforce-output-row';
+   row.append(textNode('strong','Assigned source '+selected.step_index+' · '));
+   row.append(combinedQueueLink(selected.source_ref,selected.source_ref));
+   details.append(row);
+  }
+ details.append(textNode('p','Reality has recorded your permission. '+
+  'Actual worker execution will be confirmed only by a timestamped worker receipt. '+
+  'No separate start or manual resume is required.'));
+}
+function renderShiftStartProof(readback){
+ const shifts=readback?.shifts;
+ if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+    !Array.isArray(shifts)||!shifts.length)return;
+ const shift=shifts.find(s=>
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s?.status)&&
+  (s.planned_end_at==='infinity'||
+   (Number.isFinite(Date.parse(s.planned_end_at))&&
+    Date.parse(s.planned_end_at)>Date.now())))||shifts[0];
+ if(!/^[a-f0-9-]{36}$/i.test(shift?.shift_id||'')||
+    !verifiedLocalTimestamp(shift.authorized_at))return;
+ const proof=readback.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
+  readback.shift_activity?.shift_id===shift.shift_id&&
+  readback.shift_activity?.owner_bound===true?
+   readback.shift_activity:null;
+ const first=verifiedLocalTimestamp(proof?.first_worker_seen_at);
+ $('rileyStartConfirmation').hidden=false;
+ $('rileyStartConfirmationHeadline').textContent=first?
+  'AUTOMATION START CONFIRMED · Worker actually reached Reality':
+  shift.status.startsWith('ENDED_')?
+   'BATCH CLOSED · Review final receipts and unresolved work':
+   'OWNER AUTHORIZATION CONFIRMED · Awaiting first verified worker wake';
+ const details=$('rileyStartConfirmationDetails');
+ details.replaceChildren();
+ details.append(textNode('p','Owner authorized '+verifiedLocalTimestamp(
+  shift.authorized_at)+' · Batch '+shift.shift_id+
+  (shift.planned_end_at==='infinity'?' · Runs until verified job receipts':
+   ' · Time-boxed authorization')));
+ if(first)details.append(textNode('p','First actual authenticated worker wake: '+first+
+  '. This confirms a server pulse, not that each job finished.'));
+ else details.append(textNode('p',proof?
+  'No worker wake receipt has been recorded for this job batch yet.':
+  'Worker activity readback unavailable; do not assume the test executed.'));
+ const sources=shift.steps?.slice(1,5).filter(s=>
+  COMBINED_WORK_SOURCE.test(s?.source_ref||''))||[];
+ details.append(textNode('p',sources.length+' selected source assignments:'));
+ for(const source of sources){
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong','Source step '+source.step_index+' · '));
+  row.append(combinedQueueLink(source.source_ref,source.source_ref));
+  details.append(row);
+ }
+ const close=shift.close_report;
+ if(shift.status==='ENDED_WITH_VERIFIED_JOB'&&
+    close?.completion_bound===true&&
+    close?.completion_reason==='ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED'&&
+    Number.isInteger(close.original_jobs_independently_settled_in_this_shift)&&
+    close.original_jobs_independently_settled_in_this_shift>=1)
+  details.append(textNode('p','FINAL RECEIPT RECORDED · '+
+   close.original_jobs_independently_settled_in_this_shift+
+   ' original jobs independently settled. '+(
+    verifiedLocalTimestamp(shift.closed_at)||'End time unavailable')));
+ else if(shift.status.startsWith('ENDED_'))
+  details.append(textNode('p','Closed with recorded evidence; not all original jobs were verified as completed.'));
+}
 function renderRileyLiveProgress(readback){
  const panel=$('rileyLiveProgressPanel');
  const shifts=readback?.shifts;
