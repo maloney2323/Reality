@@ -9,7 +9,7 @@ test('owner clicking Start Jobs sees pending request and separately verified sig
  assert.match(ui,/id="rileyStartConfirmation"/);
  assert.match(ui,/showPendingStartRequest\(\)/);
  assert.match(ui,/showDurableStartConfirmation\(receipt\.start_confirmation\)/);
- assert.match(ui,/AUTHORORIZATION CONFIRMED/);
+ assert.match(ui,/AUTHORIZATION CONFIRMED/);
  assert.match(ui,/worker_execution_verified!==false/);
  assert.match(api,/start_confirmation=Object\.freeze\(/);
  assert.match(api,/OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED/);
