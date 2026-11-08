@@ -121,7 +121,12 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="runFullShift" type="button" disabled title="Authorize one exact job batch until all independent final receipts; no arbitrary eight-hour cutoff">Checking combined jobs…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="riley-start-guide" id="fullShiftScope"><strong>One combined work queue. One start.</strong> Review the source-backed Riley + Taylor assignments below, then tap <strong>Start Riley + Taylor Jobs</strong>. The model investigates each authorized source; proven repair work enters the existing original-job executor. All admitted repairs must have independently verified receipts before successful completion. Blocked work remains visible and never counts as completed. Installing new code still needs your separate exact approval.</p>
+<section class="team-value" aria-label="Reality next action" aria-live="polite" id="rileyNextActionPanel">
+ <h3 id="rileyNextActionTitle">Checking your next action…</h3>
+ <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
+ <button id="rileyHistoryToggle" type="button" aria-expanded="false" aria-controls="rileyLiveProgressPanel">Show previous shift's receipts and investigation</button>
+</section>
+<p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p>
 <section id="rileyStartConfirmation" class="team-value" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
  <h3>Reality · Job test confirmation</h3>
  <p id="rileyStartConfirmationHeadline">Awaiting exact signed-in owner authorization.</p>
@@ -234,7 +239,7 @@ const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
 const SELF_AUDIT='/api/reality/personal-capability-self-audit';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
-let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false,combinedQueueLoading=false;
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false,combinedQueueLoading=false,verifiedFreshBatchReady=false,showHistoricalEvidence=false;
 const workforceAssumptions=new Map();
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
