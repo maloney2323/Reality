@@ -108,7 +108,10 @@ export async function wakeExistingRileyShiftCapabilityBatch({
   results.push(Object.freeze({
    original_work_id:gate.original_work_id,
    status:'EXISTING_CAPABILITY_WAKE_DISPATCHED_NOT_EXECUTED',
-   trigger_id:gate.trigger_id,already_dispatched:wake.existing===true
+   trigger_id:gate.trigger_id,
+   source_ref:gate.source_ref,
+   source_proof_sha256:gate.source_proof_sha256,
+   already_dispatched:wake.existing===true
   }));
  }
  return verdict('EXISTING_MULTI_JOB_CAPABILITY_WAKES_RECORDED',{
