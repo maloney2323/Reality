@@ -292,6 +292,11 @@ export async function runAuthorizedRileyPrReview({
   const source=await sourceDetails(c,{fetchImpl,token:githubToken});
   if(source.head_sha!==c.source_head_sha)
    return unavailable('PR_REVIEW_SOURCE_CHANGED_BEFORE_GITHUB_WRITE');
+  // Credential preflight MUST precede durable publish intent. Missing
+  // permission is an environment/authority gap, not an uncertain effect;
+  // PREPARED remains recoverable without a second job or unsafe POST.
+  if(typeof githubToken!=='string'||githubToken.length<25)
+   return unavailable('PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING');
   const marked=await callRpc(db,'reality_mark_authorized_riley_pr_publish_v1',{
    p_original_work_id:c.original_work_id,p_claim_id:c.claim_id},{fetchImpl});
   if(marked?.status!=='PR_REVIEW_PUBLISH_INTENT_DURABLY_RECORDED'||
