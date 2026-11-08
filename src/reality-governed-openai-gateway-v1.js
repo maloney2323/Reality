@@ -4,6 +4,11 @@
 // Read-only shift context is checked against service-role provider readback
 // before AND after inference. Original-job tool execution needs a separate
 // capability/Continuity adapter and cannot use this advisory-only route.
+import {planZeroTouchSameJobContinuation}
+ from './reality-universal-governed-recovery-handoff-v1.js';
+import {runGovernedToolSession}
+ from './reality-governed-tool-session-v1.js';
+
 export const REALITY_GOVERNED_OPENAI_GATEWAY_VERSION =
  'reality-governed-openai-gateway-read-only-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -53,15 +58,101 @@ function safeReason(status) {
   'OPENAI_RESPONSE_UNAVAILABLE';
 }
 export function createRealityGovernedOpenAIGateway({
- apiKey,model,readCurrentShift,fetchImpl=fetch
+ apiKey,model,readCurrentShift=null,fetchImpl=fetch
 }={}) {
  if(typeof apiKey!=='string'||apiKey.length<12||
     typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,70}$/.test(model)||
-    typeof readCurrentShift!=='function'||typeof fetchImpl!=='function')
+    (readCurrentShift!==null&&typeof readCurrentShift!=='function')||
+    typeof fetchImpl!=='function')
   fail('TRUSTED_SERVER_MODEL_AND_SCOPE_ADAPTERS_REQUIRED');
  return Object.freeze({
   version:REALITY_GOVERNED_OPENAI_GATEWAY_VERSION,
+  // This second mode is the ONLY gateway method that may expose a capability
+  // to a model, and it runs through the existing independently verified
+  // Continuity/broker + fenced sandbox adapter, never employee prompt text.
+  // The caller must be the trusted original-job service, not Reality Chat.
+  async originalJobCapabilitySession({
+   envelope,signingKey,brokerResult,installedReadback=null,
+   readCurrentScope,readCheckpoint,readOriginalTask,lateBoundAdapter,
+   now=()=>new Date().toISOString(),mode='DISCOVER_ON_DEMAND'
+  }={}) {
+   if(typeof readCurrentScope!=='function'||
+      typeof readCheckpoint!=='function'||
+      typeof readOriginalTask!=='function'||
+      typeof lateBoundAdapter?.describe!=='function'||
+      typeof lateBoundAdapter?.forToolSearch!=='function'||
+      typeof lateBoundAdapter?.dispatch!=='function'||
+      typeof now!=='function'||
+      !['PRE_EQUIP','DISCOVER_ON_DEMAND'].includes(mode))
+    fail('TRUSTED_ORIGINAL_CONTINUITY_AND_CAPABILITY_ADAPTERS_REQUIRED');
+   const requested=envelope?.body?.scope;
+   if(!requested||envelope?.body?.handoff_purpose!==
+      'ASSESS_AND_PREPARE_ORIGINAL_RECOVERY')
+    fail('SIGNED_ORIGINAL_CONTINUITY_HANDOFF_REQUIRED');
+   let providerRequests=0;
+   async function verifyBoundary(){
+    // All observations are trusted SERVICE readbacks at this exact instant,
+    // not objects supplied by a browser, issue, employee or model response.
+    const [current,checkpoint,task]=await Promise.all([
+     readCurrentScope(),readCheckpoint(),readOriginalTask()
+    ]);
+    const plan=planZeroTouchSameJobContinuation({
+     envelope,signingKey,currentScope:current,executionTime:now(),
+     brokerResult,checkpointReadback:checkpoint,installedReadback
+    });
+    if(plan.status!=='SAME_ORIGINAL_JOB_READY_FOR_GOVERNED_CONTINUATION'||
+       plan.tool_scope!=='EPHEMERAL_ORIGINAL_JOB_ONLY'||
+       plan.original_work_id!==requested.original_work_id||
+       plan.owner_id!==requested.owner_id||
+       plan.goal_id!==requested.goal_id||
+       plan.original_job_completed===true||
+       task?.independently_verified!==true||
+       task.original_work_id!==plan.original_work_id||
+       task.owner_id!==plan.owner_id||task.goal_id!==plan.goal_id||
+       task.installation_authorized!==false||
+       task.provider_effect_may_have_occurred!==false||
+       task.production_changed!==false||task.independently_settled!==false)
+     fail('ORIGINAL_CONTINUITY_SCOPE_OR_TASK_DRIFT');
+    return Object.freeze({task,checkpoint_sha256:plan.checkpoint_sha256});
+   }
+   // Prevent even initial model inference unless exact signed original work
+   // and approved/rebound tool are still eligible for the current checkpoint.
+   const initial=await verifyBoundary();
+   const guardedFetch=async(url,options)=>{
+    if(url!=='https://api.openai.com/v1/responses'||
+       options?.method!=='POST'||!options?.body)
+     fail('PROVIDER_HOST_OR_REQUEST_OUTSIDE_GATEWAY');
+    await verifyBoundary();
+    const response=await fetchImpl(url,options);
+    // Drift after a provider response invalidates its output. The model
+    // cannot continue on a stale job, ledger tip, authorization or tool.
+    await verifyBoundary();
+    providerRequests++;
+    return response;
+   };
+   const result=await runGovernedToolSession({
+    mode,model,apiKey,fetchImpl:guardedFetch,now,
+    readOriginalTask:async()=>{
+     const checked=await verifyBoundary();
+     return checked.task;
+    },lateBoundAdapter
+   });
+   // A session result is model data, NOT settlement. Even a verified tool
+   // call requires the existing original runner to finish/settle the job.
+   if(result?.original_work_id!==requested.original_work_id||
+      result.original_job_completed!==false)
+    fail('ORIGINAL_JOB_RESULT_MISMATCH_OR_FALSE_SETTLEMENT');
+   return Object.freeze({...result,
+    gateway_version:REALITY_GOVERNED_OPENAI_GATEWAY_VERSION,
+    governed_original_job_scope:true,
+    verified_original_checkpoint_sha256:initial.checkpoint_sha256,
+    model_provider_requests_verified:providerRequests,
+    model_granted_authority:false,
+    original_job_completed:false,production_changed:false});
+  },
   async readOnlyShiftAdvisory({scope,request}={}) {
+   if(typeof readCurrentShift!=='function')
+    fail('SHIFT_SCOPE_ADAPTER_REQUIRED');
    requestScope(scope);
    if(!request||request.model!==model||
      request.tool_choice!=='none'||Object.hasOwn(request,'tools')||
