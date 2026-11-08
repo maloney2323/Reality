@@ -165,3 +165,19 @@ test('worker source and database require independent negative proof and do not i
  assert.match(sql,/MODEL_REVISION_UNVERIFIED/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
 });
+test('independent failed owner-scope CI readback supersedes stale pending model status',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ const boundary=readFileSync(new URL('../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ const sql=readFileSync(new URL('../supabase/migrations/20261108_riley_current_revision_failure_readback_v1.sql',import.meta.url),'utf8');
+ assert.match(worker,/reality_read_current_riley_revision_test_outcome_v1/);
+ assert.match(worker,/RILEY_CORRECTED_CODE_OWNER_SCOPE_TEST_FAILED/);
+ assert.match(worker,/riley_revision_frozen_test:rileyCorrectionTest/);
+ assert.match(ui,/REPAIR REJECTED · Independent owner-scope test failed/);
+ assert.match(ui,/you do not need to authorize another batch/);
+ assert.match(boundary,/read_current_riley_revision_test_outcome_v1/);
+ assert.match(sql,/f\.ci_conclusion='failure'/);
+ assert.match(sql,/j\.exact_approval_receipt_ref is null/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
