@@ -1,0 +1,29 @@
+{
+  "version": "reality-riley-real-original-existing-file-model-repair-proof-v1",
+  "status": "MODEL_WRITTEN_REPAIR_FROZEN_AND_EXISTING_CHECKS_PASSED",
+  "issue_url": "https://github.com/maloney2323/Reality/issues/263",
+  "original_work_id": "work:f2a5b8ecdd048cfa102cbb20c5fa2e86",
+  "shift_id": "21dff8db-6f46-444d-a149-ab15f1caf8fe",
+  "shift_source_proof_sha256": "sha256:e6a68e0bac2f8465da13b00fcc808eacba11ec1c0cfbd07497bdb5f7a95d09b6",
+  "original_failing_run_id": 42450082737,
+  "workflow_run_id": 42451203582,
+  "request_commit_sha": "321d00ccb854fe095174495cf1c3fb8147922bf1",
+  "baseline_source_sha256": "5afabbf7533da62503e47f0efdf8ba7590953e171731b9cf3f1f458c68a578e3",
+  "candidate_source_sha256": "1c2b46ce0ae95beb5756483abe9eba10179e9dae42a3ca3e8facfe8e80796ec7",
+  "frozen_test_sha256": "69a287647c006452715538d5cc9205ab652addc434ad9b83996b0cba3c1542c4",
+  "model_response_id": "resp_0097b7f3bb4a9705006af0098f8acc87d1bb6c74ec0f3b535c",
+  "model_name": "gpt-4.1-mini",
+  "independent_baseline_reproduced": true,
+  "independent_frozen_passed": true,
+  "independent_existing_tests_passed": true,
+  "independent_candidate_syntax_passed": true,
+  "changed_files": [
+    "src/reality-riley-authorized-pr-review-job-v1.js"
+  ],
+  "model_patch_root_cause": "The code proceeded from PREPARED to PUBLISHING phase without first verifying the presence and adequacy of the GitHub writer token, leading to unauthorized durable publish intent marking and resulting ",
+  "original_job_completed": false,
+  "owner_installation_authorized": false,
+  "production_changed": false,
+  "provider_comment_published": false,
+  "actual_labor_cost_saved_usd": null
+}

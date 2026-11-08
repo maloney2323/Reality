@@ -263,6 +263,8 @@ export async function runAuthorizedRileyPrReview({
   c.review_body=body;c.review_digest=sha(body);
  }
  if(c.phase==='PREPARED'){
+  if(!githubToken||typeof githubToken!=='string'||githubToken.length<25) return unavailable('PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING');
+
   const source=await sourceDetails(c,{fetchImpl,token:githubToken});
   if(source.head_sha!==c.source_head_sha)
    return unavailable('PR_REVIEW_SOURCE_CHANGED_BEFORE_GITHUB_WRITE');
