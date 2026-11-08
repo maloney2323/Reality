@@ -14,8 +14,9 @@ const env={VERCEL_ENV:'preview',
 const db={strictSecrets:true,project:'isolated-preview',secretKey:'demo-key'};
 const digest=s=>'sha256:'+createHash('sha256').update(s).digest('hex');
 const validReview='## Riley — Code\\nThe updated src/example.js changes the rendering order of the work console. Verify the previous controls remain accessible and add an assertion for exact owner work scope.\\n## Taylor — Reliability\\nExercise a signed-in UI regression to confirm the replacement section still displays authorized work after a refresh.';
-function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish=false,existing=false}={}){
+function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish=false,existing=false,scopeNotCurrent=false,postModelScopeDrift=false,postModelHeadDrift=false}={}){
  const calls=[],ghPosts=[];
+ let modelRequests=0,modelScopeReads=0,prReads=0;
  const persisted={body:null,head:null,model:null,comment:null,commentUrl:null,digest:null};
  let comment=existing?{id:600,body:'',issue_url:BASE+'/issues/58',
   html_url:REVIEW_URL+'#issuecomment-600'}:null;
@@ -31,6 +32,27 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
    if(afterPublish){const c=claim();c.phase='PUBLISHING';c.review_body=persisted.body;
     c.review_digest=persisted.digest;c.source_head_sha=SHA;return c;}
    return claim();
+  }
+  if(name==='reality_read_authorized_pr_review_model_scope_v1'){
+   modelScopeReads++;
+   assert.equal(args.p_owner_id,OWNER);
+   assert.equal(args.p_original_work_id,WORK);
+   assert.equal(args.p_claim_id,CLAIM);
+   const notCurrent=scopeNotCurrent||
+    (postModelScopeDrift&&modelScopeReads>=2);
+   return {
+    status:notCurrent?'OWNER_REVIEW_MODEL_SCOPE_NOT_CURRENT':
+     'OWNER_ORIGINAL_REVIEW_CURRENT_FOR_MODEL',
+    readback_source:'REALITY_SERVICE_ROLE_ORIGINAL_DB',
+    owner_id:OWNER,shift_id:SHIFT,claim_id:CLAIM,
+    original_work_id:WORK,source_ref:REVIEW_URL,
+    source_proof_sha256:'sha256:'+'f'.repeat(64),
+    phase:'CLAIMED',model_response_id:null,
+    shift_status:'RUNNING',
+    shift_plan_fingerprint:'sha256:'+'1'.repeat(64),
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false
+   };
   }
   if(name==='reality_prepare_authorized_riley_pr_review_v1'){
    persisted.body=args.p_review_body;persisted.head=args.p_head_sha;
@@ -54,6 +76,7 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
  };
  const fetchImpl=async(url,opts={})=>{
   if(url.startsWith('https://api.openai.com/')){
+   modelRequests++;
    if(modelStatus!==200)return {ok:false,status:modelStatus};
    const body=JSON.parse(opts.body);
    assert.equal(body.model,'gpt-4.1-mini');
@@ -62,8 +85,10 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
     status:'completed',output_text:validReview,output:[]})};
   }
   if(url===BASE+'/pulls/58'){
+   prReads++;
    return {ok:true,json:async()=>({number:58,html_url:REVIEW_URL,state:'open',
-    draft:false,head:{sha:headChanged?'b'.repeat(40):SHA},changed_files:1,
+    draft:false,head:{sha:postModelHeadDrift&&prReads>=3?'c'.repeat(40):
+     headChanged?'b'.repeat(40):SHA},changed_files:1,
     title:'Clean work console'})};
   }
   if(url===BASE+'/pulls/58/files?per_page=100')
@@ -83,6 +108,7 @@ function fixture({phase='CLAIMED',modelStatus=200,headChanged=false,afterPublish
   throw Error('UNKNOWN_PROVIDER_URL_'+url);
  };
  return {callRpc,fetchImpl,calls,ghPosts,persisted,
+  getModelRequests:()=>modelRequests,getScopeReads:()=>modelScopeReads,
   setPreviousReceipt:()=>{persisted.body='## Reality · Riley + Taylor — Owner-authorized code review\\n'+
    validReview+'\\n<!-- reality-riley-original:'+WORK+' -->';
    persisted.digest=digest(persisted.body);persisted.head=SHA;
@@ -109,6 +135,8 @@ test('one real owner source-bound model review is posted once and durably settle
  const order=f.calls.map(x=>x.name);
  assert.deepEqual(order,[
   'reality_claim_authorized_riley_pr_review_v1',
+  'reality_read_authorized_pr_review_model_scope_v1',
+  'reality_read_authorized_pr_review_model_scope_v1',
   'reality_prepare_authorized_riley_pr_review_v1',
   'reality_mark_authorized_riley_pr_publish_v1',
   'reality_settle_authorized_riley_pr_review_v1']);
@@ -117,10 +145,10 @@ test('one real owner source-bound model review is posted once and durably settle
 test('model provider failure does not publish, settle, or fake review completion',async()=>{
  const f=fixture({modelStatus:401});
  const result=await runAuthorizedRileyPrReview(options(f));
- assert.match(result.status,/OPENAI_PROVIDER_HTTP_401/);
+ assert.match(result.status,/OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED/);
  assert.equal(result.original_job_completed,false);
  assert.equal(f.ghPosts.length,0);
- assert.equal(f.calls.length,1);
+ assert.equal(f.calls.length,2);
 });
 test('GitHub drift before model source check prevents review publication',async()=>{
  const f=fixture({headChanged:true});
@@ -175,6 +203,47 @@ test('without a preview writer token the real model review stays prepared and do
  assert.ok(f.persisted.review_body===undefined||f.persisted.body?.includes('reality-riley-original:'));
  assert.deepEqual(f.calls.map(x=>x.name),[
   'reality_claim_authorized_riley_pr_review_v1',
+  'reality_read_authorized_pr_review_model_scope_v1',
+  'reality_read_authorized_pr_review_model_scope_v1',
   'reality_prepare_authorized_riley_pr_review_v1'
  ]);
+});
+
+test('real original refuses stale owner shift before model inference',async()=>{
+ const f=fixture({scopeNotCurrent:true});
+ const result=await runAuthorizedRileyPrReview(options(f));
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.getModelRequests(),0);
+ assert.equal(f.ghPosts.length,0);
+ assert.equal(f.calls.some(x=>x.name==='reality_prepare_authorized_riley_pr_review_v1'),false);
+});
+test('real original rejects owner authorization drift after model response and before preparation',async()=>{
+ const f=fixture({postModelScopeDrift:true});
+ const result=await runAuthorizedRileyPrReview(options(f));
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.getModelRequests(),1);
+ assert.equal(f.ghPosts.length,0);
+ assert.equal(f.calls.some(x=>x.name==='reality_prepare_authorized_riley_pr_review_v1'),false);
+});
+test('real original rejects GitHub PR head drift after model inference',async()=>{
+ const f=fixture({postModelHeadDrift:true});
+ const result=await runAuthorizedRileyPrReview(options(f));
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.getModelRequests(),1);
+ assert.equal(f.ghPosts.length,0);
+ assert.equal(f.calls.some(x=>x.name==='reality_prepare_authorized_riley_pr_review_v1'),false);
+});
+test('real-original code path has no direct OpenAI calls outside Reality shared gateway',()=>{
+ const src=readFileSync(new URL('../src/reality-riley-authorized-pr-review-job-v1.js',
+  import.meta.url),'utf8');
+ assert.match(src,/createRealityGovernedOpenAIGateway/);
+ assert.match(src,/originalJobReadOnlyInference/);
+ assert.doesNotMatch(src,/fetchImpl\('https:\/\/api\.openai\.com\/v1\/responses'/);
+ const sql=readFileSync(new URL('../supabase/migrations/20261108_governed_original_pr_review_model_scope_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/t\.state='SOURCE_CHECKED'/);
+ assert.match(sql,/s\.planned_end_at>clock_timestamp\(\)/);
+ assert.match(sql,/grant execute on function public\.reality_read_authorized_pr_review_model_scope_v1/);
+ assert.doesNotMatch(sql,/grant execute[^;]*authenticated;/);
 });
