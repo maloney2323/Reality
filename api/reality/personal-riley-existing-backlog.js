@@ -4,8 +4,14 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
-import {fetchCatalogGitHub}
+import {fetchCatalogGitHub,buildRealityWorkCatalog}
  from '../../src/reality-work-catalog-v0.1.js';
+import {buildRealityWorkdayOpportunityBrief}
+ from '../../src/reality-workday-opportunity-brief-v1.js';
+import {buildRealityNamedEmployeeRoster}
+ from '../../src/reality-employee-identity-roster-v1.js';
+import {reconcileRileyCategoryAssignments}
+ from '../../src/reality-riley-category-backlog-bridge-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -57,8 +63,25 @@ export default async function handler(req,res){
    coverageComplete:issues.source_scan?.query_scope_fully_reconciled===true&&
     sourceIssues.length===issues.filter(x=>x?.state==='open'&&!x.pull_request).length
   });
+  // Do not equate an empty eligible executor queue with empty Riley work.
+  // Reconcile category findings (including PR reviews) against owner-scoped
+  // issue original history. This remains informational, not admission.
+  let assigned_category_backlog=null;
+  let assigned_category_backlog_status='CATEGORY_CROSSCHECK_UNAVAILABLE_NOT_NO_WORK';
+  try{
+   const catalog=await buildRealityWorkCatalog();
+   const brief=buildRealityWorkdayOpportunityBrief(catalog);
+   const roster=buildRealityNamedEmployeeRoster(brief);
+   assigned_category_backlog=reconcileRileyCategoryAssignments({
+    roster,issueBacklog:backlog
+   });
+   assigned_category_backlog_status=assigned_category_backlog.status;
+  }catch{
+   // A stale or unavailable category provider is not zero unfinished work.
+  }
   return res.status(200).json({ok:true,owner_scope_verified:true,
-   read_only:true,worker_execution_authorized_by_read:false,...backlog});
+   read_only:true,worker_execution_authorized_by_read:false,
+   assigned_category_backlog_status,assigned_category_backlog,...backlog});
  }catch(e){
   console.warn('RILEY_BACKLOG_OWNER_READBACK','INDEPENDENT_SOURCE_UNAVAILABLE');
   return res.status(503).json({ok:false,

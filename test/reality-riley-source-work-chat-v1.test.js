@@ -42,9 +42,9 @@ test('Riley work exists as authenticated provider SOURCE even without authorized
  assert.equal(observation[0].observed_open_issue_count,2);
  assert.equal(observation[0].event_kind,'riley_discovered_source_work_readback_before_shift');
  assert.match(observation[0].summary,/Issue #263/);
- assert.match(observation[0].summary,/ordinary Chat DOES NOT authorize/);
- assert.match(observation[0].summary,/chat-simple#riley-shift/);
- assert.match(observation[0].summary,/Do NOT say there is no known work/);
+ assert.match(observation[0].summary,/only a source inventory, NOT a shift authorization readback/);
+ assert.match(observation[0].summary,/signed-in explicit chat instruction "start the shift"/);
+ assert.match(observation[0].summary,/Never claim the absence of qualified originals means Riley has no unfinished work/);
  assert.equal(observation[0].external_execution_authorized,false);
  assert.equal(observation[0].installation_authorized,false);
  const snap=await readRileySourceWorkSnapshot({session,env,db,fetchImpl,now:NOW});
@@ -101,7 +101,7 @@ test('source-read service function is service-role only and cannot authorize or 
  const chat=read('api/reality/personal-chat.js');
  assert.match(chat,/readVerifiedRileySourceWorkForChat/);
  assert.match(chat,/\.\.\.rileySourceWorkObservations/);
- assert.match(chat,/shift_owner_authorization_requires_explicit_button_click:true/);
+ assert.match(chat,/shift_owner_authorization_requires_explicit_button_click:false/);
 });
 test('main conversation displays qualified source names before opening owner shift button, with no passive automation',()=>{
  const index=read('index.html');

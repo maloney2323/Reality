@@ -1,0 +1,10 @@
+{
+  "version": "reality-riley-unattended-source-repair-warrant-v1",
+  "shift_id": "21dff8db-6f46-444d-a149-ab15f1caf8fe",
+  "original_work_id": "work:f2a5b8ecdd048cfa102cbb20c5fa2e86",
+  "issue_number": 263,
+  "issue_url": "https://github.com/maloney2323/Reality/issues/263",
+  "source_proof_sha256": "sha256:e6a68e0bac2f8465da13b00fcc808eacba11ec1c0cfbd07497bdb5f7a95d09b6",
+  "baseline_failure_run_id": 42450082737,
+  "attempt": 2
+}

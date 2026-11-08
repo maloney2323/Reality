@@ -1,0 +1,56 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {Script} from 'node:vm';
+const file=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const html=file('reality-chat-simple.html');
+const sql=file('supabase/migrations/20261107_riley_live_activity_model_error_readback_v1.sql');
+const shift=file('api/reality/personal-governed-employee-shift.js');
+const worker=file('src/reality-one-openai-combined-role-handoff-v1.js');
+const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+test('live activity panel is prominent, automatic and shows source versus original receipts',()=>{
+ assert.match(html,/id="rileyLiveProgressPanel"/);
+ assert.match(html,/Live activity · What Reality is doing/);
+ assert.ok(html.indexOf('id="rileyLiveProgressPanel"')<
+  html.indexOf('id="rileyTaylorCombinedQueue"'));
+ assert.match(html,/id="rileySourceProgress"/);
+ assert.match(html,/id="rileyLiveApprovalStatus"/);
+ assert.match(html,/id="rileyLiveTimeline"/);
+ assert.match(html,/renderRileyLiveProgress\(data\)/);
+ assert.match(html,/refreshes every 30 seconds/);
+ assert.match(html,/No independent final repair receipt for this shift/);
+ assert.match(html,/A source check, model suggestion, or timer is not a completed repair/);
+ assert.match(html,/new Date\(step\.completed_at\)\.toLocaleTimeString/);
+});
+test('no added approval/replay buttons, no fake cash savings, and fail closed on source error',()=>{
+ assert.match(script,/YOU DO NOT NEED TO AUTHORIZE THE SHIFT AGAIN/);
+ assert.match(script,/No independently verified capability installation request is pending/);
+ assert.match(script,/ACTION NEEDED: an independently verified exact capability upgrade/);
+ assert.match(script,/No exact eligible original job has reached the execution gate/);
+ assert.match(script,/current missing-extension-only intake can reject ordinary existing-code defects/i);
+ assert.match(script,/\$\('runFullShift'\)\.disabled=true/);
+ assert.match(script,/\$\('rileyLiveProgressPanel'\)\.hidden=true/);
+ assert.match(script,/RECEIPT_VERIFIED/);
+ assert.doesNotMatch(script,/localStorage\.setItem\('riley[^']*receipt/);
+ assert.match(shift,/authenticatedChatSession\(req,res\)/);
+ assert.match(shift,/reality_authorize_employee_shift_v1/);
+ assert.doesNotMatch(html,/id="approveSourceStep"|id="generateFinalReceipt"/);
+ const js=script.replace(/^\s*import\s*\{[^}]+\}\s*from\s*'[^']+';\s*/,'');
+ assert.doesNotThrow(()=>new Script(js));
+});
+test('service-only readback exposes allowlisted model reason, never raw provider error body',()=>{
+ assert.equal((sql.match(/create or replace function/g)||[]).length,1);
+ assert.match(sql,/security invoker/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/where owner_id=p_owner_id/);
+ assert.match(sql,/'role_handoff_reason',case when/);
+ assert.match(sql,/t\.proof->'combined_role_handoff'->>'reason' in/);
+ assert.match(sql,/ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM/);
+ assert.match(sql,/OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED/);
+ assert.match(sql,/OPENAI_REQUEST_OPTIONS_REJECTED/);
+ assert.match(sql,/t\.proof->'combined_role_handoff'->>'original_job_completed'='false'/);
+ assert.match(sql,/revoke all on function public\.reality_read_owner_employee_shifts_v1\(uuid\)/);
+ assert.match(sql,/grant execute on function public\.reality_read_owner_employee_shifts_v1\(uuid\)\s+to service_role/);
+ assert.doesNotMatch(sql,/\b(?:insert into|update reality_internal|net\.http_post)\b/i);
+ assert.doesNotMatch(worker,/console\.log\([^)]*apiKey/);
+});

@@ -1,0 +1,176 @@
+name: Reality · Riley unattended real-source repair candidate
+on:
+  push:
+    branches:
+      - fix/reality-governed-riley-original-driver-20261107
+    paths:
+      - reality-riley-repair-intents/263-live-shift.json
+  workflow_dispatch:
+    # Dispatch is permitted ONLY for independent reconciliation; the runner
+    # also checks one new source-bound request committed in HEAD^..HEAD.
+permissions:
+  contents: read
+jobs:
+  riley-model-repair-and-frozen-proof:
+    if: github.ref == 'refs/heads/fix/reality-governed-riley-original-driver-20261107'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check bounded repair runner and actual frozen source
+        run: |
+          node --check scripts/reality-riley-unattended-source-repair-v1.mjs
+          node --check src/reality-riley-authorized-pr-review-job-v1.js
+          test -f test/reality-frozen-regressions/riley-pr-credential-preflight.test.js
+      - name: One REAL OpenAI model diagnoses and writes ONE existing file repair
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REALITY_RILEY_AUTOMATED_REPAIR_MODEL: gpt-4.1-mini
+        run: node scripts/reality-riley-unattended-source-repair-v1.mjs
+      - name: Preserve exact model, pinned source and independent test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: riley-actual-original-source-repair-263
+          path: benchmark-results/riley-unattended-263/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  stage-model-verified-candidate-isolated:
+    needs: riley-model-repair-and-frozen-proof
+    if: needs.riley-model-repair-and-frozen-proof.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: riley-actual-original-source-repair-263
+          path: /tmp/riley-actual-repair
+      - name: Independently re-test downloaded candidate BEFORE any write credential is supplied
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const out='/tmp/riley-actual-repair/';
+          const proof=JSON.parse(fs.readFileSync(out+'repair-proof.json','utf8'));
+          const candidate=fs.readFileSync(out+'candidate-source.js','utf8');
+          const before=fs.readFileSync('src/reality-riley-authorized-pr-review-job-v1.js','utf8');
+          const sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const intent=JSON.parse(fs.readFileSync('reality-riley-repair-intents/263-live-shift.json','utf8'));
+          if(proof.status!=='MODEL_WRITTEN_REPAIR_FROZEN_AND_EXISTING_CHECKS_PASSED'||
+           proof.request_commit_sha!==process.env.GITHUB_SHA||
+           proof.original_work_id!==intent.original_work_id||
+           proof.shift_id!==intent.shift_id||
+           proof.shift_source_proof_sha256!==intent.source_proof_sha256||
+           proof.original_failing_run_id!==42450082737||
+           proof.independent_frozen_passed!==true||
+           proof.independent_existing_tests_passed!==true||
+           proof.independent_baseline_reproduced!==true||
+           proof.owner_installation_authorized!==false||
+           proof.original_job_completed!==false||
+           proof.production_changed!==false||
+           !/^resp_[A-Za-z0-9_-]{4,160}$/.test(proof.model_response_id||'')||
+           proof.baseline_source_sha256!==sha(before)||
+           proof.candidate_source_sha256!==sha(candidate)||
+           candidate===before||
+           JSON.stringify(proof.changed_files)!==
+            JSON.stringify(['src/reality-riley-authorized-pr-review-job-v1.js']))
+            throw Error('RILEY_CANDIDATE_INDEPENDENT_ARTIFACT_SCOPE_CHANGED');
+          fs.writeFileSync('src/reality-riley-authorized-pr-review-job-v1.js',candidate);
+          NODE
+          node --check src/reality-riley-authorized-pr-review-job-v1.js
+          node --test test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js
+      - name: Publish ONLY independently proved source patch on inert isolated branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs=require('node:fs');
+            const crypto=require('node:crypto');
+            const owner=context.repo.owner,repo=context.repo.repo;
+            if(owner!=='maloney2323'||repo!=='Reality'||
+             context.ref!=='refs/heads/fix/reality-governed-riley-original-driver-20261107')
+             throw Error('RILEY_REPAIR_REPOSITORY_SOURCE_IDENTITY_CHANGED');
+            const proof=JSON.parse(fs.readFileSync('/tmp/riley-actual-repair/repair-proof.json','utf8'));
+            const source=fs.readFileSync('/tmp/riley-actual-repair/candidate-source.js','utf8');
+            const base=context.sha;
+            const work=proof.original_work_id;
+            if(!/^work:[a-f0-9]{32}$/.test(work||'')||
+             proof.request_commit_sha!==base||
+             proof.status!=='MODEL_WRITTEN_REPAIR_FROZEN_AND_EXISTING_CHECKS_PASSED'||
+             proof.production_changed!==false||
+             proof.owner_installation_authorized!==false||
+             proof.original_job_completed!==false)
+             throw Error('RILEY_REPAIR_OWNER_JOB_WARRANT_INVALID');
+            const candidateBranch='reality/riley/repair-263-'+work.slice(5,17);
+            const ref='refs/heads/'+candidateBranch;
+            const baseCommit=await github.rest.git.getCommit({owner,repo,commit_sha:base});
+            const [fileBlob,receiptBlob]=await Promise.all([
+              github.rest.git.createBlob({owner,repo,content:source,encoding:'utf-8'}),
+              github.rest.git.createBlob({owner,repo,
+                content:JSON.stringify(proof,null,2)+'\n',encoding:'utf-8'})
+            ]);
+            const tree=await github.rest.git.createTree({owner,repo,
+              base_tree:baseCommit.data.tree.sha,
+              tree:[
+                {path:'src/reality-riley-authorized-pr-review-job-v1.js',
+                 mode:'100644',type:'blob',sha:fileBlob.data.sha},
+                {path:'reality-riley-proof/repair-263-'+work.slice(5,17)+'.json',
+                 mode:'100644',type:'blob',sha:receiptBlob.data.sha}
+              ]});
+            const commit=await github.rest.git.createCommit({owner,repo,
+              message:'Riley model-written independently frozen-tested repair '+work,
+              tree:tree.data.sha,parents:[base]});
+            let already;
+            try{already=await github.rest.git.getRef({owner,repo,ref:'heads/'+candidateBranch});}
+            catch(e){if(e.status!==404)throw e;}
+            if(already){
+              if(already.data.object.sha!==commit.data.sha)
+                throw Error('RILEY_REPAIR_BRANCH_ALREADY_EXISTS_DIFFERENT_BYTES');
+            }else{
+              await github.rest.git.createRef({owner,repo,ref,sha:commit.data.sha});
+            }
+            const observed=await github.rest.git.getRef({owner,repo,ref:'heads/'+candidateBranch});
+            if(observed.data.object.sha!==commit.data.sha)
+              throw Error('RILEY_REPAIR_CANDIDATE_BRANCH_PROVIDER_READBACK_FAILED');
+            core.info('RILEY_VERIFIED_CANDIDATE_BRANCH '+JSON.stringify({
+              original_work_id:work,branch:candidateBranch,
+              commit_sha:commit.data.sha,model_response_id:proof.model_response_id,
+              independently_frozen_tested:true,installation_authorized:false,
+              original_job_completed:false,production_changed:false
+            }));
+            try{
+              const pr=await github.rest.pulls.create({owner,repo,
+                head:candidateBranch,
+                base:'fix/reality-governed-riley-original-driver-20261107',
+                draft:true,
+                title:'Riley: independently tested no-credential publish-fence repair (issue #263)',
+                body:'Automated Reality Riley original '+work+' on signed shift '+
+                  proof.shift_id+'. Live red regression: https://github.com/maloney2323/Reality/actions/runs/42450082737. '+
+                  'One real OpenAI source patch; frozen acceptance and existing test passed independently. '+
+                  'For owner review only: no capability installation, original-job settlement, '+
+                  'production change or ROI claimed. Source receipt is in the candidate branch.'});
+              core.info('RILEY_VERIFIED_CANDIDATE_PR '+pr.data.html_url);
+            }catch(e){
+              core.warning('RILEY_VERIFIED_BRANCH_ONLY_PR_NEEDS_RECONCILIATION_CODE_'+
+               String(e.status||'UNKNOWN'));
+            }

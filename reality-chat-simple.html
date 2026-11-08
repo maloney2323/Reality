@@ -84,6 +84,15 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 @media(max-width:550px){.team-value-metrics{grid-template-columns:1fr}}
 
 @media(max-width:600px){.team-grid{grid-template-columns:1fr;max-height:44vh}.team-board{padding:10px}}
+
+.workforce-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}
+.workforce-form-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#d8e6f7}
+.workforce-form-grid input,.workforce-form-grid select{min-height:43px;padding:9px;border-radius:9px;background:#111d2b;border:1px solid #42617d;color:#fff;width:100%}
+.workforce-form-grid label.check{display:flex;flex-direction:row;align-items:center;gap:9px}
+.workforce-form-grid label.check input{width:19px;min-height:19px;height:19px}
+.workforce-output-row{padding:12px 0;border-bottom:1px solid #34485e;line-height:1.55}
+.workforce-output-row strong{display:block}
+#workforceScenarioStatus{color:#dbeafa;line-height:1.6}
 </style>
 </head>
 <body>
@@ -108,12 +117,36 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="newChat" type="button">New chat</button>
 <button id="refresh" type="button">Refresh</button>
 <button id="teamToggle" type="button" aria-expanded="false" aria-controls="employeeBoardPanel">Show AI team · 8</button>
-<label style="font-size:12px;color:#cedfec">Shift length <select id="runShiftHours" aria-label="Riley shift duration in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
-<button id="runFullShift" type="button" disabled title="One exact signed-in owner authorization for a chosen 1–12-hour Riley shift">Checking existing shift…</button>
+<label style="font-size:12px;color:#cedfec">Maximum authorized window <select id="runShiftHours" aria-label="Riley authorized safety window maximum in hours" style="min-width:68px;color:#f1f4f8;background:#141a25;border:1px solid #3a4558;padding:9px;border-radius:10px"><option value="1">1h</option><option value="2">2h</option><option value="3">3h</option><option value="4">4h</option><option value="5">5h</option><option value="6">6h</option><option value="7">7h</option><option value="8" selected>8h</option><option value="9">9h</option><option value="10">10h</option><option value="11">11h</option><option value="12">12h</option></select></label>
+<button id="runFullShift" type="button" disabled title="Authorize one combined Riley + Taylor source-work shift; stop after independent receipts, not arbitrary elapsed time">Checking combined jobs…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<p class="riley-start-guide" id="fullShiftScope"><strong>Start Riley in two steps:</strong> Select <strong>3h</strong> under Shift length, then tap <strong>Run Riley's Shift</strong> above. That button submits your signed-in owner authorization. <strong>Sending a chat message is not authorization.</strong> The system must record the shift and independently qualify original jobs; installations still require your separate exact approval.</p>
+<p class="riley-start-guide" id="fullShiftScope"><strong>One combined work queue. One start.</strong> Review the source-backed Riley + Taylor assignments below, choose a maximum safety window, then tap <strong>Start Riley + Taylor Jobs</strong>. The model investigates each authorized source; proven repair work enters the existing original-job executor. All admitted repairs must have independently verified receipts before successful completion. Expired or blocked work is never counted as completed. Installing new code still needs your separate exact approval.</p>
+<section id="rileyLiveProgressPanel" class="team-value" aria-label="Riley and Taylor live work activity" aria-live="polite" hidden>
+ <h3>Live activity · What Reality is doing</h3>
+ <p id="rileyLiveHeadline" role="status">Reading verified worker state…</p>
+ <label for="rileySourceProgress" style="font-size:13px;display:block;margin:9px 0 4px">Source investigations <span id="rileySourceProgressLabel">0 of 5</span></label>
+ <progress id="rileySourceProgress" max="5" value="0" style="width:100%;height:13px"></progress>
+ <p id="rileyLiveApprovalStatus">Checking whether anything needs your approval…</p>
+ <p id="rileyLiveBlocker" role="status"></p>
+ <h4>Real original jobs · independently settled</h4>
+ <div id="rileyVerifiedOriginalJobRows">No completed original-job receipt recorded for this shift.</div>
+ <h4>Recorded activity · not hidden model thoughts</h4>
+ <div id="rileyLiveTimeline"></div>
+ <p style="font-size:12px">Updates automatically from Reality's owner-scoped worker receipts. A source check, model suggestion, or timer is not a completed repair.</p>
+</section>
+<section id="rileyTaylorCombinedQueue" class="team-value" aria-label="Riley and Taylor combined assigned work queue" aria-live="polite" hidden>
+ <h3>Combined work queue · Riley + Taylor · One OpenAI model</h3>
+ <p id="rileyTaylorQueueStatus">Checking unfinished Employee and Work Center assignments…</p>
+ <div id="rileyTaylorQueueRows"></div>
+ <p>Riley investigates the code; Taylor checks reliability and safe continuation. Quinn independently verifies accepted results. An inspected issue or PR is not automatically a completed repair.</p>
+</section>
 <p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
+<section id="combinedShiftRoleHandoffs" class="team-value" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
+ <h3>Combined shift · One OpenAI model across relevant business roles</h3>
+ <p>Roles share a source-backed, owner-authorized shift. Model suggestions are never independent verification or completed work.</p>
+ <div id="combinedShiftRoleRows"></div>
+</section>
 <section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
@@ -129,6 +162,31 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
   <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
  </section>
+ <details class="team-value" id="workforceSavingsPlanner" open aria-label="Potential workforce consolidation and annual payroll value">
+  <summary><strong>Workforce savings · roles Reality could potentially consolidate</strong></summary>
+  <p>One shared OpenAI model covers business functions, not eight independent workers. Enter your business's positions, actual loaded pay and a proposed workload for each function. This is a scenario, not an instruction to dismiss specific people.</p>
+  <div class="workforce-form-grid">
+   <label>Business role<select id="workforceRole" aria-label="Role to evaluate"></select></label>
+   <label>Current positions<input id="workforcePositions" type="number" min="0" max="5000" step="1" value="1"></label>
+   <label>Annual loaded cost per position ($)<input id="workforceSalary" type="number" min="0" max="10000000" step="1000" value="100000"></label>
+   <label>Hours per human position per month<input id="workforceHumanHours" type="number" min="40" max="260" step="1" value="160"></label>
+   <label>Hours of human work Reality could handle per month<input id="workforceAutomatedHours" type="number" min="0" max="100000" step="1" value="0"></label>
+   <label>Human review hours still needed per month<input id="workforceReviewHours" type="number" min="0" max="100000" step="1" value="0"></label>
+   <label>OpenAI runtime hours this role uses per month<input id="workforceModelHours" type="number" min="0" max="744" step="1" value="0"></label>
+   <label>AI and infrastructure expense per month ($)<input id="workforceMonthlyAI" type="number" min="0" max="10000000" step="1" value="0"></label>
+   <label>Additional human supervision expense per month ($)<input id="workforceExtraSupervision" type="number" min="0" max="10000000" step="1" value="0"></label>
+   <label>Total shared OpenAI runtime budget per month (hours)<input id="workforceSharedCapacity" type="number" min="1" max="744" step="1" value="160"></label>
+   <label class="check"><input type="checkbox" id="workforceCriticalDuties">Assume all critical duties for a full position can be covered</label>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+   <button type="button" id="workforceCalculate">Add/update role · calculate savings</button>
+   <button type="button" id="workforceReset">Clear assumptions</button>
+  </div>
+  <p id="workforceScenarioStatus" role="status" aria-live="polite">Enter company-specific assumptions to estimate potential whole-position consolidation and payroll savings. NASA defect-repair labor value alone cannot prove positions are replaceable.</p>
+  <p id="workforceEvidenceStatus" role="status" aria-live="polite">Independent Reality job evidence has not yet been read. Even a completed isolated repair does not establish recurring employee replacement.</p>
+  <div id="workforceScenarioRows" aria-live="polite"></div>
+  <p>Important: An FTE-capacity equivalent is not an employee who can safely be removed. Ongoing reliability, uncovered duties, compliance, actual staffing changes and verified payroll expenses must be checked before claiming realized savings. No information entered here is saved.</p>
+ </details>
  <section class="team-next-week" aria-label="Next week prepared employee roles">
   <div class="team-head"><strong>Next week's proposed employee schedule</strong><span class="team-role" id="nextWeekSourceStatus">Checking background preparation…</span></div>
   <p id="nextWeekSummary">Reality prepares next-week work while the current week runs. These are proposed source inspections, not authorized shifts or promised eight-hour workloads.</p>
@@ -161,12 +219,14 @@ const SESSION='/api/reality/personal-session';
 const API='/api/reality/personal-chat';
 const SHIFT='/api/reality/personal-governed-employee-shift';
 const ROSTER='/api/reality/personal-employee-roster';
+const WORKFORCE_SAVINGS='/api/reality/personal-workforce-savings-scenario';
 const RILEY_PROOF='/api/reality/personal-riley-proof';
 const RILEY_LOOP='/api/reality/personal-riley-loop-readiness';
 const RILEY_BACKLOG='/api/reality/personal-riley-existing-backlog';
 const SELF_AUDIT='/api/reality/personal-capability-self-audit';
 const uuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||'');
-let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false;
+let active=null,pending=false,sequence=0,elapsed=null,shiftLoading=false,teamLoading=false,combinedQueueLoading=false;
+const workforceAssumptions=new Map();
 function conversation(){
   let id;try{id=localStorage.getItem(KEY)}catch{}
   if(!uuid(id)){id=crypto.randomUUID();try{localStorage.setItem(KEY,id)}catch{}}
@@ -424,6 +484,55 @@ async function refreshRileyExistingBacklog(){
    line.append(a,textNode('div',statuses[entry.status]));
    node.append(line);
   }
+  // Basic Work Center categories and Employee category are two VIEWS of
+  // the same source observations, not two job queues or worker approvals.
+  const category=x.assigned_category_backlog;
+  if(category!==null){
+   if(category?.version!=='reality-riley-category-backlog-bridge-v1'||
+      category.status!=='EXISTING_RILEY_CATEGORY_FINDINGS_RECONCILED_NOT_EXECUTED'||
+      category.execution_authorized!==false||
+      category.installation_authorized!==false||
+      category.worker_shift_dispatched!==false||
+      category.production_changed!==false||
+      !Array.isArray(category.assignments)||category.assignments.length>25||
+      category.category_findings!==category.assignments.length||
+      category.remaining_or_reconciliation_findings<0||
+      category.remaining_or_reconciliation_findings>category.category_findings)
+    throw Error('RILEY_CROSS_CATEGORY_SOURCE_UNVERIFIED');
+   node.append(textNode('div',
+    'Riley’s existing Employee + Work Center assignments: '+
+    category.category_findings+' categorized source findings · '+
+    category.open_implementation_review_items+' open PR review candidates · '+
+    category.remaining_or_reconciliation_findings+
+    ' not independently confirmed settled by the category bridge.'));
+   const shownIssues=new Set(x.rows.slice(0,5).map(z=>z.source_url));
+   const examples=category.assignments.filter(z=>
+    !shownIssues.has(z.source_url)).slice(0,5);
+   for(const work of examples){
+    if(!/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(work.source_url)||
+       !['ISSUE','PULL_REQUEST','FAILURE_SIGNAL'].includes(work.source_kind)||
+       work.original_execution_authorized!==false||
+       work.independently_accepted_outcome!==false||
+       work.installation_authorized!==false)
+     throw Error('RILEY_CATEGORY_ITEM_UNVERIFIED');
+    const line=document.createElement('div');
+    line.style.marginTop='8px';
+    const a=document.createElement('a');a.href=work.source_url;
+    a.rel='noopener noreferrer';a.target='_blank';
+    a.textContent=work.title;
+    const hint=work.source_kind==='PULL_REQUEST'?
+     'Open code review — independently test before any installation':
+     work.source_kind==='FAILURE_SIGNAL'?
+      'Historical provider failure — check current reproduction':
+      'Source-backed issue — verify exact existing owner work first';
+    line.append(a,textNode('div',hint));node.append(line);
+   }
+   node.append(textNode('div',
+    'Why these are not all executing yet: the current original-job intake requires a narrow, independently proven missing-extension defect. Existing-file repairs and PR reviews need their corresponding verified admission path. An assigned category is not an execution warrant.'));
+  }else{
+   node.append(textNode('div',
+    'Employee/Work Center category cross-check unavailable. This does NOT mean Riley has no unfinished work.'));
+  }
   node.append(textNode('div',
    'Tracked issues are work candidates, not permission to repair. Reality preserves the original approval and does not replay settled work.'));
  }catch{
@@ -495,6 +604,177 @@ function clearShiftValueEvidence(){
  $('teamValueProof').textContent='Verified human work returned and net ROI: not measured.';
  $('teamValueSources').textContent='Source readback unavailable; no financial impact inferred.';
 }
+
+function configureWorkforceSavingsRoles(roster){
+ const roles=roster?.proposed_employees;
+ if(roster?.status!=='READ_ONLY_PROPOSED_AI_EMPLOYEES'||
+  !Array.isArray(roles)||roles.length!==8)
+  throw Error('WORKFORCE_SCENARIO_ROLE_SOURCE_UNVERIFIED');
+ const select=$('workforceRole'),previous=select.value;
+ select.replaceChildren();
+ for(const role of roles){
+  if(role.employee_id!=='reality-proposed:'+role.function_id||
+   typeof role.role!=='string'||!role.role||
+   role.activation_status!=='PROPOSED_NOT_DEPLOYED')
+   throw Error('WORKFORCE_SCENARIO_ROLE_NOT_VERIFIED');
+  const option=document.createElement('option');
+  option.value=role.function_id;
+  option.textContent=role.role+' · '+role.display_name;
+  select.append(option);
+ }
+ if([...select.options].some(o=>o.value===previous))select.value=previous;
+}
+function loadWorkforceRoleInputs(){
+ const a=workforceAssumptions.get($('workforceRole').value);
+ const defaults={
+  current_employee_positions:1,
+  annual_fully_loaded_cost_per_position_usd:100000,
+  monthly_human_work_hours_per_position:160,
+  assumed_automatable_human_hours_per_month:0,
+  assumed_human_supervision_hours_per_month:0,
+  assumed_shared_model_runtime_hours_per_month:0,
+  estimated_monthly_provider_and_infrastructure_cost_usd:0,
+  extra_monthly_supervision_cash_cost_usd:0,
+  all_critical_duties_assumed_covered:false
+ };
+ const values=a||defaults;
+ for(const [id,key] of [
+  ['workforcePositions','current_employee_positions'],
+  ['workforceSalary','annual_fully_loaded_cost_per_position_usd'],
+  ['workforceHumanHours','monthly_human_work_hours_per_position'],
+  ['workforceAutomatedHours','assumed_automatable_human_hours_per_month'],
+  ['workforceReviewHours','assumed_human_supervision_hours_per_month'],
+  ['workforceModelHours','assumed_shared_model_runtime_hours_per_month'],
+  ['workforceMonthlyAI','estimated_monthly_provider_and_infrastructure_cost_usd'],
+  ['workforceExtraSupervision','extra_monthly_supervision_cash_cost_usd']
+ ])$(id).value=String(values[key]);
+ $('workforceCriticalDuties').checked=values.all_critical_duties_assumed_covered;
+}
+function readWorkforceRoleInputs(){
+ const num=id=>{
+  const input=$(id);
+  if(!input.checkValidity()||!input.value.trim())
+   throw Error('Check the value for '+input.closest('label')?.textContent);
+  return Number(input.value);
+ };
+ return {
+  function_id:$('workforceRole').value,
+  current_employee_positions:num('workforcePositions'),
+  annual_fully_loaded_cost_per_position_usd:num('workforceSalary'),
+  monthly_human_work_hours_per_position:num('workforceHumanHours'),
+  assumed_automatable_human_hours_per_month:num('workforceAutomatedHours'),
+  assumed_human_supervision_hours_per_month:num('workforceReviewHours'),
+  assumed_shared_model_runtime_hours_per_month:num('workforceModelHours'),
+  estimated_monthly_provider_and_infrastructure_cost_usd:num('workforceMonthlyAI'),
+  extra_monthly_supervision_cash_cost_usd:num('workforceExtraSupervision'),
+  all_critical_duties_assumed_covered:$('workforceCriticalDuties').checked,
+ };
+}
+function renderWorkforceSavingsProjection(data){
+ if(data?.ok!==true||
+  data.version!=='reality-role-workforce-consolidation-scenario-v1'||
+  data.endpoint_scope!=='SIGNED_IN_OWNER_PRIVATE_PREVIEW_READ_ONLY'||
+  data.underlying_model_provider!=='OpenAI'||
+  data.shared_model_concurrency_limit!==1||
+  data.independently_active_ai_employees!==0||
+  data.authorized_hr_actions!==false||
+  data.actual_positions_removed_verified!==null||
+  data.realized_payroll_savings_usd!==null||
+  data.positions_terminated!==false||
+  data.inputs_saved!==false||
+  !Array.isArray(data.role_scenarios)||
+  !Number.isFinite(data.annual_net_payroll_scenario_usd))
+  throw Error('WORKFORCE_SCENARIO_EVIDENCE_INVALID');
+ const usd=n=>new Intl.NumberFormat('en-US',{
+  style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
+ $('workforceScenarioStatus').textContent=
+  'HYPOTHETICAL · '+data.potential_whole_positions_scenario+
+  ' whole-position equivalents potentially consolidatable · '+usd(data.annual_gross_payroll_avoidance_scenario_usd)+
+  ' annual gross payroll · '+usd(data.annual_net_payroll_scenario_usd)+
+  ' annual net after assumed AI/supervision cost. Based on YOUR inputs, not verified replacements or realized savings.';
+ const evidence=data.workforce_evidence;
+ if(evidence?.version!=='reality-role-workforce-evidence-v1'||
+  evidence.read_only!==true||evidence.owner_execution_authorized!==false||
+  evidence.production_changed!==false||
+  evidence.verified_cash_savings_usd!==null||
+  evidence.verified_positions_eliminated!==null)
+  throw Error('WORKFORCE_OWNER_EVIDENCE_UNVERIFIED');
+ const evidenceNode=$('workforceEvidenceStatus');
+ if(evidence.status==='ISOLATED_TECHNICAL_WORK_PROOF_NO_RECURRING_STAFF_COVERAGE'){
+  if(!Number.isSafeInteger(evidence.isolated_original_jobs_independently_settled)||
+   evidence.isolated_original_jobs_independently_settled<0||
+   evidence.verified_recurring_role_task_coverage_count!==0||
+   evidence.independently_proven_replacement_ready_role_count!==0||
+   !Array.isArray(evidence.role_work_proof)||
+   evidence.role_work_proof.length!==8)
+   throw Error('WORKFORCE_RECURRING_ROLE_EVIDENCE_NOT_VERIFIED');
+  evidenceNode.textContent='REALITY VERIFIED SOURCE: '+
+   evidence.isolated_original_jobs_independently_settled+
+   ' isolated original jobs independently settled; '+ 
+   evidence.isolated_jobs_with_source_recorded_economic_inputs+
+   ' with recorded economic observations. No recurring business-role workload coverage, removable positions, or cash savings verified. Technical repair is not workforce replacement.';
+ }else if(evidence.status==='OWNER_ROI_READBACK_UNAVAILABLE_NO_CLAIMS'){
+  if(evidence.isolated_original_jobs_independently_settled!==null||
+   evidence.role_work_proof!==null)
+   throw Error('WORKFORCE_UNAVAILABLE_EVIDENCE_CANNOT_BE_ZERO');
+  evidenceNode.textContent='Independent Reality job and economic readback unavailable. Verified staffing coverage and realized payroll savings remain unknown.';
+ }else throw Error('WORKFORCE_EVIDENCE_STATUS_UNKNOWN');
+ const holder=$('workforceScenarioRows');
+ holder.replaceChildren();
+ for(const r of data.role_scenarios){
+  if(r.proof_status!=='OWNER_ENTERED_WHAT_IF_NOT_VALIDATED_EMPLOYEE_REMOVAL'||
+   r.verified_removable_positions!==null||
+   r.verified_actual_cash_savings_usd!==null||
+   r.personnel_decision_authorized!==false)
+   throw Error('WORKFORCE_SCENARIO_ROLE_EVIDENCE_INVALID');
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong',r.role_title+' · '+r.role_label));
+  row.append(textNode('div',
+   'Proposed coverage: '+r.hypothetical_fte_capacity_equivalent+' FTE-equivalent · '+
+   r.hypothetical_whole_positions_potentially_consolidatable+
+   ' conditional whole positions · net annual payroll scenario '+
+   usd(r.illustrative_annual_net_payroll_scenario_usd)));
+  row.append(textNode('small',
+   'Source-backed findings: '+r.source_backed_findings_not_completed_jobs+
+   ' (not completed jobs). Personnel decisions: none authorized.'));
+  holder.append(row);
+ }
+}
+async function calculateWorkforceSavings(clear=false){
+ const button=$('workforceCalculate');
+ const status=$('workforceScenarioStatus');
+ if(button.disabled)return;
+ const previous=new Map(workforceAssumptions);
+ button.disabled=true;
+ try{
+  if(clear)workforceAssumptions.clear();
+  else{
+   const input=readWorkforceRoleInputs();
+   workforceAssumptions.set(input.function_id,input);
+  }
+  const capacityInput=$('workforceSharedCapacity');
+  if(!capacityInput.checkValidity()||!capacityInput.value.trim())
+   throw Error('Enter a valid total shared OpenAI runtime budget.');
+  const body={
+   assumptions:[...workforceAssumptions.values()],
+   shared_monthly_model_runtime_capacity_hours:Number(capacityInput.value)
+  };
+  status.textContent='Calculating company role coverage and annual payroll what-if…';
+  const data=await json(WORKFORCE_SAVINGS,{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify(body),signal:AbortSignal.timeout(22000)
+  });
+  renderWorkforceSavingsProjection(data);
+ }catch(e){
+  workforceAssumptions.clear();
+  for(const [key,val] of previous)workforceAssumptions.set(key,val);
+  status.textContent='Workforce calculation unavailable: '+
+   String(e?.message||'Invalid company scenario').slice(0,220)+
+   '. No verified positions removed or savings claimed.';
+  $('workforceEvidenceStatus').textContent='Independent workforce evidence could not be read; no verified staffing savings claimed.';
+ }finally{button.disabled=false}
+}
+
 function renderNextWeekWorkPlan(roster){
  const plan=roster?.next_week_plan;
  if(plan?.version!=='reality-next-week-employee-plan-v1'||
@@ -673,6 +953,8 @@ async function refreshEmployeeBoard(){
       holder.append(employeeCard(employee));
     $('teamCards').replaceChildren(holder);
     showShiftValueEvidence(roster);
+    configureWorkforceSavingsRoles(roster);
+    loadWorkforceRoleInputs();
     renderNextWeekWorkPlan(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
@@ -692,17 +974,388 @@ async function refreshEmployeeBoard(){
       '. No workers or completed work are being claimed.';
   }finally{teamLoading=false}
 }
+
+
+const RILEY_PROGRESS_STAGES=Object.freeze([
+ 'Verify existing work and receipts',
+ 'Investigate tracked engineering issue',
+ 'Check independent failure evidence',
+ 'Review current code changes',
+ 'Qualify next unfinished work',
+ 'Execute approved original repair',
+ 'Independently verify original-job result',
+ 'Record final settlement and shift outcome'
+]);
+const RILEY_SAFE_MODEL_REASONS=Object.freeze({
+ OPENAI_RESPONSE_UNAVAILABLE:'OpenAI did not return a successful response. The older attempt did not record a more specific cause.',
+ OPENAI_REQUEST_OPTIONS_REJECTED:'OpenAI rejected the model request options.',
+ OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED:'OpenAI rejected access to the configured credential or model.',
+ OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND:'The configured OpenAI model or endpoint was unavailable.',
+ OPENAI_RATE_OR_QUOTA_LIMIT:'The OpenAI rate or quota limit was reached.',
+ OPENAI_PROVIDER_SERVER_FAILURE:'The OpenAI provider reported a server error.',
+ OPENAI_REQUEST_OR_TIMEOUT_UNVERIFIED:'The model request failed or timed out without a verified result.',
+ SHARED_OPENAI_ADAPTER_NOT_CONFIGURED:'The shared OpenAI model connection is not configured.',
+ PROVIDER_SOURCE_NO_LONGER_OPEN:'The GitHub source is no longer open.',
+ OPENAI_PROVIDER_RESULT_UNVERIFIED:'The OpenAI response did not pass result validation.',
+ OPENAI_EMPTY_FINAL_ADVISORY:'The model returned no usable review.'
+});
+function renderRileyVerifiedOriginalJobs(readback,shiftId){
+ const target=$('rileyVerifiedOriginalJobRows'),frag=document.createDocumentFragment();
+ let count=0;
+ const rowFor=(title,detail,url=null,linkLabel='Open independent GitHub evidence')=>{
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong',title));
+  if(url&&/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*#issuecomment-\d+$/.test(url))
+   row.append(combinedQueueLink(url,linkLabel));
+  row.append(textNode('div',detail));frag.append(row);
+ };
+ const pr=readback?.riley_pr_review_jobs;
+ if(pr?.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'&&Array.isArray(pr.jobs)&&pr.jobs.length<=10){
+  for(const j of pr.jobs.filter(x=>x.shift_id===shiftId)){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    j.source_review_job_only===true&&j.source_code_repaired===false&&
+    j.installation_authorized===false&&
+    /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+    /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(j.settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Riley/Taylor PR review · #58':'PR review · '+j.phase,
+    settled?'Original '+j.original_work_id+' · Receipt '+j.settlement_receipt_ref+
+      '. Real review published, no code repair or installation claimed.':
+      'Review not independently settled.',
+    settled?j.provider_comment_url:null);
+   if(settled)count++;
+  }
+ }
+ const triage=readback?.riley_failure_triage_jobs;
+ if(triage?.status==='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'&&
+  Array.isArray(triage.jobs)&&triage.jobs.length<=5){
+  for(const j of triage.jobs.filter(x=>x.shift_id===shiftId&&
+   x.source_ref==='https://github.com/maloney2323/Reality/issues/143'&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||''))){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    j.code_repair_completed===false&&j.production_changed===false&&
+    /^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(
+     j.settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Riley/Taylor recurring-failure investigation · #143':
+    'CURRENTLY INVESTIGATING · recurring execution-engine failures · #143',
+    settled?'Independent latest-run evidence: historical failure, current successes. '+
+      'Original '+j.original_work_id+' · Receipt '+j.settlement_receipt_ref+
+      '. No unproven historical fix or cash savings claimed.':
+      'Checking latest and historical execution-engine runs. No repaired defect claimed yet.',
+    settled?j.provider_comment_url:null,'Open verified issue investigation');
+   if(settled)count++;
+  }
+ }
+ const repairs=readback?.riley_code_repair_jobs;
+ if(repairs?.status==='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'&&
+  Array.isArray(repairs.jobs)&&repairs.jobs.length<=6){
+  for(const j of repairs.jobs.filter(x=>x.shift_id===shiftId&&
+   x.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||''))){
+   const settled=j.phase==='SETTLED'&&j.original_job_completed===true&&
+    /^supabase:[a-z0-9_]+:[a-f0-9-]{36}$/.test(
+     j.original_settlement_receipt_ref||'');
+   rowFor(settled?'COMPLETED · Original code repair · #263':
+    'ACTIVE · Original code repair · #263 · '+String(j.phase||'NOT VERIFIED').replaceAll('_',' '),
+    settled?'Original '+j.original_work_id+' · Independent settlement '+
+      j.original_settlement_receipt_ref:
+      'Original '+j.original_work_id+' · The model/test worker must produce a '+
+      'verified code candidate and Reality must obtain exact artifact approval '+
+      'before installation and original-job settlement. Not completed.',
+    null);
+   if(settled)count++;
+  }
+ }
+ rowFor('DEPENDENT · Full-loop acceptance · issue #185',
+  'This acceptance job requires the same issue #263 code repair to be independently '+
+  'verified, approved if installation is necessary, resumed and finally settled. '+
+  'It is not counted as completed just because the worker is active.');
+ target.replaceChildren(frag);
+ return count;
+}
+function renderRileyLiveProgress(readback){
+ const panel=$('rileyLiveProgressPanel');
+ const shifts=readback?.shifts;
+ if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+    !Array.isArray(shifts)||shifts.length>5){
+  panel.hidden=true;return;
+ }
+ const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
+  .includes(x?.status))||shifts[0];
+ if(!current||!Array.isArray(current.steps)||
+    current.steps.length!==8||
+    current.steps.some((x,i)=>x?.step_index!==i+1)){
+  panel.hidden=true;return;
+ }
+ const steps=current.steps;
+ const status=String(current.status||'UNVERIFIED').replaceAll('_',' ');
+ const sourceDone=steps.slice(0,5).filter(x=>x.state==='SOURCE_CHECKED').length;
+ const modelFailures=steps.slice(1,5).filter(x=>
+  x.role_handoff_status==='ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM');
+ const modelResults=steps.slice(1,5).filter(x=>
+  x.role_handoff_status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK');
+ const admittedRepairOutcome=steps[5].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+ const independentReceipt=steps[6].state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+ const originalVerified=admittedRepairOutcome&&independentReceipt;
+ const realReviewJobs=renderRileyVerifiedOriginalJobs(readback,current.shift_id);
+ $('rileySourceProgress').value=sourceDone;
+ $('rileySourceProgressLabel').textContent=sourceDone+' of 5';
+ $('rileyLiveHeadline').textContent=
+  'Shift '+status+' · '+sourceDone+' of 5 source checks recorded · '+
+  modelResults.length+' model-assisted reviews · '+
+  modelFailures.length+' model connection failures · '+
+  realReviewJobs+' independently settled assigned jobs · '+
+  (originalVerified?'Independent original-job receipt recorded.':
+   'No independent final repair receipt for this shift.')+
+  ' Worker progress refreshes every 30 seconds.';
+ const briefing=readback.shift_briefing;
+ const approval=briefing?.shift_id===current.shift_id&&
+   briefing.approval_pending===true;
+ $('rileyLiveApprovalStatus').textContent=approval?
+  'ACTION NEEDED: an independently verified exact capability upgrade is ready for your review in Reality Chat. Installation is not authorized until you approve that artifact.':
+  'YOU DO NOT NEED TO AUTHORIZE THE SHIFT AGAIN. No independently verified capability installation request is pending. You can leave this page; the server-side worker remains responsible for the authorized shift.';
+ const exactRepair=(readback?.riley_code_repair_jobs?.jobs||[]).find(j=>
+  j?.shift_id===current.shift_id&&j.source_ref===
+   'https://github.com/maloney2323/Reality/issues/263'&&
+  /^work:[a-f0-9]{32}$/.test(j.original_work_id||''));
+ const next=steps.find(x=>['QUEUED','CLAIMED','AWAITING_EXACT_WORK'].includes(x.state));
+ const blocker=$('rileyLiveBlocker');
+ if(current.status==='AWAITING_EXACT_ORIGINAL_WORK'||
+   steps[5].state==='AWAITING_EXACT_WORK'){
+  blocker.textContent='EXECUTION BLOCKER: source inspection is not code repair. No exact eligible original job has reached the execution gate. Reality must qualify an existing-file repair against current failure evidence and bind it to this same shift; no additional start button will fix that.';
+ }else if(current.status==='ENDED_WITH_BLOCKED_WORK'||current.status==='ESCALATED'){
+  blocker.textContent='BLOCKED: this shift did not achieve independent original-job settlement. Inspect recorded failure evidence before any new attempt; do not replay uncertain or previously settled work.';
+ }else if(exactRepair&&!originalVerified){
+  blocker.textContent='CURRENT EXECUTION: owner-authorized code-repair original '+
+   exactRepair.original_work_id+' is '+String(exactRepair.phase||'unverified').replaceAll('_',' ')+
+   '. Reality must finish genuine code generation, independent frozen acceptance, '+
+   'exact upgrade approval if required, same-job resumption and final receipt. '+
+   'No shift reauthorization needed.';
+ }else if(next?.step_index===6&&!originalVerified){
+  blocker.textContent='NEXT GATE: source checks are complete, but no independently admitted original repair has been read back. The execution admission path needs repair, not another owner permission.';
+ }else if(next){
+  blocker.textContent='CURRENT WORK: '+RILEY_PROGRESS_STAGES[next.step_index-1]+
+   '. The trusted worker claims the next eligible step automatically. A source check by itself does not finish or fix a job.';
+ }else{
+  blocker.textContent=originalVerified?
+   'The independent original-job receipt has been recorded; final shift reconciliation is separate.':
+   'No further source check is queued; final original repair settlement has not been proven. Review the recorded outcome, not the elapsed timer.';
+ }
+ const timeline=$('rileyLiveTimeline'),frag=document.createDocumentFragment();
+ for(let i=0;i<steps.length;i++){
+  const step=steps[i],row=document.createElement('div');
+  row.className='workforce-output-row';
+  const state=String(step.state||'UNKNOWN').replaceAll('_',' ');
+  row.append(textNode('strong',(i+1)+'. '+RILEY_PROGRESS_STAGES[i]+' · '+state));
+  const source=step.source_ref;
+  if(typeof source==='string'&&COMBINED_WORK_SOURCE.test(source))
+   row.append(combinedQueueLink(source,source));
+  let explanation='';
+  if(step.state==='SOURCE_CHECKED'){
+   explanation='Source evidence stored at '+(step.completed_at&&
+    Number.isFinite(Date.parse(step.completed_at))?
+    new Date(step.completed_at).toLocaleTimeString():'verified readback')+
+    '; not an independently completed repair.';
+   if(step.role_handoff_status==='ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'){
+    const reason=Object.hasOwn(RILEY_SAFE_MODEL_REASONS,step.role_handoff_reason)?
+     RILEY_SAFE_MODEL_REASONS[step.role_handoff_reason]:
+     'OpenAI assistance did not complete. The older receipt lacks a safe failure classification.';
+    explanation+=' MODEL CONNECTION BLOCKER: '+reason;
+   }else if(step.role_handoff_status===
+     'SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK')
+    explanation+=' OpenAI review recorded (advice, not an accepted repair).';
+  }else if(step.state==='CLAIMED')
+   explanation='The trusted worker has claimed this step; independent evidence is pending.';
+  else if(step.state==='AWAITING_EXACT_WORK')
+   explanation='Blocked until the exact independently qualified original job is available. No installation approval exists yet.';
+  else if(step.state==='ORIGINAL_JOB_RECEIPT_VERIFIED')
+   explanation='Independent original-job receipt recorded. Verify settlement for this same authorized job.';
+  else if(step.state==='BLOCKED_PROVIDER')
+   explanation='Provider or governance blocker recorded; do not assume the task finished.';
+  else if(step.state==='REPORTED')
+   explanation='Shift report recorded; it is not automatically a completed code repair.';
+  else explanation='Queued. Worker will check when its existing authorization and prerequisites permit.';
+  row.append(textNode('div',explanation));
+  frag.append(row);
+ }
+ timeline.replaceChildren(frag);
+ panel.hidden=false;
+}
+
+const COMBINED_WORK_SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d{0,15}$/;
+function combinedQueueLink(source,title){
+ const a=document.createElement('a');a.href=source;
+ a.target='_blank';a.rel='noopener noreferrer';a.textContent=title;
+ return a;
+}
+function renderRileyTaylorDraftQueue(draft){
+ const box=$('rileyTaylorCombinedQueue'),rows=$('rileyTaylorQueueRows');
+ const orders=draft?.combined_employee_work_orders;
+ if(draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
+    draft?.read_only!==true||draft?.installation_authorized!==false||
+    draft?.job_started!==false||draft?.production_changed!==false||
+    orders?.version!=='reality-riley-taylor-combined-work-orders-v1'||
+    orders.plan_fingerprint!==draft.expected_fingerprint||
+    orders.execution_started!==false||
+    orders.installation_authorized!==false||
+    orders.production_changed!==false||
+    orders.signed_in_owner_shift_start_required!==true||
+    orders.no_extra_per_task_owner_start_approval!==true||
+    orders.operating_model!=='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'||
+    !Array.isArray(orders.tasks)||orders.tasks.length>4||
+    orders.task_count!==orders.tasks.length)
+  throw Error('RILEY_TAYLOR_COMBINED_WORK_SCOPE_UNVERIFIED');
+ const frag=document.createDocumentFragment();
+ for(const task of orders.tasks){
+  if(!COMBINED_WORK_SOURCE.test(task.source_ref||'')||
+     !/^combined-source-step:[2-5]$/.test(task.assignment_id||'')||
+     !Array.isArray(task.employees)||
+     task.employees.join(',')!=='Riley,Taylor'||
+     typeof task.title!=='string'||task.title.length>210||
+     task.owner_authorization_required!==true||
+     task.accepted_original_repair!==false||
+     task.installation_authorized!==false||
+     task.production_changed!==false)
+   throw Error('RILEY_TAYLOR_SOURCE_WORK_NOT_VERIFIED');
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong','Work '+task.source_step_index+
+   ' · Riley + Taylor · '+task.work_type.replaceAll('_',' ')));
+  row.append(combinedQueueLink(task.source_ref,task.title));
+  row.append(textNode('div','Riley: '+task.riley));
+  row.append(textNode('div','Taylor: '+task.taylor));
+  row.append(textNode('div','Acceptance: '+task.independent_acceptance));
+  frag.append(row);
+ }
+ rows.replaceChildren(frag);
+ $('rileyTaylorQueueStatus').textContent=orders.task_count?
+  orders.task_count+' exact unfinished source assignments prepared for one signed-in owner start. Maximum authorization window: '+
+  orders.maximum_authorized_hours+'h; not a required work duration. No code repair or independent final job receipt is claimed before execution.':
+  'No exact assigned source work in this plan. Reality will not authorize an empty time-only shift.';
+ box.hidden=false;
+}
+function renderActiveRileyTaylorQueue(readback){
+ const active=(readback?.shifts||[]).find(s=>
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+ if(!active||!Array.isArray(active.steps)||active.steps.length!==8)return;
+ const steps=active.steps.filter(s=>s.step_index>=2&&s.step_index<=5&&
+  COMBINED_WORK_SOURCE.test(s.source_ref||''));
+ const holder=$('rileyTaylorQueueRows');
+ const nodes=document.createDocumentFragment();
+ for(const step of steps){
+  const row=document.createElement('div');row.className='workforce-output-row';
+  const published=(readback?.riley_pr_review_jobs?.jobs||[]).find(j=>
+   j?.shift_id===active.shift_id&&j.source_ref===step.source_ref&&
+   j.phase==='SETTLED'&&j.original_job_completed===true&&
+   /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(j.settlement_receipt_ref||''));
+  row.append(textNode('strong','Work '+step.step_index+
+   ' · Riley + Taylor · '+(published?'REVIEW JOB SETTLED':String(step.state||'QUEUED').replaceAll('_',' '))));
+  row.append(combinedQueueLink(step.source_ref,step.source_ref));
+  if(published){
+   row.append(combinedQueueLink(published.provider_comment_url,'Read completed GitHub review'));
+   row.append(textNode('div','Independent original-job receipt recorded for this real PR review. No code fix or installation claimed.'));
+  }else if(step.state==='SOURCE_CHECKED')
+   row.append(textNode('div','GitHub source evidence recorded. This does not certify a completed code repair.'));
+  else if(step.state==='BLOCKED_PROVIDER')
+   row.append(textNode('div','Provider source blocked; preserve evidence and investigate without unsafe replay.'));
+  else row.append(textNode('div','Awaiting independent source check by the governed worker.'));
+  nodes.append(row);
+ }
+ holder.replaceChildren(nodes);
+ $('rileyTaylorQueueStatus').textContent=
+  'Owner-authorized combined shift '+active.status.replaceAll('_',' ')+
+  ' · '+steps.length+' assigned source tasks · '+
+  steps.filter(x=>x.state==='SOURCE_CHECKED').length+
+  ' source checks recorded. Final original-job repair receipts are independently tracked; no labor savings inferred.';
+ $('rileyTaylorCombinedQueue').hidden=false;
+}
+async function refreshRileyTaylorCombinedWorkQueue(){
+ if(combinedQueueLoading||$('chat').hidden||pending)return;
+ const hours=Number($('runShiftHours').value);
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)return;
+ combinedQueueLoading=true;
+ try{
+  const read=await json(SHIFT+'?hours='+hours,{
+   signal:AbortSignal.timeout(35000)
+  });
+  if(read?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+     !Array.isArray(read.shifts)||read.shifts.length>5)
+    throw Error('OWNER_SHIFT_READBACK_UNAVAILABLE');
+  const current=read.shifts.find(s=>
+   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+  if(current){renderActiveRileyTaylorQueue(read);return;}
+  renderRileyTaylorDraftQueue(read.requested_shift_draft);
+ }catch{
+  $('rileyTaylorCombinedQueue').hidden=false;
+  $('rileyTaylorQueueStatus').textContent=
+   'The owner-scoped combined work plan could not be verified. This does not mean Riley has no unfinished tasks. Check source connection before starting.';
+  $('rileyTaylorQueueRows').replaceChildren();
+ }finally{combinedQueueLoading=false}
+}
+
+const COMBINED_STEP_ROLES=Object.freeze({
+ 2:['Riley','Taylor'],3:['Riley','Taylor'],
+ 4:['Riley','Taylor'],5:['Riley','Taylor']
+});
+function renderCombinedShiftRoleEvidence(readback){
+ const panel=$('combinedShiftRoleHandoffs'),holder=$('combinedShiftRoleRows');
+ holder.replaceChildren();
+ const shifts=readback?.shifts;
+ if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
+  !Array.isArray(shifts)||shifts.length>5){
+  panel.hidden=true;return;
+ }
+ const latest=shifts[0];
+ if(!latest||!Array.isArray(latest.steps)||latest.steps.length!==8){
+  panel.hidden=true;return;
+ }
+ let shown=0;
+ for(const step of latest.steps){
+  const expected=COMBINED_STEP_ROLES[step?.step_index];
+  if(!expected||step.state!=='SOURCE_CHECKED'||
+    !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/.test(step.source_ref||''))
+   continue;
+  const status=step.role_handoff_status;
+  if(!['SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK',
+    'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM'].includes(status))
+   continue;
+  if(!Array.isArray(step.role_handoff_labels)||
+    step.role_handoff_labels.length!==expected.length||
+    step.role_handoff_labels.some((label,i)=>label!==expected[i]))
+   continue;
+  const row=document.createElement('div');
+  row.className='workforce-output-row';
+  row.append(textNode('strong',
+   'Step '+step.step_index+' · '+expected.join(' + ')+' · Shared OpenAI'));
+  const a=document.createElement('a');
+  a.href=step.source_ref;
+  a.rel='noopener noreferrer';a.target='_blank';
+  a.textContent=step.source_ref;
+  row.append(a);
+  row.append(textNode('div',status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK'?
+   'Source checked; model role advice recorded. NOT a completed repair or independent receipt.':
+   'Source checked; shared model role advice unavailable. No completed work claimed.'));
+  if(status==='SHARED_OPENAI_ROLE_ADVISORY_RECORDED_NOT_VERIFIED_WORK'&&
+    typeof step.role_handoff_advisory==='string'&&
+    step.role_handoff_advisory.length<=1200)
+   row.append(textNode('p',step.role_handoff_advisory));
+  holder.append(row);shown++;
+ }
+ panel.hidden=shown===0;
+}
+
 async function refreshShiftStatus(){
   if(shiftLoading)return;
   shiftLoading=true;
   try{
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
+    renderCombinedShiftRoleEvidence(data);
+    renderRileyLiveProgress(data);
+    renderActiveRileyTaylorQueue(data);
     const node=$('shiftStatus');
     if(activeState.hasActive){
       $('runFullShift').disabled=true;
       $('runFullShift').textContent='Existing shift authorized';
-      $('fullShiftScope').textContent='Your shift has already been authorized. Do NOT press Run Riley\'s Shift again. The live status below is read directly from the database every 30 seconds. Source checks do not prove an executable original job or a final receipt.';
+      $('fullShiftScope').textContent='Your combined shift is ALREADY AUTHORIZED. Do not start a duplicate shift or approve it again. Watch live activity below: source reviews, OpenAI model connection, original-job execution, independent receipts and real blockers. If an exact verified installation is needed, Reality Chat must present that artifact separately.';
       const briefing=data.shift_briefing||{};
       const current=String(briefing.current||activeState.status);
       const route=data.recovery_diagnosis;
@@ -729,11 +1382,14 @@ async function refreshShiftStatus(){
       node.hidden=false;
     }else{
       $('runFullShift').disabled=false;
-      $('runFullShift').textContent="Run Riley's Shift";
+      $('runFullShift').textContent='Start Riley + Taylor Jobs';
       node.textContent='No currently authorized shift found in the owner-scoped readback. Starting a new shift still requires your exact approval.';
       node.hidden=false;
     }
   }catch{
+    $('rileyLiveProgressPanel').hidden=true;
+    $('combinedShiftRoleHandoffs').hidden=true;
+    $('combinedShiftRoleRows').replaceChildren();
     // Fail closed: a connection problem MUST NOT unlock a second shift.
     $('runFullShift').disabled=true;
     $('runFullShift').textContent='Shift status unavailable';
@@ -779,29 +1435,51 @@ async function authorizeShiftFromChat(command){
   const before=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
   const existing=safeShiftReadbackState(before,{requestedHours:command.duration_hours});
   if(existing.hasActive){
-    let batch='';
-    if(existing.matching_requested_hours){
-      try{
-       const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
-       batch=await intakeVerifiedRileyShiftJobs(existing.shift_id,
-         match?.plan_fingerprint);
-      }catch{
-       batch=' Existing shift preserved. Batch intake needs independent reconciliation; do not retry uncertain jobs.';
-      }
-    }
+    // A real owner shift is already authorized. Treat a repeated "start"
+    // as a current-job STATUS request, not a second approval or a retry of
+    // uncertain-effect original intake/dispatch.
+    const match=before.shifts.find(x=>x.shift_id===existing.shift_id);
+    const recorded=Array.isArray(match?.steps)?
+     match.steps.slice(0,5).filter(x=>x.state==='SOURCE_CHECKED').length:null;
+    const step6=match?.steps?.[5];
+    const step7=match?.steps?.[6];
+    const receipt=step6?.state==='ORIGINAL_JOB_RECEIPT_VERIFIED'&&
+      step7?.state==='ORIGINAL_JOB_RECEIPT_VERIFIED';
+    const approval=Array.isArray(before.capability_approval_handoffs)&&
+     before.capability_approval_handoffs.some(x=>
+      x.shift_id===existing.shift_id&&
+      x.status==='EXACT_VERIFIED_CAPABILITY_APPROVAL_READY_IN_REALITY_CHAT'&&
+      x.installation_approved===false);
     return {
       acknowledged:true,
-      text:existing.matching_requested_hours?
-       'An owner-authorized '+existing.duration_hours+'-hour shift already exists. Shift ID: '+existing.shift_id+
-       '. Status: '+existing.status+'. No duplicate shift was started. See current status above.'+batch:
-       'A different '+existing.duration_hours+'-hour shift is already active (ID '+existing.shift_id+
-       '). I did not start another concurrent shift or override its authorization.',
+      text:'Your instruction is recognized. Riley + Taylor shift '+existing.shift_id+
+       ' was ALREADY AUTHORIZED through your signed-in Reality session and remains '+
+       existing.status+'. No second authorization and no duplicate shift are needed. '+
+       (recorded===null?'Source-check progress is currently unavailable.':
+        recorded+' of 5 source checks have been recorded. ')+
+       (receipt?'The original repair has independent receipt evidence in steps 6 and 7. ':
+        'The original code repair has NOT yet been independently verified. ')+
+       (step6?.state==='AWAITING_EXACT_WORK'||step6?.state==='QUEUED'?
+        'Current blocker: Reality must independently qualify and admit an exact source-backed original repair into step 6. This is an execution integration issue, not missing permission from you. ':'')+
+       (approval?
+        'One exact verified capability installation is pending in the existing Reality approval interface.':
+        'No exact verified capability installation is pending for your approval.')+
+       ' The existing worker keeps checking under the ORIGINAL shift; repeating Start cannot bypass an execution gate.'
     };
   }
   const draftRead=await json(SHIFT+'?hours='+command.duration_hours,{
     signal:AbortSignal.timeout(30000)
   });
   const draft=draftRead.requested_shift_draft;
+  const combined=draft?.combined_employee_work_orders;
+  if(combined?.version!=='reality-riley-taylor-combined-work-orders-v1'||
+      combined.plan_fingerprint!==draft?.expected_fingerprint||
+      !Number.isSafeInteger(combined.task_count)||
+      combined.task_count<1||combined.task_count>4||
+      combined.execution_started!==false||
+      combined.installation_authorized!==false||
+      combined.production_changed!==false)
+    throw Error('RILEY_TAYLOR_COMBINED_TASK_PLAN_NOT_READY_NO_IDLE_SHIFT');
   if(draft?.shift_duration_hours!==command.duration_hours||
      draft?.shift_duration_minutes!==command.duration_hours*60||
      draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
@@ -871,9 +1549,9 @@ async function authorizeShiftFromChat(command){
   }
   return {
     acknowledged:true,
-    text:'Your '+command.duration_hours+'-hour shift is durably authorized. Shift ID: '+
+    text:'Riley + Taylor combined shift authorized for '+combined.task_count+' source tasks; '+command.duration_hours+'h is the maximum safety window, not the work target. Shift ID: '+
       created.shift_id+'. Status: '+match.status+'.'+proposed+grouped+
-      ' The existing trusted worker scheduler must independently claim work. '+
+      ' The existing trusted worker scheduler must independently claim work. The selected hours are a maximum authorization window, NOT a mandatory work duration; verified completion can stop the shift early. '+
       'A worker acknowledgment and completed original-job results are NOT yet proven. '+
       'The current shift engine performs source validation and awaits exact governed '+
       'original-job admission for consequential repairs. No installation or production change was authorized.'+batch
@@ -911,17 +1589,15 @@ function showAuth(authenticated){
   $('auth').hidden=authenticated;
   $('chat').hidden=!authenticated;
   if(authenticated){
-    // A link from the main conversation preselects a safe three-hour draft.
-    // This never POSTs, starts a worker, or grants execution authority.
+    // Deep links never start work or select an arbitrary time target; the owner presses Start once.
     if(window.location.hash==='#riley-shift'){
-      $('runShiftHours').value='3';
-      $('fullShiftScope').textContent=
-       '3h selected. Tap the highlighted Run Riley\'s Shift button above to authorize the exact pilot. Sending a message is NOT authorization. Merely opening this page starts nothing. Verified repairs and installations remain separately governed.';
+      $('fullShiftScope').textContent='Review the combined Riley + Taylor source tasks below. Choose a maximum authorization window, then press Start Riley + Taylor Jobs ONCE. Opening the page does not authorize work or install code.';
     }
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
     void refreshShiftStatus();
+    void refreshRileyTaylorCombinedWorkQueue();
     void refreshEmployeeBoard();
     void refreshRealitySelfAudit();
     $('prompt').focus({preventScroll:true});
@@ -997,7 +1673,7 @@ $('runFullShift').onclick=async()=>{
   pendingResult.classList.remove('pending');
   pendingResult.lastChild.textContent=receipt.text;
   status('Full-shift authorization read back. Worker results are verified separately.');
-  void refreshShiftStatus();void refreshEmployeeBoard();
+  void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();void refreshEmployeeBoard();
  }catch(err){
   pendingResult.className='message assistant error';
   pendingResult.lastChild.textContent=
@@ -1009,7 +1685,11 @@ $('runFullShift').onclick=async()=>{
   pending=false;$('runFullShift').disabled=false;$('send').disabled=false;
  }
 };
-$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
+$('runShiftHours').onchange=()=>{if(!pending)void refreshRileyTaylorCombinedWorkQueue()};
+$('workforceRole').onchange=loadWorkforceRoleInputs;
+$('workforceCalculate').onclick=()=>{void calculateWorkforceSavings()};
+$('workforceReset').onclick=()=>{void calculateWorkforceSavings(true)};
+$('refresh').onclick=()=>{if(!pending){void refreshHistory();void listConversations();void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();void refreshEmployeeBoard();void refreshRealitySelfAudit()}};
 $('prompt').onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
     e.preventDefault();$('composer').requestSubmit();
@@ -1032,7 +1712,9 @@ $('composer').onsubmit=async(e)=>{
   elapsed=setInterval(showTime,1000);
   status('Message submitted. Waiting for a reply…');
   try{
-    const command=interpretSignedInChatShiftCommand(value);
+    const command=interpretSignedInChatShiftCommand(value,{
+      selectedHours:Number($('runShiftHours').value)
+    });
     if(command){
       const receipt=await authorizeShiftFromChat(command);
       optimistic.classList.remove('pending');

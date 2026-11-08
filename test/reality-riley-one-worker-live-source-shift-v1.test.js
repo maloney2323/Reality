@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const sql=read('supabase/migrations/20261107_riley_taylor_model_worker_claims_source_steps_v1.sql');
+const api=read('api/reality/governed-employee-shift-worker.js');
+const worker=read('src/reality-governed-employee-shift-worker-v1.js');
+const model=read('src/reality-one-openai-combined-role-handoff-v1.js');
+
+test('one isolated Vercel model worker claims already-authorized issue/PR source steps',()=>{
+ assert.equal(sql.split('select cron.schedule(').length-1,1);
+ assert.equal(sql.split(') as permitted').length-1,1);
+ assert.equal(sql.split('source_step.source_ref~').length-1,1);
+ assert.match(sql,/s\.status in \('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\)/);
+ assert.match(sql,/step\.step_index between 1 and 5/);
+ assert.match(sql,/step\.state in \('QUEUED','CLAIMED'\)/);
+ assert.match(sql,/source_step\.source_ref~/);
+ assert.match(sql,/issues\|pull\|actions\/runs/);
+ assert.match(sql,/planned_start_at<=clock_timestamp\(\)/);
+ assert.match(sql,/planned_end_at>clock_timestamp\(\)/);
+ assert.match(sql,/s\.authorized_at is not null/);
+ assert.match(sql,/where eligible_shift\.permitted/);
+ assert.match(sql,/x-vercel-protection-bypass/);
+ assert.match(sql,/from vault\.decrypted_secrets/);
+ assert.match(sql,/credential\.worker_token~'\^\[a-f0-9\]\{64\}\$'/);
+ assert.match(sql,/credential\.vercel_bypass~'\^\[A-Za-z0-9\]\{32\}\$'/);
+ assert.match(sql,/SHIFT_SCHEDULER_OWNER_SHIFT_ACTIVE_NO_MIDSHIFT_SWAP/);
+ assert.match(sql,/cron\.unschedule\('reality-governed-employee-shift-wake-v1'\)/);
+ assert.match(sql,/SHIFT_PREVIEW_MODEL_WORKER_NOT_DURABLY_SCHEDULED/);
+ assert.doesNotMatch(sql,/\b(?:insert into|update reality_internal|grant execute|create trigger)\b/i);
+});
+test('existing preview OpenAI key powers one provider across Riley/Taylor role context',()=>{
+ assert.match(api,/process\.env\.REALITY_STANDALONE_OPENAI_API_KEY\|\|/);
+ assert.match(api,/process\.env\.OPENAI_API_KEY/);
+ assert.match(api,/VERCEL_ENV!=='preview'/);
+ assert.match(api,/validSecret\(req,process\.env\)/);
+ assert.match(worker,/readProviderSource\(claimed\.source_ref/);
+ assert.match(worker,/includePatch:claimed\.step_index>=2/);
+ assert.match(worker,/PULL_REQUEST_CHANGESET_OBSERVED/);
+ assert.match(worker,/source_status:proof\.provider_status/);
+ assert.match(worker,/reality_settle_employee_shift_step_v1/);
+ assert.match(model,/observed_source_evidence:input\.provider\.provider_evidence/);
+ assert.match(model,/Produce a specific, file-aware review/);
+ assert.match(model,/tool_choice:'none'/);
+ assert.match(model,/independent_verification_performed:false/);
+ assert.doesNotMatch(api,/owner_approve|installCapability|createOriginalJob/i);
+});
+test('the original same-owner capability wake is preserved, not generalized to all PRs',()=>{
+ assert.match(sql,/s\.status='AWAITING_EXACT_ORIGINAL_WORK'/);
+ assert.match(sql,/step\.state='SOURCE_CHECKED'/);
+ assert.match(sql,/step\.source_status='OPEN_ISSUE'/);
+ assert.match(sql,/step\.proof_sha256~/);
+ assert.match(worker,/qualifiedOriginalDriverScope/);
+ assert.match(worker,/executeQualifiedOriginals/);
+ assert.match(worker,/TRUSTED_ORIGINAL_DRIVER_NOT_CONNECTED/);
+ assert.match(model,/original_job_completed:false/);
+ assert.match(model,/installation_authorized:false/);
+});

@@ -8,6 +8,8 @@ import {buildRealityNamedEmployeeRoster} from '../../src/reality-employee-identi
 import {buildRealityShiftValuePreview} from '../../src/reality-shift-value-preview-v1.js';
 import {prepareNextWeekEmployeePlan}
  from '../../src/reality-next-week-employee-plan-v1.js';
+import {projectSingleModelRoleQueue}
+ from '../../src/reality-single-model-role-work-router-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
 export const maxDuration=45;
@@ -50,8 +52,9 @@ export default async function handler(req,res){
   const next_week_plan=prepareNextWeekEmployeePlan(roster,{
    preparedSource:verifiedSource
   });
+  const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   return res.status(200).json({ok:true,...roster,value_preview,
-   next_week_plan,
+   next_week_plan,single_model_role_routing,
    next_week_background_open_issue_count:backgroundSourceIssueCount,
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',

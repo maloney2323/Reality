@@ -4,7 +4,7 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 import {auditRealityEngineeringIssue,verifyRileyAuditReceipt}
  from '../src/reality-riley-engineering-pilot-v1.js';
 const err=code=>{throw Error('RILEY_PILOT_'+code)};
-const branch='fix/riley-multi-job-readiness-preclaim-20261106';
+const branch='fix/reality-governed-riley-original-driver-20261107';
 const allowedPush=process.env.GITHUB_EVENT_NAME==='push'&&
  process.env.GITHUB_REF==='refs/heads/'+branch;
 const allowedReview=process.env.GITHUB_EVENT_NAME==='pull_request'&&

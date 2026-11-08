@@ -1,7 +1,7 @@
 name: Reality Riley first real engineering investigation
 on:
   push:
-    branches: [fix/reality-chat-fullscreen-verified-cycle-20261105]
+    branches: [fix/reality-governed-riley-original-driver-20261107]
     paths:
       - src/reality-riley-engineering-pilot-v1.js
       - scripts/reality-riley-engineering-pilot-v1.mjs
@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -27,8 +29,8 @@ jobs:
       - name: Riley investigates one real category source
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RILEY_SOURCE_ISSUE: '143'
-          RILEY_TARGET_WORKFLOW_NAME: Reality Governed Execution Engine v0.1
+          RILEY_SOURCE_ISSUE: '263'
+          RILEY_TARGET_WORKFLOW_NAME: Reality flexible governed employee shifts
         run: node scripts/reality-riley-engineering-pilot-v1.mjs
       - name: Preserve provider-backed pilot evidence
         uses: actions/upload-artifact@v4

@@ -7,6 +7,7 @@ import {buildRealityWorkCatalog} from '../../src/reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from '../../src/reality-workday-opportunity-brief-v1.js';
 import {assessRealityWorkdayTeam,routeRealityWorkCategoriesToEmployees} from '../../src/reality-workday-team-assessment-v1.js';
 import {buildRealityEightHourShiftDraft} from '../../src/reality-eight-hour-shift-plan-v1.js';
+import {buildRileyTaylorCombinedWorkOrders} from '../../src/reality-riley-taylor-combined-work-orders-v1.js';
 import {computeShiftFingerprint,shiftDatabase,shiftRpc,
  assertShiftReceipt,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
@@ -106,6 +107,70 @@ export default async function handler(req,res){
      if(handoffs.length)handoff_status='EXACT_CAPABILITY_APPROVAL_REQUESTED_IN_CHAT';
     }catch{handoff_status='EXACT_CAPABILITY_READBACK_UNAVAILABLE_FAIL_CLOSED';}
    }
+   let riley_pr_review_jobs={
+    status:'OWNER_PR_REVIEW_READBACK_UNAVAILABLE',jobs:[],
+    production_changed:false,verified_human_hours_saved:null
+   };
+   try{
+    const verified=await shiftRpc(db,'reality_read_owner_riley_pr_review_v1',
+      {p_owner_id:session.user_id});
+    if(verified?.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'&&
+      verified.production_changed===false&&
+      verified.verified_human_hours_saved===null&&
+      Array.isArray(verified.jobs)&&verified.jobs.length<=10&&
+      verified.jobs.every(j=>j.source_review_job_only===true&&
+        j.installation_authorized===false&&j.production_changed===false&&
+        /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+        /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(j.source_ref||'')&&
+        (j.phase!=='SETTLED'||(
+          j.original_job_completed===true&&
+          /^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(
+            j.settlement_receipt_ref||'')&&
+          /^https:\/\/github\.com\/maloney2323\/Reality\/(?:pull|issues)\/[1-9]\d*#issuecomment-\d+$/.test(
+            j.provider_comment_url||'')
+        ))))
+     riley_pr_review_jobs=verified;
+   }catch{/* Never represent missing durable original receipt as settlement. */}
+   let riley_failure_triage_jobs={status:'OWNER_TRIAGE_READBACK_UNAVAILABLE',jobs:[]};
+   let riley_code_repair_jobs={status:'OWNER_REPAIR_READBACK_UNAVAILABLE',jobs:[]};
+   try{
+    const x=await shiftRpc(db,'reality_read_owner_shift_failure_triage_143_v1',
+     {p_owner_id:session.user_id});
+    if(x?.status==='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'&&
+       x.installation_authorized===false&&x.production_changed===false&&
+       Array.isArray(x.jobs)&&x.jobs.length<=5&&
+       x.jobs.every(j=>j.code_repair_completed===false&&
+         j.production_changed===false&&
+         j.source_ref==='https://github.com/maloney2323/Reality/issues/143'&&
+         /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+         (j.phase!=='SETTLED'||(
+           j.original_job_completed===true&&
+           /^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(
+            j.settlement_receipt_ref||'')&&
+           /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/143#issuecomment-\d+$/.test(
+            j.provider_comment_url||'')
+         ))))
+      riley_failure_triage_jobs=x;
+   }catch{/* Explicit no independent disposition readback. */}
+   try{
+    const x=await shiftRpc(db,'reality_read_owner_riley_repair_original_v1',
+     {p_owner_id:session.user_id});
+    if(x?.status==='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'&&
+       x.does_not_authorize_new_work===true&&
+       x.production_changed===false&&
+       Array.isArray(x.jobs)&&x.jobs.length<=6&&
+       x.jobs.every(j=>
+        j.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+        /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+        /^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')&&
+        j.production_changed===false&&
+        (j.phase!=='SETTLED'||(
+         j.original_job_completed===true&&
+         /^supabase:[a-z0-9_]+:[a-f0-9-]{36}$/.test(
+          j.original_settlement_receipt_ref||'')
+        ))))
+      riley_code_repair_jobs=x;
+   }catch{/* Do not mistake missing readback for completed repair. */}
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -116,7 +181,10 @@ export default async function handler(req,res){
       catalog,brief,ownerId:session.user_id,db});
      const plan=buildRealityEightHourShiftDraft(brief,{
       durationHours:hours,prioritySourceRefs:priority.refs});
-     draft={...plan,expected_fingerprint:computeShiftFingerprint(plan),
+     const fingerprint=computeShiftFingerprint(plan);
+     const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
+     draft={...plan,expected_fingerprint:fingerprint,
+       combined_employee_work_orders:combined,
        proposed_team:assessRealityWorkdayTeam(brief),
        employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief),
        existing_owner_backlog_priorities:priority.refs,
@@ -126,6 +194,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,...read,shift_briefing,
     requested_shift_draft:draft,
     recovery_diagnosis,
+    riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
     job_started_by_read:false,
     shift_approval_does_not_authorize_installation:true,
@@ -158,6 +227,13 @@ export default async function handler(req,res){
   const plan=buildRealityEightHourShiftDraft(brief,{
    durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs});
   const fingerprint=computeShiftFingerprint(plan);
+  const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
+  // Do not create a timer-only idle shift when no paired source task was
+  // actually nominated in the exact, already-pinned owner scope.
+  if(combined.task_count===0)
+   return res.status(409).json({ok:false,
+    error:'NO_COMBINED_RILEY_TAYLOR_SOURCE_WORK_IN_APPROVED_PLAN',
+    job_started:false,installation_authorized:false,production_changed:false});
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
   const receipt=assertShiftReceipt(await shiftRpc(db,
@@ -174,6 +250,7 @@ export default async function handler(req,res){
    Number(new Date(s.planned_end_at))-Number(start)===plan.shift_duration_minutes*60000);
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
   return res.status(202).json({ok:true,...receipt,shift:exact,
+   combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
    installation_authorized:false,
    existing_chat_approval_required_for_exact_capabilities:true,

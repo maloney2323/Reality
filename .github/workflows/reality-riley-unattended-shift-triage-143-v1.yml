@@ -1,0 +1,142 @@
+name: Reality · Riley/Taylor unattended recurring CI investigation
+on:
+  push:
+    branches:
+      - fix/reality-governed-riley-original-driver-20261107
+    paths:
+      - reality-riley-repair-intents/143-live-shift.json
+permissions:
+  contents: read
+concurrency:
+  group: riley-current-shift-143-source-investigation
+  cancel-in-progress: false
+jobs:
+  source-verified-openai-reliability-investigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check actual source-backed investigation executor
+        run: node --check scripts/reality-riley-unattended-143-current-ci-triage-v1.mjs
+      - name: Independently recheck historical failures, latest results, ask one OpenAI model
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/reality-riley-unattended-143-current-ci-triage-v1.mjs
+      - name: Preserve real model response and exact source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-riley-shift-143-source-investigation
+          path: benchmark-results/riley-unattended-143/investigation.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  publish-and-independently-verify-triage:
+    needs: source-verified-openai-reliability-investigation
+    if: needs.source-verified-openai-reliability-investigation.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: reality-riley-shift-143-source-investigation
+          path: /tmp/reality-riley-143
+      - name: Publish once to the original assigned issue, then independently re-read
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs=require('node:fs');
+            const crypto=require('node:crypto');
+            const owner=context.repo.owner,repo=context.repo.repo;
+            const proof=JSON.parse(fs.readFileSync('/tmp/reality-riley-143/investigation.json','utf8'));
+            const sha=x=>'sha256:'+crypto.createHash('sha256').update(x).digest('hex');
+            const intent=JSON.parse(fs.readFileSync('reality-riley-repair-intents/143-live-shift.json','utf8'));
+            const source='https://github.com/maloney2323/Reality/issues/143';
+            const tag='<!-- reality-riley-triage-original:'+proof.original_work_id+' -->';
+            if(owner!=='maloney2323'||repo!=='Reality'||
+               context.ref!=='refs/heads/fix/reality-governed-riley-original-driver-20261107'||
+               context.sha!==proof.request_commit_sha||
+               proof.original_work_id!==intent.original_work_id||
+               proof.shift_id!==intent.shift_id||
+               proof.source_proof_sha256!==intent.source_proof_sha256||
+               proof.source_ref!==source||
+               proof.historical_failed_run_id!==40591283500||
+               proof.independent_provider_run_statuses_verified!==true||
+               proof.finding!=='HISTORICAL_FAILURE_VERIFIED_CURRENT_EXECUTION_ENGINE_PASSES'||
+               proof.historical_root_cause_proven_fixed!==false||
+               proof.code_repair_completed!==false||
+               proof.original_job_completed!==false||
+               proof.installation_authorized!==false||
+               proof.production_changed!==false||
+               typeof proof.issue_comment_body!=='string'||
+               proof.issue_comment_body.length<400||
+               !proof.issue_comment_body.includes(tag)||
+               sha(proof.issue_comment_body)!==proof.issue_comment_body_sha256||
+               !/^resp_[A-Za-z0-9_-]{4,160}$/.test(proof.model_response_id||'')||
+               !Array.isArray(proof.current_verified_success_run_ids)||
+               proof.current_verified_success_run_ids.length!==3||
+               new Set(proof.current_verified_success_run_ids).size!==3)
+               throw Error('RILEY_TRIAGE_SECOND_JOB_AUTHORISATION_EVIDENCE_INVALID');
+            // Revalidate current provider results in an independent job.
+            const [historical,...current]=await Promise.all([
+              40591283500,...proof.current_verified_success_run_ids
+            ].map(run_id=>github.rest.actions.getWorkflowRun({owner,repo,run_id})));
+            if(historical.data.conclusion!=='failure'||
+               historical.data.status!=='completed'||
+               historical.data.name!=='Reality Governed Execution Engine v0.1'||
+               current.some((r,i)=>r.data.conclusion!=='success'||
+                 r.data.status!=='completed'||
+                 r.data.name!==historical.data.name||
+                 r.data.id!==proof.current_verified_success_run_ids[i]))
+               throw Error('RILEY_TRIAGE_PROVIDER_STATUS_DRIFT');
+            const comments=await github.rest.issues.listComments({
+              owner,repo,issue_number:143,per_page:100});
+            if(comments.data.length===100)
+               throw Error('TRIAGE_COMMENT_PAGINATION_INCOMPLETE_NO_REPOST');
+            const found=comments.data.filter(c=>
+              typeof c.body==='string'&&c.body.includes(tag));
+            if(found.length>1)throw Error('DUPLICATE_TRIAGE_PROVIDER_EFFECT_NO_REPOST');
+            let id;
+            if(found.length===1){
+              if(found[0].body!==proof.issue_comment_body)
+               throw Error('EXISTING_TRIAGE_PROVIDER_EFFECT_CONTENT_DRIFT');
+              id=found[0].id;
+            }else{
+              const posted=await github.rest.issues.createComment({owner,repo,
+               issue_number:143,body:proof.issue_comment_body});
+              id=posted.data.id;
+            }
+            const back=await github.rest.issues.getComment({owner,repo,comment_id:id});
+            if(back.data.body!==proof.issue_comment_body||
+               back.data.issue_url!=='https://api.github.com/repos/maloney2323/Reality/issues/143'||
+               back.data.html_url!=='https://github.com/maloney2323/Reality/issues/143#issuecomment-'+id)
+              throw Error('INDEPENDENT_PROVIDER_COMMENT_READBACK_UNVERIFIED');
+            core.info('RILEY_SECOND_ORIGINAL_PROVIDER_EVIDENCE '+JSON.stringify({
+             status:'GITHUB_PROVIDER_POSTED_AND_INDEPENDENTLY_RETRIEVED',
+             original_work_id:proof.original_work_id,shift_id:proof.shift_id,
+             comment_id:id,comment_url:back.data.html_url,
+             model_response_id:proof.model_response_id,
+             present_day_success_run_ids:proof.current_verified_success_run_ids,
+             original_job_durable_settlement_pending:true,
+             historical_root_cause_proven_fixed:false,
+             code_repair_completed:false,installation_authorized:false,
+             production_changed:false
+            }));

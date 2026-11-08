@@ -8,17 +8,27 @@ const IMMEDIATE=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:p
 // Explicit one-time full shift means the existing 8-hour owner shift,
 // never indefinite, recurring or authority over unapproved original jobs.
 const FULL_SHIFT=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:'s|’s)?\s+))?(?:(?:the|an?)\s+)?(?:full|entire|complete)\s+(?:engineering\s+)?(?:shift|workday|work\s+day)(?:\s+now)?[.!]?$/i;
+// The selected, source-fingerprinted work queue is the scope; the user does
+// not need to memorize a rigid "run an eight-hour..." phrase. These explicit
+// imperative forms are ONLY interpreted following a signed-in Send action.
+const CURRENT_WORK=/^(?:(?:hey\s+)?reality\s*[,.:!]\s*)?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:['’]s)?(?:\s+and\s+taylor(?:['’]s)?)?\s+)|(?:the\s+|my\s+|our\s+|your\s+|current\s+|this\s+))*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|workday|work\s+day|jobs?|automation)(?:\s+now)?[.!]?$/i;
+const OWNER_AUTHORIZATION=/^i\s+authorize\s+(?:(?:reality|riley\s+and\s+taylor)\s+to\s+)?(?:(?:start|run|begin|launch)\s+)?(?:(?:the|my|our|your|current|this)\s+)*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|jobs?)(?:\s+now)?[.!]?$/i;
+const FUTURE=/\b(?:tomorrow|next\s+(?:week|month|day)|later|after\s+|when\s+|if\s+|only\s+if|once\s+)\b/i;
 const RECURRENCE=/\b(?:every\s+(?:day|weekday|week|month)|daily|weekly|monthly|recurring|repeat\s+(?:every|daily|weekly)|each\s+(?:day|week|month))\b/i;
 const CONDITION=/\b(?:don't|do\s+not|never|without\s+starting|hypothetical|hypothetically|simulate|simulation|pretend|example|what\s+if)\b/i;
-export function interpretSignedInChatShiftCommand(message){
+export function interpretSignedInChatShiftCommand(message,{selectedHours=8}={}){
  if(typeof message!=='string'||!message||message.length>6000)return null;
  const text=message.trim();
- if(RECURRENCE.test(text)||CONDITION.test(text))return null;
+ if(RECURRENCE.test(text)||CONDITION.test(text)||FUTURE.test(text))return null;
  const full=FULL_SHIFT.test(text);
  const match=full?null:IMMEDIATE.exec(text);
- if(!full&&!match)return null;
- const value=full?'eight':match[1].toLowerCase();
- const hours=/^\d+$/.test(value)?Number(value):HOUR_WORDS[value];
+ const current=!full&&!match&&(CURRENT_WORK.test(text)||OWNER_AUTHORIZATION.test(text));
+ if(!full&&!match&&!current)return null;
+ // An explicit duration wins. An unqualified "start the job/shift" uses the
+ // owner-selected bounded window and exact verified source fingerprint.
+ const value=full?'eight':match?match[1].toLowerCase():null;
+ const hours=value===null?selectedHours:
+  /^\d+$/.test(value)?Number(value):HOUR_WORDS[value];
  if(!Number.isSafeInteger(hours)||hours<1||hours>12)return null;
  return Object.freeze({
   intent:'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT',

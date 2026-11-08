@@ -21,7 +21,8 @@ test('light Chat is on an isolated route without replacing the existing approval
   assert.match(html,/<a id="rileyNavEvaluation" href="\/value#pre-automation">Evaluation<\/a>/);
   assert.match(html,/id="teamToggle" type="button" aria-expanded="false"/);
   assert.match(html,/id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden/);
-  assert.match(html,/Sending a chat message is not authorization/);
+  assert.match(html,/Start Riley \+ Taylor Jobs/);
+  assert.match(html,/One combined work queue\. One start/);
 });
 test('light Chat preserves existing private session and scoped saved conversation',()=>{
   assert.match(html,/\/api\/reality\/personal-session/);
@@ -50,7 +51,8 @@ test('real shift remains visible and prevents duplicate approval when progress s
  assert.match(script,/QUALIFICATION BLOCKER/);
  assert.match(script,/\$\('runFullShift'\)\.disabled=true/);
  assert.match(script,/Existing shift authorized/);
- assert.match(script,/Do NOT press Run Riley/);
+ assert.match(script,/Do not start a duplicate/);
+ assert.match(script,/renderActiveRileyTaylorQueue\(data\)/);
  assert.match(script,/Shift status readback unavailable/);
  assert.match(script,/Status refreshed/);
  assert.doesNotMatch(script,/activeState\.hasActive\)\{[\s\S]{0,500}authorizeShiftFromChat\(/);

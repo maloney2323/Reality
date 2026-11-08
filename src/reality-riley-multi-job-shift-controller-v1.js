@@ -85,10 +85,11 @@ export async function runRileyGovernedMultiJobShiftTick({
  loadShiftReadback,loadOwnerLedgerReadback,
  loadTrustedAuthorizedOriginal,
  callRpc=rpc,runOriginal=runRileyOriginalJobViaReality,
- now=()=>new Date(),maxJobs=4
+ now=()=>new Date(),maxJobs=4,onlyOriginalWorkId=null
 }={}){
  if(!db||!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
   !Number.isInteger(maxJobs)||maxJobs<1||maxJobs>4||
+  (onlyOriginalWorkId!==null&&!WORK.test(onlyOriginalWorkId))||
   [loadShiftReadback,loadOwnerLedgerReadback,
    loadTrustedAuthorizedOriginal,callRpc,runOriginal,now]
    .some(x=>typeof x!=='function'))
@@ -105,9 +106,13 @@ export async function runRileyGovernedMultiJobShiftTick({
    installation_authorized:false,production_changed:false});
  const eligible=verifyRileyMultiJobEligibility({
   shiftReadback,ownerLedgerReadback,ownerId,shiftId,eligibility:raw,now:now()});
- const outcomes=[],count=Math.min(eligible.length,maxJobs);
+ const selected=onlyOriginalWorkId===null?eligible:
+   eligible.filter(c=>c.original_work_id===onlyOriginalWorkId);
+ if(onlyOriginalWorkId!==null&&selected.length!==1)
+  fail('EXACT_TARGET_ORIGINAL_NO_OTHER_WORK_CLAIMED');
+ const outcomes=[],count=Math.min(selected.length,maxJobs);
  for(let i=0;i<count;i++){
-  const c=eligible[i];
+  const c=selected[i];
   // Validate the exact trusted, owner-bound original BEFORE taking the
   // globally unique one-shot DB claim. Missing execution adapters must not
   // consume a job or leave it permanently stuck as an uncertain effect.
@@ -117,7 +122,8 @@ export async function runRileyGovernedMultiJobShiftTick({
     owner_id:ownerId,shift_id:shiftId,
     original_work_id:c.original_work_id,
     trigger_id:c.trigger_id,claim_id:null,
-    source_ref:c.source_ref,read_only:true,preflight_only:true
+    source_ref:c.source_ref,source_proof_sha256:c.source_proof_sha256,
+    read_only:true,preflight_only:true
    }));
    if(!job||job.qualifiedOriginal?.original_work_id!==c.original_work_id||
      job.qualifiedOriginal.owner_id!==ownerId||
