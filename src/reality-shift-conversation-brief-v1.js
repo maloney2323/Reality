@@ -65,7 +65,10 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   needs_you:'No capability installation approval is pending for a shift.',
   planned_start_at:null,as_of:now.toISOString(),
   verified_source_checks:0,verified_original_job_receipts:0,
-  complete_shift_proven:false,verified_human_hours_saved:null,
+  complete_shift_proven:completeBoundProven,
+  verified_final_original_job_count:completeBoundProven?finalCount:0,
+  final_receipt:completeBoundProven?final:null,
+  verified_human_hours_saved:null,
   events:[],approval_pending:false,read_only:true,
   production_changed:false});
  const s=shifts[0];
@@ -86,6 +89,21 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
     durationHours<1||durationHours>12))
   throw Error('SHIFT_CHAT_DURATION_INVALID');
  const originalReceipt=s.steps.some(t=>t.step_index===6&&t.state==='ORIGINAL_JOB_RECEIPT_VERIFIED');
+ const final=s.close_report;
+ const finalCount=final?.original_jobs_independently_settled_in_this_shift;
+ const accepted=final?.verified_original_receipts;
+ const completeBoundProven=completionBound&&s.status==='ENDED_WITH_VERIFIED_JOB'&&
+  final?.status==='EMPLOYEE_SHIFT_EVIDENCE_REPORT'&&
+  final?.shift_id===s.shift_id&&final.completion_bound===true&&
+  final.completion_reason==='ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED'&&
+  Number.isSafeInteger(finalCount)&&finalCount>=1&&finalCount<=4&&
+  final.authorized_source_job_count===finalCount&&
+  Array.isArray(accepted)&&accepted.length===finalCount&&
+  new Set(accepted.map(x=>x.original_work_id)).size===finalCount&&
+  accepted.every(x=>x.independent_final_receipt_verified===true&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||''))&&
+  final.production_changed===false;
  const eventItems=s.steps.map(eventFor).filter(Boolean);
  const recorded=eventItems.filter(x=>x.code==='SOURCE_VALIDATED').length;
  const recent=[...eventItems].sort((a,b)=>{
@@ -138,7 +156,10 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='No further source-validation steps are currently claimable.';
   next='No further authorized source checks remain. The independent worker continues checking for exact original-job receipts and closes only after every selected job is independently settled. It cannot invent work or a receipt.';
  }
- const whatFinished=recent.length?
+ const whatFinished=completeBoundProven?
+  (finalCount+' original jobs independently settled. Final durable receipt '+
+   'is recorded in the owner-scoped Continuity readback.') :
+  recent.length?
   (recorded+' recorded source/preflight checks; '+
    (originalReceipt?'one independently matched original-job receipt.':
      'no original-job completion independently matched to this shift.')+
