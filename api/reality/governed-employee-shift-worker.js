@@ -72,7 +72,9 @@ export default async function handler(req,res){
       !Number.isFinite(Date.parse(shift.planned_start_at))||
       !Number.isFinite(Date.parse(shift.planned_end_at))||
       Date.parse(shift.planned_start_at)>now||
-      Date.parse(shift.planned_end_at)<=now||
+      (shift.planned_end_at!=='infinity'&&
+       (!Number.isFinite(Date.parse(shift.planned_end_at))||
+        Date.parse(shift.planned_end_at)<=now))||
       step?.step_index!==requested.step_index||
       step.state!=='CLAIMED'||step.source_ref!==requested.source_ref||
       (step.claim_id!=null&&step.claim_id!==requested.claim_id))
@@ -108,6 +110,26 @@ export default async function handler(req,res){
     // authorization, Continuity and atomic fenced-claim path.
     batchEligibleOriginals:true,
    }):null;
+  // A completion-bound owner shift closes only when EVERY selected
+  // original has its independently verified final receipt.
+  const completionClose=await shiftRpc(db,
+   'reality_close_employee_completion_shift_v1',{});
+  if(!completionClose||![
+     'NO_COMPLETION_BOUND_SHIFT_READY',
+     'COMPLETION_WAITING_FOR_SOURCE_VALIDATION',
+     'COMPLETION_WAITING_FOR_FINAL_JOB_RECEIPTS',
+     'EMPLOYEE_SHIFT_EVIDENCE_REPORT'
+    ].includes(completionClose.status)||
+    (completionClose.status==='EMPLOYEE_SHIFT_EVIDENCE_REPORT'&&(
+      completionClose.completion_bound!==true||
+      completionClose.completion_reason!==
+       'ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED'||
+      !Number.isSafeInteger(completionClose.original_jobs_independently_settled_in_this_shift)||
+      completionClose.original_jobs_independently_settled_in_this_shift<1||
+      completionClose.original_jobs_independently_settled_in_this_shift!==
+       completionClose.authorized_source_job_count||
+      completionClose.production_changed!==false)))
+   throw Error('COMPLETION_BOUND_SHIFT_INDEPENDENT_RECEIPT_UNVERIFIED');
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
@@ -190,6 +212,7 @@ export default async function handler(req,res){
    };
   }
   return res.status(200).json({...result,
+    completion_bound_work:completionClose,
     riley_original_review:rileyOriginalReview,
     riley_code_repair_original:rileyCodeRepair,
     riley_failure_triage_original:rileyFailureTriage,
