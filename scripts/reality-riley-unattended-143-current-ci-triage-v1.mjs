@@ -23,7 +23,7 @@ if(process.env.GITHUB_ACTIONS!=='true'||
  manifest.version!=='reality-riley-shift-current-failure-recheck-v1'||
  manifest.issue_number!==ISSUE||manifest.shift_id!==SHIFT||
  manifest.source_ref!==SOURCE||
- manifest.source_proof_sha256!=='sha256:PLACEHOLDER_SOURCE_DIGEST'||
+ manifest.source_proof_sha256!=='sha256:69f8425fd1e056097a2d6db88eb6559bdfa0f88f2e92cc45183fb4df0027dcc7'||
  manifest.historical_failed_run_id!==OLD||
  !/^work:[a-f0-9]{32}$/.test(manifest.original_work_id||'')||
  changes.length!==1||changes[0]!==path)
