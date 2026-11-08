@@ -143,6 +143,8 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <div id="rileyVerifiedOriginalJobRows">No completed original-job receipt recorded for this shift.</div>
  <h4>Recorded activity · not hidden model thoughts</h4>
  <div id="rileyActualWorkerReceipt" role="status">No confirmed worker wake yet.</div>
+ <h4>Shared governed execution · Current exact job decisions</h4>
+ <div id="rileyUnifiedOriginalGraph" aria-live="polite">Checking owner-frozen work scope…</div>
  <h4>Original jobs · Exact recorded phase and time</h4>
  <div id="rileyOriginalActivityRows">Waiting for original-job readback.</div>
  <h4>Source and execution evidence · Time-stamped</h4>
@@ -1187,6 +1189,48 @@ function renderShiftStartProof(readback){
  else if(shift.status.startsWith('ENDED_'))
   details.append(textNode('p','Closed with recorded evidence; not all original jobs were verified as completed.'));
 }
+function renderUnifiedOriginalGraph(readback,current){
+ const el=$('rileyUnifiedOriginalGraph');el.replaceChildren();
+ const graph=readback?.shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'&&
+  readback.shift_execution_graph?.shift_id===current?.shift_id&&
+  readback.shift_execution_graph?.installation_authorized===false&&
+  readback.shift_execution_graph?.original_job_completed===false?
+   readback.shift_execution_graph:null;
+ if(!graph||!Array.isArray(graph.jobs)||graph.jobs.length>4){
+  el.append(textNode('p','No verified unified execution readback. '+
+   'Do not infer that source checks are code repair or that work is settled.'));
+  return;
+ }
+ const pretty={
+  GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR:
+   'Generate a genuine repair and run independent frozen tests — NOT YET COMPLETED',
+  CONTINUE_INDEPENDENT_PR_REVIEW:
+   'Continue the existing provider-backed PR review and independently verify the result',
+  QUALIFY_DISTINCT_OWNER_WORK_NO_FAKE_JOB:
+   'Source inspected; not yet a separately qualified original job',
+  VERIFY_SOURCE_BEFORE_ANY_EXECUTION:
+   'Verify the source and frozen authority before execution',
+  AWAIT_EXACT_ARTIFACT_INSTALL_APPROVAL:
+   'A separately verified candidate requires one exact installation approval'
+ };
+ el.append(textNode('p','Whole-shift next action: '+
+  (pretty[graph.next_action]||String(graph.next_action||'UNVERIFIED')
+   .replaceAll('_',' '))+
+  '. These are service-role job readbacks, not model intentions.'));
+ for(const j of graph.jobs){
+  if(!COMBINED_WORK_SOURCE.test(j.source_ref||''))continue;
+  const row=document.createElement('div');row.className='workforce-output-row';
+  row.append(textNode('strong',j.original_kind.replaceAll('_',' ')+
+   ' · '+j.phase.replaceAll('_',' ')));
+  row.append(textNode('div','Next: '+
+   (pretty[j.next_governed_action]||
+    String(j.next_governed_action).replaceAll('_',' '))));
+  if(/^work:[a-f0-9]{32}$/.test(j.original_work_id||''))
+   row.append(textNode('div','Same original: '+j.original_work_id));
+  row.append(combinedQueueLink(j.source_ref,'Open exact source'));
+  el.append(row);
+ }
+}
 function renderRileyAuditedActivity(readback,current,timeline){
  const work=$('rileyOriginalActivityRows'),heartbeat=$('rileyActualWorkerReceipt');
  work.replaceChildren();
@@ -1392,6 +1436,7 @@ function renderRileyLiveProgress(readback){
   frag.append(row);
  }
  timeline.replaceChildren(frag);
+ renderUnifiedOriginalGraph(readback,current);
  renderRileyAuditedActivity(readback,current,timeline);
  panel.hidden=false;
 }
@@ -1621,7 +1666,17 @@ async function refreshShiftStatus(){
       const currentBlocker=data.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
        data.shift_activity?.shift_id===activeState.shift_id?
        data.shift_activity.last_worker_safe_result:null;
-      if(currentBlocker==='RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY'){
+      const unified=data.shift_execution_graph_status===
+       'VERIFIED_CURRENT_OWNER_EXECUTION'&&
+       data.shift_execution_graph?.shift_id===activeState.shift_id?
+        data.shift_execution_graph:null;
+      if(unified?.next_action==='GENERATE_AND_INDEPENDENTLY_TEST_SAME_REPAIR'){
+       showRileyNextAction('NEXT EXECUTION · Generate and independently test issue #263',
+        'The same owner-authorized shift has a real admitted repair and a prepared PR review. '+
+        'The unified system identifies code synthesis and frozen acceptance tests as the next work. '+
+        'It has NOT produced a verified candidate, approval or final receipt yet. '+
+        'No new shift or duplicate job should be started.');
+      }else if(currentBlocker==='RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY'){
        showRileyNextAction('BLOCKED AT REPAIR EXECUTION · Your shift remains authorized',
         'Reality has admitted issue #263 but has not staged an independently tested repair, '+
         'and no exact original is eligible for its canonical capability worker. '+
