@@ -97,7 +97,10 @@ export async function wakeExistingRileyShiftCapabilityBatch({
   // On uncertain effect do not automatically re-send in this invocation.
   const wake=await dispatch({trigger_id:gate.trigger_id,
    source_event_id:gate.source_event_id,
-   original_work_id:gate.original_work_id});
+   original_work_id:gate.original_work_id,
+   shift_id:gate.shift_id,source_ref:gate.source_ref,
+   source_proof_sha256:gate.source_proof_sha256,
+   db,fetchImpl});
   if(wake?.dispatched!==true||
    wake.trigger_id!==gate.trigger_id||
    wake.source_event_id!==gate.source_event_id||
