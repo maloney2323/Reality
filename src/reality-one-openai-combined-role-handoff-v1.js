@@ -67,8 +67,11 @@ export function createOneOpenAICombinedRoleCoordinator({
 }={}){
  if(typeof apiKey!=='string'||apiKey.length<12||
   typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,70}$/.test(model)||
-  typeof fetchImpl!=='function')
+  typeof fetchImpl!=='function'||typeof readCurrentShift!=='function')
   fail('TRUSTED_SERVER_OPENAI_ADAPTER_REQUIRED');
+ const gateway=createRealityGovernedOpenAIGateway({
+  apiKey,model,fetchImpl,readCurrentShift
+ });
  return async function coordinateClaimedRoleWork(input){
   const rule=validateInput(input);
   // Skip work that no longer exists. This is not a usable issue or job.
