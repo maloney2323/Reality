@@ -113,7 +113,11 @@ export function createRealityGovernedOpenAIGateway({
        task.provider_effect_may_have_occurred!==false||
        task.production_changed!==false||task.independently_settled!==false)
      fail('ORIGINAL_CONTINUITY_SCOPE_OR_TASK_DRIFT');
-    return Object.freeze({task,checkpoint_sha256:plan.checkpoint_sha256});
+    return Object.freeze({
+     task,checkpoint_sha256:plan.checkpoint_sha256,
+     capability_id:plan.verified_tool_manifest.capability_id,
+     capability_schema_sha256:plan.verified_tool_manifest.schema_sha256
+    });
    }
    // Prevent even initial model inference unless exact signed original work
    // and approved/rebound tool are still eligible for the current checkpoint.
@@ -132,6 +136,17 @@ export function createRealityGovernedOpenAIGateway({
    };
    const result=await runGovernedToolSession({
     mode,model,apiKey,fetchImpl:guardedFetch,now,
+    verifiedContinuityContext:Object.freeze({
+     independently_verified:true,
+     original_work_id:requested.original_work_id,goal_id:requested.goal_id,
+     continuity_root_id:requested.continuity_root_id,
+     worldline_id:requested.worldline_id,
+     source_identity_hash:requested.source_identity_hash,
+     ledger_head_hash:requested.ledger_head_hash,
+     checkpoint_sha256:initial.checkpoint_sha256,
+     capability_id:initial.capability_id,
+     capability_schema_sha256:initial.capability_schema_sha256
+    }),
     readOriginalTask:async()=>{
      const checked=await verifyBoundary();
      return checked.task;
