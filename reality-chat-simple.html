@@ -1398,9 +1398,18 @@ function combinedQueueLink(source,title){
  a.target='_blank';a.rel='noopener noreferrer';a.textContent=title;
  return a;
 }
+function showRileyNextAction(title,message){
+ $('rileyNextActionTitle').textContent=title;
+ $('rileyNextActionText').textContent=message;
+}
 function renderRileyTaylorDraftQueue(draft){
  const box=$('rileyTaylorCombinedQueue'),rows=$('rileyTaylorQueueRows');
  const orders=draft?.combined_employee_work_orders;
+ const exclusions=draft?.previously_settled_original_source_refs_excluded;
+ if(!Array.isArray(exclusions)||exclusions.length>25||
+    exclusions.some(u=>!COMBINED_WORK_SOURCE.test(u||''))||
+    new Set(exclusions).size!==exclusions.length)
+  throw Error('RILEY_OWNER_SETTLED_SOURCE_EXCLUSIONS_UNVERIFIED');
  if(draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
     draft?.read_only!==true||draft?.installation_authorized!==false||
     draft?.job_started!==false||draft?.production_changed!==false||
@@ -1413,7 +1422,10 @@ function renderRileyTaylorDraftQueue(draft){
     orders.no_extra_per_task_owner_start_approval!==true||
     orders.operating_model!=='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'||
     !Array.isArray(orders.tasks)||orders.tasks.length>4||
-    orders.task_count!==orders.tasks.length)
+    orders.task_count!==orders.tasks.length||
+    orders.tasks.some(task=>exclusions.includes(task.source_ref))||
+    draft.counts?.already_settled_source_records_excluded!==
+     exclusions.length)
   throw Error('RILEY_TAYLOR_COMBINED_WORK_SCOPE_UNVERIFIED');
  const frag=document.createDocumentFragment();
  for(const task of orders.tasks){
@@ -1437,9 +1449,28 @@ function renderRileyTaylorDraftQueue(draft){
   frag.append(row);
  }
  rows.replaceChildren(frag);
+ verifiedFreshBatchReady=orders.task_count>0;
+ $('runFullShift').disabled=pending||!verifiedFreshBatchReady;
+ $('runFullShift').textContent=verifiedFreshBatchReady?
+  'Start '+orders.task_count+' Fresh Assignments':'No Fresh Eligible Assignments';
  $('rileyTaylorQueueStatus').textContent=orders.task_count?
-  orders.task_count+' exact unfinished source assignments prepared for one signed-in owner start. Completion-bound authorization: continue until every selected job has independent final receipts, with finite per-job execution leases. No code repair or independent final job receipt is claimed before execution.':
-  'No exact assigned source work in this plan. Reality will not authorize an empty time-only shift.';
+  orders.task_count+' NEW source assignments are proposed. '+
+  exclusions.length+' already-settled sources excluded from this batch. '+
+  'One signed-in start authorizes this exact frozen scope until independently verified final receipts. '+
+  'These are source candidates, not yet a completed code repair or a capability installation.':
+  exclusions.length+' already-settled sources excluded. No new source assignments qualified; '+ 
+  'Reality will not start an empty shift.';
+ showRileyNextAction(verifiedFreshBatchReady?
+  'NEXT STEP · Start the fresh work batch once':
+  'NO FRESH WORK READY · Do not start another shift',
+  verifiedFreshBatchReady?
+  'The prior shift is closed. '+exclusions.length+
+   ' previously settled sources have been excluded. Review the '+
+   orders.task_count+' assignments below, then press Start once. '+
+   'Reality will confirm the owner authorization first, then the actual worker wake and job evidence. '+
+   'Do not press Start again while it is working.':
+  'The previous shift is closed; Reality could not qualify new distinct assignments. '+
+   'No extra owner authorization or historical replay should occur until fresh evidence is available.');
  box.hidden=false;
 }
 function renderActiveRileyTaylorQueue(readback){
