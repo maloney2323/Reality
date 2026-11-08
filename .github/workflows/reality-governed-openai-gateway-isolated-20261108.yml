@@ -20,6 +20,8 @@ on:
       - test/reality-owner-chat-shift-command-v1.test.js
       - reality-chat-simple.html
       - reality-owner-chat-shift-command-v1.js
+      - src/reality-riley-multi-job-shift-controller-v1.js
+      - supabase/migrations/20261108_completion_bound_employee_work_warrant_v1.sql
       - api/reality/personal-governed-employee-shift.js
       - test/reality-riley-trusted-original-driver-bridge-v1.test.js
       - src/reality-governed-shift-boundary-v1.js
@@ -49,6 +51,7 @@ jobs:
           node --check src/reality-riley-authorized-pr-review-job-v1.js
           node --check src/reality-riley-trusted-original-driver-bridge-v1.js
           node --check reality-owner-chat-shift-command-v1.js
+          node --check src/reality-riley-multi-job-shift-controller-v1.js
           node --check api/reality/personal-governed-employee-shift.js
           node --check src/reality-riley-existing-multi-job-wake-v1.js
           node --check src/reality-employee-shared-capability-wake-v1.js
