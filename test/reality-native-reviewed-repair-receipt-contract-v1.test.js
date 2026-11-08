@@ -44,3 +44,20 @@ test('receipt contract requires distinct proof of installed code and original ex
  assert.match(sql,/j\.original_settlement_receipt_ref=/);
  assert.match(sql,/n\.receipt_id::text/);
 });
+
+test('signed-in Reality Chat shows only exact tested native patch, but no installation approval before full loop readiness',()=>{
+ const api=get('api/reality/personal-governed-employee-shift.js');
+ const ui=get('reality-chat-simple.html');
+ const rpc=get('src/reality-governed-shift-boundary-v1.js');
+ assert.match(api,/reality_read_owner_native_reviewed_patch_v1/);
+ assert.match(api,/p_owner_id:session\.user_id,p_shift_id:chosen\.shift_id/);
+ assert.match(api,/riley_native_reviewed_patch_status='VERIFIED_OWNER_SOURCE_PATCH_NOT_INSTALLABLE'/);
+ assert.match(api,/patch\.owner_approval_ready===false/);
+ assert.match(api,/patch\.native_install_to_settlement_accepted===false/);
+ assert.match(ui,/id="rileyReviewedPatchEvidence"/);
+ assert.match(ui,/renderRileyReviewedPatchEvidence\(readback,current\)/);
+ assert.match(ui,/Installation NOT approved/);
+ assert.match(ui,/This engineering-reviewed patch is/);
+ assert.match(ui,/No approval button is shown until that path is proven/);
+ assert.match(rpc,/read_owner_native_reviewed_patch_v1/);
+});
