@@ -94,7 +94,9 @@ export default async function handler(req,res){
    const read=assertShiftReadback(await shiftRpc(db,'reality_read_owner_employee_shifts_v1',
     {p_owner_id:session.user_id}));
    let handoffs=[],handoff_status='NO_VERIFIED_SHIFT_BOUND_CAPABILITY_REQUEST';
-   const active=read.shifts.some(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+   const active=read.shifts.some(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+       Number.isFinite(Date.parse(s.planned_end_at))&&
+       Date.parse(s.planned_end_at)>Date.now());
    if(active){
     try{
      const [qualified,loop]=await Promise.all([
