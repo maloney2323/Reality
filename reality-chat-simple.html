@@ -1255,6 +1255,32 @@ function renderUnifiedOriginalGraph(readback,current){
   (pretty[graph.next_action]||String(graph.next_action||'UNVERIFIED')
    .replaceAll('_',' '))+
   '. These are service-role job readbacks, not model intentions.'));
+ const readiness=readback?.riley_native_batch_readiness;
+ if(readiness?.status===
+    'OWNER_SHIFT_EVIDENCE_VERIFIED_INSTALL_AND_FINAL_RECEIPTS_BLOCKED'&&
+    readiness.shift_id===graph.shift_id&&
+    readiness.owner_approval_ready===false&&
+    readiness.ready_for_new_install_approval===false&&
+    readiness.installation_authorized===false&&
+    Array.isArray(readiness.blockers)&&readiness.blockers.length<=8){
+  const causes={
+   PREVIEW_GITHUB_WRITER_CREDENTIAL_MISSING:
+    'Preview GitHub writer credential is missing',
+   PREVIEW_VERCEL_DEPLOY_CREDENTIAL_MISSING:
+    'Preview deployment credential is missing',
+   NATIVE_EXACT_APPROVAL_TO_ISOLATED_INSTALL_NOT_PROVEN:
+    'Exact owner approval through isolated installation is not yet verified',
+   NATIVE_POSTINSTALL_SAME_ORIGINAL_RESUME_NOT_PROVEN:
+    'Automatic same-job resumption and final receipt are not yet verified',
+   OTHER_SELECTED_JOBS_NOT_INDEPENDENTLY_SETTLED:
+    'Other selected assignments have not yet all been independently settled',
+   NATIVE_INDEPENDENT_TESTED_CANDIDATE_NOT_CURRENT:
+    'No verified current native repair candidate is available'
+  };
+  el.append(textNode('p','Release gate: '+readiness.blockers
+   .map(x=>causes[x]||'Independent release prerequisite not verified')
+   .join(' · ')+'. No new shift is required. No installation approval is being requested.'));
+ }
  for(const j of graph.jobs){
   if(!COMBINED_WORK_SOURCE.test(j.source_ref||''))continue;
   const row=document.createElement('div');row.className='workforce-output-row';
