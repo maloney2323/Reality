@@ -21,7 +21,7 @@ grant select,insert,update on reality_internal.governed_employee_shift_worker_pu
 create or replace function public.reality_record_employee_shift_worker_pulse_v1(
  p_shift_id uuid,p_status text,p_safe_result text default null
 ) returns jsonb language plpgsql security invoker set search_path='' as $fn$
-declare v_shift record;v_seen timestamptz:=clock_timestamp();v rowtype record;
+declare v_shift record;v_seen timestamptz:=clock_timestamp();v record;
 begin
  if current_user<>'service_role' then
   raise exception 'SHIFT_WORKER_PULSE_SERVICE_ROLE_REQUIRED';end if;
@@ -74,6 +74,34 @@ revoke all on function public.reality_record_employee_shift_worker_pulse_v1(
  uuid,text,text) from public,anon,authenticated;
 grant execute on function public.reality_record_employee_shift_worker_pulse_v1(
  uuid,text,text) to service_role;
+
+-- Worker chooses no owner or shift from its HTTP request; the existing
+-- exact service-only authorized window selects the sole current shift.
+create or replace function public.reality_record_current_shift_worker_pulse_v1(
+ p_status text,p_safe_result text default null
+) returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare v_shift_id uuid;v_count int;v_now timestamptz:=clock_timestamp();
+begin
+ if current_user<>'service_role' then
+  raise exception 'SHIFT_CURRENT_WORKER_PULSE_SERVICE_ROLE_REQUIRED';end if;
+ select count(*),min(s.shift_id) into v_count,v_shift_id
+ from reality_internal.governed_employee_shifts_v1 s
+ where s.status in ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  and s.authorized_at is not null and s.closed_at is null
+  and s.planned_start_at<=v_now and
+  (s.planned_end_at='infinity'::timestamptz or s.planned_end_at>v_now);
+ if v_count=0 then
+  return jsonb_build_object('status','NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE',
+   'worker_started',false,'installation_authorized',false);end if;
+ if v_count<>1 then
+  raise exception 'MULTIPLE_OWNER_WORKER_PULSE_SCOPES_AMBIGUOUS';end if;
+ return public.reality_record_employee_shift_worker_pulse_v1(
+  v_shift_id,p_status,p_safe_result);
+end $fn$;
+revoke all on function public.reality_record_current_shift_worker_pulse_v1(
+ text,text) from public,anon,authenticated;
+grant execute on function public.reality_record_current_shift_worker_pulse_v1(
+ text,text) to service_role;
 
 create or replace function public.reality_read_owner_shift_live_activity_v1(
  p_owner_id uuid,p_shift_id uuid
