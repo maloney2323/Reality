@@ -145,6 +145,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <div id="rileyActualWorkerReceipt" role="status">No confirmed worker wake yet.</div>
  <h4>Shared governed execution · Current exact job decisions</h4>
  <div id="rileyUnifiedOriginalGraph" aria-live="polite">Checking owner-frozen work scope…</div>
+ <div id="rileyReviewedPatchEvidence" aria-live="polite" hidden></div>
  <h4>Original jobs · Exact recorded phase and time</h4>
  <div id="rileyOriginalActivityRows">Waiting for original-job readback.</div>
  <h4>Source and execution evidence · Time-stamped</h4>
@@ -1189,6 +1190,41 @@ function renderShiftStartProof(readback){
  else if(shift.status.startsWith('ENDED_'))
   details.append(textNode('p','Closed with recorded evidence; not all original jobs were verified as completed.'));
 }
+function renderRileyReviewedPatchEvidence(readback,current){
+ const el=$('rileyReviewedPatchEvidence');el.replaceChildren();el.hidden=true;
+ const p=readback?.riley_native_reviewed_patch_status===
+  'VERIFIED_OWNER_SOURCE_PATCH_NOT_INSTALLABLE'&&
+  readback.riley_native_reviewed_patch?.shift_id===current?.shift_id?
+  readback.riley_native_reviewed_patch:null;
+ if(!p||p.status!=='EXACT_NATIVE_ENGINEERING_PATCH_INDEPENDENTLY_TESTED_REVIEW_ONLY'||
+  !/^work:[a-f0-9]{32}$/.test(p.original_work_id||'')||
+  !/^[a-f0-9]{40}$/.test(p.candidate_commit_sha||'')||
+  !/^sha256:[a-f0-9]{64}$/.test(p.candidate_artifact_sha256||'')||
+  !Number.isSafeInteger(p.independent_passing_run_id)||
+  p.independent_passing_run_id<10000||
+  p.provenance!=='CHATGPT_REVIEWED_ENGINEERING_PATCH_AFTER_REJECTED_MODEL_DRAFT'||
+  p.owner_approval_ready!==false||
+  p.installation_authorized!==false||
+  p.original_job_completed!==false||
+  p.production_changed!==false)return;
+ el.hidden=false;
+ el.append(textNode('h4','Tested #263 engineering patch · Installation NOT approved'));
+ el.append(textNode('p','Independent regression evidence is attached to original '+
+  p.original_work_id+'. The edit strengthens settlement and authorization '+
+  'checks immediately before execution. This engineering-reviewed patch is '+
+  'not evidence that Reality autonomously generated a passing capability.'));
+ el.append(textNode('p','Exact source SHA-256: '+p.candidate_artifact_sha256+
+  ' · Tested commit: '+p.candidate_commit_sha));
+ const link=document.createElement('a');
+ link.href='https://github.com/maloney2323/Reality/actions/runs/'+
+  p.independent_passing_run_id;
+ link.target='_blank';link.rel='noopener noreferrer';
+ link.textContent='Open independent passing regression run';
+ el.append(link);
+ el.append(textNode('p','Next gate: Reality must verify its native '+
+  'owner-approved isolated installation and original-job settlement path. '+
+  'No approval button is shown until that path is proven. No code is installed.'));
+}
 function renderUnifiedOriginalGraph(readback,current){
  const el=$('rileyUnifiedOriginalGraph');el.replaceChildren();
  const graph=readback?.shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'&&
@@ -1437,6 +1473,7 @@ function renderRileyLiveProgress(readback){
  }
  timeline.replaceChildren(frag);
  renderUnifiedOriginalGraph(readback,current);
+ renderRileyReviewedPatchEvidence(readback,current);
  renderRileyAuditedActivity(readback,current,timeline);
  panel.hidden=false;
 }
