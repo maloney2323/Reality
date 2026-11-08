@@ -90,7 +90,7 @@ export async function attestCurrentRileyCandidate263({
  if(matches.length!==1)fail('CURRENT_REPAIR_NOT_BOUND_TO_SOURCE_STEP');
  const job=matches[0];
  if(job.phase==='CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL')
-  return blocked('EXACT_TESTED_CANDIDATE_AWAITING_OWNER_APPROVAL');
+  return blocked('EXACT_TESTED_CANDIDATE_NATIVE_INSTALL_GATE_NOT_VERIFIED');
  if(job.phase!=='SOURCE_ADMITTED')
   return blocked('EXACT_REPAIR_NOT_AWAITING_CANDIDATE');
  const suffix=job.original_work_id.slice(5,17);
