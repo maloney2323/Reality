@@ -68,3 +68,16 @@ test('activity readback is owned by current signed-in user and inaccessible to n
  assert.match(sql,/from public,anon,authenticated/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
 });
+
+test('real queued repair blocker is displayed instead of generic healthy worker status',()=>{
+ const worker=source('api/reality/governed-employee-shift-worker.js');
+ const ui=source('reality-chat-simple.html');
+ assert.match(worker,/RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY/);
+ assert.match(worker,/RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED/);
+ assert.match(worker,/NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE/);
+ assert.match(ui,/BLOCKED AT REPAIR EXECUTION/);
+ assert.match(ui,/The scheduler is still waking successfully/);
+ assert.match(ui,/Do not start a duplicate shift/);
+ assert.match(ui,/no canonical capability job is eligible/);
+ assert.doesNotMatch(worker,/original_job_completed:true/);
+});
