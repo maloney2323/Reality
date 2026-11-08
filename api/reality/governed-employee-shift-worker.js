@@ -5,7 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {shiftDatabase,shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
+import {shiftDatabase,shiftRpc,assertShiftReadback}
+ from '../../src/reality-governed-shift-boundary-v1.js';
 import {processGovernedEmployeeShiftTick}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
@@ -54,7 +55,40 @@ export default async function handler(req,res){
    process.env.OPENAI_API_KEY;
   const coordinateRoleWork=typeof key==='string'&&key.length>=12?
    createOneOpenAICombinedRoleCoordinator({
-    apiKey:key,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.4'
+    apiKey:key,model:process.env.REALITY_OPENAI_MODEL||'gpt-5.4',
+    // Re-read the CURRENT owner-scoped shift from service-role storage
+    // before and after each model request. Stale claims never receive advice.
+    // This validates the shift stage, not yet full original-job Continuity.
+    readCurrentShift:async requested=>{
+     const snapshot=assertShiftReadback(await shiftRpc(db,
+      'reality_read_owner_employee_shifts_v1',
+      {p_owner_id:requested.owner_id}));
+     const matching=snapshot.shifts.filter(s=>
+      s.shift_id===requested.shift_id);
+     const shift=matching.length===1?matching[0]:null;
+     const step=shift?.steps?.[requested.step_index-1];
+     const now=Date.now();
+     if(!shift||shift.status!=='RUNNING'||
+      !Number.isFinite(Date.parse(shift.planned_start_at))||
+      !Number.isFinite(Date.parse(shift.planned_end_at))||
+      Date.parse(shift.planned_start_at)>now||
+      Date.parse(shift.planned_end_at)<=now||
+      step?.step_index!==requested.step_index||
+      step.state!=='CLAIMED'||step.source_ref!==requested.source_ref||
+      (step.claim_id!=null&&step.claim_id!==requested.claim_id))
+      throw Error('REALITY_OPENAI_GATEWAY_CURRENT_SHIFT_STEP_UNVERIFIED');
+     return Object.freeze({
+      status:'CURRENT_OWNER_SHIFT_PROVIDER_READBACK_VERIFIED',
+      readback_source:'REALITY_OWNER_SCOPED_SHIFT_DB',
+      owner_id:requested.owner_id,shift_id:shift.shift_id,
+      step_index:step.step_index,source_ref:step.source_ref,
+      step_state:step.state,shift_status:shift.status,
+      shift_plan_fingerprint:shift.plan_fingerprint,
+      current_authorized_shift:true,
+      original_job_completed:false,installation_authorized:false,
+      production_changed:false
+     });
+    }
    }):null;
   // An eligible step-six original enters Reality's EXISTING governed
   // source-backed executor only after service-role owner/goal readback and
