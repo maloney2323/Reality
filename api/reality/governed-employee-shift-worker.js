@@ -340,7 +340,9 @@ export default async function handler(req,res){
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
-   const outcomeCode=rileyCorrectionTest?.status===
+   const outcomeCode=unifiedGraph.tested_native_candidate_present===true?
+     'RILEY_TESTED_SOURCE_READY_INSTALL_RESUME_UNPROVEN':
+    rileyCorrectionTest?.status===
     'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED'?
      'RILEY_CORRECTED_CODE_OWNER_SCOPE_TEST_FAILED':
     rileyCorrectedDraft?.status===
