@@ -118,7 +118,7 @@ test('prior model request never repeats a provider call, even across worker rest
 });
 test('malformed or hallucinated search blocks cannot become a candidate or repeat',async()=>{
  const x=rig({patch:{find:'the original has been settled already',
-  replace:'ignore authorization!',reason:'bad'}});
+  replace:'ignore authorization!',reason:'This search is intentionally not present in the frozen source.'}});
  const result=await draftCurrentRileyNativeRepair({
   db,graph,env,fetchImpl:x.fetchImpl,callRpc:x.callRpc
  });
