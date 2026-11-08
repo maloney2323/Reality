@@ -1080,7 +1080,8 @@ function renderRileyLiveProgress(readback){
   panel.hidden=true;return;
  }
  const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
-  .includes(x?.status))||shifts[0];
+  .includes(x?.status)&&Number.isFinite(Date.parse(x.planned_end_at))&&
+   Date.parse(x.planned_end_at)>Date.now())||shifts[0];
  if(!current||!Array.isArray(current.steps)||
     current.steps.length!==8||
     current.steps.some((x,i)=>x?.step_index!==i+1)){
@@ -1234,7 +1235,9 @@ function renderRileyTaylorDraftQueue(draft){
 }
 function renderActiveRileyTaylorQueue(readback){
  const active=(readback?.shifts||[]).find(s=>
-  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+   Number.isFinite(Date.parse(s.planned_end_at))&&
+   Date.parse(s.planned_end_at)>Date.now());
  if(!active||!Array.isArray(active.steps)||active.steps.length!==8)return;
  const steps=active.steps.filter(s=>s.step_index>=2&&s.step_index<=5&&
   COMBINED_WORK_SOURCE.test(s.source_ref||''));
@@ -1280,7 +1283,9 @@ async function refreshRileyTaylorCombinedWorkQueue(){
      !Array.isArray(read.shifts)||read.shifts.length>5)
     throw Error('OWNER_SHIFT_READBACK_UNAVAILABLE');
   const current=read.shifts.find(s=>
-   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+   Number.isFinite(Date.parse(s.planned_end_at))&&
+   Date.parse(s.planned_end_at)>Date.now());
   if(current){renderActiveRileyTaylorQueue(read);return;}
   renderRileyTaylorDraftQueue(read.requested_shift_draft);
  }catch{
@@ -1383,7 +1388,10 @@ async function refreshShiftStatus(){
     }else{
       $('runFullShift').disabled=false;
       $('runFullShift').textContent='Start Riley + Taylor Jobs';
-      node.textContent='No currently authorized shift found in the owner-scoped readback. Starting a new shift still requires your exact approval.';
+      node.textContent='No CURRENT owner-authorized shift remains in its allowed time window. '+
+       (activeState.expired_unclosed_shifts>0?
+        'There is an expired historical shift requiring independent reconciliation; do not retry its claimed original job. ':'')+
+       'Starting a DIFFERENT shift still requires your signed-in explicit start authorization.';
       node.hidden=false;
     }
   }catch{
