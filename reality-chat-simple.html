@@ -1428,8 +1428,9 @@ function renderRileyTaylorDraftQueue(draft){
     !Array.isArray(orders.tasks)||orders.tasks.length>4||
     orders.task_count!==orders.tasks.length||
     orders.tasks.some(task=>exclusions.includes(task.source_ref))||
-    draft.counts?.already_settled_source_records_excluded!==
-     exclusions.length)
+    !Number.isSafeInteger(draft.counts?.already_settled_source_records_excluded)||
+    draft.counts.already_settled_source_records_excluded<0||
+    draft.counts.already_settled_source_records_excluded>exclusions.length)
   throw Error('RILEY_TAYLOR_COMBINED_WORK_SCOPE_UNVERIFIED');
  const frag=document.createDocumentFragment();
  for(const task of orders.tasks){
@@ -1459,17 +1460,16 @@ function renderRileyTaylorDraftQueue(draft){
   'Start '+orders.task_count+' Fresh Assignments':'No Fresh Eligible Assignments';
  $('rileyTaylorQueueStatus').textContent=orders.task_count?
   orders.task_count+' NEW source assignments are proposed. '+
-  exclusions.length+' already-settled sources excluded from this batch. '+
+  draft.counts.already_settled_source_records_excluded+' settled source records removed from this draft; '+exclusions.length+' historical original(s) protected from replay. '+
   'One signed-in start authorizes this exact frozen scope until independently verified final receipts. '+
   'These are source candidates, not yet a completed code repair or a capability installation.':
-  exclusions.length+' already-settled sources excluded. No new source assignments qualified; '+ 
+  exclusions.length+' settled historical original(s) protected. No new source assignments qualified; '+ 
   'Reality will not start an empty shift.';
  showRileyNextAction(verifiedFreshBatchReady?
   'NEXT STEP · Start the fresh work batch once':
   'NO FRESH WORK READY · Do not start another shift',
   verifiedFreshBatchReady?
-  'The prior shift is closed. '+exclusions.length+
-   ' previously settled sources have been excluded. Review the '+
+  'The prior shift is closed. Previously settled originals cannot be reused. Review the '+
    orders.task_count+' assignments below, then press Start once. '+
    'Reality will confirm the owner authorization first, then the actual worker wake and job evidence. '+
    'Do not press Start again while it is working.':
