@@ -60,3 +60,32 @@ test('existing preview worker runs receipt-check before ordinary shift pulse',()
   source.indexOf('processGovernedEmployeeShiftTick(db'));
  assert.match(source,/completion_bound_work:completionClose/);
 });
+
+test('owner-scoped Chat shows final receipt only when every exact original was independently settled',()=>{
+ const a='work:'+'a'.repeat(32),b='work:'+'b'.repeat(32);
+ const proof={status:'EMPLOYEE_SHIFT_EVIDENCE_REPORT',
+  shift_id:shift.shift_id,completion_bound:true,
+  completion_reason:'ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED',
+  original_jobs_independently_settled_in_this_shift:2,
+  authorized_source_job_count:2,
+  verified_original_receipts:[
+   {original_work_id:a,source_proof_sha256:'sha256:'+'a'.repeat(64),
+    independent_final_receipt_verified:true},
+   {original_work_id:b,source_proof_sha256:'sha256:'+'b'.repeat(64),
+    independent_final_receipt_verified:true}
+  ],production_changed:false};
+ const closed={...shift,status:'ENDED_WITH_VERIFIED_JOB',
+  close_report:proof,closed_at:'2026-11-09T09:11:00Z'};
+ const data=buildRealityShiftConversationBrief([closed],[],
+  new Date('2026-11-09T10:00:00Z'));
+ assert.equal(data.complete_shift_proven,true);
+ assert.equal(data.verified_final_original_job_count,2);
+ assert.deepEqual(data.final_receipt,proof);
+ assert.match(data.what_finished,/2 original jobs independently settled/);
+ const incomplete=buildRealityShiftConversationBrief([{
+  ...closed,close_report:{...proof,
+   original_jobs_independently_settled_in_this_shift:1}
+ }],[],new Date('2026-11-09T10:00:00Z'));
+ assert.equal(incomplete.complete_shift_proven,false);
+ assert.equal(incomplete.final_receipt,null);
+});
