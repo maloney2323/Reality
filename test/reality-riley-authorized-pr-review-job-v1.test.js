@@ -213,6 +213,7 @@ test('real original refuses stale owner shift before model inference',async()=>{
  const f=fixture({scopeNotCurrent:true});
  const result=await runAuthorizedRileyPrReview(options(f));
  assert.equal(result.original_job_completed,false);
+ assert.equal(result.status,'PR_REVIEW_REALITY_SCOPE_OR_SOURCE_CHANGED_NO_MODEL_EFFECT');
  assert.equal(f.getModelRequests(),0);
  assert.equal(f.ghPosts.length,0);
  assert.equal(f.calls.some(x=>x.name==='reality_prepare_authorized_riley_pr_review_v1'),false);
@@ -221,6 +222,7 @@ test('real original rejects owner authorization drift after model response and b
  const f=fixture({postModelScopeDrift:true});
  const result=await runAuthorizedRileyPrReview(options(f));
  assert.equal(result.original_job_completed,false);
+ assert.equal(result.status,'PR_REVIEW_REALITY_SCOPE_OR_SOURCE_CHANGED_NO_MODEL_EFFECT');
  assert.equal(f.getModelRequests(),1);
  assert.equal(f.ghPosts.length,0);
  assert.equal(f.calls.some(x=>x.name==='reality_prepare_authorized_riley_pr_review_v1'),false);
