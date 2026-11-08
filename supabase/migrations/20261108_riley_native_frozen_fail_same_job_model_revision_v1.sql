@@ -39,7 +39,7 @@ grant select,insert,update on reality_internal.riley_native_model_revisions_v1 t
 create or replace function public.reality_claim_same_riley_native_model_revision_v1(
  p_shift_id uuid,p_original_work_id text)
 returns jsonb language plpgsql security invoker set search_path='' as $fn$
-declare g jsonb;j jsonb;count_orig int;d record;f record;v record;
+declare g jsonb;j jsonb;count_orig int;d record;v record;
 begin
  if current_user<>'service_role' then raise exception 'RILEY_REVISION_SERVICE_ONLY';end if;
  if p_original_work_id!~'^work:[a-f0-9]{32}$' or p_shift_id is null then
