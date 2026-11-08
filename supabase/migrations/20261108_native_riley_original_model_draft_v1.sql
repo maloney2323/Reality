@@ -53,7 +53,7 @@ begin
   or v_graph->>'installation_authorized'<>'false'
   or v_graph->>'production_changed'<>'false'
  then raise exception 'RILEY_NATIVE_DRAFT_CURRENT_WARRANT_UNVERIFIED';end if;
- select count(*),max(value) into v_count,v_work
+ select count(*),(jsonb_agg(value)->0) into v_count,v_work
  from jsonb_array_elements(v_graph->'jobs')
  where value->>'original_kind'='REAL_ENGINEERING_REPAIR_ORIGINAL'
    and value->>'original_work_id'=p_original_work_id
