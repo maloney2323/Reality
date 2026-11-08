@@ -5,15 +5,15 @@
 export const CHAT_SHIFT_COMMAND_VERSION='reality-owner-chat-shift-command-v1';
 const HOUR_WORDS=Object.freeze({one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12});
 const IMMEDIATE=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch|schedule)\s+(?:(?:me\s+)?(?:an?\s+))?(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})(?:\s|-)+(?:hours?|hrs?)(?:\s|-)+(?:autonomous\s+|governed\s+|development\s+|employee\s+|work\s+|research\s+|software\s+){0,4}(?:shift|workday|work\s+day)\b/i;
-// Explicit one-time full shift means the existing 8-hour owner shift,
-// never indefinite, recurring or authority over unapproved original jobs.
+// An explicit full shift means work until all exact original receipts exist,
+// never authority to install a capability or replay another job.
 const FULL_SHIFT=/^(?:(?:reality\s*[,.:!]\s*)|(?:hey\s+reality\s*[,.:!]\s*))?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:'s|’s)?\s+))?(?:(?:the|an?)\s+)?(?:full|entire|complete)\s+(?:engineering\s+)?(?:shift|workday|work\s+day)(?:\s+now)?[.!]?$/i;
 // The selected, source-fingerprinted work queue is the scope; the user does
 // not need to memorize a rigid "run an eight-hour..." phrase. These explicit
 // imperative forms are ONLY interpreted following a signed-in Send action.
 const CURRENT_WORK=/^(?:(?:hey\s+)?reality\s*[,.:!]\s*)?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:riley(?:['’]s)?(?:\s+and\s+taylor(?:['’]s)?)?\s+)|(?:the\s+|my\s+|our\s+|your\s+|current\s+|this\s+))*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|workday|work\s+day|jobs?|automation)(?:\s+now)?[.!]?$/i;
 const OWNER_AUTHORIZATION=/^i\s+authorize\s+(?:(?:reality|riley\s+and\s+taylor)\s+to\s+)?(?:(?:start|run|begin|launch)\s+)?(?:(?:the|my|our|your|current|this)\s+)*(?:(?:combined|automation|automated|engineering|employee|original)\s+)*(?:shift|job\s*shift|jobshift|jobs?)(?:\s+now)?[.!]?$/i;
-const UNTIL_RECEIPTS=/^(?:(?:hey\\s+)?reality\\s*[,.:!]\\s*)?(?:please\\s+)?(?:run|start|begin|launch)\\s+(?:(?:the|my|our|your)\\s+)?(?:(?:combined|employee|automation|original|riley(?:\\s+and\\s+taylor)?)\\s+)*(?:jobs?|shift|work)\\s+until\\s+(?:all\\s+)?(?:jobs?\\s+are\\s+)?(?:complete|completed|tested\\s+and\\s+verified|verified\\s+and\\s+receipted)(?:\\s+and\\s+receipted)?[.!]?$/i;
+const UNTIL_RECEIPTS=/^(?:(?:hey\s+)?reality\s*[,.:!]\s*)?(?:please\s+)?(?:run|start|begin|launch)\s+(?:(?:the|my|our|your)\s+)?(?:(?:combined|employee|automation|original|riley(?:\s+and\s+taylor)?)\s+)*(?:jobs?|shift|work)\s+until\s+(?:all\s+)?(?:jobs?\s+are\s+)?(?:complete|completed|tested\s+and\s+verified|verified\s+and\s+receipted)(?:\s+and\s+receipted)?[.!]?$/i
 const FUTURE=/\b(?:tomorrow|next\s+(?:week|month|day)|later|after\s+|when\s+|if\s+|only\s+if|once\s+)\b/i;
 const RECURRENCE=/\b(?:every\s+(?:day|weekday|week|month)|daily|weekly|monthly|recurring|repeat\s+(?:every|daily|weekly)|each\s+(?:day|week|month))\b/i;
 const CONDITION=/\b(?:don't|do\s+not|never|without\s+starting|hypothetical|hypothetically|simulate|simulation|pretend|example|what\s+if)\b/i;
@@ -31,8 +31,8 @@ export function interpretSignedInChatShiftCommand(message,{selectedHours=8}={}){
  // Ordinary "start jobs / full shift / until done" means one
  // exact, frozen owner work batch until independently accepted receipts.
  const completionBound=completionRequest||full||current;
- // An explicit duration wins. An unqualified "start the job/shift" uses the
- // owner-selected bounded window and exact verified source fingerprint.
+ // Hours remain a legacy planning input, never a completion deadline for
+ // completion_bound=true; source fingerprint and owner warrant remain exact.
  const value=full?'eight':match?match[1].toLowerCase():null;
  const hours=value===null?selectedHours:
   /^\d+$/.test(value)?Number(value):HOUR_WORDS[value];
