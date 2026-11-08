@@ -35,6 +35,7 @@ export async function runGovernedToolSession({
  mode='DISCOVER_ON_DEMAND',
  readOriginalTask,lateBoundAdapter,
  model,apiKey,fetchImpl=fetch,
+ verifiedContinuityContext=null,
  now=()=>new Date().toISOString()
 }={}){
  if(!SCOPES.has(mode)||typeof readOriginalTask!=='function'||
@@ -59,10 +60,38 @@ export async function runGovernedToolSession({
   task.independently_settled!==false)
   fail('CURRENT_SIGNED_ORIGINAL_TASK_REQUIRED');
  const job=task.original_work_id;
+ if(verifiedContinuityContext!==null&&(
+   verifiedContinuityContext.independently_verified!==true||
+   verifiedContinuityContext.original_work_id!==job||
+   verifiedContinuityContext.goal_id!==task.goal_id||
+   !/^[a-f0-9]{64}$/.test(verifiedContinuityContext.source_identity_hash||'')||
+   !/^[a-f0-9]{64}$/.test(verifiedContinuityContext.ledger_head_hash||'')||
+   !/^[a-f0-9]{64}$/.test(verifiedContinuityContext.checkpoint_sha256||'')||
+   !/^[a-f0-9]{64}$/.test(verifiedContinuityContext.capability_schema_sha256||'')||
+   typeof verifiedContinuityContext.continuity_root_id!=='string'||
+   typeof verifiedContinuityContext.worldline_id!=='string'||
+   !verifiedContinuityContext.continuity_root_id||
+   !verifiedContinuityContext.worldline_id||
+   typeof verifiedContinuityContext.capability_id!=='string'||
+   !/^[a-z][a-z0-9._-]{2,90}$/.test(verifiedContinuityContext.capability_id)||
+   JSON.stringify(verifiedContinuityContext).length>2000
+  ))fail('VERIFIED_CONTINUITY_CONTEXT_REQUIRED');
  // Caution: the returned job's context is read-only task data, not a grant.
  // Only the server's signed envelope and the call-level lease grant tools.
  const context=JSON.stringify({
   original_work_id:job,goal_id:task.goal_id,objective:task.objective,
+  // The central Reality gateway supplies this from current independent
+  // Continuity/broker readback. The model cannot mint, edit or elevate it.
+  ...(verifiedContinuityContext?{reality_governance:{
+   continuity_root_id:verifiedContinuityContext.continuity_root_id,
+   worldline_id:verifiedContinuityContext.worldline_id,
+   source_identity_hash:verifiedContinuityContext.source_identity_hash,
+   ledger_head_hash:verifiedContinuityContext.ledger_head_hash,
+   checkpoint_sha256:verifiedContinuityContext.checkpoint_sha256,
+   available_capability_id:verifiedContinuityContext.capability_id,
+   capability_schema_sha256:verifiedContinuityContext.capability_schema_sha256,
+   authority:'Reality validates permissions, tool results and settlement',
+  }}:{}),
   rules:'Use only governed tools. Do not claim installation or settlement. Unverified model conclusions are proposals.'
  });
  let requests=0;
