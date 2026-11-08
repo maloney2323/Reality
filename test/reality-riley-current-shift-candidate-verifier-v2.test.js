@@ -166,7 +166,7 @@ test('provider workflow failure cannot create a valid candidate',async()=>{
 test('active candidate does not reuse historical proof, and browser cannot attest without service boundary',async()=>{
  const f=fixture({phase:'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL'});
  const out=await f.run();
- assert.equal(out.status,'RILEY_CURRENT_CANDIDATE_EXACT_TESTED_CANDIDATE_AWAITING_OWNER_APPROVAL');
+ assert.equal(out.status,'RILEY_CURRENT_CANDIDATE_EXACT_TESTED_CANDIDATE_NATIVE_INSTALL_GATE_NOT_VERIFIED');
  assert.equal(f.requests.length,0);
  await assert.rejects(attestCurrentRileyCandidate263({
   db,ownerId:owner,env:{...env,VERCEL_ENV:'production'},
