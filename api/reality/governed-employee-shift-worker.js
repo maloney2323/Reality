@@ -16,6 +16,8 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {runAuthorizedRileyPrReview}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
+import {reconcileOwnerShiftFailureTriage143}
+ from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -113,9 +115,27 @@ export default async function handler(req,res){
     original_job_completed:false,installation_authorized:false,
     production_changed:false};
   }
+  // This is a different original work item already signed under the
+  // SAME shift. It can complete even while the code-repair candidate is
+  // still running. No historical defect is declared fixed without evidence.
+  let rileyFailureTriage;
+  try{
+   rileyFailureTriage=await reconcileOwnerShiftFailureTriage143({
+    db,fetchImpl:fetch
+   });
+  }catch(e){
+   const code=String(e?.message||'');
+   rileyFailureTriage={
+    status:/^RILEY_SHIFT_TRIAGE_[A-Z0-9_]{4,115}$/.test(code)?
+     code:'RILEY_SHIFT_TRIAGE_CURRENT_PROVIDER_READBACK_UNAVAILABLE',
+    original_job_completed:false,code_repair_completed:false,
+    installation_authorized:false,production_changed:false
+   };
+  }
   return res.status(200).json({...result,
     riley_original_review:rileyOriginalReview,
-    riley_code_repair_original:rileyCodeRepair});
+    riley_code_repair_original:rileyCodeRepair,
+    riley_failure_triage_original:rileyFailureTriage});
  }catch{
   return res.status(503).json({
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
