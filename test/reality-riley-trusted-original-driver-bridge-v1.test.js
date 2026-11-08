@@ -32,10 +32,10 @@ const result={status:'SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'
  shift_finished:false,full_shift_proven:false,
  installation_authorized:false,production_changed:false};
 const db={url:'https://isolated.example',secretKey:'test-service-only-stub'};
-function ready({readback=eligible,runnerResult=result}={}){
+function ready({readback=eligible,runnerResult=result,batchEligibleOriginals=false}={}){
  const observations={rpc:[],run:[]};
  const adapter=createRileyTrustedOriginalDriver({
-  db,
+  db,batchEligibleOriginals,
   loadShiftReadback:async()=>({}),
   loadOwnerLedgerReadback:async()=>({}),
   loadTrustedAuthorizedOriginal:async()=>({}),
@@ -130,4 +130,46 @@ test('shared executor fabricated settlement and wrong scope are not returned to 
   const {adapter}=ready({runnerResult:bad});
   await assert.rejects(adapter(scope),/SHARED_EXECUTOR_OUTCOME_READBACK_INVALID/);
  }
+});
+
+test('one signed shift wake can batch multiple verified distinct original jobs without granting tool installation',async()=>{
+ const other={...candidate,original_work_id:'work:'+'b'.repeat(32),
+  source_ref:'https://github.com/maloney2323/Reality/issues/143',
+  source_proof_sha256:'sha256:'+'f'.repeat(64),
+  trigger_id:'44444444-5555-4666-8777-888888888888'};
+ const multi={...result,attempted:2,independently_settled:0,
+  outcomes:[result.outcomes[0],{
+   original_work_id:other.original_work_id,
+   status:'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY',
+   original_job_settled:false
+  }]};
+ const {adapter,observations}=ready({
+  readback:{...eligible,candidate_count:2,candidates:[candidate,other]},
+  runnerResult:multi,batchEligibleOriginals:true
+ });
+ const actual=await adapter(scope);
+ assert.equal(actual.attempted,2);
+ assert.equal(actual.outcomes.length,2);
+ assert.equal(observations.run.length,1);
+ assert.equal(observations.run[0].maxJobs,2);
+ assert.equal(observations.run[0].onlyOriginalWorkId,null);
+ assert.equal(actual.installation_authorized,false);
+ assert.equal(actual.full_shift_proven,false);
+});
+test('batch mode blocks duplicated work identities and fabricated third-job receipts',async()=>{
+ const other={...candidate,original_work_id:'work:'+'b'.repeat(32),
+  trigger_id:'44444444-5555-4666-8777-888888888888'};
+ const duplicated=ready({batchEligibleOriginals:true,
+  readback:{...eligible,candidate_count:2,
+   candidates:[candidate,candidate]}});
+ await assert.rejects(duplicated.adapter(scope),/DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH/);
+ assert.equal(duplicated.observations.run.length,0);
+ const fake={...result,attempted:2,outcomes:[result.outcomes[0],{
+  original_work_id:'work:'+'c'.repeat(32),
+  status:'INDEPENDENT_ORIGINAL_SETTLEMENT_CONFIRMED',
+  original_job_settled:false}]};
+ const invalid=ready({batchEligibleOriginals:true,
+  readback:{...eligible,candidate_count:2,candidates:[candidate,other]},
+  runnerResult:fake});
+ await assert.rejects(invalid.adapter(scope),/SHARED_EXECUTOR_OUTCOME_READBACK_INVALID/);
 });
