@@ -10,6 +10,9 @@ on:
       - src/reality-governed-tool-session-v1.js
       - src/reality-riley-authorized-pr-review-job-v1.js
       - src/reality-riley-trusted-original-driver-bridge-v1.js
+      - src/reality-riley-existing-multi-job-wake-v1.js
+      - src/reality-governed-employee-shift-worker-v1.js
+      - test/reality-riley-existing-multi-job-wake-v1.test.js
       - test/reality-riley-trusted-original-driver-bridge-v1.test.js
       - src/reality-governed-shift-boundary-v1.js
       - supabase/migrations/20261108_governed_original_pr_review_model_scope_v1.sql
@@ -37,5 +40,7 @@ jobs:
           node --check src/reality-governed-tool-session-v1.js
           node --check src/reality-riley-authorized-pr-review-job-v1.js
           node --check src/reality-riley-trusted-original-driver-bridge-v1.js
+          node --check src/reality-riley-existing-multi-job-wake-v1.js
+          node --check src/reality-governed-employee-shift-worker-v1.js
           node --check api/reality/governed-employee-shift-worker.js
-          node --test test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
+          node --test test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
