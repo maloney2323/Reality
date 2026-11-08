@@ -226,3 +226,11 @@ test('frozen #263: changed source owner execution authority cannot be reused at 
    shiftReadback:readback(),ownerLedgerReadback:ledger()}),
   /RILEY_SERVICE_ORIGINAL_CURRENT_TRUSTED_ORIGINAL_POSTCLAIM_SCOPE_REQUIRED/);
 });
+
+test('the narrow runner scope is never treated as authoritative settlement evidence',()=>{
+ const source=readFileSync(new URL(
+  '../src/reality-riley-service-original-runtime-v1.js',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/scope\?\.original_job_settled|scope\.original_job_settled/);
+ assert.match(source,/source_context\.original_job_settled!==false/);
+ assert.match(source,/source_context\.installation_authorized!==false/);
+});
