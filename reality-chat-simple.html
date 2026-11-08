@@ -1204,6 +1204,9 @@ function renderRileyAuditedActivity(readback,current,timeline){
   ' · Wake count: '+(Number.isSafeInteger(activity.worker_wake_count)?
      activity.worker_wake_count:'unavailable')+
   ' · Worker state: '+String(activity.last_worker_status||'UNVERIFIED').replaceAll('_',' ')+
+  (typeof activity.last_worker_safe_result==='string'&&
+   /^[A-Z0-9_]{3,100}$/.test(activity.last_worker_safe_result)?
+   ' · Last result: '+activity.last_worker_safe_result.replaceAll('_',' '):'')+
   ' · Database checked: '+(readAt||'unavailable'):
   'WORKER HAS NOT YET BEEN CONFIRMED · No actual authenticated wake recorded for this batch. '+
   'Database checked: '+(readAt||'unavailable');
