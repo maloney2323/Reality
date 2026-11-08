@@ -203,6 +203,7 @@ begin
   'last_worker_seen_at',v_p.last_worker_seen_at,
   'last_worker_completed_at',v_p.last_worker_completed_at,
   'worker_wake_count',v_p.wake_count,
+  'last_worker_safe_result',v_p.last_worker_safe_result,
   'source_events',v_events,
   'original_jobs',v_originals,
   'final_receipt',case when v_s.status='ENDED_WITH_VERIFIED_JOB'
