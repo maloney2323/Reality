@@ -78,9 +78,13 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
            item.phase==='SOURCE_ADMITTED'){
    fail('ADMITTED_REPAIR_MUST_HAVE_ORIGINAL_ID');
   }
-  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
-     item.source_ref!=='https://github.com/maloney2323/Reality/issues/263')
+  const is263=item.source_ref===
+   'https://github.com/maloney2323/Reality/issues/263';
+  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&!is263)
    fail('REPAIR_SOURCE_SCOPE_CHANGED');
+  if(is263&&item.independent_source_proof_verified===true&&
+     item.original_kind!=='REAL_ENGINEERING_REPAIR_ORIGINAL')
+   fail('EXACT_REPAIR_IDENTITY_MUST_NOT_BE_RECAST_AS_OTHER_ENGINE');
   return Object.freeze({...item});
  });
  const engineering=all.filter(x=>x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL');
