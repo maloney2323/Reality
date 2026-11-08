@@ -145,3 +145,53 @@ test('ordinary signed-in Start the shift/job commands authorize the existing exa
  ])
   assert.equal(interpretSignedInChatShiftCommand(message),null,message);
 });
+
+test('ordinary one-tap Start Jobs means until every independent final receipt, never eight-hour expiry',()=>{
+ for(const command of [
+  'Start the jobs','Start the shift','Start the job',
+  'Run the full shift','Start the jobs until complete',
+  'Start jobs until tested and verified',
+  'Start jobs until verified and receipted'
+ ]){
+  const out=interpretSignedInChatShiftCommand(command);
+  assert.equal(out?.intent,'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT',command);
+  assert.equal(out?.completion_bound,true,command);
+  assert.equal(out?.installation_authorized,false,command);
+ }
+ const timed=interpretSignedInChatShiftCommand('Start a 3 hour shift');
+ assert.equal(timed?.completion_bound,false);
+ assert.equal(timed?.duration_hours,3);
+});
+test('completion-bound work remains active until independently settled despite elapsed 8-hour estimate',()=>{
+ const s={shift_id:'11111111-2222-4333-8444-555555555555',
+  status:'AWAITING_EXACT_ORIGINAL_WORK',
+  planned_start_at:'2026-11-05T01:00:00.000Z',
+  planned_end_at:'infinity'};
+ const r=safeShiftReadbackState({ok:true,shifts:[s]},{
+  requestedHours:8,now:Date.parse('2026-11-08T09:00:00Z')});
+ assert.equal(r.hasActive,true);
+ assert.equal(r.completion_bound,true);
+ assert.equal(r.duration_hours,null);
+ assert.equal(r.completion_condition,
+  'ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED');
+ assert.equal(r.expired_unclosed_shifts,0);
+});
+test('completion-bound owner UI uses exact signed-in start and never asks for hours',()=>{
+ const html=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',
+  import.meta.url),'utf8');
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261108_completion_bound_employee_work_warrant_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(html,/Start the jobs until complete/);
+ assert.match(html,/completion_bound:true/);
+ assert.match(api,/reality_authorize_employee_completion_shift_v1/);
+ assert.match(api,/completion_bound:b\.completion_bound===true/);
+ assert.match(sql,/ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED/);
+ assert.match(sql,/genuine_independent_final_receipts_v1/);
+ assert.match(sql,/riley_pr_review_originals_v1/);
+ assert.match(sql,/realized_cash_savings_usd',null/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/planned_end_at='infinity'::timestamptz/);
+ assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
