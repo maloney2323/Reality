@@ -84,7 +84,7 @@ declare v_shift_id uuid;v_count int;v_now timestamptz:=clock_timestamp();
 begin
  if current_user<>'service_role' then
   raise exception 'SHIFT_CURRENT_WORKER_PULSE_SERVICE_ROLE_REQUIRED';end if;
- select count(*),min(s.shift_id) into v_count,v_shift_id
+ select count(*),min(s.shift_id::text)::uuid into v_count,v_shift_id
  from reality_internal.governed_employee_shifts_v1 s
  where s.status in ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
   and s.authorized_at is not null and s.closed_at is null
