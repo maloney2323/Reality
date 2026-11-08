@@ -58,15 +58,107 @@ function safeReason(status) {
   'OPENAI_RESPONSE_UNAVAILABLE';
 }
 export function createRealityGovernedOpenAIGateway({
- apiKey,model,readCurrentShift=null,fetchImpl=fetch
+ apiKey,model,readCurrentShift=null,readCurrentOriginal=null,fetchImpl=fetch
 }={}) {
  if(typeof apiKey!=='string'||apiKey.length<12||
     typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,70}$/.test(model)||
     (readCurrentShift!==null&&typeof readCurrentShift!=='function')||
+    (readCurrentOriginal!==null&&typeof readCurrentOriginal!=='function')||
     typeof fetchImpl!=='function')
   fail('TRUSTED_SERVER_MODEL_AND_SCOPE_ADAPTERS_REQUIRED');
  return Object.freeze({
   version:REALITY_GOVERNED_OPENAI_GATEWAY_VERSION,
+
+  // One real PR-review original is admitted by the existing service-role
+  // atomic claim. This read-only inference grants NO capability/installation
+  // permissions. It must re-read the durable claim AND the exact GitHub PR
+  // head before and after OpenAI; neither the model nor browser selects work.
+  async originalJobReadOnlyInference({
+   scope,sourceHeadSha,request,readCurrentSource
+  }={}) {
+   if(typeof readCurrentOriginal!=='function'||
+      typeof readCurrentSource!=='function'||
+      !UUID.test(scope?.owner_id||'')||
+      !UUID.test(scope?.shift_id||'')||
+      !UUID.test(scope?.claim_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(scope?.original_work_id||'')||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(scope?.source_ref||'')||
+      !SHA.test(scope?.source_proof_sha256||'')||
+      !/^[a-f0-9]{40}$/.test(sourceHeadSha||''))
+    fail('EXACT_OWNER_REVIEW_ORIGINAL_SCOPE_REQUIRED');
+   if(!request||request.model!==model||
+      request.tool_choice!=='none'||Object.hasOwn(request,'tools')||
+      Object.hasOwn(request,'previous_response_id')||
+      !Array.isArray(request.input)||request.input.length!==2||
+      request.input[0]?.role!=='system'||request.input[1]?.role!=='user'||
+      !Number.isSafeInteger(request.max_output_tokens)||
+      request.max_output_tokens<1||request.max_output_tokens>1200||
+      JSON.stringify(request).length>18000)
+    fail('ORIGINAL_REVIEW_READ_ONLY_MODEL_REQUEST_REQUIRED');
+   const verify=async()=>{
+    const state=await readCurrentOriginal(Object.freeze({...scope}));
+    if(state?.status!=='OWNER_ORIGINAL_REVIEW_CURRENT_FOR_MODEL'||
+       state.readback_source!=='REALITY_SERVICE_ROLE_ORIGINAL_DB'||
+       state.owner_id!==scope.owner_id||
+       state.shift_id!==scope.shift_id||
+       state.claim_id!==scope.claim_id||
+       state.original_work_id!==scope.original_work_id||
+       state.source_ref!==scope.source_ref||
+       state.source_proof_sha256!==scope.source_proof_sha256||
+       state.phase!=='CLAIMED'||
+       state.shift_status!=='RUNNING'&&
+        state.shift_status!=='AWAITING_EXACT_ORIGINAL_WORK'||
+       !SHA.test(state.shift_plan_fingerprint||'')||
+       state.model_response_id!==null||
+       state.installation_authorized!==false||
+       state.original_job_completed!==false||
+       state.production_changed!==false)
+     fail('ORIGINAL_REVIEW_CLAIM_OR_SHIFT_NOT_CURRENT');
+    const observed=await readCurrentSource(Object.freeze({...scope}));
+    if(observed?.source_ref!==scope.source_ref||
+       observed?.head_sha!==sourceHeadSha||
+       observed?.independently_read!==true||
+       observed?.read_only!==true||
+       observed?.production_changed!==false)
+     fail('ORIGINAL_REVIEW_GITHUB_SOURCE_HEAD_DRIFT');
+    return Object.freeze({plan_hash:state.shift_plan_fingerprint});
+   };
+   const before=await verify();
+   let response;
+   try {
+    response=await fetchImpl('https://api.openai.com/v1/responses',{
+     method:'POST',redirect:'error',cache:'no-store',
+     signal:AbortSignal.timeout(20000),
+     headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
+     body:JSON.stringify(request)
+    });
+   }catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'OPENAI_REQUEST_OR_TIMEOUT_UNVERIFIED'});
+   }
+   if(!response?.ok)
+    return Object.freeze({status:'UNAVAILABLE',reason:safeReason(Number(response?.status))});
+   let data;
+   try{data=await response.json()}catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'OPENAI_PROVIDER_RESULT_UNVERIFIED'});
+   }
+   // Do not accept a tool invocation or model-proclaimed provider receipt.
+   if(data?.status!=='completed'||!Array.isArray(data.output)||
+      data.output.length>12||
+      data.output.some(x=>['function_call','tool_search_call'].includes(x?.type))||
+      !/^resp_[A-Za-z0-9_-]{4,160}$/.test(data.id||''))
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'OPENAI_PROVIDER_RESULT_UNVERIFIED'});
+   const after=await verify();
+   if(after.plan_hash!==before.plan_hash)
+    fail('ORIGINAL_REVIEW_SHIFT_PLAN_CHANGED_DURING_INFERENCE');
+   return Object.freeze({status:'CURRENT_ORIGINAL_REVIEW_ADVISORY_UNTRUSTED',
+    data,original_work_id:scope.original_work_id,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,
+    full_continuity_verified:false,model_granted_authority:false});
+  },
   // This second mode is the ONLY gateway method that may expose a capability
   // to a model, and it runs through the existing independently verified
   // Continuity/broker + fenced sandbox adapter, never employee prompt text.
