@@ -1,4 +1,5 @@
-// Owner-authenticated 1–12-hour shift creation and independent progress.
+// Owner-authenticated exact-job shift creation and independent completion.
+// Legacy hour planning is not a deadline for completion-bound warrants.
 // First approval authorizes source checks, NOT arbitrary new original jobs or
 // installs. Exact upgrades are presented in EXISTING Reality Chat.
 import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
@@ -209,10 +210,16 @@ export default async function handler(req,res){
    return res.status(415).json({ok:false,error:'SHIFT_JSON_REQUIRED'});
   const b=req.body||{},keys=Object.keys(b);
   if(!b||typeof b!=='object'||Array.isArray(b)||
-   ![3,4].includes(keys.length)||
-   keys.some(x=>!['action','expected_fingerprint','planned_start_at','requested_hours'].includes(x))||
-   (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
-   (keys.length===3&&Object.hasOwn(b,'requested_hours'))||
+   ![3,4,5].includes(keys.length)||
+   keys.some(x=>!['action','expected_fingerprint','planned_start_at',
+     'requested_hours','completion_bound'].includes(x))||
+   (b.completion_bound!==undefined&&b.completion_bound!==true)||
+   (b.completion_bound===true&&
+     (keys.length!==5||b.requested_hours!==8))||
+   (b.completion_bound!==true&&
+     (keys.length!==3&&keys.length!==4||
+      (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
+      (keys.length===3&&Object.hasOwn(b,'requested_hours'))))||
    (!Number.isSafeInteger(b.requested_hours??8)||
    (b.requested_hours??8)<1||(b.requested_hours??8)>12)||
    b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
@@ -239,7 +246,9 @@ export default async function handler(req,res){
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
   const receipt=assertShiftReceipt(await shiftRpc(db,
-   'reality_authorize_employee_shift_v1',{
+   b.completion_bound===true?
+    'reality_authorize_employee_completion_shift_v1':
+    'reality_authorize_employee_shift_v1',{
     p_owner_id:session.user_id,p_fingerprint:fingerprint,
     p_source_observed_at:plan.observed_at,p_start_at:start.toISOString(),
     p_steps:plan.slots
@@ -249,11 +258,17 @@ export default async function handler(req,res){
    {p_owner_id:session.user_id}));
   const exact=read.shifts.find(s=>s.shift_id===receipt.shift_id&&
    s.plan_fingerprint===fingerprint&&s.steps.length===8&&
-   Number(new Date(s.planned_end_at))-Number(start)===plan.shift_duration_minutes*60000);
+   (b.completion_bound===true?
+     s.planned_end_at==='infinity'&&receipt.completion_bound===true:
+     Number(new Date(s.planned_end_at))-Number(start)===
+      plan.shift_duration_minutes*60000));
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
   return res.status(202).json({ok:true,...receipt,shift:exact,
    combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
+   completion_bound:b.completion_bound===true,
+   completion_condition:b.completion_bound===true?
+    'ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED':null,
    installation_authorized:false,
    existing_chat_approval_required_for_exact_capabilities:true,
    job_started:false,shift_started:false,
