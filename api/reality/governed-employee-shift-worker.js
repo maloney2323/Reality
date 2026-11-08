@@ -5,7 +5,7 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {shiftDatabase} from '../../src/reality-governed-shift-boundary-v1.js';
+import {shiftDatabase,shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
 import {processGovernedEmployeeShiftTick}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
@@ -86,7 +86,36 @@ export default async function handler(req,res){
     production_changed:false
    };
   }
-  return res.status(200).json({...result,riley_original_review:rileyOriginalReview});
+  // Admit the ACTUAL source-backed existing-code repair only from the
+  // CURRENT signed owner shift and frozen verified issue #263 source proof.
+  // Admission creates a durable original ID, NOT a fix or installation.
+  let rileyCodeRepair;
+  try{
+   const ticket=await shiftRpc(db,'reality_admit_exact_riley_263_repair_v1',{});
+   if(!['NO_OWNER_AUTHORIZED_263_SOURCE_TO_ADMIT',
+     'EXACT_OWNER_SHIFT_REPAIR_SOURCE_ADMITTED',
+     'ALREADY_SETTLED_NO_REPLAY'].includes(ticket?.status)||
+     ticket.installation_authorized!==false||
+     ticket.production_changed!==false||
+     (ticket.status==='EXACT_OWNER_SHIFT_REPAIR_SOURCE_ADMITTED'&&(
+       !/^work:[a-f0-9]{32}$/.test(ticket.original_work_id||'')||
+       !/^sha256:[a-f0-9]{64}$/.test(ticket.source_proof_sha256||'')||
+       !['SOURCE_ADMITTED','CANDIDATE_TESTING',
+        'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL','BLOCKED'].includes(ticket.phase)
+     )))throw Error('RILEY_REPAIR_EXACT_OWNER_SOURCE_READBACK_INVALID');
+   rileyCodeRepair={...ticket,
+    original_job_completed:ticket.status==='ALREADY_SETTLED_NO_REPLAY',
+    installation_authorized:false,production_changed:false};
+  }catch(e){
+   const c=String(e?.message||'');
+   rileyCodeRepair={status:/^RILEY_REPAIR_[A-Z0-9_]{5,100}$/.test(c)?
+    c:'RILEY_REPAIR_SOURCE_ADMISSION_UNVERIFIED',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false};
+  }
+  return res.status(200).json({...result,
+    riley_original_review:rileyOriginalReview,
+    riley_code_repair_original:rileyCodeRepair});
  }catch{
   return res.status(503).json({
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
