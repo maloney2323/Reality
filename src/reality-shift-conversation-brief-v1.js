@@ -65,9 +65,8 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   needs_you:'No capability installation approval is pending for a shift.',
   planned_start_at:null,as_of:now.toISOString(),
   verified_source_checks:0,verified_original_job_receipts:0,
-  complete_shift_proven:completeBoundProven,
-  verified_final_original_job_count:completeBoundProven?finalCount:0,
-  final_receipt:completeBoundProven?final:null,
+  complete_shift_proven:false,
+  verified_final_original_job_count:0,final_receipt:null,
   verified_human_hours_saved:null,
   events:[],approval_pending:false,read_only:true,
   production_changed:false});
@@ -188,8 +187,12 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   next_planned_step_at:timeNext,
   as_of:now.toISOString(),
   verified_source_checks:recorded,
-  verified_original_job_receipts:originalReceipt?1:0,
-  complete_shift_proven:false,verified_human_hours_saved:null,
+  verified_original_job_receipts:completeBoundProven?
+   finalCount:(originalReceipt?1:0),
+  complete_shift_proven:completeBoundProven,
+  verified_final_original_job_count:completeBoundProven?finalCount:0,
+  final_receipt:completeBoundProven?final:null,
+  verified_human_hours_saved:null,
   events:recent,approval_pending:pending,read_only:true,
   production_changed:false
  });
