@@ -25,6 +25,8 @@ import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
+import {proveNativeOriginalReadOnlyModelTool}
+ from '../../src/reality-native-recovery-readonly-tool-v1.js';
 import {draftCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-model-draft-v1.js';
 import {reviseCurrentRileyNativeRepair}
@@ -337,6 +339,28 @@ export default async function handler(req,res){
     production_changed:false
    };
   }
+  // A genuine Responses function call can inspect the current exact original
+  // through a Reality-owned, READ-ONLY tool. A durable service-only
+  // singleflight claim prevents repeated model requests on every cron wake.
+  // This never installs a patch or settles the original.
+  let nativeReadOnlyToolProof={
+   status:'NO_CURRENT_TESTED_NATIVE_MODEL_TOOL_SCOPE',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false
+  };
+  if(unifiedGraph.tested_native_candidate_present===true){
+   try{
+    nativeReadOnlyToolProof=await proveNativeOriginalReadOnlyModelTool({
+     db,env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    nativeReadOnlyToolProof={
+     status:'NATIVE_READONLY_TOOL_PROVIDER_OR_BOUNDARY_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false
+    };
+   }
+  }
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -402,6 +426,7 @@ export default async function handler(req,res){
     riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate,
+    native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
   // Best-effort independent failure timestamp; never claim a model/tool
