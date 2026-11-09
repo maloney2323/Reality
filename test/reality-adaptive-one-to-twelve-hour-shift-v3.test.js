@@ -78,7 +78,8 @@ test('3h active readback and conversation remain accurate, not human wages saved
    step_index:i+1,state:'QUEUED',proof_sha256:null
   }))
  };
- const r=safeShiftReadbackState({ok:true,shifts:[shift]},{requestedHours:3});
+ const r=safeShiftReadbackState({ok:true,shifts:[shift]},
+  {requestedHours:3,now:Date.parse('2026-11-09T11:59:00.000Z')});
  assert.equal(r.duration_hours,3);
  assert.equal(r.matching_requested_hours,true);
  const b=buildRealityShiftConversationBrief([shift],[],
