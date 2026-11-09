@@ -22,7 +22,7 @@ revoke all on reality_internal.riley_native_readonly_tool_proofs_v1 from public,
 grant select,insert,update on reality_internal.riley_native_readonly_tool_proofs_v1 to service_role;
 create or replace function public.reality_claim_current_native_readonly_tool_v1()
 returns jsonb language plpgsql set search_path to '' as $function$
-declare v_shift record;v_original record;v_proof record;v_newclaim uuid;
+declare v_shift record;v_original record;v_proof record;v_newclaim uuid;v_inserted integer;
 begin
  if current_user <> 'service_role' then
   raise exception 'NATIVE_TOOL_PROOF_SERVICE_ONLY';
@@ -71,6 +71,7 @@ begin
   v_shift.plan_fingerprint,v_original.shift_source_proof_sha256,
   gen_random_uuid(),'CLAIMED')
  on conflict (original_work_id) do nothing;
+ get diagnostics v_inserted = row_count;
  select * into v_proof from reality_internal.riley_native_readonly_tool_proofs_v1
  where original_work_id=v_original.original_work_id for update;
  if v_proof.shift_id<>v_shift.shift_id or
@@ -97,8 +98,7 @@ begin
   return jsonb_build_object('status','NATIVE_TOOL_PREVIOUS_PROVIDER_EFFECT_UNCERTAIN_NO_REPLAY',
    'installation_authorized',false,'original_job_completed',false);
  end if;
- if v_proof.state='CLAIMED' and
-    v_proof.claim_at <= clock_timestamp() - interval '2 seconds' then
+ if v_proof.state='CLAIMED' and v_inserted=0 then
   return jsonb_build_object('status','NATIVE_TOOL_ATTEMPT_ALREADY_CLAIMED',
    'installation_authorized',false,'original_job_completed',false);
  end if;
@@ -164,10 +164,10 @@ begin
  if p_state not in ('MODEL_TOOL_READBACK_VERIFIED','MODEL_PROVIDER_RETRYABLE',
     'CURRENT_SCOPE_DRIFT_BLOCKED') then raise exception 'INVALID_NATIVE_TOOL_RESULT';end if;
  if p_state='MODEL_TOOL_READBACK_VERIFIED' and (
-   p_first_response_id !~ '^resp_[a-zA-Z0-9_-]{5,150}$' or
-   p_final_response_id !~ '^resp_[a-zA-Z0-9_-]{5,150}$' or
-   p_function_call_id !~ '^call_[a-zA-Z0-9_-]{4,150}$' or
-   p_tool_readback_sha256 !~ '^sha256:[a-f0-9]{64}$'
+   coalesce(p_first_response_id,'') !~ '^resp_[a-zA-Z0-9_-]{5,150}$' or
+   coalesce(p_final_response_id,'') !~ '^resp_[a-zA-Z0-9_-]{5,150}$' or
+   coalesce(p_function_call_id,'') !~ '^call_[a-zA-Z0-9_-]{4,150}$' or
+   coalesce(p_tool_readback_sha256,'') !~ '^sha256:[a-f0-9]{64}$'
  ) then raise exception 'NATIVE_TOOL_RESULT_EVIDENCE_INVALID';end if;
  if p_state<>'MODEL_TOOL_READBACK_VERIFIED' and (
    p_error_code is null or p_error_code !~ '^[A-Z0-9_]{5,90}$'
