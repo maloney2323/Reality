@@ -121,54 +121,58 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <button id="runFullShift" type="button" disabled title="Authorize one exact job batch until all independent final receipts; no arbitrary eight-hour cutoff">Checking combined jobs…</button>
 <button id="passkeyEnroll" type="button" title="Register a fingerprint or device passkey for future sign-ins">Set up fingerprint</button><button id="logout" type="button">Log out</button>
 </div>
-<section class="team-value" aria-label="Reality next action" aria-live="polite" id="rileyNextActionPanel">
- <h3 id="rileyNextActionTitle">Checking your next action…</h3>
- <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
- <button id="rileyHistoryToggle" type="button" aria-expanded="false" aria-controls="rileyLiveProgressPanel">Show previous shift's receipts and investigation</button>
-</section>
-<p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p>
-<section id="rileyStartConfirmation" class="team-value" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
- <h3>Reality · Job test confirmation</h3>
- <p id="rileyStartConfirmationHeadline">Awaiting exact signed-in owner authorization.</p>
- <div id="rileyStartConfirmationDetails"></div>
-</section>
-<section id="rileyLiveProgressPanel" class="team-value" aria-label="Riley and Taylor live work activity" aria-live="polite" hidden>
+<section id="rileyLiveProgressPanel" class="team-value live-work-priority" aria-label="Riley and Taylor live work activity" aria-live="polite">
  <h3>Live activity · What Reality is doing</h3>
+ <p class="live-priority-hint">Current automation stays visible here; expand sections below for supporting evidence and employee profiles.</p>
+ <div class="active-automation-head"><strong>Currently processing · Selected jobs</strong><span id="rileyActiveAutomationCount">Verifying job scope…</span></div>
+ <div id="rileyActiveAutomationCards" class="active-automation-grid" aria-live="polite">Reading verified original-job phases…</div>
  <p id="rileyLiveHeadline" role="status">Reading verified worker state…</p>
  <label for="rileySourceProgress" style="font-size:13px;display:block;margin:9px 0 4px">Source investigations <span id="rileySourceProgressLabel">0 of 5</span></label>
  <progress id="rileySourceProgress" max="5" value="0" style="width:100%;height:13px"></progress>
  <p id="rileyLiveApprovalStatus">Checking whether anything needs your approval…</p>
  <p id="rileyLiveBlocker" role="status"></p>
- <h4>Real original jobs · independently settled</h4>
- <div id="rileyVerifiedOriginalJobRows">No completed original-job receipt recorded for this shift.</div>
+ <details class="live-evidence-fold"><summary>Independently settled original jobs</summary>
+ <div id="rileyVerifiedOriginalJobRows">No completed original-job receipt recorded for this shift.</div></details>
  <h4>Recorded activity · not hidden model thoughts</h4>
  <div id="rileyActualWorkerReceipt" role="status">No confirmed worker wake yet.</div>
- <h4>Shared governed execution · Current exact job decisions</h4>
- <div id="rileyUnifiedOriginalGraph" aria-live="polite">Checking owner-frozen work scope…</div>
+ <details class="live-evidence-fold"><summary>Governed execution · Detailed decisions and release gates</summary>
+ <div id="rileyUnifiedOriginalGraph" aria-live="polite">Checking owner-frozen work scope…</div></details>
  <div id="rileyReviewedPatchEvidence" aria-live="polite" hidden></div>
- <h4>Original jobs · Exact recorded phase and time</h4>
- <div id="rileyOriginalActivityRows">Waiting for original-job readback.</div>
- <h4>Source and execution evidence · Time-stamped</h4>
- <div id="rileyLiveTimeline"></div>
+ <details class="live-evidence-fold"><summary>Original jobs · Exact recorded phase and time</summary>
+ <div id="rileyOriginalActivityRows">Waiting for original-job readback.</div></details>
+ <details class="live-evidence-fold"><summary>Source and execution evidence · Time-stamped</summary>
+ <div id="rileyLiveTimeline"></div></details>
  <p style="font-size:12px">Shows only server-recorded authorization, actual worker wakes, provider/source readbacks, claims, tests and independently accepted receipts. Refreshing the screen is not new worker activity. Times show your device's local time and date. Model reasoning is not a provider action or proof.</p>
 </section>
-<section id="rileyTaylorCombinedQueue" class="team-value" aria-label="Riley and Taylor combined assigned work queue" aria-live="polite" hidden>
- <h3>Combined work queue · Riley + Taylor · One OpenAI model</h3>
+<details class="team-value section-fold" aria-label="Reality next action" aria-live="polite" id="rileyNextActionPanel">
+ <summary id="rileyNextActionTitle">Checking your next action…</summary>
+ <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
+ <button id="rileyHistoryToggle" type="button" aria-expanded="false" aria-controls="rileyLiveProgressPanel">Show previous shift's receipts and investigation</button>
+</details>
+<details class="section-fold shift-scope-fold"><summary>Shift authorization and operating rules</summary><p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p></details>
+<details id="rileyStartConfirmation" class="team-value section-fold" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
+ <summary>Reality · Job test confirmation</summary>
+ <p id="rileyStartConfirmationHeadline">Awaiting exact signed-in owner authorization.</p>
+ <div id="rileyStartConfirmationDetails"></div>
+</details>
+<details id="rileyTaylorCombinedQueue" class="team-value section-fold" aria-label="Riley and Taylor combined assigned work queue" aria-live="polite" hidden>
+ <summary>Combined work queue · Riley + Taylor · One OpenAI model</summary>
  <p id="rileyTaylorQueueStatus">Checking unfinished Employee and Work Center assignments…</p>
  <div id="rileyTaylorQueueRows"></div>
  <p>Riley investigates the code; Taylor checks reliability and safe continuation. Quinn independently verifies accepted results. An inspected issue or PR is not automatically a completed repair.</p>
-</section>
-<p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 14px;line-height:1.5;font-size:13px;padding:13px"></p>
-<section id="combinedShiftRoleHandoffs" class="team-value" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
- <h3>Combined shift · One OpenAI model across relevant business roles</h3>
+</details>
+<details id="rileyShiftStatusDisclosure" class="team-value section-fold"><summary>Detailed shift authorization and status</summary><p id="shiftStatus" class="status" role="status" hidden aria-live="polite" style="background:#16283a;border:1px solid #4d718f;border-radius:11px;margin:10px 0;line-height:1.5;font-size:13px;padding:13px"></p></details>
+<details id="combinedShiftRoleHandoffs" class="team-value section-fold" aria-label="Combined Reality employee role handoffs" aria-live="polite" hidden>
+ <summary>Combined shift · OpenAI model role handoffs</summary>
  <p>Roles share a source-backed, owner-authorized shift. Model suggestions are never independent verification or completed work.</p>
  <div id="combinedShiftRoleRows"></div>
-</section>
-<section class="team-board" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
+</details>
+<details class="team-board section-fold" id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden>
+ <summary>AI employees · Roles and assignments</summary>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
- <section class="team-value" aria-label="Reality source-backed business value">
-  <h3>Potential business value · before the shift</h3>
+ <details class="team-value section-fold" aria-label="Reality source-backed business value">
+  <summary>Potential business value · before the shift</summary>
   <p>What Reality discovers, what comparable human work might cost, and what Reality has actually verified. Scheduled AI role-hours are not automatically human hours saved.</p>
   <div class="team-value-metrics" aria-live="polite">
    <div><small>Potential AI business functions</small><strong id="teamValueRoles">Checking…</strong><span>Proposed roles, not human staff replaced</span></div>
@@ -178,8 +182,8 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <p id="teamValueNASA">Calculating a comparable human software-repair wage example…</p>
   <p id="teamValueProof">Verified human hours saved: not measured · Cash savings: not measured · Actual automation costs: not measured · Net ROI: not verified.</p>
   <p id="teamValueSources">NASA-hosted research applies to software-fault repairs, not every business function.</p>
- </section>
- <details class="team-value" id="workforceSavingsPlanner" open aria-label="Potential workforce consolidation and annual payroll value">
+ </details>
+ <details class="team-value section-fold" id="workforceSavingsPlanner" aria-label="Potential workforce consolidation and annual payroll value">
   <summary><strong>Workforce savings · roles Reality could potentially consolidate</strong></summary>
   <p>One shared OpenAI model covers business functions, not eight independent workers. Enter your business's positions, actual loaded pay and a proposed workload for each function. This is a scenario, not an instruction to dismiss specific people.</p>
   <div class="workforce-form-grid">
@@ -204,18 +208,19 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <div id="workforceScenarioRows" aria-live="polite"></div>
   <p>Important: An FTE-capacity equivalent is not an employee who can safely be removed. Ongoing reliability, uncovered duties, compliance, actual staffing changes and verified payroll expenses must be checked before claiming realized savings. No information entered here is saved.</p>
  </details>
- <section class="team-next-week" aria-label="Next week prepared employee roles">
-  <div class="team-head"><strong>Next week's proposed employee schedule</strong><span class="team-role" id="nextWeekSourceStatus">Checking background preparation…</span></div>
+ <details class="team-next-week section-fold" aria-label="Next week prepared employee roles">
+  <summary>Next week's proposed employee schedule</summary>
+  <div class="team-role" id="nextWeekSourceStatus">Checking background preparation…</div>
   <p id="nextWeekSummary">Reality prepares next-week work while the current week runs. These are proposed source inspections, not authorized shifts or promised eight-hour workloads.</p>
   <div id="nextWeekEmployeeRoles" aria-live="polite"></div>
- </section>
+ </details>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
 <details class="team-proof" id="realitySelfAwareness">
  <summary>Reality's verified self-understanding</summary>
  <div id="realitySelfAudit" aria-live="polite">Checking current Reality capabilities…</div>
 </details>
  <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
-</section>
+</details>
 <div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
 <p id="status" class="status" role="status" aria-live="polite">Ready.</p>
 <form id="composer" class="composer">
