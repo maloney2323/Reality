@@ -23,6 +23,8 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {diagnoseRealityNativeCapabilityGap}
+ from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {draftCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-model-draft-v1.js';
 import {reviseCurrentRileyNativeRepair}
@@ -162,6 +164,11 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Every worker wake independently diagnoses the exact native model
+  // capability-exposure boundary. Read-only: no approval or effect.
+  const nativeCapabilityDiagnosis=diagnoseRealityNativeCapabilityGap({
+   graph:unifiedGraph,env:process.env
+  });
   const hasVerifiedSource=(url)=>unifiedGraph.jobs.some(x=>
    x.source_ref===url&&x.independent_source_proof_verified===true);
   const hasReview=unifiedGraph.jobs.some(x=>
@@ -341,7 +348,7 @@ export default async function handler(req,res){
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
    const outcomeCode=unifiedGraph.tested_native_candidate_present===true?
-     'RILEY_TESTED_SOURCE_READY_INSTALL_RESUME_UNPROVEN':
+     'RILEY_NATIVE_CAPABILITY_HANDOFF_NOT_CONNECTED':
     rileyCorrectionTest?.status===
     'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED'?
      'RILEY_CORRECTED_CODE_OWNER_SCOPE_TEST_FAILED':
@@ -394,7 +401,8 @@ export default async function handler(req,res){
     riley_corrected_model_draft:rileyCorrectedDraft,
     riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
-    riley_verified_candidate:rileyVerifiedCandidate});
+    riley_verified_candidate:rileyVerifiedCandidate,
+    native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
   // Best-effort independent failure timestamp; never claim a model/tool
   // succeeded, never take another job claim and never leak provider secrets.

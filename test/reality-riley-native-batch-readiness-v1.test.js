@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {assessRealityNativeBatchReadiness}
+import {assessRealityNativeBatchReadiness,diagnoseRealityNativeCapabilityGap}
  from '../src/reality-riley-native-batch-readiness-v1.js';
 const shift='9460cfff-937a-4105-9093-2e41ab39a950';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -114,5 +114,48 @@ test('owner GET includes one verified exact native preview readiness, no approva
  assert.match(api,/riley_native_batch_readiness,/);
  assert.match(api,/native_install_to_settlement_accepted:false/);
  assert.doesNotMatch(api,/reality_owner_approve_current_riley_native_patch_v1/);
+ assert.doesNotMatch(worker,/automaticallyInstallRileyWithoutOwnerApproval/);
+});
+test('Reality itself identifies missing native model-tool bridge without minting permissions',()=>{
+ const diagnosis=diagnoseRealityNativeCapabilityGap({graph,env:{
+  ...env,REALITY_OPENAI_MODEL:'gpt-4.1-mini'}});
+ assert.equal(diagnosis.status,
+  'TESTED_NATIVE_REPAIR_NEEDS_GOVERNED_MODEL_TOOL_HANDOFF');
+ assert.equal(diagnosis.source_original_work_id,work);
+ assert.equal(diagnosis.shift_id,shift);
+ assert.equal(diagnosis.shift_role_model_mode,'ADVISORY_ONLY_NO_TOOLS');
+ assert.equal(diagnosis.native_signed_tool_session_independently_verified,false);
+ assert.equal(diagnosis.governed_tool_session_model_compatible_configured,false);
+ assert.ok(diagnosis.blockers.includes(
+  'CONFIGURED_MODEL_NOT_ELIGIBLE_FOR_GOVERNED_TOOL_SESSION'));
+ assert.equal(diagnosis.automatic_installation_attempted,false);
+ assert.equal(diagnosis.original_job_completed,false);
+ assert.equal(diagnosis.new_shift_required,false);
+ const readiness=assessRealityNativeBatchReadiness({
+  graph,reviewedPatch:p,env:{...env,REALITY_OPENAI_MODEL:'gpt-4.1-mini'}
+ });
+ assert.equal(readiness.capability_handoff_diagnosis.source_original_work_id,work);
+ assert.equal(readiness.ready_for_new_install_approval,false);
+});
+test('Reality distinguishes eligible model selection from proven signed tool execution',()=>{
+ const x=diagnoseRealityNativeCapabilityGap({
+  graph,env:{...env,REALITY_OPENAI_MODEL:'gpt-5.4'}});
+ assert.equal(x.governed_tool_session_model_compatible_configured,true);
+ assert.equal(x.native_signed_tool_session_independently_verified,false);
+ assert.ok(x.blockers.includes(
+  'NATIVE_ORIGINAL_TO_SIGNED_CAPABILITY_SESSION_NOT_VERIFIED'));
+ assert.equal(x.installation_authorized,false);
+ const y=diagnoseRealityNativeCapabilityGap({
+  graph:{status:'NO_CURRENT_AUTHORIZED_WORK'},env});
+ assert.equal(y.status,'NO_VERIFIED_NATIVE_ORIGINAL_CAPABILITY_DIAGNOSIS');
+ assert.equal(y.source_original_work_id,null);
+ assert.equal(y.new_shift_required,false);
+});
+test('the actual worker reports capability self-diagnosis on each wake',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/diagnoseRealityNativeCapabilityGap\(/);
+ assert.match(worker,/native_capability_handoff_diagnosis:nativeCapabilityDiagnosis/);
+ assert.match(worker,/RILEY_NATIVE_CAPABILITY_HANDOFF_NOT_CONNECTED/);
  assert.doesNotMatch(worker,/automaticallyInstallRileyWithoutOwnerApproval/);
 });

@@ -104,6 +104,57 @@ export function assessRealityNativeBatchReadiness({
   source_tasks_inspected:jobs.length,
   jobs:Object.freeze(jobs),
   blockers:Object.freeze(blockers),
+  capability_handoff_diagnosis:diagnoseRealityNativeCapabilityGap({graph,env}),
   next_safe_action:'CONNECT_RESTRICTED_PREVIEW_TRANSPORT_AND_PROVE_POSTAPPROVAL_SAME_ORIGINAL_SETTLEMENT'
+ });
+}
+
+// Read-only self-diagnosis of WHY a tested native original cannot yet equip
+// OpenAI with Reality's governed executable capabilities. This is a route
+// classifier, NOT a model tool grant, capability-gap claim, installation,
+// settled receipt, credential test, or authorization.
+export function diagnoseRealityNativeCapabilityGap({graph,env={}}={}){
+ const safe={installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_required:false,
+  automatic_installation_attempted:false};
+ if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    !Array.isArray(graph.jobs))
+  return Object.freeze({...safe,
+   status:'NO_VERIFIED_NATIVE_ORIGINAL_CAPABILITY_DIAGNOSIS',
+   source_original_work_id:null,blockers:Object.freeze([])});
+ const native=graph.jobs.filter(x=>
+  x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+  x.source_ref==='https://github.com/maloney2323/Reality/issues/263');
+ if(native.length!==1||!WORK.test(native[0].original_work_id||''))
+  return Object.freeze({...safe,
+   status:'NO_EXACT_NATIVE_REPAIR_ORIGINAL_TO_EQUIP',
+   source_original_work_id:null,blockers:Object.freeze([])});
+ const candidateTested=native[0].phase===
+  'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL';
+ const selected=String(env.REALITY_OPENAI_MODEL||'');
+ // Match the actual enforced model allowlist in
+ // reality-governed-tool-session-v1.js, not a generic API-key presence test.
+ const modelEligible=/^(?:gpt-6|gpt-5\.[4-9])(?:[._-].*)?$/i.test(selected);
+ const blockers=[
+  'SHIFT_ROLE_MODEL_REQUEST_EXPLICITLY_DISABLES_TOOLS',
+  'NATIVE_ORIGINAL_TO_SIGNED_CAPABILITY_SESSION_NOT_VERIFIED',
+  'NATIVE_POST_TOOL_SAME_ORIGINAL_SETTLEMENT_NOT_VERIFIED'
+ ];
+ if(!modelEligible)
+  blockers.push('CONFIGURED_MODEL_NOT_ELIGIBLE_FOR_GOVERNED_TOOL_SESSION');
+ return Object.freeze({...safe,
+  status:candidateTested?
+   'TESTED_NATIVE_REPAIR_NEEDS_GOVERNED_MODEL_TOOL_HANDOFF':
+   'NATIVE_REPAIR_TOOL_HANDOFF_AWAITING_CANDIDATE_EVIDENCE',
+  shift_id:graph.shift_id,
+  source_original_work_id:native[0].original_work_id,
+  candidate_independently_tested_phase:candidateTested,
+  shift_role_model_mode:'ADVISORY_ONLY_NO_TOOLS',
+  original_job_model_tool_mode:'SEPARATE_SIGNED_CONTINUITY_SESSION',
+  governed_tool_session_model_compatible_configured:modelEligible,
+  native_signed_tool_session_independently_verified:false,
+  independently_verified_install_resume_receipt:false,
+  blockers:Object.freeze(blockers),
+  next_governed_repair:'CONNECT_SAME_NATIVE_ORIGINAL_TO_FENCED_CAPABILITY_SESSION_WITH_INDEPENDENT_READBACK'
  });
 }
