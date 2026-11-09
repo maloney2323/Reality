@@ -104,6 +104,7 @@ export function assessRealityNativeBatchReadiness({
   source_tasks_inspected:jobs.length,
   jobs:Object.freeze(jobs),
   blockers:Object.freeze(blockers),
+  capability_handoff_diagnosis:diagnoseRealityNativeCapabilityGap({graph,env}),
   next_safe_action:'CONNECT_RESTRICTED_PREVIEW_TRANSPORT_AND_PROVE_POSTAPPROVAL_SAME_ORIGINAL_SETTLEMENT'
  });
 }
@@ -133,7 +134,7 @@ export function diagnoseRealityNativeCapabilityGap({graph,env={}}={}){
  const selected=String(env.REALITY_OPENAI_MODEL||'');
  // Match the actual enforced model allowlist in
  // reality-governed-tool-session-v1.js, not a generic API-key presence test.
- const modelEligible=/^(?:gpt-6|gpt-5\\.[4-9])(?:[._-].*)?$/i.test(selected);
+ const modelEligible=/^(?:gpt-6|gpt-5\.[4-9])(?:[._-].*)?$/i.test(selected);
  const blockers=[
   'SHIFT_ROLE_MODEL_REQUEST_EXPLICITLY_DISABLES_TOOLS',
   'NATIVE_ORIGINAL_TO_SIGNED_CAPABILITY_SESSION_NOT_VERIFIED',
