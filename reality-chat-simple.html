@@ -93,6 +93,44 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .workforce-output-row{padding:12px 0;border-bottom:1px solid #34485e;line-height:1.55}
 .workforce-output-row strong{display:block}
 #workforceScenarioStatus{color:#dbeafa;line-height:1.6}
+
+/* Live Activity is always visible and is prioritized over supporting disclosures. */
+.live-work-priority{margin:10px 14px 8px;border:1px solid #7194ba;background:#102235}
+.live-work-priority>h3{font-size:18px;margin-bottom:5px}
+.live-priority-hint{font-size:12px;color:#bed3e8;margin:5px 0 12px}
+.active-automation-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:7px 0}
+.active-automation-head strong{font-size:14px}
+.active-automation-head span{font-size:12px;color:#c4d8eb}
+.active-automation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}
+.automation-card{padding:12px;border:1px solid #4b6989;border-radius:12px;background:#192e43;line-height:1.55;font-size:12px;overflow-wrap:anywhere;min-width:0}
+.automation-card strong{display:block;font-size:14px;margin-bottom:5px;color:#f0f7ff}
+.automation-card-phase{font-weight:700;color:#d6e9fc}
+.automation-card-original{font-size:11px;color:#b5c8e1;margin-top:5px}
+.automation-card-next{margin-top:8px}
+.automation-card-note{color:#ffe1b1;margin-top:7px}
+.automation-card a{display:inline-block;margin-top:7px}
+.section-fold{border:1px solid #354c65;border-radius:12px;margin:8px 14px;min-width:0}
+.section-fold>summary,.live-evidence-fold>summary{cursor:pointer;line-height:1.5;font-size:14px;font-weight:750;color:#e4f0ff}
+.section-fold[open]>summary,.live-evidence-fold[open]>summary{border-bottom:1px solid #425a75;margin-bottom:10px;padding-bottom:9px}
+.shift-scope-fold{background:#132539;padding:10px 12px}
+.shift-scope-fold .riley-start-guide{background:transparent;border:0;padding:8px 0}
+.live-evidence-fold{border-top:1px solid #37526e;margin-top:12px;padding-top:9px}
+.live-evidence-fold>summary{font-size:13px}
+.team-board.section-fold{padding:11px 13px}
+.team-board>summary{padding:8px 0}
+.team-card{padding:10px}
+.team-card-summary{display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.team-card-summary .team-card-top{align-items:center}
+.team-card-summary .team-status{margin-top:0;align-self:flex-start}
+.team-card[open]{border-color:#769dcc}
+.team-card[open]>.team-card-summary{border-bottom:1px solid #455d78;margin-bottom:8px;padding-bottom:8px}
+.conversation-fold{display:block;padding:12px;background:#111b28}
+.conversation-fold[open]{display:flex;flex-direction:column}
+.conversation-fold>summary{padding:6px 2px}
+.conversation-fold #thread{min-height:45vh;max-height:70vh;border:1px solid #30445c;border-radius:10px}
+.conversation-fold .composer{margin-top:8px}
+.team-next-week.section-fold{padding:11px;margin:10px 0}
+@media(max-width:550px){.active-automation-grid{grid-template-columns:1fr}.live-work-priority{margin:8px}.section-fold{margin:8px}.team-board.section-fold{padding:10px}}
 </style>
 </head>
 <body>
@@ -221,12 +259,15 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 </details>
  <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
 </details>
+<details id="rileyConversationDisclosure" class="conversation-fold section-fold">
+<summary>Reality Chat · Expand conversation and message Reality</summary>
 <div id="thread" role="log" aria-live="polite" aria-label="Reality conversation"></div>
 <p id="status" class="status" role="status" aria-live="polite">Ready.</p>
 <form id="composer" class="composer">
 <textarea id="prompt" maxlength="6000" placeholder="Message Reality…" aria-label="Message Reality"></textarea>
 <button id="send" type="submit">Send</button>
 </form>
+</details>
 </div>
 <p id="startup" class="status" role="status">Checking your Reality session…</p>
 </div>
@@ -286,20 +327,22 @@ function employeeCard(employee){
     !Array.isArray(employee.candidate_jobs)||employee.candidate_jobs.length>25||
     employee.candidate_jobs.length!==employee.candidate_count)
     throw Error('EMPLOYEE_TEAM_SOURCE_UNVERIFIED');
-  const card=document.createElement('article');card.className='team-card'+(employee.pilot?' pilot':'');
+  const card=document.createElement('details');card.className='team-card'+(employee.pilot?' pilot':'');
+  const summary=document.createElement('summary');summary.className='team-card-summary';
   const top=document.createElement('div');top.className='team-card-top';
   const avatar=textNode('div',employee.display_name.trim().slice(0,1).toUpperCase(),'team-avatar');
   avatar.setAttribute('aria-hidden','true');
   const title=document.createElement('div');
   title.append(textNode('div',employee.display_name,'team-name'),
    textNode('div',employee.role,'team-role'));
-  top.append(avatar,title);card.append(top);
-  card.append(textNode('p',employee.role_summary));
-  card.append(textNode('div','Categories: '+employee.categories.join(' · '),'team-tags'));
-  card.append(textNode('div',
+  top.append(avatar,title);summary.append(top);
+  summary.append(textNode('div',
     (employee.pilot?'First pilot · ':'')+'Proposed, not active · '+
     employee.candidate_count+' source finding'+(employee.candidate_count===1?'':'s'),
     'team-status'));
+  card.append(summary);
+  card.append(textNode('p',employee.role_summary));
+  card.append(textNode('div','Categories: '+employee.categories.join(' · '),'team-tags'));
   const detail=document.createElement('details');
   detail.append(textNode('summary','Responsibilities and assigned work'));
   const duties=document.createElement('ul');
@@ -1104,6 +1147,7 @@ function verifiedLocalTimestamp(raw){
 }
 function showPendingStartRequest(){
  $('rileyStartConfirmation').hidden=false;
+ $('rileyStartConfirmation').open=true;
  $('rileyStartConfirmationHeadline').textContent=
   'Start requested · awaiting signed-in database authorization';
  $('rileyStartConfirmationDetails').textContent=
@@ -1230,6 +1274,46 @@ function renderRileyReviewedPatchEvidence(readback,current){
   'owner-approved isolated installation and original-job settlement path. '+
   'No approval button is shown until that path is proven. No code is installed.'));
 }
+function renderCurrentAutomationCards(graph){
+ const target=$('rileyActiveAutomationCards');target.replaceChildren();
+ const count=$('rileyActiveAutomationCount');
+ if(!graph||!Array.isArray(graph.jobs)){
+  count.textContent='Scope not verified';
+  target.append(textNode('p','Awaiting independently verified owner-scoped job records.'));
+  return;
+ }
+ const jobs=graph.jobs.filter(j=>COMBINED_WORK_SOURCE.test(j?.source_ref||'')&&
+  j.phase!=='SETTLED').sort((a,b)=>{
+   const rank=x=>x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'?0:
+    x.original_kind==='REAL_PR_REVIEW_ORIGINAL'?1:2;
+   return rank(a)-rank(b);
+  });
+ count.textContent=jobs.length+' unfinished selected job'+(jobs.length===1?'':'s');
+ if(!jobs.length){
+  target.append(textNode('p','No unfinished jobs in the verified snapshot. Final receipts still require independent readback.'));
+  return;
+ }
+ for(const j of jobs){
+  const card=document.createElement('article');card.className='automation-card';
+  const label=j.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'?
+   'Riley · Engineering repair':
+   j.original_kind==='REAL_PR_REVIEW_ORIGINAL'?
+    'Riley + Taylor · PR review':
+    'Source-qualified work · Not yet an executable original';
+  card.append(textNode('strong',label));
+  card.append(textNode('div','Phase: '+String(j.phase||'UNVERIFIED').replaceAll('_',' '),'automation-card-phase'));
+  if(/^work:[a-f0-9]{32}$/.test(j.original_work_id||''))
+   card.append(textNode('div','Original job: '+j.original_work_id,'automation-card-original'));
+  else card.append(textNode('div','Source finding only · original-job authority still required','automation-card-original'));
+  card.append(textNode('div','Next governed action: '+
+   String(j.next_governed_action||'AWAITING_INDEPENDENT_READBACK').replaceAll('_',' ').toLowerCase(),
+   'automation-card-next'));
+  if(j.phase==='CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL')
+   card.append(textNode('div','Tested candidate only. Installation, approval and same-job settlement are not proven.','automation-card-note'));
+  card.append(combinedQueueLink(j.source_ref,'Open source and provider evidence'));
+  target.append(card);
+ }
+}
 function renderUnifiedOriginalGraph(readback,current){
  const el=$('rileyUnifiedOriginalGraph');el.replaceChildren();
  const graph=readback?.shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'&&
@@ -1237,6 +1321,7 @@ function renderUnifiedOriginalGraph(readback,current){
   readback.shift_execution_graph?.installation_authorized===false&&
   readback.shift_execution_graph?.original_job_completed===false?
    readback.shift_execution_graph:null;
+ renderCurrentAutomationCards(graph);
  if(!graph||!Array.isArray(graph.jobs)||graph.jobs.length>4){
   el.append(textNode('p','No verified unified execution readback. '+
    'Do not infer that source checks are code repair or that work is settled.'));
@@ -1401,7 +1486,10 @@ function renderRileyLiveProgress(readback){
  const shifts=readback?.shifts;
  if(readback?.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
     !Array.isArray(shifts)||shifts.length>5){
-  panel.hidden=true;return;
+  panel.hidden=false;
+  $('rileyLiveHeadline').textContent='Live activity unavailable: no owner-scoped worker readback verified.';
+  $('rileyActiveAutomationCards').replaceChildren(textNode('p','Current original-job scope could not be independently verified.'));
+  $('rileyActiveAutomationCount').textContent='Evidence unavailable';return;
  }
  const current=shifts.find(x=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
   .includes(x?.status)&&(x.planned_end_at==='infinity'||
@@ -1411,7 +1499,10 @@ function renderRileyLiveProgress(readback){
  if(!current||!Array.isArray(current.steps)||
     current.steps.length!==8||
     current.steps.some((x,i)=>x?.step_index!==i+1)){
-  panel.hidden=true;return;
+  panel.hidden=false;
+  $('rileyLiveHeadline').textContent='No active authorized shift verified. Prior work is available in shift history.';
+  $('rileyActiveAutomationCards').replaceChildren(textNode('p','No current owner-authorized automation jobs verified.'));
+  $('rileyActiveAutomationCount').textContent='No verified active jobs';return;
  }
  const steps=current.steps;
  const status=String(current.status||'UNVERIFIED').replaceAll('_',' ');
@@ -1446,17 +1537,16 @@ function renderRileyLiveProgress(readback){
   /^work:[a-f0-9]{32}$/.test(j.original_work_id||''));
  const next=steps.find(x=>['QUEUED','CLAIMED','AWAITING_EXACT_WORK'].includes(x.state));
  const blocker=$('rileyLiveBlocker');
- if(current.status==='AWAITING_EXACT_ORIGINAL_WORK'||
+ if(exactRepair&&!originalVerified){
+  blocker.textContent='CURRENT ENGINEERING ORIGINAL: '+exactRepair.original_work_id+
+   ' · '+String(exactRepair.phase||'UNVERIFIED').replaceAll('_',' ')+
+   '. Reality must verify the governed capability handoff and exact installation-to-resumption path. '+
+   'A tested candidate is not an installed repair or a final receipt. No second Start needed.';
+ }else if(current.status==='AWAITING_EXACT_ORIGINAL_WORK'||
    steps[5].state==='AWAITING_EXACT_WORK'){
-  blocker.textContent='EXECUTION BLOCKER: source inspection is not code repair. No exact eligible original job has reached the execution gate. Reality must qualify an existing-file repair against current failure evidence and bind it to this same shift; no additional start button will fix that.';
+  blocker.textContent='EXECUTION BLOCKER: source inspection alone is not a completed original job. Reality must qualify and continue a genuine job under the existing shift; another Start will not fix this.';
  }else if(current.status==='ENDED_WITH_BLOCKED_WORK'||current.status==='ESCALATED'){
-  blocker.textContent='BLOCKED: this shift did not achieve independent original-job settlement. Inspect recorded failure evidence before any new attempt; do not replay uncertain or previously settled work.';
- }else if(exactRepair&&!originalVerified){
-  blocker.textContent='CURRENT EXECUTION: owner-authorized code-repair original '+
-   exactRepair.original_work_id+' is '+String(exactRepair.phase||'unverified').replaceAll('_',' ')+
-   '. Reality must finish genuine code generation, independent frozen acceptance, '+
-   'exact upgrade approval if required, same-job resumption and final receipt. '+
-   'No shift reauthorization needed.';
+  blocker.textContent='BLOCKED: this shift did not achieve independent original-job settlement. Investigate recorded failures without replaying uncertain or settled work.';
  }else if(next?.step_index===6&&!originalVerified){
   blocker.textContent='NEXT GATE: source checks are complete, but no independently admitted original repair has been read back. The execution admission path needs repair, not another owner permission.';
  }else if(next){
@@ -1815,7 +1905,10 @@ async function refreshShiftStatus(){
       node.hidden=false;
     }
   }catch{
-    $('rileyLiveProgressPanel').hidden=true;
+    $('rileyLiveProgressPanel').hidden=false;
+    $('rileyLiveHeadline').textContent='Live activity readback unavailable. Use Refresh; do not start a duplicate shift.';
+    $('rileyActiveAutomationCards').replaceChildren(textNode('p','Original-job state unavailable. No execution claim made.'));
+    $('rileyActiveAutomationCount').textContent='Evidence unavailable';
     $('combinedShiftRoleHandoffs').hidden=true;
     $('combinedShiftRoleRows').replaceChildren();
     // Fail closed: a connection problem MUST NOT unlock a second shift.
@@ -2082,6 +2175,7 @@ $('logout').onclick=async()=>{
 $('teamToggle').onclick=()=>{
  const panel=$('employeeBoardPanel');
  panel.hidden=!panel.hidden;
+ panel.open=!panel.hidden;
  $('teamToggle').setAttribute('aria-expanded',String(!panel.hidden));
  $('teamToggle').textContent=panel.hidden?'Show AI team · 8':'Hide AI team · 8';
  if(!panel.hidden){void refreshEmployeeBoard();void refreshRealitySelfAudit();}
