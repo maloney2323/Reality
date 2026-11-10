@@ -92,7 +92,7 @@ begin
   'provider_comment_url',j.provider_comment_url,
   'settlement_receipt_id',j.settlement_receipt_id,
   'installation_authorized',false,'production_changed',false);
-end $function$
+end $function$;
 
 revoke all on function public.reality_claim_authorized_riley_pr_review_v1()
  from public,anon,authenticated;
