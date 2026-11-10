@@ -164,6 +164,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <p class="live-priority-hint">Current automation stays visible here; expand sections below for supporting evidence and employee profiles.</p>
  <div class="active-automation-head"><strong>Currently processing · Selected jobs</strong><span id="rileyActiveAutomationCount">Verifying job scope…</span></div>
  <div id="rileyActiveAutomationCards" class="active-automation-grid" aria-live="polite">Reading verified original-job phases…</div>
+ <div id="rileyNativeModelToolProof" class="team-proof" role="status" aria-live="polite">Checking original-job model/tool evidence…</div>
  <p id="rileyLiveHeadline" role="status">Reading verified worker state…</p>
  <label for="rileySourceProgress" style="font-size:13px;display:block;margin:9px 0 4px">Source investigations <span id="rileySourceProgressLabel">0 of 5</span></label>
  <progress id="rileySourceProgress" max="5" value="0" style="width:100%;height:13px"></progress>
@@ -1314,6 +1315,26 @@ function renderCurrentAutomationCards(graph){
   target.append(card);
  }
 }
+function renderNativeModelToolProof(readback,current){
+ const el=$('rileyNativeModelToolProof');
+ if(!el)return;
+ const p=readback?.riley_native_model_tool_proof;
+ if(p?.status==='OWNER_NATIVE_MODEL_TOOL_INDEPENDENT_READBACK_VERIFIED'&&
+    p.shift_id===current?.shift_id&&
+    p.model_tool_readback_verified===true&&
+    p.tool_scope==='READ_ONLY_CURRENT_ORIGINAL_EVIDENCE'&&
+    /^work:[a-f0-9]{32}$/.test(p.original_work_id||'')&&
+    /^sha256:[a-f0-9]{64}$/.test(p.tool_readback_sha256||'')&&
+    Number.isFinite(Date.parse(p.verified_at))){
+  el.replaceChildren(
+   textNode('strong','VERIFIED · OpenAI used Reality\'s read-only original-job tool'),
+   textNode('div','Independent model/tool receipt: '+p.tool_readback_sha256),
+   textNode('div','Original: '+p.original_work_id+
+    ' · Verified '+verifiedLocalTimestamp(p.verified_at)),
+   textNode('div','NOT yet installed, automatically resumed or independently settled.')
+  );
+ }else el.textContent='Governed model/tool evidence is unavailable or unverified. Worker wakes and advice are not proof of executable repair.';
+}
 function renderUnifiedOriginalGraph(readback,current){
  const el=$('rileyUnifiedOriginalGraph');el.replaceChildren();
  const graph=readback?.shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'&&
@@ -1322,6 +1343,7 @@ function renderUnifiedOriginalGraph(readback,current){
   readback.shift_execution_graph?.original_job_completed===false?
    readback.shift_execution_graph:null;
  renderCurrentAutomationCards(graph);
+ renderNativeModelToolProof(readback,current);
  if(!graph||!Array.isArray(graph.jobs)||graph.jobs.length>4){
   el.append(textNode('p','No verified unified execution readback. '+
    'Do not infer that source checks are code repair or that work is settled.'));
