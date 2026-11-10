@@ -249,3 +249,16 @@ test('real-original code path has no direct OpenAI calls outside Reality shared 
  assert.match(sql,/grant execute on function public\.reality_read_authorized_pr_review_model_scope_v1/);
  assert.doesNotMatch(sql,/grant execute[^;]*authenticated;/);
 });
+
+test('already-prepared or publishing original does not exhaust retry counter on each worker wake',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261109_riley_prepared_pr_review_no_retry_exhaustion_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/elsif j\.phase='CLAIMED' then/);
+ assert.doesNotMatch(sql,/elsif j\.phase in \('CLAIMED','PREPARED','PUBLISHING'\)/);
+ assert.match(sql,/if j\.phase='CLAIMED' and j\.attempts>=6 then/);
+ assert.match(sql,/PREPARED already has durable model bytes/);
+ assert.match(sql,/PUBLISHING is an uncertain external/);
+ assert.match(sql,/grant execute on function public\.reality_claim_authorized_riley_pr_review_v1\(\) to service_role/);
+ assert.doesNotMatch(sql,/grant execute[^;]*authenticated/i);
+});
