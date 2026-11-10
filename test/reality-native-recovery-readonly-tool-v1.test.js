@@ -188,3 +188,24 @@ test('exact new service-only native recovery RPCs pass the worker allowlist, unr
   {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
  assert.equal(seen.length,2);
 });
+
+test('owner proof comes from service-only readback and appears in Live Activity without false installation',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261109_owner_native_model_tool_proof_readback_v1.sql',
+  import.meta.url),'utf8');
+ const api=readFileSync(new URL(
+  '../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ const rpc=readFileSync(new URL(
+  '../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/grant execute on function public.reality_read_owner_native_readonly_tool_proof_v1/);
+ assert.doesNotMatch(sql,/grant execute[^;]*authenticated/i);
+ assert.match(rpc,/read_owner_native_readonly_tool_proof_v1/);
+ assert.match(api,/riley_native_model_tool_proof=proof/);
+ assert.match(api,/tool_scope==='READ_ONLY_CURRENT_ORIGINAL_EVIDENCE'/);
+ assert.match(ui,/id="rileyNativeModelToolProof"/);
+ assert.match(ui,/function renderNativeModelToolProof/);
+ assert.match(ui,/renderNativeModelToolProof\(readback,current\)/);
+ assert.match(ui,/NOT yet installed, automatically resumed or independently settled/);
+});
