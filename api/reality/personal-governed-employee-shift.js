@@ -334,6 +334,41 @@ export default async function handler(req,res){
      };
     }
    }
+   // Show only a service-read, owner-matched receipt from the exact active
+   // shift. This is proof of a real read-only OpenAI->Reality tool call,
+   // NOT native original execution, installation or final settlement.
+   let riley_native_model_tool_proof={
+    status:'NATIVE_MODEL_TOOL_OWNER_READBACK_UNAVAILABLE',
+    model_tool_readback_verified:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   };
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     const proof=await shiftRpc(db,
+      'reality_read_owner_native_readonly_tool_proof_v1',{
+       p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(proof?.status==='OWNER_NATIVE_MODEL_TOOL_INDEPENDENT_READBACK_VERIFIED'&&
+       proof.shift_id===chosen.shift_id&&
+       proof.original_work_id===shift_execution_graph.jobs.find(x=>
+        x.source_ref==='https://github.com/maloney2323/Reality/issues/263')
+        ?.original_work_id&&
+       proof.model_tool_readback_verified===true&&
+       proof.tool_scope==='READ_ONLY_CURRENT_ORIGINAL_EVIDENCE'&&
+       /^sha256:[a-f0-9]{64}$/.test(proof.tool_readback_sha256||'')&&
+       Number.isSafeInteger(proof.model_call_count)&&
+       proof.model_call_count>=1&&proof.model_call_count<=3&&
+       Number.isFinite(Date.parse(proof.verified_at))&&
+       proof.installation_authorized===false&&
+       proof.original_job_completed===false&&
+       proof.production_changed===false)
+      riley_native_model_tool_proof=proof;
+     else if(proof?.model_tool_readback_verified===false&&
+        proof.installation_authorized===false&&
+        proof.original_job_completed===false&&
+        proof.production_changed===false)
+      riley_native_model_tool_proof=proof;
+    }catch{/* Never invent a missing model/tool receipt. */}
+   }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -362,7 +397,7 @@ export default async function handler(req,res){
     shift_activity,shift_activity_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
-    riley_native_batch_readiness,
+    riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
