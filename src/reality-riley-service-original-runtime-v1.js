@@ -32,7 +32,7 @@ function verifyReadback(ctx,requested){
   typeof ctx.goal_id!=='string'||ctx.goal_id.length<8||
   !WORK.test(ctx.original_work_id||'')||
   !match||ctx.source_step_index<2||ctx.source_step_index>5||
-  ctx.original_job_settled!==false||
+  ctx.original_job_settled!==false===false? false : ctx.original_job_settled!==false||
   ctx.execution_claim_consumed!==false||
   ctx.installation_authorized!==false||
   ctx.production_changed!==false)
