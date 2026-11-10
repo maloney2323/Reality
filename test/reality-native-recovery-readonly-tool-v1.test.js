@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {proveNativeOriginalReadOnlyModelTool}
  from '../src/reality-native-recovery-readonly-tool-v1.js';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 const SHIFT='9460cfff-937a-4105-9093-2e41ab39a950';
 const OWNER='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const WORK='work:873a6e74fd14c6beacc9042dd8021dfc';
@@ -166,4 +167,24 @@ test('isolated SQL is service-only, exact original-bound, and does not grant ins
  assert.match(worker,/proveNativeOriginalReadOnlyModelTool/);
  assert.match(worker,/native_readonly_model_tool_proof:/);
  assert.doesNotMatch(worker,/automaticallyInstallRileyWithoutOwnerApproval/);
+});
+
+test('exact new service-only native recovery RPCs pass the worker allowlist, unrelated arbitrary RPC is denied',async()=>{
+ const seen=[];
+ const fetchImpl=async(url,opts)=>{
+  seen.push({url,method:opts.method});
+  return {ok:true,json:async()=>({status:'TEST_PROVIDER_READBACK_ONLY'})};
+ };
+ for(const name of ['reality_claim_current_native_readonly_tool_v1',
+  'reality_finish_current_native_readonly_tool_v1']){
+  const r=await shiftRpc({url:'https://isolated-preview.supabase.co',
+   secretKey:'service-key-test'},name,{}, {fetchImpl});
+  assert.equal(r.status,'TEST_PROVIDER_READBACK_ONLY');
+  assert.equal(seen.at(-1).url,'https://isolated-preview.supabase.co/rest/v1/rpc/'+name);
+  assert.equal(seen.at(-1).method,'POST');
+ }
+ await assert.rejects(()=>shiftRpc({url:'https://isolated-preview.supabase.co',
+  secretKey:'service-key-test'},'reality_owner_install_without_approval_v1',{},
+  {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
+ assert.equal(seen.length,2);
 });
