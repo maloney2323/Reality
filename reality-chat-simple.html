@@ -183,6 +183,10 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <div id="rileyLiveTimeline"></div></details>
  <p style="font-size:12px">Shows only server-recorded authorization, actual worker wakes, provider/source readbacks, claims, tests and independently accepted receipts. Refreshing the screen is not new worker activity. Times show your device's local time and date. Model reasoning is not a provider action or proof.</p>
 </section>
+<details class="team-value section-fold" id="realitySelfAwareness" aria-label="Reality current governed system audit">
+ <summary>Reality system audit · What's connected, blocked and independently proven</summary>
+ <div id="realitySelfAudit" aria-live="polite">Checking current Reality capabilities and business value…</div>
+</details>
 <details class="team-value section-fold" aria-label="Reality next action" aria-live="polite" id="rileyNextActionPanel">
  <summary id="rileyNextActionTitle">Checking your next action…</summary>
  <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
@@ -254,10 +258,7 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <div id="nextWeekEmployeeRoles" aria-live="polite"></div>
  </details>
  <div id="teamCards" class="team-grid" aria-live="polite"></div>
-<details class="team-proof" id="realitySelfAwareness">
- <summary>Reality's verified self-understanding</summary>
- <div id="realitySelfAudit" aria-live="polite">Checking current Reality capabilities…</div>
-</details>
+
  <p class="team-intro" id="teamEvidenceNote">Category findings need independent validation before execution. NASA's software repair benchmark is a planning reference, not measured savings.</p>
 </details>
 <details id="rileyConversationDisclosure" class="conversation-fold section-fold">
@@ -500,8 +501,46 @@ async function refreshRealitySelfAudit(){
     entry.proof_level.replaceAll('_',' ').toLowerCase());
    line.style.marginTop='6px';node.append(line);
   }
+  const conn=data.provider_capability_connections;
+  if(data.current_shift_native_readonly_tool_verified===true&&
+     conn?.openai_to_reality_readonly_tool==='PROVIDER_MODEL_TOOL_RECEIPT_VERIFIED')
+   node.append(textNode('div',
+    'VERIFIED: OpenAI used a Reality-governed READ-ONLY tool on the existing original job. This is not permission to install or proof of final settlement.'));
+  else node.append(textNode('div',
+    'Model-to-Reality tool receipt is not independently verified by this audit.'));
+  if(conn?.github_source_read==='DURABLE_SOURCE_READBACK_RECORDED')
+   node.append(textNode('div','VERIFIED: GitHub source evidence has been read and stored.'));
+  if(['REALITY_PREVIEW_GITHUB_WRITER_NOT_CONFIGURED',
+      'CREDENTIAL_CONFIGURED_WRITE_PERMISSION_NOT_VERIFIED'].includes(
+       conn?.github_provider_write)){
+   const meaning=conn.github_provider_write==='REALITY_PREVIEW_GITHUB_WRITER_NOT_CONFIGURED'?
+    'NOT CONNECTED: Reality-governed preview GitHub writing authority.':
+    'NEEDS INDEPENDENT CHECK: GitHub provider credential is configured, but write permission is not verified.';
+   node.append(textNode('div',meaning));
+  }
+  if(['NATIVE_DEPLOY_PROVIDER_PERMISSION_NOT_PROVEN',
+      'CREDENTIAL_CONFIGURED_DEPLOY_PERMISSION_NOT_VERIFIED'].includes(
+       conn?.vercel_native_deploy))
+   node.append(textNode('div',
+    'NOT PROVEN: autonomous native preview deployment and post-install resumption.'));
+  if(Number.isSafeInteger(data.historically_settled_isolated_jobs_from_roi)&&
+    data.historically_settled_isolated_jobs_from_roi>=0)
+   node.append(textNode('div',
+    'PREVIOUS TECHNICAL VALUE: '+
+    data.historically_settled_isolated_jobs_from_roi+
+    ' independently settled isolated jobs; '+
+    (Number.isSafeInteger(data.genuine_economic_observation_count)?
+      data.genuine_economic_observation_count+' recorded job economic observations.':
+      'economic observations unavailable.')+
+    ' Cash savings and net ROI remain NOT MEASURED.'));
+  if(typeof data.next_governed_executable_action==='string'&&
+     /^[A-Z0-9_]{10,120}$/.test(data.next_governed_executable_action))
+   node.append(textNode('div',
+    'NEXT GOVERNED GATE: '+
+    data.next_governed_executable_action.replaceAll('_',' ').toLowerCase()+
+    '. Use the already authorized shift; do not start a duplicate.'));
   node.append(textNode('div',
-   'Reality can investigate and pursue governed repairs, but cannot claim that every capability is live or every engineering problem can be solved.'));
+   'A source-implemented capability, successful worker wake, or model recommendation is not an independently completed customer job.'));
  }catch{
   node.textContent='Independent capability self-audit unavailable. No unverified live capability is claimed.';
  }
