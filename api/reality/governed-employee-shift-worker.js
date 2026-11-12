@@ -17,6 +17,8 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {runAuthorizedRileyPrReview}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
+import {executeExactlyPreparedRileyReviewViaReality}
+ from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -196,6 +198,29 @@ export default async function handler(req,res){
     original_job_completed:false,installation_authorized:false,
     production_changed:false
    };
+  }
+  // Provider writing is brokered THROUGH Reality, not through the model or
+  // a separately privileged employee. A missing Vercel writer credential
+  // can be an intentionally restricted preview: try Reality's separate
+  // service-authenticated, exact-original GitHub broker once per wake.
+  let governedPrProvider={status:'NO_GOVERNED_PROVIDER_BRIDGE_NEEDED',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false};
+  if(hasReview&&rileyOriginalReview.status===
+     'PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING'){
+   try{
+    governedPrProvider=await executeExactlyPreparedRileyReviewViaReality({
+     db,env:process.env,graph:unifiedGraph
+    });
+    if(governedPrProvider.status===
+       'EXACT_PR_REVIEW_ORIGINAL_INDEPENDENTLY_SETTLED'&&
+       governedPrProvider.independently_verified_original_receipt===true)
+     rileyOriginalReview=governedPrProvider;
+   }catch{
+    governedPrProvider={status:'GOVERNED_PROVIDER_BOUNDARY_OR_READBACK_BLOCKED',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+   }
   }
   // Admit the ACTUAL source-backed existing-code repair only from the
   // CURRENT signed owner shift and frozen verified issue #263 source proof.
@@ -420,6 +445,7 @@ export default async function handler(req,res){
      installation_authorized:false,original_job_completed:false
     },
     riley_original_review:rileyOriginalReview,
+    riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
     riley_model_draft:rileyModelDraft,
     riley_corrected_model_draft:rileyCorrectedDraft,
