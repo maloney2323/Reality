@@ -362,3 +362,20 @@ test('Reality self-audit rejects stale, mismatched or self-asserted model/provid
  assert.ok(ui.indexOf('id="realitySelfAwareness"')<
   ui.indexOf('id="rileyNextActionPanel"'));
 });
+
+test('Reality Chat reads the same owner-verified operational and economic evidence as the UI',()=>{
+ const context=readFileSync(new URL(
+  '../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ const audit=readFileSync(new URL(
+  '../api/reality/personal-capability-self-audit.js',import.meta.url),'utf8');
+ for(const rpc of ['reality_read_owner_native_readonly_tool_proof_v1',
+  'reality_read_owner_job_roi_evidence_v2']){
+  assert.match(context,new RegExp(rpc));
+  assert.match(audit,new RegExp(rpc));
+ }
+ assert.match(context,/Promise\.allSettled/);
+ assert.match(context,/previewGithubWriteConfigured/);
+ assert.match(context,/summarizeRealitySelfAuditForModel\(audit\)/);
+ assert.match(context,/installation_authorized:false/);
+ assert.doesNotMatch(context,/model_self_authorized:true/);
+});
