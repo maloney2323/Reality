@@ -9,7 +9,7 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const NAME=new Set(['Avery','Riley','Quinn','Taylor','Casey','Morgan','Jordan','Sage']);
 const fail=x=>{throw Error('REALITY_CHAT_ASSIGNMENT_'+x)};
-function makeRoles(proposal){
+export function deriveRealityApprovedChatRoleTasks(proposal){
  if(proposal?.version!=='reality-saved-chat-employee-proposals-v1'||
   proposal.status!=='SAVED_CHAT_IDEAS_AWAITING_SOURCE_AND_SETTLEMENT_RECONCILIATION'||
   !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(proposal.source_message_ref||'')||
@@ -41,7 +41,7 @@ function makeRoles(proposal){
  });
  return Object.freeze(roles);
 }
-function verifyReadback(x){
+export function verifyRealityOwnerApprovedChatJobList(x){
  if(x?.status!=='OWNER_APPROVED_CHAT_EMPLOYEE_JOB_LIST_READBACK'||
   x.owner_scope_verified!==true||
   x.read_only!==true||
@@ -102,7 +102,7 @@ function boundDb(session,env){
 export async function readOwnerApprovedChatEmployeeAssignments(session,{
  env=process.env,fetchImpl=fetch}={}){
  const db=boundDb(session,env);
- return verifyReadback(await rpc(db,
+ return verifyRealityOwnerApprovedChatJobList(await rpc(db,
   'reality_read_owner_chat_employee_assignments_v1',
   {p_owner_id:session.user_id},{fetchImpl}));
 }
@@ -115,7 +115,7 @@ export async function approveCurrentSavedChatEmployeeAssignments(session,{
   proposal.source_message_ref!==expectedMessageRef||
   proposal.source_content_sha256!==expectedContentSha256)
   fail('CHAT_OWNER_PREVIEW_CHANGED');
- const roles=makeRoles(proposal);
+ const roles=deriveRealityApprovedChatRoleTasks(proposal);
  const msg=expectedMessageRef.slice('supabase:reality_chat_messages:'.length);
  if(!UUID.test(msg))fail('SOURCE_MESSAGE_ID_INVALID');
  const x=await rpc(db,'reality_record_owner_chat_employee_assignments_v1',{
