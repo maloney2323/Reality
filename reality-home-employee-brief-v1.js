@@ -62,12 +62,47 @@
     }
     savedStatus='VERIFIED_SAVED_CHAT';
    }
+   const sourceQualification=data.upstream_source_qualification;
+   const inspected=sourceQualification?.status===
+    'UPSTREAM_PROVIDER_SOURCES_QUALIFIED_FOR_INVESTIGATION'&&
+    Number.isSafeInteger(sourceQualification.inspected_count)&&
+    Number.isSafeInteger(sourceQualification.investigation_assignment_count)&&
+    Number.isSafeInteger(sourceQualification.already_settled_no_replay_count)&&
+    Array.isArray(sourceQualification.items)&&
+    sourceQualification.items.length===sourceQualification.inspected_count&&
+    sourceQualification.inspected_count===
+     sourceQualification.investigation_assignment_count+
+      sourceQualification.already_settled_no_replay_count;
+   const precheckedByEmployee=new Map();
+   if(inspected){
+    for(const item of sourceQualification.items){
+     if(!names.includes(item?.assigned_employee)||
+        !Number.isSafeInteger(item.issue_number)||
+        item.source_url!=='https://github.com/maloney2323/Reality/issues/'+
+          item.issue_number||
+        !['PRIOR_ORIGINAL_SETTLED_NO_REPLAY',
+         'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE',
+         'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK',
+         'CURRENT_FAILURE_REPRODUCTION_REQUIRED',
+         'SOURCE_REVIEW_NEEDS_CURRENT_PROOF'].includes(item.status)||
+        item.executable_original!==false||item.execution_authorized!==false||
+        item.installation_authorized!==false)
+      throw Error('UPSTREAM_EMPLOYEE_INSPECTION_UNVERIFIED');
+     if(item.status!=='PRIOR_ORIGINAL_SETTLED_NO_REPLAY')
+      precheckedByEmployee.set(item.assigned_employee,
+       (precheckedByEmployee.get(item.assigned_employee)||0)+1);
+    }
+   }
    for(const name of names){
     const card=root.querySelector('[data-home-employee="'+name+'"]');
     const caption=card?.querySelector('[data-home-work]');
     if(!caption)throw Error('EMPLOYEE_HOME_CARD_MISSING');
     const e=map.get(name),n=e.candidate_count;
-    caption.textContent=n+' source finding'+(n===1?'':'s')+' to qualify · '+
+    caption.textContent=(inspected?
+      (precheckedByEmployee.get(name)||0)+' current GitHub investigation'+
+       ((precheckedByEmployee.get(name)||0)===1?'':'s')+
+       ' prechecked · ':'')+
+      n+' other catalog signal'+(n===1?'':'s')+' to qualify · '+
       (savedStatus==='VERIFIED_SAVED_CHAT'?
        ((saved.get(name)||0)+' saved Chat idea'+((saved.get(name)||0)===1?'':'s')):
        'saved Chat readback unavailable');
@@ -76,8 +111,13 @@
    const total=data.existing_work_center_candidates;
    if(!Number.isSafeInteger(total)||total<0)
     throw Error('EMPLOYEE_SOURCE_TOTAL_UNVERIFIED');
-   status.textContent='8 proposed AI roles · '+total+
-    ' source findings across the team · '+
+   status.textContent=(inspected?
+    sourceQualification.inspected_count+' current GitHub findings independently inspected upstream · '+
+    sourceQualification.investigation_assignment_count+' employee investigations organized · '+
+    sourceQualification.already_settled_no_replay_count+' settled source withheld from replay. ':
+    'Weekly GitHub qualification pending. ')+
+    '8 proposed AI roles · '+total+
+    ' other catalog findings awaiting qualification · '+
     (savedStatus==='VERIFIED_SAVED_CHAT'?
      saved.size+' roles with saved Chat proposals. ':
      'Saved Chat proposals temporarily unverified. ')+
