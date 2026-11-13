@@ -85,7 +85,7 @@ test('verified original-job memory survives open-ended follow-ups without keywor
  const ctx={db,env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project},now:fixedNow};
  const examples=[
   'Is there anything else you would like to tell me about this? This is a big milestone.',
-  'You don't have additional evidence for the job you just completed?',
+  "You don\'t have additional evidence for the job you just completed?",
   'You do not remember two sixty three?',
   'What does it mean for our future?',
   'How did that go again?',
