@@ -1,0 +1,12 @@
+{
+  "schema": "reality-vercel-native-git-preview-trigger-probe-v2",
+  "purpose": "Verify existing Vercel Git project and preview-deployment configuration after explicitly enabling previews",
+  "target_environment": "isolated-preview",
+  "source_branch": "reality/isolated-openai-governance-gateway-20261108",
+  "original_work_id": "work:873a6e74fd14c6beacc9042dd8021dfc",
+  "tested_candidate_installed": false,
+  "owner_installation_approval_given": false,
+  "original_job_settled": false,
+  "production_changed": false,
+  "token_created": false
+}
