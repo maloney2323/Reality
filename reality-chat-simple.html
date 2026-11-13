@@ -258,6 +258,11 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
   <div id="workforceScenarioRows" aria-live="polite"></div>
   <p>Important: An FTE-capacity equivalent is not an employee who can safely be removed. Ongoing reliability, uncovered duties, compliance, actual staffing changes and verified payroll expenses must be checked before claiming realized savings. No information entered here is saved.</p>
  </details>
+ <details class="team-next-week section-fold" aria-label="Saved Chat employee proposals">
+  <summary>Saved Chat recommendations · Review later</summary>
+  <p id="savedEmployeeChatSummary">Checking saved employee suggestions…</p>
+  <div id="savedEmployeeChatRoles" aria-live="polite"></div>
+ </details>
  <details class="team-next-week section-fold" aria-label="Next week prepared employee roles">
   <summary>Next week's proposed employee schedule</summary>
   <div class="team-role" id="nextWeekSourceStatus">Checking background preparation…</div>
@@ -1036,6 +1041,78 @@ function renderNextWeekWorkPlan(roster){
   throw Error('NEXT_WEEK_UNIQUE_SOURCE_COVERAGE_MISMATCH');
  $('nextWeekEmployeeRoles').replaceChildren(holder);
 }
+function renderSavedEmployeeChatProposals(roster){
+ const note=$('savedEmployeeChatSummary'),holder=$('savedEmployeeChatRoles');
+ const data=roster?.saved_chat_employee_proposals;
+ holder.replaceChildren();
+ if(roster?.saved_chat_employee_proposals_status!=='AUTHENTICATED_SAVED_CHAT_READBACK'||
+    !data){
+  note.textContent='Saved Chat suggestions could not be independently read. Your existing employee source assignments are unaffected.';
+  return;
+ }
+ if(data.version!=='reality-saved-chat-employee-proposals-v1'||
+    data.read_only!==true||data.plan_authorized!==false||
+    data.execution_authorized!==false||data.installation_authorized!==false||
+    data.production_changed!==false||data.proposals_not_verified_jobs!==true||
+    !Array.isArray(data.roles)||data.roles.length>8||
+    !Array.isArray(data.missing_employee_roles)||
+    !Number.isSafeInteger(data.roles_with_proposals)||
+    data.roles_with_proposals!==data.roles.length)
+  throw Error('SAVED_EMPLOYEE_CHAT_PROPOSAL_AUTHORITY_UNVERIFIED');
+ if(data.status==='NO_SAVED_MULTI_EMPLOYEE_CHAT_PROPOSALS_OBSERVED'){
+  note.textContent='No saved multi-employee Chat plan found yet. Ask Reality to propose employee work in Chat; suggestions will appear here after the answer is saved.';
+  return;
+ }
+ if(data.status!=='SAVED_CHAT_IDEAS_AWAITING_SOURCE_AND_SETTLEMENT_RECONCILIATION'||
+    !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(data.source_message_ref||'')||
+    !Number.isFinite(Date.parse(data.created_at||'')))
+  throw Error('SAVED_EMPLOYEE_CHAT_SOURCE_NOT_VERIFIED');
+ note.textContent=data.roles_with_proposals+' employee roles have suggestions from a saved Chat answer ('+
+  new Date(data.created_at).toLocaleDateString()+'). These are remembered ideas, NOT independently qualified jobs or authorized work. Source and prior settlement must be checked before scheduling.';
+ const known=new Set(['Avery','Riley','Quinn','Taylor','Casey','Morgan','Jordan','Sage']);
+ const seen=new Set();
+ for(const role of data.roles){
+  if(!known.has(role.employee_name)||seen.has(role.employee_name)||
+     !Array.isArray(role.proposals)||role.proposals.length>8)
+   throw Error('SAVED_EMPLOYEE_CHAT_ROLE_UNVERIFIED');
+  seen.add(role.employee_name);
+  const details=document.createElement('details');details.className='week-role';
+  const sum=document.createElement('summary');
+  sum.textContent=role.employee_name+' · '+role.proposals.length+' saved idea(s) · Not scheduled';
+  details.append(sum);
+  const list=document.createElement('ul');
+  for(const proposed of role.proposals){
+   if(typeof proposed.description!=='string'||!proposed.description||
+      proposed.description.length>270||
+      proposed.source_status!=='CHAT_SUGGESTION_UNQUALIFIED'||
+      proposed.authorized_execution!==false||
+      proposed.independently_verified_job!==false)
+     throw Error('SAVED_EMPLOYEE_CHAT_IDEA_NOT_READ_ONLY');
+   const li=document.createElement('li');
+   li.textContent=proposed.description+
+    (proposed.may_reference_previously_settled_work===true?
+     ' · Check settled-job receipts; do not repeat completed work.':'');
+   list.append(li);
+  }
+  details.append(list);holder.append(details);
+ }
+ if(data.missing_employee_roles.some(name=>!known.has(name)||seen.has(name))||
+    seen.size+data.missing_employee_roles.length!==8)
+  throw Error('SAVED_EMPLOYEE_CHAT_MISSING_ROLES_INVALID');
+ if(data.missing_employee_roles.length){
+  const missing=document.createElement('p');
+  missing.textContent='Not included in that Chat response: '+
+   data.missing_employee_roles.join(', ')+'. No assignments invented.';
+  holder.append(missing);
+ }
+ const p=document.createElement('p');
+ p.textContent='Saved automatically with the conversation. You can return and discuss or revise these proposals later; nothing has been started.';
+ holder.append(p);
+}
+function clearSavedEmployeeChatProposals(){
+ $('savedEmployeeChatSummary').textContent='Saved Chat proposals unavailable. No recommendations or work authorization inferred.';
+ $('savedEmployeeChatRoles').replaceChildren();
+}
 function clearNextWeekWorkPlan(){
  $('nextWeekSourceStatus').textContent='Preparation unverified';
  $('nextWeekSummary').textContent='Next-week source or owner evidence could not be verified. No shift, worker execution or business savings is claimed.';
@@ -1068,6 +1145,7 @@ async function refreshEmployeeBoard(){
     configureWorkforceSavingsRoles(roster);
     loadWorkforceRoleInputs();
     renderNextWeekWorkPlan(roster);
+    renderSavedEmployeeChatProposals(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
     void refreshRileyExistingBacklog();
@@ -1080,6 +1158,7 @@ async function refreshEmployeeBoard(){
     $('teamCards').replaceChildren();
     clearShiftValueEvidence();
     clearNextWeekWorkPlan();
+    clearSavedEmployeeChatProposals();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
       String(e?.message||'Unknown').slice(0,180)+
