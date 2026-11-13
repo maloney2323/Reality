@@ -103,7 +103,7 @@ function renderInfo({summary,description,done,now,next,owner,button}){
  element('native263Next').textContent=next;
  element('native263OwnerAction').textContent=owner;
  const b=element('native263ApproveInstall');
- b.hidden=!button;b.disabled=!button||submitted||inFlight;
+ b.hidden=!button;b.disabled=!button||submitted;
 }
 function renderExact(d){
  const state=d.approval_state;
