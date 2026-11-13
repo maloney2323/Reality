@@ -43,6 +43,15 @@ test('Only explicit click approves the current fingerprint; edits revoke that ap
  assert.doesNotMatch(main,/install_approval_authorized_by_triage:true|installation_authorized:true/);
  assert.match(main,/governed amendment/);
 });
+test('Shift planner stays in the optional Work panel instead of pushing saved Chat messages down',()=>{
+ assert.match(main,/const workPanel=document\.getElementById\('realityChatPanelWork'\)/);
+ assert.match(main,/workPanel\.prepend\(block\)/);
+ assert.doesNotMatch(main,/transcript\.insertAdjacentElement\('beforebegin',block\)/);
+ assert.match(main,/const openWork=document\.getElementById\('realityChatOpenInspector'\)/);
+ assert.match(main,/window\.addEventListener\('hashchange',revealLinkedShift\)/);
+ assert.match(main,/Your previously authorized shift is not cancelled/);
+ assert.doesNotMatch(main,/\binstallCapability\s*\(|\bstartJob\s*\(/);
+});
 test('Conversation export uses authenticated saved source and local user-controlled actions',()=>{
  assert.match(exportsUI,/credentials:'same-origin'/);
  assert.match(exportsUI,/\/api\/reality\/personal-chat\?conversation_id=/);
