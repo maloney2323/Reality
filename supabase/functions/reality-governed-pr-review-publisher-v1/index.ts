@@ -24,7 +24,7 @@ const digest=async(bytes:string)=>{
  return 'sha256:'+Array.from(new Uint8Array(out)).map(x=>x.toString(16).padStart(2,'0')).join('');
 };
 async function rpc(name:string,payload:Record<string,unknown>,key:string){
- if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1)$/.test(name))
+ if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1)$/.test(name))
   fail('RPC_OUT_OF_SCOPE');
  const r=await fetch('https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
@@ -73,17 +73,29 @@ async function gh(path:string,token:string,method='GET',body:unknown=undefined){
 async function findExisting(c:any,token:string){
  const marker='<!-- reality-riley-original:'+ORIGINAL+' -->';
  let found:any=null;
+ const fingerprints:string[]=[];
  for(let page=1;page<=5;page++){
   const comments=await gh('/issues/57/comments?per_page=100&page='+page,token);
   if(!Array.isArray(comments)||comments.length>100)
    fail('GITHUB_COMMENT_COVERAGE_INVALID');
   for(const comment of comments){
-   if(typeof comment?.body==='string'&&comment.body.includes(marker)){
+   if(!Number.isSafeInteger(comment?.id)||comment.id<1||
+      typeof comment.body!=='string'||
+      comment.issue_url!==ROOT+'/issues/57')
+    fail('GITHUB_COMMENT_PROVIDER_IDENTITY_UNVERIFIED');
+   // Authenticated provider observations without exposing other comments.
+   fingerprints.push(String(comment.id)+':'+await digest(comment.body));
+   if(comment.body.includes(marker)){
     if(found!==null)fail('MULTIPLE_PROVIDER_EFFECTS_RECONCILIATION_REQUIRED');
     found=comment;
    }
   }
-  if(comments.length<100)return found;
+  if(comments.length<100){
+   return {found,comment_count:fingerprints.length,
+    comments_scan_sha256:await digest(JSON.stringify({
+     original_work_id:ORIGINAL,source_ref:SOURCE,
+     comment_fingerprints:fingerprints}))};
+  }
  }
  fail('GITHUB_COMMENT_COVERAGE_INCOMPLETE');
 }
@@ -168,16 +180,50 @@ Deno.serve(async req=>{
    original_work_id:ORIGINAL,shift_id:SHIFT,credentials_present:false
   });
   await verifyExactProvider(c,token);
-  const prior=await findExisting(c,token);
-  if(prior!==null){
+  const initial=await findExisting(c,token);
+  if(initial.found!==null){
    if(c.phase!=='PUBLISHING')
-    // Existing matching effect discovered before new publish intent:
+    // Existing matching effect discovered before a new publish intent:
     // stop; never attribute a foreign or uncertain effect to this job.
     return respond('PREEXISTING_PROVIDER_EFFECT_REQUIRES_RECONCILIATION',false,409);
-   return settle(c,prior,token,key);
+   return settle(c,initial.found,token,key);
   }
-  if(c.phase==='PUBLISHING')
-   return respond('PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',true,200);
+  if(c.phase==='PUBLISHING'){
+   // A stale, uncertain prior POST may be recovered ONCE, but only after
+   // complete authenticated GitHub readback, unchanged frozen bytes/head,
+   // a 20-minute holdoff, and an atomic service-only Reality ledger fence.
+   const reset=await rpc('reality_rearm_authorized_riley_pr_publish_v1',{
+    p_original_work_id:ORIGINAL,p_claim_id:c.claim_id,
+    p_head_sha:c.source_head_sha,p_review_digest:c.review_digest,
+    p_provider_comment_scan_sha256:initial.comments_scan_sha256,
+    p_provider_comment_count:initial.comment_count
+   },key);
+   if(reset?.status!=='EXACT_PR_REVIEW_ONE_RECOVERY_ARMED')
+    return respond(reset?.status==='PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY'?
+     'PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY':
+     'PUBLISHING_RECONCILIATION_ONLY_NO_FURTHER_RETRY',true,200);
+   if(reset.original_work_id!==ORIGINAL||reset.claim_id!==c.claim_id||
+      reset.shift_id!==SHIFT||reset.review_digest!==c.review_digest||
+      reset.source_head_sha!==c.source_head_sha||
+      reset.comment_scan_sha256!==initial.comments_scan_sha256||
+      reset.publish_recovery_count!==1||
+      reset.original_job_completed!==false||
+      reset.installation_authorized!==false||reset.production_changed!==false)
+    fail('RECOVERY_FENCE_READBACK_UNVERIFIED');
+   c.phase='PREPARED'; // same claim, original and frozen model bytes
+  }
+  // A second provider GET closes the gap between recovery re-arm and effect.
+  const justBeforeIntent=await findExisting(c,token);
+  if(justBeforeIntent.found!==null){
+   // A late prior effect appeared: preserve it; NEVER submit new POST.
+   const reconciled=await rpc('reality_mark_authorized_riley_pr_publish_v1',{
+    p_original_work_id:ORIGINAL,p_claim_id:c.claim_id
+   },key);
+   if(reconciled.status!=='PR_REVIEW_PUBLISH_INTENT_DURABLY_RECORDED'||
+      reconciled.review_digest!==c.review_digest)
+    fail('LATE_PROVIDER_EFFECT_RECOVERY_FENCE_UNVERIFIED');
+   return settle(c,justBeforeIntent.found,token,key);
+  }
   // One database transition PREPARED -> PUBLISHING before the sole POST.
   const marked=await rpc('reality_mark_authorized_riley_pr_publish_v1',{
    p_original_work_id:ORIGINAL,p_claim_id:c.claim_id},key);
@@ -189,7 +235,11 @@ Deno.serve(async req=>{
      marked.production_changed!==false)
    fail('ONE_TIME_PROVIDER_WRITE_FENCE_NOT_RECORDED');
   await verifyExactProvider(c,token);
-  // No retry after uncertain provider effects. Subsequent runs only GET.
+  // Final independent GET before POST: a delayed prior provider effect
+  // must be reconciled, not duplicated.
+  const finalScan=await findExisting(c,token);
+  if(finalScan.found!==null)return settle(c,finalScan.found,token,key);
+  // One finite recovery attempt, never repeated after a new uncertain POST.
   let created;
   try{created=await gh('/issues/57/comments',token,'POST',{body:c.review_body})}
   catch(e){
