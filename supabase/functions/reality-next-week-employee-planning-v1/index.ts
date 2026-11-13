@@ -122,7 +122,7 @@ function qualifyCurrentSource(item:{
    'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE':
   exact?.original_kind==='SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL'?
    'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK':
-  /github.com\\/maloney2323\\/Reality\\/actions\\/runs\\/[0-9]+|frozen.acceptance|frozen.regressions|err_module_not_found/.test(text)?
+  /github[.]com[/]maloney2323[/]Reality[/]actions[/]runs[/][0-9]+|frozen.acceptance|frozen.regressions|err_module_not_found/.test(text)?
    'CURRENT_FAILURE_REPRODUCTION_REQUIRED':
    'SOURCE_REVIEW_NEEDS_CURRENT_PROOF';
  if(!QUAL_STATUSES.has(status))deny('QUALIFICATION_STATUS_INVALID');
