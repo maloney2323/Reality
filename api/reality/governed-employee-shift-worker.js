@@ -224,9 +224,14 @@ export default async function handler(req,res){
      token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
       process.env.GITHUB_TOKEN||null
     });
-  }catch{
+  }catch(error){
+   // Only a bounded diagnostic code is exposed, never secrets or raw provider data.
+   const message=String(error?.message||'');
+   const failureCode=/^SHIFT_COMMIT_TRIAGE_(?:HANDOFF_)?[A-Z0-9_]{3,100}$/.test(message)?
+    message:'SHIFT_COMMIT_TRIAGE_UNCLASSIFIED_SOURCE_FAILURE';
    commitTriageHandoff={
-    qualification:{status:'COMMIT_TRIAGE_PROVIDER_OR_SOURCE_READBACK_UNVERIFIED'},
+    qualification:{status:'COMMIT_TRIAGE_PROVIDER_OR_SOURCE_READBACK_UNVERIFIED',
+     failure_code:failureCode},
     original:{status:'EXACT_SHIFT_COMMIT_TRIAGE_ADMISSION_OR_EVIDENCE_RECONCILIATION_REQUIRED',
      original_job_admitted:false,original_job_completed:false,
      installation_authorized:false,production_changed:false}
