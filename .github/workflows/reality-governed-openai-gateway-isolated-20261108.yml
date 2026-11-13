@@ -48,6 +48,14 @@ on:
       - supabase/migrations/20261113_existing_shift_weekly_capability_intake_v1.sql
       - src/reality-existing-shift-integrated-intake-v1.js
       - test/reality-existing-shift-integrated-intake-v1.test.js
+      - supabase/migrations/20261113_chat_employee_approved_job_list_v1.sql
+      - src/reality-saved-chat-employee-proposals-v1.js
+      - src/reality-owner-approved-chat-assignments-v1.js
+      - api/reality/personal-employee-roster.js
+      - api/reality/personal-employee-chat-assignments.js
+      - reality-chat-simple.html
+      - reality-chat-approved-assignments-v1.js
+      - test/reality-owner-approved-chat-assignments-v1.test.js
       - reality-chat-simple.html
       - api/reality/governed-employee-shift-worker.js
       - src/reality-mixed-shift-receipts-v1.js
@@ -220,6 +228,12 @@ jobs:
           node --check api/reality/governed-employee-shift-worker.js
           node --check api/reality/personal-governed-employee-shift.js
           node --test test/reality-existing-shift-integrated-intake-v1.test.js
+          node --check src/reality-owner-approved-chat-assignments-v1.js
+          node --check src/reality-saved-chat-employee-proposals-v1.js
+          node --check api/reality/personal-employee-chat-assignments.js
+          node --check api/reality/personal-employee-roster.js
+          node --check reality-chat-approved-assignments-v1.js
+          node --test test/reality-owner-approved-chat-assignments-v1.test.js
           node --check src/reality-mixed-shift-receipts-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check api/reality/personal-governed-employee-shift.js
