@@ -31,6 +31,9 @@ on:
       - src/reality-cognitive-runtime-v1.0.js
       - test/reality-private-chat-conversation-and-weekly-role-v1.test.js
       - test/reality-saved-chat-employee-proposals-v1.test.js
+      - test/reality-home-live-employees-v1.test.js
+      - reality-home-employee-brief-v1.js
+      - index.html
       - src/reality-saved-chat-employee-proposals-v1.js
       - api/reality/personal-employee-roster.js
       - src/reality-owner-completed-work-chat-context-v1.js
@@ -175,3 +178,5 @@ jobs:
           node --check src/reality-saved-chat-employee-proposals-v1.js
           node --check api/reality/personal-employee-roster.js
           node --test test/reality-saved-chat-employee-proposals-v1.test.js
+          node --check reality-home-employee-brief-v1.js
+          node --test test/reality-home-live-employees-v1.test.js
