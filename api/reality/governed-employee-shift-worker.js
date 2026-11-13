@@ -19,6 +19,8 @@ import {runAuthorizedRileyPrReview}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 import {executeExactlyPreparedRileyReviewViaReality}
  from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
+import {inspectNative263ExistingFileInstallTransport}
+ from '../../src/reality-native-263-install-preflight-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -178,6 +180,32 @@ export default async function handler(req,res){
   const hasReview=unifiedGraph.jobs.some(x=>
    x.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
    x.independent_source_proof_verified===true&&x.phase!=='SETTLED');
+
+  // The same owner-authorized #263 original is now read-only preflighted
+  // against its frozen tested source and exact existing-file preview baseline.
+  // Reality does not consume owner approval, write code, or settle the job.
+  let nativeExistingFilePreflight={
+   status:'NO_CURRENT_TESTED_NATIVE_EXISTING_FILE_TO_INSTALL',
+   installation_authorized:false,owner_approval_ready:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(unifiedGraph.jobs.some(x=>
+    x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+    x.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+    x.phase==='CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL')){
+   try{
+    nativeExistingFilePreflight=
+     await inspectNative263ExistingFileInstallTransport({
+      db,graph:unifiedGraph,env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    nativeExistingFilePreflight={
+     status:'NATIVE263_PREINSTALL_PROVIDER_OR_OWNER_SCOPE_UNVERIFIED',
+     installation_authorized:false,owner_approval_ready:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
   // Complete ONE source-backed assigned PR review as a REAL original job:
   // OpenAI authors the review, GitHub receives it, an independent provider
   // GET proves the exact effect, and the owner-scoped service ledger settles.
@@ -458,6 +486,7 @@ export default async function handler(req,res){
     riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate,
+    native_existing_file_install_preflight:nativeExistingFilePreflight,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
