@@ -12,6 +12,8 @@ import {projectSingleModelRoleQueue}
  from '../../src/reality-single-model-role-work-router-v1.js';
 import {readRealitySavedChatEmployeeProposals}
  from '../../src/reality-saved-chat-employee-proposals-v1.js';
+import {readOwnerApprovedChatEmployeeAssignments}
+ from '../../src/reality-owner-approved-chat-assignments-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
 export const maxDuration=45;
@@ -33,6 +35,8 @@ export default async function handler(req,res){
   // separately from verified source work, without creating a shift or job.
   // A missing Chat readback must not erase the independently sourced roster.
   const savedChatPromise=readRealitySavedChatEmployeeProposals(session).catch(()=>null);
+  const approvedAssignmentsPromise=
+   readOwnerApprovedChatEmployeeAssignments(session).catch(()=>null);
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
@@ -60,8 +64,12 @@ export default async function handler(req,res){
   });
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   const saved_chat_employee_proposals=await savedChatPromise;
+  const approved_chat_employee_assignments=await approvedAssignmentsPromise;
   return res.status(200).json({ok:true,...roster,value_preview,
    next_week_plan,single_model_role_routing,saved_chat_employee_proposals,
+   approved_chat_employee_assignments,
+   approved_chat_employee_assignments_status:approved_chat_employee_assignments?
+    'OWNER_DURABLE_CHAT_JOB_LIST_READBACK':'APPROVED_CHAT_JOB_LIST_UNVERIFIED',
    saved_chat_employee_proposals_status:saved_chat_employee_proposals?
     'AUTHENTICATED_SAVED_CHAT_READBACK':'SAVED_CHAT_READBACK_UNAVAILABLE',
    next_week_background_open_issue_count:backgroundSourceIssueCount,
