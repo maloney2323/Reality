@@ -58,6 +58,8 @@ test('signed-in Reality Chat shows only exact tested native patch, but no instal
  assert.match(ui,/renderRileyReviewedPatchEvidence\(readback,current\)/);
  assert.match(ui,/Installation NOT approved/);
  assert.match(ui,/This engineering-reviewed patch is/);
- assert.match(ui,/No approval button is shown until that path is proven/);
+ assert.match(ui,/id="native263ApproveInstall" type="button" disabled/);
+ assert.match(ui,/approval card below remains gated until the installation and original-job continuation path is independently proven/);
+ assert.match(get('reality-native263-install-approval-ui-v1.js'),/data\.owner_approval_ready===true/);
  assert.match(rpc,/read_owner_native_reviewed_patch_v1/);
 });
