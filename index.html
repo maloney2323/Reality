@@ -6510,6 +6510,7 @@ setInterval(refreshSavedShiftHome,300000);
   const body=document.createElement('div');body.style.whiteSpace='pre-wrap';
   body.textContent=String(text||'');
   node.append(head,body);el('privateTranscript').append(node);
+  return node;
  }
  async function loadConversations(){
   const r=await fetch('/api/reality/personal-chat?list=1',{cache:'no-store',signal:AbortSignal.timeout(12000)});
@@ -6729,24 +6730,48 @@ setInterval(refreshSavedShiftHome,300000);
   const value=el('privatePrompt').value.trim();if(!value)return;
   const goalCommand=el('privateGoalCommand').value||null;
   const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
+  // Present the owner's typed words immediately in their conversation.
+  // This is a LOCAL delivery candidate until the authenticated RLS readback
+  // verifies it; no synthetic saved history, model response or job event.
+  const pendingBubble=bubble('user',value);
+  pendingBubble.dataset.requestId=sentRequest;
+  pendingBubble.querySelector('.label').textContent='YOU · SENDING (save not yet verified)';
+  el('privatePrompt').value='';
+  el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
   window.dispatchEvent(new CustomEvent('reality:chat-request-started',{
    detail:{conversation_id:sentConversation,request_id:sentRequest}
   }));
-  el('privateSend').disabled=true;status('Reality is working with saved context…');
+  el('privateSend').disabled=true;
+  status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
     signal:AbortSignal.timeout(95000),
     headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
-   const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
-   el('privatePrompt').value='';
+   const data=await r.json().catch(()=>null);
+   if(!r.ok||data?.ok!==true){
+    const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
+    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
+   }
+   if(typeof data.answer!=='string'||!data.answer.trim()||
+      data.continuity?.current_answer_persisted!==true)
+    throw Error('CHAT_ANSWER_DURABILITY_NOT_VERIFIED');
    el('privateGoalCommand').value='';
-   // The server's completed reply must not be held hostage by UI readbacks.
-   // These are read-only refreshes, with their own deadlines.
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent='YOU · RETURNED WITH VERIFIED ANSWER';
+   // The server independently verified its saved answer before returning 200.
+   // Display it now; the GET readback below replaces temporary DOM entries
+   // with the exact authenticated history when available.
+   if(el('privateTranscript').contains(pendingBubble)){
+    const answerBubble=bubble('assistant',data.answer);
+    answerBubble.querySelector('.label').textContent='REALITY · VERIFIED SAVED ANSWER';
+    el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+   }
    void Promise.allSettled([loadSaved(),loadConversations()]).then(results=>{
     if(results.some(x=>x.status==='rejected'))
-     status('Answer returned; saved history refresh was unavailable. You can retry refreshing without resending.');
+     status('The answer was verified by the server, but reloading saved history is temporarily unavailable. Do not resend this request.');
    });
    // Refresh Reality's independently observed improvement queue after chat.
    // This request remains GET-only and cannot start a model or authorize work.
@@ -6863,8 +6888,18 @@ setInterval(refreshSavedShiftHome,300000);
     ' · Corrections: '+(reliability.intervention||'none')+
     (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':'')+
     ' · External truth not independently verified');
-  }catch(e){status(e.message+' · Saved user messages may still be recoverable.');}
-  finally{el('privateSend').disabled=false}
+  }catch(e){
+   const errorCode=String(e?.message||'CHAT_RESPONSE_UNAVAILABLE');
+   const safeCode=/^[A-Z][A-Z0-9_]{3,119}$/.test(errorCode)?errorCode:'CHAT_RESPONSE_UNAVAILABLE';
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent='YOU · DELIVERY OR REPLY NOT VERIFIED';
+   // Do not lose the owner's text when the server cannot confirm a saved turn.
+   if(!el('privatePrompt').value.trim()){
+    el('privatePrompt').value=value;
+    el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+   }
+   status('Reality could not verify this Chat turn ('+safeCode+'). Your text is preserved for retry. No job was started.');
+  }finally{el('privateSend').disabled=false}
  };
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
  init();
