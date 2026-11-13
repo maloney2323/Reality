@@ -79,16 +79,21 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
 // old UI strings, model advice or an inference from an issue being open.
 export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
  if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
- const [reviews,triage]=await Promise.all([
+ const [reviews,triage,native]=await Promise.all([
   call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
-  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId})
+  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId})
  ]);
  if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
     reviews.production_changed!==false||
     !Array.isArray(reviews.jobs)||reviews.jobs.length>10||
     triage?.status!=='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'||
     triage.production_changed!==false||
-    !Array.isArray(triage.jobs)||triage.jobs.length>5)
+    !Array.isArray(triage.jobs)||triage.jobs.length>5||
+    native?.status!=='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'||
+    native.production_changed!==false||
+    native.does_not_authorize_new_work!==true||
+    !Array.isArray(native.jobs)||native.jobs.length>6)
   throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
  const refs=new Set();
  for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
@@ -106,6 +111,23 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
    )throw Error('SHIFT_SETTLED_JOB_INDEPENDENT_RECEIPT_INVALID');
    refs.add(source);
   }
+ }
+ // Native engineering receipts are distinct from older Universe capability
+ // receipts. A GitHub issue can remain OPEN even after Reality independently
+ // installed, verified and settled the exact original repair. Never schedule it
+ // again merely to fill a new employee shift.
+ for(const j of native.jobs){
+  if(j.phase!=='SETTLED')continue;
+  if(j.original_job_completed!==true||
+     j.code_repair_completed!==true||
+     j.production_changed!==false||
+     !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
+     j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
+     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')||
+     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(
+      j.original_settlement_receipt_ref||''))
+   throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+  refs.add(j.source_ref);
  }
  return Object.freeze([...refs].sort());
 }
