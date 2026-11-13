@@ -11,9 +11,10 @@ const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/;
 const PR=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/;
 const RECEIPT_PR=/^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/i;
 const RECEIPT_NATIVE=/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i;
+const RECEIPT_TRIAGE=/^supabase:riley_commit_reference_triage_originals_v1:[a-f0-9-]{36}$/i;
 const fail=x=>{throw Error('REALITY_MIXED_SHIFT_RECEIPTS_'+x)};
 export function reconcileRealityMixedShiftReceipts(shift,{
- prReadback=null,repairReadback=null
+ prReadback=null,repairReadback=null,unifiedGraph=null
 }={}){
  if(!UUID.test(shift?.shift_id||'')||
   !Array.isArray(shift.steps)||shift.steps.length!==8||
@@ -95,6 +96,41 @@ export function reconcileRealityMixedShiftReceipts(shift,{
   for(const j of repairReadback.jobs){
    if(j.shift_id===shift.shift_id&&j.phase==='SETTLED')
     record(j,'NATIVE_REPAIR',ISSUE);
+  }
+ }
+ // This is a durable service-only DB receipt, not a model assertion or
+ // inferred completion from a closed GitHub issue.
+ if(unifiedGraph!==null){
+  if(unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+   unifiedGraph.shift_id!==shift.shift_id||
+   !Array.isArray(unifiedGraph.jobs)||
+   unifiedGraph.jobs.length!==selected.size)
+   fail('TRIAGE_GRAPH_OWNER_SHIFT_READBACK_UNVERIFIED');
+  for(const job of unifiedGraph.jobs){
+   if(job.original_kind!=='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'||
+      job.phase!=='SETTLED')continue;
+   const source=selected.get(job.source_ref);
+   if(!source||source.state!=='SOURCE_CHECKED'||
+      !DIGEST.test(source.proof_sha256||'')||
+      source.proof_sha256!==job.source_proof_sha256||
+      !WORK.test(job.original_work_id||'')||
+      !RECEIPT_TRIAGE.test(job.provider_final_receipt_ref||'')||
+      job.capability_installation_authorized!==false||
+      job.original_job_completed_by_graph!==false||
+      seenWork.has(job.original_work_id)||seenSource.has(job.source_ref))
+    fail('TRIAGE_FINAL_PROVIDER_RECEIPT_SOURCE_MISMATCH');
+   seenWork.add(job.original_work_id);seenSource.add(job.source_ref);
+   receipts.push(Object.freeze({
+    original_work_id:job.original_work_id,
+    source_ref:job.source_ref,source_step_index:source.step_index,
+    source_proof_sha256:source.proof_sha256,
+    kind:'OWNER_ASSISTED_COMMIT_TRIAGE',
+    final_receipt_ref:job.provider_final_receipt_ref,
+    independently_settled:true,
+    installation_authorized_by_this_read:false,
+    work_replayed_by_this_read:false,
+    human_hours_saved:null,automation_cost_usd:null
+   }));
   }
  }
  receipts.sort((a,b)=>a.source_step_index-b.source_step_index);
