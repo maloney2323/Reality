@@ -15,8 +15,10 @@ const ISSUE='https://github.com/maloney2323/Reality/issues/263';
 const BRANCH='reality/isolated-openai-governance-gateway-20261108';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 
-export const native263ConversationRelevant=message=>
- /\b263\b|\b(?:latest|last|recent|current)\s+(?:original\s+)?(?:repair|job|settlement|receipt)\b|\bpast\b.{0,70}\bpresent\b.{0,70}\bfuture\b/i.test(String(message||''));
+// No lexical relevance gate. The completed original is read as verified
+// owner operational memory, whether the user says "the job", "it", "two sixty
+// three" or changes topics. Cognition decides conversational relevance; the
+// source readback only decides what facts are true.
 
 export function projectNative263OwnerTemporalBrief(c,{ownerId,now=new Date()}={}){
  if(!UUID.test(ownerId||'')||ownerId!==OWNER||
@@ -132,7 +134,7 @@ export async function readVerifiedNative263TemporalForChat({
  session,message,env=process.env,db=resolveReliabilityBenchmarkDb(env),
  fetchImpl=fetch,rpc=shiftRpc,now=new Date()
 }={}){
- if(!native263ConversationRelevant(message)||env.VERCEL_ENV!=='preview'||
+ if(env.VERCEL_ENV!=='preview'||
   session?.user_id!==OWNER||db?.strictSecrets!==true||
   db.project!=='hvkfreoagbrphwghjajw'||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
