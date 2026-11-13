@@ -41,6 +41,10 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {reconcileRealityMixedShiftReceipts}
+ from '../../src/reality-mixed-shift-receipts-v1.js';
+import {projectRealityAutomaticShiftSupervisor}
+ from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {proveNativeOriginalReadOnlyModelTool}
@@ -201,6 +205,37 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // The worker automatically reconciles native-repair and PR-review receipts
+  // against the frozen owner warrant on every pulse. The status is merely
+  // a truthful next-work diagnostic: never a new job or installation grant.
+  let automaticWorkSupervisor=null;
+  let automaticWorkSupervisorStatus='NO_CURRENT_OWNER_SHIFT_TO_TRIAGE';
+  if(unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'){
+   try{
+    const [shiftRead,prRead,repairRead]=await Promise.all([
+     shiftRpc(db,'reality_read_owner_employee_shifts_v1',
+      {p_owner_id:unifiedGraph.owner_id}),
+     shiftRpc(db,'reality_read_owner_riley_pr_review_v1',
+      {p_owner_id:unifiedGraph.owner_id}),
+     shiftRpc(db,'reality_read_owner_riley_repair_original_v1',
+      {p_owner_id:unifiedGraph.owner_id})
+    ]);
+    const scope=assertShiftReadback(shiftRead).shifts.find(s=>
+     s.shift_id===unifiedGraph.shift_id&&
+     s.plan_fingerprint===unifiedGraph.plan_fingerprint&&
+     ['AWAITING_EXACT_ORIGINAL_WORK','RUNNING'].includes(s.status)&&
+     s.planned_end_at==='infinity');
+    if(!scope)throw Error('AUTOMATIC_WORK_TRIAGE_SHIFT_CHANGED');
+    const mixed=reconcileRealityMixedShiftReceipts(scope,{
+     prReadback:prRead,repairReadback:repairRead});
+    automaticWorkSupervisor=projectRealityAutomaticShiftSupervisor(
+     unifiedGraph,mixed);
+    automaticWorkSupervisorStatus='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY';
+   }catch{
+    automaticWorkSupervisor=null;
+    automaticWorkSupervisorStatus='AUTOMATIC_WORK_TRIAGE_SOURCE_UNAVAILABLE';
+   }
+  }
   // Existing signed shift consumes a separately recorded exact Chat owner
   // approval. No approval, model permission, new shift or manual resume here.
   let nativeOwnerApprovedInstallation={
@@ -614,7 +649,11 @@ export default async function handler(req,res){
      'RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY':
     activeRepairUnstaged?
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED':
-     result?.status;
+    result?.status==='SHIFT_FINAL_REPORT_NOT_DUE'&&
+     automaticWorkSupervisor?.status===
+      'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
+      automaticWorkSupervisor.next_worker_pulse_code:
+      result?.status;
    const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED';
    completedPulse=await shiftRpc(db,
@@ -630,6 +669,8 @@ export default async function handler(req,res){
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
+    automatic_work_supervisor:automaticWorkSupervisor,
+    automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     completion_bound_work:completionClose,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
