@@ -419,10 +419,15 @@ export function mountNative263ExactInstallApproval(){
    'Question prepared in the conversation. Tap Send to Reality when ready; nothing was executed.';
  });
  element('refresh')?.addEventListener('click',()=>{void refreshExactNative263InstallApproval()});
- const h=host();
- if(h){
-  new MutationObserver(()=>{if(visible())void refreshExactNative263InstallApproval();else panel.hidden=true})
-   .observe(h,{attributes:true,attributeFilter:['hidden','style']});
+ // The proof panel stays behind a hidden Work tab until requested.
+ // Watch the actual authenticated-session container instead, so sign-in
+ // triggers the greeting immediately rather than waiting for a poll.
+ const sessionHost=element('privateReady')||element('chat')||host();
+ if(sessionHost){
+  new MutationObserver(()=>{
+   if(visible())void refreshExactNative263InstallApproval();
+   else panel.hidden=true;
+  }).observe(sessionHost,{attributes:true,attributeFilter:['hidden','style']});
  }
  if(visible())void refreshExactNative263InstallApproval();
  window.addEventListener('focus',()=>{void refreshExactNative263InstallApproval()});
