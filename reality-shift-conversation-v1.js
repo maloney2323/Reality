@@ -23,7 +23,7 @@ function valid(d){
   b.complete_shift_proven!==false||b.verified_human_hours_saved!==null||
   !Number.isSafeInteger(b.verified_source_checks)||
   !Number.isSafeInteger(b.verified_original_job_receipts)||
-  b.verified_original_job_receipts>1||
+  b.verified_original_job_receipts>4||
   typeof b.approval_pending!=='boolean'||
   !['headline','what_finished','current','next','needs_you'].every(k=>
     typeof b[k]==='string'&&b[k].length>0&&b[k].length<=850)||
