@@ -13,6 +13,8 @@ import {readVerifiedNative263TemporalForChat}
  from '../../src/reality-native263-temporal-chat-context-v1.js';
 import {readVerifiedOwnerCompletedWorkForChat}
  from '../../src/reality-owner-completed-work-chat-context-v1.js';
+import {buildRealityProposedEmployeeRoleDiscussionContext}
+ from '../../src/reality-employee-identity-roster-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
@@ -222,6 +224,9 @@ export default async function handler(req,res){
        'OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE':
        'NO_INDEPENDENT_OWNER_RECEIPT_AVAILABLE_THIS_TURN',
     connected_world_observations:[
+     // Trusted existing employee roles are standing operational context.
+     // Proposed weekly jobs are free to discuss but not already authorized.
+     buildRealityProposedEmployeeRoleDiscussionContext(),
      ...native263TemporalObservations,...ownerCompletedWorkObservations,
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
