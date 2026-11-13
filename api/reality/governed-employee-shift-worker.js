@@ -206,8 +206,14 @@ export default async function handler(req,res){
   let governedPrProvider={status:'NO_GOVERNED_PROVIDER_BRIDGE_NEEDED',
    original_job_completed:false,installation_authorized:false,
    production_changed:false};
-  if(hasReview&&rileyOriginalReview.status===
-     'PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING'){
+  // A provider write already fenced as PUBLISHING is NEVER replayed.
+  // Reality's broker must still receive later wakes to reconcile the
+  // original effect by independent GitHub GET, even when the legacy
+  // no-token path returns a readback-only uncertainty.
+  if(hasReview&&[
+     'PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING',
+     'PR_REVIEW_PUBLISH_EFFECT_UNCERTAIN_READBACK_ONLY'
+   ].includes(rileyOriginalReview.status)){
    try{
     governedPrProvider=await executeExactlyPreparedRileyReviewViaReality({
      db,env:process.env,graph:unifiedGraph
