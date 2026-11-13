@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const root=new URL('../',import.meta.url);
+const get=file=>readFileSync(new URL(file,root),'utf8');
+const home=get('index.html');
+const main=get('reality-chat-employee-shift-card-v1.js');
+const exportsUI=get('reality-chat-conversation-export-v1.js');
+const simple=get('reality-chat-simple.html');
+test('Home presents a single Chat-first automated employee shift card and retains manual read-only draft',()=>{
+ assert.match(home,/Build an automated employee shift/);
+ assert.match(home,/Reality, create my shift with automated employees/);
+ assert.match(home,/href="\/chat#realityCreateShift"/);
+ assert.match(home,/Already have employee roles\? Generate a detailed eight-hour work plan/);
+ assert.match(home,/id="realityEmployeeShiftSchedule"/);
+ assert.match(home,/src="\/reality-chat-employee-shift-card-v1.js"/);
+ assert.match(home,/src="\/reality-chat-conversation-export-v1.js"/);
+ assert.match(simple,/src="\/reality-chat-conversation-export-v1.js"/);
+});
+test('Chat prepares an exact source-bound draft without model-generated work authority',()=>{
+ assert.match(main,/personal-governed-employee-shift\?hours=8/);
+ assert.match(main,/OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK/);
+ assert.match(main,/validDraft\(p\)/);
+ assert.match(main,/p\.expected_fingerprint/);
+ assert.match(main,/p\.owner_approval_created===false/);
+ assert.match(main,/tasks\.operating_model==='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'/);
+ assert.match(main,/new Set\(\['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\]\)/);
+ assert.match(main,/if\(existing\)\{showExisting\(existing\);return;\}/);
+ assert.match(main,/No job has started/);
+});
+test('Only explicit click approves the current fingerprint; edits revoke that approval path',()=>{
+ assert.match(main,/approve\.addEventListener\('click'/);
+ assert.match(main,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
+ assert.match(main,/expected_fingerprint:p\.expected_fingerprint/);
+ assert.match(main,/completion_bound:true,requested_hours:8/);
+ assert.match(main,/editing=true/);
+ assert.match(main,/approve\.hidden=true;approve\.disabled=true/);
+ assert.match(main,/if\(processing\|\|editing\|\|!draft/);
+ assert.doesNotMatch(main,/install_approval_authorized_by_triage:true|installation_authorized:true/);
+ assert.match(main,/governed amendment/);
+});
+test('Conversation export uses authenticated saved source and local user-controlled actions',()=>{
+ assert.match(exportsUI,/credentials:'same-origin'/);
+ assert.match(exportsUI,/\/api\/reality\/personal-chat\?conversation_id=/);
+ assert.match(exportsUI,/Copy conversation/);
+ assert.match(exportsUI,/Export Markdown/);
+ assert.match(exportsUI,/Export JSON/);
+ assert.match(exportsUI,/Print \/ Save PDF/);
+ assert.match(exportsUI,/navigator\.clipboard\.writeText/);
+ assert.match(exportsUI,/popup\.print\(\)/);
+ assert.match(exportsUI,/textContent/);
+ assert.match(exportsUI,/continuity\?\.older_messages_may_be_missing/);
+ assert.doesNotMatch(exportsUI,/document\.write\(|\.innerHTML\s*=|localStorage\.setItem\(/);
+});
+test('Export and shift cards do not mint extra LLM keys or new internal credentials',()=>{
+ assert.doesNotMatch(exportsUI+main,/REALITY_STANDALONE_OPENAI_API_KEY|REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN|SUPABASE_SERVICE_ROLE_KEY|sk-[A-Za-z0-9]{10}/);
+ assert.doesNotMatch(main,/create_project_env|new .*token|\/api\/reality\/governed-employee-shift-worker/);
+});
