@@ -41,9 +41,15 @@ export function selectRileyFullShiftOriginals({
   !allowed.has(shift.status)||!Array.isArray(shift.steps)||
   shift.steps.length!==8||shift.steps.some((s,i)=>s.step_index!==i+1))
   fail('EXACT_APPROVED_SHIFT_SOURCES_CHANGED');
- const start=Date.parse(shift.planned_start_at),end=Date.parse(shift.planned_end_at);
- if(!Number.isFinite(start)||!Number.isFinite(end)||
-  now.getTime()<start-120000||now.getTime()>=end)
+ // Completion-bound warrants use PostgreSQL timestamptz 'infinity':
+ // the frozen owner scope remains active until independent final settlement.
+ // Ordinary time-boxed shifts must still expire at their authorized end.
+ const completionBound=shift.planned_end_at==='infinity';
+ const start=Date.parse(shift.planned_start_at);
+ const end=completionBound?Infinity:Date.parse(shift.planned_end_at);
+ if(!Number.isFinite(start)||
+    (!completionBound&&!Number.isFinite(end))||
+    now.getTime()<start-120000||now.getTime()>=end)
   fail('OWNER_SHIFT_NOT_IN_CURRENT_EXECUTION_WINDOW');
  const sources=new Set(shift.steps.map(s=>s.source_ref)
   .filter(x=>ISSUE.test(String(x||''))));
