@@ -156,6 +156,8 @@ export async function runLiveIntelligenceOrchestration({
   verifiedConversationTurns = null,
   // Trusted server-only opt-in; never inferred from model statements.
   publicResearchEnabled = false,
+  // Server-controlled model effort; browser text cannot override governance.
+  cognitionEffort = 'AUTO',
   model,
   apiKey,
   fetchImpl,
@@ -496,6 +498,7 @@ export async function runLiveIntelligenceOrchestration({
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
     publicResearchEnabled: publicResearchEnabled === true,
+    cognitionEffort,
     model:resolvedModel,
     apiKey:resolvedApiKey,
     fetchImpl,
