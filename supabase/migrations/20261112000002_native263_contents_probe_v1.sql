@@ -110,85 +110,9 @@ begin
   'BROKER_CREDENTIAL_MISSING','GITHUB_READ_UNVERIFIED')
   or (p_http_status is not null and (p_http_status<100 or p_http_status>599))
   or (p_result_status='WRITE_READBACK_VERIFIED' and
-   (p_http_status is distinct from 201 or
-    coalesce(p_commit_sha,'') !~ '^[a-f0-9]{40})
-  or (p_result_status<>'WRITE_READBACK_VERIFIED' and
-    (p_commit_sha is not null or p_blob_sha is not null))
- then raise exception 'NATIVE263_CANARY_EXACT_RESULT_INVALID'; end if;
- update reality_internal.native263_contents_canary_probes_v1
- set state=case when p_result_status='WRITE_READBACK_VERIFIED' then 'VERIFIED'
-  when p_result_status='PROVIDER_EFFECT_UNVERIFIED' then 'UNCERTAIN'
-  else 'BLOCKED' end,
-  result_status=p_result_status,github_http_status=p_http_status,
-  provider_commit_sha=p_commit_sha,provider_blob_sha=p_blob_sha,
-  recorded_at=clock_timestamp()
- where probe_key='native263-isolated-github-contents-canary-20261112'
-  and state='CLAIMED'
- returning * into v;
- if not found then
-  select * into v from reality_internal.native263_contents_canary_probes_v1
-  where probe_key='native263-isolated-github-contents-canary-20261112';
-  if not found then raise exception 'NATIVE263_CANARY_CLAIM_MISSING'; end if;
- end if;
- return pg_catalog.jsonb_build_object(
-  'status','NATIVE263_INERT_PROVIDER_WRITE_RESULT_RECORDED',
-  'state',v.state,'result_status',v.result_status,
-  'github_http_status',v.github_http_status,
-  'provider_commit_sha',v.provider_commit_sha,
-  'provider_blob_sha',v.provider_blob_sha,
-  'original_work_id',v.original_work_id,
-  'shift_id',v.shift_id,
-  'installation_authorized',false,'original_job_completed',false,
-  'production_changed',false);
-end $fn$;
-revoke all on function public.reality_claim_native263_contents_canary_v1()
- from public,anon,authenticated;
-grant execute on function public.reality_claim_native263_contents_canary_v1()
- to service_role;
-revoke all on function public.reality_record_native263_contents_canary_v1(text,integer,text,text)
- from public,anon,authenticated;
-grant execute on function public.reality_record_native263_contents_canary_v1(text,integer,text,text)
- to service_role;
-
-    or coalesce(p_blob_sha,'') !~ '^[a-f0-9]{40})
-  or (p_result_status<>'WRITE_READBACK_VERIFIED' and
-    (p_commit_sha is not null or p_blob_sha is not null))
- then raise exception 'NATIVE263_CANARY_EXACT_RESULT_INVALID'; end if;
- update reality_internal.native263_contents_canary_probes_v1
- set state=case when p_result_status='WRITE_READBACK_VERIFIED' then 'VERIFIED'
-  when p_result_status='PROVIDER_EFFECT_UNVERIFIED' then 'UNCERTAIN'
-  else 'BLOCKED' end,
-  result_status=p_result_status,github_http_status=p_http_status,
-  provider_commit_sha=p_commit_sha,provider_blob_sha=p_blob_sha,
-  recorded_at=clock_timestamp()
- where probe_key='native263-isolated-github-contents-canary-20261112'
-  and state='CLAIMED'
- returning * into v;
- if not found then
-  select * into v from reality_internal.native263_contents_canary_probes_v1
-  where probe_key='native263-isolated-github-contents-canary-20261112';
-  if not found then raise exception 'NATIVE263_CANARY_CLAIM_MISSING'; end if;
- end if;
- return pg_catalog.jsonb_build_object(
-  'status','NATIVE263_INERT_PROVIDER_WRITE_RESULT_RECORDED',
-  'state',v.state,'result_status',v.result_status,
-  'github_http_status',v.github_http_status,
-  'provider_commit_sha',v.provider_commit_sha,
-  'provider_blob_sha',v.provider_blob_sha,
-  'original_work_id',v.original_work_id,
-  'shift_id',v.shift_id,
-  'installation_authorized',false,'original_job_completed',false,
-  'production_changed',false);
-end $fn$;
-revoke all on function public.reality_claim_native263_contents_canary_v1()
- from public,anon,authenticated;
-grant execute on function public.reality_claim_native263_contents_canary_v1()
- to service_role;
-revoke all on function public.reality_record_native263_contents_canary_v1(text,integer,text,text)
- from public,anon,authenticated;
-grant execute on function public.reality_record_native263_contents_canary_v1(text,integer,text,text)
- to service_role;
-))
+   (p_http_status is distinct from 201
+    or coalesce(p_commit_sha,'') !~ '^[a-f0-9]{40}$'
+    or coalesce(p_blob_sha,'') !~ '^[a-f0-9]{40}$'))
   or (p_result_status<>'WRITE_READBACK_VERIFIED' and
     (p_commit_sha is not null or p_blob_sha is not null))
  then raise exception 'NATIVE263_CANARY_EXACT_RESULT_INVALID'; end if;
