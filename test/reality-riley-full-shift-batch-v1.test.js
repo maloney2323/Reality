@@ -112,6 +112,45 @@ test('API requires same owner session, current shift, real provider and durable 
  assert.doesNotMatch(api,/owner_approve_qualified_preview|merge_pull_request|installRiley/);
 });
 
+test('completion-bound existing shift stays eligible after eight hours without issuing new authority',()=>{
+ const b=base();
+ b.shiftReadback.shifts[0].planned_end_at='infinity';
+ b.shiftReadback.shifts[0].status='AWAITING_EXACT_ORIGINAL_WORK';
+ const outcome=selectRileyFullShiftOriginals({...b,
+  now:new Date('2026-11-13T21:30:00Z')});
+ assert.equal(outcome.status,'OWNER_APPROVED_SHIFT_SOURCE_JOBS_INDEPENDENTLY_SELECTED');
+ assert.equal(outcome.shift_id,SHIFT);
+ assert.equal(outcome.selected_count,4);
+ assert.equal(outcome.one_owner_shift_authorization,true);
+ assert.equal(outcome.installation_authorized,false);
+ assert.equal(outcome.original_job_completed,false);
+ assert.equal(outcome.final_receipt_verified,false);
+});
+
+test('completion-bound shift still rejects a stale warrant, mismatched fingerprint and already admitted originals',()=>{
+ const b=base();
+ b.shiftReadback.shifts[0].planned_end_at='infinity';
+ b.shiftReadback.shifts[0].status='AWAITING_EXACT_ORIGINAL_WORK';
+ const now=new Date('2026-11-13T21:30:00Z');
+ const expired=selectRileyFullShiftOriginals({...b,
+  priorOriginals:priors().map(x=>x.issue_number===263?{
+   ...x,record:{status:'EXISTING_UNFINISHED_ORIGINAL',
+    installation_authorized:false,job_completed:false,production_changed:false}
+  }:x),now});
+ assert.equal(expired.selected.some(x=>x.issue_number===263),false);
+ assert.equal(expired.skipped.some(x=>x.issue_number===263),true);
+ for(const broken of [
+  {expectedFingerprint:'sha256:'+'e'.repeat(64)},
+  {shiftReadback:{...b.shiftReadback,shifts:[{
+   ...b.shiftReadback.shifts[0],status:'ESCALATED'}]}},
+  {shiftReadback:{...b.shiftReadback,shifts:[{
+   ...b.shiftReadback.shifts[0],planned_end_at:'Infinity'}]}}
+ ]){
+  assert.throws(()=>selectRileyFullShiftOriginals({...b,...broken,now}),
+   /RILEY_FULL_SHIFT_/);
+ }
+});
+
 test('actual deployed Riley batch endpoint parses as JavaScript before any customer clicks Run',()=>{
  const file=fileURLToPath(new URL(
   '../api/reality/personal-riley-full-shift-batch.js',import.meta.url));
