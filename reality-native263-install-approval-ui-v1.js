@@ -168,6 +168,19 @@ function renderProactiveOpening(d){
    const head=add('div',null,'REALITY · VERIFIED COMPLETION',node);
    head.className='label';
    add('div','native263VerifiedRealityIntroBody','',node).style.whiteSpace='pre-wrap';
+   const receiptButton=add('button','native263ViewReceipt','View verified receipt',node);
+   receiptButton.type='button';
+   receiptButton.style.cssText='display:block;margin-top:12px;min-height:40px;border:1px solid #709cb2;border-radius:10px;background:#1a4156;color:#e8f8ff;padding:9px 13px;font-weight:700';
+   receiptButton.addEventListener('click',()=>{
+    const work=element('realityChatOpenInspector');
+    if(work){
+     if(document.body.dataset.realityChatPanel!=='work')work.click();
+     element('realityChatTabProof')?.click();
+     element('realityChatInspector')?.scrollTo?.({top:0,behavior:'auto'});
+    }else{
+     element('native263InstallApprovalPanel')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+   });
    transcript.prepend(node);
   }
   element('native263VerifiedRealityIntroBody').textContent=message;
