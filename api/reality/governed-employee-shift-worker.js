@@ -27,6 +27,8 @@ import {probeRealityNative263GithubWriteTransportV2}
  from '../../src/reality-native263-github-write-canary-v2-bridge.js';
 import {stageRealityNative263ExactInstallWarrant}
  from '../../src/reality-native263-exact-install-warrant-bridge-v1.js';
+import {checkNative263LiveOwnerApprovalFence}
+ from '../../src/reality-native263-live-installer-fence-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -278,6 +280,27 @@ export default async function handler(req,res){
     nativeExactInstallWarrant={
      status:'NATIVE263_EXACT_INSTALL_WARRANT_SOURCE_OR_LEDGER_BLOCKED',
      owner_approval_ready:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
+  // Independently verify the real source-writing installer REFUSES the
+  // staged original before owner approval. This call cannot create approval.
+  let nativeInstallerApprovalFence={
+   status:'NATIVE263_EXACT_INSTALL_NOT_READY_FOR_OWNER_FENCE_CHECK',
+   installation_authorized:false,source_installed:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(nativeExactInstallWarrant.status===
+     'EXACT_NATIVE263_OWNER_WARRANT_STAGED_INSTALL_BLOCKED'){
+   try{
+    nativeInstallerApprovalFence=await checkNative263LiveOwnerApprovalFence({
+     db,env:process.env,warrant:nativeExactInstallWarrant,fetchImpl:fetch
+    });
+   }catch{
+    nativeInstallerApprovalFence={
+     status:'NATIVE263_EXACT_INSTALLER_LIVE_DENIAL_UNVERIFIED',
+     installation_authorized:false,source_installed:false,
      original_job_completed:false,production_changed:false
     };
    }
@@ -566,6 +589,7 @@ export default async function handler(req,res){
     native_github_contents_write_canary:nativeGithubWriteCanary,
     native_github_contents_write_canary_v2:nativeGithubContentsCanaryV2,
     native_exact_install_warrant:nativeExactInstallWarrant,
+    native_live_installer_approval_fence:nativeInstallerApprovalFence,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
