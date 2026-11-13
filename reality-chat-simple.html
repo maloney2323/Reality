@@ -131,6 +131,10 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 .conversation-fold .composer{margin-top:8px}
 .team-next-week.section-fold{padding:11px;margin:10px 0}
 @media(max-width:550px){.active-automation-grid{grid-template-columns:1fr}.live-work-priority{margin:8px}.section-fold{margin:8px}.team-board.section-fold{padding:10px}}
+/* Conversation export lives under the real Chat transcript, never an approval card. */
+.reality-conversation-exports{display:flex;gap:6px;flex-wrap:wrap;padding:9px;margin:6px 0 12px;border-top:1px solid #3b5368}
+.reality-conversation-exports button,.reality-copy-message{font-size:11px!important;padding:6px 9px!important;min-height:29px!important;margin:2px!important}
+.reality-conversation-export-status{flex-basis:100%;font-size:11px;color:#b1cbdc;margin:3px 0}
 </style>
 </head>
 <body>
@@ -2540,5 +2544,6 @@ void init();
 })();
 </script>
 <script type="module">import '/reality-native263-install-approval-ui-v1.js';</script>
+<script defer src="/reality-chat-conversation-export-v1.js"></script>
 </body>
 </html>
