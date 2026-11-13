@@ -29,7 +29,7 @@ create or replace function public.reality_admit_verified_shift_commit_triage_v1(
  p_issue_body_sha256 text,p_commit_content_sha256 text
 ) returns jsonb language plpgsql security invoker set search_path='' as $fn$
 declare s record; j reality_internal.riley_commit_reference_triage_originals_v1%rowtype;
- v_work text;v_matches int;
+ v_work text;v_matches int;v_shift_id uuid;
 begin
  if current_user<>'service_role' then
   raise exception 'COMMIT_TRIAGE_ADMISSION_SERVICE_ONLY';end if;
@@ -40,7 +40,7 @@ begin
   p_commit_content_sha256 !~ '^sha256:[a-f0-9]{64}$'
  then raise exception 'COMMIT_TRIAGE_INDEPENDENT_SOURCE_REQUIRED';end if;
  -- No user-supplied owner/shift: derive sole active completion-bound warrant.
- select count(*),min(s.shift_id::text)::uuid into v_matches,s
+ select count(*),min(s.shift_id::text)::uuid into v_matches,v_shift_id
  from reality_internal.governed_employee_shifts_v1 s
  join reality_internal.governed_employee_completion_warrants_v1 w
   on w.shift_id=s.shift_id and w.owner_id=s.owner_id
@@ -67,11 +67,12 @@ begin
   and t.proof_sha256='sha256:'||pg_catalog.encode(
    pg_catalog.sha256(pg_catalog.convert_to(t.proof::text,'UTF8')),'hex')
   and t.proof->>'source_title' ~ '^Review needed: commit [a-f0-9]{7,40} lacks issue reference$'
-  and pg_catalog.position(
-   'https://github.com/maloney2323/Reality/commit/'||p_commit_sha
-   in coalesce(t.proof->'provider_evidence'->>'body_excerpt',''))>0
-  and pg_catalog.position('Please associate this commit' in
-   coalesce(t.proof->'provider_evidence'->>'body_excerpt',''))>0;
+  and pg_catalog.strpos(
+   coalesce(t.proof->'provider_evidence'->>'body_excerpt',''),
+   'https://github.com/maloney2323/Reality/commit/'||p_commit_sha)>0
+  and pg_catalog.strpos(
+   coalesce(t.proof->'provider_evidence'->>'body_excerpt',''),
+   'Please associate this commit')>0;
  if v_matches=0 then return jsonb_build_object(
   'status','NO_CURRENT_FROZEN_COMMIT_TRIAGE_SOURCE_TO_ADMIT',
   'original_job_admitted',false,'original_job_completed',false,
@@ -84,7 +85,7 @@ begin
  join reality_internal.governed_employee_completion_warrants_v1 w
   on w.shift_id=q.shift_id and w.owner_id=q.owner_id
   and w.plan_fingerprint=q.plan_fingerprint and w.state='ACTIVE'
- where q.shift_id=s.shift_id and q.closed_at is null
+ where q.shift_id=v_shift_id and q.closed_at is null
   and q.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
  for update of q;
  if not found then raise exception 'COMMIT_TRIAGE_WARRANT_CHANGED';end if;
