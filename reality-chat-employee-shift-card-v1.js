@@ -6,9 +6,10 @@
  'use strict';
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const panel=document.getElementById('realityChatConversation');
+ const workPanel=document.getElementById('realityChatPanelWork');
  const transcript=document.getElementById('privateTranscript');
  const prompt=document.getElementById('privatePrompt');
- if(!panel||!transcript||!prompt)return;
+ if(!panel||!workPanel||!transcript||!prompt)return;
  const block=document.createElement('section');
  block.className='reality-chat-employee-shift-card';
  block.id='realityCreateShift';
@@ -26,7 +27,9 @@
  const work=x('div');work.className='reality-shift-plan-assignments';
  actions.append(prepare,edit,reset,approve);
  block.append(title,detail,actions,info,work);
- transcript.insertAdjacentElement('beforebegin',block);
+ // Operational shift controls belong to Work, never above Chat messages.
+ // Move the SAME controls; do not duplicate authorizations or create a shift.
+ workPanel.prepend(block);
  const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/;
@@ -111,9 +114,12 @@
     approve.hidden=false;approve.disabled=false;
    }
   }catch(err){
-   draft=null;info.textContent='Shift plan unavailable: '+
-    String(err.message||'Unverified source').slice(0,160)+
-    '. No job or shift was authorized.';
+   draft=null;
+   const reason=String(err?.message||'Unverified source').slice(0,160);
+   info.textContent=reason==='SHIFT_SIGN_IN_REQUIRED'?
+    'Shift details require an authenticated session in this preview. Your previously authorized shift is not cancelled. Sign in to this Reality preview and review Work; this screen requested no new authorization.':
+    'Shift plan unavailable: '+reason+
+    '. This screen did not authorize any new job or shift; check the current owner shift readback.';
   }finally{processing=false;prepare.disabled=false;}
  }
  prepare.addEventListener('click',()=>void load());
@@ -165,8 +171,14 @@
     String(err.message||'Unverified').slice(0,120);
   }finally{processing=false;prepare.disabled=false;approve.disabled=false;}
  });
- if(location.hash==='#realityCreateShift'){
-  // Navigating here is a read-only invitation, never authorization.
+ function revealLinkedShift(){
+  if(location.hash!=='#realityCreateShift')return;
+  // A direct link is a navigation request to Work, not an authorization.
+  const openWork=document.getElementById('realityChatOpenInspector');
+  if(document.body.dataset.realityChatPanel!=='work')openWork?.click();
+  block.scrollIntoView({block:'start'});
   void load();
  }
+ window.addEventListener('hashchange',revealLinkedShift);
+ revealLinkedShift();
 })();
