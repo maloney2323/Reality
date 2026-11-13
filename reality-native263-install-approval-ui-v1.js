@@ -296,6 +296,18 @@ export function mountNative263ExactInstallApproval(){
  if(!panel)return;
  const button=element('native263ApproveInstall');
  button.addEventListener('click',()=>{void approveExactlyOnce()});
+ // The main conversation restores its saved messages asynchronously. Retain
+ // the already-verified opening after a transcript redraw, without posting
+ // a synthetic assistant message into the stored conversation.
+ const transcript=element('privateTranscript');
+ if(transcript){
+  new MutationObserver(()=>{
+   if(exact?.original_job_completed===true &&
+      element('privateReady')?.style.display!=='none' &&
+      !element('native263VerifiedRealityIntro'))
+    renderProactiveOpening(exact);
+  }).observe(transcript,{childList:true});
+ }
  const ask=element('native263AskAboutJob');
  if(ask)ask.addEventListener('click',()=>{
   // This is a draft question, not an automatic model call or authorization.
