@@ -1,0 +1,11 @@
+{
+  "schema": "reality-inert-active-preview-auto-deploy-trigger-v1",
+  "original_work_id": "work:873a6e74fd14c6beacc9042dd8021dfc",
+  "original_shift_id": "9460cfff-937a-4105-9093-2e41ab39a950",
+  "expected_parent_sha": "c234f2fa5e76f8478fef2d9ac8d834abbe7ab69c",
+  "event": "verify GitHub push -> Actions -> Vercel existing integration",
+  "owner_upgrade_approved": false,
+  "source_code_installed": false,
+  "production_changed": false,
+  "original_job_completed": false
+}
