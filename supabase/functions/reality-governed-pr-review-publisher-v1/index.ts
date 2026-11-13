@@ -24,7 +24,7 @@ const digest=async(bytes:string)=>{
  return 'sha256:'+Array.from(new Uint8Array(out)).map(x=>x.toString(16).padStart(2,'0')).join('');
 };
 async function rpc(name:string,payload:Record<string,unknown>,key:string){
- if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1)$/.test(name))
+ if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1|rearm_authorized_riley_pr_post_403_v1)$/.test(name))
   fail('RPC_OUT_OF_SCOPE');
  const r=await fetch('https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
@@ -192,24 +192,47 @@ Deno.serve(async req=>{
    // A stale, uncertain prior POST may be recovered ONCE, but only after
    // complete authenticated GitHub readback, unchanged frozen bytes/head,
    // a 20-minute holdoff, and an atomic service-only Reality ledger fence.
-   const reset=await rpc('reality_rearm_authorized_riley_pr_publish_v1',{
+   const witness={
     p_original_work_id:ORIGINAL,p_claim_id:c.claim_id,
     p_head_sha:c.source_head_sha,p_review_digest:c.review_digest,
     p_provider_comment_scan_sha256:initial.comments_scan_sha256,
     p_provider_comment_count:initial.comment_count
-   },key);
-   if(reset?.status!=='EXACT_PR_REVIEW_ONE_RECOVERY_ARMED')
+   };
+   let reset=await rpc('reality_rearm_authorized_riley_pr_publish_v1',
+    witness,key);
+   let permissionRecovery=false;
+   if(reset?.status==='PR_REVIEW_RECOVERY_NOT_ARMABLE_PRESERVE_FENCE'){
+    // The original single recovery was already consumed. A SECOND
+    // bounded chance is only possible if Reality's durable wake readback
+    // explicitly proves a definite GitHub HTTP 403 on that SAME original.
+    // The service-role DB rechecks that evidence, shift, claim, exact
+    // frozen bytes and provider scan before an atomic one-time re-arm.
+    reset=await rpc('reality_rearm_authorized_riley_pr_post_403_v1',
+     witness,key);
+    permissionRecovery=true;
+   }
+   if(![
+    'EXACT_PR_REVIEW_ONE_RECOVERY_ARMED',
+    'EXACT_PR57_ONE_PERMISSION_REMEDIATION_ARMED'
+   ].includes(reset?.status||''))
     return respond(reset?.status==='PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY'?
      'PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY':
-     'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',true,200);
+     reset?.status==='PR57_POST403_REMEDIATION_HOLDOFF_NO_REPLAY'?
+      'PR57_POST403_REMEDIATION_HOLDOFF_NO_REPLAY':
+      'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',true,200);
    if(reset.original_work_id!==ORIGINAL||reset.claim_id!==c.claim_id||
       reset.shift_id!==SHIFT||reset.review_digest!==c.review_digest||
       reset.source_head_sha!==c.source_head_sha||
       reset.comment_scan_sha256!==initial.comments_scan_sha256||
-      reset.publish_recovery_count!==1||
       reset.original_job_completed!==false||
       reset.installation_authorized!==false||reset.production_changed!==false)
     fail('RECOVERY_FENCE_READBACK_UNVERIFIED');
+   if(permissionRecovery?
+     reset.status!=='EXACT_PR57_ONE_PERMISSION_REMEDIATION_ARMED'||
+      reset.publish_permission_remediation_count!==1:
+     reset.status!=='EXACT_PR_REVIEW_ONE_RECOVERY_ARMED'||
+      reset.publish_recovery_count!==1)
+    fail('RECOVERY_MODE_OR_ONE_USE_COUNTER_CHANGED');
    c.phase='PREPARED'; // same claim, original and frozen model bytes
   }
   // A second provider GET closes the gap between recovery re-arm and effect.

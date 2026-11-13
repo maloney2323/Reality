@@ -186,3 +186,37 @@ test('already-consumed recovery cannot be represented as new settlement authorit
  assert.equal(result.status,'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY');
  assert.equal(f.requests.length,1);
 });
+
+test('permission-remediated PR57 retry requires historical definite HTTP 403 and cannot be repeated',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261112000001_riley_pr57_permission_403_remediation_v1.sql',
+  import.meta.url),'utf8');
+ const edge=readFileSync(new URL(
+  '../supabase/functions/reality-governed-pr-review-publisher-v1/index.ts',
+  import.meta.url),'utf8');
+ assert.match(sql,/publish_permission_remediation_count between 0 and 1/);
+ assert.match(sql,/j.publish_permission_remediation_count <> 0/);
+ assert.match(sql,/j.publish_recovery_count <> 1/);
+ assert.match(sql,/current_user <> 'service_role'/);
+ assert.match(sql,/net\._http_response e/);
+ assert.match(sql,/GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_403_FENCE_PRESERVED/);
+ assert.match(sql,/\{riley_governed_pr_write_broker,existing_original\}/);
+ assert.match(sql,/p_provider_comment_scan_sha256/);
+ assert.match(sql,/p_provider_comment_count/);
+ assert.match(sql,/j\.source_head_sha <> p_head_sha/);
+ assert.match(sql,/j\.review_digest <> p_review_digest/);
+ assert.match(sql,/j\.provider_comment_id is not null/);
+ assert.match(sql,/s\.authorized_at is not null and s\.closed_at is null/);
+ assert.match(sql,/j\.phase <> 'PUBLISHING'/);
+ assert.match(sql,/phase='PREPARED',publish_permission_remediation_count=1/);
+ assert.match(sql,/grant execute on function public.reality_rearm_authorized_riley_pr_post_403_v1/);
+ assert.match(edge,/reality_rearm_authorized_riley_pr_post_403_v1/);
+ assert.match(edge,/permissionRecovery=true/);
+ assert.match(edge,/EXACT_PR57_ONE_PERMISSION_REMEDIATION_ARMED/);
+ assert.match(edge,/reset\.publish_permission_remediation_count!==1/);
+ assert.match(edge,/justBeforeIntent/);
+ assert.match(edge,/finalScan/);
+ assert.match(edge,/if\(finalScan\.found!==null\)return settle/);
+ assert.match(edge,/PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY/);
+ assert.doesNotMatch(sql,/grant execute[\s\S]*\bto authenticated\b/);
+});
