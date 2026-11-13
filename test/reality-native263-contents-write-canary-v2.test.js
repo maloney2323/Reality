@@ -123,7 +123,7 @@ test('canary is fenced in SQL and cannot write to #263 or production',()=>{
  assert.match(edge,/reality_claim_native263_contents_canary_v2/);
  assert.match(edge,/reality_record_native263_contents_canary_v2/);
  assert.match(edge,/CANARY_V2_BASE='dd628609639e37f85c5151986d4f5eb691bddf03'/);
- assert.match(edge,/CANARY_V2_FILE='evidence\/native263-broker-contents-write-canary-20261112.json'/);
+ assert.match(edge,/CANARY_V2_FILE='evidence\/native263-broker-contents-write-canary-v2-20261112.json'/);
  assert.match(edge,/method==='PUT'&&path===fileWrite/);
  assert.match(edge,/canary_write_verified:result_status==='WRITE_READBACK_VERIFIED'/);
  assert.match(edge,/original_job_completed:false,production_changed:false/);
