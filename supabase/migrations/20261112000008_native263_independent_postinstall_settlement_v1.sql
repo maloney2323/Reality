@@ -14,12 +14,15 @@ returns jsonb language plpgsql security invoker set search_path='' as $fn$
 declare c reality_internal.native263_exact_install_warrants_v1%rowtype;
  j reality_internal.riley_unattended_repair_originals_v1%rowtype;
  a reality_internal.riley_native_exact_install_approvals_v1%rowtype;
+ r reality_internal.riley_native_exact_install_readiness_v1%rowtype;
 begin
  if current_user<>'service_role' then
   raise exception 'NATIVE263_POSTINSTALL_PROVIDER_SERVICE_ONLY';end if;
  select * into c from reality_internal.native263_exact_install_warrants_v1
  where original_work_id='work:873a6e74fd14c6beacc9042dd8021dfc';
  select * into j from reality_internal.riley_unattended_repair_originals_v1
+ where original_work_id=c.original_work_id;
+ select * into r from reality_internal.riley_native_exact_install_readiness_v1
  where original_work_id=c.original_work_id;
  if c.owner_id is distinct from j.owner_id or
    c.shift_id is distinct from j.shift_id or
@@ -46,6 +49,8 @@ begin
   'target_branch',c.exact_target_branch,'target_path',c.exact_target_path,
   'expected_installed_blob_sha',c.expected_installed_blob_sha,
   'state',c.state,'installed_commit_sha',c.installed_commit_sha,
+  'owner_approval_ready',coalesce(
+    r.state='VERIFIED_READY_FOR_ONE_EXACT_OWNER_APPROVAL',false),
   'approval_receipt_id',c.approval_receipt_id,
   'owner_approved_at',c.owner_approved_at,
   'original_phase',j.phase,'original_installed',j.installed,
