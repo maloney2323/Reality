@@ -23,7 +23,7 @@ test('Home displays eight real role names without claiming active independent wo
   assert.equal(html.match(new RegExp('data-home-employee="'+n+'"','g'))?.length,1);
  }
  assert.match(html,/names represent eight roles for one OpenAI model/);
- assert.match(html,/No new job or shift authorized/);
+ assert.match(brief,/No new job or shift authorized/);
  assert.match(html,/Verified net capacity returned/);
  assert.match(html,/realityEconReceipts/);
 });
