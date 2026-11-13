@@ -24,7 +24,7 @@ const digest=async(bytes:string)=>{
  return 'sha256:'+Array.from(new Uint8Array(out)).map(x=>x.toString(16).padStart(2,'0')).join('');
 };
 async function rpc(name:string,payload:Record<string,unknown>,key:string){
- if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1|rearm_authorized_riley_pr_post_403_v1|read_current_shift_execution_graph_v1|read_owner_native_reviewed_patch_v1|claim_native263_contents_canary_v1|record_native263_contents_canary_v1)$/.test(name))
+ if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1|rearm_authorized_riley_pr_post_403_v1|read_current_shift_execution_graph_v1|read_owner_native_reviewed_patch_v1|claim_native263_contents_canary_v1|record_native263_contents_canary_v1|claim_native263_contents_canary_v2|record_native263_contents_canary_v2)$/.test(name))
   fail('RPC_OUT_OF_SCOPE');
  const r=await fetch('https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
@@ -450,6 +450,165 @@ async function native263ContentsCanary(key:string){
  return await finish('WRITE_READBACK_VERIFIED',201,commit,blob);
 }
 
+/* V2: Fresh owner-scoped one-use permission test after v1 definitive HTTP 403.
+   Never resets or reuses v1's durable claim or provider file. */
+// An inert, non-installing one-use GitHub Contents write canary.
+// This is NOT the native repair installer. It tests only the exact existing
+// Reality-broker token against a disposable canary branch and new evidence
+// file. No owner approval is consumed, and the #263 file is never modified.
+const CANARY_V2_BRANCH='reality/isolated-contents-write-canary-v2-20261112';
+const CANARY_V2_BASE='dd628609639e37f85c5151986d4f5eb691bddf03';
+const CANARY_V2_FILE='evidence/native263-broker-contents-write-canary-v2-20261112.json';
+const CANARY_V2_BODY=JSON.stringify({
+ kind:'REALITY_NATIVE263_BROKER_CONTENTS_TRANSPORT_PROBE_V2',
+ original_work_id:NATIVE_ORIGINAL,branch:CANARY_V2_BRANCH,
+ source_path_modified:false,capability_installed:false,
+ owner_installation_approval_consumed:false,
+ original_job_completed:false,production_changed:false
+})+'\n';
+async function canaryGitHubV2(token:string,method:string,path:string,body?:unknown){
+ const ref='/git/ref/heads/'+CANARY_V2_BRANCH;
+ const file='/contents/'+CANARY_V2_FILE+'?ref='+encodeURIComponent(CANARY_V2_BRANCH);
+ const fileWrite='/contents/'+CANARY_V2_FILE;
+ if(!(
+   method==='GET'&&(path===ref||path===file)||
+   method==='PUT'&&path===fileWrite
+ ))fail('CANARY_GITHUB_RESOURCE_OR_METHOD_OUT_OF_SCOPE');
+ let result:Response;
+ try{
+  result=await fetch(ROOT+path,{method,cache:'no-store',redirect:'error',
+   signal:AbortSignal.timeout(12000),
+   headers:{authorization:'Bearer '+token,
+    accept:'application/vnd.github+json',
+    'content-type':'application/json',
+    'x-github-api-version':'2022-11-28',
+    'user-agent':'Reality-Native263-Inert-Contents-Canary'},
+   body:body===undefined?undefined:JSON.stringify(body)});
+ }catch{fail('CANARY_GITHUB_PROVIDER_NETWORK_EFFECT_UNVERIFIED')}
+ if(method==='GET'&&result.status===404&&path===file)
+  return {status:404,missing:true,data:null};
+ let data:any=null;try{data=await result.json()}catch{/*not used for rejected response*/}
+ if(!result.ok&&method==='GET')fail('CANARY_GITHUB_READ_UNVERIFIED');
+ return {status:result.status,missing:false,data};
+}
+async function native263ContentsCanaryV2(key:string){
+ // First independently verify Reality's frozen original/PR268/baseline.
+ const source=await nativeInstallPreflight(key);
+ const sourceProof=await source.json().catch(()=>null);
+ if(!source.ok||sourceProof?.status!==
+    'NATIVE_263_EXISTING_SOURCE_TRANSPORT_PREFLIGHT_VERIFIED'||
+    sourceProof.owner_approval_ready!==false||
+    sourceProof.installation_authorized!==false)
+  return respond('NATIVE263_CONTENTS_CANARY_SOURCE_PREFLIGHT_BLOCKED',false,409);
+ // Durable service-role CLAIM prevents a second write even if the first
+ // PUT times out or the edge function crashes. No client-selected scope.
+ const claim=await rpc('reality_claim_native263_contents_canary_v2',{},key);
+ if(claim?.status!=='ONE_INERT_CANARY_WRITE_PROBE_CLAIMED'){
+  if(claim?.status!=='ALREADY_CLAIMED_OR_RECORDED_NEVER_REPOST'||
+    claim.original_work_id!==NATIVE_ORIGINAL||claim.shift_id!==SHIFT)
+   fail('CANARY_DURABLE_CLAIM_READBACK_INVALID');
+  return respond(claim.result_status==='WRITE_READBACK_VERIFIED'?
+   'NATIVE263_CONTENTS_WRITE_TRANSPORT_VERIFIED':
+   claim.result_status==='GITHUB_HTTP_403_FORBIDDEN'?
+    'NATIVE263_GITHUB_CONTENTS_WRITE_HTTP_403':
+    'NATIVE263_CONTENTS_CANARY_ALREADY_FENCED_NO_REPLAY',true,200,{
+     shift_id:SHIFT,original_work_id:NATIVE_ORIGINAL,
+     canary_state:claim.state,provider_http_status:claim.github_http_status,
+     provider_commit_sha:claim.provider_commit_sha,
+     canary_write_verified:claim.result_status==='WRITE_READBACK_VERIFIED',
+     source_code_installed:false,code_write_permission_verification_only:true
+    });
+ }
+ if(claim.original_work_id!==NATIVE_ORIGINAL||claim.shift_id!==SHIFT||
+    claim.installation_authorized!==false||claim.production_changed!==false||
+    claim.original_job_completed!==false)
+  fail('CANARY_DURABLE_OWNER_SCOPE_MISMATCH');
+ async function finish(result_status:string,http_status:number|null=null,
+  commit_sha:string|null=null,blob_sha:string|null=null){
+  const ledger=await rpc('reality_record_native263_contents_canary_v2',{
+   p_result_status:result_status,p_http_status:http_status,
+   p_commit_sha:commit_sha,p_blob_sha:blob_sha},key);
+  if(ledger.status!=='NATIVE263_INERT_PROVIDER_WRITE_RESULT_RECORDED'||
+     ledger.original_work_id!==NATIVE_ORIGINAL||ledger.shift_id!==SHIFT||
+     ledger.result_status!==result_status||
+     ledger.installation_authorized!==false||
+     ledger.production_changed!==false||ledger.original_job_completed!==false)
+   fail('CANARY_FINAL_PROVIDER_LEDGER_READBACK_MISMATCH');
+  return respond(result_status==='WRITE_READBACK_VERIFIED'?
+   'NATIVE263_CONTENTS_WRITE_TRANSPORT_VERIFIED':
+   result_status==='GITHUB_HTTP_403_FORBIDDEN'?
+    'NATIVE263_GITHUB_CONTENTS_WRITE_HTTP_403':
+    result_status==='GITHUB_HTTP_401_UNAUTHORIZED'?
+     'NATIVE263_GITHUB_CONTENTS_WRITE_HTTP_401':
+     'NATIVE263_CONTENTS_WRITE_PROBE_BLOCKED_NO_REPLAY',true,200,{
+    shift_id:SHIFT,original_work_id:NATIVE_ORIGINAL,
+    canary_state:ledger.state,provider_http_status:ledger.github_http_status,
+    provider_commit_sha:ledger.provider_commit_sha,
+    canary_write_verified:result_status==='WRITE_READBACK_VERIFIED',
+    source_code_installed:false,code_write_permission_verification_only:true
+   });
+ }
+ const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
+ if(token.length<25)return await finish('BROKER_CREDENTIAL_MISSING');
+ let ref,absence;
+ try{
+  ref=await canaryGitHubV2(token,'GET','/git/ref/heads/'+CANARY_V2_BRANCH);
+  absence=await canaryGitHubV2(token,'GET','/contents/'+CANARY_V2_FILE+
+   '?ref='+encodeURIComponent(CANARY_V2_BRANCH));
+ }catch{return await finish('GITHUB_READ_UNVERIFIED')}
+ if(ref?.data?.ref!=='refs/heads/'+CANARY_V2_BRANCH||
+    ref?.data?.object?.sha!==CANARY_V2_BASE)
+  return await finish('PRECONDITION_SOURCE_DRIFT');
+ if(absence?.status!==404||absence?.missing!==true)
+  return await finish('CANARY_PREEXISTING_UNATTRIBUTED');
+ // Validate branch head again before the single create-only PUT.
+ let justBefore;
+ try{justBefore=await canaryGitHubV2(token,'GET','/git/ref/heads/'+CANARY_V2_BRANCH)}
+ catch{return await finish('GITHUB_READ_UNVERIFIED')}
+ if(justBefore?.data?.object?.sha!==CANARY_V2_BASE)
+  return await finish('PRECONDITION_SOURCE_DRIFT');
+ let result;
+ try{
+  result=await canaryGitHubV2(token,'PUT','/contents/'+CANARY_V2_FILE,{
+   message:'test: Reality broker one-time inert GitHub Contents-write canary',
+   branch:CANARY_V2_BRANCH,content:btoa(CANARY_V2_BODY)
+  });
+ }catch{
+  // Unknown provider effect is permanently fenced; no repeated PUT.
+  return await finish('PROVIDER_EFFECT_UNVERIFIED');
+ }
+ if(result.status!==201){
+  if(result.status===403)return await finish('GITHUB_HTTP_403_FORBIDDEN',403);
+  if(result.status===401)return await finish('GITHUB_HTTP_401_UNAUTHORIZED',401);
+  if(result.status===409)return await finish('GITHUB_HTTP_409_CONFLICT',409);
+  return await finish('GITHUB_HTTP_OTHER_REJECTED',result.status);
+ }
+ const commit=result.data?.commit?.sha;
+ const blob=result.data?.content?.sha;
+ if(!SHA.test(commit||'')||!SHA.test(blob||''))
+  return await finish('PROVIDER_EFFECT_UNVERIFIED');
+ let readback,nowRef;
+ try{
+  [readback,nowRef]=await Promise.all([
+   canaryGitHubV2(token,'GET','/contents/'+CANARY_V2_FILE+'?ref='+
+    encodeURIComponent(CANARY_V2_BRANCH)),
+   canaryGitHubV2(token,'GET','/git/ref/heads/'+CANARY_V2_BRANCH)
+  ]);
+ }catch{return await finish('PROVIDER_EFFECT_UNVERIFIED')}
+ const actual=readback?.data;
+ if(readback.status!==200||actual?.path!==CANARY_V2_FILE||
+    actual?.sha!==blob||actual?.encoding!=='base64'||
+    nowRef?.data?.object?.sha!==commit||
+    typeof actual.content!=='string')
+  return await finish('PROVIDER_EFFECT_UNVERIFIED');
+ let decoded;try{decoded=atob(actual.content.replace(/\s/g,''))}
+ catch{return await finish('PROVIDER_EFFECT_UNVERIFIED')}
+ if(decoded!==CANARY_V2_BODY||
+    await nativeBlobSha(new TextEncoder().encode(CANARY_V2_BODY))!==blob)
+  return await finish('PROVIDER_EFFECT_UNVERIFIED');
+ return await finish('WRITE_READBACK_VERIFIED',201,commit,blob);
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return respond('SERVICE_POST_REQUIRED',false,405);
@@ -457,7 +616,8 @@ Deno.serve(async req=>{
    return respond('SERVICE_JSON_REQUIRED',false,415);
   const raw=await req.text();
   if(raw!=='{"version":1}'&&raw!=='{"version":2,"action":"native_263_install_preflight"}'&&
-     raw!=='{"version":3,"action":"native_263_contents_canary"}')
+     raw!=='{"version":3,"action":"native_263_contents_canary"}'&&
+     raw!=='{"version":4,"action":"native_263_contents_canary_v2"}')
    return respond('EXACT_VERSION_ONLY_REQUEST_REQUIRED',false,400);
   // Bearer is existing Reality service's Supabase credential. It is tested
   // *against the service-role-only DB claim* before ANY GitHub operation.
@@ -469,6 +629,8 @@ Deno.serve(async req=>{
    return await nativeInstallPreflight(key);
   if(raw==='{"version":3,"action":"native_263_contents_canary"}')
    return await native263ContentsCanary(key);
+  if(raw==='{"version":4,"action":"native_263_contents_canary_v2"}')
+   return await native263ContentsCanaryV2(key);
   const c=await rpc('reality_claim_authorized_riley_pr_review_v1',{},key);
   if(c?.status==='EXACT_PR_REVIEW_ORIGINAL_INDEPENDENTLY_SETTLED')
    return respond('EXISTING_ORIGINAL_SETTLED_NO_PROVIDER_REPLAY',true,200);
