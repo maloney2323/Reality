@@ -78,7 +78,8 @@ test('3h active readback and conversation remain accurate, not human wages saved
    step_index:i+1,state:'QUEUED',proof_sha256:null
   }))
  };
- const r=safeShiftReadbackState({ok:true,shifts:[shift]},{requestedHours:3});
+ const r=safeShiftReadbackState({ok:true,shifts:[shift]},
+  {requestedHours:3,now:Date.parse('2026-11-09T11:59:00.000Z')});
  assert.equal(r.duration_hours,3);
  assert.equal(r.matching_requested_hours,true);
  const b=buildRealityShiftConversationBrief([shift],[],
@@ -106,8 +107,9 @@ test('backend enforces variable shift fingerprint and DB function 1–12h withou
  assert.match(api,/computeShiftFingerprint\(plan\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
  assert.match(ui,/id="runShiftHours"/);
- assert.match(ui,/Number\(\$\('runShiftHours'\)\?\.value\)/);
- assert.match(ui,/command.duration_hours!==hours/);
+ assert.match(ui,/Start the jobs until complete/);
+ assert.match(ui,/command.completion_bound!==true/);
+ assert.match(api,/reality_authorize_employee_completion_shift_v1/);
  assert.match(planner,/maximum_daily_review_timebox_hours:12/);
  assert.match(planner,/daily_hours_follow_source_workload_not_a_fixed_eight_hour_quota:true/);
  assert.doesNotMatch(api,/installation_authorized:true/);

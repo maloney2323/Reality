@@ -21,8 +21,8 @@ test('light Chat is on an isolated route without replacing the existing approval
   assert.match(html,/<a id="rileyNavEvaluation" href="\/value#pre-automation">Evaluation<\/a>/);
   assert.match(html,/id="teamToggle" type="button" aria-expanded="false"/);
   assert.match(html,/id="employeeBoardPanel" aria-label="Reality proposed AI team" hidden/);
-  assert.match(html,/Start Riley \+ Taylor Jobs/);
-  assert.match(html,/One combined work queue\. One start/);
+  assert.match(html,/Start Fresh Riley \+ Taylor Jobs/);
+  assert.match(html,/One authorization starts a verified fresh work batch/);
 });
 test('light Chat preserves existing private session and scoped saved conversation',()=>{
   assert.match(html,/\/api\/reality\/personal-session/);
@@ -56,4 +56,31 @@ test('real shift remains visible and prevents duplicate approval when progress s
  assert.match(script,/Shift status readback unavailable/);
  assert.match(script,/Status refreshed/);
  assert.doesNotMatch(script,/activeState\.hasActive\)\{[\s\S]{0,500}authorizeShiftFromChat\(/);
+});
+
+test('live automation jobs stay visible first while employee and support cards fold',()=>{
+ const live=html.indexOf('id="rileyLiveProgressPanel"');
+ const next=html.indexOf('id="rileyNextActionPanel"');
+ const board=html.indexOf('id="employeeBoardPanel"');
+ const conversation=html.indexOf('id="rileyConversationDisclosure"');
+ assert.ok(live>0&&live<next&&next<board&&board<conversation);
+ assert.match(html,/<section id="rileyLiveProgressPanel" class="team-value live-work-priority"/);
+ assert.match(html,/id="rileyActiveAutomationCards" class="active-automation-grid"/);
+ assert.match(html,/id="rileyActiveAutomationCount"/);
+ assert.match(script,/function renderCurrentAutomationCards\(graph\)/);
+ assert.match(script,/renderCurrentAutomationCards\(graph\);/);
+ assert.match(script,/j\.phase!=='SETTLED'/);
+ assert.match(script,/Tested candidate only\. Installation, approval and same-job settlement are not proven/);
+ for(const id of ['rileyNextActionPanel','rileyTaylorCombinedQueue',
+  'combinedShiftRoleHandoffs','employeeBoardPanel','rileyConversationDisclosure',
+  'workforceSavingsPlanner'])
+  assert.match(html,new RegExp('<details[^>]*id="'+id+'"'),id);
+ assert.match(script,/const card=document\.createElement\('details'\);card\.className='team-card'/);
+ assert.match(script,/const summary=document\.createElement\('summary'\);summary\.className='team-card-summary'/);
+ assert.match(script,/panel\.open=!panel\.hidden/);
+ assert.doesNotMatch(html,/<details[^>]*id="workforceSavingsPlanner"[^>]*\bopen\b/);
+ assert.match(html,/<summary>Reality Chat · Expand conversation and message Reality<\/summary>/);
+ for(const id of ['rileyLiveHeadline','rileyActualWorkerReceipt','rileyVerifiedOriginalJobRows',
+  'rileyUnifiedOriginalGraph','rileyLiveTimeline','rileyOriginalActivityRows','prompt','composer','send'])
+  assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
 });

@@ -65,12 +65,15 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   needs_you:'No capability installation approval is pending for a shift.',
   planned_start_at:null,as_of:now.toISOString(),
   verified_source_checks:0,verified_original_job_receipts:0,
-  complete_shift_proven:false,verified_human_hours_saved:null,
+  complete_shift_proven:false,
+  verified_final_original_job_count:0,final_receipt:null,
+  verified_human_hours_saved:null,
   events:[],approval_pending:false,read_only:true,
   production_changed:false});
  const s=shifts[0];
  if(!UUID.test(s?.shift_id||'')||!VALID.has(s.status)||
-  !isTime(s.planned_start_at)||!isTime(s.planned_end_at)||
+  !isTime(s.planned_start_at)||
+  !(isTime(s.planned_end_at)||s.planned_end_at==='infinity')||
   !Array.isArray(s.steps)||s.steps.length!==8||
   s.steps.some((t,i)=>t.step_index!==i+1||
     !['QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK',
@@ -78,9 +81,28 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
     (t.proof_sha256!==null&&!/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||''))))
   throw Error('SHIFT_CHAT_SOURCE_UNTRUSTED');
  const start=new Date(s.planned_start_at).getTime();
- const durationHours=(new Date(s.planned_end_at).getTime()-start)/3600000;
- if(!Number.isSafeInteger(durationHours)||durationHours<1||durationHours>12)throw Error('SHIFT_CHAT_DURATION_INVALID');
+ const completionBound=s.planned_end_at==='infinity';
+ const durationHours=completionBound?null:
+  (new Date(s.planned_end_at).getTime()-start)/3600000;
+ if(!completionBound&&(!Number.isSafeInteger(durationHours)||
+    durationHours<1||durationHours>12))
+  throw Error('SHIFT_CHAT_DURATION_INVALID');
  const originalReceipt=s.steps.some(t=>t.step_index===6&&t.state==='ORIGINAL_JOB_RECEIPT_VERIFIED');
+ const final=s.close_report;
+ const finalCount=final?.original_jobs_independently_settled_in_this_shift;
+ const accepted=final?.verified_original_receipts;
+ const completeBoundProven=completionBound&&s.status==='ENDED_WITH_VERIFIED_JOB'&&
+  final?.status==='EMPLOYEE_SHIFT_EVIDENCE_REPORT'&&
+  final?.shift_id===s.shift_id&&final.completion_bound===true&&
+  final.completion_reason==='ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED'&&
+  Number.isSafeInteger(finalCount)&&finalCount>=1&&finalCount<=4&&
+  final.authorized_source_job_count===finalCount&&
+  Array.isArray(accepted)&&accepted.length===finalCount&&
+  new Set(accepted.map(x=>x.original_work_id)).size===finalCount&&
+  accepted.every(x=>x.independent_final_receipt_verified===true&&
+   /^work:[a-f0-9]{32}$/.test(x.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||''))&&
+  final.production_changed===false;
  const eventItems=s.steps.map(eventFor).filter(Boolean);
  const recorded=eventItems.filter(x=>x.code==='SOURCE_VALIDATED').length;
  const recent=[...eventItems].sort((a,b)=>{
@@ -119,7 +141,9 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='A prior source-check or lease problem needs investigation; independent wake/recovery continues within this authorization.';
   next='Review blocked provider evidence. Do not assume that the scheduled workload completed.';
  }else if(s.status.startsWith('ENDED_')){
-  current='The scheduled shift window has ended; the database recorded its final state.';
+  current=completionBound?
+   'The completion-bound work batch is closed; inspect independently verified receipts and any unresolved work.':
+   'The scheduled shift window has ended; the database recorded its final state.';
   next='Review recorded receipts and unresolved work before planning another shift.';
  }else if(firstPending?.state==='CLAIMED'){
   current='Worker claimed '+STEPS[firstPending.step_index-1]+'. A provider receipt is still pending.';
@@ -129,9 +153,12 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   next='Next: '+STEPS[firstPending.step_index-1]+'. No separate start or “Next” button is required.';
  }else{
   current='No further source-validation steps are currently claimable.';
-  next='No further authorized source checks remain. The independent worker continues checking for exact original-job receipts and closes the shift at its approved end; it cannot invent additional work.';
+  next='No further authorized source checks remain. The independent worker continues checking for exact original-job receipts and closes only after every selected job is independently settled. It cannot invent work or a receipt.';
  }
- const whatFinished=recent.length?
+ const whatFinished=completeBoundProven?
+  (finalCount+' original jobs independently settled. Final durable receipt '+
+   'is recorded in the owner-scoped Continuity readback.') :
+  recent.length?
   (recorded+' recorded source/preflight checks; '+
    (originalReceipt?'one independently matched original-job receipt.':
      'no original-job completion independently matched to this shift.')+
@@ -143,19 +170,29 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
  return Object.freeze({
   version:'reality-shift-conversation-v1',status:s.status,shift_id:s.shift_id,
   headline:s.status==='QUEUED'&&now.getTime()<start?
+   completionBound?'Your verified-receipt job batch is queued, not running yet.':
    'Your '+durationHours+'-hour shift is queued, not running yet.':
-   s.status.startsWith('ENDED_')?'Your scheduled shift has ended.':
+   s.status.startsWith('ENDED_')?
+    (completionBound?'Your job batch is closed with recorded evidence.':
+     'Your scheduled shift has ended.'):
    s.status==='AWAITING_EXACT_ORIGINAL_WORK'?'Your shift is continuing safely around the original-job gate.':
    s.status==='ESCALATED'?'Your shift needs recovery attention.':
    'Your shift has recorded an activity state.',
   what_finished:whatFinished,current,next,needs_you:needs,
   shift_duration_hours:durationHours,
+  completion_bound:completionBound,
+  completion_condition:completionBound?
+   'ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED':null,
   planned_start_at:safeDate(s.planned_start_at),
   next_planned_step_at:timeNext,
   as_of:now.toISOString(),
   verified_source_checks:recorded,
-  verified_original_job_receipts:originalReceipt?1:0,
-  complete_shift_proven:false,verified_human_hours_saved:null,
+  verified_original_job_receipts:completeBoundProven?
+   finalCount:(originalReceipt?1:0),
+  complete_shift_proven:completeBoundProven,
+  verified_final_original_job_count:completeBoundProven?finalCount:0,
+  final_receipt:completeBoundProven?final:null,
+  verified_human_hours_saved:null,
   events:recent,approval_pending:pending,read_only:true,
   production_changed:false
  });

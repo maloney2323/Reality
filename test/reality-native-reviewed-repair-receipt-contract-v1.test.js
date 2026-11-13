@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const get=(path)=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+test('a reviewed #263 source patch is not incorrectly marked as model-driven or installation-ready',()=>{
+ const sql=get('supabase/migrations/20261108_riley_native_reviewed_candidate_proof_v1.sql');
+ assert.match(sql,/CHATGPT_REVIEWED_ENGINEERING_PATCH_AFTER_REJECTED_MODEL_DRAFT/);
+ assert.match(sql,/owner_installation_authorized boolean not null default false check\(not owner_installation_authorized\)/);
+ assert.match(sql,/original_job_completed boolean not null default false check\(not original_job_completed\)/);
+ assert.match(sql,/native_install_to_settlement_accepted',false/);
+ assert.match(sql,/owner_approval_ready',false/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/riley_unattended_repair_originals_v1/);
+ assert.match(sql,/shift_source_proof_sha256=p.shift_source_proof_sha256/);
+ assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
+test('native final receipt is accepted ONLY by existing whole-shift closer after exact approval, installed verification and original outcome',()=>{
+ const sql=get('supabase/migrations/20261108_riley_native_final_settlement_shift_closer_v2.sql');
+ assert.match(sql,/create or replace function public.reality_close_employee_completion_shift_v1/);
+ assert.match(sql,/riley_native_independent_final_receipts_v1/);
+ assert.match(sql,/j\.phase='SETTLED'/);
+ assert.match(sql,/j\.installed=true/);
+ assert.match(sql,/n\.approval_receipt_ref=j\.exact_approval_receipt_ref/);
+ assert.match(sql,/n\.frozen_verifier_run_id=j\.independent_proof_run_id/);
+ assert.match(sql,/n\.candidate_artifact_sha256=j\.candidate_artifact_sha256/);
+ assert.match(sql,/n\.installed_provider_readback_verified=true/);
+ assert.match(sql,/n\.original_execution_independently_verified=true/);
+ assert.match(sql,/n\.final_outcome='SUCCEEDED'/);
+ assert.match(sql,/n\.production_changed=false/);
+ assert.match(sql,/v_work is null or v_work=any\(v_work_ids\)/);
+ assert.match(sql,/COMPLETION_WAITING_FOR_FINAL_JOB_RECEIPTS/);
+ assert.match(sql,/reality_internal\.genuine_independent_final_receipts_v1/);
+ assert.match(sql,/reality_internal\.riley_pr_review_originals_v1/);
+ assert.equal((sql.match(/return v_receipt;/g)||[]).length,1);
+ assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
+test('receipt contract requires distinct proof of installed code and original execution; source inspection alone cannot settle',()=>{
+ const sql=get('supabase/migrations/20261108_riley_native_final_settlement_shift_closer_v2.sql');
+ assert.match(sql,/installed_provider_run_id bigint not null/);
+ assert.match(sql,/original_execution_run_id bigint not null/);
+ assert.match(sql,/check\(installed_provider_run_id<>original_execution_run_id\)/);
+ assert.match(sql,/approval_receipt_ref~'\^supabase:riley_native_exact_install_approvals_v1/);
+ assert.match(sql,/production_changed boolean not null default false check\(not production_changed\)/);
+ assert.match(sql,/j\.original_settlement_receipt_ref=/);
+ assert.match(sql,/n\.receipt_id::text/);
+});
+
+test('signed-in Reality Chat shows only exact tested native patch, but no installation approval before full loop readiness',()=>{
+ const api=get('api/reality/personal-governed-employee-shift.js');
+ const ui=get('reality-chat-simple.html');
+ const rpc=get('src/reality-governed-shift-boundary-v1.js');
+ assert.match(api,/reality_read_owner_native_reviewed_patch_v1/);
+ assert.match(api,/p_owner_id:session\.user_id,p_shift_id:chosen\.shift_id/);
+ assert.match(api,/riley_native_reviewed_patch_status='VERIFIED_OWNER_SOURCE_PATCH_NOT_INSTALLABLE'/);
+ assert.match(api,/patch\.owner_approval_ready===false/);
+ assert.match(api,/patch\.native_install_to_settlement_accepted===false/);
+ assert.match(ui,/id="rileyReviewedPatchEvidence"/);
+ assert.match(ui,/renderRileyReviewedPatchEvidence\(readback,current\)/);
+ assert.match(ui,/Installation NOT approved/);
+ assert.match(ui,/This engineering-reviewed patch is/);
+ assert.match(ui,/id="native263ApproveInstall" type="button" disabled/);
+ assert.match(ui,/approval card below remains gated until the installation and original-job continuation path is independently proven/);
+ assert.match(get('reality-native263-install-approval-ui-v1.js'),/data\.owner_approval_ready===true/);
+ assert.match(rpc,/read_owner_native_reviewed_patch_v1/);
+});

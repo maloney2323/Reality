@@ -54,18 +54,41 @@ test('shift readback accepts exact one active owner shift and rejects ambiguity'
  const start='2026-11-06T08:00:00.000Z',end='2026-11-06T18:00:00.000Z';
  const x={shift_id:'11111111-2222-4333-8444-555555555555',
   status:'QUEUED',planned_start_at:start,planned_end_at:end};
- const r=safeShiftReadbackState({ok:true,shifts:[x]},{requestedHours:10});
+ const clock=Date.parse('2026-11-06T09:00:00.000Z');
+ const r=safeShiftReadbackState({ok:true,shifts:[x]},{requestedHours:10,now:clock});
  assert.equal(r.hasActive,true);
  assert.equal(r.duration_hours,10);
  assert.equal(r.matching_requested_hours,true);
  assert.equal(safeShiftReadbackState({ok:true,shifts:[x]},
-  {requestedHours:12}).matching_requested_hours,false);
+  {requestedHours:12,now:clock}).matching_requested_hours,false);
  assert.equal(safeShiftReadbackState({ok:true,shifts:[]}).hasActive,false);
- assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[x,x]}),
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[x,x]},{now:clock}),
   /MULTIPLE_ACTIVE/);
  assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[{
-  ...x,planned_end_at:'2026-11-07T08:00:00.000Z'}]}),
+  ...x,planned_end_at:'2026-11-07T08:00:00.000Z'}]},{now:clock}),
   /ACTIVE_IDENTITY/);
+});
+test('expired unclosed original shift does not hold the new owner shift hostage',()=>{
+ const past={shift_id:'11111111-2222-4333-8444-555555555555',
+  status:'AWAITING_EXACT_ORIGINAL_WORK',
+  planned_start_at:'2026-11-07T22:58:08.286Z',
+  planned_end_at:'2026-11-08T06:58:08.286Z'};
+ const now=Date.parse('2026-11-08T09:00:00.000Z');
+ const r=safeShiftReadbackState({ok:true,shifts:[past]},{now});
+ assert.equal(r.hasActive,false);
+ assert.equal(r.expired_unclosed_shifts,1);
+ const next={...past,shift_id:'22222222-3333-4444-8555-666666666666',
+  status:'QUEUED',planned_start_at:'2026-11-08T09:10:00.000Z',
+  planned_end_at:'2026-11-08T17:10:00.000Z'};
+ const shared=safeShiftReadbackState({ok:true,shifts:[past,next]},{now});
+ assert.equal(shared.hasActive,true);
+ assert.equal(shared.shift_id,next.shift_id);
+ assert.equal(shared.expired_unclosed_shifts,1);
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[
+  {...past,planned_end_at:'garbled'},next]},{now}),/ACTIVE_IDENTITY/);
+ assert.throws(()=>safeShiftReadbackState({ok:true,shifts:[next,
+  {...next,shift_id:'33333333-4444-4555-8666-777777777777'}]},{now}),
+  /MULTIPLE_ACTIVE/);
 });
 test('Chat uses signed-in Send event and the real authenticated shift endpoint',()=>{
  const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
@@ -82,7 +105,8 @@ test('Chat uses signed-in Send event and the real authenticated shift endpoint',
  assert.match(ui,/void refreshShiftStatus\(\)/);
  assert.match(shift,/await authenticatedChatSession\(req,res\)/);
  assert.match(shift,/assertSameOrigin\(req\)/);
- assert.match(shift,/shiftRpc\(db,\s*'reality_authorize_employee_shift_v1'/);
+ assert.match(shift,/reality_authorize_employee_completion_shift_v1/);
+ assert.match(shift,/reality_authorize_employee_shift_v1/);
  assert.match(shift,/worker_dispatch_verified:false/);
  assert.doesNotMatch(ui,/installation_authorized:true|production_changed:true/);
 });
@@ -110,7 +134,8 @@ test('ordinary signed-in Start the shift/job commands authorize the existing exa
   assert.equal(command?.installation_authorized,false,message);
   assert.equal(command?.repeated_confirmations_required,false,message);
  }
- assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).duration_hours,10);
+ assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).duration_hours,8);
+ assert.equal(interpretSignedInChatShiftCommand('Start the job',{selectedHours:10}).completion_bound,true);
  assert.equal(interpretSignedInChatShiftCommand('Start the shift',{selectedHours:13}),null);
  for(const message of [
   'What if I start the shift?','I am ready to approve',
@@ -121,4 +146,54 @@ test('ordinary signed-in Start the shift/job commands authorize the existing exa
   'I authorize everyone to deploy production'
  ])
   assert.equal(interpretSignedInChatShiftCommand(message),null,message);
+});
+
+test('ordinary one-tap Start Jobs means until every independent final receipt, never eight-hour expiry',()=>{
+ for(const command of [
+  'Start the jobs','Start the shift','Start the job',
+  'Run the full shift','Start the jobs until complete',
+  'Start jobs until tested and verified',
+  'Start jobs until verified and receipted'
+ ]){
+  const out=interpretSignedInChatShiftCommand(command);
+  assert.equal(out?.intent,'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT',command);
+  assert.equal(out?.completion_bound,true,command);
+  assert.equal(out?.installation_authorized,false,command);
+ }
+ const timed=interpretSignedInChatShiftCommand('Start a 3 hour shift');
+ assert.equal(timed?.completion_bound,false);
+ assert.equal(timed?.duration_hours,3);
+});
+test('completion-bound work remains active until independently settled despite elapsed 8-hour estimate',()=>{
+ const s={shift_id:'11111111-2222-4333-8444-555555555555',
+  status:'AWAITING_EXACT_ORIGINAL_WORK',
+  planned_start_at:'2026-11-05T01:00:00.000Z',
+  planned_end_at:'infinity'};
+ const r=safeShiftReadbackState({ok:true,shifts:[s]},{
+  requestedHours:8,now:Date.parse('2026-11-08T09:00:00Z')});
+ assert.equal(r.hasActive,true);
+ assert.equal(r.completion_bound,true);
+ assert.equal(r.duration_hours,null);
+ assert.equal(r.completion_condition,
+  'ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED');
+ assert.equal(r.expired_unclosed_shifts,0);
+});
+test('completion-bound owner UI uses exact signed-in start and never asks for hours',()=>{
+ const html=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',
+  import.meta.url),'utf8');
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261108_completion_bound_employee_work_warrant_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(html,/Start the jobs until complete/);
+ assert.match(html,/completion_bound:true/);
+ assert.match(api,/reality_authorize_employee_completion_shift_v1/);
+ assert.match(api,/completion_bound:b\.completion_bound===true/);
+ assert.match(sql,/ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED/);
+ assert.match(sql,/genuine_independent_final_receipts_v1/);
+ assert.match(sql,/riley_pr_review_originals_v1/);
+ assert.match(sql,/realized_cash_savings_usd',null/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/planned_end_at='infinity'::timestamptz/);
+ assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
 });

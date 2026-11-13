@@ -97,7 +97,10 @@ export async function wakeExistingRileyShiftCapabilityBatch({
   // On uncertain effect do not automatically re-send in this invocation.
   const wake=await dispatch({trigger_id:gate.trigger_id,
    source_event_id:gate.source_event_id,
-   original_work_id:gate.original_work_id});
+   original_work_id:gate.original_work_id,
+   shift_id:gate.shift_id,source_ref:gate.source_ref,
+   source_proof_sha256:gate.source_proof_sha256,
+   db,fetchImpl});
   if(wake?.dispatched!==true||
    wake.trigger_id!==gate.trigger_id||
    wake.source_event_id!==gate.source_event_id||
@@ -108,7 +111,10 @@ export async function wakeExistingRileyShiftCapabilityBatch({
   results.push(Object.freeze({
    original_work_id:gate.original_work_id,
    status:'EXISTING_CAPABILITY_WAKE_DISPATCHED_NOT_EXECUTED',
-   trigger_id:gate.trigger_id,already_dispatched:wake.existing===true
+   trigger_id:gate.trigger_id,
+   source_ref:gate.source_ref,
+   source_proof_sha256:gate.source_proof_sha256,
+   already_dispatched:wake.existing===true
   }));
  }
  return verdict('EXISTING_MULTI_JOB_CAPABILITY_WAKES_RECORDED',{

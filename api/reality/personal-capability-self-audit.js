@@ -33,9 +33,32 @@ export default async function handler(req,res){
    shiftRpc(db,'reality_read_owner_genuine_loop_v1',
     {p_owner_id:session.user_id})
   ]);
+  const readback=assertShiftReadback(shifts);
+  // Independent READ-ONLY Reality-ledger evidence, not a model's answer.
+  // Fail closed on missing receipts; do not block the owner's base audit.
+  const active=readback.shifts.filter(x=>
+   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(x.status));
+  const [toolResult,roiResult]=await Promise.allSettled([
+   active.length===1?
+    shiftRpc(db,'reality_read_owner_native_readonly_tool_proof_v1',{
+     p_owner_id:session.user_id,p_shift_id:active[0].shift_id}):
+    Promise.resolve(null),
+   shiftRpc(db,'reality_read_owner_job_roi_evidence_v2',{
+    p_owner_id:session.user_id})
+  ]);
+  const modelToolProof=toolResult.status==='fulfilled'?toolResult.value:null;
+  const roiReadback=roiResult.status==='fulfilled'?roiResult.value:null;
   const audit=buildRealityEvidenceGroundedSelfAudit({
-   shiftReadback:assertShiftReadback(shifts),
-   ownerLoopReadback:loop,sourceVerifiedAt:new Date().toISOString()});
+   shiftReadback:readback,ownerLoopReadback:loop,
+   modelToolProof,roiReadback,
+   // These flags prove presence ONLY, not runtime write/deploy permissions.
+   previewGithubWriteConfigured:
+    typeof process.env.REALITY_GITHUB_TOKEN==='string'&&
+    process.env.REALITY_GITHUB_TOKEN.length>=25,
+   previewVercelDeployConfigured:
+    typeof process.env.REALITY_NATIVE_VERCEL_DEPLOY_TOKEN==='string'&&
+    process.env.REALITY_NATIVE_VERCEL_DEPLOY_TOKEN.length>=25,
+   sourceVerifiedAt:new Date().toISOString()});
   return res.status(200).json({ok:true,read_only:true,
    owner_scope_verified:true,execution_authorized_by_read:false,...audit});
  }catch(error){

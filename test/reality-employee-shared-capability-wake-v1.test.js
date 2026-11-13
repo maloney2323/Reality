@@ -57,9 +57,14 @@ test('wake only pre-existing owner-scoped Reality job after second independent r
  assert.equal(f.reads.length,1);
  assert.equal(f.reads[0].original_work_id,WORK);
  assert.equal(f.wakes.length,1);
- assert.deepEqual(f.wakes[0],{
-  trigger_id:TRIGGER,source_event_id:EVENT,original_work_id:WORK
- });
+ assert.equal(f.wakes[0].trigger_id,TRIGGER);
+ assert.equal(f.wakes[0].source_event_id,EVENT);
+ assert.equal(f.wakes[0].original_work_id,WORK);
+ assert.equal(f.wakes[0].shift_id,ID);
+ assert.equal(f.wakes[0].source_ref,ISSUE);
+ assert.equal(f.wakes[0].source_proof_sha256,PROOF);
+ assert.equal(f.wakes[0].db,f.args.db);
+ assert.equal(typeof f.wakes[0].fetchImpl,'function');
 });
 test('no eligible exact work or queue phase never sends a worker wake',async()=>{
  for(const x of [

@@ -73,8 +73,28 @@ export async function readVerifiedEmployeeShiftForChat({
   try{
    const ownerLoop=await shiftRpc(db,'reality_read_owner_genuine_loop_v1',
     {p_owner_id:session.user_id},{fetchImpl});
+   // Reality Chat reads the SAME service-verified self-audit as the UI.
+   // Provider receipts remain observations, never model-created authority.
+   const active=read.shifts.filter(x=>
+    ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(x.status));
+   const [toolResult,roiResult]=await Promise.allSettled([
+    active.length===1?
+     shiftRpc(db,'reality_read_owner_native_readonly_tool_proof_v1',{
+      p_owner_id:session.user_id,p_shift_id:active[0].shift_id},{fetchImpl}):
+     Promise.resolve(null),
+    shiftRpc(db,'reality_read_owner_job_roi_evidence_v2',{
+     p_owner_id:session.user_id},{fetchImpl})
+   ]);
    const audit=buildRealityEvidenceGroundedSelfAudit({
     shiftReadback:read,ownerLoopReadback:ownerLoop,
+    modelToolProof:toolResult.status==='fulfilled'?toolResult.value:null,
+    roiReadback:roiResult.status==='fulfilled'?roiResult.value:null,
+    previewGithubWriteConfigured:
+     typeof env.REALITY_GITHUB_TOKEN==='string'&&
+     env.REALITY_GITHUB_TOKEN.length>=25,
+    previewVercelDeployConfigured:
+     typeof env.REALITY_NATIVE_VERCEL_DEPLOY_TOKEN==='string'&&
+     env.REALITY_NATIVE_VERCEL_DEPLOY_TOKEN.length>=25,
     sourceVerifiedAt:now.toISOString()});
    observations.push(Object.freeze({
     entry_id:'reality:self-audit:'+String(brief.shift_id||'none')+':'+audit.observed_at,

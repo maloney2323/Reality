@@ -154,6 +154,57 @@ function qualifiedOriginalDriverScope(reconciled,wake,claimed){
   exact_trusted_original_preflight_required:true
  });
 }
+// For a genuinely ambiguous multi-original owner shift, the shared wake
+// already verified all source references and all idempotent provider triggers.
+// The trusted driver MUST still re-read the CURRENT scope for every original,
+// take independent single-use claims and verify every receipt. No model grants
+// execution, and the wake itself never acts as an installation approval.
+function qualifiedBatchDriverScope(reconciled,wake,claimed){
+ if(reconciled?.status!=='EXACT_ORIGINAL_JOB_NOT_INDEPENDENTLY_SETTLED'||
+    reconciled.governed_existing_work_status!==
+     'AMBIGUOUS_ORIGINAL_SCOPE_NO_AUTOMATIC_SELECTION'||
+    reconciled.governed_cycle_dispatched_by_shift!==false||
+    reconciled.model_invoked_by_shift!==false||
+    reconciled.new_customer_job_created!==false||
+    reconciled.installation_authorized!==false||
+    reconciled.production_changed!==false||
+    !UUID.test(reconciled.shift_id||'')||
+    wake?.status!=='EXISTING_MULTI_JOB_CAPABILITY_WAKES_RECORDED'||
+    wake.shift_id!==reconciled.shift_id||
+    wake.worker_execution_acknowledged!==false||
+    wake.original_job_completed!==false||
+    wake.installation_authorized!==false||
+    wake.production_changed!==false||
+    wake.full_shift_proven!==false||
+    claimed?.status!=='EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED'||
+    claimed.shift_id!==reconciled.shift_id||
+    !Array.isArray(wake.dispatches)||
+    wake.dispatches.length<2||wake.dispatches.length>4||
+    wake.eligible_count!==wake.dispatches.length||
+    wake.dispatched_count!==wake.dispatches.length)
+  return null;
+ const entries=wake.dispatches;
+ if(entries.some(x=>!/^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')||
+    !UUID.test(x.trigger_id||'')||
+    !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(x.source_ref||'')||
+    !/^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||'')||
+    x.status!=='EXISTING_CAPABILITY_WAKE_DISPATCHED_NOT_EXECUTED')||
+    new Set(entries.map(x=>x.original_work_id)).size!==entries.length||
+    new Set(entries.map(x=>x.trigger_id)).size!==entries.length)
+  return null;
+ const anchor=entries[0];
+ return Object.freeze({
+  shift_id:reconciled.shift_id,
+  original_work_id:anchor.original_work_id,
+  trigger_id:anchor.trigger_id,
+  source_ref:anchor.source_ref,
+  source_proof_sha256:anchor.source_proof_sha256,
+  batch_original_work_ids:Object.freeze(entries.map(x=>x.original_work_id)),
+  read_only:false,preflight_only:false,
+  shift_read_does_not_grant_execution_authority:true,
+  exact_trusted_original_preflight_required:true
+ });
+}
 function assertOriginalDriverOutcome(out,scope){
  if(out?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
   out.shift_id!==scope.shift_id||
@@ -230,7 +281,8 @@ export async function processGovernedEmployeeShiftTick(db,{fetchImpl=fetch,
    'LEASE_EXHAUSTED_ESCALATED','STEP_BLOCKED_SHIFT_CONTINUES',
    'SHIFT_STEP_NOT_YET_DUE','EXACT_ORIGINAL_JOB_AUTHORITY_REQUIRED',
    'SHIFT_FINAL_REPORT_NOT_DUE'].includes(claimed.status)){
-  const scope=qualifiedOriginalDriverScope(reconciled,capabilityWake,claimed);
+  const scope=qualifiedOriginalDriverScope(reconciled,capabilityWake,claimed)||
+   qualifiedBatchDriverScope(reconciled,capabilityWake,claimed);
   // Absence of a trusted driver is a visible blocker, not a successful shift.
   // A wake/notification is never mistaken for a real executor result.
   const originalJobDriver=!scope?null:executeQualifiedOriginals===null?

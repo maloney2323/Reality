@@ -1,0 +1,43 @@
+name: Reality · #263 independent post-install original acceptance
+on:
+  push:
+    branches:
+      - reality/isolated-openai-governance-gateway-20261108
+    paths:
+      - src/reality-riley-service-original-runtime-v1.js
+permissions:
+  contents: read
+jobs:
+  original-263-frozen-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Checkout only exact installed source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Set up pinned Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Independently check exact frozen repair bytes and source branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/reality/isolated-openai-governance-gateway-20261108"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git hash-object src/reality-riley-service-original-runtime-v1.js)" = "dda8e71d44cca6745312bcbd000089d5a0b01d54"
+          printf '%s  %s\n' "459e2bbe9a9d9c7037c87542a9cdbebf06f77a6d368d72769c79fdbef7947f48" "src/reality-riley-service-original-runtime-v1.js" | sha256sum --check
+      - name: Run #263 exact original-job and governance acceptance
+        run: |
+          set -euo pipefail
+          node --check src/reality-riley-service-original-runtime-v1.js
+          node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-frozen-regressions/riley-live-original-shift-dispatch.test.js
+      - name: Confirm no authorization or production state was granted by CI
+        run: |
+          echo "ORIGINAL=work:873a6e74fd14c6beacc9042dd8021dfc"
+          echo "ACCEPTANCE=INDEPENDENT_FROZEN_SOURCE_AND_ORIGINAL_REGRESSIONS"
+          echo "INSTALL_AUTHORITY=EXISTING_OWNER_RECEIPT_ONLY"
+          echo "PRODUCTION_CHANGE=FALSE"
+          echo "FINAL_SETTLEMENT=REQUIRES_REALITY_PROVIDER_READBACK"

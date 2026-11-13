@@ -93,3 +93,79 @@ test('source-bound wake targets full governed pipeline, not inert inspection',()
   'scripts/reality-genuine-original-settle-v1.mjs'
  ])assert.ok(full.includes(required),'Full-loop stage absent: '+required);
 });
+
+const shiftId='33333333-3333-4333-8333-333333333333';
+const issue='https://github.com/maloney2323/Reality/issues/263';
+const sourceProof='sha256:'+'d'.repeat(64);
+const isolatedDb={
+ project:'hvkfreoagbrphwghjajw',
+ url:'https://hvkfreoagbrphwghjajw.supabase.co',
+ secretKey:'isolated-test-service-only-database-key'
+};
+const scoped={trigger_id:trigger,source_event_id:event,original_work_id:work,
+ shift_id:shiftId,source_ref:issue,source_proof_sha256:sourceProof,
+ db:isolatedDb,
+ env:{VERCEL_ENV:'preview',
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'}
+};
+test('existing service-authenticated Supabase broker replaces a separate preview GitHub token',async()=>{
+ const calls=[];
+ const outcome=await dispatchGenuineCapabilityWake({...scoped,
+  fetchImpl:async(url,options)=>{
+   calls.push({url,options});
+   return {ok:true,json:async()=>({
+    ok:true,status:'EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED',
+    existing_idempotent_delivery:false,
+    worker_acknowledged:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false,
+    no_new_job_created:true
+   })};
+  }});
+ assert.equal(outcome.dispatched,true);
+ assert.equal(outcome.worker_execution_acknowledged,false);
+ assert.equal(outcome.original_job_completed,false);
+ assert.equal(outcome.installation_authorized,false);
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].url,
+  isolatedDb.url+'/functions/v1/reality-employee-capability-wake-broker-v1');
+ assert.equal(calls[0].options.method,'POST');
+ assert.deepEqual(JSON.parse(calls[0].options.body),{
+  shift_id:shiftId,original_work_id:work,trigger_id:trigger,
+  source_ref:issue,source_proof_sha256:sourceProof});
+ assert.equal(calls[0].options.headers.apikey,isolatedDb.secretKey);
+ assert.equal(calls[0].options.headers.authorization,
+  'Bearer '+isolatedDb.secretKey);
+ assert.equal(calls.some(x=>x.url.includes('github.com')),false);
+});
+test('broker source scope must match exact owner-approved original before network access',async()=>{
+ let calls=0;
+ for(const delta of [
+  {shift_id:'another'},{source_ref:'https://example.org/issues/263'},
+  {source_proof_sha256:'sha256:wrong'},
+  {db:{...isolatedDb,project:'different'}},
+  {db:{...isolatedDb,secretKey:''}},
+  {env:{...scoped.env,VERCEL_ENV:'production'}}
+ ]){
+  await assert.rejects(dispatchGenuineCapabilityWake({...scoped,...delta,
+   fetchImpl:async()=>{calls++;throw Error('NOT_REACHABLE')}}),
+   /GENUINE_WAKE_DISPATCH_/);
+ }
+ assert.equal(calls,0);
+});
+test('broker unverified effect or stale source never falls back to a GitHub write',async()=>{
+ for(const observed of [
+  {ok:false,status:'BROKER_DELIVERY_REQUIRES_RECONCILIATION'},
+  {ok:true,status:'NO_ELIGIBLE_CAPABILITY_WAKE'},
+  {ok:true,status:'EXISTING_CAPABILITY_WAKE_TRANSPORT_CONFIRMED',
+   existing_idempotent_delivery:false,worker_acknowledged:true,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,no_new_job_created:true}
+ ]){
+  let calls=0;
+  await assert.rejects(dispatchGenuineCapabilityWake({...scoped,
+   fetchImpl:async()=>{calls++;return{
+    ok:true,json:async()=>observed
+   }}}),/GENUINE_WAKE_DISPATCH_INDEPENDENT_BROKER_DELIVERY_READBACK_REQUIRED/);
+  assert.equal(calls,1);
+ }
+});

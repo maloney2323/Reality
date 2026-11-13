@@ -14,13 +14,30 @@ const context={shift_id:uuid,claim_id:uuid,owner_id:uuid,
  step_index:2,stage:'VERIFY_OPEN_ISSUE',source_ref:issue,
  provider:data,shift_step_claimed:true,read_only:true,
  installation_authorized:false,production_changed:false};
+// Isolated trusted shift-readback fixture. Production uses the service-role
+// database adapter and MUST independently re-read the current step twice.
+function makeCoordinator(config={}) {
+ return createOneOpenAICombinedRoleCoordinator({
+  readCurrentShift:async scope=>({
+   status:'CURRENT_OWNER_SHIFT_PROVIDER_READBACK_VERIFIED',
+   readback_source:'REALITY_OWNER_SCOPED_SHIFT_DB',
+   owner_id:scope.owner_id,shift_id:scope.shift_id,
+   step_index:scope.step_index,source_ref:scope.source_ref,
+   step_state:'CLAIMED',shift_status:'RUNNING',
+   shift_plan_fingerprint:'sha256:'+'a'.repeat(64),
+   current_authorized_shift:true,original_job_completed:false,
+   installation_authorized:false,production_changed:false
+  }),
+  ...config
+ });
+}
 const mockResponse=(output='Source confirms open engineering issue; inspect live executor bindings.')=>({
  ok:true,json:async()=>({id:'resp_1234567890abcdef',status:'completed',
   output:[{type:'message',content:[{type:'output_text',text:output}]}],
   usage:{input_tokens:162,output_tokens:37}})
 });
 test('one OpenAI request combines Riley and Taylor, and never receives tools or owner authority',async()=>{
- const sent=[],coord=createOneOpenAICombinedRoleCoordinator({
+ const sent=[],coord=makeCoordinator({
   apiKey:'isolated-not-secret-key',model:'gpt-test',
   fetchImpl:async(url,options)=>{
    sent.push({url,options});return mockResponse();
@@ -51,7 +68,7 @@ test('one OpenAI request combines Riley and Taylor, and never receives tools or 
 });
 test('the one-model coordinator changes role context by governed step, no additional model instances',async()=>{
  const seen=[];
- const c=createOneOpenAICombinedRoleCoordinator({
+ const c=makeCoordinator({
   apiKey:'isolated-not-secret-key',fetchImpl:async(u,o)=>{
    seen.push(JSON.parse(o.body));return mockResponse();
   }});
@@ -69,7 +86,7 @@ test('the one-model coordinator changes role context by governed step, no additi
 });
 test('fabricated step identity, unclaimed source, changed GitHub URL and install authority all block before OpenAI',async()=>{
  let calls=0;
- const c=createOneOpenAICombinedRoleCoordinator({
+ const c=makeCoordinator({
   apiKey:'isolated-not-secret-key',fetchImpl:async()=>{
    calls++;return mockResponse();
   }});
@@ -91,7 +108,7 @@ test('fabricated step identity, unclaimed source, changed GitHub URL and install
 });
 test('closed sources skip model calls; unknown OpenAI output is never a verified result',async()=>{
  let calls=0;
- const c=createOneOpenAICombinedRoleCoordinator({
+ const c=makeCoordinator({
   apiKey:'isolated-not-secret-key',fetchImpl:async()=>{
    calls++;return mockResponse();
   }});
@@ -104,14 +121,14 @@ test('closed sources skip model calls; unknown OpenAI output is never a verified
   {ok:true,json:async()=>({id:'resp_1234567',status:'completed',
    output:[{type:'function_call',name:'install'}]})}
  ]){
-  const ca=createOneOpenAICombinedRoleCoordinator({
+  const ca=makeCoordinator({
    apiKey:'isolated-not-secret-key',fetchImpl:async()=>response});
   const result=await ca(context);
   assert.equal(result.status,'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM');
   assert.equal(result.model_invocations_completed,0);
   assert.equal(result.original_job_completed,false);
  }
- const longModel=createOneOpenAICombinedRoleCoordinator({
+ const longModel=makeCoordinator({
   apiKey:'isolated-not-secret-key',
   fetchImpl:async()=>mockResponse('x'.repeat(2600))
  });
@@ -151,7 +168,7 @@ function fakeShiftStep({coordinator=null,source=issue,step=2,stage='VERIFY_OPEN_
  return {fetchImpl,bodyCalls,coordinator};
 }
 test('actual claimed shift source readback invokes one combined OpenAI advisor, stores advisory in durable proof',async()=>{
- const c=createOneOpenAICombinedRoleCoordinator({
+ const c=makeCoordinator({
   apiKey:'isolated-not-secret-key',fetchImpl:async()=>mockResponse()});
  const {fetchImpl,bodyCalls}=fakeShiftStep();
  const result=await processGovernedEmployeeShiftTick({
@@ -223,7 +240,7 @@ test('Riley and Quinn inspect actual PR change patches in an authorized shift re
   throw Error('Unexpected PR work request '+url);
  };
  const openaiBodies=[];
- const model=createOneOpenAICombinedRoleCoordinator({
+ const model=makeCoordinator({
   apiKey:'isolated-not-secret-key',model:'gpt-test',
   fetchImpl:async(url,opt)=>{
    assert.equal(url,'https://api.openai.com/v1/responses');
@@ -255,7 +272,7 @@ test('Riley and Quinn inspect actual PR change patches in an authorized shift re
 
 test('preview nonreasoning GPT-4.1 model omits reasoning-only request fields',async()=>{
  const sent=[];
- const c=createOneOpenAICombinedRoleCoordinator({
+ const c=makeCoordinator({
   apiKey:'isolated-not-secret-key',model:'gpt-4.1-mini',
   fetchImpl:async(url,opt)=>{sent.push(JSON.parse(opt.body));return mockResponse();}
  });
@@ -267,7 +284,7 @@ test('preview nonreasoning GPT-4.1 model omits reasoning-only request fields',as
  assert.equal(sent[0].tool_choice,'none');
  assert.equal(r.original_job_completed,false);
  const advanced=[];
- const c2=createOneOpenAICombinedRoleCoordinator({
+ const c2=makeCoordinator({
   apiKey:'isolated-not-secret-key',model:'gpt-5.4',
   fetchImpl:async(url,opt)=>{advanced.push(JSON.parse(opt.body));return mockResponse();}
  });
@@ -283,7 +300,7 @@ test('failed provider returns whitelisted diagnostic class, not raw secret or fa
   [429,'OPENAI_RATE_OR_QUOTA_LIMIT'],
   [503,'OPENAI_PROVIDER_SERVER_FAILURE']
  ]){
-  const c=createOneOpenAICombinedRoleCoordinator({
+  const c=makeCoordinator({
    apiKey:'isolated-not-secret-key',model:'gpt-4.1-mini',
    fetchImpl:async()=>({
     ok:false,status:http,
@@ -297,4 +314,55 @@ test('failed provider returns whitelisted diagnostic class, not raw secret or fa
   assert.equal(result.original_job_completed,false);
   assert.equal(JSON.stringify(result).includes('leak sensitive'),false);
  }
+});
+
+test('missing trusted Reality gateway scope verifier fails before any model call',()=>{
+ assert.throws(()=>createOneOpenAICombinedRoleCoordinator({
+  apiKey:'isolated-not-secret-key',model:'gpt-5.4',
+  fetchImpl:async()=>mockResponse()
+ }),/TRUSTED_SERVER_OPENAI_ADAPTER_REQUIRED/);
+});
+test('Reality gateway rechecks shift after model call and discards drifted advice',async()=>{
+ let checks=0,providerCalls=0;
+ const c=makeCoordinator({
+  apiKey:'isolated-not-secret-key',
+  fetchImpl:async()=>{providerCalls++;return mockResponse();},
+  readCurrentShift:async s=>({
+   status:'CURRENT_OWNER_SHIFT_PROVIDER_READBACK_VERIFIED',
+   readback_source:'REALITY_OWNER_SCOPED_SHIFT_DB',
+   owner_id:s.owner_id,shift_id:s.shift_id,
+   step_index:s.step_index,source_ref:s.source_ref,
+   step_state:'CLAIMED',shift_status:'RUNNING',
+   shift_plan_fingerprint:'sha256:'+(++checks===1?'a':'b').repeat(64),
+   current_authorized_shift:true,original_job_completed:false,
+   installation_authorized:false,production_changed:false
+  })
+ });
+ const result=await c(context);
+ assert.equal(providerCalls,1);
+ assert.equal(checks,2);
+ assert.equal(result.status,'ROLE_ADVISORY_UNAVAILABLE_NO_COMPLETION_CLAIM');
+ assert.equal(result.reason,'REALITY_GOVERNANCE_READBACK_UNVERIFIED');
+ assert.equal(result.model_invocations_completed,0);
+ assert.equal(result.original_job_completed,false);
+});
+test('Reality gateway refuses a stale step before invoking OpenAI',async()=>{
+ let providerCalls=0;
+ const c=makeCoordinator({
+  apiKey:'isolated-not-secret-key',
+  fetchImpl:async()=>{providerCalls++;return mockResponse();},
+  readCurrentShift:async s=>({
+   status:'CURRENT_OWNER_SHIFT_PROVIDER_READBACK_VERIFIED',
+   readback_source:'REALITY_OWNER_SCOPED_SHIFT_DB',
+   owner_id:s.owner_id,shift_id:s.shift_id,
+   step_index:s.step_index,source_ref:s.source_ref,
+   step_state:'REPORTED',shift_status:'RUNNING',
+   shift_plan_fingerprint:'sha256:'+'a'.repeat(64),
+   current_authorized_shift:true,original_job_completed:false,
+   installation_authorized:false,production_changed:false
+  })
+ });
+ const result=await c(context);
+ assert.equal(providerCalls,0);
+ assert.equal(result.reason,'REALITY_GOVERNANCE_READBACK_UNVERIFIED');
 });

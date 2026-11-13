@@ -268,8 +268,114 @@ test('self audit API is owner-authenticated and read-only, linked to real Realit
  assert.match(api,/execution_authorized_by_read:false/);
  assert.doesNotMatch(api,/executeAuthorizedWork|reality_claim_exact_shift_original_v1/);
  assert.match(ui,/id="realitySelfAwareness"/);
- assert.match(ui,/Reality's verified self-understanding/);
+ assert.match(ui,/Reality system audit · What's connected, blocked and independently proven/);
  assert.match(ui,/refreshRealitySelfAudit/);
  assert.match(ui,/REALITY_SELF_AUDIT_PROVIDER_UNVERIFIED/);
  assert.match(ui,/full_shift_automation_proven!==false/);
+});
+
+test('Reality self-audit recognizes real governed model tool evidence without inventing installs or ROI',()=>{
+ const proof={
+  status:'OWNER_NATIVE_MODEL_TOOL_INDEPENDENT_READBACK_VERIFIED',
+  shift_id:SHIFT,original_work_id:W1,
+  model_tool_readback_verified:true,tool_scope:'READ_ONLY_CURRENT_ORIGINAL_EVIDENCE',
+  tool_readback_sha256:HASH,verified_at:'2026-11-10T00:07:11.96659Z',
+  model_call_count:1,installation_authorized:false,
+  original_job_completed:false,production_changed:false
+ };
+ const roi={
+  schema:'reality-owner-original-job-roi-evidence-v2',
+  evidence_scope:'SIGNED_OWNER_SCOPED_ISOLATED_LEDGER_READBACK',
+  work_executed_by_read:false,owner_authorization_granted:false,
+  production_changed:false,
+  jobs:[W1,W2,'work:'+'c'.repeat(32)].map(original_work_id=>({
+   original_work_id,state:'SETTLED_ISOLATED',settlement_verified:true,
+   original_work_verified:true,isolated_preview_only:true,
+   production_changed:false,economic_observations:[]
+  }))
+ };
+ const audit=buildRealityEvidenceGroundedSelfAudit({
+  shiftReadback:shift(),ownerLoopReadback:loop(),
+  modelToolProof:proof,roiReadback:roi,
+  previewGithubWriteConfigured:false,previewVercelDeployConfigured:false,
+  sourceVerifiedAt:'2026-11-12T18:00:00Z'
+ });
+ assert.equal(audit.current_shift_native_readonly_tool_verified,true);
+ assert.equal(audit.current_shift_native_tool_original_work_id,W1);
+ assert.equal(audit.capabilities.find(x=>x.id==='openai_reasoning_gateway').proof_level,
+  'CURRENT_NATIVE_READ_ONLY_MODEL_TOOL_PROVIDER_RECEIPT_VERIFIED');
+ assert.equal(audit.historically_settled_isolated_jobs_from_roi,3);
+ assert.equal(audit.genuine_economic_observation_count,0);
+ assert.equal(audit.verified_cash_savings_usd,null);
+ assert.equal(audit.verified_net_roi_usd,null);
+ assert.equal(audit.provider_capability_connections.github_provider_write,
+  'REALITY_PREVIEW_GITHUB_WRITER_NOT_CONFIGURED');
+ assert.equal(audit.provider_capability_connections.same_original_postinstall_settlement,
+  'NOT_INDEPENDENTLY_PROVEN');
+ assert.equal(audit.no_duplicate_shift_required,true);
+ assert.match(summarizeRealitySelfAuditForModel(audit),/tool call proven: YES/);
+ assert.match(summarizeRealitySelfAuditForModel(audit),/actual cash savings: NOT MEASURED/);
+ assert.equal(audit.full_shift_automation_proven,false);
+ assert.equal(audit.installation_authorized,false);
+});
+
+test('Reality self-audit rejects stale, mismatched or self-asserted model/provider success',()=>{
+ const fake={
+  status:'OWNER_NATIVE_MODEL_TOOL_INDEPENDENT_READBACK_VERIFIED',
+  shift_id:'00000000-0000-4000-8000-000000000000',
+  original_work_id:W1,model_tool_readback_verified:true,
+  tool_scope:'READ_ONLY_CURRENT_ORIGINAL_EVIDENCE',
+  tool_readback_sha256:HASH,verified_at:'2026-11-10T00:07:11.96659Z',
+  model_call_count:1,installation_authorized:false,
+  original_job_completed:false,production_changed:false
+ };
+ for(const modelToolProof of [fake,{...fake,shift_id:SHIFT,
+  installation_authorized:true},null]){
+  const audit=buildRealityEvidenceGroundedSelfAudit({
+   shiftReadback:shift(),ownerLoopReadback:loop(),modelToolProof,
+   roiReadback:{schema:'reality-owner-original-job-roi-evidence-v2',
+    evidence_scope:'MODEL_ASSERTED',jobs:[],production_changed:false},
+   previewGithubWriteConfigured:true,previewVercelDeployConfigured:true
+  });
+  assert.equal(audit.current_shift_native_readonly_tool_verified,false);
+  assert.equal(audit.historically_settled_isolated_jobs_from_roi,null);
+  assert.equal(audit.verified_cash_savings_usd,null);
+  assert.equal(audit.provider_capability_connections.github_provider_write,
+   'CREDENTIAL_CONFIGURED_WRITE_PERMISSION_NOT_VERIFIED');
+  assert.equal(audit.provider_capability_connections.vercel_native_deploy,
+   'CREDENTIAL_CONFIGURED_DEPLOY_PERMISSION_NOT_VERIFIED');
+  assert.equal(audit.full_shift_automation_proven,false);
+ }
+ const api=readFileSync(new URL('../api/reality/personal-capability-self-audit.js',
+  import.meta.url),'utf8');
+ const boundary=readFileSync(new URL(
+  '../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
+ assert.match(boundary,/read_owner_job_roi_evidence_v2/);
+ assert.match(api,/reality_read_owner_native_readonly_tool_proof_v1/);
+ assert.match(api,/reality_read_owner_job_roi_evidence_v2/);
+ assert.match(api,/Promise\.allSettled/);
+ assert.match(ui,/PREVIOUS TECHNICAL VALUE/);
+ assert.match(ui,/Reality-governed preview GitHub writing authority/);
+ assert.ok(ui.indexOf('id="rileyLiveProgressPanel"')<
+  ui.indexOf('id="realitySelfAwareness"'));
+ assert.ok(ui.indexOf('id="realitySelfAwareness"')<
+  ui.indexOf('id="rileyNextActionPanel"'));
+});
+
+test('Reality Chat reads the same owner-verified operational and economic evidence as the UI',()=>{
+ const context=readFileSync(new URL(
+  '../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ const audit=readFileSync(new URL(
+  '../api/reality/personal-capability-self-audit.js',import.meta.url),'utf8');
+ for(const rpc of ['reality_read_owner_native_readonly_tool_proof_v1',
+  'reality_read_owner_job_roi_evidence_v2']){
+  assert.match(context,new RegExp(rpc));
+  assert.match(audit,new RegExp(rpc));
+ }
+ assert.match(context,/Promise\.allSettled/);
+ assert.match(context,/previewGithubWriteConfigured/);
+ assert.match(context,/summarizeRealitySelfAuditForModel\(audit\)/);
+ assert.match(context,/installation_authorized:false/);
+ assert.doesNotMatch(context,/model_self_authorized:true/);
 });

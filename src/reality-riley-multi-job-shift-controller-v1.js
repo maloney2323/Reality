@@ -41,8 +41,12 @@ export function verifyRileyMultiJobEligibility({
  const selected=shiftReadback.shifts.filter(x=>x.shift_id===shiftId);
  if(selected.length!==1)fail('EXACT_SHIFT_REQUIRED');
  const shift=selected[0];
+ // An exact completion-bound shift stays in scope until each independently
+ // verified original receipt is recorded. Service-only SQL and signed owner
+ // source fingerprints still fence all claims; no model can set this value.
  const within=Number(new Date(shift.planned_start_at))<=now.getTime()&&
-  Number(new Date(shift.planned_end_at))>now.getTime();
+  (shift.planned_end_at==='infinity'||
+   Number(new Date(shift.planned_end_at))>now.getTime());
  if(!within||!['RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(shift.status)||
    shift.steps[5].state!=='AWAITING_EXACT_WORK')
   fail('CURRENT_EXECUTION_SHIFT_GATE_REQUIRED');

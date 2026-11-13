@@ -4,6 +4,8 @@
 // verify the effect. NO installation, branch changes, or source repair claims.
 import {createHash} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {createRealityGovernedOpenAIGateway}
+ from './reality-governed-openai-gateway-v1.js';
 export const RILEY_AUTHORIZED_PR_REVIEW_VERSION='reality-riley-authorized-pr-review-original-v1';
 const REPO='maloney2323/Reality';
 const ROOT='https://api.github.com/repos/'+REPO;
@@ -90,9 +92,7 @@ function textFromModel(data){
    .map(x=>x.text).join('\n');
  return text.trim();
 }
-async function modelReview(source,{fetchImpl,apiKey,model}){
- if(typeof apiKey!=='string'||apiKey.length<12)
-  deny('OPENAI_CREDENTIAL_NOT_CONFIGURED');
+async function modelReview(source,{gateway,scope,readCurrentSource,model}){
  if(!/^[a-zA-Z0-9._-]{3,70}$/.test(model||''))
   deny('MODEL_IDENTITY_REQUIRED');
  const request={
@@ -117,15 +117,12 @@ async function modelReview(source,{fetchImpl,apiKey,model}){
       JSON.stringify(source).slice(0,12800)}]}
   ]
  };
- const response=await fetchImpl('https://api.openai.com/v1/responses',{
-  method:'POST',cache:'no-store',redirect:'error',
-  signal:AbortSignal.timeout(20000),
-  headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
-  body:JSON.stringify(request)
+ const verdict=await gateway.originalJobReadOnlyInference({
+  scope,sourceHeadSha:source.head_sha,request,readCurrentSource
  });
- if(!response?.ok)deny('OPENAI_PROVIDER_HTTP_'+
-  (Number(response?.status)||0));
- const data=await response.json().catch(()=>null);
+ if(verdict.status!=='CURRENT_ORIGINAL_REVIEW_ADVISORY_UNTRUSTED')
+  deny(verdict.reason||'REALITY_MODEL_GATEWAY_PROVIDER_UNAVAILABLE');
+ const data=verdict.data;
  const text=textFromModel(data);
  if(data?.status!=='completed')
   deny('MODEL_RESPONSE_NOT_COMPLETED');
@@ -243,11 +240,45 @@ export async function runAuthorizedRileyPrReview({
   let source,modelResult;
   try{
    source=await sourceDetails(c,{fetchImpl,token:githubToken});
-   modelResult=await modelReview(source,{fetchImpl,apiKey:openaiKey,model});
+   // The shared Reality gateway, not Riley or OpenAI, owns the
+   // authorized model boundary for this REAL original job.
+   if(typeof openaiKey!=='string'||openaiKey.length<12)
+    deny('OPENAI_CREDENTIAL_NOT_CONFIGURED');
+   const gateway=createRealityGovernedOpenAIGateway({
+    apiKey:openaiKey,model,fetchImpl,
+    readCurrentOriginal:async exact=>{
+     const receipt=await callRpc(db,
+      'reality_read_authorized_pr_review_model_scope_v1',{
+       p_owner_id:exact.owner_id,p_original_work_id:exact.original_work_id,
+       p_claim_id:exact.claim_id},{fetchImpl});
+     return receipt;
+    }
+   });
+   modelResult=await modelReview(source,{gateway,model,
+    scope:Object.freeze({
+     owner_id:c.owner_id,shift_id:c.shift_id,claim_id:c.claim_id,
+     original_work_id:c.original_work_id,source_ref:c.source_ref,
+     source_proof_sha256:c.source_proof_sha256
+    }),
+    readCurrentSource:async()=>{
+     const pr=await github('/pulls/'+source.number,{
+      fetchImpl,token:githubToken});
+     if(pr?.number!==source.number||pr.html_url!==c.source_ref||
+        pr.state!=='open'||pr.draft===true||!SHA.test(pr.head?.sha||''))
+      deny('GITHUB_LIVE_PR_HEAD_READBACK_UNVERIFIED');
+     return Object.freeze({source_ref:pr.html_url,head_sha:pr.head.sha,
+      independently_read:true,read_only:true,production_changed:false});
+    }
+   });
   }catch(e){
    const code=String(e?.message||'');
    return unavailable(/^RILEY_PR_REVIEW_[A-Z0-9_]{5,100}$/.test(code)?
-    code:'PR_REVIEW_SOURCE_OR_MODEL_UNAVAILABLE');
+    code:
+    code.startsWith('REALITY_OPENAI_GATEWAY_ORIGINAL_REVIEW_')?
+     'PR_REVIEW_REALITY_SCOPE_OR_SOURCE_CHANGED_NO_MODEL_EFFECT':
+    code.startsWith('REALITY_OPENAI_GATEWAY_')?
+     'PR_REVIEW_REALITY_GATEWAY_PREFLIGHT_REJECTED':
+     'PR_REVIEW_SOURCE_OR_MODEL_UNAVAILABLE');
   }
   const body=makeComment(c,source,modelResult);
   const prepared=await callRpc(db,'reality_prepare_authorized_riley_pr_review_v1',{
@@ -266,6 +297,11 @@ export async function runAuthorizedRileyPrReview({
   const source=await sourceDetails(c,{fetchImpl,token:githubToken});
   if(source.head_sha!==c.source_head_sha)
    return unavailable('PR_REVIEW_SOURCE_CHANGED_BEFORE_GITHUB_WRITE');
+  // Credential preflight MUST precede durable publish intent. Missing
+  // permission is an environment/authority gap, not an uncertain effect;
+  // PREPARED remains recoverable without a second job or unsafe POST.
+  if(typeof githubToken!=='string'||githubToken.length<25)
+   return unavailable('PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING');
   const marked=await callRpc(db,'reality_mark_authorized_riley_pr_publish_v1',{
    p_original_work_id:c.original_work_id,p_claim_id:c.claim_id},{fetchImpl});
   if(marked?.status!=='PR_REVIEW_PUBLISH_INTENT_DURABLY_RECORDED'||

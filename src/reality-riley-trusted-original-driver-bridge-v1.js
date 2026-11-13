@@ -22,7 +22,7 @@ export function createRileyTrustedOriginalDriver({
  loadTrustedAuthorizedOriginal,
  callRpc=null,runOriginal=runRileyOriginalJobViaReality,
  runTick=runRileyGovernedMultiJobShiftTick,
- now=()=>new Date(),
+ now=()=>new Date(),batchEligibleOriginals=false,
 }={}){
  if(!db||typeof db.secretKey!=='string'||db.secretKey.length<8||
   typeof db.url!=='string'||!db.url.startsWith('https://')||
@@ -30,7 +30,8 @@ export function createRileyTrustedOriginalDriver({
   typeof runOriginal!=='function'||typeof now!=='function'||
   [loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal]
    .some(x=>typeof x!=='function')||
-  (callRpc!==null&&typeof callRpc!=='function'))
+  (callRpc!==null&&typeof callRpc!=='function')||
+  typeof batchEligibleOriginals!=='boolean')
   fail('ALL_TRUSTED_SERVER_ADAPTERS_REQUIRED');
  const rpc=callRpc|| (async({db,name,args,fetchImpl})=>
   shiftRpc(db,name,args,{fetchImpl}));
@@ -47,6 +48,14 @@ export function createRileyTrustedOriginalDriver({
     !SHA.test(input.source_proof_sha256||''))
    fail('EXACT_SOURCE_BOUNDED_SHIFT_SCOPE_REQUIRED');
 
+  const hasBatch=Object.hasOwn(input,'batch_original_work_ids');
+  const batchIds=hasBatch?input.batch_original_work_ids:null;
+  if(hasBatch&&(!batchEligibleOriginals||!Array.isArray(batchIds)||
+      batchIds.length<2||batchIds.length>4||
+      batchIds[0]!==input.original_work_id||
+      batchIds.some(id=>!WORK.test(id||''))||
+      new Set(batchIds).size!==batchIds.length))
+   fail('INDEPENDENT_MULTI_ORIGINAL_WAKE_SCOPE_REQUIRED');
   const observation=await rpc({db,fetchImpl,
    name:'reality_read_eligible_shift_originals_v1',
    args:{p_shift_id:input.shift_id}});
@@ -62,6 +71,8 @@ export function createRileyTrustedOriginalDriver({
     observation.candidate_count!==observation.candidates.length)
    fail('CURRENT_SERVICE_ONLY_ELIGIBILITY_READBACK_REQUIRED');
   const candidates=observation.candidates;
+  if(new Set(candidates.map(c=>c.original_work_id)).size!==candidates.length)
+   fail('DUPLICATED_ORIGINAL_ID_IN_SHIFT_BATCH');
   const selected=candidates.filter(c=>
    c.original_work_id===input.original_work_id);
   if(selected.length!==1||
@@ -79,22 +90,35 @@ export function createRileyTrustedOriginalDriver({
   const owner=selected[0].owner_id;
   if(candidates.some(c=>c.owner_id!==owner))
    fail('MULTI_OWNER_SCOPE_NOT_ALLOWED');
+  const eligibleIds=new Set(candidates.map(c=>c.original_work_id));
+  // Every member of a multi-job execution batch must have a separate
+  // independently verified wake in THIS shift. A newly arrived candidate
+  // cannot quietly piggyback on a previous job's authorization.
+  if(hasBatch&&(eligibleIds.size!==batchIds.length||
+     batchIds.some(id=>!eligibleIds.has(id))))
+   fail('BATCH_WAKE_AND_CURRENT_OWNER_ORIGINALS_DIVERGED');
   // The existing runner does the independent owner/shift/ledger readbacks,
   // takes the global single-use database claim, invokes the shared executor,
   // records the result and reconciles final original-job receipts.
-  // Only one exact original may be attempted for this shift pulse.
+  // The previously verified root original anchors this pulse. When the
+  // trusted preview worker elects shift batching, all other original jobs
+  // must independently survive service-only owner/shift, source digest,
+  // current Continuity, atomic claim and settlement checks in runTick.
+  // A wake alone cannot mint execution authority for any candidate.
+  const batchLimit=hasBatch?batchIds.length:1;
   const result=await runTick({
    db,ownerId:owner,shiftId:input.shift_id,fetchImpl,
    loadShiftReadback,loadOwnerLedgerReadback,loadTrustedAuthorizedOriginal,
-   callRpc:rpc,runOriginal,now,maxJobs:1,
-   onlyOriginalWorkId:input.original_work_id
+   callRpc:rpc,runOriginal,now,maxJobs:batchLimit,
+   onlyOriginalWorkId:hasBatch?null:input.original_work_id
   });
   if(result?.status!=='SHIFT_TICK_OUTCOMES_RECORDED_RECHECK_MORE_AUTHORIZED_WORK'||
     result.shift_id!==input.shift_id||
     !Array.isArray(result.outcomes)||
     !result.outcomes.some(x=>x.original_work_id===input.original_work_id)||
-    result.outcomes.length>1||
-    result.attempted>1||
+    result.outcomes.length>batchLimit||
+    result.attempted>batchLimit||
+    result.outcomes.some(x=>!eligibleIds.has(x.original_work_id))||
     result.installation_authorized!==false||
     result.production_changed!==false||
     result.shift_finished!==false||

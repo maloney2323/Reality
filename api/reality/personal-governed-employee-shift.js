@@ -1,4 +1,5 @@
-// Owner-authenticated 1–12-hour shift creation and independent progress.
+// Owner-authenticated exact-job shift creation and independent completion.
+// Legacy hour planning is not a deadline for completion-bound warrants.
 // First approval authorizes source checks, NOT arbitrary new original jobs or
 // installs. Exact upgrades are presented in EXISTING Reality Chat.
 import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
@@ -15,6 +16,10 @@ import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
 import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
+import {assertRealityUnifiedShiftGraph}
+ from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {assessRealityNativeBatchReadiness}
+ from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
 import {projectRileyExistingBacklog}
@@ -66,6 +71,43 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
   source_coverage_complete:reconciled.source_coverage_complete});
 }
 
+// Never offer a previously independently settled owner's original-job
+// source as a fresh source assignment simply to fill a four-slot work plan.
+// These receipts are CURRENT owner-scoped service-role DB readbacks, not
+// old UI strings, model advice or an inference from an issue being open.
+export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
+ if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
+ const [reviews,triage]=await Promise.all([
+  call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId})
+ ]);
+ if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
+    reviews.production_changed!==false||
+    !Array.isArray(reviews.jobs)||reviews.jobs.length>10||
+    triage?.status!=='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'||
+    triage.production_changed!==false||
+    !Array.isArray(triage.jobs)||triage.jobs.length>5)
+  throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
+ const refs=new Set();
+ for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
+  for(const j of data){
+   if(j?.phase!=='SETTLED')continue;
+   const source=String(j.source_ref||'');
+   const receipt=String(j.settlement_receipt_ref||'');
+   if(j.original_job_completed!==true||
+      !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
+      (kind==='PR_REVIEW'?
+       !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(source)||
+       !/^supabase:riley_pr_review_originals_v1:[a-f0-9-]{36}$/.test(receipt):
+       source!=='https://github.com/maloney2323/Reality/issues/143'||
+       !/^supabase:riley_shift_failure_triage_v1:[a-f0-9-]{36}$/.test(receipt))
+   )throw Error('SHIFT_SETTLED_JOB_INDEPENDENT_RECEIPT_INVALID');
+   refs.add(source);
+  }
+ }
+ return Object.freeze([...refs].sort());
+}
+
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -94,7 +136,10 @@ export default async function handler(req,res){
    const read=assertShiftReadback(await shiftRpc(db,'reality_read_owner_employee_shifts_v1',
     {p_owner_id:session.user_id}));
    let handoffs=[],handoff_status='NO_VERIFIED_SHIFT_BOUND_CAPABILITY_REQUEST';
-   const active=read.shifts.some(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status));
+   const active=read.shifts.some(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+       (s.planned_end_at==='infinity'||(
+        Number.isFinite(Date.parse(s.planned_end_at))&&
+        Date.parse(s.planned_end_at)>Date.now())));
    if(active){
     try{
      const [qualified,loop]=await Promise.all([
@@ -171,6 +216,159 @@ export default async function handler(req,res){
         ))))
       riley_code_repair_jobs=x;
    }catch{/* Do not mistake missing readback for completed repair. */}
+   // Owner-scoped database records distinguish permission from work:
+   // authorization, actual server pulse, step claim, verification and receipt.
+   let shift_activity=null,shift_activity_status='NO_SHIFT_ACTIVITY_YET';
+   const chosen=read.shifts.find(s=>
+    ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+     (s.planned_end_at==='infinity'||(
+      Number.isFinite(Date.parse(s.planned_end_at))&&
+      Date.parse(s.planned_end_at)>Date.now())))||read.shifts[0];
+   if(chosen){
+    try{
+     const activity=await shiftRpc(db,'reality_read_owner_shift_live_activity_v1',{
+      p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(activity?.status==='OWNER_SHIFT_LIVE_ACTIVITY_INDEPENDENT_READBACK'&&
+        activity.shift_id===chosen.shift_id&&
+        activity.owner_bound===true&&activity.installation_authorized===false&&
+        activity.production_changed===false&&
+        activity.original_job_completed_by_readback===false&&
+        Array.isArray(activity.source_events)&&activity.source_events.length<=20&&
+        Array.isArray(activity.original_jobs)&&activity.original_jobs.length<=20){
+      shift_activity=activity;shift_activity_status='VERIFIED_OWNER_ACTIVITY';
+     }else shift_activity_status='ACTIVITY_READBACK_SCOPE_UNVERIFIED';
+    }catch{shift_activity_status='ACTIVITY_READBACK_UNAVAILABLE';}
+   }
+   // One independently checked execution graph is shared by the worker
+   // and signed-in owner Chat. Source-native and Universe originals have
+   // the SAME owner/shift/source identity; no synthetic job or authority.
+   let shift_execution_graph=null;
+   let shift_execution_graph_status='NO_CURRENT_EXECUTION_GRAPH';
+   if(chosen?.planned_end_at==='infinity'&&
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(chosen.status)){
+    try{
+     const graph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+      'reality_read_owner_shift_execution_graph_v1',{
+       p_owner_id:session.user_id,p_shift_id:chosen.shift_id
+      }),{expectedShiftId:chosen.shift_id});
+     if(graph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+        graph.owner_id===session.user_id&&graph.jobs.length<=4){
+      shift_execution_graph={
+       status:graph.status,shift_id:graph.shift_id,
+       owner_id:graph.owner_id,plan_fingerprint:graph.plan_fingerprint,
+       next_action:graph.next_action,
+       jobs:graph.jobs.map(x=>({
+        source_step_index:x.source_step_index,
+        source_ref:x.source_ref,original_kind:x.original_kind,
+        original_work_id:x.original_work_id,phase:x.phase,
+        source_proof_sha256:x.source_proof_sha256,
+        independent_source_proof_verified:x.independent_source_proof_verified,
+        next_governed_action:x.next_governed_action
+       })),
+       installation_authorized:false,original_job_completed:false,
+       production_changed:false
+      };
+      shift_execution_graph_status='VERIFIED_CURRENT_OWNER_EXECUTION';
+     }else shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNVERIFIED';
+    }catch{shift_execution_graph_status='EXECUTION_GRAPH_READBACK_UNAVAILABLE';}
+   }
+   // Exact reviewed source patch is owner-private informational evidence;
+   // it is NOT a verified autonomous upgrade nor permission to install.
+   let riley_native_reviewed_patch=null;
+   let riley_native_reviewed_patch_status='NO_NATIVE_PATCH_REVIEW';
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     const patch=await shiftRpc(db,'reality_read_owner_native_reviewed_patch_v1',{
+      p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(patch?.status==='EXACT_NATIVE_ENGINEERING_PATCH_INDEPENDENTLY_TESTED_REVIEW_ONLY'&&
+        patch.owner_id===session.user_id&&
+        patch.shift_id===chosen.shift_id&&
+        /^work:[a-f0-9]{32}$/.test(patch.original_work_id||'')&&
+        /^sha256:[a-f0-9]{64}$/.test(patch.candidate_artifact_sha256||'')&&
+        /^[a-f0-9]{40}$/.test(patch.candidate_commit_sha||'')&&
+        Number.isSafeInteger(patch.independent_passing_run_id)&&
+        patch.independent_passing_run_id>10000&&
+        patch.provenance==='CHATGPT_REVIEWED_ENGINEERING_PATCH_AFTER_REJECTED_MODEL_DRAFT'&&
+        patch.owner_approval_ready===false&&
+        patch.native_install_to_settlement_accepted===false&&
+        patch.installation_authorized===false&&
+        patch.original_job_completed===false&&
+        patch.production_changed===false&&
+        shift_execution_graph.jobs.some(j=>j.original_work_id===patch.original_work_id)){
+      riley_native_reviewed_patch={
+       status:patch.status,original_work_id:patch.original_work_id,
+       shift_id:patch.shift_id,owner_id:patch.owner_id,
+       source_ref:patch.source_ref,
+       source_proof_sha256:patch.source_proof_sha256,
+       native_install_to_settlement_accepted:false,
+       candidate_commit_sha:patch.candidate_commit_sha,
+       candidate_artifact_sha256:patch.candidate_artifact_sha256,
+       independent_passing_run_id:patch.independent_passing_run_id,
+       provenance:patch.provenance,owner_approval_ready:false,
+       installation_authorized:false,original_job_completed:false,
+       production_changed:false
+      };
+      riley_native_reviewed_patch_status='VERIFIED_OWNER_SOURCE_PATCH_NOT_INSTALLABLE';
+     }else if(patch?.status==='NO_CURRENT_OWNER_NATIVE_REVIEWED_PATCH')
+      riley_native_reviewed_patch_status='NO_OWNER_TESTED_PATCH_YET';
+     else riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNVERIFIED';
+    }catch{riley_native_reviewed_patch_status='NATIVE_PATCH_READBACK_UNAVAILABLE';}
+   }
+   // No new authorization or installation can be inferred from a test run.
+   // The exact owner graph and artifact are evaluated together with the
+   // PREVIEW-only provider setup; unresolved execution gates stay closed.
+   let riley_native_batch_readiness=null;
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     riley_native_batch_readiness=assessRealityNativeBatchReadiness({
+      graph:shift_execution_graph,reviewedPatch:riley_native_reviewed_patch,
+      env:process.env,expectedProject:db.project
+     });
+    }catch{
+     riley_native_batch_readiness={
+      status:'NATIVE_BATCH_READINESS_UNVERIFIED',
+      ready_for_new_install_approval:false,
+      new_shift_required:false,installation_authorized:false,
+      original_job_completed:false,production_changed:false,
+      blockers:['OWNER_SOURCE_OR_ARTIFACT_READBACK_UNVERIFIED']
+     };
+    }
+   }
+   // Show only a service-read, owner-matched receipt from the exact active
+   // shift. This is proof of a real read-only OpenAI->Reality tool call,
+   // NOT native original execution, installation or final settlement.
+   let riley_native_model_tool_proof={
+    status:'NATIVE_MODEL_TOOL_OWNER_READBACK_UNAVAILABLE',
+    model_tool_readback_verified:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   };
+   if(shift_execution_graph_status==='VERIFIED_CURRENT_OWNER_EXECUTION'){
+    try{
+     const proof=await shiftRpc(db,
+      'reality_read_owner_native_readonly_tool_proof_v1',{
+       p_owner_id:session.user_id,p_shift_id:chosen.shift_id});
+     if(proof?.status==='OWNER_NATIVE_MODEL_TOOL_INDEPENDENT_READBACK_VERIFIED'&&
+       proof.shift_id===chosen.shift_id&&
+       proof.original_work_id===shift_execution_graph.jobs.find(x=>
+        x.source_ref==='https://github.com/maloney2323/Reality/issues/263')
+        ?.original_work_id&&
+       proof.model_tool_readback_verified===true&&
+       proof.tool_scope==='READ_ONLY_CURRENT_ORIGINAL_EVIDENCE'&&
+       /^sha256:[a-f0-9]{64}$/.test(proof.tool_readback_sha256||'')&&
+       Number.isSafeInteger(proof.model_call_count)&&
+       proof.model_call_count>=1&&proof.model_call_count<=3&&
+       Number.isFinite(Date.parse(proof.verified_at))&&
+       proof.installation_authorized===false&&
+       proof.original_job_completed===false&&
+       proof.production_changed===false)
+      riley_native_model_tool_proof=proof;
+     else if(proof?.model_tool_readback_verified===false&&
+        proof.installation_authorized===false&&
+        proof.original_job_completed===false&&
+        proof.production_changed===false)
+      riley_native_model_tool_proof=proof;
+    }catch{/* Never invent a missing model/tool receipt. */}
+   }
    const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
@@ -179,8 +377,11 @@ export default async function handler(req,res){
      const brief=buildRealityWorkdayOpportunityBrief(catalog);
      const priority=await ownerExistingRileySourcePriority({
       catalog,brief,ownerId:session.user_id,db});
+     const settledRefs=await ownerSettledOriginalSourceRefs({
+      ownerId:session.user_id,db});
      const plan=buildRealityEightHourShiftDraft(brief,{
-      durationHours:hours,prioritySourceRefs:priority.refs});
+      durationHours:hours,prioritySourceRefs:priority.refs,
+      excludedSettledSourceRefs:settledRefs});
      const fingerprint=computeShiftFingerprint(plan);
      const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
      draft={...plan,expected_fingerprint:fingerprint,
@@ -189,9 +390,14 @@ export default async function handler(req,res){
        employee_category_assignments:routeRealityWorkCategoriesToEmployees(brief),
        existing_owner_backlog_priorities:priority.refs,
        owner_backlog_issue_records_reconciled:priority.ranked,
-       owner_backlog_coverage_complete:priority.source_coverage_complete};
+       owner_backlog_coverage_complete:priority.source_coverage_complete,
+       previously_settled_original_source_refs_excluded:settledRefs};
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
+    shift_activity,shift_activity_status,
+    shift_execution_graph,shift_execution_graph_status,
+    riley_native_reviewed_patch,riley_native_reviewed_patch_status,
+    riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
@@ -207,10 +413,16 @@ export default async function handler(req,res){
    return res.status(415).json({ok:false,error:'SHIFT_JSON_REQUIRED'});
   const b=req.body||{},keys=Object.keys(b);
   if(!b||typeof b!=='object'||Array.isArray(b)||
-   ![3,4].includes(keys.length)||
-   keys.some(x=>!['action','expected_fingerprint','planned_start_at','requested_hours'].includes(x))||
-   (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
-   (keys.length===3&&Object.hasOwn(b,'requested_hours'))||
+   ![3,4,5].includes(keys.length)||
+   keys.some(x=>!['action','expected_fingerprint','planned_start_at',
+     'requested_hours','completion_bound'].includes(x))||
+   (b.completion_bound!==undefined&&b.completion_bound!==true)||
+   (b.completion_bound===true&&
+     (keys.length!==5||b.requested_hours!==8))||
+   (b.completion_bound!==true&&
+     (keys.length!==3&&keys.length!==4||
+      (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
+      (keys.length===3&&Object.hasOwn(b,'requested_hours'))))||
    (!Number.isSafeInteger(b.requested_hours??8)||
    (b.requested_hours??8)<1||(b.requested_hours??8)>12)||
    b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
@@ -224,8 +436,11 @@ export default async function handler(req,res){
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const priority=await ownerExistingRileySourcePriority({
    catalog,brief,ownerId:session.user_id,db});
+  const settledRefs=await ownerSettledOriginalSourceRefs({
+   ownerId:session.user_id,db});
   const plan=buildRealityEightHourShiftDraft(brief,{
-   durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs});
+   durationHours:b.requested_hours??8,prioritySourceRefs:priority.refs,
+   excludedSettledSourceRefs:settledRefs});
   const fingerprint=computeShiftFingerprint(plan);
   const combined=buildRileyTaylorCombinedWorkOrders({plan,fingerprint});
   // Do not create a timer-only idle shift when no paired source task was
@@ -237,7 +452,9 @@ export default async function handler(req,res){
   if(fingerprint!==b.expected_fingerprint)
    return res.status(409).json({ok:false,error:'SHIFT_SOURCE_CHANGED_REBUILD_PLAN'});
   const receipt=assertShiftReceipt(await shiftRpc(db,
-   'reality_authorize_employee_shift_v1',{
+   b.completion_bound===true?
+    'reality_authorize_employee_completion_shift_v1':
+    'reality_authorize_employee_shift_v1',{
     p_owner_id:session.user_id,p_fingerprint:fingerprint,
     p_source_observed_at:plan.observed_at,p_start_at:start.toISOString(),
     p_steps:plan.slots
@@ -247,11 +464,30 @@ export default async function handler(req,res){
    {p_owner_id:session.user_id}));
   const exact=read.shifts.find(s=>s.shift_id===receipt.shift_id&&
    s.plan_fingerprint===fingerprint&&s.steps.length===8&&
-   Number(new Date(s.planned_end_at))-Number(start)===plan.shift_duration_minutes*60000);
+   (b.completion_bound===true?
+     s.planned_end_at==='infinity'&&receipt.completion_bound===true:
+     Number(new Date(s.planned_end_at))-Number(start)===
+      plan.shift_duration_minutes*60000));
   if(!exact)throw Error('SHIFT_COMMIT_NOT_READ_BACK_VERIFIED');
+  const start_confirmation=Object.freeze({
+   status:'OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED',
+   shift_id:exact.shift_id,authorized_at:exact.authorized_at,
+   planned_start_at:exact.planned_start_at,
+   completion_bound:b.completion_bound===true,
+   exact_job_count:exact.steps.slice(1,5).filter(t=>t.source_ref).length,
+   selected_sources:exact.steps.slice(1,5).filter(t=>t.source_ref)
+    .map(t=>({step_index:t.step_index,source_ref:t.source_ref})),
+   worker_execution_verified:false,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  });
   return res.status(202).json({ok:true,...receipt,shift:exact,
+   start_confirmation,
    combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
+   completion_bound:b.completion_bound===true,
+   completion_condition:b.completion_bound===true?
+    'ALL_SELECTED_JOBS_INDEPENDENTLY_VERIFIED_AND_RECEIPTED':null,
    installation_authorized:false,
    existing_chat_approval_required_for_exact_capabilities:true,
    job_started:false,shift_started:false,

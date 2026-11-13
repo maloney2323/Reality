@@ -1,0 +1,29 @@
+name: Reality · Riley unattended real-source repair candidate
+on:
+  push:
+    branches:
+      - 'reality/riley/repair-263-*'
+    paths:
+      - 'src/reality-riley-service-original-runtime-v1.js'
+      - 'test/reality-riley-service-original-runtime-v1.test.js'
+      - '.github/workflows/reality-riley-native-repair-frozen-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-frozen-original:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check exact original runtime syntax
+        run: node --check src/reality-riley-service-original-runtime-v1.js
+      - name: Independently exercise frozen original-job acceptance
+        run: node --test test/reality-riley-service-original-runtime-v1.test.js
+      - name: Verify governed model-draft and source-control constraints
+        run: node --test test/reality-riley-native-model-draft-v1.test.js

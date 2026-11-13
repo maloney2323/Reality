@@ -4,6 +4,8 @@
 // The model can only offer bounded read-only advice; authority and independent
 // verification remain in the existing service-only database and executor.
 import {createHash} from 'node:crypto';
+import {createRealityGovernedOpenAIGateway}
+ from './reality-governed-openai-gateway-v1.js';
 
 export const COMBINED_ROLE_HANDOFF_VERSION='reality-one-openai-coordinated-role-handoff-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -61,12 +63,15 @@ function rejected(input,code){
  });
 }
 export function createOneOpenAICombinedRoleCoordinator({
- apiKey,model='gpt-5.4',fetchImpl=fetch
+ apiKey,model='gpt-5.4',fetchImpl=fetch,readCurrentShift
 }={}){
  if(typeof apiKey!=='string'||apiKey.length<12||
   typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,70}$/.test(model)||
-  typeof fetchImpl!=='function')
+  typeof fetchImpl!=='function'||typeof readCurrentShift!=='function')
   fail('TRUSTED_SERVER_OPENAI_ADAPTER_REQUIRED');
+ const gateway=createRealityGovernedOpenAIGateway({
+  apiKey,model,fetchImpl,readCurrentShift
+ });
  return async function coordinateClaimedRoleWork(input){
   const rule=validateInput(input);
   // Skip work that no longer exists. This is not a usable issue or job.
@@ -115,33 +120,13 @@ export function createOneOpenAICombinedRoleCoordinator({
      'Do not execute, install, merge or claim independent acceptance.'}]}
    ],
   };
-  let response;
   try{
-   response=await fetchImpl('https://api.openai.com/v1/responses',{
-    method:'POST',redirect:'error',cache:'no-store',
-    signal:AbortSignal.timeout(18000),
-    headers:{authorization:'Bearer '+apiKey,
-     'content-type':'application/json'},
-    body:JSON.stringify(payload),
+   const verdict=await gateway.readOnlyShiftAdvisory({
+    scope:input,request:payload
    });
-   if(!response.ok){
-    // Persist only a bounded HTTP class; NEVER expose provider body,
-    // authorization headers, prompt, token or untrusted error strings.
-    const status=Number(response.status);
-    const reason=status===400||status===422?'OPENAI_REQUEST_OPTIONS_REJECTED':
-      status===401||status===403?'OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED':
-      status===404?'OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND':
-      status===429?'OPENAI_RATE_OR_QUOTA_LIMIT':
-      status>=500&&status<=599?'OPENAI_PROVIDER_SERVER_FAILURE':
-      'OPENAI_RESPONSE_UNAVAILABLE';
-    return rejected(input,reason);
-   }
-   const data=await response.json();
-   if(data.status!=='completed'||
-     !Array.isArray(data.output)||
-     data.output.some(x=>['function_call','tool_search_call'].includes(x?.type))||
-     typeof data.id!=='string'||!/^resp_[a-zA-Z0-9_-]{4,160}$/.test(data.id))
-    return rejected(input,'OPENAI_PROVIDER_RESULT_UNVERIFIED');
+   if(verdict.status!=='UNTRUSTED_ADVISORY_ONLY')
+    return rejected(input,verdict.reason||'REALITY_GOVERNANCE_READBACK_UNVERIFIED');
+   const data=verdict.data;
    const fullAdvice=textFromResponse(data).trim();
    if(!fullAdvice)
     return rejected(input,'OPENAI_EMPTY_FINAL_ADVISORY');
@@ -181,7 +166,12 @@ export function createOneOpenAICombinedRoleCoordinator({
     installation_authorized:false,production_changed:false,
     read_only:true
    });
-  }catch{return rejected(input,'OPENAI_REQUEST_OR_TIMEOUT_UNVERIFIED')}
+  }catch(e){
+   const message=String(e?.message||'');
+   return rejected(input,message.startsWith('REALITY_OPENAI_GATEWAY_')?
+    'REALITY_GOVERNANCE_READBACK_UNVERIFIED':
+    'OPENAI_REQUEST_OR_TIMEOUT_UNVERIFIED');
+  }
  };
 }
 export function unavailableRoleHandoff(input){

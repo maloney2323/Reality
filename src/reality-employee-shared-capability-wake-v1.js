@@ -63,7 +63,10 @@ export async function wakeExistingRileyCapabilityJob({
  const wake=await dispatch({
   trigger_id:evidence.trigger_id,
   source_event_id:evidence.source_event_id,
-  original_work_id:evidence.original_work_id
+  original_work_id:evidence.original_work_id,
+  shift_id:evidence.shift_id,source_ref:evidence.source_ref,
+  source_proof_sha256:evidence.source_proof_sha256,
+  db,fetchImpl
  });
  if(wake?.dispatched!==true||
   wake.trigger_id!==evidence.trigger_id||
