@@ -5,6 +5,8 @@ import {admitVerifiedCurrentShiftCommitTriage}
  from '../src/reality-shift-commit-triage-handoff-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../src/reality-shift-unified-execution-controller-v1.js';
+import {projectRealityAutomaticShiftSupervisor}
+ from '../src/reality-automatic-shift-supervisor-v1.js';
 const shift='9460cfff-937a-4105-9093-2e41ab39a950';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const source='https://github.com/maloney2323/Reality/issues/62';
@@ -124,6 +126,33 @@ test('same shift graph accepts verified triage original but rejects an anonymous
   {...base.jobs[0],original_work_id:null}
  ]}),/COMMIT_TRIAGE_REQUIRES_VERIFIED_FROZEN_ISSUE_ORIGINAL/);
 });
+test('existing supervisor distinguishes unfinished verified triage from completed repair receipts',()=>{
+ const sourceJob={source_step_index:5,source_ref:source,
+  original_work_id:work,source_proof_sha256:ref,
+  independent_source_proof_verified:true,
+  original_kind:'REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL',
+  phase:'EVIDENCE_VERIFIED',
+  next_governed_action:'AWAIT_INDEPENDENT_COMMIT_TRIAGE_DISPOSITION',
+  capability_installation_authorized:false,
+  original_job_completed_by_graph:false,provider_effect_claimed_by_graph:false};
+ const g={status:'UNIFIED_OWNER_JOB_CONTROL_READY',shift_id:shift,
+  owner_id:owner,plan_fingerprint:'sha256:'+'d'.repeat(64),
+  jobs:[sourceJob],installation_authorized:false,production_changed:false};
+ const mixed={version:'reality-mixed-shift-receipts-v1',
+  shift_id:shift,current_shift_complete:false,read_only:true,
+  installation_authorized:false,production_changed:false,
+  completed_original_receipts:[],
+  source_items_without_verified_final_receipt:[source],
+  source_items_in_authorized_scope:1};
+ const x=projectRealityAutomaticShiftSupervisor(g,mixed);
+ assert.equal(x.sources_awaiting_final_receipt_verification,1);
+ assert.equal(x.independently_settled_originals,0);
+ assert.equal(x.jobs[0].status,
+  'INDEPENDENT_COMMIT_TRIAGE_EVIDENCE_RECORDED_AWAITING_DISPOSITION');
+ assert.equal(x.jobs[0].original_work_id,work);
+ assert.equal(x.automatically_started_job_count,0);
+ assert.equal(x.install_approval_authorized_by_triage,false);
+});
 test('SQL original admission cannot be used from browser, model, unscoped issue, or static claim',()=>{
  const sql=readFileSync(new URL(
   '../supabase/migrations/20261113_trusted_shift_commit_reference_triage_v1.sql',import.meta.url),'utf8');
@@ -138,6 +167,7 @@ test('SQL original admission cannot be used from browser, model, unscoped issue,
   /riley_commit_reference_triage_originals_v1/,
   /on conflict\(shift_id,source_ref\) do nothing/,
   /COMMIT_TRIAGE_PRIOR_ORIGINAL_SOURCE_CHANGED/,
+  /COMMIT_TRIAGE_PRIOR_ORIGINAL_REQUIRES_RECONCILIATION/,
   /revoke all on function public\.reality_admit_verified_shift_commit_triage_v1/,
   /to service_role/,
   /REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL/
