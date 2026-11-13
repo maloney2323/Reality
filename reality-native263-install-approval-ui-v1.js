@@ -1,5 +1,5 @@
-// Exactly ONE owner-facing native #263 upgrade-approval control.
-// Never interpret chat text, model responses, or passive refresh as consent.
+// Owner-facing, read-only job explanation plus the existing single exact
+// #263 approval action. Never infer consent from text, viewing or refresh.
 const API='/api/reality/native263-owner-install-approval';
 const WORK='work:873a6e74fd14c6beacc9042dd8021dfc';
 const SHIFT='9460cfff-937a-4105-9093-2e41ab39a950';
@@ -7,67 +7,200 @@ const HASH='sha256:459e2bbe9a9d9c7037c87542a9cdbebf06f77a6d368d72769c79fdbef7947
 const SOURCE='e44ee294f21c73803a2bcdb5a9cb487f0f80fc85';
 const element=id=>document.getElementById(id);
 let exact=null,submitted=false,inFlight=false;
-function safeCard(data){
- return data?.ok===true&&
-  data.status==='EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD'&&
-  data.original_work_id===WORK&&data.shift_id===SHIFT&&
-  data.artifact_sha256===HASH&&data.candidate_commit_sha===SOURCE&&
-  data.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
-  data.target_branch==='reality/isolated-openai-governance-gateway-20261108'&&
-  data.production_changed===false&&
-  typeof data.owner_approval_ready==='boolean';
+
+function safeCard(d){
+ return d?.ok===true&&
+  d.status==='EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD'&&
+  d.original_work_id===WORK&&d.shift_id===SHIFT&&
+  d.artifact_sha256===HASH&&d.candidate_commit_sha===SOURCE&&
+  d.source_ref==='https://github.com/maloney2323/Reality/issues/263'&&
+  d.target_branch==='reality/isolated-openai-governance-gateway-20261108'&&
+  d.production_changed===false&&
+  typeof d.owner_approval_ready==='boolean'&&
+  typeof d.original_job_completed==='boolean';
+}
+function host(){
+ return element('chat')||element('privateReady');
+}
+function visible(){
+ const h=host();
+ return !!h&&(!h.hidden)&&(h.id!=='privateReady'||h.style.display!=='none');
+}
+function add(tag,id,value,parent){
+ const n=document.createElement(tag);
+ if(id)n.id=id;
+ if(value)n.textContent=value;
+ parent.append(n);
+ return n;
+}
+function ensurePanel(){
+ const h=host();
+ if(!h)return null;
+ let p=element('native263InstallApprovalPanel');
+ if(!p){
+  p=add('section','native263InstallApprovalPanel','',document.createDocumentFragment());
+  p.setAttribute('aria-label','Reality current job #263 and owner decision');
+  p.setAttribute('aria-live','polite');
+  p.className='team-proof';
+  p.hidden=true;
+  add('h4',null,'Job #263 · Riley + Taylor',p);
+  add('p','native263ApprovalExplanation','Checking the recorded job state…',p);
+  add('p','native263ArtifactDetails','',p);
+  const b=add('button','native263ApproveInstall','Approve verified upgrade',p);
+  b.type='button';b.disabled=true;
+  add('p','native263ApprovalFeedback','',p).setAttribute('role','status');
+  h.prepend(p);
+ }
+ if(!element('native263OwnerSummary')){
+  const summary=add('p','native263OwnerSummary','Verifying the current work…',document.createDocumentFragment());
+  summary.style.fontWeight='750';
+  summary.style.fontSize='16px';
+  p.insertBefore(summary,element('native263ApprovalExplanation'));
+ }
+ if(!element('native263ProgressRows')){
+  const rows=add('div','native263ProgressRows','',document.createDocumentFragment());
+  rows.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;margin:12px 0';
+  for(const [id,title] of [
+   ['native263Completed','What has finished'],
+   ['native263Now','What Reality is doing'],
+   ['native263Next','What happens next'],
+   ['native263OwnerAction','Do you need to do anything?']
+  ]){
+   const box=add('div',null,'',rows);
+   box.style.cssText='padding:12px;background:#15283a;border:1px solid #3c5a75;border-radius:10px';
+   const label=add('strong',null,title,box);
+   label.style.cssText='display:block;margin-bottom:7px;color:#eff7ff;font-size:13px';
+   const value=add('p',id,'Reading evidence…',box);
+   value.style.cssText='font-size:13px;line-height:1.5;margin:0;color:#d6e5f4';
+  }
+  p.insertBefore(rows,element('native263ArtifactDetails'));
+ }
+ if(!element('native263EvidenceDisclosure')){
+  const disclosure=add('details','native263EvidenceDisclosure','',document.createDocumentFragment());
+  add('summary',null,'Technical evidence · original job and tested artifact',disclosure);
+  disclosure.append(element('native263ArtifactDetails'));
+  p.insertBefore(disclosure,element('native263ApproveInstall'));
+ }
+ if(!element('native263ProgressStyles')){
+  const css=add('style','native263ProgressStyles','',document.head);
+  css.textContent='#native263InstallApprovalPanel{margin:12px 0;padding:16px;border:1px solid #7496b8;border-radius:14px;background:#102437;color:#e4f0fa;line-height:1.5}'+
+   '#native263InstallApprovalPanel h4{margin:0 0 8px;color:#fff;font-size:17px}'+
+   '#native263InstallApprovalPanel>p{font-size:13px;line-height:1.5}'+
+   '#native263InstallApprovalPanel details{font-size:12px;overflow-wrap:anywhere;margin:12px 0}'+
+   '#native263InstallApprovalPanel button{background:#d2efff;color:#102838;border-radius:10px;min-height:46px;padding:10px 14px;font-size:15px;font-weight:750}'+
+   '#native263InstallApprovalPanel [hidden]{display:none!important}';
+ }
+ return p;
+}
+function renderInfo({summary,description,done,now,next,owner,button}){
+ const panel=ensurePanel();
+ if(!panel)return;
+ panel.hidden=false;
+ element('native263OwnerSummary').textContent=summary;
+ element('native263ApprovalExplanation').textContent=description;
+ element('native263Completed').textContent=done;
+ element('native263Now').textContent=now;
+ element('native263Next').textContent=next;
+ element('native263OwnerAction').textContent=owner;
+ const b=element('native263ApproveInstall');
+ b.hidden=!button;b.disabled=!button||submitted||inFlight;
+}
+function renderExact(d){
+ const state=d.approval_state;
+ const ready=d.owner_approval_ready===true&&
+  d.source_write_verified===true&&
+  d.automatic_preview_deploy_verified===true&&
+  d.same_original_continuation_and_receipt_verified===true&&
+  d.installation_authorized===false&&d.original_job_completed===false;
+ element('native263ArtifactDetails').textContent=
+  'Original '+WORK+' · Tested source '+SOURCE+
+  ' · Frozen artifact SHA-256 '+HASH+
+  ' · Isolated preview only. Source issue: github.com/maloney2323/Reality/issues/263';
+ if(d.original_job_completed===true){
+  submitted=true;
+  renderInfo({
+   summary:'Job #263 · Independently completed',
+   description:'The original-job ledger reports completion. This is not a claim of measured cost savings.',
+   done:'Owner authorization, installation and original-job settlement are recorded.',
+   now:'The work is complete according to the authenticated ledger readback.',
+   next:'Review the independently verified final receipt and actual business-value evidence.',
+   owner:'No further approval or start is required.',button:false
+  });
+ }else if(state==='SOURCE_INSTALLED'){
+  submitted=true;
+  renderInfo({
+   summary:'Job #263 · Installed, final receipt pending',
+   description:'Your one installation approval was recorded and the repair is installed in the isolated branch. Installation is not the same as a completed original job.',
+   done:'Verified candidate, your one approval, and source installation.',
+   now:'Reality must verify the exact deployed repair and independent original-job acceptance checks before it can record a final receipt.',
+   next:'Independently verify the installed commit, finish the same original job and record its final receipt. Any blocker must be shown explicitly.',
+   owner:'Nothing to approve or restart. Your approval is already recorded.',button:false
+  });
+ }else if(state!=='STAGED_UNAPPROVED'){
+  submitted=true;
+  renderInfo({
+   summary:'Job #263 · Approved, awaiting installation proof',
+   description:'An exact owner approval is recorded; the installation result has not yet been independently confirmed.',
+   done:'The repair candidate was tested and the owner decision recorded.',
+   now:'The authorized worker is responsible for the one-time installation and independent readback.',
+   next:'Confirm the exact installed commit, acceptance tests and final receipt.',
+   owner:'Do not approve twice or start another shift.',button:false
+  });
+ }else if(ready){
+  renderInfo({
+   summary:'Job #263 · Ready for your installation decision',
+   description:'The repair was tested and the installation-to-receipt pathway was checked. No source installation has been authorized yet.',
+   done:'Original job identified, fix independently tested, guarded installation and continuation path verified.',
+   now:'Reality is waiting for your one exact installation approval.',
+   next:'Once approved, Reality installs in isolation, verifies the same job and attempts to record a final receipt automatically.',
+   owner:'Review the tested artifact, then choose “Approve verified upgrade” once if you want to install it.',button:true
+  });
+ }else{
+  renderInfo({
+   summary:'Job #263 · Verification gate still closed',
+   description:'The current owner readback does not authorize installation. A tested candidate is not the same as installation readiness.',
+   done:'The candidate exists, but all release conditions have not been independently confirmed.',
+   now:'Reality must verify its missing installation or continuation evidence.',
+   next:'Show the specific failed check, then present the one approval only if the gate passes.',
+   owner:'No approval is available. Do not start another shift.',button:false
+  });
+ }
 }
 export async function refreshExactNative263InstallApproval(){
- if(submitted||inFlight||!element('chat')||element('chat').hidden)return;
+ if(inFlight||!visible())return;
+ const panel=ensurePanel();
+ if(!panel)return;
  inFlight=true;
- const panel=element('native263InstallApprovalPanel');
- const button=element('native263ApproveInstall');
- if(!panel||!button){inFlight=false;return}
- button.disabled=true;
  try{
   const response=await fetch(API,{credentials:'same-origin',cache:'no-store',
    signal:AbortSignal.timeout(13000)});
   const data=await response.json().catch(()=>null);
-  if(!response.ok||!safeCard(data))throw Error('READBACK_NOT_VERIFIED');
-  exact=data;
-  panel.hidden=false;
-  element('native263ArtifactDetails').textContent=
-   'Original '+WORK+' · Tested commit '+SOURCE+' · Artifact SHA-256 '+HASH;
-  if(data.approval_state!=='STAGED_UNAPPROVED'){
-   submitted=true;
-   button.textContent='Already approved · Reality continuing';
-   element('native263ApprovalExplanation').textContent=
-    'The exact approval has been recorded once. The existing worker owns installation and original-job continuation. No third confirmation.';
-  }else if(data.owner_approval_ready===true&&
-   data.source_write_verified===true&&
-   data.automatic_preview_deploy_verified===true&&
-   data.same_original_continuation_and_receipt_verified===true&&
-   data.installation_authorized===false&&
-   data.original_job_completed===false){
-   button.disabled=false;
-   button.textContent='Approve verified upgrade';
-   element('native263ApprovalExplanation').textContent=
-    'One approval installs this exact tested repair in isolated preview and automatically resumes the same job. No separate Resume button.';
-  }else{
-   button.textContent='Approval gated · Verification incomplete';
-   element('native263ApprovalExplanation').textContent=
-    'GitHub source writing and Vercel automatic preview deployment are proven. Same-original continuation and independent final receipt still need verification. No approval or installation is authorized.';
-  }
+  if(!response.ok||!safeCard(data))throw Error('OWNER_READBACK_UNVERIFIED');
+  exact=data;renderExact(data);
  }catch{
-  exact=null;panel.hidden=false;button.disabled=true;
-  element('native263ApprovalExplanation').textContent=
-   'Owner approval evidence could not be verified. Installation remains blocked; do not repeat an uncertain approval.';
+  exact=null;
+  renderInfo({
+   summary:'Job #263 · Live status unavailable',
+   description:'Reality cannot verify the latest owner-scoped job record right now. This is a connection or proof problem, not proof that the job failed or finished.',
+   done:'No current event can be confirmed from this screen.',
+   now:'Waiting for authenticated provider readback.',
+   next:'Retry the read-only status check after your session is connected.',
+   owner:'Do not reapprove or restart based on an unavailable readback.',button:false
+  });
  }finally{inFlight=false}
 }
 async function approveExactlyOnce(){
  const button=element('native263ApproveInstall');
  if(submitted||inFlight||!exact||!safeCard(exact)||
+  exact.approval_state!=='STAGED_UNAPPROVED'||
   exact.owner_approval_ready!==true||
+  exact.source_write_verified!==true||
+  exact.automatic_preview_deploy_verified!==true||
   exact.same_original_continuation_and_receipt_verified!==true||
+  exact.installation_authorized!==false||
   exact.original_job_completed!==false)return;
  submitted=true;button.disabled=true;inFlight=true;
- element('native263ApprovalFeedback').textContent=
-  'Recording one exact owner approval…';
+ element('native263ApprovalFeedback').textContent='Recording one exact owner decision…';
  try{
   const response=await fetch(API,{
    method:'POST',credentials:'same-origin',cache:'no-store',
@@ -84,28 +217,30 @@ async function approveExactlyOnce(){
    d.production_changed!==false||d.retry_owner_approval!==false||
    !['OWNER_APPROVED_EXACT_NATIVE263_INSTALL_AUTO_CONTINUATION',
      'NATIVE263_EXACT_OWNER_APPROVAL_ALREADY_RECORDED_NO_REAPPROVE'].includes(d.status))
-    throw Error('APPROVAL_NOT_CONFIRMED');
-  button.textContent='Approved once · Reality continuing';
+   throw Error('APPROVAL_NOT_CONFIRMED');
   element('native263ApprovalFeedback').textContent=
-   'Exact approval recorded. Reality automatically installs, verifies deployment and resumes original #263. Final completion requires an independent receipt.';
+   'Approval recorded once. The existing worker installs and verifies the same original job automatically. The final receipt is not yet guaranteed.';
  }catch{
   element('native263ApprovalFeedback').textContent=
-   'Approval outcome uncertain: refresh the owner ledger before any further action. Do not click approval again.';
- }finally{inFlight=false}
+   'Approval result is uncertain. Reality must read its ledger before any other action. Do not click a second time.';
+ }finally{
+  inFlight=false;
+  void refreshExactNative263InstallApproval();
+ }
 }
 export function mountNative263ExactInstallApproval(){
- const panel=element('native263InstallApprovalPanel');
- const button=element('native263ApproveInstall');
- if(!panel||!button)return;
- button.addEventListener('click',()=>{void approveExactlyOnce()});
- element('refresh')?.addEventListener('click',()=>{
-  if(!submitted)void refreshExactNative263InstallApproval();
- });
- const chat=element('chat');
- if(chat)new MutationObserver(()=>{
-  if(!chat.hidden&&!submitted)void refreshExactNative263InstallApproval();
-  if(chat.hidden){panel.hidden=true;exact=null}
- }).observe(chat,{attributes:true,attributeFilter:['hidden']});
- if(chat&&!chat.hidden)void refreshExactNative263InstallApproval();
+ const panel=ensurePanel();
+ if(!panel)return;
+ element('native263ApproveInstall').addEventListener('click',()=>{void approveExactlyOnce()});
+ element('refresh')?.addEventListener('click',()=>{void refreshExactNative263InstallApproval()});
+ const h=host();
+ if(h){
+  new MutationObserver(()=>{if(visible())void refreshExactNative263InstallApproval();else panel.hidden=true})
+   .observe(h,{attributes:true,attributeFilter:['hidden','style']});
+ }
+ if(visible())void refreshExactNative263InstallApproval();
+ window.addEventListener('focus',()=>{void refreshExactNative263InstallApproval()});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshExactNative263InstallApproval()});
+ setInterval(()=>{if(!document.hidden)void refreshExactNative263InstallApproval()},30000);
 }
 if(typeof document!=='undefined')mountNative263ExactInstallApproval();
