@@ -93,3 +93,28 @@ test('missing broker token preserves prepared original without new provider writ
  assert.match(worker,/riley_governed_pr_write_broker/);
  assert.doesNotMatch(edge,/eval\(|new Function\(|Deno\.env\.get\('REALITY_GITHUB_TOKEN'\)/);
 });
+
+test('uncertain GitHub publication remains Reality-broker readback-only on future wakes',async()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const code=worker.slice(worker.indexOf('let governedPrProvider'),worker.indexOf('// Admit the ACTUAL'));
+ assert.match(code,/PR_REVIEW_GITHUB_WRITER_CREDENTIAL_MISSING/);
+ assert.match(code,/PR_REVIEW_PUBLISH_EFFECT_UNCERTAIN_READBACK_ONLY/);
+ assert.match(code,/executeExactlyPreparedRileyReviewViaReality/);
+ const f=fixture({status:'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_created:false,code_installed:false});
+ const result=await executeExactlyPreparedRileyReviewViaReality({
+  db,env,graph:{...graph,jobs:[{...graph.jobs[0],phase:'PUBLISHING'}]},
+  fetchImpl:f.fetchImpl});
+ assert.equal(result.status,'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY');
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.requests.length,1);
+ assert.equal(f.requests[0].body,'{"version":1}');
+ const broker=readFileSync(new URL(
+  '../supabase/functions/reality-governed-pr-review-publisher-v1/index.ts',
+  import.meta.url),'utf8');
+ assert.match(broker,/if\(c\.phase==='PUBLISHING'\)/);
+ assert.match(broker,/PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY/);
+ assert.match(broker,/reality_mark_authorized_riley_pr_publish_v1/);
+});
