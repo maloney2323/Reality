@@ -177,7 +177,19 @@
   const openWork=document.getElementById('realityChatOpenInspector');
   if(document.body.dataset.realityChatPanel!=='work')openWork?.click();
   block.scrollIntoView({block:'start'});
-  void load();
+  // A deep link must not ask the shift API before Chat has restored its
+  // authenticated session. This is a read-only wait, not an approval.
+  const ready=document.getElementById('privateReady');
+  if(ready?.style.display==='block'){void load();return;}
+  info.textContent='Checking the Reality Chat session before reading your existing shift. No new shift has been requested.';
+  if(!ready||revealLinkedShift.authObserver)return;
+  const observer=new MutationObserver(()=>{
+   if(ready.style.display!=='block')return;
+   observer.disconnect();revealLinkedShift.authObserver=null;
+   if(location.hash==='#realityCreateShift')void load();
+  });
+  revealLinkedShift.authObserver=observer;
+  observer.observe(ready,{attributes:true,attributeFilter:['style']});
  }
  window.addEventListener('hashchange',revealLinkedShift);
  revealLinkedShift();
