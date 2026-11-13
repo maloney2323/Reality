@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {admitVerifiedCurrentShiftCommitTriage}
  from '../src/reality-shift-commit-triage-handoff-v1.js';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../src/reality-shift-unified-execution-controller-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
@@ -36,6 +37,30 @@ const evidence={status:'EXACT_SHIFT_COMMIT_TRIAGE_PROVIDER_EVIDENCE_RECORDED',
  shift_id:shift,original_work_id:work,source_ref:source,commit_sha:commit,
  phase:'EVIDENCE_VERIFIED',independent_provider_readback_verified:true,
  original_job_completed:false,installation_authorized:false,production_changed:false};
+test('live shift RPC boundary permits only the existing two source-bound admission functions',async()=>{
+ const calls=[];
+ const db={url:'https://hvkfreoagbrphwghjajw.supabase.co',
+  secretKey:'test-only-fake-service-key'};
+ const fetchImpl=async(url,request)=>{
+  calls.push({url,method:request.method,body:JSON.parse(request.body)});
+  return {ok:true,json:async()=>({status:'SIMULATED_READBACK_ONLY'})};
+ };
+ for(const rpc of [
+  'reality_admit_verified_shift_commit_triage_v1',
+  'reality_record_verified_shift_commit_triage_v1'
+ ]){
+  const result=await shiftRpc(db,rpc,{}, {fetchImpl});
+  assert.equal(result.status,'SIMULATED_READBACK_ONLY');
+ }
+ assert.equal(calls.length,2);
+ assert.equal(calls[0].method,'POST');
+ assert.equal(calls[1].method,'POST');
+ assert.ok(calls.every(x=>x.url.startsWith(
+  'https://hvkfreoagbrphwghjajw.supabase.co/rest/v1/rpc/reality_')));
+ await assert.rejects(()=>shiftRpc(db,'reality_unscoped_open_any_job_v1',{},
+  {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
+ assert.equal(calls.length,2);
+});
 test('frozen owner shift permits one verified triage admission plus durable independent evidence only',async()=>{
  const calls=[],g=graph();
  const x=await admitVerifiedCurrentShiftCommitTriage({
