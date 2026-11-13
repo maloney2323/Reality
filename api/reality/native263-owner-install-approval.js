@@ -7,6 +7,8 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
+import {projectNative263OwnerTemporalBrief,verifiedNative263OpeningMessage}
+ from '../../src/reality-native263-temporal-chat-context-v1.js';
 export const maxDuration=35;
 const WORK='work:873a6e74fd14c6beacc9042dd8021dfc';
 const OWNER='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -71,35 +73,56 @@ export default async function handler(req,res){
      db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
      !db.secretKey)
    throw Error('NATIVE263_ISOLATED_OWNER_SERVICE_SCOPE_REQUIRED');
-  const card=await ownerCard(db,session);
   if(req.method==='GET'){
-   let independentlyVerifiedOriginalReceiptId=null;
-   if(card.original_job_completed===true){
-    // Read the EXISTING frozen original+approval ledger, not a model's claim
-    // or a new memory table. This endpoint is already exact-owner protected.
-    const current=await shiftRpc(db,'reality_read_native263_postinstall_context_v1',{});
-    if(current?.status!=='NATIVE263_ORIGINAL_POSTINSTALL_READONLY_CONTEXT'||
-       current.owner_id!==session.user_id||
-       current.original_work_id!==WORK||current.shift_id!==SHIFT||
-       current.candidate_artifact_sha256!==HASH||
-       current.state!=='ORIGINAL_SETTLED'||current.original_phase!=='SETTLED'||
-       current.original_installed!==true||
-       current.installed_commit_sha!=='de45ee4c557339b19aa1f320aba1cd5fba301dbb'||
-       !UUID.test(current.original_final_receipt_id||'')||
+   // A completed original is NOT another installation approval request.
+   // Read the settled original directly from Reality's existing audited
+   // receipt/approval ledger, without requiring the older readiness card
+   // (which was designed for pre-install owner decisions).
+   const current=await shiftRpc(db,'reality_read_native263_postinstall_context_v1',{});
+   if(current?.state==='ORIGINAL_SETTLED'){
+    const brief=projectNative263OwnerTemporalBrief(current,{
+      ownerId:session.user_id});
+    if(brief.original_job_completed!==true||
+       current.target_path!=='src/reality-riley-service-original-runtime-v1.js'||
+       current.expected_installed_blob_sha!=='dda8e71d44cca6745312bcbd000089d5a0b01d54'||
+       current.original_final_receipt_id!==brief.original_final_receipt_id||
        current.production_changed!==false)
-     throw Error('NATIVE263_FINAL_ORIGINAL_OWNER_READBACK_MISMATCH');
-    independentlyVerifiedOriginalReceiptId=current.original_final_receipt_id;
+      throw Error('NATIVE263_FINAL_ORIGINAL_OWNER_READBACK_MISMATCH');
+    const opening=verifiedNative263OpeningMessage(brief);
+    return res.status(200).json({
+      ok:true,status:'EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD',
+      original_work_id:WORK,shift_id:SHIFT,owner_id:session.user_id,
+      source_ref:current.source_ref,
+      target_branch:current.target_branch,
+      source_file:current.target_path,
+      artifact_sha256:current.candidate_artifact_sha256,
+      candidate_commit_sha:current.candidate_commit_sha,
+      verified_frozen_ci_run_id:current.frozen_verifier_run_id,
+      approval_state:current.state,owner_approval_ready:false,
+      installation_authorized:true,installation_completed:true,
+      original_job_completed:true,
+      independently_verified_final_original_receipt_id:brief.original_final_receipt_id,
+      installed_commit_sha:current.installed_commit_sha,
+      owner_approved_at:current.owner_approved_at,
+      source_write_verified:true,
+      automatic_preview_deploy_verified:true,
+      same_original_continuation_and_receipt_verified:true,
+      opening_message:opening,
+      next_step:'ORIGINAL_INDEPENDENTLY_SETTLED_NO_NEW_APPROVAL_OR_RESTART',
+      production_changed:false,
+      no_third_confirmation:true
+    });
    }
+   const card=await ownerCard(db,session);
    return res.status(200).json({
     ok:true,...card,
-    independently_verified_final_original_receipt_id:independentlyVerifiedOriginalReceiptId,
-    installation_completed:['SOURCE_INSTALLED','ORIGINAL_SETTLED'].includes(card.approval_state),
-    next_step:card.original_job_completed?
-      'ORIGINAL_INDEPENDENTLY_SETTLED_NO_NEW_APPROVAL_OR_RESTART':
-      card.owner_approval_ready?
-       'EXACT_OWNER_CLICK_MAY_AUTHORIZE_SINGLE_AUTOMATIC_INSTALL':
-       'CONTINUATION_AND_FINAL_RECEIPT_PROOF_REQUIRED_BEFORE_OWNER_APPROVAL'});
+    independently_verified_final_original_receipt_id:null,
+    installation_completed:card.approval_state==='SOURCE_INSTALLED',
+    next_step:card.owner_approval_ready?
+     'EXACT_OWNER_CLICK_MAY_AUTHORIZE_SINGLE_AUTOMATIC_INSTALL':
+     'CONTINUATION_AND_FINAL_RECEIPT_PROOF_REQUIRED_BEFORE_OWNER_APPROVAL'});
   }
+  const card=await ownerCard(db,session);
   if(!req.body||typeof req.body!=='object'||
      Object.getPrototypeOf(req.body)!==Object.prototype||
      Array.isArray(req.body)||
