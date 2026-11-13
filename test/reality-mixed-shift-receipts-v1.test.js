@@ -98,5 +98,5 @@ test('owner endpoint projects receipt reconciliation only after authenticated re
  assert.match(api,/riley_pr_review_jobs\.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'/);
  assert.match(api,/riley_code_repair_jobs\.status===/);
  assert.match(home,/b\.verified_original_job_receipts>4/);
- assert.doesNotMatch(api,/reconcileRealityMixedShiftReceipts[\s\S]*?reality_authorize_employee_shift_v1/);
+ assert.match(api,/shift_source_native_receipts_status='SOURCE_NATIVE_RECEIPT_BINDING_UNVERIFIED'/);
 });
