@@ -247,7 +247,18 @@
   panels.approvals.append(get('realityChatApprovalInbox'));
   const proofLead = node('p','reality-chat-proof-note',
     'A passing test, provider observation or model statement is not a completed business job. Review only original-job evidence independently verified by Reality.');
-  panels.proof.append(proofLead,get('realityChatVerifiedRepairReview'));
+  panels.proof.append(proofLead);
+  // Research-stage upgrade candidates are NOT this settled original job.
+  // Keep them in Work so an uninstalled candidate never visually overrides
+  // the independently settled #263 original receipt in the Proof tab.
+  const researchCandidate=get('realityChatVerifiedRepairReview');
+  if(researchCandidate){
+    const otherWork=node('section','reality-chat-other-research');
+    otherWork.append(heading('Other research candidates',
+      'Separate from completed original #263. Testing is not installation or settlement.'));
+    otherWork.append(researchCandidate);
+    panels.work.append(otherWork);
+  }
   // The settled original's proof panel is mounted here by its read-only UI
   // module. Keep the same original decision control and receipt, not a copy.
   const native263Proof = get('native263InstallApprovalPanel');
