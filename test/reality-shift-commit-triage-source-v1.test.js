@@ -62,7 +62,6 @@ test('real pinned shift #62 independently verifies the issue plus commit, not th
 });
 test('source missing, unsettled identity absent and unverified observations create no authority',async()=>{
  for(const change of [
-  {jobs:[]},
   {jobs:[{...job(62,5),phase:'SETTLED'}]},
   {jobs:[{...job(62,5),independent_source_proof_verified:false}]},
   {jobs:[{...job(62,5),original_work_id:'work:'+'e'.repeat(32)}]}
@@ -74,6 +73,13 @@ test('source missing, unsettled identity absent and unverified observations crea
   assert.equal(x.original_job_admitted,false);
   assert.equal(m.urls.length,0);
  }
+});
+test('an empty unbound execution graph cannot qualify or authorize work',async()=>{
+ const m=mock();
+ await assert.rejects(()=>verifyCurrentShiftCommitTriageSource({
+  graph:{...graph(),jobs:[]},fetchImpl:m.fetchImpl
+ }),/SHIFT_COMMIT_TRIAGE_OWNER_FROZEN_WARRANT_READBACK_REQUIRED/);
+ assert.equal(m.urls.length,0);
 });
 test('tampered owner or provider issue/commit identity fails closed before any admission',async()=>{
  for(const change of [
