@@ -31,6 +31,8 @@ import {checkNative263LiveOwnerApprovalFence}
  from '../../src/reality-native263-live-installer-fence-bridge-v1.js';
 import {executeNative263GovernedPreviewAutoDeployTrigger}
  from '../../src/reality-native263-preview-auto-deploy-trigger-bridge-v1.js';
+import {continueOnceApprovedNative263Install}
+ from '../../src/reality-native263-approved-install-continuation-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -180,6 +182,22 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Existing signed shift consumes a separately recorded exact Chat owner
+  // approval. No approval, model permission, new shift or manual resume here.
+  let nativeOwnerApprovedInstallation={
+   status:'NATIVE263_INSTALL_CONTINUATION_NOT_ELIGIBLE',
+   original_job_completed:false,production_changed:false
+  };
+  try{
+   nativeOwnerApprovedInstallation=await continueOnceApprovedNative263Install({
+    db,env:process.env,fetchImpl:fetch
+   });
+  }catch{
+   nativeOwnerApprovedInstallation={
+    status:'NATIVE263_EXACT_INSTALL_CONTINUATION_UNVERIFIED',
+    original_job_completed:false,production_changed:false
+   };
+  }
   // Every worker wake independently diagnoses the exact native model
   // capability-exposure boundary. Read-only: no approval or effect.
   const nativeCapabilityDiagnosis=diagnoseRealityNativeCapabilityGap({
@@ -618,6 +636,7 @@ export default async function handler(req,res){
     native_exact_install_warrant:nativeExactInstallWarrant,
     native_live_installer_approval_fence:nativeInstallerApprovalFence,
     native_preview_auto_deploy_probe:nativePreviewAutoDeployProbe,
+    native_exact_owner_approved_auto_install:nativeOwnerApprovedInstallation,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
