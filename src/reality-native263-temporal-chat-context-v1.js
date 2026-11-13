@@ -72,6 +72,29 @@ export function projectNative263OwnerTemporalBrief(c,{ownerId,now=new Date()}={}
  });
 }
 
+// The proactive opening is a deterministic projection of an authenticated,
+// exact-owner, independently settled original; it does not create a chat turn.
+export function verifiedNative263OpeningMessage(brief){
+ if(brief?.original_job_completed!==true||
+  brief.independent_original_settlement_verified!==true||
+  !UUID.test(brief.original_final_receipt_id||'')||
+  brief.exact_install_sha!==INSTALLED||
+  brief.production_changed!==false||
+  brief.new_job_started!==false||
+  brief.verified_cash_savings_usd!==null)
+  throw Error('NATIVE263_OPENING_MUST_HAVE_INDEPENDENT_FINAL_RECEIPT');
+ return 'Reality · Verified work completed. Original job #263 is independently settled. '+
+  'Past: A source-backed repair was tested and you approved its exact installation once. '+
+  'Present: The repair is installed in Reality\'s isolated preview and its original-job acceptance passed. '+
+  'The independent settlement receipt is '+brief.original_final_receipt_id+
+  '. The installed commit is '+INSTALLED+
+  '. Production was not changed. '+
+  'Operational future: This job requires no new approval or restart. '+
+  'My next useful step is to explain the evidence and evaluate the business value. '+
+  'Actual labor time and financial savings have not been measured yet. '+
+  'What would you like to know about the work or its receipt?';
+}
+
 export async function readVerifiedNative263TemporalForChat({
  session,message,env=process.env,db=resolveReliabilityBenchmarkDb(env),
  fetchImpl=fetch,rpc=shiftRpc,now=new Date()
