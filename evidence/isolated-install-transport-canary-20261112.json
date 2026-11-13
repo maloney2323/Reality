@@ -1,0 +1,12 @@
+{
+  "schema": "reality-isolated-git-preview-transport-canary-v1",
+  "purpose": "verify GitHub commit-to-Vercel preview transport only; not candidate installation",
+  "branch": "reality/isolated-install-transport-canary-20261112",
+  "original_work_id": null,
+  "owner_installation_approval": false,
+  "model_access_granted": false,
+  "production_changed": false,
+  "capability_installed": false,
+  "original_job_completed": false,
+  "final_receipt_claimed": false
+}
