@@ -20,17 +20,18 @@
  const prepare=x('button','Generate or review my shift');
  const approve=x('button','Approve exact shift and start');approve.hidden=true;approve.disabled=true;
  const edit=x('button','Discuss changes in Chat');edit.hidden=true;
+ const reset=x('button','Discard edit request · restore verified plan');reset.hidden=true;
  const info=x('p','Planning is not work authorization. Existing shifts remain authorized; do not start a duplicate.');
  info.setAttribute('role','status');info.setAttribute('aria-live','polite');
  const work=x('div');work.className='reality-shift-plan-assignments';
- actions.append(prepare,edit,approve);
+ actions.append(prepare,edit,reset,approve);
  block.append(title,detail,actions,info,work);
  transcript.insertAdjacentElement('beforebegin',block);
  const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/;
  const active=new Set(['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']);
- let draft=null,editing=false,processing=false;
+ let draft=null,editing=false,revisionRequested=false,processing=false;
  async function request(url,options={}){
   const res=await fetch(url,{method:'GET',credentials:'same-origin',cache:'no-store',
    signal:AbortSignal.timeout(40000),...options});
@@ -63,7 +64,7 @@
      typeof t.title==='string'&&t.title.length<=210);
  }
  function showExisting(s){
-  draft=null;approve.hidden=true;edit.hidden=false;
+  draft=null;approve.hidden=true;edit.hidden=false;reset.hidden=true;
   info.textContent='An existing employee shift is already authorized ('+s.status+
    '). Reality will not create a second shift. You can discuss priorities in Chat; altering live work requires a governed amendment.';
   work.replaceChildren(x('p','Existing shift · '+s.shift_id));
@@ -89,10 +90,12 @@
    if(existing){showExisting(existing);return;}
    const p=data.requested_shift_draft;
    if(!validDraft(p))throw Error('Exact owner shift draft was not independently verified');
-   draft=p;editing=false;edit.hidden=false;
+   draft=p;editing=revisionRequested;edit.hidden=false;
+   reset.hidden=!revisionRequested;
    info.textContent=p.combined_employee_work_orders.task_count+
     ' selected source-backed assignment(s) for Riley + Taylor, one OpenAI model. '+
-    'Source observations still require qualification. No job has started.';
+    'Source observations still require qualification. No job has started.'+
+    (revisionRequested?' Requested Chat revisions are NOT incorporated into this original source-fingerprinted draft. Approval is disabled until a revised plan has its own verified fingerprint, or you explicitly discard the edits.':'');
    const list=x('ul');
    for(const t of p.combined_employee_work_orders.tasks){
     const li=x('li');const name=x('strong',t.title);
@@ -104,7 +107,7 @@
    }
    if(list.children.length)work.append(list);
    else work.append(x('p','No qualified source assignments are available in this draft. Reality will not authorize an empty shift.'));
-   if(p.combined_employee_work_orders.task_count>0){
+   if(p.combined_employee_work_orders.task_count>0&&!revisionRequested){
     approve.hidden=false;approve.disabled=false;
    }
   }catch(err){
@@ -116,7 +119,7 @@
  prepare.addEventListener('click',()=>void load());
  edit.addEventListener('click',()=>{
   const plan=draft;
-  editing=true;
+  editing=true;revisionRequested=true;reset.hidden=false;
   approve.hidden=true;approve.disabled=true;
   const summaries=plan?.combined_employee_work_orders.tasks.map(t=>
     '- '+t.title+' ('+t.source_ref+')').join('\n')||'(existing shift)';
@@ -129,8 +132,11 @@
   prompt.focus({preventScroll:true});
   info.textContent='You can discuss and save revisions in Chat. The currently generated exact plan is no longer approvable; changed assignments must be rebound to a new verified plan fingerprint before execution.';
  });
+ reset.addEventListener('click',()=>{
+  revisionRequested=false;editing=false;reset.hidden=true;void load();
+ });
  approve.addEventListener('click',async()=>{
-  if(processing||editing||!draft||!validDraft(draft)||
+  if(processing||editing||revisionRequested||!draft||!validDraft(draft)||
      draft.combined_employee_work_orders.task_count===0)return;
   processing=true;approve.disabled=true;prepare.disabled=true;
   info.textContent='Verifying the current source fingerprint and recording your one explicit start approval…';
