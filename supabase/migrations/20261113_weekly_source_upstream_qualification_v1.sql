@@ -87,7 +87,7 @@ begin
   'shift_execution_authorized',false,
   'installation_authorized',false,'production_changed',false);
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.reality_read_next_week_source_snapshot_v1()
  RETURNS jsonb
@@ -147,4 +147,4 @@ begin
   'shift_execution_authorized',false,'installation_authorized',false,
   'production_changed',false);
 end;
-$function$
+$function$;
