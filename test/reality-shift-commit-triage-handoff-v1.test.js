@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {admitVerifiedCurrentShiftCommitTriage}
+import {admitVerifiedCurrentShiftCommitTriage,
+ reconcileVerifiedCurrentShiftCommitTriage}
  from '../src/reality-shift-commit-triage-handoff-v1.js';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {assertRealityUnifiedShiftGraph}
@@ -209,4 +210,51 @@ test('SQL original admission cannot be used from browser, model, unscoped issue,
  assert.match(worker,/admitVerifiedCurrentShiftCommitTriage/);
  assert.match(worker,/commit_reference_triage_original/);
  assert.doesNotMatch(worker,/original_job_completed:commitTriageHandoff\.original\.original_job_admitted/);
+});
+
+test('owner-assisted GitHub disposition yields exact provider-bound final receipt only',async()=>{
+ const exactWork='work:90353feca9e44feafa8df0a1bf272a2a';
+ const g={...graph(),jobs:[{...graph().jobs[0],
+  original_kind:'REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL',
+  original_work_id:exactWork,phase:'EVIDENCE_VERIFIED'}]};
+ const body='Verified commit-reference triage: '+exactWork+
+  ' relates to 939914571be04ba519e2d644fe5e7c37e57c734d. '+
+  'This was not automatically authored by Reality. '.repeat(10);
+ const comment={
+  id:6866770573,user:{login:'maloney2323'},author_association:'OWNER',
+  issue_url:'https://api.github.com/repos/maloney2323/Reality/issues/62',
+  html_url:source+'#issuecomment-6866770573',
+  created_at:'2026-11-13T22:43:45Z',body};
+ const issue={number:62,state:'closed',state_reason:'completed',
+  pull_request:undefined,html_url:source,
+  repository_url:'https://api.github.com/repos/maloney2323/Reality',
+  body:'939914571be04ba519e2d644fe5e7c37e57c734d',
+  closed_at:'2026-11-13T22:43:53Z',comments:1};
+ const seen=[];
+ const fetchImpl=async(url)=>({ok:true,json:async()=>(
+  url.endsWith('/issues/62')?issue:[comment])});
+ const callRpc=async(db,name,args)=>{
+  seen.push({name,args});
+  return {status:'EXACT_COMMIT_TRIAGE_ORIGINAL_INDEPENDENTLY_SETTLED',
+   shift_id:shift,original_work_id:exactWork,
+   provider_comment_url:comment.html_url,
+   settlement_receipt_ref:'supabase:riley_commit_reference_triage_originals_v1:'+
+    '11111111-1111-1111-1111-111111111111',
+   execution_origin:'OWNER_DIRECTED_CHATGPT_GITHUB_ACTION',
+   independent_provider_readback_verified:true,
+   original_job_completed:true,installation_authorized:false,
+   production_changed:false};
+ };
+ const r=await reconcileVerifiedCurrentShiftCommitTriage({
+  graph:g,db:{},fetchImpl,callRpc});
+ assert.equal(r.original_job_completed,true);
+ assert.equal(seen.length,1);
+ assert.equal(seen[0].name,'reality_settle_verified_shift_commit_triage_v1');
+ assert.equal(seen[0].args.p_comment_id,comment.id);
+ const badFetch=async url=>({ok:true,json:async()=>(
+  url.endsWith('/issues/62')?{...issue,state:'open'}:[comment])});
+ await assert.rejects(()=>reconcileVerifiedCurrentShiftCommitTriage({
+  graph:g,db:{},fetchImpl:badFetch,callRpc}),
+  /SETTLEMENT_SOURCE_ISSUE_CLOSED_STATE_UNVERIFIED/);
+ assert.equal(seen.length,1);
 });
