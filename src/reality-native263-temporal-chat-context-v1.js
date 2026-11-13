@@ -95,6 +95,39 @@ export function verifiedNative263OpeningMessage(brief){
   'What would you like to know about the work or its receipt?';
 }
 
+// Safe, complete response schema for the original owner's pre-existing Chat
+// GET route. Pure function so exact settled-state projection is testable
+// without a browser session or making any model/provider calls.
+export function buildNative263SettledOwnerCard(c,{ownerId,now=new Date()}={}){
+ const brief=projectNative263OwnerTemporalBrief(c,{ownerId,now});
+ if(brief.original_job_completed!==true||
+  c.target_path!=='src/reality-riley-service-original-runtime-v1.js'||
+  c.expected_installed_blob_sha!=='dda8e71d44cca6745312bcbd000089d5a0b01d54'||
+  c.original_final_receipt_id!==brief.original_final_receipt_id||
+  c.production_changed!==false)
+  throw Error('NATIVE263_FINAL_ORIGINAL_OWNER_READBACK_MISMATCH');
+ return Object.freeze({
+  ok:true,status:'EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD',
+  original_work_id:WORK,shift_id:SHIFT,owner_id:ownerId,
+  source_ref:c.source_ref,target_branch:c.target_branch,
+  source_file:c.target_path,artifact_sha256:c.candidate_artifact_sha256,
+  candidate_commit_sha:c.candidate_commit_sha,
+  verified_frozen_ci_run_id:c.frozen_verifier_run_id,
+  approval_state:c.state,owner_approval_ready:false,
+  installation_authorized:true,installation_completed:true,
+  original_job_completed:true,
+  independently_verified_final_original_receipt_id:brief.original_final_receipt_id,
+  installed_commit_sha:c.installed_commit_sha,
+  owner_approved_at:c.owner_approved_at,
+  source_write_verified:true,
+  automatic_preview_deploy_verified:true,
+  same_original_continuation_and_receipt_verified:true,
+  opening_message:verifiedNative263OpeningMessage(brief),
+  next_step:'ORIGINAL_INDEPENDENTLY_SETTLED_NO_NEW_APPROVAL_OR_RESTART',
+  production_changed:false,no_third_confirmation:true
+ });
+}
+
 export async function readVerifiedNative263TemporalForChat({
  session,message,env=process.env,db=resolveReliabilityBenchmarkDb(env),
  fetchImpl=fetch,rpc=shiftRpc,now=new Date()
