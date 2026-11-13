@@ -168,10 +168,15 @@ test('SQL original admission cannot be used from browser, model, unscoped issue,
   /on conflict\(shift_id,source_ref\) do nothing/,
   /COMMIT_TRIAGE_PRIOR_ORIGINAL_SOURCE_CHANGED/,
   /COMMIT_TRIAGE_PRIOR_ORIGINAL_REQUIRES_RECONCILIATION/,
+  /from reality_internal\.governed_employee_shifts_v1 shift_row/,
+  /min\(shift_row\.shift_id::text\)::uuid/,
+  /COMMIT_TRIAGE_MULTIPLE_WARRANT_AMBIGUITY/,
   /revoke all on function public\.reality_admit_verified_shift_commit_triage_v1/,
   /to service_role/,
   /REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL/
  ])assert.match(sql,contract);
+ // Prevent PL/pgSQL record variable from shadowing the FROM alias.
+ assert.doesNotMatch(sql,/min\(s\.shift_id::text\)::uuid/);
  assert.doesNotMatch(sql,/grant execute on function public\.reality_admit_verified_shift_commit_triage_v1[\s\S]{0,120}to authenticated/);
  assert.match(worker,/admitVerifiedCurrentShiftCommitTriage/);
  assert.match(worker,/commit_reference_triage_original/);
