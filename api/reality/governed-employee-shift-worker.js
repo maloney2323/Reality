@@ -45,6 +45,8 @@ import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityExistingShiftIntegratedIntake}
+ from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {proveNativeOriginalReadOnlyModelTool}
@@ -234,6 +236,30 @@ export default async function handler(req,res){
    }catch{
     automaticWorkSupervisor=null;
     automaticWorkSupervisorStatus='AUTOMATIC_WORK_TRIAGE_SOURCE_UNAVAILABLE';
+   }
+  }
+  // The same worker now reads the existing weekly employee source snapshot
+  // AND the Homepage upgrade feed. These sources are advisory, never a
+  // modification of the signed four-source execution warrant.
+  let integratedWorkIntake=null;
+  let integratedWorkIntakeStatus='NO_VERIFIED_EXISTING_WORK_INTAKE';
+  if(automaticWorkSupervisor&&
+     automaticWorkSupervisorStatus==='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY'){
+   try{
+    const [weekly,capabilities]=await Promise.all([
+     shiftRpc(db,'reality_read_owner_shift_weekly_backlog_v1',{
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:unifiedGraph.shift_id}),
+     shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
+      p_owner_id:unifiedGraph.owner_id})
+    ]);
+    integratedWorkIntake=projectRealityExistingShiftIntegratedIntake({
+     graph:unifiedGraph,supervisor:automaticWorkSupervisor,
+     weekly,capabilityFeed:capabilities
+    });
+    integratedWorkIntakeStatus='WEEKLY_AND_HOMEPAGE_INTAKE_OWNER_RECONCILED';
+   }catch{
+    integratedWorkIntake=null;
+    integratedWorkIntakeStatus='WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
    }
   }
   // Existing signed shift consumes a separately recorded exact Chat owner
@@ -652,7 +678,11 @@ export default async function handler(req,res){
     result?.status==='SHIFT_FINAL_REPORT_NOT_DUE'&&
      automaticWorkSupervisor?.status===
       'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
-      automaticWorkSupervisor.next_worker_pulse_code:
+      integratedWorkIntake?.read_only===true&&
+       integratedWorkIntake?.status===
+        'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'?
+       integratedWorkIntake.next_worker_pulse_code:
+       automaticWorkSupervisor.next_worker_pulse_code:
       result?.status;
    const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED';
@@ -671,6 +701,8 @@ export default async function handler(req,res){
     actual_worker_completion_receipt:completedPulse,
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
+    integrated_work_intake:integratedWorkIntake,
+    integrated_work_intake_status:integratedWorkIntakeStatus,
     completion_bound_work:completionClose,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
