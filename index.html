@@ -6898,7 +6898,10 @@ setInterval(refreshSavedShiftHome,300000);
     el('privatePrompt').value=value;
     el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
    }
-   status('Reality could not verify this Chat turn ('+safeCode+'). Your text is preserved for retry. No job was started.');
+   window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
+    detail:{request_id:sentRequest,code:safeCode}
+   }));
+   status('Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before resending. No job was started.');
   }finally{el('privateSend').disabled=false}
  };
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
