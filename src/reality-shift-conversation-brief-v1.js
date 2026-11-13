@@ -53,7 +53,7 @@ function eventFor(t){
    proof_sha256:/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256||'')?t.proof_sha256:null};
  return null;
 }
-export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Date()){
+export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Date(),sourceNative=null){
  if(!Array.isArray(shifts)||shifts.length>5||!Array.isArray(handoffs)||
   handoffs.length>12||!Number.isFinite(now.getTime()))
   throw Error('SHIFT_CHAT_SOURCE_UNTRUSTED');
@@ -71,6 +71,25 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   events:[],approval_pending:false,read_only:true,
   production_changed:false});
  const s=shifts[0];
+ // These independently settled source-native original jobs are NOT in the
+ // legacy generic capability claims table. Read-only reconciliation preserves
+ // exact owner/shift/source provenance without declaring this workday done.
+ if(sourceNative!==null&&(
+   sourceNative.version!=='reality-mixed-shift-receipts-v1'||
+   sourceNative.shift_id!==s?.shift_id||
+   sourceNative.read_only!==true||
+   sourceNative.current_shift_complete!==false||
+   sourceNative.installation_authorized!==false||
+   sourceNative.any_new_original_created!==false||
+   sourceNative.production_changed!==false||
+   !Number.isSafeInteger(sourceNative.independently_settled_original_jobs)||
+   sourceNative.independently_settled_original_jobs<0||
+   sourceNative.independently_settled_original_jobs>4||
+   !Array.isArray(sourceNative.completed_original_receipts)||
+   sourceNative.completed_original_receipts.length!==
+    sourceNative.independently_settled_original_jobs||
+   !Array.isArray(sourceNative.source_items_without_verified_final_receipt)
+  ))throw Error('SHIFT_NATIVE_ORIGINAL_RECEIPT_SOURCE_UNVERIFIED');
  if(!UUID.test(s?.shift_id||'')||!VALID.has(s.status)||
   !isTime(s.planned_start_at)||
   !(isTime(s.planned_end_at)||s.planned_end_at==='infinity')||
@@ -105,10 +124,19 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   final.production_changed===false;
  const eventItems=s.steps.map(eventFor).filter(Boolean);
  const recorded=eventItems.filter(x=>x.code==='SOURCE_VALIDATED').length;
- const recent=[...eventItems].sort((a,b)=>{
+ const nativeReceipts=sourceNative?.completed_original_receipts||[];
+ const nativeEvents=nativeReceipts.map(x=>({
+  code:'ORIGINAL_RECEIPT_MATCHED',step_index:x.source_step_index,
+  text:'Independent final receipt recorded for '+(x.kind==='PR_REVIEW'?
+   'source-backed engineering PR review':'owner-approved native code repair')+
+   '. Original '+x.original_work_id+'. No labor savings inferred.',
+  observed_at:null,
+  source_url:x.source_ref,proof_sha256:x.source_proof_sha256
+ }));
+ const recent=[...nativeEvents,...eventItems.sort((a,b)=>{
   const ta=Date.parse(a.observed_at||'')||0,tb=Date.parse(b.observed_at||'')||0;
   return tb-ta||b.step_index-a.step_index;
- }).slice(0,5);
+ })].slice(0,5);
  const historicalNoop=s.steps[5]?.state==='BLOCKED_PROVIDER'&&
   s.steps[5]?.source_status==='VERIFIED_HISTORICAL_NOOP'&&
   s.steps[6]?.state==='BLOCKED_PROVIDER'&&
@@ -131,7 +159,11 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   current='Scheduled start has passed. No completed source check is recorded yet.';
   next='Await the next trusted worker wake and an actual source-check receipt.';
  }else if(s.status==='AWAITING_EXACT_ORIGINAL_WORK'){
-  current='The exact original-job action awaits independent qualification or authorization. Other eligible read-only work proceeds without artificial delays.';
+  current=nativeReceipts.length?
+   nativeReceipts.length+' source-native original job(s) independently settled. '+
+   sourceNative.source_items_without_verified_final_receipt.length+
+   ' selected source observation(s) have no verified final receipt; the workday remains unfinished.':
+   'The exact original-job action awaits independent qualification or authorization. Other eligible read-only work proceeds without artificial delays.';
   next=pending?'Review the exact verified upgrade in Reality Chat. After your approval, the existing governed installer handles continuation.':
    'Reality must independently qualify and bind an eligible original job before execution can continue.';
  }else if(historicalNoop&&s.status==='RUNNING'){
@@ -158,6 +190,10 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
  const whatFinished=completeBoundProven?
   (finalCount+' original jobs independently settled. Final durable receipt '+
    'is recorded in the owner-scoped Continuity readback.') :
+  nativeReceipts.length?
+  (nativeReceipts.length+' source-native original jobs have separate independent final receipts. '+
+   sourceNative.source_items_without_verified_final_receipt.length+
+   ' selected source observation(s) still lack a final receipt. Full shift completion and measured ROI are NOT verified.') :
   recent.length?
   (recorded+' recorded source/preflight checks; '+
    (originalReceipt?'one independently matched original-job receipt.':
@@ -188,7 +224,7 @@ export function buildRealityShiftConversationBrief(shifts,handoffs=[],now=new Da
   as_of:now.toISOString(),
   verified_source_checks:recorded,
   verified_original_job_receipts:completeBoundProven?
-   finalCount:(originalReceipt?1:0),
+   finalCount:Math.max(nativeReceipts.length,originalReceipt?1:0),
   complete_shift_proven:completeBoundProven,
   verified_final_original_job_count:completeBoundProven?finalCount:0,
   final_receipt:completeBoundProven?final:null,
