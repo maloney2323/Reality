@@ -10,7 +10,8 @@ const SHIFT='9460cfff-937a-4105-9093-2e41ab39a950';
 const REPO_BRANCH='reality/isolated-openai-governance-gateway-20261108';
 const SRC='src/reality-riley-service-original-runtime-v1.js';
 const CI_NAME='Reality — Isolated governed OpenAI gateway proof';
-const ACCEPT_NAME='Reality · #263 independent post-install original acceptance';
+const ACCEPT_NAME='Reality ·'; // GitHub parses the unquoted #263 in the frozen YAML name as a comment.
+const MAIN_WORKFLOW='.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml';
 const WORKFLOW='.github/workflows/reality-native263-postinstall-original-acceptance-v1.yml';
 const WORKFLOW_BLOB='0b3b5ed4057c6f502f22a4489913fe7ef21c7e5d';
 const NEW_BLOB='dda8e71d44cca6745312bcbd000089d5a0b01d54';
@@ -121,7 +122,13 @@ async function workflowRuns(sha:string,token:string){
   Number.isSafeInteger(r.id)&&r.id>10000);
 }
 function matchRun(runs:any[],name:string){
- const a=runs.filter(r=>r.name===name);
+ // A workflow *display name* is not an independently sufficient identity.
+ // The frozen acceptance YAML's unquoted #263 is treated as a comment, so
+ // GitHub reports its name as "Reality ·". Match the exact workflow file as
+ // well, preserving the original installed SHA, branch and distinct CI runs.
+ const requiredPath=name===CI_NAME?MAIN_WORKFLOW:WORKFLOW;
+ const a=runs.filter(r=>r.name===name&&r.path===requiredPath&&
+  (name===CI_NAME?r.workflow_id===410924343:r.workflow_id===417245142));
  if(a.length!==1)bad('DISTINCT_INDEPENDENT_GITHUB_CI_RUN_REQUIRED_'+(name===CI_NAME?'MAIN':'ORIGINAL'));
  return a[0].id as number;
 }
@@ -255,6 +262,8 @@ Deno.serve(async req=>{
   const status=/^NATIVE263_POSTINSTALL_[A-Z0-9_]{4,115}$/.test(msg)?
    msg.slice('NATIVE263_POSTINSTALL_'.length):
    'NATIVE263_INDEPENDENT_PROVIDER_OR_RECEIPT_BLOCKED';
+  // Log a bounded, sanitized error code only; never log credentials or request bodies.
+  console.error('NATIVE263_POSTINSTALL_VERIFIER_BLOCKED:'+status);
   return answer(status,{original_job_completed:false,
    owner_approval_ready:false},503);
  }
