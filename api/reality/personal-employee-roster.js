@@ -42,6 +42,7 @@ export default async function handler(req,res){
   const roster=buildRealityNamedEmployeeRoster(brief);
   const value_preview=buildRealityShiftValuePreview(roster);
   let verifiedSource=null,backgroundSourceIssueCount=null;
+  let weeklyInvestigationReceipts=null;
   // Scheduled private Supabase prep is a SOURCE snapshot, never owner job
   // authority. Losing that readback degrades to an explicitly on-demand draft.
   try{
@@ -58,6 +59,47 @@ export default async function handler(req,res){
    }
   }catch{
    // Never claim the unattended refresh succeeded on readback failure.
+  }
+  // Read back the SAME signed worker's actual provider investigation
+  // receipts, NOT the unexecuted weekly work-planning projection.
+  // A source investigation is not an authorized repair or saved labor.
+  if(verifiedSource?.status==='NEXT_WEEK_SOURCE_SNAPSHOT_PREPARED'){
+   try{
+    const db=shiftDatabase(process.env);
+    if(db.url===session.config?.url){
+     const checked=await shiftRpc(db,
+      'reality_read_current_shift_weekly_investigations_v1',{});
+     if(checked?.status==='CURRENT_SIGNED_WEEKLY_INVESTIGATION_READBACK'&&
+      checked.owner_id===session.user_id&&
+      checked.snapshot_sha256===verifiedSource.source_sha256&&
+      checked.execution_authorized===false&&
+      checked.installation_authorized===false&&
+      checked.production_changed===false&&
+      Array.isArray(checked.items)&&checked.items.length<=30&&
+      new Set(checked.items.map(x=>x.source_ref)).size===checked.items.length&&
+      checked.items.every(x=>
+       /^[1-9][0-9]*$/.test(String(x?.issue_number||''))&&
+       x.source_ref==='https://github.com/maloney2323/Reality/issues/'+
+         x.issue_number&&
+       ['Riley','Taylor','Quinn','Avery','Casey','Morgan','Jordan','Sage']
+        .includes(x.employee)&&
+       /^supabase:weekly_employee_investigation_receipts_v1:[a-f0-9-]{36}$/
+        .test(x.investigation_receipt_ref||'')&&
+       typeof x.investigation_status==='string'&&
+       x.investigation_status.length>=24&&
+       /^sha256:[a-f0-9]{64}$/.test(x.provider_evidence_sha256||'')))
+      weeklyInvestigationReceipts={
+       status:'SIGNED_WORKER_EMPLOYEE_INVESTIGATIONS_INDEPENDENTLY_RECEIPTED',
+       count:checked.items.length,
+       receipts:checked.items,
+       source_investigation_only:true,
+       new_executable_jobs_authorized:0,
+       installation_authorized:false,production_changed:false
+      };
+    }
+   }catch{
+    // An unavailable readback MUST NOT become a claimed completed task.
+   }
   }
   // Existing signed background planner now qualifies each GitHub source
   // BEFORE it reaches owner-facing employee Discovery. This is an investigation
@@ -123,6 +165,7 @@ export default async function handler(req,res){
     'AUTHENTICATED_SAVED_CHAT_READBACK':'SAVED_CHAT_READBACK_UNAVAILABLE',
    next_week_background_open_issue_count:backgroundSourceIssueCount,
    upstream_source_qualification:qualification,
+   weekly_employee_investigation_receipts:weeklyInvestigationReceipts,
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
