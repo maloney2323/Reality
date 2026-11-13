@@ -41,6 +41,8 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {admitVerifiedCurrentShiftCommitTriage}
+ from '../../src/reality-shift-commit-triage-handoff-v1.js';
 import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
@@ -199,6 +201,37 @@ export default async function handler(req,res){
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
+  // A source-checked commit-triage observation only becomes a durable original
+  // after independent provider GET and service-only warrant/proof readback.
+  // No new shift, GitHub write, installation or settlement is implied.
+  let commitTriageHandoff={
+   qualification:{status:'NO_VERIFIED_SHIFT_COMMIT_TRIAGE_CANDIDATE'},
+   original:{status:'NO_SHIFT_COMMIT_TRIAGE_ORIGINAL_ADMITTED',
+    original_job_admitted:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false}
+  };
+  try{
+   const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:initialGraph.shift_id
+   });
+   if(sourceGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+      sourceGraph.jobs.some(x=>
+       x.original_kind==='SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL'&&
+       x.independent_source_proof_verified===true&&x.phase==='NOT_ADMITTED'))
+    commitTriageHandoff=await admitVerifiedCurrentShiftCommitTriage({
+     graph:sourceGraph,db,fetchImpl:fetch,
+     token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+      process.env.GITHUB_TOKEN||null
+    });
+  }catch{
+   commitTriageHandoff={
+    qualification:{status:'COMMIT_TRIAGE_PROVIDER_OR_SOURCE_READBACK_UNVERIFIED'},
+    original:{status:'EXACT_SHIFT_COMMIT_TRIAGE_ADMISSION_OR_EVIDENCE_RECONCILIATION_REQUIRED',
+     original_job_admitted:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false}
+   };
+  }
   // SAME frozen shift and source identities across all real employee roles.
   const unifiedGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
    'reality_read_current_shift_execution_graph_v1',{}),{
@@ -659,7 +692,12 @@ export default async function handler(req,res){
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
-   const outcomeCode=unifiedGraph.tested_native_candidate_present===true?
+   const qualifiedCommitTriage=unifiedGraph.jobs.some(x=>
+    x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
+    x.phase==='EVIDENCE_VERIFIED');
+   const outcomeCode=qualifiedCommitTriage?
+    'COMMIT_TRIAGE_SOURCE_EVIDENCE_VERIFIED_FINAL_DISPOSITION_PENDING':
+    unifiedGraph.tested_native_candidate_present===true?
      'RILEY_NATIVE_CAPABILITY_HANDOFF_NOT_CONNECTED':
     rileyCorrectionTest?.status===
     'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED'?
@@ -719,6 +757,8 @@ export default async function handler(req,res){
      })),
      installation_authorized:false,original_job_completed:false
     },
+    commit_reference_triage_qualification:commitTriageHandoff.qualification,
+    commit_reference_triage_original:commitTriageHandoff.original,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
