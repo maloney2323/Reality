@@ -157,6 +157,8 @@ test('mobile Chat keeps its conversation and navigation outside the long #263 pr
  assert.match(proof,/if\(proof&&p\.parentNode!==proof\)proof\.append\(p\)/);
  assert.match(proof,/view\.hidden=!!conversation/);
  assert.match(proof,/transcript\.prepend\(node\)/);
+ assert.match(proof,/native263ViewReceipt/);
+ assert.match(proof,/realityChatTabProof/);
  assert.match(proof,/const ready=element\('privateReady'\)/);
  assert.match(workspace,/homeLink\.href = '\/'/);
  assert.match(workspace,/threadButtons\.append\(homeLink, historyToggle, inspectorToggle, focusToggle\)/);
