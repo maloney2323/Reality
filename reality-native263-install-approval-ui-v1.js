@@ -107,7 +107,8 @@ function renderInfo({summary,description,done,now,next,owner,button}){
 }
 function renderExact(d){
  const state=d.approval_state;
- const ready=d.owner_approval_ready===true&&
+ const data=d;
+ const ready=data.owner_approval_ready===true&&
   d.source_write_verified===true&&
   d.automatic_preview_deploy_verified===true&&
   d.same_original_continuation_and_receipt_verified===true&&
@@ -231,7 +232,8 @@ async function approveExactlyOnce(){
 export function mountNative263ExactInstallApproval(){
  const panel=ensurePanel();
  if(!panel)return;
- element('native263ApproveInstall').addEventListener('click',()=>{void approveExactlyOnce()});
+ const button=element('native263ApproveInstall');
+ button.addEventListener('click',()=>{void approveExactlyOnce()});
  element('refresh')?.addEventListener('click',()=>{void refreshExactNative263InstallApproval()});
  const h=host();
  if(h){
