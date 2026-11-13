@@ -59,6 +59,18 @@ function ensurePanel(){
   summary.style.fontSize='16px';
   p.insertBefore(summary,element('native263ApprovalExplanation'));
  }
+ if(!element('native263OpeningMessage')){
+  const opening=add('section','native263OpeningMessage','',document.createDocumentFragment());
+  opening.hidden=true;
+  opening.setAttribute('role','status');
+  opening.setAttribute('aria-label','Reality verified opening response');
+  opening.style.cssText='background:#153548;border:1px solid #6ba6b3;border-radius:12px;padding:14px;margin:12px 0';
+  const heading=add('strong',null,'Reality · I completed an original job',opening);
+  heading.style.cssText='display:block;margin-bottom:8px;font-size:15px;color:#e6f6ff';
+  const body=add('p','native263OpeningText','',opening);
+  body.style.cssText='white-space:pre-wrap;font-size:14px;line-height:1.6;margin:0';
+  p.insertBefore(opening,element('native263ApprovalExplanation'));
+ }
  if(!element('native263ProgressRows')){
   const rows=add('div','native263ProgressRows','',document.createDocumentFragment());
   rows.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;margin:12px 0';
@@ -114,6 +126,41 @@ function renderInfo({summary,description,done,now,next,owner,button}){
  const b=element('native263ApproveInstall');
  b.hidden=!button;b.disabled=!button||submitted;
 }
+function renderProactiveOpening(d){
+ const view=element('native263OpeningMessage');
+ const text=element('native263OpeningText');
+ if(!view||!text)return;
+ const receipt=d?.independently_verified_final_original_receipt_id;
+ const message=d?.opening_message;
+ if(d?.original_job_completed!==true||
+  !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(receipt||'')||
+  typeof message!=='string'||message.length>2200||
+  !message.includes(receipt)||!message.startsWith('Reality · Verified work completed.')){
+  view.hidden=true;
+  text.textContent='';
+  element('native263AskAboutJob').textContent='Ask Reality about this job';
+  return;
+ }
+ view.hidden=false;
+ text.textContent=message;
+ element('native263AskAboutJob').textContent='Reply to Reality';
+ // Show the verified initial briefing as a Reality message before any
+ // user prompt. This view is read-only; no model call, fake chat-history row,
+ // job start or second owner approval is created by page load.
+ const transcript=element('privateTranscript');
+ if(transcript&&element('privateReady')?.style.display!=='none'){
+  let node=element('native263VerifiedRealityIntro');
+  if(!node){
+   node=add('div','native263VerifiedRealityIntro','',document.createDocumentFragment());
+   node.className='bubble';
+   const head=add('div',null,'REALITY · VERIFIED COMPLETION',node);
+   head.className='label';
+   add('div','native263VerifiedRealityIntroBody','',node).style.whiteSpace='pre-wrap';
+   transcript.prepend(node);
+  }
+  element('native263VerifiedRealityIntroBody').textContent=message;
+ }
+}
 function renderExact(d){
  const state=d.approval_state;
  const data=d;
@@ -128,6 +175,7 @@ function renderExact(d){
   ' · Isolated preview only. Source issue: github.com/maloney2323/Reality/issues/263';
  if(d.original_job_completed===true){
   submitted=true;
+  renderProactiveOpening(d);
   renderInfo({
    summary:'Job #263 · Independently completed',
    description:'The original-job ledger reports completion. This is not a claim of measured cost savings.',
@@ -137,6 +185,7 @@ function renderExact(d){
    owner:'No further approval or start is required.',button:false
   });
  }else if(state==='SOURCE_INSTALLED'){
+  renderProactiveOpening(null);
   submitted=true;
   renderInfo({
    summary:'Job #263 · Installed, final receipt pending',
@@ -147,6 +196,7 @@ function renderExact(d){
    owner:'Nothing to approve or restart. Your approval is already recorded.',button:false
   });
  }else if(state!=='STAGED_UNAPPROVED'){
+  renderProactiveOpening(null);
   submitted=true;
   renderInfo({
    summary:'Job #263 · Approved, awaiting installation proof',
@@ -157,6 +207,7 @@ function renderExact(d){
    owner:'Do not approve twice or start another shift.',button:false
   });
  }else if(ready){
+  renderProactiveOpening(null);
   renderInfo({
    summary:'Job #263 · Ready for your installation decision',
    description:'The repair was tested and the installation-to-receipt pathway was checked. No source installation has been authorized yet.',
@@ -166,6 +217,7 @@ function renderExact(d){
    owner:'Review the tested artifact, then choose “Approve verified upgrade” once if you want to install it.',button:true
   });
  }else{
+  renderProactiveOpening(null);
   renderInfo({
    summary:'Job #263 · Verification gate still closed',
    description:'The current owner readback does not authorize installation. A tested candidate is not the same as installation readiness.',
@@ -189,6 +241,7 @@ export async function refreshExactNative263InstallApproval(){
   exact=data;renderExact(data);
  }catch{
   exact=null;
+  renderProactiveOpening(null);
   renderInfo({
    summary:'Job #263 · Live status unavailable',
    description:'Reality cannot verify the latest owner-scoped job record right now. This is a connection or proof problem, not proof that the job failed or finished.',
@@ -255,6 +308,14 @@ export function mountNative263ExactInstallApproval(){
    return;
   }
   if(isSimple)element('rileyConversationDisclosure')?.setAttribute('open','');
+  if(exact?.original_job_completed===true){
+   const composer=element('realityChatComposer')||prompt;
+   element('native263ApprovalFeedback').textContent=
+    'Reality has opened with its verified result above. Type your next question in the conversation below. No new work or approval was started.';
+   composer.scrollIntoView({block:'center',behavior:'smooth'});
+   prompt.focus({preventScroll:false});
+   return;
+  }
   const phase=exact?.original_job_completed===true?'settled':
    exact?.approval_state==='SOURCE_INSTALLED'?'installed_receipt_pending':
    exact?.approval_state==='STAGED_UNAPPROVED'?'awaiting_install_decision':
@@ -270,7 +331,9 @@ export function mountNative263ExactInstallApproval(){
    ' and trusted provider/database receipts. This is a question, not execution or install authority.';
   prompt.dispatchEvent(new Event('input',{bubbles:true}));
   prompt.focus({preventScroll:false});
-  prompt.scrollIntoView({block:'center',behavior:'auto'});
+  (element('realityChatComposer')||prompt).scrollIntoView({block:'center',behavior:'smooth'});
+  element('native263ApprovalFeedback').textContent=
+   'Question prepared in the conversation. Tap Send to Reality when ready; nothing was executed.';
  });
  element('refresh')?.addEventListener('click',()=>{void refreshExactNative263InstallApproval()});
  const h=host();
