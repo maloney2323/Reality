@@ -177,6 +177,13 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <details class="live-evidence-fold"><summary>Governed execution · Detailed decisions and release gates</summary>
  <div id="rileyUnifiedOriginalGraph" aria-live="polite">Checking owner-frozen work scope…</div></details>
  <div id="rileyReviewedPatchEvidence" aria-live="polite" hidden></div>
+  <section id="native263InstallApprovalPanel" class="team-proof" aria-label="Exact 263 installation approval in Reality Chat" aria-live="polite" hidden>
+   <h4>Reality · Exact verified upgrade #263</h4>
+   <p id="native263ApprovalExplanation">Checking the authenticated owner and exact original-job evidence…</p>
+   <p id="native263ArtifactDetails"></p>
+   <button id="native263ApproveInstall" type="button" disabled title="One exact owner approval starts governed installation and automatic same-job continuation">Approve verified upgrade</button>
+   <p id="native263ApprovalFeedback" role="status"></p>
+  </section>
  <details class="live-evidence-fold"><summary>Original jobs · Exact recorded phase and time</summary>
  <div id="rileyOriginalActivityRows">Waiting for original-job readback.</div></details>
  <details class="live-evidence-fold"><summary>Source and execution evidence · Time-stamped</summary>
@@ -1312,7 +1319,7 @@ function renderRileyReviewedPatchEvidence(readback,current){
  el.append(link);
  el.append(textNode('p','Next gate: Reality must verify its native '+
   'owner-approved isolated installation and original-job settlement path. '+
-  'No approval button is shown until that path is proven. No code is installed.'));
+  'The approval card below remains gated until the installation and original-job continuation path is independently proven. No code is installed.'));
 }
 function renderCurrentAutomationCards(graph){
  const target=$('rileyActiveAutomationCards');target.replaceChildren();
@@ -2445,5 +2452,6 @@ void init();
  enroll.addEventListener('click',()=>{void start(true)});
 })();
 </script>
+<script type="module" src="/reality-native263-install-approval-ui-v1.js"></script>
 </body>
 </html>
