@@ -142,3 +142,47 @@ test('definitive Github HTTP rejection is evidence, not a grant to replay the or
  assert.equal(r.production_changed,false);
  assert.equal(f.requests.length,1);
 });
+
+test('original review recovers through EXACTLY one service-only fenced provider scan',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261112000000_riley_pr57_proof_bound_publish_recovery_v1.sql',
+  import.meta.url),'utf8');
+ const edge=readFileSync(new URL(
+  '../supabase/functions/reality-governed-pr-review-publisher-v1/index.ts',
+  import.meta.url),'utf8');
+ assert.match(sql,/publish_recovery_count between 0 and 1/);
+ assert.match(sql,/publish_recovery_count=0/);
+ assert.match(sql,/phase='PUBLISHING'/);
+ assert.match(sql,/phase='PREPARED'/);
+ assert.match(sql,/current_user <> 'service_role'/);
+ assert.match(sql,/interval '20 minutes'/);
+ assert.match(sql,/p_provider_comment_scan_sha256/);
+ assert.match(sql,/p_provider_comment_count/);
+ assert.match(sql,/source_head_sha<>p_head_sha/);
+ assert.match(sql,/review_digest<>p_review_digest/);
+ assert.match(sql,/s.authorized_at is not null and s.closed_at is null/);
+ assert.match(sql,/settlement_receipt_id is not null/);
+ assert.match(sql,/revoke all on function public.reality_rearm_authorized_riley_pr_publish_v1/);
+ assert.match(edge,/reality_rearm_authorized_riley_pr_publish_v1/);
+ assert.match(edge,/EXACT_PR_REVIEW_ONE_RECOVERY_ARMED/);
+ assert.match(edge,/reset.publish_recovery_count!==1/);
+ assert.match(edge,/comments_scan_sha256/);
+ assert.match(edge,/justBeforeIntent/);
+ assert.match(edge,/finalScan/);
+ assert.match(edge,/if\(finalScan.found!==null\)return settle/);
+ assert.match(edge,/if\(c.phase==='PUBLISHING'\)/);
+ assert.match(edge,/PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY/);
+ assert.doesNotMatch(sql,/grant execute .*\bto authenticated\b/);
+});
+test('already-consumed recovery cannot be represented as new settlement authority',async()=>{
+ const f=fixture({status:'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_created:false,code_installed:false});
+ const result=await executeExactlyPreparedRileyReviewViaReality({
+  db,env,graph:{...graph,jobs:[{...graph.jobs[0],phase:'PUBLISHING'}]},
+  fetchImpl:f.fetchImpl});
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.status,'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY');
+ assert.equal(f.requests.length,1);
+});

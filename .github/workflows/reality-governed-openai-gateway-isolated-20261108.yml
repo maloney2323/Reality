@@ -14,6 +14,7 @@ on:
       - src/reality-riley-authorized-pr-review-job-v1.js
       - src/reality-riley-governed-pr-provider-bridge-v1.js
       - supabase/functions/reality-governed-pr-review-publisher-v1/index.ts
+      - supabase/migrations/20261112000000_riley_pr57_proof_bound_publish_recovery_v1.sql
       - test/reality-governed-pr-provider-bridge-v1.test.js
       - src/reality-riley-trusted-original-driver-bridge-v1.js
       - src/reality-riley-existing-multi-job-wake-v1.js
