@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  projectNative263OwnerTemporalBrief,
- native263ConversationRelevant,
  readVerifiedNative263TemporalForChat,
  verifiedNative263OpeningMessage,
  buildNative263SettledOwnerCard
@@ -80,23 +79,43 @@ test('owner-bound chat read uses existing read-only Supabase context, not an act
  assert.equal(observations[0].original_job_completed,true);
  assert.deepEqual(calls,[{name:'reality_read_native263_postinstall_context_v1',payload:{}}]);
 });
-test('irrelevant, unauthenticated and unavailable readback cannot create invented context',async()=>{
+test('verified original-job memory survives open-ended follow-ups without keyword gates',async()=>{
  const db={strictSecrets:true,project:'hvkfreoagbrphwghjajw',
   url:'https://hvkfreoagbrphwghjajw.supabase.co',secretKey:'UNIT_TEST_ONLY_NOT_REAL'};
  const ctx={db,env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project},now:fixedNow};
- assert.equal(native263ConversationRelevant('Explain job #263'),true);
- assert.equal(native263ConversationRelevant('What is the weather?'),false);
- assert.deepEqual(await readVerifiedNative263TemporalForChat({
-  ...ctx,session:{user_id:OWNER,config:{url:db.url}},
-  message:'What is the weather?',rpc:async()=>{throw Error('unexpected call')}
- }),[]);
- assert.deepEqual(await readVerifiedNative263TemporalForChat({
+ const examples=[
+  'Is there anything else you would like to tell me about this? This is a big milestone.',
+  'You don't have additional evidence for the job you just completed?',
+  'You do not remember two sixty three?',
+  'What does it mean for our future?',
+  'How did that go again?',
+  'What is the weather?'
+ ];
+ let readCount=0;
+ for(const message of examples){
+  const result=await readVerifiedNative263TemporalForChat({
+   ...ctx,session:{user_id:OWNER,config:{url:db.url}},
+   message,rpc:async(_db,name,payload)=>{
+    assert.equal(name,'reality_read_native263_postinstall_context_v1');
+    assert.deepEqual(payload,{});
+    readCount++;
+    return raw;
+   }
+  });
+  assert.equal(result.length,1,'Owner-scoped evidence must not depend on '+message);
+  assert.equal(result[0].original_final_receipt_id,receipt);
+ }
+ assert.equal(readCount,examples.length);
+ // Having verified evidence available is not an instruction to make an
+ // unrelated answer about the original job.
+ const other=await readVerifiedNative263TemporalForChat({
   ...ctx,session:{user_id:'c24a6ba0-24bf-4cad-a153-d4e45fcd8b4b',config:{url:db.url}},
-  message:'Explain #263',rpc:async()=>raw
- }),[]);
+  message:'Explain #263',rpc:async()=>{throw Error('cross-account read must not occur')}
+ });
+ assert.deepEqual(other,[]);
  assert.deepEqual(await readVerifiedNative263TemporalForChat({
   ...ctx,session:{user_id:OWNER,config:{url:db.url}},
-  message:'Explain #263',rpc:async()=>{throw Error('provider unavailable')}
+  message:'What happened?',rpc:async()=>{throw Error('provider unavailable')}
  }),[]);
 });
 
