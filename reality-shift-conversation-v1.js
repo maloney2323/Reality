@@ -44,17 +44,35 @@ function el(tag,text){
  if(text!==undefined)n.textContent=text;
  return n;
 }
-function render(b){
+function render(b,supervisor=null){
  last=b;
+ let triage='';
+ if(supervisor?.status==='AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'&&
+    supervisor.read_only===true&&supervisor.production_changed===false&&
+    supervisor.shift_id===b.shift_id&&
+    supervisor.install_approval_authorized_by_triage===false&&
+    supervisor.original_job_admission_authorized_by_triage===false&&
+    supervisor.shift_completed_by_triage===false&&
+    Number.isSafeInteger(supervisor.independently_settled_originals)&&
+    Number.isSafeInteger(supervisor.sources_needing_distinct_qualification)&&
+    supervisor.independently_settled_originals>=0&&
+    supervisor.sources_needing_distinct_qualification>=0){
+  const done=supervisor.independently_settled_originals;
+  const pending=supervisor.sources_needing_distinct_qualification;
+  triage=' Automatic supervisor: '+done+' independently receipted job'+
+   (done===1?'':'s')+'; '+pending+' source'+(pending===1?'':'s')+
+   ' still need'+(pending===1?'s':'')+
+   ' a qualified original job before execution. No duplicate work or new approval inferred.';
+ }
  const start=b.planned_start_at?new Date(b.planned_start_at):null;
  const pretty=start&&Number.isFinite(start.valueOf())?start.toLocaleString():null;
- $('realityShiftHomeNow').textContent=b.headline+' '+b.current+
+ $('realityShiftHomeNow').textContent=b.headline+' '+b.current+triage+
   (b.status==='QUEUED'&&pretty?' Scheduled start: '+pretty+'.':'');
  $('realityShiftHomeNext').textContent='Next: '+b.next;
  $('realityChatShiftHeadline').textContent=b.headline+
   (b.status==='QUEUED'&&pretty?' Scheduled start: '+pretty+'.':'');
  $('realityChatShiftDid').textContent=b.what_finished;
- $('realityChatShiftNow').textContent=b.current;
+ $('realityChatShiftNow').textContent=b.current+triage;
  $('realityChatShiftNext').textContent=b.next;
  $('realityChatShiftNeed').textContent=b.needs_you;
  const list=$('realityChatShiftTimeline');
@@ -94,7 +112,10 @@ async function refresh(){
   if(!response.ok)throw Error('SHIFT_SOURCE_READBACK_UNAVAILABLE');
   const data=await response.json().catch(()=>null);
   if(!valid(data))throw Error('SHIFT_RECEIPT_PROVENANCE_UNVERIFIED');
-  render(data.shift_briefing);
+  render(data.shift_briefing,
+   data.shift_automatic_supervisor_status===
+    'EXACT_OWNER_SOURCE_TRIAGE_READ_ONLY_VERIFIED'?
+    data.shift_automatic_supervisor:null);
  }catch{
   $('realityChatShiftHeadline').textContent='Shift readback unavailable.';
   $('realityChatShiftNow').textContent='Cannot independently verify the latest state.';
