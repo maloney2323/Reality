@@ -100,3 +100,37 @@ test('owner endpoint projects receipt reconciliation only after authenticated re
  assert.match(home,/b\.verified_original_job_receipts>4/);
  assert.match(api,/shift_source_native_receipts_status='SOURCE_NATIVE_RECEIPT_BINDING_UNVERIFIED'/);
 });
+
+test('third independently settled owner-assisted triage shows in the same shift with no replay',()=>{
+ const triage='work:90353feca9e44feafa8df0a1bf272a2a';
+ const triageReceipt='supabase:riley_commit_reference_triage_originals_v1:'+
+  '3845f745-be6a-4253-a2da-02a58eee4551';
+ const base={source_ref:issue(62),source_proof_sha256:sha('a'),
+  original_kind:'REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL',
+  original_work_id:triage,phase:'SETTLED',
+  provider_final_receipt_ref:triageReceipt,
+  capability_installation_authorized:false,
+  original_job_completed_by_graph:false};
+ const graph={status:'UNIFIED_OWNER_JOB_CONTROL_READY',
+  shift_id:shiftId,jobs:[
+   {source_ref:issue(263)},
+   {source_ref:issue(185)},
+   {source_ref:pr(57)},base]};
+ const result=reconcileRealityMixedShiftReceipts(shift,{
+  prReadback:reviews,repairReadback:repairs,unifiedGraph:graph});
+ assert.equal(result.independently_settled_original_jobs,3);
+ assert.deepEqual(result.completed_original_receipts.map(j=>j.original_work_id),
+  [work263,work57,triage]);
+ assert.deepEqual(result.source_items_without_verified_final_receipt,
+  [issue(185)]);
+ assert.equal(result.completed_original_receipts[2].kind,
+  'OWNER_ASSISTED_COMMIT_TRIAGE');
+ assert.equal(result.completed_original_receipts[2].final_receipt_ref,triageReceipt);
+ assert.equal(result.current_shift_complete,false);
+ assert.equal(result.measured_human_hours_saved,null);
+ const forged={...graph,jobs:[...graph.jobs.slice(0,3),{
+  ...base,provider_final_receipt_ref:'fake'}]};
+ assert.throws(()=>reconcileRealityMixedShiftReceipts(shift,{
+  prReadback:reviews,repairReadback:repairs,unifiedGraph:forged}),
+  /TRIAGE_FINAL_PROVIDER_RECEIPT_SOURCE_MISMATCH/);
+});
