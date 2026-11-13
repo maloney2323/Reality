@@ -237,6 +237,33 @@ export async function refreshExactNative263InstallApproval(){
   const response=await fetch(API,{credentials:'same-origin',cache:'no-store',
    signal:AbortSignal.timeout(13000)});
   const data=await response.json().catch(()=>null);
+  if(response.status===401){
+   exact=null;
+   renderProactiveOpening(null);
+   renderInfo({
+    summary:'Job #263 · Sign in to hear Reality’s update',
+    description:'This original-job receipt belongs to your private account. Sign in to let Reality verify and explain its completed work automatically.',
+    done:'Account-owner verification is required before private evidence can be displayed.',
+    now:'Reality is protecting the owner-scoped final receipt. No new job is required.',
+    next:'Sign in through the existing Reality Chat account form below. The verified opening will appear automatically.',
+    owner:'Sign in only. Do not restart or reapprove the job.',button:false
+   });
+   element('native263AskAboutJob').textContent='Go to sign in';
+   return;
+  }
+  if(response.status===403){
+   exact=null;renderProactiveOpening(null);
+   renderInfo({
+    summary:'Job #263 · Owner account required',
+    description:'This account is not authorized to read the original job #263. No receipt has been disclosed.',
+    done:'The original job is retained in its owner-scoped ledger.',
+    now:'Account ownership has not been verified for this session.',
+    next:'Sign in to the account that originally authorized the job.',
+    owner:'Do not start another job to resolve an account mismatch.',button:false
+   });
+   element('native263AskAboutJob').textContent='Check account sign-in';
+   return;
+  }
   if(!response.ok||!safeCard(data))throw Error('OWNER_READBACK_UNVERIFIED');
   exact=data;renderExact(data);
  }catch{
@@ -310,6 +337,22 @@ export function mountNative263ExactInstallApproval(){
  }
  const ask=element('native263AskAboutJob');
  if(ask)ask.addEventListener('click',()=>{
+  // Missing account evidence is not grounds for an AI response or new action.
+  if(!exact){
+   const login=element('privateLogin');
+   const retry=element('privateRetrySession');
+   if(login&&login.style.display!=='none'){
+    login.scrollIntoView({block:'center',behavior:'smooth'});
+    element('privateEmail')?.focus({preventScroll:false});
+   }else if(retry&&!retry.hidden){
+    retry.scrollIntoView({block:'center',behavior:'smooth'});
+    retry.focus({preventScroll:false});
+   }else{
+    element('native263ApprovalFeedback').textContent=
+     'Reality cannot verify this owner session yet. Use the account sign-in control below; no job needs to restart.';
+   }
+   return;
+  }
   // This is a draft question, not an automatic model call or authorization.
   // Use Reality's own existing chat composer, preserving signed-in session.
   const prompt=element('privatePrompt')||element('prompt');
