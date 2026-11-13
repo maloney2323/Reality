@@ -59,6 +59,55 @@ export default async function handler(req,res){
   }catch{
    // Never claim the unattended refresh succeeded on readback failure.
   }
+  // Existing signed background planner now qualifies each GitHub source
+  // BEFORE it reaches owner-facing employee Discovery. This is an investigation
+  // assignment only, not permission to start or install an original job.
+  const rawAssignments=verifiedSource?.qualification_status===
+   'CURRENT_SOURCE_INSPECTED_BEFORE_OWNER_DISCOVERY'&&
+   Number.isSafeInteger(verifiedSource.upstream_inspected_count)&&
+   verifiedSource.upstream_inspected_count===verifiedSource.open_issue_count&&
+   Array.isArray(verifiedSource.employee_source_investigation_assignments)&&
+   verifiedSource.employee_source_investigation_assignments.length===
+     verifiedSource.open_issue_count?
+    verifiedSource.employee_source_investigation_assignments:null;
+  const qualification=rawAssignments===null?{
+   status:'UPSTREAM_SOURCE_QUALIFICATION_UNVERIFIED',
+   inspected_count:0,investigation_assignment_count:0,
+   already_settled_no_replay_count:0,items:[]
+  }:(()=>{
+   const seen=new Set(),valid=rawAssignments.every(x=>{
+    if(!Number.isSafeInteger(x?.issue_number)||x.issue_number<1||
+       seen.has(x.issue_number)||
+       x.source_url!=='https://github.com/maloney2323/Reality/issues/'+
+        x.issue_number||
+       typeof x.title!=='string'||x.title.length<1||x.title.length>200||
+       !['PRIOR_ORIGINAL_SETTLED_NO_REPLAY',
+        'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE',
+        'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK',
+        'CURRENT_FAILURE_REPRODUCTION_REQUIRED',
+        'SOURCE_REVIEW_NEEDS_CURRENT_PROOF'].includes(x.status)||
+       !['Riley','Taylor','Quinn','Avery','Casey','Morgan','Jordan','Sage']
+        .includes(x.assigned_employee)||
+       typeof x.next_proof!=='string'||x.next_proof.length<20||
+       x.executable_original!==false||
+       x.execution_authorized!==false||
+       x.installation_authorized!==false)return false;
+    seen.add(x.issue_number);return true;
+   });
+   if(!valid)throw Error('EMPLOYEE_UPSTREAM_SOURCE_PROOF_UNVERIFIED');
+   return {
+    status:'UPSTREAM_PROVIDER_SOURCES_QUALIFIED_FOR_INVESTIGATION',
+    inspected_count:rawAssignments.length,
+    investigation_assignment_count:rawAssignments.filter(x=>
+     x.status!=='PRIOR_ORIGINAL_SETTLED_NO_REPLAY').length,
+    already_settled_no_replay_count:rawAssignments.filter(x=>
+     x.status==='PRIOR_ORIGINAL_SETTLED_NO_REPLAY').length,
+    items:rawAssignments,
+    new_original_jobs_authorized:0,
+    capability_installations_authorized:0,
+    production_changed:false
+   };
+  })();
   const next_week_plan=prepareNextWeekEmployeePlan(roster,{
    preparedSource:verifiedSource
   });
@@ -73,6 +122,7 @@ export default async function handler(req,res){
    saved_chat_employee_proposals_status:saved_chat_employee_proposals?
     'AUTHENTICATED_SAVED_CHAT_READBACK':'SAVED_CHAT_READBACK_UNAVAILABLE',
    next_week_background_open_issue_count:backgroundSourceIssueCount,
+   upstream_source_qualification:qualification,
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
