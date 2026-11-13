@@ -298,7 +298,7 @@ export default async function handler(req,res){
      s.planned_end_at==='infinity');
     if(!scope)throw Error('AUTOMATIC_WORK_TRIAGE_SHIFT_CHANGED');
     const mixed=reconcileRealityMixedShiftReceipts(scope,{
-     prReadback:prRead,repairReadback:repairRead});
+     prReadback:prRead,repairReadback:repairRead,unifiedGraph});
     automaticWorkSupervisor=projectRealityAutomaticShiftSupervisor(
      unifiedGraph,mixed);
     automaticWorkSupervisorStatus='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY';
