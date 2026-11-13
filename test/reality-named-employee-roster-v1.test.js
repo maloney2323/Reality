@@ -102,7 +102,8 @@ test('read-only roster endpoint uses existing sources and explicit owner authent
  assert.doesNotMatch(endpoint,/reality_store_next_week_source_snapshot_v1/);
  assert.match(chat,/Meet Reality's AI team/);
  assert.match(chat,/const ROSTER='\/api\/reality\/personal-employee-roster'/);
- assert.match(chat,/employeeCard\(employee\)/);
+ assert.match(chat,/employeeCard\(employee,approved\.roles\.get\(employee\.display_name\)\|\|\[\]\)/);
+ assert.match(chat,/Owner-approved Chat job list/);
  assert.match(chat,/roster\.proposed_employee_count!==8/);
  assert.match(chat,/roster\.active_ai_employee_count!==0/);
  assert.match(chat,/No verified cash savings/);
