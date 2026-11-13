@@ -23,6 +23,8 @@ import {inspectNative263ExistingFileInstallTransport}
  from '../../src/reality-native-263-install-preflight-bridge-v1.js';
 import {probeRealityNative263GithubWriteTransport}
  from '../../src/reality-native263-github-write-canary-bridge-v1.js';
+import {probeRealityNative263GithubWriteTransportV2}
+ from '../../src/reality-native263-github-write-canary-v2-bridge.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -227,6 +229,29 @@ export default async function handler(req,res){
      status:'NATIVE263_CANARY_PROVIDER_OR_SCOPE_UNVERIFIED',
      installation_authorized:false,original_job_completed:false,
      production_changed:false
+    };
+   }
+  }
+  // New separately fenced permission retest after v1's definite HTTP 403.
+  // Only the trusted Reality service can call the new broker action.
+  let nativeGithubContentsCanaryV2={
+   status:'NO_VERIFIED_NATIVE263_PREFLIGHT_FOR_V2_PERMISSION_TEST',
+   installation_authorized:false,owner_approval_ready:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(nativeExistingFilePreflight.status===
+      'NATIVE_263_EXISTING_SOURCE_TRANSPORT_PREFLIGHT_VERIFIED'){
+   try{
+    nativeGithubContentsCanaryV2=
+     await probeRealityNative263GithubWriteTransportV2({
+      db,graph:unifiedGraph,nativePreflight:nativeExistingFilePreflight,
+      env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    nativeGithubContentsCanaryV2={
+     status:'NATIVE263_V2_PERMISSION_RETEST_SCOPE_OR_PROVIDER_UNVERIFIED',
+     installation_authorized:false,owner_approval_ready:false,
+     original_job_completed:false,production_changed:false
     };
    }
   }
@@ -512,6 +537,7 @@ export default async function handler(req,res){
     riley_verified_candidate:rileyVerifiedCandidate,
     native_existing_file_install_preflight:nativeExistingFilePreflight,
     native_github_contents_write_canary:nativeGithubWriteCanary,
+    native_github_contents_write_canary_v2:nativeGithubContentsCanaryV2,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
