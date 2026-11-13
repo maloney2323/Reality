@@ -61,14 +61,14 @@
    steps.append(row);
   };
   steps.replaceChildren();
-  one('Message submitted',true,'You pressed Send. This is a Chat request, not authorization to start or reinstall work.');
+  one('Message submitted',true,'You pressed Send. No development worker was started by this Chat display; no installation or approval was authorized.');
   one('Authenticated message save',Boolean(state.saved),
    state.saved?'Verified from the signed-in conversation: '+state.saved.source_ref:
      'Waiting for independent message readback. The message above is displayed locally until verified.');
   one('Evidence and answer processing',Boolean(state.answer),
    state.answer?'The server completed its governed response process; saved output is available.':
      state.complete?'No successful response has been independently verified.':
-     'Reality is handling this Chat request. The current API does not stream individual model or evidence-check stages.');
+     'Reality is handling this Chat request. Internal model reasoning and verification stages are not streamed by the current Chat endpoint.');
   one('Final reply saved and verified',Boolean(state.answer),
    state.answer?'The same request ID has an independently read-back answer: '+state.answer.source_ref:
      'Waiting for a matching assistant message in authenticated saved history.');
