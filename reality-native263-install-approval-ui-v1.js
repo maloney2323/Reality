@@ -22,11 +22,16 @@ function safeCard(d){
    /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(d.independently_verified_final_original_receipt_id||''));
 }
 function host(){
- return element('chat')||element('privateReady');
+ // On /chat the existing workspace owns the full-height conversation and
+ // work inspector. Put the long receipt in its Proof panel, never before
+ // the message thread, composer or page navigation.
+ return element('realityChatPanelProof')||element('chat')||element('privateReady');
 }
 function visible(){
- const h=host();
- return !!h&&(!h.hidden)&&(h.id!=='privateReady'||h.style.display!=='none');
+ const ready=element('privateReady');
+ if(ready)return ready.style.display==='block';
+ const simple=element('chat');
+ return !!simple&&!simple.hidden;
 }
 function add(tag,id,value,parent){
  const n=document.createElement(tag);
@@ -51,8 +56,12 @@ function ensurePanel(){
   const b=add('button','native263ApproveInstall','Approve verified upgrade',p);
   b.type='button';b.disabled=true;
   add('p','native263ApprovalFeedback','',p).setAttribute('role','status');
-  h.prepend(p);
+  h.append(p);
  }
+ // If the workspace finished mounting after the module, relocate the
+ // same original panel to the proof tab; never duplicate any decision UI.
+ const proof=element('realityChatPanelProof');
+ if(proof&&p.parentNode!==proof)proof.append(p);
  if(!element('native263OwnerSummary')){
   const summary=add('p','native263OwnerSummary','Verifying the current work…',document.createDocumentFragment());
   summary.style.fontWeight='750';
@@ -141,8 +150,11 @@ function renderProactiveOpening(d){
   element('native263AskAboutJob').textContent='Ask Reality about this job';
   return;
  }
- view.hidden=false;
- text.textContent=message;
+ // The same first response appears in the signed-in conversation, so the
+ // technical inspector must not repeat an entire screenful above the receipt.
+ const conversation=element('realityChatConversation');
+ view.hidden=!!conversation;
+ text.textContent=conversation?'':message;
  element('native263AskAboutJob').textContent='Reply to Reality';
  // Show the verified initial briefing as a Reality message before any
  // user prompt. This view is read-only; no model call, fake chat-history row,
@@ -364,6 +376,9 @@ export function mountNative263ExactInstallApproval(){
   }
   if(isSimple)element('rileyConversationDisclosure')?.setAttribute('open','');
   if(exact?.original_job_completed===true){
+   // Close the mobile Work inspector before focusing the actual composer.
+   if(document.body.dataset.realityChatPanel==='work')
+    element('realityChatOpenInspector')?.click();
    const composer=element('realityChatComposer')||prompt;
    element('native263ApprovalFeedback').textContent=
     'Reality has opened with its verified result above. Type your next question in the conversation below. No new work or approval was started.';
