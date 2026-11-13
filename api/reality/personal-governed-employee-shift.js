@@ -16,6 +16,8 @@ import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
 import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
+import {reconcileRealityMixedShiftReceipts}
+ from '../../src/reality-mixed-shift-receipts-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {assessRealityNativeBatchReadiness}
@@ -369,7 +371,32 @@ export default async function handler(req,res){
       riley_native_model_tool_proof=proof;
     }catch{/* Never invent a missing model/tool receipt. */}
    }
-   const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
+   // Existing signed-in owner: independently read finalized source-native
+   // originals without reopening their DB claims or changing shift authority.
+   let shift_source_native_receipts=null;
+   let shift_source_native_receipts_status='NO_OWNER_SOURCE_NATIVE_RECEIPT_COVERAGE';
+   const activeBrief=read.shifts[0];
+   if(activeBrief?.planned_end_at==='infinity'&&
+      Array.isArray(activeBrief.steps)&&activeBrief.steps.length===8&&
+      activeBrief.steps.slice(1,5).every(x=>
+       /^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/.test(
+        x.source_ref||''))){
+    try{
+     shift_source_native_receipts=reconcileRealityMixedShiftReceipts(activeBrief,{
+      prReadback:riley_pr_review_jobs.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'?
+       riley_pr_review_jobs:null,
+      repairReadback:riley_code_repair_jobs.status===
+       'OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'?
+       riley_code_repair_jobs:null
+     });
+     shift_source_native_receipts_status='OWNER_SOURCE_NATIVE_RECEIPTS_RECONCILED_READ_ONLY';
+    }catch{
+     shift_source_native_receipts=null;
+     shift_source_native_receipts_status='SOURCE_NATIVE_RECEIPT_BINDING_UNVERIFIED';
+    }
+   }
+   const shift_briefing=buildRealityShiftConversationBrief(
+    read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
    if(hours!==null){
@@ -395,6 +422,7 @@ export default async function handler(req,res){
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
+    shift_source_native_receipts,shift_source_native_receipts_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,
