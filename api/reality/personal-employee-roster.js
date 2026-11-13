@@ -10,6 +10,8 @@ import {prepareNextWeekEmployeePlan}
  from '../../src/reality-next-week-employee-plan-v1.js';
 import {projectSingleModelRoleQueue}
  from '../../src/reality-single-model-role-work-router-v1.js';
+import {readRealitySavedChatEmployeeProposals}
+ from '../../src/reality-saved-chat-employee-proposals-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
 export const maxDuration=45;
@@ -27,6 +29,10 @@ export default async function handler(req,res){
    return res.status(401).json({ok:false,error:'EMPLOYEE_ROSTER_SIGN_IN_REQUIRED'});
   if(process.env.VERCEL_ENV!=='preview')
    return res.status(403).json({ok:false,error:'EMPLOYEE_ROSTER_PREVIEW_ONLY'});
+  // Existing authenticated Chat is the durable archive. Project suggestions
+  // separately from verified source work, without creating a shift or job.
+  // A missing Chat readback must not erase the independently sourced roster.
+  const savedChatPromise=readRealitySavedChatEmployeeProposals(session).catch(()=>null);
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
@@ -53,8 +59,11 @@ export default async function handler(req,res){
    preparedSource:verifiedSource
   });
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
+  const saved_chat_employee_proposals=await savedChatPromise;
   return res.status(200).json({ok:true,...roster,value_preview,
-   next_week_plan,single_model_role_routing,
+   next_week_plan,single_model_role_routing,saved_chat_employee_proposals,
+   saved_chat_employee_proposals_status:saved_chat_employee_proposals?
+    'AUTHENTICATED_SAVED_CHAT_READBACK':'SAVED_CHAT_READBACK_UNAVAILABLE',
    next_week_background_open_issue_count:backgroundSourceIssueCount,
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
