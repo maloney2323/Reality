@@ -142,3 +142,18 @@ test('worker wires actual read-only investigation, not just a category projectio
  assert.match(sql,/WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATION_DURABLY_RECORDED/);
  assert.doesNotMatch(sql,/grant execute.*to authenticated/i);
 });
+
+test('owner Home distinguishes durable worker investigations from unexecuted work plans',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-employee-roster.js',
+  import.meta.url),'utf8');
+ const home=readFileSync(new URL('../reality-home-employee-brief-v1.js',
+  import.meta.url),'utf8');
+ assert.match(api,/reality_read_current_shift_weekly_investigations_v1/);
+ assert.match(api,/SIGNED_WORKER_EMPLOYEE_INVESTIGATIONS_INDEPENDENTLY_RECEIPTED/);
+ assert.match(api,/checked\.owner_id===session\.user_id/);
+ assert.match(api,/checked\.snapshot_sha256===verifiedSource\.source_sha256/);
+ assert.match(home,/weekly_employee_investigation_receipts/);
+ assert.match(home,/independently receipted/);
+ assert.match(home,/doneByEmployee/);
+ assert.match(home,/new_executable_jobs_authorized===0/);
+});
