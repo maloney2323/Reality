@@ -21,6 +21,8 @@ import {executeExactlyPreparedRileyReviewViaReality}
  from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
 import {inspectNative263ExistingFileInstallTransport}
  from '../../src/reality-native-263-install-preflight-bridge-v1.js';
+import {probeRealityNative263GithubWriteTransport}
+ from '../../src/reality-native263-github-write-canary-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -203,6 +205,28 @@ export default async function handler(req,res){
      status:'NATIVE263_PREINSTALL_PROVIDER_OR_OWNER_SCOPE_UNVERIFIED',
      installation_authorized:false,owner_approval_ready:false,
      original_job_completed:false,production_changed:false
+    };
+   }
+  }
+  // This single-use canary does NOT write to #263 or issue an approval. It
+  // checks REAL GitHub Contents-write permission held by Reality's broker.
+  let nativeGithubWriteCanary={
+   status:'NO_VERIFIED_NATIVE263_PREINSTALL_SCOPE_FOR_WRITE_TEST',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false
+  };
+  if(nativeExistingFilePreflight.status===
+      'NATIVE_263_EXISTING_SOURCE_TRANSPORT_PREFLIGHT_VERIFIED'){
+   try{
+    nativeGithubWriteCanary=await probeRealityNative263GithubWriteTransport({
+     db,graph:unifiedGraph,nativePreflight:nativeExistingFilePreflight,
+     env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    nativeGithubWriteCanary={
+     status:'NATIVE263_CANARY_PROVIDER_OR_SCOPE_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false
     };
    }
   }
@@ -487,6 +511,7 @@ export default async function handler(req,res){
     riley_failure_triage_original:rileyFailureTriage,
     riley_verified_candidate:rileyVerifiedCandidate,
     native_existing_file_install_preflight:nativeExistingFilePreflight,
+    native_github_contents_write_canary:nativeGithubWriteCanary,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
