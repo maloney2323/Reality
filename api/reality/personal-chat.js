@@ -179,6 +179,9 @@ export default async function handler(req,res){
    // The signed-in user's current request can permit read-only public search;
    // model text cannot authorize installation, worker execution or any account action.
    publicResearchEnabled:isPublicResearchRequest(text),
+   // A planning conversation uses one grounded model call. The existing
+   // independent reliability/readback and atomic publication still apply.
+   cognitionEffort:'CONVERSATION',
    model:'gpt-4.1-mini',apiKey:key,
    systemContext:{conversation_id:conversationId,
     worldline_id:scopedRoot,world_id:scopedRoot,
