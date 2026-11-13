@@ -24,7 +24,7 @@ const digest=async(bytes:string)=>{
  return 'sha256:'+Array.from(new Uint8Array(out)).map(x=>x.toString(16).padStart(2,'0')).join('');
 };
 async function rpc(name:string,payload:Record<string,unknown>,key:string){
- if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1|rearm_authorized_riley_pr_post_403_v1)$/.test(name))
+ if(!/^reality_(?:claim_authorized_riley_pr_review_v1|mark_authorized_riley_pr_publish_v1|settle_authorized_riley_pr_review_v1|rearm_authorized_riley_pr_publish_v1|rearm_authorized_riley_pr_post_403_v1|read_current_shift_execution_graph_v1|read_owner_native_reviewed_patch_v1)$/.test(name))
   fail('RPC_OUT_OF_SCOPE');
  const r=await fetch('https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
@@ -153,19 +153,161 @@ async function settle(c:any,observed:any,token:string,key:string){
   settlement_receipt_ref:receipt.settlement_receipt_ref
  });
 }
+
+// READ-ONLY native existing-code installation preflight. This proves source,
+// tested candidate and exact preview target under the SAME signed shift; no
+// executable GitHub write, deployment, owner approval or settlement is implied.
+const NATIVE_ORIGINAL='work:873a6e74fd14c6beacc9042dd8021dfc';
+const NATIVE_ISSUE='https://github.com/'+REPO+'/issues/263';
+const NATIVE_PR='https://github.com/'+REPO+'/pull/268';
+const NATIVE_PATH='src/reality-riley-service-original-runtime-v1.js';
+const NATIVE_BRANCH='reality/isolated-openai-governance-gateway-20261108';
+const NATIVE_TARGET_BLOB_SHA='aaf22a1f69a2c3e91e18641cf1ef40d16a563bc0';
+const NATIVE_SOURCE_SHA='sha256:2969a5ea2c0ea27446be73c4840d762e669872b3e1a2351524d6a3cc8d9554b4';
+const NATIVE_CANDIDATE_SHA='e44ee294f21c73803a2bcdb5a9cb487f0f80fc85';
+const NATIVE_CANDIDATE_BYTES_SHA='sha256:459e2bbe9a9d9c7037c87542a9cdbebf06f77a6d368d72769c79fdbef7947f48';
+async function nativeGithubRead(path:string,token:string){
+ // Scope ALL paths before substituting any provenance supplied by a provider.
+ if(![
+  '/pulls/268','/git/ref/heads/'+NATIVE_BRANCH,
+  '/contents/'+NATIVE_PATH+'?ref='+NATIVE_CANDIDATE_SHA,
+  '/actions/runs/42525028367'
+ ].includes(path)&&
+ !(/^\/contents\/src\/reality-riley-service-original-runtime-v1\.js\?ref=[a-f0-9]{40}$/.test(path)))
+  fail('NATIVE_PREVIEW_GITHUB_READ_RESOURCE_OUT_OF_SCOPE');
+ const response=await fetch(ROOT+path,{
+  method:'GET',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
+  headers:{authorization:'Bearer '+token,
+   accept:'application/vnd.github+json',
+   'x-github-api-version':'2022-11-28',
+   'user-agent':'Reality-Native263-Governed-ReadOnly-Install-Preflight'}
+ });
+ if(!response.ok)fail('NATIVE_PREVIEW_GITHUB_READBACK_UNAVAILABLE');
+ const obj=await response.json().catch(()=>null);
+ if(!obj||typeof obj!=='object'||Array.isArray(obj))
+  fail('NATIVE_PREVIEW_GITHUB_OBJECT_INVALID');
+ return obj;
+}
+function nativeDecodeBlob(blob:any){
+ if(blob?.path!==NATIVE_PATH||blob.encoding!=='base64'||
+  !SHA.test(blob.sha||'')||
+  !Number.isInteger(blob.size)||blob.size<1||blob.size>40000||
+  typeof blob.content!=='string')fail('NATIVE_GITHUB_FILE_METADATA_INVALID');
+ const encoded=blob.content.replace(/\s/g,'');
+ if(!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)||encoded.length>60000)
+  fail('NATIVE_GITHUB_FILE_ENCODING_INVALID');
+ let binary:string;try{binary=atob(encoded)}catch{
+  fail('NATIVE_GITHUB_FILE_BASE64_INVALID');
+ }
+ const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
+ if(bytes.length!==blob.size)fail('NATIVE_GITHUB_FILE_SIZE_CHANGED');
+ return bytes;
+}
+async function nativeBlobSha(bytes:Uint8Array){
+ const prefix=new TextEncoder().encode('blob '+bytes.length+'\0');
+ const all=new Uint8Array(prefix.length+bytes.length);
+ all.set(prefix);all.set(bytes,prefix.length);
+ const out=await crypto.subtle.digest('SHA-1',all);
+ return Array.from(new Uint8Array(out)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function nativeInstallPreflight(serviceKey:string){
+ const graph=await rpc('reality_read_current_shift_execution_graph_v1',{},serviceKey);
+ if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
+    graph.shift_id!==SHIFT||graph.installation_authorized!==false||
+    graph.production_changed!==false||
+    graph.execution_scope_from_owner_warrant_only!==true||
+    graph.completion_bound!==true||
+    !UUID.test(graph.owner_id||'')||
+    !Array.isArray(graph.jobs)||graph.jobs.length!==4)
+   fail('NATIVE_FROZEN_OWNER_SHIFT_REQUIRED');
+ const matching=graph.jobs.filter((j:any)=>j.original_work_id===NATIVE_ORIGINAL);
+ if(matching.length!==1||
+    matching[0].source_ref!==NATIVE_ISSUE||
+    matching[0].phase!=='CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL'||
+    matching[0].source_proof_sha256!==NATIVE_SOURCE_SHA||
+    matching[0].independent_source_proof_verified!==true||
+    matching[0].capability_installation_authorized!==false)
+   fail('NATIVE_EXACT_ORIGINAL_NOT_READY_FOR_PREFLIGHT');
+ const patch=await rpc('reality_read_owner_native_reviewed_patch_v1',{
+  p_owner_id:graph.owner_id,p_shift_id:graph.shift_id},serviceKey);
+ if(patch?.status!=='EXACT_NATIVE_ENGINEERING_PATCH_INDEPENDENTLY_TESTED_REVIEW_ONLY'||
+    patch.owner_id!==graph.owner_id||patch.shift_id!==SHIFT||
+    patch.original_work_id!==NATIVE_ORIGINAL||patch.source_ref!==NATIVE_ISSUE||
+    patch.source_file_path!==NATIVE_PATH||
+    patch.source_proof_sha256!==NATIVE_SOURCE_SHA||
+    patch.candidate_commit_sha!==NATIVE_CANDIDATE_SHA||
+    patch.candidate_artifact_sha256!==NATIVE_CANDIDATE_BYTES_SHA||
+    patch.independent_passing_run_id!==42525028367||
+    patch.provenance!=='CHATGPT_REVIEWED_ENGINEERING_PATCH_AFTER_REJECTED_MODEL_DRAFT'||
+    patch.owner_approval_ready!==false||
+    patch.native_install_to_settlement_accepted!==false||
+    patch.installation_authorized!==false||
+    patch.original_job_completed!==false||patch.production_changed!==false)
+   fail('NATIVE_REVIEWED_CANDIDATE_DURABLE_EVIDENCE_MISMATCH');
+ const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
+ if(token.length<25)fail('NATIVE_GITHUB_SOURCE_READ_CREDENTIAL_MISSING');
+ const [pr,branch,source,run]=await Promise.all([
+  nativeGithubRead('/pulls/268',token),
+  nativeGithubRead('/git/ref/heads/'+NATIVE_BRANCH,token),
+  nativeGithubRead('/contents/'+NATIVE_PATH+'?ref='+NATIVE_CANDIDATE_SHA,token),
+  nativeGithubRead('/actions/runs/42525028367',token)
+ ]);
+ if(pr.number!==268||pr.html_url!==NATIVE_PR||pr.state!=='open'||
+    pr.head?.sha!==NATIVE_CANDIDATE_SHA||
+    pr.base?.ref!==NATIVE_BRANCH||
+    !SHA.test(branch?.object?.sha||'')||
+    branch.ref!=='refs/heads/'+NATIVE_BRANCH||
+    run.id!==42525028367||run.status!=='completed'||
+    run.conclusion!=='success'||run.head_sha!==NATIVE_CANDIDATE_SHA)
+   fail('NATIVE_SOURCE_PR_CI_OR_TARGET_BRANCH_CHANGED');
+ const sourceBytes=nativeDecodeBlob(source);
+ if(await nativeBlobSha(sourceBytes)!==source.sha||
+    await digest(new TextDecoder('utf-8',{fatal:true}).decode(sourceBytes))!==NATIVE_CANDIDATE_BYTES_SHA)
+   fail('NATIVE_FROZEN_CANDIDATE_SOURCE_BYTES_MISMATCH');
+ const target=await nativeGithubRead(
+  '/contents/'+NATIVE_PATH+'?ref='+branch.object.sha,token);
+ const targetBytes=nativeDecodeBlob(target);
+ if(target.sha!==NATIVE_TARGET_BLOB_SHA||
+    await nativeBlobSha(targetBytes)!==target.sha||
+    target.sha===source.sha)
+   fail('NATIVE_PREVIEW_EXISTING_FILE_BASELINE_DRIFT');
+ return respond('NATIVE_263_EXISTING_SOURCE_TRANSPORT_PREFLIGHT_VERIFIED',true,200,{
+  source:'INDEPENDENT_REALITY_PROVIDER_AND_FROZEN_OWNER_LEDGER',
+  original_work_id:NATIVE_ORIGINAL,shift_id:SHIFT,
+  source_ref:NATIVE_ISSUE,preview_branch:NATIVE_BRANCH,
+  preview_baseline_commit_sha:branch.object.sha,
+  preview_existing_file_blob_sha:target.sha,
+  candidate_commit_sha:NATIVE_CANDIDATE_SHA,
+  candidate_file_blob_sha:source.sha,
+  candidate_artifact_sha256:NATIVE_CANDIDATE_BYTES_SHA,
+  independent_ci_run_id:42525028367,
+  exact_existing_file_update_required:true,
+  source_and_frozen_tests_verified:true,
+  code_write_permission_verified:false,
+  native_approval_bridge_verified:false,
+  preview_deployment_automation_verified:false,
+  post_install_same_original_settlement_verified:false,
+  owner_approval_ready:false,
+  next_governed_action:'VERIFY_OWNER_APPROVAL_AND_EXACT_NATIVE_EXISTING_FILE_INSTALL'
+ });
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return respond('SERVICE_POST_REQUIRED',false,405);
   if(req.headers.get('content-type')!=='application/json')
    return respond('SERVICE_JSON_REQUIRED',false,415);
   const raw=await req.text();
-  if(raw!=='{"version":1}')return respond('EXACT_VERSION_ONLY_REQUEST_REQUIRED',false,400);
+  if(raw!=='{"version":1}'&&raw!=='{"version":2,"action":"native_263_install_preflight"}')
+   return respond('EXACT_VERSION_ONLY_REQUEST_REQUIRED',false,400);
   // Bearer is existing Reality service's Supabase credential. It is tested
   // *against the service-role-only DB claim* before ANY GitHub operation.
   // No browser or anonymous token can pass the DB role gate.
   const key=req.headers.get('apikey')||'';
   if(key.length<25||req.headers.get('authorization')!=='Bearer '+key)
    return respond('REALITY_SERVICE_CREDENTIAL_REQUIRED',false,403);
+  if(raw==='{"version":2,"action":"native_263_install_preflight"}')
+   return await nativeInstallPreflight(key);
   const c=await rpc('reality_claim_authorized_riley_pr_review_v1',{},key);
   if(c?.status==='EXACT_PR_REVIEW_ORIGINAL_INDEPENDENTLY_SETTLED')
    return respond('EXISTING_ORIGINAL_SETTLED_NO_PROVIDER_REPLAY',true,200);
