@@ -89,6 +89,17 @@ begin
   and q.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
  for update of q;
  if not found then raise exception 'COMMIT_TRIAGE_WARRANT_CHANGED';end if;
+ -- A source already owned by the native repair or Universe original engine
+ -- must never be reminted merely because a newer commit-triage adapter exists.
+ if exists(select 1 from reality_internal.riley_unattended_repair_originals_v1 r
+   where r.owner_id=s.owner_id and r.issue_url=p_source_ref)
+   or exists(select 1 from reality_internal.genuine_capability_queue_v1 q
+     join public.universe_events e on e.event_id=q.original_work_event_id
+     where q.owner_id=s.owner_id
+      and e.payload->>'owner_id'=s.owner_id::text
+      and e.payload->>'issue_number'=
+       pg_catalog.split_part(p_source_ref,'/issues/',2))
+ then raise exception 'COMMIT_TRIAGE_PRIOR_ORIGINAL_REQUIRES_RECONCILIATION';end if;
  v_work:='work:'||left(pg_catalog.encode(pg_catalog.sha256(
   pg_catalog.convert_to(
    'reality:shift-commit-triage:v1:'||s.owner_id::text||':'||
