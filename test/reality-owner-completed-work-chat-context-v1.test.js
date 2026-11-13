@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {projectOwnerCompletedWorkForChat,readVerifiedOwnerCompletedWorkForChat}
  from '../src/reality-owner-completed-work-chat-context-v1.js';
+import {mergeCurrentAndDurableUniverseForCognition}
+ from '../src/reality-native-universe-v1.0.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const otherOwner='c24a6ba0-24bf-4cad-a153-d4e45fcd8b4b';
 const db={strictSecrets:true,project:'hvkfreoagbrphwghjajw',
@@ -75,4 +77,22 @@ test('chat hands recent verified work and original evidence into cognition on ev
  assert.match(model,/No exact job ID, keyword phrase, or repeated user-provided evidence is required/);
  assert.doesNotMatch(native,/native263ConversationRelevant|if\(!native263ConversationRelevant/);
  assert.doesNotMatch(api,/readVerifiedNative263TemporalForChat\(\{session,message:text/);
+});
+
+test('current authenticated evidence survives a full historical Universe context window',()=>{
+ const past=Array.from({length:100},(_,i)=>({entry_id:'historical:'+i,event_kind:'prior',summary:'History '+i}));
+ const recent=[
+  {entry_id:'owner:verified-original:recent',event_kind:'owner_independent_original_job_final_receipt',summary:'Independently settled original'},
+  {entry_id:'owner:verified-original:recent',event_kind:'duplicate',summary:'Old duplicate'}
+ ];
+ const result=mergeCurrentAndDurableUniverseForCognition({current:recent,durable:past,limit:100});
+ assert.equal(result.length,100);
+ assert.equal(result[0].summary,'Independently settled original');
+ assert.equal(result[1].entry_id,'historical:0');
+ assert.equal(result.at(-1).entry_id,'historical:98');
+ assert.equal(Object.isFrozen(result),true);
+ const orchestration=readFileSync(new URL('../src/reality-live-intelligence-orchestration-v0.1.js',import.meta.url),'utf8');
+ assert.match(orchestration,/entries: mergeCurrentAndDurableUniverseForCognition\(/);
+ assert.match(orchestration,/current:requestContext\.entries,durable:durable\.entries,limit:100/);
+ assert.throws(()=>mergeCurrentAndDurableUniverseForCognition({current:'untrusted'}));
 });
