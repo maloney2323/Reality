@@ -709,6 +709,26 @@ body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) m
 #realitySimpleHome .reality-home-proof h3{font-size:17px;margin:10px 0}
 #realitySimpleHome .reality-home-labor-source{margin:8px 0 21px}
 #realitySimpleHome .reality-home-priorities{padding:9px 0 17px}
+
+/* Compact home operating view. Detailed evidence remains in Evaluation and disclosures. */
+#realitySimpleHome .home-team-brief{margin:14px 0 17px;padding:17px 18px;border:1px solid #42667d;border-radius:17px;background:#101e2c}
+#realitySimpleHome .home-team-head{display:flex;align-items:start;justify-content:space-between;gap:13px;flex-wrap:wrap}
+#realitySimpleHome .home-team-head h2{font-size:clamp(19px,3.5vw,25px);margin:6px 0;color:#f2f8ff}
+#realitySimpleHome .home-team-head p{margin:3px 0 11px;color:#abc3d6;font-size:12px;line-height:1.5;max-width:760px}
+#realitySimpleHome .home-team-head button{font-size:12px;min-height:36px;padding:8px 12px}
+#realitySimpleHome .home-team-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:7px 0 11px}
+#realitySimpleHome .home-team-grid article{display:flex;flex-direction:column;gap:5px;min-width:0;background:#152b3b;border:1px solid #36536b;border-radius:11px;padding:13px 11px}
+#realitySimpleHome .home-team-grid article strong{font-size:16px;line-height:1.25;color:#f1f9ff}
+#realitySimpleHome .home-team-grid article span{font-size:12px;color:#d0e0ed}
+#realitySimpleHome .home-team-grid article small{font-size:11px;line-height:1.5;color:#aac8dc;overflow-wrap:anywhere}
+#realitySimpleHome .home-team-disclaimer{font-size:11px;line-height:1.5;margin:6px 0 10px;color:#a7bccc}
+#realitySimpleHome .home-team-actions{display:flex;gap:12px;flex-wrap:wrap;font-size:13px}
+#realitySimpleHome .home-team-actions a{color:#bde9ff;text-decoration:underline;text-underline-offset:3px}
+#realitySimpleHome .home-compact-upgrades{margin:15px 0;padding:13px 15px;border:1px solid #3e5f79;border-radius:13px;background:#0c1b2b}
+#realitySimpleHome .home-compact-upgrades>summary{cursor:pointer;color:#e4f4ff;font-size:14px;font-weight:650;line-height:1.5}
+@media(max-width:900px){#realitySimpleHome .home-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:450px){#realitySimpleHome .home-team-brief{padding:12px}#realitySimpleHome .home-team-grid article{padding:10px 9px}}
+
 #realitySimpleHome .reality-home-priorities h2{font-size:20px;margin:7px 0 10px}
 #realitySimpleHome .reality-home-explore{border-top:1px solid #38516a;padding:20px 0 10px}
 #realitySimpleHome .reality-engine-metrics[hidden],#realitySimpleHome .reality-econ-grid[hidden]{display:none!important}
@@ -1023,12 +1043,36 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 
 <section id="realitySimpleHome" aria-labelledby="simpleRealityTitle">
  <div class="simple-kicker">REALITY · BUSINESS VALUE FIRST</div>
- <h1 id="simpleRealityTitle">What Reality has accomplished — and what comes next</h1>
- <p class="simple-lead">See verified work, independent receipts, and transparent labor comparisons first. Reality preserves the underlying capabilities, governance, and detailed evidence for inspection without counting the same work twice.</p>
+ <h1 id="simpleRealityTitle">Your business, today</h1>
+ <p class="simple-lead">See your AI employees, current work, and independently verified value. Detailed results, forecasts, and prior work live in <a href="/value">Evaluation</a>.</p>
  <div class="simple-bar">
   <span class="simple-info" id="simpleLoginState" role="status">Checking your account…</span>
   <span class="simple-info" id="simpleResearchCount">Loading assessed upgrades…</span>
  </div>
+ <section id="realityHomeEmployees" class="home-team-brief" aria-labelledby="realityHomeEmployeesTitle">
+  <div class="home-team-head">
+   <div><div class="simple-kicker">MY AI TEAM · WORK AT A GLANCE</div>
+    <h2 id="realityHomeEmployeesTitle">Your eight AI employees</h2>
+    <p id="realityHomeEmployeesStatus" role="status" aria-live="polite">Checking source-backed work and saved Chat plans…</p>
+   </div>
+   <button type="button" id="realityHomeEmployeesRefresh" class="simple-secondary">Refresh work</button>
+  </div>
+  <div class="home-team-grid" aria-label="Eight proposed employee responsibilities and owner-scoped work">
+   <article data-home-employee="Avery"><strong>Avery</strong><span>Product strategy</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Riley"><strong>Riley</strong><span>Software engineering</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Quinn"><strong>Quinn</strong><span>Quality &amp; security</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Taylor"><strong>Taylor</strong><span>Operations</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Casey"><strong>Casey</strong><span>Customer experience</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Morgan"><strong>Morgan</strong><span>Marketing research</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Jordan"><strong>Jordan</strong><span>Sales &amp; success</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Sage"><strong>Sage</strong><span>Finance &amp; administration</span><small data-home-work>Checking saved work…</small></article>
+  </div>
+  <p class="home-team-disclaimer">Employee names represent eight roles for one OpenAI model, not eight active autonomous workers. Suggestions are not authorized jobs.</p>
+  <div class="home-team-actions">
+   <a href="/chat-simple#employeeBoardPanel">View employees &amp; saved work proposals</a>
+   <a href="/chat">Discuss next week's assignments</a>
+  </div>
+ </section>
  <section id="simpleEconomicEvidenceDashboard" class="reality-economic-evidence" aria-labelledby="realityEconomicTitle">
   <div class="reality-econ-heading">
    <div>
@@ -1117,6 +1161,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
      <a href="https://www.bls.gov/news.release/ocwage.t01.htm" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics · May 2025 software developer wage</a>
     </div>
    </section></div>
+ <details id="realityHomeUpgradeDetails" class="reality-home-expand home-compact-upgrades">
+  <summary>Upgrade opportunities · Benefits, risks, and verification details</summary>
  <section id="realityHomePriorities" class="reality-home-priorities" aria-label="Inspected upgrade opportunities">
   <div class="simple-kicker">REALITY · NEXT OPPORTUNITIES</div>
   <h2>Upgrades Reality has already inspected</h2>
@@ -1127,6 +1173,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <p id="simpleGapFeedStatus" class="simple-status" role="status" aria-live="polite">Checking complete capability intake…</p>
   <p id="simpleResearchStatus" class="simple-status" role="status">Reading automatically inspected upgrades from Reality’s ledger…</p>
  </section>
+ </details>
  <section class="reality-home-explore" aria-label="Further capability and economic evidence">
   <div class="simple-kicker">EXPLORE DETAILS · NO EVIDENCE REMOVED</div>
   <p class="reality-econ-footnote">Expand the evidence you need. Repeated summary counts stay hidden; unique capabilities, categories, sources and controls remain accessible.</p>
@@ -5932,6 +5979,8 @@ $('simpleViewGapCategory').onclick=()=>{
  $('wcCategories')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 };
 $('simpleReviewFirst').onclick=()=>{
+ const upgradeDisclosure=$('realityHomeUpgradeDetails');
+ if(upgradeDisclosure)upgradeDisclosure.open=true;
  const first=$('simpleResearchList')?.querySelector('.simple-finding');
  if(first&&realitySimpleFindings.length){
   const details=first.querySelector('details');
@@ -6920,6 +6969,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-value-verification-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
+<script defer src="/reality-home-employee-brief-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
 <script defer src="/reality-model-capability-map-v1.js"></script>
