@@ -72,11 +72,12 @@ export default async function handler(req,res){
    throw Error('NATIVE263_ISOLATED_OWNER_SERVICE_SCOPE_REQUIRED');
   const card=await ownerCard(db,session);
   if(req.method==='GET')return res.status(200).json({
-   ok:true,...card,installation_completed:false,
+   ok:true,...card,installation_completed:card.approval_state==='SOURCE_INSTALLED',
    next_step:card.owner_approval_ready?
      'EXACT_OWNER_CLICK_MAY_AUTHORIZE_SINGLE_AUTOMATIC_INSTALL':
      'CONTINUATION_AND_FINAL_RECEIPT_PROOF_REQUIRED_BEFORE_OWNER_APPROVAL'});
-  if(Object.getPrototypeOf(req.body)!==Object.prototype||
+  if(!req.body||typeof req.body!=='object'||
+     Object.getPrototypeOf(req.body)!==Object.prototype||
      Array.isArray(req.body)||
      Object.keys(req.body).sort().join(',')!==
       'artifact_sha256,confirmation,intent,original_work_id,request_id'||
