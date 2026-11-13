@@ -57,8 +57,9 @@ test('existing eight employee roles are available for free planning discussion w
  assert.equal(context.weekly_plan_generated_by_this_read,false);
  assert.equal(context.job_started,false);
  assert.equal(context.external_execution_authorized,false);
- assert.equal(context.business_days_customizable,true);
- assert.equal(context.shift_hours_customizable,true);
+ assert.equal(context.customer_workday_preferences_discussable,true);
+ assert.equal(context.existing_readonly_draft_workweek,'MONDAY_TO_FRIDAY_AMERICA_NEW_YORK');
+ assert.equal(context.arbitrary_customer_calendar_execution_supported,false);
  assert.ok(context.roles.every(r=>r.status==='PROPOSED_ROLE_NOT_AN_ACTIVE_WORKER'));
  assert.ok(context.roles.every(r=>r.actual_assigned_source_jobs===null));
  assert.match(context.summary,/NOT eight independent/);
