@@ -29,6 +29,8 @@ import {stageRealityNative263ExactInstallWarrant}
  from '../../src/reality-native263-exact-install-warrant-bridge-v1.js';
 import {checkNative263LiveOwnerApprovalFence}
  from '../../src/reality-native263-live-installer-fence-bridge-v1.js';
+import {executeNative263GovernedPreviewAutoDeployTrigger}
+ from '../../src/reality-native263-preview-auto-deploy-trigger-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -300,6 +302,31 @@ export default async function handler(req,res){
    }catch{
     nativeInstallerApprovalFence={
      status:'NATIVE263_EXACT_INSTALLER_LIVE_DENIAL_UNVERIFIED',
+     installation_authorized:false,source_installed:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
+  // One inert, owner-scoped preview commit through Reality's existing
+  // GitHub broker. GitHub Actions/Vercel event evidence is verified separately.
+  let nativePreviewAutoDeployProbe={
+   status:'REALITY_PREVIEW_AUTO_DEPLOY_ORIGINAL_NOT_ELIGIBLE',
+   installation_authorized:false,source_installed:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(nativeInstallerApprovalFence.status===
+     'NATIVE263_EXACT_OWNER_APPROVAL_SERVICE_FENCE_LIVE_VERIFIED'){
+   try{
+    nativePreviewAutoDeployProbe=
+     await executeNative263GovernedPreviewAutoDeployTrigger({
+      db,env:process.env,graph:unifiedGraph,
+      sourcePreflight:nativeExistingFilePreflight,
+      installWarrant:nativeExactInstallWarrant,
+      liveInstallerFence:nativeInstallerApprovalFence,fetchImpl:fetch
+     });
+   }catch{
+    nativePreviewAutoDeployProbe={
+     status:'REALITY_PREVIEW_AUTO_DEPLOY_PROBE_UNVERIFIED',
      installation_authorized:false,source_installed:false,
      original_job_completed:false,production_changed:false
     };
@@ -590,6 +617,7 @@ export default async function handler(req,res){
     native_github_contents_write_canary_v2:nativeGithubContentsCanaryV2,
     native_exact_install_warrant:nativeExactInstallWarrant,
     native_live_installer_approval_fence:nativeInstallerApprovalFence,
+    native_preview_auto_deploy_probe:nativePreviewAutoDeployProbe,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
