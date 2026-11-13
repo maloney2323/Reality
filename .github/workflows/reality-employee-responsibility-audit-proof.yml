@@ -9,6 +9,10 @@ on:
       - reality-employee-work-audit-ui-v1.js
       - index.html
       - test/reality-employee-responsibility-audit-v1.test.js
+      - src/reality-active-weekly-source-investigator-v1.js
+      - api/reality/governed-employee-shift-worker.js
+      - supabase/migrations/20261113_worker_active_weekly_investigations_v1.sql
+      - test/reality-active-weekly-source-investigator-v1.test.js
       - .github/workflows/reality-employee-responsibility-audit-proof.yml
   workflow_dispatch:
 permissions:
@@ -27,9 +31,11 @@ jobs:
           node --check src/reality-employee-responsibility-audit-v1.js
           node --check api/reality/personal-employee-work-audit.js
           node --check reality-employee-work-audit-ui-v1.js
+          node --check src/reality-active-weekly-source-investigator-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
       - name: Run the actual isolated employee-audit acceptance tests
         run: |
-          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js
       - name: No new shift, installation or production effect
         run: |
           echo 'Read-only responsibility audit proof; no secrets or provider mutations'
