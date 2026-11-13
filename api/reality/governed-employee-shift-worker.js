@@ -257,9 +257,14 @@ export default async function handler(req,res){
      weekly,capabilityFeed:capabilities
     });
     integratedWorkIntakeStatus='WEEKLY_AND_HOMEPAGE_INTAKE_OWNER_RECONCILED';
-   }catch{
+   }catch(e){
+    // Expose only bounded, static validation codes; never provider responses,
+    // credentials or untrusted source text in a worker receipt.
+    const code=String(e?.message||'');
     integratedWorkIntake=null;
-    integratedWorkIntakeStatus='WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
+    integratedWorkIntakeStatus=
+     /^REALITY_INTEGRATED_INTAKE_[A-Z0-9_]{4,90}$/.test(code)?
+      code:'WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE';
    }
   }
   // Existing signed shift consumes a separately recorded exact Chat owner
