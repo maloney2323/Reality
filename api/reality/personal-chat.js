@@ -9,6 +9,8 @@ import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
 import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat,readVerifiedRileySourceWorkForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
+import {readVerifiedNative263TemporalForChat}
+ from '../../src/reality-native263-temporal-chat-context-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
@@ -145,13 +147,14 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations,native263TemporalObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
    readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
    readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),
    readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated}),
-   readVerifiedRileySourceWorkForChat({session,message:text,db:isolated})
+   readVerifiedRileySourceWorkForChat({session,message:text,db:isolated}),
+   readVerifiedNative263TemporalForChat({session,message:text,db:isolated})
   ]);
   // The same signed-in owner already has a durable shift authorization when
   // the verified owner-bound shift readback reports RUNNING/QUEUED. A chat
@@ -206,7 +209,7 @@ export default async function handler(req,res){
     connected_world_observations:[
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations
+     ...rileySourceWorkObservations,...native263TemporalObservations
     ],
     action_authorized:false,execution_authorized:false,
    },
