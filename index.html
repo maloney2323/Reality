@@ -844,6 +844,11 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 .reality-conversation-exports{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0 13px;padding:9px;border-top:1px solid #36536b}
 .reality-conversation-exports button,.reality-copy-message{font-size:11px!important;padding:6px 9px!important;min-height:30px!important;margin:2px!important}
 .reality-conversation-export-status{flex-basis:100%;font-size:11px;color:#a7bac8;margin:3px 0}
+.reality-chat-approved-assignments{margin-top:10px;padding:10px;border:1px solid #4f6a80;border-radius:10px}
+.reality-chat-approved-assignments>summary{cursor:pointer;font-size:12px;font-weight:650}
+.reality-chat-approved-assignments details{padding:6px 0;margin:4px 0;border-bottom:1px solid #304d63}
+.reality-chat-approved-assignments li{font-size:12px;line-height:1.4;margin:5px 0}
+.reality-chat-approved-assignments button{margin:8px 0;font-size:12px;padding:10px 12px}
 </style>
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
@@ -6979,6 +6984,7 @@ setInterval(refreshSavedShiftHome,300000);
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
+<script defer src="/reality-chat-approved-assignments-v1.js"></script>
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
