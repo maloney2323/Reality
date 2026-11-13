@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
  projectNative263OwnerTemporalBrief,
  native263ConversationRelevant,
- readVerifiedNative263TemporalForChat
+ readVerifiedNative263TemporalForChat,
+ verifiedNative263OpeningMessage
 } from '../src/reality-native263-temporal-chat-context-v1.js';
 const OWNER='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const receipt='681ce4ab-4dd0-47cf-963b-dc65087468fc';
@@ -94,4 +95,35 @@ test('irrelevant, unauthenticated and unavailable readback cannot create invente
   ...ctx,session:{user_id:OWNER,config:{url:db.url}},
   message:'Explain #263',rpc:async()=>{throw Error('provider unavailable')}
  }),[]);
+});
+
+test('Reality opens first with exact independent evidence, no user question, no made-up ROI',()=>{
+ const b=projectNative263OwnerTemporalBrief(raw,{ownerId:OWNER,now:fixedNow});
+ const m=verifiedNative263OpeningMessage(b);
+ assert.match(m,/Reality · Verified work completed/);
+ assert.match(m,/Past:/);
+ assert.match(m,/Present:/);
+ assert.match(m,/Operational future:/);
+ assert.ok(m.includes(receipt));
+ assert.ok(m.includes(SHA));
+ assert.match(m,/Actual labor time and financial savings have not been measured yet/);
+ assert.match(m,/no new approval or restart/i);
+ assert.throws(()=>verifiedNative263OpeningMessage({...b,original_job_completed:false}));
+ assert.throws(()=>verifiedNative263OpeningMessage({...b,original_final_receipt_id:null}));
+});
+
+test('settled owner GET bypasses obsolete installation card and never approves again',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const api=readFileSync(new URL('../api/reality/native263-owner-install-approval.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-native263-install-approval-ui-v1.js',import.meta.url),'utf8');
+ assert.match(api,/if\(req\.method==='GET'\)\{/);
+ assert.match(api,/current\?\.state==='ORIGINAL_SETTLED'/);
+ assert.match(api,/projectNative263OwnerTemporalBrief\(current/);
+ assert.match(api,/opening_message:opening/);
+ assert.match(api,/no_third_confirmation:true/);
+ assert.match(ui,/renderProactiveOpening\(d\)/);
+ assert.match(ui,/transcript\.prepend\(node\)/);
+ assert.match(ui,/Reply to Reality/);
+ assert.match(ui,/composer\.scrollIntoView/);
+ assert.doesNotMatch(ui,/await fetch\([^)]*method:'POST'[^)]*\.original_job_completed/);
 });
