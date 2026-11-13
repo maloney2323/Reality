@@ -20,6 +20,8 @@ import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityExistingShiftIntegratedIntake}
+ from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {assessRealityNativeBatchReadiness}
@@ -437,6 +439,30 @@ export default async function handler(req,res){
       'EXACT_OWNER_SOURCE_TRIAGE_READBACK_UNVERIFIED';
     }
    }
+   // The Chat/employee UI can read the SAME unified work inventory that
+   // the trusted scheduled worker checks; observations are not executable jobs.
+   let shift_integrated_work_intake=null;
+   let shift_integrated_work_intake_status='NO_VERIFIED_CURRENT_SHIFT_INTAKE';
+   if(verifiedGraphForTriage&&shift_automatic_supervisor){
+    try{
+     const [weekly,capabilities]=await Promise.all([
+      shiftRpc(db,'reality_read_owner_shift_weekly_backlog_v1',{
+       p_owner_id:session.user_id,
+       p_shift_id:verifiedGraphForTriage.shift_id}),
+      shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
+       p_owner_id:session.user_id})
+     ]);
+     shift_integrated_work_intake=projectRealityExistingShiftIntegratedIntake({
+      graph:verifiedGraphForTriage,
+      supervisor:shift_automatic_supervisor,
+      weekly,capabilityFeed:capabilities});
+     shift_integrated_work_intake_status=
+      'WEEKLY_AND_HOMEPAGE_INTAKE_OWNER_RECONCILED';
+    }catch{
+     shift_integrated_work_intake_status=
+      'WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
+    }
+   }
    const shift_briefing=buildRealityShiftConversationBrief(
     read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -466,6 +492,7 @@ export default async function handler(req,res){
     shift_activity,shift_activity_status,
     shift_source_native_receipts,shift_source_native_receipts_status,
     shift_automatic_supervisor,shift_automatic_supervisor_status,
+    shift_integrated_work_intake,shift_integrated_work_intake_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,
