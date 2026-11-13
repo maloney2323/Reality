@@ -18,6 +18,8 @@ import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
 import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
+import {projectRealityAutomaticShiftSupervisor}
+ from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {assessRealityNativeBatchReadiness}
@@ -266,6 +268,7 @@ export default async function handler(req,res){
    // One independently checked execution graph is shared by the worker
    // and signed-in owner Chat. Source-native and Universe originals have
    // the SAME owner/shift/source identity; no synthetic job or authority.
+   let verifiedGraphForTriage=null;
    let shift_execution_graph=null;
    let shift_execution_graph_status='NO_CURRENT_EXECUTION_GRAPH';
    if(chosen?.planned_end_at==='infinity'&&
@@ -277,6 +280,7 @@ export default async function handler(req,res){
       }),{expectedShiftId:chosen.shift_id});
      if(graph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
         graph.owner_id===session.user_id&&graph.jobs.length<=4){
+      verifiedGraphForTriage=graph;
       shift_execution_graph={
        status:graph.status,shift_id:graph.shift_id,
        owner_id:graph.owner_id,plan_fingerprint:graph.plan_fingerprint,
@@ -417,6 +421,22 @@ export default async function handler(req,res){
      shift_source_native_receipts_status='SOURCE_NATIVE_RECEIPT_BINDING_UNVERIFIED';
     }
    }
+   // Automatically classify all frozen authorized sources at each owner
+   // readback; verified original-job receipts take precedence over GitHub
+   // OPEN status or an old, generic execution queue.
+   let shift_automatic_supervisor=null;
+   let shift_automatic_supervisor_status='NO_VERIFIED_OWNER_SOURCE_TRIAGE';
+   if(verifiedGraphForTriage&&shift_source_native_receipts){
+    try{
+     shift_automatic_supervisor=projectRealityAutomaticShiftSupervisor(
+      verifiedGraphForTriage,shift_source_native_receipts);
+     shift_automatic_supervisor_status=
+      'EXACT_OWNER_SOURCE_TRIAGE_READ_ONLY_VERIFIED';
+    }catch{
+     shift_automatic_supervisor_status=
+      'EXACT_OWNER_SOURCE_TRIAGE_READBACK_UNVERIFIED';
+    }
+   }
    const shift_briefing=buildRealityShiftConversationBrief(
     read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -445,6 +465,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
     shift_source_native_receipts,shift_source_native_receipts_status,
+    shift_automatic_supervisor,shift_automatic_supervisor_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,
