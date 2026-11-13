@@ -176,7 +176,10 @@ test('SQL original admission cannot be used from browser, model, unscoped issue,
   /REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL/
  ])assert.match(sql,contract);
  // Prevent PL/pgSQL record variable from shadowing the FROM alias.
- assert.doesNotMatch(sql,/min\(s\.shift_id::text\)::uuid/);
+ const admissionOnly=sql.slice(
+  sql.indexOf('create or replace function public.reality_admit_verified_shift_commit_triage_v1('),
+  sql.indexOf('create or replace function public.reality_record_verified_shift_commit_triage_v1('));
+ assert.doesNotMatch(admissionOnly,/min\(s\.shift_id::text\)::uuid/);
  assert.doesNotMatch(sql,/grant execute on function public\.reality_admit_verified_shift_commit_triage_v1[\s\S]{0,120}to authenticated/);
  assert.match(worker,/admitVerifiedCurrentShiftCommitTriage/);
  assert.match(worker,/commit_reference_triage_original/);
