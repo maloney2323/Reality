@@ -68,7 +68,11 @@ export async function executeExactlyPreparedRileyReviewViaReality({
   'PREEXISTING_PROVIDER_EFFECT_REQUIRES_RECONCILIATION',
   'POST_UNCERTAIN_RECONCILE_BY_READBACK_ONLY',
   'GITHUB_BROKER_PERMISSION_OR_TOKEN_REJECTED',
-  'PR57_HEAD_OR_APPROVED_SOURCE_DRIFT'
+  'PR57_HEAD_OR_APPROVED_SOURCE_DRIFT',
+  // Exact HTTP rejection is useful evidence for recovery planning, never
+  // by itself a second authorization or permission to replay the POST.
+  ...[400,401,403,404,422,429].map(code=>
+   'GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_'+code+'_FENCE_PRESERVED')
  ]);
  const status=String(data.status||'');
  if(!allowed.has(status))return hold('GOVERNED_PR_PROVIDER_BROKER_BLOCKED');
