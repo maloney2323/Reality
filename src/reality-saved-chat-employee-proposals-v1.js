@@ -1,6 +1,7 @@
 // Read-only projection of existing authenticated saved Chat proposals into
 // Reality's employee board. No new database authority, execution job, schedule,
 // approval, or speculative source observation is created.
+import {createHash} from 'node:crypto';
 export const REALITY_SAVED_CHAT_EMPLOYEE_PROPOSALS_VERSION =
  'reality-saved-chat-employee-proposals-v1';
 const ROLE_NAMES=Object.freeze([
@@ -13,7 +14,7 @@ const clean=s=>String(s||'').replace(/<[^>]*>/g,'').replace(/\*\*/g,'')
 function empty(status){
  return Object.freeze({version:REALITY_SAVED_CHAT_EMPLOYEE_PROPOSALS_VERSION,
   status,source_kind:'AUTHENTICATED_SAVED_CHAT_ASSISTANT_MESSAGE',
-  source_message_ref:null,conversation_id:null,created_at:null,
+  source_message_ref:null,source_content_sha256:null,conversation_id:null,created_at:null,
   roles:[],roles_with_proposals:0,missing_employee_roles:[...ROLE_NAMES],
   plan_authorized:false,execution_authorized:false,
   installation_authorized:false,production_changed:false,read_only:true,
@@ -70,6 +71,7 @@ export function projectRealitySavedChatEmployeeProposals(rows){
    status:'SAVED_CHAT_IDEAS_AWAITING_SOURCE_AND_SETTLEMENT_RECONCILIATION',
    source_kind:'AUTHENTICATED_SAVED_CHAT_ASSISTANT_MESSAGE',
    source_message_ref:'supabase:reality_chat_messages:'+row.id,
+   source_content_sha256:'sha256:'+createHash('sha256').update(row.content,'utf8').digest('hex'),
    conversation_id:row.conversation_id,created_at:row.created_at,
    roles:Object.freeze(roles),roles_with_proposals:roles.length,
    missing_employee_roles:ROLE_NAMES.filter(x=>!included.has(x)),
