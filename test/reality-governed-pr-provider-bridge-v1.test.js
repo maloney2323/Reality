@@ -118,3 +118,27 @@ test('uncertain GitHub publication remains Reality-broker readback-only on futur
  assert.match(broker,/PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY/);
  assert.match(broker,/reality_mark_authorized_riley_pr_publish_v1/);
 });
+
+test('definitive Github HTTP rejection is evidence, not a grant to replay the original effect',async()=>{
+ const edge=readFileSync(new URL(
+  '../supabase/functions/reality-governed-pr-review-publisher-v1/index.ts',
+  import.meta.url),'utf8');
+ assert.match(edge,/REALITY_PR57_POST_HTTP_REJECTED/);
+ assert.match(edge,/GITHUB_POST_HTTP_REJECTED_/);
+ assert.match(edge,/GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_/);
+ assert.match(edge,/POST_UNCERTAIN_RECONCILE_BY_READBACK_ONLY/);
+ assert.match(edge,/c\.phase==='PUBLISHING'/);
+ assert.match(edge,/PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY/);
+ const f=fixture({status:'GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_403_FENCE_PRESERVED',
+  original_work_id:WORK,shift_id:SHIFT,original_job_completed:false,
+  installation_authorized:false,production_changed:false,
+  new_shift_created:false,code_installed:false});
+ const r=await executeExactlyPreparedRileyReviewViaReality({
+  db,env,graph,fetchImpl:f.fetchImpl
+ });
+ assert.equal(r.status,'GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_403_FENCE_PRESERVED');
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.production_changed,false);
+ assert.equal(f.requests.length,1);
+});
