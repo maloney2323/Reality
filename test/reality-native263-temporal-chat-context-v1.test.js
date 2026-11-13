@@ -166,3 +166,30 @@ test('mobile Chat keeps its conversation and navigation outside the long #263 pr
  assert.match(css,/reality-chat-home-link/);
  assert.match(css,/reality-chat-inspector #native263InstallApprovalPanel/);
 });
+
+test('Send places owner text into transcript immediately and preserves typed words on failure',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const index=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const status=readFileSync(new URL('../reality-chat-request-status-v1.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../reality-chat-fullscreen-v2.css',import.meta.url),'utf8');
+ const workspace=readFileSync(new URL('../reality-chat-workspace-v1.js',import.meta.url),'utf8');
+ assert.match(index,/const pendingBubble=bubble\('user',value\)/);
+ assert.match(index,/YOU · SENDING \(save not yet verified\)/);
+ assert.match(index,/el\('privatePrompt'\)\.value='';/);
+ assert.match(index,/el\('privateTranscript'\)\.scrollTop/);
+ assert.match(index,/reality:chat-request-started/);
+ assert.match(index,/data\.continuity\?\.current_answer_persisted!==true/);
+ assert.match(index,/REALITY · VERIFIED SAVED ANSWER/);
+ assert.match(index,/reality:chat-request-failed/);
+ assert.match(index,/YOU · DELIVERY OR REPLY NOT VERIFIED/);
+ assert.match(index,/el\('privatePrompt'\)\.value=value/);
+ assert.match(status,/transcript\.append\(block\)/);
+ assert.match(status,/details\.open=true/);
+ assert.match(status,/Authenticated message save/);
+ assert.match(status,/Final reply saved and verified/);
+ assert.match(status,/reality:chat-request-failed/);
+ assert.doesNotMatch(status,/parent\.insertAdjacentElement\('afterend',block\)/);
+ assert.match(css,/#privateTranscript #realityChatRequestStatus/);
+ assert.match(workspace,/panels\.work\.append\(otherWork\)/);
+ assert.match(workspace,/panels\.proof\.append\(proofLead\)/);
+});
