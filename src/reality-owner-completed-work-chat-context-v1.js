@@ -5,7 +5,7 @@
 import {resolveReliabilityBenchmarkDb} from './reality-reliability-db-boundary-v0.1.js';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 
-const UUID=/^[a-f0-9]{8}-(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/i;
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^(?:sha256:)?[a-f0-9]{64}$/i;
