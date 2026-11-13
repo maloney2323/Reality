@@ -81,6 +81,13 @@ function ensurePanel(){
   disclosure.append(element('native263ArtifactDetails'));
   p.insertBefore(disclosure,element('native263ApproveInstall'));
  }
+ if(!element('native263AskAboutJob')){
+  const ask=add('button','native263AskAboutJob','Ask Reality about this job',document.createDocumentFragment());
+  ask.type='button';
+  ask.style.cssText='margin:8px 8px 8px 0;border:1px solid #8aa6c7;background:#203b55;color:#f3f8ff';
+  ask.setAttribute('aria-label','Ask Reality a question about original job 263');
+  p.insertBefore(ask,element('native263ApproveInstall'));
+ }
  if(!element('native263ProgressStyles')){
   const css=add('style','native263ProgressStyles','',document.head);
   css.textContent='#native263InstallApprovalPanel{margin:12px 0;padding:16px;border:1px solid #7496b8;border-radius:14px;background:#102437;color:#e4f0fa;line-height:1.5}'+
@@ -234,6 +241,35 @@ export function mountNative263ExactInstallApproval(){
  if(!panel)return;
  const button=element('native263ApproveInstall');
  button.addEventListener('click',()=>{void approveExactlyOnce()});
+ const ask=element('native263AskAboutJob');
+ if(ask)ask.addEventListener('click',()=>{
+  // This is a draft question, not an automatic model call or authorization.
+  // Use Reality's own existing chat composer, preserving signed-in session.
+  const prompt=element('privatePrompt')||element('prompt');
+  const isSimple=!!element('prompt')&&!element('privatePrompt');
+  if(!prompt){
+   element('native263ApprovalFeedback').textContent=
+    'Reality Chat is unavailable in this view. Sign in and open Chat to ask a question.';
+   return;
+  }
+  if(isSimple)element('rileyConversationDisclosure')?.setAttribute('open','');
+  const phase=exact?.original_job_completed===true?'settled':
+   exact?.approval_state==='SOURCE_INSTALLED'?'installed_receipt_pending':
+   exact?.approval_state==='STAGED_UNAPPROVED'?'awaiting_install_decision':
+   'status_unverified';
+  const topic=phase==='settled'
+   ?'Explain what job #263 independently completed, where the final receipt is, and what business value is actually measured.'
+   :phase==='installed_receipt_pending'
+   ?'Explain why job #263 has been approved and installed but still has no independent final settlement receipt. Which exact checks remain, which have passed, what is blocked, and what happens automatically next?'
+   :phase==='awaiting_install_decision'
+   ?'Explain the verified #263 repair, its advantages and risks, what approval permits, and what evidence proves the continuation and receipt path. Do not approve anything for me.'
+   :'Investigate the latest authenticated evidence for original job #263. What is verified, what is unknown, and what remains to be done? Do not assume a status from Chat text.';
+  prompt.value=topic+' Refer to the same owner-scoped original work '+WORK+
+   ' and trusted provider/database receipts. This is a question, not execution or install authority.';
+  prompt.dispatchEvent(new Event('input',{bubbles:true}));
+  prompt.focus({preventScroll:false});
+  prompt.scrollIntoView({block:'center',behavior:'auto'});
+ });
  element('refresh')?.addEventListener('click',()=>{void refreshExactNative263InstallApproval()});
  const h=host();
  if(h){
