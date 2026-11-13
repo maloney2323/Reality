@@ -94,7 +94,7 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
      (!/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(item.source_ref)||
       item.independent_source_proof_verified!==true||
       !WORK.test(item.original_work_id||'')||
-      !['SOURCE_ADMITTED','EVIDENCE_VERIFIED','BLOCKED'].includes(item.phase)))
+      !['SOURCE_ADMITTED','EVIDENCE_VERIFIED','BLOCKED','SETTLED'].includes(item.phase)))
    fail('COMMIT_TRIAGE_REQUIRES_VERIFIED_FROZEN_ISSUE_ORIGINAL');
   if(is263&&item.independent_source_proof_verified===true&&
      item.original_kind!=='REAL_ENGINEERING_REPAIR_ORIGINAL')
