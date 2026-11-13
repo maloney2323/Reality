@@ -92,7 +92,7 @@ async function rpc(db,name,payload,{fetchImpl=fetch}={}){
 function boundDb(session,env){
  if(env.VERCEL_ENV!=='preview'||!UUID.test(session?.user_id||'')||
   !session?.config?.url||
-  env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF!=='hvkfreoagbrphwghjajw')
+  !env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail('OWNER_PREVIEW_SCOPE_REQUIRED');
  const db=shiftDatabase(env);
  if(db.url!==session.config.url||!db.secretKey||!db.strictSecrets)
@@ -136,7 +136,10 @@ export async function approveCurrentSavedChatEmployeeAssignments(session,{
   x.source_content_sha256!==expectedContentSha256||
   x.role_count!==roles.length||
   x.task_count!==roles.reduce((n,r)=>n+r.tasks.length,0)||
-  JSON.stringify(x.roles)!==JSON.stringify(roles))
+  !Array.isArray(x.roles)||x.roles.length!==roles.length||
+  x.roles.some((r,i)=>r.employee_name!==roles[i].employee_name||
+   !Array.isArray(r.tasks)||r.tasks.length!==roles[i].tasks.length||
+   r.tasks.some((task,j)=>task!==roles[i].tasks[j])))
   fail('DURABLE_ASSIGNMENT_RECEIPT_UNVERIFIED');
  return Object.freeze(x);
 }
