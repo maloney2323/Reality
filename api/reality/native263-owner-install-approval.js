@@ -7,7 +7,7 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
-import {projectNative263OwnerTemporalBrief,verifiedNative263OpeningMessage}
+import {buildNative263SettledOwnerCard}
  from '../../src/reality-native263-temporal-chat-context-v1.js';
 export const maxDuration=35;
 const WORK='work:873a6e74fd14c6beacc9042dd8021dfc';
@@ -80,38 +80,8 @@ export default async function handler(req,res){
    // (which was designed for pre-install owner decisions).
    const current=await shiftRpc(db,'reality_read_native263_postinstall_context_v1',{});
    if(current?.state==='ORIGINAL_SETTLED'){
-    const brief=projectNative263OwnerTemporalBrief(current,{
-      ownerId:session.user_id});
-    if(brief.original_job_completed!==true||
-       current.target_path!=='src/reality-riley-service-original-runtime-v1.js'||
-       current.expected_installed_blob_sha!=='dda8e71d44cca6745312bcbd000089d5a0b01d54'||
-       current.original_final_receipt_id!==brief.original_final_receipt_id||
-       current.production_changed!==false)
-      throw Error('NATIVE263_FINAL_ORIGINAL_OWNER_READBACK_MISMATCH');
-    const opening=verifiedNative263OpeningMessage(brief);
-    return res.status(200).json({
-      ok:true,status:'EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD',
-      original_work_id:WORK,shift_id:SHIFT,owner_id:session.user_id,
-      source_ref:current.source_ref,
-      target_branch:current.target_branch,
-      source_file:current.target_path,
-      artifact_sha256:current.candidate_artifact_sha256,
-      candidate_commit_sha:current.candidate_commit_sha,
-      verified_frozen_ci_run_id:current.frozen_verifier_run_id,
-      approval_state:current.state,owner_approval_ready:false,
-      installation_authorized:true,installation_completed:true,
-      original_job_completed:true,
-      independently_verified_final_original_receipt_id:brief.original_final_receipt_id,
-      installed_commit_sha:current.installed_commit_sha,
-      owner_approved_at:current.owner_approved_at,
-      source_write_verified:true,
-      automatic_preview_deploy_verified:true,
-      same_original_continuation_and_receipt_verified:true,
-      opening_message:opening,
-      next_step:'ORIGINAL_INDEPENDENTLY_SETTLED_NO_NEW_APPROVAL_OR_RESTART',
-      production_changed:false,
-      no_third_confirmation:true
-    });
+    return res.status(200).json(buildNative263SettledOwnerCard(current,{
+      ownerId:session.user_id}));
    }
    const card=await ownerCard(db,session);
    return res.status(200).json({
