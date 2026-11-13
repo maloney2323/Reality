@@ -50,6 +50,8 @@ import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
+import {runCurrentShiftWeeklyInvestigations}
+ from '../../src/reality-active-weekly-source-investigator-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {proveNativeOriginalReadOnlyModelTool}
@@ -334,6 +336,35 @@ export default async function handler(req,res){
     integratedWorkIntakeStatus=
      /^REALITY_INTEGRATED_INTAKE_[A-Z0-9_]{4,90}$/.test(code)?
       code:'WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE';
+   }
+  }
+  // Actual employee source investigations now RUN on the existing signed
+  // worker, rather than merely appearing as proposed jobs on the Homepage.
+  // Provider GETs + idempotent service-only receipts; no extra authorization.
+  let weeklyEmployeeInvestigations={
+   status:'WEEKLY_SOURCE_INVESTIGATION_INPUT_UNAVAILABLE',
+   just_investigated:0,source_receipts:[],
+   executable_original_admitted:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(integratedWorkIntake?.status===
+    'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+   try{
+    weeklyEmployeeInvestigations=await runCurrentShiftWeeklyInvestigations({
+     db,graph:unifiedGraph,intake:integratedWorkIntake,fetchImpl:fetch,
+     token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+      process.env.GITHUB_TOKEN||null
+    });
+   }catch(error){
+    const diagnostic=String(error?.message||'');
+    weeklyEmployeeInvestigations={
+     status:'WEEKLY_SOURCE_INVESTIGATION_PROVIDER_OR_RECEIPT_RECONCILIATION_REQUIRED',
+     failure_code:/^ACTIVE_WEEKLY_SOURCE_INVESTIGATION_[A-Z0-9_]{4,100}$/.test(
+      diagnostic)?diagnostic:'ACTIVE_WEEKLY_SOURCE_INVESTIGATION_UNVERIFIED',
+     just_investigated:0,source_receipts:[],
+     executable_original_admitted:false,installation_authorized:false,
+     production_changed:false
+    };
    }
   }
   // Existing signed shift consumes a separately recorded exact Chat owner
@@ -734,7 +765,11 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const outcomeCode=settledCommitTriage?
+   const outcomeCode=weeklyEmployeeInvestigations.just_investigated>0?
+    'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_EXECUTED_AND_RECEIPTED':
+    weeklyEmployeeInvestigations.source_receipts?.length>=5?
+     'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_PREVIOUSLY_RECEIPTED':
+    settledCommitTriage?
     'COMMIT_TRIAGE_PROVIDER_DISPOSITION_SETTLED_OWNER_ASSISTED':
     qualifiedCommitTriage?
     'COMMIT_TRIAGE_SOURCE_EVIDENCE_VERIFIED_FINAL_DISPOSITION_PENDING':
@@ -787,6 +822,7 @@ export default async function handler(req,res){
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
     integrated_work_intake_status:integratedWorkIntakeStatus,
+    weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     completion_bound_work:completionClose,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
