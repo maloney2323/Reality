@@ -37,6 +37,14 @@ on:
       - reality-chat-employee-shift-card-v1.js
       - reality-chat-conversation-export-v1.js
       - test/reality-chat-automated-shift-and-export-v1.test.js
+      - supabase/migrations/20261113_shift_final_receipt_economic_evidence_v1.sql
+      - src/reality-shift-final-value-evidence-v1.js
+      - src/reality-owner-shift-final-value-readback-v1.js
+      - src/reality-shift-final-value-receipt-pdf-v1.js
+      - api/reality/personal-shift-value-receipts.js
+      - api/reality/personal-shift-value-receipt-pdf.js
+      - reality-economic-evidence-dashboard-v1.js
+      - test/reality-shift-final-value-evidence-v1.test.js
       - reality-chat-simple.html
       - api/reality/governed-employee-shift-worker.js
       - src/reality-mixed-shift-receipts-v1.js
@@ -198,6 +206,13 @@ jobs:
           node --check reality-chat-employee-shift-card-v1.js
           node --check reality-chat-conversation-export-v1.js
           node --test test/reality-chat-automated-shift-and-export-v1.test.js
+          node --check src/reality-shift-final-value-evidence-v1.js
+          node --check src/reality-owner-shift-final-value-readback-v1.js
+          node --check src/reality-shift-final-value-receipt-pdf-v1.js
+          node --check api/reality/personal-shift-value-receipts.js
+          node --check api/reality/personal-shift-value-receipt-pdf.js
+          node --check reality-economic-evidence-dashboard-v1.js
+          node --test test/reality-shift-final-value-evidence-v1.test.js
           node --check src/reality-mixed-shift-receipts-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check api/reality/personal-governed-employee-shift.js
