@@ -18,7 +18,10 @@ async function provider(path,{fetchImpl,token}){
  const response=await fetchImpl(API+'/'+path,{
   method:'GET',redirect:'error',cache:'no-store',headers,
   signal:AbortSignal.timeout(10000)});
- if(!response?.ok)fail('PROVIDER_READBACK_UNAVAILABLE');
+ // Safe diagnostic only: public HTTP status, never credentials or response body.
+ if(!response?.ok)fail('PROVIDER_HTTP_'+String(
+  Number.isInteger(response?.status)&&response.status>=100&&response.status<=599?
+    response.status:0));
  const body=await response.json();
  if(!body||typeof body!=='object'||Array.isArray(body))
   fail('PROVIDER_OBJECT_UNVERIFIED');
