@@ -80,8 +80,15 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
   }
   const is263=item.source_ref===
    'https://github.com/maloney2323/Reality/issues/263';
-  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&!is263)
-   fail('REPAIR_SOURCE_SCOPE_CHANGED');
+  // Engineering originals are not specific to historical issue #263.
+  // The upstream service-only admission gate supplies the owner-bound
+  // source proof and durable original-work ID. The read-only controller
+  // must reject any PR, unverified source or anonymous "original" here.
+  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+     (!/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(item.source_ref)||
+      item.independent_source_proof_verified!==true||
+      !WORK.test(item.original_work_id||'')))
+   fail('ENGINEERING_ORIGINAL_REQUIRES_VERIFIED_ISSUE_AND_WORK_ID');
   if(is263&&item.independent_source_proof_verified===true&&
      item.original_kind!=='REAL_ENGINEERING_REPAIR_ORIGINAL')
    fail('EXACT_REPAIR_IDENTITY_MUST_NOT_BE_RECAST_AS_OTHER_ENGINE');
