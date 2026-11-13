@@ -140,7 +140,7 @@
     method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
      expected_fingerprint:p.expected_fingerprint,
-     planned_start_at:new Date(Date.now()+90000).toISOString(),
+     planned_start_at:new Date().toISOString(),
      completion_bound:true,requested_hours:8})
    });
    if(!['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(after.status)||
