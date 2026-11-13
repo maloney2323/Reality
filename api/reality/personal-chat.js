@@ -11,6 +11,8 @@ import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForC
  from '../../src/reality-employee-shift-chat-context-v1.js';
 import {readVerifiedNative263TemporalForChat}
  from '../../src/reality-native263-temporal-chat-context-v1.js';
+import {readVerifiedOwnerCompletedWorkForChat}
+ from '../../src/reality-owner-completed-work-chat-context-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {createHash} from 'node:crypto';
@@ -147,14 +149,17 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
-  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations,native263TemporalObservations]=await Promise.all([
+  const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations,native263TemporalObservations,ownerCompletedWorkObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
    readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),
    readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),
    readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated}),
    readVerifiedRileySourceWorkForChat({session,message:text,db:isolated}),
-   readVerifiedNative263TemporalForChat({session,message:text,db:isolated})
+   // Always load independent owner work evidence. Reference resolution belongs
+   // to authenticated conversation history + model cognition, not a regex.
+   readVerifiedNative263TemporalForChat({session,db:isolated}),
+   readVerifiedOwnerCompletedWorkForChat({session,db:isolated})
   ]);
   // The same signed-in owner already has a durable shift authorization when
   // the verified owner-bound shift readback reports RUNNING/QUEUED. A chat
@@ -206,10 +211,18 @@ export default async function handler(req,res){
     // Static published references already shown on Reality's homepage.
     // These are references, not evidence of measured business savings.
     published_research_references:publishedReferencesForChat(text),
+    // Grounded recent owner work is visible to the model even when the
+    // next message merely says "it", "this job", or "the milestone".
+    // Cognition must still keep unrelated questions unrelated.
+    owner_completed_work_context_status:
+      native263TemporalObservations.length+ownerCompletedWorkObservations.length>0?
+       'OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE':
+       'NO_INDEPENDENT_OWNER_RECEIPT_AVAILABLE_THIS_TURN',
     connected_world_observations:[
+     ...native263TemporalObservations,...ownerCompletedWorkObservations,
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations,...native263TemporalObservations
+     ...rileySourceWorkObservations
     ],
     action_authorized:false,execution_authorized:false,
    },
