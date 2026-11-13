@@ -80,6 +80,26 @@ export function projectRealityExistingShiftIntegratedIntake({
    item.title.length<5||item.title.length>220)
    fail('WEEKLY_PROVIDER_SOURCE_SCOPE_UNVERIFIED');
   weeklySeen.add(url);
+  const q=item.qualification;
+  const statuses=new Set([
+   'PRIOR_ORIGINAL_SETTLED_NO_REPLAY',
+   'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE',
+   'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK',
+   'CURRENT_FAILURE_REPRODUCTION_REQUIRED',
+   'SOURCE_REVIEW_NEEDS_CURRENT_PROOF'
+  ]);
+  if(q!=null&&
+   (typeof q!=='object'||Array.isArray(q)||
+    !statuses.has(q.status)||
+    !['Riley','Taylor','Quinn','Avery','Casey','Morgan','Jordan','Sage']
+     .includes(q.employee)||
+    q.evidence!=='GITHUB_CURRENT_OPEN_ISSUE_READBACK'||
+    typeof q.next_proof!=='string'||q.next_proof.length<20||
+    q.executable_original!==false||
+    q.execution_authorized!==false||
+    q.installation_authorized!==false||
+    q.verified_current_defect!==false))
+   fail('WEEKLY_SOURCE_UPSTREAM_QUALIFICATION_UNVERIFIED');
   const matching=selected.get(url);
   const status=done.has(url)?
    'SETTLED_CURRENT_WARRANT_NO_REPLAY':
@@ -91,6 +111,13 @@ export function projectRealityExistingShiftIntegratedIntake({
    scope_status:status,
    current_shift_step_index:matching?.source_step_index??null,
    exact_original_work_id:matching?.original_work_id??null,
+   upstream_qualification_status:q?.status||
+    'LEGACY_SOURCE_NEEDS_AUTOMATIC_INSPECTION',
+   investigation_employee:q?.status==='PRIOR_ORIGINAL_SETTLED_NO_REPLAY'?null:
+    q?.employee||null,
+   independent_next_proof:q?.next_proof||null,
+   source_provider_checked_upstream:q?.evidence===
+    'GITHUB_CURRENT_OPEN_ISSUE_READBACK',
    is_executable_original:false,
    owner_authorization_created:false,
    installation_authorized:false,
@@ -145,6 +172,12 @@ export function projectRealityExistingShiftIntegratedIntake({
   independent_settlements_recognized:settled,
   current_shift_sources_needing_qualification:unqualified,
   weekly_source_observations:weekJobs.length,
+  upstream_provider_inspected_source_count:weekJobs.filter(x=>
+   x.source_provider_checked_upstream).length,
+  employee_investigation_tasks_organized:weekJobs.filter(x=>
+   x.source_provider_checked_upstream&&x.investigation_employee!==null).length,
+  previously_settled_weekly_sources_excluded:weekJobs.filter(x=>
+   x.upstream_qualification_status==='PRIOR_ORIGINAL_SETTLED_NO_REPLAY').length,
   homepage_upgrade_opportunities:upgrades.length,
   verified_current_capability_gaps:capabilityFeed.counts.verified_current_gaps,
   // Research, historic and source-checked observations are NOT executable
