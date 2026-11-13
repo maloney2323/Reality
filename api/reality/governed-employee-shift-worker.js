@@ -33,6 +33,8 @@ import {executeNative263GovernedPreviewAutoDeployTrigger}
  from '../../src/reality-native263-preview-auto-deploy-trigger-bridge-v1.js';
 import {continueOnceApprovedNative263Install}
  from '../../src/reality-native263-approved-install-continuation-v1.js';
+import {verifyNative263ApprovedInstallToOriginalReceipt}
+ from '../../src/reality-native263-postinstall-original-settlement-bridge-v1.js';
 import {reconcileOwnerShiftFailureTriage143}
  from '../../src/reality-riley-failure-triage-reconciler-v1.js';
 import {attestCurrentRileyCandidate263}
@@ -72,6 +74,23 @@ export default async function handler(req,res){
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
+  // Existing owner-shift continuation, never another start or approval:
+  // independently verify same installed Git/Vercel commit and TWO distinct
+  // source+original acceptance CI runs before recording the final receipt.
+  let nativePostinstallOriginalProof={
+   status:'NATIVE263_POSTINSTALL_EVIDENCE_UNAVAILABLE',
+   original_job_completed:false,production_changed:false
+  };
+  try{
+   nativePostinstallOriginalProof=
+    await verifyNative263ApprovedInstallToOriginalReceipt({
+     db,env:process.env,fetchImpl:fetch});
+  }catch{
+   nativePostinstallOriginalProof={
+    status:'NATIVE263_POSTINSTALL_PROVIDER_OR_OWNER_SCOPE_UNVERIFIED',
+    original_job_completed:false,production_changed:false
+   };
+  }
   // The ACTUAL server wake is durably timestamped, separate from the
   // signed-in owner authorization and from any original-job claim.
   // No HTTP user-supplied owner or shift ID is ever accepted.
@@ -637,6 +656,7 @@ export default async function handler(req,res){
     native_live_installer_approval_fence:nativeInstallerApprovalFence,
     native_preview_auto_deploy_probe:nativePreviewAutoDeployProbe,
     native_exact_owner_approved_auto_install:nativeOwnerApprovedInstallation,
+    native_same_original_postinstall_receipt:nativePostinstallOriginalProof,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch{
