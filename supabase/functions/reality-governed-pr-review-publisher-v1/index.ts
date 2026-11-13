@@ -201,7 +201,7 @@ Deno.serve(async req=>{
    if(reset?.status!=='EXACT_PR_REVIEW_ONE_RECOVERY_ARMED')
     return respond(reset?.status==='PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY'?
      'PR_REVIEW_RECOVERY_HOLDOFF_ACTIVE_NO_REPLAY':
-     'PUBLISHING_RECONCILIATION_ONLY_NO_FURTHER_RETRY',true,200);
+     'PUBLISHING_WITH_UNKNOWN_EFFECT_READBACK_ONLY',true,200);
    if(reset.original_work_id!==ORIGINAL||reset.claim_id!==c.claim_id||
       reset.shift_id!==SHIFT||reset.review_digest!==c.review_digest||
       reset.source_head_sha!==c.source_head_sha||
