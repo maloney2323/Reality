@@ -4,7 +4,8 @@ import {
  projectNative263OwnerTemporalBrief,
  native263ConversationRelevant,
  readVerifiedNative263TemporalForChat,
- verifiedNative263OpeningMessage
+ verifiedNative263OpeningMessage,
+ buildNative263SettledOwnerCard
 } from '../src/reality-native263-temporal-chat-context-v1.js';
 const OWNER='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const receipt='681ce4ab-4dd0-47cf-963b-dc65087468fc';
@@ -17,6 +18,8 @@ const raw={
  shift_id:'9460cfff-937a-4105-9093-2e41ab39a950',
  source_ref:'https://github.com/maloney2323/Reality/issues/263',
  target_branch:'reality/isolated-openai-governance-gateway-20261108',
+ target_path:'src/reality-riley-service-original-runtime-v1.js',
+ expected_installed_blob_sha:'dda8e71d44cca6745312bcbd000089d5a0b01d54',
  candidate_artifact_sha256:'sha256:459e2bbe9a9d9c7037c87542a9cdbebf06f77a6d368d72769c79fdbef7947f48',
  candidate_commit_sha:SOURCE,
  frozen_verifier_run_id:42525028367,
@@ -118,12 +121,29 @@ test('settled owner GET bypasses obsolete installation card and never approves a
  const ui=readFileSync(new URL('../reality-native263-install-approval-ui-v1.js',import.meta.url),'utf8');
  assert.match(api,/if\(req\.method==='GET'\)\{/);
  assert.match(api,/current\?\.state==='ORIGINAL_SETTLED'/);
- assert.match(api,/projectNative263OwnerTemporalBrief\(current/);
- assert.match(api,/opening_message:opening/);
+ assert.match(api,/buildNative263SettledOwnerCard\(current/);
+ assert.match(api,/return res\.status\(200\)\.json\(buildNative263SettledOwnerCard/);
  assert.match(api,/no_third_confirmation:true/);
  assert.match(ui,/renderProactiveOpening\(d\)/);
  assert.match(ui,/transcript\.prepend\(node\)/);
  assert.match(ui,/Reply to Reality/);
  assert.match(ui,/composer\.scrollIntoView/);
  assert.doesNotMatch(ui,/await fetch\([^)]*method:'POST'[^)]*\.original_job_completed/);
+});
+
+test('independently settled original produces exact validated owner GET with a real first response',()=>{
+ const card=buildNative263SettledOwnerCard(raw,{ownerId:OWNER,now:fixedNow});
+ assert.equal(card.ok,true);
+ assert.equal(card.status,'EXACT_OWNER_NATIVE263_INSTALLATION_APPROVAL_CARD');
+ assert.equal(card.original_job_completed,true);
+ assert.equal(card.independently_verified_final_original_receipt_id,receipt);
+ assert.equal(card.owner_approval_ready,false);
+ assert.equal(card.no_third_confirmation,true);
+ assert.equal(card.production_changed,false);
+ assert.equal(card.opening_message.includes(receipt),true);
+ assert.equal(card.opening_message.includes(SHA),true);
+ assert.throws(()=>buildNative263SettledOwnerCard({...raw,
+   expected_installed_blob_sha:'0'.repeat(40)},{ownerId:OWNER,now:fixedNow}));
+ assert.throws(()=>buildNative263SettledOwnerCard({...raw,
+   owner_id:'c24a6ba0-24bf-4cad-a153-d4e45fcd8b4b'},{ownerId:OWNER,now:fixedNow}));
 });
