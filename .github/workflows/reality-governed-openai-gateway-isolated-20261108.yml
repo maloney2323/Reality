@@ -45,6 +45,9 @@ on:
       - api/reality/personal-shift-value-receipt-pdf.js
       - reality-economic-evidence-dashboard-v1.js
       - test/reality-shift-final-value-evidence-v1.test.js
+      - supabase/migrations/20261113_existing_shift_weekly_capability_intake_v1.sql
+      - src/reality-existing-shift-integrated-intake-v1.js
+      - test/reality-existing-shift-integrated-intake-v1.test.js
       - reality-chat-simple.html
       - api/reality/governed-employee-shift-worker.js
       - src/reality-mixed-shift-receipts-v1.js
@@ -213,6 +216,10 @@ jobs:
           node --check api/reality/personal-shift-value-receipt-pdf.js
           node --check reality-economic-evidence-dashboard-v1.js
           node --test test/reality-shift-final-value-evidence-v1.test.js
+          node --check src/reality-existing-shift-integrated-intake-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --test test/reality-existing-shift-integrated-intake-v1.test.js
           node --check src/reality-mixed-shift-receipts-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check api/reality/personal-governed-employee-shift.js
