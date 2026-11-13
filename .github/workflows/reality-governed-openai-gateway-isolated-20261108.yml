@@ -92,6 +92,7 @@ jobs:
           node --check src/reality-riley-native-model-draft-v1.js
           node --check src/reality-riley-native-corrective-model-v1.js
           node --check src/reality-riley-service-original-runtime-v1.js
+          node -e "const fs=require('node:fs');const h=require('node:crypto');console.log('REVIEWED_263_SOURCE_SHA256=sha256:'+h.createHash('sha256').update(fs.readFileSync('src/reality-riley-service-original-runtime-v1.js')).digest('hex'))"
           node --check reality-owner-chat-shift-command-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check src/reality-riley-multi-job-shift-controller-v1.js

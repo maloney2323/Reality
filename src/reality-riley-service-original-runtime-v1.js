@@ -172,10 +172,20 @@ export function createRileyServiceOriginalRuntime({
    source_context.shift_id!==shiftId||
    source_context.original_work_id!==qualifiedOriginal?.original_work_id||
    source_context.source_proof_sha256!==preclaim_verified_source_digest||
-   scope?.owner_id!==ownerId||scope?.original_work_id!==qualifiedOriginal.original_work_id||
+   // The original was checked before claiming; repeat the settlement and
+   // consequence boundaries immediately before invocation. Never read an
+   // invented "original_job_settled" property from the narrow scope object.
+   source_context.original_job_settled!==false||
+   source_context.owner_scope_verified!==true||
+   source_context.source_checked!==true||
+   source_context.installation_authorized!==false||
+   source_context.production_changed!==false||
+   scope?.owner_id!==ownerId||
+   scope?.original_work_id!==qualifiedOriginal.original_work_id||
+   scope?.goal_id!==source_context.goal_id||
+   scope?.target_environment!=='ISOLATED_PREVIEW'||
    !current.shifts.some(s=>s.shift_id===shiftId&&
-    ['RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)||
-    s.shift_id===shiftId&&s.status==='AWAITING_EXACT_ORIGINAL_WORK')||
+    ['RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status))||
    ownerLedgerReadback?.status!=='OWNER_GOVERNED_LOOP_READBACK'||
    !ownerLedgerReadback.jobs.some(j=>
     j.original_work_id===qualifiedOriginal.original_work_id&&
