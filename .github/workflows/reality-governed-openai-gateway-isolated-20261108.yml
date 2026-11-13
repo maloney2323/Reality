@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - reality/isolated-openai-governance-gateway-20261108
+      - reality/native263-temporal-chat-proof-20261113
   pull_request:
     paths:
       - .github/workflows/reality-governed-openai-gateway-isolated-20261108.yml
@@ -29,6 +30,9 @@ on:
       - src/reality-employee-identity-roster-v1.js
       - src/reality-cognitive-runtime-v1.0.js
       - test/reality-private-chat-conversation-and-weekly-role-v1.test.js
+      - test/reality-saved-chat-employee-proposals-v1.test.js
+      - src/reality-saved-chat-employee-proposals-v1.js
+      - api/reality/personal-employee-roster.js
       - src/reality-owner-completed-work-chat-context-v1.js
       - src/reality-native263-live-installer-fence-bridge-v1.js
       - src/reality-native263-approved-install-continuation-v1.js
@@ -168,3 +172,6 @@ jobs:
           node --check src/reality-cognitive-runtime-v1.0.js
           node --check src/reality-model-gateway-v0.1.js
           node --test test/reality-private-chat-conversation-and-weekly-role-v1.test.js
+          node --check src/reality-saved-chat-employee-proposals-v1.js
+          node --check api/reality/personal-employee-roster.js
+          node --test test/reality-saved-chat-employee-proposals-v1.test.js
