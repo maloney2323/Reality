@@ -716,6 +716,27 @@ body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) m
 #realitySimpleHome .home-team-head h2{font-size:clamp(19px,3.5vw,25px);margin:6px 0;color:#f2f8ff}
 #realitySimpleHome .home-team-head p{margin:3px 0 11px;color:#abc3d6;font-size:12px;line-height:1.5;max-width:760px}
 #realitySimpleHome .home-team-head button{font-size:12px;min-height:36px;padding:8px 12px}
+
+/* Owner-triggered employee responsibility audit, distinct from starting a shift. */
+#realitySimpleHome .reality-employee-audit-trigger{font-size:12px;min-height:36px;padding:7px 10px;margin-top:7px;width:100%;text-align:center}
+#realitySimpleHome .reality-employee-audit-all{font-size:13px;min-height:40px;margin:6px 0;padding:8px 12px}
+#realitySimpleHome .reality-employee-audit-panel{border:1px solid #4d7184;border-radius:13px;background:#102536;padding:13px;margin:12px 0;color:#e7f3ff}
+#realitySimpleHome .reality-employee-audit-panel p{font-size:12px;line-height:1.6}
+#realitySimpleHome .reality-audit-summary{font-weight:700;color:#daefff;margin:0 0 10px}
+#realitySimpleHome .reality-audit-role-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#realitySimpleHome .reality-audit-role{padding:12px;border:1px solid #45677e;border-radius:11px;background:#183047;overflow-wrap:anywhere}
+#realitySimpleHome .reality-audit-role strong{font-size:14px;color:#f2f9ff}
+#realitySimpleHome .reality-audit-role-description{color:#c8ddec}
+#realitySimpleHome .reality-audit-role-counts{color:#d5efff}
+#realitySimpleHome .reality-audit-responsibilities{padding-left:19px;margin:8px 0;font-size:12px;color:#c2d9e8;line-height:1.6}
+#realitySimpleHome .reality-audit-findings summary{cursor:pointer;color:#bde8ff;font-size:12px}
+#realitySimpleHome .reality-audit-work-item{border-top:1px solid #36576d;padding:9px 0;display:flex;flex-direction:column;gap:5px}
+#realitySimpleHome .reality-audit-work-item a{color:#bde8ff;font-size:12px;overflow-wrap:anywhere}
+#realitySimpleHome .reality-audit-work-item small{font-size:11px;color:#b9d3e4;line-height:1.5}
+#realitySimpleHome .reality-audit-warning{color:#f8d9ab}
+#realitySimpleHome .reality-audit-footnote{color:#b5d5e8}
+@media(max-width:720px){#realitySimpleHome .reality-audit-role-list{grid-template-columns:1fr}}
+
 #realitySimpleHome .home-team-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:7px 0 11px}
 #realitySimpleHome .home-team-grid article{display:flex;flex-direction:column;gap:5px;min-width:0;background:#152b3b;border:1px solid #36536b;border-radius:11px;padding:13px 11px}
 #realitySimpleHome .home-team-grid article strong{font-size:16px;line-height:1.25;color:#f1f9ff}
@@ -6997,6 +7018,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-home-employee-brief-v1.js"></script>
+<script defer src="/reality-employee-work-audit-ui-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
 <script defer src="/reality-model-capability-map-v1.js"></script>
