@@ -4,7 +4,7 @@
 // Never claims that all selected source observations are finished, that a
 // shift ended, or that human time or cash was saved.
 export const REALITY_MIXED_SHIFT_RECEIPTS_VERSION='reality-mixed-shift-receipts-v1';
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const DIGEST=/^sha256:[a-f0-9]{64}$/;
 const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/;
