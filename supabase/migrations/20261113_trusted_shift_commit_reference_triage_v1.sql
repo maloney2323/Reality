@@ -40,17 +40,17 @@ begin
   p_commit_content_sha256 !~ '^sha256:[a-f0-9]{64}$'
  then raise exception 'COMMIT_TRIAGE_INDEPENDENT_SOURCE_REQUIRED';end if;
  -- No user-supplied owner/shift: derive sole active completion-bound warrant.
- select count(*),min(s.shift_id::text)::uuid into v_matches,v_shift_id
- from reality_internal.governed_employee_shifts_v1 s
+ select count(*),min(shift_row.shift_id::text)::uuid into v_matches,v_shift_id
+ from reality_internal.governed_employee_shifts_v1 shift_row
  join reality_internal.governed_employee_completion_warrants_v1 w
-  on w.shift_id=s.shift_id and w.owner_id=s.owner_id
-  and w.plan_fingerprint=s.plan_fingerprint
+  on w.shift_id=shift_row.shift_id and w.owner_id=shift_row.owner_id
+  and w.plan_fingerprint=shift_row.plan_fingerprint
  join reality_internal.governed_employee_shift_steps_v1 t
-  on t.shift_id=s.shift_id and t.source_ref=p_source_ref
- where s.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
-  and s.authorized_at is not null and s.closed_at is null
-  and s.planned_start_at<=clock_timestamp()
-  and s.planned_end_at='infinity'::timestamptz
+  on t.shift_id=shift_row.shift_id and t.source_ref=p_source_ref
+ where shift_row.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  and shift_row.authorized_at is not null and shift_row.closed_at is null
+  and shift_row.planned_start_at<=clock_timestamp()
+  and shift_row.planned_end_at='infinity'::timestamptz
   and w.state='ACTIVE'
   and exists(select 1 from jsonb_array_elements(w.source_scope) x
    where x->>'source_ref'=p_source_ref
