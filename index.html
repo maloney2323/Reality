@@ -829,6 +829,21 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 #realitySimpleHome .simple-footer{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #364a61}
 #realitySimpleHome .simple-note{font-size:13px;color:#acbecf;line-height:1.45;max-width:580px}
 @media(max-width:600px){#realitySimpleHome{margin:14px 0 24px;padding:18px;border-radius:16px}#realitySimpleHome .simple-actions{flex-direction:column}#realitySimpleHome .simple-actions button{width:100%}#realitySimpleHome .simple-list{grid-template-columns:minmax(0,1fr)}}
+/* Chat-first employee shift card and conversation exports. */
+#realitySimpleHome .reality-employee-shift-chat-primary{display:inline-flex;align-items:center;justify-content:center;max-width:100%;text-align:center;background:#d7eefc;color:#0c273a;font-weight:750;border-radius:11px;padding:13px 17px;text-decoration:none;margin:8px 0 10px}
+#realitySimpleHome .reality-employee-shift-advanced{margin-top:5px;padding:10px;border:1px solid #38566b;border-radius:10px}
+#realitySimpleHome .reality-employee-shift-advanced>summary{cursor:pointer;font-size:13px;color:#c8e0ed}
+.reality-chat-employee-shift-card{padding:15px;background:#13283a;border:1px solid #456b88;border-radius:13px;margin:8px 0 12px;max-width:100%;overflow-wrap:anywhere}
+.reality-chat-employee-shift-card h3{margin:0 0 8px;font-size:17px}
+.reality-chat-employee-shift-card p{font-size:12px;line-height:1.5;color:#c6ddec;margin:7px 0}
+.reality-shift-plan-actions{display:flex;gap:8px;flex-wrap:wrap}
+.reality-shift-plan-actions button{font-size:12px;padding:10px 12px;min-height:38px;margin:3px 0}
+.reality-shift-plan-assignments ul{margin:10px 0;padding-left:20px}
+.reality-shift-plan-assignments li{font-size:12px;margin:8px 0}
+.reality-shift-plan-assignments a{font-size:12px;color:#c6eeff}
+.reality-conversation-exports{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0 13px;padding:9px;border-top:1px solid #36536b}
+.reality-conversation-exports button,.reality-copy-message{font-size:11px!important;padding:6px 9px!important;min-height:30px!important;margin:2px!important}
+.reality-conversation-export-status{flex-basis:100%;font-size:11px;color:#a7bac8;margin:3px 0}
 </style>
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
@@ -1106,9 +1121,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <button type="button" id="realityShiftOpenConversation" class="simple-primary">Open Reality Chat · Live Workday</button>
  </section>
  <section id="realityEmployeeShiftPlanner" class="reality-employee-shift-planner" aria-labelledby="realityEmployeeShiftTitle">
-  <div class="simple-kicker">REALITY · PLAN BEFORE EXECUTION</div>
-  <h3 id="realityEmployeeShiftTitle">Build an employee's 8-hour workday</h3>
-  <p>Reality checks its current source-backed backlog, avoids identical records, orders investigation ahead of governed execution, and prepares an eight-hour schedule for your review. Planning is not authorization.</p>
+  <div class="simple-kicker">REALITY · AUTOMATED EMPLOYEES</div>
+  <h3 id="realityEmployeeShiftTitle">Build an automated employee shift</h3>
+  <p>Reality organizes work for your existing employees, proposes assignments, and presents the plan in Chat for review. Adjust the draft before one start approval. No duplicate shifts or extra OpenAI connections.</p>
+  <a class="reality-employee-shift-chat-primary" href="/chat#realityCreateShift">Reality, create my shift with automated employees</a>
+  <details class="reality-employee-shift-advanced">
+   <summary>Already have employee roles? Generate a detailed eight-hour work plan</summary>
   <div class="reality-employee-shift-inputs">
    <label>Proposed start time · your device's local time
     <input type="time" id="realityEmployeeShiftStart" value="09:00">
@@ -1122,6 +1140,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityEmployeeShiftApprovalStatus" role="status" aria-live="polite">Installation of any capability will require your separate exact approval in Reality Chat.</p>
   </div>
   <div id="realityEmployeeShiftSchedule" hidden aria-label="Eight-hour source-backed shift proposal"></div>
+  </details>
  </section>
  <div class="simple-actions reality-home-primary-actions" aria-label="Start and inspect governed work">
   <button type="button" id="simpleRunFullLoop" class="simple-primary">Run Full Loop</button>
@@ -6959,6 +6978,8 @@ setInterval(refreshSavedShiftHome,300000);
 
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
+<script defer src="/reality-chat-employee-shift-card-v1.js"></script>
+<script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
 <script defer src="/reality-riley-source-work-v1.js"></script>
