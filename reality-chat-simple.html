@@ -2278,6 +2278,14 @@ function showAuth(authenticated){
     if(window.location.hash==='#riley-shift'){
       $('fullShiftScope').textContent='This page shows what is running now and what you should do next. Historical receipts are available separately. Reality must exclude already settled work before a new Start becomes available. One start authorizes a frozen, completion-bound batch. A new capability installation always requires exact approval in Chat.';
     }
+    // Home employee overview links directly to the existing Employee board.
+    // Opening it is read-only; never authorizes a job or changes shift scope.
+    if(window.location.hash==='#employeeBoardPanel'){
+      const panel=$('employeeBoardPanel');
+      panel.hidden=false;panel.open=true;
+      $('teamToggle').setAttribute('aria-expanded','true');
+      $('teamToggle').textContent='Hide AI team · 8';
+    }
     setConversation(conversation());
     void refreshHistory();
     void listConversations();
