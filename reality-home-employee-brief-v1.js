@@ -93,12 +93,41 @@
        (precheckedByEmployee.get(item.assigned_employee)||0)+1);
     }
    }
+   // Distinguish actual signed-worker investigation receipts from
+   // source triage suggestions; never infer a completed code repair.
+   const workerReceipts=data.weekly_employee_investigation_receipts;
+   const verifiedWorkerReceipts=workerReceipts?.status===
+    'SIGNED_WORKER_EMPLOYEE_INVESTIGATIONS_INDEPENDENTLY_RECEIPTED'&&
+    workerReceipts.source_investigation_only===true&&
+    workerReceipts.new_executable_jobs_authorized===0&&
+    workerReceipts.installation_authorized===false&&
+    workerReceipts.production_changed===false&&
+    Array.isArray(workerReceipts.receipts)&&
+    workerReceipts.receipts.length===workerReceipts.count;
+   const doneByEmployee=new Map();
+   if(verifiedWorkerReceipts){
+    const unique=new Set();
+    for(const proof of workerReceipts.receipts){
+     if(!names.includes(proof.employee)||
+      !/^supabase:weekly_employee_investigation_receipts_v1:[a-f0-9-]{36}$/
+       .test(proof.investigation_receipt_ref||'')||
+      unique.has(proof.source_ref))
+      throw Error('WORKER_EMPLOYEE_INVESTIGATION_PROOF_UNVERIFIED');
+     unique.add(proof.source_ref);
+     doneByEmployee.set(proof.employee,
+      (doneByEmployee.get(proof.employee)||0)+1);
+    }
+   }
    for(const name of names){
     const card=root.querySelector('[data-home-employee="'+name+'"]');
     const caption=card?.querySelector('[data-home-work]');
     if(!caption)throw Error('EMPLOYEE_HOME_CARD_MISSING');
     const e=map.get(name),n=e.candidate_count;
-    caption.textContent=(inspected?
+    caption.textContent=(verifiedWorkerReceipts?
+      (doneByEmployee.get(name)||0)+' investigation'+
+       ((doneByEmployee.get(name)||0)===1?'':'s')+
+       ' independently receipted · ':'')+
+     (inspected?
       (precheckedByEmployee.get(name)||0)+' current GitHub investigation'+
        ((precheckedByEmployee.get(name)||0)===1?'':'s')+
        ' prechecked · ':'')+
@@ -111,7 +140,10 @@
    const total=data.existing_work_center_candidates;
    if(!Number.isSafeInteger(total)||total<0)
     throw Error('EMPLOYEE_SOURCE_TOTAL_UNVERIFIED');
-   status.textContent=(inspected?
+   status.textContent=(verifiedWorkerReceipts?
+     workerReceipts.count+' actual employee source investigations independently receipted · ':
+     'Employee investigation receipts not yet independently read back · ')+
+    (inspected?
     sourceQualification.inspected_count+' current GitHub findings independently inspected upstream · '+
     sourceQualification.investigation_assignment_count+' employee investigations organized · '+
     sourceQualification.already_settled_no_replay_count+' settled source withheld from replay. ':
