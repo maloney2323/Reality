@@ -78,9 +78,7 @@ async function preflight(token){
   !SHA.test(head.data?.object?.sha||'')||
   source.data?.path!==SOURCE||source.data?.sha!==SOURCE_BLOB)
   err('CURRENT_PREVIEW_OR_ORIGINAL_SOURCE_DRIFT');
- if(file.status!==404)
-  err('INERT_PROBE_FILE_ALREADY_EXISTS_NO_WRITE');
- return head.data.object.sha;
+ return {head:head.data.object.sha,absent:file.status===404};
 }
 Deno.serve(async req=>{
  try{
@@ -96,7 +94,8 @@ Deno.serve(async req=>{
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<25)return reply('EXISTING_BROKER_GITHUB_WRITER_NOT_CONFIGURED');
   // Inert probe only; exact preview branch and original file baseline verified.
-  const before=await preflight(token);
+  const provider=await preflight(token);
+  const before=provider.head;
   const claim=await rpc('reality_claim_native263_preview_auto_deploy_probe_v1',{
    p_preview_head_sha:before},key);
   if(claim.status!=='EXACT_INERT_ACTIVE_PREVIEW_DEPLOY_PROBE_CLAIMED'){
@@ -136,6 +135,8 @@ Deno.serve(async req=>{
      probe_file:PATH
     });
   }
+  if(!provider.absent)
+   return await finish('GITHUB_PREEXISTING_FILE_BLOCKED');
   let lastRef;
   try{lastRef=await github(token,'/git/ref/heads/'+BRANCH)}
   catch{return await finish('GITHUB_SOURCE_READBACK_UNVERIFIED')}
