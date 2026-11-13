@@ -32,6 +32,9 @@ on:
       - test/reality-private-chat-conversation-and-weekly-role-v1.test.js
       - test/reality-saved-chat-employee-proposals-v1.test.js
       - test/reality-home-live-employees-v1.test.js
+      - src/reality-automatic-shift-supervisor-v1.js
+      - test/reality-automatic-shift-supervisor-v1.test.js
+      - api/reality/governed-employee-shift-worker.js
       - src/reality-mixed-shift-receipts-v1.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js
@@ -185,6 +188,9 @@ jobs:
           node --test test/reality-saved-chat-employee-proposals-v1.test.js
           node --check reality-home-employee-brief-v1.js
           node --test test/reality-home-live-employees-v1.test.js
+          node --check src/reality-automatic-shift-supervisor-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-automatic-shift-supervisor-v1.test.js
           node --check src/reality-mixed-shift-receipts-v1.js
           node --check src/reality-shift-conversation-brief-v1.js
           node --check api/reality/personal-governed-employee-shift.js
