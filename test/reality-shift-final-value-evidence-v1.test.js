@@ -106,11 +106,19 @@ test('source-native final receipt PDFs show actual partial evidence and no inven
  assert.match(text,/PARTIAL/);
  assert.match(text,/VERIFIED NET SAVINGS: NOT MEASURED/);
  assert.match(text,/FINANCIAL ROI: NOT VERIFIED/);
+ assert.match(text,/NASA \/ BLS EXTERNAL LABOR REFERENCE - NOT SAVINGS/);
+ assert.match(text,/NASA study medians: 2h fault investigation; 3h fix implementation/);
+ assert.match(text,/BLS May 2025 developer median wage: \$65\.38 per hour/);
+ assert.match(text,/5h x \$65\.38 = \$326\.90 illustrative labor cost; NOT saved/);
+ assert.match(text,/https:\/\/ntrs\.nasa\.gov\/citations\/20160008693/);
+ assert.match(text,/https:\/\/www\.bls\.gov\/news\.release\/ocwage\.t01\.htm/);
  assert.match(text,/681ce4ab-4dd0-47cf-963b-dc65087468fc/);
  assert.match(text,/\/Count 1/);
  assert.ok(first.length>2000&&first.length<60000);
  const second=renderRealityShiftValueReceiptPdf(report.receipts[1],{verifiedReport:report});
  assert.match(second.toString('latin1'),/Model output tokens recorded: NOT RECORDED/);
+ assert.match(second.toString('latin1'),/A PR-only review is not a comparable verified repair/);
+ assert.match(second.toString('latin1'),/No NASA labor-cost scenario assigned to this review/);
  const output=process.env.REALITY_SHIFT_VALUE_PDF_SMOKE_OUT;
  if(output){mkdirSync(dirname(output),{recursive:true});writeFileSync(output,first)}
 });
