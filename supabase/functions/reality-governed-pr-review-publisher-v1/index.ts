@@ -48,9 +48,24 @@ async function gh(path:string,token:string,method='GET',body:unknown=undefined){
    'content-type':'application/json','x-github-api-version':'2022-11-28',
    'user-agent':'Reality-Owner-Governed-PR57-Provider-v1'},
   body:body===undefined?undefined:JSON.stringify(body)});
- if(!r.ok)fail(r.status===401||r.status===403?
+ if(!r.ok){
+  // A received HTTP rejection is not the same as a network timeout or
+  // unknown effect. Preserve its safe category for future original jobs.
+  // Never emit tokens, request body, GitHub response body or review text.
+  if(method==='POST'){
+   const rejected=[400,401,403,404,422,429].includes(r.status);
+   if(rejected){
+    console.warn('REALITY_PR57_POST_HTTP_REJECTED',r.status);
+    fail('GITHUB_POST_HTTP_REJECTED_'+r.status);
+   }
+   console.warn('REALITY_PR57_POST_HTTP_UNCERTAIN',r.status);
+   fail('GITHUB_POST_HTTP_UNCERTAIN_'+
+    (Number.isInteger(r.status)?r.status:'UNKNOWN'));
+  }
+  fail(r.status===401||r.status===403?
    'GITHUB_BROKER_PERMISSION_OR_TOKEN_REJECTED':
    'GITHUB_PROVIDER_EFFECT_OR_READBACK_UNVERIFIED');
+ }
  const data=await r.json().catch(()=>null);
  if(!data||typeof data!=='object')fail('GITHUB_PROVIDER_JSON_INVALID');
  return data;
@@ -177,7 +192,20 @@ Deno.serve(async req=>{
   // No retry after uncertain provider effects. Subsequent runs only GET.
   let created;
   try{created=await gh('/issues/57/comments',token,'POST',{body:c.review_body})}
-  catch{return respond('POST_UNCERTAIN_RECONCILE_BY_READBACK_ONLY',false,503)}
+  catch(e){
+   const raw=e instanceof Error?e.message:'UNKNOWN';
+   const definite=/^PR57_BROKER_GITHUB_POST_HTTP_REJECTED_(?:400|401|403|404|422|429)$/.exec(raw);
+   if(definite){
+    // The POST returned an explicit rejection; there is no published
+    // effect claimed. Keep the durable fence until a separate verified
+    // recovery protocol authorizes any retry. Never retry here.
+    return respond('GITHUB_POST_DEFINITIVELY_REJECTED_HTTP_'+
+     raw.slice(-3)+'_FENCE_PRESERVED',false,424,{
+      original_work_id:ORIGINAL,shift_id:SHIFT
+     });
+   }
+   return respond('POST_UNCERTAIN_RECONCILE_BY_READBACK_ONLY',false,503);
+  }
   return await settle(c,created,token,key);
  }catch(e){
   const raw=e instanceof Error?e.message:'UNKNOWN';
