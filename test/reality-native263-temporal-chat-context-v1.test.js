@@ -147,3 +147,20 @@ test('independently settled original produces exact validated owner GET with a r
  assert.throws(()=>buildNative263SettledOwnerCard({...raw,
    owner_id:'c24a6ba0-24bf-4cad-a153-d4e45fcd8b4b'},{ownerId:OWNER,now:fixedNow}));
 });
+
+test('mobile Chat keeps its conversation and navigation outside the long #263 proof panel',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const proof=readFileSync(new URL('../reality-native263-install-approval-ui-v1.js',import.meta.url),'utf8');
+ const workspace=readFileSync(new URL('../reality-chat-workspace-v1.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../reality-chat-workspace-v1.css',import.meta.url),'utf8');
+ assert.match(proof,/return element\('realityChatPanelProof'\)\|\|element\('chat'\)\|\|element\('privateReady'\)/);
+ assert.match(proof,/if\(proof&&p\.parentNode!==proof\)proof\.append\(p\)/);
+ assert.match(proof,/view\.hidden=!!conversation/);
+ assert.match(proof,/transcript\.prepend\(node\)/);
+ assert.match(proof,/const ready=element\('privateReady'\)/);
+ assert.match(workspace,/homeLink\.href = '\/'/);
+ assert.match(workspace,/threadButtons\.append\(homeLink, historyToggle, inspectorToggle, focusToggle\)/);
+ assert.match(workspace,/panels\.proof\.append\(native263Proof\)/);
+ assert.match(css,/reality-chat-home-link/);
+ assert.match(css,/reality-chat-inspector #native263InstallApprovalPanel/);
+});
