@@ -65,7 +65,7 @@ begin
    v_role->>'employee_name'=any(v_seen) or
    pg_catalog.jsonb_typeof(v_role->'tasks')<>'array' or
    pg_catalog.jsonb_array_length(v_role->'tasks') not between 1 and 8 or
-   pg_catalog.jsonb_object_length(v_role)<>2
+   (select count(*) from pg_catalog.jsonb_object_keys(v_role))<>2
   then raise exception 'CHAT_EMPLOYEE_APPROVAL_ROLE_UNVERIFIED';end if;
   v_seen:=array_append(v_seen,v_role->>'employee_name');
   v_role_count:=v_role_count+1;
