@@ -63,14 +63,26 @@ export function renderRealityShiftValueReceiptPdf(receipt,{verifiedReport}={}){
  txt(55,301,'VERIFIED NET SAVINGS: NOT MEASURED',11,teal,true);
  txt(55,281,'FINANCIAL ROI: NOT VERIFIED',10,teal,true);
  txt(55,264,'No savings amount inferred from elapsed time or token counts.',8.5,muted);
- header('WHAT REALITY MUST CAPTURE TO PROVE ROI',226);
- txt(43,207,'1. Independently comparable human work hours or business baseline',8.7,ink);
- txt(43,190,'2. Measured human review/supervision and verified hourly labor cost',8.7,ink);
- txt(43,173,'3. Actual provider and infrastructure charges for this exact work',8.7,ink);
- txt(43,156,'4. Independent value calculation linked to the final work receipt',8.7,ink);
- rect(43,79,525,1,pale);
- txt(43,64,'Evidence is owner-scoped, preview-only, and linked to the source receipt.',8.4,muted);
- txt(43,49,'No new shift, job, capability installation, or production effect.',8.4,muted);
+ header('WHAT IS STILL NEEDED FOR VERIFIED ROI',226);
+ txt(43,207,'Comparable human effort, measured review time and labor-cost evidence.',8.7,ink);
+ txt(43,190,'Actual OpenAI/infrastructure charges and independent net-value proof.',8.7,ink);
+ header('NASA / BLS EXTERNAL LABOR REFERENCE - NOT SAVINGS',172);
+ if(receipt.kind==='NATIVE_CODE_REPAIR'){
+  txt(43,151,'NASA study medians: 2h fault investigation; 3h fix implementation.',8.5,ink);
+  txt(43,137,'Reference scenario: 2h + 3h = 5h (sum of separate medians).',8.5,ink);
+  txt(43,123,'BLS May 2025 developer median wage: $65.38 per hour.',8.5,ink);
+  txt(43,109,'5h x $65.38 = $326.90 illustrative labor cost; NOT saved.',8.5,teal,true);
+ }else{
+  txt(43,151,'NASA fault-repair medians: 2h investigation; 3h implementation.',8.5,ink);
+  txt(43,137,'BLS May 2025 developer median hourly wage: $65.38.',8.5,ink);
+  txt(43,123,'A PR-only review is not a comparable verified repair.',8.5,ink);
+  txt(43,109,'No NASA labor-cost scenario assigned to this review.',8.5,teal,true);
+ }
+ txt(43,94,'NASA source: https://ntrs.nasa.gov/citations/20160008693',7.8,muted);
+ txt(43,81,'BLS source: https://www.bls.gov/news.release/ocwage.t01.htm',7.8,muted);
+ rect(43,65,525,1,pale);
+ txt(43,51,'External benchmarks are scenarios, not measured work or cash savings.',8.2,muted);
+ txt(43,36,'No new shift, capability installation or production effect.',8.2,muted);
  const stream=cmds.join('\n')+'\n';
  const objects=[];
  const add=o=>(objects.push(o),objects.length);
