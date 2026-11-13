@@ -1,0 +1,11 @@
+{
+  "schema": "reality-github-verified-merge-autodeploy-diagnostic-v1",
+  "purpose": "Distinguish GitHub signed-merge deployment trigger from broker-authored unsigned push",
+  "original_work_id": "work:873a6e74fd14c6beacc9042dd8021dfc",
+  "branch": "reality/isolated-openai-governance-gateway-20261108",
+  "source_file_modified": false,
+  "capability_installed": false,
+  "owner_install_approval_consumed": false,
+  "production_changed": false,
+  "final_receipt_claimed": false
+}
