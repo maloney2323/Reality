@@ -117,7 +117,13 @@ export async function invokeRealityModel({ governedSignal, systemContext = null,
        tools:[{type:'web_search',search_context_size:'low'}],
        tool_choice:'required',
        max_output_tokens:Math.max(500,maxOutputTokens),
-      }:{}),
+      }:{
+       // Ordinary Chat also needs a bounded response token allowance,
+       // particularly when discussing work plans across eight roles.
+       // Previously maxOutputTokens was silently ignored outside web search.
+       max_output_tokens:Number.isSafeInteger(maxOutputTokens)?
+        Math.max(300,Math.min(1800,maxOutputTokens)):300,
+      }),
       input: [
         {
           role: 'system',
