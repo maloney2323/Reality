@@ -34,6 +34,10 @@ test('Only explicit click approves the current fingerprint; edits revoke that ap
  assert.match(main,/expected_fingerprint:p\.expected_fingerprint/);
  assert.match(main,/completion_bound:true,requested_hours:8/);
  assert.match(main,/editing=true/);
+ assert.match(main,/revisionRequested=true/);
+ assert.match(main,/approval is disabled until a revised plan has its own verified fingerprint/i);
+ assert.match(main,/if\(p\.combined_employee_work_orders\.task_count>0&&!revisionRequested\)/);
+ assert.match(main,/reset\.addEventListener\('click'/);
  assert.match(main,/approve\.hidden=true;approve\.disabled=true/);
  assert.match(main,/if\(processing\|\|editing\|\|!draft/);
  assert.doesNotMatch(main,/install_approval_authorized_by_triage:true|installation_authorized:true/);
