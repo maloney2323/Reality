@@ -334,7 +334,7 @@ function textNode(tag,content,cls=''){
   if(cls)node.className=cls;
   return node;
 }
-function employeeCard(employee){
+function employeeCard(employee,approvedTasks=[]){
   if(!employee||typeof employee.display_name!=='string'||
     typeof employee.role!=='string'||typeof employee.role_summary!=='string'||
     employee.activation_status!=='PROPOSED_NOT_DEPLOYED'||
@@ -386,6 +386,14 @@ function employeeCard(employee){
   if(employee.candidate_count>5)list.append(textNode('li',
     'Additional '+(employee.candidate_count-5)+' findings in existing Work Center'));
   detail.append(list);
+  if(approvedTasks.length){
+   if(approvedTasks.length>8||approvedTasks.some(t=>typeof t!=='string'||t.length<5||t.length>270))
+    throw Error('OWNER_APPROVED_CHAT_JOB_LIST_UNVERIFIED');
+   detail.append(textNode('div','Owner-approved Chat job list · Awaiting source qualification and execution authorization:','evidence'));
+   const ownerJobs=document.createElement('ul');
+   for(const task of approvedTasks)ownerJobs.append(textNode('li',task));
+   detail.append(ownerJobs);
+  }
   detail.append(textNode('div','Human accountability: '+employee.human_accountability,
     'evidence'));
   card.append(detail);
@@ -1045,9 +1053,40 @@ function renderNextWeekWorkPlan(roster){
   throw Error('NEXT_WEEK_UNIQUE_SOURCE_COVERAGE_MISMATCH');
  $('nextWeekEmployeeRoles').replaceChildren(holder);
 }
+function ownerApprovedChatRoleJobs(roster){
+ const read=roster?.approved_chat_employee_assignments;
+ if(roster?.approved_chat_employee_assignments_status!=='OWNER_DURABLE_CHAT_JOB_LIST_READBACK'||
+    read?.status!=='OWNER_APPROVED_CHAT_EMPLOYEE_JOB_LIST_READBACK'||
+    read.owner_scope_verified!==true||
+    read.work_execution_authorized_by_read!==false||
+    read.production_changed!==false||
+    read.read_only!==true||
+    !Array.isArray(read.approvals)||read.approvals.length>12||
+    read.approvals_count!==read.approvals.length)
+   return {verified:false,roles:new Map(),latest:null};
+ const latest=read.approvals[0]||null;
+ const jobs=new Map();
+ if(latest){
+  if(latest.approval_status!=='APPROVED_ASSIGNMENTS_AWAITING_QUALIFICATION'||
+     !Array.isArray(latest.roles)||latest.roles.length>8||
+     latest.shift_execution_authorized!==false||
+     latest.installation_authorized!==false||
+     latest.production_changed!==false)
+    throw Error('OWNER_CHAT_APPROVAL_JOB_LIST_SCOPE_UNVERIFIED');
+  for(const role of latest.roles){
+   if(jobs.has(role.employee_name)||
+      !['Avery','Riley','Quinn','Taylor','Casey','Morgan','Jordan','Sage'].includes(role.employee_name)||
+      !Array.isArray(role.tasks)||role.tasks.length<1||role.tasks.length>8)
+    throw Error('OWNER_CHAT_APPROVAL_ROLE_INVALID');
+   jobs.set(role.employee_name,role.tasks);
+  }
+ }
+ return {verified:true,roles:jobs,latest};
+}
 function renderSavedEmployeeChatProposals(roster){
  const note=$('savedEmployeeChatSummary'),holder=$('savedEmployeeChatRoles');
  const data=roster?.saved_chat_employee_proposals;
+ const approval=ownerApprovedChatRoleJobs(roster);
  holder.replaceChildren();
  if(roster?.saved_chat_employee_proposals_status!=='AUTHENTICATED_SAVED_CHAT_READBACK'||
     !data){
@@ -1110,8 +1149,46 @@ function renderSavedEmployeeChatProposals(roster){
   holder.append(missing);
  }
  const p=document.createElement('p');
- p.textContent='Saved automatically with the conversation. You can return and discuss or revise these proposals later; nothing has been started.';
+ p.textContent='Saved automatically with the conversation. Approval adds assignments to employee job lists only; it never starts new work or approves an installation.';
  holder.append(p);
+ const approvedCurrent=approval.latest?.source_message_id===
+    data.source_message_ref.slice('supabase:reality_chat_messages:'.length)&&
+   approval.latest?.source_content_sha256===data.source_content_sha256;
+ if(approvedCurrent){
+  holder.append(textNode('p','This exact saved Chat plan is approved in employee job lists. Independent job qualification is still required.','evidence'));
+ }else if(approval.verified&&/^sha256:[a-f0-9]{64}$/.test(data.source_content_sha256||'')){
+  const button=document.createElement('button');
+  button.type='button';
+  const tasks=data.roles.reduce((n,r)=>n+r.proposals.length,0);
+  button.textContent='Approve '+tasks+' Chat assignments for '+data.roles_with_proposals+' employee roles';
+  button.addEventListener('click',async()=>{
+   button.disabled=true;
+   note.textContent='Verifying the exact saved Chat plan and recording owner-approved assignments…';
+   try{
+    const result=await json('/api/reality/personal-employee-chat-assignments',{
+     method:'POST',headers:{'content-type':'application/json'},
+     body:JSON.stringify({action:'APPROVE_EXACT_SAVED_CHAT_EMPLOYEE_ASSIGNMENTS',
+      expected_source_message_ref:data.source_message_ref,
+      expected_content_sha256:data.source_content_sha256})
+    });
+    if(result.ok!==true||
+       result.status!=='OWNER_CHAT_EMPLOYEE_ASSIGNMENTS_DURABLY_APPROVED'||
+       result.job_list_assignments_persisted!==true||
+       result.shift_execution_authorized!==false||
+       result.original_job_created!==false||
+       result.capability_installation_authorized!==false||
+       result.production_changed!==false)
+     throw Error('Owner approval receipt not independently verified');
+    note.textContent='Approved employee job lists saved; no new shift or execution started.';
+    await refreshEmployeeBoard();
+   }catch(e){
+    note.textContent='Assignment approval was not confirmed: '+String(e?.message||'Source unavailable').slice(0,130);
+    button.disabled=false;
+   }
+  });
+  holder.append(button);
+ }
+
 }
 function clearSavedEmployeeChatProposals(){
  $('savedEmployeeChatSummary').textContent='Saved Chat proposals unavailable. No recommendations or work authorization inferred.';
@@ -1141,9 +1218,10 @@ async function refreshEmployeeBoard(){
       throw Error('EMPLOYEE_TEAM_READBACK_UNVERIFIED');
     const ids=new Set(roster.proposed_employees.map(x=>x.employee_id));
     if(ids.size!==8)throw Error('EMPLOYEE_TEAM_DUPLICATE_IDENTITIES');
+    const approved=ownerApprovedChatRoleJobs(roster);
     const holder=document.createDocumentFragment();
     for(const employee of roster.proposed_employees)
-      holder.append(employeeCard(employee));
+      holder.append(employeeCard(employee,approved.roles.get(employee.display_name)||[]));
     $('teamCards').replaceChildren(holder);
     showShiftValueEvidence(roster);
     configureWorkforceSavingsRoles(roster);
