@@ -6768,6 +6768,10 @@ setInterval(refreshSavedShiftHome,300000);
      String(x.user_source_ref||'').startsWith('supabase:reality_chat_messages:')
     ).map(x=>[x.request_id,x]):[]
   );
+  // Snapshot unanswered authenticated turns for same-intent duplicate prevention.
+  window.realitySavedUnansweredTurns=(data.messages||[]).filter(x=>
+   x.role==='user'&&unmatched.has(x.request_id)).map(x=>({
+    text:x.text,request_id:x.request_id,source_ref:x.source_ref}));
   const workReadback=data.work_handoff;
   const verifiedWorkReadback=workReadback?.status===
    'OWNER_CHAT_WORK_INTAKE_READBACK'&&
@@ -6971,7 +6975,39 @@ setInterval(refreshSavedShiftHome,300000);
     explanation.textContent=older?
      'Your message was saved, but Reality did not publish a verified reply. The exact server failure was not durably recorded. Its separate governed work intake and worker status are shown above when independently available. Do not resend the same saved instruction.':
      'Your message was saved. A Chat reply has not been verified. The governed work intake has a separate receipt when the existing worker accepts it.';
-    notice.append(heading,explanation);
+    const retry=document.createElement('button');
+    retry.type='button';
+    retry.textContent='Retry this saved reply — do not send again';
+    retry.onclick=async()=>{
+     retry.disabled=true;
+     explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
+     try{
+      const recovered=await fetch('/api/reality/personal-chat',{
+       method:'POST',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(95000),
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({conversation_id:data.conversation_id,
+        request_id:message.request_id,message:message.text})
+      });
+      const outcome=await recovered.json().catch(()=>null);
+      if(!recovered.ok||outcome?.ok!==true||
+         outcome.continuity?.current_answer_persisted!==true){
+       const code=String(outcome?.error||'CHAT_RESPONSE_UNAVAILABLE');
+       const stage=String(outcome?.stage||'UNKNOWN');
+       explanation.textContent='The original message remains saved. Reply recovery stopped at '+
+        stage.slice(0,80)+' ('+code.slice(0,110)+'). No new message or work authorization was created.';
+       retry.disabled=false;
+       return;
+      }
+      status('Reality saved a verified answer against the original request.');
+      await loadSaved();
+     }catch(e){
+      explanation.textContent='Saved reply recovery did not finish. Your original instruction is preserved. '+
+       String(e?.name==='TimeoutError'?'Response timed out':e?.message||'NETWORK_UNAVAILABLE').slice(0,120);
+      retry.disabled=false;
+     }
+    };
+    notice.append(heading,explanation,retry);
     thread.append(notice);
    }
   }
@@ -7050,6 +7086,15 @@ setInterval(refreshSavedShiftHome,300000);
  };
  el('privateSend').onclick=async()=>{
   const value=el('privatePrompt').value.trim();if(!value)return;
+  // A second click/paste must not create a second original work request
+  // when this EXACT text is already durably saved and awaiting a reply.
+  const outstanding=(window.realitySavedUnansweredTurns||[]).find(x=>x.text===value);
+  if(outstanding){
+   el('privatePrompt').value='';
+   el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+   status('This exact instruction is already saved in Reality. Use Retry this saved reply underneath the original message; no duplicate was submitted.');
+   return;
+  }
   const goalCommand=el('privateGoalCommand').value||null;
   const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
   // Present the owner's typed words immediately in their conversation.
@@ -7065,6 +7110,7 @@ setInterval(refreshSavedShiftHome,300000);
    detail:{conversation_id:sentConversation,request_id:sentRequest}
   }));
   el('privateSend').disabled=true;
+  let intakeVerified=false;
   status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
    // A conversation is durably accepted before model/reliability processing.
@@ -7080,6 +7126,7 @@ setInterval(refreshSavedShiftHome,300000);
     const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
    }
+   intakeVerified=true;
    if(pendingBubble.isConnected)
     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
    window.realityJustSavedWorkRequest={conversation_id:sentConversation,
@@ -7260,21 +7307,21 @@ setInterval(refreshSavedShiftHome,300000);
     return;
    }
    if(pendingBubble.isConnected)
-    pendingBubble.querySelector('.label').textContent=savedUser?
-     'YOU · SAVED · REPLY NOT VERIFIED':'YOU · DELIVERY OR REPLY NOT VERIFIED';
-   if(savedUser||window.realityJustSavedWorkRequest?.request_id===sentRequest)
+    pendingBubble.querySelector('.label').textContent=(savedUser||intakeVerified)?
+     'YOU · SAVED · REPLY NOT VERIFIED':'YOU · DELIVERY NOT VERIFIED';
+   if(savedUser||intakeVerified||window.realityJustSavedWorkRequest?.request_id===sentRequest)
     void loadSaved().catch(()=>{});
    // On authenticated save, keep the text in history rather than putting
    // an already-sent message back into the composer for accidental resending.
-   if(!savedUser&&!el('privatePrompt').value.trim()){
+   if(!savedUser&&!intakeVerified&&!el('privatePrompt').value.trim()){
     el('privatePrompt').value=value;
     el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
    }
    window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
     detail:{request_id:sentRequest,code:safeCode}
    }));
-   status(savedUser?
-    'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Do not resend this request or assume a development job started.':
+   status((savedUser||intakeVerified)?
+    'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Retry that saved reply; do not send a new request or assume execution.':
     'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
   }finally{el('privateSend').disabled=false}
  };
