@@ -23,8 +23,21 @@
  const msg=el('p','Export the saved conversation for this account. PDF uses your device’s Print / Save as PDF option.');
  msg.setAttribute('role','status');msg.className='reality-conversation-export-status';
  controls.append(copy,markdown,json,pdf,msg);
- if(main)transcript.insertAdjacentElement('afterend',controls);
- else transcript.insertAdjacentElement('beforebegin',controls);
+ // Keep document-export controls OUT of the flex conversation thread.
+ // On narrow screens, placing them between the scroll pane and composer
+ // consumes the scroll height and makes past messages appear trapped.
+ // The existing Chats side panel is an independently scrollable home for them.
+ if(main){
+  const sidebar=document.getElementById('realityChatSidebar');
+  if(sidebar){
+   const title=el('h3','Saved conversation');
+   title.className='reality-chat-panel-heading';
+   sidebar.append(title,controls);
+  }else{
+   // Safe legacy layout: outside the thread, never inside its flex column.
+   (document.getElementById('privateReady')||wrapper).append(controls);
+  }
+ }else transcript.insertAdjacentElement('beforebegin',controls);
  const key='reality.private.chat.conversation.v1';
  function currentId(){
   const id=main&&typeof window.realityActiveConversationId==='function'?
