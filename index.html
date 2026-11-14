@@ -6468,7 +6468,7 @@ setInterval(refreshSavedShiftHome,300000);
 
 (function(){
  const el=id=>document.getElementById(id);
- const status=s=>el('privateStatus').textContent=s;
+ const status=s=>{el('privateStatus').textContent=typeof s==='string'&&s.trim()?s:'';};
  const endpoint='/api/reality/personal-session';
  function conversationId(){
   let id=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -6751,11 +6751,17 @@ setInterval(refreshSavedShiftHome,300000);
  async function loadSaved(){
   const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
-  el('privateTranscript').replaceChildren();
+  const thread=el('privateTranscript');
+  const atBottom=thread.scrollHeight-thread.scrollTop-thread.clientHeight<=90;
+  const previousTop=thread.scrollTop,previousHeight=thread.scrollHeight;
+  thread.replaceChildren();
   for(const message of data.messages||[])bubble(message.role,message.text);
   status((data.messages?.length||0)+' saved messages restored'+
    (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
-  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+  // A readback must not force the owner to the newest message while
+  // scrolling through earlier conversation history.
+  thread.scrollTop=atBottom?thread.scrollHeight:
+   Math.max(0,previousTop+(thread.scrollHeight-previousHeight));
   await loadGoals();
  }
  async function init(){
@@ -6985,17 +6991,49 @@ setInterval(refreshSavedShiftHome,300000);
   }catch(e){
    const errorCode=String(e?.message||'CHAT_RESPONSE_UNAVAILABLE');
    const safeCode=/^[A-Z][A-Z0-9_]{3,119}$/.test(errorCode)?errorCode:'CHAT_RESPONSE_UNAVAILABLE';
+   // Distinguish a saved user turn from an unsaved draft after a
+   // synchronous Chat timeout. Do not encourage sending a duplicate request.
+   let savedUser=null,savedAnswer=null;
+   try{
+    const readback=await fetch('/api/reality/personal-chat?conversation_id='+
+     encodeURIComponent(sentConversation),{method:'GET',
+     credentials:'same-origin',cache:'no-store',
+     signal:AbortSignal.timeout(7500)});
+    if(readback.ok){
+     const body=await readback.json();
+     if(body?.ok===true&&body.conversation_id===sentConversation&&
+      Array.isArray(body.messages)){
+      savedUser=body.messages.find(x=>x.role==='user'&&
+       x.request_id===sentRequest&&x.text===value&&
+       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'))||null;
+      savedAnswer=body.messages.find(x=>x.role==='assistant'&&
+       x.request_id===sentRequest&&typeof x.text==='string'&&x.text.trim()&&
+       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'))||null;
+     }
+    }
+   }catch{/* A temporary readback error is not proof of failed delivery. */}
+   if(savedUser&&savedAnswer){
+    if(pendingBubble.isConnected)
+     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
+    void loadSaved().catch(()=>{});
+    status('Reality saved your answer. Recovered from the authenticated conversation.');
+    return;
+   }
    if(pendingBubble.isConnected)
-    pendingBubble.querySelector('.label').textContent='YOU · DELIVERY OR REPLY NOT VERIFIED';
-   // Do not lose the owner's text when the server cannot confirm a saved turn.
-   if(!el('privatePrompt').value.trim()){
+    pendingBubble.querySelector('.label').textContent=savedUser?
+     'YOU · SAVED · REPLY NOT VERIFIED':'YOU · DELIVERY OR REPLY NOT VERIFIED';
+   // On authenticated save, keep the text in history rather than putting
+   // an already-sent message back into the composer for accidental resending.
+   if(!savedUser&&!el('privatePrompt').value.trim()){
     el('privatePrompt').value=value;
     el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
    }
    window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
     detail:{request_id:sentRequest,code:safeCode}
    }));
-   status('Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before resending. No job was started.');
+   status(savedUser?
+    'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Do not resend this request or assume a development job started.':
+    'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
   }finally{el('privateSend').disabled=false}
  };
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
