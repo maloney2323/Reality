@@ -186,3 +186,9 @@ export async function runAuthorizedShiftSourceRepairAutoTrigger({
   owner_warrant_reused:true,new_shift_created:false,
   installation_authorized:false,production_changed:false});
 }
+
+// The same existing governor also brokers independently failed original-repair
+// continuations. The service-only durable claim remains the authority source;
+// no model prompt or Chat answer can mint a shift, job, install or settlement.
+export {continueSameOriginalRecoveryAfterVerifiedFailure}
+ from './reality-same-original-recovery-attempt-v2.js';
