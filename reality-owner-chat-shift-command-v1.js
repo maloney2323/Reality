@@ -185,7 +185,7 @@ export async function resolveExistingSignedInChatShift(command,{
   throw Error('CHAT_SHIFT_CREATED_BUT_READBACK_UNVERIFIED_NO_REPEAT');
  let batch_verified=false,batch_status='BATCH_INTAKE_REQUIRES_READBACK';
  try{
-  const admitted=await fetchJSON('/api/reality/personal-riley-shift-original-batch',{
+  const admitted=await fetchJSON('/api/reality/personal-riley-full-shift-batch',{
    method:'POST',headers:{'content-type':'application/json'},
    body:JSON.stringify({
     action:'ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT',
