@@ -133,7 +133,7 @@ test('a green general gateway can NEVER approve the model candidate',async()=>{
  try{
   const result=await (await stageOrObserve(claim,'opaque-github-token',
    base,baseSha,'opaque-service-key',true)).json();
-  assert.equal(result.status,'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI');
+  assert.equal(result.status,'CORRECTIVE_CANDIDATE_STAGED_AWAITING_EXACT_FROZEN_CI');
   assert.equal(result.independent_ci_verified,false);
   assert.equal(result.installation_authorized,false);
   assert.equal(m.requests.some(x=>x.url===db+'reality_record_same_original_recovery_ci_v2'),false);
