@@ -182,16 +182,41 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  const exactRuns=runs.workflow_runs.filter(r=>eligible(r)&&
    r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
  if(exactRuns.length>1)refuse('AMBIGUOUS_INDEPENDENT_CI_RUN');
- const prFailureRuns=exactRuns.length===0?
-   runs.workflow_runs.filter(r=>eligible(r)&&
+ let prFailureRuns=[];
+ if(exactRuns.length===0){
+  // GitHub's per-branch Actions listing can omit pull_request runs.
+  // Verify the PR itself from the trusted repository, then independently
+  // discover Actions runs. The browser/model cannot select a run or PR.
+  const pulls=await exact(token,'/pulls?state=open&head='+
+   encodeURIComponent('maloney2323:'+branch)+'&per_page=30');
+  if(!Array.isArray(pulls))refuse('CORRECTIVE_OWNER_PR_READBACK_UNVERIFIED');
+  const verifiedPRs=pulls.filter(pr=>pr?.state==='open'&&
+   pr.head?.sha===head&&pr.head?.ref===branch&&
+   pr.base?.ref===baseBranch&&
+   pr.head?.repo?.full_name==='maloney2323/Reality'&&
+   pr.base?.repo?.full_name==='maloney2323/Reality');
+  if(verifiedPRs.length>1)refuse('AMBIGUOUS_OWNER_ORIGINAL_CORRECTIVE_PR');
+  if(verifiedPRs.length===1){
+   const additional=await exact(token,'/actions/runs?event=pull_request&per_page=100');
+   if(!Array.isArray(additional.workflow_runs))
+    refuse('INDEPENDENT_PR_RUNS_UNVERIFIED');
+   const byId=new Map([...runs.workflow_runs,...additional.workflow_runs]
+    .filter(r=>Number.isSafeInteger(r?.id)).map(r=>[r.id,r]));
+   prFailureRuns=[...byId.values()].filter(r=>eligible(r)&&
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
-    /^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/.test(r.path||'')&&
-    Array.isArray(r.pull_requests)&&r.pull_requests.some(pr=>
-     pr?.head?.sha===head&&pr.head?.ref===branch&&
-     pr.base?.ref===baseBranch&&
-     pr.head?.repo?.full_name==='maloney2323/Reality'&&
-     pr.base?.repo?.full_name==='maloney2323/Reality')):[];
+    typeof r.path==='string'&&r.path.startsWith('.github/workflows/')&&
+    /\\.ya?ml(?:@.*)?$/.test(r.path)&&
+    (r.repository?.full_name===undefined||
+     r.repository.full_name==='maloney2323/Reality')&&
+    // PR itself is owner-head- and base-bound by independently fetched
+    // GitHub metadata. Run is SHA- and branch-bound by eligible(r).
+    verifiedPRs[0].number>0);
+  }
+  if(prFailureRuns.length===0)console.info('REALITY_CORRECTIVE_CI_EVIDENCE_NOT_YET_MATCHED',
+   JSON.stringify({branch_runs:runs.workflow_runs.length,
+    owner_prs:verifiedPRs.length,pr_runs_checked:verifiedPRs.length===1}));
+ }
  // Restrict fallback to the latest verified completed run of that exact
  // original SHA; failed reruns never alter the staged source digest.
  prFailureRuns.sort((a,b)=>b.id-a.id);
