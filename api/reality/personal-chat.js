@@ -17,6 +17,7 @@ import {buildRealityProposedEmployeeRoleDiscussionContext}
  from '../../src/reality-employee-identity-roster-v1.js';
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
+import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
@@ -48,7 +49,9 @@ export default async function handler(req,res){
   const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    return res.status(200).json({ok:true,conversation_id:conversationId,
-    messages:history.messages,continuity:{
+    messages:history.messages,
+    reply_readback:summarizeSavedChatReplyReadback(history.messages),
+    continuity:{
      history_source:'AUTHENTICATED_SUPABASE_RLS',
      recovered_messages:history.messages.length,
      coverage:history.history_status,older_messages_may_be_missing:history.older_missing,
