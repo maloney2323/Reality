@@ -36,6 +36,7 @@ export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ let stage='AUTHENTICATION';
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method))
@@ -47,6 +48,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,conversations:await listPrivateConversations(session)});
   const conversationId=String((req.method==='GET'?req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
+  stage='AUTHENTICATED_HISTORY';
   const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    return res.status(200).json({ok:true,conversation_id:conversationId,
@@ -111,6 +113,7 @@ export default async function handler(req,res){
   // message. Only a fully hash-verified non-consequential terminal fork may
   // start a new, explicitly linked read-only recovery segment.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
+  stage='CONTINUITY_RECONSTRUCTION';
   const continuity=await resolvePrivateChatContinuity({
    scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
   });
@@ -128,6 +131,7 @@ export default async function handler(req,res){
    });
   // The signed human message entered the governed durable work inbox via
   // AFTER INSERT, independently of Chat cognition or assistant publication.
+  stage='SIGNED_CHAT_WORK_READBACK';
   const chatWorkReadback=await readOwnerChatWorkHandoff({
    session,conversationId
   });
@@ -174,6 +178,7 @@ export default async function handler(req,res){
     fail('CHAT_AUTHORIZED_GOAL_READBACK_FAILED',503);
   }
   // Context comes only from trusted owner-scoped database stage receipts.
+  stage='OWNER_EVIDENCE_COLLECTION';
   const [marketStageObservations,verifiedUpgradeObservations,employeeShiftObservations,workerWakeObservations,companyWorkforceObservations,rileySourceWorkObservations,native263TemporalObservations,ownerCompletedWorkObservations]=await Promise.all([
    readVerifiedMarketStageForChat({session,message:text,db:isolated}),
    readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),
@@ -199,6 +204,7 @@ export default async function handler(req,res){
    /^reality:employee-shift:[a-f0-9-]{36}$/i.test(x.source_ref||'')&&
    x.active_owner_shift_id===x.source_ref.slice('reality:employee-shift:'.length));
   const verifiedOwnerShift=ownerShiftFacts.length===1?ownerShiftFacts[0]:null;
+  stage='COGNITION_AND_RELIABILITY';
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;
@@ -271,6 +277,7 @@ export default async function handler(req,res){
   // without another source-linked verification receipt.
   const answer=String(result?.intelligence?.answer||'');
   if(!answer.trim())fail('CHAT_MODEL_ANSWER_UNAVAILABLE',503);
+  stage='FINAL_ANSWER_REVIEW';
   const finalPublicationProof=assertFinalChatPublicationProof({
    answer,reliability:result?.reliability,
    atomicGoalPublicationEnabled:true,
@@ -291,6 +298,7 @@ export default async function handler(req,res){
     continuityRootId:scopedRoot,worldlineId:scopedRoot,
     subjectId:session.user_id,
   });
+  stage='GOAL_SNAPSHOT_RECONCILIATION';
   const goalHistory=await createUniversePostgresPersistence({
     ...isolated,
   }).reconstruct({
@@ -309,6 +317,7 @@ export default async function handler(req,res){
    fail('CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN',409);
   // This atomic RPC reads the same conversation/goal revision while inserting
   // the EXACT answer checked by the final Integrity publication decision.
+  stage='ATOMIC_ASSISTANT_PUBLICATION';
   const publication=await publishPrivateAssistantAtomically(session,{
     conversationId,requestId,text:answer,isolatedDb:isolated,
     // On a recovered fork, keep the *original* independently verified goal
@@ -320,6 +329,7 @@ export default async function handler(req,res){
       continuity.verified_prior_goal_cas.expected_last_goal_event_id:
       goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
   });
+  stage='ASSISTANT_DURABILITY_READBACK';
   const check=await readPrivateChat(session,conversationId);
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
    fail('CHAT_ASSISTANT_DURABILITY_NOT_VERIFIED',503);
@@ -382,6 +392,12 @@ export default async function handler(req,res){
    execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
  }catch(e){
   const status=Number(e.status)||503;
-  return res.status(status).json({ok:false,error:e.message||'CHAT_UNAVAILABLE'});
+  const underlying=String(e?.message||'');
+  // Never reflect arbitrary provider/database errors or user content.
+  const code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
+  console.warn('REALITY_CHAT_STAGE_FAILURE',stage,code);
+  return res.status(status).json({ok:false,error:code,
+   stage,request_saved_state:'CHECK_AUTHENTICATED_HISTORY',
+   execution_authorized:false,installation_authorized:false});
  }
 }
