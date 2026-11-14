@@ -160,9 +160,11 @@ test('CI workflow must be an EXACT deterministic rewrite of trusted base workflo
  await assert.rejects(observe({tamperWorkflow:true}),
   /PINNED_CI_WORKFLOW_UNTRUSTED_CHANGE/);
 });
-test('inconsistent run head SHA cannot be falsely bound to original candidate',async()=>{
- await assert.rejects(observe({wrongRunSHA:true}),
-  /PINNED_CI_INDEPENDENT_RUN_IDENTITY_MISMATCH/);
+test('inconsistent run head SHA is not eligible and cannot write a CI receipt',async()=>{
+ const {response,requests}=await observe({wrongRunSHA:true});
+ assert.equal(response,null);
+ assert.equal(requests.some(x=>x.url===endpoint+
+  'reality_record_same_original_frozen_ci_attestation_v1'),false);
 });
 test('absent exact original checkout evidence never becomes independent CI',async()=>{
  await assert.rejects(observe({missingCheckout:true}),
