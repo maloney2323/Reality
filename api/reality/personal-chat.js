@@ -1,6 +1,6 @@
 // Isolated, authenticated Personal Reality conversation. No customer actions.
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {readPrivateChat,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
@@ -57,20 +57,23 @@ export default async function handler(req,res){
   const conversationId=String((req.method==='GET'?req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
   stage='AUTHENTICATED_HISTORY';
-  const history=await readPrivateChat(session,conversationId);
-  // The progress monitor needs only authenticated message/reply readback.
-  // Never fetch unrelated employee, discovery or dashboard evidence on
-  // every polling request while a governed answer is being generated.
-  if(req.method==='GET'&&String(req.query?.reply_readback||'')==='1')
+  // Progress polling is exact-request owner-RLS readback only, with
+  // no model, worker, full-history reconstruction or dashboard lookups.
+  if(req.method==='GET'&&String(req.query?.reply_readback||'')==='1'){
+   const targetRequestId=String(req.query?.request_id||'');
+   if(!validUuid(targetRequestId))fail('CHAT_REQUEST_ID_INVALID',400);
+   const exact=await readPrivateChatRequest(session,{
+    conversationId,requestId:targetRequestId});
    return res.status(200).json({ok:true,conversation_id:conversationId,
-    messages:history.messages,
-    reply_readback:summarizeSavedChatReplyReadback(history.messages),
+    request_id:targetRequestId,messages:exact.messages,
+    reply_readback:summarizeSavedChatReplyReadback(exact.messages),
     continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',
-     recovered_messages:history.messages.length,
-     coverage:history.history_status,
-     older_messages_may_be_missing:history.older_missing},
-    readback_scope:'AUTHENTICATED_MESSAGES_ONLY',
+     recovered_messages:exact.messages.length,coverage:'EXACT_SAVED_REQUEST',
+     older_messages_may_be_missing:null},
+    readback_scope:exact.status,
     work_execution_authorized:false,installation_authorized:false});
+  }
+  const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    const context=await collectOptionalChatEvidence([
     {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({session,conversationId}),
