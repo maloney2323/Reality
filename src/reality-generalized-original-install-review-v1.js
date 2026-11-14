@@ -7,7 +7,7 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 const REPO='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const PATH=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
