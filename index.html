@@ -6874,7 +6874,9 @@ setInterval(refreshSavedShiftHome,300000);
     // Chat is an operational control surface, not only an advice screen.
     // A signed user turn can inspect its eligible WORK executor and authorize
     // it from this conversation. Unsupported jobs are NOT falsely started.
-    // Even an earlier advisory marked conversational may contain a genuine\n    // work request; the trusted capability router makes that decision.\n    if(message.role==='user'){
+    // Even an earlier advisory marked conversational may contain a genuine
+    // work request; the trusted capability router makes that decision.
+    if(message.role==='user'){
      const controls=document.createElement('div');
      controls.className='reality-chat-signed-work-actions';
      const inspect=document.createElement('button');
