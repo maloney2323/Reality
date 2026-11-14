@@ -45,12 +45,18 @@ function rig({conclusion='failure',failedStep=true,foreignPR=false,frozen=false,
  const pr={number:301,state:'open',draft:true,head:{
   sha:head,ref:branch,repo:{full_name:foreignPR?'foreign/Reality':'maloney2323/Reality'}},
   base:{ref:base,repo:{full_name:'maloney2323/Reality'}}};
+ const ghExpr='ref: '+String.fromCharCode(36,123,123)+
+  ' github.event.pull_request.head.sha '+String.fromCharCode(125,125)+'\n';
  const frozenTrust='Verify Reality model boundary and original tool-continuation regressions\n'+
   'test/reality-riley-service-original-runtime-v1.test.js\n'+
   'test/reality-riley-full-execution-path-v1.test.js\n'+
   (frozen?'independent-corrective-frozen:\n'+
   "startsWith(github.head_ref, 'reality/riley/auto-corrective-')"+'\n'+
-  'ref: '+'
+  ghExpr+
+  'persist-credentials: false\n'+
+  'test/reality-riley-trusted-original-driver-bridge-v1.test.js\n'+
+  'test/reality-riley-governed-original-job-v1.test.js\n'+
+  'Independent original-job continuity and governed handoff acceptance\n':'');
  globalThis.fetch=async(url,opt={})=>{
   requests.push({url,method:opt.method||'GET',body:opt.body});
   let result;
