@@ -73,6 +73,47 @@ export default async function handler(req,res){
     readback_scope:exact.status,
     work_execution_authorized:false,installation_authorized:false});
   }
+  // Exact saved Chat request -> existing governed work inbox readback.
+  // This is evidence only: neither a model answer nor a browser poll can
+  // authorize execution, claim a job or fabricate a worker completion.
+  if(req.method==='GET'&&String(req.query?.work_readback||'')==='1'){
+   const targetRequestId=String(req.query?.request_id||'');
+   if(!validUuid(targetRequestId))fail('CHAT_REQUEST_ID_INVALID',400);
+   const exact=await readPrivateChatRequest(session,{
+    conversationId,requestId:targetRequestId});
+   const source=exact.messages.find(x=>x.role==='user');
+   if(!source)return res.status(200).json({
+    ok:true,conversation_id:conversationId,request_id:targetRequestId,
+    status:'NO_AUTHENTICATED_SAVED_USER_TURN',
+    work_handoff:null,execution_authorized_by_chat:false,
+    installation_authorized:false,production_changed:false});
+   const read=await readOwnerChatWorkHandoff({session,conversationId});
+   if(!read)return res.status(200).json({
+    ok:true,conversation_id:conversationId,request_id:targetRequestId,
+    status:'WORK_HANDOFF_READBACK_UNAVAILABLE',
+    work_handoff:null,execution_authorized_by_chat:false,
+    installation_authorized:false,production_changed:false});
+   const matches=read.items.filter(x=>
+    x.request_id===targetRequestId&&x.source_ref===source.source_ref);
+   if(matches.length>1)fail('CHAT_WORK_INTAKE_IDENTITY_AMBIGUOUS',503);
+   const item=matches[0]||null;
+   return res.status(200).json({
+    ok:true,conversation_id:conversationId,request_id:targetRequestId,
+    status:item?'AUTHENTICATED_WORK_INTAKE_RECORD_VERIFIED':
+     'NO_MATCHING_WORK_INTAKE_RECORD',
+    work_handoff:item?{
+     status:item.status,shift_id:item.shift_id,
+     source_ref:item.source_ref,request_id:item.request_id,
+     diagnosis_status:item.diagnosis_status,
+     selected_source_refs:item.selected_source_refs,
+     work_chain:item.work_chain,
+     worker_invocation_claimed:item.worker_invocation_claimed,
+     execution_authorized_by_chat:false,
+     installation_authorized:false,production_changed:false,
+    }:null,
+    execution_authorized_by_chat:false,
+    installation_authorized:false,production_changed:false});
+  }
   const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    const context=await collectOptionalChatEvidence([
