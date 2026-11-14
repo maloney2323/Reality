@@ -200,7 +200,10 @@ test('Send places owner text into transcript immediately and preserves typed wor
  assert.match(index,/data\.continuity\?\.current_answer_persisted!==true/);
  assert.match(index,/REALITY · VERIFIED SAVED ANSWER/);
  assert.match(index,/reality:chat-request-failed/);
- assert.match(index,/YOU · DELIVERY OR REPLY NOT VERIFIED/);
+ assert.match(index,/YOU · DELIVERY NOT VERIFIED/);
+ assert.match(index,/YOU · SAVED · REPLY NOT VERIFIED/);
+ assert.match(index,/Retry this saved reply/);
+ assert.match(index,/realitySavedUnansweredTurns/);
  assert.match(index,/el\('privatePrompt'\)\.value=value/);
  assert.match(status,/transcript\.append\(block\)/);
  assert.match(status,/details\.open=true/);
