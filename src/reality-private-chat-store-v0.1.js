@@ -133,14 +133,15 @@ export async function readPrivateChatRequest(session,{conversationId,requestId},
  if(!validUuid(session?.user_id)||!validUuid(conversationId)||
     !validUuid(requestId)||!session?.access_token||!session?.config)
   throw Object.assign(Error('CHAT_REQUEST_READBACK_IDENTITY_INVALID'),{status:400});
- const q='?select=id,role,content,created_at,request_id'+
+ const q='?select=id,user_id,conversation_id,role,content,created_at,request_id'+
   '&user_id=eq.'+encodeURIComponent(session.user_id)+
   '&conversation_id=eq.'+encodeURIComponent(conversationId)+
   '&request_id=eq.'+encodeURIComponent(requestId)+
   '&order=created_at.asc,id.asc&limit=3';
  const rows=await storageRequest(session,q,{fetchImpl});
  if(rows.length>2||rows.some(row=>
-   !validUuid(row.id)||row.request_id!==requestId||
+   !validUuid(row.id)||row.user_id!==session.user_id||
+   row.conversation_id!==conversationId||row.request_id!==requestId||
    !['user','assistant'].includes(row.role)||
    typeof row.content!=='string')||
    rows.filter(r=>r.role==='user').length>1||
