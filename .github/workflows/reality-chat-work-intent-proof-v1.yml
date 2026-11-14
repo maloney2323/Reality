@@ -15,6 +15,9 @@ on:
       - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'test/reality-continuity-universe-projection-v1.test.js'
       - 'test/reality-chat-optional-evidence-v1.test.js'
+      - 'reality-chat-recover-unanswered-v1.js'
+      - 'test/reality-chat-recover-unanswered-v1.test.js'
+      - 'index.html'
       - '.github/workflows/reality-chat-work-intent-proof-v1.yml'
   workflow_dispatch:
 permissions:
@@ -36,6 +39,7 @@ jobs:
           node --test test/reality-owner-original-work-chat-readback-v1.test.js
           node --test test/reality-personal-chat-durable-intake-v1.test.js
           node --test test/reality-chat-optional-evidence-v1.test.js
+          node --test test/reality-chat-recover-unanswered-v1.test.js
           node --test test/reality-continuity-universe-projection-v1.test.js
       - name: Check authenticated Chat route syntax
         run: node --check api/reality/personal-chat-work.js
