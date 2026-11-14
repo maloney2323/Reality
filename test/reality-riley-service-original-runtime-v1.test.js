@@ -269,3 +269,14 @@ test('actual worker recovery lane requires a verified persisted shift pulse',asy
 
 // The existing frozen owner-original proof must also exercise the CI broker.
 import './reality-corrective-pr-ci-reconciliation-v1.test.js';
+
+test('worker failure persistence reports only safe stage and never provider text',()=>{
+ const api=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',
+  import.meta.url),'utf8');
+ assert.match(api,/workerStage='SHIFT_WAKE_RECEIPT'/);
+ assert.match(api,/workerStage='GOVERNED_EXECUTION_TICK'/);
+ assert.match(api,/workerStage='CORRECTIVE_CI_RECEIPT_RECONCILIATION'/);
+ assert.match(api,/p_safe_result:'WORKER_'\+safeStage\+'_UNVERIFIED'/);
+ assert.match(api,/console\.warn\('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage\)/);
+ assert.doesNotMatch(api,/console\.warn\('REALITY_SHIFT_WORKER_FAILED_STAGE',error\)/);
+});
