@@ -92,12 +92,20 @@ export default async function handler(req,res){
   if(goalCommand&&text.length>700)
    fail('CHAT_GOAL_COMMAND_TEXT_TOO_LONG',400);
   const existing=history.messages.filter(m=>m.request_id===requestId);
+  const previouslySavedUser=existing.find(x=>x.role==='user'&&x.text===text);
+  if(existing.length&&(!previouslySavedUser||
+     existing.some(x=>x.role==='user'&&x.text!==text)))
+   fail('CHAT_REQUEST_ID_CONTENT_MISMATCH',409);
   if(existing.length){
    const prior=existing.find(x=>x.role==='assistant');
    if(prior)return res.status(200).json({ok:true,conversation_id:conversationId,
-     answer:prior.text,replayed:true,continuity:{coverage:history.history_status,
-      recovered_messages:history.messages.length,older_messages_may_be_missing:history.older_missing}});
-   fail('CHAT_REQUEST_ALREADY_IN_HISTORY',409);
+     answer:prior.text,replayed:true,continuity:{
+      history_source:'AUTHENTICATED_SUPABASE_RLS',
+      current_answer_persisted:true,coverage:history.history_status,
+      recovered_messages:history.messages.length,older_messages_may_be_missing:history.older_missing},
+     execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
+   // A user turn durably saved by the fast intake can continue through
+   // governed cognition with the SAME request ID, without another insert.
   }
   // Inspect the actual immutable scoped ledger before saving another user
   // message. Only a fully hash-verified non-consequential terminal fork may
@@ -113,9 +121,11 @@ export default async function handler(req,res){
   if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
   // continuity success when source persistence fails.
-  const recordedUser=await recordPrivateMessage(session,{
-   conversationId,requestId,role:'user',text,
-  });
+  const recordedUser=previouslySavedUser?
+   {source_ref:previouslySavedUser.source_ref}:
+   await recordPrivateMessage(session,{
+    conversationId,requestId,role:'user',text,
+   });
   // The signed human message entered the governed durable work inbox via
   // AFTER INSERT, independently of Chat cognition or assistant publication.
   const chatWorkReadback=await readOwnerChatWorkHandoff({
