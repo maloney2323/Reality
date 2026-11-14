@@ -62,6 +62,8 @@ import {draftCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-model-draft-v1.js';
 import {reviseCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-corrective-model-v1.js';
+import {reconcileCurrentShiftRejectedNativeModelCandidate}
+ from '../../src/reality-riley-current-shift-failed-candidate-reconciliation-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -696,6 +698,33 @@ export default async function handler(req,res){
    independent_tests_passed:false,installation_authorized:false,
    original_job_completed:false,production_changed:false
   };
+  // Reconcile the isolated, independently failed candidate of THIS owner
+  // original before the existing one-shot corrective OpenAI model lease.
+  let rileyCandidateFrozenFailure={
+   status:'NO_CURRENT_FROZEN_CANDIDATE_FAILURE_TO_RECONCILE',
+   independent_failure_recorded:false,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(unifiedGraph.engineering_ready===true){
+   try{
+    rileyCandidateFrozenFailure=
+     await reconcileCurrentShiftRejectedNativeModelCandidate({
+      db,env:process.env,fetchImpl:fetch,
+      token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+       process.env.GITHUB_TOKEN||null
+     });
+   }catch(e){
+    const code=String(e?.message||'');
+    rileyCandidateFrozenFailure={
+     status:/^RILEY_SHIFT_FROZEN_CANDIDATE_[A-Z0-9_]{4,120}$/
+      .test(code)?code:'RILEY_SHIFT_FROZEN_CANDIDATE_PROVIDER_PROOF_UNVERIFIED',
+     independent_failure_recorded:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
   // Independent frozen CI failure on this EXACT original may trigger ONE
   // tightly scoped corrective OpenAI draft. No new job, repeat uncertain
   // provider call, GitHub write, install or false settled receipt.
@@ -879,6 +908,7 @@ export default async function handler(req,res){
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
     riley_model_draft:rileyModelDraft,
+    riley_failed_candidate_frozen_reconciliation:rileyCandidateFrozenFailure,
     riley_corrected_model_draft:rileyCorrectedDraft,
     riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
