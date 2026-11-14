@@ -258,16 +258,7 @@ begin
  if current_user<>'service_role' then
   raise exception 'CHAT_WORK_FAILURE_SERVICE_ROLE_ONLY';end if;
  if p_message_id is null or p_claim_id is null
-  or p_failure_code is null or p_failure_code !~ '^[A-Z][A-Z0-9_]{3,100}
-revoke all on function public.reality_record_chat_work_diagnosis_v1(
- uuid,uuid,uuid,text,text,text,jsonb,text) from public,anon,authenticated;
-revoke all on function public.reality_read_chat_work_for_owner_v1(uuid,uuid)
- from public,anon,authenticated;
-grant execute on function public.reality_claim_chat_work_for_shift_v1() to service_role;
-grant execute on function public.reality_record_chat_work_diagnosis_v1(
- uuid,uuid,uuid,text,text,text,jsonb,text) to service_role;
-grant execute on function public.reality_read_chat_work_for_owner_v1(uuid,uuid) to service_role;
-
+  or p_failure_code is null or p_failure_code !~ '^[A-Z][A-Z0-9_]{3,100}$'
  then raise exception 'CHAT_WORK_FAILURE_CODE_INVALID';end if;
  select * into i from reality_internal.chat_work_handoffs_v1
  where message_id=p_message_id for update;
@@ -319,15 +310,14 @@ revoke all on function public.reality_record_chat_work_diagnosis_v1(
  uuid,uuid,uuid,text,text,text,jsonb,text) from public,anon,authenticated;
 revoke all on function public.reality_read_chat_work_for_owner_v1(uuid,uuid)
  from public,anon,authenticated;
-grant execute on function public.reality_claim_chat_work_for_shift_v1() to service_role;
-grant execute on function public.reality_record_chat_work_diagnosis_v1(
- uuid,uuid,uuid,text,text,text,jsonb,text) to service_role;
-grant execute on function public.reality_read_chat_work_for_owner_v1(uuid,uuid) to service_role;
-
 revoke all on function public.reality_fail_chat_work_claim_v1(
  uuid,uuid,text) from public,anon,authenticated;
 revoke all on function public.reality_reconcile_expired_chat_work_v1()
  from public,anon,authenticated;
+grant execute on function public.reality_claim_chat_work_for_shift_v1() to service_role;
+grant execute on function public.reality_record_chat_work_diagnosis_v1(
+ uuid,uuid,uuid,text,text,text,jsonb,text) to service_role;
+grant execute on function public.reality_read_chat_work_for_owner_v1(uuid,uuid) to service_role;
 grant execute on function public.reality_fail_chat_work_claim_v1(
  uuid,uuid,text) to service_role;
 grant execute on function public.reality_reconcile_expired_chat_work_v1()
