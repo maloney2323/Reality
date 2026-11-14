@@ -68,6 +68,8 @@ import {investigateAuthenticatedChatUnderExistingShift}
  from '../../src/reality-signed-chat-to-work-v1.js';
 import {continueRileyCorrectiveModelIntoIndependentCI}
  from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
+import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
+ from '../../src/reality-bounded-corrective-proof-tick-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -100,16 +102,6 @@ export default async function handler(req,res){
    status:'NATIVE263_POSTINSTALL_EVIDENCE_UNAVAILABLE',
    original_job_completed:false,production_changed:false
   };
-  try{
-   nativePostinstallOriginalProof=
-    await verifyNative263ApprovedInstallToOriginalReceipt({
-     db,env:process.env,fetchImpl:fetch});
-  }catch{
-   nativePostinstallOriginalProof={
-    status:'NATIVE263_POSTINSTALL_PROVIDER_OR_OWNER_SCOPE_UNVERIFIED',
-    original_job_completed:false,production_changed:false
-   };
-  }
   // The ACTUAL server wake is durably timestamped, separate from the
   // signed-in owner authorization and from any original-job claim.
   // No HTTP user-supplied owner or shift ID is ever accepted.
@@ -122,6 +114,54 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // Every bounded service-recognized pulse takes one independent recovery
+  // lane through the *existing* corrective broker. Other pulses still perform
+  // the entire shift flow. This avoids a 300s all-in-one worker timeout
+  // preventing the CI outcome from ever reaching the durable pulse ledger.
+  // A returned WAKE_COMPLETED proves the bounded check finished, not that
+  // any original job completed or installation was authorized.
+  if(isBoundedCorrectiveProofWake(wakeReceipt)){
+   const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   }));
+   const classification=classifyCorrectiveProofTick(corrective);
+   const pulse=await shiftRpc(db,
+    'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_status:classification.worker_status,
+     p_safe_result:classification.worker_result,
+    });
+   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      pulse.shift_id!==wakeReceipt.shift_id||
+      pulse.installation_authorized!==false||
+      pulse.production_changed!==false)
+    throw Error('BOUNDED_CORRECTIVE_WORKER_PULSE_READBACK_UNVERIFIED');
+   return res.status(classification.http_status).json({
+    status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
+    original_job_completed:false,
+    independent_ci_proof_verified:classification.proof_verified,
+    bounded_worker_wake_receipt:wakeReceipt,
+    bounded_worker_completion_receipt:pulse,
+    corrective_ci_result:corrective,
+    new_shift_started:false,installation_authorized:false,
+    production_changed:false
+   });
+  }
+  // Continue normal/full shift work on the other durable wake receipts.
+  try{
+   nativePostinstallOriginalProof=
+    await verifyNative263ApprovedInstallToOriginalReceipt({
+     db,env:process.env,fetchImpl:fetch});
+  }catch{
+   nativePostinstallOriginalProof={
+    status:'NATIVE263_POSTINSTALL_PROVIDER_OR_OWNER_SCOPE_UNVERIFIED',
+    original_job_completed:false,production_changed:false
+   };
+  }
   // Existing owner-authorized wake now consumes saved Chat instructions.
   // No Chat turn changes the frozen source scope, start approval, or install.
   const chatClaimReconciliation=await shiftRpc(db,
