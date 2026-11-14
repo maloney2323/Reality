@@ -35,7 +35,7 @@ export function summarizeSavedChatReplyReadback(messages,{limit=16}={}){
    'NO_UNANSWERED_REQUESTS_IN_LOADED_HISTORY',
   source:'AUTHENTICATED_OWNER_SCOPED_RLS_HISTORY',
   scope:'ONLY_MESSAGES_RETURNED_IN_LOADED_HISTORY',
-  chat_endpoint_mode:'CONVERSATIONAL_ONLY_NO_DEVELOPMENT_JOB_DISPATCH',
+  chat_endpoint_mode:'AUTHENTICATED_CHAT_PERSISTS_TO_GOVERNED_WORK_INTAKE',
   unanswered_requests:pending,
   independently_verified_model_answer_for_pending:false,
   no_new_job_started_by_this_readback:true
