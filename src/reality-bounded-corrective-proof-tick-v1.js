@@ -1,14 +1,19 @@
-// Small, owner-shift-bound corrective proof lane. Shift receipt decides which
-// periodic wake uses this bounded lane; no job ID, owner or issue is hardcoded.
-// Caller must authenticate worker and obtain current signed shift pulse first.
+// A bounded corrective lane is selected by current independently sourced
+// work readiness, NOT a wake-count modulus or a hardcoded historical job.
+// Only the service-authenticated pulse and the current owner-warranted
+// corrective-ci selector can enable it. No new authorization is implied.
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
-export const CORRECTIVE_PROOF_WAKE_DIVISOR=8;
-export function isBoundedCorrectiveProofWake(wake){
+export function isBoundedCorrectiveProofWake(wake,scope){
  return wake?.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
   UUID.test(wake.shift_id||'')&&
-  Number.isSafeInteger(wake.wake_count)&&wake.wake_count>0&&
-  wake.wake_count%CORRECTIVE_PROOF_WAKE_DIVISOR===0&&
-  wake.installation_authorized===false&&wake.production_changed===false;
+  wake.installation_authorized===false&&
+  wake.production_changed===false&&
+  scope?.status==='EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'&&
+  scope.shift_id===wake.shift_id&&
+  /^work:[a-f0-9]{32}$/.test(scope.original_work_id||'')&&
+  scope.original_job_completed===false&&
+  scope.installation_authorized===false&&
+  scope.production_changed===false;
 }
 export function classifyCorrectiveProofTick(result){
  const status=String(result?.status||'');
