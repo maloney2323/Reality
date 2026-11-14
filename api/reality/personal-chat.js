@@ -21,7 +21,8 @@ import {readVerifiedIndependentWorkerForChat}
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
 import {readOwnerOriginalWorkForChat,originalWorkObservation,
- readOwnerWeeklyCandidateQueueForChat,weeklyQueueObservation}
+ readOwnerWeeklyCandidateQueueForChat,weeklyQueueObservation,
+ scopeOwnerOriginalWorkToShift}
  from '../../src/reality-owner-original-work-chat-readback-v1.js';
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
@@ -150,15 +151,37 @@ export default async function handler(req,res){
   // The signed human message entered the governed durable work inbox via
   // AFTER INSERT, independently of Chat cognition or assistant publication.
   stage='SIGNED_CHAT_WORK_READBACK';
-  const chatWorkContext=await collectOptionalChatEvidence([
+  // Start all optional context reads together. Independent sources share one
+  // short wall-clock budget instead of serially delaying the model 3 times.
+  // The goal/authority CAS and mandatory final publication are separate.
+  const optionalContextPromise=collectOptionalChatEvidence([
    {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({
-      session,conversationId}),
-    validate:v=>v!==null&&typeof v==='object',fallback:null}
-  ],{timeoutMs:2000});
-  const chatWorkReadback=chatWorkContext.values.work_handoff;
-  const signedIntake=chatWorkReadback?.items?.find(x=>
-   x.request_id===requestId&&x.source_ref===recordedUser.source_ref)||
-   null;
+      session,conversationId}),validate:v=>v!==null&&typeof v==='object',
+      fallback:null},
+   {id:'market',read:()=>readVerifiedMarketStageForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'upgrade',read:()=>readVerifiedResearchUpgradeForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'employee_shift',read:()=>readVerifiedEmployeeShiftForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'worker_wake',read:()=>readVerifiedIndependentWorkerForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'workforce',read:()=>readVerifiedRealityCompanyWorkforceForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'riley_sources',read:()=>readVerifiedRileySourceWorkForChat({
+      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'native263',read:()=>readVerifiedNative263TemporalForChat({
+      session,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'settlements',read:()=>readVerifiedOwnerCompletedWorkForChat({
+      session,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'originals',read:()=>readOwnerOriginalWorkForChat({session}),
+      validate:v=>v?.status==='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
+      fallback:null},
+   {id:'weekly_queue',read:()=>readOwnerWeeklyCandidateQueueForChat({session}),
+      validate:v=>typeof v?.status==='string'&&
+       (v.status.startsWith('CHAT_WEEKLY_QUEUE_')||
+        v.status==='CHAT_WEEKLY_SOURCE_CANDIDATES_VERIFIED'),fallback:null},
+  ],{timeoutMs:2500});
   // RLS readback is the authentication evidence for a USER goal directive.
   // A supplied model answer, client source_ref or username is never accepted.
   let verifiedUserGoalCommand=null;
@@ -200,22 +223,22 @@ export default async function handler(req,res){
   }
   // Context comes only from trusted owner-scoped database stage receipts.
   stage='OWNER_EVIDENCE_COLLECTION';
-  const evidence=await collectOptionalChatEvidence([
-   {id:'market',read:()=>readVerifiedMarketStageForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'upgrade',read:()=>readVerifiedResearchUpgradeForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'employee_shift',read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'worker_wake',read:()=>readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'workforce',read:()=>readVerifiedRealityCompanyWorkforceForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'riley_sources',read:()=>readVerifiedRileySourceWorkForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'native263',read:()=>readVerifiedNative263TemporalForChat({session,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'settlements',read:()=>readVerifiedOwnerCompletedWorkForChat({session,db:isolated}),validate:Array.isArray,fallback:[]}
-  ],{timeoutMs:2500});
+  const optionalContext=await optionalContextPromise;
   const {
+   work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
    workforce:companyWorkforceObservations,riley_sources:rileySourceWorkObservations,
    native263:native263TemporalObservations,settlements:ownerCompletedWorkObservations
-  }=evidence.values;
+  }=optionalContext.values;
+  const signedIntake=chatWorkReadback?.items?.find(x=>
+   x.request_id===requestId&&x.source_ref===recordedUser.source_ref)||null;
+  const evidence=optionalContext;
+  const chatWorkContext={
+   status:chatWorkReadback?'SIGNED_CHAT_WORK_READBACK_VERIFIED':'SIGNED_CHAT_WORK_READBACK_UNAVAILABLE',
+   all_sources_verified:chatWorkReadback!==null,
+   unavailable:chatWorkReadback?[]:['work_handoff']
+  };
   // The same signed-in owner already has a durable shift authorization when
   // the verified owner-bound shift readback reports RUNNING/QUEUED. A chat
   // model must NEVER turn a missing original-repair admission into a demand
@@ -230,18 +253,14 @@ export default async function handler(req,res){
    x.active_owner_shift_id===x.source_ref.slice('reality:employee-shift:'.length));
   const verifiedOwnerShift=ownerShiftFacts.length===1?ownerShiftFacts[0]:null;
   stage='OWNER_ORIGINAL_WORK_READBACK';
-  const ownerContext=await collectOptionalChatEvidence([
-   {id:'originals',read:()=>readOwnerOriginalWorkForChat({
-     session,currentShiftId:verifiedOwnerShift?.active_owner_shift_id||null}),
-    validate:v=>v?.status==='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
-    fallback:null},
-   {id:'weekly_queue',read:()=>readOwnerWeeklyCandidateQueueForChat({session}),
-    validate:v=>typeof v?.status==='string'&&
-     (v.status.startsWith('CHAT_WEEKLY_QUEUE_')||
-      v.status==='CHAT_WEEKLY_SOURCE_CANDIDATES_VERIFIED'),fallback:null}
-  ],{timeoutMs:2500});
-  const ownerOriginalWork=ownerContext.values.originals;
-  const ownerWeeklyQueue=ownerContext.values.weekly_queue;
+  const ownerOriginalWork=scopeOwnerOriginalWorkToShift(
+   optionalContext.values.originals,verifiedOwnerShift?.active_owner_shift_id||null);
+  const ownerWeeklyQueue=optionalContext.values.weekly_queue;
+  const ownerContext={
+   status:optionalContext.status,
+   unavailable:optionalContext.unavailable.filter(x=>
+    x==='originals'||x==='weekly_queue')
+  };
   stage='COGNITION_AND_RELIABILITY';
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
