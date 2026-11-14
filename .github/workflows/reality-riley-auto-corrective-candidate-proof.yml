@@ -13,6 +13,7 @@ on:
       - 'reality/**'
     paths:
       - 'src/reality-riley-service-original-runtime-v1.js'
+      - '.github/workflows/reality-riley-auto-corrective-candidate-proof.yml'
 permissions:
   contents: read
 jobs:
