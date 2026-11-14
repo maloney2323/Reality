@@ -280,6 +280,9 @@ export default async function handler(req,res){
    systemContext:{conversation_id:conversationId,
     worldline_id:scopedRoot,world_id:scopedRoot,
     continuity_root_id:scopedRoot,
+    // Signed-in owner Chat consumes the verified canonical Spine, not the
+    // stale, independently stored legacy Universe entry collection.
+    canonical_continuity_is_universe_source:true,
     fork_recovery_audit:continuity.fork_recovery,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
