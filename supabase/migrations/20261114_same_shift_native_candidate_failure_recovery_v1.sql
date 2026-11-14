@@ -133,26 +133,16 @@ begin
   original_work_id,shift_id,owner_id,model_response_id,proposal_sha256,
   tested_commit_sha,independent_run_id,independent_run_url,conclusion,
   failed_test_count,failure_class,installation_authorized,
-  original_job_completed,production_changed)
+  original_job_completed,production_changed,
+  independent_frozen_test_sha256,independent_frozen_test_path)
  values(d.original_work_id,d.shift_id,d.owner_id,d.model_response_id,
   d.proposed_sha256,p_tested_commit_sha,p_independent_run_id,
   'https://github.com/maloney2323/Reality/actions/runs/'||p_independent_run_id,
   'failure',p_failed_test_count,'ORIGINAL_JOB_CONTINUITY_REGRESSION',
-  false,false,false)
+  false,false,false,p_frozen_test_sha256,v_path)
  on conflict(original_work_id) do nothing;
  select * into f from reality_internal.riley_native_frozen_test_findings_v1
- where original_work_id=d.original_work_id for update;
- if f.independent_frozen_test_sha256 is null and
-  f.independent_frozen_test_path is null then
-  update reality_internal.riley_native_frozen_test_findings_v1
-   set independent_frozen_test_sha256=p_frozen_test_sha256,
-       independent_frozen_test_path=v_path
-  where original_work_id=d.original_work_id
-   and independent_frozen_test_sha256 is null
-   and independent_frozen_test_path is null;
-  select * into f from reality_internal.riley_native_frozen_test_findings_v1
-  where original_work_id=d.original_work_id for update;
- end if;
+ where original_work_id=d.original_work_id;
  if f.independent_frozen_test_sha256<>p_frozen_test_sha256
   or f.independent_frozen_test_path<>v_path then
   raise exception 'SIGNED_NATIVE_FAILURE_TEST_FINGERPRINT_MISMATCH';end if;
