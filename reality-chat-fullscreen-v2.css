@@ -420,6 +420,13 @@ body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-expo
   #privateTranscript .bubble{
   touch-action:pan-y;overflow-wrap:anywhere;
  }
+ /* A second scrolling box inside the progress card intercepted upward
+    swipes on Android. Keep the entire expanded stage inside ONE thread. */
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateTranscript #realityChatRequestStatus .reality-live-reply-steps{
+  max-height:none!important;overflow:visible!important;
+  touch-action:pan-y!important;
+ }
  body[data-reality-route="chat"].reality-chat-signed-in
   #realityChatComposer{
   flex:0 0 auto!important;min-height:0!important;
