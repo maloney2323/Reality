@@ -116,7 +116,7 @@ test('GitHub source evidence does not invent customer sales or automated competi
 test('company workforce questions use a dedicated non-shift read-only Chat path',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  const context=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
- assert.match(api,/readVerifiedRealityCompanyWorkforceForChat\(\{session,message:text,db:isolated\}\)/);
+ assert.match(api,/readVerifiedRealityCompanyWorkforceForChat\(\{\s*session,message:text,db:isolated\s*\}\)/);
  assert.match(api,/\.\.\.workerWakeObservations,\.\.\.companyWorkforceObservations/);
  assert.match(context,/export async function readVerifiedRealityCompanyWorkforceForChat/);
  assert.match(context,/const company=assessRealityCompanyWorkforce\(workday\)/);
