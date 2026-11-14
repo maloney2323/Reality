@@ -1,0 +1,25 @@
+name: Reality Riley 185 independently tested isolated candidate
+on:
+  push:
+    branches: [reality/riley/candidate-185-45206a326d]
+    paths:
+      - src/reality-riley-service-original-runtime-v1.js
+      - test/reality-riley-service-original-runtime-v1.test.js
+      - .github/workflows/reality-riley-185-isolated-candidate-proof.yml
+permissions:
+  contents: read
+jobs:
+  independently-replay-repair-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Independently verify model-written candidate syntax
+        run: node --check src/reality-riley-service-original-runtime-v1.js
+      - name: Test real same-original handoff and falsifiable capability flags
+        run: node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js
+      - name: No installation or customer-job settlement
+        run: echo 'Candidate source-only tests. No owner install approval; no deployment or production effect.'
