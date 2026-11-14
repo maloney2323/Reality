@@ -202,3 +202,28 @@ test('bounded failure recovery preserves prior evidence and same-shift warrant; 
  assert.doesNotMatch(sql,/insert into reality_internal\.genuine_capability_queue_v1/);
  assert.doesNotMatch(sql,/create trigger/);
 });
+
+
+test('saved Chat status projects real source-linked draft, failed independent CI, correction and retest stage without creating authority',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261114_owner_chat_original_repair_evidence_timeline_v1.sql',
+  import.meta.url),'utf8');
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(sql,/i.status='INVESTIGATED_SCOPED'/);
+ assert.match(sql,/j.owner_id=i.owner_id/);
+ assert.match(sql,/j.shift_id=i.shift_id/);
+ assert.match(sql,/j.issue_url=selected.source_ref/);
+ assert.match(sql,/riley_native_model_drafts_v1/);
+ assert.match(sql,/riley_native_frozen_test_findings_v1/);
+ assert.match(sql,/riley_native_model_revisions_v1/);
+ assert.match(sql,/riley_native_model_revision_frozen_results_v1/);
+ assert.match(sql,/CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI/);
+ assert.match(sql,/CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE/);
+ assert.match(sql,/independent_repair_or_settlement_proven_by_chat',false/);
+ assert.match(html,/const verifiedStages=new Set/);
+ assert.match(html,/handed\.work_chain/);
+ assert.match(html,/original\.current_evidence_stage/);
+ assert.match(html,/a\.rel='noopener noreferrer'/);
+ assert.doesNotMatch(sql,/insert into reality_internal\.riley_unattended_repair_originals_v1/);
+ assert.doesNotMatch(sql,/update reality_internal\.governed_employee_shifts_v1/);
+});
