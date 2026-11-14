@@ -96,8 +96,10 @@
   state.reading=true;
   try{
    const response=await fetch(
-    '/api/reality/personal-chat?conversation_id='+encodeURIComponent(state.conversationId),
-    {method:'GET',credentials:'same-origin',cache:'no-store'});
+    '/api/reality/personal-chat?conversation_id='+encodeURIComponent(state.conversationId)+
+    '&reply_readback=1&request_id='+encodeURIComponent(state.requestId),
+    {method:'GET',credentials:'same-origin',cache:'no-store',
+     signal:AbortSignal.timeout(8000)});
    if(!response.ok)return;
    const data=await response.json();
    if(current!==state||data?.ok!==true||
