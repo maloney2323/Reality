@@ -285,7 +285,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
    gatewayFrozenPassRuns.length>0;
  const matched=exactRuns.length===1?exactRuns[0]:
   gatewayFrozenPassRuns[0]||prFailureRuns[0];
- if(recovery&&exactRuns.length===0&&matched&&matched.conclusion!=='failure')
+ if(recovery&&exactRuns.length===0&&!isGatewayFrozen&&matched&&matched.conclusion!=='failure')
   refuse('RECOVERY_GATEWAY_FALLBACK_FAILURE_ONLY');
  if(!matched)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
    original_work_id:c.original_work_id,model_response_id:c.model_response_id,
