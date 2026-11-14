@@ -241,3 +241,28 @@ test('no capability-response string may override BLOCKED or VERIFIED execution',
   assert.equal(output.original_job_settled,false);
  }
 });
+
+test('actual worker recovery lane requires a verified persisted shift pulse',async()=>{
+ const {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick,
+  CORRECTIVE_PROOF_WAKE_DIVISOR}=await import(
+   '../src/reality-bounded-corrective-proof-tick-v1.js');
+ const pulse={status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',
+  shift_id:SHIFT,wake_count:CORRECTIVE_PROOF_WAKE_DIVISOR,
+  installation_authorized:false,production_changed:false};
+ assert.equal(isBoundedCorrectiveProofWake(pulse),true);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,wake_count:7}),false);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,installation_authorized:true}),false);
+ const pending=classifyCorrectiveProofTick({
+  status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
+  new_shift_started:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false
+ });
+ assert.equal(pending.worker_result,'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PENDING');
+ assert.equal(pending.proof_verified,false);
+ const unverified=classifyCorrectiveProofTick({
+  status:'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED',
+  new_shift_started:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false
+ });
+ assert.equal(unverified.worker_status,'WAKE_FAILED');
+});
