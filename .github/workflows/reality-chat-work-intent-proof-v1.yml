@@ -17,6 +17,9 @@ on:
       - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'reality-chat-recover-unanswered-v1.js'
       - 'test/reality-chat-recover-unanswered-v1.test.js'
+      - 'src/reality-private-chat-store-v0.1.js'
+      - 'reality-chat-request-status-v1.js'
+      - 'test/reality-chat-exact-reply-readback-v1.test.js'
       - 'index.html'
       - '.github/workflows/reality-chat-work-intent-proof-v1.yml'
   workflow_dispatch:
@@ -40,6 +43,7 @@ jobs:
           node --test test/reality-personal-chat-durable-intake-v1.test.js
           node --test test/reality-chat-optional-evidence-v1.test.js
           node --test test/reality-chat-recover-unanswered-v1.test.js
+          node --test test/reality-chat-exact-reply-readback-v1.test.js
           node --test test/reality-continuity-universe-projection-v1.test.js
       - name: Check authenticated Chat route syntax
         run: node --check api/reality/personal-chat-work.js
