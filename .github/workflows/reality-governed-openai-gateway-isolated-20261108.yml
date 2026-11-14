@@ -59,6 +59,11 @@ on:
       - test/reality-owner-approved-chat-assignments-v1.test.js
       - reality-chat-simple.html
       - api/reality/governed-employee-shift-worker.js
+      - src/reality-bounded-corrective-proof-tick-v1.js
+      - test/reality-bounded-corrective-proof-tick-v1.test.js
+      - src/reality-shift-worker-durable-completion-v1.js
+      - test/reality-shift-worker-durable-completion-v1.test.js
+      - supabase/migrations/20261114_general_shift_riley_revision_failure_readback_v1.sql
       - src/reality-mixed-shift-receipts-v1.js
       - src/reality-shift-conversation-brief-v1.js
       - api/reality/personal-governed-employee-shift.js

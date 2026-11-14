@@ -68,6 +68,10 @@ import {investigateAuthenticatedChatUnderExistingShift}
  from '../../src/reality-signed-chat-to-work-v1.js';
 import {continueRileyCorrectiveModelIntoIndependentCI}
  from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
+import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
+ from '../../src/reality-bounded-corrective-proof-tick-v1.js';
+import {isDurablyCompletedShiftWorkerPulse}
+ from '../../src/reality-shift-worker-durable-completion-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -90,6 +94,8 @@ export default async function handler(req,res){
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  let activePulseDb=null,activePulseShiftId=null;
+ let durableWorkerCompletion=null;
+ let workerStage='SHIFT_DB_BOUNDARY';
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
@@ -100,6 +106,67 @@ export default async function handler(req,res){
    status:'NATIVE263_POSTINSTALL_EVIDENCE_UNAVAILABLE',
    original_job_completed:false,production_changed:false
   };
+  // The ACTUAL server wake is durably timestamped, separate from the
+  // signed-in owner authorization and from any original-job claim.
+  // No HTTP user-supplied owner or shift ID is ever accepted.
+  workerStage='SHIFT_WAKE_RECEIPT';
+  const wakeReceipt=await shiftRpc(db,
+   'reality_record_current_shift_worker_pulse_v1',
+   {p_status:'WAKE_RECEIVED',p_safe_result:null});
+  if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
+    'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(wakeReceipt?.status)||
+     wakeReceipt.installation_authorized!==false)
+   throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
+   activePulseShiftId=wakeReceipt.shift_id;
+  // The existing service-only selector determines whether THIS owner
+  // shift has an eligible corrective revision. No historical job ID, employee
+  // name, arbitrary wake interval or caller-provided scope enters the gate.
+  // If this optional fast-lane readback is unavailable, the normal governed
+  // shift pipeline still runs; the corrective broker independently authorizes.
+  workerStage='CORRECTIVE_CI_WORK_READBACK';
+  const boundedCorrectiveScope=await shiftRpc(db,
+   'reality_read_next_riley_auto_corrective_ci_v1',{})
+   .catch(()=>null);
+  // A completed bounded check is not a completed customer job; every lane
+  // still records its own durable worker outcome before responding.
+  if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope)){
+   workerStage='CORRECTIVE_CI_BOUNDED';
+   const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   }));
+   const classification=classifyCorrectiveProofTick(corrective);
+   workerStage='CORRECTIVE_CI_RECEIPT';
+   const pulse=await shiftRpc(db,
+    'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_status:classification.worker_status,
+     p_safe_result:classification.worker_result,
+    });
+   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      pulse.shift_id!==wakeReceipt.shift_id||
+      pulse.installation_authorized!==false||
+      pulse.production_changed!==false)
+    throw Error('BOUNDED_CORRECTIVE_WORKER_PULSE_READBACK_UNVERIFIED');
+   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+    durableWorkerCompletion=pulse;
+   workerStage='BOUNDED_WORKER_RESPONSE_PUBLICATION';
+   return res.status(classification.http_status).json({
+    status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
+    original_job_completed:false,
+    independent_ci_proof_verified:classification.proof_verified,
+    bounded_worker_wake_receipt:wakeReceipt,
+    bounded_worker_completion_receipt:pulse,
+    corrective_ci_result:corrective,
+    new_shift_started:false,installation_authorized:false,
+    production_changed:false
+   });
+  }
+  // Continue normal/full shift work on the other durable wake receipts.
   try{
    nativePostinstallOriginalProof=
     await verifyNative263ApprovedInstallToOriginalReceipt({
@@ -110,20 +177,9 @@ export default async function handler(req,res){
     original_job_completed:false,production_changed:false
    };
   }
-  // The ACTUAL server wake is durably timestamped, separate from the
-  // signed-in owner authorization and from any original-job claim.
-  // No HTTP user-supplied owner or shift ID is ever accepted.
-  const wakeReceipt=await shiftRpc(db,
-   'reality_record_current_shift_worker_pulse_v1',
-   {p_status:'WAKE_RECEIVED',p_safe_result:null});
-  if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
-    'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(wakeReceipt?.status)||
-     wakeReceipt.installation_authorized!==false)
-   throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
-  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
-   activePulseShiftId=wakeReceipt.shift_id;
   // Existing owner-authorized wake now consumes saved Chat instructions.
   // No Chat turn changes the frozen source scope, start approval, or install.
+  workerStage='CHAT_LEASE_RECONCILIATION';
   const chatClaimReconciliation=await shiftRpc(db,
    'reality_reconcile_expired_chat_work_v1',{});
   if(chatClaimReconciliation?.status!=='STALE_CHAT_WORK_CLAIMS_RECONCILED'||
@@ -168,7 +224,8 @@ export default async function handler(req,res){
     // before and after each model request. Stale claims never receive advice.
     // This validates the shift stage, not yet full original-job Continuity.
     readCurrentShift:async requested=>{
-     const snapshot=assertShiftReadback(await shiftRpc(db,
+     workerStage='SHIFT_OWNER_READBACK';
+  const snapshot=assertShiftReadback(await shiftRpc(db,
       'reality_read_owner_employee_shifts_v1',
       {p_owner_id:requested.owner_id}));
      const matching=snapshot.shifts.filter(s=>
@@ -219,6 +276,7 @@ export default async function handler(req,res){
    }):null;
   // A completion-bound owner shift closes only when EVERY selected
   // original has its independently verified final receipt.
+  workerStage='SHIFT_COMPLETION_CHECK';
   const completionClose=await shiftRpc(db,
    'reality_close_employee_completion_shift_v1',{});
   if(!completionClose||![
@@ -237,8 +295,10 @@ export default async function handler(req,res){
        completionClose.authorized_source_job_count||
       completionClose.production_changed!==false)))
    throw Error('COMPLETION_BOUND_SHIFT_INDEPENDENT_RECEIPT_UNVERIFIED');
+  workerStage='OWNER_EXECUTION_GRAPH';
   const initialGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
    'reality_read_current_shift_execution_graph_v1',{}));
+  workerStage='GOVERNED_EXECUTION_TICK';
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
@@ -252,7 +312,8 @@ export default async function handler(req,res){
     installation_authorized:false,production_changed:false}
   };
   try{
-   const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+   workerStage='SOURCE_PROOF_GRAPH';
+  const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
     'reality_read_current_shift_execution_graph_v1',{}),{
      expectedShiftId:initialGraph.shift_id
    });
@@ -309,6 +370,7 @@ export default async function handler(req,res){
    };
   }
   // SAME frozen shift and source identities across all real employee roles.
+  workerStage='CURRENT_EXECUTION_GRAPH';
   const unifiedGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
    'reality_read_current_shift_execution_graph_v1',{}),{
     expectedShiftId:initialGraph.shift_id
@@ -323,7 +385,8 @@ export default async function handler(req,res){
   let automaticWorkSupervisorStatus='NO_CURRENT_OWNER_SHIFT_TO_TRIAGE';
   if(unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'){
    try{
-    const [shiftRead,prRead,repairRead]=await Promise.all([
+    workerStage='EMPLOYEE_SOURCE_READBACK';
+  const [shiftRead,prRead,repairRead]=await Promise.all([
      shiftRpc(db,'reality_read_owner_employee_shifts_v1',
       {p_owner_id:unifiedGraph.owner_id}),
      shiftRpc(db,'reality_read_owner_riley_pr_review_v1',
@@ -355,7 +418,8 @@ export default async function handler(req,res){
   if(automaticWorkSupervisor&&
      automaticWorkSupervisorStatus==='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY'){
    try{
-    const [weekly,capabilities]=await Promise.all([
+    workerStage='WEEKLY_WORK_QUALIFICATION';
+  const [weekly,capabilities]=await Promise.all([
      shiftRpc(db,'reality_read_owner_shift_weekly_backlog_v1',{
       p_owner_id:unifiedGraph.owner_id,p_shift_id:unifiedGraph.shift_id}),
      shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
@@ -854,6 +918,7 @@ export default async function handler(req,res){
     };
    }
   }
+  workerStage='CORRECTIVE_CI_RECEIPT_RECONCILIATION';
   const correctiveCiResult=await correctiveCiPromise;
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
@@ -927,11 +992,11 @@ export default async function handler(req,res){
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
      p_safe_result:safeOutcome
     });
-   if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
-     'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(completedPulse?.status)||
-     completedPulse.installation_authorized!==false)
+   if(!isDurablyCompletedShiftWorkerPulse(completedPulse,wakeReceipt.shift_id))
     throw Error('WORKER_COMPLETION_PULSE_UNVERIFIED');
+   durableWorkerCompletion=completedPulse;
   }
+  workerStage='WORKER_RESPONSE_PUBLICATION';
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
@@ -977,7 +1042,24 @@ export default async function handler(req,res){
     native_same_original_postinstall_receipt:nativePostinstallOriginalProof,
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
- }catch{
+ }catch(error){
+  // A durable worker-completed receipt cannot be overwritten merely because
+  // HTTP response serialization/delivery fails afterward. Preserve the
+  // independently stored checkpoint; the dispatcher can read it back.
+  if(durableWorkerCompletion){
+   console.warn('REALITY_SHIFT_WORKER_RESPONSE_FAILED_AFTER_DURABLE_COMPLETION');
+   if(res.headersSent)return;
+   return res.status(200).json({
+    status:'DURABLE_SHIFT_WAKE_COMPLETED_RESPONSE_FALLBACK',
+    actual_worker_completion_receipt:durableWorkerCompletion,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   });
+  }
+  // Persist stage only; never provider error text or credentials.
+  console.warn('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage);
+  const safeStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
+   workerStage:'UNCLASSIFIED_STAGE';
   // Best-effort independent failure timestamp; never claim a model/tool
   // succeeded, never take another job claim and never leak provider secrets.
   if(activePulseDb&&/^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
@@ -985,7 +1067,7 @@ export default async function handler(req,res){
     await shiftRpc(activePulseDb,
      'reality_record_employee_shift_worker_pulse_v1',{
       p_shift_id:activePulseShiftId,p_status:'WAKE_FAILED',
-      p_safe_result:'WORKER_PROVIDER_OR_DATABASE_UNVERIFIED'
+      p_safe_result:'WORKER_'+safeStage+'_UNVERIFIED'
      });
    }catch{/* Failed heartbeat is not a substitute for work evidence. */}
   }
