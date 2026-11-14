@@ -6,6 +6,8 @@ const PROJECT='hvkfreoagbrphwghjajw';
 const ROOT='https://api.github.com/repos/maloney2323/Reality';
 const WORKFLOW='.github/workflows/reality-riley-auto-corrective-candidate-proof.yml';
 const WORKFLOW_NAME='Reality independently tested auto-corrective candidate';
+const GATEWAY_WORKFLOW='.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml';
+const GATEWAY_NAME='Reality — Isolated governed OpenAI gateway proof';
 const TARGET='src/reality-riley-service-original-runtime-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -196,6 +198,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
    r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
  if(exactRuns.length>1)refuse('AMBIGUOUS_INDEPENDENT_CI_RUN');
  let prFailureRuns=[];
+ let gatewayFrozenPassRuns=[];
  if(exactRuns.length===0){
   // GitHub's per-branch Actions listing can omit pull_request runs.
   // Verify the PR itself from the trusted repository, then independently
@@ -246,6 +249,14 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
     r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
    if(exactPullRuns.length>1)refuse('AMBIGUOUS_RECOVERY_EXACT_PR_CI');
    if(exactPullRuns.length===1)exactRuns=exactPullRuns;
+   // A green general gateway is NEVER proof. Only a separate, completed
+   // independent-corrective-frozen job from the exact owner/HEAD PR and a
+   // trusted source-bound workflow can make its success install-reviewable.
+   gatewayFrozenPassRuns=[...byId.values()].filter(r=>eligible(r)&&
+    r.name===GATEWAY_NAME&&r.event==='pull_request'&&
+    r.conclusion==='success'&&
+    typeof r.path==='string'&&r.path.split('@')[0]===GATEWAY_WORKFLOW&&
+    verifiedPRs[0].number>0);
    // Failure-only continuity evidence: a SHA-matched, exact owner PR,
    // verified repository workflow and failing original-job boundary-test step
    // can REJECT the same candidate even if GitHub did not run the candidate
@@ -269,7 +280,11 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
  // Restrict fallback to the latest verified completed run of that exact
  // original SHA; failed reruns never alter the staged source digest.
  prFailureRuns.sort((a,b)=>b.id-a.id);
- const matched=exactRuns.length===1?exactRuns[0]:prFailureRuns[0];
+ gatewayFrozenPassRuns.sort((a,b)=>b.id-a.id);
+ const isGatewayFrozen=exactRuns.length===0&&
+   gatewayFrozenPassRuns.length>0;
+ const matched=exactRuns.length===1?exactRuns[0]:
+  gatewayFrozenPassRuns[0]||prFailureRuns[0];
  if(recovery&&exactRuns.length===0&&matched&&matched.conclusion!=='failure')
   refuse('RECOVERY_GATEWAY_FALLBACK_FAILURE_ONLY');
  if(!matched)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
@@ -286,17 +301,39 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
  if(!Array.isArray(jobs.jobs))refuse('FROZEN_CI_JOB_READBACK_UNVERIFIED');
  const isOriginalFrozen=exactRuns.length===1;
  const relevant=jobs.jobs.filter(j=>j.run_id===run.id&&
-   j.name===(isOriginalFrozen?'independent-corrective-frozen':'boundary-tests')&&
+   j.name===(isOriginalFrozen||isGatewayFrozen?
+    'independent-corrective-frozen':'boundary-tests')&&
    j.status==='completed'&&j.conclusion===run.conclusion&&
    Number.isSafeInteger(j.id)&&Array.isArray(j.steps));
+ if(isGatewayFrozen&&relevant.length===0)
+  return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_EXACT_FROZEN_CI',200,{
+   original_work_id:c.original_work_id,model_response_id:c.model_response_id,
+   candidate_branch:branch,candidate_commit_sha:head,
+   independent_ci_verified:false});
  if(relevant.length!==1)refuse('INDEPENDENT_FROZEN_JOB_VERDICT_REQUIRED');
  const steps=relevant[0].steps;
- if(isOriginalFrozen){
+ if(isOriginalFrozen||isGatewayFrozen){
   if(!steps.some(s=>s.name==='Exact candidate source syntax'&&
    s.conclusion==='success')||
    !steps.some(s=>s.name==='Independent original-job continuity and governed handoff acceptance'&&
     (run.conclusion==='success'?s.conclusion==='success':s.conclusion==='failure')))
     refuse('FROZEN_SOURCE_AND_ORIGINAL_ACCEPTANCE_NOT_VERIFIED');
+  if(isGatewayFrozen){
+   // Re-read exact deployed/trusted workflow and its immutable checkout
+   // contract. This is independent of a general green workflow summary.
+   const trusted=await source(token,GATEWAY_WORKFLOW,baseSha);
+   if(!trusted.text.includes("independent-corrective-frozen:")||
+      !trusted.text.includes("startsWith(github.head_ref, 'reality/riley/auto-corrective-')")||
+      !trusted.text.includes('ref: '+"\u0024{{ github.event.pull_request.head.sha }}")||
+      !trusted.text.includes('persist-credentials: false')||
+      !trusted.text.includes('test/reality-riley-service-original-runtime-v1.test.js')||
+      !trusted.text.includes('test/reality-riley-trusted-original-driver-bridge-v1.test.js')||
+      !trusted.text.includes('test/reality-riley-governed-original-job-v1.test.js')||
+      !trusted.text.includes('Independent original-job continuity and governed handoff acceptance')||
+      !steps.some(s=>s.name==='Confirm no installation authority in candidate CI'&&s.conclusion==='success')||
+      run.event!=='pull_request'||run.path.split('@')[0]!==GATEWAY_WORKFLOW)
+    refuse('TRUSTED_EXACT_CANDIDATE_FROZEN_GATEWAY_REQUIRED');
+  }
  }else{
   // Fallback is ONLY a verified failed run. Establish that the frozen
   // original-continuation assertions themselves failed, not a lint step or
