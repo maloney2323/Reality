@@ -6817,6 +6817,7 @@ setInterval(refreshSavedShiftHome,300000);
       'MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
       'INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED',
       'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+      'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
       'CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE',
       'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
       'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT'
@@ -6830,6 +6831,8 @@ setInterval(refreshSavedShiftHome,300000);
         'First patch rejected by independent frozen tests',
       CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI:
         'First patch failed independent tests · corrective patch drafted · independent retest not yet verified',
+      CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING:
+        'Reality staged the corrective patch in its isolated GitHub branch · independent CI verdict pending',
       CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE:
         'Corrective patch rejected by independent tests · original job still open',
       CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE:
@@ -6851,6 +6854,14 @@ setInterval(refreshSavedShiftHome,300000);
       stage.textContent='Original work '+original.original_work_id+
         ' · '+stageLabels[original.current_evidence_stage];
       card.append(stage);
+      if(original.current_evidence_stage==='CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING'&&
+         /^reality\/riley\/auto-corrective-[a-f0-9]{32}$/.test(original.corrective_candidate_branch||'')){
+        const candidateLink=document.createElement('a');
+        candidateLink.href='https://github.com/maloney2323/Reality/tree/'+original.corrective_candidate_branch;
+        candidateLink.target='_blank';candidateLink.rel='noopener noreferrer';
+        candidateLink.textContent='View isolated candidate on GitHub';
+        card.append(candidateLink);
+      }
       const run=original.corrective_ci_url||original.initial_frozen_ci_url;
       if(typeof run==='string'&&
          /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/[1-9]\d*$/.test(run)){
