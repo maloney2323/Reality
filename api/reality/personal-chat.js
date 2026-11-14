@@ -262,7 +262,9 @@ export default async function handler(req,res){
     ],
     action_authorized:false,execution_authorized:false,
    },
-   verifiedConversationTurns:history.messages,
+   // The current user turn was saved by intake; pass only PRIOR turns as
+   // conversation history so the model sees the current message exactly once.
+   verifiedConversationTurns:history.messages.filter(x=>x.request_id!==requestId),
   });
   // Preserve EXACT checked bytes, including any harmless trailing spaces.
   // Trimming after final-direction verification would change the answer
