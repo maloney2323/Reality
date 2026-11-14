@@ -6871,6 +6871,69 @@ setInterval(refreshSavedShiftHome,300000);
         card.append(a);
       }
     }
+    // Chat is an operational control surface, not only an advice screen.
+    // A signed user turn can inspect its eligible WORK executor and authorize
+    // it from this conversation. Unsupported jobs are NOT falsely started.
+    if(handed.status!=='CONVERSATION_ONLY'){
+     const controls=document.createElement('div');
+     controls.className='reality-chat-signed-work-actions';
+     const inspect=document.createElement('button');
+     inspect.type='button';
+     inspect.textContent='Check whether Reality can run this work';
+     const report=document.createElement('div');
+     report.setAttribute('role','status');
+     const postWork=async action=>{
+      const r=await fetch('/api/reality/personal-chat-work',{
+       method:'POST',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(65000),
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({action,conversation_id:conversationId(),
+        request_id:message.request_id})
+      });
+      const data=await r.json().catch(()=>null);
+      if(!r.ok||data?.ok!==true)throw Error(String(data?.error||'CHAT_WORK_READBACK_UNAVAILABLE'));
+      return data;
+     };
+     inspect.onclick=async()=>{
+      inspect.disabled=true;
+      report.textContent='Checking the existing job controller and original-work authorization…';
+      try{
+       const state=await postWork('INSPECT_VERIFIED_WORK');
+       if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+          /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
+        report.textContent='Verified unfinished original job '+state.original_work_id+
+         ' is eligible for an existing governed discovery worker. This is not installation approval.';
+        const authorize=document.createElement('button');
+        authorize.type='button';
+        authorize.textContent='Authorize this exact job from Chat';
+        authorize.onclick=async()=>{
+         authorize.disabled=true;
+         report.textContent='Submitting one owner-scoped work authorization…';
+         try{
+          const started=await postWork('AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY');
+          report.textContent=started.status==='CHAT_WORK_ORIGINAL_DISCOVERY_DISPATCHED'?
+           'Existing governed worker dispatch recorded for '+started.original_work_id+
+           '. Await independent execution and final receipts; no installation was approved.':
+           'Original job queued but dispatch is not yet verified. Reality must reconcile its worker before claiming execution.';
+         }catch(e){
+          report.textContent='No verified job dispatch: '+String(e.message||'UNKNOWN').slice(0,120);
+          authorize.disabled=false;
+         }
+        };
+        controls.append(authorize);
+       }else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
+        report.textContent='Original job '+state.original_work_id+
+         ' is already queued. Inspect its ongoing evidence; do not authorize it again.';
+       else
+        report.textContent='This saved request has no matching independently eligible executable adapter yet. The investigation and message remain preserved. No job was started.';
+      }catch(e){
+       report.textContent='Execution eligibility could not be verified: '+
+        String(e.message||'UNKNOWN').slice(0,130)+'. No job started.';
+       inspect.disabled=false;
+      }
+     };
+     controls.append(inspect,report);card.append(controls);
+    }
     thread.append(card);
    }
    const missing=message.role==='user'?unmatched.get(message.request_id):null;
