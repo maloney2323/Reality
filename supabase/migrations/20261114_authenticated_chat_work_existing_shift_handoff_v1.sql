@@ -250,6 +250,69 @@ begin
   'new_shift_started',false,'installation_authorized',false,
   'production_changed',false);
 end $fn$;
+create or replace function public.reality_fail_chat_work_claim_v1(
+ p_message_id uuid,p_claim_id uuid,p_failure_code text)
+returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare i record;
+begin
+ if current_user<>'service_role' then
+  raise exception 'CHAT_WORK_FAILURE_SERVICE_ROLE_ONLY';end if;
+ if p_message_id is null or p_claim_id is null
+  or p_failure_code is null or p_failure_code !~ '^[A-Z][A-Z0-9_]{3,100}
+revoke all on function public.reality_record_chat_work_diagnosis_v1(
+ uuid,uuid,uuid,text,text,text,jsonb,text) from public,anon,authenticated;
+revoke all on function public.reality_read_chat_work_for_owner_v1(uuid,uuid)
+ from public,anon,authenticated;
+grant execute on function public.reality_claim_chat_work_for_shift_v1() to service_role;
+grant execute on function public.reality_record_chat_work_diagnosis_v1(
+ uuid,uuid,uuid,text,text,text,jsonb,text) to service_role;
+grant execute on function public.reality_read_chat_work_for_owner_v1(uuid,uuid) to service_role;
+
+ then raise exception 'CHAT_WORK_FAILURE_CODE_INVALID';end if;
+ select * into i from reality_internal.chat_work_handoffs_v1
+ where message_id=p_message_id for update;
+ if not found or i.claim_id<>p_claim_id or i.status<>'CLAIMED'
+ then return pg_catalog.jsonb_build_object(
+  'status','CHAT_WORK_FAILURE_CLAIM_NO_LONGER_ACTIVE',
+  'production_changed',false,'installation_authorized',false);end if;
+ update reality_internal.chat_work_handoffs_v1
+ set status='PROVIDER_UNVERIFIED',finalized_at=clock_timestamp(),
+ investigation=pg_catalog.jsonb_build_object(
+  'status','INVESTIGATION_DID_NOT_COMPLETE',
+  'failure_code',p_failure_code,
+  'independently_verified_code_repair',false,
+  'execution_authorized_by_chat',false,'installation_authorized',false,
+  'job_settled',false)
+ where message_id=i.message_id and claim_id=i.claim_id and status='CLAIMED';
+ return pg_catalog.jsonb_build_object(
+  'status','CHAT_WORK_FAILURE_DURABLY_RECORDED',
+  'message_id',i.message_id,'request_id',i.request_id,
+  'shift_id',i.shift_id,'installation_authorized',false,
+  'production_changed',false);
+end $fn$;
+
+create or replace function public.reality_reconcile_expired_chat_work_v1()
+returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare n integer;
+begin
+ if current_user<>'service_role' then
+  raise exception 'CHAT_WORK_RECONCILIATION_SERVICE_ROLE_ONLY';end if;
+ update reality_internal.chat_work_handoffs_v1
+ set status='PROVIDER_UNVERIFIED',finalized_at=clock_timestamp(),
+ investigation=pg_catalog.jsonb_build_object(
+  'status','INCOMPLETE_PROVIDER_ATTEMPT_NO_AUTOMATIC_REPLAY',
+  'failure_code','LEASE_EXPIRED_WITHOUT_DURABLE_RESULT',
+  'independently_verified_code_repair',false,
+  'execution_authorized_by_chat',false,'installation_authorized',false,
+  'job_settled',false)
+ where status='CLAIMED' and claim_expires_at<clock_timestamp();
+ get diagnostics n=row_count;
+ return pg_catalog.jsonb_build_object(
+  'status','STALE_CHAT_WORK_CLAIMS_RECONCILED',
+  'stale_claims',n,'new_shift_started',false,
+  'installation_authorized',false,'production_changed',false);
+end $fn$;
+
 revoke all on function public.reality_claim_chat_work_for_shift_v1()
  from public,anon,authenticated;
 revoke all on function public.reality_record_chat_work_diagnosis_v1(
@@ -260,3 +323,12 @@ grant execute on function public.reality_claim_chat_work_for_shift_v1() to servi
 grant execute on function public.reality_record_chat_work_diagnosis_v1(
  uuid,uuid,uuid,text,text,text,jsonb,text) to service_role;
 grant execute on function public.reality_read_chat_work_for_owner_v1(uuid,uuid) to service_role;
+
+revoke all on function public.reality_fail_chat_work_claim_v1(
+ uuid,uuid,text) from public,anon,authenticated;
+revoke all on function public.reality_reconcile_expired_chat_work_v1()
+ from public,anon,authenticated;
+grant execute on function public.reality_fail_chat_work_claim_v1(
+ uuid,uuid,text) to service_role;
+grant execute on function public.reality_reconcile_expired_chat_work_v1()
+ to service_role;
