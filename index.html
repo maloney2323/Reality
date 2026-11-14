@@ -6810,6 +6810,56 @@ setInterval(refreshSavedShiftHome,300000);
     details.textContent=(descriptions[handed.status]||
      'This request has no verified work disposition.')+suffix;
     card.append(heading,details);
+    // Server-attested original work stages only. A Chat model diagnosis is
+    // NOT a tested patch or a source-installation approval.
+    const verifiedStages=new Set([
+      'SOURCE_BACKED_ORIGINAL_AWAITING_NEXT_GOVERNED_ACTION',
+      'MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+      'INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED',
+      'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+      'CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE',
+      'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
+      'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT'
+    ]);
+    const stageLabels={
+      SOURCE_BACKED_ORIGINAL_AWAITING_NEXT_GOVERNED_ACTION:
+        'Source-backed original admitted · execution evidence still needed',
+      MODEL_DRAFT_AWAITING_INDEPENDENT_CI:
+        'Model patch drafted · independent frozen tests still needed',
+      INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED:
+        'First patch rejected by independent frozen tests',
+      CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI:
+        'First patch failed independent tests · corrective patch drafted · independent retest not yet verified',
+      CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE:
+        'Corrective patch rejected by independent tests · original job still open',
+      CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE:
+        'Corrective patch passed recorded independent tests · exact installation approval still required',
+      ORIGINAL_SETTLEMENT_RECEIPT_PRESENT:
+        'Original settlement reference recorded · inspect independent final receipt'
+    };
+    const verifiedChain=Array.isArray(handed.work_chain)?
+      handed.work_chain.filter(x=>
+        x&&/^work:[a-f0-9]{32}$/.test(x.original_work_id||'')&&
+        x.shift_id===handed.shift_id&&
+        verifiedStages.has(x.current_evidence_stage)&&
+        x.installation_authorized_by_chat===false&&
+        x.independent_repair_or_settlement_proven_by_chat===false
+      ).slice(0,25):[];
+    for(const original of verifiedChain){
+      const stage=document.createElement('div');
+      stage.className='reality-chat-signed-work-stage';
+      stage.textContent='Original work '+original.original_work_id+
+        ' · '+stageLabels[original.current_evidence_stage];
+      card.append(stage);
+      const run=original.corrective_ci_url||original.initial_frozen_ci_url;
+      if(typeof run==='string'&&
+         /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/[1-9]\d*$/.test(run)){
+        const a=document.createElement('a');
+        a.href=run;a.target='_blank';a.rel='noopener noreferrer';
+        a.textContent='View independent GitHub test evidence';
+        card.append(a);
+      }
+    }
     thread.append(card);
    }
    const missing=message.role==='user'?unmatched.get(message.request_id):null;
