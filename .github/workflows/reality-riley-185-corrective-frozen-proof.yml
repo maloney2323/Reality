@@ -1,0 +1,26 @@
+name: Reality Riley 185 corrected draft independent frozen acceptance
+on:
+  push:
+    branches: [reality/riley/corrected-185-45206a326d-20261114]
+    paths:
+      - src/reality-riley-service-original-runtime-v1.js
+      - test/reality-riley-service-original-runtime-v1.test.js
+      - .github/workflows/reality-riley-185-corrective-frozen-proof.yml
+permissions:
+  contents: read
+jobs:
+  frozen-corrective-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Independent syntax acceptance of exact second model patch
+        run: node --check src/reality-riley-service-original-runtime-v1.js
+      - name: Independent existing original-job continuity and governed handoff acceptance
+        run: |
+          node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-governed-original-job-v1.test.js
+      - name: No install release nor settlement
+        run: echo 'Frozen candidate tests only; owner installation authorization required for any promotion'
