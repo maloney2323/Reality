@@ -7323,7 +7323,8 @@ setInterval(refreshSavedShiftHome,300000);
    let savedUser=null,savedAnswer=null;
    try{
     const readback=await fetch('/api/reality/personal-chat?conversation_id='+
-     encodeURIComponent(sentConversation),{method:'GET',
+     encodeURIComponent(sentConversation)+'&reply_readback=1&request_id='+
+     encodeURIComponent(sentRequest),{method:'GET',
      credentials:'same-origin',cache:'no-store',
      signal:AbortSignal.timeout(7500)});
     if(readback.ok){
