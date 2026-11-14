@@ -20,7 +20,7 @@ test('a saved user message with no signed answer is reported as unanswered, neve
  assert.equal(result.unanswered_requests[0].status,'USER_MESSAGE_SAVED_REPLY_NOT_VERIFIED');
  assert.equal(result.unanswered_requests[0].response_failure_reason,'NO_DURABLE_TERMINAL_ERROR_RECORDED');
  assert.equal(result.unanswered_requests[0].development_job_dispatched_by_this_chat_request,false);
- assert.equal(result.chat_endpoint_mode,'CONVERSATIONAL_ONLY_NO_DEVELOPMENT_JOB_DISPATCH');
+ assert.equal(result.chat_endpoint_mode,'AUTHENTICATED_CHAT_PERSISTS_TO_GOVERNED_WORK_INTAKE');
  assert.equal(result.no_new_job_started_by_this_readback,true);
 });
 test('same request assistant publication removes the unanswered condition',()=>{
@@ -48,7 +48,7 @@ test('authenticated GET and existing Chat UI show status, never pretend to have 
  assert.match(api,/execution:\{status:'NOT_EXECUTED',external_actions_authorized:false\}/);
  assert.match(html,/CHAT DELIVERY STATUS · NOT A REALITY ANSWER/);
  assert.match(html,/The exact server failure was not durably recorded/);
- assert.match(html,/this conversational Chat endpoint does not dispatch a development worker/);
+ assert.match(html,/Its separate governed work intake and worker status are shown above/);
  assert.match(html,/missing.user_source_ref===message.source_ref/);
  assert.match(html,/role','status'/);
  assert.doesNotMatch(api,/response_failure_reason:'CHAT_COMPLETED'/);
