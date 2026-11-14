@@ -81,3 +81,35 @@ test('exact source-bound Edge function has service-only access, frozen CI and se
  assert.match(worker,/riley_auto_corrective_independent_ci:correctiveCiResult/);
  assert.doesNotMatch(source,/process\.env\.REALITY_GITHUB_TOKEN/);
 });
+
+
+test('isolated worker tolerates unrelated preview commits but must recheck exact source bytes',()=>{
+ const source=readFileSync(new URL(
+  '../supabase/functions/reality-riley-auto-corrective-ci-v1/index.ts',
+  import.meta.url),'utf8');
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261114_riley_auto_corrective_staged_provider_receipt_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(source,/const liveSource=await source\(token,TARGET,current\.object\.sha\)/);
+ assert.match(source,/liveSource\.sha!==c\.source_blob_sha/);
+ assert.doesNotMatch(source,/TRUSTED_PREVIEW_BASE_BRANCH_DRIFT/);
+ assert.match(source,/reality_record_riley_auto_corrective_staging_v1/);
+ assert.match(source,/SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK/);
+ assert.match(sql,/candidate_staged_commit_sha/);
+ assert.match(sql,/rev\.owner_id=\(g->>'owner_id'\)::uuid/);
+ assert.match(sql,/j\.phase='SOURCE_ADMITTED'/);
+ assert.match(sql,/not installation_authorized/);
+ assert.match(sql,/not original_job_completed/);
+});
+test('owner Chat status shows staged CI candidate separately from actual test verdict',()=>{
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261114_owner_chat_staged_candidate_readback_v3.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING/);
+ assert.match(sql,/corrective_candidate_branch/);
+ assert.match(sql,/p\.conclusion='success'/);
+ assert.match(ui,/CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING/);
+ assert.match(ui,/View isolated candidate on GitHub/);
+ assert.match(ui,/Independent CI verdict pending/);
+});
