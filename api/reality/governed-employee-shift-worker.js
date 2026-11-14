@@ -52,6 +52,8 @@ import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
+import {admitCurrentShiftInvestigatedSourceWithFrozenProof}
+ from '../../src/reality-current-shift-auto-admission-handoff-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {proveNativeOriginalReadOnlyModelTool}
@@ -363,6 +365,39 @@ export default async function handler(req,res){
       diagnostic)?diagnostic:'ACTIVE_WEEKLY_SOURCE_INVESTIGATION_UNVERIFIED',
      just_investigated:0,source_receipts:[],
      executable_original_admitted:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
+  // Existing governed auto-trigger: a real employee-source investigation
+  // may turn into one source-bound ORIGINAL only after a separate
+  // independently failing frozen acceptance on the current preview branch.
+  // The service-role RPC rechecks the SAME signed owner shift and one
+  // immutable investigation receipt before atomic original admission.
+  let shiftVerifiedAutoAdmission={
+   status:'NO_SIGNED_VERIFIED_CURRENT_ORIGINAL_AUTO_ADMISSION',
+   original_job_admitted:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+    weeklyEmployeeInvestigations.source_receipts?.length>0&&
+    integratedWorkIntake?.status===
+     'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+   try{
+    shiftVerifiedAutoAdmission=
+     await admitCurrentShiftInvestigatedSourceWithFrozenProof({
+      db,graph:unifiedGraph,investigations:weeklyEmployeeInvestigations,
+      env:process.env,fetchImpl:fetch,
+      token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+       process.env.GITHUB_TOKEN||null
+     });
+   }catch(error){
+    const message=String(error?.message||'');
+    shiftVerifiedAutoAdmission={
+     status:'CURRENT_SHIFT_AUTO_ADMISSION_FROZEN_OR_DB_PROOF_REQUIRED',
+     failure_code:/^(?:SHIFT_AUTO_ADMISSION|GOVERNED_AUTO_TRIGGER)_[A-Z0-9_]{5,110}$/
+      .test(message)?message:'CURRENT_SHIFT_PROVIDER_OR_AUTHORITY_UNVERIFIED',
+     original_job_admitted:false,installation_authorized:false,
      production_changed:false
     };
    }
@@ -765,7 +800,9 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const outcomeCode=weeklyEmployeeInvestigations.just_investigated>0?
+   const outcomeCode=shiftVerifiedAutoAdmission.original_job_admitted===true?
+    'CURRENT_SHIFT_GOVERNED_ORIGINAL_AUTO_ADMITTED_AFTER_FROZEN_RED':
+    weeklyEmployeeInvestigations.just_investigated>0?
     'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_EXECUTED_AND_RECEIPTED':
     weeklyEmployeeInvestigations.source_receipts?.length>=5?
      'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_PREVIOUSLY_RECEIPTED':
@@ -823,6 +860,7 @@ export default async function handler(req,res){
     integrated_work_intake:integratedWorkIntake,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
+    current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
