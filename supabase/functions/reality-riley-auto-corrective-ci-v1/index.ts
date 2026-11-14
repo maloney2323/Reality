@@ -192,7 +192,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
    r.status==='completed'&&['success','failure'].includes(r.conclusion)&&
    Number.isSafeInteger(r.id)&&r.id>10000&&
    r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id;
- const exactRuns=runs.workflow_runs.filter(r=>eligible(r)&&
+ let exactRuns=runs.workflow_runs.filter(r=>eligible(r)&&
    r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
  if(exactRuns.length>1)refuse('AMBIGUOUS_INDEPENDENT_CI_RUN');
  let prFailureRuns=[];
@@ -200,21 +200,48 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
   // GitHub's per-branch Actions listing can omit pull_request runs.
   // Verify the PR itself from the trusted repository, then independently
   // discover Actions runs. The browser/model cannot select a run or PR.
-  const pulls=await exact(token,'/pulls?state=open&head='+
-   encodeURIComponent('maloney2323:'+branch)+'&per_page=30');
+  const pullLookup='/pulls?state=open&head='+
+   encodeURIComponent('maloney2323:'+branch)+'&per_page=30';
+  const pulls=await exact(token,pullLookup);
   if(!Array.isArray(pulls))refuse('CORRECTIVE_OWNER_PR_READBACK_UNVERIFIED');
-  const verifiedPRs=pulls.filter(pr=>pr?.state==='open'&&
+  let verifiedPRs=pulls.filter(pr=>pr?.state==='open'&&
    pr.head?.sha===head&&pr.head?.ref===branch&&
    pr.base?.ref===baseBranch&&
    pr.head?.repo?.full_name==='maloney2323/Reality'&&
    pr.base?.repo?.full_name==='maloney2323/Reality');
   if(verifiedPRs.length>1)refuse('AMBIGUOUS_OWNER_ORIGINAL_CORRECTIVE_PR');
+  // The owner-authorized repair scope permits an isolated DRAFT candidate
+  // PR for frozen CI, never merge/install. Reconcile from GitHub if a POST
+  // result is uncertain; no second PR or owner shift may be invented.
+  if(recovery&&verifiedPRs.length===0){
+   await github(token,'/pulls','POST',{
+    title:'test(reality): verify same-original repair attempt '+c.attempt_number,
+    head:branch,base:baseBranch,draft:true,
+    body:'Isolated governed recovery attempt '+c.attempt_number+
+      ' for existing authorized original '+c.original_work_id+
+      '. Source: '+c.source_ref+'. Candidate SHA256: '+c.proposed_sha256+
+      '. Independent CI required. No installation, production release,'+
+      ' new job or final receipt is authorized.'
+   });
+   const readback=await exact(token,pullLookup);
+   if(!Array.isArray(readback))refuse('RECOVERY_OWNER_DRAFT_PR_READBACK_UNVERIFIED');
+   verifiedPRs=readback.filter(pr=>pr?.state==='open'&&
+    pr.draft===true&&pr.head?.sha===head&&pr.head?.ref===branch&&
+    pr.base?.ref===baseBranch&&
+    pr.head?.repo?.full_name==='maloney2323/Reality'&&
+    pr.base?.repo?.full_name==='maloney2323/Reality');
+   if(verifiedPRs.length>1)refuse('AMBIGUOUS_OWNER_RECOVERY_DRAFT_PR');
+  }
   if(verifiedPRs.length===1){
    const additional=await exact(token,'/actions/runs?event=pull_request&per_page=100');
    if(!Array.isArray(additional.workflow_runs))
     refuse('INDEPENDENT_PR_RUNS_UNVERIFIED');
    const byId=new Map([...runs.workflow_runs,...additional.workflow_runs]
     .filter(r=>Number.isSafeInteger(r?.id)).map(r=>[r.id,r]));
+   const exactPullRuns=[...byId.values()].filter(r=>eligible(r)&&
+    r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
+   if(exactPullRuns.length>1)refuse('AMBIGUOUS_RECOVERY_EXACT_PR_CI');
+   if(exactPullRuns.length===1)exactRuns=exactPullRuns;
    prFailureRuns=[...byId.values()].filter(r=>eligible(r)&&
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
