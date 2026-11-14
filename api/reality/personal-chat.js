@@ -19,6 +19,8 @@ import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
+import {readOwnerOriginalWorkForChat,originalWorkObservation}
+ from '../../src/reality-owner-original-work-chat-readback-v1.js';
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
@@ -55,6 +57,7 @@ export default async function handler(req,res){
     messages:history.messages,
     reply_readback:summarizeSavedChatReplyReadback(history.messages),
     work_handoff:await readOwnerChatWorkHandoff({session,conversationId}),
+    original_work_readback:await readOwnerOriginalWorkForChat({session}).catch(()=>null),
     continuity:{
      history_source:'AUTHENTICATED_SUPABASE_RLS',
      recovered_messages:history.messages.length,
@@ -204,6 +207,10 @@ export default async function handler(req,res){
    /^reality:employee-shift:[a-f0-9-]{36}$/i.test(x.source_ref||'')&&
    x.active_owner_shift_id===x.source_ref.slice('reality:employee-shift:'.length));
   const verifiedOwnerShift=ownerShiftFacts.length===1?ownerShiftFacts[0]:null;
+  stage='OWNER_ORIGINAL_WORK_READBACK';
+  const ownerOriginalWork=await readOwnerOriginalWorkForChat({
+   session,currentShiftId:verifiedOwnerShift?.active_owner_shift_id||null,
+  }).catch(()=>null);
   stage='COGNITION_AND_RELIABILITY';
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
@@ -253,6 +260,14 @@ export default async function handler(req,res){
     // Grounded recent owner work is visible to the model even when the
     // next message merely says "it", "this job", or "the milestone".
     // Cognition must still keep unrelated questions unrelated.
+    owner_original_work_current_state:ownerOriginalWork?{
+     source:'AUTHENTICATED_OWNER_SCOPED_DATABASE_READBACK',
+     existing_authorized_shift_id:ownerOriginalWork.current_shift_id,
+     unfinished_originals:ownerOriginalWork.observed_unfinished_count,
+     jobs:ownerOriginalWork.jobs,
+     no_new_authorization_granted:true,
+     required_truth:'A job without an independently verified settlement is NOT complete. Do not claim there are no unfinished jobs when a source-admitted original is in this readback.'
+    }:{status:'READBACK_UNAVAILABLE_DO_NOT_CLAIM_ZERO_UNFINISHED'},
     owner_completed_work_context_status:
       native263TemporalObservations.length+ownerCompletedWorkObservations.length>0?
        'OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE':
@@ -264,7 +279,7 @@ export default async function handler(req,res){
      ...native263TemporalObservations,...ownerCompletedWorkObservations,
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations
+     ...rileySourceWorkObservations,...originalWorkObservation(ownerOriginalWork)
     ],
     action_authorized:false,execution_authorized:false,
    },
