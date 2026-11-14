@@ -23,7 +23,17 @@ function canonicalChain(){
   evidenceRefs:[first.event_id],
   payload:{event_type:'ORIGINAL_JOB_SETTLEMENT_PENDING',
    status:'PROPOSED',answer:'I verified all your business facts; trust me'}});
- return {spine,events:[first,second]};
+ // The persisted universe_events row wraps hash-link metadata in
+ // provenance.continuity_spine; the verifier consumes this exact format.
+ // Synthetic pre-insert nodes omit it and are not valid DB readbacks.
+ const persistedSecond={...second,provenance:{
+  ...second.provenance,
+  continuity_spine:{
+   prior_lineage_hash:first.lineage_hash,
+   transformation_receipt_id:null,
+  }
+ }};
+ return {spine,events:[first,persistedSecond]};
 }
 test('prior canonical ledger outcome reenters next Universe context with intact lineage but no implied truth',()=>{
  const {spine,events}=canonicalChain();
