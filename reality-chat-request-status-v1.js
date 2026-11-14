@@ -72,10 +72,28 @@
   one('Final reply saved and verified',Boolean(state.answer),
    state.answer?'The same request ID has an independently read-back answer: '+state.answer.source_ref:
      'Waiting for a matching assistant message in authenticated saved history.');
+  // This exact request's work handoff is read independently of its Chat
+  // answer. Diagnosed work is not execution, installation or settlement.
+  const work=state.work;
+  const names={
+   PENDING:'Saved in existing governed worker inbox; investigation not yet claimed.',
+   CLAIMED:'Existing worker claimed this instruction for investigation.',
+   INVESTIGATED_SCOPED:'Investigation recorded against existing authorized work; execution is not proven.',
+   NEEDS_AUTHORIZED_SCOPE:'Requested work is outside the existing signed scope.',
+   CONVERSATION_ONLY:'Classified as a conversation, not executable work.',
+   PROVIDER_UNVERIFIED:'Investigation failed verification; no work completion is claimed.'
+  };
+  const last=work?.work_chain?.find(x=>typeof x?.current_evidence_stage==='string');
+  const evidence=last?' Latest original-work evidence: '+String(last.current_evidence_stage)
+   .replaceAll('_',' ')+'.':'';
+  one('Governed work handoff',Boolean(work),
+   work?(names[work.status]||'Governed intake status not recognized.')+evidence:
+    state.saved?'Saved message verified; checking its separate governed work record.':
+    'Available after the authenticated message save.');
   if(state.answer){
    spinner.classList.add('completed');
    title.textContent='Reality saved your answer';
-   line.textContent='The Chat answer is durably recorded. View the separate job timeline for real worker execution.';
+   line.textContent='The Chat answer is recorded. The governed work status below is a separate, independently read-back state.';
   }else if(state.complete){
    spinner.classList.remove('completed');
    title.textContent='Reply not verified';
@@ -89,6 +107,41 @@
    title.textContent='Sending message to Reality';
    line.textContent='Waiting for the authenticated message save. This is Chat activity, not a development-worker receipt.';
   }
+ }
+ async function readWork(state){
+  if(!state||current!==state||state.workReading||!state.saved||document.hidden)return;
+  if(Date.now()-(state.lastWorkCheck||0)<7500)return;
+  state.lastWorkCheck=Date.now();
+  state.workReading=true;
+  try{
+   const response=await fetch(
+    '/api/reality/personal-chat?conversation_id='+encodeURIComponent(state.conversationId)+
+    '&work_readback=1&request_id='+encodeURIComponent(state.requestId),{
+     method:'GET',credentials:'same-origin',cache:'no-store',
+     signal:AbortSignal.timeout(8000)});
+   if(!response.ok)return;
+   const data=await response.json();
+   if(current!==state||data?.ok!==true||
+      data.conversation_id!==state.conversationId||
+      data.request_id!==state.requestId||
+      data.execution_authorized_by_chat!==false||
+      data.installation_authorized!==false||
+      data.production_changed!==false||
+      data.status!=='AUTHENTICATED_WORK_INTAKE_RECORD_VERIFIED')return;
+   const work=data.work_handoff;
+   if(!work||work.request_id!==state.requestId||
+      !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(work.source_ref||'')||
+      !['PENDING','CLAIMED','INVESTIGATED_SCOPED',
+        'NEEDS_AUTHORIZED_SCOPE','CONVERSATION_ONLY',
+        'PROVIDER_UNVERIFIED'].includes(work.status)||
+      work.execution_authorized_by_chat!==false||
+      work.installation_authorized!==false||
+      work.production_changed!==false||
+      !Array.isArray(work.work_chain)||work.work_chain.length>25)return;
+   state.work=work;
+   render();
+  }catch{/* An unavailable readback is not proof of a failed job. */}
+  finally{state.workReading=false}
  }
  async function readback(){
   const state=current;
@@ -112,6 +165,7 @@
       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'));
    if(user)state.saved={source_ref:user.source_ref};
    if(user&&answer)state.answer={source_ref:answer.source_ref};
+   if(state.saved)void readWork(state);
    if(state.answer)stopClocks();
    render();
   }catch{/* A temporary readback failure is not evidence that work failed. */}
@@ -122,7 +176,8 @@
   if(!validUuid(conversationId)||!validUuid(requestId))return;
   stopClocks();
   current={conversationId,requestId,startedAt:Date.now(),
-   saved:null,answer:null,complete:false,reading:false,failure:null};
+   saved:null,answer:null,complete:false,reading:false,failure:null,
+   work:null,workReading:false,lastWorkCheck:0};
   // If a previous attempt is still visible, give the new attempt its own
   // current inline status immediately after its user bubble.
   block.remove();
