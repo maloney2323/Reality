@@ -104,3 +104,21 @@ test('service-only CI receipt is bound to same original and its staged SHA, not 
  assert.match(workflow,/independent-corrective-frozen/);
  assert.match(workflow,/node --test/);
 });
+
+test('v2 cannot accept provider-claimed installation or silently change protocol version',async()=>{
+ const forged=harness({...base,
+  status:'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED',
+  original_work_id:WORK,attempt_id:ATTEMPT,attempt_number:2,
+  independent_ci_verified:true,
+  independent_run_url:'https://github.com/maloney2323/Reality/actions/runs/43597941179',
+  installation_authorized:true});
+ const rejected=await continueRileyCorrectiveModelIntoIndependentCI({
+  db,env,fetchImpl:forged.fetchImpl,version:2});
+ assert.equal(rejected.status,'ISOLATED_CORRECTIVE_CI_PROVIDER_READBACK_UNVERIFIED');
+ assert.equal(rejected.installation_authorized,false);
+ const transport=harness({...base,status:'NO_UNTESTED_SAME_ORIGINAL_RECOVERY_CANDIDATE'});
+ const wrongVersion=await continueRileyCorrectiveModelIntoIndependentCI({
+  db,env,fetchImpl:transport.fetchImpl,version:3});
+ assert.equal(wrongVersion.status,'ISOLATED_CORRECTIVE_CI_PROTOCOL_VERSION_INVALID');
+ assert.equal(transport.calls.length,0);
+});
