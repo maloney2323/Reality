@@ -63,3 +63,32 @@ test('progress polling bypasses full history and dashboard context and remains r
  assert.match(progress,/reply_readback=1&request_id=/);
  assert.match(progress,/signal:AbortSignal.timeout\(8000\)/);
 });
+
+test('saved Chat work status reads the exact authenticated request, without granting execution',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ const start=api.indexOf("if(req.method==='GET'&&String(req.query?.work_readback||'')==='1')");
+ const full=api.indexOf('const history=await readPrivateChat(session,conversationId);');
+ assert.ok(start>0&&start<full,'work readback must run before full Chat history');
+ const route=api.slice(start,full);
+ assert.match(route,/readPrivateChatRequest\(session/);
+ assert.match(route,/readOwnerChatWorkHandoff\(\{session,conversationId\}\)/);
+ assert.match(route,/x\.request_id===targetRequestId&&x\.source_ref===source\.source_ref/);
+ assert.match(route,/CHAT_WORK_INTAKE_IDENTITY_AMBIGUOUS/);
+ assert.match(route,/NO_AUTHENTICATED_SAVED_USER_TURN/);
+ assert.match(route,/WORK_HANDOFF_READBACK_UNAVAILABLE/);
+ assert.match(route,/execution_authorized_by_chat:false/);
+ assert.match(route,/installation_authorized:false,production_changed:false/);
+ assert.doesNotMatch(route,/recordPrivateMessage|reality_claim_chat_work_for_shift_v1|fetch\('https:\/\/api.openai.com/);
+});
+test('in-flight Chat shows only verified work intake evidence tied to matching request ID',()=>{
+ const progress=readFileSync(new URL('../reality-chat-request-status-v1.js',import.meta.url),'utf8');
+ assert.match(progress,/work_readback=1&request_id=/);
+ assert.match(progress,/data\.request_id!==state\.requestId/);
+ assert.match(progress,/work\.request_id!==state\.requestId/);
+ assert.match(progress,/work\.execution_authorized_by_chat!==false/);
+ assert.match(progress,/work\.installation_authorized!==false/);
+ assert.match(progress,/work\.production_changed!==false/);
+ assert.match(progress,/Governed work handoff/);
+ assert.match(progress,/Investigation recorded against existing authorized work; execution is not proven/);
+ assert.doesNotMatch(progress,/reality\/governed-employee-shift-worker|personal-governed-employee-shift/);
+});
