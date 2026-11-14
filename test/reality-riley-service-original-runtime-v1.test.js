@@ -205,3 +205,39 @@ test('trusted original runtime refuses production or missing durable goal state'
   db,env:bad,loadSourceAdapters:()=>({})
  }),/PREVIEW_SERVICE_DATABASE_BOUNDARY_REQUIRED/);
 });
+
+
+test('genuine durable queue status is the only accepted same-job recovery handoff',async()=>{
+ for(const capability_response of [
+  null,'REPAIR_HANDOFF_NEEDS_RECONCILIATION','SOME_UNVERIFIED_GAP_STATUS',
+  {status:'GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'},true
+ ]){
+  const {factory}=configured({runnerOutcome:{
+   original_work_id:WORK,execution_status:'UNRESOLVED',capability_response,
+   original_job_completed:false,new_job_created:false,production_changed:false
+  }});
+  const job=await factory.loadTrustedAuthorizedOriginal(args);
+  const output=await factory.runOriginal({...job,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()});
+  assert.equal(output.status,'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY');
+  assert.equal(output.owner_approval_required,false);
+  assert.equal(output.original_job_settled,false);
+ }
+});
+test('no capability-response string may override BLOCKED or VERIFIED execution',async()=>{
+ for(const [execution_status,expected] of [
+  ['BLOCKED','ORIGINAL_JOB_AUTHORIZATION_BLOCKED'],
+  ['VERIFIED','ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT'],
+ ]){
+  const {factory}=configured({runnerOutcome:{
+   original_work_id:WORK,execution_status,
+   capability_response:'GENUINE_CAPABILITY_GAP_DURABLY_QUEUED',
+   original_job_completed:false,new_job_created:false,production_changed:false
+  }});
+  const job=await factory.loadTrustedAuthorizedOriginal(args);
+  const output=await factory.runOriginal({...job,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()});
+  assert.equal(output.status,expected);
+  assert.equal(output.original_job_settled,false);
+ }
+});
