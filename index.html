@@ -6874,12 +6874,12 @@ setInterval(refreshSavedShiftHome,300000);
     // Chat is an operational control surface, not only an advice screen.
     // A signed user turn can inspect its eligible WORK executor and authorize
     // it from this conversation. Unsupported jobs are NOT falsely started.
-    if(handed.status!=='CONVERSATION_ONLY'){
+    // Even an earlier advisory marked conversational may contain a genuine\n    // work request; the trusted capability router makes that decision.\n    if(message.role==='user'){
      const controls=document.createElement('div');
      controls.className='reality-chat-signed-work-actions';
      const inspect=document.createElement('button');
      inspect.type='button';
-     inspect.textContent='Check whether Reality can run this work';
+     inspect.textContent='Check available work capability';
      const report=document.createElement('div');
      report.setAttribute('role','status');
      const postWork=async action=>{
@@ -6924,8 +6924,21 @@ setInterval(refreshSavedShiftHome,300000);
        }else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
         report.textContent='Original job '+state.original_work_id+
          ' is already queued. Inspect its ongoing evidence; do not authorize it again.';
+       else if(state.status==='CHAT_WORK_READ_ONLY_EVIDENCE_AVAILABLE'){
+        const briefing=state.briefing||{};
+        report.textContent=briefing.status==='OWNER_SHIFT_INDEPENDENTLY_READ'?
+         'Authenticated shift readback · '+String(briefing.shift_status||'UNKNOWN')+
+          ' · '+String(briefing.work_step_count??'unknown')+
+          ' planned steps. This is status evidence, not a claim that the shift is complete.':
+         'No current employee shift found. No new work started.';
+       }else if(state.status==='CHAT_WORK_CAPABILITY_GAP')
+        report.textContent='Reality understands this as work, but no matching installed executable capability is verified. It must qualify a tool or capability before it can perform the requested change.';
+       else if(state.status==='CHAT_WORK_CONVERSATION_ONLY'){
+        report.textContent='This message is conversational. No job or approval is needed.';
+       }else if(state.status==='CHAT_WORK_INTENT_UNAVAILABLE')
+        report.textContent='Work interpretation is temporarily unavailable; conversation stays saved. No executor was run.';
        else
-        report.textContent='This saved request has no matching independently eligible executable adapter yet. The investigation and message remain preserved. No job was started.';
+        report.textContent='No verified runnable work matched this exact saved instruction. Reality preserved the request without starting an unrelated job.';
       }catch(e){
        report.textContent='Execution eligibility could not be verified: '+
         String(e.message||'UNKNOWN').slice(0,130)+'. No job started.';
@@ -6933,6 +6946,12 @@ setInterval(refreshSavedShiftHome,300000);
       }
      };
      controls.append(inspect,report);card.append(controls);
+     const justSaved=window.realityJustSavedWorkRequest;
+     if(justSaved?.conversation_id===conversationId()&&
+        justSaved.request_id===message.request_id){
+      window.realityJustSavedWorkRequest=null;
+      void inspect.onclick();
+     }
     }
     thread.append(card);
    }
@@ -7061,6 +7080,8 @@ setInterval(refreshSavedShiftHome,300000);
    }
    if(pendingBubble.isConnected)
     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
+   window.realityJustSavedWorkRequest={conversation_id:sentConversation,
+    request_id:sentRequest};
    status('Your message is saved in Reality. Preparing the conversation answer.');
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
     credentials:'same-origin',signal:AbortSignal.timeout(95000),
@@ -7239,6 +7260,8 @@ setInterval(refreshSavedShiftHome,300000);
    if(pendingBubble.isConnected)
     pendingBubble.querySelector('.label').textContent=savedUser?
      'YOU · SAVED · REPLY NOT VERIFIED':'YOU · DELIVERY OR REPLY NOT VERIFIED';
+   if(savedUser||window.realityJustSavedWorkRequest?.request_id===sentRequest)
+    void loadSaved().catch(()=>{});
    // On authenticated save, keep the text in history rather than putting
    // an already-sent message back into the composer for accidental resending.
    if(!savedUser&&!el('privatePrompt').value.trim()){
