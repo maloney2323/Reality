@@ -52,10 +52,34 @@ test('invalid registry or timeout is rejected',async()=>{
 test('authenticated Chat GET and POST use bounded optional evidence, not raw dashboard calls',()=>{
  const source=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(source,/if\(req.method==='GET'\)\{\s*const context=await collectOptionalChatEvidence/);
- assert.match(source,/stage='OWNER_EVIDENCE_COLLECTION';\s*const evidence=await collectOptionalChatEvidence/);
+ assert.match(source,/stage='SIGNED_CHAT_WORK_READBACK';[\s\S]*const optionalContextPromise=collectOptionalChatEvidence/);
+ assert.match(source,/stage='OWNER_EVIDENCE_COLLECTION';\s*const optionalContext=await optionalContextPromise/);
+ assert.match(source,/scopeOwnerOriginalWorkToShift/);
  assert.match(source,/timeoutMs:2500/);
  assert.match(source,/stage='ATOMIC_ASSISTANT_PUBLICATION'/);
  assert.match(source,/publishPrivateAssistantAtomically/);
  assert.match(source,/CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN/);
  assert.match(source,/missing_context_is_not_evidence_of_no_work:true/);
+});
+
+
+test('owner original readback can be narrowed in memory to the authorized shift',async()=>{
+ const {scopeOwnerOriginalWorkToShift}=await import(
+  '../src/reality-owner-original-work-chat-readback-v1.js');
+ const a='9460cfff-937a-4105-9093-2e41ab39a950';
+ const b='21dff8db-6f46-444d-a149-ab15f1caf8fe';
+ const readback={status:'OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
+  all_recent_jobs:[
+   {shift_id:a,original_work_id:'work:'+'a'.repeat(32),independently_settled:false},
+   {shift_id:b,original_work_id:'work:'+'b'.repeat(32),independently_settled:true}
+  ]};
+ const scoped=scopeOwnerOriginalWorkToShift(readback,a);
+ assert.equal(scoped.observed_original_count,1);
+ assert.equal(scoped.observed_unfinished_count,1);
+ assert.equal(scoped.current_shift_has_unfinished_originals,true);
+ assert.equal(scoped.jobs[0].shift_id,a);
+ assert.equal(scoped.grants_execution_authority,false);
+ assert.equal(scopeOwnerOriginalWorkToShift(readback,null),readback);
+ assert.throws(()=>scopeOwnerOriginalWorkToShift(readback,'wrong-shift'),
+  /CHAT_ORIGINAL_WORK_SHIFT_SCOPE_INVALID/);
 });
