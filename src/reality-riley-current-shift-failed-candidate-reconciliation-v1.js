@@ -54,7 +54,7 @@ export async function reconcileCurrentShiftRejectedNativeModelCandidate({
    typeof fetchImpl!=='function'||typeof callRpc!=='function')
   fail('SERVICE_ROLE_ISOLATED_PREVIEW_REQUIRED');
  const candidate=await callRpc(db,
-  'reality_read_current_shift_native_candidate_for_frozen_verification_v1',
+  'reality_read_shift_native_candidate_frozen_v1',
   {},{fetchImpl});
  if(candidate?.status==='NO_ACTIVE_SIGNED_SHIFT_NATIVE_CANDIDATE'||
     candidate?.status==='NO_VERIFIED_UNSETTLED_MODEL_DRAFT_REQUIRING_TEST'||
