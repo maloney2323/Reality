@@ -7009,6 +7009,7 @@ setInterval(refreshSavedShiftHome,300000);
     const retry=document.createElement('button');
     retry.type='button';
     retry.textContent='Retry this saved reply — do not send again';
+    retry.dataset.recoverRequestId=message.request_id;
     retry.onclick=async()=>{
      retry.disabled=true;
      explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
@@ -7051,6 +7052,14 @@ setInterval(refreshSavedShiftHome,300000);
   // scrolling through earlier conversation history.
   thread.scrollTop=atBottom?thread.scrollHeight:
    Math.max(0,previousTop+(thread.scrollHeight-previousHeight));
+  // Only authentic saved-history metadata may nominate the latest unanswered
+  // turn for an idempotent, bounded, single-attempt reply recovery.
+  window.dispatchEvent(new CustomEvent('reality:saved-chat-readback',{
+   detail:{conversation_id:data.conversation_id,
+    messages:(data.messages||[]).map(x=>({role:x.role,
+     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at})),
+    unanswered_requests:replyReadback?.unanswered_requests||[]}
+  }));
   await loadGoals();
  }
  async function init(){
@@ -7367,6 +7376,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
+<script type="module" src="/reality-chat-recover-unanswered-v1.js"></script>
 <script defer src="/reality-riley-source-work-v1.js"></script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
