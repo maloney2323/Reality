@@ -205,3 +205,16 @@ test('trusted original runtime refuses production or missing durable goal state'
   db,env:bad,loadSourceAdapters:()=>({})
  }),/PREVIEW_SERVICE_DATABASE_BOUNDARY_REQUIRED/);
 });
+
+test('model proposal must not underreport a real governed capability response',async()=>{
+ const {factory}=configured();
+ const job=await factory.loadTrustedAuthorizedOriginal(args);
+ const output=await factory.runOriginal({...job,
+  ownerId:OWNER,shiftId:SHIFT,
+  shiftReadback:readback(),ownerLedgerReadback:ledger()});
+ assert.equal(output.status,'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF');
+ assert.equal(output.governed_code_generation_connected,true,
+  'A provider-backed capability handoff is a typed receipt, not Boolean true');
+ assert.equal(output.installation_authorized_by_employee,false);
+ assert.equal(output.original_job_settled,false);
+});
