@@ -73,7 +73,10 @@ test('isolated broker restricts v2 model candidate to a unique frozen owner-job 
  assert.match(broker,/recovery\?'-a'\+c\.attempt_number:''/);
  assert.match(broker,/c\.attempt_id/);
  assert.match(broker,/draft:true/);
- assert.match(broker,/prFailureRuns=recovery\?\[\]:/);
+ assert.match(broker,/prFailureRuns=\[\.\.\.byId\.values\(\)\]\.filter/);
+ assert.match(broker,/r\.event==='pull_request'&&r\.conclusion==='failure'/);
+ assert.match(broker,/matched\?\.conclusion!=='failure'/);
+ assert.match(broker,/TRUSTED_ORIGINAL_FROZEN_TEST_COMMAND_MISSING/);
  assert.match(broker,/r\.name===WORKFLOW_NAME&&r\.path===WORKFLOW/);
  assert.match(broker,/Independent original-job continuity and governed handoff acceptance/);
  assert.match(broker,/current\.object\?\.sha/);
