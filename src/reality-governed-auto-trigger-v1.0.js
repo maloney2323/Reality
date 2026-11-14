@@ -157,7 +157,8 @@ export async function runAuthorizedShiftSourceRepairAutoTrigger({
     !/^[a-f0-9]{40}$/.test(run.head_sha||'')||
     run.head_repository?.full_name!=='maloney2323/Reality'||
     run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+id||
-    run.name!=='Reality current-shift original qualification acceptance')
+    !['Reality current-shift original qualification acceptance',
+      'Reality current shift governed auto-admission frozen contract'].includes(run.name))
   denyOriginalAdmit('CURRENT_INDEPENDENT_FROZEN_RED_REQUIRED');
  const request={
   p_owner_id:graph.owner_id,p_shift_id:graph.shift_id,
