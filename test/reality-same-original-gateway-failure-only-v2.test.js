@@ -134,9 +134,10 @@ test('unrelated failing CI step does not count as original-job failure proof',as
 test('foreign PR cannot supply a negative proof for this owner original',async()=>{
  const m=rig({foreignPR:true});
  try{
-  const result=await (await stageOrObserve(claim,'opaque-github-token',
-   base,baseSha,'opaque-service-key',true)).json();
-  assert.equal(result.status,'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI');
+  await assert.rejects(stageOrObserve(claim,'opaque-github-token',
+   base,baseSha,'opaque-service-key',true),
+   /RECOVERY_FOREIGN_OR_DRIFTED_PR_REJECTED_NO_WRITE/);
   assert.equal(m.requests.some(x=>x.url===db+'reality_record_same_original_recovery_ci_v2'),false);
+  assert.equal(m.requests.some(x=>x.url===repo+'/pulls'&&x.method==='POST'),false);
  }finally{m.restore()}
 });
