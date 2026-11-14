@@ -718,7 +718,14 @@ export default async function handler(req,res){
     const code=String(e?.message||'');
     rileyCandidateFrozenFailure={
      status:/^RILEY_SHIFT_FROZEN_CANDIDATE_[A-Z0-9_]{4,120}$/
-      .test(code)?code:'RILEY_SHIFT_FROZEN_CANDIDATE_PROVIDER_PROOF_UNVERIFIED',
+      .test(code)?code:
+      code==='SHIFT_DATABASE_RPC_reality_read_current_shift_native_candidate_for_frozen_verification_v1_UNAVAILABLE'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_READONLY_DATABASE_RPC_UNAVAILABLE':
+      code==='SHIFT_DATABASE_RPC_reality_record_current_shift_native_candidate_ci_failure_v1_UNAVAILABLE'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_DURABLE_FAILURE_RPC_UNAVAILABLE':
+      code==='SHIFT_RPC_NOT_ALLOWLISTED'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_TRUSTED_RPC_ALLOWLIST_MISSING':
+       'RILEY_SHIFT_FROZEN_CANDIDATE_PROVIDER_PROOF_UNVERIFIED',
      independent_failure_recorded:false,
      original_job_completed:false,installation_authorized:false,
      production_changed:false
