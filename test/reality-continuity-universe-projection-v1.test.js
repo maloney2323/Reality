@@ -89,3 +89,38 @@ test('Chat Universe reconstruction uses the same prior verified Spine before mod
  assert.match(src,/universeEntries: universeContext.entries/);
  assert.match(src,/Do not also write[\s\S]{0,550}persistContinuityEvent\(/);
 });
+
+
+test('authenticated canonical Universe Chat skips stale duplicate native-store fetch',async()=>{
+ const {loadUniverseContext}=await import(
+  '../src/reality-live-intelligence-orchestration-v0.1.js');
+ const previous=process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+ process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED='true';
+ let legacyFetches=0;
+ try{
+  const context=await loadUniverseContext({
+   continuityRootId:'owner-bound-existing-canonical-root',
+   systemContext:{
+    canonical_continuity_is_universe_source:true,
+    connected_world_observations:[{entry_id:'current:trusted-observation',
+      event_kind:'OWNER_SOURCE_CHECK',epistemic_status:'OBSERVED'}]
+   },
+   fetchImpl:async()=>{legacyFetches++;throw Error('STALE_UNIVERSE_FETCH_CALLED')}
+  });
+  assert.equal(legacyFetches,0);
+  assert.equal(context.status,'AWAIT_CANONICAL_SPINE_UNIVERSE_REENTRY');
+  assert.equal(context.persistence,'SAME_ROOT_CONTINUITY_SPINE');
+  assert.equal(context.count,1);
+  assert.equal(context.entries[0].entry_id,'current:trusted-observation');
+ }finally{
+  if(previous===undefined)delete process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED;
+  else process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED=previous;
+ }
+});
+test('server-only authenticated Chat selects canonical Universe source',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',
+  import.meta.url),'utf8');
+ assert.match(api,/canonical_continuity_is_universe_source:true/);
+ assert.match(api,/continuity_root_id:scopedRoot/);
+ assert.match(api,/publishPrivateAssistantAtomically/);
+});
