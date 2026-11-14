@@ -238,13 +238,19 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // The entire pre-cognition alignment, source-fact grounding and
+  // authoritative user-goal reconciliation use ONE hash-verified Spine
+  // snapshot. Avoid reconstructing the same entire history three times.
+  // Final publication still independently re-reads current goal authority.
+  const preCognitionSpineHistory=continuityRuntime?.enabled?
+    await continuityRuntime.readback():[];
   // Align the current task BEFORE generation, from the SAME existing source
   // readback as Continuity. This is a projection, not new memory or authority.
   let preCognitionAlignment = null;
   if (process.env.VERCEL_ENV === 'preview' &&
       process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
       continuityRuntime?.enabled && systemContext?.world_id) {
-    const history = await continuityRuntime.readback();
+    const history = preCognitionSpineHistory;
     const grounded = readGroundedEvidence(history,{worldId:systemContext.world_id,
       asOf:observedAt||new Date().toISOString()});
     if (grounded.source_receipt_ids.length) {
@@ -281,7 +287,7 @@ export async function runLiveIntelligenceOrchestration({
   if (process.env.VERCEL_ENV === 'preview' &&
       process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
       continuityRuntime?.enabled && systemContext?.world_id) {
-    const evidenceHistory = await continuityRuntime.readback();
+    const evidenceHistory = preCognitionSpineHistory;
     const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
     sourceAttestedFrameSnapshot = grounded;
     if (grounded.source_receipt_ids.length) {
@@ -308,8 +314,7 @@ export async function runLiveIntelligenceOrchestration({
   // No assistant suggestion or inferred pivot can silently rewrite it.
   const normalizedContinuityRoot=continuityRuntime?.spine?.continuity_root_id||
     effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id);
-  const priorGoalContinuityHistory=continuityRuntime?.enabled?
-    await continuityRuntime.readback():[];
+  const priorGoalContinuityHistory=preCognitionSpineHistory;
   // Close the loop without duplicating the canonical append-only ledger.
   // The same hash-verified, root-bound Spine used for goal reconciliation
   // becomes the next Universe read model. This includes prior recorded
