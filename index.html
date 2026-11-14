@@ -6760,7 +6760,7 @@ setInterval(refreshSavedShiftHome,300000);
   const replyReadback=data.reply_readback;
   const unmatched=new Map(
    replyReadback?.source==='AUTHENTICATED_OWNER_SCOPED_RLS_HISTORY'&&
-   replyReadback?.chat_endpoint_mode==='CONVERSATIONAL_ONLY_NO_DEVELOPMENT_JOB_DISPATCH'&&
+   replyReadback?.chat_endpoint_mode==='AUTHENTICATED_CHAT_PERSISTS_TO_GOVERNED_WORK_INTAKE'&&
    Array.isArray(replyReadback.unanswered_requests)?
     replyReadback.unanswered_requests.filter(x=>
      x?.status==='USER_MESSAGE_SAVED_REPLY_NOT_VERIFIED'&&
@@ -6768,8 +6768,50 @@ setInterval(refreshSavedShiftHome,300000);
      String(x.user_source_ref||'').startsWith('supabase:reality_chat_messages:')
     ).map(x=>[x.request_id,x]):[]
   );
+  const workReadback=data.work_handoff;
+  const verifiedWorkReadback=workReadback?.status===
+   'OWNER_CHAT_WORK_INTAKE_READBACK'&&
+   workReadback.owner_id&&
+   workReadback.conversation_id===conversationId()&&
+   workReadback.source==='AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK'&&
+   workReadback.installation_authorized===false&&
+   workReadback.production_changed===false&&
+   Array.isArray(workReadback.items);
+  const workBySource=new Map(verifiedWorkReadback?
+   workReadback.items.filter(item=>
+    /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(item?.source_ref||'')&&
+    /^[a-f0-9-]{36}$/i.test(item?.request_id||'')&&
+    ['PENDING','CLAIMED','INVESTIGATED_SCOPED','NEEDS_AUTHORIZED_SCOPE',
+     'CONVERSATION_ONLY','PROVIDER_UNVERIFIED'].includes(item.status)&&
+    item.execution_authorized_by_chat===false&&
+    item.installation_authorized===false
+   ).map(item=>[item.source_ref,item]):[]);
   for(const message of data.messages||[]){
    bubble(message.role,message.text);
+   const handed=message.role==='user'?workBySource.get(message.source_ref):null;
+   if(handed&&handed.request_id===message.request_id){
+    const card=document.createElement('div');
+    card.className='bubble reality-chat-signed-work-card';
+    card.setAttribute('role','status');
+    const heading=document.createElement('div');
+    heading.className='label';
+    heading.textContent='GOVERNED WORK · AUTHENTICATED RECEIPT';
+    const details=document.createElement('div');
+    const descriptions={
+     PENDING:'Saved instruction is in Reality’s durable worker inbox. Awaiting the existing signed shift worker.',
+     CLAIMED:'Reality’s authenticated worker has claimed this instruction for investigation. No code execution is implied.',
+     INVESTIGATED_SCOPED:'Reality recorded an OpenAI investigation against existing owner-authorized work. This is not an independently tested repair.',
+     NEEDS_AUTHORIZED_SCOPE:'Reality investigated, but the requested work is not sufficiently covered by the current signed work scope.',
+     CONVERSATION_ONLY:'Reality qualified this message as conversational, not a new executable job.',
+     PROVIDER_UNVERIFIED:'Reality’s worker could not independently verify its investigation result. No model outcome or repair is claimed.'
+    };
+    const suffix=typeof handed.diagnosis==='string'&&handed.diagnosis?
+     ' Verified worker record (model advisory): '+handed.diagnosis.slice(0,700):'';
+    details.textContent=(descriptions[handed.status]||
+     'This request has no verified work disposition.')+suffix;
+    card.append(heading,details);
+    thread.append(card);
+   }
    const missing=message.role==='user'?unmatched.get(message.request_id):null;
    if(missing&&missing.user_source_ref===message.source_ref){
     const notice=document.createElement('div');
@@ -6782,8 +6824,8 @@ setInterval(refreshSavedShiftHome,300000);
     const savedAt=Date.parse(missing.saved_at||'');
     const older=Number.isFinite(savedAt)&&Date.now()-savedAt>120000;
     explanation.textContent=older?
-     'Your message was saved, but Reality did not publish a verified reply. The exact server failure was not durably recorded, and this conversational Chat endpoint does not dispatch a development worker. Do not send the same request again as though the first one had started a job.':
-     'Your message was saved. No verified reply has been published yet; this Chat endpoint does not start a development worker.';
+     'Your message was saved, but Reality did not publish a verified reply. The exact server failure was not durably recorded. Its separate governed work intake and worker status are shown above when independently available. Do not resend the same saved instruction.':
+     'Your message was saved. A Chat reply has not been verified. The governed work intake has a separate receipt when the existing worker accepts it.';
     notice.append(heading,explanation);
     thread.append(notice);
    }
