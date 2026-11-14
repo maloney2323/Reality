@@ -70,6 +70,8 @@ import {continueRileyCorrectiveModelIntoIndependentCI}
  from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
 import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
  from '../../src/reality-bounded-corrective-proof-tick-v1.js';
+import {isDurablyCompletedShiftWorkerPulse}
+ from '../../src/reality-shift-worker-durable-completion-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -92,6 +94,7 @@ export default async function handler(req,res){
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  let activePulseDb=null,activePulseShiftId=null;
+ let durableWorkerCompletion=null;
  let workerStage='SHIFT_DB_BOUNDARY';
  try{
   const db=shiftDatabase(process.env);
@@ -144,6 +147,9 @@ export default async function handler(req,res){
       pulse.installation_authorized!==false||
       pulse.production_changed!==false)
     throw Error('BOUNDED_CORRECTIVE_WORKER_PULSE_READBACK_UNVERIFIED');
+   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+    durableWorkerCompletion=pulse;
+   workerStage='BOUNDED_WORKER_RESPONSE_PUBLICATION';
    return res.status(classification.http_status).json({
     status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
     original_job_completed:false,
@@ -981,11 +987,11 @@ export default async function handler(req,res){
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
      p_safe_result:safeOutcome
     });
-   if(!['SHIFT_WORKER_PULSE_DURABLY_RECORDED',
-     'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(completedPulse?.status)||
-     completedPulse.installation_authorized!==false)
+   if(!isDurablyCompletedShiftWorkerPulse(completedPulse,wakeReceipt.shift_id))
     throw Error('WORKER_COMPLETION_PULSE_UNVERIFIED');
+   durableWorkerCompletion=completedPulse;
   }
+  workerStage='WORKER_RESPONSE_PUBLICATION';
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
@@ -1032,6 +1038,19 @@ export default async function handler(req,res){
     native_readonly_model_tool_proof:nativeReadOnlyToolProof,
     native_capability_handoff_diagnosis:nativeCapabilityDiagnosis});
  }catch(error){
+  // A durable worker-completed receipt cannot be overwritten merely because
+  // HTTP response serialization/delivery fails afterward. Preserve the
+  // independently stored checkpoint; the dispatcher can read it back.
+  if(durableWorkerCompletion){
+   console.warn('REALITY_SHIFT_WORKER_RESPONSE_FAILED_AFTER_DURABLE_COMPLETION');
+   if(res.headersSent)return;
+   return res.status(200).json({
+    status:'DURABLE_SHIFT_WAKE_COMPLETED_RESPONSE_FALLBACK',
+    actual_worker_completion_receipt:durableWorkerCompletion,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   });
+  }
   // Persist stage only; never provider error text or credentials.
   console.warn('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage);
   const safeStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
