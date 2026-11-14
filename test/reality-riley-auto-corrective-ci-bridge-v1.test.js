@@ -69,7 +69,7 @@ test('exact source-bound Edge function has service-only access, frozen CI and se
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(source,/SUPABASE_SERVICE_ROLE_KEY/);
  assert.match(source,/REALITY_GITHUB_BROKER_TOKEN/);
- assert.match(source,/source\.sha!==c\.source_blob_sha/);
+ assert.match(source,/original\.sha!==c\.source_blob_sha/);
  assert.match(source,/await digest\(patched\)!==c\.proposed_sha256/);
  assert.match(source,/independent-corrective-frozen/);
  assert.match(source,/reality\/riley\/auto-corrective-/);
