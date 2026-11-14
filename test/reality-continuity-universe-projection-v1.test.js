@@ -82,7 +82,7 @@ test('Chat Universe reconstruction uses the same prior verified Spine before mod
   import.meta.url),'utf8');
  const projection=src.indexOf('projectCanonicalContinuityIntoUniverse({');
  const model=src.indexOf('const cognitiveResult = await runRealityCognitiveRuntime({');
- const history=src.indexOf('const priorGoalContinuityHistory=continuityRuntime?.enabled?');
+ const history=src.indexOf('const preCognitionSpineHistory=continuityRuntime?.enabled?');
  assert.ok(history>=0&&projection>history&&model>projection);
  assert.match(src,/status:'VERIFIED_CANONICAL_SPINE_UNIVERSE_REENTRY'/);
  assert.match(src,/canonical_source:'HASH_VERIFIED_CONTINUITY_SPINE_OWNER_SCOPE'/);
@@ -123,4 +123,17 @@ test('server-only authenticated Chat selects canonical Universe source',()=>{
  assert.match(api,/canonical_continuity_is_universe_source:true/);
  assert.match(api,/continuity_root_id:scopedRoot/);
  assert.match(api,/publishPrivateAssistantAtomically/);
+});
+
+test('pre-cognition evidence and user-goal views share one Spine readback',()=>{
+ const src=readFileSync(new URL('../src/reality-live-intelligence-orchestration-v0.1.js',
+  import.meta.url),'utf8');
+ const first=src.indexOf('const preCognitionSpineHistory=continuityRuntime?.enabled?');
+ const model=src.indexOf('const cognitiveResult = await runRealityCognitiveRuntime({');
+ const pre=src.slice(first,model);
+ assert.ok(first>=0&&model>first);
+ assert.match(pre,/const history = preCognitionSpineHistory/);
+ assert.match(pre,/const evidenceHistory = preCognitionSpineHistory/);
+ assert.match(pre,/const priorGoalContinuityHistory=preCognitionSpineHistory/);
+ assert.equal(pre.match(/await continuityRuntime\.readback\(\)/g)?.length||0,1);
 });
