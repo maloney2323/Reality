@@ -242,8 +242,12 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
     r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
    if(exactPullRuns.length>1)refuse('AMBIGUOUS_RECOVERY_EXACT_PR_CI');
    if(exactPullRuns.length===1)exactRuns=exactPullRuns;
-   // v2 never substitutes an unrelated gateway failure for exact frozen CI.
-   prFailureRuns=recovery?[]:[...byId.values()].filter(r=>eligible(r)&&
+   // Failure-only continuity evidence: a SHA-matched, exact owner PR,
+   // verified repository workflow and failing original-job boundary-test step
+   // can REJECT the same candidate even if GitHub did not run the candidate
+   // push workflow. This can NEVER qualify a passing candidate for install:
+   // only an exact candidate-specific frozen workflow may prove success.
+   prFailureRuns=[...byId.values()].filter(r=>eligible(r)&&
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
     typeof r.path==='string'&&r.path.startsWith('.github/workflows/')&&
@@ -262,6 +266,8 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
  // original SHA; failed reruns never alter the staged source digest.
  prFailureRuns.sort((a,b)=>b.id-a.id);
  const matched=exactRuns.length===1?exactRuns[0]:prFailureRuns[0];
+ if(recovery&&exactRuns.length===0&&matched?.conclusion!=='failure')
+  refuse('RECOVERY_GATEWAY_FALLBACK_FAILURE_ONLY');
  if(!matched)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
    original_work_id:c.original_work_id,model_response_id:c.model_response_id,
    candidate_branch:branch,candidate_commit_sha:head,
