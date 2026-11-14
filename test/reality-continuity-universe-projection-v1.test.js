@@ -77,5 +77,5 @@ test('Chat Universe reconstruction uses the same prior verified Spine before mod
  assert.match(src,/status:'VERIFIED_CANONICAL_SPINE_UNIVERSE_REENTRY'/);
  assert.match(src,/canonical_source:'HASH_VERIFIED_CONTINUITY_SPINE_OWNER_SCOPE'/);
  assert.match(src,/universeEntries: universeContext.entries/);
- assert.match(src,/do not also write[\s\S]{0,550}persistContinuityEvent\(/);
+ assert.match(src,/Do not also write[\s\S]{0,550}persistContinuityEvent\(/);
 });
