@@ -6983,8 +6983,24 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateSend').disabled=true;
   status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
+   // A conversation is durably accepted before model/reliability processing.
+   // Even if cognition times out, the exact signed-in turn can be resumed.
+   const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
+    credentials:'same-origin',signal:AbortSignal.timeout(14000),
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
+      message:value})});
+   const saved=await accepted.json().catch(()=>null);
+   if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
+      !String(saved.source_ref||'').startsWith('supabase:reality_chat_messages:')){
+    const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+   }
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
+   status('Your message is saved in Reality. Preparing the conversation answer.');
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
-    signal:AbortSignal.timeout(95000),
+    credentials:'same-origin',signal:AbortSignal.timeout(95000),
     headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
