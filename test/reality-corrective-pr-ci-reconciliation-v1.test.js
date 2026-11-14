@@ -55,7 +55,13 @@ const logs=[
 "actual: 'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY'",
 "expected: 'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF'",
 ].join('\n');
-function installMock({run=ci,log=logs,pulls=[trustedPr]}={}){
+const trustedWorkflowText=[
+ 'name: Reality — Isolated governed OpenAI gateway proof',
+ 'boundary-tests:',
+ 'Verify Reality model boundary and original tool-continuation regressions',
+ 'test/reality-riley-service-original-runtime-v1.test.js',
+ 'test/reality-riley-full-execution-path-v1.test.js'].join('\n');
+function installMock({run=ci,pulls=[trustedPr],workflowText=trustedWorkflowText}={}){
  const receipts=[];
  const originalFetch=globalThis.fetch;
  globalThis.fetch=async(url,opts={})=>{
@@ -86,6 +92,10 @@ function installMock({run=ci,log=logs,pulls=[trustedPr]}={}){
     value=contents(sha===head?candidate:baseline,target);
    }else if(path.startsWith('/contents/'+workflow+'?ref='))
     value=contents('persist-credentials: false\nindependent-corrective-frozen\nnode --test',workflow);
+   else if(path.startsWith('/contents/.github/workflows/')&&path.includes('?ref=')){
+    const route=path.slice('/contents/'.length).split('?ref=')[0];
+    value=contents(workflowText,route);
+   }
    else if(path.startsWith('/actions/runs?branch='))
     value={workflow_runs:[]};
    else if(path==='/actions/runs?event=pull_request&per_page=100')
@@ -96,9 +106,7 @@ function installMock({run=ci,log=logs,pulls=[trustedPr]}={}){
     value=run;
    else if(path==='/actions/runs/'+run.id+'/jobs?per_page=60')
     value=runJobs;
-   else if(path==='/actions/jobs/'+runJobs.jobs[0].id+'/logs')
-    return new Response(log,{status:200,headers:{'content-type':'text/plain'}});
-   else throw Error('UNEXPECTED_GITHUB_URL '+path);
+    else throw Error('UNEXPECTED_GITHUB_URL '+path);
   }else throw Error('UNEXPECTED_URL '+url);
   return new Response(JSON.stringify(value),{status:200,
    headers:{'content-type':'application/json'}});
@@ -142,12 +150,12 @@ test('a broad green PR build can never substitute for exact passing frozen CI',a
   assert.equal(mock.receipts.length,0);
  }finally{mock.restore()}
 });
-test('unrelated CI errors without BOTH frozen continuity failures cannot be recorded',async()=>{
- const mock=installMock({log:'not ok - other test failed'});
+test('gateway run without the trusted frozen original-job suites cannot be recorded',async()=>{
+ const mock=installMock({workflowText:'boundary-tests: unrelated test file'});
  try{
   await assert.rejects(
    stageOrObserve(c,'opaque-token',baseBranch,baseSha,'service-key'),
-   /FROZEN_ORIGINAL_HANDOFF_TEST_FAILURE_NOT_REPRODUCED/);
+   /TRUSTED_ORIGINAL_FROZEN_TEST_COMMAND_MISSING/);
   assert.equal(mock.receipts.length,0);
  }finally{mock.restore()}
 });
