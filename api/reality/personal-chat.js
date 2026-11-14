@@ -18,6 +18,7 @@ import {buildRealityProposedEmployeeRoleDiscussionContext}
 import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
+import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
@@ -51,6 +52,7 @@ export default async function handler(req,res){
    return res.status(200).json({ok:true,conversation_id:conversationId,
     messages:history.messages,
     reply_readback:summarizeSavedChatReplyReadback(history.messages),
+    work_handoff:await readOwnerChatWorkHandoff({session,conversationId}),
     continuity:{
      history_source:'AUTHENTICATED_SUPABASE_RLS',
      recovered_messages:history.messages.length,
@@ -114,6 +116,14 @@ export default async function handler(req,res){
   const recordedUser=await recordPrivateMessage(session,{
    conversationId,requestId,role:'user',text,
   });
+  // The signed human message entered the governed durable work inbox via
+  // AFTER INSERT, independently of Chat cognition or assistant publication.
+  const chatWorkReadback=await readOwnerChatWorkHandoff({
+   session,conversationId
+  });
+  const signedIntake=chatWorkReadback?.items?.find(x=>
+   x.request_id===requestId&&x.source_ref===recordedUser.source_ref)||
+   null;
   // RLS readback is the authentication evidence for a USER goal directive.
   // A supplied model answer, client source_ref or username is never accepted.
   let verifiedUserGoalCommand=null;
@@ -198,7 +208,11 @@ export default async function handler(req,res){
     // recording. It does not run /personal-governed-build or /real-repair...
     // Merely saying "starting" must never impersonate worker dispatch.
     chat_work_execution_bridge:{
-      plain_chat_can_dispatch_workers:false,
+      authenticated_message_entered_existing_shift_intake:!!signedIntake,
+      exact_authenticated_message_source_ref:signedIntake?.source_ref||null,
+      current_work_intake_status:signedIntake?.status||'NO_DURABLE_HANDOFF_READBACK',
+      read_only_qualification_uses_existing_signed_worker:true,
+      plain_chat_can_dispatch_workers:!!signedIntake,
       original_job_queued_by_this_chat_turn:false,
       worker_acknowledgment_verified_by_this_chat_turn:false,
       existing_owner_action:'EXPLICIT_SIGNED_IN_REALITY_CHAT_START_COMMAND_OR_EQUIVALENT_START_BUTTON',
@@ -346,6 +360,12 @@ export default async function handler(req,res){
         external_action_authorized:false}:null,
      independently_verified_semantic_correctness:false,
    },
+   work_handoff:signedIntake?{
+     status:signedIntake.status,source_ref:signedIntake.source_ref,
+     request_id:requestId,shift_id:signedIntake.shift_id,
+     execution_authorized_by_chat:false,
+     installation_authorized:false,production_changed:false
+    }:null,
    execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
  }catch(e){
   const status=Number(e.status)||503;
