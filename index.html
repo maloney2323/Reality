@@ -6773,6 +6773,19 @@ setInterval(refreshSavedShiftHome,300000);
     evidence.setAttribute('role','status');
    }
   }
+  const weeklyQueue=data.weekly_queue_readback;
+  if(weeklyQueue?.status==='CHAT_WEEKLY_SOURCE_CANDIDATES_VERIFIED'&&
+     Array.isArray(weeklyQueue.source_candidates)){
+   const summary=weeklyQueue.source_candidates.slice(0,8).map(item=>
+    item.employee_role+': '+item.title+' · '+item.qualification_status).join(' | ');
+   const panel=bubble('assistant',
+    'Existing employee candidate queue · Week '+weeklyQueue.week_start+
+    ' · '+weeklyQueue.source_candidate_count+' source-backed observations. '+
+    summary+
+    '. These need evidence qualification; they are not automatically authorized executable jobs.');
+   panel.querySelector('.label').textContent='REALITY · VERIFIED WEEKLY SOURCE QUEUE';
+   panel.setAttribute('role','status');
+  }
   // Only show missing replies reported by the authenticated owner-scoped
   // readback. These notices are NOT model answers or work receipts.
   const replyReadback=data.reply_readback;
