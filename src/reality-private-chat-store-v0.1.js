@@ -122,3 +122,36 @@ export async function publishPrivateAssistantAtomically(
  return {source_ref:'supabase:reality_chat_messages:'+payload,
    atomic_goal_revision_checked:true};
 }
+
+
+// Exact authenticated request readback for reply status polling. This reads
+// at most two message rows instead of reloading 240 history rows and unrelated
+// operational dashboards on every progress tick. RLS and identity are never
+// derived from the browser; both principal and conversation are session-bound.
+export async function readPrivateChatRequest(session,{conversationId,requestId},
+ {fetchImpl=fetch}={}){
+ if(!validUuid(session?.user_id)||!validUuid(conversationId)||
+    !validUuid(requestId)||!session?.access_token||!session?.config)
+  throw Object.assign(Error('CHAT_REQUEST_READBACK_IDENTITY_INVALID'),{status:400});
+ const q='?select=id,role,content,created_at,request_id'+
+  '&user_id=eq.'+encodeURIComponent(session.user_id)+
+  '&conversation_id=eq.'+encodeURIComponent(conversationId)+
+  '&request_id=eq.'+encodeURIComponent(requestId)+
+  '&order=created_at.asc,id.asc&limit=3';
+ const rows=await storageRequest(session,q,{fetchImpl});
+ if(rows.length>2||rows.some(row=>
+   !validUuid(row.id)||row.request_id!==requestId||
+   !['user','assistant'].includes(row.role)||
+   typeof row.content!=='string')||
+   rows.filter(r=>r.role==='user').length>1||
+   rows.filter(r=>r.role==='assistant').length>1)
+  throw Error('CHAT_REQUEST_READBACK_ROWS_INVALID');
+ return Object.freeze({conversation_id:conversationId,request_id:requestId,
+  messages:Object.freeze(rows.map(row=>Object.freeze({
+   role:row.role,text:row.content,
+   source_ref:'supabase:reality_chat_messages:'+row.id,
+   created_at:row.created_at,request_id:row.request_id
+  }))),
+  status:'AUTHENTICATED_EXACT_REQUEST_RLS_READBACK',
+  work_execution_authorized:false,installation_authorized:false});
+}
