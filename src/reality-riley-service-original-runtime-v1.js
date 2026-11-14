@@ -211,7 +211,8 @@ export function createRileyServiceOriginalRuntime({
    fail('GOVERNED_EXECUTOR_ORIGINAL_OUTCOME_UNTRUSTED');
   const status=outcome.execution_status==='BLOCKED'?
    'ORIGINAL_JOB_AUTHORIZATION_BLOCKED':
-   outcome.capability_response?
+   outcome.capability_response&&
+   typeof outcome.capability_response==='object'?
     'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF':
    outcome.execution_status==='VERIFIED'?
     'ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT':
