@@ -206,7 +206,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
     typeof r.path==='string'&&r.path.startsWith('.github/workflows/')&&
-    /\\.ya?ml(?:@.*)?$/.test(r.path)&&
+    /\.ya?ml(?:@.*)?$/.test(r.path)&&
     (r.repository?.full_name===undefined||
      r.repository.full_name==='maloney2323/Reality')&&
     // PR itself is owner-head- and base-bound by independently fetched
