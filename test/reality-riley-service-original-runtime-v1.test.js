@@ -266,3 +266,6 @@ test('actual worker recovery lane requires a verified persisted shift pulse',asy
  });
  assert.equal(unverified.worker_status,'WAKE_FAILED');
 });
+
+// The existing frozen owner-original proof must also exercise the CI broker.
+import './reality-corrective-pr-ci-reconciliation-v1.test.js';
