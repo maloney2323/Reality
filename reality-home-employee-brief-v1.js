@@ -118,12 +118,40 @@
       (doneByEmployee.get(proof.employee)||0)+1);
     }
    }
+   const activeOriginals=data.current_shift_engineering_originals;
+   const originalsVerified=activeOriginals?.status===
+    'CURRENT_OWNER_SHIFT_ENGINEERING_ORIGINALS_SOURCE_BOUND'&&
+    activeOriginals.owner_scope_verified===true&&
+    activeOriginals.new_shift_started===false&&
+    activeOriginals.installation_authorized===false&&
+    activeOriginals.production_changed===false&&
+    Array.isArray(activeOriginals.items)&&
+    activeOriginals.items.length===activeOriginals.count;
+   const activeByEmployee=new Map();
+   if(originalsVerified){
+    const seenWork=new Set();
+    for(const work of activeOriginals.items){
+     if(!names.includes(work.assigned_employee)||
+      !/^work:[a-f0-9]{32}$/.test(work.original_work_id||'')||
+      seenWork.has(work.original_work_id)||
+      !['SOURCE_ADMITTED','CANDIDATE_TESTING',
+       'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL'].includes(work.phase)||
+      work.installation_authorized!==false||
+      work.original_job_completed!==false)
+      throw Error('SIGNED_ENGINEERING_ORIGINAL_PROOF_UNVERIFIED');
+     seenWork.add(work.original_work_id);
+     activeByEmployee.set(work.assigned_employee,
+      (activeByEmployee.get(work.assigned_employee)||0)+1);
+    }
+   }
    for(const name of names){
     const card=root.querySelector('[data-home-employee="'+name+'"]');
     const caption=card?.querySelector('[data-home-work]');
     if(!caption)throw Error('EMPLOYEE_HOME_CARD_MISSING');
     const e=map.get(name),n=e.candidate_count;
-    caption.textContent=(verifiedWorkerReceipts?
+    caption.textContent=(originalsVerified&&activeByEmployee.get(name)?
+      activeByEmployee.get(name)+' governed engineering original(s) admitted; awaiting model draft and tests · ':'')+
+     (verifiedWorkerReceipts?
       (doneByEmployee.get(name)||0)+' investigation'+
        ((doneByEmployee.get(name)||0)===1?'':'s')+
        ' independently receipted · ':'')+
@@ -140,7 +168,9 @@
    const total=data.existing_work_center_candidates;
    if(!Number.isSafeInteger(total)||total<0)
     throw Error('EMPLOYEE_SOURCE_TOTAL_UNVERIFIED');
-   status.textContent=(verifiedWorkerReceipts?
+   status.textContent=(originalsVerified&&activeOriginals.count?
+     activeOriginals.count+' owner-warranted engineering original(s) admitted to Reality; work not yet installed or settled · ':'')+
+    (verifiedWorkerReceipts?
      workerReceipts.count+' actual employee source investigations independently receipted · ':
      'Employee investigation receipts not yet independently read back · ')+
     (inspected?
@@ -153,7 +183,7 @@
     (savedStatus==='VERIFIED_SAVED_CHAT'?
      saved.size+' roles with saved Chat proposals. ':
      'Saved Chat proposals temporarily unverified. ')+
-    'No new job or shift authorized.';
+    'This read-only board does not start any new shift or authorize installation.';
   }catch{
    status.textContent='Employee evidence could not be verified. Existing receipts and the live work status below remain separate; no active work or savings inferred.';
   }finally{loading=false;refresh.disabled=false;}
