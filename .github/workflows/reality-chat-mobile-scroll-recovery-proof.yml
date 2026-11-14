@@ -4,10 +4,13 @@ on:
     branches: [reality/native263-temporal-chat-proof-20261113]
     paths:
       - index.html
+      - api/reality/personal-chat.js
+      - src/reality-saved-chat-reply-readback-v1.js
       - reality-chat-conversation-export-v1.js
       - reality-chat-fullscreen-v2.css
       - reality-chat-workspace-v1.js
       - test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js
+      - test/reality-chat-saved-reply-visibility-v1.test.js
       - .github/workflows/reality-chat-mobile-scroll-recovery-proof.yml
   workflow_dispatch:
 permissions:
@@ -26,8 +29,10 @@ jobs:
           node --check reality-chat-conversation-export-v1.js
           node --check reality-chat-workspace-v1.js
           node --check reality-chat-request-status-v1.js
+          node --check src/reality-saved-chat-reply-readback-v1.js
+          node --check api/reality/personal-chat.js
       - name: Independently run mobile scroll and saved-message proof
         run: |
-          node --test test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js test/reality-chat-fullscreen-v2.test.js test/reality-chat-automated-shift-and-export-v1.test.js test/reality-chat-send-nonblocking-v1.test.js
+          node --test test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js test/reality-chat-fullscreen-v2.test.js test/reality-chat-automated-shift-and-export-v1.test.js test/reality-chat-send-nonblocking-v1.test.js test/reality-chat-saved-reply-visibility-v1.test.js
       - name: No new shift, message, installation, or production change
         run: echo 'Chat UI and authenticated readback tests only'
