@@ -51,7 +51,8 @@ async function rpc(name,body,key){
       'reality_record_riley_auto_corrective_ci_v1',
       'reality_read_next_same_original_recovery_candidate_v2',
       'reality_record_same_original_recovery_staging_v2',
-      'reality_record_same_original_recovery_ci_v2'].includes(name))
+      'reality_record_same_original_recovery_ci_v2',
+      'reality_record_same_original_frozen_ci_attestation_v1'].includes(name))
   refuse('UNALLOWED_DATABASE_OPERATION');
  const url='https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name;
  const r=await fetch(url,{method:'POST',redirect:'error',cache:'no-store',
@@ -103,6 +104,139 @@ function validClaim(c,recovery=false){
   c.production_changed!==false)
   refuse('EXACT_CURRENT_MODEL_SOURCE_AND_AUTHORITY_REQUIRED');
 }
+
+/*
+ * A previous candidate can have a valid source SHA but an older malformed
+ * workflow definition. Attest the exact unchanged candidate checkout via an
+ * independently triggered, workflow-only, draft CI PR. This is not a second
+ * original job, not an install and not a generic green-gateway shortcut.
+ * The entire attestation workflow must be a deterministic, limited rewrite
+ * of the independently sourced trusted base workflow.
+ */
+async function verifyPinnedFrozenCiAttestation(
+ c,token,baseBranch,key,workflow,branch,head){
+ const attestBranch=branch+'-ci-attest';
+ const ref=await github(token,'/git/ref/heads/'+attestBranch);
+ if(ref.status===404)return null;
+ if(!ref.ok||ref.data?.ref!=='refs/heads/'+attestBranch||
+    !SHA.test(ref.data.object?.sha||''))
+  refuse('PINNED_CI_ATTESTATION_BRANCH_UNVERIFIED');
+ const attestSha=ref.data.object.sha;
+ if(attestSha===head)refuse('PINNED_CI_ATTESTATION_MUST_BE_SEPARATE_RUNNER');
+ const prs=await exact(token,'/pulls?state=open&head='+
+   encodeURIComponent('maloney2323:'+attestBranch)+'&per_page=30');
+ if(!Array.isArray(prs))refuse('PINNED_CI_PR_PROVIDER_UNVERIFIED');
+ const matches=prs.filter(p=>p.state==='open'&&p.draft===true&&
+  Number.isSafeInteger(p.number)&&p.number>0&&
+  p.head?.ref===attestBranch&&p.head?.sha===attestSha&&
+  p.head?.repo?.full_name==='maloney2323/Reality'&&
+  p.base?.ref===baseBranch&&
+  p.base?.repo?.full_name==='maloney2323/Reality');
+ if(matches.length!==1)refuse('PINNED_CI_EXACT_OWNER_PR_REQUIRED');
+ const attestPR=matches[0];
+ const changed=await exact(token,'/pulls/'+attestPR.number+'/files?per_page=100');
+ if(!Array.isArray(changed)||changed.length!==1||
+    changed[0].filename!==WORKFLOW||
+    changed[0].status!=='modified')
+  refuse('PINNED_CI_ONLY_WORKFLOW_MAY_CHANGE');
+ const attested=await source(token,WORKFLOW,attestSha);
+ const originalCheckout='          ref: '+String.fromCharCode(36,123,123)+
+  ' github.event.pull_request.head.sha || github.sha '+String.fromCharCode(125,125);
+ const pinnedCheckout='          ref: '+head;
+ const setupNode='      - uses: actions/setup-node@v4';
+ const exactStep='      - name: Verify exact original candidate SHA\n'+
+  '        run: test "$(git rev-parse HEAD)" = \u0027'+head+'\u0027\n';
+ const prPathBlock="    paths:\n"+
+  "      - 'src/reality-riley-service-original-runtime-v1.js'\n"+
+  "permissions:";
+ const revisedPrPath="    paths:\n"+
+  "      - 'src/reality-riley-service-original-runtime-v1.js'\n"+
+  "      - '.github/workflows/reality-riley-auto-corrective-candidate-proof.yml'\n"+
+  "permissions:";
+ const baseText=workflow.text;
+ if(baseText.split(originalCheckout).length!==2||
+    baseText.split(setupNode).length!==2||
+    baseText.split(prPathBlock).length!==2)
+  refuse('PINNED_CI_TRUSTED_WORKFLOW_SHAPE_CHANGED');
+ const expected=baseText.replace(originalCheckout,pinnedCheckout)
+  .replace(setupNode,exactStep+setupNode)
+  .replace(prPathBlock,revisedPrPath);
+ if(attested.text!==expected)
+  refuse('PINNED_CI_WORKFLOW_UNTRUSTED_CHANGE');
+ const listed=await exact(token,'/actions/runs?branch='+
+   encodeURIComponent(attestBranch)+'&event=pull_request&per_page=100');
+ if(!Array.isArray(listed.workflow_runs))
+  refuse('PINNED_CI_INDEPENDENT_RUNS_UNVERIFIED');
+ const matchesRun=listed.workflow_runs.filter(r=>
+  r.head_sha===attestSha&&r.head_branch===attestBranch&&
+  r.event==='pull_request'&&r.name===WORKFLOW_NAME&&
+  typeof r.path==='string'&&r.path.split('@')[0]===WORKFLOW&&
+  r.status==='completed'&&['success','failure'].includes(r.conclusion)&&
+  Number.isSafeInteger(r.id)&&r.id>10000&&
+  r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id);
+ if(matchesRun.length===0)return null;
+ matchesRun.sort((a,b)=>b.id-a.id);
+ const run=await exact(token,'/actions/runs/'+matchesRun[0].id);
+ if(run.id!==matchesRun[0].id||run.head_sha!==attestSha||
+  run.head_branch!==attestBranch||run.event!=='pull_request'||
+  run.status!=='completed'||run.conclusion!==matchesRun[0].conclusion||
+  run.name!==WORKFLOW_NAME||
+  run.path?.split('@')[0]!==WORKFLOW||
+  run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+run.id)
+  refuse('PINNED_CI_INDEPENDENT_RUN_IDENTITY_MISMATCH');
+ const jobs=await exact(token,'/actions/runs/'+run.id+'/jobs?per_page=60');
+ if(!Array.isArray(jobs.jobs))refuse('PINNED_CI_FROZEN_JOB_UNVERIFIED');
+ const exactJobs=jobs.jobs.filter(j=>j.run_id===run.id&&
+  j.name==='independent-corrective-frozen'&&j.status==='completed'&&
+  j.conclusion===run.conclusion&&Number.isSafeInteger(j.id)&&
+  Array.isArray(j.steps));
+ if(exactJobs.length!==1)refuse('PINNED_CI_ONE_EXACT_FROZEN_JOB_REQUIRED');
+ const steps=exactJobs[0].steps;
+ const passed=name=>steps.some(z=>z.name===name&&z.conclusion==='success');
+ if(!passed('Verify exact original candidate SHA')||
+    !passed('Exact candidate source syntax')||
+    !steps.some(z=>z.name===
+      'Independent original-job continuity and governed handoff acceptance'&&
+      z.conclusion===(run.conclusion==='success'?'success':'failure'))||
+    (run.conclusion==='success'&&!passed('Confirm no installation authority in candidate CI')))
+  refuse('PINNED_CI_FROZEN_JOB_STEPS_NOT_PROVEN');
+ const fingerprint=await digest(attested.bytes);
+ const saved=await rpc('reality_record_same_original_frozen_ci_attestation_v1',{
+  p_attempt_id:c.attempt_id,
+  p_candidate_commit_sha:head,
+  p_workflow_runner_commit_sha:attestSha,
+  p_verification_pr_number:attestPR.number,
+  p_independent_run_id:run.id,
+  p_independent_run_url:run.html_url,
+  p_independent_run_conclusion:run.conclusion,
+  p_workflow_file_sha256:fingerprint
+ },key);
+ if(!['SAME_ORIGINAL_RECOVERY_CI_PASSED_EXACT_INSTALL_APPROVAL_REQUIRED',
+       'SAME_ORIGINAL_RECOVERY_CI_FAILED_NEXT_EVIDENCE_BACKED_ATTEMPT_ELIGIBLE',
+       'ORIGINAL_FROZEN_CI_ALREADY_INDEPENDENTLY_RECORDED'].includes(saved.status)||
+   saved.attempt_id!==c.attempt_id||
+   saved.original_work_id!==c.original_work_id||
+   saved.shift_id!==c.shift_id||
+   saved.independent_run_id!==run.id||
+   saved.ci_conclusion!==run.conclusion||
+   saved.independent_ci_verified!==true||
+   saved.installation_authorized!==false||
+   saved.original_job_completed!==false||
+   saved.production_changed!==false)
+  refuse('PINNED_CI_ATOMIC_DURABLE_RECEIPT_MISSING');
+ return response(run.conclusion==='success'?
+  'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED':
+  'CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN',200,{
+  attempt_id:c.attempt_id,attempt_number:c.attempt_number,
+  original_work_id:c.original_work_id,candidate_commit_sha:head,
+  verification_runner_commit_sha:attestSha,
+  independent_run_url:run.html_url,independent_ci_verified:true,
+  exact_pinned_source_attestation:true,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false
+ });
+}
+
 async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
  const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5)+
    (recovery?'-a'+c.attempt_number:'');
@@ -182,6 +316,14 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
     staged.original_job_completed!==false||
     staged.production_changed!==false)
    refuse('CANDIDATE_STAGING_DURABLE_RECONCILIATION_MISSING');
+ // A workflow-only, source-pinned CI readback is a distinct, immutable
+ // attestation. It is checked against the complete trusted workflow content
+ // and can never bypass actual original-job acceptance.
+ if(recovery){
+  const attested=await verifyPinnedFrozenCiAttestation(
+   c,token,baseBranch,key,workflow,branch,head);
+  if(attested)return attested;
+ }
  // The exact frozen candidate workflow is preferred. If GitHub did not
  // emit that push workflow (for example a branch was created by a broker
  // credential that does not trigger Actions), *failure-only* evidence from
