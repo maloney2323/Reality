@@ -67,7 +67,7 @@ export async function authorizeSavedChatExistingOriginal({
   original_work_id:state.original_work_id,request_id:requestId,
   source_ref:state.source_ref,
   queue_id:response.queue_id||null,
-  worker_dispatch_verified:response.worker_dispatch_started===true,
-  execution_started:response.worker_dispatch_started===true,
+  dispatch_requested:response.worker_dispatch_started===true,
+  worker_execution_verified:false,execution_started:false,
   installation_authorized:false,production_changed:false});
 }
