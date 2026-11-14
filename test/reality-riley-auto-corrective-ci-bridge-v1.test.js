@@ -98,8 +98,8 @@ test('isolated worker tolerates unrelated preview commits but must recheck exact
  assert.match(sql,/candidate_staged_commit_sha/);
  assert.match(sql,/rev\.owner_id=\(g->>'owner_id'\)::uuid/);
  assert.match(sql,/j\.phase='SOURCE_ADMITTED'/);
- assert.match(sql,/not installation_authorized/);
- assert.match(sql,/not original_job_completed/);
+ assert.match(sql,/'installation_authorized',false/);
+ assert.match(sql,/'original_job_completed',false/);
 });
 test('owner Chat status shows staged CI candidate separately from actual test verdict',()=>{
  const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -111,5 +111,5 @@ test('owner Chat status shows staged CI candidate separately from actual test ve
  assert.match(sql,/p\.conclusion='success'/);
  assert.match(ui,/CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING/);
  assert.match(ui,/View isolated candidate on GitHub/);
- assert.match(ui,/Independent CI verdict pending/);
+ assert.match(ui,/independent CI verdict pending/);
 });
