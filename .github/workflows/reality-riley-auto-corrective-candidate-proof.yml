@@ -6,16 +6,24 @@ on:
     paths:
       - 'src/reality-riley-service-original-runtime-v1.js'
       - '.github/workflows/reality-riley-auto-corrective-candidate-proof.yml'
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+    branches:
+      - 'reality/native*'
+    paths:
+      - 'src/reality-riley-service-original-runtime-v1.js'
 permissions:
   contents: read
 jobs:
   independent-corrective-frozen:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'reality/riley/auto-corrective-')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
