@@ -51,3 +51,42 @@ test('recovery UI wires exact request identity and reuses the existing signed re
  assert.doesNotMatch(js,/\/api\/reality\/personal-chat-intake/);
  assert.doesNotMatch(js,/AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY/);
 });
+
+
+test('real browser event recovers at most once for the same saved turn',async()=>{
+ const listener=new Map(),storage=new Map();
+ let clicked=0;
+ const button={disabled:false,isConnected:true,textContent:'Retry saved reply',
+  click(){clicked++}};
+ const originalWindow=globalThis.window,originalDocument=globalThis.document;
+ globalThis.window={
+  location:{pathname:'/chat'},
+  addEventListener:(type,handler)=>listener.set(type,handler),
+  localStorage:{
+   getItem:key=>storage.get(key)||null,
+   setItem:(key,val)=>{storage.set(key,val);}
+  }
+ };
+ globalThis.document={
+  hidden:false,getElementById:()=>({disabled:false}),
+  querySelector:sel=>sel.includes(request)?button:null
+ };
+ try{
+  await import('../reality-chat-recover-unanswered-v1.js?browser-integration-v1');
+  const event={detail:{conversation_id:id,messages:[{
+   ...msg,created_at:new Date().toISOString()
+  }],unanswered_requests:[pending]}};
+  const handler=listener.get('reality:saved-chat-readback');
+  assert.equal(typeof handler,'function');
+  handler(event);
+  handler(event);
+  assert.equal(clicked,1);
+  assert.match(button.textContent,/Recovering saved reply automatically/);
+  assert.equal(storage.size,1);
+ }finally{
+  if(originalWindow===undefined)delete globalThis.window;
+  else globalThis.window=originalWindow;
+  if(originalDocument===undefined)delete globalThis.document;
+  else globalThis.document=originalDocument;
+ }
+});
