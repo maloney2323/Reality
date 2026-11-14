@@ -13,3 +13,26 @@ export function buildNativeUniverseContext({ systemContext = {} } = {}) {
     persistence: 'REQUEST_CONTEXT',
   });
 }
+
+// Merge the authenticated current observation window before the older
+// historical reconstruction, preserving the evidence that triggered THIS
+// turn under the model's bounded context. Earlier event history fills the
+// remaining capacity; duplicate event IDs do not crowd out other evidence.
+export function mergeCurrentAndDurableUniverseForCognition({
+ current=[],durable=[],limit=100
+}={}){
+ if(!Array.isArray(current)||!Array.isArray(durable)||
+  !Number.isInteger(limit)||limit<1||limit>100)
+  throw Error('UNIVERSE_COGNITION_WINDOW_INVALID');
+ const seen=new Set(),result=[];
+ for(const item of [...current,...durable]){
+  if(!item||typeof item!=='object'||Array.isArray(item))continue;
+  const id=typeof item.entry_id==='string'?item.entry_id:
+   typeof item.event_id==='string'?item.event_id:null;
+  if(id&&seen.has(id))continue;
+  if(id)seen.add(id);
+  result.push(item);
+  if(result.length===limit)break;
+ }
+ return Object.freeze(result);
+}

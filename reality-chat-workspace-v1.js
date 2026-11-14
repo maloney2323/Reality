@@ -96,6 +96,11 @@
   threadTitle.append(node('strong', '', 'Conversation'));
   threadTitle.append(node('small', '', 'Reality keeps source claims, goals and execution authority separate.'));
   const threadButtons = node('div', 'reality-chat-thread-buttons');
+  // Redundant direct navigation is intentional: a signed-in user should
+  // never depend on scrolling past an operational card to leave the chat.
+  const homeLink = node('a', 'reality-chat-home-link', '← Home');
+  homeLink.href = '/';
+  homeLink.setAttribute('aria-label','Return to Reality Home');
   const historyToggle = node('button', 'reality-chat-mobile-tool', 'Chats');
   historyToggle.type = 'button';
   historyToggle.id = 'realityChatOpenConversations';
@@ -137,7 +142,7 @@
   });
   updateFocusLabel();
   window.addEventListener('resize', updateFocusLabel);
-  threadButtons.append(historyToggle, inspectorToggle, focusToggle);
+  threadButtons.append(homeLink, historyToggle, inspectorToggle, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
 
@@ -242,7 +247,22 @@
   panels.approvals.append(get('realityChatApprovalInbox'));
   const proofLead = node('p','reality-chat-proof-note',
     'A passing test, provider observation or model statement is not a completed business job. Review only original-job evidence independently verified by Reality.');
-  panels.proof.append(proofLead,get('realityChatVerifiedRepairReview'));
+  panels.proof.append(proofLead);
+  // Research-stage upgrade candidates are NOT this settled original job.
+  // Keep them in Work so an uninstalled candidate never visually overrides
+  // the independently settled #263 original receipt in the Proof tab.
+  const researchCandidate=get('realityChatVerifiedRepairReview');
+  if(researchCandidate){
+    const otherWork=node('section','reality-chat-other-research');
+    otherWork.append(heading('Other research candidates',
+      'Separate from completed original #263. Testing is not installation or settlement.'));
+    otherWork.append(researchCandidate);
+    panels.work.append(otherWork);
+  }
+  // The settled original's proof panel is mounted here by its read-only UI
+  // module. Keep the same original decision control and receipt, not a copy.
+  const native263Proof = get('native263InstallApprovalPanel');
+  if(native263Proof)panels.proof.append(native263Proof);
   const proofLink = node('a','reality-chat-proof-link','Open Value Verification →');
   proofLink.href='/value';
   panels.proof.append(proofLink);

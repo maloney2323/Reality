@@ -1,0 +1,39 @@
+name: Reality independently tested auto-corrective candidate
+on:
+  push:
+    branches:
+      - 'reality/riley/auto-corrective-*'
+    paths:
+      - 'src/reality-riley-service-original-runtime-v1.js'
+      - '.github/workflows/reality-riley-auto-corrective-candidate-proof.yml'
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+    branches:
+      - 'reality/native*'
+    paths:
+      - 'src/reality-riley-service-original-runtime-v1.js'
+permissions:
+  contents: read
+jobs:
+  independent-corrective-frozen:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'reality/riley/auto-corrective-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact candidate source syntax
+        run: node --check src/reality-riley-service-original-runtime-v1.js
+      - name: Independent original-job continuity and governed handoff acceptance
+        run: |
+          node --test \
+            test/reality-riley-service-original-runtime-v1.test.js \
+            test/reality-riley-trusted-original-driver-bridge-v1.test.js \
+            test/reality-riley-governed-original-job-v1.test.js
+      - name: Confirm no installation authority in candidate CI
+        run: echo "Candidate only: zero installation, approval or settlement effects"

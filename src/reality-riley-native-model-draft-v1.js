@@ -1,4 +1,4 @@
-// Reality employee Riley: one real, owner-warranted model code draft for #263.
+// Reality employee Riley: one real, owner-warranted model draft for exact signed-shift repair.
 // Uses the shared OpenAI intelligence dependency, not an independent agent.
 // This NEVER executes generated code, installs a capability, writes to GitHub,
 // changes production, claims a new original, or issues a settlement receipt.
@@ -8,7 +8,7 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const TARGET='src/reality-riley-service-original-runtime-v1.js';
-const ISSUE_URL='https://github.com/maloney2323/Reality/issues/263';
+const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/;
 const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -70,8 +70,9 @@ export async function sourceFromGitHub({commit,fetchImpl}){
 export function expectedGraph(graph){
  const native=graph?.jobs?.filter(x=>
   x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
-  x.source_ref===ISSUE_URL&&x.phase==='SOURCE_ADMITTED'&&
-  x.independent_source_proof_verified===true);
+  ISSUE.test(x.source_ref||'')&&x.phase==='SOURCE_ADMITTED'&&
+  x.independent_source_proof_verified===true&&
+  /^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||''));
  if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
     !UUID.test(graph.shift_id||'')||
     !UUID.test(graph.owner_id||'')||
@@ -118,7 +119,7 @@ export async function draftCurrentRileyNativeRepair({
     claim.original_work_id!==original.original_work_id||
     claim.shift_id!==graph.shift_id||
     claim.owner_id!==graph.owner_id||
-    claim.source_ref!==ISSUE_URL||
+    claim.source_ref!==original.source_ref||
     claim.source_proof_sha256!==original.source_proof_sha256||
     claim.model_invocation_authorized!==true||
     !UUID.test(claim.request_id||'')||
@@ -152,7 +153,7 @@ export async function draftCurrentRileyNativeRepair({
      {role:'system',content:[{type:'input_text',text:
       'You are Riley, one software-engineering ROLE in the governed Reality employee shift. '+
       'You have NO authority to install, run code, create a new job or change production. '+
-      'Review the current real source file and the original issue #263. '+
+      'Review the current real source file and the exact signed-shift original issue. '+
       'Propose ONE minimal existing-file edit, strictly JSON with exact keys find,replace,reason. '+
       'find must be a copied verbatim continuous source block occurring once. '+
       'replace must be a safe changed source block. '+
@@ -163,7 +164,7 @@ export async function draftCurrentRileyNativeRepair({
       'Do not remove existing security checks. If uncertain, produce no invented test results.'}]},
      {role:'user',content:[{type:'input_text',text:
       'Frozen owner job: '+original.original_work_id+
-      '\nIssue: '+ISSUE_URL+
+      '\nIssue: '+original.source_ref+
       '\nRead-only source path: '+TARGET+
       '\nCurrent source at isolated commit '+commit+':\n'+source.text+
       '\nReturn only the JSON source edit; do not claim execution or approval.'}]}

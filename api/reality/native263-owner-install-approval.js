@@ -6,6 +6,9 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
+import {shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
+import {buildNative263SettledOwnerCard}
+ from '../../src/reality-native263-temporal-chat-context-v1.js';
 export const maxDuration=35;
 const WORK='work:873a6e74fd14c6beacc9042dd8021dfc';
 const OWNER='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -70,12 +73,26 @@ export default async function handler(req,res){
      db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
      !db.secretKey)
    throw Error('NATIVE263_ISOLATED_OWNER_SERVICE_SCOPE_REQUIRED');
-  const card=await ownerCard(db,session);
-  if(req.method==='GET')return res.status(200).json({
-   ok:true,...card,installation_completed:card.approval_state==='SOURCE_INSTALLED',
-   next_step:card.owner_approval_ready?
+  if(req.method==='GET'){
+   // A completed original is NOT another installation approval request.
+   // Read the settled original directly from Reality's existing audited
+   // receipt/approval ledger, without requiring the older readiness card
+   // (which was designed for pre-install owner decisions).
+   const current=await shiftRpc(db,'reality_read_native263_postinstall_context_v1',{});
+   if(current?.state==='ORIGINAL_SETTLED'){
+    return res.status(200).json(buildNative263SettledOwnerCard(current,{
+      ownerId:session.user_id}));
+   }
+   const card=await ownerCard(db,session);
+   return res.status(200).json({
+    ok:true,...card,
+    independently_verified_final_original_receipt_id:null,
+    installation_completed:card.approval_state==='SOURCE_INSTALLED',
+    next_step:card.owner_approval_ready?
      'EXACT_OWNER_CLICK_MAY_AUTHORIZE_SINGLE_AUTOMATIC_INSTALL':
      'CONTINUATION_AND_FINAL_RECEIPT_PROOF_REQUIRED_BEFORE_OWNER_APPROVAL'});
+  }
+  const card=await ownerCard(db,session);
   if(!req.body||typeof req.body!=='object'||
      Object.getPrototypeOf(req.body)!==Object.prototype||
      Array.isArray(req.body)||

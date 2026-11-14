@@ -41,7 +41,10 @@ test('reuses every actual Reality conversation, evidence, goal and single-approv
 test('work panels are independently inspectable and do not simulate activity',()=>{
  assert.match(js,/panels\.work\.append\(get\('realityChatShiftBrief'\),get\('realityChatActivity'\),get\('realityChatAutomationDiagnostics'\)\)/);
  assert.match(js,/panels\.approvals\.append\(get\('realityChatApprovalInbox'\)\)/);
- assert.match(js,/panels\.proof\.append\(proofLead,get\('realityChatVerifiedRepairReview'\)\)/);
+ assert.match(js,/panels\.proof\.append\(proofLead\)/);
+ assert.match(js,/const researchCandidate=get\('realityChatVerifiedRepairReview'\)/);
+ assert.match(js,/panels\.work\.append\(otherWork\)/);
+ assert.match(js,/panels\.proof\.append\(native263Proof\)/);
  assert.match(js,/get\('privateSend'\)/);
  assert.match(js,/get\('privateConversations'\)/);
  assert.match(js,/get\('privateGoalStatus'\)/);

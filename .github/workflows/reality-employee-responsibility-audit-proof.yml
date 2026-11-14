@@ -1,0 +1,46 @@
+name: Reality employee responsibility audit isolated proof
+on:
+  push:
+    branches: [reality/native263-temporal-chat-proof-20261113]
+    paths:
+      - src/reality-employee-responsibility-audit-v1.js
+      - src/reality-governed-shift-boundary-v1.js
+      - api/reality/personal-employee-work-audit.js
+      - api/reality/personal-employee-roster.js
+      - reality-home-employee-brief-v1.js
+      - reality-employee-work-audit-ui-v1.js
+      - index.html
+      - test/reality-employee-responsibility-audit-v1.test.js
+      - test/reality-home-live-employees-v1.test.js
+      - src/reality-active-weekly-source-investigator-v1.js
+      - api/reality/governed-employee-shift-worker.js
+      - supabase/migrations/20261113_worker_active_weekly_investigations_v1.sql
+      - test/reality-active-weekly-source-investigator-v1.test.js
+      - .github/workflows/reality-employee-responsibility-audit-proof.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-audit-without-business-effects:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check the new owner audit boundary and Home buttons
+        run: |
+          node --check src/reality-employee-responsibility-audit-v1.js
+          node --check api/reality/personal-employee-work-audit.js
+          node --check reality-employee-work-audit-ui-v1.js
+          node --check src/reality-active-weekly-source-investigator-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check api/reality/personal-employee-roster.js
+          node --check reality-home-employee-brief-v1.js
+      - name: Run the actual isolated employee-audit acceptance tests
+        run: |
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js
+      - name: No new shift, installation or production effect
+        run: |
+          echo 'Read-only responsibility audit proof; no secrets or provider mutations'

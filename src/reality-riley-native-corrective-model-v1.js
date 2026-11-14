@@ -6,7 +6,7 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {sourceFromGitHub,validateCandidate,outputText,expectedGraph}
  from './reality-riley-native-model-draft-v1.js';
 const REPO='https://api.github.com/repos/maloney2323/Reality';
-const URL='https://github.com/maloney2323/Reality/issues/263';
+const ISSUE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/([1-9]\d*)$/;
 const TARGET='src/reality-riley-service-original-runtime-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -21,6 +21,9 @@ export async function reviseCurrentRileyNativeRepair({
     typeof fetchImpl!=='function'||typeof callRpc!=='function')
   fail('TRUSTED_PREVIEW_REQUIRED');
  const original=expectedGraph(graph);
+ const match=ISSUE.exec(original.source_ref||'');
+ if(!match)fail('CURRENT_OWNER_ORIGINAL_SOURCE_INVALID');
+ const historical263=match[1]==='263';
  const commit=String(env.VERCEL_GIT_COMMIT_SHA||'');
  const key=String(env.REALITY_STANDALONE_OPENAI_API_KEY||env.OPENAI_API_KEY||'');
  const model=String(env.REALITY_OPENAI_MODEL||'');
@@ -69,7 +72,9 @@ export async function reviseCurrentRileyNativeRepair({
   if(run?.id!==claim.failing_run_id||
      run.head_sha!==claim.failing_commit_sha||
      run.status!=='completed'||run.conclusion!=='failure'||
-     run.name!=='Reality — Isolated governed OpenAI gateway proof'||
+     run.name!==(historical263?
+      'Reality — Isolated governed OpenAI gateway proof':
+      'Reality Riley '+match[1]+' independently tested isolated candidate')||
      run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+claim.failing_run_id)
    fail('GITHUB_FROZEN_FAILURE_MISMATCH');
   const source=await sourceFromGitHub({commit,fetchImpl});
@@ -92,16 +97,12 @@ export async function reviseCurrentRileyNativeRepair({
       'You have NO permission to execute, install, change production, fabricate owner approval or settle any job. '+
       'Provide EXACTLY ONE self-contained JSON source patch with find, replace, reason. '+
       'The find block must occur EXACTLY ONCE in the source below, and replacement must preserve valid original-job execution. '+
-      'The independent frozen run failed 2 tests: full shift original returned EXECUTION_PROVIDER_EFFECT_UNKNOWN instead of '+
-      'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF, and trusted original runtime threw '+
-      'RILEY_SERVICE_ORIGINAL_ORIGINAL_JOB_ALREADY_SETTLED on a valid unsettled job. '+
-      'The rejected patch introduced scope?.original_job_settled !== false, but scope is a bounded argument that '+
-      'does NOT contain original_job_settled. Never repeat that check or infer a missing field is false. '+
-      'The actual trusted source_context has original_job_settled, and the current owner ledger also verifies unsettled work. '+
-      'Keep all existing owner, goal, source, claim and provider-effect safety gates. '+
-      'Do not invent test results. Fix the proven defect and improve safe continuation only where source supports it.'}]},
+      (historical263?
+       'The independent frozen run failed two tests: full shift original returned EXECUTION_PROVIDER_EFFECT_UNKNOWN instead of SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF, and the trusted runtime rejected a valid unsettled job. Never introduce scope?.original_job_settled; trusted source_context and owner ledger own settlement. ':
+       'Independent current candidate CI rejected the prior draft. The draft added an advisory governed_code_generation_connected field that compared outcome.capability_response === true. The real executor returns a typed capability response, not Boolean true, so the independently frozen assertion observed false for an existing verified governed handoff. New status fields alone do not execute, resume, or settle a job. Repair the actual source-backed defect truthfully; the frozen acceptance requires correct detection of the real governed handoff without bypassing other checks. ')+
+      'Retain exact original owner, goal, source, claim, provider-effect, install and settlement safety guards. No fabricated tests or claims of installation. Only propose bounded source edits.'}]},
      {role:'user',content:[{type:'input_text',text:
-      'Same authorized source issue: '+URL+
+      'Same authorized source issue: '+original.source_ref+
       '\nOriginal work: '+original.original_work_id+
       '\nOriginal model response: '+claim.initial_model_response_id+
       '\nIndependent failing run: '+run.html_url+

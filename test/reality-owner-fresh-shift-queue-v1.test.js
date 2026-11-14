@@ -55,43 +55,61 @@ const settledTriage={
    'supabase:riley_shift_failure_triage_v1:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
  }]
 };
+const settledNative={
+ status:'OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK',
+ does_not_authorize_new_work:true,production_changed:false,
+ jobs:[{
+  original_work_id:'work:873a6e74fd14c6beacc9042dd8021dfc',
+  source_ref:prefix+'issues/263',source_proof_sha256:'sha256:'+'a'.repeat(64),
+  phase:'SETTLED',original_job_completed:true,
+  code_repair_completed:true,production_changed:false,
+  original_settlement_receipt_ref:
+   'supabase:riley_native_independent_final_receipts_v1:681ce4ab-4dd0-47cf-963b-dc65087468fc'
+ }]
+};
 test('independently settled owner originals excluded from exact new source work',async()=>{
  const rpc=async(db,name,args)=>{
   assert.equal(args.p_owner_id,owner);
   return name==='reality_read_owner_riley_pr_review_v1'?
-   settledPR:settledTriage;
+   settledPR:name==='reality_read_owner_riley_repair_original_v1'?
+    settledNative:settledTriage;
  };
  const excluded=await ownerSettledOriginalSourceRefs({
   ownerId:owner,db:{},call:rpc});
- assert.deepEqual(excluded,[prefix+'issues/143',prefix+'pull/58']);
+ assert.deepEqual(excluded,[prefix+'issues/143',prefix+'issues/263',prefix+'pull/58']);
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
  const plan=buildRealityEightHourShiftDraft(brief,{
   excludedSettledSourceRefs:excluded});
  const urls=plan.slots.slice(1,5).map(s=>s.candidate?.source_url)
   .filter(Boolean);
- assert.deepEqual(urls,[prefix+'issues/263',prefix+'issues/185']);
+ assert.deepEqual(urls,[prefix+'issues/185']);
  assert.equal(urls.includes(prefix+'issues/143'),false);
+ assert.equal(urls.includes(prefix+'issues/263'),false);
  assert.equal(urls.includes(prefix+'pull/58'),false);
- assert.equal(plan.counts.already_settled_source_records_excluded,2);
- assert.equal(plan.counts.selected_distinct_source_records,2);
+ assert.equal(plan.counts.already_settled_source_records_excluded,3);
+ assert.equal(plan.counts.selected_distinct_source_records,1);
 });
 test('receipt verification cannot be bypassed with invented success',async()=>{
- const good=async(db,name)=>name==='reality_read_owner_riley_pr_review_v1'?
-  settledPR:settledTriage;
  for(const [kind,fixture] of [
   ['review',{...settledPR,production_changed:true}],
   ['triage',{...settledTriage,status:'UNKNOWN_OWNER_SOURCE'}],
+  ['native',{...settledNative,jobs:[{...settledNative.jobs[0],
+    original_settlement_receipt_ref:'not-a-receipt'}]}],
   ['missing',{...settledPR,jobs:[{
    ...settledPR.jobs[0],settlement_receipt_ref:null}]}]
  ]){
-  const call=async(db,name)=>kind==='triage'?
-   (name==='reality_read_owner_shift_failure_triage_143_v1'?
-    fixture:settledPR):
-   (name==='reality_read_owner_riley_pr_review_v1'?
-    fixture:settledTriage);
+  const call=async(db,name)=>{
+   if(name==='reality_read_owner_riley_pr_review_v1')
+    return ['review','missing'].includes(kind)?fixture:settledPR;
+   if(name==='reality_read_owner_shift_failure_triage_143_v1')
+    return kind==='triage'?fixture:settledTriage;
+   if(name==='reality_read_owner_riley_repair_original_v1')
+    return kind==='native'?fixture:settledNative;
+   throw Error('UNEXPECTED_OWNER_READBACK');
+  };
   await assert.rejects(
    ownerSettledOriginalSourceRefs({ownerId:owner,db:{},call}),
-   /SHIFT_OWNER_SETTLED|SHIFT_SETTLED_JOB/);
+   /SHIFT_OWNER_SETTLED|SHIFT_SETTLED_JOB|SHIFT_NATIVE_SETTLED/);
  }
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
  assert.throws(()=>buildRealityEightHourShiftDraft(brief,{

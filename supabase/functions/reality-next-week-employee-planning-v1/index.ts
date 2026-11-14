@@ -25,7 +25,8 @@ async function rpc(name:string,args:Record<string,unknown>,
  const allowed=new Set([
   'reality_authenticate_employee_shift_wake_v1',
   'reality_store_next_week_source_snapshot_v1',
-  'reality_read_next_week_source_snapshot_v1']);
+  'reality_read_next_week_source_snapshot_v1',
+  'reality_read_current_shift_execution_graph_v1']);
  if(!allowed.has(name))deny('SERVICE_RPC_NOT_ALLOWED');
  const r=await fetch(env.url+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -57,7 +58,7 @@ function nextMonday(now:Date){
 }
 async function githubOpenIssues(){
  const seen=new Set<number>(),out:Array<{
-  issue_number:number;issue_url:string;title:string}>=[];
+  issue_number:number;issue_url:string;title:string;body:string}>=[];
  let complete=false;
  for(let page=1;page<=4;page++){
   const url='https://api.github.com/repos/'+REPO+
@@ -82,7 +83,8 @@ async function githubOpenIssues(){
     deny('SOURCE_ISSUE_IDENTITY_MISMATCH');
    seen.add(number);
    out.push({issue_number:number,issue_url:item.html_url,
-    title:item.title.slice(0,200)});
+    title:item.title.slice(0,200),
+    body:typeof item.body==='string'?item.body.slice(0,25000):''});
    if(out.length>150)deny('OPEN_SOURCE_COVERAGE_TOO_LARGE');
   }
   const hasNext=/(?:^|,)\s*<[^>]+>;\s*rel="next"/.test(
@@ -91,6 +93,65 @@ async function githubOpenIssues(){
  }
  if(!complete)deny('SOURCE_PAGINATION_NOT_COMPLETE');
  return out.sort((a,b)=>a.issue_number-b.issue_number);
+}
+
+// Automatic SOURCE qualification happens INSIDE the scheduled provider audit,
+// before the owner-facing snapshot or employee investigation list is saved.
+// It classifies exact prior originals and assigns investigation responsibility.
+// It never claims a current defect or creates execution/install permission.
+const QUAL_STATUSES=new Set([
+ 'PRIOR_ORIGINAL_SETTLED_NO_REPLAY',
+ 'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE',
+ 'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK',
+ 'CURRENT_FAILURE_REPRODUCTION_REQUIRED',
+ 'SOURCE_REVIEW_NEEDS_CURRENT_PROOF'
+]);
+function qualifyCurrentSource(item:{
+ issue_number:number;issue_url:string;title:string;body:string
+},graph:Record<string,unknown>|null){
+ const jobs=graph?.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
+  Array.isArray(graph.jobs)&&graph.jobs.length<=4?graph.jobs:[];
+ const exact=jobs.find((x:Record<string,unknown>)=>
+  x?.source_ref===item.issue_url&&
+  x.independent_source_proof_verified===true);
+ const text=(item.title+' '+item.body).toLowerCase();
+ const status=exact?.phase==='SETTLED'?
+  'PRIOR_ORIGINAL_SETTLED_NO_REPLAY':
+  typeof exact?.original_work_id==='string'&&
+  /^work:[a-f0-9]{32}$/.test(exact.original_work_id)?
+   'EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE':
+  exact?.original_kind==='SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL'?
+   'CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK':
+  /github[.]com[/]maloney2323[/]reality[/]actions[/]runs[/][0-9]+|frozen.acceptance|frozen.regressions|err_module_not_found/.test(text)?
+   'CURRENT_FAILURE_REPRODUCTION_REQUIRED':
+   'SOURCE_REVIEW_NEEDS_CURRENT_PROOF';
+ if(!QUAL_STATUSES.has(status))deny('QUALIFICATION_STATUS_INVALID');
+ const employee=exact?.original_kind==='SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL'?
+  'Riley':
+  /worker|dispatcher|scheduler|shift|operations|wake/.test(text)?
+   'Taylor':
+  /verification|regression|test|receipt|audit|reconcile/.test(text)?
+   'Quinn':
+  /customer.experience|onboarding|interface|ux/.test(text)?
+   'Casey':
+  /revenue|sales|financial/.test(text)?
+   'Sage':'Riley';
+ const nextProof={
+  PRIOR_ORIGINAL_SETTLED_NO_REPLAY:
+   'Independently read the existing settlement receipt. Do not replay this original; require a distinct current defect before creating new work.',
+  EXACT_ORIGINAL_CONTINUATION_REQUIRES_EVIDENCE:
+   'Inspect original-job state and provider effects; continue only the same authorized job without another claim or installation.',
+  CURRENT_OWNER_OBJECTIVE_NEEDS_EXACT_TASK:
+   'Find one specific still-failing source-backed acceptance criterion, reproduce it independently, then bind that exact task to existing governance.',
+  CURRENT_FAILURE_REPRODUCTION_REQUIRED:
+   'Recheck historical provider failures against the current source and test runs; only an independently reproduced remaining defect qualifies.',
+  SOURCE_REVIEW_NEEDS_CURRENT_PROOF:
+   'Verify the present defect and acceptance evidence, rule out earlier completion and duplicates, and define one concrete investigation.'
+ }[status];
+ return {status,employee,evidence:'GITHUB_CURRENT_OPEN_ISSUE_READBACK',
+  next_proof:nextProof,verified_current_defect:false,
+  executable_original:false,execution_authorized:false,
+  installation_authorized:false};
 }
 async function sha256(input:string){
  const bytes=new TextEncoder().encode(input);
@@ -118,7 +179,22 @@ Deno.serve(async req=>{
    auth.production_changed!==false)
    return response(403,{ok:false,status:'NEXT_WEEK_WAKE_AUTH_FAILED',...facts});
   const now=new Date(),weekStart=nextMonday(now);
-  const issues=await githubOpenIssues();
+  const rawIssues=await githubOpenIssues();
+  let graph:Record<string,unknown>|null=null;
+  try{
+   const read=await rpc('reality_read_current_shift_execution_graph_v1',{},env);
+   if(read.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
+      Array.isArray(read.jobs)&&read.jobs.length<=4&&
+      read.installation_authorized===false&&
+      read.production_changed===false)
+    graph=read;
+  }catch{
+   // A missing signed-shift graph must never imply a settled original.
+  }
+  const issues=rawIssues.map(item=>({
+   issue_number:item.issue_number,issue_url:item.issue_url,title:item.title,
+   qualification:qualifyCurrentSource(item,graph)
+  }));
   const digest=await sha256(JSON.stringify(issues));
   const stored=await rpc('reality_store_next_week_source_snapshot_v1',{
    p_week_start:weekStart,p_open_issues:issues,
@@ -143,6 +219,12 @@ Deno.serve(async req=>{
    status:'NEXT_WEEK_SOURCE_SNAPSHOT_INDEPENDENTLY_READ_BACK',
    week_start:weekStart,
    open_issues_checked:issues.length,
+   upstream_inspected_count:issues.length,
+   investigation_assignments:issues.filter(x=>
+    x.qualification.status!=='PRIOR_ORIGINAL_SETTLED_NO_REPLAY').length,
+   previously_settled_not_replayed:issues.filter(x=>
+    x.qualification.status==='PRIOR_ORIGINAL_SETTLED_NO_REPLAY').length,
+   qualified_executable_originals_created:0,
    source_sha256:digest,
    background_prepared_at:read.prepared_at,
    ...facts});

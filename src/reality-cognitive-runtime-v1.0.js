@@ -91,6 +91,7 @@ export async function runRealityCognitiveRuntime({
   fetchImpl = fetch,
   governedSignal,
   publicResearchEnabled = false,
+  cognitionEffort = 'AUTO',
 } = {}) {
   if (!textOf(message)) throw new Error('MESSAGE_REQUIRED');
 
@@ -98,7 +99,12 @@ export async function runRealityCognitiveRuntime({
 
   // A signed-in public-source lookup is one provider search, not three speculative
   // analysis lanes plus synthesis. Keep ordinary deep cognition unchanged.
-  if (!needsDeepReasoning(message) || publicResearchEnabled === true) {
+  // The trusted owner Chat endpoint chooses this lane, not the user's
+  // vocabulary. Deep independent model lanes remain opt-in for audit tasks.
+  if (!['AUTO','CONVERSATION'].includes(cognitionEffort))
+    throw new Error('COGNITION_EFFORT_NOT_AUTHORIZED');
+  if (cognitionEffort === 'CONVERSATION' ||
+      !needsDeepReasoning(message) || publicResearchEnabled === true) {
     const result = await invokeRealityModel({
       governedSignal,
       systemContext: cognitionContext,
@@ -106,6 +112,7 @@ export async function runRealityCognitiveRuntime({
       model,
       apiKey,
       fetchImpl,
+      maxOutputTokens:cognitionEffort==='CONVERSATION'?950:300,
     });
     return {
       runtime_version: REALITY_COGNITIVE_RUNTIME_VERSION,

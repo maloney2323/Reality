@@ -3,8 +3,11 @@ on:
   push:
     branches:
       - reality/isolated-openai-governance-gateway-20261108
+      - reality/native263-temporal-chat-proof-20261113
+      - reality/repair-source-bound-shift-gate-20261113
   pull_request:
     paths:
+      - .github/workflows/reality-governed-openai-gateway-isolated-20261108.yml
       - src/reality-governed-openai-gateway-v1.js
       - src/reality-native-recovery-readonly-tool-v1.js
       - test/reality-native-recovery-readonly-tool-v1.test.js
@@ -18,6 +21,54 @@ on:
       - src/reality-native263-github-write-canary-v2-bridge.js
       - src/reality-native263-exact-install-warrant-bridge-v1.js
       - test/reality-native263-governed-installer-v1.test.js
+      - src/reality-native-universe-v1.0.js
+      - src/reality-live-intelligence-orchestration-v0.1.js
+      - src/reality-model-gateway-v0.1.js
+      - src/reality-native263-temporal-chat-context-v1.js
+      - test/reality-owner-completed-work-chat-context-v1.test.js
+      - test/reality-native263-temporal-chat-context-v1.test.js
+      - api/reality/personal-chat.js
+      - src/reality-employee-identity-roster-v1.js
+      - src/reality-cognitive-runtime-v1.0.js
+      - test/reality-private-chat-conversation-and-weekly-role-v1.test.js
+      - test/reality-saved-chat-employee-proposals-v1.test.js
+      - test/reality-home-live-employees-v1.test.js
+      - src/reality-automatic-shift-supervisor-v1.js
+      - test/reality-automatic-shift-supervisor-v1.test.js
+      - reality-chat-employee-shift-card-v1.js
+      - reality-chat-conversation-export-v1.js
+      - test/reality-chat-automated-shift-and-export-v1.test.js
+      - supabase/migrations/20261113_shift_final_receipt_economic_evidence_v1.sql
+      - src/reality-shift-final-value-evidence-v1.js
+      - src/reality-owner-shift-final-value-readback-v1.js
+      - src/reality-shift-final-value-receipt-pdf-v1.js
+      - api/reality/personal-shift-value-receipts.js
+      - api/reality/personal-shift-value-receipt-pdf.js
+      - reality-economic-evidence-dashboard-v1.js
+      - test/reality-shift-final-value-evidence-v1.test.js
+      - supabase/migrations/20261113_existing_shift_weekly_capability_intake_v1.sql
+      - src/reality-existing-shift-integrated-intake-v1.js
+      - test/reality-existing-shift-integrated-intake-v1.test.js
+      - supabase/migrations/20261113_chat_employee_approved_job_list_v1.sql
+      - src/reality-saved-chat-employee-proposals-v1.js
+      - src/reality-owner-approved-chat-assignments-v1.js
+      - api/reality/personal-employee-roster.js
+      - api/reality/personal-employee-chat-assignments.js
+      - reality-chat-simple.html
+      - reality-chat-approved-assignments-v1.js
+      - test/reality-owner-approved-chat-assignments-v1.test.js
+      - reality-chat-simple.html
+      - api/reality/governed-employee-shift-worker.js
+      - src/reality-mixed-shift-receipts-v1.js
+      - src/reality-shift-conversation-brief-v1.js
+      - api/reality/personal-governed-employee-shift.js
+      - reality-shift-conversation-v1.js
+      - test/reality-mixed-shift-receipts-v1.test.js
+      - reality-home-employee-brief-v1.js
+      - index.html
+      - src/reality-saved-chat-employee-proposals-v1.js
+      - api/reality/personal-employee-roster.js
+      - src/reality-owner-completed-work-chat-context-v1.js
       - src/reality-native263-live-installer-fence-bridge-v1.js
       - src/reality-native263-approved-install-continuation-v1.js
       - src/reality-native263-postinstall-original-settlement-bridge-v1.js
@@ -62,6 +113,7 @@ on:
       - test/reality-owner-fresh-shift-queue-v1.test.js
       - test/reality-riley-current-shift-candidate-verifier-v2.test.js
       - test/reality-unified-shift-execution-controller-v1.test.js
+      - test/reality-general-engineering-original-gate-v1.test.js
       - test/reality-riley-native-model-draft-v1.test.js
       - test/reality-native-reviewed-repair-receipt-contract-v1.test.js
       - test/reality-riley-native-batch-readiness-v1.test.js
@@ -77,6 +129,13 @@ on:
       - test/reality-riley-service-original-runtime-v1.test.js
       - supabase/migrations/20261108_native_riley_original_model_draft_v1.sql
       - src/reality-shift-unified-execution-controller-v1.js
+      - src/reality-shift-commit-triage-source-v1.js
+      - src/reality-shift-commit-triage-handoff-v1.js
+      - test/reality-shift-commit-triage-source-v1.test.js
+      - test/reality-shift-commit-triage-handoff-v1.test.js
+      - supabase/migrations/20261113_trusted_shift_commit_reference_triage_v1.sql
+      - src/reality-riley-full-shift-batch-intake-v1.js
+      - test/reality-riley-full-shift-batch-v1.test.js
       - supabase/migrations/20261108_unified_owner_original_work_graph_v1.sql
       - src/reality-riley-current-shift-candidate-verifier-v2.js
       - supabase/migrations/20261108_current_riley_candidate_attestation_v2.sql
@@ -122,6 +181,14 @@ jobs:
           node --check src/reality-native263-exact-install-warrant-bridge-v1.js
           node --check src/reality-native263-live-installer-fence-bridge-v1.js
           node --check src/reality-native263-approved-install-continuation-v1.js
+          node --check src/reality-native263-temporal-chat-context-v1.js
+          node --check src/reality-owner-completed-work-chat-context-v1.js
+          node --check src/reality-employee-identity-roster-v1.js
+          node --check src/reality-cognitive-runtime-v1.0.js
+          node --check src/reality-native-universe-v1.0.js
+          node --check src/reality-live-intelligence-orchestration-v0.1.js
+          node --check src/reality-model-gateway-v0.1.js
+          node --check api/reality/personal-chat.js
           node --check src/reality-native263-postinstall-original-settlement-bridge-v1.js
           node --check api/reality/native263-owner-install-approval.js
           node --check reality-native263-install-approval-ui-v1.js
@@ -129,6 +196,8 @@ jobs:
           node --check src/reality-riley-trusted-original-driver-bridge-v1.js
           node --check src/reality-riley-current-shift-candidate-verifier-v2.js
           node --check src/reality-shift-unified-execution-controller-v1.js
+          node --check src/reality-shift-commit-triage-source-v1.js
+          node --check src/reality-shift-commit-triage-handoff-v1.js
           node --check src/reality-riley-native-batch-readiness-v1.js
           node --check src/reality-riley-native-model-draft-v1.js
           node --check src/reality-riley-native-corrective-model-v1.js
@@ -142,4 +211,42 @@ jobs:
           node --check src/reality-genuine-capability-github-wakeup-v1.js
           node --check src/reality-governed-employee-shift-worker-v1.js
           node --check api/reality/governed-employee-shift-worker.js
-          node --test test/reality-native263-postinstall-original-settlement-v1.test.js test/reality-native263-exact-owner-chat-approval-v1.test.js test/reality-native263-preview-auto-deploy-trigger-v1.test.js test/reality-native263-live-installer-fence-v1.test.js test/reality-native263-governed-installer-v1.test.js test/reality-native263-exact-install-warrant-v1.test.js test/reality-native263-contents-write-canary-v2.test.js test/reality-native263-contents-write-canary-v1.test.js test/reality-native-263-install-preflight-bridge-v1.test.js test/reality-governed-pr-provider-bridge-v1.test.js test/reality-native-recovery-readonly-tool-v1.test.js test/reality-riley-native-batch-readiness-v1.test.js test/reality-native-reviewed-repair-receipt-contract-v1.test.js test/reality-riley-native-corrective-model-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-native-model-draft-v1.test.js test/reality-unified-shift-execution-controller-v1.test.js test/reality-riley-current-shift-candidate-verifier-v2.test.js test/reality-owner-fresh-shift-queue-v1.test.js test/reality-eight-hour-shift-plan-v1.test.js test/reality-owner-shift-live-confirmation-v1.test.js test/reality-completion-bound-employee-shift-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-genuine-capability-github-wakeup-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
+          node --test test/reality-owner-completed-work-chat-context-v1.test.js test/reality-native263-temporal-chat-context-v1.test.js test/reality-native263-postinstall-original-settlement-v1.test.js test/reality-native263-exact-owner-chat-approval-v1.test.js test/reality-native263-preview-auto-deploy-trigger-v1.test.js test/reality-native263-live-installer-fence-v1.test.js test/reality-native263-governed-installer-v1.test.js test/reality-native263-exact-install-warrant-v1.test.js test/reality-native263-contents-write-canary-v2.test.js test/reality-native263-contents-write-canary-v1.test.js test/reality-native-263-install-preflight-bridge-v1.test.js test/reality-governed-pr-provider-bridge-v1.test.js test/reality-native-recovery-readonly-tool-v1.test.js test/reality-riley-native-batch-readiness-v1.test.js test/reality-native-reviewed-repair-receipt-contract-v1.test.js test/reality-riley-native-corrective-model-v1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-native-model-draft-v1.test.js test/reality-unified-shift-execution-controller-v1.test.js test/reality-general-engineering-original-gate-v1.test.js test/reality-riley-full-shift-batch-v1.test.js test/reality-shift-commit-triage-source-v1.test.js test/reality-shift-commit-triage-handoff-v1.test.js test/reality-riley-current-shift-candidate-verifier-v2.test.js test/reality-owner-fresh-shift-queue-v1.test.js test/reality-eight-hour-shift-plan-v1.test.js test/reality-owner-shift-live-confirmation-v1.test.js test/reality-completion-bound-employee-shift-v1.test.js test/reality-employee-shared-capability-wake-v1.test.js test/reality-genuine-capability-github-wakeup-v1.test.js test/reality-owner-chat-shift-command-v1.test.js test/reality-full-shift-owner-control-and-recovery-v1.test.js test/reality-model-gateway-v0.1.test.js test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-full-execution-path-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-existing-multi-job-wake-v1.test.js test/reality-riley-original-driver-security-v1.test.js test/reality-frozen-regressions/riley-pr-credential-preflight.test.js test/reality-riley-authorized-pr-review-job-v1.test.js test/reality-governed-openai-continuity-capability-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-universal-governed-recovery-handoff-v1.test.js test/reality-governed-openai-gateway-v1.test.js test/reality-one-openai-combined-role-handoff-v1.test.js test/reality-governed-tool-session-v1.test.js
+      - name: Verify responsive owner Chat and safe next-week employee proposals
+        run: |
+          node --check src/reality-cognitive-runtime-v1.0.js
+          node --check src/reality-model-gateway-v0.1.js
+          node --test test/reality-private-chat-conversation-and-weekly-role-v1.test.js
+          node --check src/reality-saved-chat-employee-proposals-v1.js
+          node --check api/reality/personal-employee-roster.js
+          node --test test/reality-saved-chat-employee-proposals-v1.test.js
+          node --check reality-home-employee-brief-v1.js
+          node --test test/reality-home-live-employees-v1.test.js
+          node --check src/reality-automatic-shift-supervisor-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-automatic-shift-supervisor-v1.test.js
+          node --check reality-chat-employee-shift-card-v1.js
+          node --check reality-chat-conversation-export-v1.js
+          node --test test/reality-chat-automated-shift-and-export-v1.test.js
+          node --check src/reality-shift-final-value-evidence-v1.js
+          node --check src/reality-owner-shift-final-value-readback-v1.js
+          node --check src/reality-shift-final-value-receipt-pdf-v1.js
+          node --check api/reality/personal-shift-value-receipts.js
+          node --check api/reality/personal-shift-value-receipt-pdf.js
+          node --check reality-economic-evidence-dashboard-v1.js
+          node --test test/reality-shift-final-value-evidence-v1.test.js
+          node --check src/reality-existing-shift-integrated-intake-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --test test/reality-existing-shift-integrated-intake-v1.test.js
+          node --check src/reality-owner-approved-chat-assignments-v1.js
+          node --check src/reality-saved-chat-employee-proposals-v1.js
+          node --check api/reality/personal-employee-chat-assignments.js
+          node --check api/reality/personal-employee-roster.js
+          node --check reality-chat-approved-assignments-v1.js
+          node --test test/reality-owner-approved-chat-assignments-v1.test.js
+          node --check src/reality-mixed-shift-receipts-v1.js
+          node --check src/reality-shift-conversation-brief-v1.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check reality-shift-conversation-v1.js
+          node --test test/reality-mixed-shift-receipts-v1.test.js

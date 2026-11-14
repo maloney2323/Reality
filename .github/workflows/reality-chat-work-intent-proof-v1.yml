@@ -1,0 +1,34 @@
+name: Reality Chat Work Intent and Executor Routing Proof
+on:
+  pull_request:
+    paths:
+      - 'src/reality-chat-work-intent-v1.js'
+      - 'src/reality-saved-chat-work-adapter-v1.js'
+      - 'api/reality/personal-chat-work.js'
+      - 'test/reality-chat-work-intent-v1.test.js'
+      - 'test/reality-saved-chat-work-adapter-v1.test.js'
+      - 'src/reality-owner-original-work-chat-readback-v1.js'
+      - 'test/reality-owner-original-work-chat-readback-v1.test.js'
+      - 'api/reality/personal-chat.js'
+      - '.github/workflows/reality-chat-work-intent-proof-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-chat-routing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Verify saved-intent isolation, capability matching and authorization boundary
+        run: |
+          node --test test/reality-chat-work-intent-v1.test.js
+          node --test test/reality-saved-chat-work-adapter-v1.test.js
+          node --test test/reality-owner-original-work-chat-readback-v1.test.js
+          node --test test/reality-personal-chat-durable-intake-v1.test.js
+      - name: Check authenticated Chat route syntax
+        run: node --check api/reality/personal-chat-work.js

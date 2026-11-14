@@ -6,7 +6,7 @@ import {projectAuthoritativeUserGoals,compareAuthenticatedGoalSnapshots} from '.
 import {projectAuthoritativeGoalRelationshipGraph} from './reality-authoritative-goal-relationship-graph-v0.1.js';
 import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
-import { buildNativeUniverseContext } from './reality-native-universe-v1.0.js';
+import { buildNativeUniverseContext, mergeCurrentAndDurableUniverseForCognition } from './reality-native-universe-v1.0.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
@@ -46,7 +46,11 @@ async function loadUniverseContext({ systemContext = null, continuityRootId = nu
     ...requestContext,
     status: durable.status,
     count: requestContext.count + durable.count,
-    entries: Object.freeze([...durable.entries, ...requestContext.entries]),
+    // Verified current observations must not be silently evicted by a
+    // full historical window before the model receives this turn's evidence.
+    entries: mergeCurrentAndDurableUniverseForCognition({
+      current:requestContext.entries,durable:durable.entries,limit:100
+    }),
     persistence: durable.persistence,
     durable_count: durable.count,
     continuity_root_id: continuityRootId,
@@ -152,6 +156,8 @@ export async function runLiveIntelligenceOrchestration({
   verifiedConversationTurns = null,
   // Trusted server-only opt-in; never inferred from model statements.
   publicResearchEnabled = false,
+  // Server-controlled model effort; browser text cannot override governance.
+  cognitionEffort = 'AUTO',
   model,
   apiKey,
   fetchImpl,
@@ -492,6 +498,7 @@ export async function runLiveIntelligenceOrchestration({
     systemContext: cognitionContext,
     universeEntries: universeContext.entries,
     publicResearchEnabled: publicResearchEnabled === true,
+    cognitionEffort,
     model:resolvedModel,
     apiKey:resolvedApiKey,
     fetchImpl,

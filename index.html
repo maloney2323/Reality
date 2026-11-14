@@ -709,6 +709,47 @@ body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) m
 #realitySimpleHome .reality-home-proof h3{font-size:17px;margin:10px 0}
 #realitySimpleHome .reality-home-labor-source{margin:8px 0 21px}
 #realitySimpleHome .reality-home-priorities{padding:9px 0 17px}
+
+/* Compact home operating view. Detailed evidence remains in Evaluation and disclosures. */
+#realitySimpleHome .home-team-brief{margin:14px 0 17px;padding:17px 18px;border:1px solid #42667d;border-radius:17px;background:#101e2c}
+#realitySimpleHome .home-team-head{display:flex;align-items:start;justify-content:space-between;gap:13px;flex-wrap:wrap}
+#realitySimpleHome .home-team-head h2{font-size:clamp(19px,3.5vw,25px);margin:6px 0;color:#f2f8ff}
+#realitySimpleHome .home-team-head p{margin:3px 0 11px;color:#abc3d6;font-size:12px;line-height:1.5;max-width:760px}
+#realitySimpleHome .home-team-head button{font-size:12px;min-height:36px;padding:8px 12px}
+
+/* Owner-triggered employee responsibility audit, distinct from starting a shift. */
+#realitySimpleHome .reality-employee-audit-trigger{font-size:12px;min-height:36px;padding:7px 10px;margin-top:7px;width:100%;text-align:center}
+#realitySimpleHome .reality-employee-audit-all{font-size:13px;min-height:40px;margin:6px 0;padding:8px 12px}
+#realitySimpleHome .reality-employee-audit-panel{border:1px solid #4d7184;border-radius:13px;background:#102536;padding:13px;margin:12px 0;color:#e7f3ff}
+#realitySimpleHome .reality-employee-audit-panel p{font-size:12px;line-height:1.6}
+#realitySimpleHome .reality-audit-summary{font-weight:700;color:#daefff;margin:0 0 10px}
+#realitySimpleHome .reality-audit-role-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#realitySimpleHome .reality-audit-role{padding:12px;border:1px solid #45677e;border-radius:11px;background:#183047;overflow-wrap:anywhere}
+#realitySimpleHome .reality-audit-role strong{font-size:14px;color:#f2f9ff}
+#realitySimpleHome .reality-audit-role-description{color:#c8ddec}
+#realitySimpleHome .reality-audit-role-counts{color:#d5efff}
+#realitySimpleHome .reality-audit-responsibilities{padding-left:19px;margin:8px 0;font-size:12px;color:#c2d9e8;line-height:1.6}
+#realitySimpleHome .reality-audit-findings summary{cursor:pointer;color:#bde8ff;font-size:12px}
+#realitySimpleHome .reality-audit-work-item{border-top:1px solid #36576d;padding:9px 0;display:flex;flex-direction:column;gap:5px}
+#realitySimpleHome .reality-audit-work-item a{color:#bde8ff;font-size:12px;overflow-wrap:anywhere}
+#realitySimpleHome .reality-audit-work-item small{font-size:11px;color:#b9d3e4;line-height:1.5}
+#realitySimpleHome .reality-audit-warning{color:#f8d9ab}
+#realitySimpleHome .reality-audit-footnote{color:#b5d5e8}
+@media(max-width:720px){#realitySimpleHome .reality-audit-role-list{grid-template-columns:1fr}}
+
+#realitySimpleHome .home-team-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:7px 0 11px}
+#realitySimpleHome .home-team-grid article{display:flex;flex-direction:column;gap:5px;min-width:0;background:#152b3b;border:1px solid #36536b;border-radius:11px;padding:13px 11px}
+#realitySimpleHome .home-team-grid article strong{font-size:16px;line-height:1.25;color:#f1f9ff}
+#realitySimpleHome .home-team-grid article span{font-size:12px;color:#d0e0ed}
+#realitySimpleHome .home-team-grid article small{font-size:11px;line-height:1.5;color:#aac8dc;overflow-wrap:anywhere}
+#realitySimpleHome .home-team-disclaimer{font-size:11px;line-height:1.5;margin:6px 0 10px;color:#a7bccc}
+#realitySimpleHome .home-team-actions{display:flex;gap:12px;flex-wrap:wrap;font-size:13px}
+#realitySimpleHome .home-team-actions a{color:#bde9ff;text-decoration:underline;text-underline-offset:3px}
+#realitySimpleHome .home-compact-upgrades{margin:15px 0;padding:13px 15px;border:1px solid #3e5f79;border-radius:13px;background:#0c1b2b}
+#realitySimpleHome .home-compact-upgrades>summary{cursor:pointer;color:#e4f4ff;font-size:14px;font-weight:650;line-height:1.5}
+@media(max-width:900px){#realitySimpleHome .home-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:450px){#realitySimpleHome .home-team-brief{padding:12px}#realitySimpleHome .home-team-grid article{padding:10px 9px}}
+
 #realitySimpleHome .reality-home-priorities h2{font-size:20px;margin:7px 0 10px}
 #realitySimpleHome .reality-home-explore{border-top:1px solid #38516a;padding:20px 0 10px}
 #realitySimpleHome .reality-engine-metrics[hidden],#realitySimpleHome .reality-econ-grid[hidden]{display:none!important}
@@ -809,6 +850,26 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 #realitySimpleHome .simple-footer{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #364a61}
 #realitySimpleHome .simple-note{font-size:13px;color:#acbecf;line-height:1.45;max-width:580px}
 @media(max-width:600px){#realitySimpleHome{margin:14px 0 24px;padding:18px;border-radius:16px}#realitySimpleHome .simple-actions{flex-direction:column}#realitySimpleHome .simple-actions button{width:100%}#realitySimpleHome .simple-list{grid-template-columns:minmax(0,1fr)}}
+/* Chat-first employee shift card and conversation exports. */
+#realitySimpleHome .reality-employee-shift-chat-primary{display:inline-flex;align-items:center;justify-content:center;max-width:100%;text-align:center;background:#d7eefc;color:#0c273a;font-weight:750;border-radius:11px;padding:13px 17px;text-decoration:none;margin:8px 0 10px}
+#realitySimpleHome .reality-employee-shift-advanced{margin-top:5px;padding:10px;border:1px solid #38566b;border-radius:10px}
+#realitySimpleHome .reality-employee-shift-advanced>summary{cursor:pointer;font-size:13px;color:#c8e0ed}
+.reality-chat-employee-shift-card{padding:15px;background:#13283a;border:1px solid #456b88;border-radius:13px;margin:8px 0 12px;max-width:100%;overflow-wrap:anywhere}
+.reality-chat-employee-shift-card h3{margin:0 0 8px;font-size:17px}
+.reality-chat-employee-shift-card p{font-size:12px;line-height:1.5;color:#c6ddec;margin:7px 0}
+.reality-shift-plan-actions{display:flex;gap:8px;flex-wrap:wrap}
+.reality-shift-plan-actions button{font-size:12px;padding:10px 12px;min-height:38px;margin:3px 0}
+.reality-shift-plan-assignments ul{margin:10px 0;padding-left:20px}
+.reality-shift-plan-assignments li{font-size:12px;margin:8px 0}
+.reality-shift-plan-assignments a{font-size:12px;color:#c6eeff}
+.reality-conversation-exports{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0 13px;padding:9px;border-top:1px solid #36536b}
+.reality-conversation-exports button,.reality-copy-message{font-size:11px!important;padding:6px 9px!important;min-height:30px!important;margin:2px!important}
+.reality-conversation-export-status{flex-basis:100%;font-size:11px;color:#a7bac8;margin:3px 0}
+.reality-chat-approved-assignments{margin-top:10px;padding:10px;border:1px solid #4f6a80;border-radius:10px}
+.reality-chat-approved-assignments>summary{cursor:pointer;font-size:12px;font-weight:650}
+.reality-chat-approved-assignments details{padding:6px 0;margin:4px 0;border-bottom:1px solid #304d63}
+.reality-chat-approved-assignments li{font-size:12px;line-height:1.4;margin:5px 0}
+.reality-chat-approved-assignments button{margin:8px 0;font-size:12px;padding:10px 12px}
 </style>
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
@@ -1023,12 +1084,36 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 
 <section id="realitySimpleHome" aria-labelledby="simpleRealityTitle">
  <div class="simple-kicker">REALITY · BUSINESS VALUE FIRST</div>
- <h1 id="simpleRealityTitle">What Reality has accomplished — and what comes next</h1>
- <p class="simple-lead">See verified work, independent receipts, and transparent labor comparisons first. Reality preserves the underlying capabilities, governance, and detailed evidence for inspection without counting the same work twice.</p>
+ <h1 id="simpleRealityTitle">Your business, today</h1>
+ <p class="simple-lead">See your AI employees, current work, and independently verified value. Detailed results, forecasts, and prior work live in <a href="/value">Evaluation</a>.</p>
  <div class="simple-bar">
   <span class="simple-info" id="simpleLoginState" role="status">Checking your account…</span>
   <span class="simple-info" id="simpleResearchCount">Loading assessed upgrades…</span>
  </div>
+ <section id="realityHomeEmployees" class="home-team-brief" aria-labelledby="realityHomeEmployeesTitle">
+  <div class="home-team-head">
+   <div><div class="simple-kicker">MY AI TEAM · WORK AT A GLANCE</div>
+    <h2 id="realityHomeEmployeesTitle">Your eight AI employees</h2>
+    <p id="realityHomeEmployeesStatus" role="status" aria-live="polite">Checking source-backed work and saved Chat plans…</p>
+   </div>
+   <button type="button" id="realityHomeEmployeesRefresh" class="simple-secondary">Refresh work</button>
+  </div>
+  <div class="home-team-grid" aria-label="Eight proposed employee responsibilities and owner-scoped work">
+   <article data-home-employee="Avery"><strong>Avery</strong><span>Product strategy</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Riley"><strong>Riley</strong><span>Software engineering</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Quinn"><strong>Quinn</strong><span>Quality &amp; security</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Taylor"><strong>Taylor</strong><span>Operations</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Casey"><strong>Casey</strong><span>Customer experience</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Morgan"><strong>Morgan</strong><span>Marketing research</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Jordan"><strong>Jordan</strong><span>Sales &amp; success</span><small data-home-work>Checking saved work…</small></article>
+   <article data-home-employee="Sage"><strong>Sage</strong><span>Finance &amp; administration</span><small data-home-work>Checking saved work…</small></article>
+  </div>
+  <p class="home-team-disclaimer">Employee names represent eight roles for one OpenAI model, not eight active autonomous workers. Suggestions are not authorized jobs.</p>
+  <div class="home-team-actions">
+   <a href="/chat-simple#employeeBoardPanel">View employees &amp; saved work proposals</a>
+   <a href="/chat">Discuss next week's assignments</a>
+  </div>
+ </section>
  <section id="simpleEconomicEvidenceDashboard" class="reality-economic-evidence" aria-labelledby="realityEconomicTitle">
   <div class="reality-econ-heading">
    <div>
@@ -1062,9 +1147,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <button type="button" id="realityShiftOpenConversation" class="simple-primary">Open Reality Chat · Live Workday</button>
  </section>
  <section id="realityEmployeeShiftPlanner" class="reality-employee-shift-planner" aria-labelledby="realityEmployeeShiftTitle">
-  <div class="simple-kicker">REALITY · PLAN BEFORE EXECUTION</div>
-  <h3 id="realityEmployeeShiftTitle">Build an employee's 8-hour workday</h3>
-  <p>Reality checks its current source-backed backlog, avoids identical records, orders investigation ahead of governed execution, and prepares an eight-hour schedule for your review. Planning is not authorization.</p>
+  <div class="simple-kicker">REALITY · AUTOMATED EMPLOYEES</div>
+  <h3 id="realityEmployeeShiftTitle">Build an automated employee shift</h3>
+  <p>Reality organizes work for your existing employees, proposes assignments, and presents the plan in Chat for review. Adjust the draft before one start approval. No duplicate shifts or extra OpenAI connections.</p>
+  <a class="reality-employee-shift-chat-primary" href="/chat#realityCreateShift">Reality, create my shift with automated employees</a>
+  <details class="reality-employee-shift-advanced">
+   <summary>Already have employee roles? Generate a detailed eight-hour work plan</summary>
   <div class="reality-employee-shift-inputs">
    <label>Proposed start time · your device's local time
     <input type="time" id="realityEmployeeShiftStart" value="09:00">
@@ -1078,6 +1166,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p id="realityEmployeeShiftApprovalStatus" role="status" aria-live="polite">Installation of any capability will require your separate exact approval in Reality Chat.</p>
   </div>
   <div id="realityEmployeeShiftSchedule" hidden aria-label="Eight-hour source-backed shift proposal"></div>
+  </details>
  </section>
  <div class="simple-actions reality-home-primary-actions" aria-label="Start and inspect governed work">
   <button type="button" id="simpleRunFullLoop" class="simple-primary">Run Full Loop</button>
@@ -1117,6 +1206,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
      <a href="https://www.bls.gov/news.release/ocwage.t01.htm" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics · May 2025 software developer wage</a>
     </div>
    </section></div>
+ <details id="realityHomeUpgradeDetails" class="reality-home-expand home-compact-upgrades">
+  <summary>Upgrade opportunities · Benefits, risks, and verification details</summary>
  <section id="realityHomePriorities" class="reality-home-priorities" aria-label="Inspected upgrade opportunities">
   <div class="simple-kicker">REALITY · NEXT OPPORTUNITIES</div>
   <h2>Upgrades Reality has already inspected</h2>
@@ -1127,6 +1218,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <p id="simpleGapFeedStatus" class="simple-status" role="status" aria-live="polite">Checking complete capability intake…</p>
   <p id="simpleResearchStatus" class="simple-status" role="status">Reading automatically inspected upgrades from Reality’s ledger…</p>
  </section>
+ </details>
  <section class="reality-home-explore" aria-label="Further capability and economic evidence">
   <div class="simple-kicker">EXPLORE DETAILS · NO EVIDENCE REMOVED</div>
   <p class="reality-econ-footnote">Expand the evidence you need. Repeated summary counts stay hidden; unique capabilities, categories, sources and controls remain accessible.</p>
@@ -5932,6 +6024,8 @@ $('simpleViewGapCategory').onclick=()=>{
  $('wcCategories')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 };
 $('simpleReviewFirst').onclick=()=>{
+ const upgradeDisclosure=$('realityHomeUpgradeDetails');
+ if(upgradeDisclosure)upgradeDisclosure.open=true;
  const first=$('simpleResearchList')?.querySelector('.simple-finding');
  if(first&&realitySimpleFindings.length){
   const details=first.querySelector('details');
@@ -6374,7 +6468,7 @@ setInterval(refreshSavedShiftHome,300000);
 
 (function(){
  const el=id=>document.getElementById(id);
- const status=s=>el('privateStatus').textContent=s;
+ const status=s=>{el('privateStatus').textContent=typeof s==='string'&&s.trim()?s:'';};
  const endpoint='/api/reality/personal-session';
  function conversationId(){
   let id=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -6510,6 +6604,7 @@ setInterval(refreshSavedShiftHome,300000);
   const body=document.createElement('div');body.style.whiteSpace='pre-wrap';
   body.textContent=String(text||'');
   node.append(head,body);el('privateTranscript').append(node);
+  return node;
  }
  async function loadConversations(){
   const r=await fetch('/api/reality/personal-chat?list=1',{cache:'no-store',signal:AbortSignal.timeout(12000)});
@@ -6656,11 +6751,306 @@ setInterval(refreshSavedShiftHome,300000);
  async function loadSaved(){
   const r=await fetch('/api/reality/personal-chat?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Could not read saved conversation.');
-  el('privateTranscript').replaceChildren();
-  for(const message of data.messages||[])bubble(message.role,message.text);
-  status((data.messages?.length||0)+' saved messages restored'+
-   (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
-  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+  const thread=el('privateTranscript');
+  const atBottom=thread.scrollHeight-thread.scrollTop-thread.clientHeight<=90;
+  const previousTop=thread.scrollTop,previousHeight=thread.scrollHeight;
+  thread.replaceChildren();
+  // Independent owner-ledger evidence stays visible even when the model
+  // fails to answer or incorrectly describes all jobs as settled.
+  const originalReadback=data.original_work_readback;
+  if(originalReadback?.status==='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK'&&
+     Array.isArray(originalReadback.all_recent_jobs)){
+   const open=originalReadback.all_recent_jobs.filter(job=>
+    job.requires_independent_completion_verification===true);
+   if(open.length){
+    const evidence=bubble('assistant',
+     'Original work still open in Reality’s authenticated ledger: '+
+     open.slice(0,6).map(j=>
+      j.source_ref+' · '+j.phase+' · '+j.original_work_id+
+      ' · shift '+j.shift_id).join(' | ')+
+     '. These are not completed-job receipts or automatic permission to install.');
+    evidence.querySelector('.label').textContent='REALITY · VERIFIED ORIGINAL WORK READBACK';
+    evidence.setAttribute('role','status');
+   }
+  }
+  const weeklyQueue=data.weekly_queue_readback;
+  if(weeklyQueue?.status==='CHAT_WEEKLY_SOURCE_CANDIDATES_VERIFIED'&&
+     Array.isArray(weeklyQueue.source_candidates)){
+   const summary=weeklyQueue.source_candidates.slice(0,8).map(item=>
+    item.employee_role+': '+item.title+' · '+item.qualification_status).join(' | ');
+   const panel=bubble('assistant',
+    'Existing employee candidate queue · Week '+weeklyQueue.week_start+
+    ' · '+weeklyQueue.source_candidate_count+' source-backed observations. '+
+    summary+
+    '. These need evidence qualification; they are not automatically authorized executable jobs.');
+   panel.querySelector('.label').textContent='REALITY · VERIFIED WEEKLY SOURCE QUEUE';
+   panel.setAttribute('role','status');
+  }
+  // Only show missing replies reported by the authenticated owner-scoped
+  // readback. These notices are NOT model answers or work receipts.
+  const replyReadback=data.reply_readback;
+  const unmatched=new Map(
+   replyReadback?.source==='AUTHENTICATED_OWNER_SCOPED_RLS_HISTORY'&&
+   replyReadback?.chat_endpoint_mode==='AUTHENTICATED_CHAT_PERSISTS_TO_GOVERNED_WORK_INTAKE'&&
+   Array.isArray(replyReadback.unanswered_requests)?
+    replyReadback.unanswered_requests.filter(x=>
+     x?.status==='USER_MESSAGE_SAVED_REPLY_NOT_VERIFIED'&&
+     /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(x.request_id||'')&&
+     String(x.user_source_ref||'').startsWith('supabase:reality_chat_messages:')
+    ).map(x=>[x.request_id,x]):[]
+  );
+  // Snapshot unanswered authenticated turns for same-intent duplicate prevention.
+  window.realitySavedUnansweredTurns=(data.messages||[]).filter(x=>
+   x.role==='user'&&unmatched.has(x.request_id)).map(x=>({
+    text:x.text,request_id:x.request_id,source_ref:x.source_ref}));
+  const workReadback=data.work_handoff;
+  const verifiedWorkReadback=workReadback?.status===
+   'OWNER_CHAT_WORK_INTAKE_READBACK'&&
+   workReadback.owner_id&&
+   workReadback.conversation_id===conversationId()&&
+   workReadback.source==='AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK'&&
+   workReadback.installation_authorized===false&&
+   workReadback.production_changed===false&&
+   Array.isArray(workReadback.items);
+  const workBySource=new Map(verifiedWorkReadback?
+   workReadback.items.filter(item=>
+    /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(item?.source_ref||'')&&
+    /^[a-f0-9-]{36}$/i.test(item?.request_id||'')&&
+    ['PENDING','CLAIMED','INVESTIGATED_SCOPED','NEEDS_AUTHORIZED_SCOPE',
+     'CONVERSATION_ONLY','PROVIDER_UNVERIFIED'].includes(item.status)&&
+    item.execution_authorized_by_chat===false&&
+    item.installation_authorized===false
+   ).map(item=>[item.source_ref,item]):[]);
+  for(const message of data.messages||[]){
+   bubble(message.role,message.text);
+   const handed=message.role==='user'?workBySource.get(message.source_ref):null;
+   if(handed&&handed.request_id===message.request_id){
+    const card=document.createElement('div');
+    card.className='bubble reality-chat-signed-work-card';
+    card.setAttribute('role','status');
+    const heading=document.createElement('div');
+    heading.className='label';
+    heading.textContent='GOVERNED WORK · AUTHENTICATED RECEIPT';
+    const details=document.createElement('div');
+    const descriptions={
+     PENDING:'Saved instruction is in Reality’s durable worker inbox. Awaiting the existing signed shift worker.',
+     CLAIMED:'Reality’s authenticated worker has claimed this instruction for investigation. No code execution is implied.',
+     INVESTIGATED_SCOPED:'Reality recorded an OpenAI investigation against existing owner-authorized work. This is not an independently tested repair.',
+     NEEDS_AUTHORIZED_SCOPE:'Reality investigated, but the requested work is not sufficiently covered by the current signed work scope.',
+     CONVERSATION_ONLY:'Reality qualified this message as conversational, not a new executable job.',
+     PROVIDER_UNVERIFIED:'Reality’s worker could not independently verify its investigation result. No model outcome or repair is claimed.'
+    };
+    const suffix=typeof handed.diagnosis==='string'&&handed.diagnosis?
+     ' Verified worker record (model advisory): '+handed.diagnosis.slice(0,700):'';
+    details.textContent=(descriptions[handed.status]||
+     'This request has no verified work disposition.')+suffix;
+    card.append(heading,details);
+    // Server-attested original work stages only. A Chat model diagnosis is
+    // NOT a tested patch or a source-installation approval.
+    const verifiedStages=new Set([
+      'SOURCE_BACKED_ORIGINAL_AWAITING_NEXT_GOVERNED_ACTION',
+      'MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+      'INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED',
+      'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+      'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
+      'CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE',
+      'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
+      'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT'
+    ]);
+    const stageLabels={
+      SOURCE_BACKED_ORIGINAL_AWAITING_NEXT_GOVERNED_ACTION:
+        'Source-backed original admitted · execution evidence still needed',
+      MODEL_DRAFT_AWAITING_INDEPENDENT_CI:
+        'Model patch drafted · independent frozen tests still needed',
+      INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED:
+        'First patch rejected by independent frozen tests',
+      CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI:
+        'First patch failed independent tests · corrective patch drafted · independent retest not yet verified',
+      CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING:
+        'Reality staged the corrective patch in its isolated GitHub branch · independent CI verdict pending',
+      CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE:
+        'Corrective patch rejected by independent tests · original job still open',
+      CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE:
+        'Corrective patch passed recorded independent tests · exact installation approval still required',
+      ORIGINAL_SETTLEMENT_RECEIPT_PRESENT:
+        'Original settlement reference recorded · inspect independent final receipt'
+    };
+    const verifiedChain=Array.isArray(handed.work_chain)?
+      handed.work_chain.filter(x=>
+        x&&/^work:[a-f0-9]{32}$/.test(x.original_work_id||'')&&
+        x.shift_id===handed.shift_id&&
+        verifiedStages.has(x.current_evidence_stage)&&
+        x.installation_authorized_by_chat===false&&
+        x.independent_repair_or_settlement_proven_by_chat===false
+      ).slice(0,25):[];
+    for(const original of verifiedChain){
+      const stage=document.createElement('div');
+      stage.className='reality-chat-signed-work-stage';
+      stage.textContent='Original work '+original.original_work_id+
+        ' · '+stageLabels[original.current_evidence_stage];
+      card.append(stage);
+      if(original.current_evidence_stage==='CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING'&&
+         /^reality\/riley\/auto-corrective-[a-f0-9]{32}$/.test(original.corrective_candidate_branch||'')){
+        const candidateLink=document.createElement('a');
+        candidateLink.href='https://github.com/maloney2323/Reality/tree/'+original.corrective_candidate_branch;
+        candidateLink.target='_blank';candidateLink.rel='noopener noreferrer';
+        candidateLink.textContent='View isolated candidate on GitHub';
+        card.append(candidateLink);
+      }
+      const run=original.corrective_ci_url||original.initial_frozen_ci_url;
+      if(typeof run==='string'&&
+         /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/[1-9]\d*$/.test(run)){
+        const a=document.createElement('a');
+        a.href=run;a.target='_blank';a.rel='noopener noreferrer';
+        a.textContent='View independent GitHub test evidence';
+        card.append(a);
+      }
+    }
+    // Chat is an operational control surface, not only an advice screen.
+    // A signed user turn can inspect its eligible WORK executor and authorize
+    // it from this conversation. Unsupported jobs are NOT falsely started.
+    // Even an earlier advisory marked conversational may contain a genuine
+    // work request; the trusted capability router makes that decision.
+    if(message.role==='user'){
+     const controls=document.createElement('div');
+     controls.className='reality-chat-signed-work-actions';
+     const inspect=document.createElement('button');
+     inspect.type='button';
+     inspect.textContent='Check available work capability';
+     const report=document.createElement('div');
+     report.setAttribute('role','status');
+     const postWork=async action=>{
+      const r=await fetch('/api/reality/personal-chat-work',{
+       method:'POST',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(65000),
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({action,conversation_id:conversationId(),
+        request_id:message.request_id})
+      });
+      const data=await r.json().catch(()=>null);
+      if(!r.ok||data?.ok!==true)throw Error(String(data?.error||'CHAT_WORK_READBACK_UNAVAILABLE'));
+      return data;
+     };
+     inspect.onclick=async()=>{
+      inspect.disabled=true;
+      report.textContent='Checking the existing job controller and original-work authorization…';
+      try{
+       const state=await postWork('INSPECT_VERIFIED_WORK');
+       if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+          /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
+        report.textContent='Verified unfinished original job '+state.original_work_id+
+         ' is eligible for an existing governed discovery worker. This is not installation approval.';
+        const authorize=document.createElement('button');
+        authorize.type='button';
+        authorize.textContent='Authorize this exact job from Chat';
+        authorize.onclick=async()=>{
+         authorize.disabled=true;
+         report.textContent='Submitting one owner-scoped work authorization…';
+         try{
+          const started=await postWork('AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY');
+          report.textContent=started.status==='CHAT_WORK_ORIGINAL_DISCOVERY_DISPATCHED'?
+           'Existing governed worker dispatch recorded for '+started.original_work_id+
+           '. Await independent execution and final receipts; no installation was approved.':
+           'Original job queued but dispatch is not yet verified. Reality must reconcile its worker before claiming execution.';
+         }catch(e){
+          report.textContent='No verified job dispatch: '+String(e.message||'UNKNOWN').slice(0,120);
+          authorize.disabled=false;
+         }
+        };
+        controls.append(authorize);
+       }else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
+        report.textContent='Original job '+state.original_work_id+
+         ' is already queued. Inspect its ongoing evidence; do not authorize it again.';
+       else if(state.status==='CHAT_WORK_READ_ONLY_EVIDENCE_AVAILABLE'){
+        const briefing=state.briefing||{};
+        report.textContent=briefing.status==='OWNER_SHIFT_INDEPENDENTLY_READ'?
+         'Authenticated shift readback · '+String(briefing.shift_status||'UNKNOWN')+
+          ' · '+String(briefing.work_step_count??'unknown')+
+          ' planned steps. This is status evidence, not a claim that the shift is complete.':
+         'No current employee shift found. No new work started.';
+       }else if(state.status==='CHAT_WORK_CAPABILITY_GAP')
+        report.textContent='Reality understands this as work, but no matching installed executable capability is verified. It must qualify a tool or capability before it can perform the requested change.';
+       else if(state.status==='CHAT_WORK_CONVERSATION_ONLY'){
+        report.textContent='This message is conversational. No job or approval is needed.';
+       }else if(state.status==='CHAT_WORK_INTENT_UNAVAILABLE')
+        report.textContent='Work interpretation is temporarily unavailable; conversation stays saved. No executor was run.';
+       else
+        report.textContent='No verified runnable work matched this exact saved instruction. Reality preserved the request without starting an unrelated job.';
+      }catch(e){
+       report.textContent='Execution eligibility could not be verified: '+
+        String(e.message||'UNKNOWN').slice(0,130)+'. No job started.';
+       inspect.disabled=false;
+      }
+     };
+     controls.append(inspect,report);card.append(controls);
+     const justSaved=window.realityJustSavedWorkRequest;
+     if(justSaved?.conversation_id===conversationId()&&
+        justSaved.request_id===message.request_id){
+      window.realityJustSavedWorkRequest=null;
+      void inspect.onclick();
+     }
+    }
+    thread.append(card);
+   }
+   const missing=message.role==='user'?unmatched.get(message.request_id):null;
+   if(missing&&missing.user_source_ref===message.source_ref){
+    const notice=document.createElement('div');
+    notice.className='bubble reality-chat-unanswered-notice';
+    notice.setAttribute('role','status');
+    const heading=document.createElement('div');
+    heading.className='label';
+    heading.textContent='CHAT DELIVERY STATUS · NOT A REALITY ANSWER';
+    const explanation=document.createElement('div');
+    const savedAt=Date.parse(missing.saved_at||'');
+    const older=Number.isFinite(savedAt)&&Date.now()-savedAt>120000;
+    explanation.textContent=older?
+     'Your message was saved, but Reality did not publish a verified reply. The exact server failure was not durably recorded. Its separate governed work intake and worker status are shown above when independently available. Do not resend the same saved instruction.':
+     'Your message was saved. A Chat reply has not been verified. The governed work intake has a separate receipt when the existing worker accepts it.';
+    const retry=document.createElement('button');
+    retry.type='button';
+    retry.textContent='Retry this saved reply — do not send again';
+    retry.onclick=async()=>{
+     retry.disabled=true;
+     explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
+     try{
+      const recovered=await fetch('/api/reality/personal-chat',{
+       method:'POST',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(95000),
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({conversation_id:data.conversation_id,
+        request_id:message.request_id,message:message.text})
+      });
+      const outcome=await recovered.json().catch(()=>null);
+      if(!recovered.ok||outcome?.ok!==true||
+         outcome.continuity?.current_answer_persisted!==true){
+       const code=String(outcome?.error||'CHAT_RESPONSE_UNAVAILABLE');
+       const stage=String(outcome?.stage||'UNKNOWN');
+       explanation.textContent='The original message remains saved. Reply recovery stopped at '+
+        stage.slice(0,80)+' ('+code.slice(0,110)+'). No new message or work authorization was created.';
+       retry.disabled=false;
+       return;
+      }
+      status('Reality saved a verified answer against the original request.');
+      await loadSaved();
+     }catch(e){
+      explanation.textContent='Saved reply recovery did not finish. Your original instruction is preserved. '+
+       String(e?.name==='TimeoutError'?'Response timed out':e?.message||'NETWORK_UNAVAILABLE').slice(0,120);
+      retry.disabled=false;
+     }
+    };
+    notice.append(heading,explanation,retry);
+    thread.append(notice);
+   }
+  }
+  status(unmatched.size?
+   'Saved conversation recovered · '+unmatched.size+
+    ' message(s) have no verified Reality reply. Open the delivery-status notice under the message for the actual limitation.':
+   (data.messages?.length||0)+' saved messages restored'+
+    (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
+  // A readback must not force the owner to the newest message while
+  // scrolling through earlier conversation history.
+  thread.scrollTop=atBottom?thread.scrollHeight:
+   Math.max(0,previousTop+(thread.scrollHeight-previousHeight));
   await loadGoals();
  }
  async function init(){
@@ -6727,26 +7117,79 @@ setInterval(refreshSavedShiftHome,300000);
  };
  el('privateSend').onclick=async()=>{
   const value=el('privatePrompt').value.trim();if(!value)return;
+  // A second click/paste must not create a second original work request
+  // when this EXACT text is already durably saved and awaiting a reply.
+  const outstanding=(window.realitySavedUnansweredTurns||[]).find(x=>x.text===value);
+  if(outstanding){
+   el('privatePrompt').value='';
+   el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+   status('This exact instruction is already saved in Reality. Use Retry this saved reply underneath the original message; no duplicate was submitted.');
+   return;
+  }
   const goalCommand=el('privateGoalCommand').value||null;
   const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
+  // Present the owner's typed words immediately in their conversation.
+  // This is a LOCAL delivery candidate until the authenticated RLS readback
+  // verifies it; no synthetic saved history, model response or job event.
+  const pendingBubble=bubble('user',value);
+  pendingBubble.dataset.requestId=sentRequest;
+  pendingBubble.querySelector('.label').textContent='YOU · SENDING (save not yet verified)';
+  el('privatePrompt').value='';
+  el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+  el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
   window.dispatchEvent(new CustomEvent('reality:chat-request-started',{
    detail:{conversation_id:sentConversation,request_id:sentRequest}
   }));
-  el('privateSend').disabled=true;status('Reality is working with saved context…');
+  el('privateSend').disabled=true;
+  let intakeVerified=false;
+  status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
+   // A conversation is durably accepted before model/reliability processing.
+   // Even if cognition times out, the exact signed-in turn can be resumed.
+   const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
+    credentials:'same-origin',signal:AbortSignal.timeout(14000),
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
+      message:value})});
+   const saved=await accepted.json().catch(()=>null);
+   if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
+      !String(saved.source_ref||'').startsWith('supabase:reality_chat_messages:')){
+    const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+   }
+   intakeVerified=true;
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
+   window.realityJustSavedWorkRequest={conversation_id:sentConversation,
+    request_id:sentRequest};
+   status('Your message is saved in Reality. Preparing the conversation answer.');
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
-    signal:AbortSignal.timeout(95000),
+    credentials:'same-origin',signal:AbortSignal.timeout(95000),
     headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
-   const data=await r.json();if(!r.ok)throw Error(data.error||'Chat failed');
-   el('privatePrompt').value='';
+   const data=await r.json().catch(()=>null);
+   if(!r.ok||data?.ok!==true){
+    const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
+    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
+   }
+   if(typeof data.answer!=='string'||!data.answer.trim()||
+      data.continuity?.current_answer_persisted!==true)
+    throw Error('CHAT_ANSWER_DURABILITY_NOT_VERIFIED');
    el('privateGoalCommand').value='';
-   // The server's completed reply must not be held hostage by UI readbacks.
-   // These are read-only refreshes, with their own deadlines.
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent='YOU · RETURNED WITH VERIFIED ANSWER';
+   // The server independently verified its saved answer before returning 200.
+   // Display it now; the GET readback below replaces temporary DOM entries
+   // with the exact authenticated history when available.
+   if(el('privateTranscript').contains(pendingBubble)){
+    const answerBubble=bubble('assistant',data.answer);
+    answerBubble.querySelector('.label').textContent='REALITY · VERIFIED SAVED ANSWER';
+    el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+   }
    void Promise.allSettled([loadSaved(),loadConversations()]).then(results=>{
     if(results.some(x=>x.status==='rejected'))
-     status('Answer returned; saved history refresh was unavailable. You can retry refreshing without resending.');
+     status('The answer was verified by the server, but reloading saved history is temporarily unavailable. Do not resend this request.');
    });
    // Refresh Reality's independently observed improvement queue after chat.
    // This request remains GET-only and cannot start a model or authorize work.
@@ -6863,8 +7306,55 @@ setInterval(refreshSavedShiftHome,300000);
     ' · Corrections: '+(reliability.intervention||'none')+
     (data.continuity?.older_messages_may_be_missing?' · Earlier history incomplete':'')+
     ' · External truth not independently verified');
-  }catch(e){status(e.message+' · Saved user messages may still be recoverable.');}
-  finally{el('privateSend').disabled=false}
+  }catch(e){
+   const errorCode=String(e?.message||'CHAT_RESPONSE_UNAVAILABLE');
+   const safeCode=/^[A-Z][A-Z0-9_]{3,119}$/.test(errorCode)?errorCode:'CHAT_RESPONSE_UNAVAILABLE';
+   // Distinguish a saved user turn from an unsaved draft after a
+   // synchronous Chat timeout. Do not encourage sending a duplicate request.
+   let savedUser=null,savedAnswer=null;
+   try{
+    const readback=await fetch('/api/reality/personal-chat?conversation_id='+
+     encodeURIComponent(sentConversation),{method:'GET',
+     credentials:'same-origin',cache:'no-store',
+     signal:AbortSignal.timeout(7500)});
+    if(readback.ok){
+     const body=await readback.json();
+     if(body?.ok===true&&body.conversation_id===sentConversation&&
+      Array.isArray(body.messages)){
+      savedUser=body.messages.find(x=>x.role==='user'&&
+       x.request_id===sentRequest&&x.text===value&&
+       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'))||null;
+      savedAnswer=body.messages.find(x=>x.role==='assistant'&&
+       x.request_id===sentRequest&&typeof x.text==='string'&&x.text.trim()&&
+       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'))||null;
+     }
+    }
+   }catch{/* A temporary readback error is not proof of failed delivery. */}
+   if(savedUser&&savedAnswer){
+    if(pendingBubble.isConnected)
+     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
+    void loadSaved().catch(()=>{});
+    status('Reality saved your answer. Recovered from the authenticated conversation.');
+    return;
+   }
+   if(pendingBubble.isConnected)
+    pendingBubble.querySelector('.label').textContent=(savedUser||intakeVerified)?
+     'YOU · SAVED · REPLY NOT VERIFIED':'YOU · DELIVERY NOT VERIFIED';
+   if(savedUser||intakeVerified||window.realityJustSavedWorkRequest?.request_id===sentRequest)
+    void loadSaved().catch(()=>{});
+   // On authenticated save, keep the text in history rather than putting
+   // an already-sent message back into the composer for accidental resending.
+   if(!savedUser&&!intakeVerified&&!el('privatePrompt').value.trim()){
+    el('privatePrompt').value=value;
+    el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
+   }
+   window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
+    detail:{request_id:sentRequest,code:safeCode}
+   }));
+   status((savedUser||intakeVerified)?
+    'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Retry that saved reply; do not send a new request or assume execution.':
+    'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
+  }finally{el('privateSend').disabled=false}
  };
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
  init();
@@ -6872,6 +7362,9 @@ setInterval(refreshSavedShiftHome,300000);
 
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
+<script defer src="/reality-chat-employee-shift-card-v1.js"></script>
+<script defer src="/reality-chat-approved-assignments-v1.js"></script>
+<script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
 <script defer src="/reality-riley-source-work-v1.js"></script>
@@ -6882,6 +7375,8 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-value-verification-v1.js"></script>
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
+<script defer src="/reality-home-employee-brief-v1.js"></script>
+<script defer src="/reality-employee-work-audit-ui-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
 <script defer src="/reality-model-capability-map-v1.js"></script>
@@ -6889,5 +7384,6 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-automatic-backlog-value-v1.js"></script>
 <script defer src="/reality-category-economic-bridge-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
+<script type="module" src="/reality-native263-install-approval-ui-v1.js"></script>
 </body>
 </html>

@@ -11,6 +11,35 @@
  const auth = $('privateReady');
  if (!root || !status || !records || !auth) return;
  const WORK = /^work:[a-f0-9]{32}$/;
+ const valueKinds = new Set(['NATIVE_CODE_REPAIR','PR_CODE_REVIEW']);
+ const validShiftValue = d => d?.ok === true &&
+  d.version === 'reality-shift-final-value-evidence-v1' &&
+  d.status === 'OWNER_FINAL_RECEIPTS_WITH_ECONOMIC_ACCOUNTABILITY' &&
+  d.owner_scope_verified === true && d.read_only === true &&
+  d.original_receipts_unchanged === true &&
+  d.financial_roi_verified === false &&
+  d.verified_net_savings_usd === null &&
+  d.new_work_authorized === false &&
+  d.installation_authorized === false &&
+  d.production_changed === false &&
+  Array.isArray(d.receipts) && d.receipts.length <= 12 &&
+  d.independent_originals === d.receipts.length &&
+  new Set(d.receipts.map(r => r.original_work_id)).size === d.receipts.length &&
+  d.receipts.every(r => WORK.test(r.original_work_id || '') &&
+   valueKinds.has(r.kind) &&
+   r.status === 'INDEPENDENTLY_SETTLED_SOURCE_NATIVE_ORIGINAL' &&
+   r.independent_verification === true &&
+   r.verified_financial_roi === false &&
+   r.verified_net_savings_usd === null &&
+   r.original_receipt_unchanged === true &&
+   r.production_changed === false &&
+   /^supabase:riley_(?:native_independent_final_receipts|pr_review_originals)_v1:[a-f0-9-]{36}$/i.test(r.final_receipt_ref || '') &&
+   Number.isFinite(Date.parse(r.settled_at || '')) &&
+   (r.model_output_tokens_recorded === null ||
+    (Number.isSafeInteger(r.model_output_tokens_recorded) &&
+     r.model_output_tokens_recorded > 0)) &&
+   Array.isArray(r.economic_observations) &&
+   Array.isArray(r.data_missing) && r.data_missing.length === 4);
  const RUN = /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9][0-9]*$/;
  const nat = n => Number.isSafeInteger(n) && n >= 0;
  const nodes = ['realityEconSignals','realityEconSignalsNote','realityEconSettled',
@@ -152,7 +181,8 @@
    const results = await Promise.allSettled([
     read('/api/reality/workday-opportunities'),
     read('/api/reality/personal-operational-roi-v2'),
-    read('/api/reality/personal-genuine-loop-status')
+    read('/api/reality/personal-genuine-loop-status'),
+    read('/api/reality/personal-shift-value-receipts')
    ]);
    if (epoch !== serial || !isSignedIn()) return;
    // A partially failed readback never changes UNKNOWN into zero.
@@ -162,6 +192,8 @@
     results[1].value : null;
    const loop = results[2].status === 'fulfilled' && validLoop(results[2].value) ?
     results[2].value : null;
+   const shiftValue = results[3].status === 'fulfilled' &&
+    validShiftValue(results[3].value) ? results[3].value : null;
    clear('Reading the latest owner-scoped evidence.');
    if (work) {
     change('realityEconSignals', String(work.counts.source_backed_opportunities));
@@ -232,13 +264,32 @@
    } else {
     paragraph('Owner settlement and final-receipt sources are unavailable. Completion is unknown.');
    }
-   const checked = [work,roi,loop].filter(Boolean).length;
+   if (shiftValue && shiftValue.receipts.length) {
+    paragraph('Independently settled employee originals · '+shiftValue.receipts.length+
+     ' exact receipts. Each PDF includes the job proof, recorded token evidence when available, and the current unverified ROI status. Original receipts remain immutable.');
+    for (const item of shiftValue.receipts) {
+     if (receiptByJob.has(item.original_work_id)) continue;
+     const workTitle = item.kind === 'NATIVE_CODE_REPAIR' ?
+      'Verified engineering repair' : 'Verified pull-request review';
+     const tokens = item.model_output_tokens_recorded !== null ?
+      ' · '+item.model_output_tokens_recorded+' recorded output tokens (partial)' :
+      ' · token usage unavailable';
+     appendJob(item.original_work_id,
+      workTitle+' · '+item.original_work_id.slice(5,13),
+      'Independently settled · '+item.source_ref+tokens+
+      ' · human capacity and ROI not measured.',
+      '/api/reality/personal-shift-value-receipt-pdf?work_id='+
+       encodeURIComponent(item.original_work_id),
+      'Download final job receipt + economic accountability (PDF)');
+    }
+   }
+   const checked = [work,roi,loop,shiftValue].filter(Boolean).length;
    status.textContent = checked === 0 ?
     'Evidence readback unavailable; all counts remain unverified. No action started.' :
-    checked === 3 ?
-    'Read-only source check complete · 3/3 evidence sources validated. No jobs or approvals created.' :
+    checked === 4 ?
+    'Read-only source check complete · 4/4 evidence sources validated. Receipt PDFs include economic evidence status. No jobs or approvals created.' :
     'Partial readback · ' + checked +
-    '/3 evidence sources validated. Missing values are unknown, not zero.';
+    '/4 evidence sources validated. Missing values are unknown, not zero.';
   } catch {
    if (epoch === serial && isSignedIn())
     clear('Evidence readback failed. No jobs, receipts, time saved or dollars are inferred.');

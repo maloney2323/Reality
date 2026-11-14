@@ -355,3 +355,80 @@ body[data-reality-route="chat"] #realityChatFocusToggle{
   font-size:14px!important;line-height:1.65!important;
  }
 }
+
+
+/* Source-linked Chat activity belongs directly underneath the submitted
+   user bubble. Preserve independent scrolling and visible progress on mobile
+   rather than pinning this component above the whole conversation. */
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus{
+ display:block!important;flex:0 0 auto!important;align-self:flex-start;
+ width:min(96%,720px)!important;max-width:96%!important;min-width:0!important;
+ height:auto!important;min-height:0!important;max-height:none!important;
+ overflow:visible!important;margin:0!important;padding:12px 14px!important;
+ border:1px solid #4b768c!important;border-radius:13px!important;
+ background:#123044!important;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-text{
+ display:block!important;overflow:visible!important;
+ -webkit-line-clamp:unset!important;line-clamp:unset!important;
+ color:#d1e5ef;font-size:12px;line-height:1.5;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-proof{
+ display:block;max-height:none;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-steps{
+ max-height:240px;overflow-y:auto;overscroll-behavior:contain;
+}
+@media(max-width:600px){
+ body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus{
+  width:98%!important;max-width:98%!important;max-height:none!important;
+  overflow:visible!important;
+ }
+}
+
+/* Mobile conversation scroll recovery · 2026-11.
+   A single independent message scroll area. Controls are housed in the
+   Chats sidebar instead of consuming height between messages and composer. */
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-exports{
+ display:flex;flex-direction:column;gap:8px;align-items:stretch;
+ flex:0 0 auto;min-height:0;margin:7px 0 16px;padding:11px;
+ border:1px solid #395b71;border-radius:12px;background:#10283b;
+}
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-exports button{
+ width:100%;min-height:40px;text-align:center;
+ white-space:normal;overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-export-status{
+ margin:3px 0;font-size:12px;line-height:1.55;color:#bad2e2;
+ overflow-wrap:anywhere;
+}
+@media(max-width:600px){
+ body[data-reality-route="chat"].reality-chat-signed-in #privateChat,
+ body[data-reality-route="chat"].reality-chat-signed-in #privateReady,
+ body[data-reality-route="chat"].reality-chat-signed-in #realityChatWorkspace,
+ body[data-reality-route="chat"].reality-chat-signed-in .reality-chat-conversation{
+  min-height:0!important;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateChat .reality-chat-conversation #privateTranscript{
+  flex:1 1 0!important;min-height:0!important;height:0!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  touch-action:pan-y!important;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;scroll-behavior:auto;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateTranscript .bubble{
+  touch-action:pan-y;overflow-wrap:anywhere;
+ }
+ /* A second scrolling box inside the progress card intercepted upward
+    swipes on Android. Keep the entire expanded stage inside ONE thread. */
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateTranscript #realityChatRequestStatus .reality-live-reply-steps{
+  max-height:none!important;overflow:visible!important;
+  touch-action:pan-y!important;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #realityChatComposer{
+  flex:0 0 auto!important;min-height:0!important;
+ }
+}

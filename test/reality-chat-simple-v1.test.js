@@ -13,7 +13,9 @@ const browserScript=script?.replace(/^\s*import\s+\{[^}]+\}\s*from\s*'[^']+';\s*
 test('light Chat is on an isolated route without replacing the existing approvals view',()=>{
   assert.ok(route.rewrites.some(r=>r.source==='/chat-simple'&&r.destination==='/reality-chat-simple.html'));
   assert.ok(route.rewrites.some(r=>r.source==='/chat'&&r.destination==='/index.html'));
-  assert.doesNotMatch(html,/<script[^>]+src=/);
+  // The only permitted external script is the isolated, read-only Chat export helper.
+  assert.deepEqual([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(x=>x[1]),
+   ['/reality-chat-conversation-export-v1.js']);
   assert.match(html,/Reality · Riley shift/);
   assert.match(html,/<nav class="reality-page-nav" aria-label="Reality pages">/);
   assert.match(html,/<a id="rileyNavHome" href="\/">Home<\/a>/);

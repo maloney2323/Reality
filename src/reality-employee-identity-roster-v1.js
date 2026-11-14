@@ -15,6 +15,49 @@ const PROFILES=Object.freeze({
  financial_legal_admin:{name:'Sage',short_title:'Finance & Administration',icon:'calculator',categories:['Costs','Business administration'],summary:'Organizes costs, financial models and compliance review tasks, with required human oversight.'}
 });
 const EXPECTED_IDS=Object.keys(PROFILES);
+
+// Static source-of-truth role descriptions for authenticated read-only Chat.
+// This does not fetch a live backlog, create agents, suggest verified task
+// durations, authorize a schedule, or mark any role as an active worker.
+export function buildRealityProposedEmployeeRoleDiscussionContext({
+ observedAt=new Date()
+}={}){
+ if(!(observedAt instanceof Date)||!Number.isFinite(observedAt.getTime()))
+  throw Error('EMPLOYEE_ROLE_CONTEXT_VALID_TIME_REQUIRED');
+ const roles=Object.entries(PROFILES).map(([functionId,p])=>Object.freeze({
+  function_id:functionId,employee_name:p.name,role:p.short_title,
+  responsibilities:p.summary,candidate_categories:Object.freeze([...p.categories]),
+  status:'PROPOSED_ROLE_NOT_AN_ACTIVE_WORKER',
+  actual_assigned_source_jobs:null,
+  independently_completed_jobs_from_directory:null
+ }));
+ if(roles.length!==8)throw Error('EMPLOYEE_ROLE_DIRECTORY_UNVERIFIED');
+ const summary='REALITY PROPOSED EMPLOYEE ROLE DIRECTORY (read-only): '+
+   roles.map(r=>r.employee_name+' ('+r.role+'): '+r.responsibilities).join(' | ')+
+   '. These are existing named business-function profiles, NOT eight independent '+
+   'models or verified active workers. Discuss proposed jobs and next-week '+
+   'assignments for each role freely. The existing read-only next-week roster '+
+   'planner can later align source-backed Work Center candidates to roles and '+
+   'the customer-selected business calendar. Only a separate, exact owner-scoped '+
+   'authorization may start work. Do not fabricate active assignments, dates, '+
+   'durations, cost savings, or employee replacement.';
+ return Object.freeze({
+  entry_id:'reality:employee-role-directory:'+REALITY_EMPLOYEE_ROSTER_VERSION,
+  event_kind:'existing_employee_roles_for_readonly_weekly_discussion',
+  source_kind:'TRUSTED_STATIC_ROLE_DEFINITIONS_NOT_LIVE_JOB_EVIDENCE',
+  source_ref:'reality:src/reality-employee-identity-roster-v1.js',
+  assertion_time:observedAt.toISOString(),
+  epistemic_status:'ROLE_PROFILES_EXIST_SOURCE_ASSIGNMENTS_NOT_READ',
+  roles:Object.freeze(roles),summary,
+  customer_workday_preferences_discussable:true,
+  existing_readonly_draft_workweek:'MONDAY_TO_FRIDAY_AMERICA_NEW_YORK',
+  arbitrary_customer_calendar_execution_supported:false,
+  weekly_plan_generated_by_this_read:false,job_started:false,
+  calendar_change_authorized:false,external_execution_authorized:false,
+  installation_authorized:false,production_changed:false,
+ });
+}
+
 export function buildRealityNamedEmployeeRoster(brief){
  const workforce=assessRealityCompanyWorkforce(brief);
  const routing=routeRealityWorkCategoriesToEmployees(brief);

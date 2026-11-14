@@ -16,6 +16,12 @@ import {findEmployeeShiftCapabilityHandoffs}
  from '../../src/reality-employee-shift-capability-handoff-v1.js';
 import {buildRealityShiftConversationBrief}
  from '../../src/reality-shift-conversation-brief-v1.js';
+import {reconcileRealityMixedShiftReceipts}
+ from '../../src/reality-mixed-shift-receipts-v1.js';
+import {projectRealityAutomaticShiftSupervisor}
+ from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityExistingShiftIntegratedIntake}
+ from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
 import {assessRealityNativeBatchReadiness}
@@ -77,16 +83,21 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
 // old UI strings, model advice or an inference from an issue being open.
 export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
  if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
- const [reviews,triage]=await Promise.all([
+ const [reviews,triage,native]=await Promise.all([
   call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
-  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId})
+  call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId})
  ]);
  if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
     reviews.production_changed!==false||
     !Array.isArray(reviews.jobs)||reviews.jobs.length>10||
     triage?.status!=='OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE'||
     triage.production_changed!==false||
-    !Array.isArray(triage.jobs)||triage.jobs.length>5)
+    !Array.isArray(triage.jobs)||triage.jobs.length>5||
+    native?.status!=='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'||
+    native.production_changed!==false||
+    native.does_not_authorize_new_work!==true||
+    !Array.isArray(native.jobs)||native.jobs.length>6)
   throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
  const refs=new Set();
  for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
@@ -104,6 +115,23 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
    )throw Error('SHIFT_SETTLED_JOB_INDEPENDENT_RECEIPT_INVALID');
    refs.add(source);
   }
+ }
+ // Native engineering receipts are distinct from older Universe capability
+ // receipts. A GitHub issue can remain OPEN even after Reality independently
+ // installed, verified and settled the exact original repair. Never schedule it
+ // again merely to fill a new employee shift.
+ for(const j of native.jobs){
+  if(j.phase!=='SETTLED')continue;
+  if(j.original_job_completed!==true||
+     j.code_repair_completed!==true||
+     j.production_changed!==false||
+     !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
+     j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
+     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')||
+     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(
+      j.original_settlement_receipt_ref||''))
+   throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+  refs.add(j.source_ref);
  }
  return Object.freeze([...refs].sort());
 }
@@ -242,6 +270,7 @@ export default async function handler(req,res){
    // One independently checked execution graph is shared by the worker
    // and signed-in owner Chat. Source-native and Universe originals have
    // the SAME owner/shift/source identity; no synthetic job or authority.
+   let verifiedGraphForTriage=null;
    let shift_execution_graph=null;
    let shift_execution_graph_status='NO_CURRENT_EXECUTION_GRAPH';
    if(chosen?.planned_end_at==='infinity'&&
@@ -253,6 +282,7 @@ export default async function handler(req,res){
       }),{expectedShiftId:chosen.shift_id});
      if(graph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
         graph.owner_id===session.user_id&&graph.jobs.length<=4){
+      verifiedGraphForTriage=graph;
       shift_execution_graph={
        status:graph.status,shift_id:graph.shift_id,
        owner_id:graph.owner_id,plan_fingerprint:graph.plan_fingerprint,
@@ -369,7 +399,72 @@ export default async function handler(req,res){
       riley_native_model_tool_proof=proof;
     }catch{/* Never invent a missing model/tool receipt. */}
    }
-   const shift_briefing=buildRealityShiftConversationBrief(read.shifts,handoffs);
+   // Existing signed-in owner: independently read finalized source-native
+   // originals without reopening their DB claims or changing shift authority.
+   let shift_source_native_receipts=null;
+   let shift_source_native_receipts_status='NO_OWNER_SOURCE_NATIVE_RECEIPT_COVERAGE';
+   const activeBrief=read.shifts[0];
+   if(activeBrief?.planned_end_at==='infinity'&&
+      Array.isArray(activeBrief.steps)&&activeBrief.steps.length===8&&
+      activeBrief.steps.slice(1,5).every(x=>
+       /^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/.test(
+        x.source_ref||''))){
+    try{
+     shift_source_native_receipts=reconcileRealityMixedShiftReceipts(activeBrief,{
+      prReadback:riley_pr_review_jobs.status==='OWNER_PR_REVIEW_ORIGINAL_READBACK'?
+       riley_pr_review_jobs:null,
+      repairReadback:riley_code_repair_jobs.status===
+       'OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'?
+       riley_code_repair_jobs:null
+     });
+     shift_source_native_receipts_status='OWNER_SOURCE_NATIVE_RECEIPTS_RECONCILED_READ_ONLY';
+    }catch{
+     shift_source_native_receipts=null;
+     shift_source_native_receipts_status='SOURCE_NATIVE_RECEIPT_BINDING_UNVERIFIED';
+    }
+   }
+   // Automatically classify all frozen authorized sources at each owner
+   // readback; verified original-job receipts take precedence over GitHub
+   // OPEN status or an old, generic execution queue.
+   let shift_automatic_supervisor=null;
+   let shift_automatic_supervisor_status='NO_VERIFIED_OWNER_SOURCE_TRIAGE';
+   if(verifiedGraphForTriage&&shift_source_native_receipts){
+    try{
+     shift_automatic_supervisor=projectRealityAutomaticShiftSupervisor(
+      verifiedGraphForTriage,shift_source_native_receipts);
+     shift_automatic_supervisor_status=
+      'EXACT_OWNER_SOURCE_TRIAGE_READ_ONLY_VERIFIED';
+    }catch{
+     shift_automatic_supervisor_status=
+      'EXACT_OWNER_SOURCE_TRIAGE_READBACK_UNVERIFIED';
+    }
+   }
+   // The Chat/employee UI can read the SAME unified work inventory that
+   // the trusted scheduled worker checks; observations are not executable jobs.
+   let shift_integrated_work_intake=null;
+   let shift_integrated_work_intake_status='NO_VERIFIED_CURRENT_SHIFT_INTAKE';
+   if(verifiedGraphForTriage&&shift_automatic_supervisor){
+    try{
+     const [weekly,capabilities]=await Promise.all([
+      shiftRpc(db,'reality_read_owner_shift_weekly_backlog_v1',{
+       p_owner_id:session.user_id,
+       p_shift_id:verifiedGraphForTriage.shift_id}),
+      shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
+       p_owner_id:session.user_id})
+     ]);
+     shift_integrated_work_intake=projectRealityExistingShiftIntegratedIntake({
+      graph:verifiedGraphForTriage,
+      supervisor:shift_automatic_supervisor,
+      weekly,capabilityFeed:capabilities});
+     shift_integrated_work_intake_status=
+      'WEEKLY_AND_HOMEPAGE_INTAKE_OWNER_RECONCILED';
+    }catch{
+     shift_integrated_work_intake_status=
+      'WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
+    }
+   }
+   const shift_briefing=buildRealityShiftConversationBrief(
+    read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
    let draft=null;
    if(hours!==null){
@@ -395,6 +490,9 @@ export default async function handler(req,res){
    }
    return res.status(200).json({ok:true,...read,shift_briefing,
     shift_activity,shift_activity_status,
+    shift_source_native_receipts,shift_source_native_receipts_status,
+    shift_automatic_supervisor,shift_automatic_supervisor_status,
+    shift_integrated_work_intake,shift_integrated_work_intake_status,
     shift_execution_graph,shift_execution_graph_status,
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {draftCurrentRileyNativeRepair} from '../src/reality-riley-native-model-draft-v1.js';
+import {draftCurrentRileyNativeRepair,expectedGraph} from '../src/reality-riley-native-model-draft-v1.js';
 
 const shift='9460cfff-937a-4105-9093-2e41ab39a950';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -179,4 +179,36 @@ test('service-only database claim is an exact current original; it cannot grant 
  assert.match(worker,/draftCurrentRileyNativeRepair/);
  assert.match(worker,/riley_model_draft:rileyModelDraft/);
  assert.match(worker,/RILEY_MODEL_DRAFT_RECORDED_PENDING_FROZEN_TEST/);
+});
+test('source-admitted #185 uses exactly the same service-only singleflight draft lease, not the settled #263 original',async()=>{
+ const currentWork='work:45206a326ddf406b1c083a819da24aaa';
+ const original={...graph.jobs[0],original_work_id:currentWork,
+  source_ref:'https://github.com/maloney2323/Reality/issues/185',
+  source_proof_sha256:'sha256:'+'a'.repeat(64)};
+ const current={...graph,jobs:[
+  {...graph.jobs[0],phase:'SETTLED'},original],engineering_ready:true};
+ assert.equal(expectedGraph(current).original_work_id,currentWork);
+ let claims=0,providers=0;
+ const callRpc=async(db,name,args)=>{
+  claims++;
+  assert.equal(name,'reality_claim_current_riley_native_model_draft_v1');
+  assert.equal(args.p_shift_id,shift);
+  assert.equal(args.p_original_work_id,currentWork);
+  return {status:'EXISTING_NATIVE_MODEL_ATTEMPT_NO_REPLAY',
+   original_work_id:currentWork,shift_id:shift,
+   draft_phase:'MODEL_DRAFT_RECORDED',
+   model_invocation_authorized:false,installation_authorized:false,
+   production_changed:false};
+ };
+ const result=await draftCurrentRileyNativeRepair({
+  db,graph:current,env,callRpc,fetchImpl:async()=>{
+   providers++;throw Error('MODEL_ALREADY_CLAIMED_NO_PROVIDER_CALL');
+  }});
+ assert.equal(result.status,'EXISTING_NATIVE_MODEL_ATTEMPT_NO_REPLAY');
+ assert.equal(claims,1);
+ assert.equal(providers,0);
+ assert.throws(()=>expectedGraph({...current,jobs:[original,{
+  ...original,original_work_id:'work:'+'a'.repeat(32),
+  source_ref:'https://github.com/maloney2323/Reality/issues/999'}]}),
+ /RILEY_NATIVE_MODEL_CURRENT_OWNER_REPAIR_GRAPH_REQUIRED/);
 });

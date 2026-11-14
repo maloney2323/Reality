@@ -9,7 +9,8 @@ const SHA=/^sha256:[a-f0-9]{64}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/;
 const KINDS=new Set(['REAL_ENGINEERING_REPAIR_ORIGINAL',
- 'REAL_PR_REVIEW_ORIGINAL','GENUINE_UNIVERSE_CAPABILITY_ORIGINAL',
+ 'REAL_PR_REVIEW_ORIGINAL','REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL',
+ 'GENUINE_UNIVERSE_CAPABILITY_ORIGINAL',
  'SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL','UNVERIFIED_SOURCE']);
 const fail=x=>{throw Error('REALITY_UNIFIED_SHIFT_'+x)};
 
@@ -53,7 +54,7 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
        'PENDING_FROZEN_REPRODUCTION',
        'EVIDENCE_RECONCILIATION_REQUIRED',
        'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
-       'PUBLISHING','BLOCKED',
+       'PUBLISHING','EVIDENCE_VERIFIED','BLOCKED',
        'LEASED_FOR_INDEPENDENT_REPRODUCTION','AWAITING_OWNER_APPROVAL',
        'ISOLATED_INSTALLED_PROBATION','SETTLED_ISOLATED'].includes(item.phase)||
      !/^[A-Z0-9_]{8,100}$/.test(item.next_governed_action||'')||
@@ -80,8 +81,21 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
   }
   const is263=item.source_ref===
    'https://github.com/maloney2323/Reality/issues/263';
-  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&!is263)
-   fail('REPAIR_SOURCE_SCOPE_CHANGED');
+  // Engineering originals are not specific to historical issue #263.
+  // The upstream service-only admission gate supplies the owner-bound
+  // source proof and durable original-work ID. The read-only controller
+  // must reject any PR, unverified source or anonymous "original" here.
+  if(item.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+     (!/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(item.source_ref)||
+      item.independent_source_proof_verified!==true||
+      !WORK.test(item.original_work_id||'')))
+   fail('ENGINEERING_ORIGINAL_REQUIRES_VERIFIED_ISSUE_AND_WORK_ID');
+  if(item.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
+     (!/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(item.source_ref)||
+      item.independent_source_proof_verified!==true||
+      !WORK.test(item.original_work_id||'')||
+      !['SOURCE_ADMITTED','EVIDENCE_VERIFIED','BLOCKED','SETTLED'].includes(item.phase)))
+   fail('COMMIT_TRIAGE_REQUIRES_VERIFIED_FROZEN_ISSUE_ORIGINAL');
   if(is263&&item.independent_source_proof_verified===true&&
      item.original_kind!=='REAL_ENGINEERING_REPAIR_ORIGINAL')
    fail('EXACT_REPAIR_IDENTITY_MUST_NOT_BE_RECAST_AS_OTHER_ENGINE');

@@ -41,6 +41,19 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {admitVerifiedCurrentShiftCommitTriage,
+ reconcileVerifiedCurrentShiftCommitTriage}
+ from '../../src/reality-shift-commit-triage-handoff-v1.js';
+import {reconcileRealityMixedShiftReceipts}
+ from '../../src/reality-mixed-shift-receipts-v1.js';
+import {projectRealityAutomaticShiftSupervisor}
+ from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityExistingShiftIntegratedIntake}
+ from '../../src/reality-existing-shift-integrated-intake-v1.js';
+import {runCurrentShiftWeeklyInvestigations}
+ from '../../src/reality-active-weekly-source-investigator-v1.js';
+import {admitCurrentShiftInvestigatedSourceWithFrozenProof}
+ from '../../src/reality-current-shift-auto-admission-handoff-v1.js';
 import {diagnoseRealityNativeCapabilityGap}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {proveNativeOriginalReadOnlyModelTool}
@@ -49,6 +62,12 @@ import {draftCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-model-draft-v1.js';
 import {reviseCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-corrective-model-v1.js';
+import {reconcileCurrentShiftRejectedNativeModelCandidate}
+ from '../../src/reality-riley-current-shift-failed-candidate-reconciliation-v1.js';
+import {investigateAuthenticatedChatUnderExistingShift}
+ from '../../src/reality-signed-chat-to-work-v1.js';
+import {continueRileyCorrectiveModelIntoIndependentCI}
+ from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -103,6 +122,36 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // Existing owner-authorized wake now consumes saved Chat instructions.
+  // No Chat turn changes the frozen source scope, start approval, or install.
+  const chatClaimReconciliation=await shiftRpc(db,
+   'reality_reconcile_expired_chat_work_v1',{});
+  if(chatClaimReconciliation?.status!=='STALE_CHAT_WORK_CLAIMS_RECONCILED'||
+     chatClaimReconciliation.installation_authorized!==false)
+   throw Error('CHAT_WORK_STALE_LEASE_RECONCILIATION_UNVERIFIED');
+  const chatWorkPromise=investigateAuthenticatedChatUnderExistingShift({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(e=>({
+   status:'CHAT_WORK_SERVICE_PROOF_UNVERIFIED',
+   reason:/^REALITY_CHAT_WORK_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+     String(e.message):'CHAT_WORK_PROVIDER_OR_DATABASE_UNVERIFIED',
+   model_advisory_recorded:false,execution_authorized:false,
+   new_shift_started:false,installation_authorized:false,
+   production_changed:false
+  }));
+
+  // Independently continue the existing, model-written corrective patch into
+  // a protected isolated candidate branch and a real GitHub frozen CI run.
+  // This work is service-only, can be reconciled after uncertainty, and runs
+  // concurrently with already-authorized work, without a second Start.
+  const correctiveCiPromise=continueRileyCorrectiveModelIntoIndependentCI({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false
+  }));
+  
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
@@ -193,6 +242,72 @@ export default async function handler(req,res){
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
   });
+  // A source-checked commit-triage observation only becomes a durable original
+  // after independent provider GET and service-only warrant/proof readback.
+  // No new shift, GitHub write, installation or settlement is implied.
+  let commitTriageHandoff={
+   qualification:{status:'NO_VERIFIED_SHIFT_COMMIT_TRIAGE_CANDIDATE'},
+   original:{status:'NO_SHIFT_COMMIT_TRIAGE_ORIGINAL_ADMITTED',
+    original_job_admitted:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false}
+  };
+  try{
+   const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:initialGraph.shift_id
+   });
+   if(sourceGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+      sourceGraph.jobs.some(x=>
+       x.original_kind==='SOURCE_REVIEW_NOT_YET_AN_EXECUTABLE_ORIGINAL'&&
+       x.independent_source_proof_verified===true&&x.phase==='NOT_ADMITTED'))
+    commitTriageHandoff=await admitVerifiedCurrentShiftCommitTriage({
+     graph:sourceGraph,db,fetchImpl:fetch,
+     token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+      process.env.GITHUB_TOKEN||null
+    });
+  }catch(error){
+   // Only a bounded diagnostic code is exposed, never secrets or raw provider data.
+   const message=String(error?.message||'');
+   const failureCode=/^SHIFT_COMMIT_TRIAGE_(?:HANDOFF_)?[A-Z0-9_]{3,100}$/.test(message)?
+    message:'SHIFT_COMMIT_TRIAGE_UNCLASSIFIED_SOURCE_FAILURE';
+   commitTriageHandoff={
+    qualification:{status:'COMMIT_TRIAGE_PROVIDER_OR_SOURCE_READBACK_UNVERIFIED',
+     failure_code:failureCode},
+    original:{status:'EXACT_SHIFT_COMMIT_TRIAGE_ADMISSION_OR_EVIDENCE_RECONCILIATION_REQUIRED',
+     original_job_admitted:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false}
+   };
+  }
+  // Reconcile owner-assisted GitHub issue disposition only after a second,
+  // independent provider readback by this signed and service-only worker.
+  let commitTriageSettlement={
+   status:'NO_UNSETTLED_VERIFIED_COMMIT_TRIAGE_ORIGINAL',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  };
+  try{
+   const settleGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:initialGraph.shift_id
+   });
+   if(settleGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+      settleGraph.jobs.some(x=>
+       x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
+       x.phase==='EVIDENCE_VERIFIED'))
+    commitTriageSettlement=await reconcileVerifiedCurrentShiftCommitTriage({
+     graph:settleGraph,db,fetchImpl:fetch
+    });
+  }catch(error){
+   const message=String(error?.message||'');
+   const failureCode=/^SHIFT_COMMIT_TRIAGE_HANDOFF_[A-Z0-9_]{3,100}$/.test(message)?
+    message:'SHIFT_COMMIT_TRIAGE_SETTLEMENT_PROVIDER_OR_DATABASE_UNVERIFIED';
+   commitTriageSettlement={
+    status:'COMMIT_TRIAGE_FINAL_RECEIPT_RECONCILIATION_REQUIRED',
+    failure_code:failureCode,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false
+   };
+  }
   // SAME frozen shift and source identities across all real employee roles.
   const unifiedGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
    'reality_read_current_shift_execution_graph_v1',{}),{
@@ -201,6 +316,128 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // The worker automatically reconciles native-repair and PR-review receipts
+  // against the frozen owner warrant on every pulse. The status is merely
+  // a truthful next-work diagnostic: never a new job or installation grant.
+  let automaticWorkSupervisor=null;
+  let automaticWorkSupervisorStatus='NO_CURRENT_OWNER_SHIFT_TO_TRIAGE';
+  if(unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'){
+   try{
+    const [shiftRead,prRead,repairRead]=await Promise.all([
+     shiftRpc(db,'reality_read_owner_employee_shifts_v1',
+      {p_owner_id:unifiedGraph.owner_id}),
+     shiftRpc(db,'reality_read_owner_riley_pr_review_v1',
+      {p_owner_id:unifiedGraph.owner_id}),
+     shiftRpc(db,'reality_read_owner_riley_repair_original_v1',
+      {p_owner_id:unifiedGraph.owner_id})
+    ]);
+    const scope=assertShiftReadback(shiftRead).shifts.find(s=>
+     s.shift_id===unifiedGraph.shift_id&&
+     s.plan_fingerprint===unifiedGraph.plan_fingerprint&&
+     ['AWAITING_EXACT_ORIGINAL_WORK','RUNNING'].includes(s.status)&&
+     s.planned_end_at==='infinity');
+    if(!scope)throw Error('AUTOMATIC_WORK_TRIAGE_SHIFT_CHANGED');
+    const mixed=reconcileRealityMixedShiftReceipts(scope,{
+     prReadback:prRead,repairReadback:repairRead,unifiedGraph});
+    automaticWorkSupervisor=projectRealityAutomaticShiftSupervisor(
+     unifiedGraph,mixed);
+    automaticWorkSupervisorStatus='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY';
+   }catch{
+    automaticWorkSupervisor=null;
+    automaticWorkSupervisorStatus='AUTOMATIC_WORK_TRIAGE_SOURCE_UNAVAILABLE';
+   }
+  }
+  // The same worker now reads the existing weekly employee source snapshot
+  // AND the Homepage upgrade feed. These sources are advisory, never a
+  // modification of the signed four-source execution warrant.
+  let integratedWorkIntake=null;
+  let integratedWorkIntakeStatus='NO_VERIFIED_EXISTING_WORK_INTAKE';
+  if(automaticWorkSupervisor&&
+     automaticWorkSupervisorStatus==='EXACT_OWNER_SOURCE_TRIAGE_VERIFIED_READ_ONLY'){
+   try{
+    const [weekly,capabilities]=await Promise.all([
+     shiftRpc(db,'reality_read_owner_shift_weekly_backlog_v1',{
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:unifiedGraph.shift_id}),
+     shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
+      p_owner_id:unifiedGraph.owner_id})
+    ]);
+    integratedWorkIntake=projectRealityExistingShiftIntegratedIntake({
+     graph:unifiedGraph,supervisor:automaticWorkSupervisor,
+     weekly,capabilityFeed:capabilities
+    });
+    integratedWorkIntakeStatus='WEEKLY_AND_HOMEPAGE_INTAKE_OWNER_RECONCILED';
+   }catch(e){
+    // Expose only bounded, static validation codes; never provider responses,
+    // credentials or untrusted source text in a worker receipt.
+    const code=String(e?.message||'');
+    integratedWorkIntake=null;
+    integratedWorkIntakeStatus=
+     /^REALITY_INTEGRATED_INTAKE_[A-Z0-9_]{4,90}$/.test(code)?
+      code:'WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE';
+   }
+  }
+  // Actual employee source investigations now RUN on the existing signed
+  // worker, rather than merely appearing as proposed jobs on the Homepage.
+  // Provider GETs + idempotent service-only receipts; no extra authorization.
+  let weeklyEmployeeInvestigations={
+   status:'WEEKLY_SOURCE_INVESTIGATION_INPUT_UNAVAILABLE',
+   just_investigated:0,source_receipts:[],
+   executable_original_admitted:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(integratedWorkIntake?.status===
+    'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+   try{
+    weeklyEmployeeInvestigations=await runCurrentShiftWeeklyInvestigations({
+     db,graph:unifiedGraph,intake:integratedWorkIntake,fetchImpl:fetch,
+     token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+      process.env.GITHUB_TOKEN||null
+    });
+   }catch(error){
+    const diagnostic=String(error?.message||'');
+    weeklyEmployeeInvestigations={
+     status:'WEEKLY_SOURCE_INVESTIGATION_PROVIDER_OR_RECEIPT_RECONCILIATION_REQUIRED',
+     failure_code:/^ACTIVE_WEEKLY_SOURCE_INVESTIGATION_[A-Z0-9_]{4,100}$/.test(
+      diagnostic)?diagnostic:'ACTIVE_WEEKLY_SOURCE_INVESTIGATION_UNVERIFIED',
+     just_investigated:0,source_receipts:[],
+     executable_original_admitted:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
+  // Existing governed auto-trigger: a real employee-source investigation
+  // may turn into one source-bound ORIGINAL only after a separate
+  // independently failing frozen acceptance on the current preview branch.
+  // The service-role RPC rechecks the SAME signed owner shift and one
+  // immutable investigation receipt before atomic original admission.
+  let shiftVerifiedAutoAdmission={
+   status:'NO_SIGNED_VERIFIED_CURRENT_ORIGINAL_AUTO_ADMISSION',
+   original_job_admitted:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+    weeklyEmployeeInvestigations.source_receipts?.length>0&&
+    integratedWorkIntake?.status===
+     'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+   try{
+    shiftVerifiedAutoAdmission=
+     await admitCurrentShiftInvestigatedSourceWithFrozenProof({
+      db,graph:unifiedGraph,investigations:weeklyEmployeeInvestigations,
+      env:process.env,fetchImpl:fetch,
+      token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+       process.env.GITHUB_TOKEN||null
+     });
+   }catch(error){
+    const message=String(error?.message||'');
+    shiftVerifiedAutoAdmission={
+     status:'CURRENT_SHIFT_AUTO_ADMISSION_FROZEN_OR_DB_PROOF_REQUIRED',
+     failure_code:/^(?:SHIFT_AUTO_ADMISSION|GOVERNED_AUTO_TRIGGER)_[A-Z0-9_]{5,110}$/
+      .test(message)?message:'CURRENT_SHIFT_PROVIDER_OR_AUTHORITY_UNVERIFIED',
+     original_job_admitted:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
   // Existing signed shift consumes a separately recorded exact Chat owner
   // approval. No approval, model permission, new shift or manual resume here.
   let nativeOwnerApprovedInstallation={
@@ -495,6 +732,40 @@ export default async function handler(req,res){
    independent_tests_passed:false,installation_authorized:false,
    original_job_completed:false,production_changed:false
   };
+  // Reconcile the isolated, independently failed candidate of THIS owner
+  // original before the existing one-shot corrective OpenAI model lease.
+  let rileyCandidateFrozenFailure={
+   status:'NO_CURRENT_FROZEN_CANDIDATE_FAILURE_TO_RECONCILE',
+   independent_failure_recorded:false,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(unifiedGraph.engineering_ready===true){
+   try{
+    rileyCandidateFrozenFailure=
+     await reconcileCurrentShiftRejectedNativeModelCandidate({
+      db,env:process.env,fetchImpl:fetch,
+      token:process.env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+       process.env.GITHUB_TOKEN||null
+     });
+   }catch(e){
+    const code=String(e?.message||'');
+    rileyCandidateFrozenFailure={
+     status:/^RILEY_SHIFT_FROZEN_CANDIDATE_[A-Z0-9_]{4,120}$/
+      .test(code)?code:
+      code==='SHIFT_DATABASE_RPC_reality_read_shift_native_candidate_frozen_v1_UNAVAILABLE'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_READONLY_DATABASE_RPC_UNAVAILABLE':
+      code==='SHIFT_DATABASE_RPC_reality_record_current_shift_native_candidate_ci_failure_v1_UNAVAILABLE'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_DURABLE_FAILURE_RPC_UNAVAILABLE':
+      code==='SHIFT_RPC_NOT_ALLOWLISTED'?
+       'RILEY_SHIFT_FROZEN_CANDIDATE_TRUSTED_RPC_ALLOWLIST_MISSING':
+       'RILEY_SHIFT_FROZEN_CANDIDATE_PROVIDER_PROOF_UNVERIFIED',
+     independent_failure_recorded:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
   // Independent frozen CI failure on this EXACT original may trigger ONE
   // tightly scoped corrective OpenAI draft. No new job, repeat uncertain
   // provider call, GitHub write, install or false settled receipt.
@@ -583,6 +854,7 @@ export default async function handler(req,res){
     };
    }
   }
+  const correctiveCiResult=await correctiveCiPromise;
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -593,7 +865,32 @@ export default async function handler(req,res){
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED';
    const executionGateEmpty=activeRepairUnstaged&&
     result?.capability_wake?.status==='NO_EXACT_ACTIVE_ORIGINAL_JOB_TO_WAKE';
-   const outcomeCode=unifiedGraph.tested_native_candidate_present===true?
+   const qualifiedCommitTriage=unifiedGraph.jobs.some(x=>
+    x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
+    x.phase==='EVIDENCE_VERIFIED');
+   const settledCommitTriage=unifiedGraph.jobs.some(x=>
+    x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
+    x.phase==='SETTLED');
+   const chatWorkHandoff=await chatWorkPromise;
+   const outcomeCode=correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
+    'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
+    correctiveCiResult?.status==='CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN'?
+    'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_FAILED_RECOVERY_REQUIRED':
+    correctiveCiResult?.status==='CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI'?
+    'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING':
+    chatWorkHandoff?.status==='AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT'?
+    'SIGNED_CHAT_WORK_INVESTIGATION_RECORDED_SAME_SHIFT':
+    shiftVerifiedAutoAdmission.original_job_admitted===true?
+    'CURRENT_SHIFT_GOVERNED_ORIGINAL_AUTO_ADMITTED_AFTER_FROZEN_RED':
+    weeklyEmployeeInvestigations.just_investigated>0?
+    'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_EXECUTED_AND_RECEIPTED':
+    weeklyEmployeeInvestigations.source_receipts?.length>=5?
+     'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_PREVIOUSLY_RECEIPTED':
+    settledCommitTriage?
+    'COMMIT_TRIAGE_PROVIDER_DISPOSITION_SETTLED_OWNER_ASSISTED':
+    qualifiedCommitTriage?
+    'COMMIT_TRIAGE_SOURCE_EVIDENCE_VERIFIED_FINAL_DISPOSITION_PENDING':
+    unifiedGraph.tested_native_candidate_present===true?
      'RILEY_NATIVE_CAPABILITY_HANDOFF_NOT_CONNECTED':
     rileyCorrectionTest?.status===
     'CURRENT_RILEY_REVISION_INDEPENDENT_FROZEN_TEST_FAILED'?
@@ -614,7 +911,15 @@ export default async function handler(req,res){
      'RILEY_REPAIR_CANDIDATE_AND_CANONICAL_QUEUE_NOT_READY':
     activeRepairUnstaged?
      'RILEY_CURRENT_CANDIDATE_MODEL_WRITTEN_CANDIDATE_NOT_YET_STAGED':
-     result?.status;
+    result?.status==='SHIFT_FINAL_REPORT_NOT_DUE'&&
+     automaticWorkSupervisor?.status===
+      'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
+      integratedWorkIntake?.read_only===true&&
+       integratedWorkIntake?.status===
+        'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'?
+       integratedWorkIntake.next_worker_pulse_code:
+       automaticWorkSupervisor.next_worker_pulse_code:
+      result?.status;
    const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED';
    completedPulse=await shiftRpc(db,
@@ -630,6 +935,15 @@ export default async function handler(req,res){
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
+    automatic_work_supervisor:automaticWorkSupervisor,
+    automatic_work_supervisor_status:automaticWorkSupervisorStatus,
+    integrated_work_intake:integratedWorkIntake,
+    integrated_work_intake_status:integratedWorkIntakeStatus,
+    weekly_employee_source_investigations:weeklyEmployeeInvestigations,
+    authenticated_chat_work_handoff:chatWorkHandoff,
+    riley_auto_corrective_independent_ci:correctiveCiResult,
+    chat_work_claim_reconciliation:chatClaimReconciliation,
+    current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
@@ -641,10 +955,14 @@ export default async function handler(req,res){
      })),
      installation_authorized:false,original_job_completed:false
     },
+    commit_reference_triage_qualification:commitTriageHandoff.qualification,
+    commit_reference_triage_original:commitTriageHandoff.original,
+    commit_reference_triage_settlement:commitTriageSettlement,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
     riley_model_draft:rileyModelDraft,
+    riley_failed_candidate_frozen_reconciliation:rileyCandidateFrozenFailure,
     riley_corrected_model_draft:rileyCorrectedDraft,
     riley_revision_frozen_test:rileyCorrectionTest,
     riley_failure_triage_original:rileyFailureTriage,
