@@ -45,6 +45,7 @@ function toBase64(bytes){
 }
 async function rpc(name,body,key){
  if(!['reality_read_next_riley_auto_corrective_ci_v1',
+      'reality_record_riley_auto_corrective_staging_v1',
       'reality_record_riley_auto_corrective_ci_v1'].includes(name))
   refuse('UNALLOWED_DATABASE_OPERATION');
  const url='https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name;
@@ -143,6 +144,22 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  }
  const head=(await exact(token,'/git/ref/heads/'+branch)).object?.sha;
  if(!SHA.test(head||''))refuse('TEST_CANDIDATE_COMMIT_READBACK_INVALID');
+ const staged=await rpc('reality_record_riley_auto_corrective_staging_v1',{
+   p_original_work_id:c.original_work_id,
+   p_model_response_id:c.model_response_id,
+   p_proposed_sha256:c.proposed_sha256,
+   p_candidate_branch:branch,
+   p_candidate_commit_sha:head
+ },key);
+ if(staged.status!=='SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK'||
+    staged.original_work_id!==c.original_work_id||
+    staged.shift_id!==c.shift_id||
+    staged.candidate_commit_sha!==head||
+    staged.independent_ci_verified!==false||
+    staged.installation_authorized!==false||
+    staged.original_job_completed!==false||
+    staged.production_changed!==false)
+   refuse('CANDIDATE_STAGING_DURABLE_RECONCILIATION_MISSING');
  const runs=await exact(token,'/actions/runs?branch='+
    encodeURIComponent(branch)+'&per_page=60');
  if(!Array.isArray(runs.workflow_runs))refuse('INDEPENDENT_CI_RUNS_UNVERIFIED');
