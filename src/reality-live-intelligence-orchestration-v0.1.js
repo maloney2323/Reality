@@ -38,9 +38,19 @@ import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
-async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
+export async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
+  // In a trusted authenticated Chat root, the canonical Spine is the
+  // authoritative Universe source. The old separate native entry table
+  // is stale and must not block every reply merely to be read again.
+  // The verified projection of the SAME root is joined before cognition.
+  if(systemContext?.canonical_continuity_is_universe_source===true &&
+     typeof continuityRootId==='string'&&continuityRootId.trim())
+   return Object.freeze({...requestContext,
+    status:'AWAIT_CANONICAL_SPINE_UNIVERSE_REENTRY',
+    persistence:'SAME_ROOT_CONTINUITY_SPINE',
+   });
 
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
   return Object.freeze({
