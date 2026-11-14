@@ -119,13 +119,18 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
-  // Every bounded service-recognized pulse takes one independent recovery
-  // lane through the *existing* corrective broker. Other pulses still perform
-  // the entire shift flow. This avoids a 300s all-in-one worker timeout
-  // preventing the CI outcome from ever reaching the durable pulse ledger.
-  // A returned WAKE_COMPLETED proves the bounded check finished, not that
-  // any original job completed or installation was authorized.
-  if(isBoundedCorrectiveProofWake(wakeReceipt)){
+  // The existing service-only selector determines whether THIS owner
+  // shift has an eligible corrective revision. No historical job ID, employee
+  // name, arbitrary wake interval or caller-provided scope enters the gate.
+  // If this optional fast-lane readback is unavailable, the normal governed
+  // shift pipeline still runs; the corrective broker independently authorizes.
+  workerStage='CORRECTIVE_CI_WORK_READBACK';
+  const boundedCorrectiveScope=await shiftRpc(db,
+   'reality_read_next_riley_auto_corrective_ci_v1',{})
+   .catch(()=>null);
+  // A completed bounded check is not a completed customer job; every lane
+  // still records its own durable worker outcome before responding.
+  if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope)){
    workerStage='CORRECTIVE_CI_BOUNDED';
    const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
     db,env:process.env,fetchImpl:fetch
