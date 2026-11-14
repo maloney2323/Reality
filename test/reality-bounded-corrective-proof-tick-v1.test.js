@@ -86,3 +86,17 @@ test('bounded broker reconciliation executes ahead of all-in-one shift pipeline'
  assert.match(code,/new_shift_started:false,installation_authorized:false/);
  assert.match(code,/WAKE_RECEIVED/);
 });
+
+test('exact frozen candidate job is a pending proof, not a failed worker or install approval',()=>{
+ const pending=classifyCorrectiveProofTick({...result,
+  status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_EXACT_FROZEN_CI'});
+ assert.equal(pending.worker_status,'WAKE_COMPLETED');
+ assert.equal(pending.worker_result,'CORRECTIVE_CANDIDATE_EXACT_FROZEN_CI_PENDING');
+ assert.equal(pending.http_status,200);
+ assert.equal(pending.proof_verified,false);
+ const forged=classifyCorrectiveProofTick({...result,
+  status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_EXACT_FROZEN_CI',
+  installation_authorized:true});
+ assert.equal(forged.worker_status,'WAKE_FAILED');
+ assert.equal(forged.proof_verified,false);
+});
