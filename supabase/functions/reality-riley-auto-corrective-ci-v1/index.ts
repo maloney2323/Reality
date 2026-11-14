@@ -214,6 +214,10 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
   // PR for frozen CI, never merge/install. Reconcile from GitHub if a POST
   // result is uncertain; no second PR or owner shift may be invented.
   if(recovery&&verifiedPRs.length===0){
+   // A mismatched source/owner PR is evidence of scope drift, not permission
+   // to create a second PR under the same original and branch.
+   if(pulls.some(pr=>pr?.head?.ref===branch||pr?.head?.sha===head))
+    refuse('RECOVERY_FOREIGN_OR_DRIFTED_PR_REJECTED_NO_WRITE');
    await github(token,'/pulls','POST',{
     title:'test(reality): verify same-original repair attempt '+c.attempt_number,
     head:branch,base:baseBranch,draft:true,
@@ -266,7 +270,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
  // original SHA; failed reruns never alter the staged source digest.
  prFailureRuns.sort((a,b)=>b.id-a.id);
  const matched=exactRuns.length===1?exactRuns[0]:prFailureRuns[0];
- if(recovery&&exactRuns.length===0&&matched?.conclusion!=='failure')
+ if(recovery&&exactRuns.length===0&&matched&&matched.conclusion!=='failure')
   refuse('RECOVERY_GATEWAY_FALLBACK_FAILURE_ONLY');
  if(!matched)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
    original_work_id:c.original_work_id,model_response_id:c.model_response_id,
