@@ -242,16 +242,22 @@ test('no capability-response string may override BLOCKED or VERIFIED execution',
  }
 });
 
-test('actual worker recovery lane requires a verified persisted shift pulse',async()=>{
- const {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick,
-  CORRECTIVE_PROOF_WAKE_DIVISOR}=await import(
-   '../src/reality-bounded-corrective-proof-tick-v1.js');
+test('actual worker recovery lane requires a verified persisted shift and eligible work',async()=>{
+ const {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
+  =await import('../src/reality-bounded-corrective-proof-tick-v1.js');
  const pulse={status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',
-  shift_id:SHIFT,wake_count:CORRECTIVE_PROOF_WAKE_DIVISOR,
+  shift_id:SHIFT,wake_count:1,
   installation_authorized:false,production_changed:false};
- assert.equal(isBoundedCorrectiveProofWake(pulse),true);
- assert.equal(isBoundedCorrectiveProofWake({...pulse,wake_count:7}),false);
- assert.equal(isBoundedCorrectiveProofWake({...pulse,installation_authorized:true}),false);
+ const scope={status:'EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI',
+  shift_id:SHIFT,original_work_id:WORK,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false};
+ assert.equal(isBoundedCorrectiveProofWake(pulse,scope),true);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,wake_count:7},scope),true);
+ assert.equal(isBoundedCorrectiveProofWake(pulse,null),false);
+ assert.equal(isBoundedCorrectiveProofWake(pulse,{...scope,
+  status:'NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION'}),false);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,installation_authorized:true},scope),false);
  const pending=classifyCorrectiveProofTick({
   status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
   new_shift_started:false,original_job_completed:false,
