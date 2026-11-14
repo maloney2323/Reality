@@ -6755,6 +6755,24 @@ setInterval(refreshSavedShiftHome,300000);
   const atBottom=thread.scrollHeight-thread.scrollTop-thread.clientHeight<=90;
   const previousTop=thread.scrollTop,previousHeight=thread.scrollHeight;
   thread.replaceChildren();
+  // Independent owner-ledger evidence stays visible even when the model
+  // fails to answer or incorrectly describes all jobs as settled.
+  const originalReadback=data.original_work_readback;
+  if(originalReadback?.status==='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK'&&
+     Array.isArray(originalReadback.all_recent_jobs)){
+   const open=originalReadback.all_recent_jobs.filter(job=>
+    job.requires_independent_completion_verification===true);
+   if(open.length){
+    const evidence=bubble('assistant',
+     'Original work still open in Reality’s authenticated ledger: '+
+     open.slice(0,6).map(j=>
+      j.source_ref+' · '+j.phase+' · '+j.original_work_id+
+      ' · shift '+j.shift_id).join(' | ')+
+     '. These are not completed-job receipts or automatic permission to install.');
+    evidence.querySelector('.label').textContent='REALITY · VERIFIED ORIGINAL WORK READBACK';
+    evidence.setAttribute('role','status');
+   }
+  }
   // Only show missing replies reported by the authenticated owner-scoped
   // readback. These notices are NOT model answers or work receipts.
   const replyReadback=data.reply_readback;
