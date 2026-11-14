@@ -44,7 +44,9 @@ test('authenticated owner click invokes only the existing verified queue and rec
  });
  assert.equal(count,1);
  assert.equal(result.status,'CHAT_WORK_ORIGINAL_DISCOVERY_DISPATCHED');
- assert.equal(result.execution_started,true);
+ assert.equal(result.dispatch_requested,true);
+ assert.equal(result.worker_execution_verified,false);
+ assert.equal(result.execution_started,false);
  assert.equal(result.installation_authorized,false);
 });
 test('no matching eligible work does not execute, no retries or duplicates',async()=>{
