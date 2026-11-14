@@ -60,6 +60,7 @@ function rig({conclusion='failure',failedStep=true,foreignPR=false,frozen=false,
  globalThis.fetch=async(url,opt={})=>{
   requests.push({url,method:opt.method||'GET',body:opt.body});
   let result;
+  let responseStatus=200;
   if(url.startsWith(db)){
    const kind=url.slice(db.length),body=JSON.parse(opt.body);
    if(kind==='reality_record_same_original_recovery_staging_v2'){
@@ -80,7 +81,11 @@ function rig({conclusion='failure',failedStep=true,foreignPR=false,frozen=false,
    }else throw Error('UNEXPECTED_RPC_'+kind);
   }else if(url.startsWith(repo)){
    const path=url.slice(repo.length);
-   if(path==='/git/ref/heads/'+base)result={ref:'refs/heads/'+base,object:{sha:baseSha}};
+   if(path==='/git/ref/heads/'+branch+'-ci-attest'){
+    responseStatus=404;
+    result={message:'Not Found'};
+   }
+   else if(path==='/git/ref/heads/'+base)result={ref:'refs/heads/'+base,object:{sha:baseSha}};
    else if(path==='/git/ref/heads/'+branch)
     result={ref:'refs/heads/'+branch,object:{sha:head}};
    else if(path.startsWith('/contents/'+sourcePath+'?ref=')){
@@ -109,7 +114,7 @@ function rig({conclusion='failure',failedStep=true,foreignPR=false,frozen=false,
       ]}]:[])]};
    else throw Error('UNEXPECTED_GITHUB_'+path);
   }else throw Error('UNEXPECTED_URL_'+url);
-  return new Response(JSON.stringify(result),{status:200,
+  return new Response(JSON.stringify(result),{status:responseStatus,
    headers:{'content-type':'application/json'}});
  };
  return {requests,restore:()=>globalThis.fetch=origFetch};
