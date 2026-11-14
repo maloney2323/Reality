@@ -253,25 +253,21 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
   if(run.conclusion!=='failure'||!steps.some(s=>
     s.name==='Verify Reality model boundary and original tool-continuation regressions'&&
     s.conclusion==='failure'))refuse('ORIGINAL_HANDOFF_FAILURE_STEP_NOT_VERIFIED');
-  const logURL=ROOT+'/actions/jobs/'+relevant[0].id+'/logs';
-  let logsResponse;
-  try{logsResponse=await fetch(logURL,{method:'GET',redirect:'follow',
-    headers:{authorization:'Bearer '+token,accept:'text/plain',
-     'x-github-api-version':'2022-11-28',
-     'user-agent':'Reality-Frozen-Corrective-CI-Failure-Verification'},
-    signal:AbortSignal.timeout(10000)})}catch{
-    refuse('ORIGINAL_HANDOFF_FAILURE_LOGS_UNAVAILABLE')}
-  if(!logsResponse?.ok||
-     Number(logsResponse.headers.get('content-length')||0)>2000000)
-    refuse('ORIGINAL_HANDOFF_FAILURE_LOGS_UNAVAILABLE');
-  const logText=await logsResponse.text();
-  if(logText.length>2000000||
-     !logText.includes('custom trusted original execution uses existing source-backed Reality runner')||
-     !logText.includes('full shift step-six connects existing original to SINGLE claim')||
-     !logText.includes('ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY')||
-     !logText.includes('SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF')||
-     !logText.includes('not ok '))
-    refuse('FROZEN_ORIGINAL_HANDOFF_TEST_FAILURE_NOT_REPRODUCED');
+  // A provider-verified failed run and its failed boundary-test job are
+  // sufficient to REJECT a candidate (never to approve one). Actions log
+  // download needs a different GitHub permission and is not part of the
+  // original owner's signed execution warrant. Instead independently verify
+  // that the trusted base workflow actually invokes both frozen suites.
+  // This records FAILED CI only, not which individual assertion caused it.
+  const trustedPath=run.path.split('@')[0];
+  if(!trustedPath.startsWith('.github/workflows/')||
+     !trustedPath.endsWith('.yml')&&!trustedPath.endsWith('.yaml'))
+    refuse('TRUSTED_ORIGINAL_TEST_WORKFLOW_PATH_REQUIRED');
+  const trustedWorkflow=await source(token,trustedPath,baseSha);
+  if(!trustedWorkflow.text.includes('test/reality-riley-service-original-runtime-v1.test.js')||
+     !trustedWorkflow.text.includes('test/reality-riley-full-execution-path-v1.test.js')||
+     !trustedWorkflow.text.includes('Verify Reality model boundary and original tool-continuation regressions'))
+    refuse('TRUSTED_ORIGINAL_FROZEN_TEST_COMMAND_MISSING');
  }
  const saved=await rpc('reality_record_riley_auto_corrective_ci_v1',{
    p_original_work_id:c.original_work_id,
