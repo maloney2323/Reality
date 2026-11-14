@@ -186,7 +186,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
    runs.workflow_runs.filter(r=>eligible(r)&&
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
-    /^\\.github\\/workflows\\/[A-Za-z0-9_.-]+\\.ya?ml$/.test(r.path||'')&&
+    /^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/.test(r.path||'')&&
     Array.isArray(r.pull_requests)&&r.pull_requests.some(pr=>
      pr?.head?.sha===head&&pr.head?.ref===branch&&
      pr.base?.ref===baseBranch&&
