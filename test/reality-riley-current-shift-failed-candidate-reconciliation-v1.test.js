@@ -71,7 +71,7 @@ test('independent frozen provider RED persists one exact failure on SAME warrant
  const result=await reconcileCurrentShiftRejectedNativeModelCandidate({
   db,env,fetchImpl:provider(),
   callRpc:async(_,name,args)=>{
-   if(name==='reality_read_current_shift_native_candidate_for_frozen_verification_v1')
+   if(name==='reality_read_shift_native_candidate_frozen_v1')
     return candidate;
    assert.equal(name,'reality_record_current_shift_native_candidate_ci_failure_v1');
    assert.equal(args.p_original_work_id,original);
@@ -101,7 +101,7 @@ test('source checksum mismatch fails BEFORE service-role failure receipt',async(
   db,env,fetchImpl:provider({sourceBlob:asBlob(Buffer.from('forged'.repeat(300)),
    candidatePath)}),
   callRpc:async(_,name)=>{
-   if(name==='reality_read_current_shift_native_candidate_for_frozen_verification_v1')
+   if(name==='reality_read_shift_native_candidate_frozen_v1')
     return candidate;
    recorded++;throw Error('UNAUTHORIZED_RECORD');
   }
@@ -118,7 +118,7 @@ test('passing, incomplete, or stale CI cannot become corrective authority',async
   const result=await reconcileCurrentShiftRejectedNativeModelCandidate({
    db,env,fetchImpl:provider({run:changed}),
    callRpc:async(_,name)=>{
-    if(name==='reality_read_current_shift_native_candidate_for_frozen_verification_v1')
+    if(name==='reality_read_shift_native_candidate_frozen_v1')
      return candidate;
     recorded++;throw Error('FORBIDDEN');
    }
@@ -131,7 +131,7 @@ test('no unsettled exact owner original makes no provider or database write',asy
  const result=await reconcileCurrentShiftRejectedNativeModelCandidate({
   db,env,fetchImpl:async()=>{throw Error('FORBIDDEN')},
   callRpc:async(_,name)=>{
-   assert.equal(name,'reality_read_current_shift_native_candidate_for_frozen_verification_v1');
+   assert.equal(name,'reality_read_shift_native_candidate_frozen_v1');
    return {status:'CURRENT_ORIGINAL_FAILURE_ALREADY_INDEPENDENTLY_RECORDED'};
   }
  });
