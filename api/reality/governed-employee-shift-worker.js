@@ -64,6 +64,8 @@ import {reviseCurrentRileyNativeRepair}
  from '../../src/reality-riley-native-corrective-model-v1.js';
 import {reconcileCurrentShiftRejectedNativeModelCandidate}
  from '../../src/reality-riley-current-shift-failed-candidate-reconciliation-v1.js';
+import {investigateAuthenticatedChatUnderExistingShift}
+ from '../../src/reality-signed-chat-to-work-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -118,6 +120,24 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // Existing owner-authorized wake now consumes saved Chat instructions.
+  // No Chat turn changes the frozen source scope, start approval, or install.
+  const chatClaimReconciliation=await shiftRpc(db,
+   'reality_reconcile_expired_chat_work_v1',{});
+  if(chatClaimReconciliation?.status!=='STALE_CHAT_WORK_CLAIMS_RECONCILED'||
+     chatClaimReconciliation.installation_authorized!==false)
+   throw Error('CHAT_WORK_STALE_LEASE_RECONCILIATION_UNVERIFIED');
+  const chatWorkPromise=investigateAuthenticatedChatUnderExistingShift({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(e=>({
+   status:'CHAT_WORK_SERVICE_PROOF_UNVERIFIED',
+   reason:/^REALITY_CHAT_WORK_[A-Z0-9_]{4,100}$/.test(String(e?.message||''))?
+     String(e.message):'CHAT_WORK_PROVIDER_OR_DATABASE_UNVERIFIED',
+   model_advisory_recorded:false,execution_authorized:false,
+   new_shift_started:false,installation_authorized:false,
+   production_changed:false
+  }));
+
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
@@ -836,7 +856,10 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const outcomeCode=shiftVerifiedAutoAdmission.original_job_admitted===true?
+   const chatWorkHandoff=await chatWorkPromise;
+   const outcomeCode=chatWorkHandoff?.status==='AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT'?
+    'SIGNED_CHAT_WORK_INVESTIGATION_RECORDED_SAME_SHIFT':
+    shiftVerifiedAutoAdmission.original_job_admitted===true?
     'CURRENT_SHIFT_GOVERNED_ORIGINAL_AUTO_ADMITTED_AFTER_FROZEN_RED':
     weeklyEmployeeInvestigations.just_investigated>0?
     'WEEKLY_EMPLOYEE_PROVIDER_INVESTIGATIONS_EXECUTED_AND_RECEIPTED':
@@ -896,6 +919,8 @@ export default async function handler(req,res){
     integrated_work_intake:integratedWorkIntake,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
+    authenticated_chat_work_handoff:chatWorkHandoff,
+    chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
     unified_execution_graph:{
