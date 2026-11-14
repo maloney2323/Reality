@@ -101,6 +101,54 @@ export default async function handler(req,res){
     // An unavailable readback MUST NOT become a claimed completed task.
    }
   }
+  // The approved worker can now AUTO-ADMIT a real ORIGINAL after frozen RED.
+  // Show the current signed source without inventing an install or final receipt.
+  let signedOriginals=null;
+  try{
+   const db=shiftDatabase(process.env);
+   if(db.url===session.config?.url){
+    const graph=await shiftRpc(db,
+     'reality_read_current_shift_execution_graph_v1',{});
+    if(graph?.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
+       graph.owner_id===session.user_id&&
+       graph.completion_bound===true&&
+       graph.execution_scope_from_owner_warrant_only===true&&
+       graph.installation_authorized===false&&
+       graph.production_changed===false&&
+       Array.isArray(graph.jobs)&&graph.jobs.length<=4){
+     const rows=graph.jobs.filter(x=>
+      x.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+      ['SOURCE_ADMITTED','CANDIDATE_TESTING',
+       'CANDIDATE_VERIFIED_AWAITING_EXACT_APPROVAL'].includes(x.phase)&&
+      /^work:[a-f0-9]{32}$/.test(x.original_work_id||'')&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/
+       .test(x.source_ref||'')&&
+      /^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||'')&&
+      x.independent_source_proof_verified===true&&
+      x.capability_installation_authorized===false);
+     signedOriginals={
+      status:'CURRENT_OWNER_SHIFT_ENGINEERING_ORIGINALS_SOURCE_BOUND',
+      count:rows.length,
+      shift_id:graph.shift_id,
+      items:rows.map(x=>({
+       source_ref:x.source_ref,
+       original_work_id:x.original_work_id,
+       phase:x.phase,
+       next_governed_action:x.next_governed_action,
+       assigned_employee:'Riley',
+       installation_authorized:false,
+       original_job_completed:false
+      })),
+      owner_scope_verified:true,
+      new_shift_started:false,
+      installation_authorized:false,
+      production_changed:false
+     };
+    }
+   }
+  }catch{
+   // Never infer live admission from a stale issue or last worker pulse.
+  }
   // Existing signed background planner now qualifies each GitHub source
   // BEFORE it reaches owner-facing employee Discovery. This is an investigation
   // assignment only, not permission to start or install an original job.
@@ -166,6 +214,7 @@ export default async function handler(req,res){
    next_week_background_open_issue_count:backgroundSourceIssueCount,
    upstream_source_qualification:qualification,
    weekly_employee_investigation_receipts:weeklyInvestigationReceipts,
+   current_shift_engineering_originals:signedOriginals,
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
