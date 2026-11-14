@@ -173,3 +173,32 @@ test('real SQL trigger and existing worker dispatch are wired, no second shift o
  assert.doesNotMatch(sql,/update reality_internal\.governed_employee_shifts_v1/);
  assert.doesNotMatch(sql,/insert into reality_internal\.genuine_capability_queue_v1/);
 });
+
+
+test('bounded failure recovery preserves prior evidence and same-shift warrant; never replays ambiguous failures or starts work',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261114_chat_work_bounded_failed_investigation_recovery_v1.sql',
+  import.meta.url),'utf8');
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',
+  import.meta.url),'utf8');
+ assert.match(sql,/bounded_recovery_count=0/);
+ assert.match(sql,/bounded_recovery_count=i\.bounded_recovery_count\+1/);
+ assert.match(sql,/previous_failed_investigations=i\.previous_failed_investigations/);
+ assert.match(sql,/i\.message_sha256=pg_catalog\.encode/);
+ assert.match(sql,/sh\.shift_id=i\.shift_id and sh\.owner_id=i\.owner_id/);
+ assert.match(sql,/sh\.plan_fingerprint=i\.plan_fingerprint/);
+ assert.match(sql,/w\.state='ACTIVE'/);
+ assert.match(sql,/w\.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'/);
+ assert.match(sql,/i\.status='PROVIDER_UNVERIFIED'/);
+ assert.match(sql,/DIAGNOSIS_PERSISTENCE_UNVERIFIED/);
+ assert.match(sql,/MODEL_SELECTED_SOURCES_WITHOUT_WORK_DECISION/);
+ assert.match(sql,/where status='CLAIMED' and claim_expires_at<clock_timestamp\(\)/);
+ assert.match(sql,/where i\.message_id=e\.message_id and i\.status='PROVIDER_UNVERIFIED'/);
+ assert.match(worker,/reality_reconcile_expired_chat_work_v1/);
+ assert.match(worker,/const chatWorkPromise=investigateAuthenticatedChatUnderExistingShift/);
+ assert.match(worker,/await chatWorkPromise/);
+ assert.doesNotMatch(sql,/update reality_internal\.governed_employee_shifts_v1/);
+ assert.doesNotMatch(sql,/insert into reality_internal\.genuine_capability_queue_v1/);
+ assert.doesNotMatch(sql,/create trigger/);
+});
