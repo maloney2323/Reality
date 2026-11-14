@@ -45,3 +45,21 @@ test('general readback keeps owner, source and independent-CI boundaries without
  assert.match(sql,/NO_INDEPENDENT_CURRENT_REVISION_FAILURE_RECORDED/);
  assert.doesNotMatch(sql,/insert into|update reality_internal|delete from/i);
 });
+
+test('real authenticated Chat-work result remains in scope for normal full worker response',()=>{
+ const source=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const result=source.indexOf('const chatWorkHandoff=await chatWorkPromise;');
+ const checkpointBranch=source.indexOf(
+  "if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){",result);
+ const response=source.indexOf('authenticated_chat_work_handoff:chatWorkHandoff,');
+ const fallback=source.indexOf('DURABLE_SHIFT_WAKE_COMPLETED_RESPONSE_FALLBACK');
+ assert.ok(result>0&&checkpointBranch>result&&response>checkpointBranch&&
+  fallback>response);
+ assert.equal(source.split('const chatWorkHandoff=await chatWorkPromise;').length,2);
+ // A block-local declaration produces a ReferenceError after the durable
+ // WAKE_COMPLETED receipt, hiding original-job evidence behind the fallback.
+ assert.doesNotMatch(source.slice(checkpointBranch,response),
+  /const chatWorkHandoff=await chatWorkPromise;/);
+ assert.match(source,/chatWorkHandoff\?\.status==='AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT'/);
+});
