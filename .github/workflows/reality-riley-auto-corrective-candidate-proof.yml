@@ -10,6 +10,7 @@ on:
     types: [opened, reopened, synchronize, edited]
     branches:
       - 'reality/native*'
+      - 'reality/**'
     paths:
       - 'src/reality-riley-service-original-runtime-v1.js'
 permissions:
