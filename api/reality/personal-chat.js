@@ -19,7 +19,8 @@ import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
-import {readOwnerOriginalWorkForChat,originalWorkObservation}
+import {readOwnerOriginalWorkForChat,originalWorkObservation,
+ readOwnerWeeklyCandidateQueueForChat,weeklyQueueObservation}
  from '../../src/reality-owner-original-work-chat-readback-v1.js';
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
@@ -58,6 +59,7 @@ export default async function handler(req,res){
     reply_readback:summarizeSavedChatReplyReadback(history.messages),
     work_handoff:await readOwnerChatWorkHandoff({session,conversationId}),
     original_work_readback:await readOwnerOriginalWorkForChat({session}).catch(()=>null),
+    weekly_queue_readback:await readOwnerWeeklyCandidateQueueForChat({session}).catch(()=>null),
     continuity:{
      history_source:'AUTHENTICATED_SUPABASE_RLS',
      recovered_messages:history.messages.length,
@@ -208,9 +210,11 @@ export default async function handler(req,res){
    x.active_owner_shift_id===x.source_ref.slice('reality:employee-shift:'.length));
   const verifiedOwnerShift=ownerShiftFacts.length===1?ownerShiftFacts[0]:null;
   stage='OWNER_ORIGINAL_WORK_READBACK';
-  const ownerOriginalWork=await readOwnerOriginalWorkForChat({
-   session,currentShiftId:verifiedOwnerShift?.active_owner_shift_id||null,
-  }).catch(()=>null);
+  const [ownerOriginalWork,ownerWeeklyQueue]=await Promise.all([
+   readOwnerOriginalWorkForChat({session,
+    currentShiftId:verifiedOwnerShift?.active_owner_shift_id||null}).catch(()=>null),
+   readOwnerWeeklyCandidateQueueForChat({session}).catch(()=>null)
+  ]);
   stage='COGNITION_AND_RELIABILITY';
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
@@ -260,6 +264,15 @@ export default async function handler(req,res){
     // Grounded recent owner work is visible to the model even when the
     // next message merely says "it", "this job", or "the milestone".
     // Cognition must still keep unrelated questions unrelated.
+    owner_weekly_employee_queue_state:ownerWeeklyQueue?{
+     source:'AUTHENTICATED_OWNER_SCOPED_FROZEN_WEEKLY_QUEUE',
+     shift_id:ownerWeeklyQueue.shift_id||null,
+     candidate_count:ownerWeeklyQueue.source_candidate_count??null,
+     candidates:ownerWeeklyQueue.source_candidates||[],
+     qualification_needed:true,
+     work_authorized_by_read:false,
+     required_truth:'These are existing weekly work candidates, not approved executable jobs. Proactively qualify current defects; never manufacture work or replay settled originals.'
+    }:{status:'WEEKLY_QUEUE_READBACK_UNAVAILABLE_DO_NOT_CLAIM_NO_WORK'},
     owner_original_work_current_state:ownerOriginalWork?{
      source:'AUTHENTICATED_OWNER_SCOPED_DATABASE_READBACK',
      existing_authorized_shift_id:ownerOriginalWork.current_shift_id,
@@ -279,7 +292,8 @@ export default async function handler(req,res){
      ...native263TemporalObservations,...ownerCompletedWorkObservations,
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations,...originalWorkObservation(ownerOriginalWork)
+     ...rileySourceWorkObservations,...originalWorkObservation(ownerOriginalWork),
+     ...weeklyQueueObservation(ownerWeeklyQueue)
     ],
     action_authorized:false,execution_authorized:false,
    },
