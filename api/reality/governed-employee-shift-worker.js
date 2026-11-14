@@ -920,6 +920,11 @@ export default async function handler(req,res){
   }
   workerStage='CORRECTIVE_CI_RECEIPT_RECONCILIATION';
   const correctiveCiResult=await correctiveCiPromise;
+  // The full authenticated Chat investigation proof also belongs to the
+  // eventual response, not only the durable pulse-disposition branch.
+  // A block-local declaration caused response publication to throw after an
+  // otherwise successful WAKE_COMPLETED database receipt.
+  const chatWorkHandoff=await chatWorkPromise;
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -936,7 +941,6 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const chatWorkHandoff=await chatWorkPromise;
    const outcomeCode=correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
     correctiveCiResult?.status==='CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN'?
