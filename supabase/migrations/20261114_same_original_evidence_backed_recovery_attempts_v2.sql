@@ -233,3 +233,42 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_mark_same_original_recovery_uncertain_v2(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_mark_same_original_recovery_uncertain_v2(uuid,uuid,text) TO service_role;
+
+-- Enforce evidence immutability even for a privileged worker: the only
+-- permitted updates are one-way phase transitions with retained past proof.
+CREATE OR REPLACE FUNCTION reality_internal.guard_same_original_recovery_attempt_v2()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $guard$
+BEGIN
+ IF (OLD.original_work_id,OLD.owner_id,OLD.shift_id,OLD.attempt_number,
+     OLD.attempt_id,OLD.source_ref,OLD.source_proof_sha256,OLD.source_path,
+     OLD.prior_attempt_id,OLD.failed_run_id,OLD.failed_commit_sha,
+     OLD.failed_candidate_sha256,OLD.request_id,OLD.claimed_at,OLD.created_at)
+  IS DISTINCT FROM
+    (NEW.original_work_id,NEW.owner_id,NEW.shift_id,NEW.attempt_number,
+     NEW.attempt_id,NEW.source_ref,NEW.source_proof_sha256,NEW.source_path,
+     NEW.prior_attempt_id,NEW.failed_run_id,NEW.failed_commit_sha,
+     NEW.failed_candidate_sha256,NEW.request_id,NEW.claimed_at,NEW.created_at)
+ THEN RAISE EXCEPTION 'RECOVERY_IMMUTABLE_ORIGINAL_AND_FAILURE_EVIDENCE'; END IF;
+ IF OLD.phase IN ('CI_FAILED','CI_PASSED','PROVIDER_UNVERIFIED')
+   OR (OLD.phase='MODEL_LEASED' AND
+       NEW.phase NOT IN ('MODEL_PATCH_RECORDED','PROVIDER_UNVERIFIED'))
+   OR (OLD.phase='MODEL_PATCH_RECORDED' AND NEW.phase<>'CANDIDATE_STAGED')
+   OR (OLD.phase='CANDIDATE_STAGED' AND NEW.phase NOT IN ('CI_FAILED','CI_PASSED'))
+ THEN RAISE EXCEPTION 'RECOVERY_ONE_WAY_GOVERNED_TRANSITION_REQUIRED'; END IF;
+ IF OLD.phase<>'MODEL_LEASED' AND
+    (OLD.model_response_id,OLD.source_commit_sha,OLD.source_blob_sha,
+     OLD.source_file_sha256,OLD.proposed_source_sha256,
+     OLD.replacement_find,OLD.replacement_with,OLD.model_reason,
+     OLD.model_output_tokens,OLD.model_completed_at)
+    IS DISTINCT FROM
+    (NEW.model_response_id,NEW.source_commit_sha,NEW.source_blob_sha,
+     NEW.source_file_sha256,NEW.proposed_source_sha256,
+     NEW.replacement_find,NEW.replacement_with,NEW.model_reason,
+     NEW.model_output_tokens,NEW.model_completed_at)
+ THEN RAISE EXCEPTION 'RECOVERY_IMMUTABLE_MODEL_REPAIR_EVIDENCE'; END IF;
+ RETURN NEW;
+END $guard$;
+REVOKE ALL ON FUNCTION reality_internal.guard_same_original_recovery_attempt_v2() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER guard_same_original_recovery_attempt_v2
+BEFORE UPDATE ON reality_internal.riley_same_original_recovery_attempts_v2
+FOR EACH ROW EXECUTE FUNCTION reality_internal.guard_same_original_recovery_attempt_v2();
