@@ -4,11 +4,14 @@ on:
     branches: [reality/native263-temporal-chat-proof-20261113]
     paths:
       - src/reality-governed-auto-trigger-v1.0.js
+      - src/reality-riley-native-model-draft-v1.js
+      - supabase/migrations/20261113_signed_shift_native_model_draft_from_verified_original_v1.sql
+      - test/reality-riley-native-model-draft-v1.test.js
       - src/reality-current-shift-auto-admission-handoff-v1.js
       - api/reality/governed-employee-shift-worker.js
       - supabase/migrations/20261113_current_shift_qualified_original_auto_admission_v1.sql
       - test/reality-frozen-regressions/reality-current-shift-auto-admission-v1.test.js
-      - test/reality-current-shift-auto-admission-handoff-v1.test.js
+      - test/reality-current-shift-auto-admission-handoff-v1.test.js test/reality-riley-native-model-draft-v1.test.js
       - .github/workflows/reality-current-shift-auto-admission-proof.yml
   workflow_dispatch:
 permissions:
@@ -25,6 +28,7 @@ jobs:
       - name: Syntax of same-shift auto-trigger and independent provider bridge
         run: |
           node --check src/reality-governed-auto-trigger-v1.0.js
+          node --check src/reality-riley-native-model-draft-v1.js
           node --check src/reality-current-shift-auto-admission-handoff-v1.js
           node --check api/reality/governed-employee-shift-worker.js
       - name: Frozen current shift and independent provider auto-admission acceptance
