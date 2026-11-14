@@ -7171,6 +7171,46 @@ setInterval(refreshSavedShiftHome,300000);
     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
    window.realityJustSavedWorkRequest={conversation_id:sentConversation,
     request_id:sentRequest};
+   // Restore the PRE-EXISTING explicit owner Chat command. The prior simple
+   // Chat checked the authenticated shift controller before any new Start.
+   // No broad LLM intent inference, no duplicate shift, no worker dispatch
+   // from this UI, and no new installation authority. Ordinary Chat remains
+   // on its original saved-request cognition path.
+   if(!goalCommand){
+    const {interpretSignedInChatShiftCommand,
+     resolveExistingSignedInChatShift}=await import(
+      '/reality-owner-chat-shift-command-v1.js');
+    const exactOwnerCommand=interpretSignedInChatShiftCommand(value);
+    if(exactOwnerCommand){
+     try{
+      const verified=await resolveExistingSignedInChatShift(exactOwnerCommand,{
+       conversationId:sentConversation});
+      if(!['EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED',
+            'EXACT_SHIFT_OWNER_AUTHORIZATION_DURABLY_VERIFIED']
+        .includes(verified.status)||
+        !/^[a-f0-9-]{36}$/i.test(verified.shift_id||'')||
+        verified.installation_authorized!==false||
+        verified.production_changed!==false||
+        verified.worker_execution_verified!==false)
+       throw Error('CHAT_SHIFT_OWNER_READBACK_UNVERIFIED');
+      const proof=bubble('assistant',
+       verified.new_shift_started?
+        'SIGNED-IN SHIFT AUTHORIZATION VERIFIED · Batch '+
+        verified.shift_id+' · '+verified.shift_status+
+        ' · '+String(verified.batch_status||'INTAKE_NOT_VERIFIED')+
+        '. Worker execution and completion still require independent receipts.':
+        'EXISTING SHIFT VERIFIED · '+verified.shift_id+' · '+
+        verified.shift_status+
+        '. Authorization already recorded. No second shift or Start was issued.');
+      proof.querySelector('.label').textContent=
+       'REALITY · AUTHENTICATED SHIFT READBACK · NOT A MODEL ANSWER';
+      status('Owner command matched the existing governed shift controller. The same Chat request continues to its saved reply.');
+     }catch{
+      // An uncertain first-Start effect is never automatically replayed.
+      status('Shift authorization/readback uncertain. Reality kept your saved message; check the owner shift record before repeating Start.');
+     }
+    }
+   }
    status('Your message is saved in Reality. Preparing the conversation answer.');
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
     credentials:'same-origin',signal:AbortSignal.timeout(95000),
