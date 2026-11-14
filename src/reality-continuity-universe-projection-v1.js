@@ -17,8 +17,12 @@ export function projectCanonicalContinuityIntoUniverse({
     !UUID.test(worldlineId||'')||!Number.isInteger(limit)||
     limit<1||limit>48)
   throw Error('UNIVERSE_CANONICAL_SPINE_PROJECTION_INVALID');
- // This verifies every historical event's content hash, parent link,
- // lineage hash, and single-chain integrity, not just the latest tip.
+ // Reject a cross-owner/root request before hashing, but only accept
+ // records after validating their full chain and content hashes.
+ if(history.some(e=>e?.continuity_root_id!==rootId||
+                   e?.worldline_id!==worldlineId))
+  throw Error('UNIVERSE_CANONICAL_SPINE_SCOPE_OR_STAGE_UNVERIFIED');
+ // Verify every historical event's content hash, parent and lineage links.
  const verified=orderContinuityHistory(history);
  if(verified.some(e=>e.continuity_root_id!==rootId||
                   e.worldline_id!==worldlineId||
