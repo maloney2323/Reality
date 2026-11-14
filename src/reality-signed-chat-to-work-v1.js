@@ -149,9 +149,10 @@ export async function investigateAuthenticatedChatUnderExistingShift({
   if(result.selected_source_refs.some(x=>!allowed.has(x))||
      new Set(result.selected_source_refs).size!==result.selected_source_refs.length)
    fail('MODEL_SELECTED_SOURCE_NOT_IN_EXISTING_WARRANT');
-  if(result.decision!=='INVESTIGATE_EXISTING_WORK'&&
-     result.selected_source_refs.length)
-   fail('MODEL_SELECTED_SOURCES_WITHOUT_WORK_DECISION');
+  // A model suggestion cannot enlarge the current signed work scope.
+  // A conversational or out-of-scope message NEVER carries selected work.
+  if(result.decision!=='INVESTIGATE_EXISTING_WORK')
+   result.selected_source_refs=[];
   if(result.decision==='INVESTIGATE_EXISTING_WORK'&&
      result.selected_source_refs.length===0)
    result.decision='NEEDS_NEW_OR_EXACT_SCOPE';
