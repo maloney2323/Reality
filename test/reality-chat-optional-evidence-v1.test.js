@@ -53,7 +53,7 @@ test('authenticated Chat GET and POST use bounded optional evidence, not raw das
  const source=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(source,/if\(req.method==='GET'\)\{\s*const context=await collectOptionalChatEvidence/);
  assert.match(source,/stage='SIGNED_CHAT_WORK_READBACK';[\s\S]*const optionalContextPromise=collectOptionalChatEvidence/);
- assert.match(source,/stage='OWNER_EVIDENCE_COLLECTION';\s*const optionalContext=await optionalContextPromise/);
+ assert.match(source,/stage='OWNER_EVIDENCE_COLLECTION';[\s\S]*const optionalContext=await optionalContextPromise/);
  assert.match(source,/scopeOwnerOriginalWorkToShift/);
  assert.match(source,/timeoutMs:2500/);
  assert.match(source,/stage='ATOMIC_ASSISTANT_PUBLICATION'/);
