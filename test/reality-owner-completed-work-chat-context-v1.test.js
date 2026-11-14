@@ -69,8 +69,8 @@ test('chat hands recent verified work and original evidence into cognition on ev
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  const model=readFileSync(new URL('../src/reality-model-gateway-v0.1.js',import.meta.url),'utf8');
  const native=readFileSync(new URL('../src/reality-native263-temporal-chat-context-v1.js',import.meta.url),'utf8');
- assert.match(api,/readVerifiedNative263TemporalForChat\(\{session,db:isolated\}\)/);
- assert.match(api,/readVerifiedOwnerCompletedWorkForChat\(\{session,db:isolated\}\)/);
+ assert.match(api,/readVerifiedNative263TemporalForChat\(\{\s*session,db:isolated\s*\}\)/);
+ assert.match(api,/readVerifiedOwnerCompletedWorkForChat\(\{\s*session,db:isolated\s*\}\)/);
  assert.match(api,/\.\.\.native263TemporalObservations,\.\.\.ownerCompletedWorkObservations/);
  assert.match(api,/owner_completed_work_context_status:/);
  assert.match(model,/VERIFIED OWNER WORK MEMORY CONTRACT/);
