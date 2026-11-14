@@ -385,3 +385,43 @@ body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .re
   overflow:visible!important;
  }
 }
+
+/* Mobile conversation scroll recovery · 2026-11.
+   A single independent message scroll area. Controls are housed in the
+   Chats sidebar instead of consuming height between messages and composer. */
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-exports{
+ display:flex;flex-direction:column;gap:8px;align-items:stretch;
+ flex:0 0 auto;min-height:0;margin:7px 0 16px;padding:11px;
+ border:1px solid #395b71;border-radius:12px;background:#10283b;
+}
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-exports button{
+ width:100%;min-height:40px;text-align:center;
+ white-space:normal;overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-export-status{
+ margin:3px 0;font-size:12px;line-height:1.55;color:#bad2e2;
+ overflow-wrap:anywhere;
+}
+@media(max-width:600px){
+ body[data-reality-route="chat"].reality-chat-signed-in #privateChat,
+ body[data-reality-route="chat"].reality-chat-signed-in #privateReady,
+ body[data-reality-route="chat"].reality-chat-signed-in #realityChatWorkspace,
+ body[data-reality-route="chat"].reality-chat-signed-in .reality-chat-conversation{
+  min-height:0!important;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateChat .reality-chat-conversation #privateTranscript{
+  flex:1 1 0!important;min-height:0!important;height:0!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  touch-action:pan-y!important;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;scroll-behavior:auto;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #privateTranscript .bubble{
+  touch-action:pan-y;overflow-wrap:anywhere;
+ }
+ body[data-reality-route="chat"].reality-chat-signed-in
+  #realityChatComposer{
+  flex:0 0 auto!important;min-height:0!important;
+ }
+}
