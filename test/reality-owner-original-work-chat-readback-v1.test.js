@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {projectOwnerOriginalWorkReadback,readOwnerOriginalWorkForChat,
- originalWorkObservation} from '../src/reality-owner-original-work-chat-readback-v1.js';
+ originalWorkObservation,readOwnerWeeklyCandidateQueueForChat,
+ weeklyQueueObservation} from '../src/reality-owner-original-work-chat-readback-v1.js';
 const shift='9460cfff-937a-4105-9093-2e41ab39a950';
 const otherShift='21dff8db-6f46-444d-a149-ab15f1caf8fe';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -63,4 +64,59 @@ test('unverified project or session never reports an empty queue',async()=>{
   db:{strictSecrets:true,project:'hvkfreoagbrphwghjajw',
     secretKey:'provided-by-test-only',url:user.config.url},
  }),/CHAT_ORIGINAL_WORK_OWNER_SCOPE_UNVERIFIED/);
+});
+
+test('existing weekly source queue displays real candidate roles, never grants execution',async()=>{
+ const env={VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'};
+ const db={strictSecrets:true,secretKey:'test-key',project:'hvkfreoagbrphwghjajw',
+  url:user.config.url};
+ const shiftLedger={status:'OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK',
+  work_installation_authorized_by_read:false,production_changed:false,
+  verified_human_hours_saved:null,shifts:[{
+   shift_id:shift,plan_fingerprint:'sha256:'+'a'.repeat(64),
+   status:'RUNNING',closed_at:null,
+   steps:Array.from({length:8},(_,i)=>({step_index:i+1,state:'SOURCE_CHECKED'}))
+  }]};
+ const weekly={status:'EXISTING_WEEKLY_SOURCE_SNAPSHOT_RECONCILED_READ_ONLY',
+  owner_scope_verified:true,shift_id:shift,week_start:'2026-11-16',
+  open_issue_count:1,open_issues:[{
+   issue_url:'https://github.com/owner/project/issues/185',issue_number:185,
+   title:'Repair genuine source failure',qualification:{
+    status:'CURRENT_FAILURE_REPRODUCTION_REQUIRED',employee:'Engineer',
+    next_proof:'Independently reproduce the current defect',
+    executable_original:false,execution_authorized:false,
+    installation_authorized:false
+   }}],
+  snapshot_is_new_execution_authority:false,
+  snapshot_is_original_job_qualification:false,
+  production_changed:false,installation_authorized:false,
+  execution_authorized_by_read:false};
+ let called=[];
+ const result=await readOwnerWeeklyCandidateQueueForChat({
+  session:user,env,db,callRpc:async(_db,rpc,payload)=>{
+   called.push(rpc);assert.equal(payload.p_owner_id,owner);
+   if(rpc==='reality_read_owner_employee_shifts_v1')return shiftLedger;
+   if(rpc==='reality_read_owner_shift_weekly_backlog_v1'){
+    assert.equal(payload.p_shift_id,shift);return weekly;
+   }
+   throw Error('UNEXPECTED_RPC');
+  },
+ });
+ assert.deepEqual(called,['reality_read_owner_employee_shifts_v1',
+  'reality_read_owner_shift_weekly_backlog_v1']);
+ assert.equal(result.status,'CHAT_WEEKLY_SOURCE_CANDIDATES_VERIFIED');
+ assert.equal(result.source_candidate_count,1);
+ assert.equal(result.source_candidates[0].employee_role,'Engineer');
+ assert.equal(result.source_candidates[0].executable_original,false);
+ assert.equal(result.execution_authorized_by_read,false);
+ assert.equal(weeklyQueueObservation(result)[0].candidate_count,1);
+});
+test('weekly read failure is not reported as an empty employee queue',async()=>{
+ await assert.rejects(()=>readOwnerWeeklyCandidateQueueForChat({
+  session:user,env:{VERCEL_ENV:'preview',
+   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'},
+  db:{strictSecrets:true,secretKey:'test-key',project:'hvkfreoagbrphwghjajw',
+   url:user.config.url},
+  callRpc:async()=>{throw Error('PROVIDER_UNAVAILABLE')},
+ }),/PROVIDER_UNAVAILABLE/);
 });
