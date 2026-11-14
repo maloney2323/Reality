@@ -1,26 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick,
- CORRECTIVE_PROOF_WAKE_DIVISOR} from '../src/reality-bounded-corrective-proof-tick-v1.js';
+import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
+ from '../src/reality-bounded-corrective-proof-tick-v1.js';
 const SHIFT='9460cfff-937a-4105-9093-2e41ab39a950';
 const authorized={status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',
- shift_id:SHIFT,wake_count:CORRECTIVE_PROOF_WAKE_DIVISOR,
+ shift_id:SHIFT,wake_count:1,
  installation_authorized:false,production_changed:false};
+const ready={status:'EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI',
+ shift_id:SHIFT,original_work_id:'work:'+'a'.repeat(32),
+ original_job_completed:false,installation_authorized:false,
+ production_changed:false};
 const result={status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
  original_job_completed:false,installation_authorized:false,
  production_changed:false,new_shift_started:false};
-test('only a database recorded shift pulse can enter a bounded proof tick',()=>{
- assert.equal(isBoundedCorrectiveProofWake(authorized),true);
+test('only independently warranted pending corrective work takes the bounded lane',()=>{
+ assert.equal(isBoundedCorrectiveProofWake(authorized,ready),true);
+ assert.equal(isBoundedCorrectiveProofWake({...authorized,wake_count:8740},ready),true);
+ assert.equal(isBoundedCorrectiveProofWake(authorized,null),false);
  for(const change of [
-  {wake_count:CORRECTIVE_PROOF_WAKE_DIVISOR-1},
-  {wake_count:null},
-  {wake_count:'8'},
   {status:'CLIENT_REQUESTED_WORKER_START'},
   {shift_id:'not-a-uuid'},
   {installation_authorized:true},
   {production_changed:true},
- ])assert.equal(isBoundedCorrectiveProofWake({...authorized,...change}),false);
+ ])assert.equal(isBoundedCorrectiveProofWake({...authorized,...change},ready),false);
+ for(const change of [
+  {status:'NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION'},
+  {shift_id:'00000000-0000-0000-0000-000000000001'},
+  {original_work_id:'not-a-work-id'},
+  {original_job_completed:true},
+  {installation_authorized:true},
+  {production_changed:true},
+ ])assert.equal(isBoundedCorrectiveProofWake(authorized,{...ready,...change}),false);
 });
 test('pending CI is a completed worker check, never a completed customer job',()=>{
  const evidence=classifyCorrectiveProofTick(result);
@@ -67,9 +78,10 @@ test('unverified broker replies and forged authority never become completion',()
 test('bounded broker reconciliation executes ahead of all-in-one shift pipeline',()=>{
  const code=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',
   import.meta.url),'utf8');
- const bounded=code.indexOf('if(isBoundedCorrectiveProofWake(wakeReceipt))');
+ const bounded=code.indexOf('if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope))');
  const entire=code.indexOf('await processGovernedEmployeeShiftTick(db,');
- assert.ok(bounded>0&&entire>bounded);
+ const selected=code.indexOf("'reality_read_next_riley_auto_corrective_ci_v1',{}");
+ assert.ok(selected>0&&bounded>selected&&entire>bounded);
  assert.match(code,/return res\.status\(classification\.http_status\)/);
  assert.match(code,/new_shift_started:false,installation_authorized:false/);
  assert.match(code,/WAKE_RECEIVED/);
