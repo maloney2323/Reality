@@ -58,6 +58,9 @@ test('authenticated Chat GET and POST use bounded optional evidence, not raw das
  assert.match(source,/timeoutMs:2500/);
  assert.match(source,/stage='ATOMIC_ASSISTANT_PUBLICATION'/);
  assert.match(source,/publishPrivateAssistantAtomically/);
+ assert.match(source,/optional_context_wait_ms:optionalContextWaitMs/);
+ assert.match(source,/governed_cognition_ms:governedCognitionMs/);
+ assert.match(source,/total_ms:Date.now\(\)-chatStartedAt/);
  assert.match(source,/CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN/);
  assert.match(source,/missing_context_is_not_evidence_of_no_work:true/);
 });
