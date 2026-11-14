@@ -224,7 +224,7 @@ GRANT EXECUTE ON FUNCTION public.reality_read_generalized_original_install_revie
 -- not a model-selected run id, Chat text or hardcoded original number.
 CREATE OR REPLACE FUNCTION public.reality_read_next_generalized_verified_install_review_v1()
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE g jsonb; a record; v_count integer; old record;
+DECLARE g jsonb; v_candidate record; v_count integer;
 BEGIN
  IF current_user<>'service_role' THEN
   RAISE EXCEPTION 'GENERALIZED_INSTALL_REVIEW_DISCOVERY_SERVICE_ONLY'; END IF;
@@ -254,7 +254,7 @@ BEGIN
   'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
  IF v_count>1 THEN RAISE EXCEPTION 'GENERALIZED_INSTALL_MULTIPLE_PASSED_ORIGINALS_REQUIRE_SELECTION';END IF;
  SELECT a.*,t.verification_pr_number
- INTO a
+ INTO v_candidate
  FROM reality_internal.riley_same_original_recovery_attempts_v2 a
  JOIN reality_internal.riley_same_original_frozen_ci_attestations_v1 t
   ON t.attempt_id=a.attempt_id AND t.original_work_id=a.original_work_id
@@ -270,19 +270,19 @@ BEGIN
   AND a.owner_id=(g->>'owner_id')::uuid AND a.shift_id=(g->>'shift_id')::uuid
   AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_original_install_reviews_v1 r
    WHERE r.original_work_id=a.original_work_id);
- IF a.original_work_id IS NULL OR a.source_path IS NULL OR
-   a.source_commit_sha!~'^[a-f0-9]{40}$' OR
-   a.candidate_staged_commit_sha!~'^[a-f0-9]{40}$' OR
-   a.proposed_source_sha256!~'^sha256:[a-f0-9]{64}$'
+ IF v_candidate.original_work_id IS NULL OR v_candidate.source_path IS NULL OR
+   v_candidate.source_commit_sha!~'^[a-f0-9]{40}$' OR
+   v_candidate.candidate_staged_commit_sha!~'^[a-f0-9]{40}$' OR
+   v_candidate.proposed_source_sha256!~'^sha256:[a-f0-9]{64}$'
  THEN RAISE EXCEPTION 'GENERALIZED_INSTALL_SOURCE_IDENTITY_DRIFT';END IF;
  RETURN jsonb_build_object('status','PASSED_SAME_ORIGINAL_INSTALL_REVIEW_ELIGIBLE',
-  'attempt_id',a.attempt_id,'original_work_id',a.original_work_id,
-  'owner_id',a.owner_id,'shift_id',a.shift_id,'source_ref',a.source_ref,
-  'source_path',a.source_path,'source_commit_sha',a.source_commit_sha,
-  'candidate_commit_sha',a.candidate_staged_commit_sha,
-  'candidate_artifact_sha256',a.proposed_source_sha256,
-  'replacement_find',a.replacement_find,'replacement_with',a.replacement_with,
-  'independent_frozen_run_id',a.ci_run_id,
+  'attempt_id',v_candidate.attempt_id,'original_work_id',v_candidate.original_work_id,
+  'owner_id',v_candidate.owner_id,'shift_id',v_candidate.shift_id,'source_ref',v_candidate.source_ref,
+  'source_path',v_candidate.source_path,'source_commit_sha',v_candidate.source_commit_sha,
+  'candidate_commit_sha',v_candidate.candidate_staged_commit_sha,
+  'candidate_artifact_sha256',v_candidate.proposed_source_sha256,
+  'replacement_find',v_candidate.replacement_find,'replacement_with',v_candidate.replacement_with,
+  'independent_frozen_run_id',v_candidate.ci_run_id,
   'installation_authorized',false,'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_read_next_generalized_verified_install_review_v1()
