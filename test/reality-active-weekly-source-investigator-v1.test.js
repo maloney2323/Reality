@@ -157,3 +157,19 @@ test('owner Home distinguishes durable worker investigations from unexecuted wor
  assert.match(home,/doneByEmployee/);
  assert.match(home,/new_executable_jobs_authorized===0/);
 });
+
+test('owner-signed SOURCE_ADMITTED original appears separately from completed investigations',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-employee-roster.js',
+  import.meta.url),'utf8');
+ const home=readFileSync(new URL('../reality-home-employee-brief-v1.js',
+  import.meta.url),'utf8');
+ assert.match(api,/reality_read_current_shift_execution_graph_v1/);
+ assert.match(api,/CURRENT_OWNER_SHIFT_ENGINEERING_ORIGINALS_SOURCE_BOUND/);
+ assert.match(api,/graph\.owner_id===session\.user_id/);
+ assert.match(api,/graph\.execution_scope_from_owner_warrant_only===true/);
+ assert.match(api,/independent_source_proof_verified===true/);
+ assert.match(home,/current_shift_engineering_originals/);
+ assert.match(home,/awaiting model draft and tests/);
+ assert.match(home,/work not yet installed or settled/);
+ assert.doesNotMatch(home,/work has been completed automatically/);
+});
