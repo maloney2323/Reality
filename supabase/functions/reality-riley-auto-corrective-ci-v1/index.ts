@@ -98,7 +98,14 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5);
  const current=await exact(token,'/git/ref/heads/'+baseBranch);
  if(current.ref!=='refs/heads/'+baseBranch||
-    current.object?.sha!==baseSha)refuse('TRUSTED_PREVIEW_BASE_BRANCH_DRIFT');
+    !SHA.test(current.object?.sha||''))
+   refuse('TRUSTED_PREVIEW_SOURCE_REF_UNVERIFIED');
+ // A UI/CI commit can advance this branch while the model's exact frozen
+ // repair source remains unchanged. Guard the relevant bytes, not a moving
+ // branch-wide commit SHA. Both deployed and current source are re-read.
+ const liveSource=await source(token,TARGET,current.object.sha);
+ if(liveSource.sha!==c.source_blob_sha)
+   refuse('PREVIEW_SOURCE_FILE_CHANGED_REQUALIFICATION_REQUIRED');
  const workflow=await source(token,WORKFLOW,baseSha);
  if(!workflow.text.includes("persist-credentials: false")||
     !workflow.text.includes("independent-corrective-frozen")||
