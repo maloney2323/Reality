@@ -223,6 +223,75 @@ export default async function handler(req,res){
     });
    }
   }
+  // The EXISTING corrective broker now accepts v2 evidence-bound repair
+  // attempts. Only one current owner-warranted candidate is selected from
+  // private service storage. Every patch gets a distinct isolated branch,
+  // independent frozen CI and the SAME original work ID. Model output alone
+  // cannot stage, install or settle anything.
+  workerStage='SAME_ORIGINAL_RECOVERY_CI_ELIGIBILITY';
+  const recoveryCiScope=await shiftRpc(db,
+   'reality_read_next_same_original_recovery_candidate_v2',{})
+   .catch(()=>null);
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     recoveryCiScope?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'&&
+     recoveryCiScope.shift_id===wakeReceipt.shift_id&&
+     /^[a-f0-9-]{36}$/i.test(recoveryCiScope.attempt_id||'')&&
+     /^work:[a-f0-9]{32}$/.test(recoveryCiScope.original_work_id||'')&&
+     Number.isSafeInteger(recoveryCiScope.attempt_number)&&
+     recoveryCiScope.attempt_number>=2&&
+     recoveryCiScope.installation_authorized===false&&
+     recoveryCiScope.original_job_completed===false&&
+     recoveryCiScope.production_changed===false){
+   workerStage='SAME_ORIGINAL_RECOVERY_CI_BROKER';
+   const retryCi=await continueRileyCorrectiveModelIntoIndependentCI({
+    db,env:process.env,fetchImpl:fetch,version:2
+   }).catch(()=>({
+    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+    original_job_completed:false,new_shift_started:false,
+    installation_authorized:false,production_changed:false
+   }));
+   const expectedBranch='reality/riley/auto-corrective-'+
+     recoveryCiScope.original_work_id.slice(5)+'-a'+
+     recoveryCiScope.attempt_number;
+   const matchingProof=retryCi.original_work_id===
+      recoveryCiScope.original_work_id&&
+     (retryCi.attempt_id==null||
+      retryCi.attempt_id===recoveryCiScope.attempt_id)&&
+     (retryCi.candidate_branch==null||
+      retryCi.candidate_branch===expectedBranch);
+   const classification=matchingProof?
+     classifyCorrectiveProofTick(retryCi):
+     {worker_status:'WAKE_FAILED',
+      worker_result:'CORRECTIVE_PROOF_BOUNDARY_UNVERIFIED',
+      http_status:503,proof_verified:false};
+   workerStage='SAME_ORIGINAL_RECOVERY_CI_PULSE';
+   const pulse=await shiftRpc(db,
+    'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_status:classification.worker_status,
+     p_safe_result:classification.worker_result
+    });
+   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      pulse.shift_id!==wakeReceipt.shift_id||
+      pulse.installation_authorized!==false||
+      pulse.production_changed!==false)
+    throw Error('SAME_ORIGINAL_RECOVERY_CI_PULSE_UNVERIFIED');
+   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+    durableWorkerCompletion=pulse;
+   workerStage='SAME_ORIGINAL_RECOVERY_CI_RESPONSE_PUBLICATION';
+   return res.status(classification.http_status).json({
+    status:'GOVERNED_SAME_ORIGINAL_RECOVERY_CI_RECONCILED',
+    original_work_id:recoveryCiScope.original_work_id,
+    attempt_id:recoveryCiScope.attempt_id,
+    attempt_number:recoveryCiScope.attempt_number,
+    same_original_recovery_ci:retryCi,
+    independent_ci_verified:classification.proof_verified,
+    actual_worker_wake_receipt:wakeReceipt,
+    actual_worker_completion_receipt:pulse,
+    original_job_completed:false,new_shift_started:false,
+    installation_authorized:false,production_changed:false
+   });
+  }
   // Continue normal/full shift work on the other durable wake receipts.
   try{
    nativePostinstallOriginalProof=
