@@ -242,7 +242,8 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
     r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
    if(exactPullRuns.length>1)refuse('AMBIGUOUS_RECOVERY_EXACT_PR_CI');
    if(exactPullRuns.length===1)exactRuns=exactPullRuns;
-   prFailureRuns=[...byId.values()].filter(r=>eligible(r)&&
+   // v2 never substitutes an unrelated gateway failure for exact frozen CI.
+   prFailureRuns=recovery?[]:[...byId.values()].filter(r=>eligible(r)&&
     r.name==='Reality — Isolated governed OpenAI gateway proof'&&
     r.event==='pull_request'&&r.conclusion==='failure'&&
     typeof r.path==='string'&&r.path.startsWith('.github/workflows/')&&
