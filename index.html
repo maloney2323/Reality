@@ -6755,9 +6755,44 @@ setInterval(refreshSavedShiftHome,300000);
   const atBottom=thread.scrollHeight-thread.scrollTop-thread.clientHeight<=90;
   const previousTop=thread.scrollTop,previousHeight=thread.scrollHeight;
   thread.replaceChildren();
-  for(const message of data.messages||[])bubble(message.role,message.text);
-  status((data.messages?.length||0)+' saved messages restored'+
-   (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
+  // Only show missing replies reported by the authenticated owner-scoped
+  // readback. These notices are NOT model answers or work receipts.
+  const replyReadback=data.reply_readback;
+  const unmatched=new Map(
+   replyReadback?.source==='AUTHENTICATED_OWNER_SCOPED_RLS_HISTORY'&&
+   replyReadback?.chat_endpoint_mode==='CONVERSATIONAL_ONLY_NO_DEVELOPMENT_JOB_DISPATCH'&&
+   Array.isArray(replyReadback.unanswered_requests)?
+    replyReadback.unanswered_requests.filter(x=>
+     x?.status==='USER_MESSAGE_SAVED_REPLY_NOT_VERIFIED'&&
+     /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(x.request_id||'')&&
+     String(x.user_source_ref||'').startsWith('supabase:reality_chat_messages:')
+    ).map(x=>[x.request_id,x]):[]
+  );
+  for(const message of data.messages||[]){
+   bubble(message.role,message.text);
+   const missing=message.role==='user'?unmatched.get(message.request_id):null;
+   if(missing&&missing.user_source_ref===message.source_ref){
+    const notice=document.createElement('div');
+    notice.className='bubble reality-chat-unanswered-notice';
+    notice.setAttribute('role','status');
+    const heading=document.createElement('div');
+    heading.className='label';
+    heading.textContent='CHAT DELIVERY STATUS · NOT A REALITY ANSWER';
+    const explanation=document.createElement('div');
+    const savedAt=Date.parse(missing.saved_at||'');
+    const older=Number.isFinite(savedAt)&&Date.now()-savedAt>120000;
+    explanation.textContent=older?
+     'Your message was saved, but Reality did not publish a verified reply. The exact server failure was not durably recorded, and this conversational Chat endpoint does not dispatch a development worker. Do not send the same request again as though the first one had started a job.':
+     'Your message was saved. No verified reply has been published yet; this Chat endpoint does not start a development worker.';
+    notice.append(heading,explanation);
+    thread.append(notice);
+   }
+  }
+  status(unmatched.size?
+   'Saved conversation recovered · '+unmatched.size+
+    ' message(s) have no verified Reality reply. Open the delivery-status notice under the message for the actual limitation.':
+   (data.messages?.length||0)+' saved messages restored'+
+    (data.continuity?.older_messages_may_be_missing?' · Older history is not fully loaded':''));
   // A readback must not force the owner to the newest message while
   // scrolling through earlier conversation history.
   thread.scrollTop=atBottom?thread.scrollHeight:
