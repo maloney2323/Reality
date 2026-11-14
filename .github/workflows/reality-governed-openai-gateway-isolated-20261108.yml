@@ -6,6 +6,7 @@ on:
       - reality/native263-temporal-chat-proof-20261113
       - reality/repair-source-bound-shift-gate-20261113
   pull_request:
+    types: [opened, reopened, synchronize, edited]
     paths:
       - .github/workflows/reality-governed-openai-gateway-isolated-20261108.yml
       - src/reality-governed-openai-gateway-v1.js
@@ -174,6 +175,35 @@ on:
 permissions:
   contents: read
 jobs:
+
+  # The existing working PR gateway supplies a separately identifiable,
+  # candidate-specific proof. A green general boundary-tests job is NOT
+  # sufficient to qualify any model-repair candidate for installation.
+  independent-corrective-frozen:
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'reality/riley/auto-corrective-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact candidate source syntax
+        run: node --check src/reality-riley-service-original-runtime-v1.js
+      - name: Independent original-job continuity and governed handoff acceptance
+        run: |
+          node --test \
+            test/reality-riley-service-original-runtime-v1.test.js \
+            test/reality-riley-trusted-original-driver-bridge-v1.test.js \
+            test/reality-riley-governed-original-job-v1.test.js
+      - name: Confirm no installation authority in candidate CI
+        run: echo "Candidate only: zero installation, approval or settlement effects"
   boundary-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
