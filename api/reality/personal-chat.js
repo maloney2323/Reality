@@ -58,6 +58,19 @@ export default async function handler(req,res){
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
   stage='AUTHENTICATED_HISTORY';
   const history=await readPrivateChat(session,conversationId);
+  // The progress monitor needs only authenticated message/reply readback.
+  // Never fetch unrelated employee, discovery or dashboard evidence on
+  // every polling request while a governed answer is being generated.
+  if(req.method==='GET'&&String(req.query?.reply_readback||'')==='1')
+   return res.status(200).json({ok:true,conversation_id:conversationId,
+    messages:history.messages,
+    reply_readback:summarizeSavedChatReplyReadback(history.messages),
+    continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',
+     recovered_messages:history.messages.length,
+     coverage:history.history_status,
+     older_messages_may_be_missing:history.older_missing},
+    readback_scope:'AUTHENTICATED_MESSAGES_ONLY',
+    work_execution_authorized:false,installation_authorized:false});
   if(req.method==='GET'){
    const context=await collectOptionalChatEvidence([
     {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({session,conversationId}),
