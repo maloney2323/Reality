@@ -6,6 +6,12 @@ on:
       - index.html
       - api/reality/personal-chat.js
       - src/reality-saved-chat-reply-readback-v1.js
+      - src/reality-private-chat-work-readback-v1.js
+      - src/reality-signed-chat-to-work-v1.js
+      - src/reality-governed-shift-boundary-v1.js
+      - api/reality/governed-employee-shift-worker.js
+      - supabase/migrations/20261114_authenticated_chat_work_existing_shift_handoff_v1.sql
+      - test/reality-chat-to-governed-work-handoff-v1.test.js
       - reality-chat-conversation-export-v1.js
       - reality-chat-fullscreen-v2.css
       - reality-chat-workspace-v1.js
@@ -31,8 +37,11 @@ jobs:
           node --check reality-chat-request-status-v1.js
           node --check src/reality-saved-chat-reply-readback-v1.js
           node --check api/reality/personal-chat.js
+          node --check src/reality-signed-chat-to-work-v1.js
+          node --check src/reality-private-chat-work-readback-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
       - name: Independently run mobile scroll and saved-message proof
         run: |
-          node --test test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js test/reality-chat-fullscreen-v2.test.js test/reality-chat-automated-shift-and-export-v1.test.js test/reality-chat-send-nonblocking-v1.test.js test/reality-chat-saved-reply-visibility-v1.test.js
+          node --test test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js test/reality-chat-fullscreen-v2.test.js test/reality-chat-automated-shift-and-export-v1.test.js test/reality-chat-send-nonblocking-v1.test.js test/reality-chat-saved-reply-visibility-v1.test.js test/reality-chat-to-governed-work-handoff-v1.test.js
       - name: No new shift, message, installation, or production change
         run: echo 'Chat UI and authenticated readback tests only'
