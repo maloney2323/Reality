@@ -177,8 +177,13 @@ export async function stageGeneralizedVerifiedOriginalInstallReview({
    exact_source_blob_sha:nextBlob,independent_integration_ci_run_id:run.id,
    next_gate:'VERIFY_RELEASE_TRANSPORT_AND_SAME_ORIGINAL_SETTLEMENT_CONTRACT'
   });
- }catch{
-  return safe('GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED',{
+ }catch(error){
+  // Preserve only a predefined non-secret evidence-failure classification.
+  // Never surface URLs, credentials, response bodies or provider stack traces.
+  const code=String(error instanceof Error?error.message:'');
+  const status=/^GENERALIZED_REVIEW_[A-Z0-9_]{5,85}$/.test(code)?
+    code:'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED';
+  return safe(status,{
     original_work_id:candidate.original_work_id,attempt_id:candidate.attempt_id
   });
  }
