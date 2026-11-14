@@ -218,3 +218,74 @@ REVOKE ALL ON FUNCTION public.reality_read_generalized_original_install_review_v
  FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_read_generalized_original_install_review_v1(uuid)
  TO service_role;
+
+-- Authoritative service-only claim-free read of a uniquely passed original.
+-- Preview worker discovers the integration PR and CI from GitHub itself,
+-- not a model-selected run id, Chat text or hardcoded original number.
+CREATE OR REPLACE FUNCTION public.reality_read_next_generalized_verified_install_review_v1()
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE g jsonb; a record; v_count integer; old record;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'GENERALIZED_INSTALL_REVIEW_DISCOVERY_SERVICE_ONLY'; END IF;
+ g:=public.reality_read_current_shift_execution_graph_v1();
+ IF g->>'status'<>'OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'
+  OR g->>'installation_authorized'<>'false'
+  OR g->>'production_changed'<>'false'
+ THEN RETURN jsonb_build_object('status','GENERALIZED_INSTALL_NO_CURRENT_AUTHORIZED_SHIFT',
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
+ SELECT count(*) INTO v_count
+ FROM reality_internal.riley_same_original_recovery_attempts_v2 a
+ JOIN reality_internal.riley_same_original_frozen_ci_attestations_v1 t
+  ON t.attempt_id=a.attempt_id AND t.original_work_id=a.original_work_id
+  AND t.candidate_commit_sha=a.candidate_staged_commit_sha
+  AND t.independent_run_id=a.ci_run_id
+  AND t.independent_run_conclusion='success'
+ JOIN reality_internal.riley_unattended_repair_originals_v1 j
+  ON j.original_work_id=a.original_work_id AND j.owner_id=a.owner_id
+  AND j.shift_id=a.shift_id AND j.phase='SOURCE_ADMITTED'
+  AND j.installed=false AND j.production_changed=false
+  AND j.original_settlement_receipt_ref IS NULL
+ WHERE a.phase='CI_PASSED' AND a.ci_conclusion='success'
+  AND a.owner_id=(g->>'owner_id')::uuid AND a.shift_id=(g->>'shift_id')::uuid
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_original_install_reviews_v1 r
+   WHERE r.original_work_id=a.original_work_id);
+ IF v_count=0 THEN RETURN jsonb_build_object('status','NO_UNSTAGED_PASSED_ORIGINAL_INSTALL_REVIEW',
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
+ IF v_count>1 THEN RAISE EXCEPTION 'GENERALIZED_INSTALL_MULTIPLE_PASSED_ORIGINALS_REQUIRE_SELECTION';END IF;
+ SELECT a.*,t.verification_pr_number
+ INTO a
+ FROM reality_internal.riley_same_original_recovery_attempts_v2 a
+ JOIN reality_internal.riley_same_original_frozen_ci_attestations_v1 t
+  ON t.attempt_id=a.attempt_id AND t.original_work_id=a.original_work_id
+  AND t.candidate_commit_sha=a.candidate_staged_commit_sha
+  AND t.independent_run_id=a.ci_run_id
+  AND t.independent_run_conclusion='success'
+ JOIN reality_internal.riley_unattended_repair_originals_v1 j
+  ON j.original_work_id=a.original_work_id AND j.owner_id=a.owner_id
+  AND j.shift_id=a.shift_id AND j.phase='SOURCE_ADMITTED'
+  AND j.installed=false AND j.production_changed=false
+  AND j.original_settlement_receipt_ref IS NULL
+ WHERE a.phase='CI_PASSED' AND a.ci_conclusion='success'
+  AND a.owner_id=(g->>'owner_id')::uuid AND a.shift_id=(g->>'shift_id')::uuid
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_original_install_reviews_v1 r
+   WHERE r.original_work_id=a.original_work_id);
+ IF a.original_work_id IS NULL OR a.source_path IS NULL OR
+   a.source_commit_sha!~'^[a-f0-9]{40}$' OR
+   a.candidate_staged_commit_sha!~'^[a-f0-9]{40}$' OR
+   a.proposed_source_sha256!~'^sha256:[a-f0-9]{64}$'
+ THEN RAISE EXCEPTION 'GENERALIZED_INSTALL_SOURCE_IDENTITY_DRIFT';END IF;
+ RETURN jsonb_build_object('status','PASSED_SAME_ORIGINAL_INSTALL_REVIEW_ELIGIBLE',
+  'attempt_id',a.attempt_id,'original_work_id',a.original_work_id,
+  'owner_id',a.owner_id,'shift_id',a.shift_id,'source_ref',a.source_ref,
+  'source_path',a.source_path,'source_commit_sha',a.source_commit_sha,
+  'candidate_commit_sha',a.candidate_staged_commit_sha,
+  'candidate_artifact_sha256',a.proposed_source_sha256,
+  'replacement_find',a.replacement_find,'replacement_with',a.replacement_with,
+  'independent_frozen_run_id',a.ci_run_id,
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_read_next_generalized_verified_install_review_v1()
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_next_generalized_verified_install_review_v1()
+ TO service_role;
