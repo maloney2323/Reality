@@ -46,7 +46,10 @@ function toBase64(bytes){
 async function rpc(name,body,key){
  if(!['reality_read_next_riley_auto_corrective_ci_v1',
       'reality_record_riley_auto_corrective_staging_v1',
-      'reality_record_riley_auto_corrective_ci_v1'].includes(name))
+      'reality_record_riley_auto_corrective_ci_v1',
+      'reality_read_next_same_original_recovery_candidate_v2',
+      'reality_record_same_original_recovery_staging_v2',
+      'reality_record_same_original_recovery_ci_v2'].includes(name))
   refuse('UNALLOWED_DATABASE_OPERATION');
  const url='https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name;
  const r=await fetch(url,{method:'POST',redirect:'error',cache:'no-store',
@@ -80,8 +83,12 @@ async function source(token,path,ref){
  if(await blob(bytes)!==v.sha)refuse('SOURCE_GIT_BLOB_HASH_CHANGED');
  return {bytes,text:new TextDecoder().decode(bytes),sha:v.sha};
 }
-function validClaim(c){
- if(c?.status!=='EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'||
+function validClaim(c,recovery=false){
+ if(c?.status!==(recovery?'SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI':
+   'EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI')||
+  (recovery&&(!/^[a-f0-9-]{36}$/.test(c.attempt_id||'')||
+   !Number.isSafeInteger(c.attempt_number)||c.attempt_number<2||
+   c.attempt_number>8))||
   !WORK.test(c.original_work_id||'')||!SHA.test(c.source_commit_sha||'')||
   !SHA.test(c.source_blob_sha||'')||!HASH.test(c.proposed_sha256||'')||
   c.source_path!==TARGET||
@@ -94,8 +101,9 @@ function validClaim(c){
   c.production_changed!==false)
   refuse('EXACT_CURRENT_MODEL_SOURCE_AND_AUTHORITY_REQUIRED');
 }
-async function stageOrObserve(c,token,baseBranch,baseSha,key){
- const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5);
+async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
+ const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5)+
+   (recovery?'-a'+c.attempt_number:'');
  const current=await exact(token,'/git/ref/heads/'+baseBranch);
  if(current.ref!=='refs/heads/'+baseBranch||
     !SHA.test(current.object?.sha||''))
@@ -151,14 +159,19 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  }
  const head=(await exact(token,'/git/ref/heads/'+branch)).object?.sha;
  if(!SHA.test(head||''))refuse('TEST_CANDIDATE_COMMIT_READBACK_INVALID');
- const staged=await rpc('reality_record_riley_auto_corrective_staging_v1',{
-   p_original_work_id:c.original_work_id,
+ const staged=await rpc(recovery?
+   'reality_record_same_original_recovery_staging_v2':
+   'reality_record_riley_auto_corrective_staging_v1',{
+   ...(recovery?{p_attempt_id:c.attempt_id}:
+     {p_original_work_id:c.original_work_id}),
    p_model_response_id:c.model_response_id,
    p_proposed_sha256:c.proposed_sha256,
    p_candidate_branch:branch,
    p_candidate_commit_sha:head
  },key);
- if(staged.status!=='SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK'||
+ if(staged.status!==(recovery?'SAME_ORIGINAL_RECOVERY_CANDIDATE_STAGED':
+    'SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK')||
+    (recovery&&staged.attempt_id!==c.attempt_id)||
     staged.original_work_id!==c.original_work_id||
     staged.shift_id!==c.shift_id||
     staged.candidate_commit_sha!==head||
@@ -269,8 +282,10 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
      !trustedWorkflow.text.includes('Verify Reality model boundary and original tool-continuation regressions'))
     refuse('TRUSTED_ORIGINAL_FROZEN_TEST_COMMAND_MISSING');
  }
- const saved=await rpc('reality_record_riley_auto_corrective_ci_v1',{
-   p_original_work_id:c.original_work_id,
+ const saved=await rpc(recovery?'reality_record_same_original_recovery_ci_v2':
+   'reality_record_riley_auto_corrective_ci_v1',{
+   ...(recovery?{p_attempt_id:c.attempt_id}:
+     {p_original_work_id:c.original_work_id}),
    p_model_response_id:c.model_response_id,
    p_proposed_sha256:c.proposed_sha256,
    p_tested_commit_sha:head,
@@ -278,7 +293,12 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
    p_independent_run_url:run.html_url,
    p_conclusion:run.conclusion
  },key);
- if(saved.status!=='INDEPENDENT_SAME_ORIGINAL_CORRECTIVE_CI_RECORDED'||
+ if(saved.status!==(recovery?
+    (run.conclusion==='failure'?
+     'SAME_ORIGINAL_RECOVERY_CI_FAILED_NEXT_EVIDENCE_BACKED_ATTEMPT_ELIGIBLE':
+     'SAME_ORIGINAL_RECOVERY_CI_PASSED_EXACT_INSTALL_APPROVAL_REQUIRED'):
+    'INDEPENDENT_SAME_ORIGINAL_CORRECTIVE_CI_RECORDED')||
+    (recovery&&saved.attempt_id!==c.attempt_id)||
     saved.original_work_id!==c.original_work_id||
     saved.shift_id!==c.shift_id||
     saved.ci_conclusion!==run.conclusion||
@@ -289,6 +309,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  return response(run.conclusion==='success'?
   'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED':
   'CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN',200,{
+    ...(recovery?{attempt_id:c.attempt_id,attempt_number:c.attempt_number}:{}),
     original_work_id:c.original_work_id,candidate_commit_sha:head,
     independent_run_url:run.html_url,independent_ci_verified:true,
     original_job_completed:false,installation_authorized:false});
@@ -305,21 +326,28 @@ Deno.serve(async req=>{
   if(raw.length>400)refuse('ENVELOPE_TOO_LARGE');
   const body=JSON.parse(raw);
   if(!body||Array.isArray(body)||Object.keys(body).sort().join(',')!==
-     'action,base_branch,base_sha,version'||body.version!==1||
+     'action,base_branch,base_sha,version'||![1,2].includes(body.version)||
      body.action!=='stage_or_check'||!SHA.test(body.base_sha||'')||
      !/^reality\/[a-zA-Z0-9/_-]{10,130}$/.test(body.base_branch||'')||
      body.base_branch.includes('..')||body.base_branch.includes('//')||
      body.base_branch.startsWith('reality/riley/'))
     refuse('TRUSTED_ISOLATED_PREVIEW_BASE_ONLY');
-  const c=await rpc('reality_read_next_riley_auto_corrective_ci_v1',{},secret);
-  if(c.status==='NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION'||
-     c.status==='NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI')
+  const recovery=body.version===2;
+  const c=await rpc(recovery?
+   'reality_read_next_same_original_recovery_candidate_v2':
+   'reality_read_next_riley_auto_corrective_ci_v1',{},secret);
+  if((recovery&&[
+    'NO_UNTESTED_SAME_ORIGINAL_RECOVERY_CANDIDATE',
+    'NO_OWNER_WARRANTED_RECOVERY_PATCH_FOR_CI'].includes(c.status))||
+     (!recovery&&[
+    'NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION',
+    'NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI'].includes(c.status)))
     return response(c.status);
-  validClaim(c);
+  validClaim(c,recovery);
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<25)
    return response('ISOLATED_GITHUB_CANDIDATE_WRITER_NOT_CONFIGURED',503);
-  return await stageOrObserve(c,token,body.base_branch,body.base_sha,secret);
+  return await stageOrObserve(c,token,body.base_branch,body.base_sha,secret,recovery);
  }catch(error){
   const msg=String(error instanceof Error?error.message:'');
   const code=/^AUTO_CORRECTIVE_[A-Z0-9_]{3,100}$/.test(msg)?
