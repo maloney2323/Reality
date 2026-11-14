@@ -74,6 +74,8 @@ import {isDurablyCompletedShiftWorkerPulse}
  from '../../src/reality-shift-worker-durable-completion-v1.js';
 import {continueSameOriginalRecoveryAfterVerifiedFailure}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
+import {stageGeneralizedVerifiedOriginalInstallReview}
+ from '../../src/reality-generalized-original-install-review-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -292,6 +294,18 @@ export default async function handler(req,res){
     installation_authorized:false,production_changed:false
    });
   }
+  // Evidence-backed transition from verified corrective CI into the same
+  // original's eventual owner install decision. This READS provider evidence
+  // and stages a service-only review. It never installs or creates consent.
+  workerStage='GENERALIZED_ORIGINAL_INSTALL_REVIEW_PREFLIGHT';
+  const generalizedInstallReview=
+   await stageGeneralizedVerifiedOriginalInstallReview({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED',
+    owner_approval_ready:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   }));
   // Continue normal/full shift work on the other durable wake receipts.
   try{
    nativePostinstallOriginalProof=
@@ -1137,6 +1151,7 @@ export default async function handler(req,res){
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
+    generalized_original_install_review:generalizedInstallReview,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
