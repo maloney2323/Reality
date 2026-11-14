@@ -5,8 +5,12 @@ const SHA=/^[a-f0-9]{40}$/;
 const BRANCH=/^reality\/[A-Za-z0-9/_-]{10,130}$/;
 const validStatus=/^(?:AUTO_CORRECTIVE_|CORRECTIVE_|CANDIDATE_|ISOLATED_|NO_)[A-Z0-9_]{4,130}$/;
 export async function continueRileyCorrectiveModelIntoIndependentCI({
- db,env=process.env,fetchImpl=fetch
+ db,env=process.env,fetchImpl=fetch,version=1
 }={}){
+ if(![1,2].includes(version))
+  return Object.freeze({status:'ISOLATED_CORRECTIVE_CI_PROTOCOL_VERSION_INVALID',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false});
  const safe=(status)=>Object.freeze({status,original_job_completed:false,
   installation_authorized:false,production_changed:false,
   new_shift_started:false});
@@ -28,7 +32,7 @@ export async function continueRileyCorrectiveModelIntoIndependentCI({
    method:'POST',redirect:'error',cache:'no-store',
    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
     accept:'application/json','content-type':'application/json'},
-   body:JSON.stringify({action:'stage_or_check',base_branch,base_sha,version:1}),
+   body:JSON.stringify({action:'stage_or_check',base_branch,base_sha,version}),
    signal:AbortSignal.timeout(28000)
   });
  }catch{return safe('ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED')}
@@ -39,6 +43,11 @@ export async function continueRileyCorrectiveModelIntoIndependentCI({
     typeof r.status!=='string'||!validStatus.test(r.status))
   return safe('ISOLATED_CORRECTIVE_CI_PROVIDER_READBACK_UNVERIFIED');
  if(!res.ok)return safe(r.status);
+ if(version===2&&r.attempt_id!=null&&
+   (!/^[a-f0-9-]{36}$/.test(r.attempt_id)||
+    !Number.isSafeInteger(r.attempt_number)||
+    r.attempt_number<2||r.attempt_number>8))
+  return safe('ISOLATED_CORRECTIVE_CI_RECOVERY_ATTEMPT_ID_INVALID');
  if(r.independent_ci_verified===true&&(
     !/^work:[a-f0-9]{32}$/.test(r.original_work_id||'')||
     !/^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(
