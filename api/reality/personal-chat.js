@@ -41,7 +41,10 @@ export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ const chatStartedAt=Date.now();
  let stage='AUTHENTICATION';
+ let optionalContextWaitMs=null;
+ let governedCognitionMs=null;
  try{
   privateChatConfig();
   if(!['GET','POST'].includes(req.method))
@@ -223,7 +226,9 @@ export default async function handler(req,res){
   }
   // Context comes only from trusted owner-scoped database stage receipts.
   stage='OWNER_EVIDENCE_COLLECTION';
+  const optionalContextWaitStart=Date.now();
   const optionalContext=await optionalContextPromise;
+  optionalContextWaitMs=Date.now()-optionalContextWaitStart;
   const {
    work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
@@ -262,6 +267,7 @@ export default async function handler(req,res){
     x==='originals'||x==='weekly_queue')
   };
   stage='COGNITION_AND_RELIABILITY';
+  const governedCognitionStart=Date.now();
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;
@@ -354,6 +360,7 @@ export default async function handler(req,res){
   // Preserve EXACT checked bytes, including any harmless trailing spaces.
   // Trimming after final-direction verification would change the answer
   // without another source-linked verification receipt.
+  governedCognitionMs=Date.now()-governedCognitionStart;
   const answer=String(result?.intelligence?.answer||'');
   if(!answer.trim())fail('CHAT_MODEL_ANSWER_UNAVAILABLE',503);
   stage='FINAL_ANSWER_REVIEW';
@@ -474,15 +481,22 @@ export default async function handler(req,res){
      execution_authorized_by_chat:false,
      installation_authorized:false,production_changed:false
     }:null,
-   execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
+   response_timing:{total_ms:Date.now()-chatStartedAt,
+     optional_context_wait_ms:optionalContextWaitMs,
+     governed_cognition_ms:governedCognitionMs},
+    execution:{status:'NOT_EXECUTED',external_actions_authorized:false}});
  }catch(e){
   const status=Number(e.status)||503;
   const underlying=String(e?.message||'');
   // Never reflect arbitrary provider/database errors or user content.
   const code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
-  console.warn('REALITY_CHAT_STAGE_FAILURE',stage,code);
+  console.warn('REALITY_CHAT_STAGE_FAILURE',stage,code,
+   'elapsed_ms',Date.now()-chatStartedAt);
   return res.status(status).json({ok:false,error:code,
-   stage,request_saved_state:'CHECK_AUTHENTICATED_HISTORY',
+   stage,response_timing:{total_ms:Date.now()-chatStartedAt,
+    optional_context_wait_ms:optionalContextWaitMs,
+    governed_cognition_ms:governedCognitionMs},
+   request_saved_state:'CHECK_AUTHENTICATED_HISTORY',
    execution_authorized:false,installation_authorized:false});
  }
 }
