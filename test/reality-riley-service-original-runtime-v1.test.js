@@ -205,3 +205,78 @@ test('trusted original runtime refuses production or missing durable goal state'
   db,env:bad,loadSourceAdapters:()=>({})
  }),/PREVIEW_SERVICE_DATABASE_BOUNDARY_REQUIRED/);
 });
+
+
+test('genuine durable queue status is the only accepted same-job recovery handoff',async()=>{
+ for(const capability_response of [
+  null,'REPAIR_HANDOFF_NEEDS_RECONCILIATION','SOME_UNVERIFIED_GAP_STATUS',
+  {status:'GENUINE_CAPABILITY_GAP_DURABLY_QUEUED'},true
+ ]){
+  const {factory}=configured({runnerOutcome:{
+   original_work_id:WORK,execution_status:'UNRESOLVED',capability_response,
+   original_job_completed:false,new_job_created:false,production_changed:false
+  }});
+  const job=await factory.loadTrustedAuthorizedOriginal(args);
+  const output=await factory.runOriginal({...job,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()});
+  assert.equal(output.status,'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY');
+  assert.equal(output.owner_approval_required,false);
+  assert.equal(output.original_job_settled,false);
+ }
+});
+test('no capability-response string may override BLOCKED or VERIFIED execution',async()=>{
+ for(const [execution_status,expected] of [
+  ['BLOCKED','ORIGINAL_JOB_AUTHORIZATION_BLOCKED'],
+  ['VERIFIED','ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT'],
+ ]){
+  const {factory}=configured({runnerOutcome:{
+   original_work_id:WORK,execution_status,
+   capability_response:'GENUINE_CAPABILITY_GAP_DURABLY_QUEUED',
+   original_job_completed:false,new_job_created:false,production_changed:false
+  }});
+  const job=await factory.loadTrustedAuthorizedOriginal(args);
+  const output=await factory.runOriginal({...job,ownerId:OWNER,shiftId:SHIFT,
+   shiftReadback:readback(),ownerLedgerReadback:ledger()});
+  assert.equal(output.status,expected);
+  assert.equal(output.original_job_settled,false);
+ }
+});
+
+test('actual worker recovery lane requires a verified persisted shift pulse',async()=>{
+ const {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick,
+  CORRECTIVE_PROOF_WAKE_DIVISOR}=await import(
+   '../src/reality-bounded-corrective-proof-tick-v1.js');
+ const pulse={status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',
+  shift_id:SHIFT,wake_count:CORRECTIVE_PROOF_WAKE_DIVISOR,
+  installation_authorized:false,production_changed:false};
+ assert.equal(isBoundedCorrectiveProofWake(pulse),true);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,wake_count:7}),false);
+ assert.equal(isBoundedCorrectiveProofWake({...pulse,installation_authorized:true}),false);
+ const pending=classifyCorrectiveProofTick({
+  status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
+  new_shift_started:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false
+ });
+ assert.equal(pending.worker_result,'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PENDING');
+ assert.equal(pending.proof_verified,false);
+ const unverified=classifyCorrectiveProofTick({
+  status:'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED',
+  new_shift_started:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false
+ });
+ assert.equal(unverified.worker_status,'WAKE_FAILED');
+});
+
+// The existing frozen owner-original proof must also exercise the CI broker.
+import './reality-corrective-pr-ci-reconciliation-v1.test.js';
+
+test('worker failure persistence reports only safe stage and never provider text',()=>{
+ const api=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',
+  import.meta.url),'utf8');
+ assert.match(api,/workerStage='SHIFT_WAKE_RECEIPT'/);
+ assert.match(api,/workerStage='GOVERNED_EXECUTION_TICK'/);
+ assert.match(api,/workerStage='CORRECTIVE_CI_RECEIPT_RECONCILIATION'/);
+ assert.match(api,/p_safe_result:'WORKER_'\+safeStage\+'_UNVERIFIED'/);
+ assert.match(api,/console\.warn\('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage\)/);
+ assert.doesNotMatch(api,/console\.warn\('REALITY_SHIFT_WORKER_FAILED_STAGE',error\)/);
+});
