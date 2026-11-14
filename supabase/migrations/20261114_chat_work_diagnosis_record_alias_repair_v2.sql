@@ -31,13 +31,13 @@ begin
    pg_catalog.convert_to(i.content,'UTF8')),'hex')
   or i.claim_expires_at<clock_timestamp()
  then raise exception 'CHAT_WORK_ORIGINAL_CLAIM_OR_SOURCE_UNVERIFIED';end if;
- select w.source_scope,w.plan_fingerprint into w
- from reality_internal.governed_employee_completion_warrants_v1 w
+ select warrant.source_scope,warrant.plan_fingerprint into w
+ from reality_internal.governed_employee_completion_warrants_v1 warrant
  join reality_internal.governed_employee_shifts_v1 sh
-  on sh.shift_id=w.shift_id and sh.owner_id=w.owner_id
-  and sh.plan_fingerprint=w.plan_fingerprint
- where w.shift_id=i.shift_id and w.owner_id=i.owner_id
-  and w.plan_fingerprint=i.plan_fingerprint and w.state='ACTIVE'
+  on sh.shift_id=warrant.shift_id and sh.owner_id=warrant.owner_id
+  and sh.plan_fingerprint=warrant.plan_fingerprint
+ where warrant.shift_id=i.shift_id and warrant.owner_id=i.owner_id
+  and warrant.plan_fingerprint=i.plan_fingerprint and warrant.state='ACTIVE'
   and sh.closed_at is null and sh.authorized_at is not null
   and sh.status in ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
   and sh.planned_end_at>clock_timestamp();
