@@ -72,6 +72,8 @@ import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
  from '../../src/reality-bounded-corrective-proof-tick-v1.js';
 import {isDurablyCompletedShiftWorkerPulse}
  from '../../src/reality-shift-worker-durable-completion-v1.js';
+import {continueSameOriginalRecoveryAfterVerifiedFailure}
+ from '../../src/reality-governed-auto-trigger-v1.0.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -165,6 +167,61 @@ export default async function handler(req,res){
     new_shift_started:false,installation_authorized:false,
     production_changed:false
    });
+  }
+  // Existing Governed Auto-Trigger: separately qualified independent
+  // failure can lease ONE new repair attempt on the SAME authorized original.
+  // The bounded model stage records only a proposed edit; subsequent frozen
+  // independent CI, exact install approval and final settlement remain gated.
+  let sameOriginalRecovery={
+   status:'NO_SAME_ORIGINAL_RECOVERY_ON_THIS_WORKER_WAKE',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false
+  };
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   workerStage='SAME_ORIGINAL_RECOVERY_ELIGIBILITY';
+   sameOriginalRecovery=
+    await continueSameOriginalRecoveryAfterVerifiedFailure({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'RECOVERY_PROVIDER_OR_EVIDENCE_UNVERIFIED_NO_REPLAY',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false
+    }));
+   if(['SAME_ORIGINAL_RECOVERY_PATCH_RECORDED',
+       'RECOVERY_PROVIDER_OR_EVIDENCE_UNVERIFIED_NO_REPLAY']
+       .includes(sameOriginalRecovery.status)){
+    workerStage='SAME_ORIGINAL_RECOVERY_DURABLE_RECEIPT';
+    const recoveryCompleted=
+     sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED';
+    const pulse=await shiftRpc(db,
+     'reality_record_employee_shift_worker_pulse_v1',{
+      p_shift_id:wakeReceipt.shift_id,
+      p_status:recoveryCompleted?'WAKE_COMPLETED':'WAKE_FAILED',
+      p_safe_result:recoveryCompleted?
+       'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
+       'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED'
+     });
+    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+       pulse.shift_id!==wakeReceipt.shift_id||
+       pulse.installation_authorized!==false||
+       pulse.production_changed!==false)
+     throw Error('SAME_ORIGINAL_RECOVERY_WORKER_PULSE_UNVERIFIED');
+    if(recoveryCompleted&&
+       isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+     durableWorkerCompletion=pulse;
+    workerStage='SAME_ORIGINAL_RECOVERY_RESPONSE_PUBLICATION';
+    return res.status(recoveryCompleted?200:503).json({
+     status:recoveryCompleted?
+      'GOVERNED_SAME_ORIGINAL_RECOVERY_PATCH_RECORDED':
+      'GOVERNED_SAME_ORIGINAL_RECOVERY_UNVERIFIED',
+     same_original_recovery_attempt:sameOriginalRecovery,
+     actual_worker_wake_receipt:wakeReceipt,
+     actual_worker_completion_receipt:pulse,
+     independent_tests_passed:false,original_job_completed:false,
+     new_shift_started:false,installation_authorized:false,
+     production_changed:false
+    });
+   }
   }
   // Continue normal/full shift work on the other durable wake receipts.
   try{
@@ -1010,6 +1067,7 @@ export default async function handler(req,res){
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     authenticated_chat_work_handoff:chatWorkHandoff,
+    same_original_recovery_attempt:sameOriginalRecovery,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
