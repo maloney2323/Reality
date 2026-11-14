@@ -129,7 +129,6 @@ export function createRileyServiceOriginalRuntime({
    loaded.work_item?.work_item_id!==ctx.original_work_id||
    loaded.work_item.connector!==null||
    loaded.work_item.consequential!==false||
-   typeof loaded.connector?.execute!=='function'||
    typeof loaded.independent_verifier?.verify!=='function')
    fail('CURRENT_CONTINUITY_ORIGINAL_PRECLAIM_MISMATCH');
   const observed=await loaded.independent_verifier.verify({
