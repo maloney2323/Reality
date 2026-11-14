@@ -66,6 +66,8 @@ import {reconcileCurrentShiftRejectedNativeModelCandidate}
  from '../../src/reality-riley-current-shift-failed-candidate-reconciliation-v1.js';
 import {investigateAuthenticatedChatUnderExistingShift}
  from '../../src/reality-signed-chat-to-work-v1.js';
+import {continueRileyCorrectiveModelIntoIndependentCI}
+ from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -138,6 +140,18 @@ export default async function handler(req,res){
    production_changed:false
   }));
 
+  // Independently continue the existing, model-written corrective patch into
+  // a protected isolated candidate branch and a real GitHub frozen CI run.
+  // This work is service-only, can be reconciled after uncertainty, and runs
+  // concurrently with already-authorized work, without a second Start.
+  const correctiveCiPromise=continueRileyCorrectiveModelIntoIndependentCI({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false
+  }));
+  
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
   // A missing API key leaves an explicit unavailable role advisory; source
@@ -840,6 +854,7 @@ export default async function handler(req,res){
     };
    }
   }
+  const correctiveCiResult=await correctiveCiPromise;
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -857,7 +872,13 @@ export default async function handler(req,res){
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
    const chatWorkHandoff=await chatWorkPromise;
-   const outcomeCode=chatWorkHandoff?.status==='AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT'?
+   const outcomeCode=correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
+    'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
+    correctiveCiResult?.status==='CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN'?
+    'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_FAILED_RECOVERY_REQUIRED':
+    correctiveCiResult?.status==='CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI'?
+    'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING':
+    chatWorkHandoff?.status==='AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT'?
     'SIGNED_CHAT_WORK_INVESTIGATION_RECORDED_SAME_SHIFT':
     shiftVerifiedAutoAdmission.original_job_admitted===true?
     'CURRENT_SHIFT_GOVERNED_ORIGINAL_AUTO_ADMITTED_AFTER_FROZEN_RED':
@@ -920,6 +941,7 @@ export default async function handler(req,res){
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     authenticated_chat_work_handoff:chatWorkHandoff,
+    riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
