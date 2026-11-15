@@ -215,7 +215,7 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     if(continuationBody?.status!=='completed'||!additional.trim()||
        !/^resp_[A-Za-z0-9_-]{4,120}$/.test(continuationBody.id||''))
       throw new Error('MODEL_RESPONSE_CONTINUATION_NOT_COMPLETED');
-    rawAnswer+=/\\s$/.test(rawAnswer)?additional:' '+additional;
+    rawAnswer+=/\s$/.test(rawAnswer)?additional:' '+additional;
     completedBody=continuationBody;
     continuedFromTruncation=true;
   }else if(body?.status!==undefined&&body.status!=='completed'){
