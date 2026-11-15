@@ -43,6 +43,24 @@ test('responsive shell masks old nav and keeps original workflows in their own d
  assert.match(html,/reality-home-command-v1\.js/);
  assert.match(html,/reality-chat-workspace-v1\.js/);
 });
+test('Chat mobile viewport overrides the later unified desktop three-column grid',()=>{
+ // The unified stylesheet loads AFTER Chat CSS. A lower-specificity @media
+ // rule in the original Chat CSS cannot override its desktop columns.
+ const mobile=css.lastIndexOf('@media(max-width:950px)');
+ assert.ok(mobile>=0,'matching-specificity narrow-layout rule is required');
+ const narrow=css.slice(mobile);
+ assert.match(narrow,/body\.reality-unified-ui\[data-reality-route="chat"\] \.reality-chat-workspace\s*\{/);
+ assert.match(narrow,/grid-template-columns:minmax\(0,1fr\)!important/);
+ assert.match(narrow,/\.reality-chat-conversation\s*\{\s*grid-column:1/);
+ assert.match(narrow,/#privateTranscript/);
+ assert.match(narrow,/\[data-reality-chat-panel="history"\]/);
+ assert.match(narrow,/\[data-reality-chat-panel="work"\]/);
+ const prior=css.slice(0,mobile);
+ assert.match(prior,/grid-template-columns:minmax\(160px,180px\) minmax\(0,1fr\) minmax\(235px,280px\)/);
+ assert.match(narrow,/@media\(max-width:600px\)/);
+ assert.match(html,/<meta name="viewport" content="width=device-width,initial-scale=1">/);
+});
+
 class Node {
  constructor(tag='div'){
   this.tagName=tag.toUpperCase();this.children=[];this.parentElement=null;
