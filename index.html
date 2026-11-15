@@ -7191,7 +7191,10 @@ setInterval(refreshSavedShiftHome,300000);
   }));
   await loadGoals();
  }
+ let sessionRequestInFlight=false;
  async function init(){
+  if(sessionRequestInFlight)return;
+  sessionRequestInFlight=true;
   // Never hide the account section when a preview auth check is slow,
   // blocked or unavailable. No sign-in form is enabled until session
   // endpoint availability has been confirmed.
@@ -7200,7 +7203,8 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateLogin').style.display='none';
   el('privateReady').style.display='none';
   try{
-   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin'});
+   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin',
+    signal:AbortSignal.timeout(16500)});
    if(!r.ok)throw Error(r.status===404?
     'Sign-in service is not installed on this preview (HTTP 404).':
     'Sign-in service returned HTTP '+r.status+'.');
@@ -7223,6 +7227,8 @@ setInterval(refreshSavedShiftHome,300000);
     ' The sign-in form stays disabled until the secure session can be checked. No job has started.';
    el('privateRetrySession').hidden=false;
    status('Sign-in unavailable. Check the message above or retry the connection.');
+  }finally{
+   sessionRequestInFlight=false;
   }
  }
  el('privateRetrySession').onclick=()=>{void init()};
@@ -7233,6 +7239,7 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateSignIn').disabled=true;status('Checking account…');
   try{
    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
+    signal:AbortSignal.timeout(18000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
    el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
