@@ -36,7 +36,10 @@ const nowIso=()=>new Date().toISOString();
 function choosePaths(paths,topicText){
  const topics=Object.entries(TOPICS).filter(([,rx])=>rx.test(topicText))
   .map(([name])=>name);
- const active=topics.length?topics:['governance','verification','capability','inspection'];
+ const active=topics.length?topics:['governance','verification','capability'];
+ // Any architectural self-question must also surface the existing
+ // self-inspection and owner audit implementation, not only topic matches.
+ if(!active.includes('inspection'))active.push('inspection');
  const labels={
   governance:['govern','authoriz','approv','constitution'],
   verification:['verif','receipt','test','settlement','acceptance'],
@@ -134,6 +137,7 @@ export async function readRealitySelfVisibilityForChat({
 }={}){
  if(!needsRealityCapabilityInspection(message,priorTurns)||
    env.VERCEL_ENV!=='preview'||!SHA.test(env.VERCEL_GIT_COMMIT_SHA||'')||
+   !UUID.test(session?.user_id||'')||
    !db?.strictSecrets||db.url!==session?.config?.url||
    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   return [];
