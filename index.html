@@ -7457,6 +7457,44 @@ setInterval(refreshSavedShiftHome,300000);
     'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
   }finally{el('privateSend').disabled=false}
  };
+ // The Send action is the only client-side owner source for a draft-build
+ // continuation. The status panel observes evidence and emits a read-only
+ // notification, never a provider POST. The server independently checks the
+ // persisted human turn, scoped original and current warrant before dispatch.
+ const autoBuildSubmitted=new Set();
+ window.addEventListener('reality:chat-engineering-ready',async event=>{
+  const d=event.detail||{};
+  if(el('privateReady').style.display!=='block'||
+     d.conversation_id!==conversationId()||
+     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(d.request_id||'')||
+     !/^work:[a-f0-9]{32}$/.test(d.original_work_id||''))return;
+  const key=d.conversation_id+'|'+d.request_id;
+  if(autoBuildSubmitted.has(key))return;
+  autoBuildSubmitted.add(key);
+  let result={status:'CHAT_WORK_ENGINEERING_EFFECT_UNVERIFIED',
+   execution_started:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false};
+  try{
+   const response=await fetch('/api/reality/personal-chat-work',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(45000),
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({action:'CONTINUE_VERIFIED_SCOPED_ENGINEERING',
+     conversation_id:d.conversation_id,request_id:d.request_id})
+   });
+   const body=await response.json().catch(()=>null);
+   if(response.ok&&body?.ok===true&&
+      body.request_id===d.request_id&&
+      body.original_work_id===d.original_work_id&&
+      body.installation_authorized===false&&
+      body.production_changed===false&&body.new_shift_started===false)
+    result=body;
+   else result.status=String(body?.error||'CHAT_WORK_ENGINEERING_SCOPE_OR_PROVIDER_UNVERIFIED');
+  }catch{/* An uncertain write is never automatically replayed. */}
+  window.dispatchEvent(new CustomEvent('reality:chat-engineering-result',{
+   detail:{conversation_id:d.conversation_id,request_id:d.request_id,result}
+  }));
+ });
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
  init();
 })();
