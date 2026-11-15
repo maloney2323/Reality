@@ -99,10 +99,10 @@ test('latest owner user readback uses one RLS row, not the full conversation',as
  const result=await readLatestPrivateChatUserTurn(session,conversationId,{
   fetchImpl:async(url,options)=>{
    calls++;
-   assert.match(url,/role=eq\\.user/);
+   assert.match(url,/role=eq\.user/);
    assert.match(url,/limit=1/);
-   assert.match(url,/conversation_id=eq\\./);
-   assert.match(url,/user_id=eq\\./);
+   assert.match(url,/conversation_id=eq\./);
+   assert.match(url,/user_id=eq\./);
    assert.doesNotMatch(url,/limit=24[01]/);
    assert.equal(options.method,'GET');
    return {ok:true,json:async()=>[row('user',id)]};
