@@ -107,7 +107,7 @@ test('economic dashboard precedes action button and lists technical/economic evi
 });
 test('verified owner readbacks show real technical receipts, never hypothetical labor or cash',async()=>{
  const f=fixture();await f.flush();
- assert.equal(f.calls.length,3);
+ assert.equal(f.calls.length,4);
  assert.ok(f.calls.every(c=>c.options.method==='GET'&&
   c.options.credentials==='same-origin'&&c.options.cache==='no-store'));
  assert.equal(f.elements.realityEconSignals.textContent,'3');
@@ -118,7 +118,7 @@ test('verified owner readbacks show real technical receipts, never hypothetical 
  assert.equal(f.elements.realityEconRisk.textContent,'Not established');
  assert.equal(f.elements.realityEconInputs.textContent,'0 job(s) · not verified savings');
  assert.equal(f.elements.realityEconReceipts.textContent,'1 independently reconciled');
- assert.match(f.elements.realityEconomicStatus.textContent,/3\/3 evidence sources validated/);
+ assert.match(f.elements.realityEconomicStatus.textContent,/3\/4 evidence sources validated/);
  const card=f.elements.realityEconWorkHistory.children[0];
  assert.equal(card.children[2].href,
   '/api/reality/personal-genuine-final-receipt-pdf?work_id='+encodeURIComponent(W));
@@ -132,7 +132,7 @@ test('missing provider result never becomes zero, partial readback keeps verifie
  assert.equal(f.elements.realityEconSignals.textContent,'—');
  assert.equal(f.elements.realityEconSettled.textContent,'1');
  assert.equal(f.elements.realityEconReceipts.textContent,'Unverified');
- assert.match(f.elements.realityEconomicStatus.textContent,/1\/3 evidence sources validated/);
+ assert.match(f.elements.realityEconomicStatus.textContent,/1\/4 evidence sources validated/);
 });
 test('untrusted ROI cannot certify settlement, cash savings or labor hours',async()=>{
  const bad=roi();
@@ -142,7 +142,7 @@ test('untrusted ROI cannot certify settlement, cash savings or labor hours',asyn
  assert.equal(f.elements.realityEconSettled.textContent,'—');
  assert.equal(f.elements.realityEconCash.textContent,'Not established');
  assert.equal(f.elements.realityEconCapacity.textContent,'Not measured');
- assert.match(f.elements.realityEconomicStatus.textContent,/2\/3/);
+ assert.match(f.elements.realityEconomicStatus.textContent,/2\/4/);
 });
 test('technical settlement without a matching full-loop proof does not claim a receipt',async()=>{
  const other=loop();
@@ -160,14 +160,14 @@ test('private data clears on sign-out, no queries when anonymous, owner reconnec
  assert.equal(f.elements.realityEconSettled.textContent,'—');
  await f.signIn();
  assert.equal(f.elements.realityEconSettled.textContent,'1');
- assert.equal(f.calls.length,3);
+ assert.equal(f.calls.length,4);
  await f.signOut();
  assert.equal(f.elements.realityEconSettled.textContent,'—');
  assert.equal(f.elements.realityEconReceipts.textContent,'Unverified');
  assert.equal(f.elements.realityEconWorkHistory.children.length,1);
  assert.match(f.elements.realityEconomicStatus.textContent,/Sign in/);
  f.intervals[0].fn();await f.flush();
- assert.equal(f.calls.length,3,'signed out polling must not fetch owner data');
+ assert.equal(f.calls.length,4,'signed out polling must not fetch owner data');
 });
 test('fake discovery verification claims are rejected and no claimed savings appear',async()=>{
  const d=work();d.counts.verified_current_defects=12;
