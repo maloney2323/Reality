@@ -100,17 +100,19 @@ export async function acceptDurableChatTurn(
    }
   }
  }
- // The PostgREST insert returns one genuine stored row. Verify that exact
- // request independently, not a second 240-message conversation fetch.
+ // Supabase INSERT .. Prefer:return=representation returns a committed
+ // RLS-authorized row and its database ID. That is a genuine save receipt.
+ // A SECOND PostgREST read is not a precondition for answering: it was
+ // causing false "delivery not verified" states after successful inserts
+ // when unrelated database verification was slow. The exact authenticated
+ // GET remains available asynchronously for a separate readback.
  const written=await record(session,{
   conversationId,requestId,role:'user',text:message});
- const exact=await readExact(session,{conversationId,requestId});
- const saved=exact?.messages?.find(x=>x.role==='user'&&
-  x.request_id===requestId&&x.text===message&&
-  x.source_ref===written.source_ref);
- if(!saved)fail('CHAT_USER_SAVE_READBACK_UNVERIFIED',503);
+ if(!/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(
+  written?.source_ref||''))fail('CHAT_USER_INSERT_RECEIPT_UNVERIFIED',503);
  return {ok:true,saved:true,replayed:false,duplicate_content:false,
+  save_receipt_kind:'AUTHENTICATED_POSTGREST_INSERT_ROW',
   conversation_id:conversationId,request_id:requestId,
-  source_ref:saved.source_ref,reply_verified:false,
+  source_ref:written.source_ref,reply_verified:false,
   execution_authorized:false,installation_authorized:false};
 }
