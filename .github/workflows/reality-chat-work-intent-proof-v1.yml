@@ -9,6 +9,8 @@ on:
       - 'test/reality-saved-chat-work-adapter-v1.test.js'
       - 'test/reality-chat-scoped-engineering-continuation-v1.test.js'
       - 'test/reality-chat-new-development-v1.test.js'
+      - 'test/reality-chat-direct-work-handoff-v1.test.js'
+      - 'reality-chat-direct-work-handoff-v1.js'
       - 'src/reality-chat-new-development-adapter-v1.js'
       - 'src/reality-chat-new-development-worker-v1.js'
       - 'src/reality-chat-new-development-publisher-v1.js'
@@ -52,6 +54,7 @@ jobs:
           node --test test/reality-saved-chat-work-adapter-v1.test.js
           node --test test/reality-chat-scoped-engineering-continuation-v1.test.js
           node --test test/reality-chat-new-development-v1.test.js
+          node --test test/reality-chat-direct-work-handoff-v1.test.js
           node --test test/reality-owner-original-work-chat-readback-v1.test.js
           node --test test/reality-personal-chat-durable-intake-v1.test.js
           node --test test/reality-chat-optional-evidence-v1.test.js
@@ -63,6 +66,7 @@ jobs:
           node --check api/reality/personal-chat-work.js
           node --check src/reality-saved-chat-work-adapter-v1.js
           node --check reality-chat-request-status-v1.js
+          node --check reality-chat-direct-work-handoff-v1.js
           node --check src/reality-chat-new-development-adapter-v1.js
           node --check src/reality-chat-new-development-worker-v1.js
           node --check src/reality-chat-new-development-publisher-v1.js
