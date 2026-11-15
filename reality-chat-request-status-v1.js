@@ -164,14 +164,22 @@
       !Array.isArray(work.work_chain)||work.work_chain.length>25)return;
    state.work=work;
    render();
-   if(state.explicitBuild && !state.buildPosted && !state.buildReading &&
+   if(state.explicitBuild && !state.buildPosted &&
       work.status==='INVESTIGATED_SCOPED' &&
       Array.isArray(work.work_chain) &&
       work.work_chain.length===1 &&
       ['CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
        'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING']
-       .includes(work.work_chain[0]?.current_evidence_stage))
-    void continueVerifiedBuild(state);
+       .includes(work.work_chain[0]?.current_evidence_stage)){
+    // Read-only status surfaces an independently verified candidate.
+    // Only the actual user Send handler may dispatch the governed action.
+    state.buildPosted=true;
+    window.dispatchEvent(new CustomEvent('reality:chat-engineering-ready',{
+     detail:{conversation_id:state.conversationId,
+      request_id:state.requestId,
+      original_work_id:work.work_chain[0].original_work_id}
+    }));
+   }
    if(work.status==='CONVERSATION_ONLY'||
       work.status==='NEEDS_AUTHORIZED_SCOPE'||
       work.work_chain?.some(x=>x.current_evidence_stage===
@@ -180,42 +188,6 @@
    }
   }catch{/* An unavailable readback is not proof of a failed job. */}
   finally{state.workReading=false}
- }
- async function continueVerifiedBuild(state){
-  if(current!==state||state.buildPosted||state.buildReading)return;
-  state.buildReading=true;
-  try{
-   const response=await fetch('/api/reality/personal-chat-work',{
-    method:'POST',credentials:'same-origin',cache:'no-store',
-    signal:AbortSignal.timeout(45000),
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({action:'CONTINUE_VERIFIED_SCOPED_ENGINEERING',
-     conversation_id:state.conversationId,request_id:state.requestId})
-   });
-   const data=await response.json().catch(()=>null);
-   if(current!==state)return;
-   if(response.ok&&data?.ok===true &&
-      data.request_id===state.requestId &&
-      data.original_work_id===state.work?.work_chain?.[0]?.original_work_id &&
-      data.installation_authorized===false &&
-      data.production_changed===false &&
-      data.new_shift_started===false){
-    state.buildResult=data;
-    state.buildPosted=true;
-   }else{
-    state.buildResult={status:String(data?.error||'CHAT_WORK_ENGINEERING_NOT_VERIFIED'),
-     execution_started:false};
-    // Don't automatically replay a provider write after an uncertain error.
-    state.buildPosted=true;
-   }
-   render();
-  }catch{
-   if(current!==state)return;
-   state.buildResult={status:'CHAT_WORK_ENGINEERING_EFFECT_UNVERIFIED',
-    execution_started:false};
-   state.buildPosted=true;
-   render();
-  }finally{state.buildReading=false}
  }
  async function readback(){
   const state=current;
@@ -282,6 +254,16 @@
   block.hidden=false;
   render();
  }).observe(transcript,{childList:true});
+ window.addEventListener('reality:chat-engineering-result',event=>{
+  const state=current,detail=event.detail||{};
+  if(!state||!state.buildPosted||
+     detail.conversation_id!==state.conversationId||
+     detail.request_id!==state.requestId)return;
+  state.buildResult=detail.result&&typeof detail.result==='object'?
+    detail.result:{status:'CHAT_WORK_ENGINEERING_EFFECT_UNVERIFIED',
+     execution_started:false};
+  render();
+ });
  window.addEventListener('reality:chat-request-started',start);
  window.addEventListener('reality:chat-request-failed',event=>{
   const state=current;
