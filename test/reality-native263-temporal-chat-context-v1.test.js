@@ -206,9 +206,10 @@ test('Send places owner text into transcript immediately and preserves typed wor
  assert.match(index,/realitySavedUnansweredTurns/);
  assert.match(index,/el\('privatePrompt'\)\.value=value/);
  assert.match(status,/transcript\.append\(block\)/);
- assert.match(status,/details\.open=true/);
- assert.match(status,/Authenticated message save/);
- assert.match(status,/Final reply saved and verified/);
+ assert.match(status,/state.answer&&!actualWork/);
+ assert.match(status,/Reality is replying/);
+ assert.match(status,/legitimateDevelopment/);
+ assert.doesNotMatch(status,/Show verified response stages/);
  assert.match(status,/reality:chat-request-failed/);
  assert.doesNotMatch(status,/parent\.insertAdjacentElement\('afterend',block\)/);
  assert.match(css,/#privateTranscript #realityChatRequestStatus/);
