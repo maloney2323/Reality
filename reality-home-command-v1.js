@@ -242,6 +242,9 @@
  const sourceOK=()=>/^(Checked connected provider sources|Partial source coverage)/.test(sourceStatus?.textContent||'');
  const intText=s=>/^(0|[1-9][0-9]*)$/.test(s||'')?s:null;
  function paint(){
+  // Never retain a previous signed-in owner's planning details across
+  // logout/account switch, even if a browser keeps this tab mounted.
+  if(!signed())weeklyInsight=null;
   const ok=econOK(),found=ok?intText(signals?.textContent?.trim()):null;
   showWeekly();
   metrics.found.value.textContent=found??'—';
