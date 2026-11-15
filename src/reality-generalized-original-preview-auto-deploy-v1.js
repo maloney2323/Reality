@@ -56,7 +56,16 @@ export async function verifyGeneralizedOriginalPreviewAutoDeploy({
    public_status_actor_login:login.length>=1&&login.length<=64&&
     [...login].every(c=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]-'.includes(c))?
     login:null,
-   public_status_actor_type:['Bot','User','Organization'].includes(type)?type:null
+   public_status_actor_type:['Bot','User','Organization'].includes(type)?type:null,
+   public_check_surface:['PRESENT','EMPTY','UNAVAILABLE'].includes(j.public_check_surface)?
+    j.public_check_surface:'UNAVAILABLE',
+   public_vercel_app_check_candidates:Array.isArray(j.public_vercel_app_check_candidates)?
+    j.public_vercel_app_check_candidates.filter(z=>
+      z&&typeof z==='object'&&
+      (z.app_slug===null||/^[a-z0-9-]{1,60}$/.test(z.app_slug))&&
+      (z.check_name===null||/^[a-zA-Z0-9 _:/.-]{1,100}$/.test(z.check_name))&&
+      typeof z.head_match==='boolean'
+    ).slice(0,5):[]
   });
  }
  if(['NO_CURRENT_ORIGINAL_DEPLOYMENT_RECEIPT_NEEDED',
