@@ -109,7 +109,12 @@ export async function stageGeneralizedVerifiedOriginalInstallReview({
   const possible=prs.filter(p=>p?.state==='open'&&p.draft===true&&
    p.base?.ref===branch&&p.base?.repo?.full_name==='maloney2323/Reality'&&
    p.head?.repo?.full_name==='maloney2323/Reality'&&
-   SHA.test(p.head?.sha||'')&&Number.isSafeInteger(p.number)&&p.number>0
+   SHA.test(p.head?.sha||'')&&
+   // The frozen candidate PR is NOT a separately integrated source test.
+   // Both contain identical source bytes, but only an independently
+   // tested distinct commit qualifies as the integration witness.
+   p.head.sha!==candidate.candidate_commit_sha&&
+   Number.isSafeInteger(p.number)&&p.number>0
   ).slice(0,20);
   let matches=[];
   for(const p of possible){
