@@ -73,7 +73,7 @@ test('intermittent provider 503 preserves verified session and retries only safe
  assert.match(html,/if\(previouslySignedIn!==yes\)el\('privateReady'\)\.style\.display=/);
  assert.match(html,/if\(previouslyVerified\)\{/);
  assert.match(html,/scheduleSessionRetry\(\)/);
- assert.match(html,/sessionRetryDelayMs===0\?12000/);
+ assert.match(html,/sessionRetryDelayMs=sessionRetryDelayMs\?Math\.min\(60000,sessionRetryDelayMs\*2\):12000/);
  assert.match(html,/Math\.min\(60000,sessionRetryDelayMs\*2\)/);
  assert.match(html,/if\(document\.visibilityState!=='hidden'\)void init\(\)/);
  assert.match(html,/Only re-issue a GET session check\. NEVER replay a work\/approval write/);
