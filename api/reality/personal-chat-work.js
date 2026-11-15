@@ -5,7 +5,7 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {readPrivateChat,validUuid}
  from '../../src/reality-private-chat-store-v0.1.js';
-import {inspectSavedChatWork,authorizeSavedChatExistingOriginal,continueVerifiedChatEngineering,authorizeSavedChatNewDevelopment}
+import {inspectSavedChatWork,authorizeSavedChatExistingOriginal,continueVerifiedChatEngineering,authorizeSavedChatNewDevelopment,processSignedSavedChatWork}
  from '../../src/reality-saved-chat-work-adapter-v1.js';
 export const maxDuration=60;
 export default async function handler(req,res){
@@ -30,18 +30,31 @@ export default async function handler(req,res){
   if(!validUuid(conversationId)||!validUuid(requestId))
    return res.status(400).json({ok:false,error:'CHAT_WORK_EXACT_SOURCE_INVALID'});
   if(!['INSPECT_VERIFIED_WORK','AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY',
-      'CONTINUE_VERIFIED_SCOPED_ENGINEERING','ADMIT_SIGNED_NEW_DEVELOPMENT'].includes(action))
+      'CONTINUE_VERIFIED_SCOPED_ENGINEERING','ADMIT_SIGNED_NEW_DEVELOPMENT',
+      'PROCESS_SIGNED_WORK_REQUEST'].includes(action))
    return res.status(400).json({ok:false,error:'CHAT_WORK_ACTION_UNSUPPORTED'});
   const {messages}=await readPrivateChat(session,conversationId);
   const args={session,conversationId,requestId,messages};
-  const result=action==='INSPECT_VERIFIED_WORK'?
+  const result=action==='PROCESS_SIGNED_WORK_REQUEST'?
+   await processSignedSavedChatWork(args):
+   action==='INSPECT_VERIFIED_WORK'?
    await inspectSavedChatWork(args):
    action==='AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY'?
    await authorizeSavedChatExistingOriginal(args):
    action==='CONTINUE_VERIFIED_SCOPED_ENGINEERING'?
    await continueVerifiedChatEngineering(args):
    await authorizeSavedChatNewDevelopment(args);
-  return res.status(action==='INSPECT_VERIFIED_WORK'?200:202).json({ok:true,...result});
+  // A non-actionable signed message remains an inspected conversation, not
+  // a claimed build or a job authorization.
+  const transition=action==='PROCESS_SIGNED_WORK_REQUEST'&&
+   ['CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_READBACK_PENDING',
+    'CHAT_WORK_ENGINEERING_CI_DISPATCH_VERIFIED',
+    'CHAT_WORK_ORIGINAL_DISCOVERY_DISPATCHED',
+    'CHAT_WORK_ORIGINAL_DISCOVERY_QUEUED_BLOCKED'].includes(result.status);
+  return res.status(action==='INSPECT_VERIFIED_WORK'||(
+   action==='PROCESS_SIGNED_WORK_REQUEST'&&!transition)?200:202)
+   .json({ok:true,...result});
  }catch(error){
   const code=String(error?.message||'CHAT_WORK_UNAVAILABLE');
   const safe=/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_UNAVAILABLE';
