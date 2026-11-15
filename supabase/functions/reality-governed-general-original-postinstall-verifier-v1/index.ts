@@ -81,7 +81,7 @@ async function verifyRun(token,id,shaCommit,branch,kind){
  const required=kind==='original'?
   ['Verify isolated preview commit and source tree identity',
    'Independently accept original-job runtime and governed handoff',
-   'Independently rerun all frozen original-job regressions',
+   'Independently verify same-original frozen-CI and recovery safeguards',
    'Confirm no upgrade installation or customer settlement from CI']:
   ['Verify Reality model boundary and original tool-continuation regressions'];
  const nameOfJob=kind==='original'?'independent-original-acceptance':'boundary-tests';
