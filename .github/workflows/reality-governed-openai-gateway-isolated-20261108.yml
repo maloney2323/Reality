@@ -78,6 +78,7 @@ on:
       - supabase/functions/reality-governed-original-preview-auto-deploy-verifier-v1/index.ts
       - supabase/migrations/20261114_generalized_original_preview_deployment_receipt_v1.sql
       - supabase/migrations/20261114_generalized_vercel_actor_evidence_label_v2.sql
+      - supabase/migrations/20261115_generalized_vercel_app_correlated_deploy_receipt_v2.sql
       - src/reality-generalized-original-source-write-canary-v1.js
       - supabase/functions/reality-governed-original-source-write-canary-v1/index.ts
       - supabase/migrations/20261114_governed_generalized_source_write_canary_v1.sql
