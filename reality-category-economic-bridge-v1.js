@@ -4,6 +4,8 @@
 // independent jobs because the same underlying repair can appear twice.
 (()=>{
 'use strict';
+// Do not fetch hidden pages' private evidence: their readers are re-mounted on the owning route.
+if(!["/value","/work"].includes(window.location.pathname))return;
 const $=id=>document.getElementById(id);
 const root=$('realityCategoryEconomics'),auth=$('privateReady');
 const status=$('realityCategoryEconomicsStatus'),grid=$('realityCategoryList');
