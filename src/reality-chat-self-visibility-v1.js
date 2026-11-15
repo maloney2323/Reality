@@ -22,7 +22,7 @@ const TOPICS=Object.freeze({
  inspection:/\b(self.inspec|self.audit|self.aware|introspec|architect|repo|source|system|see everything|see itself)\w*/i,
 });
 const relevant=text=>/\b(reality|itself|own|existing|already|your|system|capability|engine|authorization|verification|governance|drift|roi|inspection|architecture|source|code|self)\b/i.test(text||'')&&
- /\b(capabilit|authorization|verification|govern|existing|already|architect|inspect|engine|system|source|code|roi|drift|self|ability|abilities|upgrade|what can|what do you have)\b/i.test(text||'');
+ /\b(capabilit|authorization|verification|govern|existing|already|architect|inspect|engine|system|source|code|roi|drift|self|ability|abilities|upgrade|improve|what can|what do you have)\b|see everything|see itself|what it can do/i.test(text||'');
 export function needsRealityCapabilityInspection(message,priorTurns=[]){
  if(typeof message!=='string'||!message.trim())return false;
  if(relevant(message))return true;
