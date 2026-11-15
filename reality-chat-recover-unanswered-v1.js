@@ -30,30 +30,48 @@ export function selectSavedReplyForRecovery({
 if(typeof window!=='undefined'&&typeof document!=='undefined'&&
    window.location?.pathname==='/chat'){
  const attempted=new Set();
- window.addEventListener('reality:saved-chat-readback',event=>{
-  const detail=event.detail||{};
+ let lastReadback=null;
+ const sendButton=document.getElementById('privateSend');
+ function recoverSavedReplyIfReady(){
+  const detail=lastReadback||{};
   const selected=selectSavedReplyForRecovery({
    conversationId:detail.conversation_id,
    messages:detail.messages,unansweredRequests:detail.unanswered_requests
   });
-  if(!selected||document.hidden||document.getElementById('privateSend')?.disabled)
-   return;
+  if(!selected||document.hidden)return;
+  // History often arrives BEFORE the failed Send handler's finally block.
+  // Defer, don't discard the recovery when the Send button is still disabled.
+  if(sendButton?.disabled)return;
   const key='reality.chat.saved-reply-recovery.v1:'+
    selected.conversation_id+':'+selected.request_id;
   if(attempted.has(key))return;
-  try{
-   const prior=Number(window.localStorage?.getItem(key)||0);
-   if(Number.isFinite(prior)&&Date.now()-prior<60*60*1000)return;
-   window.localStorage?.setItem(key,String(Date.now()));
-  }catch{return}// No safe cross-tab lease; keep manual recovery available.
-  attempted.add(key);
   const selector='.reality-chat-unanswered-notice button[data-recover-request-id="'+
    selected.request_id+'"]';
   const control=document.querySelector(selector);
   if(!control||control.disabled||!control.isConnected)return;
-  // The existing recovery button performs the same authenticated POST,
-  // checks final durability and reports exact safe stage errors.
+  try{
+   const prior=Number(window.localStorage?.getItem(key)||0);
+   if(Number.isFinite(prior)&&Date.now()-prior<60*60*1000)return;
+   window.localStorage?.setItem(key,String(Date.now()));
+  }catch{return}// No safe cross-tab lease; manual recovery stays available.
+  attempted.add(key);
+  // This invokes the existing exact saved-request POST, never Chat intake.
+  // An independently verified assistant row is still required for success.
   control.textContent='Recovering saved reply automatically…';
   control.click();
+ }
+ window.addEventListener('reality:saved-chat-readback',event=>{
+  lastReadback=event.detail||null;
+  recoverSavedReplyIfReady();
  });
+ // The disabled button is a temporary state, not a loss of the saved turn.
+ // When Send releases, resume the ONE pending exact-ID recovery automatically.
+ if(sendButton&&typeof MutationObserver!=='undefined'){
+  new MutationObserver(()=>recoverSavedReplyIfReady())
+   .observe(sendButton,{attributes:true,attributeFilter:['disabled']});
+ }
+ if(typeof document.addEventListener==='function')
+  document.addEventListener('visibilitychange',()=>{
+   if(!document.hidden)recoverSavedReplyIfReady();
+  });
 }
