@@ -86,13 +86,15 @@
  const weeklyStatus=el('p','rc-weekly-status',
   'Checking the existing owner-scoped Monday–Friday plan…');
  const weeklyTotals=el('div','rc-weekly-totals');
+ const nasaBox=el('section','rc-nasa-reference');
+ nasaBox.hidden=true;
  const weeklyRows=el('div','rc-weekly-rows');
  const weeklyFoot=el('details','rc-weekly-method');
  weeklyFoot.append(el('summary','','How workload hours are calculated'),
   el('p','rc-weekly-foot',
    'These bars use source-backed provisional review timeboxes and a hypothetical 40-hour comparison per source-bearing role. They are not approved schedules, completed automation, missing customer jobs, or verified financial savings.'));
  const discuss=a('Ask Reality to assess this workweek gap','/chat#weekly-workload','rc-text-link rc-weekly-chat');
- weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,weeklyRows,weeklyFoot,discuss);
+ weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,nasaBox,weeklyRows,weeklyFoot,discuss);
  const directory=el('details','rc-role-directory');
  directory.append(el('summary','','Explore all employee profiles, responsibilities & source jobs'),team);
  people.append(capacity,weekly,directory);
@@ -158,6 +160,7 @@
  function showWeekly(){
   weeklyTotals.replaceChildren();
   weeklyRows.replaceChildren();
+  nasaBox.replaceChildren();nasaBox.hidden=true;
   const info=weeklyInsight;
   if(!signed()||info?.version!=='reality-weekly-workload-insight-v1'||
    info.status!=='PROVISIONAL_REVIEW_COVERAGE_GAP_NOT_VERIFIED_EMPLOYEE_SCHEDULE'||
@@ -184,6 +187,45 @@
   weeklyStatus.textContent='Week of '+info.week_start+' through '+info.week_end+
    ' · '+info.source_work_role_count+' roles with source-backed proposed work · '+
    info.roles_without_source_work_count+' other roles not counted as missing work.';
+  const nasa=info.nasa_bls_repair_comparator;
+  const hasNasa=nasa?.evidence_status===
+    'PUBLISHED_HUMAN_REPAIR_COMPARATOR_NOT_A_REALITY_JOB_ESTIMATE'&&
+   nasa.source_scope==='SINGLE_NASA_MISSION_SOFTWARE_FAULT_REPAIR_ONLY'&&
+   nasa.investigation_median_hours===2&&nasa.implementation_median_hours===3&&
+   nasa.sum_of_separate_medians_hours===5&&
+   nasa.sum_of_medians_not_median_total===true&&
+   nasa.bls_national_median_hourly_wage_usd===65.38&&
+   nasa.bls_observation_period==='2025-05'&&
+   nasa.illustrative_gross_wage_equivalent_usd_per_confirmed_comparable_repair===326.9&&
+   nasa.nasa_study_url==='https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf'&&
+   nasa.bls_wage_source_url==='https://www.bls.gov/news.release/ocwage.t01.htm'&&
+   Number.isSafeInteger(nasa.source_review_candidates_needing_fault_validation)&&
+   nasa.source_review_candidates_needing_fault_validation>0&&
+   nasa.source_review_candidates_needing_fault_validation<=info.source_finding_count&&
+   info.roles.reduce((n,role)=>n+(role.nasa_fault_candidates_needing_validation||0),0)===
+    nasa.source_review_candidates_needing_fault_validation&&
+   nasa.verified_comparable_repairs_from_this_plan===0&&
+   nasa.counted_as_weekly_proposed_review_hours===false&&
+   nasa.forecast_human_effort_hours===null&&
+   nasa.measured_human_hours_saved===null&&
+   nasa.verified_cash_savings_usd===null&&
+   nasa.source_benchmark_does_not_authorize_execution===true;
+  if(hasNasa){
+   nasaBox.hidden=false;
+   nasaBox.append(
+    el('strong','rc-nasa-heading','Published human repair benchmark · NASA + BLS'),
+    el('p','rc-nasa-metrics',
+     '2 h median fault investigation + 3 h median fix implementation · '+
+     '$65.38/h BLS national developer median wage (May 2025).'),
+    el('p','rc-nasa-foot',
+     nasa.source_review_candidates_needing_fault_validation+' source issue(s) may warrant software-fault validation. '+
+     'For one independently confirmed comparable repair, the sum of the two NASA-study medians is '+
+     '5 h, or $326.90 gross wage equivalent. This is NOT scheduled AI work, a per-issue duration forecast, '+
+     'verified hours saved, or realized ROI.'),
+    a('NASA-hosted 2017 study',nasa.nasa_study_url,'rc-nasa-link'),
+    a('BLS occupational wage source',nasa.bls_wage_source_url,'rc-nasa-link'),
+    a('Evaluation & evidence','/value#potential','rc-nasa-link'));
+  }
   const allocated=el('div','rc-weekly-total');
   allocated.append(el('span','','Proposed review · source-bearing roles'),
    el('strong','',info.source_work_comparison_available?
@@ -254,7 +296,13 @@
     }
     detail.append(dayRow);
    }
-   article.append(top,track,remaining,detail);
+   article.append(top,track,remaining);
+   if(hasNasa&&Number.isSafeInteger(role.nasa_fault_candidates_needing_validation)&&
+    role.nasa_fault_candidates_needing_validation>0)
+    article.append(el('p','rc-weekly-nasa-note',
+     role.nasa_fault_candidates_needing_validation+
+     ' source issue(s) flagged for NASA software-fault comparison if independently validated.'));
+   article.append(detail);
    if(featured.includes(role))weeklyRows.append(article);
    else additionalRows.append(article);
   }
