@@ -154,6 +154,11 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
   provisional_review_timebox_hours:2,
   hypothetical_weekly_reference_hours:80,
   unallocated_hypothetical_reference_hours:78,
+  source_work_role_count:1,roles_without_source_work_count:1,
+  source_work_roles_provisional_hours:2,
+  source_work_roles_hypothetical_reference_hours:40,
+  source_work_roles_unallocated_reference_hours:38,
+  source_work_comparison_available:true,
   read_only:true,execution_authorized:false,
   installation_authorized:false,production_changed:false,
   comparison_is_not_actual_schedule:true,
@@ -162,12 +167,12 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
    {employee_name:'Role Alpha',role_title:'Source reviewer',
     proposed_review_timebox_hours:2,hypothetical_weekly_comparison_hours:40,
     unallocated_hypothetical_reference_hours:38,
-    comparison_coverage_percent:5,source_finding_count:1,
+    comparison_coverage_percent:5,source_finding_count:1,deferred_source_count:0,
     week_days:first},
    {employee_name:'Role Beta',role_title:'Verifier',
     proposed_review_timebox_hours:0,hypothetical_weekly_comparison_hours:40,
     unallocated_hypothetical_reference_hours:40,
-    comparison_coverage_percent:0,source_finding_count:0,
+    comparison_coverage_percent:0,source_finding_count:0,deferred_source_count:0,
     week_days:days()}
   ]
  };
@@ -182,9 +187,9 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
  }
  assert.ok(textOf('rc-weekly-amount').includes('2 / 40 h'));
  assert.ok(textOf('rc-weekly-remaining').includes(
-  '38 h unallocated in hypothetical comparison · 1 sources for review'));
+  '38 h unallocated in hypothetical comparison · 1 source for review'));
  assert.ok(textOf('rc-weekly-remaining').includes(
-  '40 h unallocated in hypothetical comparison · 0 sources for review'));
+  'No source-backed review work assigned to this role. No missing business work inferred.'));
  const statuses=textOf('rc-weekly-status');
  assert.match(statuses[0],/Week of 2026-11-16 through 2026-11-20/);
  f.ids.privateReady.style.display='none';
