@@ -7294,10 +7294,19 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     signal:AbortSignal.timeout(18000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
-   el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
+   el('privatePassword').value='';resetSessionRetry();showSignedIn(true);
+   // Credentials were verified by the server; don't block the login control
+   // behind unrelated endpoints and don't fetch a hidden page's Chat archive.
+   if(realityCurrentRoute()==='chat'){
+    void loadSaved().then(()=>loadConversations()).catch(()=>{
+     status('Signed in. Saved conversations are temporarily unavailable; retry readback without resending messages.');
+    });
+   }
+   if(['work','shifts'].includes(realityCurrentRoute())){
     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
-   void wcLoadCompletionReports();
-   if(!confirmedActiveGoal)jumpToWorkSetup('goal');
+    void wcLoadCompletionReports();
+   }
+   if(realityCurrentRoute()==='chat'&&!confirmedActiveGoal)jumpToWorkSetup('goal');
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
