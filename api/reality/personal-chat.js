@@ -7,6 +7,8 @@ import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
 import {readRealitySelfVisibilityForChat,reconcileOwnerOriginalStatesForChat}
  from '../../src/reality-chat-self-visibility-v1.js';
+import {projectOwnerRealityUniverseForChat}
+ from '../../src/reality-chat-universe-cognitive-projection-v1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
@@ -378,6 +380,30 @@ export default async function handler(req,res){
    unavailable:optionalContext.unavailable.filter(x=>
     x==='originals'||x==='weekly_queue')
   };
+  // ONE authenticated Universe observation window supplies Reality and
+  // its underlying model in both response modes. Not a second ledger.
+  const ownerCurrentUniverseObservations=[
+   buildRealityProposedEmployeeRoleDiscussionContext(),
+   ...native263TemporalObservations,...ownerCompletedWorkObservations,
+   ...marketStageObservations,...verifiedUpgradeObservations,
+   ...employeeShiftObservations,...workerWakeObservations,
+   ...companyWorkforceObservations,...rileySourceWorkObservations,
+   ...selfVisibilityObservations,...originalWorkObservation(ownerOriginalWork),
+   ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
+  ];
+  const makeOwnerUniverseReadModel=(priorHistory=null)=>{
+   const spine=createContinuitySpine({
+    continuityRootId:scopedRoot,worldlineId:scopedRoot,
+    subjectId:session.user_id
+   });
+   return projectOwnerRealityUniverseForChat({
+    rootId:spine.continuity_root_id,
+    worldlineId:spine.worldline_id,
+    worldId:scopedRoot,continuityHistory:priorHistory,
+    currentObservations:ownerCurrentUniverseObservations,
+    reconciledOriginals
+   });
+  };
   // Ordinary Chat needs no job settlement or installation proof to ANSWER.
   // It still uses the existing Signal Cleaner, grounded cognitive gateway,
   // owner-scoped history and atomic goal-revision compare-and-swap.
@@ -411,6 +437,8 @@ export default async function handler(req,res){
    if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
       (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId)))
     fail('CHAT_READ_ONLY_OWNER_GOAL_SNAPSHOT_UNVERIFIED',503);
+   stage='READ_ONLY_UNIVERSE_COGNITIVE_PROJECTION';
+   const ownerUniverse=makeOwnerUniverseReadModel(priorGoals);
    stage='READ_ONLY_MODEL_COGNITION';
    const quickStart=Date.now();
    const advisory=await generateProportionalReadOnlyReply({
@@ -426,20 +454,12 @@ export default async function handler(req,res){
      weekly_queue:ownerWeeklyQueue||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
      authoritative_goal_state:currentGoal,
+     universe_cognitive_state_id:ownerUniverse.state_id,
+     universe_read_model:'EXISTING_UNIVERSE_PLUS_CANONICAL_CONTINUITY',
      source_status:ownerContext.status,
      unavailable_sources:ownerContext.unavailable
     },
-    verifiedUniverseObservations:[
-     buildRealityProposedEmployeeRoleDiscussionContext(),
-     ...native263TemporalObservations,
-     ...ownerCompletedWorkObservations,
-     ...employeeShiftObservations,
-     ...companyWorkforceObservations,
-     ...selfVisibilityObservations,
-     ...originalWorkObservation(ownerOriginalWork),
-     ...reconciliationObservation,
-     ...weeklyQueueObservation(ownerWeeklyQueue)
-    ]
+    verifiedUniverseObservations:ownerUniverse.observations
    });
    governedCognitionMs=Date.now()-quickStart;
    // An answer is not independent evidence that an action happened.
@@ -493,6 +513,10 @@ export default async function handler(req,res){
   }
   stage='COGNITION_AND_RELIABILITY';
   const governedCognitionStart=Date.now();
+  // The full operational pipeline already reconstructs durable Universe
+  // history itself. Supply the SAME current owner cognitive read model,
+  // without issuing another persistence query or creating a second ledger.
+  const ownerUniverse=makeOwnerUniverseReadModel();
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;
@@ -573,18 +597,9 @@ export default async function handler(req,res){
       native263TemporalObservations.length+ownerCompletedWorkObservations.length>0?
        'OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE':
        'NO_INDEPENDENT_OWNER_RECEIPT_AVAILABLE_THIS_TURN',
-    connected_world_observations:[
-     // Trusted existing employee roles are standing operational context.
-     // Proposed weekly jobs are free to discuss but not already authorized.
-     buildRealityProposedEmployeeRoleDiscussionContext(),
-     ...native263TemporalObservations,...ownerCompletedWorkObservations,
-     ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
-     ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations,...selfVisibilityObservations,
-     ...originalWorkObservation(ownerOriginalWork),
-     ...reconciliationObservation,
-     ...weeklyQueueObservation(ownerWeeklyQueue)
-    ],
+    universe_cognitive_state_id:ownerUniverse.state_id,
+    universe_read_model:'EXISTING_UNIVERSE_COGNITIVE_PROJECTION',
+    connected_world_observations:ownerUniverse.observations,
     action_authorized:false,execution_authorized:false,
    },
    // The current user turn was saved by intake; pass only PRIOR turns as
