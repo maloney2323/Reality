@@ -39,11 +39,13 @@
  // The send handler first appends a visibly unverified local user bubble.
 
  const validUuid=s=>/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(s||'');
- let current=null,pollInterval=null,clockInterval=null;
- function stopClocks(){
+ let current=null,pollInterval=null,clockInterval=null,workInterval=null;
+ function stopClocks({keepWork=false}={}){
   clearInterval(pollInterval);
   clearInterval(clockInterval);
+  if(!keepWork)clearInterval(workInterval);
   pollInterval=null;clockInterval=null;
+  if(!keepWork)workInterval=null;
  }
  function render(){
   const state=current;
@@ -86,6 +88,28 @@
   const last=work?.work_chain?.find(x=>typeof x?.current_evidence_stage==='string');
   const evidence=last?' Latest original-work evidence: '+String(last.current_evidence_stage)
    .replaceAll('_',' ')+'.':'';
+  const stage=last?.current_evidence_stage||'';
+  const verified=new Set(['MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+   'INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED',
+   'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+   'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
+   'CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE',
+   'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
+   'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT']);
+  const engineering=verified.has(stage);
+  one('Engineering and independent test receipts',engineering,
+   engineering?'Original '+String(last.original_work_id)+': '+stage.replaceAll('_',' ')+
+     (last.corrective_ci_url?' · '+String(last.corrective_ci_url):'')+
+     '. These are provider-backed stage readbacks, not a new owner approval.':
+     work?.status==='INVESTIGATED_SCOPED'?
+       'Investigation was recorded; model analysis is not yet verified code generation.':
+       'Awaiting a scoped engineering receipt from the existing signed worker.');
+  if(state.buildResult)
+   one('Requested isolated build continuation',state.buildResult.execution_started===true,
+    'Reality governed builder: '+state.buildResult.status+
+    (state.buildResult.broker_status?' · '+state.buildResult.broker_status:'')+
+    (state.buildResult.independent_run_url?' · '+state.buildResult.independent_run_url:'')+
+    '. No installation, production change or new shift.');
   one('Governed work handoff',Boolean(work),
    work?(names[work.status]||'Governed intake status not recognized.')+evidence:
     state.saved?'Saved message verified; checking its separate governed work record.':
@@ -140,8 +164,58 @@
       !Array.isArray(work.work_chain)||work.work_chain.length>25)return;
    state.work=work;
    render();
+   if(state.explicitBuild && !state.buildPosted && !state.buildReading &&
+      work.status==='INVESTIGATED_SCOPED' &&
+      Array.isArray(work.work_chain) &&
+      work.work_chain.length===1 &&
+      ['CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+       'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING']
+       .includes(work.work_chain[0]?.current_evidence_stage))
+    void continueVerifiedBuild(state);
+   if(work.status==='CONVERSATION_ONLY'||
+      work.status==='NEEDS_AUTHORIZED_SCOPE'||
+      work.work_chain?.some(x=>x.current_evidence_stage===
+       'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT')){
+    clearInterval(workInterval);workInterval=null;
+   }
   }catch{/* An unavailable readback is not proof of a failed job. */}
   finally{state.workReading=false}
+ }
+ async function continueVerifiedBuild(state){
+  if(current!==state||state.buildPosted||state.buildReading)return;
+  state.buildReading=true;
+  try{
+   const response=await fetch('/api/reality/personal-chat-work',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(45000),
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({action:'CONTINUE_VERIFIED_SCOPED_ENGINEERING',
+     conversation_id:state.conversationId,request_id:state.requestId})
+   });
+   const data=await response.json().catch(()=>null);
+   if(current!==state)return;
+   if(response.ok&&data?.ok===true &&
+      data.request_id===state.requestId &&
+      data.original_work_id===state.work?.work_chain?.[0]?.original_work_id &&
+      data.installation_authorized===false &&
+      data.production_changed===false &&
+      data.new_shift_started===false){
+    state.buildResult=data;
+    state.buildPosted=true;
+   }else{
+    state.buildResult={status:String(data?.error||'CHAT_WORK_ENGINEERING_NOT_VERIFIED'),
+     execution_started:false};
+    // Don't automatically replay a provider write after an uncertain error.
+    state.buildPosted=true;
+   }
+   render();
+  }catch{
+   if(current!==state)return;
+   state.buildResult={status:'CHAT_WORK_ENGINEERING_EFFECT_UNVERIFIED',
+    execution_started:false};
+   state.buildPosted=true;
+   render();
+  }finally{state.buildReading=false}
  }
  async function readback(){
   const state=current;
@@ -166,7 +240,7 @@
    if(user)state.saved={source_ref:user.source_ref};
    if(user&&answer)state.answer={source_ref:answer.source_ref};
    if(state.saved)void readWork(state);
-   if(state.answer)stopClocks();
+   if(state.answer)stopClocks({keepWork:true});
    render();
   }catch{/* A temporary readback failure is not evidence that work failed. */}
   finally{state.reading=false}
@@ -177,7 +251,9 @@
   stopClocks();
   current={conversationId,requestId,startedAt:Date.now(),
    saved:null,answer:null,complete:false,reading:false,failure:null,
-   work:null,workReading:false,lastWorkCheck:0};
+   work:null,workReading:false,lastWorkCheck:0,
+   explicitBuild:event.detail?.explicit_scoped_build===true,
+   buildPosted:false,buildReading:false,buildResult:null};
   // If a previous attempt is still visible, give the new attempt its own
   // current inline status immediately after its user bubble.
   block.remove();
@@ -189,6 +265,9 @@
   transcript.scrollTop=transcript.scrollHeight;
   clockInterval=setInterval(render,1000);
   pollInterval=setInterval(()=>{void readback()},2500);
+  // Work evidence is independent of Chat's answer. Keep checking even after
+  // the assistant has replied; a worker may write and test code later.
+  workInterval=setInterval(()=>{if(current?.saved)void readWork(current)},8500);
   setTimeout(()=>{void readback()},800);
  }
  window.addEventListener('reality:chat-request-started',start);
@@ -198,14 +277,14 @@
   state.failure=/^[A-Z][A-Z0-9_]{3,119}$/.test(event.detail?.code||'')?
    event.detail.code:'CHAT_RESPONSE_UNAVAILABLE';
   state.complete=true;
-  stopClocks();
+  stopClocks({keepWork:true});
   void readback();
   render();
  });
  new MutationObserver(()=>{
   if(current&&!button.disabled&&!current.complete){
    current.complete=true;
-   stopClocks();
+   stopClocks({keepWork:true});
    void readback();
    render();
   }
