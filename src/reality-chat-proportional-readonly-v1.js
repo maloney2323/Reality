@@ -26,7 +26,7 @@ export async function generateProportionalReadOnlyReply({
  if(typeof message!=='string'||!message.trim()||
     !UUID.test(conversationId||'')||!UUID.test(requestId||'')||
     !UUID.test(ownerId||'')||!SOURCE.test(sourceRef||'')||
-    typeof apiKey!=='string'||apiKey.length<20||
+    typeof apiKey!=='string'||!apiKey.trim()||
     typeof runtime!=='function'||!Array.isArray(verifiedPriorTurns)||
     !Array.isArray(verifiedUniverseObservations)||
     verifiedUniverseObservations.length>150)
@@ -52,6 +52,7 @@ export async function generateProportionalReadOnlyReply({
    conversation_continuity:{
     status:'AUTHENTICATED_SAVED_CONVERSATION_HISTORY',
     source:'OWNER_RLS_READBACK',
+    source_message_count:prior.length,
     recent_exchanges:prior
    },
    owner_business_context:ownerContext,
