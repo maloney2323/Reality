@@ -4,7 +4,7 @@
  */
 (()=>{
  'use strict';
- if(window.location.pathname!=='/')return;
+ if(!['/','/employees','/shifts'].includes(window.location.pathname))return;
  const $=id=>document.getElementById(id);
  const home=$('realitySimpleHome'),team=$('realityHomeEmployees'),economic=$('simpleEconomicEvidenceDashboard');
  if(!home||!team||!economic||$('realityHomeCommand'))return;
@@ -39,7 +39,7 @@
  }
  for(const [title,path,sym,target] of [
   ['Home','/','⌂'],['Chat','/chat','▤'],
-  ['Employees','/chat-simple#employeeBoardPanel','♧'],
+  ['Employees','/employees','♧'],
   ['Work',null,'▣','realityHomeWorkday'],
   ['Shifts',null,'▦','realityEmployeeShiftPlanner'],
   ['ROI & Drift','/value','▥'],['Receipts','/value','✓']
@@ -140,7 +140,7 @@
  const mobile=el('nav','rc-mobile-nav');
  mobile.setAttribute('aria-label','Reality mobile navigation');
  for(const [label,path,sym,target] of [
-  ['Home','/','⌂'],['Employees','/chat-simple#employeeBoardPanel','♧'],
+  ['Home','/','⌂'],['Employees','/employees','♧'],
   ['Work',null,'▣','realityHomeWorkday'],['ROI','/value','▥'],['Chat','/chat','▤']
  ])mobile.append(item(label,path,sym,target));
  document.body.append(mobile);
