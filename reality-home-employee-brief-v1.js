@@ -48,9 +48,10 @@
    insight.roles.reduce((n,r)=>n+r.unallocated_hypothetical_reference_hours,0)===
    insight.unallocated_hypothetical_reference_hours;
  };
- let loading=false;
+ const auth=document.getElementById('privateReady');
+ let loading=false,pendingReload=false;
  async function load(){
-  if(loading)return;
+  if(loading){pendingReload=true;return;}
   loading=true;refresh.disabled=true;
   emitWeekly(null); // Remove stale owner data before each authenticated readback.
   status.textContent='Checking saved employee work and current source observations…';
@@ -231,8 +232,21 @@
   }catch{
    emitWeekly(null);
    status.textContent='Employee evidence could not be verified. Existing receipts and the live work status below remain separate; no active work or savings inferred.';
-  }finally{loading=false;refresh.disabled=false;}
+  }finally{
+   loading=false;refresh.disabled=false;
+   if(pendingReload){
+    pendingReload=false;
+    if(auth?.style.display==='block')void load();
+   }
+  }
  }
+ // Login may finish after initial anonymous readback. Reuse this same
+ // owner-scoped endpoint; do not leave stale data until manual Refresh.
+ if(auth&&typeof MutationObserver==='function')
+  new MutationObserver(()=>{
+   if(auth.style.display==='block')void load();
+   else emitWeekly(null);
+  }).observe(auth,{attributes:true,attributeFilter:['style']});
  refresh.addEventListener('click',()=>{void load();});
  void load();
 })();
