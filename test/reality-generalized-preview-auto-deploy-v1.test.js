@@ -40,7 +40,7 @@ const request=auth=>new Request('https://example.invalid/',{
  'content-type':'application/json'},
  body:'{"version":1,"action":"verify_same_original_preview_auto_deploy"}'
 });
-function rig({creator='vercel[bot]',statusContext='Vercel',
+function rig({creator='vercel[bot]',creatorType='Bot',statusContext='Vercel',
  verdict='success',wrongSha=false,wrongSource=false,duplicate=false}={}){
  const oldFetch=globalThis.fetch,requests=[];
  let savedCalls=0;
@@ -55,7 +55,7 @@ function rig({creator='vercel[bot]',statusContext='Vercel',
    assert.equal(args.p_attempt_id,attempt);
    assert.equal(args.p_canary_commit_sha,sha);
    assert.equal(args.p_github_vercel_status_id,987654321);
-   assert.equal(args.p_github_vercel_creator,'vercel[bot]');
+   assert.equal(args.p_github_vercel_creator,creator);
    assert.equal(args.p_vercel_deployment_url,deployUrl);
    data={status:'GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED',
     original_work_id:original,shift_id:shift,attempt_id:attempt,
@@ -66,7 +66,7 @@ function rig({creator='vercel[bot]',statusContext='Vercel',
     original_job_completed:false,production_changed:false};
   }else if(route==='/commits/'+sha+'/status'){
    const s={id:987654321,context:statusContext,state:verdict,target_url:deployUrl,
-    creator:{type:'Bot',login:creator}};
+    creator:{type:creatorType,login:creator}};
    data={sha:wrongSha?'f'.repeat(40):sha,statuses:duplicate?[s,s]:[s]};
   }else if(route==='/git/ref/heads/'+branch)
    data={ref:'refs/heads/'+branch,object:{sha:liveHead}};
@@ -94,8 +94,22 @@ test('independently verified Vercel App status of exact canary SHA creates only 
   assert.equal(t.requests.some(x=>x.method==='PUT'),false);
  }finally{t.restore()}
 });
+test('official Vercel GitHub service user can attest exact signed deployment',async()=>{
+ const t=rig({creator:'vercel',creatorType:'User'});
+ try{
+  const r=await entry(request(true)),d=await r.json();
+  assert.equal(r.status,200,'safe_status='+JSON.stringify(d));
+  assert.equal(d.preview_auto_deploy_verified,true);
+  assert.equal(d.installation_authorized,false);
+  assert.equal(d.original_job_completed,false);
+  assert.equal(t.savedCalls,1);
+ }finally{t.restore()}
+});
 test('a generic green CI or another bot cannot claim the Vercel deployment',async()=>{
- for(const flags of [{creator:'attacker[bot]'},{statusContext:'Tests'},
+ for(const flags of [{creator:'attacker[bot]'},
+   {creator:'vercel',creatorType:'Bot'},
+   {creator:'vercel[bot]',creatorType:'User'},
+   {statusContext:'Tests'},
    {verdict:'pending'},{duplicate:true}]){
   const t=rig(flags);
   try{
