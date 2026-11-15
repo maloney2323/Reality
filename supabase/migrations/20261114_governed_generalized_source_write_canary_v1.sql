@@ -135,3 +135,77 @@ END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_generalized_source_write_canary_v1(uuid,text,text)
  FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_generalized_source_write_canary_v1(uuid,text,text) TO service_role;
+
+
+CREATE OR REPLACE FUNCTION public.reality_record_generalized_source_write_canary_v1(
+ p_attempt_id uuid,p_result_status text,p_github_http_status integer,
+ p_provider_commit_sha text,p_provider_probe_blob_sha text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE a reality_internal.governed_original_source_write_probes_v1%rowtype;
+r reality_internal.governed_original_install_reviews_v1%rowtype;
+v_success boolean;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'GENERALIZED_CANARY_RECORD_SERVICE_ONLY';END IF;
+ v_success:=p_result_status='GITHUB_WRITE_AND_ORIGINAL_SOURCE_READBACK_VERIFIED';
+ IF p_attempt_id IS NULL OR p_result_status NOT IN(
+  'GITHUB_WRITE_AND_ORIGINAL_SOURCE_READBACK_VERIFIED',
+  'GITHUB_PROVIDER_REJECTED','GITHUB_EFFECT_UNCERTAIN')
+  OR (v_success AND (
+   p_github_http_status IS DISTINCT FROM 201 OR
+   coalesce(p_provider_commit_sha,'')!~'^[a-f0-9]{40}$' OR
+   coalesce(p_provider_probe_blob_sha,'')!~'^[a-f0-9]{40}$'))
+  OR (NOT v_success AND p_provider_probe_blob_sha IS NOT NULL)
+ THEN RAISE EXCEPTION 'GENERALIZED_CANARY_EXACT_PROVIDER_RECEIPT_INVALID';END IF;
+ SELECT * INTO a FROM reality_internal.governed_original_source_write_probes_v1
+ WHERE attempt_id=p_attempt_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'GENERALIZED_CANARY_UNCLAIMED_PROVIDER_EFFECT';END IF;
+ SELECT * INTO r FROM reality_internal.governed_original_install_reviews_v1
+ WHERE attempt_id=a.attempt_id FOR UPDATE;
+ IF NOT FOUND OR r.original_work_id<>a.original_work_id OR
+  r.owner_id<>a.owner_id OR r.shift_id<>a.shift_id OR
+  r.exact_install_target_branch<>a.target_branch OR
+  r.source_file_path<>a.original_source_path OR
+  r.expected_preinstall_blob_sha<>a.exact_source_blob_sha OR
+  r.installed_commit_sha IS NOT NULL OR r.approval_receipt_id IS NOT NULL OR
+  r.original_final_receipt_id IS NOT NULL OR
+  r.phase NOT IN ('REVIEW_STAGED_NOT_INSTALL_READY','PREINSTALL_TRANSPORT_VERIFIED')
+ THEN RAISE EXCEPTION 'GENERALIZED_CANARY_ORIGINAL_INSTALL_SCOPE_DRIFT';END IF;
+ IF a.result_status='GITHUB_WRITE_AND_ORIGINAL_SOURCE_READBACK_VERIFIED' THEN
+  IF NOT v_success OR a.github_http_status<>p_github_http_status OR
+    a.provider_commit_sha<>p_provider_commit_sha OR
+    a.provider_probe_blob_sha<>p_provider_probe_blob_sha
+  THEN RAISE EXCEPTION 'GENERALIZED_CANARY_ALREADY_VERIFIED_REPLAY_CONFLICT';END IF;
+ ELSE
+  -- Read-only reconciliation is permitted after an uncertain effect;
+  -- a second provider write is never permitted.
+  UPDATE reality_internal.governed_original_source_write_probes_v1
+  SET result_status=p_result_status,github_http_status=p_github_http_status,
+      provider_commit_sha=p_provider_commit_sha,
+      provider_probe_blob_sha=p_provider_probe_blob_sha,
+      receipt_at=CASE WHEN v_success THEN clock_timestamp() ELSE NULL END
+  WHERE original_work_id=a.original_work_id;
+ END IF;
+ IF v_success THEN
+  UPDATE reality_internal.governed_original_install_reviews_v1
+  SET isolated_github_write_verified=true,updated_at=clock_timestamp()
+  WHERE original_work_id=r.original_work_id AND approval_receipt_id IS NULL
+   AND installed_commit_sha IS NULL AND phase='REVIEW_STAGED_NOT_INSTALL_READY';
+  IF NOT FOUND AND r.isolated_github_write_verified IS DISTINCT FROM true
+  THEN RAISE EXCEPTION 'GENERALIZED_CANARY_OWNER_REVIEW_NOT_RECORDED';END IF;
+ END IF;
+ RETURN jsonb_build_object(
+ 'status',CASE WHEN v_success THEN 'GENERALIZED_SOURCE_WRITE_TRANSPORT_INDEPENDENTLY_VERIFIED'
+    ELSE 'GENERALIZED_SOURCE_WRITE_TRANSPORT_EFFECT_NOT_VERIFIED' END,
+ 'original_work_id',a.original_work_id,'shift_id',a.shift_id,
+ 'attempt_id',a.attempt_id,'probe_path',a.inert_probe_path,
+ 'provider_commit_sha',p_provider_commit_sha,
+ 'provider_probe_blob_sha',p_provider_probe_blob_sha,
+ 'isolated_github_write_verified',v_success,
+ 'preview_auto_deploy_verified',false,
+ 'installation_authorized',false,'source_installed',false,
+ 'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_record_generalized_source_write_canary_v1(
+ uuid,text,integer,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_record_generalized_source_write_canary_v1(
+ uuid,text,integer,text,text) TO service_role;
