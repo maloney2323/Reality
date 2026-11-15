@@ -57,7 +57,7 @@
   const quickNav = node('nav','reality-chat-quick-nav');
   quickNav.setAttribute('aria-label','Reality workspace sections');
   for(const [label,path] of [
-    ['Home','/'],['Chat','/chat'],['Employees','/chat-simple#employeeBoardPanel'],
+    ['Home','/'],['Chat','/chat'],['Employees','/employees'],
     ['ROI & evidence','/value']
   ]){
     const link=node('a','reality-chat-quick-link',label);
@@ -329,7 +329,7 @@
   }
   mobileLink('Home','/','⌂');
   mobileLink('Chat','/chat','▣',true);
-  mobileLink('Employees','/chat-simple#employeeBoardPanel','♧');
+  mobileLink('Employees','/employees','♧');
   const mobileWork=node('button','reality-chat-mobile-nav-item');
   mobileWork.type='button';
   mobileWork.append(node('span','reality-chat-mobile-nav-icon','▤'),
