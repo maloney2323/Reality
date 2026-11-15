@@ -20,9 +20,10 @@ const TOPICS=Object.freeze({
  drift:/\b(drift|continuity|memory|context|integrity|grounding)\w*/i,
  employee:/\b(employee|shift|workforce|staff|workday|job)\w*/i,
  inspection:/\b(self.inspec|self.audit|self.aware|introspec|architect|repo|source|system|see everything|see itself)\w*/i,
+ universe:/\b(universe|worldline|world model|underlying llm|memory|knowledge graph)\b/i,
 });
-const relevant=text=>/\b(reality|itself|own|existing|already|your|system|capability|engine|authorization|verification|governance|drift|roi|inspection|architecture|source|code|self)\b/i.test(text||'')&&
- /\b(capabilit|authorization|verification|govern|existing|already|architect|inspect|engine|system|source|code|roi|drift|self|ability|abilities|upgrade|improve|what can|what do you have)\b|see everything|see itself|what it can do/i.test(text||'');
+const relevant=text=>/\b(reality|itself|own|existing|already|your|system|capability|engine|authorization|verification|governance|drift|roi|inspection|architecture|source|code|self|universe|underlying|memory|context)\b/i.test(text||'')&&
+ /\b(capabilit|authorization|verification|govern|existing|already|architect|inspect|engine|system|source|code|roi|drift|self|ability|abilities|upgrade|improve|universe|underlying|memory|context|what can|what do you have)\b|see everything|see itself|what it can do/i.test(text||'');
 export function needsRealityCapabilityInspection(message,priorTurns=[]){
  if(typeof message!=='string'||!message.trim())return false;
  if(relevant(message))return true;
@@ -47,7 +48,8 @@ function choosePaths(paths,topicText){
   roi:['roi','value','labor','econom'],
   drift:['drift','continuity','integrity','ground'],
   employee:['shift','employee','workday','workforce'],
-  inspection:['self-inspect','self-audit','system-access','capability-operating','registry'],
+  inspection:['self-inspect','self-audit','system-access','capability-operating','registry','universe'],
+  universe:['universe','continuity','world','cognition','memory'],
  };
  const ranked=paths.map(path=>{
   const low=path.toLowerCase();
