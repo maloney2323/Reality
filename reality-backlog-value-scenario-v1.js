@@ -3,6 +3,8 @@
 // Data is session only. A scenario is not an installation or savings receipt.
 (()=>{
  'use strict';
+ // Do not fetch hidden pages' private evidence: their readers are re-mounted on the owning route.
+ if(!["/value"].includes(window.location.pathname))return;
  const $=id=>document.getElementById(id);
  const root=$('realityBacklogValuePanel'),status=$('realityBacklogValueStatus');
  const list=$('realityBacklogInputItems'),button=$('realityBacklogCompute');
