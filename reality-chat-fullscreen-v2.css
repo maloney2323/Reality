@@ -459,3 +459,12 @@ body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .re
 body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-duration[hidden]{
  display:none!important;
 }
+
+
+/* Conversational delivery and errors are already inline in the transcript.
+   The legacy footer-status element is redundant and was leaking literal
+   "null" beneath Send on Android. Keep it off the Chat page only; Work
+   controls and authenticated inline reply errors remain unchanged. */
+body[data-reality-route="chat"] #privateStatus{
+ display:none!important;
+}
