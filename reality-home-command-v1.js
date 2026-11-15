@@ -53,13 +53,12 @@
  for(const text of ['Source-backed discovery','Governed review','Independent receipts'])
   assurances.append(el('span','',text));
  copy.append(assurances);
- const actions=el('div','rc-hero-actions');
- const button=el('button','rc-start','▶ Review & Start Ready Work');
- button.id='realityHomeReviewWork';button.type='button';
- button.addEventListener('click',()=>reveal('realityEmployeeShiftPlanner'));
- actions.append(button,el('p','',
-  'Opens your existing shift review. Nothing starts until you authorize its exact scope.'));
- hero.append(copy,actions);stage.append(hero);
+ // Home is for discovery and understanding. Execution remains in the
+ // existing governed Shifts workflow; there is deliberately no Start CTA.
+ const heroFoot=el('p','rc-hero-foot',
+  'Proposed work is separate from qualified jobs, active execution and verified outcomes.');
+ copy.append(heroFoot);
+ hero.append(copy);stage.append(hero);
  const stats=el('div','rc-stats'),metrics={};
  stats.setAttribute('aria-label','Operational evidence states');
  for(const [key,label,note] of [
