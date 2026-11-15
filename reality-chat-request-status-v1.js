@@ -270,6 +270,18 @@
   workInterval=setInterval(()=>{if(current?.saved)void readWork(current)},8500);
   setTimeout(()=>{void readback()},800);
  }
+ // Saved-history refresh replaces the transcript's children. Preserve the
+ // request-bound live work panel under its exact signed-in user turn; otherwise
+ // the existing timer updates a detached, invisible node after the reply.
+ new MutationObserver(()=>{
+  if(!current||block.isConnected)return;
+  const bubble=[...transcript.querySelectorAll('.bubble.user')]
+   .find(x=>x.dataset.requestId===current.requestId);
+  if(!bubble)return;
+  bubble.after(block);
+  block.hidden=false;
+  render();
+ }).observe(transcript,{childList:true});
  window.addEventListener('reality:chat-request-started',start);
  window.addEventListener('reality:chat-request-failed',event=>{
   const state=current;
