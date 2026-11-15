@@ -128,7 +128,10 @@ export async function stageGeneralizedVerifiedOriginalInstallReview({
   }
   if(matches.length!==1)fail('EXACTLY_ONE_SOURCE_ONLY_INTEGRATION_PR_REQUIRED');
   const integration=matches[0];
-  const runs=await github(fetchImpl,'/actions/runs?event=pull_request&per_page=100');
+  // Query THIS integration branch, never GitHub's global PR-run feed:
+  // the latter is capped and can evict the exact original's test evidence.
+  const runs=await github(fetchImpl,'/actions/runs?branch='+
+   encodeURIComponent(integration.head.ref)+'&event=pull_request&per_page=100');
   if(!Array.isArray(runs?.workflow_runs))
    fail('INDEPENDENT_GITHUB_PR_RUNS_UNVERIFIED');
   const eligible=r=>r.head_sha===integration.head.sha&&
