@@ -159,3 +159,35 @@ test('ordinary completed model reply remains single-call and unchanged',async()=
  assert.equal(result.continued_from_output_limit,false);
  assert.equal(result.answer,'Reality already has authorization and verification.');
 });
+
+
+test('the final model input is the EXACT current saved owner draft request, not previous capability summary',async()=>{
+ const latest='Draft the exact owner approval workflow and recommend backlog jobs. Explain monitoring, recovery and drift ROI.';
+ const recent={...signal,fragments:[{
+  fragment_id:'sig:latest',cleaned_text:latest
+ }]};
+ const prior='Reality has authorization capabilities and you can request a draft later.';
+ let providerInput=null;
+ await invokeRealityModel({
+  governedSignal:recent,apiKey:'test-only',model:'test-model',
+  systemContext:{conversation_continuity:{
+   recent_exchanges:[{role:'assistant',text:prior}],
+  }},
+  fetchImpl:async(_url,options)=>{
+   providerInput=JSON.parse(options.body).input;
+   return {ok:true,json:async()=>({
+    id:'resp_current_draft_123',status:'completed',
+    output_text:'Owner approval draft: Review job scope, approve the exact installation, verify completion.'
+   })};
+  }
+ });
+ assert.equal(providerInput[1].role,'user');
+ assert.match(providerInput[1].content[0].text,/conversation_continuity/);
+ assert.equal(providerInput.at(-1).role,'user');
+ const last=providerInput.at(-1).content[0].text;
+ assert.match(last,/CURRENT AUTHENTICATED USER REQUEST/);
+ assert(last.includes(latest));
+ assert.match(last,/deliver those requested items directly/);
+ assert.match(last,/do not repeat a capability inventory/);
+ assert(!last.includes(prior),'old model advice must not become latest instruction');
+});
