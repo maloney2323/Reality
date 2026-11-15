@@ -6468,7 +6468,11 @@ setInterval(refreshSavedShiftHome,300000);
 
 (function(){
  const el=id=>document.getElementById(id);
- const status=s=>{el('privateStatus').textContent=typeof s==='string'&&s.trim()?s:'';};
+ const status=s=>{
+  const clean=typeof s==='string'?s.trim():'';
+  el('privateStatus').textContent=clean&&
+   !/^(?:null|undefined|\\[object Object\\])$/i.test(clean)?clean:'';
+ };
  const endpoint='/api/reality/personal-session';
  function conversationId(){
   let id=localStorage.getItem('reality.private.chat.conversation.v1');
