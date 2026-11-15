@@ -1,10 +1,14 @@
-// Authenticated owner read-only overview of Reality's verified original
-// repair. No browser element or model response can authorize an install.
+// Authenticated owner exact-artifact review with ONE explicit installation
+// click only after all three independent readiness gates. No model output,
+// passive refresh or shift-start message authorizes installation.
 const API='/api/reality/generalized-original-install-review';
 const SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+const APPROVE_API='/api/reality/generalized-owner-install-approval';
+const INTENT='OWNER_APPROVE_EXACT_INDEPENDENTLY_VERIFIED_ISOLATED_REPAIR';
 const get=id=>document.getElementById(id);
 const add=(kind,parent,value)=>{const e=document.createElement(kind);
  if(value)e.textContent=value;parent.append(e);return e;};
@@ -21,6 +25,11 @@ function panel(){
   add('p',p).id='generalizedOriginalInstallReviewArtifact';
   add('p',p).id='generalizedOriginalInstallReviewGates';
   const links=add('p',p);links.id='generalizedOriginalInstallReviewEvidence';
+  const approve=add('button',p,'Approve exact verified upgrade');
+  approve.type='button';approve.hidden=true;
+  approve.id='generalizedOriginalInstallApproveExactButton';
+  approve.addEventListener('click',()=>approveExactFromUserClick());
+  add('p',p).id='generalizedOriginalInstallApprovalResult';
   const warning=add('p',p,
    'Reality does not install a repair or settle an original job from a passing model answer or CI check. The exact owner approval must follow independent release-continuation readiness.');
   warning.style.fontSize='13px';
@@ -46,7 +55,8 @@ function safe(d){
   typeof d.owner_approval_ready==='boolean'&&
   typeof d.installation_authorized==='boolean'&&
   typeof d.original_job_completed==='boolean'&&
-  d.owner_approval_action_available===false&&
+  typeof d.owner_approval_action_available==='boolean'&&
+  UUID.test(d.attempt_id||'')&&
   typeof d.phase==='string';
 }
 function evidenceLink(parent,label,url){
@@ -54,7 +64,54 @@ function evidenceLink(parent,label,url){
  a.href=url;a.target='_blank';a.rel='noopener noreferrer';
  a.style.display='inline-block';a.style.marginRight='14px';
 }
-let busy=false;
+let busy=false,submitting=false,submitted=false,activeCard=null;
+function actionable(d){
+ return safe(d)&&d.owner_approval_action_available===true&&
+  d.owner_approval_ready===true&&
+  d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'&&
+  d.isolated_github_write_verified===true&&
+  d.preview_auto_deploy_verified===true&&
+  d.same_original_execution_and_settlement_contract_verified===true&&
+  d.installation_authorized===false&&
+  d.original_job_completed===false&&
+  d.approval_receipt_id===null&&
+  d.approval_action_endpoint===APPROVE_API;
+}
+async function approveExactFromUserClick(){
+ // Only this physical owner button press can POST. Never from an effect,
+ // page reload, chat message, automatic wake or a model completion.
+ if(!activeCard||!actionable(activeCard)||submitting||submitted)return;
+ submitting=true;submitted=true;
+ const card=activeCard;
+ const btn=get('generalizedOriginalInstallApproveExactButton');
+ if(btn){btn.disabled=true;btn.hidden=true;}
+ const status=get('generalizedOriginalInstallApprovalResult');
+ status.textContent='Recording one exact owner approval; no second click is needed.';
+ try{
+  const response=await fetch(APPROVE_API,{
+   method:'POST',cache:'no-store',credentials:'same-origin',
+   headers:{'content-type':'application/json',accept:'application/json'},
+   body:JSON.stringify({
+    original_work_id:card.original_work_id,
+    attempt_id:card.attempt_id,
+    candidate_commit_sha:card.candidate_commit_sha,
+    artifact_sha256:card.candidate_artifact_sha256,
+    intent:INTENT,request_id:crypto.randomUUID()
+   })
+  });
+  const r=await response.json().catch(()=>null);
+  if(response.status===202&&r?.status==='ACCEPTED'&&
+     r.original_work_id===card.original_work_id&&
+     r.approval_recorded===true&&UUID.test(r.approval_id||'')&&
+     r.no_third_confirmation===true&&r.original_job_completed===false){
+   status.textContent='Exact approval recorded. Reality is installing, independently verifying, and continuing the same original job automatically.';
+  }else{
+   status.textContent='The approval result is not independently confirmed. Check Reality’s owner ledger; do not send another approval.';
+  }
+ }catch{
+  status.textContent='Approval transport result is unknown. Refresh and inspect the owner receipt before any further action.';
+ }finally{submitting=false;activeCard=null;refresh();}
+}
 async function refresh(){
  if(busy)return;const p=panel();if(!p)return;
  busy=true;
@@ -67,6 +124,8 @@ async function refresh(){
    p.hidden=true;return;
   }
   if(!response.ok||!safe(d)){
+   const btn=get('generalizedOriginalInstallApproveExactButton');
+   if(btn)btn.hidden=true;activeCard=null;
    p.hidden=false;
    get('generalizedOriginalInstallReviewStatus').textContent=
     'Current original installation review is unavailable or not independently verified.';
@@ -76,6 +135,10 @@ async function refresh(){
    return;
   }
   p.hidden=false;
+  const approvalButton=get('generalizedOriginalInstallApproveExactButton');
+  const canApprove=actionable(d)&&!submitted&&!submitting;
+  approvalButton.hidden=!canApprove;approvalButton.disabled=!canApprove;
+  activeCard=canApprove?d:null;
   const issue=d.source_ref.split('/').at(-1);
   get('generalizedOriginalInstallReviewStatus').textContent=
     'Original job #'+issue+' · '+d.phase.replaceAll('_',' ')+
