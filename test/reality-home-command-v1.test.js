@@ -46,6 +46,11 @@ class Node {
   if(n.parentElement){const p=n.parentElement;p.children.splice(p.children.indexOf(n),1);}
   this.children.push(n);n.parentElement=this;
  }}
+ replaceChildren(...nodes){
+  for(const old of this.children)old.parentElement=null;
+  this.children=[];
+  this.append(...nodes);
+ }
  insertBefore(n,ref){
   if(n.parentElement){const p=n.parentElement;p.children.splice(p.children.indexOf(n),1);}
   const at=this.children.indexOf(ref);
