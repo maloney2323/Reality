@@ -35,6 +35,14 @@
    insight.hypothetical_weekly_reference_hours!==data.next_week_plan?.five_day_week_capacity_hours||
    !Number.isFinite(insight.unallocated_hypothetical_reference_hours)||
    insight.unallocated_hypothetical_reference_hours<0||
+   !Number.isSafeInteger(insight.source_work_role_count)||
+   insight.source_work_role_count<0||
+   insight.source_work_role_count>insight.role_count||
+   insight.roles_without_source_work_count!==insight.role_count-insight.source_work_role_count||
+   insight.source_work_roles_hypothetical_reference_hours!==insight.source_work_role_count*40||
+   insight.source_work_comparison_available!==(insight.source_work_role_count>0)||
+   !Number.isFinite(insight.source_work_roles_provisional_hours)||
+   !Number.isFinite(insight.source_work_roles_unallocated_reference_hours)||
    !insight.roles.every(r=>
     names.includes(r.employee_name)&&
     Number.isFinite(r.proposed_review_timebox_hours)&&
@@ -43,10 +51,16 @@
     Array.isArray(r.week_days)&&r.week_days.length===5&&
     r.active_worker_verified===false))
    return false;
+  const active=insight.roles.filter(r=>r.source_finding_count+r.deferred_source_count>0);
   return insight.roles.reduce((n,r)=>n+r.proposed_review_timebox_hours,0)===
    insight.provisional_review_timebox_hours&&
    insight.roles.reduce((n,r)=>n+r.unallocated_hypothetical_reference_hours,0)===
-   insight.unallocated_hypothetical_reference_hours;
+   insight.unallocated_hypothetical_reference_hours&&
+   active.length===insight.source_work_role_count&&
+   active.reduce((n,r)=>n+r.proposed_review_timebox_hours,0)===
+    insight.source_work_roles_provisional_hours&&
+   active.reduce((n,r)=>n+r.unallocated_hypothetical_reference_hours,0)===
+    insight.source_work_roles_unallocated_reference_hours;
  };
  const auth=document.getElementById('privateReady');
  let loading=false,pendingReload=false;
