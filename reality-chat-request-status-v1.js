@@ -26,14 +26,10 @@
  line.className='reality-live-reply-text';
  line.setAttribute('role','status');
  line.setAttribute('aria-live','polite');
- const details=document.createElement('details');
- details.className='reality-live-reply-proof';
- const summary=document.createElement('summary');
- summary.textContent='Show verified response stages';
- const steps=document.createElement('div');
- steps.className='reality-live-reply-steps';
- details.append(summary,steps);
- block.append(heading,line,details);
+ // Normal Chat has one unobtrusive reply indicator. The detailed
+ // lifecycle belongs in Work ONLY after real provider-backed execution
+ // evidence exists; it must not interrupt the conversation on every Send.
+ block.append(heading,line);
  // Progress belongs directly BELOW the new user message in the thread,
  // not in a fixed banner above the conversation or inside the composer.
  // The send handler first appends a visibly unverified local user bubble.
@@ -50,103 +46,73 @@
  function render(){
   const state=current;
   if(!state)return;
-  const seconds=Math.floor((Date.now()-state.startedAt)/1000);
-  duration.textContent=seconds+'s';
-  const one=(name,verified,description)=>{
-   const row=document.createElement('div');
-   row.className='reality-live-reply-row';
-   const strong=document.createElement('strong');
-   strong.textContent=(verified?'✓ ':'○ ')+name;
-   const p=document.createElement('p');
-   p.textContent=description;
-   row.append(strong,p);
-   steps.append(row);
-  };
-  steps.replaceChildren();
-  one('Message submitted',true,'You pressed Send. No development worker was started by this Chat display; no installation or approval was authorized.');
-  one('Authenticated message save',Boolean(state.saved),
-   state.saved?'Verified from the signed-in conversation: '+state.saved.source_ref:
-     'Waiting for independent message readback. The message above is displayed locally until verified.');
-  one('Evidence and answer processing',Boolean(state.answer),
-   state.answer?'The server completed its governed response process; saved output is available.':
-     state.complete?'No successful response has been independently verified.':
-     'Reality is handling this Chat request. Internal model reasoning and verification stages are not streamed by the current Chat endpoint.');
-  one('Final reply saved and verified',Boolean(state.answer),
-   state.answer?'The same request ID has an independently read-back answer: '+state.answer.source_ref:
-     'Waiting for a matching assistant message in authenticated saved history.');
-  // This exact request's work handoff is read independently of its Chat
-  // answer. Diagnosed work is not execution, installation or settlement.
   const work=state.work;
-  const names={
-   PENDING:'Saved in existing governed worker inbox; investigation not yet claimed.',
-   CLAIMED:'Existing worker claimed this instruction for investigation.',
-   INVESTIGATED_SCOPED:'Investigation recorded against existing authorized work; execution is not proven.',
-   NEEDS_AUTHORIZED_SCOPE:'Requested work is outside the existing signed scope.',
-   CONVERSATION_ONLY:'Classified as a conversation, not executable work.',
-   PROVIDER_UNVERIFIED:'Investigation failed verification; no work completion is claimed.'
-  };
   const development=work?.development;
-  if(development&&/^work:[a-f0-9]{32}$/.test(development.original_work_id||'')&&
-     development.installation_authorized===false&&
-     development.production_changed===false){
-    const stage=String(development.phase||'QUEUED');
-    one('New development task · '+development.original_work_id,
-      ['DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'].includes(stage),
-      'Owner-signed work admission · '+stage.replaceAll('_',' ')+
-      '. '+(stage==='QUEUED'?'Waiting for existing service worker.':
-       stage==='CLAIMED'?'Existing service worker is preparing code.':
-       stage==='DRAFT_GENERATED'?'Model-generated candidate saved; independent proof pending.':
-       stage==='CI_VERIFIED'?'Independent CI receipt recorded; installation still requires exact approval.':
-       'No production installation has been authorized.'));
+  const legitimateDevelopment=development&&
+   /^work:[a-f0-9]{32}$/.test(development.original_work_id||'')&&
+   development.installation_authorized===false&&
+   development.production_changed===false&&
+   ['QUEUED','CLAIMED','DRAFT_GENERATED','PUBLISH_FENCED',
+    'CANDIDATE_STAGED','CI_VERIFIED','CI_REJECTED',
+    'NEEDS_SOURCE','PROVIDER_UNVERIFIED'].includes(development.phase);
+  const chain=work?.work_chain?.find(x=>
+   /^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')&&
+   ['CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+    'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
+    'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
+    'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT']
+    .includes(x.current_evidence_stage));
+  const broker=state.buildResult?.execution_started===true&&
+   /^work:[a-f0-9]{32}$/.test(state.buildResult.original_work_id||'')?
+    state.buildResult:null;
+  const actualWork=Boolean(legitimateDevelopment||chain||broker);
+  // Never show ordinary conversational PENDING / NEEDS_AUTHORIZED_SCOPE /
+  // model-advice checks as a nine-step "operational" workflow.
+  if(state.answer&&!actualWork){
+   block.hidden=true;
+   return;
   }
-  const last=work?.work_chain?.find(x=>typeof x?.current_evidence_stage==='string');
-  const evidence=last?' Latest original-work evidence: '+String(last.current_evidence_stage)
-   .replaceAll('_',' ')+'.':'';
-  const stage=last?.current_evidence_stage||'';
-  const verified=new Set(['MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
-   'INITIAL_CANDIDATE_INDEPENDENTLY_REJECTED',
-   'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
-   'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
-   'CORRECTIVE_CI_REJECTED_WITH_FROZEN_EVIDENCE',
-   'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE',
-   'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT']);
-  const engineering=verified.has(stage);
-  one('Engineering and independent test receipts',engineering,
-   engineering?'Original '+String(last.original_work_id)+': '+stage.replaceAll('_',' ')+
-     (last.corrective_ci_url?' · '+String(last.corrective_ci_url):'')+
-     '. These are provider-backed stage readbacks, not a new owner approval.':
-     work?.status==='INVESTIGATED_SCOPED'?
-       'Investigation was recorded; model analysis is not yet verified code generation.':
-       'Awaiting a scoped engineering receipt from the existing signed worker.');
-  if(state.buildResult)
-   one('Requested isolated build continuation',state.buildResult.execution_started===true,
-    'Reality governed builder: '+state.buildResult.status+
-    (state.buildResult.broker_status?' · '+state.buildResult.broker_status:'')+
-    (state.buildResult.independent_run_url?' · '+state.buildResult.independent_run_url:'')+
-    '. No installation, production change or new shift.');
-  one('Governed work handoff',Boolean(work),
-   work?(names[work.status]||'Governed intake status not recognized.')+evidence:
-    state.saved?'Saved message verified; checking its separate governed work record.':
-    'Available after the authenticated message save.');
-  if(state.answer){
+  block.hidden=false;
+  duration.hidden=!actualWork;
+  duration.textContent=actualWork?
+   Math.floor((Date.now()-state.startedAt)/1000)+'s':'';
+  if(actualWork){
    spinner.classList.add('completed');
-   title.textContent='Reality saved your answer';
-   line.textContent='The Chat answer is recorded. The governed work status below is a separate, independently read-back state.';
-  }else if(state.complete){
-   spinner.classList.remove('completed');
-   title.textContent='Reply not verified';
-   line.textContent=state.failure?
-     'Reality could not finish this Chat request ('+state.failure+
-      (state.failureStage?' · '+state.failureStage:'')+
-      '). '+(state.saved?'Your message IS verified as saved. The same request can be recovered without resending.':
-      'Delivery is not independently verified; the draft is preserved.'):
-     'The request ended without a verified saved answer. Check the saved-message stage; do not assume work continues in the background.';
-  }else if(state.saved){
-   title.textContent='Reality is preparing a reply';
-   line.textContent='Your message is saved. Waiting for the checked answer; the current endpoint does not expose live internal reasoning.';
+   if(legitimateDevelopment){
+    title.textContent='Reality development · '+development.phase.replaceAll('_',' ').toLowerCase();
+    line.textContent=development.original_work_id+
+     (development.evidence?.pr_url?' · '+development.evidence.pr_url:'')+
+     (development.evidence?.ci_url?' · Independent CI: '+development.evidence.ci_url:'')+
+     ' · Installation not authorized';
+   }else if(chain){
+    title.textContent='Reality engineering · '+chain.current_evidence_stage.replaceAll('_',' ').toLowerCase();
+    line.textContent=chain.original_work_id+
+     (chain.corrective_ci_url?' · '+chain.corrective_ci_url:'')+
+     ' · Verified original-stage evidence';
+   }else{
+    title.textContent='Reality engineering · provider dispatch verified';
+    line.textContent=broker.original_work_id+
+     (broker.independent_run_url?' · '+broker.independent_run_url:'')+
+     ' · Installation not authorized';
+   }
+   line.hidden=false;
+   return;
+  }
+  spinner.classList.remove('completed');
+  duration.hidden=true;
+  if(state.complete&&state.failure){
+   title.textContent=state.saved?'Reply unavailable · message saved':
+    'Message delivery not verified';
+   line.hidden=false;
+   line.textContent=state.saved?
+    'Reality saved this message. Recover its reply using the saved message; do not send it again.':
+    'Reality could not verify delivery. Your draft is preserved.';
+  }else if(state.complete&&!state.answer){
+   title.textContent='Checking saved reply…';
+   line.hidden=true;
   }else{
-   title.textContent='Sending message to Reality';
-   line.textContent='Waiting for the authenticated message save. This is Chat activity, not a development-worker receipt.';
+   title.textContent='Reality is replying…';
+   line.hidden=true;
   }
  }
  async function readWork(state){
@@ -248,7 +214,6 @@
   transcript.append(block);
   block.hidden=false;
   spinner.classList.remove('completed');
-  details.open=true;
   render();
   transcript.scrollTop=transcript.scrollHeight;
   clockInterval=setInterval(render,1000);
