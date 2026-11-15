@@ -43,12 +43,23 @@ export function clearChatCookie(res){
  res.setHeader('Cache-Control','no-store');
 }
 async function provider(config,route,{method='GET',body,token,fetchImpl=fetch}={}){
- const response=await fetchImpl(config.url+'/auth/v1/'+route,{
-  method,headers:{apikey:config.key,...(token?{authorization:'Bearer '+token}:{}),
-   ...(body?{'content-type':'application/json'}:{})},
-  ...(body?{body:JSON.stringify(body)}:{}),
- });
- return {ok:response.ok,status:response.status,body:await response.json().catch(()=>null)};
+ let response;
+ try{
+  // Bound EACH external auth call so a slow Supabase dependency cannot leave
+  // Reality's full mobile shell indefinitely stuck on "Checking session".
+  response=await fetchImpl(config.url+'/auth/v1/'+route,{
+   method,headers:{apikey:config.key,...(token?{authorization:'Bearer '+token}:{}),
+    ...(body?{'content-type':'application/json'}:{})},
+   ...(body?{body:JSON.stringify(body)}:{}),
+   signal:AbortSignal.timeout(7000),
+  });
+  return {ok:response.ok,status:response.status,
+   body:await response.json().catch(()=>null)};
+ }catch{
+  // Provider timeouts are retryable connectivity failures. NEVER clear a
+  // previously sealed cookie based only on an unavailable provider.
+  fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+ }
 }
 export function assertSameOrigin(req){
  const origin=req.headers?.origin,host=req.headers?.host;
