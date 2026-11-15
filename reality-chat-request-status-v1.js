@@ -116,7 +116,7 @@
   }
  }
  async function readWork(state){
-  if(!state||current!==state||state.workReading||!state.saved||document.hidden)return;
+  if(!state||current!==state||!state.monitorWork||state.workReading||!state.saved||document.hidden)return;
   if(Date.now()-(state.lastWorkCheck||0)<7500)return;
   state.lastWorkCheck=Date.now();
   state.workReading=true;
@@ -193,7 +193,7 @@
       String(x.source_ref||'').startsWith('supabase:reality_chat_messages:'));
    if(user)state.saved={source_ref:user.source_ref};
    if(user&&answer)state.answer={source_ref:answer.source_ref};
-   if(state.saved)void readWork(state);
+   if(state.saved&&state.monitorWork)void readWork(state);
    if(state.answer)stopClocks({keepWork:true});
    render();
   }catch{/* A temporary readback failure is not evidence that work failed. */}
@@ -207,6 +207,7 @@
    saved:null,answer:null,complete:false,reading:false,failure:null,failureStage:null,
    work:null,workReading:false,lastWorkCheck:0,
    explicitBuild:event.detail?.explicit_scoped_build===true,
+   monitorWork:event.detail?.work_status_requested===true,
    buildPosted:false,buildReading:false,buildResult:null};
   // If a previous attempt is still visible, give the new attempt its own
   // current inline status immediately after its user bubble.
@@ -220,7 +221,8 @@
   pollInterval=setInterval(()=>{void readback()},2500);
   // Work evidence is independent of Chat's answer. Keep checking even after
   // the assistant has replied; a worker may write and test code later.
-  workInterval=setInterval(()=>{if(current?.saved)void readWork(current)},8500);
+  if(current.monitorWork)
+   workInterval=setInterval(()=>{if(current?.saved)void readWork(current)},8500);
   setTimeout(()=>{void readback()},800);
  }
  // Saved-history refresh replaces the transcript's children. Preserve the
