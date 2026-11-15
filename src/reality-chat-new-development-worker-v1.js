@@ -47,7 +47,7 @@ async function askModel({apiKey,model,fetchImpl,claim,role,input,maxTokens}){
   signal:AbortSignal.timeout(18500),
   headers:{authorization:'Bearer '+apiKey,
    'content-type':'application/json',
-   'x-client-request-id':claim.claim_id},
+   'x-client-request-id':claim.claim_id+':'+role},
   body:JSON.stringify({model,store:false,tool_choice:'none',
    max_output_tokens:maxTokens,
    text:{format:{type:'json_schema',name:'reality_chat_new_development_'+role,
@@ -145,9 +145,14 @@ export async function generateNextSignedChatDevelopmentDraft({
  let failure='MODEL_OR_SOURCE_UNVERIFIED',failedPhase='PROVIDER_UNVERIFIED';
  try{
   const githubToken=String(env.REALITY_GITHUB_TOKEN||'');
-  const tree=await readGitHub('/git/trees/'+claim.release_sha+'?recursive=1',{
+  const sourceCommit=await readGitHub('/git/commits/'+claim.release_sha,{
    fetchImpl,token:githubToken});
-  if(tree.truncated===true||!Array.isArray(tree.tree)||
+  if(sourceCommit.sha!==claim.release_sha||!SHA.test(sourceCommit.tree?.sha||''))
+   fail('PINNED_RELEASE_GIT_TREE_READBACK_REQUIRED');
+  const tree=await readGitHub('/git/trees/'+sourceCommit.tree.sha+'?recursive=1',{
+   fetchImpl,token:githubToken});
+  if(tree.sha!==sourceCommit.tree.sha||
+     tree.truncated===true||!Array.isArray(tree.tree)||
      tree.tree.length>20000)
    fail('SOURCE_TREE_INCOMPLETE');
   const candidates=tree.tree.filter(f=>f.type==='blob'&&allowPath(f.path)&&
