@@ -5,6 +5,13 @@ on:
       - 'index.html'
       - 'reality-home-command-v1.js'
       - 'reality-home-command-v1.css'
+      - 'reality-home-employee-brief-v1.js'
+      - 'reality-chat-workspace-v1.js'
+      - 'api/reality/personal-employee-roster.js'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-employee-shift-chat-context-v1.js'
+      - 'src/reality-weekly-workload-insight-v1.js'
+      - 'test/reality-weekly-workload-insight-v1.test.js'
       - 'test/reality-home-command-v1.test.js'
       - '.github/workflows/reality-premium-home-v1.yml'
   workflow_dispatch:
@@ -25,6 +32,9 @@ jobs:
         run: |
           node --check reality-home-command-v1.js
           node --test test/reality-home-command-v1.test.js
+          node --test test/reality-weekly-workload-insight-v1.test.js
+          node --test test/reality-next-week-employee-plan-v1.test.js
+          node --test test/reality-chat-universe-cognitive-projection-v1.test.js
           node --test test/reality-home-live-employees-v1.test.js
           node --test test/reality-home-value-first-v1.test.js
           node --test test/reality-economic-evidence-dashboard-v1.test.js
