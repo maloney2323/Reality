@@ -28,6 +28,7 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'src/reality-chat-universe-cognitive-projection-v1.js'
       - 'test/reality-chat-universe-cognitive-projection-v1.test.js'
+      - 'test/reality-chat-owner-epoch-fast-readonly-v1.test.js'
       - 'src/reality-chat-proportional-readonly-v1.js'
       - 'supabase/migrations/20261115020000_indexed_governed_wake_health_readback_v1.sql'
       - 'api/reality/personal-chat.js'
@@ -62,6 +63,7 @@ jobs:
           node --test test/reality-chat-proportional-readonly-v1.test.js
           node --test test/reality-chat-self-visibility-v1.test.js
           node --test test/reality-chat-universe-cognitive-projection-v1.test.js
+          node --test test/reality-chat-owner-epoch-fast-readonly-v1.test.js
           node --check src/reality-chat-universe-cognitive-projection-v1.js
           node --check src/reality-chat-self-visibility-v1.js
           node --check api/reality/personal-chat.js
