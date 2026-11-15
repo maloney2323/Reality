@@ -6471,7 +6471,7 @@ setInterval(refreshSavedShiftHome,300000);
  const status=s=>{
   const clean=typeof s==='string'?s.trim():'';
   el('privateStatus').textContent=clean&&
-   !/^(?:null|undefined|\\[object Object\\])$/i.test(clean)?clean:'';
+   !['null','undefined','[object object]'].includes(clean.toLowerCase())?clean:'';
  };
  const endpoint='/api/reality/personal-session';
  function conversationId(){
