@@ -88,8 +88,10 @@ test('in-flight Chat shows only verified work intake evidence tied to matching r
  assert.match(progress,/work\.execution_authorized_by_chat!==false/);
  assert.match(progress,/work\.installation_authorized!==false/);
  assert.match(progress,/work\.production_changed!==false/);
- assert.match(progress,/Governed work handoff/);
- assert.match(progress,/Investigation recorded against existing authorized work; execution is not proven/);
+ assert.match(progress,/state\.monitorWork/);
+ assert.match(progress,/legitimateDevelopment/);
+ assert.match(progress,/state\.answer&&!actualWork/);
+ assert.doesNotMatch(progress,/Show verified response stages|steps\.append/);
  assert.doesNotMatch(progress,/reality\/governed-employee-shift-worker|personal-governed-employee-shift/);
 });
 
