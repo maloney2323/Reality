@@ -85,7 +85,7 @@ function fixture(){
  add('simpleWorkdayCandidates');
  const planner=add('realityEmployeeShiftPlanner');econ.append(planner);
  const work=add('realityHomeWorkday');econ.append(work);
- const seen=[];
+ const seen=[],windowListeners={};
  const context={
   document:{body,createElement:t=>new Node(t),
    getElementById:id=>{
@@ -93,12 +93,13 @@ function fixture(){
     const find=n=>n.id===id?n:n.children.map(find).find(Boolean);
     return find(body)||null;
    }},
-  window:{location:{pathname:'/'}},
+  window:{location:{pathname:'/'},addEventListener:(name,fn)=>{windowListeners[name]=fn}},
   MutationObserver:class {constructor(fn){this.fn=fn;seen.push(this)}
    observe(){}}
  };
  vm.runInNewContext(js,context);
- return {body,ids,seen,get:context.document.getElementById};
+ return {body,ids,seen,get:context.document.getElementById,
+  emitWeekly:detail=>windowListeners['reality:weekly-workload-readback']?.({detail})};
 }
 test('renders verified source signals and final receipts while suppressing readiness/ROI inventions',()=>{
  const f=fixture();
@@ -134,4 +135,64 @@ test('signout and unavailable economic evidence never leave old owner counts on 
  scan(f.get('realityHomeCommand'));
  assert.equal(values[0],'—');
  assert.equal(values[4],'Not verified');
+});
+
+test('weekly source-review gap becomes visible as per-role bars and clears on sign-out',()=>{
+ const f=fixture();
+ const days=()=>['Monday','Tuesday','Wednesday','Thursday','Friday'].map(weekday=>({
+  weekday,provisional_review_timebox_hours:0,source_findings:[]
+ }));
+ const first=days();
+ first[0].provisional_review_timebox_hours=2;
+ first[0].source_findings=[{title:'Review source-backed issue',
+  source_url:'https://github.com/maloney2323/Reality/issues/263'}];
+ const insight={
+  version:'reality-weekly-workload-insight-v1',
+  status:'PROVISIONAL_REVIEW_COVERAGE_GAP_NOT_VERIFIED_EMPLOYEE_SCHEDULE',
+  week_start:'2026-11-16',week_end:'2026-11-20',
+  source_finding_count:1,role_count:2,
+  provisional_review_timebox_hours:2,
+  hypothetical_weekly_reference_hours:80,
+  unallocated_hypothetical_reference_hours:78,
+  read_only:true,execution_authorized:false,
+  installation_authorized:false,production_changed:false,
+  comparison_is_not_actual_schedule:true,
+  remaining_reference_hours_are_not_verified_missing_customer_jobs:true,
+  roles:[
+   {employee_name:'Role Alpha',role_title:'Source reviewer',
+    proposed_review_timebox_hours:2,hypothetical_weekly_comparison_hours:40,
+    unallocated_hypothetical_reference_hours:38,
+    comparison_coverage_percent:5,source_finding_count:1,
+    week_days:first},
+   {employee_name:'Role Beta',role_title:'Verifier',
+    proposed_review_timebox_hours:0,hypothetical_weekly_comparison_hours:40,
+    unallocated_hypothetical_reference_hours:40,
+    comparison_coverage_percent:0,source_finding_count:0,
+    week_days:days()}
+  ]
+ };
+ f.emitWeekly(insight);
+ const weekly=f.get('realityHomeWeeklyWorkload');
+ assert.ok(weekly);
+ function textOf(cls){
+  const out=[];function visit(node){
+   if(node.className?.split(' ').includes(cls))out.push(node.textContent);
+   node.children.forEach(visit);
+  }visit(weekly);return out;
+ }
+ assert.ok(textOf('rc-weekly-amount').includes('2 / 40 h'));
+ assert.ok(textOf('rc-weekly-remaining').includes(
+  '38 h unallocated in hypothetical comparison · 1 sources for review'));
+ assert.ok(textOf('rc-weekly-remaining').includes(
+  '40 h unallocated in hypothetical comparison · 0 sources for review'));
+ const statuses=textOf('rc-weekly-status');
+ assert.match(statuses[0],/Week of 2026-11-16 through 2026-11-20/);
+ f.ids.privateReady.style.display='none';
+ f.seen[0].fn();
+ assert.equal(textOf('rc-weekly-amount').length,0);
+ assert.match(textOf('rc-weekly-status')[0],/Sign in/);
+ f.ids.privateReady.style.display='block';
+ f.seen[0].fn();
+ assert.equal(textOf('rc-weekly-amount').length,0,
+  'a different signed-in account must not inherit the prior owner\'s workload');
 });
