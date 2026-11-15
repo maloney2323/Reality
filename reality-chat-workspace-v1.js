@@ -200,7 +200,11 @@
   const statusCopy = node('p', 'muted');
   statusCopy.id = 'realityChatStatusSummary';
   if (originalStatus) {
-    const syncStatus = () => { statusCopy.textContent = originalStatus.textContent; };
+    const syncStatus = () => {
+      const raw = String(originalStatus.textContent ?? '').trim();
+      // No provider evidence should appear as a bare serialized "null".
+      statusCopy.textContent = /^(?:null|undefined|nan|\[object object\])$/i.test(raw) ? '' : raw;
+    };
     new MutationObserver(syncStatus).observe(originalStatus, {
       childList:true, characterData:true, subtree:true
     });
