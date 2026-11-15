@@ -85,7 +85,7 @@ test('independently verified Vercel App status of exact canary SHA creates only 
  const t=rig();
  try{
   const r=await entry(request(true)),d=await r.json();
-  assert.equal(r.status,200);
+  assert.equal(r.status,200,'SAFE_DEPLOYMENT_REJECTION='+JSON.stringify(d));
   assert.equal(d.status,'GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED');
   assert.equal(d.preview_auto_deploy_verified,true);
   assert.equal(d.installation_authorized,false);
