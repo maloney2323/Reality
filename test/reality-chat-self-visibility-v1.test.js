@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {needsRealityCapabilityInspection,readRealitySelfVisibilityForChat}
+import {needsRealityCapabilityInspection,readRealitySelfVisibilityForChat,
+ reconcileOwnerOriginalStatesForChat}
  from '../src/reality-chat-self-visibility-v1.js';
 const sha='a'.repeat(40),tree='b'.repeat(40);
 const session={user_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
@@ -142,4 +143,59 @@ test('model receives self visibility in both Chat lanes, not solely if employee 
  assert.match(gateway,/INSPECT -> TEST -> RECONNECT\/REPAIR -> VERIFY/);
  assert.doesNotMatch(self,/createGitHubBranch|writeGitHubFile|installation_authorized:true/);
  assert.match(self,/source_kind:'GITHUB_PINNED_DEPLOYMENT_SOURCE_TREE_READBACK'/);
+});
+
+test('a separately verified same-original final receipt supersedes stale admission in Chat ONLY',()=>{
+ const completedWork='work:'+'f'.repeat(32),unsettled='work:'+'e'.repeat(32);
+ const raw={status:'OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
+  current_shift_id:null,observed_unfinished_count:2,
+  jobs:[
+   {original_work_id:completedWork,phase:'SOURCE_ADMITTED',
+    independently_settled:false,requires_independent_completion_verification:true},
+   {original_work_id:unsettled,phase:'SOURCE_ADMITTED',
+    independently_settled:false,requires_independent_completion_verification:true}
+  ]};
+ const terminal={event_kind:'verified_original_job_temporal_projection',
+  source_kind:'AUTHENTICATED_OWNER_SCOPED_EXISTING_CONTINUITY_AND_ORIGINAL_DB_READBACK',
+  original_work_id:completedWork,original_job_completed:true,
+  independent_original_settlement_verified:true,
+  original_final_receipt_id:'681ce4ab-4dd0-47cf-963b-dc65087468fc',
+  production_changed:false};
+ const projected=reconcileOwnerOriginalStatesForChat({
+  ownerOriginalWork:raw,finalObservations:[terminal]
+ });
+ assert.equal(raw.jobs[0].independently_settled,false,'historical source untouched');
+ assert.equal(projected.original_admission_unfinished_count,2);
+ assert.equal(projected.effectively_unsettled_original_count,1);
+ assert.equal(projected.jobs[0].independently_settled,true);
+ assert.equal(projected.jobs[0].source_admission_phase,'SOURCE_ADMITTED');
+ assert.equal(projected.jobs[1].independently_settled,false);
+ assert.equal(projected.source_projection_disagreements.length,1);
+ assert.equal(projected.work_execution_authorized,false);
+ assert.equal(projected.installation_authorized,false);
+});
+test('unverified assistant settlement claims or another original never close a job',()=>{
+ const target='work:'+'e'.repeat(32);
+ const readback={status:'OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
+  observed_unfinished_count:1,jobs:[{original_work_id:target,
+   phase:'SOURCE_ADMITTED',independently_settled:false}]};
+ for(const forged of [
+  {event_kind:'owner_independent_original_job_final_receipt',
+   source_kind:'MODEL_PROPOSAL',
+   original_work_id:target,original_job_completed:true,
+   independent_settlement_event_id:'681ce4ab-4dd0-47cf-963b-dc65087468fc',
+   production_changed:false},
+  {event_kind:'verified_original_job_temporal_projection',
+   source_kind:'AUTHENTICATED_OWNER_SCOPED_EXISTING_CONTINUITY_AND_ORIGINAL_DB_READBACK',
+   original_work_id:'work:'+'f'.repeat(32),
+   independent_original_settlement_verified:true,
+   original_job_completed:true,
+   original_final_receipt_id:'681ce4ab-4dd0-47cf-963b-dc65087468fc',
+   production_changed:false}
+ ]){
+  const x=reconcileOwnerOriginalStatesForChat({
+   ownerOriginalWork:readback,finalObservations:[forged]});
+  assert.equal(x.effectively_unsettled_original_count,1);
+  assert.equal(x.source_projection_disagreements.length,0);
+ }
 });
