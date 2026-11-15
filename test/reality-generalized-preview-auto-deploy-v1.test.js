@@ -158,4 +158,10 @@ test('DB durable deploy status requires original uninstalled source receipt and 
  assert.doesNotMatch(sql,/GRANT EXECUTE[^;]*authenticated/i);
  assert.match(worker,/verifyGeneralizedOriginalPreviewAutoDeploy/);
  assert.match(worker,/generalized_original_preview_auto_deploy:generalizedPreviewDeployment/);
+ const labelMigration=readFileSync(new URL(
+  '../supabase/migrations/20261114_generalized_vercel_actor_evidence_label_v2.sql',
+  import.meta.url),'utf8');
+ assert.match(labelMigration,/GITHUB_VERIFIED_VERCEL_OFFICIAL_ACTOR_SUCCESS_EXACT_CANARY_SHA/);
+ assert.match(labelMigration,/pg_catalog\.pg_get_constraintdef/);
+ assert.match(labelMigration,/already_rec[o]?rded|ALREADY_RECORDED/i);
 });
