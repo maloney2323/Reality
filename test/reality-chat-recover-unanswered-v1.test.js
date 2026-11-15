@@ -90,3 +90,56 @@ test('real browser event recovers at most once for the same saved turn',async()=
   else globalThis.document=originalDocument;
  }
 });
+
+
+test('saved reply recovery waits for disabled Send to release, then retries the SAME request once',async()=>{
+ const listeners=new Map(),storage=new Map();
+ let clicked=0,mutationHandler=null;
+ const sendButton={disabled:true};
+ const retryButton={
+  disabled:false,isConnected:true,textContent:'Retry original saved reply',
+  click(){clicked++;}
+ };
+ const oldWindow=globalThis.window,oldDocument=globalThis.document,
+  oldMutation=globalThis.MutationObserver;
+ globalThis.window={
+  location:{pathname:'/chat'},
+  addEventListener:(event,handler)=>listeners.set(event,handler),
+  localStorage:{
+   getItem:key=>storage.get(key)||null,
+   setItem:(key,value)=>storage.set(key,value)
+  }
+ };
+ globalThis.document={
+  hidden:false,
+  getElementById:()=>sendButton,
+  addEventListener:()=>{},
+  querySelector:selector=>selector.includes(request)?retryButton:null
+ };
+ globalThis.MutationObserver=class {
+  constructor(handler){mutationHandler=handler}
+  observe(target,config){
+   assert.equal(target,sendButton);
+   assert.deepEqual(config.attributeFilter,['disabled']);
+  }
+ };
+ try{
+  await import('../reality-chat-recover-unanswered-v1.js?deferred-browser-test-v2');
+  const event={detail:{conversation_id:id,
+   messages:[{...msg,created_at:new Date().toISOString()}],
+   unanswered_requests:[pending]}};
+  listeners.get('reality:saved-chat-readback')(event);
+  assert.equal(clicked,0,'must not drop or prematurely retry while sending');
+  assert.equal(storage.size,0,'one-use recovery only when actually ready');
+  sendButton.disabled=false;
+  mutationHandler();
+  mutationHandler();
+  assert.equal(clicked,1);
+  assert.equal(storage.size,1);
+ }finally{
+  if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;
+  if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;
+  if(oldMutation===undefined)delete globalThis.MutationObserver;
+  else globalThis.MutationObserver=oldMutation;
+ }
+});
