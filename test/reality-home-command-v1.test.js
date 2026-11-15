@@ -118,11 +118,14 @@ test('renders verified source signals and final receipts while suppressing readi
  assert.ok(values(command,'rc-stat-value').includes('1'));
  assert.ok(values(command,'rc-stat-value').includes('Not verified'));
  assert.ok(values(command,'rc-cash').includes('Not established'));
- const action=f.get('realityHomeReviewWork');
- assert.equal(typeof action.listeners.click,'function');
- action.listeners.click();
- assert.equal(f.get('realityHomeExistingEvidence').open,true);
- assert.equal(f.ids.realityEmployeeShiftPlanner.scrolled,true);
+ // Home explains valuable work without starting or approving a shift.
+ assert.equal(f.get('realityHomeReviewWork'),null);
+ assert.ok(js.includes('rc-hero-foot'));
+ assert.ok(!js.includes('Review & Start Ready Work'));
+ assert.ok(!css.includes('.rc-start{'));
+ // The original governed planner remains for the Shifts section.
+ assert.ok(f.ids.realityEmployeeShiftPlanner);
+ assert.equal(f.get('realityHomeExistingEvidence').open,false);
 });
 test('signout and unavailable economic evidence never leave old owner counts on Home',()=>{
  const f=fixture();
@@ -200,4 +203,19 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
  f.seen[0].fn();
  assert.equal(textOf('rc-weekly-amount').length,0,
   'a different signed-in account must not inherit the prior owner\'s workload');
+});
+
+test('mobile screenshot layout prioritizes workforce bars and side-by-side value proof',()=>{
+ assert.match(css,/\.rc-stats\s*\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.rc-stat\.rc-verified\s*\{[\s\S]*?grid-column:1\/-1/);
+ assert.match(css,/\.rc-impacts\s*\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.rc-weekly-track/);
+ assert.match(css,/\.rc-weekly-fill/);
+ assert.match(js,/featured=ordered\.filter/);
+ assert.match(js,/\.slice\(0,3\)/);
+ assert.match(js,/rc-weekly-more/);
+ assert.match(js,/How workload hours are calculated/);
+ assert.match(js,/Ask Reality to assess this workweek gap/);
+ assert.match(js,/if\(isSignedIn!==authWasSignedIn\)/);
+ assert.doesNotMatch(js,/Review & Start Ready Work|rc-start|realityHomeReviewWork/);
 });
