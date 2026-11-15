@@ -108,7 +108,8 @@ async function refresh(){
  loggedIn=true;busy=true;
  try{
   const response=await fetch('/api/reality/personal-governed-employee-shift',{
-   method:'GET',credentials:'same-origin',cache:'no-store'});
+   method:'GET',credentials:'same-origin',cache:'no-store',
+   signal:AbortSignal.timeout(12000)});
   if(!response.ok)throw Error('SHIFT_SOURCE_READBACK_UNAVAILABLE');
   const data=await response.json().catch(()=>null);
   if(!valid(data))throw Error('SHIFT_RECEIPT_PROVENANCE_UNVERIFIED');
@@ -143,7 +144,21 @@ ask.onclick=()=>{
 };
 const refreshButton=$('realityChatShiftRefresh');
 if(refreshButton)refreshButton.onclick=()=>{void refresh()};
-if(typeof setTimeout==='function')setTimeout(()=>void refresh(),1200);
-if(typeof setInterval==='function')setInterval(()=>void refresh(),30000);
+const shiftVisibleRoute=()=>['/','/chat','/shifts'].includes(window.location.pathname);
+const onlineVisible=()=>typeof document.visibilityState!=='string'||
+ document.visibilityState==='visible';
+if(typeof setTimeout==='function')setTimeout(()=>{
+ if(shiftVisibleRoute()&&onlineVisible())void refresh();
+},1200);
+// Page visibility and route scope bound the read-only polling load; this
+// does not stop a server-side authorized shift or independent workers.
+if(typeof setInterval==='function')setInterval(()=>{
+ if(shiftVisibleRoute()&&onlineVisible())void refresh();
+},60000);
+if(typeof MutationObserver==='function')
+ new MutationObserver(()=>{
+  if(ready.style.display==='block'&&shiftVisibleRoute()&&onlineVisible())
+   void refresh();
+ }).observe(ready,{attributes:true,attributeFilter:['style']});
 window.realityShiftRefreshBriefing=()=>void refresh();
 })();
