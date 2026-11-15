@@ -211,7 +211,8 @@ export async function authorizeSavedChatExistingOriginal({
   installation_authorized:false,production_changed:false});
 }
 
-\n// Explicit saved owner build instruction -> SAME already-governed original's
+
+// Explicit saved owner build instruction -> SAME already-governed original's
 // pre-existing corrective CI broker. This endpoint never creates a job or
 // shift, writes production, or installs a candidate. The broker performs its
 // own independent service-role/current-source/one-shot provider checks.
