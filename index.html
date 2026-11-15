@@ -6467,9 +6467,11 @@ $('runShiftNow').onclick=async()=>{
   }finally{button.disabled=false;}
 };
 // Loading saved discoveries is automatic; it never starts a new LLM call,
-// authorizes a tool, or runs the cron handler.
-refreshSavedShiftHome();
-setInterval(refreshSavedShiftHome,300000);
+// authorizes a tool, or runs the cron handler. Hidden pages do not poll.
+if(['/','/work','/shifts'].includes(window.location.pathname)){
+ refreshSavedShiftHome();
+ setInterval(()=>{if(document.visibilityState==='visible')void refreshSavedShiftHome();},300000);
+}
 
 (function(){
  const el=id=>document.getElementById(id);
@@ -6575,14 +6577,17 @@ setInterval(refreshSavedShiftHome,300000);
   }
  };
 
+ const realityCurrentRoute=()=>document.body.dataset.realityRoute||'home';
  function showSignedIn(yes){
+  const previouslySignedIn=el('privateReady').style.display==='block';
   el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
   el('privateAccountState').textContent=yes?
    '✓ Signed in. Your conversation and goal controls are available below.':
    'Sign in below using your existing Reality account.';
   el('privateRetrySession').hidden=true;
   el('privateLogin').style.display=yes?'none':'block';
-  el('privateReady').style.display=yes?'block':'none';
+  // Avoid re-triggering a large fan-out of private readers when revalidating.
+  if(previouslySignedIn!==yes)el('privateReady').style.display=yes?'block':'none';
   guidedSetup.authenticated=yes;
   guidedSetup.accountError='';
   realitySimpleAccount(yes);
@@ -6591,14 +6596,23 @@ setInterval(refreshSavedShiftHome,300000);
    wcGapFeedStatus='Sign in to see your capability gap intake.';
    $('simpleGapFeedStatus').textContent=wcGapFeedStatus;wcRender();
   }
-  if(!yes)void realityChatMarketStage();
+  if(!yes&&realityCurrentRoute()==='work')void realityChatMarketStage();
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
-  if(yes&&typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
-  if(yes){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
-  else{void realityBusinessRefresh();void homeOwnerRefresh();
+  if(yes&&!previouslySignedIn){
+   const route=realityCurrentRoute();
+   if(['chat','work'].includes(route))void refreshRealitySelfImprovement();
+   if(['chat','work','shifts','home'].includes(route))void homeOwnerRefresh();
+   if(route==='chat')void realityChatRefreshEvents();
+   if(['home','value'].includes(route))void realityBusinessRefresh();
+   if(['chat','work','shifts'].includes(route)&&
+      typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
+   if(route==='work'){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
+  }
+  if(!yes){
+   if(['home','value'].includes(realityCurrentRoute()))void realityBusinessRefresh();
+   if(['chat','work','shifts'].includes(realityCurrentRoute()))void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
    el('privateSelfImprovementStatus').textContent=
