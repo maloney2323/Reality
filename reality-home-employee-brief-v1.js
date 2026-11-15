@@ -3,7 +3,7 @@
 // does not create employees, dispatch work, authorize shifts or infer ROI.
 (() => {
  'use strict';
- if (window.location.pathname !== '/') return;
+ if (!['/','/employees','/shifts'].includes(window.location.pathname)) return;
  const root=document.getElementById('realityHomeEmployees');
  if (!root) return;
  const status=document.getElementById('realityHomeEmployeesStatus');
