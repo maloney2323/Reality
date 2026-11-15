@@ -75,6 +75,18 @@ export async function inspectSavedChatWork({
    action_eligible:false,execution_started:false,
    installation_authorized:false,production_changed:false});
  }
+ // A literal, signed request to code an exact GitHub issue or original work
+ // identity wins over a vague "discover existing work" classification. This
+ // narrows the destination; it cannot add an original or mint an authority.
+ if(intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
+    typeof intent.source_quote==='string'&&
+    verified.text.includes(intent.source_quote)&&
+    /\b(?:build|code|implement|repair|fix|develop|upgrade)\b/i.test(verified.text)&&
+    (/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|\b(?:issue|job|repair)\s*#?[1-9]\d*\b|work:[a-f0-9]{32})/i)
+      .test(verified.text)){
+  intent={...intent,capability_id:'governed-original-engineering',
+   action_eligible:true};
+ }
  const common={
   request_id:requestId,source_ref:verified.source_ref,
   intent_kind:intent.kind,objective:intent.objective||null,
