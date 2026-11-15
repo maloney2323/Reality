@@ -7289,21 +7289,47 @@ setInterval(refreshSavedShiftHome,300000);
   try{
    // A conversation is durably accepted before model/reliability processing.
    // Even if cognition times out, the exact signed-in turn can be resumed.
-   const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
-    credentials:'same-origin',signal:AbortSignal.timeout(22000),
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
-      message:value})});
-   const saved=await accepted.json().catch(()=>null);
-   if(typeof saved?.stage==='string'&&
-      /^[A-Z][A-Z0-9_]{3,80}$/.test(saved.stage))
-    responseFailureStage=saved.stage;
-   if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
-      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(saved.request_id||'')||
-      !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(saved.source_ref||'')){
-
-    const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
-    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+   let saved=null;
+   try{
+    const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
+     credentials:'same-origin',signal:AbortSignal.timeout(22000),
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
+       message:value})});
+    saved=await accepted.json().catch(()=>null);
+    if(typeof saved?.stage==='string'&&
+       /^[A-Z][A-Z0-9_]{3,80}$/.test(saved.stage))
+     responseFailureStage=saved.stage;
+    if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
+       !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(saved.request_id||'')||
+       !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(saved.source_ref||'')){
+     const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:
+      'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+    }
+   }catch(intakeError){
+    // An HTTP timeout is NOT evidence that the INSERT failed. Confirm the
+    // exact saved owner turn before declaring failure; do not POST intake a
+    // second time or mint another request. If saved, continue cognition.
+    try{
+     const verify=await fetch('/api/reality/personal-chat?conversation_id='+
+      encodeURIComponent(sentConversation)+'&reply_readback=1&request_id='+
+      encodeURIComponent(sentRequest),{
+       method:'GET',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(8500)});
+     const proof=verify.ok?await verify.json().catch(()=>null):null;
+     const exact=proof?.ok===true&&
+      proof.conversation_id===sentConversation&&
+      Array.isArray(proof.messages)?proof.messages.filter(x=>
+       x.role==='user'&&x.request_id===sentRequest&&x.text===value&&
+       /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(x.source_ref||'')):[];
+     if(exact.length===1){
+      saved={ok:true,saved:true,conversation_id:sentConversation,
+       request_id:sentRequest,source_ref:exact[0].source_ref,
+       recovered_from_exact_owner_readback:true};
+     }
+    }catch{/* A readback problem never proves that the saved row is absent. */}
+    if(!saved?.ok||saved.saved!==true)throw intakeError;
    }
    // The server may have recovered an earlier saved, unanswered request
    // after the old HTTP acknowledgment was lost. Use the original request
