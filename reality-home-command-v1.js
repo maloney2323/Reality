@@ -78,8 +78,23 @@
  const main=el('div','rc-main-grid');
  const people=el('section','rc-workforce');
  people.append(head('AI WORKFORCE · OWNER-SCOPED ROLES','Your AI workforce'));
- const capacity=el('p','rc-capacity','Weekly hours and available capacity require measured schedules.');
- people.append(capacity,team);
+ const capacity=el('p','rc-capacity',
+  'Workload is evaluated against a hypothetical 40-hour-per-role reference, not actual scheduled employee hours.');
+ const weekly=el('section','rc-weekly');
+ weekly.id='realityHomeWeeklyWorkload';
+ weekly.setAttribute('aria-label','Next week provisional workload allocation');
+ const weeklyTitle=el('h3','rc-weekly-title','Next week · workload coverage');
+ const weeklyStatus=el('p','rc-weekly-status',
+  'Checking the existing owner-scoped Monday–Friday plan…');
+ const weeklyTotals=el('div','rc-weekly-totals');
+ const weeklyRows=el('div','rc-weekly-rows');
+ const weeklyFoot=el('p','rc-weekly-foot',
+  'Only proposed review timeboxes are shown. They are NOT scheduled execution, measured work, unfilled customer orders, or verified savings.');
+ const discuss=a('Ask Reality to assess this workweek gap','/chat#weekly-workload','rc-text-link rc-weekly-chat');
+ weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,weeklyRows,weeklyFoot,discuss);
+ const directory=el('details','rc-role-directory');
+ directory.append(el('summary','','Explore all employee profiles, responsibilities & source jobs'),team);
+ people.append(capacity,weekly,directory);
  const today=el('section','rc-today');
  today.append(head('GOVERNED SHIFT · CURRENT EVIDENCE','Today’s work'));
  today.append(el('strong','rc-today-label','Current shift'));
@@ -137,11 +152,98 @@
   plan=$('realityEmployeeShiftStatus'),teamStatus=$('realityHomeEmployeesStatus'),
   sourceStatus=$('simpleWorkdayStatus'),sourceList=$('simpleWorkdayCandidates');
  const signed=()=>auth?.style.display==='block';
+ let weeklyInsight=null;
+ const h=x=>Number.isInteger(x)?String(x):String(x).replace(/\\.0$/,'');
+ function showWeekly(){
+  weeklyTotals.replaceChildren();
+  weeklyRows.replaceChildren();
+  const info=weeklyInsight;
+  if(!signed()||info?.version!=='reality-weekly-workload-insight-v1'||
+   info.status!=='PROVISIONAL_REVIEW_COVERAGE_GAP_NOT_VERIFIED_EMPLOYEE_SCHEDULE'||
+   info.read_only!==true||info.execution_authorized!==false||
+   info.installation_authorized!==false||info.production_changed!==false||
+   info.comparison_is_not_actual_schedule!==true||
+   info.remaining_reference_hours_are_not_verified_missing_customer_jobs!==true||
+   !Array.isArray(info.roles)||info.roles.length!==info.role_count){
+   weeklyStatus.textContent=signed()?
+    'Weekly source readback unavailable. No coverage or missing work inferred.':
+    'Sign in to inspect the source-backed proposed workweek.';
+   weeklyRows.append(el('p','rc-weekly-unknown',
+    'No weekly allocation is verified for display.'));
+   return;
+  }
+  weeklyStatus.textContent='Week of '+info.week_start+' through '+info.week_end+
+   ' · '+info.source_finding_count+' source-backed findings routed for provisional review.';
+  const allocated=el('div','rc-weekly-total');
+  allocated.append(el('span','','Provisional source-review timeboxes'),
+   el('strong','',h(info.provisional_review_timebox_hours)+' / '+
+    h(info.hypothetical_weekly_reference_hours)+' h'));
+  const unallocated=el('div','rc-weekly-total');
+  unallocated.append(el('span','','Unallocated hypothetical reference'),
+   el('strong','',h(info.unallocated_hypothetical_reference_hours)+' h'));
+  weeklyTotals.append(allocated,unallocated);
+  for(const role of info.roles.slice().sort((a,b)=>
+   b.proposed_review_timebox_hours-a.proposed_review_timebox_hours||
+   a.employee_name.localeCompare(b.employee_name))){
+   const article=el('article','rc-weekly-row');
+   const top=el('div','rc-weekly-row-head');
+   const name=el('div','rc-weekly-name');
+   name.append(el('strong','',role.employee_name),
+    el('small','',role.role_title));
+   const amount=el('strong','rc-weekly-amount',
+    h(role.proposed_review_timebox_hours)+' / '+
+    h(role.hypothetical_weekly_comparison_hours)+' h');
+   top.append(name,amount);
+   const track=el('div','rc-weekly-track');
+   track.setAttribute('role','progressbar');
+   track.setAttribute('aria-label',role.employee_name+' provisional timebox relative to hypothetical 40-hour reference');
+   track.setAttribute('aria-valuemin','0');
+   track.setAttribute('aria-valuemax','100');
+   track.setAttribute('aria-valuenow',String(role.comparison_coverage_percent));
+   const fill=el('span','rc-weekly-fill');
+   fill.style.width=role.comparison_coverage_percent+'%';
+   track.append(fill);
+   const remaining=el('p','rc-weekly-remaining',
+    h(role.unallocated_hypothetical_reference_hours)+
+    ' h unallocated in hypothetical comparison · '+
+    role.source_finding_count+' sources for review');
+   const detail=el('details','rc-weekly-details');
+   detail.append(el('summary','','View Monday–Friday source assignments'));
+   for(const day of role.week_days){
+    const dayRow=el('div','rc-weekly-day');
+    dayRow.append(el('strong','',day.weekday+' · '+
+     h(day.provisional_review_timebox_hours)+' h proposed review'));
+    if(!day.source_findings.length){
+     dayRow.append(el('p','','No source assigned for review on this day.'));
+    }else for(const finding of day.source_findings){
+     if(!/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/.test(finding.source_url))
+      continue;
+     const source=a(finding.title,finding.source_url,'rc-weekly-source-link');
+     source.target='_blank';source.rel='noopener noreferrer';
+     dayRow.append(source);
+    }
+    detail.append(dayRow);
+   }
+   article.append(top,track,remaining,detail);
+   weeklyRows.append(article);
+  }
+ }
+ if(typeof window.addEventListener==='function')
+  window.addEventListener('reality:weekly-workload-readback',event=>{
+   const value=event.detail;
+   // A browser event can change only presentation, never work authority.
+   weeklyInsight=value?.read_only===true&&value.execution_authorized===false&&
+    value.installation_authorized===false&&value.production_changed===false?
+    value:null;
+   showWeekly();
+  });
+
  const econOK=()=>signed()&&/^(Read-only source check complete|Partial readback)/.test(econStatus?.textContent||'');
  const sourceOK=()=>/^(Checked connected provider sources|Partial source coverage)/.test(sourceStatus?.textContent||'');
  const intText=s=>/^(0|[1-9][0-9]*)$/.test(s||'')?s:null;
  function paint(){
   const ok=econOK(),found=ok?intText(signals?.textContent?.trim()):null;
+  showWeekly();
   metrics.found.value.textContent=found??'—';
   metrics.found.caption.textContent=found!==null?
    (signalNote?.textContent||'Source observations need validation'):'Owner discovery readback not verified';
