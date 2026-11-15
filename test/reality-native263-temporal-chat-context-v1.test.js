@@ -180,7 +180,7 @@ test('mobile Chat keeps its conversation and navigation outside the long #263 pr
  assert.match(proof,/realityChatTabProof/);
  assert.match(proof,/const ready=element\('privateReady'\)/);
  assert.match(workspace,/homeLink\.href = '\/'/);
- assert.match(workspace,/threadButtons\.append\(homeLink, historyToggle, inspectorToggle, focusToggle\)/);
+ assert.match(workspace,/threadButtons\.append\(homeLink, historyToggle, inspectorToggle, (?:newChatHeader, )?focusToggle\)/);
  assert.match(workspace,/panels\.proof\.append\(native263Proof\)/);
  assert.match(css,/reality-chat-home-link/);
  assert.match(css,/reality-chat-inspector #native263InstallApprovalPanel/);
