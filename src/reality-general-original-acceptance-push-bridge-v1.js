@@ -5,7 +5,7 @@
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const safe=(status,more={})=>Object.freeze({
- status,independent_push_acceptance_verified:false,
+ status,independent_pr_sync_acceptance_verified:false,
  installation_authorized:false,source_installed:false,
  original_job_completed:false,production_changed:false,...more
 });
@@ -37,18 +37,24 @@ export async function verifyGeneralOriginalAcceptancePushTransport({
   result.production_changed!==false)
   return safe('GENERAL_ORIGINAL_CI_PUSH_RESPONSE_AUTHORITY_DRIFT');
  if(!response.ok)return safe('GENERAL_ORIGINAL_CI_PUSH_SERVICE_OR_PROVIDER_UNVERIFIED');
- if(result.status==='EXACT_ISOLATED_PUSH_AND_CI_INDEPENDENTLY_VERIFIED'&&
-   result.independent_push_acceptance_verified===true&&
+ if(result.status==='EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED'&&
+   result.independent_pr_sync_acceptance_verified===true&&
+   result.acceptance_event==='pull_request'&&
+   Number.isSafeInteger(result.acceptance_pr_number)&&
+   result.acceptance_pr_number>0&&
    WORK.test(result.original_work_id||'')&&
    SHA.test(result.github_commit_sha||'')&&
    Number.isSafeInteger(result.push_ci_run_id)&&result.push_ci_run_id>10000)
-  return safe(result.status,{independent_push_acceptance_verified:true,
+  return safe(result.status,{independent_pr_sync_acceptance_verified:true,
+   acceptance_event:result.acceptance_event,
+   acceptance_pr_number:result.acceptance_pr_number,
    original_work_id:result.original_work_id,
    github_commit_sha:result.github_commit_sha,push_ci_run_id:result.push_ci_run_id});
  if(['NO_CURRENT_AUTHORIZED_PUSH_PROBE',
    'EXACT_ISOLATED_SOURCE_PATH_PUSH_PROVIDER_VERIFIED',
    'GOVERNED_PUSH_INDEPENDENT_ACCEPTANCE_PENDING_OR_UNVERIFIED',
    'EXACT_ISOLATED_PUSH_FENCED_OR_UNVERIFIED',
+   'GOVERNED_PR_ORIGINAL_AND_BASE_IDENTITY_UNVERIFIED',
    'ONE_SHOT_GITHUB_PUSH_EFFECT_UNVERIFIED_NO_RETRY',
    'ISOLATED_PREFLIGHT_SOURCE_OR_BRANCH_DRIFT_NO_EFFECT',
    'ISOLATED_GITHUB_BROKER_CREDENTIAL_UNVERIFIED'].includes(result.status))
