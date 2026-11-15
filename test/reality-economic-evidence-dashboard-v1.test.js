@@ -80,7 +80,7 @@ function fixture({signed=true,routes={}}={}){
  const context={
   document:{getElementById:id=>elements[id],createElement:node,
    visibilityState:'visible',addEventListener:(name,fn)=>{listeners[name]=fn}},
-  window:{addEventListener:(name,fn)=>{listeners['window:'+name]=fn}},
+  window:{location:{pathname:'/'},addEventListener:(name,fn)=>{listeners['window:'+name]=fn}},
   MutationObserver:MutationObserverFake,
   setInterval:(fn,ms)=>intervals.push({fn,ms}),
   fetch:async(url,options)=>{calls.push({url,options});
