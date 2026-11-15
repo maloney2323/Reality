@@ -151,6 +151,63 @@ export async function publishPrivateAssistantAtomically(
 }
 
 
+// The EXISTING owner-goal publication epoch is already independently read
+// by the execution controller. For ordinary READ-ONLY Chat, this single
+// service-scoped RPC gives the exact goal CAS revision without forcing a
+// complete Universe history reconstruction before the model can reply.
+// The final atomic publication RPC still checks the same revision, latest
+// owner request and exact committed user turn under the existing DB lock.
+export async function readPrivateChatGoalPublicationEpoch(
+ session,{conversationId,requestId,isolatedDb},{fetchImpl=fetch}={}
+){
+ if(!validUuid(session?.user_id)||!validUuid(conversationId)||
+    !validUuid(requestId)||!isolatedDb?.strictSecrets||
+    isolatedDb.url!==session.config?.url||
+    typeof isolatedDb.secretKey!=='string'||!isolatedDb.secretKey)
+  throw Object.assign(Error('CHAT_GOAL_EPOCH_OWNER_SCOPE_INVALID'),{status:503});
+ const response=await fetchImpl(
+  isolatedDb.url+'/rest/v1/rpc/reality_read_execution_epoch',{
+   method:'POST',signal:AbortSignal.timeout(3500),
+   headers:{
+    apikey:isolatedDb.secretKey,
+    authorization:'Bearer '+isolatedDb.secretKey,
+    accept:'application/json','content-type':'application/json'
+   },
+   body:JSON.stringify({
+    p_user_id:session.user_id,p_conversation_id:conversationId
+   })
+  }
+ );
+ if(!response.ok)
+  throw Object.assign(Error('CHAT_GOAL_EPOCH_READ_UNAVAILABLE'),{status:503});
+ const result=await response.json().catch(()=>null);
+ if(!Array.isArray(result)||result.length!==1)
+  throw Object.assign(Error('CHAT_GOAL_EPOCH_EXACT_ROW_REQUIRED'),{status:503});
+ const row=result[0];
+ if(!Number.isSafeInteger(Number(row.goal_revision))||
+    Number(row.goal_revision)<0||
+    !Number.isSafeInteger(Number(row.user_message_revision))||
+    Number(row.user_message_revision)<1||
+    (row.goal_transition_event_id!==null&&
+     !validUuid(row.goal_transition_event_id))||
+    !validUuid(row.latest_user_request_id))
+  throw Object.assign(Error('CHAT_GOAL_EPOCH_INVALID'),{status:503});
+ if(row.latest_user_request_id!==requestId)
+  throw Object.assign(
+   Error('CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN'),
+   {status:409}
+  );
+ return Object.freeze({
+  expected_revision:Number(row.goal_revision),
+  expected_last_goal_event_id:row.goal_transition_event_id||null,
+  user_message_revision:Number(row.user_message_revision),
+  latest_user_request_id:row.latest_user_request_id,
+  source:'EXISTING_OWNER_SCOPED_EXECUTION_EPOCH_RPC',
+  independent_full_history_not_claimed:true,
+  execution_authorized:false,installation_authorized:false
+ });
+}
+
 // Exact authenticated request readback for reply status polling. This reads
 // at most two message rows instead of reloading 240 history rows and unrelated
 // operational dashboards on every progress tick. RLS and identity are never
