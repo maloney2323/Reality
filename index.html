@@ -7224,7 +7224,11 @@ setInterval(refreshSavedShiftHome,300000);
   localStorage.setItem('reality.private.chat.conversation.v1',crypto.randomUUID());
   el('privateTranscript').replaceChildren();await loadConversations();void wcLoadCompletionReports();status('New conversation ready.');
  };
+ let privateChatSending=false;
  el('privateSend').onclick=async()=>{
+  // A disabled control is not enough to prevent a second Enter/click event
+  // from racing the first request's immutable source identity.
+  if(privateChatSending)return;
   const value=el('privatePrompt').value.trim();if(!value)return;
   // A second click/paste must not create a second original work request
   // when this EXACT text is already durably saved and awaiting a reply.
@@ -7235,8 +7239,10 @@ setInterval(refreshSavedShiftHome,300000);
    status('This exact instruction is already saved in Reality. Use Retry this saved reply underneath the original message; no duplicate was submitted.');
    return;
   }
+  privateChatSending=true;
   const goalCommand=el('privateGoalCommand').value||null;
-  const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
+  const sentConversation=conversationId();
+  let sentRequest=crypto.randomUUID();
   // Present the owner's typed words immediately in their conversation.
   // This is a LOCAL delivery candidate until the authenticated RLS readback
   // verifies it; no synthetic saved history, model response or job event.
@@ -7256,7 +7262,7 @@ setInterval(refreshSavedShiftHome,300000);
        /work:[a-f0-9]{32}/i.test(value))}
   }));
   el('privateSend').disabled=true;
-  let intakeVerified=false;
+  let intakeVerified=false,responseFailureStage=null;
   status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
    // A conversation is durably accepted before model/reliability processing.
@@ -7268,11 +7274,29 @@ setInterval(refreshSavedShiftHome,300000);
       message:value})});
    const saved=await accepted.json().catch(()=>null);
    if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
-      !String(saved.source_ref||'').startsWith('supabase:reality_chat_messages:')){
+      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(saved.request_id||'')||
+      !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(saved.source_ref||'')){
+
     const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
    }
+   // The server may have recovered an earlier saved, unanswered request
+   // after the old HTTP acknowledgment was lost. Use the original request
+   // ID for cognition, status and recovery; NEVER insert another message.
+   if(saved.request_id!==sentRequest){
+    const previousRequestId=sentRequest;
+    sentRequest=saved.request_id;
+    pendingBubble.dataset.requestId=sentRequest;
+    window.dispatchEvent(new CustomEvent('reality:chat-request-rebound',{
+     detail:{conversation_id:sentConversation,previous_request_id:previousRequestId,
+      request_id:sentRequest,source_ref:saved.source_ref}
+    }));
+   }
    intakeVerified=true;
+   window.dispatchEvent(new CustomEvent('reality:chat-intake-saved',{
+    detail:{conversation_id:sentConversation,request_id:sentRequest,
+     source_ref:saved.source_ref,duplicate_content:saved.duplicate_content===true}
+   }));
    if(pendingBubble.isConnected)
     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
    window.realityJustSavedWorkRequest={conversation_id:sentConversation,
@@ -7324,6 +7348,8 @@ setInterval(refreshSavedShiftHome,300000);
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
    const data=await r.json().catch(()=>null);
+   if(typeof data?.stage==='string'&&/^[A-Z][A-Z0-9_]{3,80}$/.test(data.stage))
+    responseFailureStage=data.stage;
    if(!r.ok||data?.ok!==true){
     const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
@@ -7505,12 +7531,16 @@ setInterval(refreshSavedShiftHome,300000);
     el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
    }
    window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
-    detail:{request_id:sentRequest,code:safeCode}
+    detail:{request_id:sentRequest,code:safeCode,
+     ...(responseFailureStage?{stage:responseFailureStage}:{})}
    }));
    status((savedUser||intakeVerified)?
     'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Retry that saved reply; do not send a new request or assume execution.':
     'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
-  }finally{el('privateSend').disabled=false}
+  }finally{
+   privateChatSending=false;
+   el('privateSend').disabled=false;
+  }
  };
  // The Send action is the only client-side owner source for a draft-build
  // continuation. The status panel observes evidence and emits a read-only
