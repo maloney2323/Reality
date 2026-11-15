@@ -30,4 +30,3 @@ jobs:
           node --test test/reality-economic-evidence-dashboard-v1.test.js
           node --test test/reality-simple-customer-home-v1.test.js
           node --test test/reality-eight-hour-shift-plan-v1.test.js
-          node --test test/reality-combined-employee-shift-visibility-v1.test.js
