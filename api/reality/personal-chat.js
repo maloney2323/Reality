@@ -2,6 +2,8 @@
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
 import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
+import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
+ from '../../src/reality-chat-proportional-readonly-v1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
@@ -341,6 +343,117 @@ export default async function handler(req,res){
    unavailable:optionalContext.unavailable.filter(x=>
     x==='originals'||x==='weekly_queue')
   };
+  // Ordinary Chat needs no job settlement or installation proof to ANSWER.
+  // It still uses the existing Signal Cleaner, grounded cognitive gateway,
+  // owner-scoped history and atomic goal-revision compare-and-swap.
+  // Actual work commands, public research and goal mutations retain the
+  // full governed orchestration, independent testing and exact approvals.
+  if(isProportionalReadOnlyChat({
+   message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
+  })){
+   stage='READ_ONLY_OWNER_GOAL_SNAPSHOT';
+   const authoritySpine=createContinuitySpine({
+    continuityRootId:scopedRoot,worldlineId:scopedRoot,
+    subjectId:session.user_id
+   });
+   const priorGoals=await createUniversePostgresPersistence({
+    ...isolated
+   }).reconstruct({
+    continuityRootId:authoritySpine.continuity_root_id,
+    worldlineId:authoritySpine.worldline_id
+   });
+   const currentGoal=projectAuthoritativeUserGoals({
+    continuityHistory:priorGoals,
+    continuityRootId:authoritySpine.continuity_root_id,
+    worldId:scopedRoot,principalId:session.user_id
+   });
+   const expectedRevision=continuity.verified_prior_goal_cas?
+    continuity.verified_prior_goal_cas.expected_revision:
+    currentGoal.transition_count;
+   const expectedLastGoalEventId=continuity.verified_prior_goal_cas?
+    continuity.verified_prior_goal_cas.expected_last_goal_event_id:
+    currentGoal.recent_transition_receipts.at(-1)?.event_id||null;
+   if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
+      (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId)))
+    fail('CHAT_READ_ONLY_OWNER_GOAL_SNAPSHOT_UNVERIFIED',503);
+   stage='READ_ONLY_MODEL_COGNITION';
+   const quickStart=Date.now();
+   const advisory=await generateProportionalReadOnlyReply({
+    message:text,conversationId,requestId,ownerId:session.user_id,
+    sourceRef:recordedUser.source_ref,
+    verifiedPriorTurns:history.messages.filter(x=>x.request_id!==requestId),
+    worldlineId:scopedRoot,apiKey:key,model:'gpt-4.1-mini',
+    ownerContext:{
+     current_work_intake_status:signedIntake?.status||'NOT_VERIFIED',
+     worker_scope_limits_external_execution_only:true,
+     currently_authorized_shift:verifiedOwnerShift||null,
+     owner_originals:ownerOriginalWork||null,
+     weekly_queue:ownerWeeklyQueue||null,
+     verified_workforce:companyWorkforceObservations.slice(0,12),
+     authoritative_goal_state:currentGoal,
+     source_status:ownerContext.status,
+     unavailable_sources:ownerContext.unavailable
+    },
+    verifiedUniverseObservations:[
+     buildRealityProposedEmployeeRoleDiscussionContext(),
+     ...native263TemporalObservations,
+     ...ownerCompletedWorkObservations,
+     ...employeeShiftObservations,
+     ...companyWorkforceObservations,
+     ...originalWorkObservation(ownerOriginalWork),
+     ...weeklyQueueObservation(ownerWeeklyQueue)
+    ]
+   });
+   governedCognitionMs=Date.now()-quickStart;
+   // An answer is not independent evidence that an action happened.
+   stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION';
+   const publication=await publishPrivateAssistantAtomically(session,{
+    conversationId,requestId,text:advisory.answer,isolatedDb:isolated,
+    expectedRevision,expectedLastEventId:expectedLastGoalEventId
+   });
+   stage='READ_ONLY_EXACT_REPLY_RLS_READBACK';
+   const exact=await readPrivateChatRequest(session,{conversationId,requestId});
+   const saved=exact.messages.filter(x=>x.role==='assistant'&&
+    x.request_id===requestId&&x.text===advisory.answer&&
+    /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(x.source_ref||''));
+   const savedUser=exact.messages.filter(x=>x.role==='user'&&
+    x.request_id===requestId&&x.text===text&&
+    x.source_ref===recordedUser.source_ref);
+   if(saved.length!==1||savedUser.length!==1||
+      publication?.atomic_goal_revision_checked!==true)
+    fail('CHAT_READ_ONLY_ATOMIC_REPLY_READBACK_UNVERIFIED',503);
+   return res.status(200).json({
+    ok:true,conversation_id:conversationId,answer:advisory.answer,
+    replayed:false,read_only_conversation:true,
+    continuity:{
+     history_source:'AUTHENTICATED_SUPABASE_RLS',
+     recovered_messages:exact.messages.length,
+     coverage:'EXACT_SAVED_REQUEST',
+     older_messages_may_be_missing:history.older_missing,
+     current_answer_persisted:true,
+     goal_publication_atomicity:'ATOMIC_DATABASE_GOAL_REVISION_AND_ASSISTANT_INSERT'
+    },
+    reliability:{
+     chat_lane:'PROPORTIONAL_READ_ONLY',
+     canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
+     readback_verified:false,
+     semantic_review_status:'NOT_INDEPENDENTLY_ASSESSED',
+     independently_verified_semantic_correctness:false,
+     external_actions_authorized:false,
+     business_outcome_verified:false
+    },
+    contextual_readback_status:{
+     evidence:evidence.status,owner_job_queue:ownerContext.status,
+     unavailable_sources:[...evidence.unavailable,...ownerContext.unavailable],
+     missing_source_does_not_prove_no_work:true,
+     grants_execution_authority:false
+    },
+    execution:{status:'NOT_EXECUTED',external_actions_authorized:false},
+    response_timing:{total_ms:Date.now()-chatStartedAt,
+     optional_context_wait_ms:optionalContextWaitMs,
+     governed_cognition_ms:governedCognitionMs}
+   });
+  }
   stage='COGNITION_AND_RELIABILITY';
   const governedCognitionStart=Date.now();
   const result=await runLiveIntelligenceOrchestration({
