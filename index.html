@@ -6825,13 +6825,31 @@ setInterval(refreshSavedShiftHome,300000);
    const savedBubble=bubble(message.role,message.text);
    savedBubble.dataset.requestId=message.request_id;
    const handed=message.role==='user'?workBySource.get(message.source_ref):null;
-   if(handed&&handed.request_id===message.request_id){
+   // Normal conversation is not a worker shift. Do not attach a huge
+   // governance card to questions, brainstorming or a saved advisory
+   // merely because every Chat turn also enters the signed worker inbox.
+   const explicitWorkRequest=message.role==='user'&&
+    /\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(message.text||'');
+   const actualDevelopment=handed?.development&&
+    /^work:[a-f0-9]{32}$/.test(handed.development.original_work_id||'')&&
+    handed.development.installation_authorized===false&&
+    handed.development.production_changed===false;
+   const actualOriginalWork=handed?.work_chain?.some(x=>
+    /^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')&&
+    ['MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+     'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+     'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
+     'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE']
+      .includes(x.current_evidence_stage));
+   if(handed&&handed.request_id===message.request_id&&
+      (actualDevelopment||actualOriginalWork||explicitWorkRequest)){
     const card=document.createElement('div');
     card.className='bubble reality-chat-signed-work-card';
     card.setAttribute('role','status');
     const heading=document.createElement('div');
     heading.className='label';
-    heading.textContent='GOVERNED WORK · AUTHENTICATED RECEIPT';
+    heading.textContent=(actualDevelopment||actualOriginalWork)?
+     'REALITY · VERIFIED WORK':'REALITY · WORK REQUEST';
     const details=document.createElement('div');
     const descriptions={
      PENDING:'Saved instruction is in Reality’s durable worker inbox. Awaiting the existing signed shift worker.',
@@ -6843,8 +6861,10 @@ setInterval(refreshSavedShiftHome,300000);
     };
     const suffix=typeof handed.diagnosis==='string'&&handed.diagnosis?
      ' Verified worker record (model advisory): '+handed.diagnosis.slice(0,700):'';
-    details.textContent=(descriptions[handed.status]||
-     'This request has no verified work disposition.')+suffix;
+    details.textContent=(actualDevelopment||actualOriginalWork)?
+     (descriptions[handed.status]||
+      'Verified source-backed engineering work identified.')+suffix:
+     'You can ask Reality to perform this work. Execution has not been verified.';
     card.append(heading,details);
     const development=handed.development;
     if(development&&
