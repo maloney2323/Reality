@@ -432,3 +432,30 @@ body[data-reality-route="chat"] .reality-chat-sidebar .reality-conversation-expo
   flex:0 0 auto!important;min-height:0!important;
  }
 }
+
+
+/* Normal Reality Chat behaves like Chat, not a nine-stage workflow.
+   A single unobtrusive inline "replying" indicator disappears after a
+   verified answer. Only server-attested actual work gets a persistent row. */
+body[data-reality-route="chat"] .reality-cycle-headline[hidden],
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus[hidden]{
+ display:none!important;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus{
+ background:transparent!important;border:0!important;box-shadow:none!important;
+ width:auto!important;max-width:min(96%,640px)!important;
+ padding:4px 10px!important;margin:2px 0 6px!important;
+ max-height:none!important;overflow:visible!important;
+ font-size:12px!important;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-heading{
+ gap:7px!important;line-height:1.35;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-text{
+ margin:3px 0 0!important;font-size:11px;line-height:1.5;
+ max-height:none!important;overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-text[hidden],
+body[data-reality-route="chat"] #privateTranscript #realityChatRequestStatus .reality-live-reply-duration[hidden]{
+ display:none!important;
+}
