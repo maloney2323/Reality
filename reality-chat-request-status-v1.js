@@ -194,12 +194,11 @@
       original_work_id:work.work_chain[0].original_work_id}
     }));
    }
-   if(work.status==='CONVERSATION_ONLY'||
-      work.status==='NEEDS_AUTHORIZED_SCOPE'||
-      work.work_chain?.some(x=>x.current_evidence_stage===
-       'ORIGINAL_SETTLEMENT_RECEIPT_PRESENT')){
-    clearInterval(workInterval);workInterval=null;
-   }
+   // A conversational investigation may conclude 'needs scope' while
+   // the independent NEW development is already queued/generating. Keep the
+   // signed work readback alive after Chat answers so code and CI are visible.
+   // The interval has an idempotent 7.5s floor and stops on new request or
+   // when the page is hidden, never by declaring model advice a final job.
   }catch{/* An unavailable readback is not proof of a failed job. */}
   finally{state.workReading=false}
  }
