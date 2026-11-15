@@ -286,6 +286,45 @@ body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visibl
  body.reality-unified-ui .rx-shift-card{padding:12px}
  body.reality-unified-ui[data-reality-route="work"] #workCenter{padding:13px}
 }
+/* The unified shell is loaded after Chat's workspace CSS. Its desktop
+   three-column selector is more specific than Chat's mobile rule, so without
+   this matching-specificity override the entire conversation is squeezed into
+   a sidebar-width column while the other tracks consume the phone viewport. */
+@media(max-width:950px){
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr);
+  min-width:0;max-width:100%;width:100%;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] #privateChat,
+ body.reality-unified-ui[data-reality-route="chat"] #privateReady,
+ body.reality-unified-ui[data-reality-route="chat"] #realityChatConversation,
+ body.reality-unified-ui[data-reality-route="chat"] #privateTranscript,
+ body.reality-unified-ui[data-reality-route="chat"] #realityChatComposer{
+  box-sizing:border-box;min-width:0;max-width:100%;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-conversation{
+  grid-column:1;min-width:0;width:100%;
+ }
+ /* Existing Chat CSS owns the explicitly toggled history/work drawers.
+    Neither drawer may permanently occupy a mobile grid column. */
+ body.reality-unified-ui[data-reality-route="chat"]:not([data-reality-chat-panel="history"])
+  .reality-chat-sidebar,
+ body.reality-unified-ui[data-reality-route="chat"]:not([data-reality-chat-panel="work"])
+  .reality-chat-inspector{display:none}
+}
+@media(max-width:600px){
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+  height:calc(100dvh - 179px);min-height:350px;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-heading{
+  min-width:0;flex-wrap:wrap;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-buttons{
+  min-width:0;max-width:100%;
+ }
+}
+
 @media(prefers-reduced-motion:reduce){
  body.reality-unified-ui .rx-nav-link{transition:none!important}
 }
