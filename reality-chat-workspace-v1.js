@@ -30,7 +30,7 @@
   if (intro[0]) intro[0].classList.add('reality-chat-intro');
   for (const p of intro.slice(1)) p.classList.add('reality-chat-secondary-intro');
   const title = get('realityChatTitle');
-  if (title) title.textContent = 'Your Reality workspace';
+  if (title) title.textContent = 'Reality Chat';
 
   const workspace = node('div', 'reality-chat-workspace');
   workspace.id = 'realityChatWorkspace';
@@ -52,6 +52,27 @@
   const closeSidebar = node('button', 'reality-chat-panel-close', 'Close conversations');
   closeSidebar.type = 'button';
   sidebar.append(closeSidebar);
+  // Design #1 keeps navigation inside the EXISTING chat workspace.
+  // Links go only to existing Reality routes/anchors; no new dashboard.
+  const quickNav = node('nav','reality-chat-quick-nav');
+  quickNav.setAttribute('aria-label','Reality workspace sections');
+  for(const [label,path] of [
+    ['Home','/'],['Chat','/chat'],['Employees','/chat-simple#employeeBoardPanel'],
+    ['ROI & evidence','/value']
+  ]){
+    const link=node('a','reality-chat-quick-link',label);
+    link.href=path;
+    if(path==='/chat')link.setAttribute('aria-current','page');
+    quickNav.append(link);
+  }
+  const quickWork=node('button','reality-chat-quick-link','Work & approvals');
+  quickWork.type='button';
+  quickWork.addEventListener('click',()=>{
+    selectTab('work');
+    if(window.matchMedia('(max-width:950px)').matches)openPanel('work');
+  });
+  quickNav.insertBefore(quickWork,quickNav.lastChild);
+  sidebar.append(quickNav);
   sidebar.append(heading('Conversations', 'Private to your signed-in Reality account.'));
   const conversationLabel = settings.querySelector('label[for="privateConversations"]');
   if (conversationLabel) sidebar.append(conversationLabel);
@@ -93,8 +114,10 @@
   // Center: a conversation, not a stack of operational cards.
   const threadHeader = node('div', 'reality-chat-thread-heading');
   const threadTitle = node('div');
-  threadTitle.append(node('strong', '', 'Conversation'));
-  threadTitle.append(node('small', '', 'Reality keeps source claims, goals and execution authority separate.'));
+  threadTitle.append(node('span','reality-chat-premium-eyebrow',
+    'REALITY · CONTINUITY-AWARE CHAT'));
+  threadTitle.append(node('strong', '', 'Reality Chat'));
+  threadTitle.append(node('small', '', 'Ask. Investigate. Review. Move work forward.'));
   const threadButtons = node('div', 'reality-chat-thread-buttons');
   // Redundant direct navigation is intentional: a signed-in user should
   // never depend on scrolling past an operational card to leave the chat.
@@ -117,6 +140,14 @@
   focusToggle.id = 'realityChatFocusToggle';
   focusToggle.textContent = 'Expand chat';
   focusToggle.setAttribute('aria-pressed','false');
+  // This delegates to the EXISTING New Conversation handler. No duplicate intake.
+  const newChatHeader=node('button','reality-chat-new-action','＋ New chat');
+  newChatHeader.type='button';
+  newChatHeader.addEventListener('click',()=>{
+    closePanel();
+    const existing=get('privateNew');
+    if(existing&&!existing.disabled)existing.click();
+  });
   const smallScreen = () => window.matchMedia('(max-width:600px)').matches;
   function updateFocusLabel(){
     inspectorToggle.textContent = smallScreen() ? 'Work' : 'Work & approvals';
@@ -142,7 +173,7 @@
   });
   updateFocusLabel();
   window.addEventListener('resize', updateFocusLabel);
-  threadButtons.append(homeLink, historyToggle, inspectorToggle, focusToggle);
+  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
 
@@ -192,7 +223,7 @@
   const closeInspector = node('button','reality-chat-panel-close','Close work panel');
   closeInspector.type='button';
   inspector.append(closeInspector);
-  inspector.append(heading('Reality operations', 'Source-backed status and decisions. No simulated progress.'));
+  inspector.append(heading('Live work & approvals', 'Source-backed status and decisions. No simulated progress.'));
   const tabs = node('div', 'reality-chat-inspector-nav');
   tabs.setAttribute('role', 'tablist');
   tabs.setAttribute('aria-label', 'Reality operational context');
@@ -216,7 +247,12 @@
     panels[key]=panel;
     tabs.append(button);
   }
-  inspector.append(tabs,...panelNames.map(([key])=>panels[key]));
+  // A review link, NOT a Start button or an approval grant. Current verified
+  // decision controls remain owned by the existing approval inbox.
+  const reviewWork=node('button','reality-chat-review-action','Review work & decisions');
+  reviewWork.type='button';
+  reviewWork.addEventListener('click',()=>selectTab('approvals',true));
+  inspector.append(reviewWork,tabs,...panelNames.map(([key])=>panels[key]));
   function selectTab(key, moveFocus=false) {
     for (const [name] of panelNames) {
       const active=key===name;
@@ -270,6 +306,29 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  // Mobile navigation is presentational. Work opens the existing read-only
+  // inspector; no job/shift starts when the button is pressed.
+  const mobileNav=node('nav','reality-chat-mobile-nav');
+  mobileNav.setAttribute('aria-label','Reality mobile navigation');
+  function mobileLink(name,url,iconText,active=false){
+    const link=node('a','reality-chat-mobile-nav-item');
+    link.href=url;
+    if(active)link.setAttribute('aria-current','page');
+    link.append(node('span','reality-chat-mobile-nav-icon',iconText),
+      node('span','',name));
+    mobileNav.append(link);
+  }
+  mobileLink('Home','/','⌂');
+  mobileLink('Chat','/chat','▣',true);
+  mobileLink('Employees','/chat-simple#employeeBoardPanel','♧');
+  const mobileWork=node('button','reality-chat-mobile-nav-item');
+  mobileWork.type='button';
+  mobileWork.append(node('span','reality-chat-mobile-nav-icon','▤'),
+    node('span','','Work'));
+  mobileWork.addEventListener('click',()=>{selectTab('work');openPanel('work');});
+  mobileNav.append(mobileWork);
+  mobileLink('Value','/value','◫');
+  document.body.append(mobileNav);
   const refreshReadyDisplay = () => document.body.classList.toggle(
     'reality-chat-signed-in', ready.style.display === 'block'
   );
