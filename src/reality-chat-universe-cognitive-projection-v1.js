@@ -25,17 +25,21 @@ function providerEvidence(e){
 }
 export function projectOwnerRealityUniverseForChat({
  rootId,worldlineId,worldId,
- currentObservations=[],continuityHistory=[],
+ currentObservations=[],continuityHistory=null,
  reconciledOriginals=null
 }={}){
  if(!UUID.test(rootId||'')||!UUID.test(worldlineId||'')||
     typeof worldId!=='string'||!worldId.startsWith('personal:chat:')||
     !Array.isArray(currentObservations)||currentObservations.length>100||
-    !Array.isArray(continuityHistory)||continuityHistory.length>1000)
+    !(continuityHistory===null||
+      (Array.isArray(continuityHistory)&&continuityHistory.length<=1000)))
   fail('OWNER_ROOT_OR_EVIDENCE_INVALID');
  // The existing Spine verifier hashes the full chain; it excludes any
  // prior assistant text from external-fact assertions.
- const durable=projectCanonicalContinuityIntoUniverse({
+ const durable=continuityHistory===null?{
+  status:'DURABLE_CONTINUITY_FETCHED_BY_EXISTING_FULL_RUNTIME',
+  verified_history_event_count:null,entries:[]
+ }:projectCanonicalContinuityIntoUniverse({
   history:continuityHistory,rootId,worldlineId,limit:24
  });
  const current=currentObservations.filter(providerEvidence).slice(0,76);
@@ -114,7 +118,9 @@ export function projectOwnerRealityUniverseForChat({
   assertion_time:new Date().toISOString(),
   summary:'Reality existing Universe cognitive state '+state.state_id+
    '. Current authenticated source observations '+current.length+
-   ', validated durable Continuity events '+durable.verified_history_event_count+
+   ', validated durable Continuity events '+
+   (durable.verified_history_event_count===null?
+    'OWNED_BY_FULL_UNIVERSE_RUNTIME':durable.verified_history_event_count)+
    ', source or runtime capability entries '+caps.length+
    ', contradictions '+state.contradictions.length+
    ', unsettled original jobs '+jobs.filter(j=>j.status!=='SETTLED').length+
