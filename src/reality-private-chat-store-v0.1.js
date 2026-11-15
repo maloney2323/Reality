@@ -77,6 +77,33 @@ export async function listPrivateConversations(session,{fetchImpl=fetch}={}){
 }
 
 
+// The most recent SAVED human turn, queried under that human's Supabase
+// RLS session. Used solely to avoid creating duplicate unanswered messages
+// when an earlier insert succeeded but its HTTP acknowledgment was lost.
+// Unlike full conversation reconstruction, this reads ONE lightweight row.
+export async function readLatestPrivateChatUserTurn(session,conversationId,{
+ fetchImpl=fetch
+}={}){
+ if(!validUuid(session?.user_id)||!validUuid(conversationId)||
+   !session?.access_token||!session?.config)
+  throw Object.assign(Error('CHAT_LATEST_USER_IDENTITY_INVALID'),{status:400});
+ const q='?select=id,user_id,conversation_id,role,content,created_at,request_id'+
+  '&user_id=eq.'+encodeURIComponent(session.user_id)+
+  '&conversation_id=eq.'+encodeURIComponent(conversationId)+
+  '&role=eq.user&order=created_at.desc,id.desc&limit=1';
+ const rows=await storageRequest(session,q,{fetchImpl});
+ if(rows.length>1||rows.some(r=>
+   !validUuid(r.id)||!validUuid(r.request_id)||
+   r.user_id!==session.user_id||r.conversation_id!==conversationId||
+   r.role!=='user'||typeof r.content!=='string'))
+  throw Error('CHAT_LATEST_USER_READBACK_INVALID');
+ const row=rows[0];
+ return row?Object.freeze({role:'user',text:row.content,
+  request_id:row.request_id,
+  source_ref:'supabase:reality_chat_messages:'+row.id,
+  created_at:row.created_at}):null;
+}
+
 // Final publication happens inside ONE PostgreSQL transaction that locks
 // the same principal/conversation resource as each authorized goal transition.
 // Requires the reviewed isolated-preview SQL migration. Never downgrade to
