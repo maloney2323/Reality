@@ -1,0 +1,12 @@
+{
+  "schema": "reality-isolated-source-path-ci-push-transport-v1",
+  "original_work_id": "work:45206a326ddf406b1c083a819da24aaa",
+  "attempt_id": "788beab4-34e0-44ba-9577-1062ca459643",
+  "shift_id": "9460cfff-937a-4105-9093-2e41ab39a950",
+  "preflight_branch": "reality/general-postinstall-acceptance-contract-preflight",
+  "unchanged_original_source_blob": "11181292987b4406bf2dfd95ace8befa5ce1b81d",
+  "repair_source_installed": false,
+  "owner_approval_given": false,
+  "original_job_completed": false,
+  "production_changed": false
+}
