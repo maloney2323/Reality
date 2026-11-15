@@ -6846,6 +6846,27 @@ setInterval(refreshSavedShiftHome,300000);
     details.textContent=(descriptions[handed.status]||
      'This request has no verified work disposition.')+suffix;
     card.append(heading,details);
+    const development=handed.development;
+    if(development&&
+       /^work:[a-f0-9]{32}$/.test(development.original_work_id||'')&&
+       development.installation_authorized===false&&
+       development.production_changed===false){
+      const stage=document.createElement('div');
+      stage.className='reality-chat-signed-work-stage';
+      stage.textContent='NEW DEVELOPMENT · '+development.original_work_id+
+        ' · '+String(development.phase||'QUEUED').replaceAll('_',' ')+
+        '. Separate signed build request; no other shift or repair borrowed.';
+      card.append(stage);
+      const receipt=development.evidence||{};
+      if(typeof receipt.ci_url==='string'&&
+         /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(receipt.ci_url)){
+        const link=document.createElement('a');
+        link.href=receipt.ci_url;link.target='_blank';
+        link.rel='noopener noreferrer';
+        link.textContent='Independent development CI receipt';
+        card.append(link);
+      }
+    }
     // Server-attested original work stages only. A Chat model diagnosis is
     // NOT a tested patch or a source-installation approval.
     const verifiedStages=new Set([
