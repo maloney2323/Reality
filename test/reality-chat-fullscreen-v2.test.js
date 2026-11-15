@@ -50,7 +50,11 @@ test('verified stages expand to show evidence and source while preserving text s
  assert.match(js,/What we know/);
  assert.match(js,/Reference/);
  assert.match(js,/textContent=String\(text\)/);
- assert.match(js,/MutationObserver/);
+ assert.match(js,/headline.hidden=true/);
+ assert.match(js,/headline.hidden=false/);
+ assert.match(js,/if\(independentlyExecuting\)draw\(states\)/);
+ assert.match(js,/const workIsOpen=/);
+ assert.doesNotMatch(js,/new MutationObserver\(\(\)=>\{\s*clearTimeout\(debounce\)/);
  assert.match(js,/realityChatOpenInspector/);
  assert.match(js,/getComputedStyle\(button\)\.display/);
  assert.doesNotMatch(js,/\.innerHTML\s*=|insertAdjacentHTML|dangerouslySetInnerHTML/);
