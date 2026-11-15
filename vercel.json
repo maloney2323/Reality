@@ -26,6 +26,18 @@
     {
       "source": "/value",
       "destination": "/index.html"
+    },
+    {
+      "source": "/employees",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/work",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shifts",
+      "destination": "/index.html"
     }
   ]
 }
