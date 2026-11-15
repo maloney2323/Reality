@@ -136,7 +136,10 @@
    spinner.classList.remove('completed');
    title.textContent='Reply not verified';
    line.textContent=state.failure?
-     'Reality could not finish this Chat request ('+state.failure+'). Your message is preserved; no worker or new job started.':
+     'Reality could not finish this Chat request ('+state.failure+
+      (state.failureStage?' · '+state.failureStage:'')+
+      '). '+(state.saved?'Your message IS verified as saved. The same request can be recovered without resending.':
+      'Delivery is not independently verified; the draft is preserved.'):
      'The request ended without a verified saved answer. Check the saved-message stage; do not assume work continues in the background.';
   }else if(state.saved){
    title.textContent='Reality is preparing a reply';
@@ -235,7 +238,7 @@
   if(!validUuid(conversationId)||!validUuid(requestId))return;
   stopClocks();
   current={conversationId,requestId,startedAt:Date.now(),
-   saved:null,answer:null,complete:false,reading:false,failure:null,
+   saved:null,answer:null,complete:false,reading:false,failure:null,failureStage:null,
    work:null,workReading:false,lastWorkCheck:0,
    explicitBuild:event.detail?.explicit_scoped_build===true,
    buildPosted:false,buildReading:false,buildResult:null};
@@ -267,6 +270,29 @@
   block.hidden=false;
   render();
  }).observe(transcript,{childList:true});
+ // Trust the authenticated intake receipt immediately. An independent GET
+ // can corroborate it later, but a timeout must never erase a genuine save
+ // receipt and mislabel an already-persisted message as "not delivered".
+ window.addEventListener('reality:chat-intake-saved',event=>{
+  const d=event.detail||{},state=current;
+  if(!state||d.conversation_id!==state.conversationId||
+     d.request_id!==state.requestId||
+     !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(d.source_ref||''))return;
+  state.saved={source_ref:d.source_ref};
+  void readWork(state);
+  render();
+ });
+ window.addEventListener('reality:chat-request-rebound',event=>{
+  const d=event.detail||{},state=current;
+  if(!state||d.conversation_id!==state.conversationId||
+     d.previous_request_id!==state.requestId||
+     !validUuid(d.request_id)||
+     !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(d.source_ref||''))return;
+  state.requestId=d.request_id;
+  state.saved={source_ref:d.source_ref};
+  state.work=null;state.lastWorkCheck=0;
+  render();
+ });
  window.addEventListener('reality:chat-engineering-result',event=>{
   const state=current,detail=event.detail||{};
   if(!state||!state.buildPosted||
@@ -283,6 +309,8 @@
   if(!state||event.detail?.request_id!==state.requestId)return;
   state.failure=/^[A-Z][A-Z0-9_]{3,119}$/.test(event.detail?.code||'')?
    event.detail.code:'CHAT_RESPONSE_UNAVAILABLE';
+  state.failureStage=/^[A-Z][A-Z0-9_]{3,80}$/.test(event.detail?.stage||'')?
+   event.detail.stage:null;
   state.complete=true;
   stopClocks({keepWork:true});
   void readback();
