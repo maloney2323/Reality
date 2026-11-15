@@ -8,7 +8,7 @@ import {shiftDatabase,shiftRpc} from './reality-governed-shift-boundary-v1.js';
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const SOURCE=/^supabase:reality_chat_messages:([a-f0-9-]{36})$/i;
-const PHASES=new Set(['QUEUED','CLAIMED','DRAFT_GENERATED','NEEDS_SOURCE',
+const PHASES=new Set(['QUEUED','CLAIMED','DRAFT_GENERATED','PUBLISH_FENCED','NEEDS_SOURCE',
  'PROVIDER_UNVERIFIED','CANDIDATE_STAGED','CI_VERIFIED','CI_REJECTED']);
 const fail=(suffix,status=409)=>{throw Object.assign(
  Error('CHAT_WORK_NEW_DEVELOPMENT_'+suffix),{status})};
