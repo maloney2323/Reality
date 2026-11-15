@@ -62,7 +62,14 @@ export default async function handler(req,res){
    next_gate:r.owner_approval_ready?
     'EXACT_OWNER_APPROVAL_MAY_BE_PRESENTED_SEPARATELY':
     'RELEASE_TRANSPORT_AND_ORIGINAL_SETTLEMENT_CONTINUATION_PROOF_REQUIRED',
-   owner_approval_action_available:false,
+   owner_approval_action_available:(
+    r.owner_approval_ready===true&&r.phase==='READY_FOR_EXACT_OWNER_APPROVAL'&&
+    r.isolated_github_write_verified===true&&
+    r.preview_auto_deploy_verified===true&&
+    r.same_original_execution_and_settlement_contract_verified===true&&
+    r.approval_receipt_id===null&&
+    r.installation_authorized===false&&r.original_job_completed===false),
+   approval_action_endpoint:'/api/reality/generalized-owner-install-approval',
    no_installation_effect_by_get:true
   });
  }catch{
