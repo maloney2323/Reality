@@ -156,8 +156,8 @@ test('Chat retains an independently refreshed engineering timeline after answer 
  assert.match(status,/workInterval=setInterval/);
  assert.match(status,/stopClocks\(\{keepWork:true\}\)/);
  assert.match(status,/reality:chat-engineering-ready/);
- assert.doesNotMatch(status,/method:\\s*['\"]POST['\"]/);
- assert.match(index,/window\\.addEventListener\\('reality:chat-engineering-ready'/);
+ assert.doesNotMatch(status,/method:\s*['"]POST['"]/);
+ assert.match(index,/window\.addEventListener\('reality:chat-engineering-ready'/);
  assert.match(status,/bubble\.after\(block\)/);
  assert.match(status,/current_evidence_stage/);
  assert.match(index,/savedBubble\.dataset\.requestId=message\.request_id/);
