@@ -76,6 +76,8 @@ import {continueSameOriginalRecoveryAfterVerifiedFailure}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
 import {stageGeneralizedVerifiedOriginalInstallReview}
  from '../../src/reality-generalized-original-install-review-v1.js';
+import {verifyGeneralizedOriginalSourceWriteTransport}
+ from '../../src/reality-generalized-original-source-write-canary-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -304,6 +306,19 @@ export default async function handler(req,res){
    }).catch(()=>({
     status:'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED',
     owner_approval_ready:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false
+   }));
+  // The preapproved transport canary is not a capability installation:
+  // it is durably fenced by the private DB and can only write inert evidence.
+  workerStage='GENERALIZED_ORIGINAL_SOURCE_WRITE_PERMISSION_PROBE';
+  const generalizedSourceWriteTransport=
+   await verifyGeneralizedOriginalSourceWriteTransport({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERALIZED_CANARY_PROVIDER_PROOF_NOT_ACCEPTED',
+    isolated_github_write_verified:false,
+    preview_auto_deploy_verified:false,
+    installation_authorized:false,source_installed:false,
     original_job_completed:false,production_changed:false
    }));
   // Continue normal/full shift work on the other durable wake receipts.
@@ -1152,6 +1167,7 @@ export default async function handler(req,res){
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
+    generalized_original_source_write_transport:generalizedSourceWriteTransport,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
