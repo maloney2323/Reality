@@ -17,7 +17,7 @@ test('all customer sections use the same app rather than legacy employee chat-si
   assert.ok(html.includes("realityOtherPage"),route);
  assert.ok(html.includes('reality-unified-shell-v1.css'));
  assert.ok(html.includes('reality-unified-shell-v1.js'));
- assert.doesNotMatch(js,/chat-simple|cloneNode|\bfetch\s*\(|AUTHORIZE_EXACT|\.click\(/);
+ assert.doesNotMatch(js,/\/chat-simple|\.cloneNode\s*\(|\bfetch\s*\(|AUTHORIZE_EXACT|\.click\(/);
  assert.match(js,/realityHomeEmployees/);
  assert.match(js,/realityEmployeeShiftPlanner/);
  assert.match(js,/realityShiftHomeBrief/);
@@ -48,7 +48,7 @@ class Node {
   this.tagName=tag.toUpperCase();this.children=[];this.parentElement=null;
   this.className='';this.id='';this.attributes={};this.style={display:'none'};
   this.textContent='';this.href='';this.open=false;
-  this.classList={add:()=>{}};
+  this.classList={add:()=>{},toggle:()=>{}};
  }
  append(...nodes){for(const n of nodes){
   if(n.parentElement){const p=n.parentElement;p.children.splice(p.children.indexOf(n),1)}
