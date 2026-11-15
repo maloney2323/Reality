@@ -7279,7 +7279,9 @@ setInterval(refreshSavedShiftHome,300000);
     explicit_scoped_build:/\b(?:build|implement|code|repair|fix|develop|upgrade)\b/i.test(value)&&
       (/https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*/.test(value)||
        /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
-       /work:[a-f0-9]{32}/i.test(value))}
+       /work:[a-f0-9]{32}/i.test(value)),
+    // Presentation hint only: don't poll a worker inbox on normal Chat.
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(value)}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false,responseFailureStage=null;
