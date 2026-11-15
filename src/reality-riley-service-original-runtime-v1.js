@@ -251,3 +251,4 @@ export function createRileyServiceOriginalRuntime({
 
 // Independent post-install acceptance workflow transport preflight only.
 // Second isolated provider-trigger transport readback; never an installed repair.
+// Third isolated PR synchronize transport check; CI-only and not an installed repair.
