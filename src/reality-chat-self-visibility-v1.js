@@ -143,11 +143,13 @@ export async function readRealitySelfVisibilityForChat({
   session,db,env,callRpc,fetchImpl})).catch(()=>null);
  // Read-only context cannot hold ordinary Chat hostage if the GitHub
  // provider or owner audit is slow. The best verified result wins.
- const settled=Promise.all([sourcePending,auditPending]);
- const values=await Promise.race([settled,new Promise(resolve=>{
-  const timer=setTimeout(()=>resolve(null),1750);timer.unref?.();
- })]);
- let [source,audit]=values||[null,null];
+ const bounded=p=>Promise.race([p,new Promise(resolve=>
+  setTimeout(()=>resolve(null),1750))]);
+ // Independent budgets: a slow owner audit does not conceal an already
+ // verified GitHub source tree, and vice versa.
+ const [source,audit]=await Promise.all([
+  bounded(sourcePending),bounded(auditPending)
+ ]);
  const observations=[];
  if(source?.sha===env.VERCEL_GIT_COMMIT_SHA&&
     SHA.test(source.tree_sha||'')&&Array.isArray(source.files)&&
