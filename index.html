@@ -7206,16 +7206,29 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   await loadGoals();
  }
  let sessionRequestInFlight=false;
+ let sessionRetryTimer=null,sessionRetryDelayMs=0;
+ function resetSessionRetry(){
+  if(sessionRetryTimer!==null){clearTimeout(sessionRetryTimer);sessionRetryTimer=null;}
+  sessionRetryDelayMs=0;
+ }
+ function scheduleSessionRetry(){
+  if(sessionRetryTimer!==null)return;
+  sessionRetryDelayMs=sessionRetryDelayMs?Math.min(60000,sessionRetryDelayMs*2):12000;
+  sessionRetryTimer=setTimeout(()=>{
+   sessionRetryTimer=null;
+   if(document.visibilityState!=='hidden')void init();
+  },sessionRetryDelayMs);
+ }
  async function init(){
   if(sessionRequestInFlight)return;
   sessionRequestInFlight=true;
-  // Never hide the account section when a preview auth check is slow,
-  // blocked or unavailable. No sign-in form is enabled until session
-  // endpoint availability has been confirmed.
-  el('privateAccountState').textContent='Checking secure account session…';
+  const previouslyVerified=el('privateReady').style.display==='block';
+  if(!previouslyVerified){
+   el('privateAccountState').textContent='Checking secure account session…';
+   el('privateLogin').style.display='none';
+   el('privateReady').style.display='none';
+  }
   el('privateRetrySession').hidden=true;
-  el('privateLogin').style.display='none';
-  el('privateReady').style.display='none';
   try{
    const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin',
     signal:AbortSignal.timeout(16500)});
@@ -7225,27 +7238,52 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    const data=await r.json();
    if(typeof data.authenticated!=='boolean')
     throw Error('Sign-in service returned an unrecognized session response.');
+   resetSessionRetry();
    showSignedIn(data.authenticated===true);
    if(data.authenticated){
-    await loadSaved();await loadConversations();
-    void wcLoadCompletionReports();
-    if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
+    // The Chat archive belongs only to Chat. The other route readers own
+    // their individual account-scoped data and should not all boot together.
+    if(realityCurrentRoute()==='chat'){
+     void loadSaved().then(()=>loadConversations()).catch(()=>{
+      status('Signed in. Saved conversation readback is temporarily unavailable; do not resend work.');
+     });
+    }
+    if(['work','shifts'].includes(realityCurrentRoute())){
+     void wcLoadCompletionReports();
+     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
+    }
    }else status('Sign in below with your existing account to resume your conversation.');
   }catch(e){
-   guidedSetup.authenticated=false;
-   guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
-   paintGuidedSetup();
-   el('accountShortcut').textContent='Account · Unavailable';
-   el('privateAccountState').textContent='Account connection unavailable: '+
-    String(e.message||'Please retry')+
-    ' The sign-in form stays disabled until the secure session can be checked. No job has started.';
+   const detail=String(e.message||'Please retry');
+   if(previouslyVerified){
+    // Transient network failure is not an authenticated sign-out.
+    // Leave the previously verified workspace, scroll position, draft and
+    // transcript mounted; every private action still requires server auth.
+    el('accountShortcut').textContent='Account · Reconnecting';
+    el('privateAccountState').textContent=
+     'Secure account check temporarily unavailable: '+detail+
+     '. Your open workspace and draft are preserved. New actions still require server verification.';
+    status('Connection interrupted. Your current conversation is preserved; checking secure session again.');
+   }else{
+    guidedSetup.authenticated=false;
+    guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
+    paintGuidedSetup();
+    el('accountShortcut').textContent='Account · Unavailable';
+    el('privateAccountState').textContent='Account connection unavailable: '+detail+
+     '. Reality will retry the secure session check. No job has started.';
+    status('Sign-in service temporarily unavailable. Retrying the secure connection.');
+   }
    el('privateRetrySession').hidden=false;
-   status('Sign-in unavailable. Check the message above or retry the connection.');
-  }finally{
-   sessionRequestInFlight=false;
-  }
+   // Only re-issue a GET session check. NEVER replay a work/approval write.
+   scheduleSessionRetry();
+  }finally{sessionRequestInFlight=false;}
  }
- el('privateRetrySession').onclick=()=>{void init()};
+ el('privateRetrySession').onclick=()=>{resetSessionRetry();void init()};
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='hidden'&&!el('privateRetrySession').hidden){
+   resetSessionRetry();void init();
+  }
+ });
  el('privateSignIn').onclick=async()=>{
   for(const id of ['privateEmail','privatePassword']){
     if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
