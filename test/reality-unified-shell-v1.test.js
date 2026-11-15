@@ -23,7 +23,7 @@ test('all customer sections use the same app rather than legacy employee chat-si
  assert.match(js,/realityShiftHomeBrief/);
  assert.match(js,/realityHomeWorkday/);
  assert.match(js,/workCenter/);
- assert.match(js,/realityValueVerification|reality main navigation/);
+ assert.match(js,/Reality main navigation/);
  assert.doesNotThrow(()=>new vm.Script(js));
 });
 
