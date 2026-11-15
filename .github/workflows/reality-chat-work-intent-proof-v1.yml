@@ -18,6 +18,7 @@ on:
       - 'supabase/migrations/20261115010000_chat_new_development_admission_v1.sql'
       - 'supabase/migrations/20261115010100_chat_new_development_model_draft_v1.sql'
       - 'supabase/migrations/20261115010200_chat_new_development_governed_candidate_v1.sql'
+      - 'supabase/migrations/20261115213939_reality_chat_new_development_release_bound_claim_v2.sql'
       - 'test/ci/reality-chat-new-development-syntax-proof-v1.mjs'
       - '.github/workflows/reality-chat-new-development-candidate-v1.yml'
       - 'src/reality-owner-original-work-chat-readback-v1.js'
