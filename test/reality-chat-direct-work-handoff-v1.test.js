@@ -168,3 +168,19 @@ test('preview only: saved intake feeds direct work and never mistakes Chat text 
  assert.match(worker,/continueChatNewDevelopmentCandidate/);
  assert.doesNotMatch(ui,/APPROVE_EXACT_INSTALL|installation_authorized:true/);
 });
+
+
+test('signed development worker leases only its own preview release and legacy worker cannot steal work',()=>{
+ const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+ const migration=read('supabase/migrations/20261115213939_reality_chat_new_development_release_bound_claim_v2.sql');
+ const worker=read('src/reality-chat-new-development-worker-v1.js');
+ assert.match(migration,/reality_claim_chat_new_development_release_v2\(/);
+ assert.match(migration,/w\.development->>'release_sha'=p_release_sha/);
+ assert.match(migration,/development->>'release_sha'=p_release_sha/);
+ assert.match(migration,/FOR UPDATE OF w SKIP LOCKED/);
+ assert.match(migration,/NO_PENDING_SIGNED_NEW_DEVELOPMENT/);
+ assert.match(migration,/REVOKE ALL ON FUNCTION public\.reality_claim_chat_new_development_release_v2\(text\)/);
+ assert.match(worker,/reality_claim_chat_new_development_release_v2/);
+ assert.match(worker,/p_release_sha:env\.VERCEL_GIT_COMMIT_SHA/);
+ assert.doesNotMatch(worker,/callRpc\(db,'reality_claim_chat_new_development_v1'/);
+});
