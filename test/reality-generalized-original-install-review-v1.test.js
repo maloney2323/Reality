@@ -98,7 +98,7 @@ function rig({drifted=false,unrelatedFile=false,badPR=false,badRun=false,
   else if(route==='/pulls/304/files?per_page=100')
    data=unrelatedFile?[{filename:'src/other.js',status:'modified'}]:
     [{filename:file,status:'modified'}];
-  else if(route==='/actions/runs?event=pull_request&per_page=100')
+  else if(route.startsWith('/actions/runs?branch=')&&route.includes('&event=pull_request&per_page=100'))
    data={workflow_runs:[badRun?{...run,conclusion:'failure'}:run]};
   else if(route==='/actions/runs/'+runID)
    data=run;
