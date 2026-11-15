@@ -74,6 +74,26 @@ test('canonical weekly source plan identifies provisional coverage, not a real s
  assert.equal(i.production_changed,false);
  assert.equal(i.remaining_reference_hours_are_not_verified_missing_customer_jobs,true);
  assert.equal(i.evidence_refs.length,4);
+ // Published NASA/BLS comparator is conditional; candidates aren't completed repairs.
+ const n=i.nasa_bls_repair_comparator;
+ assert.equal(n.source_review_candidates_needing_fault_validation,2);
+ assert.equal(n.verified_comparable_repairs_from_this_plan,0);
+ assert.equal(n.investigation_median_hours,2);
+ assert.equal(n.implementation_median_hours,3);
+ assert.equal(n.sum_of_separate_medians_hours,5);
+ assert.equal(n.sum_of_medians_not_median_total,true);
+ assert.equal(n.bls_national_median_hourly_wage_usd,65.38);
+ assert.equal(n.illustrative_gross_wage_equivalent_usd_per_confirmed_comparable_repair,326.9);
+ assert.equal(n.counted_as_weekly_proposed_review_hours,false);
+ assert.equal(n.forecast_human_effort_hours,null);
+ assert.equal(n.measured_human_hours_saved,null);
+ assert.equal(n.verified_cash_savings_usd,null);
+ const riley=i.roles.find(r=>r.function_id==='software_engineering');
+ assert.equal(riley.nasa_fault_candidates_needing_validation,2);
+ const flagged=riley.week_days.flatMap(d=>d.source_findings).filter(x=>x.nasa_fault_candidate_needs_validation);
+ assert.equal(flagged.length,2);
+ assert.equal(flagged.reduce((n,x)=>n+x.review_hours,0),2,
+  'NASA medians must never be substituted for source triage timeboxes');
 });
 test('refuses forged schedule, duplicated source, inflated time and claimed completions',()=>{
  const p=plan();
@@ -89,6 +109,20 @@ test('refuses forged schedule, duplicated source, inflated time and claimed comp
  ])assert.throws(()=>projectRealityWeeklyWorkloadInsight(corrupt),
   /WEEKLY_WORKLOAD_INSIGHT_/);
 });
+test('non-defect source categories do not borrow NASA repair effort or invent ROI',()=>{
+ const c=catalog();
+ c.items[0].category='features';
+ c.items[1].category='upgrades';
+ const p=prepareNextWeekEmployeePlan(buildRealityNamedEmployeeRoster(
+  buildRealityWorkdayOpportunityBrief(c)),{now});
+ const i=projectRealityWeeklyWorkloadInsight(p);
+ assert.equal(i.nasa_bls_repair_comparator.source_review_candidates_needing_fault_validation,0);
+ assert.equal(i.provisional_review_timebox_hours,4);
+ assert.equal(i.verified_human_hours_saved,null);
+ assert.equal(i.verified_cash_savings_usd,null);
+ assert(i.roles.every(r=>r.nasa_fault_candidates_needing_validation===0));
+});
+
 test('authenticated weekly question projects the same source plan into existing Universe context',async()=>{
  const session={
   user_id:'a61c7791-9d0d-4969-881b-05af149e37ae',
