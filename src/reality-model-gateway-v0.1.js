@@ -165,8 +165,10 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
         // Give the exact authenticated current message its own final user
         // turn, AFTER context, for every conversational query.
         {role:'user',content:[{type:'input_text',text:
-          'CURRENT AUTHENTICATED USER REQUEST — ANSWER THIS REQUEST NOW, '+
-          'not an earlier discussion: '+currentQuestion+'\n'+
+          (publicResearchEnabled===true?
+           'CURRENT AUTHENTICATED PUBLIC RESEARCH REQUEST — ANSWER THIS, not an earlier topic: ':
+           'CURRENT AUTHENTICATED USER REQUEST — ANSWER THIS REQUEST NOW, not an earlier discussion: ')+
+          currentQuestion+'\n'+
           (publicResearchEnabled===true?
            'If this is public research, use the supplied grounded source '+
            'references and cite actual retrieved evidence. ':
