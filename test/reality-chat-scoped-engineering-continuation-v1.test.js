@@ -131,6 +131,21 @@ test('wrong original, owner, shift or environment fails before any provider writ
  }),/CHAT_WORK_ENGINEERING/);
  assert.equal(writes,0);
 });
+test('two unsettled engineering originals cannot cause the broker to stage a different repair',async()=>{
+ let calls=0;
+ const ambiguous={...graph,jobs:[...graph.jobs,{
+  original_work_id:'work:'+'c'.repeat(32),
+  source_ref:'https://github.com/maloney2323/Reality/issues/201',
+  original_kind:'REAL_ENGINEERING_REPAIR_ORIGINAL',
+  phase:'SOURCE_ADMITTED'}]};
+ await assert.rejects(()=>continueVerifiedChatEngineering({
+  session,conversationId,requestId,messages,env,
+  inspect:async()=>ready,dbFactory:()=>db,
+  callRpc:async()=>ambiguous,
+  continueCI:async()=>{calls++}
+ }),/CHAT_WORK_ENGINEERING_CURRENT_WARRANT_DRIFT/);
+ assert.equal(calls,0);
+});
 test('uncertain or mismatched provider response cannot grant install or claim successful build',async()=>{
  for(const result of [
   {status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
