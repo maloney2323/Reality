@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readPrivateChatRequest} from '../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChatRequest,readLatestPrivateChatUserTurn} from '../src/reality-private-chat-store-v0.1.js';
 const user='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conversationId='a8c800f6-6848-492c-b6aa-e8deca0db3fe';
 const requestId='3a2978fc-3188-44ec-a75c-a51e201a8e5a';
@@ -91,4 +91,35 @@ test('in-flight Chat shows only verified work intake evidence tied to matching r
  assert.match(progress,/Governed work handoff/);
  assert.match(progress,/Investigation recorded against existing authorized work; execution is not proven/);
  assert.doesNotMatch(progress,/reality\/governed-employee-shift-worker|personal-governed-employee-shift/);
+});
+
+
+test('latest owner user readback uses one RLS row, not the full conversation',async()=>{
+ let calls=0;
+ const result=await readLatestPrivateChatUserTurn(session,conversationId,{
+  fetchImpl:async(url,options)=>{
+   calls++;
+   assert.match(url,/role=eq\\.user/);
+   assert.match(url,/limit=1/);
+   assert.match(url,/conversation_id=eq\\./);
+   assert.match(url,/user_id=eq\\./);
+   assert.doesNotMatch(url,/limit=24[01]/);
+   assert.equal(options.method,'GET');
+   return {ok:true,json:async()=>[row('user',id)]};
+  }
+ });
+ assert.equal(calls,1);
+ assert.equal(result.request_id,requestId);
+ assert.equal(result.source_ref,'supabase:reality_chat_messages:'+id);
+});
+test('latest user readback rejects another owner and a spoofed row role',async()=>{
+ for(const invalid of [
+  {...row('user',id),user_id:conversationId},
+  {...row('user',id),role:'assistant'},
+  {...row('user',id),conversation_id:requestId}
+ ]){
+  await assert.rejects(()=>readLatestPrivateChatUserTurn(session,conversationId,{
+   fetchImpl:async()=>({ok:true,json:async()=>[invalid]})
+  }),/CHAT_LATEST_USER_READBACK_INVALID/);
+ }
 });
