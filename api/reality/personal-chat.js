@@ -107,6 +107,17 @@ export default async function handler(req,res){
      diagnosis_status:item.diagnosis_status,
      selected_source_refs:item.selected_source_refs,
      work_chain:item.work_chain,
+     // Only source-matched, service-read model development receipts appear
+     // in the original conversation. No model wording can mint execution.
+     development:item.development&&
+      /^work:[a-f0-9]{32}$/.test(item.development.original_work_id||'')&&
+      item.development.installation_authorized===false&&
+      item.development.production_changed===false?{
+       original_work_id:item.development.original_work_id,
+       phase:String(item.development.phase||'QUEUED'),
+       evidence:item.development.evidence||null,
+       installation_authorized:false,production_changed:false
+      }:null,
      worker_invocation_claimed:item.worker_invocation_claimed,
      execution_authorized_by_chat:false,
      installation_authorized:false,production_changed:false,
