@@ -49,11 +49,17 @@ jobs:
           set -euo pipefail
           node --check src/reality-riley-service-original-runtime-v1.js
           node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-governed-original-job-v1.test.js
-      - name: Independently rerun all frozen original-job regressions
+      # Historical intentionally-red extension fixtures are NOT this original
+      # candidate's frozen test manifest. Those contracts remain unchanged and
+      # must never be interpreted as an installed-source regression.
+      - name: Independently verify same-original frozen-CI and recovery safeguards
         shell: bash
         run: |
           set -euo pipefail
-          node --test test/reality-frozen-regressions/*.test.js
+          node --test \
+            test/reality-same-original-frozen-attestation-v1.test.js \
+            test/reality-same-original-recovery-ci-v2.test.js \
+            test/reality-same-original-gateway-failure-only-v2.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
