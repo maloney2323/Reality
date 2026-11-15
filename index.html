@@ -6937,7 +6937,41 @@ setInterval(refreshSavedShiftHome,300000);
       report.textContent='Checking the existing job controller and original-work authorization…';
       try{
        const state=await postWork('INSPECT_VERIFIED_WORK');
-       if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+       if(state.status==='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'){
+        report.textContent='This is a new, explicit development request. Reality can admit it as its own isolated work, without borrowing a prior job or shift.';
+        const admit=document.createElement('button');
+        admit.type='button';
+        admit.textContent='Start this new build';
+        const admitNow=async()=>{
+         admit.disabled=true;
+         report.textContent='Admitting this exact saved build instruction into Reality’s existing work inbox…';
+         try{
+          const accepted=await postWork('ADMIT_SIGNED_NEW_DEVELOPMENT');
+          if(accepted.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'&&
+             accepted.status!=='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED')
+           throw Error('DEVELOPMENT_ADMISSION_NOT_VERIFIED');
+          report.textContent='New Reality development admitted: '+accepted.original_work_id+
+           '. Source: saved Chat request. Building is queued; model generation, independent tests and installation have NOT yet been verified. This is not another employee shift.';
+          void loadSaved();
+         }catch(e){
+          report.textContent='New development was not verified: '+
+           String(e.message||'UNKNOWN').slice(0,140)+
+           '. Check the existing request before retrying.';
+          admit.disabled=false;
+         }
+        };
+        controls.append(admit);
+        // The owner just pressed Send on this explicit new build request.
+        // That is sufficient to admit non-production development; no second
+        // "approve" click, no new shift and no production install.
+        if(justSaved?.conversation_id===conversationId()&&
+           justSaved.request_id===message.request_id)void admitNow();
+        else admit.onclick=admitNow;
+       }else if(state.status==='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'){
+        report.textContent='New development '+state.original_work_id+
+         ' · '+String(state.development_phase||'QUEUED')+
+         '. The original signed instruction is already admitted; do not create another job.';
+       }else if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
           /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
         report.textContent='Verified unfinished original job '+state.original_work_id+
          ' is eligible for an existing governed discovery worker. This is not installation approval.';
