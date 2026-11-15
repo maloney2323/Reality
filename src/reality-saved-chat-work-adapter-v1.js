@@ -345,3 +345,86 @@ export async function authorizeSavedChatNewDevelopment({
   fail('CHAT_WORK_NEW_DEVELOPMENT_ADMISSION_RECEIPT_UNVERIFIED',503);
  return result;
 }
+
+
+// One signed Chat instruction -> exactly one installed governed work adapter.
+// The model chooses only among registered capabilities; it cannot mint a
+// warrant. Reuse the SAME inspection in the chosen adapter, instead of
+// classifying a source twice and drifting between inspection and admission.
+// This action never grants installation or starts another employee shift.
+export async function processSignedSavedChatWork({
+ session,conversationId,requestId,messages,
+ inspect=inspectSavedChatWork,
+ admitNew=authorizeSavedChatNewDevelopment,
+ readNew=readOwnerNewDevelopment,
+ queueOriginal=authorizeSavedChatExistingOriginal,
+ continueEngineering=continueVerifiedChatEngineering
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ const args={session,conversationId,requestId,messages};
+ const eligible=await inspect(args);
+ if(!eligible||typeof eligible.status!=='string')
+  fail('CHAT_WORK_PROCESS_INSPECTION_UNVERIFIED',503);
+ if(eligible.source_ref!==signed.source_ref||
+    eligible.request_id!==requestId||
+    eligible.installation_authorized!==false||
+    eligible.production_changed!==false)
+  fail('CHAT_WORK_PROCESS_SOURCE_OR_AUTHORITY_MISMATCH',503);
+ const inspection=async()=>eligible;
+ if(eligible.status==='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'&&
+    eligible.capability_id==='governed-chat-new-development'&&
+    eligible.action_eligible===true){
+  const admitted=await admitNew({...args,inspect:inspection});
+  if(admitted?.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'||
+     !workId(admitted.original_work_id)||
+     admitted.request_id!==requestId||
+     admitted.source_ref!==signed.source_ref||
+     admitted.installation_authorized!==false||
+     admitted.production_changed!==false||
+     admitted.new_shift_started!==false)
+   fail('CHAT_WORK_PROCESS_ADMISSION_RECEIPT_UNVERIFIED',503);
+  // Independent owner-scoped service readback. A failed read MUST NOT
+  // cause a second admission attempt or erase the committed source identity.
+  let read=null;
+  try{read=await readNew({session,conversationId})}catch{}
+  const matches=read?.status==='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'&&
+    read.owner_id===session.user_id&&
+    read.conversation_id===conversationId&&
+    read.installation_authorized===false&&
+    read.production_changed===false&&
+    Array.isArray(read.items)?
+   read.items.filter(x=>x.request_id===requestId&&
+    x.source_ref===signed.source_ref&&
+    x.original_work_id===admitted.original_work_id&&
+    x.installation_authorized===false&&
+    x.production_changed===false):[];
+  return Object.freeze({
+   status:matches.length===1?
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK':
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_READBACK_PENDING',
+   capability_id:'governed-chat-new-development',
+   request_id:requestId,source_ref:signed.source_ref,
+   original_work_id:admitted.original_work_id,
+   development_phase:matches.length===1?matches[0].phase:
+    admitted.development_phase,
+   admission_receipt_verified:true,independent_readback_verified:matches.length===1,
+   work_execution_verified:false,execution_started:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  });
+ }
+ if(eligible.status==='CHAT_WORK_ENGINEERING_SCOPED_CI_READY'&&
+    eligible.capability_id==='governed-original-engineering'&&
+    eligible.action_eligible===true)
+  return await continueEngineering({...args,inspect:inspection});
+ if(eligible.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+    eligible.capability_id==='governed-original-discovery'&&
+    eligible.action_eligible===true)
+  return await queueOriginal({...args,inspect:inspection});
+ // Existing work, conversational questions and missing capabilities cause
+ // no writes. Never infer authority from a model explanation.
+ return Object.freeze({...eligible,request_id:requestId,
+  source_ref:signed.source_ref,
+  execution_started:false,installation_authorized:false,
+  production_changed:false,new_shift_started:false});
+}
