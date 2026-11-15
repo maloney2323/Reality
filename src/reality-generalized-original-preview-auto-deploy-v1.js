@@ -49,6 +49,16 @@ export async function verifyGeneralizedOriginalPreviewAutoDeploy({
    canary_commit_sha:j.canary_commit_sha,
    vercel_deployment_url:j.vercel_deployment_url
   });
+ if(j.status==='VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED'){
+  const login=String(j.public_status_actor_login||'');
+  const type=String(j.public_status_actor_type||'');
+  return safe(j.status,{
+   public_status_actor_login:login.length>=1&&login.length<=64&&
+    [...login].every(c=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]-'.includes(c))?
+    login:null,
+   public_status_actor_type:['Bot','User','Organization'].includes(type)?type:null
+  });
+ }
  if(['NO_CURRENT_ORIGINAL_DEPLOYMENT_RECEIPT_NEEDED',
       'GENERALIZED_DEPLOY_NO_ACTIVE_OWNER_SHIFT',
       'VERCEL_OFFICIAL_INTEGRATION_STATUS_NOT_UNAMBIGUOUS',
