@@ -86,6 +86,10 @@ import {continueGeneralOwnerApprovedOriginalInstall}
  from '../../src/reality-general-original-auto-install-bridge-v1.js';
 import {settleGeneralOwnerApprovedOriginal}
  from '../../src/reality-general-original-auto-settlement-bridge-v1.js';
+import {generateNextSignedChatDevelopmentDraft}
+ from '../../src/reality-chat-new-development-worker-v1.js';
+import {continueChatNewDevelopmentCandidate}
+ from '../../src/reality-chat-new-development-publisher-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -133,6 +137,74 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // NEW Chat development uses its own signed original-message identity,
+  // not an old shift's frozen issue scope. Reuse this same signed service
+  // wake and broker; no second shift, scheduler or installation grant.
+  // At most ONE bounded new-development transition per wake. An unresolved
+  // provider write never gets automatically replayed.
+  workerStage='CHAT_NEW_DEVELOPMENT_PUBLISH_READBACK';
+  const chatNewPublished=await continueChatNewDevelopmentCandidate({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'CHAT_NEW_DEV_PUBLISH_EFFECT_UNVERIFIED',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  const publisherProgress=new Set([
+   'NEW_CHAT_DEVELOPMENT_PROVIDER_CANDIDATE_STAGED',
+   'CHAT_DEVELOPMENT_INDEPENDENT_SOURCE_SYNTAX_CI_VERIFIED'
+  ]);
+  let chatNewBuild={
+   status:'NO_PENDING_SIGNED_NEW_DEVELOPMENT',
+   model_generated:false,independent_ci_verified:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  };
+  if(!publisherProgress.has(chatNewPublished.status)){
+   workerStage='CHAT_NEW_DEVELOPMENT_MODEL_PROPOSAL';
+   chatNewBuild=await generateNextSignedChatDevelopmentDraft({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'CHAT_NEW_DEVELOPMENT_GENERATION_EFFECT_UNVERIFIED',
+    model_generated:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false,
+    new_shift_started:false
+   }));
+  }
+  const newDevelopmentAdvanced=publisherProgress.has(chatNewPublished.status)||
+   chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
+  if(newDevelopmentAdvanced){
+   // The old shift's pulse is only a worker-availability receipt. The newly
+   // generated development has its OWN source and independent proof ledger.
+   let pulse=null;
+   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+    workerStage='CHAT_NEW_DEVELOPMENT_WAKE_DISPOSITION';
+    pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+     p_safe_result:'NEW_CHAT_DEVELOPMENT_SEPARATE_SIGNED_SOURCE'
+    });
+    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+       pulse.shift_id!==wakeReceipt.shift_id||
+       pulse.installation_authorized!==false||
+       pulse.original_job_completed!==false||
+       pulse.production_changed!==false)
+     throw Error('CHAT_NEW_DEV_SIGNED_WAKE_DISPOSITION_UNVERIFIED');
+    if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+     durableWorkerCompletion=pulse;
+   }
+   workerStage='CHAT_NEW_DEVELOPMENT_BOUNDED_RESPONSE';
+   return res.status(200).json({
+    status:'SIGNED_CHAT_NEW_DEVELOPMENT_BOUNDED_TICK',
+    development_result:newDevelopmentAdvanced&&
+      publisherProgress.has(chatNewPublished.status)?chatNewPublished:chatNewBuild,
+    original_job_completed:false,new_shift_started:false,
+    installation_authorized:false,production_changed:false,
+    worker_wake_receipt:wakeReceipt,
+    ...(pulse?{worker_completion_receipt:pulse}:{})
+   });
+  }
+  // Existing original-job shift work continues on normal wakes, including
+  // while a new feature awaits independent GitHub CI or reconciliation.
   // The existing service-only selector determines whether THIS owner
   // shift has an eligible corrective revision. No historical job ID, employee
   // name, arbitrary wake interval or caller-provided scope enters the gate.
