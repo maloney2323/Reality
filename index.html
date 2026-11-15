@@ -6822,7 +6822,8 @@ setInterval(refreshSavedShiftHome,300000);
     item.installation_authorized===false
    ).map(item=>[item.source_ref,item]):[]);
   for(const message of data.messages||[]){
-   bubble(message.role,message.text);
+   const savedBubble=bubble(message.role,message.text);
+   savedBubble.dataset.requestId=message.request_id;
    const handed=message.role==='user'?workBySource.get(message.source_ref):null;
    if(handed&&handed.request_id===message.request_id){
     const card=document.createElement('div');
@@ -6958,7 +6959,51 @@ setInterval(refreshSavedShiftHome,300000);
          }
         };
         controls.append(authorize);
-       }else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
+       }else if(state.status==='CHAT_WORK_ENGINEERING_SCOPED_CI_READY'&&
+          /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
+        report.textContent='Original '+state.original_work_id+
+         ' is independently scoped to this signed build instruction. Reality can continue its existing isolated candidate and CI broker. No installation authorization.';
+        const go=document.createElement('button');
+        go.type='button';
+        go.textContent='Continue verified engineering now';
+        go.onclick=async()=>{
+         go.disabled=true;
+         report.textContent='Checking the owner warrant and existing corrective CI broker…';
+         try{
+          const run=await postWork('CONTINUE_VERIFIED_SCOPED_ENGINEERING');
+          const proof=typeof run.independent_run_url==='string'&&
+            /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(run.independent_run_url)?
+             ' · Independent evidence: '+run.independent_run_url:'';
+          report.textContent='Reality engineering · '+run.status+
+           ' · '+String(run.broker_status||'UNVERIFIED')+proof+
+           '. No production change or new shift.';
+         }catch(e){
+          report.textContent='Reality could not verify the original engineering continuation: '+
+           String(e.message||'UNVERIFIED').slice(0,120)+
+           '. Do not replay an uncertain provider write.';
+         }
+        };
+        controls.append(go);
+       }else if(state.status==='CHAT_WORK_ENGINEERING_TESTED_AWAITING_EXACT_APPROVAL')
+        report.textContent='Reality already has independently tested source for original '+
+         state.original_work_id+'. Only the existing separate exact installation gate remains.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_SOURCE_NOT_EXPLICIT')
+        report.textContent='This build request does not identify the authorized original. '+
+         'Reality will not change an unrelated job. Reference the exact existing source, '+
+         'or qualify a separate governed development task.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_PREPARING_DRAFT')
+        report.textContent='Reality’s existing engineering worker is preparing source for original '+
+         state.original_work_id+' · verified stage: '+String(state.stage||'SOURCE_REVIEW')+
+         '. A model diagnosis is not a tested source change.';
+       else if(['CHAT_WORK_ENGINEERING_INVESTIGATION_PENDING',
+                'CHAT_WORK_ENGINEERING_INTAKE_PENDING',
+                'CHAT_WORK_ENGINEERING_READBACK_UNAVAILABLE'].includes(state.status))
+        report.textContent='The authenticated build instruction is saved. '+
+         'Reality is awaiting its independent scoped work readback; no code write is claimed.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_SOURCE_UNQUALIFIED')
+        report.textContent='Reality found no matching authorized engineering original for this build. '+
+         'It cannot substitute an unrelated repair or claim work was started.';
+       else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
         report.textContent='Original job '+state.original_work_id+
          ' is already queued. Inspect its ongoing evidence; do not authorize it again.';
        else if(state.status==='CHAT_WORK_READ_ONLY_EVIDENCE_AVAILABLE'){
@@ -7147,7 +7192,13 @@ setInterval(refreshSavedShiftHome,300000);
   el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
   el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
   window.dispatchEvent(new CustomEvent('reality:chat-request-started',{
-   detail:{conversation_id:sentConversation,request_id:sentRequest}
+   detail:{conversation_id:sentConversation,request_id:sentRequest,
+    // UI dispatch hint only; the server re-reads the signed user message,
+    // current original and source warrant independently before any write.
+    explicit_scoped_build:/\b(?:build|implement|code|repair|fix|develop|upgrade)\b/i.test(value)&&
+      (/https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*/.test(value)||
+       /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
+       /work:[a-f0-9]{32}/i.test(value))}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false;
