@@ -66,6 +66,37 @@ test('Chat mobile viewport overrides the later unified desktop three-column grid
  assert.match(html,/<meta name="viewport" content="width=device-width,initial-scale=1">/);
 });
 
+
+test('intermittent provider 503 preserves verified session and retries only safe GET',()=>{
+ assert.match(html,/const previouslyVerified=el\('privateReady'\)\.style\.display==='block'/);
+ assert.match(html,/if\(!previouslyVerified\)\{/);
+ assert.match(html,/if\(previouslySignedIn!==yes\)el\('privateReady'\)\.style\.display=/);
+ assert.match(html,/if\(previouslyVerified\)\{/);
+ assert.match(html,/scheduleSessionRetry\(\)/);
+ assert.match(html,/sessionRetryDelayMs===0\?12000/);
+ assert.match(html,/Math\.min\(60000,sessionRetryDelayMs\*2\)/);
+ assert.match(html,/if\(document\.visibilityState!=='hidden'\)void init\(\)/);
+ assert.match(html,/Only re-issue a GET session check\. NEVER replay a work\/approval write/);
+ assert.match(html,/loadSaved\(\)\.then\(\(\)=>loadConversations\(\)\)/);
+});
+
+test('nonvisible pages do not trigger unrelated authenticated data readers',()=>{
+ for(const [file,pattern] of [
+  ['reality-economic-evidence-dashboard-v1.js',/\["\/","\/value"\]\.includes\(window\.location\.pathname\)/],
+  ['reality-workday-brief-v1.js',/\["\/","\/work"\]\.includes\(window\.location\.pathname\)/],
+  ['reality-backlog-value-scenario-v1.js',/\["\/value"\]\.includes\(window\.location\.pathname\)/],
+  ['reality-automatic-backlog-value-v1.js',/\["\/value"\]\.includes\(window\.location\.pathname\)/],
+  ['reality-category-economic-bridge-v1.js',/\["\/value","\/work"\]\.includes\(window\.location\.pathname\)/]
+ ]){
+  const source=read(file);
+  assert.match(source,pattern,file);
+  const position=source.indexOf('Do not fetch hidden pages');
+  assert.ok(position>0 && position<source.indexOf('fetch('),file+' must gate before networking');
+ }
+ assert.match(html,/if\(route==='work'\)\{void wcInvestigateMarket/);
+ assert.match(html,/if\(route==='chat'\)void realityChatRefreshEvents/);
+});
+
 class Node {
  constructor(tag='div'){
   this.tagName=tag.toUpperCase();this.children=[];this.parentElement=null;
