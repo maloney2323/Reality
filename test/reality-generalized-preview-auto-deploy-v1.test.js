@@ -13,7 +13,7 @@ globalThis.Deno={serve:f=>{entry=f},env:{get:name=>({
  REALITY_GITHUB_BROKER_TOKEN:'fake-git-token-unique-test-secret-credential'
 })[name]||''}};
 await import('data:text/javascript;base64,'+Buffer.from(body).toString('base64'));
-globalThis.Deno=previousDeno;
+// Keep the test-only Deno environment available for the captured handler.
 const project='https://hvkfreoagbrphwghjajw.supabase.co';
 const github='https://api.github.com/repos/maloney2323/Reality';
 const branch='reality/isolated-branch-test';
