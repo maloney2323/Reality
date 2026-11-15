@@ -1,3 +1,4 @@
+import {publishedRepairEffortReference} from './reality-published-repair-effort-v1.js';
 /* Existing next-week employee planner -> shared, truthful workload-gap read model.
  * The SAME deterministic projection is used on authenticated Home and by
  * Reality Chat's existing Universe cognition window. No new queue or ledger.
@@ -38,8 +39,16 @@ export function projectRealityWeeklyWorkloadInsight(plan){
   plan.five_day_week_capacity_hours<=0||
   plan.five_day_week_capacity_hours/plan.employee_role_count!==40)
   fail('TRUSTED_NEXT_WEEK_PROVISIONAL_PLAN_REQUIRED');
+ const nasa=publishedRepairEffortReference();
+ if(nasa.reference_scope!=='HUMAN_SOFTWARE_FAULT_REPAIR_NOT_GENERAL_UPGRADE_OR_PR_WORK'||
+  nasa.study.median_investigation_hours!==2||nasa.study.median_implementation_hours!==3||
+  nasa.combined_reference_hours!==5||
+  nasa.public_median_developer_wage_usd_per_hour!==65.38||
+  nasa.calibrated_to_reality_task_durations!==false||
+  nasa.verified_actual_cash_savings_usd!==null)
+  fail('PUBLISHED_HUMAN_REPAIR_REFERENCE_NOT_VERIFIED');
  const seenRoles=new Set(),seenSources=new Set();
- let total=0,unallocated=0,deferred=0;
+ let total=0,unallocated=0,deferred=0,nasaCandidates=0;
  const roles=[];
  for(const role of plan.employee_roles){
   if(typeof role?.employee_name!=='string'||role.employee_name.length<2||
@@ -59,7 +68,7 @@ export function projectRealityWeeklyWorkloadInsight(plan){
    role.deferred_source_count!==role.deferred_source_findings.length)
    fail('ROLE_PLAN_SOURCE_NOT_VERIFIED');
   seenRoles.add(role.function_id);
-  let hours=0,count=0;
+  let hours=0,count=0,roleNasaCandidates=0;
   const days=[];
   for(const [i,day] of role.week_days.entries()){
    if(!date.test(day?.date||'')||
@@ -90,11 +99,18 @@ export function projectRealityWeeklyWorkloadInsight(plan){
      fail('DUPLICATE_OR_EXECUTABLE_SOURCE_FINDING');
     seenSources.add(a.finding_id);count++;
     dayHours+=a.proposed_review_timebox_hours;
+    // A catalog bug/reliability ISSUE is an unverified fault candidate,
+    // not a demonstrated repair or a NASA-calibrated task duration.
+    const nasaCandidate=role.function_id==='software_engineering'&&
+     ['bugs','reliability'].includes(a.category)&&
+     /\/issues\/[1-9][0-9]*$/.test(a.source_url);
+    if(nasaCandidate){roleNasaCandidates++;nasaCandidates++;}
     refs.push(Object.freeze({
      finding_id:a.finding_id,title:a.title.slice(0,200),
      source_url:a.source_url,
      review_hours:a.proposed_review_timebox_hours,
      timebox_basis:a.timebox_basis,
+     nasa_fault_candidate_needs_validation:nasaCandidate,
      qualified_executable_job:false
     }));
    }
@@ -132,6 +148,7 @@ export function projectRealityWeeklyWorkloadInsight(plan){
    comparison_coverage_percent:Math.min(100,Math.round(hours/40*100)),
    above_hypothetical_reference_hours:Math.max(0,hours-40),
    source_finding_count:count,deferred_source_count:role.deferred_source_count,
+   nasa_fault_candidates_needing_validation:roleNasaCandidates,
    week_days:Object.freeze(days),
    scheduled_execution_hours_verified:null,
    independently_completed_work_hours_verified:null,
@@ -174,6 +191,30 @@ export function projectRealityWeeklyWorkloadInsight(plan){
   hypothetical_weekly_reference_hours:plan.five_day_week_capacity_hours,
   unallocated_hypothetical_reference_hours:unallocated,
   source_items_deferred_beyond_timeboxes:deferred,
+  // Shared public comparator is also consumed by the existing independently
+  // settled original-job economic scorecard. Never count source observations
+  // as completed repairs, scheduled effort, or verified savings.
+  nasa_bls_repair_comparator:Object.freeze({
+   evidence_status:'PUBLISHED_HUMAN_REPAIR_COMPARATOR_NOT_A_REALITY_JOB_ESTIMATE',
+   source_scope:'SINGLE_NASA_MISSION_SOFTWARE_FAULT_REPAIR_ONLY',
+   study_title:nasa.study.title,study_year:nasa.study.published_year,
+   nasa_study_url:nasa.study.source_url,
+   investigation_median_hours:nasa.study.median_investigation_hours,
+   implementation_median_hours:nasa.study.median_implementation_hours,
+   sum_of_separate_medians_hours:nasa.combined_reference_hours,
+   sum_of_medians_not_median_total:true,
+   bls_wage_source_url:nasa.public_wage_source,
+   bls_observation_period:nasa.public_wage_observation_period,
+   bls_national_median_hourly_wage_usd:nasa.public_median_developer_wage_usd_per_hour,
+   illustrative_gross_wage_equivalent_usd_per_confirmed_comparable_repair:
+    nasa.per_comparable_repair_gross_wage_equivalent_usd,
+   source_review_candidates_needing_fault_validation:nasaCandidates,
+   verified_comparable_repairs_from_this_plan:0,
+   counted_as_weekly_proposed_review_hours:false,
+   forecast_human_effort_hours:null,
+   measured_human_hours_saved:null,verified_cash_savings_usd:null,
+   source_benchmark_does_not_authorize_execution:true
+  }),
   evidence_refs:Object.freeze(refs),
   gap_recognized:scoped.length>0&&scopedUnallocated>0,
   comparison_is_not_actual_schedule:true,
