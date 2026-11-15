@@ -874,6 +874,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
 <link rel="stylesheet" href="/reality-home-command-v1.css">
+<link rel="stylesheet" href="/reality-unified-shell-v1.css">
 </head>
 <body class="reality-simple-home">
 <main>
@@ -2020,7 +2021,10 @@ const $=id=>document.getElementById(id);
 let realityChatPreviousFocus=null;
 const realityIsChatPage=()=>/^\/chat\/?$/.test(window.location.pathname);
 const realityIsValuePage=()=>/^\/value\/?$/.test(window.location.pathname);
-document.body.dataset.realityRoute=realityIsChatPage()?'chat':realityIsValuePage()?'value':'home';
+const realityOtherPage=()=>['employees','work','shifts'].find(x=>
+   window.location.pathname==='/'+x)||null;
+document.body.dataset.realityRoute=realityIsChatPage()?'chat':
+ realityIsValuePage()?'value':realityOtherPage()||'home';
 $('realityHomeTab').setAttribute('aria-current',(!realityIsChatPage()&&!realityIsValuePage())?'page':'false');
 $('realityChatTab').setAttribute('aria-current',realityIsChatPage()?'page':'false');
 $('realityValueTab').setAttribute('aria-current',realityIsValuePage()?'page':'false');
@@ -7665,6 +7669,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-home-employee-brief-v1.js"></script>
 <script defer src="/reality-home-command-v1.js"></script>
+<script defer src="/reality-unified-shell-v1.js"></script>
 <script defer src="/reality-employee-work-audit-ui-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>
