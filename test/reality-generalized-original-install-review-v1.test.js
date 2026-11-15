@@ -123,7 +123,7 @@ test('target preview source drift refuses to stage, install or approve',async()=
  const h=rig({drifted:true});
  const outcome=await stageGeneralizedVerifiedOriginalInstallReview({
   db,env,fetchImpl:h.fetchImpl,callRpc:h.callRpc});
- assert.equal(outcome.status,'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED');
+ assert.equal(outcome.status,'GENERALIZED_REVIEW_ORIGINAL_FILE_CHANGED_SINCE_FROZEN_CANDIDATE');
  assert.equal(h.requests.some(x=>x.rpc==='reality_stage_generalized_original_install_review_v1'),false);
 });
 test('integration PR must change exactly the trusted file',async()=>{
@@ -131,7 +131,7 @@ test('integration PR must change exactly the trusted file',async()=>{
  const outcome=await stageGeneralizedVerifiedOriginalInstallReview({
   db,env,fetchImpl:h.fetchImpl,callRpc:h.callRpc});
  assert.equal(outcome.owner_approval_ready,false);
- assert.equal(outcome.status,'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED');
+ assert.equal(outcome.status,'GENERALIZED_REVIEW_EXACTLY_ONE_SOURCE_ONLY_INTEGRATION_PR_REQUIRED');
  assert.equal(h.requests.some(x=>x.rpc==='reality_stage_generalized_original_install_review_v1'),false);
 });
 test('an unapproved PR or failed general CI cannot be promoted to owner review',async()=>{
@@ -139,7 +139,9 @@ test('an unapproved PR or failed general CI cannot be promoted to owner review',
   const h=rig(flags);
   const outcome=await stageGeneralizedVerifiedOriginalInstallReview({
    db,env,fetchImpl:h.fetchImpl,callRpc:h.callRpc});
-  assert.equal(outcome.status,'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED');
+  assert.equal(outcome.status,flags.badPR?
+   'GENERALIZED_REVIEW_EXACTLY_ONE_SOURCE_ONLY_INTEGRATION_PR_REQUIRED':
+   'GENERALIZED_REVIEW_EXACT_SOURCE_INTEGRATION_CI_MISSING_OR_AMBIGUOUS');
   assert.equal(h.requests.some(x=>x.rpc==='reality_stage_generalized_original_install_review_v1'),false);
  }
 });
@@ -147,7 +149,7 @@ test('a model supplied artifact hash not matching actual exact candidate bytes i
  const h=rig({unsupportedClaim:true});
  const outcome=await stageGeneralizedVerifiedOriginalInstallReview({
   db,env,fetchImpl:h.fetchImpl,callRpc:h.callRpc});
- assert.equal(outcome.status,'GENERALIZED_REVIEW_PROVIDER_SOURCE_OR_RELEASE_PROOF_UNVERIFIED');
+ assert.equal(outcome.status,'GENERALIZED_REVIEW_INTEGRATED_MODEL_ARTIFACT_SOURCE_DIGEST_MISMATCH');
  assert.equal(h.requests.some(x=>x.rpc==='reality_stage_generalized_original_install_review_v1'),false);
 });
 test('without preview service identity, no provider calls or staging occur',async()=>{
