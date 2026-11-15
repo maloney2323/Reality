@@ -159,10 +159,24 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
             text: JSON.stringify(input),
           }],
         },
-        ...(publicResearchEnabled===true?[{
-          role:'user',content:[{type:'input_text',text:
-           'CURRENT AUTHENTICATED PUBLIC RESEARCH REQUEST (answer THIS, not a previous topic): '+currentQuestion+'\nPrioritize the primary published source supplied in system_context.published_research_references when applicable. Cite it and distinguish source benchmarks from measured Reality outcomes. Do not return unrelated finance, inflation, sports or economic headlines.'}]
-        }]:[]),
+        // The grounded JSON packet contains earlier Chat turns and a large
+        // Universe. The model was repeatedly summarizing a PRIOR question
+        // instead of fulfilling the latest owner's explicit DRAFT request.
+        // Give the exact authenticated current message its own final user
+        // turn, AFTER context, for every conversational query.
+        {role:'user',content:[{type:'input_text',text:
+          'CURRENT AUTHENTICATED USER REQUEST — ANSWER THIS REQUEST NOW, '+
+          'not an earlier discussion: '+currentQuestion+'\n'+
+          (publicResearchEnabled===true?
+           'If this is public research, use the supplied grounded source '+
+           'references and cite actual retrieved evidence. ':
+           'Use the supplied Reality Universe and trusted prior exchanges '+
+           'as context, not as the current instruction. ')+
+          'When asked to draft, outline or recommend, deliver those '+
+          'requested items directly; do not repeat a capability inventory '+
+          'or ask whether to proceed. Do not claim an external execution '+
+          'or installation merely from drafting. '
+        }]} ,
       ],
     }),
   });
