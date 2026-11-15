@@ -39,6 +39,18 @@ function provider(){
     return new Response(JSON.stringify({id:user,email:'test@example.com'}),{status:200});
    }
    if(u.pathname==='/auth/v1/logout')return new Response('{}',{status:200});
+   if(u.pathname==='/rest/v1/rpc/reality_read_execution_epoch'){
+    const params=JSON.parse(opts.body||'{}');
+    const ownerTurns=messages.filter(m=>m.user_id===params.p_user_id&&
+     m.conversation_id===params.p_conversation_id&&m.role==='user');
+    if(params.p_user_id!==user||!ownerTurns.length)
+     return new Response(JSON.stringify([]),{status:200});
+    return new Response(JSON.stringify([{
+     goal_revision:0,goal_transition_event_id:null,
+     user_message_revision:ownerTurns.length,
+     latest_user_request_id:ownerTurns.at(-1).request_id
+    }]),{status:200});
+   }
    if(u.pathname==='/rest/v1/rpc/reality_publish_assistant_if_goal_current'){
     const params=JSON.parse(opts.body||'{}');
     // Matches the signed-in user's saved request and atomically stores exactly
@@ -46,8 +58,12 @@ function provider(){
     const matching=messages.find(m=>m.user_id===params.p_user_id&&
      m.conversation_id===params.p_conversation_id&&
      m.request_id===params.p_request_id&&m.role==='user');
-    if(!matching||params.p_user_id!==user||
-       !Number.isSafeInteger(params.p_expected_goal_revision))
+    const newest=messages.filter(m=>m.user_id===params.p_user_id&&
+     m.conversation_id===params.p_conversation_id&&m.role==='user').at(-1);
+    if(!matching||newest?.request_id!==params.p_request_id||
+       params.p_expected_goal_revision!==0||
+       params.p_expected_last_goal_event_id!==null||
+       params.p_user_id!==user)
      return new Response(JSON.stringify({message:'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN'}),{status:409});
     const id=crypto.randomUUID();
     messages.push({id,user_id:user,conversation_id:params.p_conversation_id,
