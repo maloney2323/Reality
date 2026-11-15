@@ -22,7 +22,7 @@ test('all customer sections use the same app rather than legacy employee chat-si
  assert.match(js,/realityEmployeeShiftPlanner/);
  assert.match(js,/realityShiftHomeBrief/);
  assert.match(js,/realityHomeWorkday/);
- assert.match(js,/workCenter/);
+ assert.match(css,/#workCenter/);
  assert.match(js,/Reality main navigation/);
  assert.doesNotThrow(()=>new vm.Script(js));
 });
@@ -57,6 +57,8 @@ class Node {
  setAttribute(k,v){this.attributes[k]=v}
  querySelector(selector){
   if(selector==='.rx-nav-label')return this.children.find(x=>x.className==='rx-nav-label');
+  if(selector==='.top')return this.children.find(x=>x.className==='top')||null;
+  if(selector==='#accountShortcut')return this.children.find(x=>x.id==='accountShortcut')||null;
   return null;
  }
  insertBefore(n,ref){
@@ -74,6 +76,7 @@ class Node {
 }
 function build(route){
  const body=new Node('body'),main=new Node('main'),top=new Node('div');
+ top.className='top';
  const shortcut=new Node('a');shortcut.id='accountShortcut';
  const nodes={accountShortcut:shortcut};
  top.append(shortcut);main.append(top);body.append(main);
