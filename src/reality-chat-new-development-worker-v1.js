@@ -3,6 +3,8 @@
 // it never creates a shift, asks an LLM for authority, writes executable
 // source to GitHub, installs anything or settles the original job.
 // Model source drafts are persisted under the original message identity.
+// Atomic release-scoped leasing prevents an older preview worker from claiming
+// a new Chat job that it cannot safely read or process.
 import {createHash} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
@@ -133,7 +135,8 @@ export async function generateNextSignedChatDevelopmentDraft({
  const model=String(env.REALITY_OPENAI_MODEL||'gpt-5.4');
  if(apiKey.length<20||!/^[a-z0-9][a-z0-9._-]{3,64}$/i.test(model))
   return hold('CHAT_NEW_DEVELOPMENT_MODEL_CREDENTIAL_UNAVAILABLE');
- const claim=await callRpc(db,'reality_claim_chat_new_development_v1',{},
+ const claim=await callRpc(db,'reality_claim_chat_new_development_release_v2',
+   {p_release_sha:env.VERCEL_GIT_COMMIT_SHA},
   {fetchImpl});
  if(!checkClaim(claim,db,env))
   return hold('NO_PENDING_SIGNED_NEW_DEVELOPMENT');
