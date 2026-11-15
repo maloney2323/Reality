@@ -198,9 +198,17 @@ async function main(){
      r.event==='push'&&r.path?.split('@')[0]===CI_PATH&&
      r.status==='completed'&&r.conclusion==='success'&&
      Number.isSafeInteger(r.id)&&r.id>10000);
-   if(eligible.length!==1)
+   if(eligible.length!==1){
+    const observed=list.data.workflow_runs.filter(r=>r.head_sha===sha);
+    const exact=observed.filter(r=>r.name===CI_NAME);
     return clean('GOVERNED_PUSH_INDEPENDENT_ACCEPTANCE_PENDING_OR_UNVERIFIED',{
-      original_work_id:scope.original_work_id,github_commit_sha:sha});
+      original_work_id:scope.original_work_id,github_commit_sha:sha,
+      provider_push_runs_for_sha:observed.length,
+      provider_exact_push_workflow_runs:exact.length,
+      provider_exact_push_conclusions:exact.slice(0,4).map(r=>({
+        event:r.event,status:r.status,conclusion:r.conclusion,run_id:r.id
+      }))});
+   }
    const runId=eligible[0].id;
    const jobs=await github(token,'/actions/runs/'+runId+'/jobs?per_page=100');
    const matches=(jobs.data?.jobs||[]).filter(j=>
