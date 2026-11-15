@@ -701,8 +701,9 @@ body[data-reality-route="chat"] :is(.reality-chat-review-action,.reality-chat-qu
   display:flex;min-width:0;flex-direction:column;align-items:center;
   justify-content:center;gap:3px;min-height:48px;
   padding:3px 1px;border:0;border-radius:9px;background:transparent;
-  text-decoration:none;color:#a9cee8;font:700 10px/1.15 inherit;
-  text-align:center;cursor:pointer;
+  text-decoration:none;color:#a9cee8;
+  text-align:center;cursor:pointer;font-size:10px;font-weight:700;
+  line-height:1.15;font-family:inherit;
  }
  body[data-reality-route="chat"] .reality-chat-mobile-nav-icon{
   font-family:system-ui,sans-serif;font-size:20px;line-height:1;
