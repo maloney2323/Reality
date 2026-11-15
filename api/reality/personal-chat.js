@@ -5,7 +5,7 @@ import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intellige
 import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
  from '../../src/reality-chat-proportional-readonly-v1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
-import {readRealitySelfVisibilityForChat}
+import {readRealitySelfVisibilityForChat,reconcileOwnerOriginalStatesForChat}
  from '../../src/reality-chat-self-visibility-v1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
@@ -348,6 +348,31 @@ export default async function handler(req,res){
   const ownerOriginalWork=scopeOwnerOriginalWorkToShift(
    optionalContext.values.originals,verifiedOwnerShift?.active_owner_shift_id||null);
   const ownerWeeklyQueue=optionalContext.values.weekly_queue;
+  const reconciledOriginals=reconcileOwnerOriginalStatesForChat({
+   ownerOriginalWork,
+   finalObservations:[
+    ...native263TemporalObservations,...ownerCompletedWorkObservations
+   ]
+  });
+  const reconciliationObservation=reconciledOriginals&&
+   reconciledOriginals.source_projection_disagreements.length?
+   [Object.freeze({
+    entry_id:'reality:owner-original-ledger-reconciliation',
+    event_kind:'owner_exact_original_independent_final_receipt_reconciliation',
+    source_kind:'RECONCILED_FROM_EXISTING_AUTHENTICATED_OWNER_LEDGER_READBACKS',
+    source_ref:'reality:original-ledger-cross-check',
+    assertion_time:new Date().toISOString(),
+    epistemic_status:'SAME_ORIGINAL_TERMINAL_RECEIPT_PRECEDENCE',
+    summary:'One Reality ledger still projects a source admission for an original '+
+     'that has a separately verified terminal settlement receipt. '+
+     'For these EXACT original work IDs, completed settlement takes priority; '+
+     'do not count them as still open: '+
+     reconciledOriginals.source_projection_disagreements.map(x=>
+      x.original_work_id+' receipt '+x.verified_final_receipt_ref).join(' | ')+
+     '. Source projection may need reconciliation; do not replay or reapprove.',
+    contradictions:reconciledOriginals.source_projection_disagreements,
+    installation_authorized:false,production_changed:false
+   })]:[];
   const ownerContext={
    status:optionalContext.status,
    unavailable:optionalContext.unavailable.filter(x=>
@@ -397,7 +422,7 @@ export default async function handler(req,res){
      current_work_intake_status:signedIntake?.status||'NOT_VERIFIED',
      worker_scope_limits_external_execution_only:true,
      currently_authorized_shift:verifiedOwnerShift||null,
-     owner_originals:ownerOriginalWork||null,
+     owner_originals:reconciledOriginals||ownerOriginalWork||null,
      weekly_queue:ownerWeeklyQueue||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
      authoritative_goal_state:currentGoal,
@@ -412,6 +437,7 @@ export default async function handler(req,res){
      ...companyWorkforceObservations,
      ...selfVisibilityObservations,
      ...originalWorkObservation(ownerOriginalWork),
+     ...reconciliationObservation,
      ...weeklyQueueObservation(ownerWeeklyQueue)
     ]
    });
@@ -534,8 +560,12 @@ export default async function handler(req,res){
     owner_original_work_current_state:ownerOriginalWork?{
      source:'AUTHENTICATED_OWNER_SCOPED_DATABASE_READBACK',
      existing_authorized_shift_id:ownerOriginalWork.current_shift_id,
-     unfinished_originals:ownerOriginalWork.observed_unfinished_count,
-     jobs:ownerOriginalWork.jobs,
+     unfinished_originals:reconciledOriginals?
+      reconciledOriginals.effectively_unsettled_original_count:
+      ownerOriginalWork.observed_unfinished_count,
+     source_projection_unfinished_count:ownerOriginalWork.observed_unfinished_count,
+     jobs:reconciledOriginals?.jobs||ownerOriginalWork.jobs,
+     cross_ledger_disagreements:reconciledOriginals?.source_projection_disagreements||[],
      no_new_authorization_granted:true,
      required_truth:'A job without an independently verified settlement is NOT complete. Do not claim there are no unfinished jobs when a source-admitted original is in this readback.'
     }:{status:'READBACK_UNAVAILABLE_DO_NOT_CLAIM_ZERO_UNFINISHED'},
@@ -552,6 +582,7 @@ export default async function handler(req,res){
      ...workerWakeObservations,...companyWorkforceObservations,
      ...rileySourceWorkObservations,...selfVisibilityObservations,
      ...originalWorkObservation(ownerOriginalWork),
+     ...reconciliationObservation,
      ...weeklyQueueObservation(ownerWeeklyQueue)
     ],
     action_authorized:false,execution_authorized:false,
