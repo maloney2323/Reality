@@ -10,6 +10,12 @@ import {buildRealityEvidenceGroundedSelfAudit,summarizeRealitySelfAuditForModel}
  from './reality-evidence-grounded-self-audit-v1.js';
 import {buildRealityWorkCatalog} from './reality-work-catalog-v0.1.js';
 import {buildRealityWorkdayOpportunityBrief} from './reality-workday-opportunity-brief-v1.js';
+import {buildRealityNamedEmployeeRoster}
+ from './reality-employee-identity-roster-v1.js';
+import {prepareNextWeekEmployeePlan}
+ from './reality-next-week-employee-plan-v1.js';
+import {projectRealityWeeklyWorkloadInsight}
+ from './reality-weekly-workload-insight-v1.js';
 import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce,routeRealityWorkCategoriesToEmployees} from './reality-workday-team-assessment-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|self.aware|self.understand|know itself|own abilities|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
@@ -312,3 +318,67 @@ export async function readVerifiedRealityCompanyWorkforceForChat({
  }catch{return []}
 }
 
+
+
+/**
+ * Existing Work Catalog -> named roles -> existing Monday–Friday planner ->
+ * SAME weekly gap projection as Home. This is an optional owner-authenticated
+ * Universe observation, not a new planning engine or auto-start instruction.
+ */
+const weeklyRequested=message=>
+ /\\b(?:workweek|work week|weekly|week|schedule|scheduled|scheduling|staffing|employee|employees|workload|capacity|hours|unfilled|underfilled|assignments|role allocation|not enough work)\\b/i
+ .test(String(message||''));
+export async function readVerifiedWeeklyWorkloadForChat({
+ session,message,env=process.env,now=new Date(),
+ catalogBuilder=buildRealityWorkCatalog
+}={}){
+ if(!weeklyRequested(message))return [];
+ if(env.VERCEL_ENV!=='preview'||!UUID.test(session?.user_id||'')||
+  typeof session?.config?.url!=='string'||
+  session.config.url!=='https://'+env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF+'.supabase.co'||
+  typeof session.access_token!=='string'||!session.access_token||
+  typeof catalogBuilder!=='function'||!(now instanceof Date)||
+  !Number.isFinite(now.getTime()))return [];
+ try{
+  const catalog=await catalogBuilder();
+  const brief=buildRealityWorkdayOpportunityBrief(catalog);
+  const roster=buildRealityNamedEmployeeRoster(brief);
+  const plan=prepareNextWeekEmployeePlan(roster,{now});
+  const insight=projectRealityWeeklyWorkloadInsight(plan);
+  const roleSummary=insight.roles.map(r=>r.employee_name+': '+
+   r.proposed_review_timebox_hours+'h provisional review out of '+
+   r.hypothetical_weekly_comparison_hours+'h hypothetical comparison, '+
+   r.unallocated_hypothetical_reference_hours+'h reference unallocated').join(' | ');
+  const summary='REALITY WEEKLY WORKLOAD GAP (READ-ONLY, NOT A COMPLETED SHIFT): '+
+   'Week '+insight.week_start+' through '+insight.week_end+
+   '; '+insight.source_finding_count+' source-backed findings for review; '+
+   insight.provisional_review_timebox_hours+' provisional REVIEW timebox hours '+
+   'across '+insight.role_count+' proposed roles compared with '+
+   insight.hypothetical_weekly_reference_hours+' hours in a hypothetical 40h-per-role workweek; '+
+   insight.unallocated_hypothetical_reference_hours+' comparison hours unallocated. '+
+   'Per role: '+roleSummary+'. '+
+   'The number unallocated is NOT confirmed missing customer work. Review timeboxes are NOT '+
+   'approved, executed, scheduled AI work or measured human hours. The owner can investigate '+
+   'available source work, qualify current jobs, and separately authorize exact work when ready. '+
+   'Do not claim the week is fully scheduled, invent tasks, request a duplicate shift, or assign ROI.';
+  return [Object.freeze({
+   entry_id:'reality:weekly-workload:'+insight.week_start,
+   event_kind:'owner_source_backed_weekly_review_capacity_gap',
+   source_kind:'READ_ONLY_EXISTING_REALITY_WORK_CATALOG',
+   source_ref:'reality:weekly-workload:source-plan:'+insight.week_start,
+   assertion_time:now.toISOString(),
+   epistemic_status:insight.status,
+   summary:summary.slice(0,4000),
+   weekly_workload_insight:insight,
+   candidate_source_refs:insight.evidence_refs,
+   owner_scope_confirmed_by_parent_chat_session:true,
+   week_is_executably_scheduled:false,
+   comparison_gap_is_not_verified_customer_backlog:true,
+   work_execution_verified:false,
+   execution_authorized:false,installation_authorized:false,production_changed:false
+  })];
+ }catch{
+  // No provider result means UNKNOWN, not a filled workweek or zero tasks.
+  return [];
+ }
+}
