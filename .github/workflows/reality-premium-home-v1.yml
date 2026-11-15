@@ -5,6 +5,15 @@ on:
       - 'index.html'
       - 'reality-home-command-v1.js'
       - 'reality-home-command-v1.css'
+      - 'reality-unified-shell-v1.js'
+      - 'reality-unified-shell-v1.css'
+      - 'reality-shift-conversation-v1.js'
+      - 'reality-eight-hour-shift-plan-v1.js'
+      - 'reality-value-verification-v1.js'
+      - 'src/reality-private-chat-auth-v0.1.js'
+      - 'vercel.json'
+      - 'test/reality-unified-shell-v1.test.js'
+      - 'test/reality-chat-session-continuity-v2.test.js'
       - 'reality-home-employee-brief-v1.js'
       - 'reality-chat-workspace-v1.js'
       - 'api/reality/personal-employee-roster.js'
@@ -31,6 +40,10 @@ jobs:
       - name: Check new Home presentation and existing source safety
         run: |
           node --check reality-home-command-v1.js
+          node --check reality-unified-shell-v1.js
+          node --test test/reality-unified-shell-v1.test.js
+          node --test test/reality-chat-session-continuity-v2.test.js
+          node --test test/reality-chat-premium-design1-v1.test.js
           node --test test/reality-home-command-v1.test.js
           node --test test/reality-weekly-workload-insight-v1.test.js
           node --test test/reality-next-week-employee-plan-v1.test.js
