@@ -66,14 +66,15 @@ function cleanScope(s){
   SHA.test(s.release_sha||'')&&
   s.installation_authorized===false&&s.original_job_completed===false&&
   s.production_changed===false&&s.new_shift_started===false&&
-  c&&typeof c==='object'&&!Array.isArray(c)&&
-  c.base_sha===s.release_sha&&SHA.test(c.source_blob_sha||'')&&
-  PATH.test(c.target_path||'')&&!c.target_path.includes('..')&&
-  !c.target_path.includes('//')&&
-  typeof c.find==='string'&&c.find.length>=20&&c.find.length<=12000&&
-  typeof c.replace==='string'&&c.replace.length>=20&&c.replace.length<=16000&&
-  typeof c.reason==='string'&&c.reason.length>=10&&c.reason.length<=1800&&
-  c.find!==c.replace&&
+  (s.phase==='CANDIDATE_STAGED'&&c==null||
+   c&&typeof c==='object'&&!Array.isArray(c)&&
+    c.base_sha===s.release_sha&&SHA.test(c.source_blob_sha||'')&&
+    PATH.test(c.target_path||'')&&!c.target_path.includes('..')&&
+    !c.target_path.includes('//')&&
+    typeof c.find==='string'&&c.find.length>=20&&c.find.length<=12000&&
+    typeof c.replace==='string'&&c.replace.length>=20&&c.replace.length<=16000&&
+    typeof c.reason==='string'&&c.reason.length>=10&&c.reason.length<=1800&&
+    c.find!==c.replace)&&
   /^sha256:[a-f0-9]{64}$/.test(s.evidence?.candidate_sha256||'');
 }
 const asBytes=x=>new TextEncoder().encode(x);
@@ -126,10 +127,6 @@ async function readExisting(s,token,base){
   !Array.isArray(prs.data)||!prs.ok)return null;
  const commit=ref.data.object.sha;
  const text=evidenceText(s),bytes=asBytes(text),blob=await gitBlob(bytes);
- if(file.data.sha!==blob||decodeBase64(file.data.content)!==b64(bytes) &&
-   file.data.content){
-  // UTF-8 binary comparison below is the authoritative check.
- }
  const fromProvider=decodeBase64(file.data.content);
  if(!fromProvider||file.data.sha!==blob||
   b64(bytes)!==btoa(fromProvider))return null;
