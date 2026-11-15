@@ -103,9 +103,8 @@
  today.append(live,el('strong','rc-today-label','What’s next'));
  const next=el('p','rc-next','Next step awaiting source readback.');
  today.append(next);
- const reviewShift=el('button','rc-outline','Review shift & assignments');
- reviewShift.type='button';reviewShift.addEventListener('click',()=>reveal('realityEmployeeShiftPlanner'));
- today.append(reviewShift);
+ const viewShift=a('View current shift details','/shifts','rc-outline');
+ today.append(viewShift);
  main.append(people,today);stage.append(main);
  const impact=el('div','rc-impacts'),roi=el('section','rc-impact'),drift=el('section','rc-impact');
  roi.append(head('REAL ROI · VERIFIED OUTCOMES','Measured business value'));
