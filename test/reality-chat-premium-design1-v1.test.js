@@ -40,7 +40,7 @@ test('premium desktop and mobile CSS preserve full-height conversation and separ
 });
 
 test('navigation stays within existing routes and has no fictional cost or completion values',()=>{
- for(const route of ['/chat-simple#employeeBoardPanel','/value','/chat'])
+ for(const route of ['/employees','/value','/chat'])
   assert.ok(js.includes(route),route);
  assert.ok(js.includes('No simulated progress'));
  assert.ok(!/\$6,480|48%|142 hrs|completed shift|saved money/i.test(js));
