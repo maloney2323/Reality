@@ -117,8 +117,16 @@ Deno.serve(async req=>{
    vercel.creator.login==='vercel[bot]';
   const officialServiceUser=vercel.creator?.type==='User'&&
    vercel.creator.login==='vercel';
-  if(!officialBot&&!officialServiceUser)
-   return safe('VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED');
+  if(!officialBot&&!officialServiceUser){
+   // Only public, non-secret GitHub status actor metadata. This is a
+   // diagnosis of *why* the strict provider trust gate remains closed.
+   const login=String(vercel.creator?.login||'');
+   const type=String(vercel.creator?.type||'');
+   return safe('VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED',{
+    public_status_actor_login:/^[A-Za-z0-9_\\[\\]-]{1,64}$/.test(login)?login:null,
+    public_status_actor_type:/^(Bot|User|Organization)$/.test(type)?type:null
+   });
+  }
   if(!Number.isSafeInteger(vercel.id)||vercel.id<=0)
    return safe('VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED');
   // Source check at current GitHub head protects against an unrelated
