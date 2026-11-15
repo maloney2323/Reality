@@ -57,7 +57,7 @@
   const quickNav = node('nav','reality-chat-quick-nav');
   quickNav.setAttribute('aria-label','Reality workspace sections');
   for(const [label,path] of [
-    ['Home','/'],['Chat','/chat'],['Employees','/chat-simple#employeeBoardPanel'],
+    ['Home','/'],['Chat','/chat'],['Employees','/employees'],
     ['ROI & evidence','/value']
   ]){
     const link=node('a','reality-chat-quick-link',label);
@@ -200,7 +200,11 @@
   const statusCopy = node('p', 'muted');
   statusCopy.id = 'realityChatStatusSummary';
   if (originalStatus) {
-    const syncStatus = () => { statusCopy.textContent = originalStatus.textContent; };
+    const syncStatus = () => {
+      const raw = String(originalStatus.textContent ?? '').trim();
+      // No provider evidence should appear as a bare serialized "null".
+      statusCopy.textContent = /^(?:null|undefined|nan|\[object object\])$/i.test(raw) ? '' : raw;
+    };
     new MutationObserver(syncStatus).observe(originalStatus, {
       childList:true, characterData:true, subtree:true
     });
@@ -306,6 +310,15 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  // Home may open Chat to discuss a gap. Prefill an owner-editable question,
+  // but NEVER submit it or grant work authority from a navigation link.
+  if(window.location.hash==='#weekly-workload'){
+    const input=get('privatePrompt');
+    if(input&&!input.value.trim()){
+      input.value='Reality, assess our next-week employee workload using your source-backed weekly plan. Show each role’s provisional review timeboxes, the unallocated hypothetical capacity, and what source work needs qualification. Distinguish proposals from authorized jobs, completed work, and verified savings.';
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  }
   // Mobile navigation is presentational. Work opens the existing read-only
   // inspector; no job/shift starts when the button is pressed.
   const mobileNav=node('nav','reality-chat-mobile-nav');
@@ -320,7 +333,7 @@
   }
   mobileLink('Home','/','⌂');
   mobileLink('Chat','/chat','▣',true);
-  mobileLink('Employees','/chat-simple#employeeBoardPanel','♧');
+  mobileLink('Employees','/employees','♧');
   const mobileWork=node('button','reality-chat-mobile-nav-item');
   mobileWork.type='button';
   mobileWork.append(node('span','reality-chat-mobile-nav-icon','▤'),

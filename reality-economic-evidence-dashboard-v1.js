@@ -4,6 +4,8 @@
 // hypothetical human effort or technical receipt into verified dollars saved.
 (() => {
  'use strict';
+ // Do not fetch hidden pages' private evidence: their readers are re-mounted on the owning route.
+ if(!["/","/value"].includes(window.location.pathname))return;
  const $ = id => document.getElementById(id);
  const root = $('simpleEconomicEvidenceDashboard');
  const status = $('realityEconomicStatus');

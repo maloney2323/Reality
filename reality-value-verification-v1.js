@@ -170,7 +170,14 @@ if(typeof document.querySelectorAll==='function')
     $('rvViewNav')?.scrollIntoView?.({block:'nearest',behavior:'smooth'});
   });
  }
-selectView(typeof window!=='undefined'&&window.location?.hash==='#pre-automation'?'potential':'overview');
+const valueRouteHash=()=>{
+ const value=String(window.location?.hash||'').replace(/^#/,'');
+ return ['overview','opportunities','potential','results','governance'].includes(value)?
+  value:value==='pre-automation'?'potential':'overview';
+};
+selectView(typeof window==='undefined'?'overview':valueRouteHash());
+if(typeof window!=='undefined'&&typeof window.addEventListener==='function')
+ window.addEventListener('hashchange',()=>selectView(valueRouteHash()));
 
 const watched=['realityEconSignals','realityEconSettled','realityEconReceipts',
  'realityEconCapacity','privateReady','realityCategoryOwnerStatus',

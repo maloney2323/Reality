@@ -86,7 +86,8 @@ test('Value Verification owns the source-backed business case; Home only links b
  assert.match(html,/href="\/value#pre-automation">Review business case in Evaluation/);
  assert.match(client,/document\.body\?\.dataset\?\.realityRoute!=='value'/);
  const nav=readFileSync(new URL('../reality-value-verification-v1.js',import.meta.url),'utf8');
- assert.match(nav,/window\.location\?\.hash==='#pre-automation'\?'potential':'overview'/);
+ assert.match(nav,/valueRouteHash\(\)/);
+ assert.match(nav,/value==='pre-automation'\?'potential':'overview'/);
  assert.match(html,/src="\/reality-pre-automation-business-case-v1\.js"/);
  assert.match(html,/BEFORE YOUR FIRST AUTOMATION/);
  assert.match(html,/PROJECTED COST-BENEFIT SCENARIO · NOT VERIFIED ROI/);

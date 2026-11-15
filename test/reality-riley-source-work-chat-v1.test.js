@@ -108,7 +108,7 @@ test('main conversation displays qualified source names before opening owner shi
  const client=read('reality-riley-source-work-v1.js');
  assert.match(index,/id="realityRileySourceStatus"/);
  assert.match(index,/id="realityRileySourceList"/);
- assert.match(index,/id="realityRileyShiftLaunchLink" href="\/chat-simple#riley-shift"/);
+ assert.match(index,/id="realityRileyShiftLaunchLink" href="\/shifts"/);
  assert.match(index,/window\.realityRefreshRileyWork/);
  assert.match(index,/<script defer src="\/reality-riley-source-work-v1\.js"><\/script>/);
  assert.match(client,/personal-riley-source-work/);

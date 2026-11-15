@@ -873,6 +873,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 </style>
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
+<link rel="stylesheet" href="/reality-home-command-v1.css">
+<link rel="stylesheet" href="/reality-unified-shell-v1.css">
 </head>
 <body class="reality-simple-home">
 <main>
@@ -1110,7 +1112,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   </div>
   <p class="home-team-disclaimer">Employee names represent eight roles for one OpenAI model, not eight active autonomous workers. Suggestions are not authorized jobs.</p>
   <div class="home-team-actions">
-   <a href="/chat-simple#employeeBoardPanel">View employees &amp; saved work proposals</a>
+   <a href="/employees">View employees &amp; saved work proposals</a>
    <a href="/chat">Discuss next week's assignments</a>
   </div>
  </section>
@@ -1136,7 +1138,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   
   
 
-  <div class="rv-home-cta"><div><strong>Which business positions could Reality consolidate?</strong><p>Model role-by-role payroll exposure, whole-position capacity, AI operating costs and human supervision using one shared OpenAI model. Potential only — no verified staff reductions or payroll savings claimed.</p></div><a href="/chat-simple#workforceSavingsPlanner">Explore workforce savings by business function</a></div>
+  <div class="rv-home-cta"><div><strong>Which business positions could Reality consolidate?</strong><p>Model role-by-role payroll exposure, whole-position capacity, AI operating costs and human supervision using one shared OpenAI model. Potential only — no verified staff reductions or payroll savings claimed.</p></div><a href="/value#potential">Review potential value and workforce assumptions</a></div>
   <div class="rv-home-cta"><div><strong>Review value before starting automation</strong><p>Source-backed opportunities, potential costs, ROI assumptions, and verified outcomes belong together in Evaluation.</p></div><a href="/value#pre-automation">Review business case in Evaluation</a></div>
   <div class="reality-home-value-layout">
  <section id="realityShiftHomeBrief" class="reality-shift-home-brief" aria-labelledby="realityShiftHomeTitle">
@@ -1566,7 +1568,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <div id="realityRileyShiftLaunch" style="border:1px solid #5886a4;border-radius:12px;background:#142c3c;padding:14px;margin:12px 0" aria-label="Authorize Riley's three-hour shift">
     <strong style="font-size:16px">Ready to start Riley?</strong>
     <p class="muted" style="margin:8px 0">No shift starts when you set a goal or send an ordinary message. Open the signed-in shift control, inspect the exact 3-hour scope, and authorize it once. Independent upgrade installation still requires separate approval.</p>
-    <a id="realityRileyShiftLaunchLink" href="/chat-simple#riley-shift" class="simple-primary" style="display:inline-block;border-radius:10px;padding:12px 16px;text-decoration:none;background:#d6f0fc;color:#0d2430;font-weight:750">Start Riley's 3-hour shift · Review &amp; authorize</a>
+    <a id="realityRileyShiftLaunchLink" href="/shifts" class="simple-primary" style="display:inline-block;border-radius:10px;padding:12px 16px;text-decoration:none;background:#d6f0fc;color:#0d2430;font-weight:750">Start Riley's 3-hour shift · Review &amp; authorize</a>
   </div>
 
   <div id="realityChatComposer" class="reality-chat-composer" aria-label="Talk to Reality">
@@ -1906,7 +1908,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 <label>Hourly labor value (USD)<input id="wcLaborRate" type="number" min="0.01" max="100000" step="0.01" placeholder="Enter your labor cost/value"></label>
 <label>Monthly automation operating cost (USD, optional)<input id="wcMonthlyCost" type="number" min="0" max="1000000000" step="0.01" placeholder="Unknown unless measured"></label>
 </div><div class="wc-feedback" id="wcValueOutput" role="status" aria-live="polite">No verified labor baseline. Select one workflow and enter assumptions to model a hypothetical opportunity.</div>
-<p class="wc-plan-desc"><a href="/chat-simple#workforceSavingsPlanner">Compare whole-position staffing scenarios across business functions using Reality's one OpenAI model</a>. This cross-role view uses company-entered costs and remains hypothetical.</p>
+<p class="wc-plan-desc"><a href="/value#potential">Review conditional staffing and workforce value assumptions</a>. This cross-role view uses company-entered costs and remains hypothetical.</p>
 <details class="wc-staffing" id="wcStaffing">
 <summary>Workforce impact · employees & FTE capacity</summary>
 <p class="wc-plan-desc">Estimate the maximum staffing capacity potentially freed, AFTER manual reviews and exceptions. This is a hypothetical planning model, not a recommendation to eliminate employees.</p>
@@ -2019,7 +2021,10 @@ const $=id=>document.getElementById(id);
 let realityChatPreviousFocus=null;
 const realityIsChatPage=()=>/^\/chat\/?$/.test(window.location.pathname);
 const realityIsValuePage=()=>/^\/value\/?$/.test(window.location.pathname);
-document.body.dataset.realityRoute=realityIsChatPage()?'chat':realityIsValuePage()?'value':'home';
+const realityOtherPage=()=>['employees','work','shifts'].find(x=>
+   window.location.pathname==='/'+x)||null;
+document.body.dataset.realityRoute=realityIsChatPage()?'chat':
+ realityIsValuePage()?'value':realityOtherPage()||'home';
 $('realityHomeTab').setAttribute('aria-current',(!realityIsChatPage()&&!realityIsValuePage())?'page':'false');
 $('realityChatTab').setAttribute('aria-current',realityIsChatPage()?'page':'false');
 $('realityValueTab').setAttribute('aria-current',realityIsValuePage()?'page':'false');
@@ -6462,9 +6467,11 @@ $('runShiftNow').onclick=async()=>{
   }finally{button.disabled=false;}
 };
 // Loading saved discoveries is automatic; it never starts a new LLM call,
-// authorizes a tool, or runs the cron handler.
-refreshSavedShiftHome();
-setInterval(refreshSavedShiftHome,300000);
+// authorizes a tool, or runs the cron handler. Hidden pages do not poll.
+if(['/','/work','/shifts'].includes(window.location.pathname)){
+ refreshSavedShiftHome();
+ setInterval(()=>{if(document.visibilityState==='visible')void refreshSavedShiftHome();},300000);
+}
 
 (function(){
  const el=id=>document.getElementById(id);
@@ -6570,14 +6577,17 @@ setInterval(refreshSavedShiftHome,300000);
   }
  };
 
+ const realityCurrentRoute=()=>document.body.dataset.realityRoute||'home';
  function showSignedIn(yes){
+  const previouslySignedIn=el('privateReady').style.display==='block';
   el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
   el('privateAccountState').textContent=yes?
    '✓ Signed in. Your conversation and goal controls are available below.':
    'Sign in below using your existing Reality account.';
   el('privateRetrySession').hidden=true;
   el('privateLogin').style.display=yes?'none':'block';
-  el('privateReady').style.display=yes?'block':'none';
+  // Avoid re-triggering a large fan-out of private readers when revalidating.
+  if(previouslySignedIn!==yes)el('privateReady').style.display=yes?'block':'none';
   guidedSetup.authenticated=yes;
   guidedSetup.accountError='';
   realitySimpleAccount(yes);
@@ -6586,14 +6596,23 @@ setInterval(refreshSavedShiftHome,300000);
    wcGapFeedStatus='Sign in to see your capability gap intake.';
    $('simpleGapFeedStatus').textContent=wcGapFeedStatus;wcRender();
   }
-  if(!yes)void realityChatMarketStage();
+  if(!yes&&realityCurrentRoute()==='work')void realityChatMarketStage();
   if(!yes){guidedSetup.goal='missing';guidedSetup.goalTitle='';
    guidedSetup.workFound=false;guidedSetup.approved=false;}
   paintGuidedSetup();
-  if(yes){void refreshRealitySelfImprovement();void homeOwnerRefresh();void realityChatRefreshEvents();void realityBusinessRefresh();}
-  if(yes&&typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
-  if(yes){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
-  else{void realityBusinessRefresh();void homeOwnerRefresh();
+  if(yes&&!previouslySignedIn){
+   const route=realityCurrentRoute();
+   if(['chat','work'].includes(route))void refreshRealitySelfImprovement();
+   if(['chat','work','shifts','home'].includes(route))void homeOwnerRefresh();
+   if(route==='chat')void realityChatRefreshEvents();
+   if(['home','value'].includes(route))void realityBusinessRefresh();
+   if(['chat','work','shifts'].includes(route)&&
+      typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
+   if(route==='work'){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
+  }
+  if(!yes){
+   if(['home','value'].includes(realityCurrentRoute()))void realityBusinessRefresh();
+   if(['chat','work','shifts'].includes(realityCurrentRoute()))void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
    el('privateSelfImprovementStatus').textContent=
@@ -7186,41 +7205,85 @@ setInterval(refreshSavedShiftHome,300000);
   }));
   await loadGoals();
  }
+ let sessionRequestInFlight=false;
+ let sessionRetryTimer=null,sessionRetryDelayMs=0;
+ function resetSessionRetry(){
+  if(sessionRetryTimer!==null){clearTimeout(sessionRetryTimer);sessionRetryTimer=null;}
+  sessionRetryDelayMs=0;
+ }
+ function scheduleSessionRetry(){
+  if(sessionRetryTimer!==null)return;
+  sessionRetryDelayMs=sessionRetryDelayMs?Math.min(60000,sessionRetryDelayMs*2):12000;
+  sessionRetryTimer=setTimeout(()=>{
+   sessionRetryTimer=null;
+   if(document.visibilityState!=='hidden')void init();
+  },sessionRetryDelayMs);
+ }
  async function init(){
-  // Never hide the account section when a preview auth check is slow,
-  // blocked or unavailable. No sign-in form is enabled until session
-  // endpoint availability has been confirmed.
-  el('privateAccountState').textContent='Checking secure account session…';
+  if(sessionRequestInFlight)return;
+  sessionRequestInFlight=true;
+  const previouslyVerified=el('privateReady').style.display==='block';
+  if(!previouslyVerified){
+   el('privateAccountState').textContent='Checking secure account session…';
+   el('privateLogin').style.display='none';
+   el('privateReady').style.display='none';
+  }
   el('privateRetrySession').hidden=true;
-  el('privateLogin').style.display='none';
-  el('privateReady').style.display='none';
   try{
-   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin'});
+   const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin',
+    signal:AbortSignal.timeout(16500)});
    if(!r.ok)throw Error(r.status===404?
     'Sign-in service is not installed on this preview (HTTP 404).':
     'Sign-in service returned HTTP '+r.status+'.');
    const data=await r.json();
    if(typeof data.authenticated!=='boolean')
     throw Error('Sign-in service returned an unrecognized session response.');
+   resetSessionRetry();
    showSignedIn(data.authenticated===true);
    if(data.authenticated){
-    await loadSaved();await loadConversations();
-    void wcLoadCompletionReports();
-    if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
+    // The Chat archive belongs only to Chat. The other route readers own
+    // their individual account-scoped data and should not all boot together.
+    if(realityCurrentRoute()==='chat'){
+     void loadSaved().then(()=>loadConversations()).catch(()=>{
+      status('Signed in. Saved conversation readback is temporarily unavailable; do not resend work.');
+     });
+    }
+    if(['work','shifts'].includes(realityCurrentRoute())){
+     void wcLoadCompletionReports();
+     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
+    }
    }else status('Sign in below with your existing account to resume your conversation.');
   }catch(e){
-   guidedSetup.authenticated=false;
-   guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
-   paintGuidedSetup();
-   el('accountShortcut').textContent='Account · Unavailable';
-   el('privateAccountState').textContent='Account connection unavailable: '+
-    String(e.message||'Please retry')+
-    ' The sign-in form stays disabled until the secure session can be checked. No job has started.';
+   const detail=String(e.message||'Please retry');
+   if(previouslyVerified){
+    // Transient network failure is not an authenticated sign-out.
+    // Leave the previously verified workspace, scroll position, draft and
+    // transcript mounted; every private action still requires server auth.
+    el('accountShortcut').textContent='Account · Reconnecting';
+    el('privateAccountState').textContent=
+     'Secure account check temporarily unavailable: '+detail+
+     '. Your open workspace and draft are preserved. New actions still require server verification.';
+    status('Connection interrupted. Your current conversation is preserved; checking secure session again.');
+   }else{
+    guidedSetup.authenticated=false;
+    guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
+    paintGuidedSetup();
+    el('accountShortcut').textContent='Account · Unavailable';
+    el('privateAccountState').textContent='Account connection unavailable: '+detail+
+     '. Reality will retry the secure session check. No job has started.';
+    status('Sign-in service temporarily unavailable. Retrying the secure connection.');
+   }
    el('privateRetrySession').hidden=false;
-   status('Sign-in unavailable. Check the message above or retry the connection.');
-  }
+   // Only re-issue a GET session check. NEVER replay a work/approval write.
+   scheduleSessionRetry();
+  }finally{sessionRequestInFlight=false;}
  }
- el('privateRetrySession').onclick=()=>{void init()};
+ el('privateRetrySession').onclick=()=>{resetSessionRetry();void init()};
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='hidden'&&!el('privateRetrySession').hidden){
+   resetSessionRetry();void init();
+  }
+ });
  el('privateSignIn').onclick=async()=>{
   for(const id of ['privateEmail','privatePassword']){
     if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
@@ -7228,12 +7291,22 @@ setInterval(refreshSavedShiftHome,300000);
   el('privateSignIn').disabled=true;status('Checking account…');
   try{
    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
+    signal:AbortSignal.timeout(18000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
-   el('privatePassword').value='';showSignedIn(true);await loadSaved();await loadConversations();
+   el('privatePassword').value='';resetSessionRetry();showSignedIn(true);
+   // Credentials were verified by the server; don't block the login control
+   // behind unrelated endpoints and don't fetch a hidden page's Chat archive.
+   if(realityCurrentRoute()==='chat'){
+    void loadSaved().then(()=>loadConversations()).catch(()=>{
+     status('Signed in. Saved conversations are temporarily unavailable; retry readback without resending messages.');
+    });
+   }
+   if(['work','shifts'].includes(realityCurrentRoute())){
     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
-   void wcLoadCompletionReports();
-   if(!confirmedActiveGoal)jumpToWorkSetup('goal');
+    void wcLoadCompletionReports();
+   }
+   if(realityCurrentRoute()==='chat'&&!confirmedActiveGoal)jumpToWorkSetup('goal');
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
@@ -7663,6 +7736,8 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-workday-brief-v1.js"></script>
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-home-employee-brief-v1.js"></script>
+<script defer src="/reality-home-command-v1.js"></script>
+<script defer src="/reality-unified-shell-v1.js"></script>
 <script defer src="/reality-employee-work-audit-ui-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>

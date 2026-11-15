@@ -3,16 +3,71 @@
 // does not create employees, dispatch work, authorize shifts or infer ROI.
 (() => {
  'use strict';
- if (window.location.pathname !== '/') return;
+ if (!['/','/employees','/shifts'].includes(window.location.pathname)) return;
  const root=document.getElementById('realityHomeEmployees');
  if (!root) return;
  const status=document.getElementById('realityHomeEmployeesStatus');
  const refresh=document.getElementById('realityHomeEmployeesRefresh');
  const names=['Avery','Riley','Quinn','Taylor','Casey','Morgan','Jordan','Sage'];
- let loading=false;
+ const emitWeekly=insight=>{
+  // The existing roster fetch owns the source. Home receives a read-only
+  // projection, not a duplicate employee planner or private API call.
+  window.dispatchEvent(new CustomEvent('reality:weekly-workload-readback',{
+   detail:insight||null
+  }));
+ };
+ const validWeekly=(insight,data)=>{
+  if(insight?.version!=='reality-weekly-workload-insight-v1'||
+   insight.status!=='PROVISIONAL_REVIEW_COVERAGE_GAP_NOT_VERIFIED_EMPLOYEE_SCHEDULE'||
+   insight.source_scope!=='REALITY_GITHUB_REPOSITORY_ONLY'||
+   insight.read_only!==true||insight.execution_authorized!==false||
+   insight.installation_authorized!==false||
+   insight.production_changed!==false||
+   insight.comparison_is_not_actual_schedule!==true||
+   insight.remaining_reference_hours_are_not_verified_missing_customer_jobs!==true||
+   insight.actual_scheduled_execution_hours_verified!==null||
+   insight.verified_cash_savings_usd!==null||
+   insight.role_count!==data.proposed_employee_count||
+   !Array.isArray(insight.roles)||insight.roles.length!==insight.role_count||
+   insight.week_start!==data.next_week_plan?.week_start||
+   insight.week_end!==data.next_week_plan?.week_end||
+   insight.provisional_review_timebox_hours!==data.next_week_plan?.proposed_review_timebox_hours_total||
+   insight.hypothetical_weekly_reference_hours!==data.next_week_plan?.five_day_week_capacity_hours||
+   !Number.isFinite(insight.unallocated_hypothetical_reference_hours)||
+   insight.unallocated_hypothetical_reference_hours<0||
+   !Number.isSafeInteger(insight.source_work_role_count)||
+   insight.source_work_role_count<0||
+   insight.source_work_role_count>insight.role_count||
+   insight.roles_without_source_work_count!==insight.role_count-insight.source_work_role_count||
+   insight.source_work_roles_hypothetical_reference_hours!==insight.source_work_role_count*40||
+   insight.source_work_comparison_available!==(insight.source_work_role_count>0)||
+   !Number.isFinite(insight.source_work_roles_provisional_hours)||
+   !Number.isFinite(insight.source_work_roles_unallocated_reference_hours)||
+   !insight.roles.every(r=>
+    names.includes(r.employee_name)&&
+    Number.isFinite(r.proposed_review_timebox_hours)&&
+    Number.isFinite(r.unallocated_hypothetical_reference_hours)&&
+    r.hypothetical_weekly_comparison_hours===40&&
+    Array.isArray(r.week_days)&&r.week_days.length===5&&
+    r.active_worker_verified===false))
+   return false;
+  const active=insight.roles.filter(r=>r.source_finding_count+r.deferred_source_count>0);
+  return insight.roles.reduce((n,r)=>n+r.proposed_review_timebox_hours,0)===
+   insight.provisional_review_timebox_hours&&
+   insight.roles.reduce((n,r)=>n+r.unallocated_hypothetical_reference_hours,0)===
+   insight.unallocated_hypothetical_reference_hours&&
+   active.length===insight.source_work_role_count&&
+   active.reduce((n,r)=>n+r.proposed_review_timebox_hours,0)===
+    insight.source_work_roles_provisional_hours&&
+   active.reduce((n,r)=>n+r.unallocated_hypothetical_reference_hours,0)===
+    insight.source_work_roles_unallocated_reference_hours;
+ };
+ const auth=document.getElementById('privateReady');
+ let loading=false,pendingReload=false;
  async function load(){
-  if(loading)return;
+  if(loading){pendingReload=true;return;}
   loading=true;refresh.disabled=true;
+  emitWeekly(null); // Remove stale owner data before each authenticated readback.
   status.textContent='Checking saved employee work and current source observations…';
   try{
    const response=await fetch('/api/reality/personal-employee-roster',{
@@ -184,10 +239,28 @@
      saved.size+' roles with saved Chat proposals. ':
      'Saved Chat proposals temporarily unverified. ')+
     'This read-only board does not start any new shift or authorize installation.';
+   // Publish only the exact same owner-scoped projection Home received.
+   // A failure is UNKNOWN, never zero hours, and cannot survive logout.
+   emitWeekly(validWeekly(data.weekly_workload_insight,data)?
+    data.weekly_workload_insight:null);
   }catch{
+   emitWeekly(null);
    status.textContent='Employee evidence could not be verified. Existing receipts and the live work status below remain separate; no active work or savings inferred.';
-  }finally{loading=false;refresh.disabled=false;}
+  }finally{
+   loading=false;refresh.disabled=false;
+   if(pendingReload){
+    pendingReload=false;
+    if(auth?.style.display==='block')void load();
+   }
+  }
  }
+ // Login may finish after initial anonymous readback. Reuse this same
+ // owner-scoped endpoint; do not leave stale data until manual Refresh.
+ if(auth&&typeof MutationObserver==='function')
+  new MutationObserver(()=>{
+   if(auth.style.display==='block')void load();
+   else emitWeekly(null);
+  }).observe(auth,{attributes:true,attributeFilter:['style']});
  refresh.addEventListener('click',()=>{void load();});
  void load();
 })();

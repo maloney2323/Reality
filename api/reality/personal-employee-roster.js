@@ -8,6 +8,8 @@ import {buildRealityNamedEmployeeRoster} from '../../src/reality-employee-identi
 import {buildRealityShiftValuePreview} from '../../src/reality-shift-value-preview-v1.js';
 import {prepareNextWeekEmployeePlan}
  from '../../src/reality-next-week-employee-plan-v1.js';
+import {projectRealityWeeklyWorkloadInsight}
+ from '../../src/reality-weekly-workload-insight-v1.js';
 import {projectSingleModelRoleQueue}
  from '../../src/reality-single-model-role-work-router-v1.js';
 import {readRealitySavedChatEmployeeProposals}
@@ -201,11 +203,12 @@ export default async function handler(req,res){
   const next_week_plan=prepareNextWeekEmployeePlan(roster,{
    preparedSource:verifiedSource
   });
+  const weekly_workload_insight=projectRealityWeeklyWorkloadInsight(next_week_plan);
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   const saved_chat_employee_proposals=await savedChatPromise;
   const approved_chat_employee_assignments=await approvedAssignmentsPromise;
   return res.status(200).json({ok:true,...roster,value_preview,
-   next_week_plan,single_model_role_routing,saved_chat_employee_proposals,
+   next_week_plan,weekly_workload_insight,single_model_role_routing,saved_chat_employee_proposals,
    approved_chat_employee_assignments,
    approved_chat_employee_assignments_status:approved_chat_employee_assignments?
     'OWNER_DURABLE_CHAT_JOB_LIST_READBACK':'APPROVED_CHAT_JOB_LIST_UNVERIFIED',

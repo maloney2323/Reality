@@ -1,0 +1,330 @@
+/* Reality Unified Interface v1 — one app, one route family, one visual shell.
+ * This stylesheet does not change source readbacks, approval or execution. */
+body.reality-unified-ui{
+ --rx-bg:#030d1e;--rx-pane:#071a31;--rx-raised:#0b2945;
+ --rx-line:#25618e;--rx-blue:#43bfff;--rx-green:#70f59a;
+ --rx-ink:#effaff;--rx-muted:#aaccdf;
+ background:
+  radial-gradient(ellipse at 27% 8%,#0c3767 0,transparent 42%),
+  radial-gradient(ellipse at 94% 79%,#08264c 0,transparent 32%),#030b1c;
+ color:var(--rx-ink);overflow-x:hidden;
+}
+body.reality-unified-ui main,
+body.reality-unified-ui.reality-home-command-ready[data-reality-route="home"] main{
+ box-sizing:border-box;max-width:none!important;
+ width:calc(100% - 232px)!important;
+ margin:0 0 0 222px!important;
+ padding:8px clamp(10px,1.5vw,25px) 65px!important;
+ min-width:0;
+}
+body.reality-unified-ui .top,
+body.reality-unified-ui.reality-home-command-ready .top{
+ box-sizing:border-box;min-height:65px;max-width:none;
+ display:flex;align-items:center;gap:12px;
+ border:1px solid #245987;border-radius:15px;
+ padding:10px 19px;margin:0 0 13px;
+ background:linear-gradient(112deg,#081e3d,#05172b)!important;
+ box-shadow:0 6px 22px #0006;
+}
+body.reality-unified-ui .top .brand{
+ color:#f1fbff;font-size:18px;font-weight:850;letter-spacing:.08em;
+}
+body.reality-unified-ui .rx-top-section{
+ margin-left:auto;font-size:13px;font-weight:750;color:#81d3ff;
+}
+body.reality-unified-ui #accountShortcut{
+ display:inline-flex;align-items:center;min-height:40px;
+ border:1px solid #3976a1;background:#0b3050;
+ color:#c1ebff;text-decoration:none;font-weight:750;
+ white-space:nowrap;font-size:11px;max-width:210px;
+ overflow:hidden;text-overflow:ellipsis;
+}
+body.reality-unified-ui #realityPageTabs,
+body.reality-unified-ui .rc-rail,
+body.reality-unified-ui .reality-chat-quick-nav,
+body.reality-unified-ui .rc-mobile-nav,
+body.reality-unified-ui .reality-chat-mobile-nav,
+body.reality-unified-ui #realityChatDockOpen{display:none!important}
+body.reality-unified-ui .rc-layout,
+body.reality-unified-ui[data-reality-route="home"] .rc-layout{
+ grid-template-columns:minmax(0,1fr)!important;
+}
+body.reality-unified-ui .rx-nav-rail{
+ position:fixed;z-index:90;
+ top:11px;bottom:11px;left:11px;width:205px;
+ display:flex;flex-direction:column;gap:6px;
+ border:1px solid #2e6b99;border-radius:17px;
+ padding:20px 12px 14px;
+ background:
+  radial-gradient(ellipse at 10% 96%,#13477d 0,transparent 52%),
+  linear-gradient(156deg,#082348,#06152d);
+ box-shadow:0 10px 30px #0008;
+}
+body.reality-unified-ui .rx-brand{
+ border-bottom:1px solid #2a628e;display:flex;
+ flex-direction:column;gap:6px;margin:0 2px 16px;padding:1px 5px 20px;
+}
+body.reality-unified-ui .rx-brand strong{
+ color:#effaff;font-size:19px;font-weight:900;letter-spacing:.06em;
+}
+body.reality-unified-ui .rx-brand small{
+ color:#8fc7e4;font-size:9px;line-height:1.5;letter-spacing:.08em;
+}
+body.reality-unified-ui .rx-nav-link{
+ display:flex;align-items:center;gap:12px;
+ min-height:45px;width:100%;box-sizing:border-box;
+ padding:9px 12px;border-radius:10px;border:1px solid transparent;
+ text-decoration:none;background:transparent;color:#bbd8ef;
+ font:750 13px/1.4 system-ui,sans-serif;
+}
+body.reality-unified-ui .rx-nav-link:hover,
+body.reality-unified-ui .rx-nav-link:focus-visible{
+ background:#104571;border-color:#2f79aa;color:#fff;
+}
+body.reality-unified-ui .rx-nav-link[aria-current="page"]{
+ background:linear-gradient(110deg,#0679e4,#20a4f0);
+ color:white;border-color:#48c4ff;box-shadow:0 0 18px #087feb52;
+}
+body.reality-unified-ui .rx-nav-icon{
+ display:grid;place-items:center;
+ flex:0 0 25px;color:#8ee5ff;
+ font:800 23px/1 system-ui,sans-serif;
+}
+body.reality-unified-ui .rx-nav-link[aria-current="page"] .rx-nav-icon{color:white}
+body.reality-unified-ui .rx-nav-foot{
+ margin-top:auto;border-top:1px solid #29547a;
+ padding:16px 5px 2px;color:#8fbed8;
+ font-size:10px;line-height:1.6;letter-spacing:.025em;
+}
+body.reality-unified-ui .rx-nav-mobile{display:none}
+body.reality-unified-ui .rx-route-view{
+ padding:clamp(18px,2.5vw,29px);
+ border:1px solid #2b6a99;border-radius:17px;
+ background:
+ radial-gradient(ellipse at 87% 0,#1850a090 0,transparent 55%),
+ linear-gradient(135deg,#082b53,#061830);
+ box-shadow:0 6px 28px #0005;
+ margin:5px 0 15px;
+}
+body.reality-unified-ui .rx-eyebrow{
+ color:#64cfff;font-size:10px;letter-spacing:.12em;
+ font-weight:850;text-transform:uppercase;
+}
+body.reality-unified-ui .rx-route-view h1{
+ color:#f4fbff;margin:7px 0 10px;line-height:1.12;
+ font-size:clamp(25px,3vw,39px);
+}
+body.reality-unified-ui .rx-route-lead{
+ color:#c3dbe9;font-size:13px;line-height:1.6;max-width:800px;
+}
+body.reality-unified-ui .rx-quick-actions{
+ display:flex;gap:9px;flex-wrap:wrap;margin-top:17px;
+}
+body.reality-unified-ui .rx-action{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:44px;padding:10px 13px;border-radius:10px;
+ text-decoration:none;font-size:12px;font-weight:800;
+ color:#dcf5ff;border:1px solid #3889b8;background:#0c3c63;
+}
+body.reality-unified-ui .rx-action:hover{background:#145782}
+body.reality-unified-ui .rx-shift-card{
+ margin:10px 0;padding:16px;
+ border-radius:14px;border:1px solid #285d86;
+ background:linear-gradient(160deg,#081c35,#09243e);
+}
+body.reality-unified-ui .rx-shift-card>.rx-eyebrow{display:block;margin-bottom:10px}
+body.reality-unified-ui .rx-empty{
+ padding:17px;border:1px solid #775f47;border-radius:12px;
+ color:#e4d3b9;font-size:13px;
+}
+/* Keep only the actual command center on Home. Legacy read-only / technical
+   controls stay available through the original disclosure, not stacked below. */
+body.reality-unified-ui[data-reality-route="home"]
+ #realitySimpleHome>:not(#realityHomeCommand):not(#realityHomeExistingEvidence){
+ display:none!important;
+}
+/* Employees uses the SAME authenticated roster and weekly source plan as Home:
+   no second employee board, API, team roster or schedule state. */
+body.reality-unified-ui[data-reality-route="employees"]
+ main>:not(.top):not(#realitySimpleHome):not(#privateChat){display:none!important}
+body.reality-unified-ui[data-reality-route="employees"] #realitySimpleHome{
+ max-width:none!important;margin:0;padding:0!important;
+ background:transparent!important;border:0!important;
+}
+body.reality-unified-ui[data-reality-route="employees"]
+ #realitySimpleHome>:not(#realityHomeCommand){display:none!important}
+body.reality-unified-ui[data-reality-route="employees"]
+ #realityHomeCommand .rc-stage>:not(.rc-main-grid){display:none!important}
+body.reality-unified-ui[data-reality-route="employees"]
+ #realityHomeCommand .rc-main-grid>:not(.rc-workforce){display:none!important}
+body.reality-unified-ui[data-reality-route="employees"] .rc-main-grid{
+ display:block!important;margin:0!important;
+}
+body.reality-unified-ui[data-reality-route="employees"] .rc-workforce{
+ width:100%;padding:clamp(16px,2.4vw,28px);
+ border:1px solid #3077a7;
+ background:linear-gradient(145deg,#09254a,#061a32);
+}
+body.reality-unified-ui[data-reality-route="employees"] .rc-capacity{
+ font-size:13px;color:#bbd9ed;
+}
+/* Work: reuse its original discovery, unfinished-job and receipt controls. */
+body.reality-unified-ui[data-reality-route="work"]
+ main>:not(.top):not(#realityUnifiedView):not(#workCenter):not(#privateChat){display:none!important}
+body.reality-unified-ui[data-reality-route="work"] #workCenter{
+ display:block!important;max-width:none;min-width:0;
+ border:1px solid #286b9b;background:linear-gradient(145deg,#082345,#05182f);
+ padding:clamp(14px,2vw,23px);
+ box-shadow:0 6px 26px #0006;
+}
+body.reality-unified-ui[data-reality-route="work"] #workCenter .wc-head h2,
+body.reality-unified-ui[data-reality-route="work"] #workCenter h3{
+ color:#eaf8ff;
+}
+body.reality-unified-ui[data-reality-route="work"] #workCenter .wc-panel,
+body.reality-unified-ui[data-reality-route="work"] #workCenter .wc-unfinished,
+body.reality-unified-ui[data-reality-route="work"] #workCenter .wc-completion,
+body.reality-unified-ui[data-reality-route="work"] #workCenter .wc-capability-shelf{
+ background:#0b263e!important;border-color:#2e6a92!important;
+ border-radius:14px!important;
+}
+body.reality-unified-ui[data-reality-route="work"] #workCenter button:not(:disabled){
+ min-height:40px;
+}
+/* Shifts shows the SAME governed planner in a dedicated destination. */
+body.reality-unified-ui[data-reality-route="shifts"]
+ main>:not(.top):not(#realityUnifiedView):not(#privateChat){display:none!important}
+body.reality-unified-ui[data-reality-route="shifts"] .rx-shift-card
+ :is(h2,h3,h4){color:#e6f5ff}
+body.reality-unified-ui[data-reality-route="shifts"] .rx-shift-card
+ :is(p,small){overflow-wrap:anywhere}
+body.reality-unified-ui[data-reality-route="shifts"] .rx-shift-card a{
+ color:#8ddfff;
+}
+/* ROI/receipts and Chat preserve their original data and approval controls
+   but share the same navigation, backgrounds, and control semantics. */
+body.reality-unified-ui[data-reality-route="value"]
+ #realityValueVerification{margin:0 auto 30px;max-width:none}
+body.reality-unified-ui[data-reality-route="value"]
+ .rv-hero,body.reality-unified-ui[data-reality-route="value"] .rv-panel{
+ border-color:#2e6a97;
+ background:linear-gradient(150deg,#092c4d,#07192f);
+}
+body.reality-unified-ui[data-reality-route="value"] .rv-kpis article{
+ border-color:#2c739f;background:#0c304c;
+}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+ grid-template-columns:minmax(185px,220px) minmax(0,1fr) minmax(275px,325px);
+}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-sidebar{border-color:#2a6996}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-inspector{border-color:#2a6996}
+body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visible{
+ outline:3px solid #8edfff;outline-offset:2px;
+}
+/* Tablet and mobile: same five places, no old tab bar or floating button. */
+@media(max-width:1130px){
+ body.reality-unified-ui .rx-nav-rail{width:175px}
+ body.reality-unified-ui main,
+ body.reality-unified-ui.reality-home-command-ready[data-reality-route="home"] main{
+  width:calc(100% - 198px)!important;margin-left:190px!important;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+  grid-template-columns:minmax(160px,180px) minmax(0,1fr) minmax(235px,280px);
+ }
+}
+@media(max-width:900px){
+ body.reality-unified-ui .rx-nav-rail{display:none!important}
+ body.reality-unified-ui main,
+ body.reality-unified-ui.reality-home-command-ready[data-reality-route="home"] main{
+  width:100%!important;max-width:none!important;margin:0!important;
+  padding:8px 10px calc(86px + env(safe-area-inset-bottom))!important;
+ }
+ body.reality-unified-ui .rx-nav-mobile{
+  position:fixed;left:0;right:0;bottom:0;z-index:190;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  align-items:center;gap:2px;
+  min-height:65px;padding:4px 5px max(7px,env(safe-area-inset-bottom));
+  border-top:1px solid #3485bd;
+  background:linear-gradient(180deg,#082448,#041329);
+  box-shadow:0 -5px 26px #0009;
+ }
+ body.reality-unified-ui .rx-nav-mobile .rx-nav-link{
+  display:flex;flex-direction:column;
+  min-width:0;min-height:49px;justify-content:center;gap:3px;
+  padding:5px 1px;font-size:10px;text-align:center;border-radius:9px;
+ }
+ body.reality-unified-ui .rx-nav-mobile .rx-nav-icon{font-size:22px;flex:none}
+ body.reality-unified-ui .rx-nav-mobile .rx-nav-label{
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ }
+ body.reality-unified-ui .rc-layout{grid-template-columns:minmax(0,1fr)!important}
+}
+@media(max-width:600px){
+ body.reality-unified-ui .top,
+ body.reality-unified-ui.reality-home-command-ready .top{
+  min-height:54px;padding:8px 12px;margin:0 0 10px;border-radius:0;
+ }
+ body.reality-unified-ui .top .brand{font-size:16px}
+ body.reality-unified-ui .rx-top-section{
+  font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ }
+ body.reality-unified-ui #accountShortcut{display:none}
+ body.reality-unified-ui main,
+ body.reality-unified-ui.reality-home-command-ready[data-reality-route="home"] main{
+  padding:0 8px calc(85px + env(safe-area-inset-bottom))!important;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] main{
+  padding-bottom:calc(69px + env(safe-area-inset-bottom))!important;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] #privateChat{margin:0!important}
+ body.reality-unified-ui[data-reality-route="employees"] .rc-workforce{
+  padding:13px;
+ }
+ body.reality-unified-ui .rx-route-view{padding:18px 13px;border-radius:12px}
+ body.reality-unified-ui .rx-route-view h1{font-size:25px}
+ body.reality-unified-ui .rx-action{width:100%;justify-content:center}
+ body.reality-unified-ui .rx-shift-card{padding:12px}
+ body.reality-unified-ui[data-reality-route="work"] #workCenter{padding:13px}
+}
+/* The unified shell is loaded after Chat's workspace CSS. Its desktop
+   three-column selector is more specific than Chat's mobile rule, so without
+   this matching-specificity override the entire conversation is squeezed into
+   a sidebar-width column while the other tracks consume the phone viewport. */
+@media(max-width:950px){
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr);
+  min-width:0;max-width:100%;width:100%;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] #privateChat,
+ body.reality-unified-ui[data-reality-route="chat"] #privateReady,
+ body.reality-unified-ui[data-reality-route="chat"] #realityChatConversation,
+ body.reality-unified-ui[data-reality-route="chat"] #privateTranscript,
+ body.reality-unified-ui[data-reality-route="chat"] #realityChatComposer{
+  box-sizing:border-box;min-width:0;max-width:100%;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-conversation{
+  grid-column:1;min-width:0;width:100%;
+ }
+ /* Existing Chat CSS owns the explicitly toggled history/work drawers.
+    Neither drawer may permanently occupy a mobile grid column. */
+ body.reality-unified-ui[data-reality-route="chat"]:not([data-reality-chat-panel="history"])
+  .reality-chat-sidebar,
+ body.reality-unified-ui[data-reality-route="chat"]:not([data-reality-chat-panel="work"])
+  .reality-chat-inspector{display:none}
+}
+@media(max-width:600px){
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+  height:calc(100dvh - 179px);min-height:350px;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-heading{
+  min-width:0;flex-wrap:wrap;
+ }
+ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-buttons{
+  min-width:0;max-width:100%;
+ }
+}
+
+@media(prefers-reduced-motion:reduce){
+ body.reality-unified-ui .rx-nav-link{transition:none!important}
+}

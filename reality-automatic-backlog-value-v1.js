@@ -3,6 +3,8 @@
 // work, avoided loss, earned cash, employee reduction or daily savings.
 (()=>{
  'use strict';
+ // Do not fetch hidden pages' private evidence: their readers are re-mounted on the owning route.
+ if(!["/value"].includes(window.location.pathname))return;
  const $=id=>document.getElementById(id);
  const root=$('realityAutoBacklogComparison');
  const auth=$('privateReady'),explanation=$('realityAutoBacklogExplanation');

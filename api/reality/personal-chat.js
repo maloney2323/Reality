@@ -14,7 +14,7 @@ import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
 import {readVerifiedResearchUpgradeForChat}
  from '../../src/reality-verified-repair-chat-context-v1.js';
-import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat,readVerifiedRileySourceWorkForChat}
+import {readVerifiedEmployeeShiftForChat,readVerifiedRealityCompanyWorkforceForChat,readVerifiedRileySourceWorkForChat,readVerifiedWeeklyWorkloadForChat}
  from '../../src/reality-employee-shift-chat-context-v1.js';
 import {readVerifiedNative263TemporalForChat}
  from '../../src/reality-native263-temporal-chat-context-v1.js';
@@ -266,6 +266,10 @@ export default async function handler(req,res){
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'employee_shift',read:()=>readVerifiedEmployeeShiftForChat({
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   // Same canonical source-review allocation read model as Home. An optional
+   // failure may not prevent Chat from replying or become zero scheduled work.
+   {id:'weekly_workload',read:()=>readVerifiedWeeklyWorkloadForChat({
+      session,message:text}),validate:Array.isArray,fallback:[]},
    {id:'worker_wake',read:()=>wantsWorkerHealth?
      readVerifiedIndependentWorkerForChat({
       session,message:text,db:isolated}):[],
@@ -334,6 +338,7 @@ export default async function handler(req,res){
    work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
+   weekly_workload:weeklyWorkloadObservations,
    workforce:companyWorkforceObservations,riley_sources:rileySourceWorkObservations,
    native263:native263TemporalObservations,settlements:ownerCompletedWorkObservations,
    self_visibility:selfVisibilityObservations
@@ -391,7 +396,7 @@ export default async function handler(req,res){
   const ownerContext={
    status:optionalContext.status,
    unavailable:optionalContext.unavailable.filter(x=>
-    x==='originals'||x==='weekly_queue')
+    x==='originals'||x==='weekly_queue'||x==='weekly_workload')
   };
   // ONE authenticated Universe observation window supplies Reality and
   // its underlying model in both response modes. Not a second ledger.
@@ -401,6 +406,7 @@ export default async function handler(req,res){
    ...marketStageObservations,...verifiedUpgradeObservations,
    ...employeeShiftObservations,...workerWakeObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
+   ...weeklyWorkloadObservations,
    ...selfVisibilityObservations,...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
@@ -490,6 +496,7 @@ export default async function handler(req,res){
      currently_authorized_shift:verifiedOwnerShift||null,
      owner_originals:reconciledOriginals||ownerOriginalWork||null,
      weekly_queue:ownerWeeklyQueue||null,
+     weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
      authoritative_goal_state:currentGoal,
      universe_cognitive_state_id:ownerUniverse.state_id,
@@ -635,6 +642,8 @@ export default async function handler(req,res){
       native263TemporalObservations.length+ownerCompletedWorkObservations.length>0?
        'OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE':
        'NO_INDEPENDENT_OWNER_RECEIPT_AVAILABLE_THIS_TURN',
+    owner_weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||
+     {status:'OWNER_WEEKLY_SOURCE_ALLOCATION_UNAVAILABLE_NOT_ZERO_WORK'},
     universe_cognitive_state_id:ownerUniverse.state_id,
     universe_read_model:'EXISTING_UNIVERSE_COGNITIVE_PROJECTION',
     connected_world_observations:ownerUniverse.observations,

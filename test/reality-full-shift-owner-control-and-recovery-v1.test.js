@@ -40,7 +40,7 @@ test('one click always uses original authenticated owner shift endpoint',()=>{
  assert.match(html,/\$\('runFullShift'\)\.onclick=async\(\)=>/);
  assert.match(html,/id="runShiftHours"/);
  const mainChat=read('index.html');
- assert.match(mainChat,/id="realityRileyShiftLaunchLink" href="\/chat-simple#riley-shift"/);
+ assert.match(mainChat,/id="realityRileyShiftLaunchLink" href="\/shifts"/);
  assert.match(mainChat,/No shift starts when you set a goal or send an ordinary message/);
  assert.match(html,/window\.location\.hash==='#riley-shift'/);
  assert.doesNotMatch(html,/\$\('runShiftHours'\)\.value='3'/);

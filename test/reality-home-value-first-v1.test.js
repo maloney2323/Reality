@@ -13,7 +13,7 @@ test('Reality home begins with verified work and one independent final receipt c
  assert.ok(order.every(id=>at(id)>=0));
  for(let i=1;i<order.length;i++)assert.ok(at(order[i])>at(order[i-1]),
   order[i]+' must follow '+order[i-1]);
- assert.match(html,/What Reality has accomplished — and what comes next/);
+ assert.ok(readFileSync(new URL('../reality-home-command-v1.js',import.meta.url),'utf8').includes('Work Found. Your Team, Organized.'));
  assert.match(html,/One unduplicated operational evidence scorecard/);
  assert.equal(idCount('realityEconReceipts'),1);
  assert.equal(idCount('realityEconSettled'),1);
