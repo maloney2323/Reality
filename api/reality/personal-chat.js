@@ -225,6 +225,11 @@ export default async function handler(req,res){
   // Start all optional context reads together. Independent sources share one
   // short wall-clock budget instead of serially delaying the model 3 times.
   // The goal/authority CAS and mandatory final publication are separate.
+  // A scheduled-worker health probe must not delay ordinary answers.
+  // Direct worker-health questions still receive the independently read
+  // wake evidence, while regular conversation uses the other grounded
+  // optional sources and existing read-only governance.
+  const wantsWorkerHealth=/(?:\bwatchdog\b|\bauto[ -]?wake\b|\bwake(?:up)?\s+(?:status|health|failure|trigger)\b|\bworker\s+(?:health|status|wake|failed)\b)/i.test(text);
   const optionalContextPromise=collectOptionalChatEvidence([
    {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({
       session,conversationId}),validate:v=>v!==null&&typeof v==='object',
@@ -235,8 +240,10 @@ export default async function handler(req,res){
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'employee_shift',read:()=>readVerifiedEmployeeShiftForChat({
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
-   {id:'worker_wake',read:()=>readVerifiedIndependentWorkerForChat({
-      session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+   {id:'worker_wake',read:()=>wantsWorkerHealth?
+     readVerifiedIndependentWorkerForChat({
+      session,message:text,db:isolated}):[],
+     validate:Array.isArray,fallback:[]},
    {id:'workforce',read:()=>readVerifiedRealityCompanyWorkforceForChat({
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'riley_sources',read:()=>readVerifiedRileySourceWorkForChat({
