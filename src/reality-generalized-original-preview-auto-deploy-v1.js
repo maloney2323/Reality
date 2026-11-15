@@ -35,7 +35,8 @@ export async function verifyGeneralizedOriginalPreviewAutoDeploy({
     typeof j.preview_auto_deploy_verified!=='boolean')
   return safe('GENERALIZED_DEPLOY_PROOF_OR_AUTHORITY_UNVERIFIED');
  if(!r.ok)return safe('GENERALIZED_DEPLOY_PROVIDER_NOT_YET_VERIFIED');
- if(j.status==='GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED'&&
+ if(['GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED',
+     'GENERALIZED_VERCEL_APP_CORRELATED_EXACT_DEPLOY_STATUS_VERIFIED'].includes(j.status)&&
     j.preview_auto_deploy_verified===true&&
     j.isolated_github_write_verified===true&&
     /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
@@ -47,7 +48,12 @@ export async function verifyGeneralizedOriginalPreviewAutoDeploy({
    preview_auto_deploy_verified:true,
    original_work_id:j.original_work_id,
    canary_commit_sha:j.canary_commit_sha,
-   vercel_deployment_url:j.vercel_deployment_url
+   vercel_deployment_url:j.vercel_deployment_url,
+   ...(j.status==='GENERALIZED_VERCEL_APP_CORRELATED_EXACT_DEPLOY_STATUS_VERIFIED'&&
+    Number.isSafeInteger(j.official_vercel_app_check_run_id)&&j.official_vercel_app_check_run_id>0&&
+    Number.isSafeInteger(j.official_vercel_app_id)&&j.official_vercel_app_id>0?
+    {official_vercel_app_check_run_id:j.official_vercel_app_check_run_id,
+     official_vercel_app_id:j.official_vercel_app_id}: {})
   });
  if(j.status==='VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED'){
   const login=String(j.public_status_actor_login||'');
@@ -77,7 +83,9 @@ export async function verifyGeneralizedOriginalPreviewAutoDeploy({
       'VERCEL_PROVIDER_CREATOR_TYPE_NOT_BOT',
       'VERCEL_PROVIDER_CREATOR_LOGIN_NOT_ATTESTED',
       'VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED',
-      'VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED'].includes(j.status))
+      'VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED',
+      'VERCEL_OFFICIAL_APP_CHECK_SURFACE_UNVERIFIED',
+      'VERCEL_OFFICIAL_APP_AND_SUCCESS_STATUS_CORRELATION_MISSING'].includes(j.status))
   return safe(j.status);
  return safe('GENERALIZED_DEPLOY_PROVIDER_STATUS_NOT_ACCEPTED');
 }
