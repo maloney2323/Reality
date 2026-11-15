@@ -31,7 +31,8 @@ test('single durable intake uses exact RLS request checks, never two full-histor
  assert.equal(result.request_id,requestId);
  assert.equal(result.execution_authorized,false);
  assert.equal(result.installation_authorized,false);
- assert.equal(records,1);assert.equal(exactReads,2);
+ assert.equal(records,1);assert.equal(exactReads,1);
+ assert.equal(result.save_receipt_kind,'AUTHENTICATED_POSTGREST_INSERT_ROW');
  assert.equal(latestReads,1);
 });
 test('same request ID replays with unchanged message and no second insert',async()=>{
@@ -110,12 +111,25 @@ test('request-ID collision fails before writing a different instruction',async()
   record:async()=>{throw Error('MUST_NOT_WRITE')}
  }),/CHAT_REQUEST_ID_CONTENT_MISMATCH/);
 });
-test('independent exact readback failure never claims a saved user turn',async()=>{
- await assert.rejects(()=>acceptDurableChatTurn(source,{
-  readExact:async()=>({messages:[]}),
+test('a malformed committed insertion receipt never claims delivery',async()=>{
+ for(const receipt of [null,{}, {source_ref:'fake'}, {source_ref:'supabase:reality_chat_messages:not-a-uuid'}]){
+  await assert.rejects(()=>acceptDurableChatTurn(source,{
+   readExact:async()=>({messages:[]}),
+   readLatest:async()=>null,
+   record:async()=>receipt
+  }),/CHAT_USER_INSERT_RECEIPT_UNVERIFIED/);
+ }
+});
+test('committed owner-RLS insert returns before a later exact lookup can time out',async()=>{
+ let reads=0;
+ const r=await acceptDurableChatTurn(source,{
+  readExact:async()=>{reads++;return {messages:[]}},
   readLatest:async()=>null,
   record:async()=>({source_ref})
- }),/CHAT_USER_SAVE_READBACK_UNVERIFIED/);
+ });
+ assert.equal(reads,1);
+ assert.equal(r.saved,true);
+ assert.equal(r.reply_verified,false);
 });
 test('intake has no full conversation scan and can report genuine reused identity',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat-intake.js',import.meta.url),'utf8');
