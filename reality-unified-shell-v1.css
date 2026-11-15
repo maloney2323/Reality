@@ -306,9 +306,6 @@ body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visibl
  body.reality-unified-ui[data-reality-route="chat"] .reality-chat-conversation{
   grid-column:1;min-width:0;width:100%;
  }
- body.reality-unified-ui[data-reality-route="chat"] #realityChatFocusToggle{
-  display:none!important;
- }
  /* Existing Chat CSS owns the explicitly toggled history/work drawers.
     Neither drawer may permanently occupy a mobile grid column. */
  body.reality-unified-ui[data-reality-route="chat"]:not([data-reality-chat-panel="history"])
