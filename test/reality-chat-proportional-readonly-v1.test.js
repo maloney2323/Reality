@@ -109,5 +109,7 @@ test('read-only HTTP publication uses existing atomic owner-goal CAS and exact R
  assert.match(sql,/created >= clock_timestamp\(\)-interval '30 minutes'/);
  assert.doesNotMatch(sql,/ORDER BY d\.start_time DESC/);
  assert.match(index,/recovered_from_exact_owner_readback:true/);
+ assert.match(index,/data\.read_only_conversation===true/);
+ assert.match(index,/status\('Reply saved\.'\)/);
  assert.match(index,/if\(!saved\?\.ok\|\|saved\.saved!==true\)throw intakeError/);
 });
