@@ -86,7 +86,15 @@ function rig({drifted=false,unrelatedFile=false,badPR=false,badRun=false,
    data=fileResponse(ref===integratedCommit?after:
     drifted&&ref===head?before+'drift':ref===candidateCommit?after:before);
   }else if(route.startsWith('/pulls?state=open&base='))
-   data=[badPR?{...pr,draft:false}:pr];
+   data=[
+    // The frozen candidate and independent integration PR have identical
+    // source bytes; the approved original candidate SHA is not its own
+    // independent integration witness.
+    {...pr,number:302,head:{...pr.head,
+      ref:'reality/riley/auto-corrective-'+work.slice(5)+'-a3',
+      sha:candidateCommit}},
+    badPR?{...pr,draft:false}:pr
+   ];
   else if(route==='/pulls/304/files?per_page=100')
    data=unrelatedFile?[{filename:'src/other.js',status:'modified'}]:
     [{filename:file,status:'modified'}];
