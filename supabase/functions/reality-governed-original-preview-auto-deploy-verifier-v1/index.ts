@@ -120,6 +120,11 @@ Deno.serve(async req=>{
    vercel.creator.login==='vercel';
   let officialAppCheck=null;
   if(!officialBot&&!officialServiceUser){
+   // Only ABSENT status attribution may be repaired by correlated official
+   // App evidence. A present but untrusted status author is contradictory
+   // evidence and must never be laundered through a separate green check.
+   if(vercel.creator!==null&&vercel.creator!==undefined)
+    return safe('VERCEL_STATUS_CREATOR_PRESENT_BUT_UNTRUSTED');
    // An official Vercel GitHub App check is an independently issued
    // GitHub object whose app.slug cannot be set by a normal commit actor.
    // It complements, never REPLACES, the exact Vercel deployment-success
