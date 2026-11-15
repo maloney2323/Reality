@@ -7426,6 +7426,13 @@ setInterval(refreshSavedShiftHome,300000);
    // Refresh Reality's independently observed improvement queue after chat.
    // This request remains GET-only and cannot start a model or authorize work.
    void refreshRealitySelfImprovement();
+   // Ordinary conversational replies finish like Chat. Detailed governance
+   // diagnostics belong to Work, not a giant status string after each answer.
+   if(data.read_only_conversation===true&&
+      data.reliability?.chat_lane==='PROPORTIONAL_READ_ONLY'){
+    status('Reply saved.');
+    return;
+   }
    const reliability=data.reliability||{};
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
    const issues=reliability.semantic_issue_candidates?.length||0;
