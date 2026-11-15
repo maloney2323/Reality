@@ -9,6 +9,8 @@ export const maxDuration=20;
 function fail(code,status=503){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ let stage='AUTHENTICATION';
+ const intakeStarted=Date.now();
  try{
   privateChatConfig();
   if(req.method!=='POST')
@@ -25,12 +27,20 @@ export default async function handler(req,res){
    fail('CHAT_MESSAGE_INVALID',400);
   // Intake never interprets model text as owner authorization, and does not
   // apply or accept goal/installation/worker commands.
+  stage='EXACT_RLS_INTAKE_AND_SAVE';
   const result=await acceptDurableChatTurn({
    session,conversationId,requestId,message,
   });
   return res.status(200).json(result);
  }catch(e){
-  return res.status(Number(e.status)||503).json({ok:false,error:e.message||'CHAT_INTAKE_UNAVAILABLE'});
+  const value=String(e?.message||'');
+  const code=/^[A-Z][A-Z0-9_]{3,119}$/.test(value)?value:'CHAT_INTAKE_UNAVAILABLE';
+  console.warn('REALITY_CHAT_INTAKE_STAGE_FAILURE',stage,code,
+   'elapsed_ms',Date.now()-intakeStarted);
+  return res.status(Number(e.status)||503).json({
+   ok:false,error:code,stage,
+   request_saved_state:'CHECK_AUTHENTICATED_HISTORY',
+   execution_authorized:false,installation_authorized:false});
  }
 }
 
