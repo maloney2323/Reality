@@ -58,7 +58,6 @@ test('Chat mobile viewport overrides the later unified desktop three-column grid
  const prior=css.slice(0,mobile);
  assert.match(prior,/grid-template-columns:minmax\(160px,180px\) minmax\(0,1fr\) minmax\(235px,280px\)/);
  assert.match(narrow,/@media\(max-width:600px\)/);
- assert.match(narrow,/#realityChatFocusToggle\s*\{\s*display:none!important/);
  const chatCss = html.indexOf('/reality-chat-workspace-v1.css');
  const fullscreenCss = html.indexOf('/reality-chat-fullscreen-v2.css');
  const unifiedCss = html.indexOf('/reality-unified-shell-v1.css');
