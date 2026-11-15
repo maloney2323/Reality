@@ -4,7 +4,7 @@
 // A GitHub green TEST is not equivalent to Vercel deployment verification.
 const API='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
-const URL=/^https:\/\/vercel\.com\/[a-zA-Z0-9_-]+\/reality\/[a-zA-Z0-9_-]{10,100}$/;
+const VERCEL_DEPLOYMENT_URL=/^https:\/\/vercel\.com\/[a-zA-Z0-9_-]+\/reality\/[a-zA-Z0-9_-]{10,100}$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
 const SOURCE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const PROBE=/^evidence\/reality-governed-original-canary-[a-f0-9-]{36}\.json$/;
@@ -106,7 +106,7 @@ Deno.serve(async req=>{
   if(named.length!==1)
    return safe('VERCEL_OFFICIAL_INTEGRATION_STATUS_NOT_UNAMBIGUOUS');
   const vercel=named[0];
-  if(vercel.state!=='success'||!URL.test(vercel.target_url||'')||
+  if(vercel.state!=='success'||!VERCEL_DEPLOYMENT_URL.test(vercel.target_url||'')||
      vercel.creator?.type!=='Bot'||
      !['vercel[bot]','vercel'].includes(vercel.creator?.login)||
      !Number.isSafeInteger(vercel.id)||vercel.id<=0)
