@@ -306,6 +306,15 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  // Home may open Chat to discuss a gap. Prefill an owner-editable question,
+  // but NEVER submit it or grant work authority from a navigation link.
+  if(window.location.hash==='#weekly-workload'){
+    const input=get('privatePrompt');
+    if(input&&!input.value.trim()){
+      input.value='Reality, assess our next-week employee workload using your source-backed weekly plan. Show each role’s provisional review timeboxes, the unallocated hypothetical capacity, and what source work needs qualification. Distinguish proposals from authorized jobs, completed work, and verified savings.';
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  }
   // Mobile navigation is presentational. Work opens the existing read-only
   // inspector; no job/shift starts when the button is pressed.
   const mobileNav=node('nav','reality-chat-mobile-nav');
