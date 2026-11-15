@@ -210,7 +210,10 @@ test('signed developer can draft a bounded real source change using frozen Git r
   throw Error('UNEXPECTED_SOURCE_REQUEST:'+url);
  };
  const callRpc=async(_db,name,args)=>{
-  if(name==='reality_claim_chat_new_development_v1')return original;
+  if(name==='reality_claim_chat_new_development_release_v2'){
+   assert.equal(args.p_release_sha,release);
+   return original;
+  }
   if(name==='reality_record_chat_new_development_draft_v1'){
    stored++;assert.equal(args.p_target_path,path);
    assert.equal(args.p_source_blob_sha,blob);
