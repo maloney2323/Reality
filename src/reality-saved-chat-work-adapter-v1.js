@@ -9,6 +9,8 @@ import {classifyChatWorkIntent} from './reality-chat-work-intent-v1.js';
 import {readOwnerChatWorkHandoff} from './reality-private-chat-work-readback-v1.js';
 import {continueRileyCorrectiveModelIntoIndependentCI}
  from './reality-riley-auto-corrective-ci-bridge-v1.js';
+import {admitOwnerNewDevelopment,readOwnerNewDevelopment}
+ from './reality-chat-new-development-adapter-v1.js';
 
 const workId=x=>/^work:[a-f0-9]{32}$/.test(String(x||''));
 const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
@@ -24,6 +26,9 @@ export const CHAT_WORK_CAPABILITIES=Object.freeze([
  Object.freeze({id:'governed-original-engineering',
   description:'Build or repair source code for an explicitly referenced, already admitted and owner-authorized original software-engineering job. Reuse Reality\'s existing model-written corrective candidate and independently tested isolated GitHub CI. No new feature outside the original warrant, no installation.',
   effect:'isolated source candidate and independent CI',authorizes_installation:false}),
+ Object.freeze({id:'governed-chat-new-development',
+  description:'Create a genuinely new isolated Reality code development task from the currently saved explicit owner build instruction. No prior job or shift borrowed. Model code generation and independent verification are separate; production installation never authorized.',
+  effect:'new isolated development admission only',authorizes_installation:false}),
  Object.freeze({id:'owner-employee-shift-briefing',
   description:'Read actual employee shift authorization, current work and steps from the owner-scoped independent ledger. Read only.',
   effect:'read only',authorizes_installation:false}),
@@ -63,7 +68,7 @@ export async function inspectSavedChatWork({
  session,conversationId,requestId,messages,
  readBuild=readOwnerGovernedBuild,
  readShift=readOwnerEmployeeShift,readWork=readOwnerChatWorkHandoff,
- classify=classifyChatWorkIntent
+ readNew=readOwnerNewDevelopment,classify=classifyChatWorkIntent
 }={}){
  const verified=sourceTurn({session,conversationId,requestId,messages});
  let intent;
@@ -90,6 +95,7 @@ export async function inspectSavedChatWork({
  const common={
   request_id:requestId,source_ref:verified.source_ref,
   intent_kind:intent.kind,objective:intent.objective||null,
+  source_quote:intent.source_quote||null,
   capability_id:intent.capability_id||null,
   action_eligible:false,execution_started:false,
   installation_authorized:false,production_changed:false
@@ -97,6 +103,36 @@ export async function inspectSavedChatWork({
  if(intent.kind==='CONVERSATION'||intent.kind==='UNCERTAIN')
   return Object.freeze({...common,status:intent.status==='CONVERSATION_ONLY'?
    'CHAT_WORK_CONVERSATION_ONLY':'CHAT_WORK_INTENT_NEEDS_CLARIFICATION'});
+ if(intent.capability_id==='governed-chat-new-development'&&
+    intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
+    intent.action_eligible===true){
+  // Fresh signed Chat wording admits its OWN new source. No automatic
+  // assignment of an unrelated prior repair or an existing shift warrant.
+  let prior=null;
+  try{prior=await readNew({session,conversationId})}catch{
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_READBACK_UNAVAILABLE'});
+  }
+  if(prior?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+     prior.owner_id!==session.user_id||
+     prior.conversation_id!==conversationId||
+     !Array.isArray(prior.items))
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_READBACK_UNAVAILABLE'});
+  const matched=prior.items.filter(x=>
+    x.request_id===requestId&&x.source_ref===verified.source_ref);
+  if(matched.length>1)
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_DUPLICATE_SOURCE');
+  if(matched.length===1)return Object.freeze({...common,
+   status:'CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED',
+   original_work_id:matched[0].original_work_id,
+   development_phase:matched[0].phase,
+   development_evidence:matched[0].evidence||null});
+  return Object.freeze({...common,
+   status:'CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE',
+   action_eligible:true,
+   original_work_id:null,
+   development_phase:'NOT_YET_ADMITTED',
+   new_shift_started:false});
+ }
  if(intent.capability_id==='governed-original-engineering'&&
     intent.kind==='WORK_REQUEST'&&intent.action_eligible===true){
   let read=null;
@@ -277,4 +313,35 @@ export async function continueVerifiedChatEngineering({
   installation_authorized:false,original_job_completed:false,
   production_changed:false,new_shift_started:false
  });
+}
+
+// A signed, direct Chat request is sufficient for isolated build admission.
+export async function authorizeSavedChatNewDevelopment({
+ session,conversationId,requestId,messages,
+ inspect=inspectSavedChatWork,admit=admitOwnerNewDevelopment
+}={}){
+ const source=sourceTurn({session,conversationId,requestId,messages});
+ const review=await inspect({session,conversationId,requestId,messages});
+ if(review?.status==='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'&&
+    workId(review.original_work_id))
+  return Object.freeze({...review,request_id:requestId,
+   source_ref:source.source_ref,execution_started:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false});
+ if(review?.status!=='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'||
+    review.action_eligible!==true||
+    review.capability_id!=='governed-chat-new-development'||
+    typeof review.source_quote!=='string'||
+    typeof review.objective!=='string')
+  fail('CHAT_WORK_NEW_DEVELOPMENT_NO_SIGNED_INSTRUCTION',409);
+ const result=await admit({session,conversationId,requestId,messages,
+  sourceQuote:review.source_quote,expectedObjective:review.objective});
+ if(result?.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'||
+    result.request_id!==requestId||
+    result.source_ref!==source.source_ref||
+    !workId(result.original_work_id)||
+    result.installation_authorized!==false||
+    result.production_changed!==false||result.new_shift_started!==false)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_ADMISSION_RECEIPT_UNVERIFIED',503);
+ return result;
 }
