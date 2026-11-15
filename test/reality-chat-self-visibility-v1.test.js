@@ -138,7 +138,10 @@ test('model receives self visibility in both Chat lanes, not solely if employee 
  const self=file('src/reality-chat-self-visibility-v1.js');
  assert.match(api,/id:'self_visibility'/);
  assert.match(api,/self_visibility:selfVisibilityObservations/);
- assert((api.match(/\.\.\.selfVisibilityObservations/g)||[]).length>=2);
+ assert.match(api,/\.\.\.selfVisibilityObservations/);
+ assert.match(api,/currentObservations:ownerCurrentUniverseObservations/);
+ assert.match(api,/verifiedUniverseObservations:ownerUniverse\.observations/);
+ assert.match(api,/connected_world_observations:ownerUniverse\.observations/);
  assert.match(gateway,/REALITY SELF-VISIBILITY AND SELF-CORRECTION CONTRACT/);
  assert.match(gateway,/INSPECT -> TEST -> RECONNECT\/REPAIR -> VERIFY/);
  assert.doesNotMatch(self,/createGitHubBranch|writeGitHubFile|installation_authorized:true/);
