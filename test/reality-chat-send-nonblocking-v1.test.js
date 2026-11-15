@@ -11,7 +11,11 @@ test('successful Chat response never waits for history or conversation-list GET 
  assert.ok(start>=0&&end>start);
  assert.ok(send.includes("void Promise.allSettled([loadSaved(),loadConversations()])"));
  assert.ok(!send.includes("await loadSaved();await loadConversations()"));
- assert.ok(send.includes("finally{el('privateSend').disabled=false}"));
+ assert.match(send,/finally\\s*\\{\\s*privateChatSending=false;\\s*el\\('privateSend'\\)\\.disabled=false;/);
+ assert.match(send,/if\\(privateChatSending\\)return/);
+ assert.match(send,/let sentRequest=crypto\\.randomUUID\\(\\)/);
+ assert.match(send,/reality:chat-intake-saved/);
+ assert.match(send,/reality:chat-request-rebound/);
  assert.ok(send.includes("signal:AbortSignal.timeout(95000)"));
 });
 test('all authenticated read-only refreshes have a finite deadline',()=>{
