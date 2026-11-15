@@ -7268,11 +7268,14 @@ setInterval(refreshSavedShiftHome,300000);
    // A conversation is durably accepted before model/reliability processing.
    // Even if cognition times out, the exact signed-in turn can be resumed.
    const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
-    credentials:'same-origin',signal:AbortSignal.timeout(14000),
+    credentials:'same-origin',signal:AbortSignal.timeout(22000),
     headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value})});
    const saved=await accepted.json().catch(()=>null);
+   if(typeof saved?.stage==='string'&&
+      /^[A-Z][A-Z0-9_]{3,80}$/.test(saved.stage))
+    responseFailureStage=saved.stage;
    if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
       !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(saved.request_id||'')||
       !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(saved.source_ref||'')){
