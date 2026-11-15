@@ -5,9 +5,10 @@ import {verifyGeneralOriginalAcceptancePushTransport} from
 const url='https://hvkfreoagbrphwghjajw.supabase.co';
 const db={url,project:'hvkfreoagbrphwghjajw',strictSecrets:true,secretKey:'x'.repeat(36)};
 const env={VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project};
-const valid={status:'EXACT_ISOLATED_PUSH_AND_CI_INDEPENDENTLY_VERIFIED',
+const valid={status:'EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED',
  original_work_id:'work:'+'a'.repeat(32),github_commit_sha:'b'.repeat(40),
- push_ci_run_id:43679502391,independent_push_acceptance_verified:true,
+ push_ci_run_id:43679502391,independent_pr_sync_acceptance_verified:true,
+ acceptance_event:'pull_request',acceptance_pr_number:305,
  installation_authorized:false,source_installed:false,
  original_job_completed:false,production_changed:false};
 test('only signed isolated worker can contact the one-shot transport broker',async()=>{
@@ -19,7 +20,7 @@ test('only signed isolated worker can contact the one-shot transport broker',asy
   {env:{...env,REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'foreign'}}
  ]){
   const result=await verifyGeneralOriginalAcceptancePushTransport({db,env,fetchImpl,...patch});
-  assert.equal(result.independent_push_acceptance_verified,false);
+  assert.equal(result.independent_pr_sync_acceptance_verified,false);
   assert.equal(result.installation_authorized,false);
   assert.equal(result.original_job_completed,false);
   assert.equal(result.production_changed,false);
@@ -37,10 +38,12 @@ test('request has zero model/owner-supplied scope and cannot mutate original job
   return new Response(JSON.stringify(valid),{status:200,headers:{'content-type':'application/json'}});
  };
  const r=await verifyGeneralOriginalAcceptancePushTransport({db,env,fetchImpl});
- assert.equal(n,1);assert.equal(r.independent_push_acceptance_verified,true);
+ assert.equal(n,1);assert.equal(r.independent_pr_sync_acceptance_verified,true);
  assert.equal(r.original_work_id,valid.original_work_id);
  assert.equal(r.github_commit_sha,valid.github_commit_sha);
  assert.equal(r.push_ci_run_id,valid.push_ci_run_id);
+ assert.equal(r.acceptance_event,'pull_request');
+ assert.equal(r.acceptance_pr_number,305);
  assert.equal(r.installation_authorized,false);
  assert.equal(r.source_installed,false);
  assert.equal(r.original_job_completed,false);
@@ -54,14 +57,16 @@ test('rejected, partial and forged success do not release approval',async()=>{
   {...valid,production_changed:true},
   {...valid,push_ci_run_id:1},
   {...valid,github_commit_sha:'bad'},
-  {...valid,independent_push_acceptance_verified:false},
+  {...valid,acceptance_event:'push'},
+  {...valid,acceptance_pr_number:null},
+  {...valid,independent_pr_sync_acceptance_verified:false},
   {...valid,status:'PUSH_VERIFIED_AWAITING_CI'},
   {status:'NO_CURRENT_AUTHORIZED_PUSH_PROBE',installation_authorized:false,
    source_installed:false,original_job_completed:false,production_changed:false}
  ]){
   const fetchImpl=async()=>new Response(JSON.stringify(v),{status:200});
   const r=await verifyGeneralOriginalAcceptancePushTransport({db,env,fetchImpl});
-  assert.equal(r.independent_push_acceptance_verified,false);
+  assert.equal(r.independent_pr_sync_acceptance_verified,false);
   assert.equal(r.installation_authorized,false);
   assert.equal(r.original_job_completed,false);
   assert.equal(r.production_changed,false);
@@ -73,7 +78,7 @@ test('network outage and untrusted HTTP error fail closed',async()=>{
   async()=>new Response(JSON.stringify(valid),{status:403})
  ]){
   const r=await verifyGeneralOriginalAcceptancePushTransport({db,env,fetchImpl});
-  assert.equal(r.independent_push_acceptance_verified,false);
+  assert.equal(r.independent_pr_sync_acceptance_verified,false);
   assert.equal(r.original_job_completed,false);
  }
 });
