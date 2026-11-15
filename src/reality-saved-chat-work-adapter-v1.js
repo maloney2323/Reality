@@ -241,16 +241,18 @@ export async function continueVerifiedChatEngineering({
  // graph BEFORE invoking a broker which is already independently fenced.
  const graph=await callRpc(db,'reality_read_current_shift_execution_graph_v1',
   {},{fetchImpl});
- const same=graph?.jobs?.filter(j=>
-   j.original_work_id===eligibility.original_work_id&&
-   j.source_ref===eligibility.original_source_ref&&
+ const engineering=graph?.jobs?.filter(j=>
+   j.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
    !['SETTLED','ALREADY_SETTLED'].includes(j.phase))||[];
+ const same=engineering.filter(j=>
+   j.original_work_id===eligibility.original_work_id&&
+   j.source_ref===eligibility.original_source_ref);
  if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
     graph.owner_id!==session.user_id||
     graph.shift_id!==eligibility.shift_id||
     graph.installation_authorized!==false||
     graph.production_changed!==false||
-    same.length!==1)
+    engineering.length!==1||same.length!==1)
   fail('CHAT_WORK_ENGINEERING_CURRENT_WARRANT_DRIFT',409);
  const result=await continueCI({db,env,fetchImpl});
  if(result?.installation_authorized!==false||
