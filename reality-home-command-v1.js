@@ -87,8 +87,10 @@
   'Checking the existing owner-scoped Monday–Friday plan…');
  const weeklyTotals=el('div','rc-weekly-totals');
  const weeklyRows=el('div','rc-weekly-rows');
- const weeklyFoot=el('p','rc-weekly-foot',
-  'Only proposed review timeboxes are shown. They are NOT scheduled execution, measured work, unfilled customer orders, or verified savings.');
+ const weeklyFoot=el('details','rc-weekly-method');
+ weeklyFoot.append(el('summary','','How workload hours are calculated'),
+  el('p','rc-weekly-foot',
+   'These bars use source-backed provisional review timeboxes and a hypothetical 40-hour comparison per source-bearing role. They are not approved schedules, completed automation, missing customer jobs, or verified financial savings.'));
  const discuss=a('Ask Reality to assess this workweek gap','/chat#weekly-workload','rc-text-link rc-weekly-chat');
  weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,weeklyRows,weeklyFoot,discuss);
  const directory=el('details','rc-role-directory');
@@ -152,6 +154,7 @@
   sourceStatus=$('simpleWorkdayStatus'),sourceList=$('simpleWorkdayCandidates');
  const signed=()=>auth?.style.display==='block';
  let weeklyInsight=null;
+ let authWasSignedIn=null;
  const h=x=>Number.isInteger(x)?String(x):String(x).replace(/\\.0$/,'');
  function showWeekly(){
   weeklyTotals.replaceChildren();
@@ -194,9 +197,23 @@
     h(info.source_work_roles_unallocated_reference_hours)+' h':
     'Not yet comparable'));
   weeklyTotals.append(allocated,unallocated);
-  for(const role of info.roles.slice().sort((a,b)=>
+  // The screenshot gives the meaningful assigned work visual priority.
+  // Other roles remain accessible, without presenting an empty role as a
+  // missing paying-customer job or overwhelming a phone with eight rows.
+  const ordered=info.roles.slice().sort((a,b)=>
    b.proposed_review_timebox_hours-a.proposed_review_timebox_hours||
-   a.employee_name.localeCompare(b.employee_name))){
+   a.employee_name.localeCompare(b.employee_name));
+  const featured=ordered.filter(r=>
+   r.source_finding_count+r.deferred_source_count>0).slice(0,3);
+  const additional=el('details','rc-weekly-more');
+  const additionalRows=el('div','rc-weekly-more-rows');
+  additional.append(el('summary','',
+   'See all '+(ordered.length-featured.length)+' other employee roles'),
+   additionalRows);
+  if(!featured.length)
+   weeklyRows.append(el('p','rc-weekly-unknown',
+    'No employee has source-backed proposed work in this readback. Reality can investigate further sources; no executable work or missing customers inferred.'));
+  for(const role of ordered){
    const article=el('article','rc-weekly-row');
    const top=el('div','rc-weekly-row-head');
    const name=el('div','rc-weekly-name');
@@ -239,8 +256,10 @@
     detail.append(dayRow);
    }
    article.append(top,track,remaining,detail);
-   weeklyRows.append(article);
+   if(featured.includes(role))weeklyRows.append(article);
+   else additionalRows.append(article);
   }
+  if(ordered.length>featured.length)weeklyRows.append(additional);
  }
  if(typeof window.addEventListener==='function')
   window.addEventListener('reality:weekly-workload-readback',event=>{
@@ -258,9 +277,15 @@
  function paint(){
   // Never retain a previous signed-in owner's planning details across
   // logout/account switch, even if a browser keeps this tab mounted.
-  if(!signed())weeklyInsight=null;
+  const isSignedIn=signed();
+  if(!isSignedIn)weeklyInsight=null;
+  // Changing unrelated economic/shift summaries must not collapse an
+  // employee's expanded weekday assignments on mobile.
+  if(isSignedIn!==authWasSignedIn){
+   authWasSignedIn=isSignedIn;
+   showWeekly();
+  }
   const ok=econOK(),found=ok?intText(signals?.textContent?.trim()):null;
-  showWeekly();
   metrics.found.value.textContent=found??'—';
   metrics.found.caption.textContent=found!==null?
    (signalNote?.textContent||'Source observations need validation'):'Owner discovery readback not verified';
