@@ -222,3 +222,64 @@ export async function readRealitySelfVisibilityForChat({
  }
  return observations;
 }
+
+// Composition of already-existing, independently scoped owner readbacks.
+ // An admitted source record is not automatically a current-state verdict:
+ // a terminal, exact-original independent receipt supersedes that earlier
+ // phase for conversational understanding only. No database write is made.
+export function reconcileOwnerOriginalStatesForChat({
+ ownerOriginalWork,finalObservations=[]
+}={}){
+ if(ownerOriginalWork?.status!=='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK'||
+    !Array.isArray(ownerOriginalWork.jobs)||ownerOriginalWork.jobs.length>12)
+  return null;
+ const finals=new Map();
+ for(const e of Array.isArray(finalObservations)?finalObservations.slice(0,35):[]){
+  if(!/^work:[a-f0-9]{32}$/.test(e?.original_work_id||'')||
+     e?.production_changed!==false)continue;
+  const native=e.event_kind==='verified_original_job_temporal_projection'&&
+    e.source_kind==='AUTHENTICATED_OWNER_SCOPED_EXISTING_CONTINUITY_AND_ORIGINAL_DB_READBACK'&&
+    e.independent_original_settlement_verified===true&&
+    e.original_job_completed===true&&UUID.test(e.original_final_receipt_id||'');
+  const owner=e.event_kind==='owner_independent_original_job_final_receipt'&&
+    e.source_kind==='SERVICE_VERIFIED_OWNER_SCOPED_EXISTING_FINAL_RECEIPT_LEDGER'&&
+    e.original_job_completed===true&&
+    UUID.test(e.independent_settlement_event_id||'');
+  if(native||owner)finals.set(e.original_work_id,{
+   receipt_ref:native?'supabase:original-final:'+e.original_final_receipt_id:
+    e.source_ref,
+   settlement_observed_at:e.assertion_time||null
+  });
+ }
+ const contradictions=[];
+ const jobs=ownerOriginalWork.jobs.map(j=>{
+  const proof=finals.get(j.original_work_id);
+  if(!proof||j.independently_settled===true)return j;
+  contradictions.push({
+   original_work_id:j.original_work_id,
+   source_admission_phase:j.phase,
+   verified_final_receipt_ref:proof.receipt_ref,
+   issue:'PRE_SETTLEMENT_SOURCE_PROJECTION_DISAGREES_WITH_TERMINAL_RECEIPT'
+  });
+  return {
+   ...j,source_admission_phase:j.phase,
+   effective_conversational_phase:'INDEPENDENTLY_SETTLED_WITH_TERMINAL_RECEIPT',
+   independently_settled:true,
+   original_final_receipt_ref:proof.receipt_ref,
+   requires_independent_completion_verification:false
+  };
+ });
+ const remaining=jobs.filter(j=>j.independently_settled!==true).length;
+ return Object.freeze({
+  status:'READ_ONLY_OWNER_CROSS_LEDGER_RECONCILIATION',
+  source_readback_status:ownerOriginalWork.status,
+  current_shift_id:ownerOriginalWork.current_shift_id,
+  jobs,original_admission_unfinished_count:ownerOriginalWork.observed_unfinished_count,
+  effectively_unsettled_original_count:remaining,
+  source_projection_disagreements:contradictions,
+  precedence:'EXACT_ORIGINAL_INDEPENDENT_FINAL_RECEIPT_OVER_EARLIER_SOURCE_ADMISSION',
+  no_final_receipt_inference_from_missing_source:true,
+  work_execution_authorized:false,installation_authorized:false,
+  production_changed:false
+ });
+}
