@@ -41,6 +41,8 @@ const request=auth=>new Request('https://example.invalid/',{
  body:'{"version":1,"action":"verify_same_original_preview_auto_deploy"}'
 });
 function rig({creator='vercel[bot]',creatorType='Bot',statusContext='Vercel',
+ appSlug='vercel',appCheckConclusion='success',badAppHead=false,
+ duplicateAppCheck=false,missingStatusCreator=false,
  verdict='success',wrongSha=false,wrongSource=false,duplicate=false}={}){
  const oldFetch=globalThis.fetch,requests=[];
  let savedCalls=0;
@@ -64,9 +66,31 @@ function rig({creator='vercel[bot]',creatorType='Bot',statusContext='Vercel',
     same_original_execution_and_settlement_contract_verified:false,
     owner_approval_ready:false,installation_authorized:false,
     original_job_completed:false,production_changed:false};
+  }else if(route==='/rest/v1/rpc/reality_record_generalized_original_auto_deploy_app_receipt_v2'){
+   savedCalls++;const args=JSON.parse(options.body);
+   assert.equal(args.p_attempt_id,attempt);
+   assert.equal(args.p_canary_commit_sha,sha);
+   assert.equal(args.p_github_vercel_status_id,987654321);
+   assert.equal(args.p_vercel_app_check_run_id,987654322);
+   assert.equal(args.p_vercel_app_id,987654323);
+   assert.equal(args.p_vercel_deployment_url,deployUrl);
+   data={status:'GENERALIZED_VERCEL_APP_CORRELATED_EXACT_DEPLOY_STATUS_VERIFIED',
+    original_work_id:original,shift_id:shift,attempt_id:attempt,
+    canary_commit_sha:sha,vercel_deployment_url:deployUrl,
+    official_vercel_app_check_run_id:987654322,
+    official_vercel_app_id:987654323,
+    isolated_github_write_verified:true,preview_auto_deploy_verified:true,
+    same_original_execution_and_settlement_contract_verified:false,
+    owner_approval_ready:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false};
+  }else if(route==='/commits/'+sha+'/check-runs?per_page=100'){
+   const ck={id:987654322,name:'Vercel Preview Comments',
+     head_sha:badAppHead?'f'.repeat(40):sha,status:'completed',
+     conclusion:appCheckConclusion,app:{slug:appSlug,id:987654323}};
+   data={check_runs:duplicateAppCheck?[ck,ck]:[ck]};
   }else if(route==='/commits/'+sha+'/status'){
    const s={id:987654321,context:statusContext,state:verdict,target_url:deployUrl,
-    creator:{type:creatorType,login:creator}};
+    creator:missingStatusCreator?null:{type:creatorType,login:creator}};
    data={sha:wrongSha?'f'.repeat(40):sha,statuses:duplicate?[s,s]:[s]};
   }else if(route==='/git/ref/heads/'+branch)
    data={ref:'refs/heads/'+branch,object:{sha:liveHead}};
@@ -104,6 +128,31 @@ test('official Vercel GitHub service user can attest exact signed deployment',as
   assert.equal(d.original_job_completed,false);
   assert.equal(t.savedCalls,1);
  }finally{t.restore()}
+});
+test('missing status creator is attested by exact official Vercel GitHub App check plus green deploy status',async()=>{
+ const t=rig({missingStatusCreator:true});
+ try{
+  const r=await entry(request(true)),d=await r.json();
+  assert.equal(r.status,200,'safe_status='+JSON.stringify(d));
+  assert.equal(d.status,'GENERALIZED_VERCEL_APP_CORRELATED_EXACT_DEPLOY_STATUS_VERIFIED');
+  assert.equal(d.preview_auto_deploy_verified,true);
+  assert.equal(d.installation_authorized,false);
+  assert.equal(d.original_job_completed,false);
+  assert.equal(d.official_vercel_app_check_run_id,987654322);
+  assert.equal(t.savedCalls,1);
+  assert.equal(t.requests.some(x=>x.method==='PUT'),false);
+ }finally{t.restore()}
+});
+test('a missing or forged Vercel App check cannot launder a green deployment status',async()=>{
+ for(const options of [{appSlug:'not-vercel'},{appCheckConclusion:'failure'},
+  {badAppHead:true},{duplicateAppCheck:true}]){
+  const t=rig({...options,missingStatusCreator:true});
+  try{
+   const d=await (await entry(request(true))).json();
+   assert.equal(d.preview_auto_deploy_verified,false);
+   assert.equal(t.savedCalls,0);
+  }finally{t.restore()}
+ }
 });
 test('a generic green CI or another bot cannot claim the Vercel deployment',async()=>{
  for(const flags of [{creator:'attacker[bot]'},
@@ -153,6 +202,14 @@ test('DB durable deploy status requires original uninstalled source receipt and 
  assert.match(sql,/governed_original_source_write_probes_v1/);
  assert.match(sql,/reality_read_current_shift_execution_graph_v1/);
  assert.match(sql,/GITHUB_INDEPENDENT_VERCEL_BOT_SUCCESS_FOR_EXACT_CANARY_SHA/);
+ const attestation=readFileSync(new URL(
+  '../supabase/migrations/20261115_generalized_vercel_app_correlated_deploy_receipt_v2.sql',
+  import.meta.url),'utf8');
+ assert.match(attestation,/official_vercel_app_check_run_id/);
+ assert.match(attestation,/reality_read_current_shift_execution_graph_v1/);
+ assert.match(attestation,/owner_approval_ready',false/);
+ assert.match(attestation,/current_user<>'service_role'/);
+ assert.doesNotMatch(attestation,/GRANT EXECUTE[^;]*authenticated/i);
  assert.match(sql,/p_github_vercel_creator NOT IN \('vercel\[bot\]','vercel'\)/);
  assert.match(sql,/current_user<>'service_role'/);
  assert.doesNotMatch(sql,/GRANT EXECUTE[^;]*authenticated/i);
