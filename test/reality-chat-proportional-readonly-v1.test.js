@@ -81,7 +81,7 @@ test('owner session and genuine saved message are prerequisites to any model cal
   {...args,requestId:'fake'},
   {...args,sourceRef:'claimed'},
   {...args,ownerId:'fake'},
-  {...args,apiKey:'short'},
+  {...args,apiKey:''},
  ]){
   await assert.rejects(()=>generateProportionalReadOnlyReply({
    ...changed,runtime:async()=>{calls++}
