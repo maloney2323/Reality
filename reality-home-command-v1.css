@@ -50,7 +50,7 @@ body[data-reality-route="home"] .rc-nav-item{
  gap:11px;box-sizing:border-box;width:100%;min-height:46px;
  padding:10px 12px;background:transparent;border:1px solid transparent;
  border-radius:10px;text-align:left;color:#bbd8ef;
- font:700 13px/1.35 inherit;cursor:pointer;
+ font-size:13px;font-weight:700;line-height:1.35;font-family:inherit;cursor:pointer;
 }
 body[data-reality-route="home"] .rc-nav-item:hover,
 body[data-reality-route="home"] .rc-nav-item:focus-visible{
