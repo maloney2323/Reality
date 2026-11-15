@@ -72,6 +72,17 @@ on:
       - test/reality-same-original-frozen-attestation-v1.test.js
       - test/reality-generalized-original-install-review-v1.test.js
       - test/reality-generalized-original-install-review-chat-v1.test.js
+      - api/reality/generalized-owner-install-approval.js
+      - src/reality-general-original-auto-install-bridge-v1.js
+      - src/reality-general-original-auto-settlement-bridge-v1.js
+      - supabase/functions/reality-governed-general-original-installer-v1/index.ts
+      - supabase/functions/reality-governed-general-original-postinstall-verifier-v1/index.ts
+      - supabase/migrations/20261115_general_original_owner_approval_and_install_v1.sql
+      - supabase/migrations/20261115_general_original_install_service_scope_v1.sql
+      - supabase/migrations/20261115_general_original_independent_postinstall_settlement_v1.sql
+      - supabase/migrations/20261115_general_original_owner_review_readback_v2.sql
+      - .github/workflows/reality-governed-general-postinstall-original-acceptance-v1.yml
+
       - test/reality-generalized-source-write-canary-v1.test.js
       - test/reality-generalized-preview-auto-deploy-v1.test.js
       - src/reality-generalized-original-preview-auto-deploy-v1.js
@@ -286,6 +297,12 @@ jobs:
           node --check api/reality/generalized-original-install-review.js
           node --check reality-generalized-install-review-ui-v1.js
           node --test test/reality-generalized-original-install-review-chat-v1.test.js
+          node --check api/reality/generalized-owner-install-approval.js
+          node --check src/reality-general-original-auto-install-bridge-v1.js
+          node --check src/reality-general-original-auto-settlement-bridge-v1.js
+          node --check supabase/functions/reality-governed-general-original-installer-v1/index.ts
+          node --check supabase/functions/reality-governed-general-original-postinstall-verifier-v1/index.ts
+
           node --check src/reality-generalized-original-source-write-canary-v1.js
           node --check supabase/functions/reality-governed-original-source-write-canary-v1/index.ts
           node --test test/reality-generalized-source-write-canary-v1.test.js
