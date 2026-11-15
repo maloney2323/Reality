@@ -54,7 +54,8 @@ async function observeShift(){
  observingShift=true;
  try{
   const res=await fetch('/api/reality/personal-governed-employee-shift',{
-   method:'GET',credentials:'same-origin',cache:'no-store'});
+   method:'GET',credentials:'same-origin',cache:'no-store',
+   signal:AbortSignal.timeout(12000)});
   const data=await res.json().catch(()=>null);
   if(!res.ok||data?.ok!==true||
    data.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
@@ -99,6 +100,7 @@ if(approvalButton)approvalButton.onclick=async()=>{
   const startAt=plannedStart().toISOString();
   const r=await fetch('/api/reality/personal-governed-employee-shift',{
    method:'POST',credentials:'same-origin',cache:'no-store',
+   signal:AbortSignal.timeout(25000),
    headers:{'content-type':'application/json'},
    body:JSON.stringify({action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
     expected_fingerprint:lastDraft.plan_fingerprint,planned_start_at:startAt})
