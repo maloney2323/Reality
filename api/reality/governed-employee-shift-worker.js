@@ -78,6 +78,8 @@ import {stageGeneralizedVerifiedOriginalInstallReview}
  from '../../src/reality-generalized-original-install-review-v1.js';
 import {verifyGeneralizedOriginalSourceWriteTransport}
  from '../../src/reality-generalized-original-source-write-canary-v1.js';
+import {verifyGeneralOriginalAcceptancePushTransport}
+ from '../../src/reality-general-original-acceptance-push-bridge-v1.js';
 import {verifyGeneralizedOriginalPreviewAutoDeploy}
  from '../../src/reality-generalized-original-preview-auto-deploy-v1.js';
 import {continueGeneralOwnerApprovedOriginalInstall}
@@ -324,6 +326,19 @@ export default async function handler(req,res){
     status:'GENERALIZED_CANARY_PROVIDER_PROOF_NOT_ACCEPTED',
     isolated_github_write_verified:false,
     preview_auto_deploy_verified:false,
+    installation_authorized:false,source_installed:false,
+    original_job_completed:false,production_changed:false
+   }));
+  // Same pre-existing signed worker; no new shift or trigger. The Edge
+  // broker limits this preapproval test to an inert source-path .txt write,
+  // and subsequently reads independent push-triggered GitHub Actions evidence.
+  workerStage='GENERAL_ORIGINAL_PUSH_CI_PREFLIGHT';
+  const generalOriginalAcceptancePush=
+   await verifyGeneralOriginalAcceptancePushTransport({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERAL_ORIGINAL_CI_PUSH_UNVERIFIED',
+    independent_push_acceptance_verified:false,
     installation_authorized:false,source_installed:false,
     original_job_completed:false,production_changed:false
    }));
@@ -1207,6 +1222,7 @@ export default async function handler(req,res){
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
+    generalized_original_acceptance_push_preflight:generalOriginalAcceptancePush,
     generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
     generalized_original_approved_install:generalOriginalInstall,
     generalized_original_final_settlement:generalOriginalSettlement,
