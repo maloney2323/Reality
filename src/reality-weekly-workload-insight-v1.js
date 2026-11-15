@@ -142,6 +142,14 @@ export function projectRealityWeeklyWorkloadInsight(plan){
   seenSources.size!==plan.proposed_work_findings||
   deferred!==plan.source_items_deferred_beyond_timebox_capacity)
   fail('WHOLE_WEEK_SOURCE_RECONCILIATION_FAILED');
+ // The screenshot-style 40h reference is most useful for roles that
+ // actually have source-backed proposed work. Do not turn the other roles'
+ // empty profiles into invented missing customer jobs.
+ const scoped=roles.filter(r=>r.source_finding_count+r.deferred_source_count>0);
+ const scopedHours=scoped.reduce((n,r)=>n+r.proposed_review_timebox_hours,0);
+ const scopedReference=scoped.length*40;
+ const scopedUnallocated=scoped.reduce((n,r)=>
+  n+r.unallocated_hypothetical_reference_hours,0);
  const refs=[...new Set(roles.flatMap(role=>
   role.week_days.flatMap(day=>day.source_findings.map(f=>f.source_url))))].slice(0,24);
  return Object.freeze({
@@ -156,12 +164,18 @@ export function projectRealityWeeklyWorkloadInsight(plan){
   role_count:roles.length,
   roles:Object.freeze(roles),
   source_finding_count:seenSources.size,
+  source_work_role_count:scoped.length,
+  roles_without_source_work_count:roles.length-scoped.length,
+  source_work_roles_provisional_hours:scopedHours,
+  source_work_roles_hypothetical_reference_hours:scopedReference,
+  source_work_roles_unallocated_reference_hours:scopedUnallocated,
+  source_work_comparison_available:scoped.length>0,
   provisional_review_timebox_hours:total,
   hypothetical_weekly_reference_hours:plan.five_day_week_capacity_hours,
   unallocated_hypothetical_reference_hours:unallocated,
   source_items_deferred_beyond_timeboxes:deferred,
   evidence_refs:Object.freeze(refs),
-  gap_recognized:unallocated>0,
+  gap_recognized:scoped.length>0&&scopedUnallocated>0,
   comparison_is_not_actual_schedule:true,
   remaining_reference_hours_are_not_verified_missing_customer_jobs:true,
   source_findings_not_qualified_original_jobs:true,
