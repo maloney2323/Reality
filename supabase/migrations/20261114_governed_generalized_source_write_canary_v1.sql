@@ -104,7 +104,20 @@ BEGIN
  VALUES(r.original_work_id,r.attempt_id,r.owner_id,r.shift_id,
  r.exact_install_target_branch,r.source_file_path,
  r.expected_preinstall_blob_sha,p_current_head_sha,v->>'probe_path')
- ON CONFLICT (original_work_id) DO NOTHING;
+ ON CONFLICT (original_work_id) DO NOTHING RETURNING * INTO a;
+ IF FOUND THEN
+  -- This transaction durably fenced the ONE provider effect.
+  RETURN jsonb_build_object(
+   'status','GENERALIZED_CANARY_EXACT_SINGLE_WRITE_CLAIMED',
+   'original_work_id',a.original_work_id,'attempt_id',a.attempt_id,
+   'owner_id',a.owner_id,'shift_id',a.shift_id,
+   'target_branch',a.target_branch,'source_path',a.original_source_path,
+   'expected_source_blob',a.exact_source_blob_sha,
+   'expected_parent_commit_sha',a.expected_parent_commit_sha,
+   'probe_path',a.inert_probe_path,
+   'installation_authorized',false,'source_installed',false,
+   'original_job_completed',false,'production_changed',false);
+ END IF;
  SELECT * INTO a FROM reality_internal.governed_original_source_write_probes_v1
  WHERE original_work_id=r.original_work_id;
  IF NOT FOUND OR a.attempt_id<>r.attempt_id OR a.owner_id<>r.owner_id
@@ -112,23 +125,12 @@ BEGIN
   OR a.exact_source_blob_sha<>r.expected_preinstall_blob_sha
   OR a.inert_probe_path<>v->>'probe_path'
  THEN RAISE EXCEPTION 'GENERALIZED_CANARY_EXISTING_LEASE_DRIFT';END IF;
- IF a.expected_parent_commit_sha<>p_current_head_sha
- THEN RETURN jsonb_build_object('status','GENERALIZED_CANARY_ALREADY_FENCED_NO_REPEAT',
+ RETURN jsonb_build_object('status','GENERALIZED_CANARY_ALREADY_FENCED_NO_REPEAT',
    'original_work_id',a.original_work_id,'shift_id',a.shift_id,
    'provider_commit_sha',a.provider_commit_sha,
    'result_status',a.result_status,
    'installation_authorized',false,'source_installed',false,
-   'original_job_completed',false,'production_changed',false);END IF;
- IF a.intent_fenced_at IS NULL THEN RAISE EXCEPTION 'GENERALIZED_CANARY_NO_INTENT_FENCE';END IF;
- -- Only this first call may authorize a single inert file write. Subsequent
- -- invocations MUST distinguish newly inserted row using current transaction,
- -- not infer write permission from a saved intent. Use transition through a
- -- one-shot unique claim nonce provided by pg_catalog.txid_current().
- RETURN jsonb_build_object('status','GENERALIZED_CANARY_INTENT_ALREADY_FENCED_READBACK_ONLY',
- 'original_work_id',a.original_work_id,'shift_id',a.shift_id,
- 'result_status',a.result_status,
- 'installation_authorized',false,'source_installed',false,
- 'original_job_completed',false,'production_changed',false);
+   'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_generalized_source_write_canary_v1(uuid,text,text)
  FROM PUBLIC,anon,authenticated;
