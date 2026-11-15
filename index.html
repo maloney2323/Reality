@@ -7128,7 +7128,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      controls.append(inspect,report);card.append(controls);
      const justSaved=window.realityJustSavedWorkRequest;
      if(justSaved?.conversation_id===conversationId()&&
-        justSaved.request_id===message.request_id){
+        justSaved.request_id===message.request_id&&
+        window.realityChatDirectWorkEnabled!==true){
       window.realityJustSavedWorkRequest=null;
       void inspect.onclick();
      }
@@ -7358,7 +7359,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
        /work:[a-f0-9]{32}/i.test(value)),
     // Presentation hint only: don't poll a worker inbox on normal Chat.
-    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(value)}
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false,responseFailureStage=null;
@@ -7721,6 +7722,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
 
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
+<script defer src="/reality-chat-direct-work-handoff-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
 <script defer src="/reality-chat-approved-assignments-v1.js"></script>
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
