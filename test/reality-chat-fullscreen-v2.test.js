@@ -113,3 +113,11 @@ test('mobile Chat has visible, reversible, keyboard-safe expand and minimize con
  assert.match(css,/#realityChatComposer\{/);
  assert.doesNotThrow(()=>new Script(workspace));
 });
+
+
+test('ordinary Chat hides the redundant legacy footer that displayed literal null on Android',()=>{
+ assert.match(css,/body\[data-reality-route="chat"\] #privateStatus\s*\{/);
+ assert.match(html,/id="privateStatus"/);
+ assert.match(html,/!\['null','undefined','\[object object\]'\]\.includes/);
+ assert.match(css,/#privateStatus\s*\{\s*display:none!important/);
+});
