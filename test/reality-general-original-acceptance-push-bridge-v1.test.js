@@ -94,7 +94,9 @@ test('static boundaries keep probe and original owner approval distinct',async()
   import.meta.url),'utf8');
  assert.match(edge,/REALITY_GITHUB_BROKER_TOKEN/);
  assert.match(edge,/ONE_USE_FENCE_IDENTITY_MISMATCH/);
- assert.match(edge,/event=push/);
+ assert.match(edge,/event=pull_request/);
+ assert.match(edge,/reality_record_general_original_pr_acceptance_v2/);
+ assert.match(edge,/acceptance_pr_number/);
  assert.match(edge,/CI_PATH/);
  assert.match(edge,/status!=='added'/);
  assert.match(edge,/reality_record_general_original_push_ci_v1/);
