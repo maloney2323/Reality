@@ -76,7 +76,9 @@ function provider(){
     if(method==='GET'){
      const id=u.searchParams.get('conversation_id')?.slice(3);
      const uid=u.searchParams.get('user_id')?.slice(3);
-     const out=messages.filter(m=>(!id||m.conversation_id===id)&&m.user_id===uid)
+     const exactRequest=u.searchParams.get('request_id')?.slice(3);
+     const out=messages.filter(m=>(!id||m.conversation_id===id)&&
+      m.user_id===uid&&(!exactRequest||m.request_id===exactRequest))
       .slice().reverse().slice(0,Number(u.searchParams.get('limit')||241));
      return new Response(JSON.stringify(out),{status:200});
     }
@@ -171,9 +173,12 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.equal(first.status,200,JSON.stringify(first.payload));
   assert.equal(first.payload.answer,'First answer saved.');
   assert.equal(first.payload.continuity.current_answer_persisted,true);
-  assert.equal(first.payload.reliability.canonical_epistemic_state.status,'PERSISTED_AND_READBACK_VERIFIED');
+  assert.equal(first.payload.reliability.canonical_epistemic_state.status,'NOT_ASSERTED_FOR_READ_ONLY_CHAT');
+  assert.equal(first.payload.reliability.chat_lane,'PROPORTIONAL_READ_ONLY');
+  assert.equal(first.payload.reliability.business_outcome_verified,false);
   assert.equal(first.payload.reliability.independently_verified_semantic_correctness,false);
-  assert.ok(p.ledger.some(x=>x.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'));
+  assert.equal(p.ledger.some(x=>x.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'),false,
+   'read-only discussion is not a business outcome certification');
   const second=await call(chatApi,'POST',{
    conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'What did we ask first?'},cookie);
   assert.equal(second.status,200,JSON.stringify(second.payload));
