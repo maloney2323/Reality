@@ -94,7 +94,7 @@
   el('p','rc-weekly-foot',
    'These bars use source-backed provisional review timeboxes and a hypothetical 40-hour comparison per source-bearing role. They are not approved schedules, completed automation, missing customer jobs, or verified financial savings.'));
  const discuss=a('Ask Reality to assess this workweek gap','/chat#weekly-workload','rc-text-link rc-weekly-chat');
- weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,nasaBox,weeklyRows,weeklyFoot,discuss);
+ weekly.append(weeklyTitle,weeklyStatus,weeklyTotals,weeklyRows,nasaBox,weeklyFoot,discuss);
  const directory=el('details','rc-role-directory');
  directory.append(el('summary','','Explore all employee profiles, responsibilities & source jobs'),team);
  people.append(capacity,weekly,directory);
