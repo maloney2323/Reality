@@ -5,6 +5,8 @@ import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intellige
 import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
  from '../../src/reality-chat-proportional-readonly-v1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
+import {readRealitySelfVisibilityForChat}
+ from '../../src/reality-chat-self-visibility-v1.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
@@ -236,6 +238,13 @@ export default async function handler(req,res){
    {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({
       session,conversationId}),validate:v=>v!==null&&typeof v==='object',
       fallback:null},
+   // Existing self-audit + exact pinned GitHub source tree. Fast and
+   // independent of the employee-shift dashboard's readback success.
+   // A model MUST NOT infer "missing engine" from absent optional evidence.
+   {id:'self_visibility',read:()=>readRealitySelfVisibilityForChat({
+      session,message:text,
+      priorTurns:history.messages.filter(x=>x.request_id!==requestId),
+      db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'market',read:()=>readVerifiedMarketStageForChat({
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'upgrade',read:()=>readVerifiedResearchUpgradeForChat({
@@ -311,7 +320,8 @@ export default async function handler(req,res){
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
    workforce:companyWorkforceObservations,riley_sources:rileySourceWorkObservations,
-   native263:native263TemporalObservations,settlements:ownerCompletedWorkObservations
+   native263:native263TemporalObservations,settlements:ownerCompletedWorkObservations,
+   self_visibility:selfVisibilityObservations
   }=optionalContext.values;
   const signedIntake=chatWorkReadback?.items?.find(x=>
    x.request_id===requestId&&x.source_ref===recordedUser.source_ref)||null;
@@ -400,6 +410,7 @@ export default async function handler(req,res){
      ...ownerCompletedWorkObservations,
      ...employeeShiftObservations,
      ...companyWorkforceObservations,
+     ...selfVisibilityObservations,
      ...originalWorkObservation(ownerOriginalWork),
      ...weeklyQueueObservation(ownerWeeklyQueue)
     ]
@@ -539,7 +550,8 @@ export default async function handler(req,res){
      ...native263TemporalObservations,...ownerCompletedWorkObservations,
      ...marketStageObservations,...verifiedUpgradeObservations,...employeeShiftObservations,
      ...workerWakeObservations,...companyWorkforceObservations,
-     ...rileySourceWorkObservations,...originalWorkObservation(ownerOriginalWork),
+     ...rileySourceWorkObservations,...selfVisibilityObservations,
+     ...originalWorkObservation(ownerOriginalWork),
      ...weeklyQueueObservation(ownerWeeklyQueue)
     ],
     action_authorized:false,execution_authorized:false,
