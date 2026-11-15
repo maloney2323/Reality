@@ -28,7 +28,10 @@ export function projectRealityWeeklyWorkloadInsight(plan){
   plan.next_week_prepared_without_executing_jobs!==true||
   plan.verified_human_hours_saved!==null||
   plan.verified_financial_roi_usd!==null||
-  !half(plan.proposed_review_timebox_hours_total)||
+  !(Number.isFinite(plan.proposed_review_timebox_hours_total)&&
+   plan.proposed_review_timebox_hours_total>=0&&
+   plan.proposed_review_timebox_hours_total<=plan.employee_role_count*60&&
+   plan.proposed_review_timebox_hours_total*2===Math.round(plan.proposed_review_timebox_hours_total*2))||
   !Number.isSafeInteger(plan.proposed_work_findings)||
   plan.proposed_work_findings<0||
   !Number.isSafeInteger(plan.five_day_week_capacity_hours)||
