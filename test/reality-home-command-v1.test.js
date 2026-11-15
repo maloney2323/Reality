@@ -162,6 +162,22 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
   source_work_roles_hypothetical_reference_hours:40,
   source_work_roles_unallocated_reference_hours:38,
   source_work_comparison_available:true,
+  nasa_bls_repair_comparator:{
+   evidence_status:'PUBLISHED_HUMAN_REPAIR_COMPARATOR_NOT_A_REALITY_JOB_ESTIMATE',
+   source_scope:'SINGLE_NASA_MISSION_SOFTWARE_FAULT_REPAIR_ONLY',
+   investigation_median_hours:2,implementation_median_hours:3,
+   sum_of_separate_medians_hours:5,sum_of_medians_not_median_total:true,
+   bls_national_median_hourly_wage_usd:65.38,
+   bls_observation_period:'2025-05',
+   illustrative_gross_wage_equivalent_usd_per_confirmed_comparable_repair:326.9,
+   nasa_study_url:'https://ntrs.nasa.gov/api/citations/20160008693/downloads/20160008693.pdf',
+   bls_wage_source_url:'https://www.bls.gov/news.release/ocwage.t01.htm',
+   source_review_candidates_needing_fault_validation:1,
+   verified_comparable_repairs_from_this_plan:0,
+   counted_as_weekly_proposed_review_hours:false,
+   forecast_human_effort_hours:null,measured_human_hours_saved:null,
+   verified_cash_savings_usd:null,source_benchmark_does_not_authorize_execution:true
+  },
   read_only:true,execution_authorized:false,
   installation_authorized:false,production_changed:false,
   comparison_is_not_actual_schedule:true,
@@ -171,12 +187,12 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
     proposed_review_timebox_hours:2,hypothetical_weekly_comparison_hours:40,
     unallocated_hypothetical_reference_hours:38,
     comparison_coverage_percent:5,source_finding_count:1,deferred_source_count:0,
-    week_days:first},
+    nasa_fault_candidates_needing_validation:1,week_days:first},
    {employee_name:'Role Beta',role_title:'Verifier',
     proposed_review_timebox_hours:0,hypothetical_weekly_comparison_hours:40,
     unallocated_hypothetical_reference_hours:40,
     comparison_coverage_percent:0,source_finding_count:0,deferred_source_count:0,
-    week_days:days()}
+    nasa_fault_candidates_needing_validation:0,week_days:days()}
   ]
  };
  f.emitWeekly(insight);
@@ -193,11 +209,19 @@ test('weekly source-review gap becomes visible as per-role bars and clears on si
   '38 h unallocated in hypothetical comparison · 1 source for review'));
  assert.ok(textOf('rc-weekly-remaining').includes(
   'No source-backed review work assigned to this role. No missing business work inferred.'));
+ assert.match(textOf('rc-nasa-heading')[0],/NASA \+ BLS/);
+ assert.match(textOf('rc-nasa-foot')[0],/NOT scheduled AI work/);
+ assert.match(textOf('rc-nasa-foot')[0],/\$326\.90/);
+ assert.match(textOf('rc-weekly-nasa-note')[0],/independently validated/);
+ assert.equal(textOf('rc-weekly-amount')[0],'2 / 40 h',
+  'NASA comparison must never modify the proposed workload bar');
  const statuses=textOf('rc-weekly-status');
  assert.match(statuses[0],/Week of 2026-11-16 through 2026-11-20/);
  f.ids.privateReady.style.display='none';
  f.seen[0].fn();
  assert.equal(textOf('rc-weekly-amount').length,0);
+ assert.equal(textOf('rc-nasa-heading').length,0,
+  'source-linked benchmark must clear with owner evidence');
  assert.match(textOf('rc-weekly-status')[0],/Sign in/);
  f.ids.privateReady.style.display='block';
  f.seen[0].fn();
@@ -211,6 +235,9 @@ test('mobile screenshot layout prioritizes workforce bars and side-by-side value
  assert.match(css,/\.rc-impacts\s*\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
  assert.match(css,/\.rc-weekly-track/);
  assert.match(css,/\.rc-weekly-fill/);
+ assert.match(css,/\.rc-nasa-reference\[hidden\]/);
+ assert.match(js,/nasa_bls_repair_comparator/);
+ assert.doesNotMatch(js,/total_nasa_savings|verified_nasa_savings/);
  assert.match(js,/featured=ordered\.filter/);
  assert.match(js,/\.slice\(0,3\)/);
  assert.match(js,/rc-weekly-more/);
