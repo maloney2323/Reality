@@ -1,6 +1,6 @@
 // Isolated, authenticated Personal Reality conversation. No customer actions.
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,readPrivateChatGoalPublicationEpoch,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
 import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
  from '../../src/reality-chat-proportional-readonly-v1.js';
@@ -209,8 +209,21 @@ export default async function handler(req,res){
   // message. Only a fully hash-verified non-consequential terminal fork may
   // start a new, explicitly linked read-only recovery segment.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
-  stage='CONTINUITY_RECONSTRUCTION';
-  const continuity=await resolvePrivateChatContinuity({
+  const readOnlyTurn=isProportionalReadOnlyChat({
+   message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
+  });
+  stage=readOnlyTurn?'READ_ONLY_OWNER_ATOMIC_EPOCH':
+   'CONTINUITY_RECONSTRUCTION';
+  // The existing atomic owner-epoch database RPC already protects read-only
+  // conversational publication. DO NOT gate ordinary answers on a slow
+  // full-chain Universe reconstruction: it timed out after ~50 seconds
+  // on a real saved owner instruction. Goal changes and work actions still
+  // require the original complete hash-verified reconstruction.
+  const continuity=readOnlyTurn?Object.freeze({
+   scopedRoot:'personal:chat:'+scope,fork_recovery:null,
+   verified_prior_goal_cas:null,
+   full_continuity_reconstruction_required_for_external_effects:true
+  }):await resolvePrivateChatContinuity({
    scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
   });
   const scopedRoot=continuity.scopedRoot;
@@ -409,36 +422,61 @@ export default async function handler(req,res){
   // owner-scoped history and atomic goal-revision compare-and-swap.
   // Actual work commands, public research and goal mutations retain the
   // full governed orchestration, independent testing and exact approvals.
-  if(isProportionalReadOnlyChat({
-   message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
-  })){
-   stage='READ_ONLY_OWNER_GOAL_SNAPSHOT';
+  if(readOnlyTurn){
+   stage='READ_ONLY_OWNER_GOAL_EPOCH';
+   // Single existing DB RPC (indexed per owner/conversation) provides the
+   // same atomic revision check used by the production execution engine.
+   const goalEpoch=await readPrivateChatGoalPublicationEpoch(session,{
+    conversationId,requestId,isolatedDb:isolated
+   });
+   const expectedRevision=goalEpoch.expected_revision;
+   const expectedLastGoalEventId=goalEpoch.expected_last_goal_event_id;
+   stage='READ_ONLY_BOUNDED_UNIVERSE_HISTORY';
    const authoritySpine=createContinuitySpine({
     continuityRootId:scopedRoot,worldlineId:scopedRoot,
     subjectId:session.user_id
    });
-   const priorGoals=await createUniversePostgresPersistence({
-    ...isolated
-   }).reconstruct({
-    continuityRootId:authoritySpine.continuity_root_id,
-    worldlineId:authoritySpine.worldline_id
-   });
-   const currentGoal=projectAuthoritativeUserGoals({
-    continuityHistory:priorGoals,
-    continuityRootId:authoritySpine.continuity_root_id,
-    worldId:scopedRoot,principalId:session.user_id
-   });
-   const expectedRevision=continuity.verified_prior_goal_cas?
-    continuity.verified_prior_goal_cas.expected_revision:
-    currentGoal.transition_count;
-   const expectedLastGoalEventId=continuity.verified_prior_goal_cas?
-    continuity.verified_prior_goal_cas.expected_last_goal_event_id:
-    currentGoal.recent_transition_receipts.at(-1)?.event_id||null;
+   // Read the existing Universe for extra grounded context if available
+   // promptly. Never equate an unavailable provider read with no history.
+   // The owner RLS Chat messages and exact goal epoch are independent and
+   // remain sufficient for ordinary advice, drafting and explanation.
+   let priorGoals=null;
+   try{
+    const boundedFetch=(url,options={})=>fetch(url,{
+     ...options,
+     signal:AbortSignal.any([
+      options.signal||AbortSignal.timeout(1400),
+      AbortSignal.timeout(1400)
+     ])
+    });
+    priorGoals=await createUniversePostgresPersistence({
+     ...isolated,fetchImpl:boundedFetch
+    }).reconstruct({
+     continuityRootId:authoritySpine.continuity_root_id,
+     worldlineId:authoritySpine.worldline_id
+    });
+   }catch{
+    // Missing optional history does not reset, revise or delete any
+    // Continuity, user goal, original job or installed capability.
+   }
+   const currentGoal={
+    status:'EXACT_OWNER_ATOMIC_GOAL_EPOCH_READBACK',
+    transition_count:goalEpoch.expected_revision,
+    last_transition_event_id:goalEpoch.expected_last_goal_event_id,
+    source:goalEpoch.source,
+    detailed_goal_history_available:Array.isArray(priorGoals)
+   };
    if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
       (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId)))
     fail('CHAT_READ_ONLY_OWNER_GOAL_SNAPSHOT_UNVERIFIED',503);
    stage='READ_ONLY_UNIVERSE_COGNITIVE_PROJECTION';
-   const ownerUniverse=makeOwnerUniverseReadModel(priorGoals);
+   let ownerUniverse;
+   try{ownerUniverse=makeOwnerUniverseReadModel(priorGoals)}
+   catch{
+    // A temporarily conflicting or unreadable optional Universe projection
+    // is an epistemic unknown, never a reason for Chat to go silent.
+    ownerUniverse=makeOwnerUniverseReadModel(null);
+   }
    stage='READ_ONLY_MODEL_COGNITION';
    const quickStart=Date.now();
    const advisory=await generateProportionalReadOnlyReply({
