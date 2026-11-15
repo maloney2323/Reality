@@ -122,10 +122,30 @@ Deno.serve(async req=>{
    // diagnosis of *why* the strict provider trust gate remains closed.
    const login=String(vercel.creator?.login||'');
    const type=String(vercel.creator?.type||'');
+   // Public GitHub App CHECK identity is a second, independent GitHub
+   // surface. DIAGNOSE only until an exact app-check contract is established.
+   let providerCheckEvidence='UNAVAILABLE';
+   let observedCheckApps=[];
+   try{
+    const checks=await github(token,'/commits/'+proof.canary_commit_sha+'/check-runs?per_page=100');
+    if(Array.isArray(checks.check_runs)){
+     providerCheckEvidence=checks.check_runs.length?'PRESENT':'EMPTY';
+     observedCheckApps=checks.check_runs.filter(c=>
+       typeof c.name==='string'&&/vercel|deploy/i.test(c.name+' '+(c.app?.slug||'')))
+       .slice(0,5).map(c=>({
+        app_slug:/^[a-z0-9-]{1,60}$/.test(c.app?.slug||'')?c.app.slug:null,
+        check_name:/^[a-zA-Z0-9 _:/.-]{1,100}$/.test(c.name||'')?c.name:null,
+        conclusion:['success','failure','neutral','skipped'].includes(c.conclusion)?c.conclusion:null,
+        head_match:c.head_sha===proof.canary_commit_sha
+       }));
+    }
+   }catch{}
    return safe('VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED',{
     public_status_actor_login:login.length>=1&&login.length<=64&&
      [...login].every(c=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]-'.includes(c))?login:null,
-    public_status_actor_type:/^(Bot|User|Organization)$/.test(type)?type:null
+    public_status_actor_type:/^(Bot|User|Organization)$/.test(type)?type:null,
+    public_check_surface:providerCheckEvidence,
+    public_vercel_app_check_candidates:observedCheckApps
    });
   }
   if(!Number.isSafeInteger(vercel.id)||vercel.id<=0)
