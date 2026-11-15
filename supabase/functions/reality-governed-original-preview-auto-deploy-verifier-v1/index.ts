@@ -110,10 +110,15 @@ Deno.serve(async req=>{
    return safe('VERCEL_PROVIDER_STATUS_NOT_SUCCESS');
   if(!VERCEL_DEPLOYMENT_URL.test(vercel.target_url||''))
    return safe('VERCEL_PROVIDER_OFFICIAL_DEPLOYMENT_URL_MISMATCH');
-  if(vercel.creator?.type!=='Bot')
-   return safe('VERCEL_PROVIDER_CREATOR_TYPE_NOT_BOT');
-  if(!['vercel[bot]','vercel'].includes(vercel.creator?.login))
-   return safe('VERCEL_PROVIDER_CREATOR_LOGIN_NOT_ATTESTED');
+  // The GitHub/Vercel integration has two recognized provenance forms:
+  // the Vercel GitHub App bot, or Vercel's own named service user.
+  // Other users, similarly named bots and arbitrary green statuses fail.
+  const officialBot=vercel.creator?.type==='Bot'&&
+   vercel.creator.login==='vercel[bot]';
+  const officialServiceUser=vercel.creator?.type==='User'&&
+   vercel.creator.login==='vercel';
+  if(!officialBot&&!officialServiceUser)
+   return safe('VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED');
   if(!Number.isSafeInteger(vercel.id)||vercel.id<=0)
    return safe('VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED');
   // Source check at current GitHub head protects against an unrelated
