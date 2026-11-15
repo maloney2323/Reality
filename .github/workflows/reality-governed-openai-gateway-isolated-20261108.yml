@@ -82,6 +82,10 @@ on:
       - supabase/migrations/20261115_general_original_independent_postinstall_settlement_v1.sql
       - supabase/migrations/20261115_general_original_owner_review_readback_v2.sql
       - .github/workflows/reality-governed-general-postinstall-original-acceptance-v1.yml
+      - src/reality-general-original-acceptance-push-bridge-v1.js
+      - supabase/functions/reality-governed-original-acceptance-push-probe-v1/index.ts
+      - supabase/migrations/20261115_governed_original_acceptance_push_transport_preflight_v1.sql
+      - test/reality-general-original-acceptance-push-bridge-v1.test.js
 
       - test/reality-generalized-source-write-canary-v1.test.js
       - test/reality-generalized-preview-auto-deploy-v1.test.js
@@ -297,6 +301,7 @@ jobs:
           node --check api/reality/generalized-original-install-review.js
           node --check reality-generalized-install-review-ui-v1.js
           node --test test/reality-generalized-original-install-review-chat-v1.test.js
+          node --test test/reality-general-original-acceptance-push-bridge-v1.test.js
           node --check api/reality/generalized-owner-install-approval.js
           node --check src/reality-general-original-auto-install-bridge-v1.js
           node --check src/reality-general-original-auto-settlement-bridge-v1.js
