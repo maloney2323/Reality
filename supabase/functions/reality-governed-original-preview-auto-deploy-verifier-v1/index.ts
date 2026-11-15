@@ -106,11 +106,16 @@ Deno.serve(async req=>{
   if(named.length!==1)
    return safe('VERCEL_OFFICIAL_INTEGRATION_STATUS_NOT_UNAMBIGUOUS');
   const vercel=named[0];
-  if(vercel.state!=='success'||!VERCEL_DEPLOYMENT_URL.test(vercel.target_url||'')||
-     vercel.creator?.type!=='Bot'||
-     !['vercel[bot]','vercel'].includes(vercel.creator?.login)||
-     !Number.isSafeInteger(vercel.id)||vercel.id<=0)
-   return safe('VERCEL_OFFICIAL_SUCCESS_APP_IDENTITY_NOT_YET_VERIFIED');
+  if(vercel.state!=='success')
+   return safe('VERCEL_PROVIDER_STATUS_NOT_SUCCESS');
+  if(!VERCEL_DEPLOYMENT_URL.test(vercel.target_url||''))
+   return safe('VERCEL_PROVIDER_OFFICIAL_DEPLOYMENT_URL_MISMATCH');
+  if(vercel.creator?.type!=='Bot')
+   return safe('VERCEL_PROVIDER_CREATOR_TYPE_NOT_BOT');
+  if(!['vercel[bot]','vercel'].includes(vercel.creator?.login))
+   return safe('VERCEL_PROVIDER_CREATOR_LOGIN_NOT_ATTESTED');
+  if(!Number.isSafeInteger(vercel.id)||vercel.id<=0)
+   return safe('VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED');
   // Source check at current GitHub head protects against an unrelated
   // interim source installation while the immutable canary was deploying.
   const live=await github(token,'/contents/'+proof.original_source_path+
