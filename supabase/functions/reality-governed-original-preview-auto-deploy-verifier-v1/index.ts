@@ -19,7 +19,8 @@ function safe(status,extra={},http=200){
 }
 async function rpc(api,key,name,input={}){
  if(!['reality_read_generalized_original_auto_deploy_scope_v1',
-       'reality_record_generalized_original_auto_deploy_receipt_v1'].includes(name))
+       'reality_record_generalized_original_auto_deploy_receipt_v1',
+       'reality_record_generalized_original_auto_deploy_app_receipt_v2'].includes(name))
   fail('NOT_ALLOWED_SERVICE_RPC');
  const r=await fetch(api+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -117,36 +118,26 @@ Deno.serve(async req=>{
    vercel.creator.login==='vercel[bot]';
   const officialServiceUser=vercel.creator?.type==='User'&&
    vercel.creator.login==='vercel';
+  let officialAppCheck=null;
   if(!officialBot&&!officialServiceUser){
-   // Only public, non-secret GitHub status actor metadata. This is a
-   // diagnosis of *why* the strict provider trust gate remains closed.
-   const login=String(vercel.creator?.login||'');
-   const type=String(vercel.creator?.type||'');
-   // Public GitHub App CHECK identity is a second, independent GitHub
-   // surface. DIAGNOSE only until an exact app-check contract is established.
-   let providerCheckEvidence='UNAVAILABLE';
-   let observedCheckApps=[];
-   try{
-    const checks=await github(token,'/commits/'+proof.canary_commit_sha+'/check-runs?per_page=100');
-    if(Array.isArray(checks.check_runs)){
-     providerCheckEvidence=checks.check_runs.length?'PRESENT':'EMPTY';
-     observedCheckApps=checks.check_runs.filter(c=>
-       typeof c.name==='string'&&/vercel|deploy/i.test(c.name+' '+(c.app?.slug||'')))
-       .slice(0,5).map(c=>({
-        app_slug:/^[a-z0-9-]{1,60}$/.test(c.app?.slug||'')?c.app.slug:null,
-        check_name:/^[a-zA-Z0-9 _:/.-]{1,100}$/.test(c.name||'')?c.name:null,
-        conclusion:['success','failure','neutral','skipped'].includes(c.conclusion)?c.conclusion:null,
-        head_match:c.head_sha===proof.canary_commit_sha
-       }));
-    }
-   }catch{}
-   return safe('VERCEL_PROVIDER_CREATOR_IDENTITY_NOT_ATTESTED',{
-    public_status_actor_login:login.length>=1&&login.length<=64&&
-     [...login].every(c=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]-'.includes(c))?login:null,
-    public_status_actor_type:/^(Bot|User|Organization)$/.test(type)?type:null,
-    public_check_surface:providerCheckEvidence,
-    public_vercel_app_check_candidates:observedCheckApps
-   });
+   // An official Vercel GitHub App check is an independently issued
+   // GitHub object whose app.slug cannot be set by a normal commit actor.
+   // It complements, never REPLACES, the exact Vercel deployment-success
+   // status and the original source-readback.
+   const checks=await github(token,'/commits/'+proof.canary_commit_sha+
+    '/check-runs?per_page=100');
+   if(!Array.isArray(checks.check_runs))
+    return safe('VERCEL_OFFICIAL_APP_CHECK_SURFACE_UNVERIFIED');
+   const vercelChecks=checks.check_runs.filter(c=>
+    c.head_sha===proof.canary_commit_sha&&
+    c.name==='Vercel Preview Comments'&&
+    c.status==='completed'&&c.conclusion==='success'&&
+    c.app?.slug==='vercel'&&
+    Number.isSafeInteger(c.app.id)&&c.app.id>0&&
+    Number.isSafeInteger(c.id)&&c.id>0);
+   if(vercelChecks.length!==1)
+    return safe('VERCEL_OFFICIAL_APP_AND_SUCCESS_STATUS_CORRELATION_MISSING');
+   officialAppCheck=vercelChecks[0];
   }
   if(!Number.isSafeInteger(vercel.id)||vercel.id<=0)
    return safe('VERCEL_PROVIDER_STATUS_ID_NOT_VERIFIED');
@@ -157,19 +148,34 @@ Deno.serve(async req=>{
   if(live.sha!==proof.unchanged_source_blob_sha||
      live.path!==proof.original_source_path)
    fail('GITHUB_OWNER_SOURCE_CHANGED_DURING_DEPLOYMENT_PROOF');
-  const saved=await rpc(db,key,'reality_record_generalized_original_auto_deploy_receipt_v1',{
-    p_attempt_id:proof.attempt_id,
-    p_canary_commit_sha:proof.canary_commit_sha,
-    p_github_vercel_status_id:vercel.id,
-    p_github_vercel_creator:vercel.creator.login,
-    p_vercel_deployment_url:vercel.target_url
-  });
-  if(saved.status!=='GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED'||
+  const attestationRpc=officialAppCheck?
+   'reality_record_generalized_original_auto_deploy_app_receipt_v2':
+   'reality_record_generalized_original_auto_deploy_receipt_v1';
+  const attestationArgs=officialAppCheck?{
+   p_attempt_id:proof.attempt_id,
+   p_canary_commit_sha:proof.canary_commit_sha,
+   p_github_vercel_status_id:vercel.id,
+   p_vercel_app_check_run_id:officialAppCheck.id,
+   p_vercel_app_id:officialAppCheck.app.id,
+   p_vercel_deployment_url:vercel.target_url
+  }:{
+   p_attempt_id:proof.attempt_id,
+   p_canary_commit_sha:proof.canary_commit_sha,
+   p_github_vercel_status_id:vercel.id,
+   p_github_vercel_creator:vercel.creator.login,
+   p_vercel_deployment_url:vercel.target_url
+  };
+  const saved=await rpc(db,key,attestationRpc,attestationArgs);
+  if(saved.status!==(officialAppCheck?
+      'GENERALIZED_VERCEL_APP_CORRELATED_EXACT_DEPLOY_STATUS_VERIFIED':
+      'GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED')||
      saved.attempt_id!==proof.attempt_id||
      saved.original_work_id!==proof.original_work_id||
      saved.shift_id!==proof.shift_id||
      saved.canary_commit_sha!==proof.canary_commit_sha||
      saved.vercel_deployment_url!==vercel.target_url||
+     (officialAppCheck&&(saved.official_vercel_app_check_run_id!==officialAppCheck.id||
+       saved.official_vercel_app_id!==officialAppCheck.app.id))||
      saved.preview_auto_deploy_verified!==true||
      saved.isolated_github_write_verified!==true||
      saved.same_original_execution_and_settlement_contract_verified!==false||
@@ -183,6 +189,8 @@ Deno.serve(async req=>{
    shift_id:proof.shift_id,attempt_id:proof.attempt_id,
    canary_commit_sha:proof.canary_commit_sha,
    github_vercel_status_id:vercel.id,
+   ...(officialAppCheck?{official_vercel_app_check_run_id:officialAppCheck.id,
+     official_vercel_app_id:officialAppCheck.app.id}:{}),
    vercel_deployment_url:vercel.target_url,
    preview_auto_deploy_verified:true,
    isolated_github_write_verified:true
