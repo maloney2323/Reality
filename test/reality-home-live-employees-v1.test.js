@@ -14,7 +14,7 @@ test('Home makes existing employee roles and verified economic evidence visible 
  assert.ok(home>=0&&people>home&&value>people&&live>value);
  assert.ok(optional>live&&upgrade>optional);
  assert.match(html,/href="\/value">Evaluation<\/a>/);
- assert.match(html,/href="\/chat-simple#employeeBoardPanel"/);
+ assert.match(html,/href="\/employees"/);
  assert.match(html,/<script defer src="\/reality-home-employee-brief-v1.js"><\/script>/);
 });
 test('Home displays eight real role names without claiming active independent workers',()=>{
