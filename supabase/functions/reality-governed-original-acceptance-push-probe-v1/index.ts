@@ -22,7 +22,8 @@ async function rpc(url,key,name,input={}){
  if(!['reality_read_general_original_push_probe_v1',
        'reality_claim_general_original_push_probe_v1',
        'reality_record_general_original_push_provider_v1',
-       'reality_record_general_original_push_ci_v1'].includes(name))
+       'reality_record_general_original_push_ci_v1',
+       'reality_record_general_original_pr_acceptance_v2'].includes(name))
   bad('RPC_NOT_ALLOWLISTED');
  const r=await fetch(url+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -57,7 +58,7 @@ async function blobSha(bytes){
 function scoped(x){
  return x&&['EXACT_ISOLATED_PUSH_PROBE_STAGED',
    'EXACT_ISOLATED_PUSH_CI_READBACK_PENDING',
-   'EXACT_ISOLATED_PUSH_AND_CI_INDEPENDENTLY_VERIFIED',
+   'EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED',
    'EXACT_ISOLATED_PUSH_FENCED_OR_UNVERIFIED'].includes(x.status)&&
   WORK.test(x.original_work_id||'')&&UUID.test(x.attempt_id||'')&&
   UUID.test(x.shift_id||'')&&BRANCH.test(x.preflight_branch||'')&&
@@ -86,10 +87,12 @@ async function main(){
    const scope=await rpc(u.origin,key,'reality_read_general_original_push_probe_v1');
    if(scope.status==='NO_CURRENT_AUTHORIZED_PUSH_PROBE')return clean(scope.status);
    if(!scoped(scope))bad('CURRENT_OWNER_ORIGINAL_SCOPE_DRIFT');
-   if(scope.status==='EXACT_ISOLATED_PUSH_AND_CI_INDEPENDENTLY_VERIFIED')
+   if(scope.status==='EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED')
     return clean(scope.status,{original_work_id:scope.original_work_id,
       github_commit_sha:scope.github_commit_sha,push_ci_run_id:scope.push_ci_run_id,
-      independent_push_acceptance_verified:true});
+      acceptance_event:scope.accepted_event,
+      acceptance_pr_number:scope.acceptance_pr_number,
+      independent_pr_sync_acceptance_verified:scope.accepted_event==='pull_request'});
    if(scope.status==='EXACT_ISOLATED_PUSH_FENCED_OR_UNVERIFIED')
     return clean('ONE_SHOT_GITHUB_PUSH_EFFECT_UNVERIFIED_NO_RETRY');
    const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
@@ -183,19 +186,30 @@ async function main(){
       !SHA.test(scope.github_commit_sha||'')||!SHA.test(scope.inert_blob_sha||''))
     bad('PROVIDER_WRITE_NOT_ATTESTED');
    const sha=scope.github_commit_sha;
-   const [ref,original,inert,list]=await Promise.all([
+   const [ref,original,inert,list,prList]=await Promise.all([
     github(token,'/git/ref/heads/'+branch),github(token,sourceQuery),
     github(token,inertQuery),
-    github(token,'/actions/runs?head_sha='+sha+'&event=push&per_page=100')
+    github(token,'/actions/runs?head_sha='+sha+'&event=pull_request&per_page=100'),
+    github(token,'/pulls?state=open&head='+encodeURIComponent('maloney2323:'+branch)+'&per_page=100')
    ]);
    if(ref.data?.object?.sha!==sha||
      original.data?.sha!==scope.original_source_blob_sha||
      inert.data?.sha!==scope.inert_blob_sha||
-     !Array.isArray(list.data?.workflow_runs))
+     !Array.isArray(list.data?.workflow_runs)||
+     !prList.ok||!Array.isArray(prList.data))
     return clean('GOVERNED_PUSH_BRANCH_OR_PROVIDER_EVIDENCE_DRIFT');
+   const matchedPR=prList.data.filter(p=>
+     p.state==='open'&&p.head?.repo?.full_name==='maloney2323/Reality'&&
+     p.base?.repo?.full_name==='maloney2323/Reality'&&
+     p.head?.ref===branch&&p.head?.sha===sha&&
+     p.base?.ref===scope.install_target_branch&&
+     Number.isSafeInteger(p.number)&&p.number>0);
+   if(matchedPR.length!==1)
+    return clean('GOVERNED_PR_ORIGINAL_AND_BASE_IDENTITY_UNVERIFIED');
+   const pr=matchedPR[0];
    const eligible=list.data.workflow_runs.filter(r=>
      r.name===CI_NAME&&r.head_sha===sha&&r.head_branch===branch&&
-     r.event==='push'&&r.path?.split('@')[0]===CI_PATH&&
+     r.event==='pull_request'&&r.path?.split('@')[0]===CI_PATH&&
      r.status==='completed'&&r.conclusion==='success'&&
      Number.isSafeInteger(r.id)&&r.id>10000);
    if(eligible.length!==1){
@@ -223,18 +237,22 @@ async function main(){
      .every(name=>j.steps.some(s=>s.name===name&&s.conclusion==='success')));
    if(!jobs.ok||matches.length!==1)
     return clean('GOVERNED_PUSH_PROVIDER_JOB_STEPS_NOT_ACCEPTED');
-   const receipt=await rpc(u.origin,key,'reality_record_general_original_push_ci_v1',{
-    p_attempt_id:scope.attempt_id,p_commit_sha:sha,p_run_id:runId
+   const receipt=await rpc(u.origin,key,'reality_record_general_original_pr_acceptance_v2',{
+    p_attempt_id:scope.attempt_id,p_commit_sha:sha,p_run_id:runId,
+    p_pr_number:pr.number
    });
-   if(receipt.status!=='EXACT_ISOLATED_PUSH_AND_CI_INDEPENDENTLY_VERIFIED'||
+   if(receipt.status!=='EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED'||
      receipt.original_work_id!==scope.original_work_id||
-     receipt.github_commit_sha!==sha||receipt.push_ci_run_id!==runId||
+     receipt.github_commit_sha!==sha||receipt.independent_run_id!==runId||
+     receipt.accepted_event!=='pull_request'||receipt.acceptance_pr_number!==pr.number||
+     receipt.owner_approval_ready!==false||
      receipt.installation_authorized!==false||receipt.source_installed!==false||
      receipt.original_job_completed!==false||receipt.production_changed!==false)
     bad('INDEPENDENT_ACCEPTANCE_DURABLE_RECEIPT_DRIFT');
    return clean(receipt.status,{original_work_id:scope.original_work_id,
     github_commit_sha:sha,push_ci_run_id:runId,
-    independent_push_acceptance_verified:true});
+    acceptance_event:'pull_request',acceptance_pr_number:pr.number,
+    independent_pr_sync_acceptance_verified:true});
   }catch(error){
    const m=String(error instanceof Error?error.message:'');
    return clean(/^ISOLATED_ORIGINAL_CI_PUSH_[A-Z0-9_]{5,95}$/.test(m)?
