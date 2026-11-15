@@ -405,8 +405,8 @@ export default async function handler(req,res){
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
    ...marketStageObservations,...verifiedUpgradeObservations,
    ...employeeShiftObservations,...workerWakeObservations,
-   ...weeklyWorkloadObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
+   ...weeklyWorkloadObservations,
    ...selfVisibilityObservations,...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
