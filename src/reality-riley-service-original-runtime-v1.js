@@ -248,3 +248,5 @@ export function createRileyServiceOriginalRuntime({
   installation_authorized:false,
  });
 }
+
+// Independent post-install acceptance workflow transport preflight only.
