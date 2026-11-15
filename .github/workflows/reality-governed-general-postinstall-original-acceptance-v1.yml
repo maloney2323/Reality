@@ -1,0 +1,50 @@
+name: Reality independently accepted governed original post-install
+on:
+  push:
+    branches:
+      - 'reality/**'
+    paths:
+      - 'src/**'
+permissions:
+  contents: read
+jobs:
+  independent-original-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact installed source commit with credentials disabled
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Verify isolated preview commit and source tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          case "$GITHUB_REF" in refs/heads/reality/*) ;; *) exit 1 ;; esac
+          git status --porcelain | tee /tmp/reality-original-worktree
+          test ! -s /tmp/reality-original-worktree
+      - name: Prepare pinned Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Independently accept original-job runtime and governed handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/reality-riley-service-original-runtime-v1.js
+          node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-governed-original-job-v1.test.js
+      - name: Independently rerun all frozen original-job regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test/reality-frozen-regressions/*.test.js
+      - name: Confirm no upgrade installation or customer settlement from CI
+        shell: bash
+        run: |
+          echo "CI_IS_INDEPENDENT_PROVIDER_ORIGINAL_ACCEPTANCE_ONLY"
+          echo "NO_NEW_OWNER_APPROVAL"
+          echo "NO_DEPLOYMENT_CLAIM_FROM_GREEN_TEST"
+          echo "NO_ORIGINAL_SETTLEMENT_UNTIL_DURABLE_PROVIDER_READBACK"
+          echo "NO_PRODUCTION_EFFECT"
