@@ -80,6 +80,10 @@ import {verifyGeneralizedOriginalSourceWriteTransport}
  from '../../src/reality-generalized-original-source-write-canary-v1.js';
 import {verifyGeneralizedOriginalPreviewAutoDeploy}
  from '../../src/reality-generalized-original-preview-auto-deploy-v1.js';
+import {continueGeneralOwnerApprovedOriginalInstall}
+ from '../../src/reality-general-original-auto-install-bridge-v1.js';
+import {settleGeneralOwnerApprovedOriginal}
+ from '../../src/reality-general-original-auto-settlement-bridge-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -335,6 +339,26 @@ export default async function handler(req,res){
     preview_auto_deploy_verified:false,
     installation_authorized:false,original_job_completed:false,
     production_changed:false
+   }));
+  // A previously owner-approved exact repair must advance from its ORIGINAL
+  // to installation and independent settlement without a third confirmation.
+  // These brokers cannot create consent and continue only DB-current work.
+  workerStage='GENERAL_ORIGINAL_OWNER_APPROVED_INSTALL_CONTINUATION';
+  const generalOriginalInstall=
+   await continueGeneralOwnerApprovedOriginalInstall({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERAL_INSTALL_PRIVILEGED_PROVIDER_UNVERIFIED',
+    source_installed:false,original_job_completed:false,
+    production_changed:false
+   }));
+  workerStage='GENERAL_ORIGINAL_INDEPENDENT_FINAL_SETTLEMENT';
+  const generalOriginalSettlement=
+   await settleGeneralOwnerApprovedOriginal({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERAL_POSTINSTALL_PROVIDER_UNAVAILABLE',
+    original_job_completed:false,production_changed:false
    }));
   // Continue normal/full shift work on the other durable wake receipts.
   try{
@@ -1184,6 +1208,8 @@ export default async function handler(req,res){
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
     generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
+    generalized_original_approved_install:generalOriginalInstall,
+    generalized_original_final_settlement:generalOriginalSettlement,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
