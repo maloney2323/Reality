@@ -52,6 +52,13 @@ test('canonical weekly source plan identifies provisional coverage, not a real s
  assert.equal(i.provisional_review_timebox_hours,4);
  assert.equal(i.hypothetical_weekly_reference_hours,320);
  assert.equal(i.unallocated_hypothetical_reference_hours,316);
+ const sourceBearing=i.roles.filter(r=>r.source_finding_count+r.deferred_source_count>0);
+ assert.equal(i.source_work_role_count,sourceBearing.length);
+ assert.equal(i.roles_without_source_work_count,8-sourceBearing.length);
+ assert.equal(i.source_work_roles_hypothetical_reference_hours,sourceBearing.length*40);
+ assert.equal(i.source_work_roles_provisional_hours,4);
+ assert.equal(i.source_work_roles_unallocated_reference_hours,
+  sourceBearing.reduce((sum,r)=>sum+r.unallocated_hypothetical_reference_hours,0));
  assert.equal(i.gap_recognized,true);
  assert.equal(i.roles.length,8);
  assert.equal(i.roles.reduce((sum,r)=>sum+r.proposed_review_timebox_hours,0),4);
@@ -104,7 +111,10 @@ test('authenticated weekly question projects the same source plan into existing 
   i.provisional_review_timebox_hours);
  assert.equal(e.weekly_workload_insight.unallocated_hypothetical_reference_hours,
   i.unallocated_hypothetical_reference_hours);
- assert.match(e.summary,/316 comparison hours unallocated/);
+ assert.match(e.summary,new RegExp(
+  String(i.source_work_roles_unallocated_reference_hours)+' comparison hours unallocated'));
+ assert.match(e.summary,/source-bearing roles/);
+ assert.match(e.summary,/other proposed roles have no routed source work/);
  assert.match(e.summary,/NOT confirmed missing customer work/);
  assert.equal(e.execution_authorized,false);
  assert.equal(e.installation_authorized,false);
