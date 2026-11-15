@@ -175,7 +175,54 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     throw error;
   }
 
-  const rawAnswer=extractOutputText(body);
+  // A successful HTTP response is NOT proof of a completed generation.
+  // Responses API returns HTTP 200 with status=incomplete when it exhausts
+  // max_output_tokens. Previously that prefix was saved as a final reply,
+  // including the owner's real 2026-11-15 Chat answer ending mid-sentence.
+  // Continue at most once on the SAME provider response lineage. Never
+  // publish a prefix if the continuation fails or is incomplete.
+  let rawAnswer=extractOutputText(body);
+  let completedBody=body;
+  let continuedFromTruncation=false;
+  if(body?.status==='incomplete'){
+    if(body?.incomplete_details?.reason!=='max_output_tokens'||
+       typeof body.id!=='string'||!/^resp_[A-Za-z0-9_-]{4,120}$/.test(body.id)||
+       !rawAnswer.trim())
+      throw new Error('MODEL_RESPONSE_INCOMPLETE_UNRECOVERABLE');
+    const continuation=await fetchImpl('https://api.openai.com/v1/responses',{
+      method:'POST',
+      signal:AbortSignal.timeout(22000),
+      headers:{
+        authorization:`Bearer ${apiKey}`,
+        'content-type':'application/json'
+      },
+      body:JSON.stringify({
+        model,
+        previous_response_id:body.id,
+        max_output_tokens:1400,
+        input:[{role:'user',content:[{type:'input_text',text:
+          'Continue and FINISH your exact previous answer where it stopped. '+
+          'Do not repeat any previous paragraphs, headings, or text. '+
+          'Complete the unfinished sentence, be concise, and end with a '+
+          'complete final sentence. This is a continuation of the existing '+
+          'read-only answer, not a new owner request or authorization.'
+        }]}]
+      })
+    });
+    const continuationBody=await continuation.json();
+    if(!continuation.ok)throw new Error('MODEL_RESPONSE_CONTINUATION_PROVIDER_FAILED');
+    const additional=extractOutputText(continuationBody);
+    if(continuationBody?.status!=='completed'||!additional.trim()||
+       !/^resp_[A-Za-z0-9_-]{4,120}$/.test(continuationBody.id||''))
+      throw new Error('MODEL_RESPONSE_CONTINUATION_NOT_COMPLETED');
+    rawAnswer+=/\\s$/.test(rawAnswer)?additional:' '+additional;
+    completedBody=continuationBody;
+    continuedFromTruncation=true;
+  }else if(body?.status!==undefined&&body.status!=='completed'){
+    throw new Error('MODEL_RESPONSE_NOT_COMPLETED');
+  }
+  if(rawAnswer.length>12000)
+    throw new Error('MODEL_RESPONSE_COMPLETE_TEXT_TOO_LARGE');
   if(publicResearchEnabled===true&&!(body.output||[]).some(
     x=>x?.type==='web_search_call'&&x?.status==='completed'))
    throw new Error('PUBLIC_WEB_RESEARCH_NOT_VERIFIED');
@@ -191,7 +238,8 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     gateway_version: REALITY_MODEL_GATEWAY_VERSION,
     transport_authority: MODEL_TRANSPORT_AUTHORITY,
     model,
-    response_id: body.id || null,
+    response_id: completedBody.id || null,
+    continued_from_output_limit:continuedFromTruncation,
     answer: release.answer+sourceSummary,
     current_turn_release_disposition:release.disposition,
     materiality: input.materiality,
@@ -199,7 +247,7 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     transformation_receipt_id: input.governed_signal.transformation_receipt.receipt_id,
     authority_granted: false,
     execution_authorized: false,
-    provider_status: body.status || null,
+    provider_status: completedBody.status || null,
   };
 }
 
