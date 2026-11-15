@@ -164,7 +164,15 @@
    info.installation_authorized!==false||info.production_changed!==false||
    info.comparison_is_not_actual_schedule!==true||
    info.remaining_reference_hours_are_not_verified_missing_customer_jobs!==true||
-   !Array.isArray(info.roles)||info.roles.length!==info.role_count){
+   !Array.isArray(info.roles)||info.roles.length!==info.role_count||
+   !Number.isSafeInteger(info.source_work_role_count)||
+   info.source_work_role_count<0||
+   info.source_work_role_count>info.role_count||
+   info.roles_without_source_work_count!==info.role_count-info.source_work_role_count||
+   info.source_work_comparison_available!==(info.source_work_role_count>0)||
+   info.source_work_roles_hypothetical_reference_hours!==info.source_work_role_count*40||
+   !Number.isFinite(info.source_work_roles_provisional_hours)||
+   !Number.isFinite(info.source_work_roles_unallocated_reference_hours)){
    weeklyStatus.textContent=signed()?
     'Weekly source readback unavailable. No coverage or missing work inferred.':
     'Sign in to inspect the source-backed proposed workweek.';
@@ -173,14 +181,19 @@
    return;
   }
   weeklyStatus.textContent='Week of '+info.week_start+' through '+info.week_end+
-   ' · '+info.source_finding_count+' source-backed findings routed for provisional review.';
+   ' · '+info.source_work_role_count+' roles with source-backed proposed work · '+
+   info.roles_without_source_work_count+' other roles not counted as missing work.';
   const allocated=el('div','rc-weekly-total');
-  allocated.append(el('span','','Provisional source-review timeboxes'),
-   el('strong','',h(info.provisional_review_timebox_hours)+' / '+
-    h(info.hypothetical_weekly_reference_hours)+' h'));
+  allocated.append(el('span','','Proposed review · source-bearing roles'),
+   el('strong','',info.source_work_comparison_available?
+    h(info.source_work_roles_provisional_hours)+' / '+
+    h(info.source_work_roles_hypothetical_reference_hours)+' h':
+    'Not yet comparable'));
   const unallocated=el('div','rc-weekly-total');
-  unallocated.append(el('span','','Unallocated hypothetical reference'),
-   el('strong','',h(info.unallocated_hypothetical_reference_hours)+' h'));
+  unallocated.append(el('span','','Unallocated hypothetical comparison'),
+   el('strong','',info.source_work_comparison_available?
+    h(info.source_work_roles_unallocated_reference_hours)+' h':
+    'Not yet comparable'));
   weeklyTotals.append(allocated,unallocated);
   for(const role of info.roles.slice().sort((a,b)=>
    b.proposed_review_timebox_hours-a.proposed_review_timebox_hours||
@@ -203,10 +216,12 @@
    const fill=el('span','rc-weekly-fill');
    fill.style.width=role.comparison_coverage_percent+'%';
    track.append(fill);
-   const remaining=el('p','rc-weekly-remaining',
+   const withSources=role.source_finding_count+role.deferred_source_count>0;
+   const remaining=el('p','rc-weekly-remaining',withSources?
     h(role.unallocated_hypothetical_reference_hours)+
     ' h unallocated in hypothetical comparison · '+
-    role.source_finding_count+' sources for review');
+    role.source_finding_count+' source'+(role.source_finding_count===1?'':'s')+' for review':
+    'No source-backed review work assigned to this role. No missing business work inferred.');
    const detail=el('details','rc-weekly-details');
    detail.append(el('summary','','View Monday–Friday source assignments'));
    for(const day of role.week_days){
