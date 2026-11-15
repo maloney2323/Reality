@@ -23,7 +23,7 @@ const shift='9460cfff-937a-4105-9093-2e41ab39a950';
 const sha='b'.repeat(40),srcBlob='c'.repeat(40),probeBlob='d'.repeat(40),liveHead='e'.repeat(40);
 const src='src/reality-riley-service-original-runtime-v1.js';
 const probe='evidence/reality-governed-original-canary-'+attempt+'.json';
-const url='https://vercel.com/maloney2323-5310s-projects/reality/BibzEUUaY5dbjuvREnXRwLfsQGo2';
+const deployUrl='https://vercel.com/maloney2323-5310s-projects/reality/BibzEUUaY5dbjuvREnXRwLfsQGo2';
 const scope={status:'EXACT_PREAPPROVAL_ORIGINAL_VERCEL_STATUS_ELIGIBLE',
  attempt_id:attempt,original_work_id:original,shift_id:shift,
  target_branch:branch,original_source_path:src,
@@ -56,16 +56,16 @@ function rig({creator='vercel[bot]',statusContext='Vercel',
    assert.equal(args.p_canary_commit_sha,sha);
    assert.equal(args.p_github_vercel_status_id,987654321);
    assert.equal(args.p_github_vercel_creator,'vercel[bot]');
-   assert.equal(args.p_vercel_deployment_url,url);
+   assert.equal(args.p_vercel_deployment_url,deployUrl);
    data={status:'GENERALIZED_PREVIEW_AUTO_DEPLOY_GITHUB_VERCEL_STATUS_VERIFIED',
     original_work_id:original,shift_id:shift,attempt_id:attempt,
-    canary_commit_sha:sha,vercel_deployment_url:url,
+    canary_commit_sha:sha,vercel_deployment_url:deployUrl,
     isolated_github_write_verified:true,preview_auto_deploy_verified:true,
     same_original_execution_and_settlement_contract_verified:false,
     owner_approval_ready:false,installation_authorized:false,
     original_job_completed:false,production_changed:false};
   }else if(route==='/commits/'+sha+'/status'){
-   const s={id:987654321,context:statusContext,state:verdict,target_url:url,
+   const s={id:987654321,context:statusContext,state:verdict,target_url:deployUrl,
     creator:{type:'Bot',login:creator}};
    data={sha:wrongSha?'f'.repeat(40):sha,statuses:duplicate?[s,s]:[s]};
   }else if(route==='/git/ref/heads/'+branch)
