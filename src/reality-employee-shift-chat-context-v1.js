@@ -326,7 +326,7 @@ export async function readVerifiedRealityCompanyWorkforceForChat({
  * Universe observation, not a new planning engine or auto-start instruction.
  */
 const weeklyRequested=message=>
- /\\b(?:workweek|work week|weekly|week|schedule|scheduled|scheduling|staffing|employee|employees|workload|capacity|hours|unfilled|underfilled|assignments|role allocation|not enough work)\\b/i
+ /\b(?:workweek|work week|weekly|week|schedule|scheduled|scheduling|staffing|employee|employees|workload|capacity|hours|unfilled|underfilled|assignments|role allocation|not enough work)\b/i
  .test(String(message||''));
 export async function readVerifiedWeeklyWorkloadForChat({
  session,message,env=process.env,now=new Date(),
