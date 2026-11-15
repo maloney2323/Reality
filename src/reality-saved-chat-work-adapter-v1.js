@@ -120,7 +120,7 @@ export async function inspectSavedChatWork({
   const matched=prior.items.filter(x=>
     x.request_id===requestId&&x.source_ref===verified.source_ref);
   if(matched.length>1)
-   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_DUPLICATE_SOURCE');
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_DUPLICATE_SOURCE'});
   if(matched.length===1)return Object.freeze({...common,
    status:'CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED',
    original_work_id:matched[0].original_work_id,
