@@ -85,6 +85,20 @@
    CONVERSATION_ONLY:'Classified as a conversation, not executable work.',
    PROVIDER_UNVERIFIED:'Investigation failed verification; no work completion is claimed.'
   };
+  const development=work?.development;
+  if(development&&/^work:[a-f0-9]{32}$/.test(development.original_work_id||'')&&
+     development.installation_authorized===false&&
+     development.production_changed===false){
+    const stage=String(development.phase||'QUEUED');
+    one('New development task · '+development.original_work_id,
+      ['DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'].includes(stage),
+      'Owner-signed work admission · '+stage.replaceAll('_',' ')+
+      '. '+(stage==='QUEUED'?'Waiting for existing service worker.':
+       stage==='CLAIMED'?'Existing service worker is preparing code.':
+       stage==='DRAFT_GENERATED'?'Model-generated candidate saved; independent proof pending.':
+       stage==='CI_VERIFIED'?'Independent CI receipt recorded; installation still requires exact approval.':
+       'No production installation has been authorized.'));
+  }
   const last=work?.work_chain?.find(x=>typeof x?.current_evidence_stage==='string');
   const evidence=last?' Latest original-work evidence: '+String(last.current_evidence_stage)
    .replaceAll('_',' ')+'.':'';
