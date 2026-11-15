@@ -381,3 +381,126 @@ body[data-reality-route="home"] :is(.rc-start,.rc-outline,.rc-text-link):focus-v
  body[data-reality-route="home"] .rc-start,
  body[data-reality-route="home"] .rc-nav-item{transition:none!important}
 }
+
+/* Canonical source-backed weekly workload gap — not a real shift-timesheet. */
+body[data-reality-route="home"] .rc-weekly{
+ margin:14px 0 10px;padding:14px;border:1px solid #347eb0;
+ border-radius:13px;background:linear-gradient(145deg,#082b54,#061b34);
+}
+body[data-reality-route="home"] .rc-weekly-title{
+ margin:0 0 8px;color:#effaff;font-size:16px;font-weight:800;
+ letter-spacing:-.012em;
+}
+body[data-reality-route="home"] .rc-weekly-status{
+ margin:5px 0 13px;color:#b8d7e9;font-size:11px;line-height:1.6;
+}
+body[data-reality-route="home"] .rc-weekly-totals{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:8px;margin-bottom:12px;
+}
+body[data-reality-route="home"] .rc-weekly-total{
+ padding:12px;border:1px solid #276d9a;border-radius:10px;
+ background:#061a32;min-width:0;
+}
+body[data-reality-route="home"] .rc-weekly-total span{
+ display:block;font-size:10px;color:#9ccee8;line-height:1.4;
+}
+body[data-reality-route="home"] .rc-weekly-total strong{
+ display:block;color:#f2fcff;margin-top:6px;
+ font-size:clamp(16px,1.6vw,23px);line-height:1.25;overflow-wrap:anywhere;
+}
+body[data-reality-route="home"] .rc-weekly-total:last-child strong{
+ color:#b4e4ff;
+}
+body[data-reality-route="home"] .rc-weekly-rows{
+ display:grid;gap:6px;margin-bottom:12px;
+}
+body[data-reality-route="home"] .rc-weekly-row{
+ min-width:0;border-bottom:1px solid #24557a;padding:9px 2px 11px;
+}
+body[data-reality-route="home"] .rc-weekly-row:last-child{border-bottom:0}
+body[data-reality-route="home"] .rc-weekly-row-head{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:12px;margin-bottom:9px;
+}
+body[data-reality-route="home"] .rc-weekly-name{
+ display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+body[data-reality-route="home"] .rc-weekly-name strong{
+ color:#f0faff;font-size:12px;
+}
+body[data-reality-route="home"] .rc-weekly-name small{
+ color:#a8d2e9;font-size:10px;
+}
+body[data-reality-route="home"] .rc-weekly-amount{
+ color:#e9f9ff;font-size:13px;white-space:nowrap;
+}
+body[data-reality-route="home"] .rc-weekly-track{
+ height:11px;overflow:hidden;border-radius:99px;
+ background:#1e3245;box-shadow:inset 0 1px 5px #0007;
+}
+body[data-reality-route="home"] .rc-weekly-fill{
+ display:block;height:100%;border-radius:99px;
+ background:linear-gradient(90deg,#188cdf,#61caff);
+ box-shadow:0 0 12px #25c1f95e;
+}
+body[data-reality-route="home"] .rc-weekly-remaining{
+ margin:6px 0 0;font-size:10px;line-height:1.55;
+ color:#b9d0df;
+}
+body[data-reality-route="home"] .rc-weekly-details{
+ margin-top:8px;padding:0 8px;border-left:2px solid #2c80ba;
+}
+body[data-reality-route="home"] .rc-weekly-details>summary{
+ cursor:pointer;color:#8ddfff;font-size:11px;
+ padding:5px 0;line-height:1.4;
+}
+body[data-reality-route="home"] .rc-weekly-day{
+ padding:8px 0;border-top:1px solid #1e4c70;
+ display:flex;flex-direction:column;gap:5px;
+}
+body[data-reality-route="home"] .rc-weekly-day strong{
+ color:#ceeaff;font-size:11px;
+}
+body[data-reality-route="home"] .rc-weekly-day p{
+ margin:0;font-size:10px;color:#a7bdce;
+}
+body[data-reality-route="home"] .rc-weekly-source-link{
+ color:#92deff;font-size:11px;line-height:1.5;
+ overflow-wrap:anywhere;
+}
+body[data-reality-route="home"] .rc-weekly-foot{
+ margin:10px 0 8px;font-size:11px;color:#adcadc;line-height:1.6;
+}
+body[data-reality-route="home"] .rc-weekly-chat{
+ display:inline-flex;min-height:38px;align-items:center;
+ padding:7px 0;
+}
+body[data-reality-route="home"] .rc-weekly-unknown{
+ font-size:12px;color:#c1d5e1;margin:6px 0;
+}
+body[data-reality-route="home"] .rc-role-directory{
+ margin:12px 0 0;padding:7px 10px;border:1px solid #2c638b;
+ border-radius:10px;background:#092541;
+}
+body[data-reality-route="home"] .rc-role-directory>summary{
+ padding:9px 0;cursor:pointer;color:#8de0ff;font-size:12px;
+ font-weight:750;line-height:1.5;
+}
+body[data-reality-route="home"] .rc-role-directory #realityHomeEmployees{
+ margin-top:10px;
+}
+@media(max-width:600px){
+ body[data-reality-route="home"] .rc-weekly{padding:13px 10px;border-radius:12px}
+ body[data-reality-route="home"] .rc-weekly-totals{gap:6px}
+ body[data-reality-route="home"] .rc-weekly-total{padding:10px 8px}
+ body[data-reality-route="home"] .rc-weekly-total strong{font-size:18px}
+ body[data-reality-route="home"] .rc-weekly-row-head{gap:8px}
+ body[data-reality-route="home"] .rc-weekly-amount{font-size:12px}
+ body[data-reality-route="home"] .rc-weekly-name strong{font-size:13px}
+ body[data-reality-route="home"] .rc-weekly-remaining{font-size:11px}
+ body[data-reality-route="home"] .rc-weekly-details>summary{min-height:35px}
+}
+@media(max-width:360px){
+ body[data-reality-route="home"] .rc-weekly-totals{grid-template-columns:1fr}
+}
