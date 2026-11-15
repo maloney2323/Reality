@@ -44,5 +44,5 @@ test('browser JS compiles without replacing the existing Reality handler',()=>{
  assert.doesNotThrow(()=>new Script(js));
  assert.match(html,/el\('privateSend'\)\.onclick=async/);
  assert.match(html,/await loadSaved\(\);await loadConversations\(\);/);
- assert.match(html,/const sentConversation=conversationId\(\),sentRequest=crypto\.randomUUID\(\)/);
+ assert.match(html,/const sentConversation=conversationId\(\);\s*let sentRequest=crypto\.randomUUID\(\)/);
 });
