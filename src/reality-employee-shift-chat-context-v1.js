@@ -352,10 +352,13 @@ export async function readVerifiedWeeklyWorkloadForChat({
   const summary='REALITY WEEKLY WORKLOAD GAP (READ-ONLY, NOT A COMPLETED SHIFT): '+
    'Week '+insight.week_start+' through '+insight.week_end+
    '; '+insight.source_finding_count+' source-backed findings for review; '+
-   insight.provisional_review_timebox_hours+' provisional REVIEW timebox hours '+
-   'across '+insight.role_count+' proposed roles compared with '+
-   insight.hypothetical_weekly_reference_hours+' hours in a hypothetical 40h-per-role workweek; '+
-   insight.unallocated_hypothetical_reference_hours+' comparison hours unallocated. '+
+   insight.source_work_roles_provisional_hours+' provisional REVIEW timebox hours '+
+   'across '+insight.source_work_role_count+' source-bearing roles compared with '+
+   insight.source_work_roles_hypothetical_reference_hours+
+   ' hypothetical role-reference hours; '+
+   insight.source_work_roles_unallocated_reference_hours+' comparison hours unallocated. '+
+   insight.roles_without_source_work_count+
+   ' other proposed roles have no routed source work and are NOT counted as missed customer jobs. '+
    'Per role: '+roleSummary+'. '+
    'The number unallocated is NOT confirmed missing customer work. Review timeboxes are NOT '+
    'approved, executed, scheduled AI work or measured human hours. The owner can investigate '+
