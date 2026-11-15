@@ -78,6 +78,8 @@ import {stageGeneralizedVerifiedOriginalInstallReview}
  from '../../src/reality-generalized-original-install-review-v1.js';
 import {verifyGeneralizedOriginalSourceWriteTransport}
  from '../../src/reality-generalized-original-source-write-canary-v1.js';
+import {verifyGeneralizedOriginalPreviewAutoDeploy}
+ from '../../src/reality-generalized-original-preview-auto-deploy-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -320,6 +322,19 @@ export default async function handler(req,res){
     preview_auto_deploy_verified:false,
     installation_authorized:false,source_installed:false,
     original_job_completed:false,production_changed:false
+   }));
+  // Separately verify the official Vercel/GitHub integration status for
+  // the earlier one-use inert canary commit. No client-reported deployment
+  // and no green generic CI can satisfy this release transport readback.
+  workerStage='GENERALIZED_ORIGINAL_PREVIEW_AUTO_DEPLOY_EVIDENCE';
+  const generalizedPreviewDeployment=
+   await verifyGeneralizedOriginalPreviewAutoDeploy({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'GENERALIZED_DEPLOY_PROVIDER_STATUS_NOT_ACCEPTED',
+    preview_auto_deploy_verified:false,
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false
    }));
   // Continue normal/full shift work on the other durable wake receipts.
   try{
@@ -1168,6 +1183,7 @@ export default async function handler(req,res){
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
+    generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
