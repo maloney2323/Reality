@@ -3,6 +3,8 @@
    labor savings, an approved original job or a completed work shift. */
 (()=>{
 'use strict';
+// Do not fetch hidden pages' private evidence: their readers are re-mounted on the owning route.
+if(!["/","/work"].includes(window.location.pathname))return;
 const $=id=>document.getElementById(id);
 const root=$('simpleWorkdayBrief'),status=$('simpleWorkdayStatus'),
  summary=$('simpleWorkdayMetrics'),list=$('simpleWorkdayCandidates');
