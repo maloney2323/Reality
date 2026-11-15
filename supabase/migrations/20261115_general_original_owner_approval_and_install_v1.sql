@@ -64,7 +64,6 @@ BEGIN
     'original_job_completed',r.original_final_receipt_id IS NOT NULL,
     'no_third_confirmation',true,'production_changed',false);
  END IF;
- g:=public.reality_read_current_shift_execution_graph_v1();
  IF r.phase<>'READY_FOR_EXACT_OWNER_APPROVAL' OR
     r.isolated_github_write_verified IS DISTINCT FROM true OR
     r.preview_auto_deploy_verified IS DISTINCT FROM true OR
@@ -72,9 +71,20 @@ BEGIN
     r.approval_receipt_id IS NOT NULL OR r.approved_at IS NOT NULL OR
     r.installation_fenced_at IS NOT NULL OR r.installed_commit_sha IS NOT NULL OR
     r.original_final_receipt_id IS NOT NULL OR
-    g->>'status'<>'OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED' OR
-    g->>'owner_id'<>v_owner::text OR g->>'shift_id'<>r.shift_id::text OR
-    g->>'installation_authorized'<>'false' OR g->>'production_changed'<>'false'
+    NOT EXISTS(
+      SELECT 1 FROM reality_internal.governed_employee_shifts_v1 active_shift
+      JOIN reality_internal.governed_employee_completion_warrants_v1 warrant
+        ON warrant.shift_id=active_shift.shift_id
+         AND warrant.owner_id=active_shift.owner_id
+         AND warrant.plan_fingerprint=active_shift.plan_fingerprint
+      WHERE active_shift.shift_id=r.shift_id AND
+       active_shift.owner_id=v_owner AND
+       active_shift.authorized_at IS NOT NULL AND
+       active_shift.closed_at IS NULL AND
+       active_shift.planned_start_at<=clock_timestamp() AND
+       active_shift.planned_end_at='infinity'::timestamptz AND
+       active_shift.status IN ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+       AND warrant.state='ACTIVE')
  THEN RAISE EXCEPTION 'GENERAL_ORIGINAL_PREAPPROVAL_RELEASE_CONTINUATION_NOT_VERIFIED';END IF;
  SELECT * INTO j FROM reality_internal.riley_unattended_repair_originals_v1
  WHERE original_work_id=r.original_work_id AND shift_id=r.shift_id AND owner_id=r.owner_id
