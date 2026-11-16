@@ -396,9 +396,27 @@
     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED';
   const canContinue=result?.status==='CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED'||
    ['QUEUED','DRAFT_GENERATED','PUBLISH_FENCED'].includes(phase);
-  if(result?.development_phase==='CI_VERIFIED'||
-     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED')
-   void readFinalCompletion(ref,result.original_work_id);
+  const ciAccepted=result?.development_phase==='CI_VERIFIED'||
+     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED';
+  if(ciAccepted){
+   if(!verifiedComplete&&inline){
+    const verify=document.createElement('button');
+    verify.type='button';
+    verify.textContent='Check final job verification and receipt';
+    verify.style.cssText='min-height:42px;max-width:100%;white-space:normal';
+    verify.onclick=async()=>{
+     if(verify.disabled)return;
+     verify.disabled=true;
+     inlineWork(ref,
+      'Checking independent functional settlement and the final customer receipt…',
+      result);
+     const settled=await readFinalCompletion(ref,result.original_work_id);
+     if(!settled)showCheckedResult(result,ref);
+    };
+    inline.actions.append(verify);
+   }
+   if(!verifiedComplete)void readFinalCompletion(ref,result.original_work_id);
+  }
   if(!canCheck&&!canContinue)return;
   const btn=document.createElement('button');
   btn.type='button';
