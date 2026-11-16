@@ -194,6 +194,9 @@ test('Chat work UI binds existing authenticated composer and dispatches one sign
  assert.match(html,/id="realityChatComposer"/);
  assert.doesNotMatch(html,/id="realityChatConversation"/);
  assert.match(code,/getElementById\('privateReady'\)/);
+ assert.match(code,/ready\.contains\(composer\)/);
+ assert.match(code,/container=composer\?\.parentElement/);
+ assert.doesNotMatch(code,/composer\.parentElement!==container/);
  assert.doesNotMatch(code,/getElementById\('realityChatConversation'\)/);
  const received=new Map(),outbound=[];
  function element(){
@@ -203,9 +206,11 @@ test('Chat work UI binds existing authenticated composer and dispatches one sign
     assert.equal(anchor,composer);this.children.push(node)
    }};
  }
- const container=element(),composer=element();
+ // The premium workspace has already reparented the composer.
+ const ready=element(),container=element(),composer=element();
  composer.parentElement=container;
- const nodes={privateReady:container,realityChatComposer:composer};
+ ready.contains=node=>node===composer;
+ const nodes={privateReady:ready,realityChatComposer:composer};
  const window={
   location:{pathname:'/chat'},
   addEventListener(name,fn){received.set(name,fn)},
@@ -254,11 +259,13 @@ test('existing authenticated saved instruction is never re-executed on page load
    setAttribute(){},append(...nodes){this.children.push(...nodes)},
    replaceChildren(){this.children=[]},insertBefore(node){this.children.push(node)}};
  }
- const container=element(),composer=element();composer.parentElement=container;
+ const ready=element(),container=element(),composer=element();
+ composer.parentElement=container;
+ ready.contains=node=>node===composer;
  const window={location:{pathname:'/chat'},
   addEventListener(name,fn){events.set(name,fn)}};
  runInNewContext(code,{window,document:{
-  getElementById:id=>id==='privateReady'?container:
+  getElementById:id=>id==='privateReady'?ready:
    id==='realityChatComposer'?composer:null,
   createElement:element
  },fetch:async(url,options)=>{
