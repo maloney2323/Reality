@@ -31,7 +31,15 @@
  const description=document.createElement('p');
  description.style.margin='6px 0';
  const actions=document.createElement('div');
- panel.append(label,description,actions);
+ const recoverControls=document.createElement('div');
+ recoverControls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
+ const recoverButton=document.createElement('button');
+ recoverButton.type='button';
+ recoverButton.textContent='Find my saved build request';
+ recoverControls.append(recoverButton);
+ panel.append(label,description,recoverControls,actions);
+ panel.hidden=false;
+ description.textContent='Chat work status · Check an existing saved build instruction. No new message, shift or installation is created by looking it up.';
  container.insertBefore(panel,composer);
  function show(message,readOnly=false,ref=null){
   panel.hidden=false;
@@ -64,7 +72,8 @@
   });
   const json=await response.json().catch(()=>null);
   if(!response.ok||json?.ok!==true)
-   throw Error(String(json?.error||'CHAT_WORK_ACTION_UNVERIFIED'));
+   throw Error(/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(String(json?.error||''))?
+    json.error:'CHAT_WORK_ACTION_UNVERIFIED');
   if(json.request_id!==ref.request_id||
      json.source_ref!==ref.source_ref||
      json.installation_authorized!==false||
@@ -105,43 +114,90 @@
   return 'Saved work decision: '+String(result.status||'UNVERIFIED').replaceAll('_',' ')+
    '. No completed job or installation is inferred.';
  }
- // Recover ONE existing signed instruction from the authenticated history.
- // Loading history must never trigger a side-effect: only the owner clicking
- // "Continue" invokes the already-governed, idempotent exact-source endpoint.
- // This provides a recovery path for messages sent before the Chat listener fix.
- window.addEventListener('reality:saved-chat-readback',event=>{
-  if(!panel.hidden||processing.size||started.size)return;
-  const d=event.detail||{};
-  if(!UUID.test(d.conversation_id||'')||!Array.isArray(d.messages))return;
-  // A trailing "Yes, I approve" is conversational intent, not a code
-  // build request. Selection is UI-only; the server validates the signed
-  // message and exact work scope independently before any action.
-  const previous=d.messages.filter(m=>m?.role==='user'&&
-    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
-    typeof m.text==='string'&&
-    /\b(?:build|implement|code|repair|fix|develop|upgrade|create|generate|investigate|assign|execute|automate)\b/i.test(m.text));
-  const latest=previous[previous.length-1];
-  if(!latest)return;
-  const age=Date.now()-Date.parse(latest.created_at||'');
-  if(!Number.isFinite(age)||age<0||age>24*60*60*1000)return;
-  const ref={conversation_id:d.conversation_id,
-   request_id:latest.request_id,source_ref:latest.source_ref};
-  show('Continue this saved work request (not a later approval message): '+latest.text.trim().slice(0,140),true,ref);
-  const resume=document.createElement('button');
-  resume.type='button';
-  resume.textContent='Continue this saved instruction (no resend)';
-  resume.onclick=async()=>{
-   resume.disabled=true;
-   description.textContent='Checking the exact saved owner instruction and existing work record…';
-   try{
-    const result=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
-    show(explain(result),true,ref);
-   }catch{
-    show('The saved message is preserved, but the governed work handoff could not be independently verified. No duplicate message or approval was created.',true,ref);
+ // The durable signed history is looked up by an explicit user click.
+ // Do not depend on page-load CustomEvents, event timing or old Chat bubbles.
+ // A successful lookup does not authorize execution or installation.
+ recoverButton.onclick=async()=>{
+  if(recoverButton.disabled)return;
+  recoverButton.disabled=true;
+  panel.hidden=false;
+  description.textContent='Reading the authenticated saved conversation (no work is being started)…';
+  actions.replaceChildren();
+  try{
+   const conversationId=window.realityActiveConversationId?.();
+   if(!UUID.test(conversationId||''))throw Error('CHAT_WORK_CONVERSATION_NOT_SELECTED');
+   const response=await fetch('/api/reality/personal-chat?conversation_id='+
+    encodeURIComponent(conversationId),{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(20000)
+   });
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true||data.conversation_id!==conversationId||
+      !Array.isArray(data.messages))
+    throw Error(response.status===401?'CHAT_WORK_SIGN_IN_REQUIRED':
+      'CHAT_WORK_SAVED_HISTORY_READBACK_UNAVAILABLE');
+   const candidates=data.messages.filter(m=>m?.role==='user'&&
+     UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
+     typeof m.text==='string'&&
+     /\b(?:build|implement|code|repair|fix|develop|upgrade|create|generate)\b/i.test(m.text)&&
+     Number.isFinite(Date.parse(m.created_at||'')))
+     .sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
+   if(candidates.length===0){
+    description.textContent='No source-verified build instruction found in this conversation. Nothing was executed. You may send a new build instruction once.';
+    return;
    }
-  };
-  actions.append(resume);
- });
+   const latest=candidates[0];
+   const ref={conversation_id:conversationId,
+    request_id:latest.request_id,source_ref:latest.source_ref};
+   const preview=latest.text.trim().replace(/\s+/g,' ').slice(0,200);
+   description.textContent='Saved, signed request found: “'+preview+'” · Request '+latest.request_id+
+    '. Review this source before continuing. This lookup made no changes.';
+   const inspect=document.createElement('button');
+   inspect.type='button';
+   inspect.textContent='Inspect current work (read only)';
+   inspect.onclick=async()=>{
+    inspect.disabled=true;
+    description.textContent='Reading this exact signed instruction without executing work…';
+    try{
+     const result=await call('INSPECT_VERIFIED_WORK',ref);
+     description.textContent=explain(result);
+    }catch(err){
+     const code=String(err?.message||'CHAT_WORK_READBACK_UNAVAILABLE');
+     description.textContent='Inspection blocked: '+
+       (/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_READBACK_UNAVAILABLE')+
+       '. No action was performed.';
+    }finally{inspect.disabled=false;}
+   };
+   const proceed=document.createElement('button');
+   proceed.type='button';
+   proceed.textContent='Continue this exact saved build (no resend)';
+   proceed.onclick=async()=>{
+    if(proceed.disabled)return;
+    proceed.disabled=true;
+    description.textContent='Checking and processing exact signed source '+ref.request_id+
+      ' through the existing governed work adapter…';
+    try{
+     const result=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
+     description.textContent=explain(result);
+    }catch(err){
+     const code=String(err?.message||'CHAT_WORK_UNVERIFIED');
+     description.textContent='Work handoff not verified: '+
+      (/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_UNVERIFIED')+
+      '. No completion or installation is claimed. Do not resend the same request.';
+    }
+   };
+   actions.append(inspect,proceed);
+  }catch(err){
+   const code=String(err?.message||'CHAT_WORK_HISTORY_UNAVAILABLE');
+   description.textContent='Could not read your saved work: '+
+    (/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_HISTORY_UNAVAILABLE')+
+    '. No request was sent or approved.';
+  }finally{
+   recoverButton.disabled=false;
+  }
+ };
+ // A saved-history update is evidence only. It never automatically replays
+ // a previous request, so missed page-load events cannot disable recovery.
  window.addEventListener('reality:chat-request-started',event=>{
   const x=event.detail||{};
   if(!UUID.test(x.conversation_id||'')||!UUID.test(x.request_id||''))return;
