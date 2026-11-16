@@ -6,15 +6,18 @@
 (() => {
  'use strict';
  if (!/^\/chat\/?$/.test(window.location.pathname)) return;
- window.realityChatDirectWorkEnabled=true;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
  const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
  const WORK=/^work:[a-f0-9]{32}$/;
  const key=(c,r)=>c+':'+r;
  const started=new Map(),processing=new Set();
- const container=document.getElementById('realityChatConversation');
+ // The existing Chat transcript and composer live inside privateReady.
+ // Never bind to a synthetic container: an absent element previously disabled
+ // all Chat work dispatch while ordinary assistant text kept answering.
+ const container=document.getElementById('privateReady');
  const composer=document.getElementById('realityChatComposer');
- if(!container||!composer)return;
+ if(!container||!composer||composer.parentElement!==container)return;
+ window.realityChatDirectWorkEnabled=true;
  const panel=document.createElement('section');
  panel.id='realityChatDirectWorkStatus';
  panel.setAttribute('role','status');
