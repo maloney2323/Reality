@@ -113,15 +113,20 @@
   if(!panel.hidden||processing.size||started.size)return;
   const d=event.detail||{};
   if(!UUID.test(d.conversation_id||'')||!Array.isArray(d.messages))return;
+  // A trailing "Yes, I approve" is conversational intent, not a code
+  // build request. Selection is UI-only; the server validates the signed
+  // message and exact work scope independently before any action.
   const previous=d.messages.filter(m=>m?.role==='user'&&
-    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||''));
+    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
+    typeof m.text==='string'&&
+    /\b(?:build|implement|code|repair|fix|develop|upgrade|create|generate|investigate|assign|execute|automate)\b/i.test(m.text));
   const latest=previous[previous.length-1];
   if(!latest)return;
   const age=Date.now()-Date.parse(latest.created_at||'');
   if(!Number.isFinite(age)||age<0||age>24*60*60*1000)return;
   const ref={conversation_id:d.conversation_id,
    request_id:latest.request_id,source_ref:latest.source_ref};
-  show('Your most recent saved instruction can be checked and continued through Reality\'s existing governed work system without sending it again.',true,ref);
+  show('Continue this saved work request (not a later approval message): '+latest.text.trim().slice(0,140),true,ref);
   const resume=document.createElement('button');
   resume.type='button';
   resume.textContent='Continue this saved instruction (no resend)';
