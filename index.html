@@ -5946,6 +5946,15 @@ function realitySimpleRender(data){
   step.textContent='FINDING '+(i+1)+' · '+(assessed?'INSPECTED · MISSING GAP NOT YET PROVEN':'ASSESSMENT PENDING');
   const heading=document.createElement('h3');heading.textContent=String(finding.title||'Research opportunity');
   card.append(step,heading);
+  const review=finding.employee_investigation;
+  if(review?.employee==='Morgan'&&
+    review.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+    review.execution_authorized===false&&review.qualified_original_job===false&&
+    review.installation_authorized===false){
+   const caption=document.createElement('p');
+   caption.textContent='Investigation owner: Morgan · Source revalidation assigned · Engineering work not yet qualified.';
+   card.append(caption);
+  }
   const wrap=document.createElement('div');wrap.className='simple-assess';
   function paragraph(label,value){
    const item=document.createElement('div');item.className='simple-aspect';
@@ -6101,6 +6110,27 @@ async function wcInvestigateMarket({restore=false}={}){
    const title=document.createElement('h4');
    title.textContent=String(finding.title||'Market opportunity');
    card.append(level,title);
+   const route=finding.employee_investigation;
+   if(route?.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+      route.employee==='Morgan'&&
+      /^research-review:[a-f0-9-]{36}:[a-f0-9]{64}$/.test(route.assignment_id||'')&&
+      /^[a-f0-9]{64}$/.test(route.assessment_receipt_sha256||'')&&
+      route.research_only===true&&route.qualified_original_job===false&&
+      route.execution_authorized===false&&route.job_started===false&&
+      route.installation_authorized===false&&route.production_changed===false){
+    const responsibility=document.createElement('p');
+    responsibility.textContent='Morgan · Saved research-source investigation assigned · Freshness and independent Reality capability proof pending. Assignment '+route.assignment_id+
+     '. No engineering job or upgrade is approved.';
+    card.append(responsibility);
+    const next=document.createElement('p');
+    next.textContent='Morgan’s next evidence requirement: '+
+     String(route.next_proof||'Recheck dated sources and current Reality source.').slice(0,750);
+    card.append(next);
+    const employeeLink=document.createElement('a');
+    employeeLink.href='/employees';
+    employeeLink.textContent='See Morgan’s assigned source investigations';
+    card.append(employeeLink);
+   }
    for(const [label,value] of [
     ['Market evidence',finding.market_claim],
     ['Reality comparison',finding.reality_comparison],
@@ -6129,7 +6159,10 @@ async function wcInvestigateMarket({restore=false}={}){
    ' web source(s), '+cards.length+' review hypothesis(es). '+
    'Pinned Reality commit '+data.pinned_commit_sha.slice(0,12)+
    ' · Receipt '+data.receipt_id+
-   ' · Independent DB readback confirmed. These are NOT verified gaps or approved upgrades.';
+   ' · Independent DB readback confirmed. '+
+   cards.length+' source-review candidate(s) remain unqualified; '+
+   'saved Morgan investigation ownership appears on independently matched findings. '+
+   'These are NOT verified gaps or approved upgrades.';
  }catch{
   if(restore)realitySimpleSetStatus('Could not restore saved research. Check your account connection; no new search was started.');
   status.textContent=restore?'Saved research readback unavailable. Earlier research remains recorded; no actions started.':
