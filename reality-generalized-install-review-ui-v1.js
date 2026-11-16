@@ -8,6 +8,8 @@ const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const APPROVE_API='/api/reality/generalized-owner-install-approval';
+const RECOVERY_APPROVE_API='/api/reality/general-original-recovery-approval';
+const RECOVERY_INTENT='OWNER_APPROVE_ONE_EXACT_FENCED_ORIGINAL_RECOVERY_PUBLICATION';
 const INTENT='OWNER_APPROVE_EXACT_INDEPENDENTLY_VERIFIED_ISOLATED_REPAIR';
 const get=id=>document.getElementById(id);
 const add=(kind,parent,value)=>{const e=document.createElement(kind);
@@ -31,6 +33,10 @@ function panel(){
   approve.type='button';approve.hidden=true;
   approve.id='generalizedOriginalInstallApproveExactButton';
   approve.addEventListener('click',()=>approveExactFromUserClick());
+  const recover=add('button',p,'Approve one exact recovery installation');
+  recover.type='button';recover.hidden=true;
+  recover.id='generalizedOriginalRecoveryApproveButton';
+  recover.addEventListener('click',()=>approveRecoveryFromUserClick());
   add('p',p).id='generalizedOriginalInstallApprovalResult';
   const warning=add('p',p,
    'Reality does not install a repair or settle an original job from a passing model answer or CI check. The exact owner approval must follow independent release-continuation readiness.');
@@ -78,6 +84,65 @@ function evidenceLink(parent,label,url){
  a.style.display='inline-block';a.style.marginRight='14px';
 }
 let busy=false,submitting=false,submitted=false,activeCard=null;
+let recovering=false,recoverySubmitted=false,activeRecovery=null;
+function actionableRecovery(d){
+ const p=d?.recovery_publication;
+ return safe(d)&&d.recovery_approval_action_available===true&&
+  d.recovery_approval_action_endpoint===RECOVERY_APPROVE_API&&
+  d.phase==='INSTALL_INTENT_FENCED'&&
+  d.installation_authorized===true&&d.original_job_completed===false&&
+  p?.status==='GENERAL_ORIGINAL_EXACT_RECOVERY_PUBLICATION_REVIEW'&&
+  p.phase==='READY_FOR_EXACT_RECOVERY_APPROVAL'&&
+  p.owner_approval_ready===true&&p.owner_approval_id===null&&
+  UUID.test(p.recovery_publication_id||'')&&
+  UUID.test(p.attempt_id||'')&&
+  p.attempt_id===d.attempt_id&&
+  p.original_work_id===d.original_work_id&&
+  p.candidate_commit_sha===d.candidate_commit_sha&&
+  p.candidate_artifact_sha256===d.candidate_artifact_sha256&&
+  SHA.test(p.expected_parent_commit_sha||'')&&
+  Number.isSafeInteger(p.independent_recovery_test_run_id)&&
+  p.independent_recovery_test_run_id>10000&&
+  SHA.test(p.proof_commit_sha||'')&&
+  p.original_job_completed===false&&p.production_changed===false;
+}
+async function approveRecoveryFromUserClick(){
+ // This real owner click is the ONLY source of the second exact consent.
+ // Passive refresh, Chat text, the model and worker cannot invoke it.
+ if(!activeRecovery||recovering||recoverySubmitted)return;
+ const r=activeRecovery;
+ recovering=true;recoverySubmitted=true;
+ const btn=get('generalizedOriginalRecoveryApproveButton');
+ if(btn){btn.hidden=true;btn.disabled=true;}
+ const status=get('generalizedOriginalInstallApprovalResult');
+ status.textContent='Recording one exact recovery approval. Do not click again.';
+ try{
+  const response=await fetch(RECOVERY_APPROVE_API,{
+   method:'POST',cache:'no-store',credentials:'same-origin',
+   headers:{'content-type':'application/json',accept:'application/json'},
+   body:JSON.stringify({
+    recovery_publication_id:r.recovery_publication_id,
+    original_work_id:r.original_work_id,attempt_id:r.attempt_id,
+    candidate_commit_sha:r.candidate_commit_sha,
+    artifact_sha256:r.candidate_artifact_sha256,
+    expected_parent_sha:r.expected_parent_commit_sha,
+    intent:RECOVERY_INTENT,request_id:crypto.randomUUID()
+   })
+  });
+  const d=await response.json().catch(()=>null);
+  if(response.status===202&&d?.status==='ACCEPTED'&&
+    d.recovery_publication_id===r.recovery_publication_id&&
+    d.original_work_id===r.original_work_id&&
+    d.approval_recorded===true&&UUID.test(d.approval_id||'')&&
+    d.no_third_confirmation===true&&d.original_job_completed===false){
+   status.textContent='Exact one-use recovery approved. Reality will publish the same verified original repair and independently verify the original job. The receipt is not complete yet.';
+  }else{
+   status.textContent='Recovery approval readback is uncertain. Inspect the saved owner receipt; do not approve again.';
+  }
+ }catch{
+  status.textContent='Recovery approval transport is uncertain. Do not send another approval.';
+ }finally{recovering=false;activeRecovery=null;refresh();}
+}
 function actionable(d){
  return safe(d)&&d.owner_approval_action_available===true&&
   d.owner_approval_ready===true&&
@@ -139,6 +204,8 @@ async function refresh(){
   if(!response.ok||!safe(d)){
    const btn=get('generalizedOriginalInstallApproveExactButton');
    if(btn)btn.hidden=true;activeCard=null;
+   const rb=get('generalizedOriginalRecoveryApproveButton');
+   if(rb)rb.hidden=true;activeRecovery=null;
    p.hidden=false;
    get('generalizedOriginalInstallReviewStatus').textContent=
     'Current original installation review is unavailable or not independently verified.';
@@ -153,6 +220,10 @@ async function refresh(){
   const canApprove=actionable(d)&&!submitted&&!submitting;
   approvalButton.hidden=!canApprove;approvalButton.disabled=!canApprove;
   activeCard=canApprove?d:null;
+  const canRecover=actionableRecovery(d)&&!recovering&&!recoverySubmitted;
+  const recoverButton=get('generalizedOriginalRecoveryApproveButton');
+  recoverButton.hidden=!canRecover;recoverButton.disabled=!canRecover;
+  activeRecovery=canRecover?d.recovery_publication:null;
   const issue=d.source_ref.split('/').at(-1);
   p.querySelector('h4').textContent=d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'?
     'Reality · your decision is needed':'Reality · original repair progress';
@@ -170,12 +241,20 @@ async function refresh(){
    investigation.external_retry_authorized===false&&
    typeof investigation.repair_proposal==='string'&&
    investigation.repair_proposal.length<=2500;
+  const recovery=d.recovery_publication;
+  const reviewReady=actionableRecovery(d);
+  const recoveryApproved=recovery?.phase==='OWNER_APPROVED'||
+    recovery?.phase==='RECOVERY_WRITE_FENCED';
   get('generalizedOriginalInstallRecoveryUpdate').textContent=
-   hasDiagnosis?
-    'Reality · Riley investigated the stalled installation and recorded a source-backed repair hypothesis. '+investigation.repair_proposal.slice(0,700)+
-    ' Independent repair testing is still required. No second installation is authorized.':
+    reviewReady?
+     'Reality · An independently tested recovery is ready for your exact decision. This is ONE additional isolated source write because the first approval was already consumed. Same original '+recovery.original_work_id+' · branch '+recovery.target_branch+' · source artifact '+recovery.candidate_artifact_sha256+' · independent recovery tests #'+recovery.independent_recovery_test_run_id+'. The original shift and customer job stay unchanged.':
+    recoveryApproved?
+     'Reality · Your new exact recovery approval was recorded. The worker is checking GitHub publication and the original-job settlement. Neither installation nor job completion is claimed until separately verified.':
+    hasDiagnosis?
+     'Reality · Riley investigated the stalled installation and recorded a source-backed repair hypothesis. '+investigation.repair_proposal.slice(0,700)+
+     ' Independent repair testing is required; the first one-use approval cannot be replayed.':
     d.phase==='INSTALL_INTENT_FENCED'?
-    'Reality has recorded your exact approval. The installation remains fenced; source installation and original-job completion are not yet verified.':'';
+     'Reality has recorded your original approval. The installation remains fenced; source installation and job completion are not yet verified.':'';
   const gates=[
    ['GitHub write transport',d.isolated_github_write_verified],
    ['Automatic isolated preview deployment',d.preview_auto_deploy_verified],
