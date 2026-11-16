@@ -40,14 +40,24 @@ test('exact authenticated build command selects the REAL scoped engineering adap
  assert.equal(r.execution_started,false);
  assert.equal(r.installation_authorized,false);
 });
-test('unrelated feature requests cannot reuse an old authorized original',async()=>{
+test('unrelated feature requests cannot reuse an old authorized original, but may safely qualify as NEW isolated development',async()=>{
+ let oldOriginalReads=0,newDevelopmentReads=0;
  const r=await inspectSavedChatWork({...args,
   messages:[{...messages[0],text:'Build a new calendar dashboard'}],
   classify:async()=>({...classified,capability_id:'governed-original-engineering',
-   source_quote:'Build a new calendar dashboard'})});
- assert.equal(r.status,'CHAT_WORK_ENGINEERING_SOURCE_NOT_EXPLICIT');
- assert.equal(r.capability_gap,true);
- assert.equal(r.action_eligible,false);
+   source_quote:'Build a new calendar dashboard'}),
+  readWork:async()=>{oldOriginalReads++;throw Error('OLD_ORIGINAL_IS_UNRELATED')},
+  readNew:async()=>{newDevelopmentReads++;return {
+   status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+   owner_id:user,conversation_id:conversationId,items:[]}}
+ });
+ assert.equal(r.status,'CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE');
+ assert.equal(r.capability_id,'governed-chat-new-development');
+ assert.equal(r.action_eligible,true);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.new_shift_started,false);
+ assert.equal(oldOriginalReads,0);
+ assert.equal(newDevelopmentReads,1);
 });
 test('no selected source or ambiguous signed diagnosis never starts code generation',async()=>{
  for(const changed of [
