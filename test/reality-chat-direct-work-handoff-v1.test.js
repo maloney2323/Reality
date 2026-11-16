@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {processSignedSavedChatWork}
  from '../src/reality-saved-chat-work-adapter-v1.js';
@@ -183,4 +184,63 @@ test('signed development worker leases only its own preview release and legacy w
  assert.match(worker,/reality_claim_chat_new_development_release_v2/);
  assert.match(worker,/p_release_sha:env\.VERCEL_GIT_COMMIT_SHA/);
  assert.doesNotMatch(worker,/callRpc\(db,'reality_claim_chat_new_development_v1'/);
+});
+
+
+test('Chat work UI binds existing authenticated composer and dispatches one signed saved instruction',async()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ assert.match(html,/id="privateReady"/);
+ assert.match(html,/id="realityChatComposer"/);
+ assert.doesNotMatch(html,/id="realityChatConversation"/);
+ assert.match(code,/getElementById\('privateReady'\)/);
+ assert.doesNotMatch(code,/getElementById\('realityChatConversation'\)/);
+ const received=new Map(),outbound=[];
+ function element(){
+  return {hidden:false,style:{},textContent:'',parentElement:null,children:[],
+   setAttribute(){},append(...nodes){this.children.push(...nodes)},
+   replaceChildren(){this.children=[]},insertBefore(node,anchor){
+    assert.equal(anchor,composer);this.children.push(node)
+   }};
+ }
+ const container=element(),composer=element();
+ composer.parentElement=container;
+ const nodes={privateReady:container,realityChatComposer:composer};
+ const window={
+  location:{pathname:'/chat'},
+  addEventListener(name,fn){received.set(name,fn)},
+ };
+ const fakeFetch=async(url,options)=>{
+  outbound.push({url,body:JSON.parse(options.body)});
+  return {ok:true,json:async()=>({
+   ok:true,status:'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   request_id:requestId,source_ref,original_work_id:workId,
+   installation_authorized:false,production_changed:false
+  })};
+ };
+ runInNewContext(code,{window,document:{
+  getElementById:id=>nodes[id]||null,
+  createElement:element
+ },fetch:fakeFetch,AbortSignal});
+ assert.equal(window.realityChatDirectWorkEnabled,true);
+ assert.ok(received.has('reality:chat-request-started'));
+ assert.ok(received.has('reality:chat-intake-saved'));
+ const detail={conversation_id:conversationId,request_id:requestId,source_ref};
+ received.get('reality:chat-request-started')({detail:{...detail,work_status_requested:true}});
+ received.get('reality:chat-intake-saved')({detail:{...detail,duplicate_content:false}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(outbound.length,1);
+ assert.equal(outbound[0].url,'/api/reality/personal-chat-work');
+ assert.equal(outbound[0].body.action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(outbound[0].body.request_id,requestId);
+ assert.match(container.children[0].children[1].textContent,/Build admitted and independently read back/);
+});
+
+test('missing authenticated Chat DOM cannot set the direct-work installed flag',()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ const window={location:{pathname:'/chat'},addEventListener(){
+  throw Error('MUST_NOT_REGISTER_WITH_MISSING_CHAT_DOM')
+ }};
+ runInNewContext(code,{window,document:{getElementById:()=>null}});
+ assert.notEqual(window.realityChatDirectWorkEnabled,true);
 });
