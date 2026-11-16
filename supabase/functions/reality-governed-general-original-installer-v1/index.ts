@@ -10,11 +10,19 @@ const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
 const SOURCE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const fail=s=>{throw Error('GENERAL_ORIGINAL_INSTALL_'+s)};
-const safe=(status,more={},http=200)=>new Response(JSON.stringify({
- status,source_installed:false,original_job_completed:false,
- production_changed:false,...more
-}),{status:http,headers:{'content-type':'application/json',
- 'cache-control':'no-store','x-content-type-options':'nosniff'}});
+// Diagnosable worker outcomes must never expose source bodies, credentials,
+// owner identity or arbitrary provider responses. All dispositions are finite
+// installer-generated codes; log only a bounded code, not exception content.
+const safe=(status,more={},http=200)=>{
+ if(typeof status==='string'&&
+   /^GENERAL_(?:ORIGINAL_)?INSTALL_[A-Z0-9_]{4,120}$/.test(status))
+  console.info('REALITY_GOVERNED_INSTALL_DISPOSITION',status);
+ return new Response(JSON.stringify({
+  status,source_installed:false,original_job_completed:false,
+  production_changed:false,...more
+ }),{status:http,headers:{'content-type':'application/json',
+  'cache-control':'no-store','x-content-type-options':'nosniff'}});
+};
 async function rpc(base,key,name,args={}){
  if(!['reality_read_general_original_install_scope_v1',
        'reality_claim_general_original_install_v1',
