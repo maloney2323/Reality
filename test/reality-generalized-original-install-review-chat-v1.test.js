@@ -81,6 +81,10 @@ test('one-use install and independent settlement remain separate workers and fen
  assert.match(installer,/reality_claim_general_original_install_v1/);
  assert.match(installer,/REALITY_GOVERNED_INSTALL_DISPOSITION/);
  assert.match(installer,/REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY/);
+ assert.match(installer,/REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE/);
+ assert.match(installer,/FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE/);
+ assert.match(installer,/FENCED_GIT_OBJECTS_OR_EXACT_SOURCE_NOT_VERIFIED/);
+ assert.match(installer,/gh\(token,'\/git\/blobs\/'\+scope\.expected_installed_blob_sha\)/);
  assert.match(installer,/const repository=await gh\(token,''\)/);
  assert.match(installer,/console\.info\('REALITY_GOVERNED_INSTALL_DISPOSITION',status\)/);
  assert.match(installer,/GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED/);
