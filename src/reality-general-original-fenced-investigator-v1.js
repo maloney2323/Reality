@@ -8,7 +8,7 @@ const REPO='https://api.github.com/repos/maloney2323/Reality';
 const SRC='supabase/functions/reality-governed-general-original-installer-v1/index.ts';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^[a-f0-9]{64}$/;
-const UUID=/^[a-f0-9]{8}-(?:-[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const hold=(status,more={})=>Object.freeze({
  status,model_findings_are_hypotheses:true,
