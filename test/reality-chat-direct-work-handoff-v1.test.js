@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment}
+import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment,readSignedChatDevelopmentStatus}
  from '../src/reality-saved-chat-work-adapter-v1.js';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 
@@ -290,7 +290,9 @@ test('saved build buttons work after login without history event and distinguish
    return {ok:true,status:200,json:async()=>({ok:true,
     conversation_id:conversationId,messages:history})};
   return {ok:true,status:202,json:async()=>({ok:true,
-   status:requests.at(-1).body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+   status:requests.at(-1).body.action==='READ_SIGNED_NEW_DEVELOPMENT_STATUS'?
+    'CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED':
+    requests.at(-1).body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
     'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED':
     'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
    worker_status:requests.at(-1).body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
@@ -304,25 +306,25 @@ test('saved build buttons work after login without history event and distinguish
  assert.match(finder.textContent,/Find my saved build request/);
  assert.equal(requests.length,0,'mounting the control never starts or reads work');
  await finder.onclick();
- assert.equal(requests.length,1);
+ assert.equal(requests.length,2);
  assert.equal(requests[0].method,'GET');
  assert.match(requests[0].url,/\/api\/reality\/personal-chat\?conversation_id=/);
- assert.match(panel.children[1].textContent,/Reality, build the source-code repair/);
- assert.doesNotMatch(panel.children[1].textContent,/Yes I approve this/);
+ assert.equal(requests[1].body.action,'READ_SIGNED_NEW_DEVELOPMENT_STATUS');
+ assert.match(panel.children[1].textContent,/no admitted development record/);
  const buttons=panel.children[3].children;
  assert.equal(buttons.length,2);
- assert.match(buttons[0].textContent,/Inspect current work/);
+ assert.match(buttons[0].textContent,/Inspect saved work/);
  assert.match(buttons[1].textContent,/Continue this exact saved build/);
- assert.equal(requests.length,1,'read-only lookup cannot start work');
+ assert.equal(requests.length,2,'saved-work lookup makes no write');
  await buttons[1].onclick();
- assert.equal(requests.length,3);
- assert.equal(requests[1].method,'POST');
- assert.equal(requests[1].url,'/api/reality/personal-chat-work');
- assert.equal(requests[1].body.action,'PROCESS_SIGNED_WORK_REQUEST');
- assert.equal(requests[2].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
- assert.equal(requests[1].body.request_id,requestId);
+ assert.equal(requests.length,4);
+ assert.equal(requests[2].method,'POST');
+ assert.equal(requests[2].url,'/api/reality/personal-chat-work');
+ assert.equal(requests[2].body.action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(requests[3].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
  assert.equal(requests[2].body.request_id,requestId);
- assert.equal(requests[1].body.conversation_id,conversationId);
+ assert.equal(requests[3].body.request_id,requestId);
+ assert.equal(requests[2].body.conversation_id,conversationId);
  assert.match(panel.children[1].textContent,/REAL BUILD BLOCKER/);
 });
 
@@ -532,4 +534,84 @@ test('only matching original and release may reach the existing broker and CI',a
  assert.equal(good.pr_url,'https://github.com/maloney2323/Reality/pull/350');
  assert.equal(good.installation_authorized,false);
  assert.equal(published,1);
+});
+
+
+
+test('read-only owner status returns precise staged PR and forbids cross-user source',async()=>{
+ const input={...args};
+ const exact={request_id:requestId,source_ref,original_work_id:workId,
+  phase:'CANDIDATE_STAGED',model_generated:true,independent_ci_verified:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false,
+  evidence:{pr_url:'https://github.com/maloney2323/Reality/pull/309',
+   artifact_commit_sha:'a'.repeat(40)}};
+ const response={status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+  owner_id:owner,conversation_id:conversationId,items:[exact],
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false};
+ const result=await readSignedChatDevelopmentStatus({...input,
+  readNew:async()=>response});
+ assert.equal(result.status,'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK');
+ assert.equal(result.development_phase,'CANDIDATE_STAGED');
+ assert.equal(result.original_work_id,workId);
+ assert.equal(result.pr_url,'https://github.com/maloney2323/Reality/pull/309');
+ assert.equal(result.model_generated,true);
+ assert.equal(result.independent_ci_verified,false);
+ assert.equal(result.installation_authorized,false);
+ await assert.rejects(()=>readSignedChatDevelopmentStatus({...input,
+  readNew:async()=>({...response,owner_id:'11111111-2222-4333-8444-555555555555'})
+ }),/CHAT_WORK_DEVELOPMENT_STATUS_OWNER_READBACK_UNVERIFIED/);
+});
+
+test('saved PR on mobile displays independent CI next step and records actual verified receipt only after click',async()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ const requests=[];
+ const ownerText='Reality, build the existing Chat-to-code repair as an isolated GitHub source patch.';
+ const history=[{role:'user',request_id:requestId,source_ref,text:ownerText,
+  created_at:new Date().toISOString()}];
+ function element(){return {hidden:false,style:{},textContent:'',parentElement:null,children:[],
+   setAttribute(){},append(...nodes){this.children.push(...nodes)},
+   replaceChildren(){this.children=[]},insertBefore(node){this.children.push(node)}}}
+ const ready=element(),container=element(),composer=element();
+ composer.parentElement=container;ready.contains=node=>node===composer;
+ const window={location:{pathname:'/chat'},realityActiveConversationId:()=>conversationId,
+  addEventListener(){}};
+ const pr_url='https://github.com/maloney2323/Reality/pull/309';
+ const draft={ok:true,status:'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK',
+  request_id:requestId,source_ref,original_work_id:workId,
+  development_phase:'CANDIDATE_STAGED',model_generated:true,
+  independent_ci_verified:false,pr_url,installation_authorized:false,
+  production_changed:false};
+ const verified={...draft,status:'CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED',
+  development_phase:'CI_VERIFIED',independent_ci_verified:true,
+  ci_run_id:43879567344,artifact_commit_sha:'a'.repeat(40)};
+ runInNewContext(code,{window,document:{
+  getElementById:id=>id==='privateReady'?ready:
+   id==='realityChatComposer'?composer:null,createElement:element
+ },fetch:async(url,options)=>{
+  requests.push({url,method:options.method,body:options.body&&JSON.parse(options.body)});
+  if(options.method==='GET')return {ok:true,status:200,json:async()=>({
+   ok:true,conversation_id:conversationId,messages:history})};
+  return {ok:true,status:200,json:async()=>requests.at(-1).body.action===
+   'ADVANCE_SIGNED_NEW_DEVELOPMENT'?verified:draft};
+ },AbortSignal,Date,encodeURIComponent});
+ const panel=container.children[0];
+ await panel.children[2].children[0].onclick();
+ assert.equal(requests.length,2,'authenticated history GET and one read-only status POST');
+ assert.equal(requests[1].body.action,'READ_SIGNED_NEW_DEVELOPMENT_STATUS');
+ assert.match(panel.children[1].textContent,/CANDIDATE_STAGED/);
+ const buttons=panel.children[3].children;
+ assert.equal(buttons.length,3,'read-only Inspect, link, governed CI reconciliation');
+ assert.match(buttons[1].textContent,/GitHub code candidate/);
+ assert.equal(buttons[1].href,pr_url);
+ assert.match(buttons[2].textContent,/Check and record independent CI/);
+ assert.match(panel.children[4].textContent,/GitHub draft PR contains code/);
+ assert.match(panel.children[4].textContent,/○ Independent CI/);
+ await buttons[2].onclick();
+ assert.equal(requests.length,3);
+ assert.equal(requests[2].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
+ assert.equal(requests[2].body.request_id,requestId);
+ assert.match(panel.children[1].textContent,/INDEPENDENT SOURCE\/SYNTAX CI VERIFIED/);
+ assert.match(panel.children[4].textContent,/✓ Independent CI recorded/);
 });
