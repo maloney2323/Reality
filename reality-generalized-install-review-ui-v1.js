@@ -13,7 +13,7 @@ const get=id=>document.getElementById(id);
 const add=(kind,parent,value)=>{const e=document.createElement(kind);
  if(value)e.textContent=value;parent.append(e);return e;};
 function panel(){
- const host=get('realityChatConversation')||get('privateReady');
+ const host=get('privateTranscript')||get('privateReady');
  if(!host)return null;
  let p=get('generalizedOriginalInstallReviewPanel');
  if(!p){
@@ -35,14 +35,14 @@ function panel(){
    'Reality does not install a repair or settle an original job from a passing model answer or CI check. The exact owner approval must follow independent release-continuation readiness.');
   warning.style.fontSize='13px';
  }
- // The actual Chat conversation is the first view on desktop and mobile.
- // Keep this as an inline, evidence-bound Reality message beside the thread,
- // not inside the default-hidden Proof inspector or a floating dialog.
- const thread=get('privateTranscript');
- if(host.id==='realityChatConversation'&&thread?.parentNode===host){
-  if(p.parentNode!==host||p.nextSibling!==thread)host.insertBefore(p,thread);
+ // The mobile shell locks the outer page and gives scrolling to
+ // #privateTranscript. Keeping this message OUTSIDE that thread makes a long
+ // approval card unscrollable and can hide the composer entirely.
+ // Append one real, read-only Reality event bubble INSIDE the same chat scroller.
+ if(host.id==='privateTranscript'){
+  if(p.parentNode!==host)host.append(p);
  }else if(host.id==='privateReady'){
-  // Fallback for layouts that do not mount the premium Chat workspace.
+  // Legacy fallback for Chat views without a transcript.
   const banner=get('privateAccountMissionBanner');
   const before=banner?.parentNode===host?banner.nextSibling:host.firstChild;
   if(p.parentNode!==host||(banner&&p.previousSibling!==banner))
@@ -116,7 +116,7 @@ async function approveExactFromUserClick(){
      r.original_work_id===card.original_work_id&&
      r.approval_recorded===true&&UUID.test(r.approval_id||'')&&
      r.no_third_confirmation===true&&r.original_job_completed===false){
-   status.textContent='Exact approval recorded. Reality is installing, independently verifying, and continuing the same original job automatically.';
+   status.textContent='Exact approval recorded. Reality has queued the governed installation/verification continuation. Check the live receipt before treating the repair or job as completed.';
   }else{
    status.textContent='The approval result is not independently confirmed. Check Reality’s owner ledger; do not send another approval.';
   }
@@ -152,6 +152,8 @@ async function refresh(){
   approvalButton.hidden=!canApprove;approvalButton.disabled=!canApprove;
   activeCard=canApprove?d:null;
   const issue=d.source_ref.split('/').at(-1);
+  p.querySelector('h4').textContent=d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'?
+    'Reality · your decision is needed':'Reality · original repair progress';
   get('generalizedOriginalInstallReviewStatus').textContent=
     'Original job #'+issue+' · '+d.phase.replaceAll('_',' ')+
     (d.original_job_completed?' · independently settled':
@@ -162,13 +164,13 @@ async function refresh(){
   const gates=[
    ['GitHub write transport',d.isolated_github_write_verified],
    ['Automatic isolated preview deployment',d.preview_auto_deploy_verified],
-   ['Original-job continuation and final receipt',d.same_original_execution_and_settlement_contract_verified]
+   ['Original-job continuation and receipt pathway contract',d.same_original_execution_and_settlement_contract_verified]
   ];
   get('generalizedOriginalInstallReviewGates').textContent=
    gates.map(([name,ok])=>(ok?'Verified: ':'Not yet independently verified: ')+name).join(' · ')+
-   (d.owner_approval_ready?
+   (d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'&&d.owner_approval_ready?
     ' · Ready for exact owner decision through Reality governance':
-    ' · Installation approval is not available');
+    ' · No additional approval required or currently available');
   const links=get('generalizedOriginalInstallReviewEvidence');
   links.replaceChildren();
   evidenceLink(links,'Original source',d.source_ref);
