@@ -7201,7 +7201,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   window.dispatchEvent(new CustomEvent('reality:saved-chat-readback',{
    detail:{conversation_id:data.conversation_id,
     messages:(data.messages||[]).map(x=>({role:x.role,
-     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at})),
+     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at,
+     text:x.role==='user'&&typeof x.text==='string'?x.text.slice(0,6000):null})),
     unanswered_requests:replyReadback?.unanswered_requests||[]}
   }));
   await loadGoals();
