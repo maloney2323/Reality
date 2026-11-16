@@ -17,6 +17,7 @@ export const maxDuration=20;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
+ let stage='SIGNED_OWNER_AUTH';
  try{
   if(req.method!=='GET'||Object.keys(req.query||{}).length)
    return res.status(405).json({
@@ -31,6 +32,7 @@ export default async function handler(req,res){
      db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
      db.url!==session.config.url)
    throw Error('GENERALIZED_REVIEW_EXACT_ISOLATED_SERVICE_REQUIRED');
+  stage='BASELINE_ORIGINAL_PROOF';
   const r=await shiftRpc(db,'reality_read_generalized_original_install_review_v1',
    {p_owner_id:session.user_id});
   if(r?.status==='NO_CURRENT_VERIFIED_ORIGINAL_INSTALL_REVIEW')
@@ -61,9 +63,16 @@ export default async function handler(req,res){
   // The recovery model's advisory finding is visible only through this
   // already authenticated, same-owner original readback. It cannot
   // manufacture another approval or claim a finished customer job.
-  const diagnosis=await shiftRpc(db,
-   'reality_read_general_original_fenced_investigation_state_v1',{})
-   .catch(()=>null);
+  stage='ADVISORY_AND_PUBLICATION_READBACK';
+  // Both auxiliary readbacks are owner-scoped and read-only. Run them in
+  // parallel so mobile's bounded signed-owner request does not time out
+  // after making three sequential Supabase RPC calls under heavy fan-out.
+  const [diagnosis,rawPub]=await Promise.all([
+   shiftRpc(db,'reality_read_general_original_fenced_investigation_state_v1',{})
+    .catch(()=>null),
+   shiftRpc(db,'reality_read_general_original_recovery_review_v1',{
+    p_owner_id:session.user_id}).catch(()=>null)
+  ]);
   const recovery=diagnosis?.status===
     'FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED'&&
    diagnosis.original_work_id===r.original_work_id&&
@@ -80,9 +89,6 @@ export default async function handler(req,res){
   // A SECOND, exact one-use publication decision is offered only after
   // its own independently tested release proof is staged. It cannot reuse
   // the original consumed installation approval.
-  const rawPub=await shiftRpc(db,
-   'reality_read_general_original_recovery_review_v1',{
-    p_owner_id:session.user_id}).catch(()=>null);
   const pub=rawPub?.status==='GENERAL_ORIGINAL_EXACT_RECOVERY_PUBLICATION_REVIEW'&&
    rawPub.original_work_id===r.original_work_id&&
    rawPub.attempt_id===r.attempt_id&&
@@ -119,6 +125,8 @@ export default async function handler(req,res){
    no_installation_effect_by_get:true
   });
  }catch{
+  // No credentials or owner details in logs, just the bounded stage code.
+  console.warn('REALITY_GENERALIZED_REVIEW_FAILURE',stage);
   return res.status(503).json({
    ok:false,error:'GENERALIZED_REVIEW_DURABLE_OWNER_READBACK_UNVERIFIED',
    owner_approval_ready:false,installation_authorized:false,
