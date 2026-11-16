@@ -68,6 +68,13 @@
     ' · '+data.weekly_source_inspected+' weekly issues previously inspected'+
     ' · No job or capability installation authorized.';
    panel.replaceChildren(status);
+   if(data.business_launch_readiness==='NOT_VERIFIED_FROM_CONNECTED_EVIDENCE'&&
+      data.launch_decision_authorized===false&&
+      data.standing_discovery_roles_defined===data.role_audits.length&&
+      data.standing_discovery_is_execution===false){
+    panel.append(add('p','reality-audit-warning',
+     'BUSINESS LAUNCH POSTURE · Not independently certified launch-ready. Each employee below owns a source-specific discovery scope; current findings still need qualification and the recurring role-level auto-wake has not been proven.'));
+   }
    if(data.status==='EMPLOYEE_RESPONSIBILITIES_PARTIAL_SOURCE_AUDIT')
     panel.append(add('p','reality-audit-warning',
      'Weekly qualification readback was unavailable; the live catalog was checked, but its entries still require verification.'));
@@ -94,6 +101,35 @@
     for(const check of role.responsibility_checks.slice(0,3))
      checks.append(add('li',null,check));
     card.append(checks);
+    const discovery=role.standing_discovery;
+    if(discovery?.employee===role.employee_name&&
+       discovery.cadence==='WEEKLY_DISCOVERY_SCOPE_PROPOSED_NOT_AUTONOMOUS_SHIFT'&&
+       discovery.original_job_created===false&&
+       discovery.execution_authorized===false&&
+       discovery.installation_authorized===false&&
+       Array.isArray(discovery.categories)&&discovery.categories.length===3){
+     const scope=add('details','reality-audit-findings');
+     scope.append(add('summary',null,'Standing job-discovery responsibilities'));
+     const mandate=add('ul','reality-audit-responsibilities');
+     for(const requirement of discovery.categories)
+      mandate.append(add('li',null,requirement));
+     scope.append(mandate,add('p','reality-audit-warning',
+      'Discovery scope defined. Recurring autonomous employee investigation is NOT yet verified; this audit itself runs only when requested. Unconnected source coverage must be reported rather than inventing work.'));
+     card.append(scope);
+    }
+    const launch=role.business_launch_requirement;
+    if(launch?.readiness==='NOT_VERIFIED_FOR_CUSTOMER_LAUNCH'&&
+       launch.launch_authorized===false){
+     const gate=add('div','reality-audit-role-description');
+     gate.append(add('strong',null,'Launch-readiness investigation'));
+     gate.append(add('p',null,'Business outcome: '+
+       String(launch.business_outcome||'Not yet verified')+
+       ' · Required gate: '+String(launch.required_gate||'Evidence not yet connected')));
+     gate.append(add('small',null,'Existing source coverage: '+
+       String(launch.evidence_status||'UNVERIFIED')+
+       '. This role must investigate its gate; no launch or deployment approval is implied.'));
+     card.append(gate);
+    }
     const details=add('details','reality-audit-findings');
     const summary=add('summary',null,'Review '+role.suggested_checks.length+
      ' source-backed checks and next evidence requirements');
