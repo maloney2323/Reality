@@ -354,6 +354,9 @@
     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED';
   const canContinue=result?.status==='CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED'||
    ['QUEUED','DRAFT_GENERATED','PUBLISH_FENCED'].includes(phase);
+  if(result?.development_phase==='CI_VERIFIED'||
+     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED')
+   void readFinalCompletion(ref,result.original_work_id);
   if(!canCheck&&!canContinue)return;
   const btn=document.createElement('button');
   btn.type='button';
@@ -382,9 +385,6 @@
    }finally{btn.disabled=false}
   };
   (inline?.actions||actions).append(btn);
-  if(result?.development_phase==='CI_VERIFIED'||
-     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED')
-   void readFinalCompletion(ref,result.original_work_id);
  }
  // The durable signed history is looked up by an explicit user click.
  // Do not depend on page-load CustomEvents, event timing or old Chat bubbles.
@@ -454,6 +454,41 @@
    recoverButton.disabled=false;
   }
  };
+ // Rehydrate the most recent *persisted* signed build within its Chat
+ // transcript after saved history is rendered. This is a read-only action.
+ // No hidden work admission, worker claim or approval on page load.
+ let restoring=false,lastRestored='';
+ window.addEventListener('reality:saved-chat-readback',async event=>{
+  const x=event.detail||{};
+  if(restoring||!UUID.test(x.conversation_id||'')||
+     window.realityActiveConversationId?.()!==x.conversation_id||
+     !Array.isArray(x.messages))return;
+  const recent=x.messages.filter(m=>m?.role==='user'&&
+   UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
+   typeof m.text==='string'&&
+   /\b(?:build|implement|code|repair|fix|develop|upgrade|generate)\b/i.test(m.text))
+   .sort((a,b)=>Date.parse(b.created_at||'')-Date.parse(a.created_at||''))
+   .slice(0,3);
+  if(!recent.length)return;
+  restoring=true;
+  try{
+   for(const m of recent){
+    const ref={conversation_id:x.conversation_id,
+     request_id:m.request_id,source_ref:m.source_ref};
+    if(lastRestored===key(ref.conversation_id,ref.request_id)&&activeRef?.request_id===ref.request_id)
+     return;
+    const result=await call('READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
+    if(result.status!=='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
+     continue;
+    lastRestored=key(ref.conversation_id,ref.request_id);
+    showCheckedResult(result,ref);
+    return;
+   }
+  }catch{
+   // Saved history is still authoritative. A failed transient status read
+   // cannot create a job, replay a write or claim success.
+  }finally{restoring=false}
+ });
  // A saved-history update is evidence only. It never automatically replays
  // a previous request, so missed page-load events cannot disable recovery.
  window.addEventListener('reality:chat-request-started',event=>{
