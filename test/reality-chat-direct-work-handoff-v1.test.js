@@ -615,3 +615,94 @@ test('saved PR on mobile displays independent CI next step and records actual ve
  assert.match(panel.children[1].textContent,/INDEPENDENT SOURCE\/SYNTAX CI VERIFIED/);
  assert.match(panel.children[4].textContent,/✓ Independent CI recorded/);
 });
+
+
+
+test('an authenticated saved build moves the handoff box into Chat progress and only produces PDF after independent final settlement',async()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ const seen=[];
+ let settled=false;
+ function element(tag='div'){
+  return {tag,hidden:false,style:{},textContent:'',dataset:{},
+   children:[],parentElement:null,classList:{contains:()=>false},
+   setAttribute(){},append(...nodes){this.children.push(...nodes)},
+   replaceChildren(...nodes){this.children=nodes},
+   insertBefore(node){this.children.push(node)}};
+ }
+ const ready=element(),container=element(),composer=element();
+ composer.parentElement=container;ready.contains=n=>n===composer;
+ const transcript=element();
+ const user=element();user.dataset.requestId=requestId;
+ user.classList={contains:k=>k==='user'};
+ transcript.children.push(user);
+ user.after=node=>transcript.children.splice(transcript.children.indexOf(user)+1,0,node);
+ const eventHandlers=new Map(),history=[
+  {role:'user',request_id:requestId,source_ref,created_at:new Date().toISOString(),
+   text:'Reality, build the real source-code repair and independently verify it.'}];
+ const window={location:{pathname:'/chat'},
+  realityActiveConversationId:()=>conversationId,
+  addEventListener(name,fn){eventHandlers.set(name,fn)}};
+ const staged={ok:true,status:'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK',
+  request_id:requestId,source_ref,original_work_id:workId,
+  development_phase:'CANDIDATE_STAGED',model_generated:true,
+  independent_ci_verified:false,pr_url:'https://github.com/maloney2323/Reality/pull/309',
+  installation_authorized:false,production_changed:false};
+ const ci={...staged,status:'CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED',
+  development_phase:'CI_VERIFIED',independent_ci_verified:true,
+  ci_run_id:43879567344,artifact_commit_sha:'a'.repeat(40)};
+ const final={original_work_id:workId,status:'FULL_LOOP_INDEPENDENTLY_VERIFIED',
+  artifact_sha256:'a'.repeat(64),installed_commit_sha:'b'.repeat(40),
+  settlement_event_id:'c0bf34a1-a0eb-4b08-a457-0c3322b27a97',provider_run_id:43879567344,
+  verified_at:'2026-11-16T14:40:00Z',production_changed:false};
+ runInNewContext(code,{window,document:{
+  getElementById:id=>({privateReady:ready,realityChatComposer:composer,
+   privateTranscript:transcript})[id]||null,createElement:element
+ },fetch:async(url,opts)=>{
+  seen.push({url,method:opts.method,body:opts.body&&JSON.parse(opts.body)});
+  if(url.includes('personal-chat?'))return {ok:true,status:200,json:async()=>({
+   ok:true,conversation_id:conversationId,messages:history})};
+  if(url.includes('genuine-loop-status'))return {ok:true,status:200,json:async()=>({
+   status:'OWNER_GOVERNED_LOOP_READBACK',production_changed:false,
+   external_action_performed:false,
+   jobs:settled?[{original_work_id:workId,independently_settled:true,
+    universe_settlement_verified:true}]:[],
+   independent_final_receipts:settled?[final]:[]})};
+  if(url.includes('job-roi-evidence'))return {ok:false,status:503,
+   json:async()=>({ok:false})};
+  const action=seen.at(-1).body.action;
+  return {ok:true,status:200,json:async()=>action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+   ci:staged};
+ },AbortSignal,Date,encodeURIComponent});
+ const panel=container.children[0];
+ await panel.children[2].children[0].onclick();
+ assert.equal(panel.hidden,true,'handoff box disappears after authenticated job status is found');
+ assert.equal(panel.style.display,'none');
+ let card=transcript.children.find(x=>x.dataset.realityBuildRequest===requestId);
+ assert.ok(card,'actual user Chat bubble gets an inline work card');
+ assert.equal(transcript.children.indexOf(card),1,'work card follows its exact saved user turn');
+ assert.match(card.children[2].textContent,/SAVED BUILD STATUS/);
+ assert.match(card.children[3].children.map(x=>x.textContent).join(' '),
+  /✓ Real source committed/);
+ assert.match(card.children[3].children.map(x=>x.textContent).join(' '),
+  /○ Independent source\/syntax CI receipt/);
+ assert.ok(card.children[4].children.some(x=>/GitHub code/.test(x.textContent)));
+ assert.ok(card.children[4].children.some(x=>/Check and record independent CI/.test(x.textContent)));
+ const reconcile=card.children[4].children.find(x=>/Check and record independent CI/.test(x.textContent));
+ await reconcile.onclick();
+ await new Promise(resolve=>setImmediate(resolve));
+ card=transcript.children.find(x=>x.dataset.realityBuildRequest===requestId);
+ assert.match(card.children[3].children.map(x=>x.textContent).join(' '),
+  /✓ Independent source\/syntax CI receipt/);
+ assert.ok(!card.children[4].children.some(x=>/Download independently verified final receipt/.test(x.textContent)),
+  'CI success alone can never manufacture a customer PDF receipt');
+ assert.ok(card.children[4].children.some(x=>/Check final job verification/.test(x.textContent)));
+ settled=true;
+ const verify=card.children[4].children.find(x=>/Check final job verification/.test(x.textContent));
+ await verify.onclick();
+ await new Promise(resolve=>setImmediate(resolve));
+ card=transcript.children.find(x=>x.dataset.realityBuildRequest===requestId);
+ assert.match(card.children[2].textContent,/VERIFIED CUSTOMER JOB COMPLETED/);
+ assert.ok(card.children[4].children.some(x=>x.href===
+  '/api/reality/personal-genuine-final-receipt-pdf?work_id='+encodeURIComponent(workId)));
+ assert.equal(seen.filter(x=>x.method==='POST'&&x.body?.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT').length,1);
+});
