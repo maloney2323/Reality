@@ -45,6 +45,7 @@
    article.append(a);
   }
   target.append(article);
+  return article;
  }
  function signedIn() {
   return $('privateReady')?.style.display === 'block';
@@ -77,13 +78,34 @@
   try {
    // Both endpoints use the authenticated server session. Browser-supplied job
    // identifiers are never accepted as readback ownership assertions.
-   const [jobsResult, historyResult] = await Promise.allSettled([
+   const [jobsResult, historyResult, roiResult] = await Promise.allSettled([
     get('/api/reality/personal-genuine-loop-status'),
-    get('/api/reality/personal-gap-intake')
+    get('/api/reality/personal-gap-intake'),
+    get('/api/reality/personal-job-roi-evidence')
    ]);
    if (epoch !== serial || !signedIn()) return;
    let completed = 0, historical = 0, closedNoWork = 0, downloads = 0;
    let jobReadbackVerified = false, upgradeReadbackVerified = false;
+   // These are isolated-job measurements from a separate independent owner
+   // ledger. No model claim and no made-up financial or drift benefit.
+   const roiMap = new Map();
+   if (roiResult.status === 'fulfilled') {
+    const v = roiResult.value;
+    if (v.version === 'reality-owner-original-job-roi-projection-v1' &&
+        v.production_changed === false && v.financial_roi_verified === false &&
+        Array.isArray(v.jobs) && v.jobs.length <= 20) {
+     for (const item of v.jobs) {
+      if (WORK.test(item?.original_work_id || '') &&
+          item.technical_settlement_status === 'INDEPENDENTLY_SETTLED_ISOLATED_PREVIEW' &&
+          item.production_changed === false &&
+          Number.isSafeInteger(item.measured?.claim_to_settlement_ms) &&
+          item.measured.claim_to_settlement_ms >= 0 &&
+          item.economic_value?.verified_cash_savings_usd?.value === null)
+       roiMap.set(item.original_work_id,item);
+     }
+    }
+   }
+   let newestVerifiedId=null;
    if (jobsResult.status === 'fulfilled') {
     const data = jobsResult.value;
     if (data.status !== 'OWNER_GOVERNED_LOOP_READBACK' ||
@@ -98,7 +120,14 @@
       r.status === 'FULL_LOOP_INDEPENDENTLY_VERIFIED' && WORK.test(String(r.original_work_id || '')))
       .map(r => [r.original_work_id, r]));
      const seen = new Set();
-     for (const job of data.jobs) {
+     // Latest verified receipt appears first, not whichever job the
+     // provider happened to return first.
+     const recentFirst = [...data.jobs].sort((a,b) => {
+      const aTime=Date.parse(receipts.get(a.original_work_id)?.verified_at||'')||0;
+      const bTime=Date.parse(receipts.get(b.original_work_id)?.verified_at||'')||0;
+      return bTime-aTime;
+     });
+     for (const job of recentFirst) {
       const id = String(job.original_work_id || '');
       if (!WORK.test(id) || seen.has(id)) continue;
       seen.add(id);
@@ -138,14 +167,29 @@
       } else if (fullySettled) {
        completed++;
        if (receipt) downloads++;
-       record(original, name + ' · ' + id.slice(5, 13),
-        receipt ? 'FULL LOOP VERIFIED · RECEIPT READY' : 'ORIGINAL JOB SETTLED · VERIFIED',
+       const mostRecent=Boolean(receipt)&&newestVerifiedId===null;
+       if(mostRecent)newestVerifiedId=id;
+       const article=record(original, name + ' · ' + id.slice(5, 13),
+        mostRecent?'MOST RECENT COMPLETED JOB · INDEPENDENTLY VERIFIED':
+         receipt ? 'FULL LOOP VERIFIED · RECEIPT READY' : 'ORIGINAL JOB SETTLED · VERIFIED',
         'Owner-bound job ' + id + '. Independent Universe settlement verified. ' +
         (receipt ? 'Final customer PDF is independently verified and available.' :
          'No independent final-loop PDF was returned; no full-loop receipt is claimed.'),
         receipt ? '/api/reality/personal-genuine-final-receipt-pdf?work_id=' +
          encodeURIComponent(id) : null,
         receipt ? 'Download independently verified final receipt (PDF)' : null);
+       const metrics=roiMap.get(id);
+       const duration=metrics?.measured?.claim_to_settlement_ms;
+       const checks=metrics?.measured?.verified_check_pass_count;
+       const stats=document.createElement('p');
+       stats.className='archive-note';
+       stats.textContent='Verified at: '+String(receipt?.verified_at||'timestamp not returned')+
+        ' · Isolated claim-to-settlement duration: '+
+         (Number.isSafeInteger(duration)?(duration/1000).toFixed(1)+' seconds':'not measured')+
+        ' · Independently recorded technical checks passed: '+
+         (Number.isSafeInteger(checks)?String(checks):'not available')+
+        ' · Human hours saved: not measured · Realized cash ROI: not measured · Drift reduction: not measured.';
+       article.append(stats);
       } else {
        historical++;
        record(original, name + ' · ' + id.slice(5, 13),
@@ -194,7 +238,8 @@
     (upgradeReadbackVerified ?
      ' Earlier installation history loaded.' :
      ' Historical installation readback unavailable.') +
-    ' Incomplete jobs are not marked finished. Nothing was queued, approved or restarted.';
+    ' Most recent verified job: '+(newestVerifiedId||'not independently established')+
+    '. Incomplete jobs are not marked finished. Nothing was queued, approved or restarted.';
   } catch {
    if (epoch !== serial) return;
    empty(original, 'Saved history could not be verified. No completion claim made.');
