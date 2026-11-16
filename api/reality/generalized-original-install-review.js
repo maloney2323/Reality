@@ -57,9 +57,29 @@ export default async function handler(req,res){
      typeof r.original_job_completed!=='boolean'||
      typeof r.installation_authorized!=='boolean')
    throw Error('GENERALIZED_REVIEW_CURRENT_OWNER_PROOF_DRIFT');
+  // The recovery model's advisory finding is visible only through this
+  // already authenticated, same-owner original readback. It cannot
+  // manufacture another approval or claim a finished customer job.
+  const diagnosis=await shiftRpc(db,
+   'reality_read_general_original_fenced_investigation_state_v1',{})
+   .catch(()=>null);
+  const recovery=diagnosis?.status===
+    'FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED'&&
+   diagnosis.original_work_id===r.original_work_id&&
+   diagnosis.model_findings_are_hypotheses===true&&
+   diagnosis.independently_tested===false&&
+   diagnosis.external_retry_authorized===false&&
+   diagnosis.original_job_completed===false&&
+   diagnosis.production_changed===false?
+   {status:diagnosis.status,model_response_id:diagnosis.model_response_id,
+    suspected_failure_stage:diagnosis.suspected_failure_stage,
+    repair_proposal:diagnosis.repair_proposal,
+    independent_test_plan:diagnosis.independent_test_plan,
+    independently_tested:false,external_retry_authorized:false}:null;
   return res.status(200).json({
-   ok:true,...r,
-   next_gate:r.owner_approval_ready?
+   ok:true,...r,recovery_diagnosis:recovery,
+   next_gate:recovery?'INDEPENDENT_REPAIR_TEST_BEFORE_RECOVERY_DECISION':
+    r.owner_approval_ready?
     'EXACT_OWNER_APPROVAL_MAY_BE_PRESENTED_SEPARATELY':
     'RELEASE_TRANSPORT_AND_ORIGINAL_SETTLEMENT_CONTINUATION_PROOF_REQUIRED',
    owner_approval_action_available:(
