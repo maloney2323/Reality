@@ -251,9 +251,9 @@ test('missing authenticated Chat DOM cannot set the direct-work installed flag',
 });
 
 
-test('existing authenticated saved instruction is never re-executed on page load, only resumed by owner click',async()=>{
+test('saved build buttons work after login without history event and distinguish read from work write',async()=>{
  const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
- const events=new Map(),writes=[];
+ const events=new Map(),requests=[];
  function element(){
   return {hidden:false,style:{},textContent:'',parentElement:null,children:[],
    setAttribute(){},append(...nodes){this.children.push(...nodes)},
@@ -262,38 +262,73 @@ test('existing authenticated saved instruction is never re-executed on page load
  const ready=element(),container=element(),composer=element();
  composer.parentElement=container;
  ready.contains=node=>node===composer;
- const window={location:{pathname:'/chat'},
-  addEventListener(name,fn){events.set(name,fn)}};
+ const window={
+  location:{pathname:'/chat'},realityActiveConversationId:()=>conversationId,
+  addEventListener(name,fn){events.set(name,fn)}
+ };
+ const history=[{role:'user',request_id:requestId,source_ref,
+  text:'Reality, build the source-code repair through my existing governed worker.',
+  created_at:new Date().toISOString()},
+  {role:'user',request_id:'95aa144f-6e18-457f-9cd9-963426803451',
+   source_ref:'supabase:reality_chat_messages:71e01bbd-5a5a-4b8c-869f-247478e82aaa',
+   text:'Yes I approve this',created_at:new Date().toISOString()}];
  runInNewContext(code,{window,document:{
   getElementById:id=>id==='privateReady'?ready:
    id==='realityChatComposer'?composer:null,
   createElement:element
  },fetch:async(url,options)=>{
-  writes.push(JSON.parse(options.body));
-  return {ok:true,json:async()=>({ok:true,
+  requests.push({url,method:options.method,body:options.body&&JSON.parse(options.body)});
+  if(options.method==='GET')
+   return {ok:true,status:200,json:async()=>({ok:true,
+    conversation_id:conversationId,messages:history})};
+  return {ok:true,status:202,json:async()=>({ok:true,
    status:'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
    request_id:requestId,source_ref,original_work_id:workId,
    installation_authorized:false,production_changed:false})};
- },AbortSignal});
- const details={conversation_id:conversationId,messages:[
-  {role:'user',request_id:requestId,source_ref,
-   text:'Reality, build the source-code repair through my existing governed worker.',
-   created_at:new Date().toISOString()},
-  {role:'user',request_id:'95aa144f-6e18-457f-9cd9-963426803451',
-   source_ref:'supabase:reality_chat_messages:71e01bbd-5a5a-4b8c-869f-247478e82aaa',
-   text:'Yes I approve this',created_at:new Date().toISOString()}]};
- events.get('reality:saved-chat-readback')({detail:details});
- assert.equal(writes.length,0,'authenticated history never auto-runs work');
+ },AbortSignal,Date,encodeURIComponent});
  const panel=container.children[0];
- assert.equal(panel.hidden,false);
- const buttons=panel.children[2].children;
- assert.equal(buttons.length,2);
- assert.match(buttons[1].textContent,/Continue this saved instruction/);
+ assert.equal(panel.hidden,false,'saved work control is visible without a history event');
+ const finder=panel.children[2].children[0];
+ assert.match(finder.textContent,/Find my saved build request/);
+ assert.equal(requests.length,0,'mounting the control never starts or reads work');
+ await finder.onclick();
+ assert.equal(requests.length,1);
+ assert.equal(requests[0].method,'GET');
+ assert.match(requests[0].url,/\/api\/reality\/personal-chat\?conversation_id=/);
  assert.match(panel.children[1].textContent,/Reality, build the source-code repair/);
  assert.doesNotMatch(panel.children[1].textContent,/Yes I approve this/);
+ const buttons=panel.children[3].children;
+ assert.equal(buttons.length,2);
+ assert.match(buttons[0].textContent,/Inspect current work/);
+ assert.match(buttons[1].textContent,/Continue this exact saved build/);
+ assert.equal(requests.length,1,'read-only lookup cannot start work');
  await buttons[1].onclick();
- assert.equal(writes.length,1);
- assert.equal(writes[0].action,'PROCESS_SIGNED_WORK_REQUEST');
- assert.equal(writes[0].request_id,requestId);
- assert.equal(writes[0].conversation_id,conversationId);
+ assert.equal(requests.length,2);
+ assert.equal(requests[1].method,'POST');
+ assert.equal(requests[1].url,'/api/reality/personal-chat-work');
+ assert.equal(requests[1].body.action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(requests[1].body.request_id,requestId);
+ assert.equal(requests[1].body.conversation_id,conversationId);
+ assert.match(panel.children[1].textContent,/Build admitted and independently read back/);
+});
+
+test('saved work lookup shows an actionable authenticated readback error, never silently fails',async()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ function element(){return {hidden:false,style:{},textContent:'',parentElement:null,children:[],
+  setAttribute(){},append(...nodes){this.children.push(...nodes)},
+  replaceChildren(){this.children=[]},insertBefore(node){this.children.push(node)}}}
+ const ready=element(),container=element(),composer=element();
+ composer.parentElement=container;ready.contains=node=>node===composer;
+ const window={location:{pathname:'/chat'},realityActiveConversationId:()=>conversationId,
+  addEventListener(){}};
+ runInNewContext(code,{window,document:{
+  getElementById:id=>id==='privateReady'?ready:id==='realityChatComposer'?composer:null,
+  createElement:element
+ },fetch:async()=>({ok:false,status:401,json:async()=>({ok:false,error:'CHAT_SIGN_IN_REQUIRED'})}),
+ AbortSignal,Date,encodeURIComponent});
+ const panel=container.children[0];
+ await panel.children[2].children[0].onclick();
+ assert.equal(panel.hidden,false);
+ assert.match(panel.children[1].textContent,/CHAT_WORK_SIGN_IN_REQUIRED/);
+ assert.equal(panel.children[3].children.length,0,'no work action offered without verified saved source');
 });
