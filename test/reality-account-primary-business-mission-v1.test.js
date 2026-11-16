@@ -59,6 +59,10 @@ test('Chat restores saved permanent mission across logins and never silently sav
  assert.match(html,/saved\.goal_state\?\.active_goal\?\.title!==message/);
  assert.match(html,/confirmedPermanentMission\?\.text!==message/);
  assert.match(html,/No owner-confirmed permanent mission recorded/);
+ assert.match(html,/id="privateMissionAdoptHere"/);
+ assert.match(html,/Use your already-confirmed permanent business mission as this conversation/);
+ assert.match(html,/saveGoalCommand\('SET_ACTIVE',mission\)/);
+ assert.match(html,/CONVERSATION_MISSION_BINDING_READBACK_UNVERIFIED/);
  assert.match(html,/Customer Zero/);
  assert.match(html,/residential remodeling and construction companies/);
  assert.match(html,/Past, Present, and Future/);
