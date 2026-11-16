@@ -103,6 +103,38 @@
   return 'Saved work decision: '+String(result.status||'UNVERIFIED').replaceAll('_',' ')+
    '. No completed job or installation is inferred.';
  }
+ // Recover ONE existing signed instruction from the authenticated history.
+ // Loading history must never trigger a side-effect: only the owner clicking
+ // "Continue" invokes the already-governed, idempotent exact-source endpoint.
+ // This provides a recovery path for messages sent before the Chat listener fix.
+ window.addEventListener('reality:saved-chat-readback',event=>{
+  if(!panel.hidden||processing.size||started.size)return;
+  const d=event.detail||{};
+  if(!UUID.test(d.conversation_id||'')||!Array.isArray(d.messages))return;
+  const previous=d.messages.filter(m=>m?.role==='user'&&
+    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||''));
+  const latest=previous[previous.length-1];
+  if(!latest)return;
+  const age=Date.now()-Date.parse(latest.created_at||'');
+  if(!Number.isFinite(age)||age<0||age>24*60*60*1000)return;
+  const ref={conversation_id:d.conversation_id,
+   request_id:latest.request_id,source_ref:latest.source_ref};
+  show('Your most recent saved instruction can be checked and continued through Reality\'s existing governed work system without sending it again.',true,ref);
+  const resume=document.createElement('button');
+  resume.type='button';
+  resume.textContent='Continue this saved instruction (no resend)';
+  resume.onclick=async()=>{
+   resume.disabled=true;
+   description.textContent='Checking the exact saved owner instruction and existing work record…';
+   try{
+    const result=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
+    show(explain(result),true,ref);
+   }catch{
+    show('The saved message is preserved, but the governed work handoff could not be independently verified. No duplicate message or approval was created.',true,ref);
+   }
+  };
+  actions.append(resume);
+ });
  window.addEventListener('reality:chat-request-started',event=>{
   const x=event.detail||{};
   if(!UUID.test(x.conversation_id||'')||!UUID.test(x.request_id||''))return;
