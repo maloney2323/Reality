@@ -85,6 +85,18 @@
   const work=result?.original_work_id;
   label.textContent=WORK.test(work||'')?work:
    'Original work ID will appear only after durable admission';
+  if(typeof result?.objective==='string'&&result.objective.trim()){
+   const objective=document.createElement('p');
+   objective.textContent='Building: '+result.objective.slice(0,450);
+   objective.style.cssText='margin:6px 0;font-size:13px';
+   card.append(objective);
+  }
+  if(typeof result?.target_path==='string'){
+   const file=document.createElement('p');
+   file.textContent='Source file: '+result.target_path;
+   file.style.cssText='margin:6px 0;font-size:12px;opacity:.85';
+   card.append(file);
+  }
   card.append(head,label,detail,timeline,actions);
   if(result){
    const phase=result.development_phase||(
@@ -165,6 +177,33 @@
     note.textContent='Realized cash savings, human hours returned and drift reduction: not verified unless separately measured.';
     note.style.cssText='font-size:12px;opacity:.85;margin:5px 0';
     ui.card.append(note);
+    // Fetch independently measured technical statistics only after the
+    // full-job receipt is proven. Missing ROI evidence remains unknown.
+    void (async()=>{
+     try{
+      const r=await fetch('/api/reality/personal-job-roi-evidence',{
+       method:'GET',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(16000)});
+      const report=await r.json().catch(()=>null);
+      const metric=report?.version==='reality-owner-original-job-roi-projection-v1'&&
+       report.production_changed===false&&report.financial_roi_verified===false&&
+       Array.isArray(report.jobs)&&report.jobs.length<=20?
+       report.jobs.find(j=>j.original_work_id===workId&&
+        j.technical_settlement_status==='INDEPENDENTLY_SETTLED_ISOLATED_PREVIEW'&&
+        j.production_changed===false):null;
+      if(!r.ok||!metric)return;
+      const stats=document.createElement('p');
+      const ms=metric.measured?.claim_to_settlement_ms;
+      const checks=metric.measured?.verified_check_pass_count;
+      stats.textContent='Verified isolated claim-to-settlement interval: '+
+       (Number.isSafeInteger(ms)?(ms/1000).toFixed(1)+' s':'not measured')+
+       ' · Technical checks passed: '+
+       (Number.isSafeInteger(checks)?String(checks):'not verified')+
+       ' · Not a full-business-job labor baseline.';
+      stats.style.cssText='font-size:12px;margin:5px 0';
+      ui.card.append(stats);
+     }catch{}
+    })();
    }
    return true;
   }catch{return false}
@@ -306,6 +345,9 @@
  // development transitions. Each server step reauthenticates the same
  // signed user source and reads the exact persisted job again.
  async function processAndAdvance(ref){
+  if(!inlineWork(ref,
+   'Checking the exact owner-signed Chat instruction and existing job admission…',null))
+   description.textContent='Checking the exact saved work instruction…';
   const admitted=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
   if(!['CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
    'CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'].includes(admitted.status))
@@ -460,6 +502,11 @@
  let restoring=false,lastRestored='';
  window.addEventListener('reality:saved-chat-readback',async event=>{
   const x=event.detail||{};
+  if(activeRef&&UUID.test(x.conversation_id||'')&&
+     x.conversation_id!==activeRef.conversation_id){
+   activeRef=null;verifiedComplete=false;activePhase=null;lastRestored='';
+   panel.hidden=false;panel.style.display='';
+  }
   if(restoring||!UUID.test(x.conversation_id||'')||
      window.realityActiveConversationId?.()!==x.conversation_id||
      !Array.isArray(x.messages))return;
