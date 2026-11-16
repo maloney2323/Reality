@@ -63,7 +63,66 @@
     insight.source_work_roles_unallocated_reference_hours;
  };
  const auth=document.getElementById('privateReady');
- let loading=false,pendingReload=false;
+ let loading=false,pendingReload=false,reviewEpoch=0;
+ function removeMarketReview(){
+  root.querySelector('[data-market-research-review]')?.remove();
+ }
+ async function showMarketReview(){
+  const tick=++reviewEpoch;
+  removeMarketReview();
+  if(auth?.style.display!=='block')return;
+  const card=root.querySelector('[data-home-employee="Morgan"]');
+  const caption=card?.querySelector('[data-home-work]');
+  if(!caption)return;
+  try{
+   const r=await fetch('/api/reality/personal-market-research',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(14000)});
+   const d=await r.json().catch(()=>null);
+   if(tick!==reviewEpoch||auth.style.display!=='block')return;
+   if(!r.ok||d?.ok!==true||d.verified_readback!==true||
+    d.status!=='GOVERNED_MARKET_RESEARCH_RECORDED'||
+    d.review_only!==true||d.job_started!==false||
+    d.installation_authorized!==false||d.production_changed!==false||
+    !/^[a-f0-9-]{36}$/.test(d.receipt_id||'')||
+    !Array.isArray(d.findings)||d.findings.length>4)return;
+   const findings=d.findings.filter(f=>
+    f.status==='RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST'&&
+    /^[a-f0-9]{64}$/.test(f.fingerprint||'')&&
+    f.employee_investigation?.employee==='Morgan'&&
+    f.employee_investigation.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+    f.employee_investigation.assignment_id==='research-review:'+d.receipt_id+':'+f.fingerprint&&
+    /^[a-f0-9]{64}$/.test(f.employee_investigation.assessment_receipt_sha256||'')&&
+    f.employee_investigation.research_only===true&&
+    f.employee_investigation.qualified_original_job===false&&
+    f.employee_investigation.execution_authorized===false&&
+    f.employee_investigation.job_started===false&&
+    f.employee_investigation.installation_authorized===false&&
+    f.employee_investigation.production_changed===false);
+   if(!findings.length||new Set(findings.map(f=>f.fingerprint)).size!==findings.length)return;
+   caption.textContent+=' · '+findings.length+
+    ' assigned market-source reviews (not authorized execution)';
+   const details=document.createElement('details');
+   details.dataset.marketResearchReview='verified';
+   const heading=document.createElement('summary');
+   heading.textContent='Morgan · '+findings.length+' research investigations needing verification';
+   details.append(heading);
+   for(const f of findings){
+    const item=document.createElement('div');
+    const title=document.createElement('strong');
+    title.textContent=String(f.title||'Research finding').slice(0,160);
+    const proof=document.createElement('p');
+    proof.textContent='Review assigned · Test needed: '+
+     String(f.employee_investigation.next_proof||'Independent source evidence needed').slice(0,680);
+    const ref=document.createElement('small');
+    ref.textContent=f.employee_investigation.assignment_id;
+    item.append(title,proof,ref);details.append(item);
+   }
+   const link=document.createElement('a');
+   link.href='/work';link.textContent='Review market sources in the Work Center';
+   details.append(link);card.append(details);
+  }catch{ /* No readback means unknown, not zero assignments. */ }
+ }
  async function load(){
   if(loading){pendingReload=true;return;}
   loading=true;refresh.disabled=true;
@@ -239,6 +298,7 @@
      saved.size+' roles with saved Chat proposals. ':
      'Saved Chat proposals temporarily unverified. ')+
     'This read-only board does not start any new shift or authorize installation.';
+   void showMarketReview(); // exact persisted research, no extra job writes
    // Publish only the exact same owner-scoped projection Home received.
    // A failure is UNKNOWN, never zero hours, and cannot survive logout.
    emitWeekly(validWeekly(data.weekly_workload_insight,data)?
@@ -259,7 +319,7 @@
  if(auth&&typeof MutationObserver==='function')
   new MutationObserver(()=>{
    if(auth.style.display==='block')void load();
-   else emitWeekly(null);
+   else {emitWeekly(null);reviewEpoch++;removeMarketReview();}
   }).observe(auth,{attributes:true,attributeFilter:['style']});
  refresh.addEventListener('click',()=>{void load();});
  void load();
