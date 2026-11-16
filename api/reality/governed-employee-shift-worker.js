@@ -86,6 +86,8 @@ import {continueGeneralOwnerApprovedOriginalInstall}
  from '../../src/reality-general-original-auto-install-bridge-v1.js';
 import {settleGeneralOwnerApprovedOriginal}
  from '../../src/reality-general-original-auto-settlement-bridge-v1.js';
+import {investigateGeneralOriginalFencedRecovery}
+ from '../../src/reality-general-original-fenced-investigator-v1.js';
 import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
@@ -438,6 +440,16 @@ export default async function handler(req,res){
     status:'GENERAL_INSTALL_PRIVILEGED_PROVIDER_UNVERIFIED',
     source_installed:false,original_job_completed:false,
     production_changed:false
+   }));
+  // A fenced original is a one-time source-backed engineering diagnosis.
+  // The model cannot authorize another write, installation or settlement.
+  const fencedOriginalInvestigationPromise=
+   investigateGeneralOriginalFencedRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'FENCED_RECOVERY_INVESTIGATION_PROVIDER_UNVERIFIED',
+    independently_tested:false,external_retry_authorized:false,
+    original_job_completed:false,production_changed:false
    }));
   workerStage='GENERAL_ORIGINAL_INDEPENDENT_FINAL_SETTLEMENT';
   const generalOriginalSettlement=
@@ -1206,6 +1218,8 @@ export default async function handler(req,res){
   // A block-local declaration caused response publication to throw after an
   // otherwise successful WAKE_COMPLETED database receipt.
   const chatWorkHandoff=await chatWorkPromise;
+  workerStage='GENERAL_ORIGINAL_FENCED_MODEL_INVESTIGATION';
+  const fencedOriginalInvestigation=await fencedOriginalInvestigationPromise;
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -1229,7 +1243,12 @@ export default async function handler(req,res){
     generalOriginalSettlement?.original_job_completed!==true&&
     generalOriginalInstall?.status===
      'GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED';
-   const outcomeCode=originalInstallNeedsRecovery?
+   const autonomousRecoveryDiagnosisReady=
+    fencedOriginalInvestigation?.status===
+     'FENCED_ORIGINAL_RILEY_MODEL_HYPOTHESIS_RECORDED';
+   const outcomeCode=autonomousRecoveryDiagnosisReady?
+    'FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED':
+    originalInstallNeedsRecovery?
     'GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT':
     correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
@@ -1307,6 +1326,7 @@ export default async function handler(req,res){
     generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
     generalized_original_approved_install:generalOriginalInstall,
     generalized_original_final_settlement:generalOriginalSettlement,
+    generalized_original_fenced_investigation:fencedOriginalInvestigation,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
