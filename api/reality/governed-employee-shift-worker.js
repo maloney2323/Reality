@@ -1222,7 +1222,16 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const outcomeCode=correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
+   // Report a genuinely blocked approved original before unrelated
+   // successful source-check receipts. A completed wake is NOT job settlement.
+   // This is evidence-only; no retry, permission or new work is created.
+   const originalInstallNeedsRecovery=
+    generalOriginalSettlement?.original_job_completed!==true&&
+    generalOriginalInstall?.status===
+     'GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED';
+   const outcomeCode=originalInstallNeedsRecovery?
+    'GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT':
+    correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
     correctiveCiResult?.status==='CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_FAILED_RECOVERY_REQUIRED':
