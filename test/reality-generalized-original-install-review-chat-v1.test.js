@@ -21,6 +21,11 @@ test('owner review API is strictly GET, same signed-in owner and isolated servic
 test('owner proof UI exposes evidence and the separately authenticated one-click action only after all gates',()=>{
  assert.match(html,/reality-generalized-install-review-ui-v1\.js/);
  assert.match(ui,/realityChatPanelProof/);
+ assert.match(ui,/privateAccountMissionBanner/);
+ assert.match(ui,/host\.insertBefore\(p,before\|\|null\)/);
+ assert.match(ui,/host\.id==='privateReady'/);
+ assert.match(html,/id="privateReady"/);
+ assert.match(html,/id="privateAccountMissionBanner"/);
  assert.match(ui,/owner_approval_action_available===true/);
  assert.match(ui,/approveExactFromUserClick/);
  assert.match(ui,/generalizedOriginalInstallApproveExactButton/);
