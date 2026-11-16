@@ -1651,6 +1651,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <label for="privateMissionText">Confirm your permanent mission</label>
    <textarea id="privateMissionText" minlength="12" maxlength="700" style="width:100%;min-height:150px" placeholder="Describe the long-term mission for your business."></textarea>
    <button id="privateMissionConfirm" type="button">Save permanent business mission to my account</button>
+   <button id="privateMissionAdoptHere" type="button" class="simple-secondary">Use saved mission for work in this conversation</button>
+   <p class="muted" style="font-size:12px">The mission remains saved across conversations. Using it for an individual conversation requires an explicit owner-confirmed goal binding; this alone never starts or approves work.</p>
    <hr style="margin:18px 0;border-color:#30465d">
    <strong>Conversation-specific objective</strong>
    <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
@@ -6720,8 +6722,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     state.textContent='Confirmed account-wide mission · Continuity receipt: '+
       String(g.last_transition_receipt_id||'not returned');
     el('privateMissionText').value=g.title;
+    el('privateMissionAdoptHere').disabled=false;
    }else{
     confirmedPermanentMission=null;
+    el('privateMissionAdoptHere').disabled=true;
     banner.textContent='No account-wide primary mission confirmed yet. Review the proposal in Chat settings and save it once.';
     state.textContent='No owner-confirmed permanent mission recorded. This proposal is NOT yet your active account mission.';
     if(!el('privateMissionText').value.trim())
@@ -6729,6 +6733,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    }
   }catch(e){
    confirmedPermanentMission=null;
+   el('privateMissionAdoptHere').disabled=true;
    banner.textContent='Account mission verification unavailable; Reality cannot claim it was saved.';
    state.textContent='Unable to read the account mission: '+String(e.message||'UNKNOWN')+
      '. Your previous goals were not deleted.';
@@ -6738,6 +6743,23 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   if(el('realityChatSettings'))el('realityChatSettings').open=true;
   el('privateMissionText').scrollIntoView({behavior:'smooth',block:'center'});
   el('privateMissionText').focus({preventScroll:true});
+ };
+ el('privateMissionAdoptHere').disabled=true;
+ el('privateMissionAdoptHere').onclick=async()=>{
+  const mission=confirmedPermanentMission?.text;
+  if(typeof mission!=='string'||mission.length<12)
+   return status('Save your permanent mission before using it for this conversation.');
+  if(!confirm('Use your already-confirmed permanent business mission as this conversation’s active objective? This does not authorize any execution or installation.'))return;
+  const button=el('privateMissionAdoptHere');button.disabled=true;
+  try{
+   const saved=await saveGoalCommand('SET_ACTIVE',mission);
+   if(saved.goal_state?.active_goal?.title!==mission||
+      saved.goal_state?.active_goal?.user_confirmed!==true)
+    throw Error('CONVERSATION_MISSION_BINDING_READBACK_UNVERIFIED');
+   await loadGoals();
+   status('This conversation is now linked to your saved business mission. No work was started or authorized.');
+  }catch(e){status('Mission was not linked to this conversation: '+String(e.message||'UNVERIFIED'))}
+  finally{button.disabled=false}
  };
  el('privateMissionConfirm').onclick=async()=>{
   const field=el('privateMissionText'),message=field.value.trim();
@@ -6779,7 +6801,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    label.textContent=state.active_goal?
      ('USER-CONFIRMED active objective: '+String(state.active_goal.title||'').slice(0,250)+
       ' · Ledger receipt: '+state.active_goal.last_transition_receipt_id):
-     ('No explicitly confirmed active objective in this conversation. Prior suggestions are not authorization.');
+     ('No conversation-specific work objective confirmed. Your permanent account mission is displayed above; select “Use saved mission for work in this conversation” to bind it explicitly.');
    const select=el('privateSavedGoals');select.replaceChildren();
    for(const item of state.goals||[]){
     if(item.goal_id===state.active_goal_id||item.status==='ABANDONED'||
