@@ -129,6 +129,29 @@ async function reconcile(token,base,key,scope,head){
     'RUNTIME_REPO_METADATA_READ_UNAVAILABLE';
    console.info('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY',permission,
     Number.isInteger(repository.status)?repository.status:0);
+   // Verify whether the exact immutable installation ingredients still
+   // exist. GET-only: no new GitHub objects or refs, even if the old write
+   // was interrupted after creating unreachable objects.
+   const [parent,candidateBlob,baseline,candidate]=await Promise.all([
+    gh(token,'/git/commits/'+expected),
+    gh(token,'/git/blobs/'+scope.expected_installed_blob_sha),
+    checkedSource(token,scope.target_path,expected).catch(()=>null),
+    checkedSource(token,scope.target_path,scope.candidate_commit_sha)
+     .catch(()=>null)
+   ]);
+   const finding=parent.ok&&SHA.test(parent.data?.tree?.sha||'')&&
+    candidateBlob.ok&&candidateBlob.data?.sha===
+     scope.expected_installed_blob_sha&&
+    baseline?.blob===scope.expected_preinstall_blob_sha&&
+    candidate?.blob===scope.expected_installed_blob_sha&&
+    candidate?.digest===scope.candidate_artifact_sha256?
+    'FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE':
+    'FENCED_GIT_OBJECTS_OR_EXACT_SOURCE_NOT_VERIFIED';
+   console.info('REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE',finding,
+    Number.isInteger(parent.status)?parent.status:0,
+    Number.isInteger(candidateBlob.status)?candidateBlob.status:0);
+   // Passing this check is NOT proof that a previous ref update did not
+   // occur, and cannot reopen the one-use external-write authority.
   }catch{
    console.warn('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY','PROBE_UNAVAILABLE');
   }
