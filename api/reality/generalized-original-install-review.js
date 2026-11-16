@@ -12,6 +12,7 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const RUN=/^[1-9][0-9]{4,}$/;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export const maxDuration=20;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
@@ -76,8 +77,33 @@ export default async function handler(req,res){
     repair_proposal:diagnosis.repair_proposal,
     independent_test_plan:diagnosis.independent_test_plan,
     independently_tested:false,external_retry_authorized:false}:null;
+  // A SECOND, exact one-use publication decision is offered only after
+  // its own independently tested release proof is staged. It cannot reuse
+  // the original consumed installation approval.
+  const rawPub=await shiftRpc(db,
+   'reality_read_general_original_recovery_review_v1',{
+    p_owner_id:session.user_id}).catch(()=>null);
+  const pub=rawPub?.status==='GENERAL_ORIGINAL_EXACT_RECOVERY_PUBLICATION_REVIEW'&&
+   rawPub.original_work_id===r.original_work_id&&
+   rawPub.attempt_id===r.attempt_id&&
+   rawPub.candidate_commit_sha===r.candidate_commit_sha&&
+   rawPub.candidate_artifact_sha256===r.candidate_artifact_sha256&&
+   rawPub.original_job_completed===false&&rawPub.production_changed===false&&
+   UUID.test(rawPub.recovery_publication_id||'')&&
+   SHA.test(rawPub.expected_parent_commit_sha||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(rawPub.candidate_artifact_sha256||'')&&
+   Number.isSafeInteger(rawPub.independent_recovery_test_run_id)&&
+   rawPub.independent_recovery_test_run_id>10000&&
+   SHA.test(rawPub.proof_commit_sha||'')?rawPub:null;
+  const recoveryApprovalAvailable=pub?.phase==='READY_FOR_EXACT_RECOVERY_APPROVAL'&&
+   pub.owner_approval_ready===true&&pub.owner_approval_id===null&&
+   r.phase==='INSTALL_INTENT_FENCED'&&
+   r.installation_authorized===true&&r.original_job_completed===false;
   return res.status(200).json({
    ok:true,...r,recovery_diagnosis:recovery,
+   recovery_publication:pub,
+   recovery_approval_action_available:recoveryApprovalAvailable===true,
+   recovery_approval_action_endpoint:'/api/reality/general-original-recovery-approval',
    next_gate:recovery?'INDEPENDENT_REPAIR_TEST_BEFORE_RECOVERY_DECISION':
     r.owner_approval_ready?
     'EXACT_OWNER_APPROVAL_MAY_BE_PRESENTED_SEPARATELY':
