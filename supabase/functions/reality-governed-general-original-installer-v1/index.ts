@@ -26,7 +26,8 @@ const safe=(status,more={},http=200)=>{
 async function rpc(base,key,name,args={}){
  if(!['reality_read_general_original_install_scope_v1',
        'reality_claim_general_original_install_v1',
-       'reality_record_general_original_installed_source_v1'].includes(name))
+       'reality_record_general_original_installed_source_v1',
+       'reality_record_general_original_fenced_recovery_v1'].includes(name))
   fail('RPC_NOT_ALLOWED');
  const r=await fetch(base+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -150,8 +151,38 @@ async function reconcile(token,base,key,scope,head){
    console.info('REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE',finding,
     Number.isInteger(parent.status)?parent.status:0,
     Number.isInteger(candidateBlob.status)?candidateBlob.status:0);
-   // Passing this check is NOT proof that a previous ref update did not
-   // occur, and cannot reopen the one-use external-write authority.
+   if(finding==='FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE'&&
+      permission==='RUNTIME_REPO_PUSH_PERMISSION_CONFIRMED'){
+    // An immutable, exact-original diagnosis is a write to the evidence
+    // ledger only; the original GitHub ref update remains fully fenced.
+    const attested=JSON.stringify([
+     scope.attempt_id,scope.original_work_id,scope.shift_id,
+     scope.approval_receipt_id,scope.target_branch,scope.target_path,
+     expected,head,scope.expected_preinstall_blob_sha,
+     scope.expected_installed_blob_sha,scope.candidate_commit_sha,
+     scope.candidate_artifact_sha256,parent.status,candidateBlob.status,
+     baseline.blob,candidate.blob,candidate.digest
+    ]);
+    const evidenceSHA=await digest('SHA-256',
+     new TextEncoder().encode(attested));
+    const stored=await rpc(base,key,
+     'reality_record_general_original_fenced_recovery_v1',{
+      p_attempt_id:scope.attempt_id,p_observed_branch_head:head,
+      p_evidence_sha256:evidenceSHA,p_finding:finding
+     });
+    if(stored.status!=='GENERAL_ORIGINAL_FENCED_RECOVERY_OBSERVATION_DURABLE'||
+       stored.original_work_id!==scope.original_work_id||
+       stored.shift_id!==scope.shift_id||
+       stored.phase!=='READ_ONLY_DIAGNOSIS_RECORDED'||
+       stored.installation_retried!==false||
+       stored.original_job_completed!==false||
+       stored.production_changed!==false)
+     fail('FENCED_RECOVERY_DURABLE_EVIDENCE_NOT_VERIFIED');
+    console.info('REALITY_INSTALLER_FENCED_RECOVERY_RECEIPTED',
+     'SAME_ORIGINAL_DIAGNOSIS_DURABLE_NO_RETRY');
+   }
+   // Passing these GET checks is NOT proof that an earlier ref update
+   // never happened and cannot reopen the consumed write authority.
   }catch{
    console.warn('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY','PROBE_UNAVAILABLE');
   }
