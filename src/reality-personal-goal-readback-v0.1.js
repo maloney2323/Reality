@@ -11,6 +11,53 @@ import { projectAuthoritativeUserGoals }
 
 export const PERSONAL_GOAL_READBACK_VERSION='reality-personal-goal-readback-v0.1';
 
+// One verified account-wide primary mission independent of any particular
+// Chat conversation. Source is the SAME signed user-goal Continuity events;
+// never a model instruction, editable metadata, or an authorization to execute.
+export function personalAccountMissionScope({userId}={}){
+ if(!validUuid(userId))throw Error('ACCOUNT_MISSION_AUTHENTICATED_OWNER_REQUIRED');
+ const root='personal:owner-business-mission:'+
+  createHash('sha256').update(
+   'reality:owner-primary-business-mission:v1:'+userId).digest('hex');
+ return Object.freeze({root,worldline:root,world:root});
+}
+export async function readFreshPersonalAccountMissionState({
+ session,env=process.env,createPersistence=createUniversePostgresPersistence
+}={}){
+ if(!validUuid(session?.user_id)||!session?.config?.url||
+    typeof createPersistence!=='function')
+  throw Error('ACCOUNT_MISSION_AUTHENTICATED_SESSION_REQUIRED');
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
+  throw Error('ACCOUNT_MISSION_PREVIEW_DURABILITY_REQUIRED');
+ const db=resolveReliabilityBenchmarkDb(env);
+ if(!db||db.url!==session.config.url||
+   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+  throw Error('ACCOUNT_MISSION_PRIVATE_PROJECT_MISMATCH');
+ const scope=personalAccountMissionScope({userId:session.user_id});
+ const spine=createContinuitySpine({
+  continuityRootId:scope.root,worldlineId:scope.worldline,
+  subjectId:session.user_id
+ });
+ const events=await createPersistence({...db}).reconstruct({
+  continuityRootId:spine.continuity_root_id,
+  worldlineId:spine.worldline_id
+ });
+ const state=projectAuthoritativeUserGoals({
+  continuityHistory:events,continuityRootId:spine.continuity_root_id,
+  worldId:scope.world,principalId:session.user_id
+ });
+ return Object.freeze({
+  version:'reality-account-primary-business-mission-v1',
+  principal_id:session.user_id,scope,state,
+  readback_at:new Date().toISOString(),
+  source:'OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY',
+  execution_authorized:false,
+  external_actions_authorized:false
+ });
+}
+
+
 export function personalGoalScope({userId,conversationId}={}){
  if(!validUuid(userId)||!validUuid(conversationId))
   throw Error('PERSONAL_GOAL_AUTHENTICATED_SCOPE_INVALID');
