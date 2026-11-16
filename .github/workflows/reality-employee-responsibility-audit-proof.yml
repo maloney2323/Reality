@@ -1,7 +1,7 @@
 name: Reality employee responsibility audit isolated proof
 on:
   push:
-    branches: [reality/native263-temporal-chat-proof-20261113]
+    branches: [reality/native263-temporal-chat-proof-20261113, reality/chat-direct-work-handoff-20261115]
     paths:
       - src/reality-employee-responsibility-audit-v1.js
       - src/reality-governed-shift-boundary-v1.js
