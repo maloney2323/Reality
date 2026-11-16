@@ -78,6 +78,56 @@ test('unavailable weekly source stays explicitly partial; fake or duplicate sour
    ]},employee:'ALL'
  }),/WEEKLY_PROVIDER_OR_DEDUP_PROOF_INVALID/);
 });
+
+test('each existing employee owns its specialty discovery while launch readiness remains unverified',()=>{
+ const withBusinessGates={...roster,proposed_employees:roster.proposed_employees.map((x,i)=>({
+  ...x,business_outcome:'Role '+x.display_name+' launch outcome',
+  launch_gate:'EXACT_'+x.display_name.toUpperCase()+'_LAUNCH_EVIDENCE',
+  evidence_status:i%2===0?'CUSTOMER_SOURCE_NOT_CONNECTED':'REPOSITORY_SOURCE_OBSERVATION_ONLY'
+ }))};
+ const out=buildEmployeeResponsibilityAudit({
+  roster:withBusinessGates,snapshot,employee:'ALL',
+  now:new Date('2026-11-16T16:00:00Z')});
+ assert.equal(out.business_launch_readiness,'NOT_VERIFIED_FROM_CONNECTED_EVIDENCE');
+ assert.equal(out.launch_decision_authorized,false);
+ assert.equal(out.standing_discovery_roles_defined,8);
+ assert.equal(out.recurring_discovery_worker_auto_wake_verified,false);
+ assert.equal(out.standing_discovery_is_execution,false);
+ assert.equal(out.role_audits.length,8);
+ for(const role of out.role_audits){
+  assert.equal(role.standing_discovery.employee,role.employee_name);
+  assert.equal(role.standing_discovery.categories.length,3);
+  assert.equal(role.standing_discovery.cadence,
+   'WEEKLY_DISCOVERY_SCOPE_PROPOSED_NOT_AUTONOMOUS_SHIFT');
+  assert.equal(role.standing_discovery.execution_authorized,false);
+  assert.equal(role.standing_discovery.original_job_created,false);
+  assert.equal(role.business_launch_requirement.readiness,
+   'NOT_VERIFIED_FOR_CUSTOMER_LAUNCH');
+  assert.equal(role.business_launch_requirement.launch_authorized,false);
+  assert.match(role.business_launch_requirement.required_gate,
+   /^EXACT_[A-Z]+_LAUNCH_EVIDENCE$/);
+ }
+ const sage=out.role_audits.find(x=>x.employee_name==='Sage');
+ assert.ok(sage.standing_discovery.categories.some(x=>x.includes('model operating costs')));
+ assert.equal(sage.catalog_source_candidates,0);
+ assert.equal(sage.weekly_investigation_assignments,0);
+ const jordan=out.role_audits.find(x=>x.employee_name==='Jordan');
+ assert.ok(jordan.standing_discovery.categories.some(x=>x.includes('sales opportunities')));
+ const riley=out.role_audits.find(x=>x.employee_name==='Riley');
+ assert.equal(riley.weekly_investigation_assignments,1);
+ assert.equal(out.new_original_jobs_created,0);
+ assert.equal(out.automatic_business_execution_performed,false);
+});
+test('standing discovery and launch posture appear in existing employee audit UI, without hidden launch authority',()=>{
+ const ui=readFileSync(new URL('../reality-employee-work-audit-ui-v1.js',import.meta.url),'utf8');
+ assert.match(ui,/business_launch_readiness/);
+ assert.match(ui,/Standing job-discovery responsibilities/);
+ assert.match(ui,/Launch-readiness investigation/);
+ assert.match(ui,/recurring autonomous employee investigation is NOT yet verified/i);
+ assert.match(ui,/launch\.launch_authorized===false/);
+ assert.doesNotMatch(ui,/approve_owner_release|execute_product_launch|startNewShift/);
+});
+
 test('home buttons really invoke authenticated audit, never authorize an install or shift',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const ui=readFileSync(new URL('../reality-employee-work-audit-ui-v1.js',import.meta.url),'utf8');
