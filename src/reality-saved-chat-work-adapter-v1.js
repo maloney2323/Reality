@@ -11,6 +11,10 @@ import {continueRileyCorrectiveModelIntoIndependentCI}
  from './reality-riley-auto-corrective-ci-bridge-v1.js';
 import {admitOwnerNewDevelopment,readOwnerNewDevelopment}
  from './reality-chat-new-development-adapter-v1.js';
+import {generateNextSignedChatDevelopmentDraft}
+ from './reality-chat-new-development-worker-v1.js';
+import {continueChatNewDevelopmentCandidate}
+ from './reality-chat-new-development-publisher-v1.js';
 
 const workId=x=>/^work:[a-f0-9]{32}$/.test(String(x||''));
 const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
@@ -443,4 +447,114 @@ export async function processSignedSavedChatWork({
   source_ref:signed.source_ref,
   execution_started:false,installation_authorized:false,
   production_changed:false,new_shift_started:false});
+}
+
+
+// Advance the SAME saved, authenticated new-development job without depending
+// on the unrelated legacy shift worker's cron host or secret. The model cannot
+// claim its own authority: the persisted owner/source/readback and the exact
+// preview release are independently re-verified before any service write.
+// At most one transition per call: queue -> draft -> isolated candidate -> CI.
+export async function advanceSignedChatDevelopment({
+ session,conversationId,requestId,messages,
+ env=process.env,readNew=readOwnerNewDevelopment,
+ dbFactory=shiftDatabase,callRpc=shiftRpc,
+ generate=generateNextSignedChatDevelopmentDraft,
+ publish=continueChatNewDevelopmentCandidate,fetchImpl=fetch
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ if(env.VERCEL_ENV!=='preview')
+  fail('CHAT_WORK_NEW_DEVELOPMENT_PREVIEW_ONLY',403);
+ const existing=await readNew({session,conversationId,env,fetchImpl});
+ if(existing?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+    existing.owner_id!==session.user_id||
+    existing.conversation_id!==conversationId||
+    existing.installation_authorized!==false||
+    existing.production_changed!==false||
+    !Array.isArray(existing.items))
+  fail('CHAT_WORK_NEW_DEVELOPMENT_OWNER_READBACK_REQUIRED',503);
+ const matches=existing.items.filter(x=>x.request_id===requestId&&
+  x.source_ref===signed.source_ref&&workId(x.original_work_id)&&
+  x.installation_authorized===false&&x.production_changed===false);
+ if(matches.length!==1)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_EXACT_ADMISSION_REQUIRED',409);
+ const item=matches[0],db=dbFactory(env);
+ if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db.url!==session.config?.url)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_OWNER_DATABASE_REQUIRED',403);
+ const base=Object.freeze({request_id:requestId,source_ref:signed.source_ref,
+  original_work_id:item.original_work_id,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false});
+ if(item.phase==='QUEUED'){
+  const result=await generate({db,env,fetchImpl,callRpc,
+   ownerScope:{owner_id:session.user_id,conversation_id:conversationId,
+    request_id:requestId}});
+  if(result?.original_work_id!=null&&
+     result.original_work_id!==item.original_work_id)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_DRAFT_IDENTITY_MISMATCH',503);
+  if(result?.installation_authorized!==false||
+     result.production_changed!==false||
+     result.original_job_completed!==false||
+     result.new_shift_started!==false)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_DRAFT_AUTHORITY_MISMATCH',503);
+  return Object.freeze({...base,
+   status:result.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED'?
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED':
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED',
+   development_phase:result.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED'?
+    'DRAFT_GENERATED':item.phase,
+   worker_status:result.status,
+   model_generated:result.model_generated===true,
+   ...(result.source_path?{source_path:result.source_path}:{})});
+ }
+ if(['DRAFT_GENERATED','PUBLISH_FENCED','CANDIDATE_STAGED'].includes(item.phase)){
+  // The existing broker is a global service worker. Never invoke it from an
+  // owner click when it has selected another owner's candidate.
+  const selected=await callRpc(db,
+   'reality_read_next_chat_new_development_candidate_v2',{},
+   {fetchImpl});
+  if(selected?.status!=='EXACT_SIGNED_CHAT_NEW_DEVELOPMENT_CANDIDATE'||
+     selected.owner_id!==session.user_id||
+     selected.conversation_id!==conversationId||
+     selected.request_id!==requestId||
+     selected.source_sha256==null||
+     selected.original_work_id!==item.original_work_id||
+     selected.release_sha!==env.VERCEL_GIT_COMMIT_SHA||
+     selected.installation_authorized!==false||
+     selected.production_changed!==false)
+   return Object.freeze({...base,
+    status:'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_NOT_CURRENT',
+    development_phase:item.phase,
+    worker_status:'EXACT_CANDIDATE_NOT_FIRST_IN_GOVERNED_QUEUE',
+    model_generated:item.model_generated===true});
+  const result=await publish({db,env,fetchImpl});
+  if(result?.original_work_id!=null&&
+     result.original_work_id!==item.original_work_id)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_BROKER_IDENTITY_MISMATCH',503);
+  if(result?.installation_authorized!==false||
+     result.production_changed!==false||
+     result.original_job_completed!==false||
+     result.new_shift_started!==false)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_BROKER_AUTHORITY_MISMATCH',503);
+  const ci=result.status==='CHAT_DEVELOPMENT_INDEPENDENT_SOURCE_SYNTAX_CI_VERIFIED';
+  const staged=result.status==='NEW_CHAT_DEVELOPMENT_PROVIDER_CANDIDATE_STAGED';
+  return Object.freeze({...base,
+   status:ci?'CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED':
+    staged?'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED':
+    'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED',
+   worker_status:result.status,
+   development_phase:ci?'CI_VERIFIED':
+    staged?'CANDIDATE_STAGED':item.phase,
+   model_generated:item.model_generated===true,
+   independent_ci_verified:ci,
+   ...(result.pr_url?{pr_url:result.pr_url}:{}),
+   ...(result.artifact_commit_sha?{artifact_commit_sha:result.artifact_commit_sha}:{}),
+   ...(result.ci_run_id?{ci_run_id:result.ci_run_id}:{})});
+ }
+ return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_TERMINAL_OR_BLOCKED',
+  worker_status:item.phase,development_phase:item.phase,
+  model_generated:item.model_generated===true,
+  independent_ci_verified:item.independent_ci_verified===true});
 }
