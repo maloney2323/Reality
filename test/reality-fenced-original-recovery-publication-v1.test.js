@@ -8,6 +8,9 @@ const source=readFileSync(new URL(
 const migration=readFileSync(new URL(
  '../supabase/migrations/20261116_exact_fenced_original_recovery_publication_v1.sql',
  import.meta.url),'utf8');
+const signedOwnerFix=readFileSync(new URL(
+ '../supabase/migrations/20261116_exact_recovery_signed_owner_shift_warrant_v2.sql',
+ import.meta.url),'utf8');
 const main=source.slice(source.indexOf('function validScope('),
  source.indexOf('Deno.serve('));
 const SHA=/^[a-f0-9]{40}$/;
@@ -136,6 +139,19 @@ test('drifted parent prohibits a write and a lease',async()=>{
  assert.equal(r.status,'RECOVERY_SOURCE_BASELINE_CHANGED_NO_WRITE');
  assert.equal(h.calls.filter(c=>c.type==='github').length,0);
  assert.equal(h.calls.filter(c=>c.type==='rpc').length,0);
+});
+test('recovery consent verifies same owner shift without calling service-only graph as postgres',()=>{
+ assert.match(signedOwnerFix,/SECURITY DEFINER SET search_path=''/);
+ assert.match(signedOwnerFix,/auth\\.uid\\(\\)/);
+ assert.match(signedOwnerFix,/s\\.shift_id=v\\.shift_id AND s\\.owner_id=v_owner/);
+ assert.match(signedOwnerFix,/w\\.plan_fingerprint=s\\.plan_fingerprint/);
+ assert.match(signedOwnerFix,/s\\.authorized_at IS NOT NULL AND s\\.closed_at IS NULL/);
+ assert.match(signedOwnerFix,/w\\.state='ACTIVE'/);
+ assert.match(signedOwnerFix,/v_shift_ok IS DISTINCT FROM true/);
+ assert.match(signedOwnerFix,/OWNER_APPROVE_ONE_EXACT_FENCED_ORIGINAL_RECOVERY_PUBLICATION/);
+ assert.match(signedOwnerFix,/READY_FOR_EXACT_RECOVERY_APPROVAL/);
+ assert.doesNotMatch(signedOwnerFix,/g:=public\\.reality_read_current_shift_execution_graph_v1\\(\\)/);
+ assert.doesNotMatch(signedOwnerFix,/force:true/);
 });
 test('migration fences additional authority to a signed exact owner decision',()=>{
  assert.match(migration,/SECURITY DEFINER SET search_path=''/);
