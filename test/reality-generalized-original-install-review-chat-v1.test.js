@@ -74,6 +74,9 @@ test('one-use install and independent settlement remain separate workers and fen
  const finalSQL=readFileSync(new URL(
   '../supabase/migrations/20261115_general_original_independent_postinstall_settlement_v1.sql',
   import.meta.url),'utf8');
+ const recoverySQL=readFileSync(new URL(
+  '../supabase/migrations/20261116_general_original_fenced_recovery_observation_v1.sql',
+  import.meta.url),'utf8');
  assert.match(worker,/continueGeneralOwnerApprovedOriginalInstall/);
  assert.match(worker,/GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT/);
  assert.match(worker,/originalInstallNeedsRecovery\?/);
@@ -82,6 +85,8 @@ test('one-use install and independent settlement remain separate workers and fen
  assert.match(installer,/REALITY_GOVERNED_INSTALL_DISPOSITION/);
  assert.match(installer,/REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY/);
  assert.match(installer,/REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE/);
+ assert.match(installer,/reality_record_general_original_fenced_recovery_v1/);
+ assert.match(installer,/FENCED_RECOVERY_DURABLE_EVIDENCE_NOT_VERIFIED/);
  assert.match(installer,/FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE/);
  assert.match(installer,/FENCED_GIT_OBJECTS_OR_EXACT_SOURCE_NOT_VERIFIED/);
  assert.match(installer,/gh\(token,'\/git\/blobs\/'\+scope\.expected_installed_blob_sha\)/);
@@ -102,4 +107,10 @@ test('one-use install and independent settlement remain separate workers and fen
  assert.match(finalSQL,/net_verified_labor_savings_usd/);
  assert.match(finalSQL,/roi_verification_status/);
  assert.match(finalSQL,/NOT_MEASURED/);
+ assert.match(recoverySQL,/REALITY_GOVERNED_FENCED_RECOVERY_NO_REPLAY|CHECK\(NOT installation_retried\)/);
+ assert.match(recoverySQL,/GENERAL_ORIGINAL_FENCED_RECOVERY_OBSERVATION_DURABLE/);
+ assert.match(recoverySQL,/reality_read_general_original_install_scope_v1/);
+ assert.match(recoverySQL,/ON CONFLICT\(attempt_id\) DO NOTHING/);
+ assert.match(recoverySQL,/current_user<>'service_role'/);
+ assert.match(recoverySQL,/REVOKE ALL ON reality_internal\.governed_original_install_fenced_recoveries_v1/);
 });
